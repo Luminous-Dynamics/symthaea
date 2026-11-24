@@ -16,6 +16,7 @@ const MAX_DECISIONS: usize = 32;
 const MAX_ACTIONS: usize = 32;
 const MAX_OUTCOMES_PER_ACTION: usize = 64;
 const MAX_PROTOCOL_STATES: usize = 128;
+const MAX_RESOURCE_DIMENSIONS: usize = 8;
 const MAX_HORIZON_ACTIONS: u8 = 12;
 const MAX_SEARCH_NODES: usize = 100_000;
 const MAX_ENUMERATED_CHOICES: usize = 100_000;
@@ -196,6 +197,20 @@ fn validate(problem: &SequentialRobustProblem) -> Result<(), SequentialOracleErr
     if problem.resource_budget.is_empty() {
         return Err(SequentialOracleError::EmptyResourceBudget);
     }
+    if problem.resource_budget.len() > MAX_RESOURCE_DIMENSIONS {
+        return Err(SequentialOracleError::ResourceDimensionMismatch {
+            action_id: "<resource-budget>".to_owned(),
+            expected: Vec::new(),
+            actual: problem.resource_budget.keys().cloned().collect(),
+        });
+    }
+    if problem
+        .resource_budget
+        .keys()
+        .any(|dimension| dimension.trim().is_empty())
+    {
+        return Err(SequentialOracleError::EmptyIdentifier("resource dimension"));
+    }
 
     let mut states = BTreeSet::new();
     for state_id in &problem.state_ids {
@@ -241,6 +256,22 @@ fn validate(problem: &SequentialRobustProblem) -> Result<(), SequentialOracleErr
                     value_bits: loss.to_bits(),
                 });
             }
+        }
+    }
+
+    for decision_id in problem.decision_loss.keys() {
+        if !decisions.contains(decision_id.as_str()) {
+            return Err(SequentialOracleError::UnknownDecision(decision_id.clone()));
+        }
+    }
+    for (decision_id, losses) in &problem.decision_loss {
+        for state_id in losses.keys() {
+            if !states.contains(state_id.as_str()) {
+                return Err(SequentialOracleError::UnknownState(state_id.clone()));
+            }
+        }
+        if !decisions.contains(decision_id.as_str()) {
+            return Err(SequentialOracleError::UnknownDecision(decision_id.clone()));
         }
     }
 
