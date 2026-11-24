@@ -2688,7 +2688,7 @@ pub fn evaluate_scalar_unstable_mode_interface(
     })
 }
 
-/// Two-real-mode authority contract with one sampled scalar diagnostic and actuator.
+/// Two-real-mode authority contract with two sampled diagnostics and one actuator direction.
 ///
 /// The full two-state space is treated as the declared unstable subspace. Both
 /// eigenvalues of the discrete transition matrix must lie outside the unit
@@ -2698,8 +2698,10 @@ pub struct CoupledTwoModeAuthorityContract {
     /// Row-major discrete transition matrix [a00, a01, a10, a11].
     pub transition_matrix: [f64; 4],
     pub horizon_steps: u32,
-    pub diagnostic_gain: [f64; 2],
-    pub diagnostic_noise_variance: f64,
+    /// Two diagnostic rows, each observing both state coordinates.
+    pub diagnostic_gain: [[f64; 2]; 2],
+    /// Independent positive measurement-noise variances for the two channels.
+    pub diagnostic_noise_variance: [f64; 2],
     pub diagnostic_sampling_stride_steps: u32,
     pub diagnostic_delivery_delay_steps: u32,
     pub actuator_gain: [f64; 2],
@@ -2746,10 +2748,13 @@ pub fn evaluate_coupled_two_mode_authority(
         || contract
             .diagnostic_gain
             .iter()
+            .flatten()
             .chain(contract.actuator_gain.iter())
             .any(|value| !value.is_finite())
-        || !contract.diagnostic_noise_variance.is_finite()
-        || contract.diagnostic_noise_variance <= 0.0
+        || contract
+            .diagnostic_noise_variance
+            .iter()
+            .any(|value| !value.is_finite() || *value <= 0.0)
         || !contract.minimum_observability_eigenvalue.is_finite()
         || contract.minimum_observability_eigenvalue <= 0.0
         || !contract.minimum_controllability_eigenvalue.is_finite()
@@ -2804,27 +2809,28 @@ pub fn evaluate_coupled_two_mode_authority(
         if delivered_step >= contract.horizon_steps {
             break;
         }
-        let c0 = contract.diagnostic_gain[0] * power[0]
-            + contract.diagnostic_gain[1] * power[2];
-        let c1 = contract.diagnostic_gain[0] * power[1]
-            + contract.diagnostic_gain[1] * power[3];
-        let inverse_variance = 1.0 / contract.diagnostic_noise_variance;
-        let contribution = [
-            c0 * c0 * inverse_variance,
-            c0 * c1 * inverse_variance,
-            c1 * c1 * inverse_variance,
-        ];
-        if contribution.iter().any(|value| !value.is_finite()) {
-            return Err(ContractError::InvalidCoupledModeAuthority(
-                "observability Gramian overflowed",
-            ));
-        }
-        for index in 0..3 {
-            kahan_add(
-                contribution[index],
-                &mut observability[index],
-                &mut observability_compensation[index],
-            );
+        for channel in 0..2 {
+            let gain = contract.diagnostic_gain[channel];
+            let c0 = gain[0] * power[0] + gain[1] * power[2];
+            let c1 = gain[0] * power[1] + gain[1] * power[3];
+            let inverse_variance = 1.0 / contract.diagnostic_noise_variance[channel];
+            let contribution = [
+                c0 * c0 * inverse_variance,
+                c0 * c1 * inverse_variance,
+                c1 * c1 * inverse_variance,
+            ];
+            if contribution.iter().any(|value| !value.is_finite()) {
+                return Err(ContractError::InvalidCoupledModeAuthority(
+                    "observability Gramian overflowed",
+                ));
+            }
+            for index in 0..3 {
+                kahan_add(
+                    contribution[index],
+                    &mut observability[index],
+                    &mut observability_compensation[index],
+                );
+            }
         }
         observation_sample_count = observation_sample_count.saturating_add(1);
         sample_step = match sample_step.checked_add(contract.diagnostic_sampling_stride_steps) {
@@ -6400,14 +6406,14 @@ mod tests {
 
     fn coupled_two_mode_contract(
         transition_matrix: [f64; 4],
-        diagnostic_gain: [f64; 2],
+        diagnostic_gain: [[f64; 2]; 2],
         actuator_gain: [f64; 2],
     ) -> CoupledTwoModeAuthorityContract {
         CoupledTwoModeAuthorityContract {
             transition_matrix,
             horizon_steps: 12,
             diagnostic_gain,
-            diagnostic_noise_variance: 1.0,
+            diagnostic_noise_variance: [1.0, 1.0],
             diagnostic_sampling_stride_steps: 1,
             diagnostic_delivery_delay_steps: 0,
             actuator_gain,
@@ -6422,7 +6428,7 @@ mod tests {
     fn coupled_two_mode_authority_accepts_distinct_unstable_modes_with_shared_scalar_channels() {
         let report = evaluate_coupled_two_mode_authority(coupled_two_mode_contract(
             [1.2, 0.0, 0.0, 1.1],
-            [1.0, 1.0],
+            [[1.0, 0.0], [0.0, 1.0]],
             [1.0, 1.0],
         ))
         .unwrap();
@@ -6443,8 +6449,8 @@ mod tests {
     fn coupled_two_mode_authority_rejects_shared_sensor_on_repeated_unstable_eigenspace() {
         let report = evaluate_coupled_two_mode_authority(coupled_two_mode_contract(
             [1.2, 0.0, 0.0, 1.2],
+            [[1.0, 1.0], [2.0, 2.0]],
             [1.0, 1.0],
-            [1.0, 0.0],
         ))
         .unwrap();
         assert!(!report.observable);
@@ -6457,7 +6463,7 @@ mod tests {
     fn coupled_two_mode_authority_rejects_rank_one_actuator_on_repeated_unstable_eigenspace() {
         let report = evaluate_coupled_two_mode_authority(coupled_two_mode_contract(
             [1.2, 0.0, 0.0, 1.2],
-            [1.0, 0.0],
+            [[1.0, 0.0], [0.0, 1.0]],
             [1.0, 1.0],
         ))
         .unwrap();
@@ -6470,8 +6476,11 @@ mod tests {
 
     #[test]
     fn coupled_two_mode_authority_applies_sensor_and_actuator_delivery_delays() {
-        let mut contract =
-            coupled_two_mode_contract([1.2, 0.0, 0.0, 1.1], [1.0, 1.0], [1.0, 1.0]);
+        let mut contract = coupled_two_mode_contract(
+            [1.2, 0.0, 0.0, 1.1],
+            [[1.0, 0.0], [0.0, 1.0]],
+            [1.0, 1.0],
+        );
         contract.diagnostic_delivery_delay_steps = 4;
         contract.actuator_delivery_delay_steps = 5;
         let report = evaluate_coupled_two_mode_authority(contract).unwrap();
@@ -6481,8 +6490,11 @@ mod tests {
 
     #[test]
     fn coupled_two_mode_authority_rejects_late_or_absent_channel_updates() {
-        let mut contract =
-            coupled_two_mode_contract([1.2, 0.0, 0.0, 1.1], [1.0, 1.0], [1.0, 1.0]);
+        let mut contract = coupled_two_mode_contract(
+            [1.2, 0.0, 0.0, 1.1],
+            [[1.0, 0.0], [0.0, 1.0]],
+            [1.0, 1.0],
+        );
         contract.diagnostic_delivery_delay_steps = contract.horizon_steps;
         assert!(matches!(
             evaluate_coupled_two_mode_authority(contract),
