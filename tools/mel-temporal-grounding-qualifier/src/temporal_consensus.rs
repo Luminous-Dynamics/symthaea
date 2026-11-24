@@ -54,6 +54,9 @@ pub struct AnnotatorGroundingResultV1 {
     pub annotator_id_sha256: String,
     pub annotation_sha256: String,
     pub state: GroundTruthStateV1,
+    /// The exact intervals submitted by this annotator; never replaced by consensus.
+    pub intervals: Vec<FrameIntervalV1>,
+    pub status_reason: Option<String>,
     pub score: TemporalGroundingScoreV1,
     pub fully_correct_for_this_annotation: Option<bool>,
 }
@@ -103,6 +106,9 @@ pub struct MultiAnnotatorGroundingReportV1 {
     pub summary: MultiAnnotatorGroundingSummaryV1,
     /// Scores retain every per-annotator result; exclusions are not discarded.
     pub annotator_results: Vec<AnnotatorGroundingResultV1>,
+    /// Digest-shaped references are not cryptographically authenticated here.
+    pub annotation_manifest_authenticated: bool,
+    pub annotator_receipts_authenticated: bool,
     /// This adapter preserves disagreement; it does not calculate formal IAA.
     pub pairwise_inter_annotator_agreement_computed: bool,
     /// No single merged or majority-voted interval reference is constructed.
@@ -208,6 +214,8 @@ pub fn audit_multi_annotator_case(
             annotator_id_sha256: annotation.annotator_id_sha256.clone(),
             annotation_sha256: annotation.annotation_sha256.clone(),
             state: annotation.state,
+            intervals: annotation.intervals.clone(),
+            status_reason: annotation.status_reason.clone(),
             score,
             fully_correct_for_this_annotation,
         });
@@ -226,6 +234,8 @@ pub fn audit_multi_annotator_case(
         prediction: case.prediction.clone(),
         summary,
         annotator_results: results,
+        annotation_manifest_authenticated: false,
+        annotator_receipts_authenticated: false,
         pairwise_inter_annotator_agreement_computed: false,
         synthetic_consensus_ground_truth_created: false,
         population_confidence_interval_computed: false,
@@ -540,6 +550,10 @@ mod tests {
             Some(true)
         );
         assert_eq!(report.annotator_results.len(), 2);
+        assert_eq!(report.annotator_results[0].intervals.len(), 2);
+        assert_eq!(report.annotator_results[1].intervals.len(), 2);
+        assert!(!report.annotation_manifest_authenticated);
+        assert!(!report.annotator_receipts_authenticated);
         assert_eq!(report.annotator_results[0].score.f1, Some(1.0));
         assert_eq!(report.annotator_results[1].score.f1, Some(1.0));
         assert!(!report.synthetic_consensus_ground_truth_created);
