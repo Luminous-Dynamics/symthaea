@@ -848,14 +848,13 @@ mod tests {
                 .collect();
             let mut covariance = vec![vec![0.0; n]; n];
             for (i, row) in covariance.iter_mut().enumerate() {
-                for (j, value) in row.iter_mut().enumerate().skip(i) {
+                for (j, value) in row.iter_mut().enumerate() {
                     let dot: f64 = factor[i]
                         .iter()
                         .zip(&factor[j])
                         .map(|(left, right)| left * right)
                         .sum();
                     *value = dot;
-                    covariance[j][i] = dot;
                 }
             }
             let correlation = correlation_matrix(&covariance).unwrap();
