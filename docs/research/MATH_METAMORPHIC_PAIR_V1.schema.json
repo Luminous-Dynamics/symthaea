@@ -1,0 +1,156 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://github.com/Luminous-Dynamics/symthaea/blob/main/docs/research/MATH_METAMORPHIC_PAIR_V1.schema.json",
+  "title": "Symthaea MathMetamorphicDatasetV1",
+  "description": "Finite propositional metamorphic pairs with candidate/evaluator separation. Finite equivalence is limited to the declared Boolean AST and atom budget; it is not a Lean proof or general mathematical equivalence.",
+  "type": "object",
+  "additionalProperties": false,
+  "required": ["schema_version", "pairs"],
+  "properties": {
+    "schema_version": {"const": "1.0.0"},
+    "pairs": {
+      "type": "array",
+      "minItems": 1,
+      "items": {"$ref": "#/$defs/pair"}
+    }
+  },
+  "$defs": {
+    "nonEmpty": {"type": "string", "minLength": 1},
+    "sha256": {"type": "string", "pattern": "^[a-f0-9]{64}$"},
+    "pair": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["candidate", "evaluator_only"],
+      "properties": {
+        "candidate": {"$ref": "#/$defs/candidate"},
+        "evaluator_only": {
+          "oneOf": [
+            {"type": "null"},
+            {"$ref": "#/$defs/evaluator"}
+          ]
+        }
+      }
+    },
+    "candidate": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["pair_id", "source", "base", "variant"],
+      "properties": {
+        "pair_id": {"$ref": "#/$defs/nonEmpty"},
+        "source": {"$ref": "#/$defs/source"},
+        "base": {"$ref": "#/$defs/statementBinding"},
+        "variant": {"$ref": "#/$defs/statementBinding"}
+      }
+    },
+    "source": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["repository", "revision", "declaration", "task_family"],
+      "properties": {
+        "repository": {"$ref": "#/$defs/nonEmpty"},
+        "revision": {"$ref": "#/$defs/nonEmpty"},
+        "declaration": {"$ref": "#/$defs/nonEmpty"},
+        "task_family": {"$ref": "#/$defs/nonEmpty"}
+      }
+    },
+    "statementBinding": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["sequent", "sequent_sha256", "proof_route_sha256"],
+      "properties": {
+        "sequent": {"$ref": "#/$defs/sequent"},
+        "sequent_sha256": {"$ref": "#/$defs/sha256"},
+        "proof_route_sha256": {
+          "oneOf": [
+            {"$ref": "#/$defs/sha256"},
+            {"type": "null"}
+          ]
+        }
+      }
+    },
+    "sequent": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["hypotheses", "premises", "conclusion"],
+      "properties": {
+        "hypotheses": {
+          "type": "array",
+          "items": {"$ref": "#/$defs/formula"}
+        },
+        "premises": {
+          "type": "array",
+          "items": {"$ref": "#/$defs/formula"}
+        },
+        "conclusion": {"$ref": "#/$defs/formula"}
+      }
+    },
+    "formula": {
+      "oneOf": [
+        {
+          "type": "object",
+          "additionalProperties": false,
+          "required": ["op", "name"],
+          "properties": {
+            "op": {"const": "atom"},
+            "name": {"$ref": "#/$defs/nonEmpty"}
+          }
+        },
+        {
+          "type": "object",
+          "additionalProperties": false,
+          "required": ["op", "arg"],
+          "properties": {
+            "op": {"const": "not"},
+            "arg": {"$ref": "#/$defs/formula"}
+          }
+        },
+        {
+          "type": "object",
+          "additionalProperties": false,
+          "required": ["op", "left", "right"],
+          "properties": {
+            "op": {"enum": ["and", "or", "implies", "iff"]},
+            "left": {"$ref": "#/$defs/formula"},
+            "right": {"$ref": "#/$defs/formula"}
+          }
+        }
+      ]
+    },
+    "evaluator": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "transformation_class",
+        "oracle_relation",
+        "adjudication_authority",
+        "evidence_refs"
+      ],
+      "properties": {
+        "transformation_class": {
+          "enum": [
+            "semantics_preserving",
+            "semantics_changing",
+            "proof_route_only",
+            "unsupported"
+          ]
+        },
+        "oracle_relation": {
+          "enum": [
+            "equivalent",
+            "base_entails_variant",
+            "variant_entails_base",
+            "incomparable",
+            "unknown"
+          ]
+        },
+        "adjudication_authority": {"const": "finite_boolean_truth_table"},
+        "evidence_refs": {
+          "type": "array",
+          "minItems": 1,
+          "uniqueItems": true,
+          "items": {"$ref": "#/$defs/nonEmpty"}
+        }
+      }
+    }
+  }
+}
