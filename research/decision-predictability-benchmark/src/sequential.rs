@@ -1103,6 +1103,9 @@ mod tests {
         let value = evaluate_sequential_robust(&problem).unwrap();
         assert_eq!(value.worst_case_terminal_loss, 1.0);
         assert!(matches!(value.policy, SequentialPolicyNode::Stop { .. }));
+        let exhaustive = enumerate_sequential_robust(&problem).unwrap();
+        assert_eq!(exhaustive.worst_case_terminal_loss, 1.0);
+        assert!(matches!(exhaustive.policy, SequentialPolicyNode::Stop { .. }));
     }
 
     #[test]
@@ -1116,6 +1119,10 @@ mod tests {
         action.outcomes[0].possible_state_ids.clear();
         assert!(matches!(
             evaluate_sequential_robust(&problem),
+            Err(SequentialOracleError::UncoveredState { .. })
+        ));
+        assert!(matches!(
+            enumerate_sequential_robust(&problem),
             Err(SequentialOracleError::UncoveredState { .. })
         ));
     }
@@ -1133,6 +1140,8 @@ mod tests {
         assert_eq!(value.worst_case_terminal_loss, 1.0);
         assert!(matches!(value.policy, SequentialPolicyNode::Stop { .. }));
         assert!(!value.root_risk_gate_passed);
+        let exhaustive = enumerate_sequential_robust(&problem).unwrap();
+        assert_eq!(exhaustive.worst_case_terminal_loss, 1.0);
     }
 
     #[test]
@@ -1146,5 +1155,8 @@ mod tests {
         let value = evaluate_sequential_robust(&problem).unwrap();
         assert_eq!(value.worst_case_terminal_loss, 1.0);
         assert!(matches!(value.policy, SequentialPolicyNode::Stop { .. }));
+        let exhaustive = enumerate_sequential_robust(&problem).unwrap();
+        assert_eq!(exhaustive.worst_case_terminal_loss, 1.0);
+        assert!(matches!(exhaustive.policy, SequentialPolicyNode::Stop { .. }));
     }
 }
