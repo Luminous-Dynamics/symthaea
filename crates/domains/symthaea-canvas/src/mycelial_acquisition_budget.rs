@@ -814,6 +814,7 @@ fn evaluate_proposal(
     net_voi: f64,
     proposal: &MycelialAcquisitionBudgetProposal,
     budget: &MycelialSampleHealthBudget,
+    state: &MycelialSampleHealthState,
     prior_dose_by_cell_channel: &BTreeMap<(String, String), f64>,
 ) -> Result<
     Result<MycelialSampleHealthEligibleAction, MycelialSampleHealthRejection>,
@@ -891,6 +892,18 @@ fn evaluate_proposal(
                 MycelialSampleHealthRejectionReason::MissingOpticalDoseEstimate,
             );
         }
+        for required_channel in &proposal.required_illumination_channel_ids {
+            if !budget
+                .photon_dose_limits
+                .iter()
+                .any(|limit| limit.channel_id == *required_channel)
+            {
+                add_reason(
+                    &mut reasons,
+                    MycelialSampleHealthRejectionReason::UnknownIlluminationChannel,
+                );
+            }
+        }
         let mut increment_by_channel: BTreeMap<String, f64> = BTreeMap::new();
         for dose in &proposal.photon_dose_estimates {
             if !required_channels.contains(dose.channel_id.as_str()) {
@@ -937,7 +950,7 @@ fn evaluate_proposal(
                         .get(&(cell_id.clone(), limit.channel_id.clone()))
                         .copied()
                         .unwrap_or(0.0);
-                    let projected = prior + increment;
+                    let projected = prior + *increment;
                     if !projected.is_finite() {
                         return Err(MycelialSampleHealthBudgetError::ExposureArithmeticOverflow);
                     }
@@ -1062,6 +1075,7 @@ pub fn evaluate_mycelial_sample_health_budget(
             action.net_value_of_information,
             proposal,
             budget,
+            state,
             &prior_dose_by_cell_channel,
         )? {
             Ok(eligible) => eligible_actions.push(eligible),
@@ -1353,6 +1367,28 @@ mod tests {
             evaluate_mycelial_sample_health_budget(&report, &budget(), &state(), &[proposal])
                 .unwrap();
         assert_eq!(result.recommended_action_id.as_deref(), Some("new-cell"));
+    }
+
+    #[test]
+    fn missing_spatial_footprint_is_explicitly_rejected() {
+        let report = active_report(vec![action(
+            "no-footprint",
+            MycelialAcquisitionActionKind::HumanAnnotation,
+            4.0,
+        )]);
+        let proposal = proposal(
+            "no-footprint",
+            &[],
+            0.0,
+            MycelialAcquisitionActionKind::HumanAnnotation,
+        );
+        let result =
+            evaluate_mycelial_sample_health_budget(&report, &budget(), &state(), &[proposal])
+                .unwrap();
+        assert_eq!(result.recommended_action_id, None);
+        assert!(result.rejected_actions[0].reasons.contains(
+            &MycelialSampleHealthRejectionReason::MissingSpatialFootprint
+        ));
     }
 
     #[test]
