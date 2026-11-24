@@ -727,6 +727,7 @@ mod tests {
             domain: "web".to_owned(),
             run_id: "fixture-run".to_owned(),
             backend_revision_sha256: "1111111111111111111111111111111111111111111111111111111111111111".to_owned(),
+            retrieval_mode: RetrievalModeV1::HybridRrf,
             dataset_root: root.clone(),
             top_k: 4,
             slice_radius: 0,
