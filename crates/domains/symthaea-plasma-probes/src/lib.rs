@@ -1009,6 +1009,19 @@ pub struct KineticResponseSignature {
     branch_ids: Vec<Option<String>>,
 }
 
+/// Owned input for constructing a task-conditioned kinetic response signature.
+#[derive(Clone, Debug, PartialEq)]
+pub struct KineticResponseSignatureInput {
+    pub contract_id: String,
+    pub structure_class_id: String,
+    pub intervention_ids: Vec<String>,
+    pub qoi_ids: Vec<String>,
+    pub qoi_scales: Vec<f64>,
+    pub time_samples: Vec<f64>,
+    pub responses: Vec<Option<ComplexResponse>>,
+    pub branch_ids: Vec<Option<String>>,
+}
+
 /// Pairwise discrepancy and admissibility diagnostics for two response signatures.
 #[derive(Clone, Copy, Debug, PartialEq, Serialize)]
 pub struct ResponseSignatureComparison {
@@ -1024,16 +1037,17 @@ pub struct ResponseSignatureComparison {
 
 impl KineticResponseSignature {
     /// Construct a signature with exact task axes and per-QoI normalization scales.
-    pub fn new(
-        contract_id: String,
-        structure_class_id: String,
-        intervention_ids: Vec<String>,
-        qoi_ids: Vec<String>,
-        qoi_scales: Vec<f64>,
-        time_samples: Vec<f64>,
-        responses: Vec<Option<ComplexResponse>>,
-        branch_ids: Vec<Option<String>>,
-    ) -> Result<Self, ContractError> {
+    pub fn new(input: KineticResponseSignatureInput) -> Result<Self, ContractError> {
+        let KineticResponseSignatureInput {
+            contract_id,
+            structure_class_id,
+            intervention_ids,
+            qoi_ids,
+            qoi_scales,
+            time_samples,
+            responses,
+            branch_ids,
+        } = input;
         if contract_id.trim().is_empty()
             || structure_class_id.trim().is_empty()
             || intervention_ids.is_empty()
@@ -2869,23 +2883,31 @@ fn integrate_history_field(
     interval_duration: f64,
 ) -> Result<Vec<f64>, ContractError> {
     let spatial_count = values.first().map_or(0, Vec::len);
-    let mut averages = Vec::with_capacity(spatial_count);
-    for spatial_index in 0..spatial_count {
-        let mut integral = 0.0;
-        let mut compensation = 0.0;
-        for time_index in 0..sample_times.len() - 1 {
-            let delta_time = sample_times[time_index + 1] - sample_times[time_index];
-            let endpoint_sum =
-                values[time_index][spatial_index] + values[time_index + 1][spatial_index];
-            let segment_integral = 0.5 * endpoint_sum * delta_time;
+    let mut integrals = vec![0.0_f64; spatial_count];
+    let mut compensations = vec![0.0_f64; spatial_count];
+    for time_index in 0..sample_times.len() - 1 {
+        let delta_time = sample_times[time_index + 1] - sample_times[time_index];
+        for (spatial_index, (left, right)) in values[time_index]
+            .iter()
+            .zip(&values[time_index + 1])
+            .enumerate()
+        {
+            let segment_integral = 0.5 * (*left + *right) * delta_time;
             if !segment_integral.is_finite() {
                 return Err(control_timing_error(
                     "delay_history",
                     "trapezoidal integration produced a non-finite segment",
                 ));
             }
-            kahan_add(segment_integral, &mut integral, &mut compensation);
+            kahan_add(
+                segment_integral,
+                &mut integrals[spatial_index],
+                &mut compensations[spatial_index],
+            );
         }
+    }
+    let mut averages = Vec::with_capacity(spatial_count);
+    for integral in integrals {
         let average = integral / interval_duration;
         if !average.is_finite() {
             return Err(control_timing_error(
@@ -3794,18 +3816,23 @@ fn solve_dense_system(
         rhs.swap(pivot_index, pivot_row);
 
         let pivot = matrix[pivot_index][pivot_index];
-        for column in pivot_index..dimension {
-            matrix[pivot_index][column] /= pivot;
+        for value in matrix[pivot_index].iter_mut().skip(pivot_index) {
+            *value /= pivot;
         }
         rhs[pivot_index] /= pivot;
+        let normalized_pivot_row = matrix[pivot_index].clone();
 
-        for row_index in 0..dimension {
+        for (row_index, row) in matrix.iter_mut().enumerate() {
             if row_index == pivot_index {
                 continue;
             }
-            let factor = matrix[row_index][pivot_index];
-            for column in pivot_index..dimension {
-                matrix[row_index][column] -= factor * matrix[pivot_index][column];
+            let factor = row[pivot_index];
+            for (value, pivot_value) in row
+                .iter_mut()
+                .skip(pivot_index)
+                .zip(normalized_pivot_row.iter().skip(pivot_index))
+            {
+                *value -= factor * pivot_value;
             }
             rhs[row_index] -= factor * rhs[pivot_index];
         }
@@ -6510,19 +6537,19 @@ mod tests {
         structure_class_id: &str,
         branch_id: Option<&str>,
     ) -> KineticResponseSignature {
-        KineticResponseSignature::new(
-            contract_id.to_owned(),
-            structure_class_id.to_owned(),
-            vec!["pulse-mode-2-phase-0.3".to_owned()],
-            vec!["electric-field-mode-2".to_owned()],
-            vec![1.0],
-            vec![0.0, 0.5],
-            vec![
+        KineticResponseSignature::new(KineticResponseSignatureInput {
+            contract_id: contract_id.to_owned(),
+            structure_class_id: structure_class_id.to_owned(),
+            intervention_ids: vec!["pulse-mode-2-phase-0.3".to_owned()],
+            qoi_ids: vec!["electric-field-mode-2".to_owned()],
+            qoi_scales: vec![1.0],
+            time_samples: vec![0.0, 0.5],
+            responses: vec![
                 Some(ComplexResponse::new(value, 0.0).unwrap()),
                 Some(ComplexResponse::new(value, 0.0).unwrap()),
             ],
-            vec![branch_id.map(str::to_owned), branch_id.map(str::to_owned)],
-        )
+            branch_ids: vec![branch_id.map(str::to_owned), branch_id.map(str::to_owned)],
+        })
         .unwrap()
     }
 
@@ -6568,19 +6595,19 @@ mod tests {
             base.compare(&other_contract),
             Err(ContractError::ResponseSignatureContractMismatch)
         );
-        let other_axes = KineticResponseSignature::new(
-            "contract-a".to_owned(),
-            "class-a".to_owned(),
-            vec!["different-pulse".to_owned()],
-            vec!["electric-field-mode-2".to_owned()],
-            vec![1.0],
-            vec![0.0, 0.5],
-            vec![
+        let other_axes = KineticResponseSignature::new(KineticResponseSignatureInput {
+            contract_id: "contract-a".to_owned(),
+            structure_class_id: "class-a".to_owned(),
+            intervention_ids: vec!["different-pulse".to_owned()],
+            qoi_ids: vec!["electric-field-mode-2".to_owned()],
+            qoi_scales: vec![1.0],
+            time_samples: vec![0.0, 0.5],
+            responses: vec![
                 Some(ComplexResponse::new(1.0, 0.0).unwrap()),
                 Some(ComplexResponse::new(1.0, 0.0).unwrap()),
             ],
-            vec![Some("echo".to_owned()), Some("echo".to_owned())],
-        )
+            branch_ids: vec![Some("echo".to_owned()), Some("echo".to_owned())],
+        })
         .unwrap();
         assert_eq!(
             base.compare(&other_axes),
@@ -6591,16 +6618,16 @@ mod tests {
     #[test]
     fn kinetic_response_signature_rejects_missing_responses_and_unresolved_branches_for_merge() {
         let complete = make_kinetic_response_signature(1.0, "contract-a", "class-a", Some("echo"));
-        let incomplete = KineticResponseSignature::new(
-            "contract-a".to_owned(),
-            "class-a".to_owned(),
-            vec!["pulse-mode-2-phase-0.3".to_owned()],
-            vec!["electric-field-mode-2".to_owned()],
-            vec![1.0],
-            vec![0.0, 0.5],
-            vec![None, Some(ComplexResponse::new(1.0, 0.0).unwrap())],
-            vec![None, Some("echo".to_owned())],
-        )
+        let incomplete = KineticResponseSignature::new(KineticResponseSignatureInput {
+            contract_id: "contract-a".to_owned(),
+            structure_class_id: "class-a".to_owned(),
+            intervention_ids: vec!["pulse-mode-2-phase-0.3".to_owned()],
+            qoi_ids: vec!["electric-field-mode-2".to_owned()],
+            qoi_scales: vec![1.0],
+            time_samples: vec![0.0, 0.5],
+            responses: vec![None, Some(ComplexResponse::new(1.0, 0.0).unwrap())],
+            branch_ids: vec![None, Some("echo".to_owned())],
+        })
         .unwrap();
         let comparison = complete.compare(&incomplete).unwrap();
         assert_eq!(comparison.missing_response_count, 1);
@@ -6648,27 +6675,27 @@ mod tests {
 
     #[test]
     fn kinetic_response_signature_rejects_mismatched_qoi_scales() {
-        let left = KineticResponseSignature::new(
-            "contract".to_owned(),
-            "class".to_owned(),
-            vec!["pulse".to_owned()],
-            vec!["electric-field".to_owned()],
-            vec![1.0],
-            vec![0.0],
-            vec![Some(ComplexResponse::new(1.0, 0.0).unwrap())],
-            vec![Some("branch".to_owned())],
-        )
+        let left = KineticResponseSignature::new(KineticResponseSignatureInput {
+            contract_id: "contract".to_owned(),
+            structure_class_id: "class".to_owned(),
+            intervention_ids: vec!["pulse".to_owned()],
+            qoi_ids: vec!["electric-field".to_owned()],
+            qoi_scales: vec![1.0],
+            time_samples: vec![0.0],
+            responses: vec![Some(ComplexResponse::new(1.0, 0.0).unwrap())],
+            branch_ids: vec![Some("branch".to_owned())],
+        })
         .unwrap();
-        let right = KineticResponseSignature::new(
-            "contract".to_owned(),
-            "class".to_owned(),
-            vec!["pulse".to_owned()],
-            vec!["electric-field".to_owned()],
-            vec![2.0],
-            vec![0.0],
-            vec![Some(ComplexResponse::new(1.0, 0.0).unwrap())],
-            vec![Some("branch".to_owned())],
-        )
+        let right = KineticResponseSignature::new(KineticResponseSignatureInput {
+            contract_id: "contract".to_owned(),
+            structure_class_id: "class".to_owned(),
+            intervention_ids: vec!["pulse".to_owned()],
+            qoi_ids: vec!["electric-field".to_owned()],
+            qoi_scales: vec![2.0],
+            time_samples: vec![0.0],
+            responses: vec![Some(ComplexResponse::new(1.0, 0.0).unwrap())],
+            branch_ids: vec![Some("branch".to_owned())],
+        })
         .unwrap();
         assert_eq!(
             left.compare(&right),
@@ -6678,33 +6705,33 @@ mod tests {
 
     #[test]
     fn kinetic_response_signature_uses_each_qoi_scale_before_rms() {
-        let left = KineticResponseSignature::new(
-            "contract".to_owned(),
-            "class".to_owned(),
-            vec!["pulse".to_owned()],
-            vec!["electric-field".to_owned(), "energy".to_owned()],
-            vec![1.0, 10.0],
-            vec![0.0],
-            vec![
+        let left = KineticResponseSignature::new(KineticResponseSignatureInput {
+            contract_id: "contract".to_owned(),
+            structure_class_id: "class".to_owned(),
+            intervention_ids: vec!["pulse".to_owned()],
+            qoi_ids: vec!["electric-field".to_owned(), "energy".to_owned()],
+            qoi_scales: vec![1.0, 10.0],
+            time_samples: vec![0.0],
+            responses: vec![
                 Some(ComplexResponse::new(1.0, 0.0).unwrap()),
                 Some(ComplexResponse::new(1.0, 0.0).unwrap()),
             ],
-            vec![Some("branch".to_owned()), Some("branch".to_owned())],
-        )
+            branch_ids: vec![Some("branch".to_owned()), Some("branch".to_owned())],
+        })
         .unwrap();
-        let right = KineticResponseSignature::new(
-            "contract".to_owned(),
-            "class".to_owned(),
-            vec!["pulse".to_owned()],
-            vec!["electric-field".to_owned(), "energy".to_owned()],
-            vec![1.0, 10.0],
-            vec![0.0],
-            vec![
+        let right = KineticResponseSignature::new(KineticResponseSignatureInput {
+            contract_id: "contract".to_owned(),
+            structure_class_id: "class".to_owned(),
+            intervention_ids: vec!["pulse".to_owned()],
+            qoi_ids: vec!["electric-field".to_owned(), "energy".to_owned()],
+            qoi_scales: vec![1.0, 10.0],
+            time_samples: vec![0.0],
+            responses: vec![
                 Some(ComplexResponse::new(0.0, 0.0).unwrap()),
                 Some(ComplexResponse::new(0.0, 0.0).unwrap()),
             ],
-            vec![Some("branch".to_owned()), Some("branch".to_owned())],
-        )
+            branch_ids: vec![Some("branch".to_owned()), Some("branch".to_owned())],
+        })
         .unwrap();
         let compared = left.compare(&right).unwrap();
         let expected = ((1.0_f64.powi(2) + 0.1_f64.powi(2)) / 2.0).sqrt();
@@ -6714,32 +6741,32 @@ mod tests {
     #[test]
     fn kinetic_response_signature_requires_valid_axes_times_and_scale() {
         assert_eq!(
-            KineticResponseSignature::new(
-                "contract".to_owned(),
-                "class".to_owned(),
-                vec!["pulse".to_owned()],
-                vec!["qoi".to_owned()],
-                vec![1.0],
-                vec![0.0, 0.0],
-                vec![
+            KineticResponseSignature::new(KineticResponseSignatureInput {
+            contract_id: "contract".to_owned(),
+            structure_class_id: "class".to_owned(),
+            intervention_ids: vec!["pulse".to_owned()],
+            qoi_ids: vec!["qoi".to_owned()],
+            qoi_scales: vec![1.0],
+            time_samples: vec![0.0, 0.0],
+            responses: vec![
                     Some(ComplexResponse::new(1.0, 0.0).unwrap()),
                     Some(ComplexResponse::new(1.0, 0.0).unwrap())
                 ],
-                vec![Some("branch".to_owned()), Some("branch".to_owned())],
-            )
+            branch_ids: vec![Some("branch".to_owned()), Some("branch".to_owned())],
+        })
             .unwrap_err(),
             ContractError::InvalidResponseSignatureTimes
         );
-        let invalid_scale = KineticResponseSignature::new(
-            "contract".to_owned(),
-            "class".to_owned(),
-            vec!["pulse".to_owned()],
-            vec!["qoi".to_owned()],
-            vec![0.0],
-            vec![0.0],
-            vec![Some(ComplexResponse::new(1.0, 0.0).unwrap())],
-            vec![Some("branch".to_owned())],
-        );
+        let invalid_scale = KineticResponseSignature::new(KineticResponseSignatureInput {
+            contract_id: "contract".to_owned(),
+            structure_class_id: "class".to_owned(),
+            intervention_ids: vec!["pulse".to_owned()],
+            qoi_ids: vec!["qoi".to_owned()],
+            qoi_scales: vec![0.0],
+            time_samples: vec![0.0],
+            responses: vec![Some(ComplexResponse::new(1.0, 0.0).unwrap())],
+            branch_ids: vec![Some("branch".to_owned())],
+        });
         assert_eq!(
             invalid_scale.unwrap_err(),
             ContractError::InvalidResponseSignatureScale
