@@ -135,7 +135,7 @@ def verify_legacy_state_is_incomplete(env) -> dict[str, Any]:
     # Restore the full state before the caller continues.
     physics.set_state(before, sig=signature)
     return {
-        "legacy_state_size": int(np.asarray(compact[0]).size + np.asarray(compact[1]).size + np.asarray(compact[2]).size),
+        "legacy_state_size": int(np.asarray(compact).size),
         "integration_state_size": int(before.size),
         "legacy_compact_restore_changed_full_state": True,
         "integration_signature": signature,
@@ -163,7 +163,6 @@ def export_checkpoint(path: Path) -> None:
         env.step(action)
 
     physics = env.physics
-    task_rng = task_rng_tuple(env.task)
     signature = int(mujoco.mjtState.mjSTATE_INTEGRATION.value)
     if signature != EXPECTED_INTEGRATION_MASK:
         raise AssertionError(
@@ -178,6 +177,9 @@ def export_checkpoint(path: Path) -> None:
         )
     prefix_observation = env.task.get_observation(physics)
     prefix_observation = {key: np.asarray(value).copy() for key, value in prefix_observation.items()}
+    # Capture task RNG after the prefix observation so any observation-time
+    # randomness is part of the frozen common branch-point state.
+    task_rng = task_rng_tuple(env.task)
 
     # Apply the same next action in the source process and retain the expected
     # result. A second process must reconstruct the checkpoint and obtain this.
