@@ -163,43 +163,41 @@ class MaceLongMemEvalV2Memory(Memory):
         require(self.bm25_k1 > 0.0, "bm25_k1 must be greater than zero")
         require(self.bm25_b <= 1.0, "bm25_b must be <= 1")
 
+        backend_profile: dict[str, Any] = {
+            "schema_version": "mace_lmev2_backend_profile_v1",
+            "memory_type": self.memory_type,
+            "backend_id": self.backend_id,
+            "domain": self.domain,
+            "sidecar_binary_sha256": self.sidecar_binary_sha256,
+            "top_k": self.top_k,
+            "slice_radius": self.slice_radius,
+            "neighbor_radius": self.neighbor_radius,
+            "bm25_k1": self.bm25_k1,
+            "bm25_b": self.bm25_b,
+            "tokenizer_version": "unicode_alphanumeric_v1",
+            "retrieval_mode": self.retrieval_mode_label,
+            "retrieval_mode_id": self.retrieval_mode,
+            "retrieval_channels": self.retrieval_profile["retrieval_channels"],
+            "evidence_channel": self.retrieval_profile["evidence_channel"],
+            "fusion_profile": self.retrieval_profile["fusion_profile"],
+        }
+        if self.retrieval_mode in {"entity_literal_only", "hybrid_rrf"}:
+            backend_profile["entity_literal_profile"] = {
+                "schema_version": "structured_literals_v1",
+                "numeric_or_structural_tokens_only": True,
+                "field_weights": {
+                    "trajectory_id": 5,
+                    "goal": 2,
+                    "start_url": 4,
+                    "state_url": 4,
+                    "state_action": 3,
+                    "source_state_index": 3,
+                    "step": 3,
+                },
+            }
         self.backend_revision_sha256 = hashlib.sha256(
             json.dumps(
-                {
-                    "schema_version": "mace_lmev2_backend_profile_v1",
-                    "memory_type": self.memory_type,
-                    "domain": self.domain,
-                    "sidecar_binary_sha256": self.sidecar_binary_sha256,
-                    "top_k": self.top_k,
-                    "slice_radius": self.slice_radius,
-                    "neighbor_radius": self.neighbor_radius,
-                    "bm25_k1": self.bm25_k1,
-                    "bm25_b": self.bm25_b,
-                    "tokenizer_version": "unicode_alphanumeric_v1",
-                    "retrieval_mode": "hybrid_bm25_entity_literal_with_original_image_evidence",
-                    "retrieval_channels": [
-                        "trajectory_bm25_search_v1",
-                        "trajectory_entity_literal_search_v1",
-                    ],
-                    "entity_literal_profile": {
-                        "schema_version": "structured_literals_v1",
-                        "numeric_or_structural_tokens_only": True,
-                        "field_weights": {
-                            "trajectory_id": 5,
-                            "goal": 2,
-                            "start_url": 4,
-                            "state_url": 4,
-                            "state_action": 3,
-                            "source_state_index": 3,
-                            "step": 3,
-                        },
-                    },
-                    "fusion_profile": {
-                        "algorithm": "reciprocal_rank_fusion_v1",
-                        "k": 60,
-                        "channel_weights": {"bm25": 1.0, "entity_literal": 1.0},
-                    },
-                },
+                backend_profile,
                 sort_keys=True,
                 separators=(",", ":"),
             ).encode("utf-8")
