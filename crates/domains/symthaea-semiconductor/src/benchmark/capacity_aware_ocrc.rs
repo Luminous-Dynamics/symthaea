@@ -638,8 +638,22 @@ pub fn advance_ca_ocrc_round_v1(
     // 3. Receive all now-available feedback; process in a stable order.
     let mut feedback_sorted = feedback_events.to_vec();
     feedback_sorted.sort_by(|a, b| {
-        (a.originating_round, &a.label_id, a.label_revision)
-            .cmp(&(b.originating_round, &b.label_id, b.label_revision))
+        (
+            a.originating_round,
+            &a.label_id,
+            a.label_revision,
+            &a.idempotency_key,
+            &a.label_payload_sha256,
+            &a.measurement_event_id,
+        )
+            .cmp(&(
+                b.originating_round,
+                &b.label_id,
+                b.label_revision,
+                &b.idempotency_key,
+                &b.label_payload_sha256,
+                &b.measurement_event_id,
+            ))
     });
     let mut feedback_receipts = Vec::new();
     let mut feedback_loss_weighted_sum = 0.0_f64;
@@ -707,9 +721,18 @@ pub fn advance_ca_ocrc_round_v1(
         };
         let actual_delay = input.round_index.saturating_sub(feedback.originating_round);
         if let Some(reason) = validate_feedback(feedback, round, &next, actual_delay)? {
-            let disposition = match feedback.eligibility_report.eligibility {
-                LabelConsumptionEligibilityV1::Unknown => CaoOcrcFeedbackDispositionV1::HeldUnknown,
-                LabelConsumptionEligibilityV1::Blocked => CaoOcrcFeedbackDispositionV1::Blocked,
+            let disposition = match (
+                feedback.eligibility_report.eligibility,
+                reason,
+            ) {
+                (
+                    LabelConsumptionEligibilityV1::Unknown,
+                    CaoOcrcFeedbackReasonV1::LabelNotEligible,
+                ) => CaoOcrcFeedbackDispositionV1::HeldUnknown,
+                (
+                    LabelConsumptionEligibilityV1::Blocked,
+                    CaoOcrcFeedbackReasonV1::LabelNotEligible,
+                ) => CaoOcrcFeedbackDispositionV1::Blocked,
                 _ => CaoOcrcFeedbackDispositionV1::Rejected,
             };
             feedback_receipts.push(make_feedback_receipt(
@@ -1435,9 +1458,9 @@ mod tests {
         empty_engine.threshold = -0.5;
         let mut empty_round = round(1, Some(CaoOcrcTrivialSetV1::Empty), None, None);
         empty_round.threshold_used = -0.5;
-        let empty = advance_ca_ocrc_round_v1(
+        let empty = advance(
             &mut empty_engine,
-            &empty_round,
+            empty_round,
             &[],
         )
         .unwrap();
@@ -1449,9 +1472,9 @@ mod tests {
         full_engine.threshold = 100.0;
         let mut full_round = round(1, Some(CaoOcrcTrivialSetV1::Full), None, None);
         full_round.threshold_used = 100.0;
-        let full = advance_ca_ocrc_round_v1(
+        let full = advance(
             &mut full_engine,
-            &full_round,
+            full_round,
             &[],
         )
         .unwrap();
@@ -1668,6 +1691,67 @@ mod tests {
         assert_eq!(survival.len(), 6);
         assert!(survival.iter().all(|value| (*value - result.optimal_track_probability).abs() < f64::EPSILON));
         assert!(result.expected_tracking_load <= 2.0);
+    }
+
+    #[test]
+    fn general_arbitrary_delay_bound_matches_theorem_one_formula() {
+        let policy = policy(2, 3, vec![1.0, 0.8, 0.4, 0.2]);
+        let result = compute_ca_ocrc_risk_bound_v1(&policy, 100).unwrap();
+        let load = 0.8 + 0.4 + 0.2;
+        let x = load / 2.0;
+        let h = x - 1.0 - x.ln();
+        let expected = policy.score_upper_bound / (policy.learning_rate * 100.0)
+            + 3.0 / (0.2 * 100.0)
+            + (-2.0 * h).exp();
+        assert_eq!(result.regime, CaoOcrcBoundRegimeV1::CapacityConstrainedTheoremOne);
+        assert!((result.tracking_load.unwrap() - load).abs() < 1.0e-12);
+        assert!((result.bound.unwrap() - expected).abs() < 1.0e-12);
+        assert!(result.corollary_one_regime_applicable);
+    }
+
+    #[test]
+    fn dmax_exceeding_horizon_keeps_theorem_one_but_not_corollary_one_claim() {
+        let policy = policy(2, 5, vec![1.0, 0.5, 0.4, 0.3, 0.2, 0.1]);
+        let result = compute_ca_ocrc_risk_bound_v1(&policy, 4).unwrap();
+        assert_eq!(result.regime, CaoOcrcBoundRegimeV1::CapacityConstrainedTheoremOne);
+        assert!(result.bound.is_some());
+        assert!(!result.corollary_one_regime_applicable);
+    }
+
+    #[test]
+    fn full_tracking_uses_the_unlimited_ocrc_lemma_two_bound() {
+        let policy = policy(4, 3, full_tracking_proxy_survival_v1(3));
+        let result = compute_ca_ocrc_risk_bound_v1(&policy, 100).unwrap();
+        let expected = policy.score_upper_bound / (policy.learning_rate * 100.0)
+            + 4.0 / 100.0;
+        assert_eq!(result.regime, CaoOcrcBoundRegimeV1::UnlimitedTrackingOcrcLemmaTwo);
+        assert!((result.bound.unwrap() - expected).abs() < 1.0e-12);
+    }
+
+    #[test]
+    fn zero_capacity_and_dmax_zero_are_reported_as_special_regimes() {
+        let no_capacity = compute_ca_ocrc_risk_bound_v1(
+            &policy(0, 2, vec![1.0, 1.0, 1.0]),
+            100,
+        )
+        .unwrap();
+        assert_eq!(no_capacity.regime, CaoOcrcBoundRegimeV1::NoFeedbackCapacityZero);
+        assert!(no_capacity.bound.is_none());
+
+        let immediate = compute_ca_ocrc_risk_bound_v1(
+            &policy(1, 0, vec![1.0]),
+            100,
+        )
+        .unwrap();
+        assert_eq!(immediate.regime, CaoOcrcBoundRegimeV1::ImmediateFeedbackSpecialCase);
+        assert!(immediate.bound.is_some());
+    }
+
+    #[test]
+    fn bernoulli_optimizer_allows_dmax_over_horizon_but_disclaims_corollary() {
+        let result = optimize_ca_ocrc_bernoulli_proxy_v1(2, 6, 4, 100.0, 0.05).unwrap();
+        assert!(result.optimal_track_probability > 0.0);
+        assert!(!result.corollary_one_regime_applicable);
     }
 
     #[test]
