@@ -43,35 +43,60 @@ pub struct AciPredictionIntervalV1 {
 
 impl AciPredictionIntervalV1 {
     pub fn bounded(lower: f64, upper: f64) -> Self {
-        Self { kind: AciIntervalKindV1::Bounded, lower: Some(lower), upper: Some(upper) }
+        Self {
+            kind: AciIntervalKindV1::Bounded,
+            lower: Some(lower),
+            upper: Some(upper),
+        }
     }
 
     pub fn full_real_line() -> Self {
-        Self { kind: AciIntervalKindV1::FullRealLine, lower: None, upper: None }
+        Self {
+            kind: AciIntervalKindV1::FullRealLine,
+            lower: None,
+            upper: None,
+        }
     }
 
     pub fn empty() -> Self {
-        Self { kind: AciIntervalKindV1::Empty, lower: None, upper: None }
+        Self {
+            kind: AciIntervalKindV1::Empty,
+            lower: None,
+            upper: None,
+        }
     }
 
     fn validate_for_alpha(&self, alpha: f64) -> Result<(), DelayedAciErrorV1> {
         match self.kind {
             AciIntervalKindV1::Bounded => {
                 let (Some(lower), Some(upper)) = (self.lower, self.upper) else {
-                    return Err(DelayedAciErrorV1("bounded interval requires both endpoints".into()));
+                    return Err(DelayedAciErrorV1(
+                        "bounded interval requires both endpoints".into(),
+                    ));
                 };
-                if !lower.is_finite() || !upper.is_finite() || lower > upper || alpha <= 0.0 || alpha > 1.0 {
-                    return Err(DelayedAciErrorV1("bounded interval or alpha is invalid".into()));
+                if !lower.is_finite()
+                    || !upper.is_finite()
+                    || lower > upper
+                    || alpha <= 0.0
+                    || alpha > 1.0
+                {
+                    return Err(DelayedAciErrorV1(
+                        "bounded interval or alpha is invalid".into(),
+                    ));
                 }
             }
             AciIntervalKindV1::FullRealLine => {
                 if self.lower.is_some() || self.upper.is_some() || alpha > 0.0 {
-                    return Err(DelayedAciErrorV1("full-real-line interval requires alpha <= 0".into()));
+                    return Err(DelayedAciErrorV1(
+                        "full-real-line interval requires alpha <= 0".into(),
+                    ));
                 }
             }
             AciIntervalKindV1::Empty => {
                 if self.lower.is_some() || self.upper.is_some() || alpha <= 1.0 {
-                    return Err(DelayedAciErrorV1("empty interval requires alpha > 1".into()));
+                    return Err(DelayedAciErrorV1(
+                        "empty interval requires alpha > 1".into(),
+                    ));
                 }
             }
         }
@@ -256,7 +281,6 @@ pub struct AciDegenerateResolutionReceiptV1 {
     pub receipt_sha256: String,
 }
 
-
 #[derive(Clone, Debug, PartialEq, Serialize, Deserialize)]
 pub struct DelayedAciEngineV1 {
     pub schema: String,
@@ -280,14 +304,18 @@ pub struct DelayedAciErrorV1(pub String);
 
 fn require_text(value: &str, field: &str) -> Result<(), DelayedAciErrorV1> {
     if value.trim().is_empty() {
-        return Err(DelayedAciErrorV1(format!("{field}: expected non-empty text")));
+        return Err(DelayedAciErrorV1(format!(
+            "{field}: expected non-empty text"
+        )));
     }
     Ok(())
 }
 
 fn valid_sha256(value: &str) -> bool {
     value.len() == 64
-        && value.bytes().all(|byte| byte.is_ascii_digit() || (b'a'..=b'f').contains(&byte))
+        && value
+            .bytes()
+            .all(|byte| byte.is_ascii_digit() || (b'a'..=b'f').contains(&byte))
 }
 
 fn sha256_hex(bytes: &[u8]) -> String {
@@ -295,8 +323,9 @@ fn sha256_hex(bytes: &[u8]) -> String {
 }
 
 fn json_sha256<T: Serialize + ?Sized>(value: &T) -> Result<String, DelayedAciErrorV1> {
-    let bytes = serde_json::to_vec(value)
-        .map_err(|error| DelayedAciErrorV1(format!("canonical JSON serialization failed: {error}")))?;
+    let bytes = serde_json::to_vec(value).map_err(|error| {
+        DelayedAciErrorV1(format!("canonical JSON serialization failed: {error}"))
+    })?;
     Ok(sha256_hex(&bytes))
 }
 
@@ -316,7 +345,9 @@ fn update_digest(value: &DelayedAciUpdateReceiptV1) -> Result<String, DelayedAci
     json_sha256(&canonical)
 }
 
-fn eligibility_report_digest(value: &LabelConsumptionEligibilityReportV1) -> Result<String, DelayedAciErrorV1> {
+fn eligibility_report_digest(
+    value: &LabelConsumptionEligibilityReportV1,
+) -> Result<String, DelayedAciErrorV1> {
     let mut canonical = value.clone();
     canonical.report_sha256.clear();
     json_sha256(&canonical)
@@ -340,7 +371,9 @@ fn phase_state_digest(engine: &DelayedAciEngineV1) -> Result<String, DelayedAciE
 
 fn validate_policy(policy: &DelayedAciPolicyV1) -> Result<(), DelayedAciErrorV1> {
     if policy.schema != DELAYED_ACI_POLICY_SCHEMA_V1 {
-        return Err(DelayedAciErrorV1("delayed ACI policy schema is unsupported".into()));
+        return Err(DelayedAciErrorV1(
+            "delayed ACI policy schema is unsupported".into(),
+        ));
     }
     require_text(&policy.policy_id, "policy.policy_id")?;
     if !policy.target_miscoverage.is_finite()
@@ -352,14 +385,18 @@ fn validate_policy(policy: &DelayedAciPolicyV1) -> Result<(), DelayedAciErrorV1>
         || !policy.initial_phase_alpha.is_finite()
         || !(0.0..=1.0).contains(&policy.initial_phase_alpha)
     {
-        return Err(DelayedAciErrorV1("delayed ACI policy has invalid parameters".into()));
+        return Err(DelayedAciErrorV1(
+            "delayed ACI policy has invalid parameters".into(),
+        ));
     }
     Ok(())
 }
 
 fn validate_engine(engine: &DelayedAciEngineV1) -> Result<(), DelayedAciErrorV1> {
     if engine.schema != DELAYED_ACI_SCHEMA_V1 {
-        return Err(DelayedAciErrorV1("delayed ACI engine schema is unsupported".into()));
+        return Err(DelayedAciErrorV1(
+            "delayed ACI engine schema is unsupported".into(),
+        ));
     }
     require_text(&engine.engine_id, "engine.engine_id")?;
     require_text(&engine.clock_domain_id, "engine.clock_domain_id")?;
@@ -372,7 +409,9 @@ fn validate_engine(engine: &DelayedAciEngineV1) -> Result<(), DelayedAciErrorV1>
         })
         || policy_digest(&engine.policy)? != engine.policy_sha256
     {
-        return Err(DelayedAciErrorV1("delayed ACI phase/policy state is invalid".into()));
+        return Err(DelayedAciErrorV1(
+            "delayed ACI phase/policy state is invalid".into(),
+        ));
     }
     Ok(())
 }
@@ -410,9 +449,13 @@ pub fn begin_delayed_aci_round_v1(
     round: u64,
 ) -> Result<Vec<AciMissingFeedbackRecordV1>, DelayedAciErrorV1> {
     validate_engine(engine)?;
-    let expected = engine.current_round.map_or(Some(0), |previous| previous.checked_add(1));
+    let expected = engine
+        .current_round
+        .map_or(Some(0), |previous| previous.checked_add(1));
     if expected != Some(round) {
-        return Err(DelayedAciErrorV1("ACI rounds must begin at zero and advance sequentially".into()));
+        return Err(DelayedAciErrorV1(
+            "ACI rounds must begin at zero and advance sequentially".into(),
+        ));
     }
     let overdue: Vec<u64> = engine
         .pending_predictions
@@ -447,25 +490,38 @@ pub fn issue_delayed_aci_prediction_v1(
 ) -> Result<DelayedAciPredictionReceiptV1, DelayedAciErrorV1> {
     validate_engine(engine)?;
     if input.schema != DELAYED_ACI_PREDICTION_SCHEMA_V1 {
-        return Err(DelayedAciErrorV1("ACI prediction input schema is unsupported".into()));
+        return Err(DelayedAciErrorV1(
+            "ACI prediction input schema is unsupported".into(),
+        ));
     }
     require_text(&input.sample_id, "prediction.sample_id")?;
-    require_text(&input.measurement_event_id, "prediction.measurement_event_id")?;
+    require_text(
+        &input.measurement_event_id,
+        "prediction.measurement_event_id",
+    )?;
     require_text(&input.clock_domain_id, "prediction.clock_domain_id")?;
     if input.clock_domain_id != engine.clock_domain_id {
-        return Err(DelayedAciErrorV1("prediction clock domain mismatch".into()));
+        return Err(DelayedAciErrorV1(
+            "prediction clock domain mismatch".into(),
+        ));
     }
     if !valid_sha256(&input.model_artifact_sha256) || !input.point_prediction.is_finite() {
-        return Err(DelayedAciErrorV1("prediction model digest or point value is invalid".into()));
+        return Err(DelayedAciErrorV1(
+            "prediction model digest or point value is invalid".into(),
+        ));
     }
     if input.event_time_unix_seconds > input.prediction_time_unix_seconds {
-        return Err(DelayedAciErrorV1("prediction occurs before its event time".into()));
+        return Err(DelayedAciErrorV1(
+            "prediction occurs before its event time".into(),
+        ));
     }
     let round = engine.current_round.ok_or_else(|| {
         DelayedAciErrorV1("begin_delayed_aci_round_v1 must precede prediction".into())
     })?;
     if input.round != round || engine.prediction_issued_this_round {
-        return Err(DelayedAciErrorV1("prediction round is not current or already used".into()));
+        return Err(DelayedAciErrorV1(
+            "prediction round is not current or already used".into(),
+        ));
     }
     let phase = round % engine.policy.delay_rounds;
     let alpha_at_issue = engine.phase_alphas[phase as usize];
@@ -557,15 +613,22 @@ pub fn deliver_delayed_aci_label_v1(
 ) -> Result<DelayedAciUpdateReceiptV1, DelayedAciErrorV1> {
     validate_engine(engine)?;
     if delivery.schema != DELAYED_ACI_DELIVERY_SCHEMA_V1 {
-        return Err(DelayedAciErrorV1("ACI label delivery schema is unsupported".into()));
+        return Err(DelayedAciErrorV1(
+            "ACI label delivery schema is unsupported".into(),
+        ));
     }
     require_text(&delivery.sample_id, "delivery.sample_id")?;
     require_text(&delivery.label_id, "delivery.label_id")?;
-    require_text(&delivery.measurement_event_id, "delivery.measurement_event_id")?;
+    require_text(
+        &delivery.measurement_event_id,
+        "delivery.measurement_event_id",
+    )?;
     require_text(&delivery.clock_domain_id, "delivery.clock_domain_id")?;
     require_text(&delivery.idempotency_key, "delivery.idempotency_key")?;
     if delivery.label_revision == 0 || !valid_sha256(&delivery.label_payload_sha256) {
-        return Err(DelayedAciErrorV1("label revision or payload digest is invalid".into()));
+        return Err(DelayedAciErrorV1(
+            "label revision or payload digest is invalid".into(),
+        ));
     }
 
     let state_before = phase_state_digest(engine)?;
@@ -621,9 +684,7 @@ pub fn deliver_delayed_aci_label_v1(
     if delivery.label_available_at_unix_seconds > delivery.delivered_at_unix_seconds {
         reasons.push(AciUpdateReasonV1::LabelNotAvailableByDelivery);
     }
-    if delivery.eligibility_report_available_at_unix_seconds
-        > delivery.delivered_at_unix_seconds
-    {
+    if delivery.eligibility_report_available_at_unix_seconds > delivery.delivered_at_unix_seconds {
         reasons.push(AciUpdateReasonV1::ReportNotAvailableByDelivery);
     }
     if !valid_sha256(&report.label_sha256) || report.label_sha256 != delivery.label_payload_sha256 {
@@ -705,7 +766,9 @@ pub fn deliver_delayed_aci_label_v1(
 
     if !reasons.is_empty() {
         let only_unknown = report.eligibility == LabelConsumptionEligibilityV1::Unknown
-            && reasons.iter().all(|reason| *reason == AciUpdateReasonV1::LabelNotEligible);
+            && reasons
+                .iter()
+                .all(|reason| *reason == AciUpdateReasonV1::LabelNotEligible);
         let only_blocked = report.eligibility == LabelConsumptionEligibilityV1::Blocked
             && reasons.iter().all(|reason| *reason == AciUpdateReasonV1::LabelNotEligible);
         let disposition = if only_unknown {
@@ -736,7 +799,9 @@ pub fn deliver_delayed_aci_label_v1(
     let misses = prediction.interval.misses(delivery.label_value);
     let alpha_before = engine.phase_alphas[prediction.phase as usize];
     if alpha_before.to_bits() != prediction.alpha_at_issue.to_bits() {
-        return Err(DelayedAciErrorV1("phase alpha changed before its fixed-delay feedback".into()));
+        return Err(DelayedAciErrorV1(
+            "phase alpha changed before its fixed-delay feedback".into(),
+        ));
     }
     let error_value = if misses { 1.0 } else { 0.0 };
     let alpha_after = alpha_before
@@ -745,7 +810,9 @@ pub fn deliver_delayed_aci_label_v1(
         || alpha_after < -engine.policy.learning_rate - 1.0e-12
         || alpha_after > 1.0 + engine.policy.learning_rate + 1.0e-12
     {
-        return Err(DelayedAciErrorV1("delayed ACI update escaped the theoretical phase bound".into()));
+        return Err(DelayedAciErrorV1(
+            "delayed ACI update escaped the theoretical phase bound".into(),
+        ));
     }
     let next_update_count = engine
         .accepted_update_count
@@ -756,10 +823,9 @@ pub fn deliver_delayed_aci_label_v1(
     next_engine.phase_alphas[prediction.phase as usize] = alpha_after;
     next_engine.accepted_update_count = next_update_count;
     next_engine.pending_predictions.remove(&prediction.round);
-    next_engine.accepted_label_revisions.insert(format!(
-        "{}:{}",
-        delivery.label_id, delivery.label_revision
-    ));
+    next_engine
+        .accepted_label_revisions
+        .insert(format!("{}:{}", delivery.label_id, delivery.label_revision));
     let state_after = phase_state_digest(&next_engine)?;
     let receipt = make_update_receipt(
         &next_engine,
@@ -828,8 +894,7 @@ pub fn delayed_aci_finite_horizon_miscoverage_bound_v1(
         .iter()
         .map(|alpha| alpha.max(1.0 - alpha))
         .sum::<f64>();
-    Ok(initial_term / (learning_rate * total_rounds as f64)
-        + tau / total_rounds as f64)
+    Ok(initial_term / (learning_rate * total_rounds as f64) + tau / total_rounds as f64)
 }
 
 /// Calculates tau/L; the residual-memory scale L must be estimated and
@@ -843,7 +908,9 @@ pub fn delay_to_memory_ratio_v1(
         || !memory_scale_rounds.is_finite()
         || memory_scale_rounds <= 0.0
     {
-        return Err(DelayedAciErrorV1("delay-to-memory ratio has invalid inputs".into()));
+        return Err(DelayedAciErrorV1(
+            "delay-to-memory ratio has invalid inputs".into(),
+        ));
     }
     Ok(delay_rounds / memory_scale_rounds)
 }
@@ -912,7 +979,8 @@ mod tests {
             calibration_certificate_id: "cal-cert-aci".into(),
             frontier,
             eligibility,
-            downstream_consumption_allowed: eligibility == LabelConsumptionEligibilityV1::EligibleUnderDeclaredPolicy,
+            downstream_consumption_allowed: eligibility
+                == LabelConsumptionEligibilityV1::EligibleUnderDeclaredPolicy,
             reasons: Vec::new(),
             label_sha256: payload.into(),
             measurement_sha256: digest('b'),
@@ -958,7 +1026,13 @@ mod tests {
             clock_domain_id: "fab-clock".into(),
             idempotency_key: format!("{label}:{revision}"),
             eligibility_report: eligibility_report(
-                label, event, revision, &payload, eligibility, frontier, value,
+                label,
+                event,
+                revision,
+                &payload,
+                eligibility,
+                frontier,
+                value,
             ),
         }
     }
@@ -971,7 +1045,12 @@ mod tests {
         begin_delayed_aci_round_v1(engine, round).unwrap();
         issue_delayed_aci_prediction_v1(
             engine,
-            &prediction_input(&format!("sample-{round}"), &format!("event-{round}"), round, interval),
+            &prediction_input(
+                &format!("sample-{round}"),
+                &format!("event-{round}"),
+                round,
+                interval,
+            ),
         )
         .unwrap();
     }
@@ -980,14 +1059,27 @@ mod tests {
     fn tau_phases_start_independently_and_freeze_prediction_alpha() {
         let mut engine = engine(3);
         for round in 0..3 {
-            begin_and_issue(&mut engine, round, AciPredictionIntervalV1::bounded(9.0, 11.0));
+            begin_and_issue(
+                &mut engine,
+                round,
+                AciPredictionIntervalV1::bounded(9.0, 11.0),
+            );
         }
         assert_eq!(engine.phase_alphas, vec![0.10, 0.10, 0.10]);
         assert_eq!(
-            engine.pending_predictions.values().map(|item| item.phase).collect::<Vec<_>>(),
+            engine
+                .pending_predictions
+                .values()
+                .map(|item| item.phase)
+                .collect::<Vec<_>>(),
             vec![0, 1, 2]
         );
-        assert!(engine.pending_predictions.values().all(|item| item.alpha_at_issue == 0.10));
+        assert!(
+            engine
+                .pending_predictions
+                .values()
+                .all(|item| item.alpha_at_issue == 0.10)
+        );
     }
 
     #[test]
@@ -1018,7 +1110,12 @@ mod tests {
 
         let next = issue_delayed_aci_prediction_v1(
             &mut engine,
-            &prediction_input("sample-3", "event-3", 3, AciPredictionIntervalV1::full_real_line()),
+            &prediction_input(
+                "sample-3",
+                "event-3",
+                3,
+                AciPredictionIntervalV1::full_real_line(),
+            ),
         )
         .unwrap();
         assert_eq!(next.phase, 0);
@@ -1160,7 +1257,9 @@ mod tests {
         );
         let alpha = engine.phase_alphas.clone();
         assert_eq!(
-            deliver_delayed_aci_label_v1(&mut engine, &accepted).unwrap().disposition,
+            deliver_delayed_aci_label_v1(&mut engine, &accepted)
+                .unwrap()
+                .disposition,
             AciUpdateDispositionV1::Duplicate
         );
         assert_eq!(engine.phase_alphas, alpha);
