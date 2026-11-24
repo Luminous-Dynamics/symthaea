@@ -1440,22 +1440,87 @@ mod tests {
     }
 
     #[test]
-    fn single_occurrence_and_negative_queries_do_not_enter_one_to_many_metrics() {
+    fn one_to_many_duplicate_predictions_cannot_claim_the_same_true_event_twice() {
         let truth = truth(
+            GroundTruthStateV1::Present,
+            vec![
+                FrameIntervalV1 {
+                    start_frame: 100,
+                    end_frame: 200,
+                },
+                FrameIntervalV1 {
+                    start_frame: 500,
+                    end_frame: 600,
+                },
+            ],
+        );
+        let prediction = prediction(GroundingPredictionStateV1::Occurrences {
+            intervals: vec![
+                FrameIntervalV1 {
+                    start_frame: 100,
+                    end_frame: 200,
+                },
+                FrameIntervalV1 {
+                    start_frame: 110,
+                    end_frame: 190,
+                },
+            ],
+        });
+        let score = score_temporal_grounding(&truth, &prediction, &plan()).unwrap();
+        assert_eq!(score.predicted_occurrences, 2);
+        assert_eq!(score.ground_truth_occurrences, 2);
+        assert_eq!(score.true_positives, 1);
+        assert_eq!(score.false_positives, 1);
+        assert_eq!(score.false_negatives, 1);
+        assert_eq!(score.exact_occurrence_count, Some(true));
+        assert_eq!(score.f1, Some(0.5));
+
+        let aggregate = aggregate_temporal_grounding_scores(&[score]).unwrap();
+        assert_eq!(aggregate.one_to_many_count_accuracy, Some(1.0));
+        assert_eq!(aggregate.one_to_many_macro_temporal_f1, Some(0.5));
+        assert_eq!(aggregate.one_to_many_count_gated_f1, Some(0.5));
+    }
+
+    #[test]
+    fn single_occurrence_and_negative_queries_do_not_enter_one_to_many_metrics() {
+        let mut single_truth = truth(
             GroundTruthStateV1::Present,
             vec![FrameIntervalV1 {
                 start_frame: 100,
                 end_frame: 200,
             }],
         );
-        let prediction = prediction(GroundingPredictionStateV1::Occurrences {
+        single_truth.query_id = "query-single".into();
+        let mut single_prediction = prediction(GroundingPredictionStateV1::Occurrences {
             intervals: vec![FrameIntervalV1 {
                 start_frame: 100,
                 end_frame: 200,
             }],
         });
-        let score = score_temporal_grounding(&truth, &prediction, &plan()).unwrap();
-        let aggregate = aggregate_temporal_grounding_scores(&[score]).unwrap();
+        single_prediction.query_id = single_truth.query_id.clone();
+        let single_score =
+            score_temporal_grounding(&single_truth, &single_prediction, &plan()).unwrap();
+
+        let mut negative_truth = truth(GroundTruthStateV1::Absent, Vec::new());
+        negative_truth.query_id = "query-negative".into();
+        let mut negative_prediction = prediction(GroundingPredictionStateV1::QueryAbsent);
+        negative_prediction.query_id = negative_truth.query_id.clone();
+        let negative_score =
+            score_temporal_grounding(&negative_truth, &negative_prediction, &plan()).unwrap();
+
+        let mut ambiguous_truth = truth(GroundTruthStateV1::Ambiguous, Vec::new());
+        ambiguous_truth.query_id = "query-ambiguous".into();
+        let mut ambiguous_prediction = prediction(GroundingPredictionStateV1::QueryAbsent);
+        ambiguous_prediction.query_id = ambiguous_truth.query_id.clone();
+        let ambiguous_score =
+            score_temporal_grounding(&ambiguous_truth, &ambiguous_prediction, &plan()).unwrap();
+
+        let aggregate = aggregate_temporal_grounding_scores(&[
+            single_score,
+            negative_score,
+            ambiguous_score,
+        ])
+        .unwrap();
         assert_eq!(aggregate.one_to_many_queries, 0);
         assert_eq!(aggregate.one_to_many_macro_temporal_f1, None);
         assert_eq!(aggregate.one_to_many_count_gated_f1, None);
