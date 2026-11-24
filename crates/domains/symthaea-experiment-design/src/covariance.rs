@@ -863,7 +863,10 @@ mod tests {
             hypothesis_order: vec!["H0".to_owned(), "H1".to_owned()],
             observable_order: vec!["response".to_owned()],
             covariance_matrix_digest_sha256: matrix_digest_sha256(&gamma),
-            covariance_descriptor_digest_sha256: format!("{:x}", Sha256::digest(descriptor.as_bytes())),
+            covariance_descriptor_digest_sha256: format!(
+                "{:x}",
+                Sha256::digest(descriptor.as_bytes())
+            ),
             covariance_descriptor: descriptor,
             covariance: gamma,
         };
