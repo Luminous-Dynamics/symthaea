@@ -830,6 +830,68 @@ mod tests {
         assert!((score - 4.0).abs() < 1.0e-10);
     }
 
+    fn scalar_three_hypothesis_fixture(pair_variances: [f64; 3]) -> CovarianceAwareDesignInput {
+        let mut input = covariance_redundancy_fixture();
+        input.hypothesis_ids = vec!["H0".to_owned(), "H1".to_owned(), "H2".to_owned()];
+        input.experiments.truncate(1);
+        let experiment = &mut input.experiments[0];
+        experiment.observables = vec![CovarianceObservable {
+            observable_id: "scalar".to_owned(),
+            unit: "u".to_owned(),
+        }];
+        experiment.predictions = ["H0", "H1", "H2"]
+            .iter()
+            .zip([0.0, 1.0, 2.0])
+            .map(|(id, mean)| {
+                let descriptor = format!("synthetic-control:model:{id}:v1");
+                VectorHypothesisPrediction {
+                    hypothesis_id: (*id).to_owned(),
+                    model_digest_sha256: format!("{:x}", Sha256::digest(descriptor.as_bytes())),
+                    model_descriptor: descriptor,
+                    means: vec![mean],
+                }
+            })
+            .collect();
+
+        let pairs = [("H0", "H1"), ("H0", "H2"), ("H1", "H2")];
+        experiment.pairwise_difference_covariances = pairs
+            .iter()
+            .zip(pair_variances)
+            .map(|((first, second), variance)| {
+                let descriptor = format!("synthetic-difference-covariance:{first}:{second}:v1");
+                let covariance = vec![vec![variance]];
+                PairwiseDifferenceCovariance {
+                    first_hypothesis_id: (*first).to_owned(),
+                    second_hypothesis_id: (*second).to_owned(),
+                    covariance_matrix_digest_sha256: matrix_digest_sha256(&covariance),
+                    covariance_descriptor_digest_sha256: format!(
+                        "{:x}",
+                        Sha256::digest(descriptor.as_bytes())
+                    ),
+                    covariance_descriptor: descriptor,
+                    covariance,
+                }
+            })
+            .collect();
+        input
+    }
+
+    #[test]
+    fn individually_psd_pairwise_covariances_must_be_jointly_realizable() {
+        // Each scalar pairwise covariance is positive. Together they are
+        // impossible: Var(Y0-Y1)=1, Var(Y0-Y2)=1, Var(Y1-Y2)=9 would imply
+        // Cov(Y1-Y0, Y2-Y0)=-3.5 despite both marginal variances being 1.
+        let inconsistent = scalar_three_hypothesis_fixture([1.0, 1.0, 9.0]);
+        assert!(matches!(
+            rank_covariance_aware_experiments(&inconsistent),
+            Err(CovarianceDesignError::InconsistentPairwiseCovariances(_))
+        ));
+
+        // A coherent boundary case: the three difference variances are 1, 4, 1.
+        let coherent = scalar_three_hypothesis_fixture([1.0, 4.0, 1.0]);
+        assert!(rank_covariance_aware_experiments(&coherent).is_ok());
+    }
+
     #[test]
     fn invertible_observable_basis_change_preserves_the_score() {
         let mut input = covariance_redundancy_fixture();
