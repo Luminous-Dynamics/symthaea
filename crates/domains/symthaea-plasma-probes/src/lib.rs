@@ -1578,16 +1578,8 @@ impl WeightedFourierMeasureEmbedding {
             let mut imag_compensation = 0.0;
             for (position, weight) in wrapped_positions.iter().zip(&normalized_weights) {
                 let phase = TAU * harmonic as f64 * position;
-                kahan_add(
-                    weight * phase.cos(),
-                    &mut real_sum,
-                    &mut real_compensation,
-                );
-                kahan_add(
-                    weight * phase.sin(),
-                    &mut imag_sum,
-                    &mut imag_compensation,
-                );
+                kahan_add(weight * phase.cos(), &mut real_sum, &mut real_compensation);
+                kahan_add(weight * phase.sin(), &mut imag_sum, &mut imag_compensation);
             }
             moments.push(ComplexResponse::new(real_sum, imag_sum)?);
         }
@@ -1845,7 +1837,8 @@ pub fn decide_spectral_refinement(
             response_assessment_valid: !response_unknown,
             effective_memory_budget_bytes,
             projected_peak_bytes: input.projected_peak_bytes,
-            projected_peak_includes_temporary_buffers: input.projected_peak_includes_temporary_buffers,
+            projected_peak_includes_temporary_buffers: input
+                .projected_peak_includes_temporary_buffers,
             remaining_headroom_bytes: 0,
         });
     }
@@ -3738,16 +3731,21 @@ mod tests {
             assert!((moment.real - expected_real).abs() < 1.0e-12);
             assert!((moment.imag - expected_imag).abs() < 1.0e-12);
         }
-        assert!(fixture["claim_boundary"]["finite_fourier_band_is_not_injective"]
-            .as_bool()
-            .unwrap());
-        assert!(fixture["claim_boundary"]["no_physical_plasma_run"]
-            .as_bool()
-            .unwrap());
+        assert!(
+            fixture["claim_boundary"]["finite_fourier_band_is_not_injective"]
+                .as_bool()
+                .unwrap()
+        );
+        assert!(
+            fixture["claim_boundary"]["no_physical_plasma_run"]
+                .as_bool()
+                .unwrap()
+        );
     }
 
     #[test]
-    fn weighted_fourier_measure_is_stable_to_tiny_mass_outlier_while_sample_minmax_moves_all_inliers() {
+    fn weighted_fourier_measure_is_stable_to_tiny_mass_outlier_while_sample_minmax_moves_all_inliers()
+    {
         let fixture: serde_json::Value =
             serde_json::from_str(WEIGHTED_MEASURE_TAIL_STABILITY_FIXTURE).unwrap();
         let parse_numbers = |field: &str| {
@@ -3766,14 +3764,12 @@ mod tests {
         let harmonics = fixture["max_harmonic"].as_u64().unwrap() as usize;
 
         let base_map = MinMaxCoordinateMap::fit(&base_positions, 0.0, 1.0).unwrap();
-        let augmented_map =
-            MinMaxCoordinateMap::fit(&augmented_positions, 0.0, 1.0).unwrap();
+        let augmented_map = MinMaxCoordinateMap::fit(&augmented_positions, 0.0, 1.0).unwrap();
         let maximum_coordinate_shift = base_positions
             .iter()
             .map(|position| {
-                (base_map.apply(*position).unwrap()
-                    - augmented_map.apply(*position).unwrap())
-                .abs()
+                (base_map.apply(*position).unwrap() - augmented_map.apply(*position).unwrap())
+                    .abs()
             })
             .fold(0.0_f64, f64::max);
         let expected_coordinate_shift =
@@ -3784,29 +3780,26 @@ mod tests {
         assert!((maximum_coordinate_shift - expected_coordinate_shift).abs() < 1.0e-12);
 
         let embedding = WeightedFourierMeasureEmbedding::new(harmonics).unwrap();
-        let base_moments = embedding
-            .moments(&base_positions, &base_weights)
-            .unwrap();
+        let base_moments = embedding.moments(&base_positions, &base_weights).unwrap();
         let augmented_moments = embedding
             .moments(&augmented_positions, &augmented_weights)
             .unwrap();
         let maximum_moment_change = base_moments
             .iter()
             .zip(&augmented_moments)
-            .map(|(base, augmented)| {
-                (augmented.real - base.real).hypot(augmented.imag - base.imag)
-            })
+            .map(|(base, augmented)| (augmented.real - base.real).hypot(augmented.imag - base.imag))
             .fold(0.0_f64, f64::max);
-        let theoretical_bound =
-            2.0 * epsilon / (1.0 + epsilon);
+        let theoretical_bound = 2.0 * epsilon / (1.0 + epsilon);
         let declared_bound = fixture["mathematical_bound"]["expected_upper_bound"]
             .as_f64()
             .unwrap();
         assert!((theoretical_bound - declared_bound).abs() < 1.0e-24);
         assert!(maximum_moment_change <= theoretical_bound + 1.0e-15);
-        assert!(fixture["claim_boundary"]["low_mass_does_not_imply_dynamically_irrelevant"]
-            .as_bool()
-            .unwrap());
+        assert!(
+            fixture["claim_boundary"]["low_mass_does_not_imply_dynamically_irrelevant"]
+                .as_bool()
+                .unwrap()
+        );
     }
 
     #[test]
@@ -3817,9 +3810,7 @@ mod tests {
         let permutation = [0.61, 0.05, 0.94, 0.23];
         let permuted_weights = [0.3, 0.1, 0.4, 0.2];
         let original = embedding.moments(&positions, &weights).unwrap();
-        let permuted = embedding
-            .moments(&permutation, &permuted_weights)
-            .unwrap();
+        let permuted = embedding.moments(&permutation, &permuted_weights).unwrap();
         for (left, right) in original.iter().zip(&permuted) {
             assert!((left.real - right.real).abs() < 1.0e-12);
             assert!((left.imag - right.imag).abs() < 1.0e-12);
@@ -3829,15 +3820,11 @@ mod tests {
     #[test]
     fn weighted_fourier_measure_embedding_is_invariant_to_exact_coincident_split_merge() {
         let embedding = WeightedFourierMeasureEmbedding::new(12).unwrap();
-        let original = embedding
-            .moments(&[0.2, 0.7], &[0.4, 0.6])
-            .unwrap();
+        let original = embedding.moments(&[0.2, 0.7], &[0.4, 0.6]).unwrap();
         let split = embedding
             .moments(&[0.2, 0.2, 0.7], &[0.1, 0.3, 0.6])
             .unwrap();
-        let merged = embedding
-            .moments(&[0.7, 0.2], &[0.6, 0.4])
-            .unwrap();
+        let merged = embedding.moments(&[0.7, 0.2], &[0.6, 0.4]).unwrap();
         for expected in [&split, &merged] {
             for (left, right) in original.iter().zip(expected.iter()) {
                 assert!((left.real - right.real).abs() < 1.0e-12);
@@ -3869,9 +3856,7 @@ mod tests {
         let shift = 0.173;
         let original = embedding.moments(&positions, &weights).unwrap();
         let translated_positions = positions.map(|position| position + shift);
-        let translated = embedding
-            .moments(&translated_positions, &weights)
-            .unwrap();
+        let translated = embedding.moments(&translated_positions, &weights).unwrap();
         for (index, (before, after)) in original.iter().zip(&translated).enumerate() {
             let phase = TAU * (index + 1) as f64 * shift;
             let expected_real = before.real * phase.cos() - before.imag * phase.sin();
