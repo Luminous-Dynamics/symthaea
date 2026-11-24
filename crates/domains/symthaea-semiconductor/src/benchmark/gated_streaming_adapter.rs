@@ -59,6 +59,7 @@ pub enum StreamingUpdateReasonV1 {
     IdempotencyKeyMismatch,
     ClockDomainMismatch,
     DeliveryBeforeLabelAvailability,
+    EligibilityReportUnavailableAtDelivery,
     DeliveryBeforePrediction,
     LabelAvailabilityBeforeMeasurement,
     FeatureSchemaMismatch,
@@ -178,6 +179,7 @@ pub struct StreamingLabelDeliveryV1 {
     pub label_payload_sha256: String,
     pub label_value: f64,
     pub label_available_at_unix_seconds: i64,
+    pub eligibility_report_available_at_unix_seconds: i64,
     pub delivered_at_unix_seconds: i64,
     pub clock_domain_id: String,
     pub idempotency_key: String,
@@ -523,6 +525,10 @@ pub fn predict_and_register_stream_sample_v1(
         ));
     }
     let feature_vector_sha256 = json_sha256(&input.feature_vector)?;
+    let next_prediction_sequence = engine
+        .next_prediction_sequence
+        .checked_add(1)
+        .ok_or_else(|| GatedStreamingAdapterErrorV1("prediction sequence overflow".into()))?;
     let mut receipt = StreamingPredictionReceiptV1 {
         schema: STREAMING_PREDICTION_RECEIPT_SCHEMA_V1.into(),
         sequence: engine.next_prediction_sequence,
@@ -553,10 +559,7 @@ pub fn predict_and_register_stream_sample_v1(
 
     engine.seen_measurement_event_ids.insert(input.measurement_event_id.clone());
     engine.pending_predictions.insert(input.sample_id.clone(), receipt.clone());
-    engine.next_prediction_sequence = engine
-        .next_prediction_sequence
-        .checked_add(1)
-        .ok_or_else(|| GatedStreamingAdapterErrorV1("prediction sequence overflow".into()))?;
+    engine.next_prediction_sequence = next_prediction_sequence;
     Ok(receipt)
 }
 
@@ -704,6 +707,11 @@ pub fn deliver_qualified_stream_label_v1(
         if delivery.delivered_at_unix_seconds < delivery.label_available_at_unix_seconds {
             reasons.push(StreamingUpdateReasonV1::DeliveryBeforeLabelAvailability);
         }
+        if delivery.delivered_at_unix_seconds
+            < delivery.eligibility_report_available_at_unix_seconds
+        {
+            reasons.push(StreamingUpdateReasonV1::EligibilityReportUnavailableAtDelivery);
+        }
         if delivery.delivered_at_unix_seconds < prediction.prediction_at_unix_seconds {
             reasons.push(StreamingUpdateReasonV1::DeliveryBeforePrediction);
         }
@@ -731,10 +739,20 @@ pub fn deliver_qualified_stream_label_v1(
     };
 
     if !reasons.is_empty() {
-        let disposition = match report.eligibility {
-            LabelConsumptionEligibilityV1::Unknown => StreamingUpdateDispositionV1::HeldUnknown,
-            LabelConsumptionEligibilityV1::Blocked => StreamingUpdateDispositionV1::Blocked,
-            _ => StreamingUpdateDispositionV1::Rejected,
+        let only_eligibility_unknown = report.eligibility == LabelConsumptionEligibilityV1::Unknown
+            && reasons
+                .iter()
+                .all(|reason| *reason == StreamingUpdateReasonV1::LabelNotEligible);
+        let only_eligibility_blocked = report.eligibility == LabelConsumptionEligibilityV1::Blocked
+            && reasons
+                .iter()
+                .all(|reason| *reason == StreamingUpdateReasonV1::LabelNotEligible);
+        let disposition = if only_eligibility_unknown {
+            StreamingUpdateDispositionV1::HeldUnknown
+        } else if only_eligibility_blocked {
+            StreamingUpdateDispositionV1::Blocked
+        } else {
+            StreamingUpdateDispositionV1::Rejected
         };
         return update_receipt(
             engine,
@@ -749,7 +767,10 @@ pub fn deliver_qualified_stream_label_v1(
         );
     }
 
-    let error = delivery.label_value - prediction_receipt.base_prediction;
+    // All candidate mutations happen on a private clone. Any invalid delta,
+    // overflow, non-finite result or receipt-serialization error leaves the
+    // live model state and pending prediction unchanged.
+    let error = delivery.label_value - prediction_receipt.prediction_value;
     if !error.is_finite() || error.abs() > engine.policy.maximum_abs_prediction_error {
         return update_receipt(
             engine,
@@ -776,8 +797,8 @@ pub fn deliver_qualified_stream_label_v1(
         ));
     }
 
-    for (weight, feature) in engine
-        .adapter_state
+    let mut next_state = engine.adapter_state.clone();
+    for (weight, feature) in next_state
         .feature_weights
         .iter_mut()
         .zip(&prediction_receipt.selected_feature_vector)
@@ -792,58 +813,76 @@ pub fn deliver_qualified_stream_label_v1(
             -engine.policy.maximum_abs_weight_delta,
             engine.policy.maximum_abs_weight_delta,
         );
+        if !weight.is_finite() {
+            return Err(GatedStreamingAdapterErrorV1(
+                "NLMS candidate weight is non-finite".into(),
+            ));
+        }
     }
 
-    engine.adapter_state.global_temporal_residual_ema =
+    next_state.global_temporal_residual_ema =
         (1.0 - engine.policy.temporal_ema_alpha)
-            * engine.adapter_state.global_temporal_residual_ema
+            * next_state.global_temporal_residual_ema
             + engine.policy.temporal_ema_alpha * error;
 
-    let updated_feature_correction = engine
-        .adapter_state
+    let updated_feature_correction = next_state
         .feature_weights
         .iter()
         .zip(&prediction_receipt.selected_feature_vector)
         .map(|(weight, feature)| weight * feature)
         .sum::<f64>();
-    // Like the GRAPE context residual, remove the frozen global prediction and
-    // newly updated feature correction, but not the local context correction.
-    let context_residual =
-        delivery.label_value - (prediction_receipt.global_baseline_prediction + updated_feature_correction);
-    engine.adapter_state.global_context_residual_ema =
+    if !updated_feature_correction.is_finite()
+        || !next_state.global_temporal_residual_ema.is_finite()
+    {
+        return Err(GatedStreamingAdapterErrorV1(
+            "streaming adapter candidate state is non-finite".into(),
+        ));
+    }
+
+    // Residual left after the feature adapter is updated, preserving the
+    // prediction-time context/temporal corrections as the local target.
+    let context_residual = delivery.label_value
+        - (prediction_receipt.global_baseline_prediction
+            + updated_feature_correction
+            + prediction_receipt.temporal_correction);
+    if !context_residual.is_finite() {
+        return Err(GatedStreamingAdapterErrorV1(
+            "context residual is non-finite".into(),
+        ));
+    }
+    next_state.global_context_residual_ema =
         (1.0 - engine.policy.global_context_ema_alpha)
-            * engine.adapter_state.global_context_residual_ema
+            * next_state.global_context_residual_ema
             + engine.policy.global_context_ema_alpha * context_residual;
 
     if let Some(context_key) = prediction_receipt.context_key.clone() {
-        let entry = engine
-            .adapter_state
+        let entry = next_state
             .contexts
             .entry(context_key)
             .or_insert(StreamingContextStateV1 {
-                residual_ema: engine.adapter_state.global_context_residual_ema,
+                residual_ema: next_state.global_context_residual_ema,
                 support_count: 0,
             });
-        entry.residual_ema = (1.0 - engine.policy.local_context_ema_alpha) * entry.residual_ema
-            + engine.policy.local_context_ema_alpha * context_residual;
-        entry.support_count = entry
+        let next_support = entry
             .support_count
             .checked_add(1)
             .ok_or_else(|| GatedStreamingAdapterErrorV1("context support count overflow".into()))?;
+        entry.residual_ema = (1.0 - engine.policy.local_context_ema_alpha) * entry.residual_ema
+            + engine.policy.local_context_ema_alpha * context_residual;
+        entry.support_count = next_support;
+        if !entry.residual_ema.is_finite() {
+            return Err(GatedStreamingAdapterErrorV1(
+                "local context candidate state is non-finite".into(),
+            ));
+        }
     }
 
-    engine.adapter_state.accepted_update_count = engine
-        .adapter_state
+    next_state.accepted_update_count = next_state
         .accepted_update_count
         .checked_add(1)
         .ok_or_else(|| GatedStreamingAdapterErrorV1("accepted update count overflow".into()))?;
-    let after = adapter_state_digest(&engine.adapter_state)?;
-    engine.accepted_label_revisions.insert(format!(
-        "{}:{}",
-        delivery.label_id, delivery.label_revision
-    ));
-    engine.pending_predictions.remove(&delivery.sample_id);
-    update_receipt(
+    let after = adapter_state_digest(&next_state)?;
+    let receipt = update_receipt(
         engine,
         delivery,
         Some(&prediction_receipt),
@@ -851,9 +890,17 @@ pub fn deliver_qualified_stream_label_v1(
         Vec::new(),
         &before,
         &after,
-        Some(engine.adapter_state.accepted_update_count),
+        Some(next_state.accepted_update_count),
         true,
-    )
+    )?;
+
+    engine.adapter_state = next_state;
+    engine.accepted_label_revisions.insert(format!(
+        "{}:{}",
+        delivery.label_id, delivery.label_revision
+    ));
+    engine.pending_predictions.remove(&delivery.sample_id);
+    Ok(receipt)
 }
 
 #[cfg(test)]
