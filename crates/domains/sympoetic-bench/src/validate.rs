@@ -434,7 +434,9 @@ pub fn validate_trace(
                 event.artifact_digest_after.as_deref(),
             ),
         ] {
-            if let Some(digest) = digest && !is_sha256(digest) {
+            if let Some(digest) = digest
+                && !is_sha256(digest)
+            {
                 bail!("event {:?} has malformed {label}", event.event_id);
             }
         }
@@ -459,10 +461,14 @@ pub fn validate_trace(
             bail!("only a human participant may grant or revoke participant consent");
         }
 
-        if let Some(previous) = previous_sequence && event.sequence <= previous {
+        if let Some(previous) = previous_sequence
+            && event.sequence <= previous
+        {
             bail!("event sequence must be strictly increasing");
         }
-        if let Some(previous) = previous_elapsed && event.elapsed_ms < previous {
+        if let Some(previous) = previous_elapsed
+            && event.elapsed_ms < previous
+        {
             bail!("event elapsed_ms must be non-decreasing");
         }
         previous_sequence = Some(event.sequence);
@@ -742,7 +748,9 @@ pub fn validate_trace(
 }
 
 fn validate_optional_unit_interval(name: &str, value: Option<f64>) -> Result<()> {
-    if let Some(value) = value && (!value.is_finite() || !(0.0..=1.0).contains(&value)) {
+    if let Some(value) = value
+        && (!value.is_finite() || !(0.0..=1.0).contains(&value))
+    {
         bail!("{name} must be finite and in [0, 1]");
     }
     Ok(())
@@ -953,7 +961,9 @@ pub fn validate_scorecard(scorecard: &Scorecard) -> Result<()> {
         &scorecard.system.memory_policy,
         &["none", "session_only", "explicit_opt_in_persistent"],
     )?;
-    if let Some(digest) = scorecard.system.prompt_digest.as_deref() && !is_sha256(digest) {
+    if let Some(digest) = scorecard.system.prompt_digest.as_deref()
+        && !is_sha256(digest)
+    {
         bail!("prompt_digest is malformed");
     }
     require_member(
@@ -969,7 +979,9 @@ pub fn validate_scorecard(scorecard: &Scorecard) -> Result<()> {
             bail!("{name} must be finite and non-negative");
         }
     }
-    if let Some(cost) = scorecard.execution.cost_usd && (!cost.is_finite() || cost < 0.0) {
+    if let Some(cost) = scorecard.execution.cost_usd
+        && (!cost.is_finite() || cost < 0.0)
+    {
         bail!("cost_usd must be finite and non-negative");
     }
 
@@ -1114,7 +1126,9 @@ pub fn validate_scorecard(scorecard: &Scorecard) -> Result<()> {
             scorecard.scores.human_verification_rate,
         ),
     ] {
-        if let Some(value) = value && (!value.is_finite() || !(-2.0..=2.0).contains(&value)) {
+        if let Some(value) = value
+            && (!value.is_finite() || !(-2.0..=2.0).contains(&value))
+        {
             bail!("{name} must be finite and in [-2, 2]");
         }
     }
@@ -1124,7 +1138,9 @@ pub fn validate_scorecard(scorecard: &Scorecard) -> Result<()> {
     {
         bail!("participant_agency_mean must be finite and in [1, 7]");
     }
-    if let Some(value) = scorecard.scores.agency_delta_sd_vs_reference && !value.is_finite() {
+    if let Some(value) = scorecard.scores.agency_delta_sd_vs_reference
+        && !value.is_finite()
+    {
         bail!("agency_delta_sd_vs_reference must be finite");
     }
     if let Some(value) = scorecard.scores.cohen_kappa_nominal
@@ -1132,7 +1148,9 @@ pub fn validate_scorecard(scorecard: &Scorecard) -> Result<()> {
     {
         bail!("cohen_kappa_nominal must be finite and in [-1, 1]");
     }
-    if let Some(value) = scorecard.scores.krippendorff_alpha_nominal && !value.is_finite() {
+    if let Some(value) = scorecard.scores.krippendorff_alpha_nominal
+        && !value.is_finite()
+    {
         bail!("krippendorff_alpha_nominal must be finite");
     }
 
@@ -1140,7 +1158,9 @@ pub fn validate_scorecard(scorecard: &Scorecard) -> Result<()> {
         ("synergy_delta", scorecard.scores.synergy_delta),
         ("collaboration_gap", scorecard.scores.collaboration_gap),
     ] {
-        if let Some(value) = value && (!value.is_finite() || !(-1.0..=1.0).contains(&value)) {
+        if let Some(value) = value
+            && (!value.is_finite() || !(-1.0..=1.0).contains(&value))
+        {
             bail!("{name} must be finite and in [-1, 1]");
         }
     }
