@@ -235,10 +235,22 @@ fn reduce_episode(episode: &Episode) -> Result<EpisodeReport, String> {
     require_text(&episode.episode_id, "episode_id")?;
     require_text(&episode.session.session_id, "session.session_id")?;
     require_text(&episode.session.turn_id, "session.turn_id")?;
-    require_text(&episode.execution_identity.policy_id, "execution_identity.policy_id")?;
-    require_text(&episode.execution_identity.policy_version, "execution_identity.policy_version")?;
-    require_text(&episode.execution_identity.backend_id, "execution_identity.backend_id")?;
-    require_text(&episode.provenance.episode_verifier_profile, "provenance.episode_verifier_profile")?;
+    require_text(
+        &episode.execution_identity.policy_id,
+        "execution_identity.policy_id",
+    )?;
+    require_text(
+        &episode.execution_identity.policy_version,
+        "execution_identity.policy_version",
+    )?;
+    require_text(
+        &episode.execution_identity.backend_id,
+        "execution_identity.backend_id",
+    )?;
+    require_text(
+        &episode.provenance.episode_verifier_profile,
+        "provenance.episode_verifier_profile",
+    )?;
     if episode.provenance.manifest_version != 1 {
         return Err("unsupported episode manifest_version".into());
     }
@@ -252,11 +264,23 @@ fn reduce_episode(episode: &Episode) -> Result<EpisodeReport, String> {
     validate_receipt(&episode.decision.receipt, "decision.receipt")?;
     validate_receipt(&episode.capture.receipt, "capture.receipt")?;
     validate_receipt(&episode.observation.receipt, "observation.receipt")?;
-    validate_digest(&episode.disposition.scope_sha256, "disposition.scope_sha256")?;
+    validate_digest(
+        &episode.disposition.scope_sha256,
+        "disposition.scope_sha256",
+    )?;
     validate_digest(&episode.capture.payload_sha256, "capture.payload_sha256")?;
-    validate_digest(&episode.observation.capture_payload_sha256, "observation.capture_payload_sha256")?;
-    validate_digest(&episode.observation.detector_build_sha256, "observation.detector_build_sha256")?;
-    validate_digest(&episode.observation.detector_config_sha256, "observation.detector_config_sha256")?;
+    validate_digest(
+        &episode.observation.capture_payload_sha256,
+        "observation.capture_payload_sha256",
+    )?;
+    validate_digest(
+        &episode.observation.detector_build_sha256,
+        "observation.detector_build_sha256",
+    )?;
+    validate_digest(
+        &episode.observation.detector_config_sha256,
+        "observation.detector_config_sha256",
+    )?;
     if let Some(digest) = &episode.observation.event_manifest_sha256 {
         validate_digest(digest, "observation.event_manifest_sha256")?;
     }
@@ -264,17 +288,30 @@ fn reduce_episode(episode: &Episode) -> Result<EpisodeReport, String> {
         validate_receipt(receipt, "observation.qualification_receipt")?;
     }
 
-    if !same_window(&episode.session.target_window, &episode.forecast.target_window) {
+    if !same_window(
+        &episode.session.target_window,
+        &episode.forecast.target_window,
+    ) {
         return Err("forecast target window does not equal the session target window".into());
     }
-    if !same_window(&episode.session.target_window, &episode.capture.target_window) {
-        findings.push("capture target window does not exactly cover the session target window".into());
+    if !same_window(
+        &episode.session.target_window,
+        &episode.capture.target_window,
+    ) {
+        findings
+            .push("capture target window does not exactly cover the session target window".into());
     }
-    if !matches!(episode.forecast.uncertainty.as_str(), "calibrated" | "uncalibrated" | "unavailable") {
+    if !matches!(
+        episode.forecast.uncertainty.as_str(),
+        "calibrated" | "uncalibrated" | "unavailable"
+    ) {
         return Err("unknown forecast uncertainty state".into());
     }
     if episode.forecast.input_through_sequence != episode.session.input_sequence {
-        return Err("forecast input_through_sequence does not match the frozen session input sequence".into());
+        return Err(
+            "forecast input_through_sequence does not match the frozen session input sequence"
+                .into(),
+        );
     }
     if episode.forecast.committed_sequence <= episode.forecast.input_through_sequence {
         return Err("forecast was not committed after the input sequence it claims to use".into());
@@ -282,7 +319,9 @@ fn reduce_episode(episode: &Episode) -> Result<EpisodeReport, String> {
     if episode.disposition.forecast_id != episode.forecast.forecast_id
         || episode.disposition.forecast_revision != episode.forecast.revision
     {
-        return Err("musician disposition is not bound to the exact forecast ID and revision".into());
+        return Err(
+            "musician disposition is not bound to the exact forecast ID and revision".into(),
+        );
     }
     if episode.disposition.sequence <= episode.forecast.committed_sequence {
         return Err("musician disposition precedes or equals forecast commitment sequence".into());
@@ -294,7 +333,9 @@ fn reduce_episode(episode: &Episode) -> Result<EpisodeReport, String> {
         return Err("turn-taking decision does not follow the musician disposition".into());
     }
     if episode.decision.observed_through_input_sequence != episode.session.input_sequence {
-        return Err("turn-taking decision input watermark differs from the frozen session input".into());
+        return Err(
+            "turn-taking decision input watermark differs from the frozen session input".into(),
+        );
     }
     if episode.decision.forecast_id.as_deref() != Some(episode.forecast.forecast_id.as_str())
         || episode.decision.forecast_revision != Some(episode.forecast.revision)
@@ -306,7 +347,10 @@ fn reduce_episode(episode: &Episode) -> Result<EpisodeReport, String> {
         return Err("turn-taking decision occurred after forecast expiry".into());
     }
     let action_disposition = validate_action_semantics(episode)?;
-    let effect_stage_reported = episode.effect.as_ref().map(|effect| effect.reported_stage.clone());
+    let effect_stage_reported = episode
+        .effect
+        .as_ref()
+        .map(|effect| effect.reported_stage.clone());
 
     if let Some(effect) = &episode.effect {
         validate_receipt(&effect.receipt, "effect.receipt")?;
@@ -318,7 +362,9 @@ fn reduce_episode(episode: &Episode) -> Result<EpisodeReport, String> {
             validate_digest(digest, "effect.output_artifact_sha256")?;
         }
         if effect.decision_sequence != episode.decision.sequence {
-            return Err("effect decision_sequence does not bind the exact turn-taking decision".into());
+            return Err(
+                "effect decision_sequence does not bind the exact turn-taking decision".into(),
+            );
         }
         if effect.forecast_id.as_deref() != Some(episode.forecast.forecast_id.as_str())
             || effect.forecast_revision != Some(episode.forecast.revision)
@@ -348,33 +394,46 @@ fn reduce_episode(episode: &Episode) -> Result<EpisodeReport, String> {
         None => false,
     };
 
-    if !matches!(episode.capture.reported_closure.as_str(), "eligible" | "ineligible" | "unknown") {
+    if !matches!(
+        episode.capture.reported_closure.as_str(),
+        "eligible" | "ineligible" | "unknown"
+    ) {
         return Err("unknown capture reported_closure state".into());
     }
-    if !matches!(episode.observation.qualification_status.as_str(), "qualified" | "unqualified" | "unknown") {
+    if !matches!(
+        episode.observation.qualification_status.as_str(),
+        "qualified" | "unqualified" | "unknown"
+    ) {
         return Err("unknown detector qualification state".into());
     }
-    let capture_sequence_accounting_consistent =
-        episode.capture.sequence_accounting.observed
-            .checked_add(episode.capture.sequence_accounting.missing)
-            == Some(episode.capture.sequence_accounting.expected)
-            && episode.capture.sequence_accounting.duplicate == 0;
-    let capture_frame_accounting_consistent =
-        episode.capture.frame_accounting.observed
-            .checked_add(episode.capture.frame_accounting.dropped)
-            == Some(episode.capture.frame_accounting.expected)
-            && episode.capture.frame_accounting.dropped == 0
-            && episode.capture.frame_accounting.xrun_count == 0;
-    let capture_accounting_complete =
-        episode.capture.reported_closure == "eligible"
-            && same_window(&episode.session.target_window, &episode.capture.target_window)
-            && episode.capture.sequence_accounting.expected > 0
-            && episode.capture.sequence_accounting.observed == episode.capture.sequence_accounting.expected
-            && capture_sequence_accounting_consistent
-            && episode.capture.frame_accounting.expected > 0
-            && episode.capture.frame_accounting.observed == episode.capture.frame_accounting.expected
-            && capture_frame_accounting_consistent
-            && episode.capture.terminal_watermark > 0;
+    let capture_sequence_accounting_consistent = episode
+        .capture
+        .sequence_accounting
+        .observed
+        .checked_add(episode.capture.sequence_accounting.missing)
+        == Some(episode.capture.sequence_accounting.expected)
+        && episode.capture.sequence_accounting.duplicate == 0;
+    let capture_frame_accounting_consistent = episode
+        .capture
+        .frame_accounting
+        .observed
+        .checked_add(episode.capture.frame_accounting.dropped)
+        == Some(episode.capture.frame_accounting.expected)
+        && episode.capture.frame_accounting.dropped == 0
+        && episode.capture.frame_accounting.xrun_count == 0;
+    let capture_accounting_complete = episode.capture.reported_closure == "eligible"
+        && same_window(
+            &episode.session.target_window,
+            &episode.capture.target_window,
+        )
+        && episode.capture.sequence_accounting.expected > 0
+        && episode.capture.sequence_accounting.observed
+            == episode.capture.sequence_accounting.expected
+        && capture_sequence_accounting_consistent
+        && episode.capture.frame_accounting.expected > 0
+        && episode.capture.frame_accounting.observed == episode.capture.frame_accounting.expected
+        && capture_frame_accounting_consistent
+        && episode.capture.terminal_watermark > 0;
 
     if !capture_sequence_accounting_consistent {
         findings.push("capture sequence accounting is inconsistent or contains duplicates".into());
@@ -390,11 +449,19 @@ fn reduce_episode(episode: &Episode) -> Result<EpisodeReport, String> {
         return Err("event observation references a different capture_id".into());
     }
     if episode.observation.capture_payload_sha256 != episode.capture.payload_sha256 {
-        return Err("event observation payload digest does not match the exact capture payload".into());
+        return Err(
+            "event observation payload digest does not match the exact capture payload".into(),
+        );
     }
 
-    require_text(&episode.capture.recorder_identity, "capture.recorder_identity")?;
-    require_text(&episode.observation.observer_identity, "observation.observer_identity")?;
+    require_text(
+        &episode.capture.recorder_identity,
+        "capture.recorder_identity",
+    )?;
+    require_text(
+        &episode.observation.observer_identity,
+        "observation.observer_identity",
+    )?;
     let mut identities = BTreeSet::new();
     identities.insert(episode.capture.recorder_identity.as_str());
     identities.insert(episode.observation.observer_identity.as_str());
@@ -407,22 +474,23 @@ fn reduce_episode(episode: &Episode) -> Result<EpisodeReport, String> {
         findings.push("producer, capture recorder and event observer identities are not structurally distinct".into());
     }
 
-    let detector_qualified_shape =
-        episode.observation.qualification_status == "qualified"
-            && episode.observation.qualification_receipt.is_some()
-            && episode.observation.event_manifest_sha256.is_some();
+    let detector_qualified_shape = episode.observation.qualification_status == "qualified"
+        && episode.observation.qualification_receipt.is_some()
+        && episode.observation.event_manifest_sha256.is_some();
 
-    let observation_structurally_eligible =
-        capture_accounting_complete
-            && independent_identity_separation_structural
-            && detector_qualified_shape;
+    let observation_structurally_eligible = capture_accounting_complete
+        && independent_identity_separation_structural
+        && detector_qualified_shape;
 
     if !detector_qualified_shape {
-        findings.push("detector qualification or event-manifest binding is missing/unqualified".into());
+        findings
+            .push("detector qualification or event-manifest binding is missing/unqualified".into());
     }
 
     let observation_outcome = match episode.observation.detector_result.as_str() {
-        "present" if observation_structurally_eligible => ObservationOutcome::DetectorReportedPresent,
+        "present" if observation_structurally_eligible => {
+            ObservationOutcome::DetectorReportedPresent
+        }
         "absent" if observation_structurally_eligible => ObservationOutcome::DetectorReportedAbsent,
         "ambiguous" if observation_structurally_eligible => ObservationOutcome::Ambiguous,
         "not_estimable" if observation_structurally_eligible => ObservationOutcome::NotEstimable,
@@ -432,8 +500,10 @@ fn reduce_episode(episode: &Episode) -> Result<EpisodeReport, String> {
         other => return Err(format!("unknown detector_result: {other}")),
     };
 
-    if matches!(episode.observation.detector_result.as_str(), "present" | "absent")
-        && observation_outcome == ObservationOutcome::Unobserved
+    if matches!(
+        episode.observation.detector_result.as_str(),
+        "present" | "absent"
+    ) && observation_outcome == ObservationOutcome::Unobserved
     {
         findings.push("detector present/absent claim was downgraded to unobserved because eligibility did not close".into());
     }
@@ -472,7 +542,10 @@ fn reduce_episode(episode: &Episode) -> Result<EpisodeReport, String> {
 fn validate_action_semantics(episode: &Episode) -> Result<ActionDisposition, String> {
     let action = episode.disposition.action.as_str();
     let decision = episode.decision.action.as_str();
-    let effect_is_output = episode.effect.as_ref().is_some_and(|effect| is_output_stage(&effect.reported_stage));
+    let effect_is_output = episode
+        .effect
+        .as_ref()
+        .is_some_and(|effect| is_output_stage(&effect.reported_stage));
 
     match action {
         "accept" => {
@@ -480,7 +553,9 @@ fn validate_action_semantics(episode: &Episode) -> Result<ActionDisposition, Str
                 return Err(format!("unsupported turn decision for accept: {decision}"));
             }
             if matches!(decision, "WAIT" | "YIELD") && effect_is_output {
-                return Err("output effect is incompatible with WAIT/YIELD following accept".into());
+                return Err(
+                    "output effect is incompatible with WAIT/YIELD following accept".into(),
+                );
             }
             if matches!(decision, "RESPOND" | "CONTINUE") {
                 Ok(ActionDisposition::AuthorizedForBoundForecast)
@@ -490,7 +565,9 @@ fn validate_action_semantics(episode: &Episode) -> Result<ActionDisposition, Str
         }
         "veto" => {
             if decision != "YIELD" {
-                return Err("veto must dominate with YIELD; later RESPOND/CONTINUE is unauthorized".into());
+                return Err(
+                    "veto must dominate with YIELD; later RESPOND/CONTINUE is unauthorized".into(),
+                );
             }
             if effect_is_output {
                 return Err("output effect follows a veto; admission must fail closed".into());
@@ -510,11 +587,19 @@ fn validate_action_semantics(episode: &Episode) -> Result<ActionDisposition, Str
             Ok(ActionDisposition::BranchedWithoutActiveMutation)
         }
         "steer" => {
-            if episode.disposition.superseding_forecast_id.as_deref().is_none_or(str::is_empty) {
+            if episode
+                .disposition
+                .superseding_forecast_id
+                .as_deref()
+                .is_none_or(str::is_empty)
+            {
                 return Err("steer requires an explicit successor forecast ID".into());
             }
             if !matches!(decision, "WAIT" | "YIELD") || effect_is_output {
-                return Err("steer cannot execute the superseded forecast; wait for successor forecast".into());
+                return Err(
+                    "steer cannot execute the superseded forecast; wait for successor forecast"
+                        .into(),
+                );
             }
             Ok(ActionDisposition::AwaitingSuccessorForecast)
         }
@@ -536,9 +621,15 @@ fn validate_action_semantics(episode: &Episode) -> Result<ActionDisposition, Str
 
 fn validate_effect_stage(stage: &str) -> Result<(), String> {
     match stage {
-        "not_requested" | "authorized" | "queue_applied" | "application_enqueued"
-        | "callback_observed" | "cpal_predicted" | "loopback_observed"
-        | "not_applied" | "outcome_unknown" => Ok(()),
+        "not_requested"
+        | "authorized"
+        | "queue_applied"
+        | "application_enqueued"
+        | "callback_observed"
+        | "cpal_predicted"
+        | "loopback_observed"
+        | "not_applied"
+        | "outcome_unknown" => Ok(()),
         other => Err(format!("unknown effect stage: {other}")),
     }
 }
@@ -546,16 +637,31 @@ fn validate_effect_stage(stage: &str) -> Result<(), String> {
 fn is_output_stage(stage: &str) -> bool {
     matches!(
         stage,
-        "queue_applied" | "application_enqueued" | "callback_observed"
-            | "cpal_predicted" | "loopback_observed"
+        "queue_applied"
+            | "application_enqueued"
+            | "callback_observed"
+            | "cpal_predicted"
+            | "loopback_observed"
     )
 }
 
 fn validate_identity(identity: &ExecutionIdentity) -> Result<(), String> {
-    validate_digest(&identity.identity_sha256, "execution_identity.identity_sha256")?;
-    validate_digest(&identity.configuration_sha256, "execution_identity.configuration_sha256")?;
-    validate_digest(&identity.adapter_sha256, "execution_identity.adapter_sha256")?;
-    validate_digest(&identity.runtime_sha256, "execution_identity.runtime_sha256")?;
+    validate_digest(
+        &identity.identity_sha256,
+        "execution_identity.identity_sha256",
+    )?;
+    validate_digest(
+        &identity.configuration_sha256,
+        "execution_identity.configuration_sha256",
+    )?;
+    validate_digest(
+        &identity.adapter_sha256,
+        "execution_identity.adapter_sha256",
+    )?;
+    validate_digest(
+        &identity.runtime_sha256,
+        "execution_identity.runtime_sha256",
+    )?;
     if let Some(digest) = &identity.model_artifact_sha256 {
         validate_digest(digest, "execution_identity.model_artifact_sha256")?;
     }
@@ -565,7 +671,9 @@ fn validate_identity(identity: &ExecutionIdentity) -> Result<(), String> {
     match identity.kind.as_str() {
         "synthetic_rule_fixture" => {}
         "production_model" if identity.model_artifact_sha256.is_some() => {}
-        "production_model" => return Err("production execution identity requires a model artifact digest".into()),
+        "production_model" => {
+            return Err("production execution identity requires a model artifact digest".into());
+        }
         other => return Err(format!("unknown execution identity kind: {other}")),
     }
     Ok(())
@@ -587,13 +695,25 @@ fn same_window(left: &TimeWindow, right: &TimeWindow) -> bool {
 
 fn validate_receipt(receipt: &ReceiptRef, label: &str) -> Result<(), String> {
     validate_digest(&receipt.receipt_sha256, &format!("{label}.receipt_sha256"))?;
-    validate_digest(&receipt.verification_receipt_sha256, &format!("{label}.verification_receipt_sha256"))?;
-    require_text(&receipt.verifier_profile_id, &format!("{label}.verifier_profile_id"))
+    validate_digest(
+        &receipt.verification_receipt_sha256,
+        &format!("{label}.verification_receipt_sha256"),
+    )?;
+    require_text(
+        &receipt.verifier_profile_id,
+        &format!("{label}.verifier_profile_id"),
+    )
 }
 
 fn validate_digest(value: &str, label: &str) -> Result<(), String> {
-    if value.len() != 64 || !value.bytes().all(|byte| byte.is_ascii_hexdigit() && !byte.is_ascii_uppercase()) {
-        return Err(format!("{label} must be a lowercase 64-character SHA-256 digest"));
+    if value.len() != 64
+        || !value
+            .bytes()
+            .all(|byte| byte.is_ascii_hexdigit() && !byte.is_ascii_uppercase())
+    {
+        return Err(format!(
+            "{label} must be a lowercase 64-character SHA-256 digest"
+        ));
     }
     Ok(())
 }
@@ -609,14 +729,23 @@ fn require_text(value: &str, label: &str) -> Result<(), String> {
 mod tests {
     use super::*;
 
-    const PRESENT: &str = include_str!("../../../docs/research/fixtures/mel-closed-loop-episode-present.synthetic.json");
-    const ABSENT: &str = include_str!("../../../docs/research/fixtures/mel-closed-loop-episode-absent.synthetic.json");
-    const UNOBSERVED: &str = include_str!("../../../docs/research/fixtures/mel-closed-loop-episode-unobserved.synthetic.json");
+    const PRESENT: &str = include_str!(
+        "../../../docs/research/fixtures/mel-closed-loop-episode-present.synthetic.json"
+    );
+    const ABSENT: &str = include_str!(
+        "../../../docs/research/fixtures/mel-closed-loop-episode-absent.synthetic.json"
+    );
+    const UNOBSERVED: &str = include_str!(
+        "../../../docs/research/fixtures/mel-closed-loop-episode-unobserved.synthetic.json"
+    );
 
     #[test]
     fn complete_present_window_is_reported_present_not_ground_truth() {
         let report = parse_and_reduce(PRESENT).expect("valid fixture");
-        assert_eq!(report.observation_outcome, ObservationOutcome::DetectorReportedPresent);
+        assert_eq!(
+            report.observation_outcome,
+            ObservationOutcome::DetectorReportedPresent
+        );
         assert!(report.capture_accounting_complete);
         assert!(report.observation_structurally_eligible);
         assert!(!report.upstream_receipts_authenticated);
@@ -625,7 +754,10 @@ mod tests {
     #[test]
     fn complete_empty_window_can_be_absent_without_producer_effect_record() {
         let report = parse_and_reduce(ABSENT).expect("valid complete-empty fixture");
-        assert_eq!(report.observation_outcome, ObservationOutcome::DetectorReportedAbsent);
+        assert_eq!(
+            report.observation_outcome,
+            ObservationOutcome::DetectorReportedAbsent
+        );
         assert!(report.capture_accounting_complete);
         assert!(report.effect_stage_reported.is_none());
         assert_eq!(report.action_disposition, ActionDisposition::Ignored);
@@ -650,7 +782,8 @@ mod tests {
     #[test]
     fn payload_substitution_is_rejected() {
         let mut value: serde_json::Value = serde_json::from_str(PRESENT).expect("fixture JSON");
-        value["observation"]["capture_payload_sha256"] = serde_json::json!("abababababababababababababababababababababababababababababababab");
+        value["observation"]["capture_payload_sha256"] =
+            serde_json::json!("abababababababababababababababababababababababababababababababab");
         let raw = serde_json::to_string(&value).expect("serialize fixture");
         assert!(parse_and_reduce(&raw).is_err());
     }
@@ -726,7 +859,8 @@ mod tests {
         let mut value: serde_json::Value = serde_json::from_str(ABSENT).expect("fixture JSON");
         value["capture"]["sequence_accounting"]["duplicate"] = serde_json::json!(1);
         let raw = serde_json::to_string(&value).expect("serialize fixture");
-        let report = parse_and_reduce(&raw).expect("duplicate sequence is a downgraded observation");
+        let report =
+            parse_and_reduce(&raw).expect("duplicate sequence is a downgraded observation");
         assert_eq!(report.observation_outcome, ObservationOutcome::Unobserved);
     }
 }
