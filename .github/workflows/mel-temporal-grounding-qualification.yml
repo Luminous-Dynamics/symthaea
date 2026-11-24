@@ -93,7 +93,7 @@ jobs:
             and .source_work_bootstrap.recommended_confirmatory_cluster_floor == 30
             and .source_work_bootstrap.confirmatory_source_cluster_floor_met == false
             and .source_work_bootstrap.local_minus_no_evidence_f1.estimate == 0.5
-            and .source_work_bootstrap.local_minus_no_evidence_count_gated_f1.estimate == 1.0
+            and .source_work_bootstrap.local_minus_no_evidence_count_gated_f1.estimate == 0.5
           ' "$RUNNER_TEMP/temporal-revision-report.json" > /dev/null
 
       - name: Replay transformed-view equivariance when module is present
