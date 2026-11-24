@@ -327,5 +327,76 @@
     "do_not treat surface probe flux under external field as intrinsic remanence",
     "do_not combine process routes with different specimen forms in one leaderboard",
     "do_not label simulated active learning on prelabelled data as prospective physical discovery"
-  ]
+  ],
+  "commercial_bonded_grade_references": [
+    {
+      "manufacturer": "thyssenkrupp Magnettechnik",
+      "source_url": "https://ucpcdn.thyssenkrupp.com/_binary/UCPthyssenkruppBAMXSchulteMicrositeMagnettechnik/en/downloads/link-thyssenkruppMagnettechnik-Factsheet-plastic-bonded-neodym-magnets.pdf",
+      "source_revision": "manufacturer factsheet, older archived version; standard reference EN 60404-8-1:2015",
+      "evidence_class": "manufacturer_minimum_grade_data",
+      "process": "anisotropic injection moulded",
+      "grades": [
+        {
+          "grade": "NdFeB 87/100p",
+          "remanence_T_min": 0.7,
+          "intrinsic_coercivity_kA_per_m_min": 1000,
+          "bhmax_kJ_per_m3_min": 87
+        },
+        {
+          "grade": "NdFeB 120/100p",
+          "remanence_T_min": 0.84,
+          "intrinsic_coercivity_kA_per_m_min": 1000,
+          "bhmax_kJ_per_m3_min": 120
+        }
+      ],
+      "note": "Manufacturer grade minima; not matched to LPBF specimen geometry or test method."
+    },
+    {
+      "manufacturer": "Mainrich",
+      "source_url": "https://mainrichmagnets.com/injection-molded-ndfeb-magnets",
+      "source_revision": "public grade table accessed 2026-11-24",
+      "evidence_class": "manufacturer_typical_grade_data",
+      "process": "anisotropic injection moulded, oriented in mold, PA12 binder",
+      "grades": [
+        {
+          "grade": "MN-12120",
+          "remanence_T_typical": 0.786,
+          "intrinsic_coercivity_kA_per_m_typical": 860,
+          "bhmax_MGOe_typical": 12.7
+        },
+        {
+          "grade": "MN-12140",
+          "remanence_T_typical": 0.821,
+          "intrinsic_coercivity_kA_per_m_typical": 1003,
+          "bhmax_MGOe_typical": 14.2
+        }
+      ],
+      "note": "Manufacturer labels values typical; acceptance limits agreed at drawing review. Operating temperature confirmed per grade and circuit."
+    }
+  ],
+  "commercial_gap_analysis": {
+    "lpbf_hd_printed_remanence_T": 0.34,
+    "manufacturer_grade_reference_remanence_T_range": [
+      0.7,
+      0.84
+    ],
+    "lpbf_ratio_of_reference_range": [
+      0.4047619048,
+      0.4857142857
+    ],
+    "nominal_gap_closure_50pct_target_T": [
+      0.52,
+      0.59
+    ],
+    "status": "prospective_target_arithmetic_not_matched_experimental_comparison",
+    "matching_requirements": [
+      "specimen geometry",
+      "measurement direction",
+      "temperature",
+      "magnetization history",
+      "demagnetization correction",
+      "measurement method",
+      "density/material form"
+    ]
+  }
 }
