@@ -178,7 +178,10 @@ pub fn validate_pair(pair: &ScopeEquivalencePairV1) -> Vec<String> {
         errors.push("evaluator_only.adjudication_authority must be non-empty".to_owned());
     }
     if evaluator.evidence_refs.is_empty()
-        || evaluator.evidence_refs.iter().any(|reference| reference.trim().is_empty())
+        || evaluator
+            .evidence_refs
+            .iter()
+            .any(|reference| reference.trim().is_empty())
     {
         errors.push("evaluator_only.evidence_refs must be non-empty".to_owned());
     }
@@ -297,12 +300,16 @@ mod tests {
     #[test]
     fn hypothesis_permutation_changes_raw_digest_but_not_normalized_digest() {
         let dataset = fixture();
-        let report = validation_reports(&dataset).expect("validated reports")
+        let report = validation_reports(&dataset)
+            .expect("validated reports")
             .into_iter()
             .find(|report| report.pair_id == "SCOPE-T1-HYPOTHESIS-PERMUTATION-001")
             .expect("hypothesis permutation pair");
         assert_ne!(report.base_raw_sha256, report.variant_raw_sha256);
-        assert_eq!(report.base_normalized_sha256, report.variant_normalized_sha256);
+        assert_eq!(
+            report.base_normalized_sha256,
+            report.variant_normalized_sha256
+        );
         assert_eq!(
             report.relation,
             ScopeRelationV1::Tier1HypothesisPermutationEquivalent
@@ -312,31 +319,43 @@ mod tests {
     #[test]
     fn premise_order_is_not_normalized() {
         let dataset = fixture();
-        let report = validation_reports(&dataset).expect("validated reports")
+        let report = validation_reports(&dataset)
+            .expect("validated reports")
             .into_iter()
             .find(|report| report.pair_id == "SCOPE-T1-PREMISE-ORDER-001")
             .expect("premise order pair");
-        assert_ne!(report.base_normalized_sha256, report.variant_normalized_sha256);
+        assert_ne!(
+            report.base_normalized_sha256,
+            report.variant_normalized_sha256
+        );
     }
 
     #[test]
     fn hypothesis_multiplicity_is_not_deduplicated() {
         let dataset = fixture();
-        let report = validation_reports(&dataset).expect("validated reports")
+        let report = validation_reports(&dataset)
+            .expect("validated reports")
             .into_iter()
             .find(|report| report.pair_id == "SCOPE-T1-HYPOTHESIS-MULTIPLICITY-001")
             .expect("hypothesis multiplicity pair");
-        assert_ne!(report.base_normalized_sha256, report.variant_normalized_sha256);
+        assert_ne!(
+            report.base_normalized_sha256,
+            report.variant_normalized_sha256
+        );
     }
 
     #[test]
     fn conclusion_structure_is_not_normalized() {
         let dataset = fixture();
-        let report = validation_reports(&dataset).expect("validated reports")
+        let report = validation_reports(&dataset)
+            .expect("validated reports")
             .into_iter()
             .find(|report| report.pair_id == "SCOPE-T1-CONCLUSION-CHANGE-001")
             .expect("conclusion change pair");
-        assert_ne!(report.base_normalized_sha256, report.variant_normalized_sha256);
+        assert_ne!(
+            report.base_normalized_sha256,
+            report.variant_normalized_sha256
+        );
     }
 
     #[test]
@@ -344,9 +363,11 @@ mod tests {
         let mut dataset = fixture();
         let evaluator = dataset.pairs[2].evaluator_only.as_mut().unwrap();
         evaluator.expected_relation = ScopeRelationV1::Tier1HypothesisPermutationEquivalent;
-        assert!(validate_dataset(&dataset)
-            .iter()
-            .any(|error| error.contains("expected_relation mismatch")));
+        assert!(
+            validate_dataset(&dataset)
+                .iter()
+                .any(|error| error.contains("expected_relation mismatch"))
+        );
     }
 
     #[test]
@@ -355,7 +376,11 @@ mod tests {
         let candidate_json = serde_json::to_value(&dataset.pairs[1].candidate)
             .expect("candidate-only serialization");
         assert!(!candidate_json.to_string().contains("expected_relation"));
-        assert!(!candidate_json.to_string().contains("adjudication_authority"));
+        assert!(
+            !candidate_json
+                .to_string()
+                .contains("adjudication_authority")
+        );
     }
 
     #[test]
@@ -424,7 +449,10 @@ mod tests {
             } else {
                 ScopeRelationV1::Tier1HypothesisPermutationEquivalent
             };
-            assert_eq!(derive_relation(&baseline, &variant).unwrap().0, expected_relation);
+            assert_eq!(
+                derive_relation(&baseline, &variant).unwrap().0,
+                expected_relation
+            );
             raw_digests.insert(variant_raw);
         }
         assert_eq!(raw_digests.len(), 120);
