@@ -1049,10 +1049,13 @@ fn evaluate_proposal(
     MycelialSampleHealthBudgetError,
 > {
     let mut reasons = Vec::new();
-    let projected_duration = state
-        .elapsed_session_duration_ns
+    let projected_duration = proposal
+        .planned_start_offset_ns
         .checked_add(proposal.duration_ns)
         .unwrap_or(u64::MAX);
+    let wait_before_action_ns = proposal
+        .planned_start_offset_ns
+        .saturating_sub(state.elapsed_session_duration_ns);
     let projected_action_count = state.completed_actions_in_session.saturating_add(1);
 
     if projected_duration > budget.maximum_session_duration_ns {
@@ -1090,6 +1093,8 @@ fn evaluate_proposal(
     }
 
     let mut projected_by_channel: BTreeMap<String, f64> = BTreeMap::new();
+    let mut irradiance_by_channel: BTreeMap<String, f64> = BTreeMap::new();
+    let mut illumination_duration_by_channel: BTreeMap<String, u64> = BTreeMap::new();
     if action_kind == MycelialAcquisitionActionKind::HumanAnnotation {
         if !proposal.photon_dose_estimates.is_empty() {
             return Err(MycelialSampleHealthBudgetError::InvalidProposal(
@@ -1104,6 +1109,12 @@ fn evaluate_proposal(
             MycelialSampleHealthRejectionReason::MissingOpticalDoseEstimate,
         );
     } else {
+        if !state.exposure_history_complete {
+            add_reason(
+                &mut reasons,
+                MycelialSampleHealthRejectionReason::ExposureHistoryIncomplete,
+            );
+        }
         let required_channels = proposal
             .required_illumination_channel_ids
             .iter()
@@ -1168,6 +1179,38 @@ fn evaluate_proposal(
                 );
                 continue;
             }
+            if dose.irradiance_watts_per_cm2_upper > limit.maximum_irradiance_watts_per_cm2 {
+                add_reason(
+                    &mut reasons,
+                    MycelialSampleHealthRejectionReason::IrradianceExceeded,
+                );
+            }
+            if dose.illumination_duration_ns
+                > limit.maximum_continuous_illumination_duration_ns
+            {
+                add_reason(
+                    &mut reasons,
+                    MycelialSampleHealthRejectionReason::ContinuousIlluminationDurationExceeded,
+                );
+            }
+            if let Some(elapsed_since_last) = state.elapsed_since_last_optical_exposure_ns {
+                let available_recovery_ns =
+                    elapsed_since_last.saturating_add(wait_before_action_ns);
+                if available_recovery_ns < limit.minimum_recovery_interval_ns {
+                    add_reason(
+                        &mut reasons,
+                        MycelialSampleHealthRejectionReason::RecoveryIntervalNotMet,
+                    );
+                }
+            }
+            irradiance_by_channel.insert(
+                dose.channel_id.clone(),
+                dose.irradiance_watts_per_cm2_upper,
+            );
+            illumination_duration_by_channel.insert(
+                dose.channel_id.clone(),
+                dose.illumination_duration_ns,
+            );
             let increment = increment_by_channel
                 .entry(dose.channel_id.clone())
                 .or_insert(0.0);
@@ -1216,6 +1259,14 @@ fn evaluate_proposal(
         .into_iter()
         .map(
             |(channel_id, maximum_projected_photons_per_um2)| MycelialProjectedChannelDose {
+                irradiance_watts_per_cm2_upper: irradiance_by_channel
+                    .get(&channel_id)
+                    .copied()
+                    .unwrap_or(0.0),
+                illumination_duration_ns: illumination_duration_by_channel
+                    .get(&channel_id)
+                    .copied()
+                    .unwrap_or(0),
                 channel_id,
                 maximum_projected_photons_per_um2,
             },
@@ -1231,6 +1282,7 @@ fn evaluate_proposal(
         spatial_footprint_digest: proposal.spatial_footprint_digest.clone(),
         health_model_digest: proposal.health_model_digest.clone(),
         net_value_of_information: net_voi,
+        planned_start_offset_ns: proposal.planned_start_offset_ns,
         projected_session_duration_ns: projected_duration,
         projected_action_count,
         maximum_projected_photons_per_um2_by_channel: dose_summaries,
@@ -1387,6 +1439,7 @@ pub fn mycelial_sample_health_budget_report_digest(
             MycelialAcquisitionActionKind::Other => 5,
         }]);
         hash_f64(&mut hasher, action.net_value_of_information);
+        hasher.update(&action.planned_start_offset_ns.to_le_bytes());
         hasher.update(&action.projected_session_duration_ns.to_le_bytes());
         hasher.update(&action.projected_action_count.to_le_bytes());
         hasher.update(
@@ -1395,6 +1448,8 @@ pub fn mycelial_sample_health_budget_report_digest(
         for dose in &action.maximum_projected_photons_per_um2_by_channel {
             hash_string(&mut hasher, &dose.channel_id);
             hash_f64(&mut hasher, dose.maximum_projected_photons_per_um2);
+            hash_f64(&mut hasher, dose.irradiance_watts_per_cm2_upper);
+            hasher.update(&dose.illumination_duration_ns.to_le_bytes());
         }
     }
     hasher.update(&(report.rejected_actions.len() as u64).to_le_bytes());
