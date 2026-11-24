@@ -10,15 +10,16 @@ use std::fmt;
 
 use digest::CanonicalHasher;
 
+pub mod active_sensing;
 pub mod digest;
-pub mod edge_adapter;
-pub mod real_dataset_manifest;
 pub mod dms;
+pub mod edge_adapter;
 pub mod evidence;
 pub mod fast_event;
 pub mod irregular;
 pub mod knowledge_stream;
 pub mod phase;
+pub mod real_dataset_manifest;
 pub mod retention;
 pub mod temporal;
 
@@ -157,7 +158,10 @@ impl fmt::Display for DelayedCueVerificationError {
             }
             Self::InvalidProbe => write!(f, "delayed-cue probe is invalid"),
             Self::InvalidDistractor { index } => {
-                write!(f, "distractor {index} violates the declared schedule or similarity band")
+                write!(
+                    f,
+                    "distractor {index} violates the declared schedule or similarity band"
+                )
             }
             Self::InvalidEventOrder { index } => {
                 write!(f, "event {index} is not in strict temporal/ordinal order")
@@ -189,9 +193,10 @@ pub fn verify_delayed_cue_trace(
         return Err(DelayedCueVerificationError::InvalidEventCount);
     }
 
-    let first = task.events.first().ok_or(
-        DelayedCueVerificationError::InvalidTargetBinding,
-    )?;
+    let first = task
+        .events
+        .first()
+        .ok_or(DelayedCueVerificationError::InvalidTargetBinding)?;
     match &first.kind {
         EventKind::Associate { key, value }
             if first.step == 0
@@ -201,9 +206,10 @@ pub fn verify_delayed_cue_trace(
         _ => return Err(DelayedCueVerificationError::InvalidTargetBinding),
     }
 
-    let last = task.events.last().ok_or(
-        DelayedCueVerificationError::InvalidProbe,
-    )?;
+    let last = task
+        .events
+        .last()
+        .ok_or(DelayedCueVerificationError::InvalidProbe)?;
     let expected_probe_ordinal = u64::try_from(task.distractor_count)
         .unwrap_or(u64::MAX)
         .saturating_add(1);
@@ -559,10 +565,7 @@ mod tests {
     fn public_task_has_a_stable_sha256_digest() {
         let (task, _) = generate_delayed_cue(config(DistractorSimilarity::High)).unwrap();
         assert!(delayed_cue_digest_valid(&task));
-        assert_eq!(
-            task.content_sha256,
-            delayed_cue_content_digest(&task)
-        );
+        assert_eq!(task.content_sha256, delayed_cue_content_digest(&task));
     }
 
     #[test]
@@ -574,8 +577,7 @@ mod tests {
 
     #[test]
     fn target_binding_precedes_probe_by_declared_delay() {
-        let (task, oracle) =
-            generate_delayed_cue(config(DistractorSimilarity::High)).unwrap();
+        let (task, oracle) = generate_delayed_cue(config(DistractorSimilarity::High)).unwrap();
         let target = task
             .events
             .iter()
@@ -603,8 +605,7 @@ mod tests {
 
     #[test]
     fn high_similarity_distractors_are_within_four_bits() {
-        let (task, oracle) =
-            generate_delayed_cue(config(DistractorSimilarity::High)).unwrap();
+        let (task, oracle) = generate_delayed_cue(config(DistractorSimilarity::High)).unwrap();
         let distractors = associations(&task)
             .into_iter()
             .filter(|(_, key, _)| *key != oracle.target_key);
@@ -616,8 +617,7 @@ mod tests {
 
     #[test]
     fn low_similarity_distractors_are_between_twenty_eight_and_thirty_six_bits() {
-        let (task, oracle) =
-            generate_delayed_cue(config(DistractorSimilarity::Low)).unwrap();
+        let (task, oracle) = generate_delayed_cue(config(DistractorSimilarity::Low)).unwrap();
         let distractors = associations(&task)
             .into_iter()
             .filter(|(_, key, _)| *key != oracle.target_key);
@@ -659,9 +659,11 @@ mod tests {
         let mut cfg = config(DistractorSimilarity::High);
         cfg.delay_steps = 1;
         let (task, _) = generate_delayed_cue(cfg).unwrap();
-        assert!(task.events[..task.events.len() - 1]
-            .iter()
-            .all(|event| event.step <= 1));
+        assert!(
+            task.events[..task.events.len() - 1]
+                .iter()
+                .all(|event| event.step <= 1)
+        );
         assert!(matches!(
             task.events.last().map(|event| &event.kind),
             Some(EventKind::Probe { .. })
@@ -672,10 +674,7 @@ mod tests {
     fn zero_delay_is_rejected() {
         let mut cfg = config(DistractorSimilarity::High);
         cfg.delay_steps = 0;
-        assert_eq!(
-            generate_delayed_cue(cfg),
-            Err(GenerationError::ZeroDelay)
-        );
+        assert_eq!(generate_delayed_cue(cfg), Err(GenerationError::ZeroDelay));
     }
 
     #[test]
@@ -761,23 +760,14 @@ mod integration_smoke_tests {
         );
 
         let fast_config = fast_event::FastEventConfig::reference(0xA11C_E007);
-        let (fast_task, fast_oracle) =
-            fast_event::generate_fast_event_task(fast_config).unwrap();
+        let (fast_task, fast_oracle) = fast_event::generate_fast_event_task(fast_config).unwrap();
         assert_eq!(
-            fast_event::verify_fast_event_trace_seeded(
-                &fast_task,
-                &fast_oracle,
-                fast_config
-            ),
+            fast_event::verify_fast_event_trace_seeded(&fast_task, &fast_oracle, fast_config),
             Ok(())
         );
 
-        let phase_config = phase::PhaseConfig::reference(
-            0xA11C_E008,
-            phase::PhaseMode::Mixed
-        );
-        let (phase_task, phase_oracle) =
-            phase::generate_phase_task(phase_config).unwrap();
+        let phase_config = phase::PhaseConfig::reference(0xA11C_E008, phase::PhaseMode::Mixed);
+        let (phase_task, phase_oracle) = phase::generate_phase_task(phase_config).unwrap();
         assert_eq!(
             phase::verify_phase_trace_seeded(&phase_task, &phase_oracle, phase_config),
             Ok(())
@@ -807,8 +797,9 @@ mod integration_smoke_tests {
             .collect();
         let knowledge_score = knowledge_stream::score_knowledge_predictions(
             &knowledge_oracle,
-            &knowledge_predictions
-        ).unwrap();
+            &knowledge_predictions,
+        )
+        .unwrap();
         assert_eq!(knowledge_score.exact_matches, 5);
         assert_eq!(knowledge_score.future_knowledge_leaks, 0);
         assert_eq!(knowledge_score.stale_answers_after_retraction, 0);

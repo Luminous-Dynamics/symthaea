@@ -482,7 +482,6 @@ pub fn verify_evidence_trace(
         recall_rate_hz: f64::from_bits(task.recall_rate_hz_bits),
         noise_rate_hz: f64::from_bits(task.noise_rate_hz_bits),
     };
-    let (expected_task, expected_oracle) =
     let (expected_task, expected_oracle) = generate_evidence_task(config)
         .map_err(|_| EvidenceVerificationError::ReproducibilityMismatch)?;
     if expected_task != *task || expected_oracle != *oracle {
