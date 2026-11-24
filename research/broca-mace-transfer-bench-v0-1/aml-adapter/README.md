@@ -61,7 +61,7 @@ Fourteen deterministic tests are authored for raw text fidelity, strict schema/u
 
 ## LongMemEval-V2 trajectory adapter
 
-The sibling `longmemeval_v2` module parses the official V2 trajectory JSONL record shape and builds a text-only state-window BM25 reference index. It preserves the full original trajectory JSON, state JSON, source state indices/steps, actions, thoughts, accessibility-tree text and screenshot references. Each candidate chunk is a centered state window; neighbor expansion remains within the same trajectory.
+The `longmemeval_v2` module parses the official V2 trajectory JSONL record shape and builds the text state-window BM25 reference index. The companion `longmemeval_v2_entity` module builds a distinct exact structured-literal index over trajectory IDs, URLs, numeric state/step values, goals and structured action fields. Ordinary prose is intentionally excluded from the literal channel, so it complements rather than duplicates BM25. The official sidecar runs both channels and fuses their ranks with RRF (k=60, equal weights); the returned fused candidate records are bound to the hybrid channel, while the retrieval trace retains each per-channel action receipt separately. Both indexes use the same centered state-window chunk IDs and slice radius. The parser preserves the full original trajectory JSON, state JSON, source state indices/steps, actions, thoughts, accessibility-tree text and screenshot references. BM25 neighbor expansion remains within the same trajectory and is not assigned inherited relevance scores by RRF.
 
 The dataset attaches actions to destination states. The adapter keeps the action on its original destination state and describes it as the transition from the prior state; it does not shift the action backward. Web and enterprise trajectories cannot share one index.
 
@@ -70,5 +70,7 @@ Screenshots remain references rather than embedded pixels. This increment adds a
 This is still not a complete official Python `Memory.insert/query` plugin. The BM25 component does not rank by screenshot pixels or consume `query_image`; a multimodal retriever and the thin official-harness bridge remain separate work. The official harness must continue to enforce its own reader/context-token budget, and the backend must not receive evaluator labels or question metadata.
 
 Resource receipts report local measured index-build and query latency, source/state/accessibility/evidence-text bytes, screenshot-reference bytes, and lexical payload lower bounds. They exclude image pixels, allocator/container overhead, embeddings, LLM/reader cost, verification and persistent storage infrastructure. Sixteen deterministic LongMemEval-V2 adapter tests are authored across source preservation, state/action semantics, BM25 retrieval, path resolution, missing images, traversal, symlink escape, context projection and tamper detection. The tests have not been executed.
+
+The sidecar's current hybrid retrieval profile is still a fixed two-action policy, not learned strategy selection. Its exact entity-literal field weights, extraction rule, channel names, backend binary digest and RRF configuration are included in the Python bridge's backend profile commitment. The entity-literal action trace is independently recorded even when it returns no candidates.
 
 No V2 run or score is claimed.
