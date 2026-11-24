@@ -113,6 +113,7 @@ struct Effect {
 #[derive(Debug, Deserialize)]
 #[serde(deny_unknown_fields)]
 struct Capture {
+    source_kind: String,
     capture_id: String,
     payload_sha256: String,
     recorder_identity: String,
@@ -120,6 +121,7 @@ struct Capture {
     reported_closure: String,
     sequence_accounting: SequenceAccounting,
     frame_accounting: FrameAccounting,
+    heartbeat_accounting: HeartbeatAccounting,
     terminal_watermark: u64,
     receipt: ReceiptRef,
 }
@@ -140,6 +142,15 @@ struct FrameAccounting {
     observed: u64,
     dropped: u64,
     xrun_count: u64,
+}
+
+#[derive(Debug, Deserialize)]
+#[serde(deny_unknown_fields)]
+struct HeartbeatAccounting {
+    expected: u64,
+    observed: u64,
+    missing: u64,
+    duplicate: u64,
 }
 
 #[derive(Debug, Deserialize)]
@@ -205,8 +216,12 @@ pub struct EpisodeReport {
     pub decision_action: String,
     pub effect_stage_reported: Option<String>,
     pub effect_capture_binding: bool,
+    pub capture_source_kind: String,
     pub capture_sequence_accounting_consistent: bool,
+    pub capture_frame_accounting_applicable: bool,
     pub capture_frame_accounting_consistent: bool,
+    pub capture_heartbeat_accounting_applicable: bool,
+    pub capture_heartbeat_accounting_consistent: bool,
     pub capture_accounting_complete: bool,
     pub observation_structurally_eligible: bool,
     pub observation_outcome: ObservationOutcome,
@@ -399,6 +414,12 @@ fn reduce_episode(episode: &Episode) -> Result<EpisodeReport, String> {
     };
 
     if !matches!(
+        episode.capture.source_kind.as_str(),
+        "rendered_audio_loopback" | "midi_output_monitor"
+    ) {
+        return Err("unknown capture source_kind".into());
+    }
+    if !matches!(
         episode.capture.reported_closure.as_str(),
         "eligible" | "ineligible" | "unknown"
     ) {
@@ -417,6 +438,8 @@ fn reduce_episode(episode: &Episode) -> Result<EpisodeReport, String> {
         .checked_add(episode.capture.sequence_accounting.missing)
         == Some(episode.capture.sequence_accounting.expected)
         && episode.capture.sequence_accounting.duplicate == 0;
+    let capture_frame_accounting_applicable =
+        episode.capture.source_kind == "rendered_audio_loopback";
     let capture_frame_accounting_consistent = episode
         .capture
         .frame_accounting
@@ -425,6 +448,38 @@ fn reduce_episode(episode: &Episode) -> Result<EpisodeReport, String> {
         == Some(episode.capture.frame_accounting.expected)
         && episode.capture.frame_accounting.dropped == 0
         && episode.capture.frame_accounting.xrun_count == 0;
+    let capture_heartbeat_accounting_applicable =
+        episode.capture.source_kind == "midi_output_monitor";
+    let capture_heartbeat_accounting_consistent = episode
+        .capture
+        .heartbeat_accounting
+        .observed
+        .checked_add(episode.capture.heartbeat_accounting.missing)
+        == Some(episode.capture.heartbeat_accounting.expected)
+        && episode.capture.heartbeat_accounting.duplicate == 0;
+    let source_accounting_complete = match episode.capture.source_kind.as_str() {
+        "rendered_audio_loopback" => {
+            episode.capture.frame_accounting.expected > 0
+                && episode.capture.frame_accounting.observed
+                    == episode.capture.frame_accounting.expected
+                && capture_frame_accounting_consistent
+                && episode.capture.heartbeat_accounting.expected == 0
+                && episode.capture.heartbeat_accounting.observed == 0
+                && episode.capture.heartbeat_accounting.missing == 0
+                && episode.capture.heartbeat_accounting.duplicate == 0
+        }
+        "midi_output_monitor" => {
+            episode.capture.frame_accounting.expected == 0
+                && episode.capture.frame_accounting.observed == 0
+                && episode.capture.frame_accounting.dropped == 0
+                && episode.capture.frame_accounting.xrun_count == 0
+                && episode.capture.heartbeat_accounting.expected > 0
+                && episode.capture.heartbeat_accounting.observed
+                    == episode.capture.heartbeat_accounting.expected
+                && capture_heartbeat_accounting_consistent
+        }
+        _ => false,
+    };
     let capture_accounting_complete = episode.capture.reported_closure == "eligible"
         && same_window(
             &episode.session.target_window,
@@ -434,16 +489,17 @@ fn reduce_episode(episode: &Episode) -> Result<EpisodeReport, String> {
         && episode.capture.sequence_accounting.observed
             == episode.capture.sequence_accounting.expected
         && capture_sequence_accounting_consistent
-        && episode.capture.frame_accounting.expected > 0
-        && episode.capture.frame_accounting.observed == episode.capture.frame_accounting.expected
-        && capture_frame_accounting_consistent
+        && source_accounting_complete
         && episode.capture.terminal_watermark > 0;
 
     if !capture_sequence_accounting_consistent {
         findings.push("capture sequence accounting is inconsistent or contains duplicates".into());
     }
-    if !capture_frame_accounting_consistent {
-        findings.push("capture frame accounting is incomplete, dropped, or contains XRUNs".into());
+    if capture_frame_accounting_applicable && !capture_frame_accounting_consistent {
+        findings.push("audio capture frame accounting is incomplete, dropped, or contains XRUNs".into());
+    }
+    if capture_heartbeat_accounting_applicable && !capture_heartbeat_accounting_consistent {
+        findings.push("MIDI monitor heartbeat accounting is incomplete or contains duplicates".into());
     }
     if !capture_accounting_complete {
         findings.push("capture is not structurally eligible for negative-event scoring".into());
@@ -523,8 +579,12 @@ fn reduce_episode(episode: &Episode) -> Result<EpisodeReport, String> {
         decision_action: episode.decision.action.clone(),
         effect_stage_reported,
         effect_capture_binding,
+        capture_source_kind: episode.capture.source_kind.clone(),
         capture_sequence_accounting_consistent,
+        capture_frame_accounting_applicable,
         capture_frame_accounting_consistent,
+        capture_heartbeat_accounting_applicable,
+        capture_heartbeat_accounting_consistent,
         capture_accounting_complete,
         observation_structurally_eligible,
         observation_outcome,
@@ -742,6 +802,9 @@ mod tests {
     const UNOBSERVED: &str = include_str!(
         "../../../docs/research/fixtures/mel-closed-loop-episode-unobserved.synthetic.json"
     );
+    const MIDI_ABSENT: &str = include_str!(
+        "../../../docs/research/fixtures/mel-closed-loop-episode-midi-absent.synthetic.json"
+    );
 
     #[test]
     fn complete_present_window_is_reported_present_not_ground_truth() {
@@ -765,6 +828,40 @@ mod tests {
         assert!(report.capture_accounting_complete);
         assert!(report.effect_stage_reported.is_none());
         assert_eq!(report.action_disposition, ActionDisposition::Ignored);
+    }
+
+    #[test]
+    fn complete_empty_midi_monitor_window_is_absent_without_audio_frames_or_producer() {
+        let report = parse_and_reduce(MIDI_ABSENT).expect("valid MIDI monitor fixture");
+        assert_eq!(report.observation_outcome, ObservationOutcome::DetectorReportedAbsent);
+        assert_eq!(report.capture_source_kind, "midi_output_monitor");
+        assert!(report.capture_accounting_complete);
+        assert!(!report.capture_frame_accounting_applicable);
+        assert!(report.capture_heartbeat_accounting_applicable);
+        assert!(report.capture_heartbeat_accounting_consistent);
+        assert!(report.effect_stage_reported.is_none());
+    }
+
+    #[test]
+    fn midi_heartbeat_gap_downgrades_absence_to_unobserved() {
+        let mut value: serde_json::Value = serde_json::from_str(MIDI_ABSENT).expect("fixture JSON");
+        value["capture"]["heartbeat_accounting"]["observed"] = serde_json::json!(3);
+        value["capture"]["heartbeat_accounting"]["missing"] = serde_json::json!(1);
+        let raw = serde_json::to_string(&value).expect("serialize fixture");
+        let report = parse_and_reduce(&raw).expect("heartbeat gap must downgrade observation");
+        assert_eq!(report.observation_outcome, ObservationOutcome::Unobserved);
+        assert!(!report.capture_accounting_complete);
+    }
+
+    #[test]
+    fn audio_capture_cannot_claim_unexplained_midi_heartbeats() {
+        let mut value: serde_json::Value = serde_json::from_str(PRESENT).expect("fixture JSON");
+        value["capture"]["heartbeat_accounting"]["expected"] = serde_json::json!(1);
+        value["capture"]["heartbeat_accounting"]["observed"] = serde_json::json!(1);
+        let raw = serde_json::to_string(&value).expect("serialize fixture");
+        let report = parse_and_reduce(&raw).expect("cross-modality accounting should downgrade");
+        assert_eq!(report.observation_outcome, ObservationOutcome::Unobserved);
+        assert!(!report.capture_accounting_complete);
     }
 
     #[test]
