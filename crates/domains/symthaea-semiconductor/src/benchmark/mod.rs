@@ -157,6 +157,7 @@ pub use delayed_aci_controller::{
     DELAYED_ACI_UPDATE_RECEIPT_SCHEMA_V1, DelayedAciDispositionV1, DelayedAciEngineV1,
     DelayedAciErrorV1, DelayedAciLabelDeliveryV1, DelayedAciPolicyV1, DelayedAciPredictionInputV1,
     DelayedAciPredictionReceiptV1, DelayedAciReasonV1, DelayedAciStateV1,
-    DelayedAciUpdateReceiptV1, create_delayed_aci_engine_v1, deliver_delayed_aci_feedback_v1,
+    DelayedAciUpdateReceiptV1, close_delayed_aci_prediction_stream_v1,
+    create_delayed_aci_engine_v1, deliver_delayed_aci_feedback_v1,
     issue_delayed_aci_prediction_v1,
 };
