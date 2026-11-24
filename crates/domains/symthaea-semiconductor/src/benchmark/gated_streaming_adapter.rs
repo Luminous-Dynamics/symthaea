@@ -1604,15 +1604,17 @@ mod tests {
         fn run() -> String {
             let mut engine = engine();
             for index in 0..2 {
-                predict_and_register_stream_sample_v1(
+                let sample_id = format!("sample-{index}");
+                let event_id = format!("event-{index}");
+                let label_id = format!("label-{index}");
+                deliver_qualified_stream_label_v1(
                     &mut engine,
-                    &prediction(
-                        &format!("sample-{index}"),
-                        &format!("event-{index}"),
-                        100 + index * 3,
-                        102 + index * 3,
-                        Some("eqp-1/ch-1"),
-                        vec![1.0 + index as f64, 2.0],
+                    &delivery(
+                        (&sample_id, &event_id, &label_id),
+                        1,
+                        LabelConsumptionEligibilityV1::EligibleUnderDeclaredPolicy,
+                        LabelEvidenceFrontierV1::CurrentAtK1,
+                        (110 + index * 3, 112 + index * 3),
                     ),
                 )
                 .unwrap();
