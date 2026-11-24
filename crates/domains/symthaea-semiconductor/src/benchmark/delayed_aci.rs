@@ -874,6 +874,33 @@ pub fn close_delayed_aci_stream_v1(
     Ok(missing)
 }
 
+/// Evaluates the fixed-delay ACI finite-horizon bound from the paper:
+/// sum_theta max(alpha_theta, 1-alpha_theta)/(gamma*T) + tau/T.
+/// The alpha vector must be the initial phase state, not the final adapted state.
+pub fn delayed_aci_finite_horizon_miscoverage_bound_v1(
+    initial_phase_alphas: &[f64],
+    learning_rate: f64,
+    total_rounds: u64,
+) -> Result<f64, DelayedAciErrorV1> {
+    if initial_phase_alphas.is_empty()
+        || initial_phase_alphas.iter().any(|value| !value.is_finite())
+        || !learning_rate.is_finite()
+        || learning_rate <= 0.0
+        || total_rounds == 0
+    {
+        return Err(DelayedAciErrorV1(
+            "finite-horizon ACI bound has invalid inputs".into(),
+        ));
+    }
+    let tau = initial_phase_alphas.len() as f64;
+    let initial_term = initial_phase_alphas
+        .iter()
+        .map(|alpha| alpha.max(1.0 - alpha))
+        .sum::<f64>();
+    Ok(initial_term / (learning_rate * total_rounds as f64)
+        + tau / total_rounds as f64)
+}
+
 /// Calculates tau/L; the residual-memory scale L must be estimated and
 /// validated by the caller. This helper does not estimate temporal memory.
 pub fn delay_to_memory_ratio_v1(
@@ -896,6 +923,10 @@ mod tests {
 
     fn digest(ch: char) -> String {
         std::iter::repeat_n(ch, 64).collect()
+    }
+
+    fn close(left: f64, right: f64) -> bool {
+        (left - right).abs() <= 1.0e-12
     }
 
     fn policy(delay_rounds: u64) -> DelayedAciPolicyV1 {
@@ -1050,8 +1081,9 @@ mod tests {
         assert_eq!(receipt.disposition, AciUpdateDispositionV1::Updated);
         assert_eq!(receipt.miscoverage_observed, Some(true));
         assert_eq!(receipt.alpha_before, Some(0.10));
-        assert_eq!(receipt.alpha_after, Some(-0.08));
-        assert_eq!(engine.phase_alphas, vec![-0.08, 0.10, 0.10]);
+        assert!(close(receipt.alpha_after.unwrap(), -0.08));
+        assert!(close(engine.phase_alphas[0], -0.08));
+        assert_eq!(engine.phase_alphas[1..], [0.10, 0.10]);
 
         let next = issue_delayed_aci_prediction_v1(
             &mut engine,
@@ -1080,7 +1112,7 @@ mod tests {
         )
         .unwrap();
         assert_eq!(receipt.miscoverage_observed, Some(false));
-        assert_eq!(receipt.alpha_after, Some(0.12));
+        assert!(close(receipt.alpha_after.unwrap(), 0.12));
     }
 
     #[test]
@@ -1327,6 +1359,20 @@ mod tests {
             engine.phase_alphas
         }
         assert_eq!(run(), run());
+    }
+
+    #[test]
+    fn fixed_delay_finite_horizon_bound_matches_paper_formula() {
+        let bound = delayed_aci_finite_horizon_miscoverage_bound_v1(
+            &[0.10, 0.20, 0.35],
+            0.20,
+            100,
+        )
+        .unwrap();
+        let expected = (0.90 + 0.80 + 0.65) / (0.20 * 100.0) + 3.0 / 100.0;
+        assert!(close(bound, expected));
+        assert!(delayed_aci_finite_horizon_miscoverage_bound_v1(&[], 0.2, 100).is_err());
+        assert!(delayed_aci_finite_horizon_miscoverage_bound_v1(&[0.1], 0.0, 100).is_err());
     }
 
     #[test]
