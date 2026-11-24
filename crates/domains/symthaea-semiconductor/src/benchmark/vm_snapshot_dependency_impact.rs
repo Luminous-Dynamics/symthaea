@@ -916,7 +916,7 @@ mod tests {
             ) { 1 } else { 0 },
             label_statuses: vec![VmSnapshotLabelCurrentStatusV1 {
                 label_id: format!("label-{snapshot_id}"),
-                k0_projection_sha256: digest('k'),
+                k0_projection_sha256: digest('a'),
                 k1_eligibility: match disposition {
                     VmSnapshotCurrentDispositionV1::CurrentEligible => {
                         super::super::label_consumption_guard::LabelConsumptionEligibilityV1::EligibleUnderDeclaredPolicy
@@ -929,7 +929,7 @@ mod tests {
                         super::super::label_consumption_guard::LabelConsumptionEligibilityV1::Blocked
                     }
                 },
-                k1_report_sha256: digest('r'),
+                k1_report_sha256: digest('b'),
                 reasons: Vec::new(),
             }],
             historical_manifest_rewritten: false,
