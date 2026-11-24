@@ -2,8 +2,8 @@
 
 pub mod binary_metrics;
 pub mod calibration_requalification;
-pub mod dtco_manifest;
 pub mod delayed_aci;
+pub mod dtco_manifest;
 pub mod gated_streaming_adapter;
 pub mod label_consumption_guard;
 pub mod metrology_audit;
@@ -153,13 +153,11 @@ pub use gated_streaming_adapter::{
 
 pub use delayed_aci::{
     ACI_DELAY_MEMORY_DIAGNOSTIC_SCHEMA_V1, ACI_LABEL_DELIVERY_SCHEMA_V1,
-    ACI_PREDICTION_INPUT_SCHEMA_V1, ACI_PREDICTION_RECEIPT_SCHEMA_V1,
-    ACI_UPDATE_RECEIPT_SCHEMA_V1, DELAYED_ACI_ENGINE_SCHEMA_V1,
-    DELAYED_ACI_POLICY_SCHEMA_V1, AciCalibratorStateV1, AciDelayMemoryDiagnosticV1,
-    AciLabelDeliveryV1, AciPredictionInputV1, AciPredictionReceiptV1,
-    AciUpdateDispositionV1, AciUpdateModeV1, AciUpdateReasonV1, AciUpdateReceiptV1,
-    DelayedAciEngineV1, DelayedAciErrorV1, DelayedAciPolicyV1, DelayMemoryRegimeV1,
-    ResidualDependenceFamilyV1, compute_delay_memory_diagnostic_v1,
-    create_delayed_aci_engine_v1, current_aci_alpha_v1, deliver_aci_label_v1,
-    register_aci_prediction_v1,
+    ACI_PREDICTION_INPUT_SCHEMA_V1, ACI_PREDICTION_RECEIPT_SCHEMA_V1, ACI_UPDATE_RECEIPT_SCHEMA_V1,
+    AciCalibratorStateV1, AciDelayMemoryDiagnosticV1, AciLabelDeliveryV1, AciPredictionInputV1,
+    AciPredictionReceiptV1, AciUpdateDispositionV1, AciUpdateModeV1, AciUpdateReasonV1,
+    AciUpdateReceiptV1, DELAYED_ACI_ENGINE_SCHEMA_V1, DELAYED_ACI_POLICY_SCHEMA_V1,
+    DelayMemoryRegimeV1, DelayedAciEngineV1, DelayedAciErrorV1, DelayedAciPolicyV1,
+    ResidualDependenceFamilyV1, compute_delay_memory_diagnostic_v1, create_delayed_aci_engine_v1,
+    current_aci_alpha_v1, deliver_aci_label_v1, register_aci_prediction_v1,
 };
