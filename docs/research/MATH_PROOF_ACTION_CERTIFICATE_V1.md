@@ -187,3 +187,11 @@ This is one seeded mismatch control only. It is not a comprehensive adversarial 
 The focused workflow now cross-checks the certificate manifest against the source-pinned `PROOF_PLAN_AND_COMM_V1.json`: plan IDs, action node IDs, action kinds, input goal IDs and output subgoal IDs must match. The forward and reverse expected propositions must equal the corresponding plan subgoal statements. A generated mutation that changes the forward expected proposition to the identity statement is required to fail this structural binding check.
 
 This is a finite manifest-to-plan integrity gate; it does not make the candidate plan expert-reviewed gold data or establish that the conceptual interpretation of a node is correct.
+
+### 12.3. Subgoal accounting and axiom-detection controls
+
+The action-to-plan binding gate now additionally checks compositional subgoal accounting: the multiset of goals emitted by `A_SPLIT_IFF` must equal the multiset of downstream action input goals, exactly two outputs must exist, and output IDs must be unique. A generated manifest mutation omitting `G_REVERSE` must be rejected.
+
+A second pinned Lean negative fixture, [ProofActionCertificateAndCommAxiomNegative.lean](../../scripts/research/lean-proof-extractor/ProofActionCertificateAndCommAxiomNegative.lean), introduces an explicit axiom and proves a deliberately axiom-dependent proposition. This is not offered as a valid certificate. Instead, the workflow requires `#print axioms` to report the exact injected axiom name and records the source/log digests. This demonstrates detection of one known axiom dependency; it does **not** yet parse or exhaustively classify every axiom, unsafe, partial, opaque or admission path.
+
+The exact-head workflow must pass the subgoal omission rejection, wrong-proposition type-error rejection, and injected-axiom observation before the action certificate receipt can be emitted.
