@@ -374,9 +374,16 @@ mod tests {
             .iter()
             .find(|pair| pair.candidate.pair_id == "MMP-HYPOTHESIS-ORDER-PERMUTATION-001")
             .expect("hypothesis-order pair");
-        assert_ne!(pair.candidate.base.sequent_sha256, pair.candidate.variant.sequent_sha256);
+        assert_ne!(
+            pair.candidate.base.sequent_sha256,
+            pair.candidate.variant.sequent_sha256
+        );
         assert_eq!(
-            derive_relation(&pair.candidate.base.sequent, &pair.candidate.variant.sequent).unwrap(),
+            derive_relation(
+                &pair.candidate.base.sequent,
+                &pair.candidate.variant.sequent
+            )
+            .unwrap(),
             OracleRelationV1::Equivalent
         );
     }
