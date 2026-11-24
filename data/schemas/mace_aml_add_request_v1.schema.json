@@ -36,51 +36,53 @@
   ],
   "additionalProperties": false,
   "$defs": {
-    "contentPart": [
-      {
-        "type": "object",
-        "properties": {
-          "type": {
-            "const": "text"
-          },
-          "text": {
-            "type": "string",
-            "minLength": 1
-          }
-        },
-        "required": [
-          "type",
-          "text"
-        ],
-        "additionalProperties": false
-      },
-      {
-        "type": "object",
-        "properties": {
-          "type": {
-            "const": "image_url"
-          },
-          "image_url": {
-            "type": "object",
-            "properties": {
-              "url": {
-                "type": "string",
-                "pattern": "^data:image/(jpeg|png|webp);base64,[A-Za-z0-9+/]+={0,2}$"
-              }
+    "contentPart": {
+      "oneOf": [
+        {
+          "type": "object",
+          "properties": {
+            "type": {
+              "const": "text"
             },
-            "required": [
-              "url"
-            ],
-            "additionalProperties": false
-          }
+            "text": {
+              "type": "string",
+              "minLength": 1
+            }
+          },
+          "required": [
+            "type",
+            "text"
+          ],
+          "additionalProperties": false
         },
-        "required": [
-          "type",
-          "image_url"
-        ],
-        "additionalProperties": false
-      }
-    ],
+        {
+          "type": "object",
+          "properties": {
+            "type": {
+              "const": "image_url"
+            },
+            "image_url": {
+              "type": "object",
+              "properties": {
+                "url": {
+                  "type": "string",
+                  "pattern": "^data:image/(jpeg|png|webp);base64,[A-Za-z0-9+/]+={0,2}$"
+                }
+              },
+              "required": [
+                "url"
+              ],
+              "additionalProperties": false
+            }
+          },
+          "required": [
+            "type",
+            "image_url"
+          ],
+          "additionalProperties": false
+        }
+      ]
+    },
     "message": {
       "type": "object",
       "properties": {
