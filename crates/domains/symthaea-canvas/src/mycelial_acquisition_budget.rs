@@ -76,6 +76,9 @@ pub struct MycelialAcquisitionBudgetProposal {
     /// acquisitions so overlapping ROIs accumulate dose on shared cells.
     pub spatial_footprint_cell_ids: Vec<String>,
     pub spatial_footprint_digest: String,
+    /// Exact, sorted channels expected to illuminate this action. The estimate
+    /// inventory must cover every required channel.
+    pub required_illumination_channel_ids: Vec<String>,
     pub roi_area_um2: f64,
     pub duration_ns: u64,
     /// Conservative upper bound on the maximum local temperature rise.
@@ -522,12 +525,21 @@ fn validate_proposal(
             "acquisition model or cost evidence differs from active-sensing action",
         ));
     }
-    if proposal.spatial_footprint_cell_ids.is_empty()
-        || proposal.spatial_footprint_cell_ids.len() > MAX_MYCELIAL_HEALTH_BUDGET_CELLS_PER_ACTION
+    if proposal.spatial_footprint_cell_ids.len() > MAX_MYCELIAL_HEALTH_BUDGET_CELLS_PER_ACTION
     {
         return Err(MycelialSampleHealthBudgetError::ResourceLimitExceeded(
             "proposal spatial footprint",
         ));
+    }
+    let mut previous_required_channel: Option<&str> = None;
+    for channel_id in &proposal.required_illumination_channel_ids {
+        validate_identifier(channel_id, "proposal.required_illumination_channel_id")?;
+        if previous_required_channel.is_some_and(|prior| prior >= channel_id.as_str()) {
+            return Err(MycelialSampleHealthBudgetError::InvalidProposal(
+                "required illumination channels must be strictly sorted and unique",
+            ));
+        }
+        previous_required_channel = Some(channel_id);
     }
     let mut previous: Option<&str> = None;
     for cell_id in &proposal.spatial_footprint_cell_ids {
@@ -557,15 +569,15 @@ fn validate_proposal(
         ));
     }
     if action_kind == MycelialAcquisitionActionKind::HumanAnnotation {
-        if !proposal.photon_dose_estimates.is_empty() {
+        if !proposal.photon_dose_estimates.is_empty()
+            || !proposal.required_illumination_channel_ids.is_empty()
+        {
             return Err(MycelialSampleHealthBudgetError::InvalidProposal(
-                "human annotation must not carry optical exposure estimates",
+                "human annotation must not carry optical exposure requirements",
             ));
         }
-    } else if proposal.photon_dose_estimates.is_empty() {
-        // Missing dose evidence is an inadmissibility, not a malformed report.
-        return Ok(());
     }
+    let mut previous_dose_channel: Option<&str> = None;
     for dose in &proposal.photon_dose_estimates {
         validate_identifier(&dose.channel_id, "dose.channel_id")?;
         validate_digest(&dose.calibration_digest, "dose.calibration_digest")?;
@@ -577,6 +589,12 @@ fn validate_proposal(
                 "invalid conservative photon-dose estimate",
             ));
         }
+        if previous_dose_channel.is_some_and(|prior| prior >= dose.channel_id.as_str()) {
+            return Err(MycelialSampleHealthBudgetError::InvalidProposal(
+                "photon-dose estimates must be strictly sorted and unique by channel",
+            ));
+        }
+        previous_dose_channel = Some(&dose.channel_id);
     }
     Ok(())
 }
@@ -653,7 +671,11 @@ fn proposal_inventory_digest(proposals: &[MycelialAcquisitionBudgetProposal]) ->
         hash_string(&mut hasher, &proposal.sample_id);
         hash_string(&mut hasher, &proposal.coordinate_frame_id);
         hash_string(&mut hasher, &proposal.spatial_footprint_digest);
-        hasher.update(&proposal.roi_area_um2.to_bits().to_le_bytes());
+        hasher.update(&(proposal.required_illumination_channel_ids.len() as u64).to_le_bytes());
+        for channel_id in &proposal.required_illumination_channel_ids {
+            hash_string(&mut hasher, channel_id);
+        }
+        hasher.update(&proposal.roi_area_um2.to_le_bytes());
         hasher.update(&proposal.duration_ns.to_le_bytes());
         hasher.update(&proposal.local_temperature_rise_upper_millikelvin.to_le_bytes());
         hash_string(&mut hasher, &proposal.acquisition_model_digest);
@@ -772,14 +794,39 @@ fn evaluate_proposal(
                 "human annotation unexpectedly contains photon-dose estimates",
             ));
         }
-    } else if proposal.photon_dose_estimates.is_empty() {
+    } else if proposal.photon_dose_estimates.is_empty()
+        || proposal.required_illumination_channel_ids.is_empty()
+    {
         add_reason(
             &mut reasons,
             MycelialSampleHealthRejectionReason::MissingOpticalDoseEstimate,
         );
     } else {
+        let required_channels = proposal
+            .required_illumination_channel_ids
+            .iter()
+            .map(String::as_str)
+            .collect::<BTreeSet<_>>();
+        let estimated_channels = proposal
+            .photon_dose_estimates
+            .iter()
+            .map(|dose| dose.channel_id.as_str())
+            .collect::<BTreeSet<_>>();
+        if !required_channels.is_subset(&estimated_channels) {
+            add_reason(
+                &mut reasons,
+                MycelialSampleHealthRejectionReason::MissingOpticalDoseEstimate,
+            );
+        }
         let mut increment_by_channel: BTreeMap<String, f64> = BTreeMap::new();
         for dose in &proposal.photon_dose_estimates {
+            if !required_channels.contains(dose.channel_id.as_str()) {
+                add_reason(
+                    &mut reasons,
+                    MycelialSampleHealthRejectionReason::UnknownIlluminationChannel,
+                );
+                continue;
+            }
             let Some(limit) = budget
                 .photon_dose_limits
                 .iter()
@@ -1130,6 +1177,11 @@ mod tests {
             coordinate_frame_id: "specimen-frame-v1".to_string(),
             spatial_footprint_digest: footprint_digest("specimen-frame-v1", &cell_ids),
             spatial_footprint_cell_ids: cell_ids,
+            required_illumination_channel_ids: if kind == MycelialAcquisitionActionKind::HumanAnnotation {
+                Vec::new()
+            } else {
+                vec!["gfp".to_string()]
+            },
             roi_area_um2: 20.0,
             duration_ns: 10,
             local_temperature_rise_upper_millikelvin: 100,
