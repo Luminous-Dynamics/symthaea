@@ -688,7 +688,7 @@ pub fn observe_drift_channel_v1(
                 observations: existing.map_or(0, |state| state.observations),
                 missing: existing.map_or(0, |state| state.missing_observations),
                 statistic: 0.0,
-                before_sha256: &before.into(),
+                before_sha256: before.clone(),
                 after_sha256: &before.into(),
             },
         );
@@ -708,7 +708,7 @@ pub fn observe_drift_channel_v1(
                 observations: existing.map_or(0, |state| state.observations),
                 missing: existing.map_or(0, |state| state.missing_observations),
                 statistic: 0.0,
-                before_sha256: &before.into(),
+                before_sha256: before.clone(),
                 after_sha256: &before.into(),
             },
         );
@@ -722,37 +722,37 @@ pub fn observe_drift_channel_v1(
             || state.baseline_sha256 != input.baseline_sha256
         {
             return make_receipt(
-            engine,
-            input,
-            DriftObservationOutcomeV1 {
-                disposition: DriftObservationDispositionV1::Rejected,
-                reason: Some(DriftObservationReasonV1::ChannelIdentityChanged),
-                alarm_state: DriftAlarmStateV1::InsufficientEvidence,
-                observations: state.observations,
-                missing: state.missing_observations,
-                statistic: 0.0,
-                before_sha256: &before.into(),
-                after_sha256: &before.into(),
-            },
-        );
+                engine,
+                input,
+                DriftObservationOutcomeV1 {
+                    disposition: DriftObservationDispositionV1::Rejected,
+                    reason: Some(DriftObservationReasonV1::ChannelIdentityChanged),
+                    alarm_state: DriftAlarmStateV1::InsufficientEvidence,
+                    observations: state.observations,
+                    missing: state.missing_observations,
+                    statistic: 0.0,
+                    before_sha256: before.clone(),
+                    after_sha256: &before.into(),
+                },
+            );
         }
         if input.event_time_unix_seconds < state.last_event_time_unix_seconds
             || input.observed_at_unix_seconds < state.last_observed_at_unix_seconds
         {
             return make_receipt(
-            engine,
-            input,
-            DriftObservationOutcomeV1 {
-                disposition: DriftObservationDispositionV1::Rejected,
-                reason: Some(DriftObservationReasonV1::InvalidChronology),
-                alarm_state: DriftAlarmStateV1::InsufficientEvidence,
-                observations: state.observations,
-                missing: state.missing_observations,
-                statistic: 0.0,
-                before_sha256: &before.into(),
-                after_sha256: &before.into(),
-            },
-        );
+                engine,
+                input,
+                DriftObservationOutcomeV1 {
+                    disposition: DriftObservationDispositionV1::Rejected,
+                    reason: Some(DriftObservationReasonV1::InvalidChronology),
+                    alarm_state: DriftAlarmStateV1::InsufficientEvidence,
+                    observations: state.observations,
+                    missing: state.missing_observations,
+                    statistic: 0.0,
+                    before_sha256: before.clone(),
+                    after_sha256: &before.into(),
+                },
+            );
         }
     }
 
@@ -831,19 +831,19 @@ pub fn observe_drift_channel_v1(
 
     // Build the receipt before committing either detector state or evidence ID.
     let receipt = make_receipt(
-            engine,
-            input,
-            DriftObservationOutcomeV1 {
-                disposition: DriftObservationDispositionV1::Updated,
-                reason: None,
-                alarm_state: alarm_state,
-                observations: next.observations,
-                missing: next.missing_observations,
-                statistic: statistic,
-                before_sha256: &before.into(),
-                after_sha256: &after.into(),
-            },
-        )?;
+        engine,
+        input,
+        DriftObservationOutcomeV1 {
+            disposition: DriftObservationDispositionV1::Updated,
+            reason: None,
+            alarm_state: alarm_state,
+            observations: next.observations,
+            missing: next.missing_observations,
+            statistic: statistic,
+            before_sha256: before.clone(),
+            after_sha256: after.clone(),
+        },
+    )?;
     engine.channels.insert(input.channel_id.clone(), next);
     engine
         .seen_evidence_receipt_sha256
@@ -1230,7 +1230,15 @@ mod tests {
     #[test]
     fn feature_channel_updates_and_emits_alert_after_minimum_support() {
         let mut engine = engine();
-        let base = input("x1", "feature-pressure", DriftEvidencePlaneV1::InputFeature, DriftDetectorKindV1::TwoSidedCusum, Some(2.0), 100, 'c');
+        let base = input(
+            "x1",
+            "feature-pressure",
+            DriftEvidencePlaneV1::InputFeature,
+            DriftDetectorKindV1::TwoSidedCusum,
+            Some(2.0),
+            100,
+            'c',
+        );
         let mut final_receipt = None;
         for index in 0..3 {
             let mut observation = base.clone();
@@ -1249,7 +1257,15 @@ mod tests {
     #[test]
     fn unknown_and_blocked_residuals_do_not_mutate_detector_state() {
         let mut engine = engine();
-        let mut clean = input("r1", "residual-tool-1", DriftEvidencePlaneV1::QualifiedResidual, DriftDetectorKindV1::TwoSidedCusum, Some(0.2), 100, 'c');
+        let mut clean = input(
+            "r1",
+            "residual-tool-1",
+            DriftEvidencePlaneV1::QualifiedResidual,
+            DriftDetectorKindV1::TwoSidedCusum,
+            Some(0.2),
+            100,
+            'c',
+        );
         clean.evidence_receipt_sha256 = clean
             .qualification_report
             .as_ref()
@@ -1287,7 +1303,15 @@ mod tests {
     #[test]
     fn tampered_k1_label_report_is_rejected_from_residual_monitor() {
         let mut engine = engine();
-        let mut observation = input("r1", "residual", DriftEvidencePlaneV1::QualifiedResidual, DriftDetectorKindV1::TwoSidedCusum, Some(1.0), 100, 'c');
+        let mut observation = input(
+            "r1",
+            "residual",
+            DriftEvidencePlaneV1::QualifiedResidual,
+            DriftDetectorKindV1::TwoSidedCusum,
+            Some(1.0),
+            100,
+            'c',
+        );
         let report = observation.qualification_report.as_mut().unwrap();
         report.label_revision = 2;
         let receipt = observe_drift_channel_v1(&mut engine, &observation).unwrap();
@@ -1299,7 +1323,15 @@ mod tests {
     #[test]
     fn non_k1_residual_evidence_is_rejected() {
         let mut engine = engine();
-        let mut observation = input("r1", "residual", DriftEvidencePlaneV1::QualifiedResidual, DriftDetectorKindV1::TwoSidedCusum, Some(1.0), 100, 'c');
+        let mut observation = input(
+            "r1",
+            "residual",
+            DriftEvidencePlaneV1::QualifiedResidual,
+            DriftDetectorKindV1::TwoSidedCusum,
+            Some(1.0),
+            100,
+            'c',
+        );
         observation.qualification = DriftQualificationV1::NotApplicable;
         let receipt = observe_drift_channel_v1(&mut engine, &observation).unwrap();
         assert_eq!(receipt.disposition, DriftObservationDispositionV1::Rejected);
@@ -1309,7 +1341,15 @@ mod tests {
     #[test]
     fn duplicate_evidence_receipt_is_idempotent() {
         let mut engine = engine();
-        let first = input("x1", "feature", DriftEvidencePlaneV1::InputFeature, DriftDetectorKindV1::Ewma, Some(1.0), 100, 'c');
+        let first = input(
+            "x1",
+            "feature",
+            DriftEvidencePlaneV1::InputFeature,
+            DriftDetectorKindV1::Ewma,
+            Some(1.0),
+            100,
+            'c',
+        );
         observe_drift_channel_v1(&mut engine, &first).unwrap();
         let before = channel_state_digest(engine.channels.get("feature")).unwrap();
         let mut duplicate = first;
@@ -1328,7 +1368,15 @@ mod tests {
     #[test]
     fn delayed_or_out_of_order_observation_is_rejected_without_state_mutation() {
         let mut engine = engine();
-        let first = input("x1", "feature", DriftEvidencePlaneV1::InputFeature, DriftDetectorKindV1::Ewma, Some(0.1), 100, 'c');
+        let first = input(
+            "x1",
+            "feature",
+            DriftEvidencePlaneV1::InputFeature,
+            DriftDetectorKindV1::Ewma,
+            Some(0.1),
+            100,
+            'c',
+        );
         observe_drift_channel_v1(&mut engine, &first).unwrap();
         let before = channel_state_digest(engine.channels.get("feature")).unwrap();
         let mut out_of_order = first.clone();
@@ -1348,7 +1396,15 @@ mod tests {
     #[test]
     fn feature_schema_or_baseline_change_requires_a_new_channel() {
         let mut engine = engine();
-        let first = input("x1", "feature", DriftEvidencePlaneV1::InputFeature, DriftDetectorKindV1::Ewma, Some(0.1), 100, 'c');
+        let first = input(
+            "x1",
+            "feature",
+            DriftEvidencePlaneV1::InputFeature,
+            DriftDetectorKindV1::Ewma,
+            Some(0.1),
+            100,
+            'c',
+        );
         observe_drift_channel_v1(&mut engine, &first).unwrap();
         let mut changed = first;
         changed.observation_id = "x2".into();
@@ -1367,7 +1423,15 @@ mod tests {
         let mut engine = engine();
         let mut last = None;
         for index in 0..4 {
-            let mut observation = input(&format!("m{index}"), "sensor-missing", DriftEvidencePlaneV1::InputFeature, DriftDetectorKindV1::MissingnessRate, None, 100 + index, char::from(b'c' + index as u8));
+            let mut observation = input(
+                &format!("m{index}"),
+                "sensor-missing",
+                DriftEvidencePlaneV1::InputFeature,
+                DriftDetectorKindV1::MissingnessRate,
+                None,
+                100 + index,
+                char::from(b'c' + index as u8),
+            );
             observation.is_missing = index >= 2;
             last = Some(observe_drift_channel_v1(&mut engine, &observation).unwrap());
         }
@@ -1377,8 +1441,24 @@ mod tests {
     #[test]
     fn process_and_calibration_events_remain_separate_planes() {
         let mut engine = engine();
-        let process = input("p1", "recipe-event", DriftEvidencePlaneV1::ProcessContext, DriftDetectorKindV1::EventChange, Some(1.0), 100, 'c');
-        let measurement = input("m1", "calibration-event", DriftEvidencePlaneV1::MeasurementSystem, DriftDetectorKindV1::EventChange, Some(1.0), 100, 'd');
+        let process = input(
+            "p1",
+            "recipe-event",
+            DriftEvidencePlaneV1::ProcessContext,
+            DriftDetectorKindV1::EventChange,
+            Some(1.0),
+            100,
+            'c',
+        );
+        let measurement = input(
+            "m1",
+            "calibration-event",
+            DriftEvidencePlaneV1::MeasurementSystem,
+            DriftDetectorKindV1::EventChange,
+            Some(1.0),
+            100,
+            'd',
+        );
         let p = observe_drift_channel_v1(&mut engine, &process).unwrap();
         let m = observe_drift_channel_v1(&mut engine, &measurement).unwrap();
         assert_ne!(p.plane, m.plane);
@@ -1502,7 +1582,15 @@ mod tests {
     #[test]
     fn calibration_unknown_does_not_update_measurement_system_drift_channel() {
         let mut engine = engine();
-        let mut observation = input("m1", "calibration", DriftEvidencePlaneV1::MeasurementSystem, DriftDetectorKindV1::EventChange, Some(1.0), 100, 'd');
+        let mut observation = input(
+            "m1",
+            "calibration",
+            DriftEvidencePlaneV1::MeasurementSystem,
+            DriftDetectorKindV1::EventChange,
+            Some(1.0),
+            100,
+            'd',
+        );
         let report = observation.calibration_report.as_mut().unwrap();
         report.current_at_k1.status = MeasurementQualificationStatusV1::Unknown;
         report.report_sha256 = calibration_report_digest(report).unwrap();
@@ -1599,7 +1687,15 @@ mod tests {
     #[test]
     fn tampered_observation_receipt_cannot_be_sealed_into_episode() {
         let mut engine = engine();
-        let observation = input("x1", "feature", DriftEvidencePlaneV1::InputFeature, DriftDetectorKindV1::Ewma, Some(0.5), 100, 'c');
+        let observation = input(
+            "x1",
+            "feature",
+            DriftEvidencePlaneV1::InputFeature,
+            DriftDetectorKindV1::Ewma,
+            Some(0.5),
+            100,
+            'c',
+        );
         let mut receipt = observe_drift_channel_v1(&mut engine, &observation).unwrap();
         receipt.statistic = 999.0;
         assert!(seal_drift_episode_v1("episode-1", 100, 102, &[receipt]).is_err());
