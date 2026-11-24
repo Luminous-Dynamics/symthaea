@@ -1,0 +1,224 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://luminousdynamics.io/schemas/mace_decision_sufficiency_receipt_v1.schema.json",
+  "title": "MACE Decision Sufficiency Receipt V1",
+  "description": "Decision-need-specific assessment over an exact independently qualified evidence set. This receipt is not action authorization.",
+  "type": "object",
+  "additionalProperties": false,
+  "required": [
+    "schema_version",
+    "run_id",
+    "query_invocation_id",
+    "domain_id",
+    "subject_scope_sha256",
+    "environment_revision_sha256",
+    "tool_profile_sha256",
+    "query_sha256",
+    "candidate_set_sha256",
+    "qualified_evidence_set_sha256",
+    "qualification_receipt_sha256",
+    "decision_need_sha256",
+    "purpose_sha256",
+    "sufficiency_policy_sha256",
+    "calibration_profile_sha256",
+    "status",
+    "requirements",
+    "issued_at_unix",
+    "expires_at_unix",
+    "issuer_profile_sha256",
+    "key_id",
+    "signature"
+  ],
+  "properties": {
+    "schema_version": {
+      "const": "mace_decision_sufficiency_receipt_v1"
+    },
+    "run_id": {
+      "type": "string",
+      "minLength": 1,
+      "maxLength": 256
+    },
+    "query_invocation_id": {
+      "type": "string",
+      "minLength": 1,
+      "maxLength": 256
+    },
+    "domain_id": {
+      "type": "string",
+      "minLength": 1,
+      "maxLength": 512
+    },
+    "subject_scope_sha256": {
+      "type": "string",
+      "pattern": "^[0-9a-f]{64}$"
+    },
+    "environment_revision_sha256": {
+      "type": "string",
+      "pattern": "^[0-9a-f]{64}$"
+    },
+    "tool_profile_sha256": {
+      "type": "string",
+      "pattern": "^[0-9a-f]{64}$"
+    },
+    "query_sha256": {
+      "type": "string",
+      "pattern": "^[0-9a-f]{64}$"
+    },
+    "candidate_set_sha256": {
+      "type": "string",
+      "pattern": "^[0-9a-f]{64}$"
+    },
+    "qualified_evidence_set_sha256": {
+      "type": "string",
+      "pattern": "^[0-9a-f]{64}$"
+    },
+    "qualification_receipt_sha256": {
+      "type": "string",
+      "pattern": "^[0-9a-f]{64}$"
+    },
+    "decision_need_sha256": {
+      "type": "string",
+      "pattern": "^[0-9a-f]{64}$"
+    },
+    "purpose_sha256": {
+      "type": "string",
+      "pattern": "^[0-9a-f]{64}$"
+    },
+    "sufficiency_policy_sha256": {
+      "type": "string",
+      "pattern": "^[0-9a-f]{64}$"
+    },
+    "calibration_profile_sha256": {
+      "type": "string",
+      "pattern": "^[0-9a-f]{64}$"
+    },
+    "status": {
+      "enum": [
+        "sufficient",
+        "insufficient",
+        "indeterminate",
+        "abstained"
+      ]
+    },
+    "requirements": {
+      "type": "array",
+      "minItems": 1,
+      "maxItems": 1024,
+      "items": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": [
+          "requirement_id",
+          "status",
+          "basis_receipt_sha256"
+        ],
+        "properties": {
+          "requirement_id": {
+            "type": "string",
+            "minLength": 1,
+            "maxLength": 256
+          },
+          "status": {
+            "enum": [
+              "met",
+              "unmet",
+              "unknown"
+            ]
+          },
+          "basis_receipt_sha256": {
+            "type": "array",
+            "minItems": 1,
+            "maxItems": 256,
+            "uniqueItems": true,
+            "items": {
+              "type": "string",
+              "pattern": "^[0-9a-f]{64}$"
+            }
+          }
+        }
+      }
+    },
+    "risk_upper_bound_ppm": {
+      "type": "integer",
+      "minimum": 0,
+      "maximum": 1000000
+    },
+    "risk_limit_ppm": {
+      "type": "integer",
+      "minimum": 0,
+      "maximum": 1000000
+    },
+    "confidence_level_ppm": {
+      "type": "integer",
+      "minimum": 500000,
+      "maximum": 999999
+    },
+    "calibration_receipt_sha256": {
+      "type": "string",
+      "pattern": "^[0-9a-f]{64}$"
+    },
+    "issued_at_unix": {
+      "type": "integer",
+      "minimum": 0
+    },
+    "expires_at_unix": {
+      "type": "integer",
+      "minimum": 0
+    },
+    "issuer_profile_sha256": {
+      "type": "string",
+      "pattern": "^[0-9a-f]{64}$"
+    },
+    "key_id": {
+      "type": "string",
+      "minLength": 1,
+      "maxLength": 256
+    },
+    "signature": {
+      "type": "array",
+      "minItems": 1,
+      "maxItems": 4096,
+      "items": {
+        "type": "integer",
+        "minimum": 0,
+        "maximum": 255
+      }
+    }
+  },
+  "allOf": [
+    {
+      "if": {
+        "properties": {
+          "status": {
+            "const": "sufficient"
+          }
+        },
+        "required": [
+          "status"
+        ]
+      },
+      "then": {
+        "required": [
+          "risk_upper_bound_ppm",
+          "risk_limit_ppm",
+          "confidence_level_ppm",
+          "calibration_receipt_sha256"
+        ],
+        "properties": {
+          "requirements": {
+            "items": {
+              "properties": {
+                "status": {
+                  "const": "met"
+                }
+              },
+              "required": [
+                "status"
+              ]
+            }
+          }
+        }
+      }
+    }
+  ]
+}
