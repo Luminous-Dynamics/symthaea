@@ -228,6 +228,8 @@ pub struct CaOcrcEngineV1 {
     pub current_round: Option<u64>,
     pub tracking_set: BTreeMap<u64, CaOcrcTrackedPredictionV1>,
     pub accepted_label_revisions: BTreeSet<String>,
+    pub seen_sample_ids: BTreeSet<String>,
+    pub seen_measurement_event_ids: BTreeSet<String>,
     pub accepted_feedback_count: u64,
     pub rejected_feedback_count: u64,
     pub evicted_feedback_count: u64,
@@ -676,11 +678,7 @@ fn validate_delivery(
     {
         reasons.push(CaOcrcFeedbackReasonV1::LabelPayloadDigestMismatch);
     }
-    if !report
-        .qualification_report_sha256
-        .as_str()
-        .bytes()
-        .all(|byte| byte.is_ascii_hexdigit())
+    if report.schema != super::label_consumption_guard::LABEL_CONSUMPTION_REPORT_SCHEMA_V1
         || report.calibration_certificate_id.trim().is_empty()
         || !valid_sha256(&report.measurement_sha256)
         || !valid_sha256(&report.qualification_report_sha256)
@@ -801,7 +799,7 @@ fn process_round_inner(
     } else {
         sample_proxy_delay(engine)?
     };
-    let mut prediction = build_prediction_receipt(engine, input, proxy_delay, &state_before)?;
+    let prediction = build_prediction_receipt(engine, input, proxy_delay, &state_before)?;
 
     let admission = if trivial_loss.is_some() {
         CaOcrcAdmissionV1::TrivialSetNoTracking
@@ -1051,7 +1049,7 @@ pub fn optimal_arbitrary_proxy_survival_v1(
         let saturation = if x <= 0.0 {
             f64::INFINITY
         } else {
-            (-capacity as f64 * (x - 1.0 - x.ln())).exp()
+            (-(capacity as f64) * (x - 1.0 - x.ln())).exp()
         };
         (capacity as f64 + 1.0) / (p * horizon as f64) + saturation
     };
