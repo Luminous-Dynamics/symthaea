@@ -425,7 +425,7 @@ pub fn bootstrap_matched_evidence_contrasts(
         &mut rng_state,
     );
 
-    let count_gated_intervals = if lineage_count.is_empty() {
+    let count_gated_intervals = if lineage_count.len() < 2 {
         None
     } else {
         let no_values: Vec<_> = lineage_count.iter().map(|item| item.0).collect();
@@ -1245,6 +1245,67 @@ mod tests {
             end_frame: 48_000,
         });
         [no_evidence, local, yoked]
+    }
+
+    #[test]
+    fn source_work_bootstrap_is_deterministic_and_clusters_excerpts() {
+        let first = matched_evidence_triplet();
+        let mut second = first.clone();
+        for (index, case) in second.iter_mut().enumerate() {
+            case.experiment_unit_id = "unit-v2-second".into();
+            case.case_id = format!("unit-v2-second-arm-{index}");
+            case.source_lineage_id = "source-lineage-002".into();
+            let source_digest =
+                "1414141414141414141414141414141414141414141414141414141414141414";
+            case.truth.artifact.audio_sha256 = source_digest.into();
+            case.draft_prediction.artifact.audio_sha256 = source_digest.into();
+            case.final_prediction.artifact.audio_sha256 = source_digest.into();
+            if let Some(evidence) = case.evidence.as_mut() {
+                if case.evidence_condition == EvidenceConditionV1::LocalRetrieved {
+                    evidence.source_audio_sha256 = source_digest.into();
+                } else if case.evidence_condition == EvidenceConditionV1::YokedRetrieved {
+                    evidence.source_audio_sha256 =
+                        "1515151515151515151515151515151515151515151515151515151515151515"
+                            .into();
+                }
+            }
+        }
+        let mut all_cases = first.to_vec();
+        all_cases.extend(second);
+        let contrasts = compare_matched_evidence_arms(&all_cases).unwrap();
+        assert_eq!(contrasts.len(), 2);
+        assert_eq!(contrasts[0].source_lineage_id, "source-lineage-001");
+        assert_eq!(contrasts[1].source_lineage_id, "source-lineage-002");
+
+        let first_run =
+            bootstrap_matched_evidence_contrasts(&contrasts, 1_000, 0xA11CE).unwrap();
+        let second_run =
+            bootstrap_matched_evidence_contrasts(&contrasts, 1_000, 0xA11CE).unwrap();
+        assert_eq!(first_run, second_run);
+        assert_eq!(first_run.experiment_units, 2);
+        assert_eq!(first_run.source_work_clusters, 2);
+        assert_eq!(first_run.one_to_many_source_work_clusters, 2);
+        assert_eq!(
+            first_run.local_minus_no_evidence_f1.estimate,
+            0.5
+        );
+        assert_eq!(
+            first_run
+                .local_minus_no_evidence_count_gated_f1
+                .as_ref()
+                .unwrap()
+                .estimate,
+            1.0
+        );
+    }
+
+    #[test]
+    fn source_work_bootstrap_rejects_insufficient_independent_lineages() {
+        let cases = matched_evidence_triplet();
+        let contrasts = compare_matched_evidence_arms(&cases).unwrap();
+        assert!(bootstrap_matched_evidence_contrasts(&contrasts, 1_000, 1).is_err());
+        assert!(bootstrap_matched_evidence_contrasts(&contrasts, 999, 1).is_err());
+        assert!(bootstrap_matched_evidence_contrasts(&contrasts, 1_000, 0).is_err());
     }
 
     #[test]
