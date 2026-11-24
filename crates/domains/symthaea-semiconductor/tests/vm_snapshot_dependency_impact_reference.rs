@@ -347,8 +347,8 @@ fn independent_label_sources(
             "fixture graph must be acyclic"
         );
         for edge in &input.graph.edges {
-            let parent_risk =
-                direct_risks[&edge.parent_snapshot_id].max(inherited_risks[&edge.parent_snapshot_id]);
+            let parent_risk = direct_risks[&edge.parent_snapshot_id]
+                .max(inherited_risks[&edge.parent_snapshot_id]);
             let propagated_risk = propagate(parent_risk, &edge.inherited_dimensions);
             if propagated_risk == OracleRisk::None {
                 continue;
@@ -358,9 +358,7 @@ fn independent_label_sources(
                 .union(&inherited[&edge.parent_snapshot_id])
                 .cloned()
                 .collect::<BTreeSet<_>>();
-            let child_sources = inherited
-                .entry(edge.child_snapshot_id.clone())
-                .or_default();
+            let child_sources = inherited.entry(edge.child_snapshot_id.clone()).or_default();
             let before = child_sources.len();
             child_sources.extend(parent_sources);
             if child_sources.len() != before {
@@ -463,12 +461,18 @@ fn frozen_dag_matches_independent_fixed_point_impact_oracle() {
             .unwrap();
         assert_eq!(
             entry.direct_affected_label_ids,
-            expected_direct_labels[snapshot_id].iter().cloned().collect::<Vec<_>>(),
+            expected_direct_labels[snapshot_id]
+                .iter()
+                .cloned()
+                .collect::<Vec<_>>(),
             "direct label lineage for {snapshot_id}"
         );
         assert_eq!(
             entry.inherited_affected_label_ids,
-            expected_inherited_labels[snapshot_id].iter().cloned().collect::<Vec<_>>(),
+            expected_inherited_labels[snapshot_id]
+                .iter()
+                .cloned()
+                .collect::<Vec<_>>(),
             "inherited label lineage for {snapshot_id}"
         );
     }
