@@ -240,7 +240,7 @@ jobs:
             and .negative_control.expected_result == "lean_type_error"
             and .negative_control.sha256 == "f0352539bcdccf967b97f1aebf5f8cdd19d46596a25c279db74294a00a4bfb72"
             and .axiom_negative_control.expected_result == "axiom_dependency_reported"
-            and .axiom_negative_control.sha256 == "8e4a30f02043eaecfda1642eca155963f92283f6d7606af008699bb5ec7acf47"
+            and .axiom_negative_control.sha256 == "86c95578c8ee6f6d60bd1109da566ddee840a590702723a38970c19cfca8d071"
             and .axiom_negative_control.expected_observed_axiom == "ProofActionCertificateAxiomControl.injected_premise"' \
             docs/research/PROOF_ACTION_CERTIFICATE_AND_COMM_V1.json >/dev/null
           jq -e '."$schema" == "https://json-schema.org/draft/2020-12/schema"
