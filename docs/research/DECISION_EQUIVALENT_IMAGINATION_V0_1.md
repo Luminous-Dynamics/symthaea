@@ -547,3 +547,72 @@ Add MRS.Q's minimum-over-value-functions selector as a named **value-aggregation
 First use the checked-in MRS.Q Gym-HalfCheetah-v4 and DMC quadruped-walk reference rows as source/parity diagnostics; then run the shared-task normalized DMC comparison. Report prediction error, selected-action regret, return, lower-tail/CVaR outcomes, search-induced optimism, selected-action coverage, inference work, simulator calls, p50/p95/p99 latency and memory separately. Preserve each environment/task and protocol as its own result row; no pooled score across vector-control, visual-world and manipulation tracks.
 
 This is the low-cost falsification stage before visual and robot acquisition. It tests whether Symthaea's decision-focused controls improve search decisions under a known environment contract, not whether it has already beaten the world-action-model leaderboard.
+
+## Individual counterfactual effect retention — 2026-11-24
+
+A further distinction is required beyond population-average action value and decision-equivalent state compression.
+
+Okita, *Where Individual-Effect Information Survives: A Diagnostic Ladder for World Models* (4 November 2026; DOI 10.3390/make8110363), asks whether a world model can predict what would have happened to **this same individual** under another action. The paper separates:
+- factual prediction / reconstruction;
+- average intervention effect across individuals;
+- individual treatment-effect variation that requires inferring instance-specific latent causes from its history (abduction).
+
+Its diagnostic chain measures information available in the environment, retained in the model latent, and expressed by the imagined prediction. It reports cases in which information survives in the recurrent latent but is lost in rollout/output. It also requires checking whether the environment formulation supports the question at all: action efficacy, branchability and individual dependence; and whether the estimate is measurable above its estimation floor and converged. The paper reports 12 environment formulations, six of which fail at least one condition. Its evidence is bounded: the model-side results use small low-dimensional systems and do not establish the same pattern for large pixel-based or modern robotics world models.
+
+Source: https://www.mdpi.com/2504-4990/8/11/363
+
+### Why this extends #13255 rather than replacing it
+
+Decision equivalence asks whether two states can safely share a representation for a declared action/decision scope. Temporal representation preservation asks whether that remains true across future decision epochs. Individual counterfactual fidelity asks a different question: does the representation retain the history-dependent, instance-specific information needed to predict how *the same instance* responds differently under alternative actions?
+
+An average action effect can be correct while all individual effects are wrong because positive and negative effects cancel. A latent can preserve the instance identity while the transition/decoder maps every imagined intervention to the same population-average effect. Neither reconstruction accuracy nor average treatment-effect accuracy catches this.
+
+For individual (i) and two interventions (a,b), define the task-specific individual effect:
+
+`Delta_i(a,b) = U_i(a) - U_i(b)`.
+
+The mean effect `E_i[Delta_i]` is a second-rung/population quantity. It does not determine the individual `Delta_i` values. Preserve and report both.
+
+### Required measurement chain
+
+For a declared counterfactual-capable environment formulation, report separately:
+
+1. **Environment opportunity:** whether the action set changes outcomes, branchable paired interventions can be executed from the same exogenous condition, and the effect varies across individuals.
+2. **History/latent retention:** whether the encoded recurrent state retains information about individual effect heterogeneity beyond the branch-point observation alone.
+3. **Imagination/decoder expression:** whether action-conditioned rollout and decoded output preserve the same individual's effect under each intervention.
+4. **Decision consequence:** whether losing that individual contrast changes feasibility, selected action, realized regret or recovery.
+5. **Measurement validity:** whether the estimator's error floor and sample-size convergence make its reported effect interpretable.
+
+The abducible-share decomposition `A -> A_lat -> A_pred` from the paper is a useful external diagnostic, not an automatic truth oracle. Only report an environment-level `A` when the environment prerequisites, parameterization, intervention set, estimation floor, sample size and convergence checks are all disclosed. The paper's `A >= 3 phi` criterion is its source-specific convention; Symthaea must preregister its own threshold and include a 2x/3x/4x sensitivity analysis rather than treating 3x as universal.
+
+### Branch construction and leakage controls
+
+- Replay the same factual history to the branch point for each paired run.
+- Save/restore the same individual state and its exogenous-variable commitment before each intervention.
+- Keep exogenous disturbances paired within the same individual; allow endogenous state/event consequences to differ when caused by the intervention.
+- Bind branch-point observation, full history, latent-state digest, intervention identity, event/draw bundle, policy/model digest and evaluator ground truth.
+- Do not expose the hidden individual identity or branch outcomes to the candidate except through the factual history it is entitled to observe.
+- Use #13375/#13377 and the Symtropy stochastic correspondence verifier for source-bound branch and event identity. Common random numbers do not permit replaying an impossible post-intervention trajectory.
+- Treat missing, unpaired, non-branchable or unsupported counterfactual outcomes as incomplete, not zero effect.
+
+### HDC/CfC-LTC experiment
+
+Extend #13255's existing HDC-only, CfC/LTC-only, HDC+CfC/LTC, reconstruction, value-aligned and simple-projection comparisons with two readouts:
+- a frozen-latent probe/readout of history-specific individual effects;
+- the model's own action-conditioned imagined contrast from that same latent.
+
+This distinguishes representation failure from rollout/decoder failure. Train the representation on development individuals and intervention pairs; keep held-out individuals, intervention pairs and dynamics families separate. Report population-average effect error, individual-effect MAE/RMSE, effect-sign accuracy, per-individual ranking, calibration slope, lower-tail error, decision regret and the `A/A_lat/A_pred` chain (only when statistically interpretable). A probe is diagnostic only; a latent readout that uses evaluator labels is not a deployed capability.
+
+### Machine-readable controls
+
+The semantic fixture set now includes:
+- **F8 — mean cancellation:** the population-average effect is exactly correct (zero), but individual effects are +10 and -10. The history-conditioned latent recovers both; the rollout collapses both to zero. Its exact latent MAE is 0 and rollout individual-effect MAE is 10.
+- **F9 — formulation gate:** action efficacy, branchability, individual dependence, estimation-floor measurability and convergence are separately checked. Missing/failed conditions suppress a third-rung claim; the source's 3x floor convention is explicitly not treated as universal.
+
+These are deterministic semantic controls, not empirical abducible-share estimates, model results or physical-safety evidence.
+
+### Benchmark placement
+
+Start with deterministic, branchable simulation formulations where the same individual can be restored and multiple interventions actually executed. Robosuite/Meta-World-style manipulation formulations can be adapted, but each task/intervention definition must pass the five-condition audit; a simulator name alone is not sufficient. Then add held-out dynamic manipulation cases through #13389. Observational real-world datasets may support population-effect estimation under appropriate assumptions, but they do not supply exact individual counterfactual ground truth by themselves. Do not label an observational comparison as a third-rung reproduction.
+
+This extension belongs to #13255's representation/temporal experiment and #13445's decision-value evaluation. It adds no new policy, simulator, causal oracle, calibration engine, scorer, scheduler or action authority.
