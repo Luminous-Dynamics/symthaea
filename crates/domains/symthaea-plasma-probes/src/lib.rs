@@ -1129,8 +1129,7 @@ impl KineticResponseSignature {
                 (Some(left), Some(right)) => {
                     let real_delta = left.real - right.real;
                     let imag_delta = left.imag - right.imag;
-                    let squared_delta =
-                        real_delta.mul_add(real_delta, imag_delta * imag_delta);
+                    let squared_delta = real_delta.mul_add(real_delta, imag_delta * imag_delta);
                     let qoi_index = (index / time_count) % qoi_count;
                     let scale = self.qoi_scales[qoi_index];
                     squared_error += squared_delta;
