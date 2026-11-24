@@ -116,6 +116,12 @@ pub struct MycelialPhotonDoseLimit {
     pub maximum_wavelength_nm: u16,
     /// Digest of the channel-specific calibration used to convert instrument settings to dose.
     pub calibration_digest: String,
+    /// Maximum irradiance at the specimen plane, in W/cm².
+    pub maximum_irradiance_watts_per_cm2: f64,
+    /// Maximum uninterrupted illumination time for one action on this channel.
+    pub maximum_continuous_illumination_duration_ns: u64,
+    /// Minimum sample-wide recovery interval after prior optical exposure.
+    pub minimum_recovery_interval_ns: u64,
     /// Maximum cumulative incident photon dose per spatial cell, in photons/µm².
     /// This is an assay-specific exposure bound, not a universal phototoxicity threshold.
     pub maximum_cumulative_photons_per_um2: f64,
@@ -143,8 +149,12 @@ pub struct MycelialSampleHealthBudget {
 pub struct MycelialPhotonDoseEstimate {
     pub channel_id: String,
     pub wavelength_nm: u16,
-    /// Conservative upper bound, not a mean or nominal estimate.
+    /// Conservative upper bound at the specimen plane, not a mean or nominal estimate.
     pub photons_per_um2_upper: f64,
+    /// Conservative upper bound on irradiance at the specimen plane, in W/cm².
+    pub irradiance_watts_per_cm2_upper: f64,
+    /// Actual continuous illumination duration for this channel in the proposed plan.
+    pub illumination_duration_ns: u64,
     pub calibration_digest: String,
 }
 
@@ -159,6 +169,9 @@ pub struct MycelialAcquisitionBudgetProposal {
     /// Exact device/software/firmware capability manifest used for plan compilation.
     pub device_capability_manifest_digest: String,
     pub coordinate_frame_id: String,
+    /// Planned start time relative to the recorded session's monotonic timebase.
+    /// Must be at or after the state's elapsed session duration.
+    pub planned_start_offset_ns: u64,
     /// Canonical sorted, unique spatial cells. Cell identities are stable across
     /// acquisitions so overlapping ROIs accumulate dose on shared cells.
     pub spatial_footprint_cell_ids: Vec<String>,
@@ -203,6 +216,11 @@ pub struct MycelialSampleHealthState {
     pub coordinate_frame_id: String,
     pub elapsed_session_duration_ns: u64,
     pub completed_actions_in_session: u32,
+    /// True only when all prior specimen optical exposures are represented in the ledger.
+    pub exposure_history_complete: bool,
+    /// Elapsed time since the most recent optical exposure, from a qualified timebase.
+    /// None means the complete exposure history contains no prior optical exposure.
+    pub elapsed_since_last_optical_exposure_ns: Option<u64>,
     /// Exposure history can span sessions; duration and action count are session-local.
     pub cumulative_photon_exposures: Vec<MycelialCumulativePhotonExposure>,
 }
@@ -220,6 +238,10 @@ pub enum MycelialSampleHealthRejectionReason {
     MissingOpticalDoseEstimate,
     CumulativePhotonDoseExceeded,
     PhotonCalibrationMismatch,
+    IrradianceExceeded,
+    ContinuousIlluminationDurationExceeded,
+    RecoveryIntervalNotMet,
+    ExposureHistoryIncomplete,
 }
 
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
@@ -242,6 +264,7 @@ pub struct MycelialSampleHealthEligibleAction {
     pub spatial_footprint_digest: String,
     pub health_model_digest: String,
     pub net_value_of_information: f64,
+    pub planned_start_offset_ns: u64,
     pub projected_session_duration_ns: u64,
     pub projected_action_count: u32,
     pub maximum_projected_photons_per_um2_by_channel: Vec<MycelialProjectedChannelDose>,
@@ -252,6 +275,8 @@ pub struct MycelialSampleHealthEligibleAction {
 pub struct MycelialProjectedChannelDose {
     pub channel_id: String,
     pub maximum_projected_photons_per_um2: f64,
+    pub irradiance_watts_per_cm2_upper: f64,
+    pub illumination_duration_ns: u64,
 }
 
 #[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
