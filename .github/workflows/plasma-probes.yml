@@ -12,6 +12,7 @@ on:
       - "benchmarks/plasma/topology-lifting/**"
       - "benchmarks/plasma/micro-macro/**"
       - "benchmarks/plasma/control-interface/**"
+      - "benchmarks/plasma/adaptive-refinement/**"
       - ".github/workflows/plasma-probes.yml"
   pull_request:
     branches: [main]
@@ -24,6 +25,7 @@ on:
       - "benchmarks/plasma/topology-lifting/**"
       - "benchmarks/plasma/micro-macro/**"
       - "benchmarks/plasma/control-interface/**"
+      - "benchmarks/plasma/adaptive-refinement/**"
       - ".github/workflows/plasma-probes.yml"
   workflow_dispatch:
 
@@ -66,6 +68,7 @@ jobs:
           mkdir -p "${tmp_root}/benchmarks/plasma/topology-lifting/fixtures"
           mkdir -p "${tmp_root}/benchmarks/plasma/micro-macro/fixtures"
           mkdir -p "${tmp_root}/benchmarks/plasma/control-interface/fixtures"
+          mkdir -p "${tmp_root}/benchmarks/plasma/adaptive-refinement/fixtures"
           cp crates/domains/symthaea-plasma-probes/src/lib.rs "${crate_dir}/src/lib.rs"
           cp crates/domains/symthaea-plasma-probes/src/bin/kird_point_audit.rs "${crate_dir}/src/bin/kird_point_audit.rs"
           cp crates/domains/symthaea-plasma-probes/src/bin/sensor_actuator_contract_audit.rs "${crate_dir}/src/bin/sensor_actuator_contract_audit.rs"
@@ -89,6 +92,10 @@ jobs:
             "${tmp_root}/benchmarks/plasma/control-interface/"
           cp benchmarks/plasma/control-interface/fixtures/synthetic-multirate-interface-v0.1.json \
             "${tmp_root}/benchmarks/plasma/control-interface/fixtures/"
+          cp benchmarks/plasma/adaptive-refinement/refinement-policy-contract-v0.1.schema.json \
+            "${tmp_root}/benchmarks/plasma/adaptive-refinement/"
+          cp benchmarks/plasma/adaptive-refinement/fixtures/synthetic-refinement-cases-v0.1.json \
+            "${tmp_root}/benchmarks/plasma/adaptive-refinement/fixtures/"
           cat > "${crate_dir}/Cargo.toml" <<'EOF'
           [package]
           name = "symthaea-plasma-probes"
@@ -203,6 +210,23 @@ jobs:
           assert len(fixture["diagnostics"]) == 2
           assert len(fixture["actuators"]) == 1
           print("sensor_actuator_interface_schema_validation=PASS")
+          PY
+
+      - name: Validate response-aware adaptive refinement schema and known-answer cases
+        run: |
+          python3 - <<'PY'
+          import json
+          from pathlib import Path
+          from jsonschema import Draft202012Validator
+
+          root = Path("${{ runner.temp }}/plasma-probe-validation/benchmarks/plasma/adaptive-refinement")
+          schema = json.loads((root / "refinement-policy-contract-v0.1.schema.json").read_text())
+          fixture = json.loads((root / "fixtures/synthetic-refinement-cases-v0.1.json").read_text())
+          Draft202012Validator.check_schema(schema)
+          Draft202012Validator(schema).validate(fixture)
+          assert len(fixture["cases"]) == 6
+          assert fixture["claim_boundary"]["spectral_solver_evaluated"] is False
+          print("adaptive_refinement_schema_validation=PASS")
           PY
 
       - name: Run sensor/actuator timing semantic audit
