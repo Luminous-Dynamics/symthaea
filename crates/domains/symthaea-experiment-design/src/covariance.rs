@@ -311,8 +311,8 @@ fn derive_difference_covariance(
     observable_count: usize,
 ) -> Vec<Vec<f64>> {
     let mut difference = vec![vec![0.0; observable_count]; observable_count];
-    for a in 0..observable_count {
-        for b in a..observable_count {
+    for (a, row) in difference.iter_mut().enumerate() {
+        for (b, cell) in row.iter_mut().enumerate() {
             let first_a = first_hypothesis * observable_count + a;
             let first_b = first_hypothesis * observable_count + b;
             let second_a = second_hypothesis * observable_count + a;
@@ -326,10 +326,9 @@ fn derive_difference_covariance(
                 - joint[second_b][first_a];
 
             // The exact block formula is symmetric. Average both floating-point
-            // evaluation orders and write the same value to both triangles.
-            let symmetric_value = 0.5 * forward + 0.5 * reverse;
-            difference[a][b] = symmetric_value;
-            difference[b][a] = symmetric_value;
+            // evaluation orders. The transposed iteration evaluates the same two
+            // terms in reverse order, so both matrix triangles are bit-identical.
+            *cell = 0.5 * forward + 0.5 * reverse;
         }
     }
     difference
