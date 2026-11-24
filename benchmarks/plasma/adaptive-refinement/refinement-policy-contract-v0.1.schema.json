@@ -74,7 +74,11 @@
           "projected_peak_bytes",
           "expected_decision",
           "expected_reason",
-          "expected_qualification"
+          "expected_qualification",
+          "response_assessment_fresh",
+          "response_branch_association_stable",
+          "response_estimator_latency_seconds",
+          "refinement_deadline_seconds"
         ],
         "properties": {
           "case_id": {
@@ -123,6 +127,20 @@
           "matched_pair_id": {
             "type": "string",
             "minLength": 1
+          },
+          "response_assessment_fresh": {
+            "type": "boolean"
+          },
+          "response_branch_association_stable": {
+            "type": "boolean"
+          },
+          "response_estimator_latency_seconds": {
+            "type": "number",
+            "minimum": 0
+          },
+          "refinement_deadline_seconds": {
+            "type": "number",
+            "exclusiveMinimum": 0
           }
         }
       }
