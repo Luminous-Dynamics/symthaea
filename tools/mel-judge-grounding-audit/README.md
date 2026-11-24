@@ -98,3 +98,13 @@ cargo +1.96.0 run --locked --manifest-path tools/mel-judge-grounding-audit/Cargo
 The reducer reports `DetectorReportedPresent`, `DetectorReportedAbsent`, `Ambiguous`, `NotEstimable` or `Unobserved`. It checks chronology, exact forecast/disposition/decision joins, action compatibility, capture accounting, payload/capture binding and structural identity separation. It deliberately reports `upstream_receipts_authenticated=false` and `upstream_verifiers_replayed=false`: receipt references must still be resolved and replayed by their owning verifier services. A complete empty capture can produce a detector-reported absence with no producer effect record; incomplete frame/sequence accounting downgrades detector absence to unobserved.
 
 This is a structural reducer, not a waveform decoder, physical capture verifier, detector accuracy benchmark or human-agency study. See `docs/research/MEL_CLOSED_LOOP_EPISODE_V1.md` and `docs/research/MEL_CLOSED_LOOP_BENCHMARK_PROTOCOL_V1.md`.
+
+
+### Capture modalities
+
+The closed-loop episode reducer distinguishes two capture sources instead of treating MIDI sequence counts as audio frames:
+
+- `rendered_audio_loopback`: nonzero expected sample frames, complete frame accounting, no dropped frames/XRUNs, and no MIDI-heartbeat counts.
+- `midi_output_monitor`: nonzero, complete heartbeat and sequence accounting, with audio sample-frame counters all zero.
+
+Both paths bind the capture ID, payload digest, target window and capture-closure receipt to the event manifest. A modality/accounting mismatch makes the observation structurally unobserved. The synthetic MIDI fixture exercises a complete-empty monitor case; it is not a live device test.
