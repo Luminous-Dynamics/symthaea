@@ -20,7 +20,8 @@
       "timestamp_age_bound_seconds": 0.016,
       "jitter_bound_seconds": 0.001,
       "noise_std": 0.0001,
-      "dropout_policy": "predict_with_uncertainty"
+      "dropout_policy": "predict_with_uncertainty",
+      "bandwidth_hz": 80
     },
     {
       "channel_id": "density-mode-1",
@@ -30,7 +31,8 @@
       "timestamp_age_bound_seconds": 0.04,
       "jitter_bound_seconds": 0.002,
       "noise_std": 0.0005,
-      "dropout_policy": "hold_last_with_age"
+      "dropout_policy": "hold_last_with_age",
+      "bandwidth_hz": 50
     }
   ],
   "actuators": [
@@ -51,7 +53,11 @@
     "deadline_seconds": 0.01,
     "full_state_access": false,
     "maximum_observation_age_seconds": 0.04,
-    "fallback_policy": "abstain_and_escalate"
+    "fallback_policy": "abstain_and_escalate",
+    "target_instability_frequency_hz": 5,
+    "target_instability_efold_time_seconds": 0.1,
+    "minimum_bandwidth_multiple": 2,
+    "maximum_loop_latency_efold_fraction": 0.8
   },
   "claim_boundary": {
     "synthetic_interface_only": true,
