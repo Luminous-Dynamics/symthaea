@@ -253,9 +253,6 @@ fn validate_dataset(dataset: &DatasetV1) -> Result<(), String> {
         if pair.control.arm_id == pair.treatment.arm_id {
             return Err(format!("pair {} arm IDs must differ", pair.pair_id));
         }
-        if pair.control.retrieval_policy_sha256 == pair.treatment.retrieval_policy_sha256 {
-            return Err(format!("pair {} must change retrieval policy digest between arms", pair.pair_id));
-        }
         validate_contrast(pair)?;
     }
     Ok(())
@@ -305,29 +302,43 @@ fn validate_arm(pair_id: &str, label: &str, arm: &EpisodeArmV1) -> Result<(), St
 }
 
 fn validate_contrast(pair: &DecisionPairV1) -> Result<(), String> {
+    let same_policy = pair.control.retrieval_policy_sha256 == pair.treatment.retrieval_policy_sha256;
+    let different_policy = !same_policy;
+    let different_memory_snapshots =
+        pair.control.memory_snapshot_sha256 != pair.treatment.memory_snapshot_sha256;
+
+    // Poisoning and repair must hold the retrieval policy fixed so the measured
+    // contrast isolates the memory-state intervention rather than a policy change.
     let valid = match pair.contrast {
         ContrastV1::MemoryVsNoMemory => {
             pair.control.memory_condition == MemoryConditionV1::None
                 && pair.treatment.memory_condition != MemoryConditionV1::None
                 && pair.treatment.memory_condition != MemoryConditionV1::Poisoned
+                && different_policy
         }
         ContrastV1::CleanVsPoisoned => {
             pair.control.memory_condition == MemoryConditionV1::Clean
                 && pair.treatment.memory_condition == MemoryConditionV1::Poisoned
+                && same_policy
+                && different_memory_snapshots
         }
         ContrastV1::PoisonedVsRepaired => {
             pair.control.memory_condition == MemoryConditionV1::Poisoned
                 && pair.treatment.memory_condition == MemoryConditionV1::Repaired
+                && same_policy
+                && different_memory_snapshots
         }
         ContrastV1::BaselineVsCandidate => {
             pair.control.memory_condition == MemoryConditionV1::Baseline
                 && pair.treatment.memory_condition == MemoryConditionV1::Candidate
+                && different_policy
+                && different_memory_snapshots
         }
     };
     if valid {
         Ok(())
     } else {
-        Err(format!("pair {} arm conditions do not match declared contrast", pair.pair_id))
+        Err(format!("pair {} violates its contrast's memory/policy matching contract", pair.pair_id))
     }
 }
 
@@ -575,6 +586,38 @@ mod tests {
         let mut value: serde_json::Value = serde_json::from_slice(&fixture_bytes()).unwrap();
         value["pairs"][0]["control"]["memory_condition"] = serde_json::Value::String("clean".into());
         assert!(audit_json(&serde_json::to_vec(&value).unwrap()).is_err());
+    }
+
+    #[test]
+    fn poisoning_contrast_holds_retrieval_policy_fixed() {
+        let mut value: serde_json::Value = serde_json::from_slice(&fixture_bytes()).unwrap();
+        let pair = &mut value["pairs"][0];
+        pair["contrast"] = serde_json::json!("clean_vs_poisoned");
+        pair["control"]["memory_condition"] = serde_json::json!("clean");
+        pair["control"]["memory_snapshot_sha256"] =
+            serde_json::json!("dddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddd");
+        pair["control"]["selected_evidence_ids"] = serde_json::json!(["clean-memory"]);
+        pair["treatment"]["memory_condition"] = serde_json::json!("poisoned");
+        pair["treatment"]["retrieval_policy_sha256"] = pair["control"]["retrieval_policy_sha256"].clone();
+        assert!(audit_json(&serde_json::to_vec(&value).unwrap()).is_ok());
+
+        pair["treatment"]["retrieval_policy_sha256"] =
+            serde_json::json!("eeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeee");
+        assert!(audit_json(&serde_json::to_vec(&value).unwrap()).is_err());
+    }
+
+    #[test]
+    fn repair_contrast_holds_retrieval_policy_fixed() {
+        let mut value: serde_json::Value = serde_json::from_slice(&fixture_bytes()).unwrap();
+        let pair = &mut value["pairs"][0];
+        pair["contrast"] = serde_json::json!("poisoned_vs_repaired");
+        pair["control"]["memory_condition"] = serde_json::json!("poisoned");
+        pair["control"]["memory_snapshot_sha256"] =
+            serde_json::json!("dddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddd");
+        pair["control"]["selected_evidence_ids"] = serde_json::json!(["poisoned-memory"]);
+        pair["treatment"]["memory_condition"] = serde_json::json!("repaired");
+        pair["treatment"]["retrieval_policy_sha256"] = pair["control"]["retrieval_policy_sha256"].clone();
+        assert!(audit_json(&serde_json::to_vec(&value).unwrap()).is_ok());
     }
 
     #[test]
