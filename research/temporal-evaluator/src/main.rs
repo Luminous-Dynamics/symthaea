@@ -13,6 +13,7 @@ pub mod decision_observability;
 pub mod decision_regret_voi;
 pub mod decision_sufficient_representation;
 pub mod temporal_representation_preservation;
+pub mod individual_effect_retention;
 
 use std::collections::{BTreeMap, BTreeSet};
 use std::fmt;
