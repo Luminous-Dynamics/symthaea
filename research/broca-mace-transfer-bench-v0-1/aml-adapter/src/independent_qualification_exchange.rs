@@ -560,6 +560,20 @@ mod tests {
         }
     }
 
+    struct TestClock {
+        now_unix: Result<u64, QualificationClockErrorV1>,
+    }
+
+    impl QualificationTrustedClockV1 for TestClock {
+        fn now_unix(&self) -> Result<u64, QualificationClockErrorV1> {
+            self.now_unix
+        }
+    }
+
+    fn test_clock() -> TestClock {
+        TestClock { now_unix: Ok(100) }
+    }
+
     fn batch() -> CandidateEvidenceBatchV1 {
         let evidence = CandidateEvidenceV1 {
             run_id: "run-1".into(),
@@ -650,7 +664,7 @@ mod tests {
         let batch = batch();
         let (issuer, verifier, context) = setup(EvidenceDispositionV1::Admissible, false);
         let result = independently_qualify_candidate_batch_v1(
-            &batch, &context, &expected(&batch), &issuer, &verifier,
+            &batch, &context, &expected(&batch), &issuer, &verifier, &test_clock(),
         ).expect("qualification exchange");
         match result {
             CandidateEvidenceProjectionV1::Qualified(qualified) => {
@@ -723,6 +737,46 @@ mod tests {
                 &batch, &context, &wrong, &MustNotBeCalled, &verifier,
             ),
             Err(IndependentQualificationExchangeRejectV1::CandidateIdentityMismatch),
+        );
+    }
+
+
+    #[test]
+    fn unavailable_or_untrusted_clock_never_projects_qualified_context() {
+        let batch = batch();
+        let (issuer, verifier, context) = setup(EvidenceDispositionV1::Admissible, false);
+        let expected_batch = expected(&batch);
+        for (clock, expected_error) in [
+            (
+                TestClock { now_unix: Err(QualificationClockErrorV1::Unavailable) },
+                IndependentQualificationExchangeRejectV1::TrustedClockUnavailable,
+            ),
+            (
+                TestClock { now_unix: Err(QualificationClockErrorV1::Untrusted) },
+                IndependentQualificationExchangeRejectV1::TrustedClockUntrusted,
+            ),
+        ] {
+            assert_eq!(
+                independently_qualify_candidate_batch_v1(
+                    &batch, &context, &expected_batch, &issuer, &verifier, &clock,
+                ),
+                Err(expected_error),
+            );
+        }
+    }
+
+    #[test]
+    fn trusted_clock_rejects_expired_issuer_receipt() {
+        let batch = batch();
+        let (issuer, verifier, context) = setup(EvidenceDispositionV1::Admissible, false);
+        let clock = TestClock { now_unix: Ok(issuer.issued_at_unix + 300) };
+        assert_eq!(
+            independently_qualify_candidate_batch_v1(
+                &batch, &context, &expected(&batch), &issuer, &verifier, &clock,
+            ),
+            Err(IndependentQualificationExchangeRejectV1::Qualification(
+                EvidenceQualificationRejectV1::ReceiptExpired,
+            )),
         );
     }
 
