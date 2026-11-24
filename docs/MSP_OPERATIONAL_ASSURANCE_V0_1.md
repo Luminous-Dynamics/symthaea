@@ -26,6 +26,8 @@ The operating principle is: **capability does not imply authority; command compl
 | [symthaea](https://github.com/Luminous-Dynamics/symthaea) | Cognitive loop, HDC/CfC reasoning, incident analysis, causal model, knowledge and planning | Privileged fleet executor |
 | [luminous-platform](https://github.com/Luminous-Dynamics/luminous-platform) | MSP control plane, tenant/service inventory, connector lifecycle, run orchestration, evidence packaging and service reporting | A second cognitive engine or competing host executor |
 | [nixward](https://github.com/Luminous-Dynamics/nixward) | NixOS observation, declarative change planning, signed authority, snapshots, execution, post-state verification and recovery | General-purpose unconstrained shell runner |
+
+Nixward's additive [MSP Read-Only Observation Contract v0.1](https://github.com/Luminous-Dynamics/nixward/blob/main/docs/MSP_OBSERVATION_CONTRACT_V0_1.md) specifies a tenant-scoped, provenance-bearing, strictly read-only observation surface. The schema and offline fixtures are a design step; the live authenticated exporter is not yet implemented.
 | [mycelix](https://github.com/Luminous-Dynamics/mycelix) | Future identity, delegation, revocation and verifiable credential federation | An MVP dependency while its hApps remain pre-alpha |
 | [xenia-peer](https://github.com/Luminous-Dynamics/xenia-peer) / [xenia-wire](https://github.com/Luminous-Dynamics/xenia-wire) | Future consent-based remote sessions and protected operator communication | A production remote-support claim before independent review and release qualification |
 | [symtropy](https://github.com/Luminous-Dynamics/symtropy) | Isolated digital-twin and fault/recovery simulation | Evidence of real production behaviour |
