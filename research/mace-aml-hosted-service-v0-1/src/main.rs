@@ -193,6 +193,23 @@ fn sha256_fields(fields: &[&str]) -> String {
     sha256_hex(&bytes)
 }
 
+fn stable_memory_id(
+    state: &AppState,
+    request_id: &str,
+    payload_sha256: &str,
+    message_ordinal: usize,
+) -> String {
+    let ordinal = message_ordinal.to_string();
+    sha256_fields(&[
+        "mace.memory-id.v1",
+        &state.principal_id,
+        &state.tenant_id,
+        request_id,
+        payload_sha256,
+        &ordinal,
+    ])
+}
+
 fn content_text(content: &Content) -> String {
     match content {
         Content::Text(text) => text.clone(),
@@ -425,8 +442,13 @@ fn add_transaction(state: &AppState, request: AddRequest) -> Result<AddResponse,
     };
     let committed_at = now_rfc3339();
 
-    for message in &request.messages {
-        let memory_id = Uuid::new_v4().to_string();
+    for (message_ordinal, message) in request.messages.iter().enumerate() {
+        let memory_id = stable_memory_id(
+            state,
+            &request.request_id,
+            &payload_digest,
+            message_ordinal,
+        );
         let role = match message.role { Role::User => "user", Role::Assistant => "assistant" };
         let content_json = serde_json::to_string(&message.content).map_err(|_| ApiError::Internal)?;
         let searchable_text = content_text(&message.content);
@@ -723,6 +745,27 @@ mod tests {
         }).unwrap();
         assert_eq!(results.data.len(), 1);
         assert_eq!(content_text(&results.data[0].content), "The red bicycle is stored in the garage");
+    }
+
+    #[test]
+    fn same_logical_add_gets_same_memory_ids_across_fresh_stores() {
+        let first_state = test_state();
+        let second_state = test_state();
+        let request = add_request("stable-id", "same logical source record");
+        add_transaction(&first_state, request.clone()).unwrap();
+        add_transaction(&second_state, request).unwrap();
+
+        let query = SearchRequest {
+            query: Content::Text("logical source record".into()),
+            options: None,
+            user_id: "user-1".into(),
+            top_k: 5,
+        };
+        let first = search_query(&first_state, query.clone()).unwrap();
+        let second = search_query(&second_state, query).unwrap();
+        assert_eq!(first.data.len(), 1);
+        assert_eq!(second.data.len(), 1);
+        assert_eq!(first.data[0].id, second.data[0].id);
     }
 
     #[test]
