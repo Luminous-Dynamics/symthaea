@@ -164,5 +164,36 @@
     "evaluator_isolation": "Symthaea #9437",
     "cluster_inference": "Symthaea #8578",
     "external_closed_loop_world_model_benchmarks": "Symthaea #9094/#13389"
+  },
+  "implementation_surface_audit": {
+    "inspected_commit": "3ca654b0544b5ad398b2129a4884027f4d9074f4",
+    "findings": [
+      {
+        "path": "crates/core/symthaea-core/src/hdc/hdc_ltc_unified.rs",
+        "finding": "Per-step BPTT uses a single evolved-state target; contrastive_update is positive/negative hypervector attraction/repulsion, not a paired action-trajectory effect loss."
+      },
+      {
+        "path": "crates/domains/symthaea-broca/src/training.rs",
+        "finding": "Teacher-forced next-token cross-entropy training, not a physical world-transition trainer."
+      },
+      {
+        "path": "crates/domains/symthaea-broca/src/liquid_mamba.rs",
+        "finding": "Contrastive loss separates thought/token intents; not an individual treatment-effect contrast."
+      },
+      {
+        "path": "crates/core/symthaea-hdc-ltc/src/network.rs",
+        "finding": "Separate network-level temporal forward interface; compatibility with the older per-neuron BPTT API has not been established."
+      },
+      {
+        "path": "crates/core/symthaea-stt/src/phoneme_hdc_ltc.rs",
+        "finding": "Contains an ignored test_training_changes_output test marked as a known training issue; not evidence of validated training."
+      },
+      {
+        "path": "crates/domains/symthaea-multirotor/src/controller.rs",
+        "finding": "Sensor-to-action controller BPTT, not an action-conditioned world-transition model."
+      }
+    ],
+    "implementation_status": "No individual-effect HDC/CfC/LTC trainer exists in this pilot branch. Do not repurpose Broca intent-contrast training or HDC positive/negative contrastive_update. The next implementation must accumulate trajectory and all sibling-pair contrast gradients using shared pre-update parameters, then update once after all branches.",
+    "claim_boundary": "Source inspection only. No training implementation, model run, or performance result is claimed."
   }
 }
