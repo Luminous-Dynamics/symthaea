@@ -93,7 +93,8 @@
       "theoretical_density_g_cm3": 7.6,
       "remanence_T": 1.22,
       "coercivity_kA_per_m": 1269,
-      "evidence_status": "source_reported"
+      "evidence_status": "source_reported",
+      "d90_discussion_um": 279
     },
     {
       "route": "industrial_hammer_milled_hot_deformed_EOL_magnet",
@@ -161,5 +162,14 @@
     "intrinsic_Ms_or_K1_is_not_coercivity_or_BHmax",
     "coupon_performance_is_not_component_qualification",
     "approximate_60_percent_gap_does_not_supply_an_absolute_commercial_reference_value"
+  ],
+  "source_transcription_notes": [
+    {
+      "field": "HD_plus_desorbed_feedstock_D90_um",
+      "table_2_value": 276,
+      "discussion_text_value": 279,
+      "disposition": "unresolved_internal_source_discrepancy",
+      "input_policy": "do_not_treat_either_scalar_as_the_exact_full_particle_size_distribution; obtain full PSD or preserve uncertainty"
+    }
   ]
 }
