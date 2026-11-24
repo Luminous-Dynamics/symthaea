@@ -347,7 +347,25 @@ fn mahalanobis_squared(
     let mut scales = vec![0.0; n];
     let mut active = Vec::new();
     for i in 0..n {
-        if covariance[i][i] == 0.0 {
+        let diagonal = covariance[i][i];
+        if !diagonal.is_finite() {
+            return Err(CovarianceDesignError::InvalidCovariance(
+                "derived difference covariance has a non-finite diagonal".to_owned(),
+            ));
+        }
+        if diagonal < 0.0 {
+            return Err(CovarianceDesignError::NonPsdCovariance(format!(
+                "derived difference covariance has negative variance {diagonal} at observable {i}"
+            )));
+        }
+        if diagonal == 0.0 {
+            for j in 0..n {
+                if covariance[i][j] != 0.0 || covariance[j][i] != 0.0 {
+                    return Err(CovarianceDesignError::InvalidCovariance(format!(
+                        "derived difference covariance has nonzero cross-covariance with zero-variance observable {i}"
+                    )));
+                }
+            }
             if delta[i] != 0.0 {
                 let norm = delta.iter().fold(0.0_f64, |acc, value| acc.hypot(*value));
                 return Ok(PairScore::OutsideSupport {
@@ -356,7 +374,7 @@ fn mahalanobis_squared(
                 });
             }
         } else {
-            scales[i] = covariance[i][i].sqrt();
+            scales[i] = diagonal.sqrt();
             active.push(i);
         }
     }
@@ -1108,6 +1126,24 @@ mod tests {
             .unwrap()
             .worst_case_separation_squared;
         assert!((score - 4.0).abs() < 1.0e-10);
+    }
+
+    #[test]
+    fn negative_derived_difference_variance_is_rejected() {
+        let covariance = vec![vec![-1.0e-12]];
+        assert!(matches!(
+            mahalanobis_squared(&[1.0], &covariance),
+            Err(CovarianceDesignError::NonPsdCovariance(_))
+        ));
+    }
+
+    #[test]
+    fn nonzero_cross_covariance_with_zero_variance_is_rejected() {
+        let covariance = vec![vec![0.0, 1.0e-14], vec![1.0e-14, 1.0]];
+        assert!(matches!(
+            mahalanobis_squared(&[0.0, 1.0], &covariance),
+            Err(CovarianceDesignError::InvalidCovariance(_))
+        ));
     }
 
     #[test]
