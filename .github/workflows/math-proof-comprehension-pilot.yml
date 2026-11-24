@@ -183,9 +183,10 @@ jobs:
             and .candidate.local_stage.scope_binding.conclusion_text == "(q → p)"
             and .candidate.local_stage.scope_binding.root_goal_text == "(q → p)"
             and .candidate.local_stage.scope_binding.warrant_text == "From (p → q) infer (q → p)."
+            and .candidate.local_stage.scope_binding.finite_boolean_sequent.hypotheses == []
             and .candidate.local_stage.scope_binding.finite_boolean_sequent.premises[0].op == "implies"
             and .candidate.local_stage.scope_binding.finite_boolean_sequent.conclusion.op == "implies"
-            and .candidate.local_stage.scope_binding.finite_boolean_sequent_sha256 == "b084568e0b234a6869ea57c1a3bc47d1764daf3ffe525f4ef6dfaba9b43434c8"
+            and .candidate.local_stage.scope_binding.finite_boolean_sequent_sha256 == "d8511631e228ae06b643a5995e1e5e888382c9e0a5a5521fa35c899e30351199"
             and .evaluator_only.finite_boolean_countermodel.valuation == [{ "atom": "p", "value": false }, { "atom": "q", "value": true }]
             and (.evaluator_only.finite_boolean_countermodel | has("premises") | not)
             and (.evaluator_only.finite_boolean_countermodel | has("conclusion") | not)' \

@@ -551,6 +551,7 @@
       "type": "object",
       "additionalProperties": false,
       "required": [
+        "hypotheses",
         "premises",
         "conclusion"
       ],
@@ -564,6 +565,12 @@
         },
         "conclusion": {
           "$ref": "#/$defs/booleanFormula"
+        },
+        "hypotheses": {
+          "type": "array",
+          "items": {
+            "$ref": "#/$defs/booleanFormula"
+          }
         }
       }
     }

@@ -155,6 +155,9 @@ pub enum BooleanFormula {
 #[derive(Debug, Clone, Deserialize, Serialize, PartialEq, Eq)]
 #[serde(deny_unknown_fields)]
 pub struct BooleanSequent {
+    /// Explicit contextual assumptions Γ. These must also match ScopeBinding.hypotheses.
+    pub hypotheses: Vec<BooleanFormula>,
+    /// Additional inference premises supplied to the local warrant.
     pub premises: Vec<BooleanFormula>,
     pub conclusion: BooleanFormula,
 }
@@ -339,11 +342,27 @@ pub fn check_finite_propositional_entailment(
         assignments_checked,
     })
 }
+
+/// Check Γ, P₁, ..., Pₙ ⊨ C for a typed Boolean sequent.
+pub fn check_finite_boolean_sequent(
+    sequent: &BooleanSequent,
+    max_atoms: usize,
+) -> Result<FiniteTruthTableResult, String> {
+    let premises = sequent
+        .hypotheses
+        .iter()
+        .chain(sequent.premises.iter())
+        .cloned()
+        .collect::<Vec<_>>();
+    check_finite_propositional_entailment(&premises, &sequent.conclusion, max_atoms)
+}
+
 impl BooleanCountermodel {
     /// Validate the hidden valuation against the exact candidate-visible sequent.
+    /// Both contextual hypotheses and inference premises must evaluate to true.
     pub fn validate(&self, sequent: &BooleanSequent) -> Result<(), String> {
         if sequent.premises.is_empty() {
-            return Err("candidate finite Boolean sequent must contain at least one premise".to_owned());
+            return Err("candidate finite Boolean sequent must contain at least one inference premise".to_owned());
         }
 
         let mut values = std::collections::HashMap::new();
@@ -363,6 +382,9 @@ impl BooleanCountermodel {
         }
 
         let mut atoms = HashSet::new();
+        for hypothesis in &sequent.hypotheses {
+            hypothesis.collect_atoms(&mut atoms)?;
+        }
         for premise in &sequent.premises {
             premise.collect_atoms(&mut atoms)?;
         }
@@ -378,6 +400,11 @@ impl BooleanCountermodel {
             }
         }
 
+        for (index, hypothesis) in sequent.hypotheses.iter().enumerate() {
+            if !hypothesis.evaluate(&values)? {
+                return Err(format!("countermodel hypothesis[{index}] evaluates to false"));
+            }
+        }
         for (index, premise) in sequent.premises.iter().enumerate() {
             if !premise.evaluate(&values)? {
                 return Err(format!("countermodel premise[{index}] evaluates to false"));
@@ -598,8 +625,31 @@ fn validate_scope(scope: &ScopeBinding, errors: &mut Vec<String>, label: &str) {
             }
             if sequent.premises.is_empty() {
                 errors.push(format!(
-                    "{label}.finite_boolean_sequent must contain at least one premise"
+                    "{label}.finite_boolean_sequent must contain at least one inference premise"
                 ));
+            }
+            if scope.hypotheses.len() != sequent.hypotheses.len() {
+                errors.push(format!(
+                    "{label}.hypotheses length does not match finite_boolean_sequent.hypotheses"
+                ));
+            } else {
+                for (index, (display, formula)) in
+                    scope.hypotheses.iter().zip(&sequent.hypotheses).enumerate()
+                {
+                    if display != &formula.canonical_surface_text() {
+                        errors.push(format!(
+                            "{label}.hypotheses[{index}] does not match the canonical typed sequent display"
+                        ));
+                    }
+                }
+            }
+            for (index, hypothesis) in sequent.hypotheses.iter().enumerate() {
+                let mut atoms = HashSet::new();
+                if let Err(error) = hypothesis.collect_atoms(&mut atoms) {
+                    errors.push(format!(
+                        "{label}.finite_boolean_sequent.hypotheses[{index}]: {error}"
+                    ));
+                }
             }
             if scope.premises.len() != sequent.premises.len() {
                 errors.push(format!(
@@ -1074,6 +1124,81 @@ mod tests {
         assert!(!visible.to_string().contains("finite_boolean_countermodel"));
         assert!(visible["local_stage"]["scope_binding"]["finite_boolean_sequent"].is_object());
         assert!(visible.get("valuation").is_none());
+    }
+
+    #[test]
+    fn countermodel_must_satisfy_typed_hypotheses() {
+        let p = BooleanFormula::Atom {
+            name: "p".to_owned(),
+        };
+        let q = BooleanFormula::Atom {
+            name: "q".to_owned(),
+        };
+        let sequent = BooleanSequent {
+            hypotheses: vec![p.clone()],
+            premises: vec![BooleanFormula::Implies {
+                left: Box::new(p),
+                right: Box::new(q.clone()),
+            }],
+            conclusion: q,
+        };
+        let witness = BooleanCountermodel {
+            valuation: vec![
+                BooleanAssignment {
+                    atom: "p".to_owned(),
+                    value: false,
+                },
+                BooleanAssignment {
+                    atom: "q".to_owned(),
+                    value: false,
+                },
+            ],
+        };
+        assert!(
+            witness
+                .validate(&sequent)
+                .unwrap_err()
+                .contains("countermodel hypothesis[0] evaluates to false")
+        );
+    }
+
+    #[test]
+    fn sequent_oracle_includes_contextual_hypotheses() {
+        let p = BooleanFormula::Atom {
+            name: "p".to_owned(),
+        };
+        let q = BooleanFormula::Atom {
+            name: "q".to_owned(),
+        };
+        let sequent = BooleanSequent {
+            hypotheses: vec![p.clone()],
+            premises: vec![BooleanFormula::Implies {
+                left: Box::new(p),
+                right: Box::new(q.clone()),
+            }],
+            conclusion: q,
+        };
+        assert_eq!(
+            check_finite_boolean_sequent(&sequent, MAX_FINITE_BOOLEAN_ATOMS).unwrap(),
+            FiniteTruthTableResult::NoCountermodelFound {
+                assignments_checked: 4,
+            }
+        );
+    }
+
+    #[test]
+    fn sequent_scope_rejects_untyped_or_mistranslated_hypothesis_text() {
+        let mut pair = fixture();
+        pair.candidate
+            .local_stage
+            .scope_binding
+            .hypotheses
+            .push("p".to_owned());
+        assert!(
+            validate_pair(&pair)
+                .iter()
+                .any(|error| error.contains("hypotheses length does not match"))
+        );
     }
 
     #[test]

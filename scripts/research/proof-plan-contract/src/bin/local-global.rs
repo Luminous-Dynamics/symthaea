@@ -3,7 +3,7 @@ use std::fs;
 use std::process::ExitCode;
 
 use proof_plan_contract::local_global::{
-    FiniteTruthTableResult, MAX_FINITE_BOOLEAN_ATOMS, check_finite_propositional_entailment,
+    FiniteTruthTableResult, MAX_FINITE_BOOLEAN_ATOMS, check_finite_boolean_sequent,
     compute_cirr, validate_pair_json,
 };
 
@@ -61,14 +61,11 @@ fn main() -> ExitCode {
     ) {
         if let Some(countermodel) = &evaluator.finite_boolean_countermodel {
             println!(
-                "finite_boolean_countermodel=verified premises={} conclusion=false",
+                "finite_boolean_countermodel=verified hypotheses={} premises={} conclusion=false",
+                sequent.hypotheses.len(),
                 sequent.premises.len()
             );
-            match check_finite_propositional_entailment(
-                &sequent.premises,
-                &sequent.conclusion,
-                MAX_FINITE_BOOLEAN_ATOMS,
-            ) {
+            match check_finite_boolean_sequent(sequent, MAX_FINITE_BOOLEAN_ATOMS) {
                 Ok(FiniteTruthTableResult::Countermodel {
                     valuation,
                     assignments_checked,

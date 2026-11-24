@@ -53,9 +53,10 @@
               "op": "atom",
               "name": "p"
             }
-          }
+          },
+          "hypotheses": []
         },
-        "finite_boolean_sequent_sha256": "b084568e0b234a6869ea57c1a3bc47d1764daf3ffe525f4ef6dfaba9b43434c8"
+        "finite_boolean_sequent_sha256": "d8511631e228ae06b643a5995e1e5e888382c9e0a5a5521fa35c899e30351199"
       },
       "execution": {
         "prompt_sha256": "19ecd8ae491541d1451cd6bdf9fc9a173b3a55b834f0987d0df62d72ce7ba4fe",
@@ -115,9 +116,10 @@
               "op": "atom",
               "name": "p"
             }
-          }
+          },
+          "hypotheses": []
         },
-        "finite_boolean_sequent_sha256": "b084568e0b234a6869ea57c1a3bc47d1764daf3ffe525f4ef6dfaba9b43434c8"
+        "finite_boolean_sequent_sha256": "d8511631e228ae06b643a5995e1e5e888382c9e0a5a5521fa35c899e30351199"
       },
       "execution": {
         "prompt_sha256": "bbdf550fd6093eb04217ece68774b259e5bde9a92071bcb6ff9be5bec7c18c1f",
