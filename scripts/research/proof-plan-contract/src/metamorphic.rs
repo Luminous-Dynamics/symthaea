@@ -242,8 +242,13 @@ pub fn validate_pair(pair: &MathMetamorphicPairV1) -> Vec<String> {
         }
 
         let same_statement = candidate.base.sequent_sha256 == candidate.variant.sequent_sha256;
-        let same_route = candidate.base.proof_route_sha256.is_some()
-            && candidate.base.proof_route_sha256 == candidate.variant.proof_route_sha256;
+        let distinct_route_receipts = matches!(
+            (
+                candidate.base.proof_route_sha256.as_deref(),
+                candidate.variant.proof_route_sha256.as_deref()
+            ),
+            (Some(base), Some(variant)) if base != variant
+        );
         let class_matches = match evaluator.transformation_class {
             TransformationClassV1::SemanticsPreserving => {
                 evaluator.oracle_relation == OracleRelationV1::Equivalent
@@ -255,8 +260,7 @@ pub fn validate_pair(pair: &MathMetamorphicPairV1) -> Vec<String> {
             TransformationClassV1::ProofRouteOnly => {
                 evaluator.oracle_relation == OracleRelationV1::Equivalent
                     && same_statement
-                    && candidate.base.proof_route_sha256.is_some()
-                    && !same_route
+                    && distinct_route_receipts
             }
             TransformationClassV1::Unsupported => {
                 evaluator.oracle_relation == OracleRelationV1::Unknown
