@@ -242,6 +242,44 @@ jobs:
             docs/research/PROOF_ACTION_CERTIFICATE_AND_COMM_V1.schema.json >/dev/null
           echo "PROOF_ACTION_CERTIFICATE_MANIFEST_PASS"
 
+      - name: Bind local action certificates to ProofPlanV1 nodes
+        shell: bash
+        run: |
+          set -euo pipefail
+          validate_mapping() {
+            jq -e --slurpfile plan docs/research/PROOF_PLAN_AND_COMM_V1.json '
+              . as $certificate |
+              $plan[0] as $plan |
+              ($certificate.plan_id == $plan.plan_id)
+              and all($certificate.actions[];
+                . as $action |
+                any($plan.nodes[];
+                  .id == $action.plan_node_id
+                  and .kind == "plan_action"
+                  and .action_spec.operation == $action.operation
+                  and .action_spec.input_goal_ids == $action.input_goal_ids
+                  and .action_spec.output_subgoal_ids == $action.output_goal_ids
+                )
+              )
+              and (($certificate.actions[] | select(.plan_node_id == "A_FORWARD").expected_statement)
+                   == ($plan.nodes[] | select(.id == "G_FORWARD").statement))
+              and (($certificate.actions[] | select(.plan_node_id == "A_REVERSE").expected_statement)
+                   == ($plan.nodes[] | select(.id == "G_REVERSE").statement))
+            ' "$1" >/dev/null
+          }
+
+          validate_mapping docs/research/PROOF_ACTION_CERTIFICATE_AND_COMM_V1.json
+          jq '.actions |= map(if .plan_node_id == "A_FORWARD"
+            then .expected_statement = "a ∧ b → a ∧ b" else . end)' \
+            docs/research/PROOF_ACTION_CERTIFICATE_AND_COMM_V1.json \
+            > "$RUNNER_TEMP/proof-action-certificate-mutated.json"
+          if validate_mapping "$RUNNER_TEMP/proof-action-certificate-mutated.json"; then
+            echo "ERROR: validator accepted a plan/action proposition mismatch"
+            exit 1
+          fi
+          echo "PROOF_ACTION_PLAN_BINDING_PASS"
+          echo "PROOF_ACTION_PLAN_BINDING_MUTATION_REJECTED"
+
           jq -e '."$schema" == "https://json-schema.org/draft/2020-12/schema"
             and (getpath(["$defs","evaluator","required"]) | index("global_use_adjudication") != null)
             and (getpath(["$defs","globalUseNodeEvidence","required"]) | index("mention_id") != null)' \
