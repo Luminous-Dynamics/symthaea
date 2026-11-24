@@ -1,0 +1,408 @@
+{
+  "schema_version": "sequential-policy-fixture/v0.1",
+  "fixture_id": "non_myopic_branch_unlock_16_state_v0",
+  "status": "public_synthetic_known_answer",
+  "purpose": "Regression fixture for distinguishing information gain from sequential terminal decision value.",
+  "visibility_note": "This public fixture is for deterministic evaluator/oracle regression only. It is not a blind candidate-evaluation task; blind variants require separate evaluator custody.",
+  "world": {
+    "state_variables": [
+      {
+        "id": "x",
+        "values": [
+          0,
+          1
+        ],
+        "role": "decision_relevant"
+      },
+      {
+        "id": "z",
+        "values": [
+          0,
+          1
+        ],
+        "role": "branch_selector"
+      },
+      {
+        "id": "n",
+        "values": [
+          0,
+          1,
+          2,
+          3
+        ],
+        "role": "nuisance"
+      }
+    ],
+    "states": [
+      {
+        "id": "x0_z0_n0",
+        "x": 0,
+        "z": 0,
+        "n": 0
+      },
+      {
+        "id": "x0_z0_n1",
+        "x": 0,
+        "z": 0,
+        "n": 1
+      },
+      {
+        "id": "x0_z0_n2",
+        "x": 0,
+        "z": 0,
+        "n": 2
+      },
+      {
+        "id": "x0_z0_n3",
+        "x": 0,
+        "z": 0,
+        "n": 3
+      },
+      {
+        "id": "x0_z1_n0",
+        "x": 0,
+        "z": 1,
+        "n": 0
+      },
+      {
+        "id": "x0_z1_n1",
+        "x": 0,
+        "z": 1,
+        "n": 1
+      },
+      {
+        "id": "x0_z1_n2",
+        "x": 0,
+        "z": 1,
+        "n": 2
+      },
+      {
+        "id": "x0_z1_n3",
+        "x": 0,
+        "z": 1,
+        "n": 3
+      },
+      {
+        "id": "x1_z0_n0",
+        "x": 1,
+        "z": 0,
+        "n": 0
+      },
+      {
+        "id": "x1_z0_n1",
+        "x": 1,
+        "z": 0,
+        "n": 1
+      },
+      {
+        "id": "x1_z0_n2",
+        "x": 1,
+        "z": 0,
+        "n": 2
+      },
+      {
+        "id": "x1_z0_n3",
+        "x": 1,
+        "z": 0,
+        "n": 3
+      },
+      {
+        "id": "x1_z1_n0",
+        "x": 1,
+        "z": 1,
+        "n": 0
+      },
+      {
+        "id": "x1_z1_n1",
+        "x": 1,
+        "z": 1,
+        "n": 1
+      },
+      {
+        "id": "x1_z1_n2",
+        "x": 1,
+        "z": 1,
+        "n": 2
+      },
+      {
+        "id": "x1_z1_n3",
+        "x": 1,
+        "z": 1,
+        "n": 3
+      }
+    ],
+    "terminal_decisions": [
+      "d0",
+      "d1"
+    ],
+    "decision_loss": {
+      "d0": {
+        "x0_z0_n0": 0,
+        "x0_z0_n1": 0,
+        "x0_z0_n2": 0,
+        "x0_z0_n3": 0,
+        "x0_z1_n0": 0,
+        "x0_z1_n1": 0,
+        "x0_z1_n2": 0,
+        "x0_z1_n3": 0,
+        "x1_z0_n0": 1,
+        "x1_z0_n1": 1,
+        "x1_z0_n2": 1,
+        "x1_z0_n3": 1,
+        "x1_z1_n0": 1,
+        "x1_z1_n1": 1,
+        "x1_z1_n2": 1,
+        "x1_z1_n3": 1
+      },
+      "d1": {
+        "x0_z0_n0": 1,
+        "x0_z0_n1": 1,
+        "x0_z0_n2": 1,
+        "x0_z0_n3": 1,
+        "x0_z1_n0": 1,
+        "x0_z1_n1": 1,
+        "x0_z1_n2": 1,
+        "x0_z1_n3": 1,
+        "x1_z0_n0": 0,
+        "x1_z0_n1": 0,
+        "x1_z0_n2": 0,
+        "x1_z0_n3": 0,
+        "x1_z1_n0": 0,
+        "x1_z1_n1": 0,
+        "x1_z1_n2": 0,
+        "x1_z1_n3": 0
+      }
+    }
+  },
+  "protocol": {
+    "initial_state": "root",
+    "states": [
+      {
+        "id": "root",
+        "legal_action_ids": [
+          "A",
+          "B"
+        ]
+      },
+      {
+        "id": "after_A",
+        "legal_action_ids": [],
+        "terminal_decision_allowed": true
+      },
+      {
+        "id": "after_B_z0",
+        "legal_action_ids": [
+          "C0"
+        ]
+      },
+      {
+        "id": "after_B_z1",
+        "legal_action_ids": [
+          "C1"
+        ]
+      },
+      {
+        "id": "terminal_x0",
+        "legal_action_ids": [],
+        "terminal_decision_allowed": true
+      },
+      {
+        "id": "terminal_x1",
+        "legal_action_ids": [],
+        "terminal_decision_allowed": true
+      }
+    ],
+    "actions": [
+      {
+        "id": "A",
+        "legal_in_protocol_states": [
+          "root"
+        ],
+        "resource_cost": {
+          "experiment_units": 1
+        },
+        "result_delay_steps": 1,
+        "outcomes": [
+          {
+            "id": "n0",
+            "state_ids": [
+              "x0_z0_n0",
+              "x0_z1_n0",
+              "x1_z0_n0",
+              "x1_z1_n0"
+            ],
+            "next_protocol_state": "after_A"
+          },
+          {
+            "id": "n1",
+            "state_ids": [
+              "x0_z0_n1",
+              "x0_z1_n1",
+              "x1_z0_n1",
+              "x1_z1_n1"
+            ],
+            "next_protocol_state": "after_A"
+          },
+          {
+            "id": "n2",
+            "state_ids": [
+              "x0_z0_n2",
+              "x0_z1_n2",
+              "x1_z0_n2",
+              "x1_z1_n2"
+            ],
+            "next_protocol_state": "after_A"
+          },
+          {
+            "id": "n3",
+            "state_ids": [
+              "x0_z0_n3",
+              "x0_z1_n3",
+              "x1_z0_n3",
+              "x1_z1_n3"
+            ],
+            "next_protocol_state": "after_A"
+          }
+        ]
+      },
+      {
+        "id": "B",
+        "legal_in_protocol_states": [
+          "root"
+        ],
+        "resource_cost": {
+          "experiment_units": 1
+        },
+        "result_delay_steps": 1,
+        "outcomes": [
+          {
+            "id": "z0",
+            "state_ids": [
+              "x0_z0_n0",
+              "x0_z0_n1",
+              "x0_z0_n2",
+              "x0_z0_n3",
+              "x1_z0_n0",
+              "x1_z0_n1",
+              "x1_z0_n2",
+              "x1_z0_n3"
+            ],
+            "next_protocol_state": "after_B_z0"
+          },
+          {
+            "id": "z1",
+            "state_ids": [
+              "x0_z1_n0",
+              "x0_z1_n1",
+              "x0_z1_n2",
+              "x0_z1_n3",
+              "x1_z1_n0",
+              "x1_z1_n1",
+              "x1_z1_n2",
+              "x1_z1_n3"
+            ],
+            "next_protocol_state": "after_B_z1"
+          }
+        ]
+      },
+      {
+        "id": "C0",
+        "legal_in_protocol_states": [
+          "after_B_z0"
+        ],
+        "resource_cost": {
+          "experiment_units": 1
+        },
+        "result_delay_steps": 1,
+        "outcomes": [
+          {
+            "id": "x0",
+            "state_ids": [
+              "x0_z0_n0",
+              "x0_z0_n1",
+              "x0_z0_n2",
+              "x0_z0_n3"
+            ],
+            "next_protocol_state": "terminal_x0"
+          },
+          {
+            "id": "x1",
+            "state_ids": [
+              "x1_z0_n0",
+              "x1_z0_n1",
+              "x1_z0_n2",
+              "x1_z0_n3"
+            ],
+            "next_protocol_state": "terminal_x1"
+          }
+        ]
+      },
+      {
+        "id": "C1",
+        "legal_in_protocol_states": [
+          "after_B_z1"
+        ],
+        "resource_cost": {
+          "experiment_units": 1
+        },
+        "result_delay_steps": 1,
+        "outcomes": [
+          {
+            "id": "x0",
+            "state_ids": [
+              "x0_z1_n0",
+              "x0_z1_n1",
+              "x0_z1_n2",
+              "x0_z1_n3"
+            ],
+            "next_protocol_state": "terminal_x0"
+          },
+          {
+            "id": "x1",
+            "state_ids": [
+              "x1_z1_n0",
+              "x1_z1_n1",
+              "x1_z1_n2",
+              "x1_z1_n3"
+            ],
+            "next_protocol_state": "terminal_x1"
+          }
+        ]
+      }
+    ]
+  },
+  "constraints": {
+    "resource_budget": {
+      "experiment_units": 2
+    },
+    "max_actions": 2,
+    "current_step": 0,
+    "decision_deadline_step": 2,
+    "all_actions_have_result_delay_steps": 1,
+    "outcomes_are_deterministic_and_set_valued": true
+  },
+  "expected": {
+    "prior_free_robust": {
+      "initial_minimax_loss": 1,
+      "after_A_worst_case_minimax_loss": 1,
+      "after_B_worst_case_minimax_loss": 1,
+      "after_B_then_C_worst_case_minimax_loss": 0,
+      "optimal_policy": {
+        "root": "B",
+        "after_B_z0": "C0",
+        "after_B_z1": "C1",
+        "terminal_after_C_x0": "d0",
+        "terminal_after_C_x1": "d1"
+      }
+    },
+    "entropy_diagnostic_only": {
+      "reference_distribution": "uniform over the 16 states; not used by the prior-free robust oracle",
+      "information_gain_bits": {
+        "A": 2,
+        "B": 1
+      },
+      "greedy_entropy_first_action": "A"
+    },
+    "claim_boundary": "A known-answer synthetic evaluator fixture; not an external benchmark result or a blinded test."
+  }
+}
