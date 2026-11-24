@@ -3025,6 +3025,9 @@ pub const KIRD_POINT_SCHEMA: &str =
 pub const WEIGHTED_FOURIER_MEASURE_FIXTURE: &str = include_str!(
     "../../../../benchmarks/plasma/topology-lifting/fixtures/weighted-fourier-measure-known-answer-v0.1.json"
 );
+pub const WEIGHTED_MEASURE_TAIL_STABILITY_FIXTURE: &str = include_str!(
+    "../../../../benchmarks/plasma/topology-lifting/fixtures/weighted-measure-tail-stability-v0.1.json"
+);
 
 #[cfg(test)]
 mod tests {
@@ -3739,6 +3742,69 @@ mod tests {
             .as_bool()
             .unwrap());
         assert!(fixture["claim_boundary"]["no_physical_plasma_run"]
+            .as_bool()
+            .unwrap());
+    }
+
+    #[test]
+    fn weighted_fourier_measure_is_stable_to_tiny_mass_outlier_while_sample_minmax_moves_all_inliers() {
+        let fixture: serde_json::Value =
+            serde_json::from_str(WEIGHTED_MEASURE_TAIL_STABILITY_FIXTURE).unwrap();
+        let parse_numbers = |field: &str| {
+            fixture[field]
+                .as_array()
+                .unwrap()
+                .iter()
+                .map(|value| value.as_f64().unwrap())
+                .collect::<Vec<_>>()
+        };
+        let base_positions = parse_numbers("base_positions");
+        let base_weights = parse_numbers("base_weights");
+        let augmented_positions = parse_numbers("augmented_positions");
+        let augmented_weights = parse_numbers("augmented_weights");
+        let epsilon = fixture["outlier_mass"].as_f64().unwrap();
+        let harmonics = fixture["max_harmonic"].as_u64().unwrap() as usize;
+
+        let base_map = MinMaxCoordinateMap::fit(&base_positions, 0.0, 1.0).unwrap();
+        let augmented_map =
+            MinMaxCoordinateMap::fit(&augmented_positions, 0.0, 1.0).unwrap();
+        let maximum_coordinate_shift = base_positions
+            .iter()
+            .map(|position| {
+                (base_map.apply(*position).unwrap()
+                    - augmented_map.apply(*position).unwrap())
+                .abs()
+            })
+            .fold(0.0_f64, f64::max);
+        let expected_coordinate_shift =
+            fixture["sample_extrema_normalization_witness"]
+                ["max_inlier_normalized_coordinate_displacement"]
+                .as_f64()
+                .unwrap();
+        assert!((maximum_coordinate_shift - expected_coordinate_shift).abs() < 1.0e-12);
+
+        let embedding = WeightedFourierMeasureEmbedding::new(harmonics).unwrap();
+        let base_moments = embedding
+            .moments(&base_positions, &base_weights)
+            .unwrap();
+        let augmented_moments = embedding
+            .moments(&augmented_positions, &augmented_weights)
+            .unwrap();
+        let maximum_moment_change = base_moments
+            .iter()
+            .zip(&augmented_moments)
+            .map(|(base, augmented)| {
+                (augmented.real - base.real).hypot(augmented.imag - base.imag)
+            })
+            .fold(0.0_f64, f64::max);
+        let theoretical_bound =
+            2.0 * epsilon / (1.0 + epsilon);
+        let declared_bound = fixture["mathematical_bound"]["expected_upper_bound"]
+            .as_f64()
+            .unwrap();
+        assert!((theoretical_bound - declared_bound).abs() < 1.0e-24);
+        assert!(maximum_moment_change <= theoretical_bound + 1.0e-15);
+        assert!(fixture["claim_boundary"]["low_mass_does_not_imply_dynamically_irrelevant"]
             .as_bool()
             .unwrap());
     }
