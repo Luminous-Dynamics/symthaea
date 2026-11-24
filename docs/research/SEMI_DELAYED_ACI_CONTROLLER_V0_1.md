@@ -19,7 +19,7 @@ This v0.1 implements a fixed-delay, interleaved ACI *miscoverage-state controlle
 
 `alpha_next = clip(alpha_current + gamma * (alpha_target - m_t), alpha_min, alpha_max)`
 
-The fixed feedback delay `tau >= 1` creates `tau` interleaved alpha lanes, indexed by prediction-step modulo `tau`. Feedback is accepted only at its exact declared step `prediction_step + tau`, before issuing the prediction at that step. This models the fixed-delay interleaving result; it deliberately rejects variable-delay, out-of-order and capacity-tracked feedback rather than approximating their theorem.
+The fixed feedback delay `tau >= 1` creates `tau` interleaved alpha lanes, indexed by prediction-step modulo `tau`. While the prediction stream is open, feedback is accepted only at its exact declared step `prediction_step + tau`, before issuing the prediction at that step. Once prediction issuance is explicitly closed, the controller drains the final delay window in strictly sequential feedback-step order, while still requiring each label's exact `prediction_step + tau`. It rejects variable-delay, out-of-order and capacity-tracked feedback rather than approximating their theorem.
 
 The caller supplies an interval constructed for the active alpha lane. The controller freezes lower/upper bounds and the alpha used. The interval construction method is separately content-addressed and supplied as an external component. The controller does not construct conformal quantiles or prove that the interval constructor is calibrated.
 
@@ -62,7 +62,7 @@ The controller is an online state mechanism, not a substitute for an immutable c
 
 ## Test coverage
 
-The initial 15 unit tests and 2 independent integration-oracle tests include:
+The initial 16 unit tests and 2 independent integration-oracle tests include:
 1. fixed-delay interleaved lanes;
 2. an in-interval result increases alpha toward narrower future intervals;
 3. a miss decreases alpha to widen future intervals;
@@ -77,7 +77,8 @@ The initial 15 unit tests and 2 independent integration-oracle tests include:
 12. tampered pending prediction receipt rejection;
 13. missed feedback deadline invalidates assumptions before the next prediction;
 14. label availability cannot predate the measurement event;
-15. historical interval receipt remains unchanged after feedback.
+15. historical interval receipt remains unchanged after feedback;
+16. explicit prediction-stream closure rejects new predictions and drains the final fixed-delay feedback window in order.
 
 The two independent integration tests compare a 96-step, three-lane interleaved recurrence against a separate scalar reference implementation and verify a K0 negative control.
 
