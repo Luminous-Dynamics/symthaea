@@ -352,7 +352,7 @@ mod tests {
     fn fixture_has_equivalence_semantic_change_and_route_only_controls() {
         let dataset = fixture();
         let receipts = validation_receipts(&dataset).expect("validated receipts");
-        assert_eq!(receipts.len(), 3);
+        assert_eq!(receipts.len(), 5);
         assert_eq!(receipts[0].oracle_relation, OracleRelationV1::Equivalent);
         assert_eq!(
             receipts[1].oracle_relation,
@@ -361,6 +361,37 @@ mod tests {
         assert_eq!(
             receipts[2].transformation_class,
             TransformationClassV1::ProofRouteOnly
+        );
+        assert_eq!(receipts[3].oracle_relation, OracleRelationV1::Equivalent);
+        assert_eq!(receipts[4].oracle_relation, OracleRelationV1::Incomparable);
+    }
+
+    #[test]
+    fn hypothesis_order_permutation_is_semantically_invariant() {
+        let dataset = fixture();
+        let pair = dataset
+            .pairs
+            .iter()
+            .find(|pair| pair.candidate.pair_id == "MMP-HYPOTHESIS-ORDER-PERMUTATION-001")
+            .expect("hypothesis-order pair");
+        assert_ne!(pair.candidate.base.sequent_sha256, pair.candidate.variant.sequent_sha256);
+        assert_eq!(
+            derive_relation(&pair.candidate.base.sequent, &pair.candidate.variant.sequent).unwrap(),
+            OracleRelationV1::Equivalent
+        );
+    }
+
+    #[test]
+    fn unrelated_conclusions_are_incomparable() {
+        let dataset = fixture();
+        let pair = dataset
+            .pairs
+            .iter()
+            .find(|pair| pair.candidate.pair_id == "MMP-INCOMPARABLE-CONCLUSIONS-001")
+            .expect("incomparable pair");
+        assert_eq!(
+            derive_relation(&pair.candidate.base.sequent, &pair.candidate.variant.sequent).unwrap(),
+            OracleRelationV1::Incomparable
         );
     }
 
