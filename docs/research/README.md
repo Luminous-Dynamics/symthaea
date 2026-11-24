@@ -374,3 +374,5 @@ The initial seed is source-pinned to Lean 4 core and is explicitly not expert-re
 - [Proof-scope equivalence protocol](MATH_SCOPE_EQUIVALENCE_V1.md) — retains exact-scope CIRR as primary and defines a separately reported, proof-carrying comparability tier for harmless representational changes; issue [#13537](https://github.com/Luminous-Dynamics/symthaea/issues/13537).
 
 - [Mathematical invariance and intervention-sensitivity benchmark](MATH_METAMORPHIC_V1.md) — paired metamorphic tests for harmless reformulations, semantics-changing mutations, proof-route-only changes and unknown cases; tracked by issue [#13547](https://github.com/Luminous-Dynamics/symthaea/issues/13547).
+
+- [Minimum sufficient mathematical explanation protocol](MATH_MIN_SUFFICIENT_EXPLANATION_V1.md) — optimizes explanation cost under hard theorem/assumption/side-condition fidelity and measured human transfer constraints; tracked by issue [#13548](https://github.com/Luminous-Dynamics/symthaea/issues/13548).
