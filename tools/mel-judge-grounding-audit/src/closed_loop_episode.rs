@@ -270,6 +270,9 @@ fn reduce_episode(episode: &Episode) -> Result<EpisodeReport, String> {
     if !same_window(&episode.session.target_window, &episode.capture.target_window) {
         findings.push("capture target window does not exactly cover the session target window".into());
     }
+    if !matches!(episode.forecast.uncertainty.as_str(), "calibrated" | "uncalibrated" | "unavailable") {
+        return Err("unknown forecast uncertainty state".into());
+    }
     if episode.forecast.input_through_sequence != episode.session.input_sequence {
         return Err("forecast input_through_sequence does not match the frozen session input sequence".into());
     }
@@ -304,6 +307,9 @@ fn reduce_episode(episode: &Episode) -> Result<EpisodeReport, String> {
 
     if let Some(effect) = &episode.effect {
         validate_receipt(&effect.receipt, "effect.receipt")?;
+        if effect.reported_stage == "outcome_unknown" {
+            findings.push("effect outcome is unknown; reconcile the exact submission before retrying or mutating again".into());
+        }
         require_text(&effect.producer_identity, "effect.producer_identity")?;
         if let Some(digest) = &effect.output_artifact_sha256 {
             validate_digest(digest, "effect.output_artifact_sha256")?;
@@ -339,6 +345,12 @@ fn reduce_episode(episode: &Episode) -> Result<EpisodeReport, String> {
         None => false,
     };
 
+    if !matches!(episode.capture.reported_closure.as_str(), "eligible" | "ineligible" | "unknown") {
+        return Err("unknown capture reported_closure state".into());
+    }
+    if !matches!(episode.observation.qualification_status.as_str(), "qualified" | "unqualified" | "unknown") {
+        return Err("unknown detector qualification state".into());
+    }
     let capture_sequence_accounting_consistent =
         episode.capture.sequence_accounting.observed
             .checked_add(episode.capture.sequence_accounting.missing)
