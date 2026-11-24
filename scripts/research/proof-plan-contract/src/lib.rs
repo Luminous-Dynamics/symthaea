@@ -950,3 +950,5 @@ pub mod local_global;
 pub mod semantic_contract;
 
 pub mod hard_mode;
+
+pub mod metamorphic;
