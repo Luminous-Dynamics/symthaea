@@ -630,3 +630,490 @@ fn make_unknown_portfolio(
     report.report_sha256 = portfolio_report_digest(&report)?;
     Ok(report)
 }
+
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use crate::benchmark::decision_loss_metrology_policy::{
+        METROLOGY_ASSAY_MODEL_SCHEMA_V1, METROLOGY_CANDIDATE_SCHEMA_V1,
+        METROLOGY_DECISION_LOSS_INPUT_SCHEMA_V1, METROLOGY_DECISION_LOSS_POLICY_SCHEMA_V1,
+        METROLOGY_READINESS_SCHEMA_V1, MetrologyAssayModelV1, MetrologyAssayOutcomeV1,
+        MetrologyDecisionActionV1, MetrologyDecisionLossModelV1, MetrologyDecisionStateV1,
+        MetrologyReadinessEvidenceV1, MetrologyReadinessStatusV1,
+    };
+
+    fn digest(ch: char) -> String {
+        std::iter::repeat_n(ch, 64).collect()
+    }
+
+    fn model(quality: f64) -> MetrologyDecisionLossModelV1 {
+        MetrologyDecisionLossModelV1 {
+            model_id: "binary-quality-decision.v1".into(),
+            revision: 1,
+            states: vec![
+                MetrologyDecisionStateV1 {
+                    state_id: "good".into(),
+                    prior_probability: 0.90,
+                },
+                MetrologyDecisionStateV1 {
+                    state_id: "defective".into(),
+                    prior_probability: 0.10,
+                },
+            ],
+            actions: vec![
+                MetrologyDecisionActionV1 {
+                    action_id: "accept".into(),
+                    loss_by_state: BTreeMap::from([
+                        ("good".into(), 0.0),
+                        ("defective".into(), 100.0),
+                    ]),
+                },
+                MetrologyDecisionActionV1 {
+                    action_id: "hold".into(),
+                    loss_by_state: BTreeMap::from([
+                        ("good".into(), 5.0),
+                        ("defective".into(), 0.0),
+                    ]),
+                },
+            ],
+            assay: MetrologyAssayModelV1 {
+                schema: METROLOGY_ASSAY_MODEL_SCHEMA_V1.into(),
+                model_id: format!("assay-quality-{quality:.3}"),
+                revision: 1,
+                outcomes: vec![
+                    MetrologyAssayOutcomeV1 {
+                        outcome_id: "pass".into(),
+                        likelihood_by_state: BTreeMap::from([
+                            ("good".into(), 0.98),
+                            ("defective".into(), 1.0 - quality),
+                        ]),
+                    },
+                    MetrologyAssayOutcomeV1 {
+                        outcome_id: "fail".into(),
+                        likelihood_by_state: BTreeMap::from([
+                            ("good".into(), 0.02),
+                            ("defective".into(), quality),
+                        ]),
+                    },
+                ],
+            },
+        }
+    }
+
+    fn readiness(status: MetrologyReadinessStatusV1) -> MetrologyReadinessEvidenceV1 {
+        let mut value = MetrologyReadinessEvidenceV1 {
+            schema: METROLOGY_READINESS_SCHEMA_V1.into(),
+            status,
+            instrument_id: "tool-A".into(),
+            measurand_id: "film-thickness".into(),
+            unit: "nm".into(),
+            certificate_id: "certificate-robust-evsi".into(),
+            certificate_sha256: digest('a'),
+            calibration_record_sha256: digest('b'),
+            measurement_system_profile_sha256: digest('c'),
+            valid_from_unix_seconds: 0,
+            valid_until_unix_seconds: 10_000,
+            revoked_at_unix_seconds: None,
+            expected_standard_uncertainty_upper_bound: 0.01,
+            report_sha256: String::new(),
+        };
+        let mut canonical = value.clone();
+        canonical.report_sha256.clear();
+        value.report_sha256 = json_sha256(&canonical).unwrap();
+        value
+    }
+
+    fn scenario(
+        id: &str,
+        weight: Option<f64>,
+        measurement_cost: f64,
+        delay_cost_per_second: f64,
+        quality: f64,
+    ) -> RobustEvsiScenarioV1 {
+        let mut value = RobustEvsiScenarioV1 {
+            schema: ROBUST_EVSI_SCENARIO_SCHEMA_V1.into(),
+            scenario_id: id.into(),
+            scenario_weight: weight,
+            measurement_cost,
+            delay_cost_per_second,
+            decision_loss_model: model(quality),
+            source_provenance_sha256: digest('d'),
+            scenario_sha256: String::new(),
+        };
+        value.scenario_sha256 = seal_robust_evsi_scenario_v1(&value).unwrap();
+        value
+    }
+
+    fn candidate(
+        id: &str,
+        group: &str,
+        status: MetrologyReadinessStatusV1,
+        scenarios: Vec<RobustEvsiScenarioV1>,
+        complete: bool,
+    ) -> RobustEvsiCandidateV1 {
+        let central_scenario_id = "central".to_string();
+        let mut value = RobustEvsiCandidateV1 {
+            schema: ROBUST_EVSI_CANDIDATE_SCHEMA_V1.into(),
+            candidate: MetrologyCandidateV1 {
+                schema: METROLOGY_CANDIDATE_SCHEMA_V1.into(),
+                candidate_id: id.into(),
+                measurement_event_id: format!("event-{id}"),
+                group_key: group.into(),
+                instrument_id: "tool-A".into(),
+                measurand_id: "film-thickness".into(),
+                unit: "nm".into(),
+                planned_measurement_at_unix_seconds: 100,
+                decision_deadline_unix_seconds: 1_000,
+                turnaround_seconds: 10,
+                measurement_cost: 0.1,
+                measurement_cost_units: 1,
+                readiness: readiness(status),
+                decision_loss_model: model(0.95),
+            },
+            central_scenario_id,
+            scenarios,
+            scenario_set_complete: complete,
+            scenario_set_sha256: String::new(),
+        };
+        value.scenario_set_sha256 = seal_robust_evsi_candidate_v1(&value).unwrap();
+        value
+    }
+
+    fn policy(
+        budget: u32,
+        minimum_group_coverage: BTreeMap<String, u32>,
+    ) -> MetrologyDecisionLossPolicyV1 {
+        MetrologyDecisionLossPolicyV1 {
+            schema: METROLOGY_DECISION_LOSS_POLICY_SCHEMA_V1.into(),
+            policy_id: "robust-worst-case-evsi.v1".into(),
+            revision: 1,
+            measurement_budget_units: budget,
+            delay_cost_per_second: 0.01,
+            minimum_group_coverage,
+            maximum_exact_candidates: 20,
+        }
+    }
+
+    fn input(
+        candidates: Vec<RobustEvsiCandidateV1>,
+        budget: u32,
+        quotas: BTreeMap<String, u32>,
+        complete: bool,
+    ) -> RobustEvsiInputV1 {
+        RobustEvsiInputV1 {
+            schema: ROBUST_EVSI_INPUT_SCHEMA_V1.into(),
+            input_id: "robust-evsi-fixture.v1".into(),
+            base_policy: policy(budget, quotas),
+            maximum_scenarios_per_candidate: 8,
+            uncertainty_set_complete: complete,
+            candidates,
+        }
+    }
+
+    #[test]
+    fn worst_case_score_is_the_minimum_scenario_net_value() {
+        let value = candidate(
+            "candidate-a",
+            "chamber-1",
+            MetrologyReadinessStatusV1::Qualified,
+            vec![
+                scenario("central", Some(0.5), 0.10, 0.01, 0.95),
+                scenario("low-assay", Some(0.25), 0.40, 0.02, 0.70),
+                scenario("high-assay", Some(0.25), 0.05, 0.01, 0.99),
+            ],
+            true,
+        );
+        let report = optimize_robust_metrology_evsi_portfolio_v1(&input(
+            vec![value],
+            1,
+            BTreeMap::new(),
+            true,
+        ))
+        .unwrap();
+        let candidate = &report.candidate_reports[0];
+        let scenario_min = candidate
+            .scenario_results
+            .iter()
+            .filter_map(|entry| entry.net_expected_loss_reduction)
+            .fold(f64::INFINITY, f64::min);
+        assert_eq!(
+            candidate.worst_case_scenario_id.as_deref(),
+            Some("low-assay")
+        );
+        assert!(
+            (candidate.worst_case_net_expected_loss_reduction.unwrap() - scenario_min).abs()
+                < 1.0e-12
+        );
+        assert!(
+            candidate.worst_case_net_expected_loss_reduction.unwrap()
+                <= candidate.central_net_expected_loss_reduction.unwrap()
+        );
+        assert_eq!(report.status, RobustEvsiPortfolioStatusV1::Feasible);
+    }
+
+    #[test]
+    fn central_positive_but_worst_case_negative_is_not_selected() {
+        let value = candidate(
+            "fragile",
+            "chamber-1",
+            MetrologyReadinessStatusV1::Qualified,
+            vec![
+                scenario("central", None, 0.10, 0.01, 0.95),
+                scenario("expensive-assay", None, 10_000.0, 0.02, 0.95),
+            ],
+            true,
+        );
+        let report = optimize_robust_metrology_evsi_portfolio_v1(&input(
+            vec![value],
+            1,
+            BTreeMap::new(),
+            true,
+        ))
+        .unwrap();
+        let candidate = &report.candidate_reports[0];
+        assert!(
+            candidate.central_net_expected_loss_reduction.unwrap() > 0.0
+        );
+        assert!(
+            candidate.worst_case_net_expected_loss_reduction.unwrap() < 0.0
+        );
+        assert_eq!(
+            candidate.status,
+            RobustEvsiCandidateStatusV1::NonPositiveWorstCaseNetValue
+        );
+        assert!(report.selected_candidate_ids.is_empty());
+    }
+
+    #[test]
+    fn incomplete_uncertainty_set_returns_unknown_not_infeasible() {
+        let value = candidate(
+            "incomplete",
+            "chamber-1",
+            MetrologyReadinessStatusV1::Qualified,
+            vec![scenario("central", None, 0.10, 0.01, 0.95)],
+            false,
+        );
+        let report = optimize_robust_metrology_evsi_portfolio_v1(&input(
+            vec![value],
+            1,
+            BTreeMap::new(),
+            true,
+        ))
+        .unwrap();
+        assert_eq!(report.status, RobustEvsiPortfolioStatusV1::Unknown);
+        assert!(report.selected_candidate_ids.is_empty());
+        assert_eq!(
+            report.candidate_reports[0].status,
+            RobustEvsiCandidateStatusV1::IncompleteScenarioSet
+        );
+    }
+
+    #[test]
+    fn globally_incomplete_uncertainty_set_returns_unknown() {
+        let value = candidate(
+            "a",
+            "chamber-1",
+            MetrologyReadinessStatusV1::Qualified,
+            vec![scenario("central", None, 0.10, 0.01, 0.95)],
+            true,
+        );
+        let report = optimize_robust_metrology_evsi_portfolio_v1(&input(
+            vec![value],
+            1,
+            BTreeMap::new(),
+            false,
+        ))
+        .unwrap();
+        assert_eq!(report.status, RobustEvsiPortfolioStatusV1::Unknown);
+        assert!(!report.uncertainty_set_complete);
+    }
+
+    #[test]
+    fn unknown_readiness_remains_excluded_across_all_scenarios() {
+        let value = candidate(
+            "unknown-ready",
+            "chamber-1",
+            MetrologyReadinessStatusV1::Unknown,
+            vec![
+                scenario("central", None, 0.10, 0.01, 0.95),
+                scenario("low", None, 0.10, 0.01, 0.70),
+            ],
+            true,
+        );
+        let report = optimize_robust_metrology_evsi_portfolio_v1(&input(
+            vec![value],
+            1,
+            BTreeMap::new(),
+            true,
+        ))
+        .unwrap();
+        assert!(report.selected_candidate_ids.is_empty());
+        assert_eq!(
+            report.candidate_reports[0].status,
+            RobustEvsiCandidateStatusV1::ReadinessUnknown
+        );
+    }
+
+    #[test]
+    fn changed_state_action_or_outcome_identity_is_rejected() {
+        let mut low = scenario("low", None, 0.2, 0.01, 0.70);
+        low.decision_loss_model.states[0].state_id = "acceptable".into();
+        low.scenario_sha256 = seal_robust_evsi_scenario_v1(&low).unwrap();
+        let value = candidate(
+            "mismatched",
+            "chamber-1",
+            MetrologyReadinessStatusV1::Qualified,
+            vec![scenario("central", None, 0.10, 0.01, 0.95), low],
+            true,
+        );
+        assert!(
+            optimize_robust_metrology_evsi_portfolio_v1(&input(
+                vec![value],
+                1,
+                BTreeMap::new(),
+                true
+            ))
+            .is_err()
+        );
+    }
+
+    #[test]
+    fn scenario_weight_changes_do_not_change_minimax_value() {
+        let mut value = candidate(
+            "weighted",
+            "chamber-1",
+            MetrologyReadinessStatusV1::Qualified,
+            vec![
+                scenario("central", Some(0.5), 0.10, 0.01, 0.95),
+                scenario("low", Some(0.5), 0.20, 0.02, 0.75),
+            ],
+            true,
+        );
+        let first = optimize_robust_metrology_evsi_portfolio_v1(&input(
+            vec![value.clone()],
+            1,
+            BTreeMap::new(),
+            true,
+        ))
+        .unwrap();
+        value.scenarios[0].scenario_weight = Some(0.9);
+        value.scenarios[1].scenario_weight = Some(0.1);
+        for scenario in &mut value.scenarios {
+            scenario.scenario_sha256 = seal_robust_evsi_scenario_v1(scenario).unwrap();
+        }
+        value.scenario_set_sha256 = seal_robust_evsi_candidate_v1(&value).unwrap();
+        let second = optimize_robust_metrology_evsi_portfolio_v1(&input(
+            vec![value],
+            1,
+            BTreeMap::new(),
+            true,
+        ))
+        .unwrap();
+        assert_eq!(
+            first.candidate_reports[0].worst_case_net_expected_loss_reduction,
+            second.candidate_reports[0].worst_case_net_expected_loss_reduction
+        );
+    }
+
+    #[test]
+    fn scenario_order_does_not_change_robust_report_digest() {
+        let mut value = candidate(
+            "order",
+            "chamber-1",
+            MetrologyReadinessStatusV1::Qualified,
+            vec![
+                scenario("central", Some(0.5), 0.10, 0.01, 0.95),
+                scenario("low", Some(0.5), 0.20, 0.02, 0.75),
+            ],
+            true,
+        );
+        let first = optimize_robust_metrology_evsi_portfolio_v1(&input(
+            vec![value.clone()],
+            1,
+            BTreeMap::new(),
+            true,
+        ))
+        .unwrap();
+        value.scenarios.reverse();
+        value.scenario_set_sha256 = seal_robust_evsi_candidate_v1(&value).unwrap();
+        let second = optimize_robust_metrology_evsi_portfolio_v1(&input(
+            vec![value],
+            1,
+            BTreeMap::new(),
+            true,
+        ))
+        .unwrap();
+        assert_eq!(first.report_sha256, second.report_sha256);
+    }
+
+    #[test]
+    fn robust_portfolio_obeys_group_quotas_and_budget() {
+        let candidates = vec![
+            candidate(
+                "a",
+                "chamber-1",
+                MetrologyReadinessStatusV1::Qualified,
+                vec![
+                    scenario("central", None, 0.10, 0.01, 0.95),
+                    scenario("low", None, 0.10, 0.01, 0.85),
+                ],
+                true,
+            ),
+            candidate(
+                "b",
+                "chamber-2",
+                MetrologyReadinessStatusV1::Qualified,
+                vec![
+                    scenario("central", None, 0.10, 0.01, 0.95),
+                    scenario("low", None, 0.10, 0.01, 0.85),
+                ],
+                true,
+            ),
+            candidate(
+                "c",
+                "chamber-1",
+                MetrologyReadinessStatusV1::Qualified,
+                vec![
+                    scenario("central", None, 0.10, 0.01, 0.95),
+                    scenario("low", None, 0.10, 0.01, 0.75),
+                ],
+                true,
+            ),
+        ];
+        let report = optimize_robust_metrology_evsi_portfolio_v1(&input(
+            candidates,
+            2,
+            BTreeMap::from([
+                ("chamber-1".into(), 1),
+                ("chamber-2".into(), 1),
+            ]),
+            true,
+        ))
+        .unwrap();
+        assert_eq!(report.status, RobustEvsiPortfolioStatusV1::Feasible);
+        assert_eq!(report.selected_candidate_ids.len(), 2);
+        assert_eq!(report.selected_group_counts["chamber-1"], 1);
+        assert_eq!(report.selected_group_counts["chamber-2"], 1);
+        assert_eq!(report.total_measurement_cost_units, 2);
+    }
+
+    #[test]
+    fn scenario_source_digest_tampering_is_rejected() {
+        let mut value = candidate(
+            "tampered",
+            "chamber-1",
+            MetrologyReadinessStatusV1::Qualified,
+            vec![scenario("central", None, 0.10, 0.01, 0.95)],
+            true,
+        );
+        value.scenarios[0].source_provenance_sha256 = digest('0');
+        assert!(optimize_robust_metrology_evsi_portfolio_v1(&input(
+            vec![value],
+            1,
+            BTreeMap::new(),
+            true,
+        ))
+        .is_err());
+    }
+}
