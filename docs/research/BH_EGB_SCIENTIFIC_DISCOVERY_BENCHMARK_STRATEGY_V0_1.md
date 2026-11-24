@@ -36,9 +36,15 @@ The key metric is decision regret and cost to the next independently qualified d
 
 Treat the primary observable vector and its covariance as one mathematical object. Derived outputs (determinant, singular values, condition number, residual norms, transformed response entries) must be marked as derived, with their dependence preserved.
 
-For each rival pair, consume a predeclared covariance of the difference vector. Do not infer cross-hypothesis covariance from marginal standard deviations without an explicit coupling model. In singular cases, test support membership separately from the pseudoinverse quadratic form. No silent diagonal jitter.
+The current v0.2 selector consumes one **joint covariance of the stacked hypothesis-output vector** in an explicit hypothesis-major/observable-major order. It derives each pairwise difference covariance from the diagonal and cross-hypothesis blocks:
 
-The current v0.1 extension adds this contract and synthetic control; it does not yet model covariance uncertainty sets or Symtropy's endpoint Gram metrics. Work on correlated optimal designs identifies the additional assumptions and verification difficulty as a central open issue, rather than a cosmetic implementation detail (López-Fidalgo & Wong, 2026).
+\[
+S_{ij}=\Gamma_{ii}+\Gamma_{jj}-\Gamma_{ij}-\Gamma_{ji}.
+\]
+
+The whole joint matrix must be PSD, which guarantees that the derived pair covariances arise from one common covariance model. The caller must justify the cross-hypothesis coupling and shared-error semantics; marginal standard deviations alone are not enough. In singular cases, test support membership separately from the pseudoinverse quadratic form. No silent diagonal jitter. A previous pairwise-matrix double-centering completion attempt was withdrawn after a vector-output counterexample showed it could reject valid joint models.
+
+The current v0.2 extension does not yet model covariance uncertainty sets, full observable lineage, or Symtropy's endpoint Gram metrics. Those are separate follow-ons: #13472 owns derived-observable ancestry/propagation, and Symtropy #7131 owns physical response/basis semantics. Work on correlated optimal designs identifies additional assumptions and verification difficulty as a central open issue, not a cosmetic implementation detail (López-Fidalgo & Wong, 2026).
 
 ### 3. Proof-carrying experiment design
 
@@ -192,7 +198,7 @@ On identical fixed hypothesis/design sets, compare:
 2. the existing scalar variance/disagreement selector (population variance across available hypothesis predictions);
 3. a coverage-aware variant of that baseline with a frozen minimum valid-prediction fraction and explicit UNRESOLVED disposition;
 4. the original #8034 conditional-independence score after its own qualification;
-5. covariance-aware maximin Mahalanobis screen;
+5. v0.2 covariance-aware maximin Mahalanobis screen from a PSD joint hypothesis-output covariance;
 6. robust worst-case design over a predeclared covariance uncertainty set (future work);
 7. Gaussian Monte Carlo EIG / expected log Bayes factor only where predictive distributions and priors have been independently justified;
 8. interval/set-based discrimination where probability distributions are not defensible;
@@ -202,7 +208,7 @@ On identical fixed hypothesis/design sets, compare:
 
 Controls: exact duplicate observables; determinant/condition number derived from the same matrix; common-mode error; invalid/indefinite covariance; individually PSD but jointly impossible pairwise covariances; singular support mismatch and in-support mean; unit rescaling; invertible basis transformation; source/model digest change; covariance miscalibration; nuisance-parameter shifts; observational noise; irrelevant observables; a hypothesis prediction returning None; a candidate supported by only a small subset of hypotheses; a design that cannot change the downstream decision.
 
-Metrics: pairwise discrimination, ranking regret, prediction-coverage fraction, excluded-hypothesis reasons, redundancy/unit/basis invariance, joint covariance consistency, covariance coverage, calibration, failure/abstention counts, and cost to the next qualified decision.
+Metrics: pairwise discrimination, ranking regret, prediction-coverage fraction, excluded-hypothesis reasons, redundancy/unit/basis invariance, joint covariance PSD validity, covariance coverage, calibration, failure/abstention counts, and cost to the next qualified decision.
 
 ### Track C — integrated research workflow
 
