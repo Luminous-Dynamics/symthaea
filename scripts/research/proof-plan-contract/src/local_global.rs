@@ -1187,17 +1187,27 @@ mod tests {
     }
 
     #[test]
-    fn sequent_scope_rejects_untyped_or_mistranslated_hypothesis_text() {
+    fn sequent_scope_rejects_mistranslated_hypothesis_text_after_valid_rehash() {
         let mut pair = fixture();
-        pair.candidate
-            .local_stage
-            .scope_binding
-            .hypotheses
-            .push("p".to_owned());
+        let candidate_scope = &mut pair.candidate.local_stage.scope_binding;
+        candidate_scope.hypotheses = vec!["q".to_owned()];
+        let canonical = canonical_string_set(&candidate_scope.hypotheses, "hypotheses").unwrap();
+        candidate_scope.hypothesis_set_sha256 =
+            domain_separated_sha256("hypotheses", &canonical).unwrap();
+
+        let sequent = candidate_scope.finite_boolean_sequent.as_mut().unwrap();
+        sequent.hypotheses = vec![BooleanFormula::Atom {
+            name: "p".to_owned(),
+        }];
+        candidate_scope.finite_boolean_sequent_sha256 =
+            Some(domain_separated_sha256("finite_boolean_sequent", sequent).unwrap());
+
+        pair.candidate.global_stage.scope_binding = candidate_scope.clone();
+
         assert!(
-            validate_pair(&pair)
-                .iter()
-                .any(|error| error.contains("hypotheses length does not match"))
+            validate_pair(&pair).iter().any(|error| {
+                error.contains("hypotheses[0] does not match the canonical typed sequent display")
+            })
         );
     }
 

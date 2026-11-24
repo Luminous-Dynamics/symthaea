@@ -30,6 +30,7 @@
         "conclusion_text": "(q → p)",
         "warrant_text": "From (p → q) infer (q → p).",
         "finite_boolean_sequent": {
+          "hypotheses": [],
           "premises": [
             {
               "op": "implies",
@@ -53,8 +54,7 @@
               "op": "atom",
               "name": "p"
             }
-          },
-          "hypotheses": []
+          }
         },
         "finite_boolean_sequent_sha256": "d8511631e228ae06b643a5995e1e5e888382c9e0a5a5521fa35c899e30351199"
       },
@@ -93,6 +93,7 @@
         "conclusion_text": "(q → p)",
         "warrant_text": "From (p → q) infer (q → p).",
         "finite_boolean_sequent": {
+          "hypotheses": [],
           "premises": [
             {
               "op": "implies",
@@ -116,8 +117,7 @@
               "op": "atom",
               "name": "p"
             }
-          },
-          "hypotheses": []
+          }
         },
         "finite_boolean_sequent_sha256": "d8511631e228ae06b643a5995e1e5e888382c9e0a5a5521fa35c899e30351199"
       },
