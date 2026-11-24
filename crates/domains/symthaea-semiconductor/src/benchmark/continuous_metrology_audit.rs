@@ -10,8 +10,7 @@ use std::collections::{BTreeMap, BTreeSet};
 use thiserror::Error;
 
 use super::label_consumption_guard::{
-    LabelConsumptionEligibilityReportV1, LabelConsumptionEligibilityV1,
-    LabelEvidenceFrontierV1,
+    LabelConsumptionEligibilityReportV1, LabelConsumptionEligibilityV1, LabelEvidenceFrontierV1,
 };
 use super::metrology_audit::{
     MetrologyAuditSelectionReportV1, MetrologySelectionMethodV1, SELECTION_SCHEMA_V1,
@@ -155,7 +154,9 @@ fn sha256_hex(bytes: &[u8]) -> String {
     format!("{:x}", Sha256::digest(bytes))
 }
 
-fn json_sha256<T: Serialize + ?Sized>(value: &T) -> Result<String, ContinuousMetrologyAuditErrorV1> {
+fn json_sha256<T: Serialize + ?Sized>(
+    value: &T,
+) -> Result<String, ContinuousMetrologyAuditErrorV1> {
     let bytes = serde_json::to_vec(value).map_err(|error| {
         ContinuousMetrologyAuditErrorV1(format!("canonical JSON serialization failed: {error}"))
     })?;
@@ -299,16 +300,16 @@ pub fn estimate_continuous_metrology_audit_v1(
         &input.target_measurand_id,
         &input.unit,
         &canonical.predictions,
-    )? != input.frame_sha256 {
+    )? != input.frame_sha256
+    {
         return Err(ContinuousMetrologyAuditErrorV1(
             "population frame digest does not match the frozen candidate prediction frame".into(),
         ));
     }
     let input_sha256 = json_sha256(&canonical)?;
-    validate_binary_measurand_semantics_v1(&input.selection.binary_semantics)
-        .map_err(|error| ContinuousMetrologyAuditErrorV1(format!(
-            "selection policy semantics rejected: {error}"
-        )))?;
+    validate_binary_measurand_semantics_v1(&input.selection.binary_semantics).map_err(|error| {
+        ContinuousMetrologyAuditErrorV1(format!("selection policy semantics rejected: {error}"))
+    })?;
 
     if input.selection.schema != SELECTION_SCHEMA_V1
         || !valid_sha256(&input.selection.selection_sha256)
@@ -343,8 +344,14 @@ pub fn estimate_continuous_metrology_audit_v1(
         require_text(&prediction.candidate_id, "prediction.candidate_id")?;
         require_text(&prediction.subject_id, "prediction.subject_id")?;
         require_text(&prediction.stratum_id, "prediction.stratum_id")?;
-        require_text(&prediction.measurement_event_id, "prediction.measurement_event_id")?;
-        require_text(&prediction.target_measurand_id, "prediction.target_measurand_id")?;
+        require_text(
+            &prediction.measurement_event_id,
+            "prediction.measurement_event_id",
+        )?;
+        require_text(
+            &prediction.target_measurand_id,
+            "prediction.target_measurand_id",
+        )?;
         require_text(&prediction.unit, "prediction.unit")?;
         if prediction.target_measurand_id != input.target_measurand_id
             || prediction.unit != input.unit
@@ -392,8 +399,7 @@ pub fn estimate_continuous_metrology_audit_v1(
                 row.candidate_id
             )));
         };
-        if prediction.subject_id != row.subject_id || prediction.stratum_id != row.stratum_id
-        {
+        if prediction.subject_id != row.subject_id || prediction.stratum_id != row.stratum_id {
             return Err(ContinuousMetrologyAuditErrorV1(format!(
                 "candidate {} prediction metadata differs from selection frame",
                 row.candidate_id
@@ -421,7 +427,9 @@ pub fn estimate_continuous_metrology_audit_v1(
     let mut design_by_stratum: BTreeMap<&str, (usize, usize)> = BTreeMap::new();
     for row in &input.selection.rows {
         if row.method != MetrologySelectionMethodV1::DeterministicExploit {
-            let counts = design_by_stratum.entry(row.stratum_id.as_str()).or_default();
+            let counts = design_by_stratum
+                .entry(row.stratum_id.as_str())
+                .or_default();
             counts.0 += 1;
             if row.method == MetrologySelectionMethodV1::RandomizedAudit {
                 counts.1 += 1;
@@ -447,7 +455,12 @@ pub fn estimate_continuous_metrology_audit_v1(
         }
     }
 
-    let selected_rows: Vec<_> = input.selection.rows.iter().filter(|row| row.selected).collect();
+    let selected_rows: Vec<_> = input
+        .selection
+        .rows
+        .iter()
+        .filter(|row| row.selected)
+        .collect();
     let selected_count = selected_rows.len();
     if input.outcomes.len() != selected_count {
         return Err(ContinuousMetrologyAuditErrorV1(
@@ -456,7 +469,10 @@ pub fn estimate_continuous_metrology_audit_v1(
     }
     let mut outcome_by_id = BTreeMap::new();
     for outcome in &input.outcomes {
-        if outcome_by_id.insert(outcome.candidate_id.as_str(), outcome).is_some() {
+        if outcome_by_id
+            .insert(outcome.candidate_id.as_str(), outcome)
+            .is_some()
+        {
             return Err(ContinuousMetrologyAuditErrorV1(
                 "duplicate selected outcome state".into(),
             ));
@@ -472,8 +488,10 @@ pub fn estimate_continuous_metrology_audit_v1(
         }
     }
 
-    let snapshot = build_information_cutoff_snapshot_v1(&input.graph, &input.cutoff)
-        .map_err(|error| ContinuousMetrologyAuditErrorV1(format!("maturity graph rejected: {error}")))?;
+    let snapshot =
+        build_information_cutoff_snapshot_v1(&input.graph, &input.cutoff).map_err(|error| {
+            ContinuousMetrologyAuditErrorV1(format!("maturity graph rejected: {error}"))
+        })?;
     let matured: BTreeSet<&str> = snapshot
         .matured_validated_label_ids
         .iter()
@@ -538,7 +556,8 @@ pub fn estimate_continuous_metrology_audit_v1(
                 if outcome.label_id.as_deref() != Some(report.label_id.as_str())
                     || label_report_digest(report)? != report.report_sha256
                     || report.frontier != LabelEvidenceFrontierV1::CurrentAtK1
-                    || report.eligibility != LabelConsumptionEligibilityV1::EligibleUnderDeclaredPolicy
+                    || report.eligibility
+                        != LabelConsumptionEligibilityV1::EligibleUnderDeclaredPolicy
                     || !report.downstream_consumption_allowed
                     || report.label_revision == 0
                     || !valid_sha256(&report.label_sha256)
@@ -562,7 +581,9 @@ pub fn estimate_continuous_metrology_audit_v1(
                         row.candidate_id
                     )));
                 }
-                let graph_labels: Vec<_> = input.graph.metrology_labels
+                let graph_labels: Vec<_> = input
+                    .graph
+                    .metrology_labels
                     .iter()
                     .filter(|label| label.label_id == report.label_id)
                     .collect();
@@ -588,7 +609,8 @@ pub fn estimate_continuous_metrology_audit_v1(
                     )));
                 }
                 if !report.qualified_corrected_value.is_finite()
-                    || report.qualified_standard_uncertainty_upper_bound
+                    || report
+                        .qualified_standard_uncertainty_upper_bound
                         .is_none_or(|value| !value.is_finite() || value < 0.0)
                 {
                     return Err(ContinuousMetrologyAuditErrorV1(format!(
@@ -596,7 +618,8 @@ pub fn estimate_continuous_metrology_audit_v1(
                         row.candidate_id
                     )));
                 }
-                qualified_values.insert(row.candidate_id.as_str(), report.qualified_corrected_value);
+                qualified_values
+                    .insert(row.candidate_id.as_str(), report.qualified_corrected_value);
             }
         }
     }
@@ -615,7 +638,10 @@ pub fn estimate_continuous_metrology_audit_v1(
 
     let mut strata_rows: BTreeMap<String, Vec<_>> = BTreeMap::new();
     for row in &input.selection.rows {
-        strata_rows.entry(row.stratum_id.clone()).or_default().push(row);
+        strata_rows
+            .entry(row.stratum_id.clone())
+            .or_default()
+            .push(row);
     }
 
     let mut strata = Vec::new();
@@ -634,9 +660,18 @@ pub fn estimate_continuous_metrology_audit_v1(
     }
 
     for (stratum_id, rows) in strata_rows {
-        let exploit: Vec<_> = rows.iter().filter(|row| row.method == MetrologySelectionMethodV1::DeterministicExploit).collect();
-        let residual: Vec<_> = rows.iter().filter(|row| row.method != MetrologySelectionMethodV1::DeterministicExploit).collect();
-        let audit: Vec<_> = residual.iter().filter(|row| row.method == MetrologySelectionMethodV1::RandomizedAudit).collect();
+        let exploit: Vec<_> = rows
+            .iter()
+            .filter(|row| row.method == MetrologySelectionMethodV1::DeterministicExploit)
+            .collect();
+        let residual: Vec<_> = rows
+            .iter()
+            .filter(|row| row.method != MetrologySelectionMethodV1::DeterministicExploit)
+            .collect();
+        let audit: Vec<_> = residual
+            .iter()
+            .filter(|row| row.method == MetrologySelectionMethodV1::RandomizedAudit)
+            .collect();
         let residual_count = residual.len();
         let audit_count = audit.len();
         if residual_count > 0 && (audit_count == 0 || audit_count > residual_count) {
@@ -644,7 +679,8 @@ pub fn estimate_continuous_metrology_audit_v1(
                 "stratum {stratum_id}: audit positivity/support failure"
             )));
         }
-        let inclusion_probability = (residual_count > 0).then_some(audit_count as f64 / residual_count as f64);
+        let inclusion_probability =
+            (residual_count > 0).then_some(audit_count as f64 / residual_count as f64);
         for row in &residual {
             if (row.inclusion_probability - inclusion_probability.unwrap_or(1.0)).abs() > 1.0e-12 {
                 return Err(ContinuousMetrologyAuditErrorV1(format!(
@@ -656,7 +692,8 @@ pub fn estimate_continuous_metrology_audit_v1(
         let mut exploit_total = 0.0;
         for row in &exploit {
             let loss = (qualified_values[row.candidate_id.as_str()]
-                - prediction_by_id[row.candidate_id.as_str()].vm_prediction_value).abs();
+                - prediction_by_id[row.candidate_id.as_str()].vm_prediction_value)
+                .abs();
             exploit_total += loss;
             sum_weights += 1.0;
             sum_squared_weights += 1.0;
@@ -667,7 +704,8 @@ pub fn estimate_continuous_metrology_audit_v1(
             .iter()
             .map(|row| {
                 (qualified_values[row.candidate_id.as_str()]
-                    - prediction_by_id[row.candidate_id.as_str()].vm_prediction_value).abs()
+                    - prediction_by_id[row.candidate_id.as_str()].vm_prediction_value)
+                    .abs()
             })
             .collect();
         let sampled_residuals: Vec<f64> = audit
@@ -675,7 +713,8 @@ pub fn estimate_continuous_metrology_audit_v1(
             .map(|row| {
                 let prediction = prediction_by_id[row.candidate_id.as_str()];
                 let loss = (qualified_values[row.candidate_id.as_str()]
-                    - prediction.vm_prediction_value).abs();
+                    - prediction.vm_prediction_value)
+                    .abs();
                 loss - prediction.predicted_absolute_error
             })
             .collect();
@@ -716,8 +755,16 @@ pub fn estimate_continuous_metrology_audit_v1(
             })
         };
         let stratum_variance_qualified = ht_variance.is_some() && model_assisted_variance.is_some();
-        if let Some(variance) = ht_variance { total_ht_variance += variance; } else { variance_qualified = false; }
-        if let Some(variance) = model_assisted_variance { total_model_assisted_variance += variance; } else { variance_qualified = false; }
+        if let Some(variance) = ht_variance {
+            total_ht_variance += variance;
+        } else {
+            variance_qualified = false;
+        }
+        if let Some(variance) = model_assisted_variance {
+            total_model_assisted_variance += variance;
+        } else {
+            variance_qualified = false;
+        }
 
         total_ht += exploit_total + ht_residual_total;
         total_model_assisted += exploit_total + model_assisted_residual_total;
@@ -744,7 +791,8 @@ pub fn estimate_continuous_metrology_audit_v1(
             residual_ht_variance: ht_variance,
             residual_model_assisted_variance: model_assisted_variance,
             estimated_absolute_error_total_ht: exploit_total + ht_residual_total,
-            estimated_absolute_error_total_model_assisted: exploit_total + model_assisted_residual_total,
+            estimated_absolute_error_total_model_assisted: exploit_total
+                + model_assisted_residual_total,
             variance_qualified: stratum_variance_qualified,
         });
     }
@@ -801,8 +849,7 @@ mod tests {
         seal_binary_measurand_semantics_v1,
     };
     use crate::benchmark::process_event_graph::{
-        ClockBasisV1, MetrologyLabelV1, ProcessEventKindV1, ProcessEventV1,
-        GRAPH_SCHEMA_V1,
+        ClockBasisV1, GRAPH_SCHEMA_V1, MetrologyLabelV1, ProcessEventKindV1, ProcessEventV1,
     };
 
     fn digest(ch: char) -> String {
@@ -949,7 +996,8 @@ mod tests {
 
     fn label_report(label: &MetrologyLabelV1) -> LabelConsumptionEligibilityReportV1 {
         let mut report = LabelConsumptionEligibilityReportV1 {
-            schema: crate::benchmark::label_consumption_guard::LABEL_CONSUMPTION_REPORT_SCHEMA_V1.into(),
+            schema: crate::benchmark::label_consumption_guard::LABEL_CONSUMPTION_REPORT_SCHEMA_V1
+                .into(),
             label_id: label.label_id.clone(),
             label_revision: label.revision,
             measurement_event_id: label.measurement_event_id.clone(),
@@ -1095,7 +1143,12 @@ mod tests {
         );
         assert!((report.model_only_mean_absolute_error.unwrap() - 1.875).abs() < 1.0e-12);
         assert!(report.standard_error_mean_absolute_error_ht.unwrap() > 0.0);
-        assert!(report.standard_error_mean_absolute_error_model_assisted.unwrap() > 0.0);
+        assert!(
+            report
+                .standard_error_mean_absolute_error_model_assisted
+                .unwrap()
+                > 0.0
+        );
         assert_eq!(report.strata.len(), 2);
         assert!(valid_sha256(&report.report_sha256));
     }
@@ -1109,9 +1162,14 @@ mod tests {
             / 8.0;
         assert_eq!(report.status, ContinuousAuditStatusV1::Complete);
         assert!((report.estimated_mean_absolute_error_ht.unwrap() - exact).abs() < 1.0e-12);
-        assert!((report.estimated_mean_absolute_error_model_assisted.unwrap() - exact).abs() < 1.0e-12);
+        assert!(
+            (report.estimated_mean_absolute_error_model_assisted.unwrap() - exact).abs() < 1.0e-12
+        );
         assert_eq!(report.standard_error_mean_absolute_error_ht, Some(0.0));
-        assert_eq!(report.standard_error_mean_absolute_error_model_assisted, Some(0.0));
+        assert_eq!(
+            report.standard_error_mean_absolute_error_model_assisted,
+            Some(0.0)
+        );
     }
 
     #[test]
@@ -1140,7 +1198,11 @@ mod tests {
         assert_eq!(report.selected_count, 6);
         assert_eq!(report.nonresponse_count, 1);
         assert_eq!(report.estimated_mean_absolute_error_ht, None);
-        assert!(report.reason_codes.contains(&"selected_outcome_not_returned".into()));
+        assert!(
+            report
+                .reason_codes
+                .contains(&"selected_outcome_not_returned".into())
+        );
     }
 
     #[test]
@@ -1165,7 +1227,11 @@ mod tests {
         incomplete.population_frame_complete = false;
         let report = estimate_continuous_metrology_audit_v1(&incomplete).unwrap();
         assert_eq!(report.status, ContinuousAuditStatusV1::Unknown);
-        assert!(report.reason_codes.contains(&"population_frame_incomplete".into()));
+        assert!(
+            report
+                .reason_codes
+                .contains(&"population_frame_incomplete".into())
+        );
 
         let mut invalid = input(false);
         let audit = invalid
@@ -1206,7 +1272,10 @@ mod tests {
         let first = estimate_continuous_metrology_audit_v1(&input).unwrap();
         let second = estimate_continuous_metrology_audit_v1(&input).unwrap();
         assert_eq!(first.report_sha256, second.report_sha256);
-        assert_eq!(first.estimated_mean_absolute_error_ht, second.estimated_mean_absolute_error_ht);
+        assert_eq!(
+            first.estimated_mean_absolute_error_ht,
+            second.estimated_mean_absolute_error_ht
+        );
         assert_eq!(
             first.estimated_mean_absolute_error_model_assisted,
             second.estimated_mean_absolute_error_model_assisted
