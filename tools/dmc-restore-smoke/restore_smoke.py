@@ -78,9 +78,11 @@ def make_environment():
     env = suite.load(
         domain_name="cartpole",
         task_name="swingup",
-        task_kwargs={"random": random_state},
-        environment_kwargs={
+        task_kwargs={
+            "random": random_state,
             "time_limit": TIME_LIMIT_SECONDS,
+        },
+        environment_kwargs={
             "n_sub_steps": N_SUB_STEPS,
             "legacy_step": LEGACY_STEP,
             "flat_observation": False,
