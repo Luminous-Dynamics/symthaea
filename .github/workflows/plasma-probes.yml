@@ -84,6 +84,10 @@ jobs:
             "${tmp_root}/benchmarks/plasma/topology-lifting/"
           cp benchmarks/plasma/topology-lifting/fixtures/topology-lift-known-answer-v0.1.json \
             "${tmp_root}/benchmarks/plasma/topology-lifting/fixtures/"
+          cp benchmarks/plasma/topology-lifting/weighted-fourier-measure-v0.1.schema.json \
+            "${tmp_root}/benchmarks/plasma/topology-lifting/"
+          cp benchmarks/plasma/topology-lifting/fixtures/weighted-fourier-measure-known-answer-v0.1.json \
+            "${tmp_root}/benchmarks/plasma/topology-lifting/fixtures/"
           cp benchmarks/plasma/micro-macro/micro-macro-scaling-contract-v0.1.schema.json \
             "${tmp_root}/benchmarks/plasma/micro-macro/"
           cp benchmarks/plasma/micro-macro/fixtures/synthetic-micro-macro-contract-v0.1.json \
@@ -172,7 +176,18 @@ jobs:
           assert opened["lift"]["raw_coordinate_included"] is True
           assert opened["lift"]["boundary_distances_included"] is True
           assert fixture["claim_boundary"]["no_physical_plasma_run"] is True
+
+          measure_schema = json.loads((root / "weighted-fourier-measure-v0.1.schema.json").read_text())
+          measure = json.loads((root / "fixtures/weighted-fourier-measure-known-answer-v0.1.json").read_text())
+          Draft202012Validator.check_schema(measure_schema)
+          Draft202012Validator(measure_schema).validate(measure)
+          assert len(measure["positions"]) == len(measure["weights"])
+          assert len(measure["positions"]) * measure["max_harmonic"] <= 16_777_216
+          assert sum(measure["weights"]) > 0
+          assert len(measure["expected_normalized_complex_moments"]) == measure["max_harmonic"]
+          assert measure["claim_boundary"]["finite_fourier_band_is_not_injective"] is True
           print("topology_lift_schema_validation=PASS")
+          print("weighted_fourier_measure_schema_validation=PASS")
           PY
 
       - name: Validate high-field VPFP micro-macro scaling schema and fixture
