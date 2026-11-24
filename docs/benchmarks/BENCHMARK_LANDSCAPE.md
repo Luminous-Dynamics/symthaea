@@ -1,6 +1,6 @@
 # Benchmark Landscape and Positioning
 
-**Research snapshot:** 15 November 2026  
+**Research snapshot:** 24 November 2026  
 **Purpose:** choose fair comparators and identify what SympoeticBench must add rather than duplicate.
 
 ## 1. Adjacent benchmarks and studies
@@ -24,6 +24,11 @@
 
 | OHAI persistent human-AI teams (Frontiers, Oct 2026) | Distinguishes system configuration, enacted collective functioning, and multi-task collective intelligence over repeated cycles | Theoretical framework with a staged empirical programme; direct longitudinal team evidence remains limited | Add versioned team-cycle receipts, state continuity, membership/authority changes, consent-scoped memory, and a separate evidential threshold for CI claims |
 
+| CMU Human-AI Complementarity research (2026) | Individual persistence and unaided capability after AI withdrawal; team-level AI × transactive-memory interaction | Randomized individual trials (N=1,222) plus a controlled 2×2 experiment with 159 teams; the programme reports short-term assistance benefits alongside post-withdrawal capability costs and preservation of unique member-held information by TMS | Reproduce the four-arm AI × TMS design with immediate, delayed and transfer tests; distinguish assisted output from retained team capability |
+| [HiddenBench (ICML 2026)](https://proceedings.mlr.press/v306/li26ej.html) | Collective reasoning when evidence is distributed across agents | 65 hidden-profile tasks; 15 frontier LLMs; 30.1% multi-agent accuracy under distributed information versus 80.7% for a single agent given complete information in the paper's comparison | Add hidden-profile elicitation, latent-information coverage and explicit information-asymmetry reasoning; treat the full-information result as a different information condition, not a matched baseline |
+| [GroupMemBench (May 2026)](https://www.microsoft.com/en-us/research/publication/groupmembench-benchmarking-llm-agent-memory-in-multi-party-conversations/) | Multi-party memory, speaker-grounded beliefs, knowledge updates, ambiguity, temporal reasoning and abstention | 715 adversarial questions across six categories; strongest tested memory system reported 46.0% average accuracy, with 27.1% on knowledge updates and 37.7% on term ambiguity; BM25 matched or exceeded most evaluated agent-memory systems | Include a strong low-cost BM25 baseline, speaker-scoped provenance, temporal updates, ambiguity and abstention; do not assume an LLM memory layer is better because it is more elaborate |
+| [Agents of Humanity — Agent Sovereignty Benchmark](https://agentsofhumanity.ai/) | Portable, transparent, auditable, verifiable, modifiable and controllable agents | Public preview, criteria v1.1 dated 10 Nov 2026; six criteria and 26 evidence-scored tests | Add a rights/sovereignty audit alongside capability measures; treat this as a useful emerging external benchmark, not a universal or peer-reviewed standard |
+
 For concrete release gates, pilot targets, and external comparison requirements, see the [Competitive Benchmark Targets](sympoetic/COMPETITIVE_BENCHMARK_TARGETS.md) protocol.
 
 ## 2. Findings that shape our design
@@ -35,6 +40,14 @@ AgentWorld reports long-horizon failures in communication, role tracking and sha
 The COLM 2026 *Collaboration Gap* study shows that strong solo model performance can degrade in paired collaboration, and that partner order and relay strategy can matter. SympoeticBench therefore adds matched solo and paired baselines, counterbalanced A→B/B→A ordering, specialist role-loss tests, and structured handoff evaluation. The May 2026 multi-agent creativity study reports that AI-agent teams can outperform human teams on its creativity measure, driven by novelty with comparable usefulness. We should reproduce its distinction between novelty and usefulness where possible, while not treating AI-only team results as proof of superior human-AI collaboration.
 
 The Stanford AI Index 2026's summary of KaBLE highlights that models can collapse the distinction between first-person false beliefs and established facts. SympoeticBench now tests that failure within a collaborative exchange, where the participant's belief must be represented accurately without being promoted to external truth. A May 2026 mathematical-psychology paper further motivates separating confidence calibration from metacognitive sensitivity: an agent should not only be calibrated on average, it should assign lower confidence to the judgments it gets wrong.
+
+The November 2026 CMU Human-AI Complementarity programme makes withdrawal testing a priority rather than a niche extension. It reports randomized trials with 1,222 participants in which AI support improved short-term performance but reduced persistence and unassisted performance, with effects emerging after brief exposure. Its separate 159-team 2×2 experiment reports that AI access can accelerate accurate decisions while available, but teams that had used AI made less accurate decisions after withdrawal; transactive-memory systems preserved unique member-held information. These are programme-reported research findings and should be reproduced with our own matched tasks and independent analysis, not copied as a guaranteed effect size. The new team-retention evaluator is intended to make that replication testable.
+
+HiddenBench exposes a different bottleneck: pooling individually available facts is not the same as discovering what other participants know but have not yet shared. In its specific 65-task evaluation, multi-agent systems reached 30.1% accuracy under distributed information, compared with 80.7% for a single agent given the complete information profile. The conditions differ in information access, so this is a diagnostic gap rather than a head-to-head leaderboard comparison. The important design lesson is to measure elicitation coverage, minority-held fact use, source attribution and structured inquiry—not just answer accuracy.
+
+GroupMemBench adds a hard baseline for collective memory. Its strongest tested system reported 46.0% average accuracy and much lower performance on knowledge updates and term ambiguity; a simple BM25 retrieval baseline matched or outperformed most evaluated systems. Mycelix's memory and knowledge pipeline should therefore be compared against BM25, exact provenance retrieval and human transactive-memory baselines before adding more complex semantic memory layers.
+
+The public-preview Agent Sovereignty Benchmark offers an adjacent audit model: six criteria—portability, transparency, auditability, verifiability, modifiability and controllability—across 26 evidence-scored tests. We should map our own controls to these dimensions, while retaining a clear distinction between an emerging public benchmark and a validated regulatory standard.
 
 The October 2026 OHAI framework adds an important inference boundary. A one-shot collaboration task can qualify measures and test local relationships, but it cannot establish collective intelligence in a persistent human-AI team. Our reporting will distinguish component capability, enacted collective functioning, and cross-task collective capacity. Longitudinal claims require multi-cycle, comparable multi-task evidence.
 
@@ -64,6 +77,10 @@ No benchmark should claim that the adjacent work is absent. The opportunity is t
 14. Epistemic resilience: knowledge/belief distinction, confidence calibration, evidence provenance, contradiction handling, and human verification.
 15. Persistent-team collective functioning across multiple cycles; collective-intelligence claims require comparable multi-task longitudinal evidence.
 16. Team continuity and configuration audit: membership, roles, authority, memory policy, and consent changes must be explicit across cycles.
+17. AI withdrawal and capability persistence at both individual and team level, including immediate, delayed and transfer outcomes.
+18. Hidden-profile information discovery: whether participants solicit, surface, attribute and preserve unique information that other members have not yet contributed.
+19. Multi-party memory quality against BM25, source-exact retrieval and human transactive-memory baselines, including knowledge updates, temporal reasoning, ambiguity and abstention.
+20. Agent sovereignty: portability, transparency, auditability, verifiability, modifiability and controllability, each with evidence rather than self-reported claims.
 14. Coalition contribution allocation with exact Shapley values when every required counterfactual coalition is identifiable.
 
 The benchmark's contribution is the integrated measurement protocol and reproducible corpus, not a claim that any one of these constructs is newly invented.
@@ -90,6 +107,10 @@ The first goal is construct validity and reproducibility, not leaderboard rank. 
 - A matched solo/pair and counterbalanced relay evaluation inspired by The Collaboration Gap.
 - An adaptive-intervention comparison measuring overreach, missed critical warnings, and unnecessary interruption.
 - An epistemic-resilience slice with first-person false beliefs, stale evidence, non-independent sources, contradictory telemetry, and prompt injection in untrusted evidence.
+- A faithful replication of the CMU AI × transactive-memory 2×2 design, including AI-off, delayed and transfer tests.
+- A HiddenBench-style distributed-information task set with a full-information reference condition and explicit information-elicitation outcomes.
+- A GroupMemBench-style multi-party memory comparison including BM25, source-exact retrieval, updates, ambiguity and abstention.
+- A sovereignty audit mapped to the six public-preview Agent Sovereignty Benchmark criteria, with evidence-backed pass/partial/fail/unverified results.
 - A longitudinal persistent-team study before any claim about collective-intelligence trajectories.
 - A multi-cycle test of role turnover, authority revalidation, memory consent, and shared-plan continuity.
 - An external human study with preregistered outcomes and blinded raters.
