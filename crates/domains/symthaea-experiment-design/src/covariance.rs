@@ -815,6 +815,22 @@ mod tests {
     }
 
     #[test]
+    fn derived_difference_covariance_is_exactly_symmetric_after_roundoff() {
+        let joint = vec![
+            vec![2.0, 0.3, 1.5, 0.2 + 1.0e-14],
+            vec![0.3, 1.0, 0.1, 0.75],
+            vec![1.5, 0.2, 2.0, 0.4],
+            vec![0.2, 0.75, 0.4, 1.5],
+        ];
+        let difference = derive_difference_covariance(&joint, 0, 1, 2);
+        assert_eq!(difference[0][1], difference[1][0]);
+
+        let almost_symmetric = vec![vec![1.0, 0.2 + 1.0e-14], vec![0.2, 1.0]];
+        let correlation = correlation_matrix(&almost_symmetric).unwrap();
+        assert_eq!(correlation[0][1], correlation[1][0]);
+    }
+
+    #[test]
     fn covariance_aware_score_is_four_before_and_after_redundancy() {
         let report = rank_covariance_aware_experiments(&covariance_redundancy_fixture()).unwrap();
         assert_eq!(report.ranked_experiments.len(), 2);
