@@ -704,7 +704,8 @@ mod tests {
             center_state_ordinal: 3,
             window_start_ordinal: 3,
             window_end_ordinal_exclusive: 4,
-            source_trajectory_sha256: "3333333333333333333333333333333333333333333333333333333333333333".to_owned(),
+            source_trajectory_sha256:
+                "3333333333333333333333333333333333333333333333333333333333333333".to_owned(),
             state_window: vec![neighbor_state],
             screenshot_references: vec!["trajectory-2/state-3.png".to_owned()],
             chunk_sha256: "2222222222222222222222222222222222222222222222222222222222222222".to_owned(),
@@ -736,7 +737,12 @@ mod tests {
             item.evidence_id == neighbor.parent_evidence_ids[0]
                 && item.retrieval_channel == "source_state_lineage"
         }));
-        assert!(batch.evidence.iter().filter(|item| item.retrieval_channel == "source_state_lineage").count() == 3);
+        assert_eq!(
+            batch.evidence.iter()
+                .filter(|item| item.retrieval_channel == "source_state_lineage")
+                .count(),
+            3
+        );
     }
 
     #[test]
