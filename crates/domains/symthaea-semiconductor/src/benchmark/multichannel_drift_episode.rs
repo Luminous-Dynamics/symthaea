@@ -12,8 +12,7 @@ use std::collections::{BTreeMap, BTreeSet};
 use thiserror::Error;
 
 use super::calibration_requalification::{
-    CALIBRATION_REQUALIFICATION_REPORT_SCHEMA_V1, CalibrationRequalificationFrontierReportV1,
-    CalibrationRequalificationReportV1,
+    CALIBRATION_REQUALIFICATION_REPORT_SCHEMA_V1, CalibrationRequalificationReportV1,
 };
 use super::label_consumption_guard::{
     LABEL_CONSUMPTION_REPORT_SCHEMA_V1, LabelConsumptionEligibilityReportV1,
@@ -709,7 +708,7 @@ pub fn observe_drift_channel_v1(
                 missing: existing.map_or(0, |state| state.missing_observations),
                 statistic: 0.0,
                 before_sha256: before.clone(),
-                after_sha256: &before.into(),
+                after_sha256: before.to_string(),
             },
         );
     }
@@ -1469,25 +1468,9 @@ mod tests {
     fn episode_digest_is_insertion_order_invariant_and_never_claims_cause() {
         let mut engine = engine();
         let mut receipts = Vec::new();
-        for (id, channel, plane, _kind, _qualification, signal, evidence) in [
-            (
-                "x1",
-                "feature",
-                DriftEvidencePlaneV1::InputFeature,
-                DriftEvidenceKindV1::FeatureWindow,
-                DriftQualificationV1::NotApplicable,
-                0.5,
-                'c',
-            ),
-            (
-                "r1",
-                "residual",
-                DriftEvidencePlaneV1::QualifiedResidual,
-                DriftEvidenceKindV1::QualifiedMetrologyLabel,
-                DriftQualificationV1::CurrentK1Eligible,
-                0.7,
-                'd',
-            ),
+        for (id, channel, plane, signal, evidence) in [
+            ("x1", "feature", DriftEvidencePlaneV1::InputFeature, 0.5, 'c'),
+            ("r1", "residual", DriftEvidencePlaneV1::QualifiedResidual, 0.7, 'd'),
         ] {
             let detector = DriftDetectorKindV1::Ewma;
             let observation = input(id, channel, plane, detector, Some(signal), 100, evidence);
