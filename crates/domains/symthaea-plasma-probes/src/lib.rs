@@ -97,6 +97,8 @@ pub enum ContractError {
     ResponseSignatureContractMismatch,
     #[error("response signatures have different intervention, QoI or time axes")]
     ResponseSignatureAxisMismatch,
+    #[error("response signatures have different per-QoI normalization scales")]
+    ResponseSignatureScaleMismatch,
     #[error("response signature time samples must be finite and strictly increasing")]
     InvalidResponseSignatureTimes,
     #[error("response signature normalization scale must be finite and positive")]
@@ -996,6 +998,7 @@ pub struct KineticResponseSignature {
     structure_class_id: String,
     intervention_ids: Vec<String>,
     qoi_ids: Vec<String>,
+    qoi_scales: Vec<f64>,
     time_samples: Vec<f64>,
     responses: Vec<Option<ComplexResponse>>,
     branch_ids: Vec<Option<String>>,
@@ -1015,12 +1018,13 @@ pub struct ResponseSignatureComparison {
 }
 
 impl KineticResponseSignature {
-    /// Construct a signature with exact task axes and explicit missingness.
+    /// Construct a signature with exact task axes and per-QoI normalization scales.
     pub fn new(
         contract_id: String,
         structure_class_id: String,
         intervention_ids: Vec<String>,
         qoi_ids: Vec<String>,
+        qoi_scales: Vec<f64>,
         time_samples: Vec<f64>,
         responses: Vec<Option<ComplexResponse>>,
         branch_ids: Vec<Option<String>>,
@@ -1035,6 +1039,15 @@ impl KineticResponseSignature {
         }
         if has_duplicate_strings(&intervention_ids) || has_duplicate_strings(&qoi_ids) {
             return Err(ContractError::DuplicateResponseSignatureAxis);
+        }
+        if qoi_scales.len() != qoi_ids.len() {
+            return Err(ContractError::ResponseSignatureShapeMismatch);
+        }
+        if qoi_scales
+            .iter()
+            .any(|scale| !scale.is_finite() || *scale <= 0.0)
+        {
+            return Err(ContractError::InvalidResponseSignatureScale);
         }
         if time_samples.iter().any(|time| !time.is_finite())
             || time_samples.windows(2).any(|window| window[1] <= window[0])
@@ -1068,26 +1081,20 @@ impl KineticResponseSignature {
             structure_class_id,
             intervention_ids,
             qoi_ids,
+            qoi_scales,
             time_samples,
             responses,
             branch_ids,
         })
     }
 
-    /// Compare two signatures on identical frozen axes using a task-fixed RMS scale.
+    /// Compare signatures using frozen per-QoI scales and identical task axes.
     ///
-    /// normalization_scale is fixed by the task contract and must be identical
-    /// for all pairwise comparisons in a cohort. The per-entry RMS distance is
-    /// symmetric on the fixed signature grid and supports honest non-transitivity
-    /// tests for approximate pairwise compatibility.
-    pub fn compare(
-        &self,
-        other: &Self,
-        normalization_scale: f64,
-    ) -> Result<ResponseSignatureComparison, ContractError> {
-        if !normalization_scale.is_finite() || normalization_scale <= 0.0 {
-            return Err(ContractError::InvalidResponseSignatureScale);
-        }
+    /// Each complex response residual is divided by the registered scale for
+    /// its QoI before the RMS is taken across the shared response grid. Scales
+    /// are part of the signature, so callers cannot change normalization
+    /// between pairwise comparisons.
+    pub fn compare(&self, other: &Self) -> Result<ResponseSignatureComparison, ContractError> {
         if self.contract_id != other.contract_id {
             return Err(ContractError::ResponseSignatureContractMismatch);
         }
@@ -1097,25 +1104,37 @@ impl KineticResponseSignature {
         {
             return Err(ContractError::ResponseSignatureAxisMismatch);
         }
+        if self.qoi_scales != other.qoi_scales {
+            return Err(ContractError::ResponseSignatureScaleMismatch);
+        }
 
         let mut squared_error = 0.0_f64;
+        let mut squared_normalized_error = 0.0_f64;
         let mut measured_entry_count = 0_usize;
         let mut missing_response_count = 0_usize;
         let mut branch_mismatch_count = 0_usize;
         let mut unresolved_branch_count = 0_usize;
+        let time_count = self.time_samples.len();
+        let qoi_count = self.qoi_ids.len();
 
-        for (((left_response, right_response), left_branch), right_branch) in self
+        for (index, (((left_response, right_response), left_branch), right_branch)) in self
             .responses
             .iter()
             .zip(&other.responses)
             .zip(&self.branch_ids)
             .zip(&other.branch_ids)
+            .enumerate()
         {
             match (left_response, right_response) {
                 (Some(left), Some(right)) => {
                     let real_delta = left.real - right.real;
                     let imag_delta = left.imag - right.imag;
-                    squared_error += real_delta.mul_add(real_delta, imag_delta * imag_delta);
+                    let squared_delta =
+                        real_delta.mul_add(real_delta, imag_delta * imag_delta);
+                    let qoi_index = (index / time_count) % qoi_count;
+                    let scale = self.qoi_scales[qoi_index];
+                    squared_error += squared_delta;
+                    squared_normalized_error += squared_delta / (scale * scale);
                     measured_entry_count += 1;
                 }
                 _ => missing_response_count += 1,
@@ -1126,17 +1145,15 @@ impl KineticResponseSignature {
                 _ => unresolved_branch_count += 1,
             }
         }
-        if !squared_error.is_finite() {
+        if !squared_error.is_finite() || !squared_normalized_error.is_finite() {
             return Err(ContractError::InvalidGramianArithmetic);
         }
         let absolute_frobenius_error = squared_error.sqrt();
-        let rms_response_error = if measured_entry_count > 0 {
-            absolute_frobenius_error / (measured_entry_count as f64).sqrt()
+        let normalized_response_distance = if measured_entry_count > 0 {
+            Some((squared_normalized_error / measured_entry_count as f64).sqrt())
         } else {
-            0.0
+            None
         };
-        let normalized_response_distance =
-            (measured_entry_count > 0).then_some(rms_response_error / normalization_scale);
         if normalized_response_distance.is_some_and(|distance| !distance.is_finite()) {
             return Err(ContractError::InvalidGramianArithmetic);
         }
@@ -1183,6 +1200,10 @@ impl KineticResponseSignature {
 
     pub fn qoi_ids(&self) -> &[String] {
         &self.qoi_ids
+    }
+
+    pub fn qoi_scales(&self) -> &[f64] {
+        &self.qoi_scales
     }
 
     pub fn time_samples(&self) -> &[f64] {
@@ -4862,6 +4883,7 @@ mod tests {
             structure_class_id.to_owned(),
             vec!["pulse-mode-2-phase-0.3".to_owned()],
             vec!["electric-field-mode-2".to_owned()],
+            vec![1.0],
             vec![0.0, 0.5],
             vec![
                 Some(ComplexResponse::new(value, 0.0).unwrap()),
@@ -4878,8 +4900,8 @@ mod tests {
             make_kinetic_response_signature(1.0, "contract-a", "hamiltonian-class-a", Some("echo"));
         let right =
             make_kinetic_response_signature(1.5, "contract-a", "hamiltonian-class-a", Some("echo"));
-        let forward = left.compare(&right, 1.0).unwrap();
-        let reverse = right.compare(&left, 1.0).unwrap();
+        let forward = left.compare(&right).unwrap();
+        let reverse = right.compare(&left).unwrap();
         assert_eq!(forward.normalized_response_distance, Some(0.5));
         assert_eq!(
             forward.normalized_response_distance,
@@ -4911,7 +4933,7 @@ mod tests {
         let other_contract =
             make_kinetic_response_signature(1.0, "contract-b", "class-a", Some("echo"));
         assert_eq!(
-            base.compare(&other_contract, 1.0),
+            base.compare(&other_contract),
             Err(ContractError::ResponseSignatureContractMismatch)
         );
         let other_axes = KineticResponseSignature::new(
@@ -4919,6 +4941,7 @@ mod tests {
             "class-a".to_owned(),
             vec!["different-pulse".to_owned()],
             vec!["electric-field-mode-2".to_owned()],
+            vec![1.0],
             vec![0.0, 0.5],
             vec![
                 Some(ComplexResponse::new(1.0, 0.0).unwrap()),
@@ -4928,7 +4951,7 @@ mod tests {
         )
         .unwrap();
         assert_eq!(
-            base.compare(&other_axes, 1.0),
+            base.compare(&other_axes),
             Err(ContractError::ResponseSignatureAxisMismatch)
         );
     }
@@ -4941,12 +4964,13 @@ mod tests {
             "class-a".to_owned(),
             vec!["pulse-mode-2-phase-0.3".to_owned()],
             vec!["electric-field-mode-2".to_owned()],
+            vec![1.0],
             vec![0.0, 0.5],
             vec![None, Some(ComplexResponse::new(1.0, 0.0).unwrap())],
             vec![None, Some("echo".to_owned())],
         )
         .unwrap();
-        let comparison = complete.compare(&incomplete, 1.0).unwrap();
+        let comparison = complete.compare(&incomplete).unwrap();
         assert_eq!(comparison.missing_response_count, 1);
         assert_eq!(comparison.unresolved_branch_count, 1);
         assert!(!KineticResponseSignature::pairwise_compatible(comparison, 1.0).unwrap());
@@ -4968,8 +4992,8 @@ mod tests {
             "hamiltonian-class-a",
             Some("trapped"),
         );
-        let structure_comparison = base.compare(&other_structure, 1.0).unwrap();
-        let branch_comparison = base.compare(&other_branch, 1.0).unwrap();
+        let structure_comparison = base.compare(&other_structure).unwrap();
+        let branch_comparison = base.compare(&other_branch).unwrap();
         assert!(!structure_comparison.structure_class_compatible);
         assert!(!KineticResponseSignature::pairwise_compatible(structure_comparison, 1.0).unwrap());
         assert_eq!(branch_comparison.branch_mismatch_count, 2);
@@ -4982,9 +5006,9 @@ mod tests {
         let state_b =
             make_kinetic_response_signature(0.75, "contract-a", "class-a", Some("branch"));
         let state_c = make_kinetic_response_signature(1.5, "contract-a", "class-a", Some("branch"));
-        let ab = state_a.compare(&state_b, 1.0).unwrap();
-        let bc = state_b.compare(&state_c, 1.0).unwrap();
-        let ac = state_a.compare(&state_c, 1.0).unwrap();
+        let ab = state_a.compare(&state_b).unwrap();
+        let bc = state_b.compare(&state_c).unwrap();
+        let ac = state_a.compare(&state_c).unwrap();
         assert!(KineticResponseSignature::pairwise_compatible(ab, 1.0).unwrap());
         assert!(KineticResponseSignature::pairwise_compatible(bc, 1.0).unwrap());
         assert!(!KineticResponseSignature::pairwise_compatible(ac, 1.0).unwrap());
@@ -4998,6 +5022,7 @@ mod tests {
                 "class".to_owned(),
                 vec!["pulse".to_owned()],
                 vec!["qoi".to_owned()],
+                vec![1.0],
                 vec![0.0, 0.0],
                 vec![
                     Some(ComplexResponse::new(1.0, 0.0).unwrap()),
@@ -5010,7 +5035,7 @@ mod tests {
         );
         let signature = make_kinetic_response_signature(1.0, "contract", "class", Some("branch"));
         assert_eq!(
-            signature.compare(&signature, 0.0),
+            signature.compare(&signature),
             Err(ContractError::InvalidResponseSignatureScale)
         );
     }
