@@ -1,0 +1,28 @@
+name: SAM Counterfactual Support Fixtures
+
+on:
+  pull_request:
+    paths:
+      - "tools/sam-cf-support/**"
+      - ".github/workflows/sam-cf-support.yml"
+  push:
+    branches: [main]
+    paths:
+      - "tools/sam-cf-support/**"
+      - ".github/workflows/sam-cf-support.yml"
+
+permissions:
+  contents: read
+
+jobs:
+  fixture-evaluator:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: dtolnay/rust-toolchain@stable
+      - name: Check formatting
+        run: cargo fmt --manifest-path tools/sam-cf-support/Cargo.toml -- --check
+      - name: Run Clippy
+        run: cargo clippy --locked --manifest-path tools/sam-cf-support/Cargo.toml --all-targets -- -D warnings
+      - name: Run golden fixtures
+        run: cargo test --locked --manifest-path tools/sam-cf-support/Cargo.toml
