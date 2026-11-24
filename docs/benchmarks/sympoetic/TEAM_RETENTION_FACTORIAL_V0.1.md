@@ -25,6 +25,8 @@ All four arms must be assessed on comparable task families, with task order, tim
 
 The TSV contains one row per randomized team, after a preregistered task-level aggregation step. Rows are not conversation turns or repeated tasks. The exact header is enforced by the Rust parser.
 
+`team_id` must be an opaque random identifier with no embedded name, email, employer, location or other identifying attribute. The re-identification mapping, if one is necessary for follow-up, must be held separately by the authorized study custodian and excluded from benchmark artifacts. Public outputs should use aggregate group-level results and privacy-reviewed strata; small cells must not be published where they could identify participants.
+
 Required measures, each bounded to [0, 1]:
 
 - Baseline group task accuracy.
