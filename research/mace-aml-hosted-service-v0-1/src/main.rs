@@ -231,7 +231,9 @@ fn validate_add(track: Track, request: &AddRequest) -> Result<(), ApiError> {
     if track == Track::Textual && request.messages.len() > MAX_MESSAGES { return Err(ApiError::BadRequest("textual Add accepts at most 20 messages per chunk")); }
     let mut total_image_bytes = 0usize;
     for message in &request.messages {
-        if message.timestamp.is_some_and(|timestamp| timestamp < 0) { return Err(ApiError::BadRequest("timestamp must be a non-negative Unix millisecond value")); }
+        if message.timestamp.is_some_and(|timestamp| {
+            timestamp < 0 || chrono::DateTime::<Utc>::from_timestamp_millis(timestamp).is_none()
+        }) { return Err(ApiError::BadRequest("timestamp must be a representable non-negative Unix millisecond value")); }
         if track != Track::Multimodal && matches!(message.content, Content::Parts(_)) { return Err(ApiError::BadRequest("textual and coding tracks require string message content")); }
         total_image_bytes = total_image_bytes.saturating_add(validate_content(track, &message.content)?);
     }
@@ -268,7 +270,8 @@ fn open_database(path: &Path) -> Result<Connection, Box<dyn std::error::Error + 
              role TEXT NOT NULL,
              content_json TEXT NOT NULL,
              searchable_text TEXT NOT NULL,
-             created_at TEXT NOT NULL,
+             event_timestamp_ms INTEGER,
+             ingested_at TEXT NOT NULL,
              lifecycle_state TEXT NOT NULL CHECK (lifecycle_state IN ('active','revoked','erased'))
          );
          CREATE INDEX IF NOT EXISTS memory_scope_idx
@@ -324,12 +327,12 @@ fn add_transaction(state: &AppState, request: AddRequest) -> Result<AddResponse,
         tx.execute(
             "INSERT INTO memory_items (
                  memory_id, principal_id, tenant_id, user_id, session_id, request_id,
-                 role, content_json, searchable_text, created_at, lifecycle_state
-             ) VALUES (?1, ?2, ?3, ?4, ?5, ?6, ?7, ?8, ?9, ?10, 'active')",
+                 role, content_json, searchable_text, event_timestamp_ms, ingested_at, lifecycle_state
+             ) VALUES (?1, ?2, ?3, ?4, ?5, ?6, ?7, ?8, ?9, ?10, ?11, 'active')",
             params![
                 memory_id, state.principal_id, state.tenant_id, request.user_id,
                 request.session_id, request.request_id, role, content_json,
-                searchable_text, committed_at
+                searchable_text, message.timestamp, committed_at
             ],
         ).map_err(|_| ApiError::Unavailable)?;
     }
@@ -378,7 +381,7 @@ fn search_query(state: &AppState, request: SearchRequest) -> Result<SearchRespon
 
     let connection = state.db.lock().map_err(|_| ApiError::Unavailable)?;
     let mut statement = connection.prepare(
-        "SELECT memory_id, content_json, searchable_text, created_at
+        "SELECT memory_id, content_json, searchable_text, event_timestamp_ms, ingested_at
          FROM memory_items
          WHERE principal_id = ?1 AND tenant_id = ?2 AND user_id = ?3
            AND lifecycle_state = 'active'",
@@ -388,7 +391,13 @@ fn search_query(state: &AppState, request: SearchRequest) -> Result<SearchRespon
         let content: Content = serde_json::from_str(&content_json).map_err(|error| {
             rusqlite::Error::FromSqlConversionFailure(1, rusqlite::types::Type::Text, Box::new(error))
         })?;
-        Ok(StoredCandidate { id: row.get(0)?, content, searchable_text: row.get(2)?, created_at: row.get(3)? })
+        let event_timestamp_ms: Option<i64> = row.get(3)?;
+        let ingested_at: String = row.get(4)?;
+        let created_at = event_timestamp_ms
+            .and_then(chrono::DateTime::<Utc>::from_timestamp_millis)
+            .map(|timestamp| timestamp.to_rfc3339_opts(SecondsFormat::Millis, true))
+            .unwrap_or(ingested_at);
+        Ok(StoredCandidate { id: row.get(0)?, content, searchable_text: row.get(2)?, created_at })
     }).map_err(|_| ApiError::Unavailable)?;
 
     let mut candidates = Vec::new();
