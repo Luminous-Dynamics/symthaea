@@ -34,7 +34,7 @@ jobs:
       - name: Checkout exact PR head or pushed commit
         uses: actions/checkout@v4
         with:
-          ref: \${{ github.event.pull_request.head.sha || github.sha }}
+          ref: ${{ github.event.pull_request.head.sha || github.sha }}
           persist-credentials: false
       - name: Install pinned Rust
         uses: dtolnay/rust-toolchain@1.96.0
@@ -104,7 +104,7 @@ jobs:
         if: always()
         uses: actions/upload-artifact@v4
         with:
-          name: mel-closed-loop-episode-\${{ github.event.pull_request.head.sha || github.sha }}
-          path: \${{ runner.temp }}/mel-closed-loop-episode-evidence/
+          name: mel-closed-loop-episode-${{ github.event.pull_request.head.sha || github.sha }}
+          path: ${{ runner.temp }}/mel-closed-loop-episode-evidence/
           if-no-files-found: error
           retention-days: 90
