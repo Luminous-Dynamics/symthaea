@@ -48,7 +48,10 @@ impl RetrievalModeV1 {
             "bm25_only" => Ok(Self::Bm25Only),
             "entity_literal_only" => Ok(Self::EntityLiteralOnly),
             "hybrid_rrf" => Ok(Self::HybridRrf),
-            _ => Err("MACE_LMEV2_RETRIEVAL_MODE must be bm25_only, entity_literal_only, or hybrid_rrf".to_owned()),
+            _ => Err(
+                "MACE_LMEV2_RETRIEVAL_MODE must be bm25_only, entity_literal_only, or hybrid_rrf"
+                    .to_owned(),
+            ),
         }
     }
 
@@ -715,13 +718,15 @@ mod tests {
         Config {
             domain: "web".to_owned(),
             run_id: "fixture-run".to_owned(),
-            backend_revision_sha256: "1111111111111111111111111111111111111111111111111111111111111111".to_owned(),
+            backend_revision_sha256:
+                "1111111111111111111111111111111111111111111111111111111111111111".to_owned(),
             retrieval_mode: RetrievalModeV1::HybridRrf,
             dataset_root: root.clone(),
             top_k: 4,
             slice_radius: 0,
             neighbor_radius: 0,
-            environment_revision_sha256: "2222222222222222222222222222222222222222222222222222222222222222".to_owned(),
+            environment_revision_sha256:
+                "2222222222222222222222222222222222222222222222222222222222222222".to_owned(),
             policy_trace_dir: root.join(".policy-traces"),
             profile: Bm25ProfileV1 {
                 k1: 1.2,
