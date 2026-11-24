@@ -103,7 +103,8 @@ pub use mycelial_active_sensing::{
 };
 pub use mycelial_acquisition_budget::{
     MAX_MYCELIAL_HEALTH_BUDGET_ACTIONS, MAX_MYCELIAL_HEALTH_BUDGET_CHANNELS,
-    MAX_MYCELIAL_HEALTH_BUDGET_CELLS_PER_ACTION, MAX_MYCELIAL_HEALTH_EXPOSURE_RECORDS,
+    MAX_MYCELIAL_HEALTH_BUDGET_CELLS_PER_ACTION, MAX_MYCELIAL_HEALTH_BUDGET_EVALUATIONS,
+    MAX_MYCELIAL_HEALTH_EXPOSURE_RECORDS,
     MYCELIAL_SAMPLE_HEALTH_BUDGET_SCHEMA_VERSION, MycelialAcquisitionBudgetProposal,
     MycelialCumulativePhotonExposure, MycelialPhotonDoseEstimate, MycelialPhotonDoseLimit,
     MycelialProjectedChannelDose, MycelialSampleHealthBudget,
