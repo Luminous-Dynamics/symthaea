@@ -587,6 +587,58 @@ The synthetic timing contract and schema are in [PR #13405](https://github.com/L
 
 The PPMD paper appeared online 23 November 2026 and reports a SIAM reproducibility badge. The public GitHub `main` snapshot inspected for this programme is commit `056e4879a033cfecb44d8fb11983125b99a562eb` dated 21 December 2025, with only `PPMD.ipynb`, `PPMD.py` and `README.md`; the Python module hard-codes local Windows VTU data roots and the inspected tree has no datasets or environment lock. This is a discrepancy to resolve, not grounds to reject the paper's reproducibility claim: the exact badge-linked archive or supplementary package may differ. Until that package, data checksums, configuration, versions and train/test split are pinned and replayed, classify PPMD as a paper comparator with status `NOT_REPRODUCED`, not an executed baseline. See [#13501](https://github.com/Luminous-Dynamics/symthaea/issues/13501) and [PR #13502](https://github.com/Luminous-Dynamics/symthaea/pull/13502).
 
+## Production PIC comparison: do not mistake execution adaptivity for response-aware representation
+
+The production comparison must acknowledge that **Smilei and WarpX already have sophisticated hardware- and workload-aware adaptation**.
+
+### Smilei 5.1
+
+The public documentation describes:
+- GPU offloading for supported Cartesian geometries in 1D/2D/3D, with supported GPU diagnostics and boundary/physics combinations stated explicitly;
+- SIMD-vectorized particle operators, with a measured break-even depending on particles per cell and architecture;
+- local adaptive vectorization: every configured number of timesteps, choose scalar or vectorized operators per patch and species using an empirical cost model based on particles per cell;
+- patch-level load balancing, particle sorting and field/particle communication.
+
+Sources: [Smilei GPU offloading](https://smileipic.github.io/Smilei/Understand/GPU_offloading.html), [SIMD and adaptive vectorization](https://smileipic.github.io/Smilei/Understand/vectorization.html), [namelist adaptive-vectorization options](https://smileipic.github.io/Smilei/Use/namelist.html).
+
+### WarpX 26.11
+
+The current parameter documentation describes:
+- AMR with per-level refinement ratios, including per-axis refinement;
+- GPU-default particle sorting intervals to improve memory locality;
+- sorting by cell for deposition on CUDA/HIP (or by bins), with cell sorting recommended for high particles-per-cell workloads;
+- charge-deposition buffers and fine/coarse-grid deposition/gather buffers around AMR patches;
+- in-situ full, time-averaged, back-transformed, boundary-scraping and reduced diagnostics.
+
+Sources: [WarpX 26.11 parameters](https://warpx.readthedocs.io/en/26.11/usage/parameters.html), [PICMI parameter reference](https://warpx.readthedocs.io/en/26.11/usage/python.html), [WarpX algorithm overview](https://warpx.readthedocs.io/en/26.11/theory/intro.html).
+
+### What the Luminous research must add
+
+Do not claim novelty for generic dynamic particle sorting, AMR, local SIMD selection, load balancing or generic adaptive time stepping. The specific research hypothesis is different:
+
+1. **Future-response adaptivity:** refine or retain phase-space directions that are weakly energetic now but necessary for a registered future intervention/QoI, such as an echo or mode-transfer response.
+2. **Evidence-qualified adaptation:** every representation transition carries an independent reference/response receipt; unresolved response means REFINE / UNKNOWN / full-order fallback, never “safe to coarsen.”
+3. **Structure-qualified adaptation:** Hamiltonian / Poisson, positivity, mass, momentum, energy, charge and applicable entropy/Casimir gates constrain transitions.
+4. **Task-conditioned information budgeting:** choose among Fourier, Hermite, TT, particle, probabilistic-manifold and hybrid states by actual serialized bytes and future-response distortion, not rank/dimension alone.
+
+The most credible industry-facing path is a **hybrid**:
+- WarpX/Smilei remain the full-order production engines, independent references and fallback;
+- Symthaea operates a multi-query response observer / representation selector / control-proposal layer around them;
+- every accepted reduced rollout has a validity horizon, physical contract, measured response coverage and full-cost ledger.
+
+### Matched industry benchmark protocol
+
+Before comparing performance, freeze identical:
+- equations and physics modules; boundary conditions; dimensionality and geometry;
+- initial distributions, particle seeds/weights, mesh/velocity domain, interpolation/deposition order and time integrator;
+- accuracy and conservation/structure tolerances;
+- hardware (CPU/GPU model, GPU count, memory), precision, compiler and MPI layout;
+- diagnostic and I/O cadence, checkpointing and output retention.
+
+Count the complete workflow: initialization, allocation, particle sorting, deposition/gather, field solve, communication, diagnostics, I/O, training/model assets, encode/decode, representation transitions, uncertainty/response checks and fallback. Report strong and weak scaling, peak memory, energy-to-solution and p50/p95 step/rollout time.
+
+A toy 1D1V solver must never be described as beating a production 3D PIC framework. It can establish a multi-query or matched 1D1V advantage first; production claims require a larger, physically matched cohort and independent reproduction.
+
 ## Robust kinetic stabilization objectives
 
 New companion programme: [#13457 — optimize robust kinetic stabilization objectives](https://github.com/Luminous-Dynamics/symthaea/issues/13457).
