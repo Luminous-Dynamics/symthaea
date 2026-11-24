@@ -101,6 +101,10 @@ pub enum ContractError {
     InvalidHarmonicBudget,
     #[error("open-boundary coordinate must lie in [0, 1]")]
     InvalidOpenBoundaryCoordinate,
+    #[error("spectral refinement signal or threshold is invalid")]
+    InvalidRefinementSignal,
+    #[error("memory budget is smaller than the reserved headroom")]
+    InvalidRefinementMemoryBudget,
     #[error("canonical symplectic basis contains non-finite values")]
     NonFiniteSymplecticBasis,
     #[error("canonical symplectic pair defect exceeds the declared tolerance")]
@@ -1570,6 +1574,149 @@ impl OpenBoundaryCoordinateLift {
             distance_to_upper_boundary: 1.0 - xi,
         })
     }
+}
+
+/// Inputs for a memory-bounded spectral refinement decision.
+///
+/// The response risk is an upper bound in the normalized future-QoI metric.
+/// None means the response is unresolved; it is never interpreted as zero risk.
+/// projected_peak_bytes must include the padded state, FFT work buffers, split
+/// stages and other temporary allocations required by the proposed refinement.
+#[derive(Clone, Copy, Debug, PartialEq)]
+pub struct SpectralRefinementInput {
+    pub spectral_tail_measure: f64,
+    pub spectral_tail_threshold: f64,
+    pub response_risk_upper_bound: Option<f64>,
+    pub response_risk_threshold: f64,
+    pub projected_peak_bytes: u64,
+    pub memory_budget_bytes: u64,
+    pub reserved_headroom_bytes: u64,
+}
+
+#[derive(Clone, Copy, Debug, PartialEq, Eq, Serialize)]
+pub enum SpectralRefinementDecision {
+    Hold,
+    Refine,
+    BlockedByMemory,
+}
+
+#[derive(Clone, Copy, Debug, PartialEq, Eq, Serialize)]
+pub enum SpectralRefinementReason {
+    NoTrigger,
+    SpectralTail,
+    FutureResponse,
+    Both,
+    ResponseUnknown,
+}
+
+#[derive(Clone, Copy, Debug, PartialEq, Eq, Serialize)]
+pub enum SpectralRefinementQualification {
+    NoTrigger,
+    Triggered,
+    UnknownResponse,
+    UnknownBlockedByMemory,
+}
+
+#[derive(Clone, Copy, Debug, PartialEq, Serialize)]
+pub struct SpectralRefinementReport {
+    pub decision: SpectralRefinementDecision,
+    pub reason: SpectralRefinementReason,
+    pub qualification: SpectralRefinementQualification,
+    pub spectral_tail_ratio: f64,
+    pub response_risk_upper_bound: Option<f64>,
+    pub effective_memory_budget_bytes: u64,
+    pub projected_peak_bytes: u64,
+    pub remaining_headroom_bytes: u64,
+}
+
+/// Decide whether to refine using spectral-tail and future-response signals.
+///
+/// This is a policy primitive, not a physical error estimator. It assumes the
+/// caller supplies a valid response upper bound where available and a
+/// conservative projected peak-memory estimate. An unresolved response signal
+/// triggers refinement if budget permits; if it does not, the result is
+/// BLOCKED_BY_MEMORY / UNKNOWN, never a qualified hold.
+pub fn decide_spectral_refinement(
+    input: SpectralRefinementInput,
+) -> Result<SpectralRefinementReport, ContractError> {
+    if !input.spectral_tail_measure.is_finite()
+        || input.spectral_tail_measure < 0.0
+        || !input.spectral_tail_threshold.is_finite()
+        || input.spectral_tail_threshold <= 0.0
+        || !input.response_risk_threshold.is_finite()
+        || input.response_risk_threshold <= 0.0
+        || input
+            .response_risk_upper_bound
+            .is_some_and(|risk| !risk.is_finite() || risk < 0.0)
+    {
+        return Err(ContractError::InvalidRefinementSignal);
+    }
+    if input.reserved_headroom_bytes > input.memory_budget_bytes {
+        return Err(ContractError::InvalidRefinementMemoryBudget);
+    }
+
+    let effective_memory_budget_bytes =
+        input.memory_budget_bytes - input.reserved_headroom_bytes;
+    let spectral_tail_ratio = input.spectral_tail_measure / input.spectral_tail_threshold;
+    if !spectral_tail_ratio.is_finite() {
+        return Err(ContractError::InvalidRefinementSignal);
+    }
+    let tail_triggered = spectral_tail_ratio >= 1.0;
+    let response_unknown = input.response_risk_upper_bound.is_none();
+    let response_triggered = input
+        .response_risk_upper_bound
+        .is_some_and(|risk| risk >= input.response_risk_threshold);
+
+    let reason = match (tail_triggered, response_triggered, response_unknown) {
+        (true, true, _) => SpectralRefinementReason::Both,
+        (true, false, _) => SpectralRefinementReason::SpectralTail,
+        (false, true, _) => SpectralRefinementReason::FutureResponse,
+        (false, false, true) => SpectralRefinementReason::ResponseUnknown,
+        (false, false, false) => SpectralRefinementReason::NoTrigger,
+    };
+    let must_refine = tail_triggered || response_triggered || response_unknown;
+
+    if !must_refine {
+        return Ok(SpectralRefinementReport {
+            decision: SpectralRefinementDecision::Hold,
+            reason,
+            qualification: SpectralRefinementQualification::NoTrigger,
+            spectral_tail_ratio,
+            response_risk_upper_bound: input.response_risk_upper_bound,
+            effective_memory_budget_bytes,
+            projected_peak_bytes: input.projected_peak_bytes,
+            remaining_headroom_bytes: effective_memory_budget_bytes
+                .saturating_sub(input.projected_peak_bytes),
+        });
+    }
+
+    if input.projected_peak_bytes > effective_memory_budget_bytes {
+        return Ok(SpectralRefinementReport {
+            decision: SpectralRefinementDecision::BlockedByMemory,
+            reason,
+            qualification: SpectralRefinementQualification::UnknownBlockedByMemory,
+            spectral_tail_ratio,
+            response_risk_upper_bound: input.response_risk_upper_bound,
+            effective_memory_budget_bytes,
+            projected_peak_bytes: input.projected_peak_bytes,
+            remaining_headroom_bytes: 0,
+        });
+    }
+
+    Ok(SpectralRefinementReport {
+        decision: SpectralRefinementDecision::Refine,
+        reason,
+        qualification: if response_unknown {
+            SpectralRefinementQualification::UnknownResponse
+        } else {
+            SpectralRefinementQualification::Triggered
+        },
+        spectral_tail_ratio,
+        response_risk_upper_bound: input.response_risk_upper_bound,
+        effective_memory_budget_bytes,
+        projected_peak_bytes: input.projected_peak_bytes,
+        remaining_headroom_bytes: effective_memory_budget_bytes - input.projected_peak_bytes,
+    })
 }
 
 /// Audited timing envelope for a sparse, asynchronous kinetic-control interface.
@@ -3598,6 +3745,91 @@ mod tests {
 
     fn sensor_actuator_fixture_value() -> serde_json::Value {
         serde_json::from_str(SENSOR_ACTUATOR_FIXTURE).unwrap()
+    }
+
+    fn refinement_input(
+        spectral_tail_measure: f64,
+        response_risk_upper_bound: Option<f64>,
+        projected_peak_bytes: u64,
+    ) -> SpectralRefinementInput {
+        SpectralRefinementInput {
+            spectral_tail_measure,
+            spectral_tail_threshold: 10.0,
+            response_risk_upper_bound,
+            response_risk_threshold: 1.0,
+            projected_peak_bytes,
+            memory_budget_bytes: 1_000,
+            reserved_headroom_bytes: 100,
+        }
+    }
+
+    #[test]
+    fn spectral_refinement_holds_when_both_signals_are_below_threshold() {
+        let report = decide_spectral_refinement(refinement_input(5.0, Some(0.5), 700)).unwrap();
+        assert_eq!(report.decision, SpectralRefinementDecision::Hold);
+        assert_eq!(report.reason, SpectralRefinementReason::NoTrigger);
+        assert_eq!(
+            report.qualification,
+            SpectralRefinementQualification::NoTrigger
+        );
+        assert_eq!(report.remaining_headroom_bytes, 200);
+    }
+
+    #[test]
+    fn spectral_refinement_responds_to_future_qoi_even_when_tail_is_quiet() {
+        let report = decide_spectral_refinement(refinement_input(2.0, Some(1.2), 700)).unwrap();
+        assert_eq!(report.decision, SpectralRefinementDecision::Refine);
+        assert_eq!(report.reason, SpectralRefinementReason::FutureResponse);
+        assert_eq!(
+            report.qualification,
+            SpectralRefinementQualification::Triggered
+        );
+    }
+
+    #[test]
+    fn spectral_refinement_responds_to_spectral_tail_trigger() {
+        let report = decide_spectral_refinement(refinement_input(10.0, Some(0.2), 700)).unwrap();
+        assert_eq!(report.decision, SpectralRefinementDecision::Refine);
+        assert_eq!(report.reason, SpectralRefinementReason::SpectralTail);
+    }
+
+    #[test]
+    fn spectral_refinement_treats_missing_response_as_unknown_not_zero() {
+        let report = decide_spectral_refinement(refinement_input(1.0, None, 700)).unwrap();
+        assert_eq!(report.decision, SpectralRefinementDecision::Refine);
+        assert_eq!(report.reason, SpectralRefinementReason::ResponseUnknown);
+        assert_eq!(
+            report.qualification,
+            SpectralRefinementQualification::UnknownResponse
+        );
+    }
+
+    #[test]
+    fn spectral_refinement_reports_unknown_when_memory_blocks_required_growth() {
+        let report = decide_spectral_refinement(refinement_input(1.0, Some(2.0), 901)).unwrap();
+        assert_eq!(
+            report.decision,
+            SpectralRefinementDecision::BlockedByMemory
+        );
+        assert_eq!(
+            report.qualification,
+            SpectralRefinementQualification::UnknownBlockedByMemory
+        );
+        assert_eq!(report.remaining_headroom_bytes, 0);
+    }
+
+    #[test]
+    fn spectral_refinement_rejects_invalid_signal_and_memory_contracts() {
+        assert_eq!(
+            decide_spectral_refinement(refinement_input(f64::NAN, Some(0.1), 100)),
+            Err(ContractError::InvalidRefinementSignal)
+        );
+        let mut invalid_budget = refinement_input(1.0, Some(0.1), 100);
+        invalid_budget.reserved_headroom_bytes = 1_001;
+        assert_eq!(
+            decide_spectral_refinement(invalid_budget),
+            Err(ContractError::InvalidRefinementMemoryBudget)
+        );
     }
 
     #[test]
