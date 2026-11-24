@@ -1,0 +1,147 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://github.com/Luminous-Dynamics/symthaea/blob/main/benchmarks/plasma/adaptive-refinement/refinement-policy-contract-v0.1.schema.json",
+  "title": "Response-aware memory-bounded spectral refinement contract v0.1",
+  "description": "Manufactured policy-decision cases for combining spectral-tail and future-response risk under a hard peak-memory budget. Not a plasma result.",
+  "type": "object",
+  "additionalProperties": false,
+  "required": [
+    "schema_version",
+    "policy_id",
+    "thresholds",
+    "memory_policy",
+    "cases",
+    "claim_boundary"
+  ],
+  "properties": {
+    "schema_version": {
+      "const": "0.1"
+    },
+    "policy_id": {
+      "type": "string",
+      "minLength": 1
+    },
+    "thresholds": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "spectral_tail_threshold",
+        "response_risk_threshold"
+      ],
+      "properties": {
+        "spectral_tail_threshold": {
+          "type": "number",
+          "exclusiveMinimum": 0
+        },
+        "response_risk_threshold": {
+          "type": "number",
+          "exclusiveMinimum": 0
+        }
+      }
+    },
+    "memory_policy": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "memory_budget_bytes",
+        "reserved_headroom_bytes",
+        "projected_peak_includes_temporary_buffers"
+      ],
+      "properties": {
+        "memory_budget_bytes": {
+          "type": "integer",
+          "minimum": 1
+        },
+        "reserved_headroom_bytes": {
+          "type": "integer",
+          "minimum": 0
+        },
+        "projected_peak_includes_temporary_buffers": {
+          "const": true
+        }
+      }
+    },
+    "cases": {
+      "type": "array",
+      "minItems": 5,
+      "items": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": [
+          "case_id",
+          "spectral_tail_measure",
+          "response_risk_upper_bound",
+          "projected_peak_bytes",
+          "expected_decision",
+          "expected_reason",
+          "expected_qualification"
+        ],
+        "properties": {
+          "case_id": {
+            "type": "string",
+            "minLength": 1
+          },
+          "spectral_tail_measure": {
+            "type": "number",
+            "minimum": 0
+          },
+          "response_risk_upper_bound": {
+            "type": [
+              "number",
+              "null"
+            ],
+            "minimum": 0
+          },
+          "projected_peak_bytes": {
+            "type": "integer",
+            "minimum": 0
+          },
+          "expected_decision": {
+            "enum": [
+              "Hold",
+              "Refine",
+              "BlockedByMemory"
+            ]
+          },
+          "expected_reason": {
+            "enum": [
+              "NoTrigger",
+              "SpectralTail",
+              "FutureResponse",
+              "Both",
+              "ResponseUnknown"
+            ]
+          },
+          "expected_qualification": {
+            "enum": [
+              "NoTrigger",
+              "Triggered",
+              "UnknownResponse",
+              "UnknownBlockedByMemory"
+            ]
+          }
+        }
+      }
+    },
+    "claim_boundary": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "synthetic_policy_only",
+        "spectral_solver_evaluated",
+        "physical_qoi_result_claimed"
+      ],
+      "properties": {
+        "synthetic_policy_only": {
+          "const": true
+        },
+        "spectral_solver_evaluated": {
+          "const": false
+        },
+        "physical_qoi_result_claimed": {
+          "const": false
+        }
+      }
+    }
+  }
+}
