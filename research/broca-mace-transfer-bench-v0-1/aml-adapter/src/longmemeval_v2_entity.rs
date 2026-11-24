@@ -76,17 +76,19 @@ impl LongMemEvalV2EntityLiteralIndexV1 {
 
             for chunk in trajectory.evidence_chunks(slice_radius)? {
                 let literals = structured_literals(&chunk);
-                hash_field(&mut hasher, &chunk.chunk_id);
-                hasher.update((literals.len() as u64).to_be_bytes());
-                for (literal, weight) in &literals {
-                    hash_field(&mut hasher, literal);
-                    hasher.update(weight.to_be_bytes());
-                }
                 chunks.push(IndexedEntityChunkV1 { chunk, literals });
             }
         }
 
         chunks.sort_by(|left, right| left.chunk.chunk_id.cmp(&right.chunk.chunk_id));
+        for document in &chunks {
+            hash_field(&mut hasher, &document.chunk.chunk_id);
+            hasher.update((document.literals.len() as u64).to_be_bytes());
+            for (literal, weight) in &document.literals {
+                hash_field(&mut hasher, literal);
+                hasher.update(weight.to_be_bytes());
+            }
+        }
         let mut postings = BTreeMap::<String, Vec<(usize, u32)>>::new();
         for (document_index, document) in chunks.iter().enumerate() {
             for (literal, weight) in &document.literals {
