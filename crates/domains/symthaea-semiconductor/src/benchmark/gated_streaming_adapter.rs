@@ -1527,12 +1527,12 @@ mod tests {
         let receipt = deliver_qualified_stream_label_v1(
             &mut engine,
             &delivery(
-            ("sample-1", "event-1", "label-1"),
-            1,
-            LabelConsumptionEligibilityV1::EligibleUnderDeclaredPolicy,
-            LabelEvidenceFrontierV1::CurrentAtK1,
-            (110, 112),
-        ),
+                ("sample-1", "event-1", "label-1"),
+                1,
+                LabelConsumptionEligibilityV1::EligibleUnderDeclaredPolicy,
+                LabelEvidenceFrontierV1::CurrentAtK1,
+                (110, 112),
+            ),
         )
         .unwrap();
         assert_eq!(receipt.disposition, StreamingUpdateDispositionV1::Updated);
@@ -1557,12 +1557,12 @@ mod tests {
         deliver_qualified_stream_label_v1(
             &mut engine,
             &delivery(
-            ("sample-1", "event-1", "label-1"),
-            1,
-            LabelConsumptionEligibilityV1::EligibleUnderDeclaredPolicy,
-            LabelEvidenceFrontierV1::CurrentAtK1,
-            (110, 112),
-        ),
+                ("sample-1", "event-1", "label-1"),
+                1,
+                LabelConsumptionEligibilityV1::EligibleUnderDeclaredPolicy,
+                LabelEvidenceFrontierV1::CurrentAtK1,
+                (110, 112),
+            ),
         )
         .unwrap();
 
