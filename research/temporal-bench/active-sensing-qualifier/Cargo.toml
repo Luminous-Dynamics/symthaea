@@ -1,0 +1,13 @@
+[package]
+name = "active-sensing-voi-qualifier"
+version = "0.1.0"
+edition = "2024"
+rust-version = "1.96"
+license = "AGPL-3.0-or-later"
+publish = false
+description = "Isolated qualification harness for Symthaea's decision-focused active-sensing planner"
+
+[dependencies]
+sha2 = "=0.10.9"
+
+[workspace]
