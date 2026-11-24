@@ -232,7 +232,7 @@ This table suggests two high-leverage research fronts. First, preserve and impro
 | Relational reasoning | 45.82 | 53.87 | 50.82 | 55.87 |
 | Temporal reasoning | 34.23 | 40.12 | 39.23 | 42.12 |
 | Continual learning | 38.45 | 48.40 | 43.45 | 50.40 |
-| Personalization | 11.04 | 12.21 | 16.04 | 14.21 |
+| Personalization | 11.04 | 12.21 | 16.04 | 16.04 |
 | Evidence governance | 31.29 | 33.59 | 36.29 | 35.59 |
 
 | Coding measure | InsightMem open | MemoraX commercial | Phase I (+5) | Phase II (+2 commercial) |
@@ -243,7 +243,7 @@ This table suggests two high-leverage research fronts. First, preserve and impro
 | Noisy — new feature | 74.51% | 74.51% | 79.51% | 79.51% |
 | Noisy — bug fix | 57.58% | 65.66% | 62.58% | 67.66% |
 
-The personalization phase-II value is 14.21 rather than 16.04 because the commercial reference plus two points is below the Phase-I threshold; for this capability the true stretch floor should therefore be max(16.04, 14.21) = 16.04. Apply that same max rule to every capability when freezing the target manifest.
+For each capability, freeze Phase II as max(Phase I, commercial reference +2); this keeps the stretch threshold monotonic even where the commercial subscore plus two is below the open-method plus five target.
 
 Reference: [Agent Memory Leaderboard Cycle 2 official results, November 19, 2026](https://agentmemoryleaderboard.ai/results/cycle-2/). Scores and divisions are track-specific; do not combine textual, multimodal and coding points into a synthetic project score.
 
