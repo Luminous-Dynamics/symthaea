@@ -821,7 +821,7 @@ fn dot(left: &[f64], right: &[f64]) -> Result<f64, ContractError> {
 /// The convention is y = real + i * imag for the registered output-mode
 /// quadrature. Missing measurements are represented by None in the matrix,
 /// never by an implicit zero.
-#[derive(Clone, Copy, Debug, Default, PartialEq)]
+#[derive(Clone, Copy, Debug, Default, PartialEq, Serialize)]
 pub struct ComplexResponse {
     pub real: f64,
     pub imag: f64,
@@ -988,7 +988,7 @@ impl ModeResponseMatrix {
 /// The signature is only defined relative to its contract_id, intervention
 /// registry, QoI registry, time grid and physical structure class. Missing
 /// response values and unresolved branch labels remain explicit.
-#[derive(Clone, Debug, PartialEq)]
+#[derive(Clone, Debug, PartialEq, Serialize)]
 pub struct KineticResponseSignature {
     contract_id: String,
     structure_class_id: String,
@@ -1000,7 +1000,7 @@ pub struct KineticResponseSignature {
 }
 
 /// Pairwise discrepancy and admissibility diagnostics for two response signatures.
-#[derive(Clone, Copy, Debug, PartialEq)]
+#[derive(Clone, Copy, Debug, PartialEq, Serialize)]
 pub struct ResponseSignatureComparison {
     /// RMS complex-response discrepancy normalized by a task-fixed scale.
     pub normalized_response_distance: Option<f64>,
@@ -4887,6 +4887,19 @@ mod tests {
             reverse.normalized_response_distance
         );
         assert!(KineticResponseSignature::pairwise_compatible(forward, 0.5).unwrap());
+    }
+
+    #[test]
+    fn kinetic_response_signature_has_a_reproducible_json_receipt() {
+        let signature =
+            make_kinetic_response_signature(0.25, "contract-v1", "structure-class-v1", Some("echo"));
+        let value = serde_json::to_value(&signature).unwrap();
+        assert_eq!(value["contract_id"], "contract-v1");
+        assert_eq!(value["structure_class_id"], "structure-class-v1");
+        assert_eq!(value["intervention_ids"][0], "pulse-mode-2-phase-0.3");
+        assert_eq!(value["qoi_ids"][0], "electric-field-mode-2");
+        assert_eq!(value["responses"][0]["real"], 0.25);
+        assert_eq!(value["branch_ids"][0], "echo");
     }
 
     #[test]
