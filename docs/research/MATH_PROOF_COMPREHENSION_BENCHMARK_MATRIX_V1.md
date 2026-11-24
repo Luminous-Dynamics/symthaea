@@ -361,3 +361,17 @@ It also records proof-route confusion, scope identity, first-invalid-step locali
 | Proof-route-to-theorem-refutation errors | 0 observed |
 
 These are target thresholds, not Symthaea results. Publish per-family counts, confidence intervals, exclusions, reviewer cost and exact budgets.
+
+
+## 10. Minimum sufficient explanation frontier (2026-11-24)
+
+Proof explanation should be optimized under fidelity and transfer constraints, not by length or judge preference alone. The dedicated protocol is [MATH_MIN_SUFFICIENT_EXPLANATION_V1.md](MATH_MIN_SUFFICIENT_EXPLANATION_V1.md), tracked by [#13548](https://github.com/Luminous-Dynamics/symthaea/issues/13548).
+
+The intended objective is: minimize explanation cost while preserving exact theorem/hypothesis identity, critical proof-plan actions, warrants, side conditions, subgoal relationships, and measured human reconstruction/transfer.
+
+This is distinct from:
+- LeanLean's 48.3% repository-level formal code compression result on 64 Lean repositories under a 12-hour budget ([source](https://www.sri.inf.ethz.ch/publications/rognvaldsson2026leanlean));
+- ProofRank's scalable proxies for proof conciseness, computational ease, cognitive simplicity, diversity and adaptivity ([source](https://www.sri.inf.ethz.ch/publications/petrov2026proofrank));
+- formal theorem proving pass@k or LLM proof-grader scores.
+
+**Prospective gates:** ≥25% explanation-token reduction, immediate comprehension non-inferiority within 5 percentage points, ≥95% side-condition coverage, zero observed false mathematical claims in the frozen set, and +10 percentage points delayed cross-family transfer as a stretch target. No MSE or human-transfer result has been collected.
