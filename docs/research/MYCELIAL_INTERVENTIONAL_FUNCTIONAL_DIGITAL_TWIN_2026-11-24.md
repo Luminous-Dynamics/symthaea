@@ -163,6 +163,7 @@ A hard limit is not a cost to be traded against expected information gain. An in
 The proposed Rust implementation is split into two layers:
 - PR #13379 computes expected reduction in Bayes decision risk minus declared acquisition cost.
 - Issue #13486 / draft PR #13487 adds specimen-health admissibility using cumulative dose, session time, ROI, temperature and channel-calibration evidence.
+- Issue #13488 separates fungal photobiological signalling from phototoxicity and defines a species/strain/stage-specific exposure/response model.
 - The sample-health gate accepts only a replay-qualified VOI evidence bundle: the upstream report is independently recomputed against the exact source skeleton, candidate inventory, posterior, decision table and acquisition-response models.
 - The final sample-health receipt binds both the upstream report and qualified source-evidence digest. Its own `validate_against` operation replays the hard-constraint filtering and final recommendation against the exact policy, cumulative exposure ledger and acquisition proposals; a changed recommendation or receipt is rejected.
 
@@ -179,6 +180,25 @@ Hard constraints require exact calibration binding:
 - overlapping spatial footprints are accumulated by canonical source-region cell identity, not by ROI label.
 
 The policy is advisory-only. It does not infer biological viability from photon counts, guarantee absence of phototoxicity, issue microscope commands or override a laboratory protocol. Dose, irradiance, continuous-dwell, recovery and temperature bounds must be established for the specific specimen, fluorophore, modality, instrument and assay by qualified personnel.
+
+### 5.2 Photobiological signalling is not phototoxicity
+
+A second fungal-specific issue prevents treating all illumination effects as damage. Fungi sense light as an environmental/developmental signal. The 2025 review *How fungi see the world* describes UV, blue, green, red and far-red photoreception, with blue light acting as a major regulatory cue and responses depending on fungal photoreceptors and signalling pathways: https://doi.org/10.1128/mmbr.00149-22.
+
+Recent experiments illustrate why responses cannot be pooled into one generic curve:
+- *Gibberella zeae* work reports wavelength- and irradiance-dependent effects of 385/405-nm illumination on mycelial growth and deoxynivalenol production, with ROS observations at high-irradiance 405-nm exposure: https://doi.org/10.1016/j.funbio.2025.101690.
+- A *Fusarium solani* experiment reported shorter hyphal growth under 454-nm illumination while conidial quality/viability increased under its tested exposure protocol: https://pubmed.ncbi.nlm.nih.gov/32112251/.
+- A 2025 *Hericium erinaceus* study reported different mycelial-growth responses under different LED spectra: https://doi.org/10.3389/ffunb.2025.1684852.
+
+These results motivate a strict distinction:
+1. **Phototoxicity:** stress, damage, bleaching, reduced viability and recovery.
+2. **Photobiological response:** regulated changes in extension, branching, cordogenesis, sporulation, fruiting, pigments or metabolites.
+
+An exposure can preserve viability while changing developmental behaviour; opposite endpoints can move in different directions. An imaging condition must therefore be treated as a possible biological treatment until its effect is shown negligible for the endpoint being predicted.
+
+Issue #13488 specifies a separate, source-bound photobiological exposure ledger and response model. It records species, strain, stage, cultivation unit, substrate/hydration, spectrum, specimen-plane irradiance, fluence, duty cycle, dwell, schedule, spatial footprint, acquisition plan and device identities. It keeps growth, viability, sporulation, ROS and metabolite outcomes separate. Unknown species/strain/stage or out-of-domain exposure schedules must produce an explicit unqualified response state; no wavelength-only correction factor is permitted.
+
+The first controlled fungal study should include dark/ambient and low-exposure imaging controls, species-appropriate spectral bands, calibrated irradiance levels, continuous versus fractionated schedules at equal integrated fluence, temperature/handling shams, randomized independent cultivation units and post-exposure recovery observations. Such work requires qualified mycologists and approved protocols. PhotoFiTT and the cited fungal studies provide research design precedents, not universal Mycelial safe-dose thresholds.
 
 PhotoFiTT (Del Rosario et al., *Nature Communications*, 13 December 2025; https://doi.org/10.1038/s41467-025-66209-6) provides an important methodological reason not to reduce specimen illumination to one integrated dose number. In mammalian-cell confocal experiments, longer low-intensity scans produced greater mitotic delay than shorter high-intensity scans at the same total light dose. This supports treating irradiance and continuous illumination duration as separate dimensions, and recovery as a variable to test. It does **not** provide fungal phototoxicity thresholds; none of its numerical values should be copied into Mycelial policy. Fungal-specific dose-response and recovery experiments are required before any instrument actuation could be considered.
 
@@ -356,6 +376,10 @@ That would move Mycelial from network visualization toward a genuinely testable 
 - Smart microscopy interoperability roadmap (2026): https://doi.org/10.1515/mim-2025-0029
 - Adaptive smart-microscopy review (2026): https://doi.org/10.1038/s44303-026-00145-y
 - PhotoFiTT illumination-pattern / phototoxicity framework (2025): https://doi.org/10.1038/s41467-025-66209-6
+- Fungal photoreceptor / photobiology review (2025): https://doi.org/10.1128/mmbr.00149-22
+- *Gibberella zeae* wavelength/irradiance response (2025): https://doi.org/10.1016/j.funbio.2025.101690
+- *Hericium erinaceus* LED-spectrum / mycelial growth response (2025): https://doi.org/10.3389/ffunb.2025.1684852
+- *Fusarium solani* 454-nm blue-light growth and conidial viability study: https://pubmed.ncbi.nlm.nih.gov/32112251/
 - Reproducible fluorescence microscopy recommendations (2021): https://doi.org/10.1038/s41592-021-01156-w
 - Outcome-driven optogenetic microscopy (2025/2026): https://doi.org/10.1038/s41467-025-67848-5
 - Sten 2D mycelium analysis (2024): https://doi.org/10.1016/j.ecoinf.2024.102670
