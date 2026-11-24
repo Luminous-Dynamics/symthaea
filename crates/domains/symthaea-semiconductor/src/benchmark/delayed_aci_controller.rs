@@ -99,6 +99,8 @@ pub struct DelayedAciEngineV1 {
     pub policy: DelayedAciPolicyV1,
     pub state: DelayedAciStateV1,
     pub next_prediction_step: u64,
+    pub prediction_stream_closed: bool,
+    pub last_feedback_step: Option<u64>,
     pub pending_predictions: BTreeMap<String, DelayedAciPredictionReceiptV1>,
     pub accepted_label_revisions: BTreeSet<String>,
 }
@@ -342,9 +344,21 @@ pub fn create_delayed_aci_engine_v1(
         },
         policy,
         next_prediction_step: 0,
+        prediction_stream_closed: false,
+        last_feedback_step: None,
         pending_predictions: BTreeMap::new(),
         accepted_label_revisions: BTreeSet::new(),
     })
+}
+
+/// Close prediction issuance so the final fixed-delay feedback window
+/// can be drained without pretending more predictions are being issued.
+pub fn close_delayed_aci_prediction_stream_v1(
+    engine: &mut DelayedAciEngineV1,
+) -> Result<(), DelayedAciErrorV1> {
+    validate_engine(engine)?;
+    engine.prediction_stream_closed = true;
+    Ok(())
 }
 
 /// Freeze an interval and the exact alpha lane used to construct it.
@@ -354,6 +368,11 @@ pub fn issue_delayed_aci_prediction_v1(
     input: &DelayedAciPredictionInputV1,
 ) -> Result<DelayedAciPredictionReceiptV1, DelayedAciErrorV1> {
     validate_engine(engine)?;
+    if engine.prediction_stream_closed {
+        return Err(DelayedAciErrorV1(
+            "prediction stream is closed; only pending feedback may be drained".into(),
+        ));
+    }
     if input.schema != DELAYED_ACI_PREDICTION_SCHEMA_V1 {
         return Err(DelayedAciErrorV1("prediction schema is unsupported".into()));
     }
@@ -549,9 +568,18 @@ pub fn deliver_delayed_aci_feedback_v1(
     {
         reasons.push(DelayedAciReasonV1::ClockDomainMismatch);
     }
-    if delivery.feedback_step != expected_step
-        || delivery.feedback_step != engine.next_prediction_step
-    {
+    let expected_next_feedback_step = engine
+        .last_feedback_step
+        .and_then(|step| step.checked_add(1))
+        .unwrap_or(engine.policy.feedback_delay_steps);
+    let schedule_matches = delivery.feedback_step == expected_step
+        && if engine.prediction_stream_closed {
+            delivery.feedback_step == expected_next_feedback_step
+        } else {
+            delivery.feedback_step == engine.next_prediction_step
+                && delivery.feedback_step == expected_next_feedback_step
+        };
+    if !schedule_matches {
         reasons.push(DelayedAciReasonV1::FeedbackStepMismatch);
     }
     if delivery.delivered_at_unix_seconds < delivery.label_available_at_unix_seconds {
@@ -695,6 +723,7 @@ pub fn deliver_delayed_aci_feedback_v1(
     })?;
 
     engine.state = candidate_state;
+    engine.last_feedback_step = Some(delivery.feedback_step);
     engine.pending_predictions.remove(&delivery.sample_id);
     engine
         .accepted_label_revisions
