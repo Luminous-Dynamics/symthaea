@@ -126,6 +126,8 @@ pub struct CaoCrcFeedbackV1 {
     pub schema: String,
     pub source_round: u64,
     pub sample_id: String,
+    pub label_id: String,
+    pub label_revision: u64,
     pub measurement_event_id: String,
     pub label_value: f64,
     pub label_payload_sha256: String,
@@ -482,8 +484,14 @@ fn validate_feedback(
     {
         reasons.push(CaoCrcFeedbackReasonV1::UncertaintyMissingOrInvalid);
     }
-    if report.label_id.trim().is_empty() || report.label_revision == 0 {
+    if feedback.label_id.trim().is_empty()
+        || feedback.label_revision == 0
+        || report.label_id != feedback.label_id
+    {
         reasons.push(CaoCrcFeedbackReasonV1::LabelIdentityInvalid);
+    }
+    if report.label_revision != feedback.label_revision {
+        reasons.push(CaoCrcFeedbackReasonV1::LabelRevisionMismatch);
     }
     if report.frontier != LabelEvidenceFrontierV1::CurrentAtK1 {
         reasons.push(CaoCrcFeedbackReasonV1::LabelNotCurrentK1);
@@ -642,15 +650,15 @@ pub fn process_cao_crc_round_v1(
         }
         let label_key = format!(
             "{}:{}",
-            feedback.eligibility_report.label_id,
-            feedback.eligibility_report.label_revision
+            feedback.label_id,
+            feedback.label_revision
         );
         if next_engine.accepted_label_revisions.contains(&label_key) {
             feedback_results.push(CaoCrcFeedbackResultV1 {
                 source_round: feedback.source_round,
                 sample_id: feedback.sample_id.clone(),
-                label_id: Some(feedback.eligibility_report.label_id.clone()),
-                label_revision: Some(feedback.eligibility_report.label_revision),
+                label_id: Some(feedback.label_id.clone()),
+                label_revision: Some(feedback.label_revision),
                 disposition: CaoCrcFeedbackDispositionV1::Duplicate,
                 reasons: vec![CaoCrcFeedbackReasonV1::DuplicateAcceptedLabelRevision],
                 actual_delay: input.round.checked_sub(feedback.source_round),
@@ -669,8 +677,8 @@ pub fn process_cao_crc_round_v1(
                 feedback_results.push(CaoCrcFeedbackResultV1 {
                     source_round: feedback.source_round,
                     sample_id: feedback.sample_id.clone(),
-                    label_id: Some(feedback.eligibility_report.label_id.clone()),
-                    label_revision: Some(feedback.eligibility_report.label_revision),
+                    label_id: Some(feedback.label_id.clone()),
+                    label_revision: Some(feedback.label_revision),
                     disposition: CaoCrcFeedbackDispositionV1::Rejected,
                     reasons: vec![CaoCrcFeedbackReasonV1::FutureSourceRound],
                     actual_delay: None,
@@ -687,8 +695,8 @@ pub fn process_cao_crc_round_v1(
                 feedback_results.push(CaoCrcFeedbackResultV1 {
                     source_round: feedback.source_round,
                     sample_id: feedback.sample_id.clone(),
-                    label_id: Some(feedback.eligibility_report.label_id.clone()),
-                    label_revision: Some(feedback.eligibility_report.label_revision),
+                    label_id: Some(feedback.label_id.clone()),
+                    label_revision: Some(feedback.label_revision),
                     disposition: CaoCrcFeedbackDispositionV1::Untracked,
                     reasons: vec![CaoCrcFeedbackReasonV1::DelayExceedsDeclaredBound],
                     actual_delay,
@@ -708,8 +716,8 @@ pub fn process_cao_crc_round_v1(
             feedback_results.push(CaoCrcFeedbackResultV1 {
                 source_round: feedback.source_round,
                 sample_id: feedback.sample_id.clone(),
-                label_id: Some(feedback.eligibility_report.label_id.clone()),
-                label_revision: Some(feedback.eligibility_report.label_revision),
+                label_id: Some(feedback.label_id.clone()),
+                label_revision: Some(feedback.label_revision),
                 disposition: CaoCrcFeedbackDispositionV1::Untracked,
                 reasons: vec![CaoCrcFeedbackReasonV1::NotTrackedAtArrival],
                 actual_delay,
@@ -748,8 +756,8 @@ pub fn process_cao_crc_round_v1(
             feedback_results.push(CaoCrcFeedbackResultV1 {
                 source_round: feedback.source_round,
                 sample_id: feedback.sample_id.clone(),
-                label_id: Some(feedback.eligibility_report.label_id.clone()),
-                label_revision: Some(feedback.eligibility_report.label_revision),
+                label_id: Some(feedback.label_id.clone()),
+                label_revision: Some(feedback.label_revision),
                 disposition,
                 reasons,
                 actual_delay: Some(actual_delay),
@@ -787,8 +795,8 @@ pub fn process_cao_crc_round_v1(
         feedback_results.push(CaoCrcFeedbackResultV1 {
             source_round: feedback.source_round,
             sample_id: feedback.sample_id.clone(),
-            label_id: Some(feedback.eligibility_report.label_id.clone()),
-            label_revision: Some(feedback.eligibility_report.label_revision),
+            label_id: Some(feedback.label_id.clone()),
+            label_revision: Some(feedback.label_revision),
             disposition: CaoCrcFeedbackDispositionV1::Updated,
             reasons: Vec::new(),
             actual_delay: Some(actual_delay),
@@ -1037,6 +1045,8 @@ mod tests {
             schema: CA_OCRC_FEEDBACK_SCHEMA_V1.into(),
             source_round,
             sample_id: sample_id.into(),
+            label_id: label_id.into(),
+            label_revision: 1,
             measurement_event_id: event_id.into(),
             label_value: value,
             label_payload_sha256: payload,
