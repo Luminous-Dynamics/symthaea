@@ -27,6 +27,7 @@ const MAX_MEASURE_PARTICLES: usize = 1_000_000;
 const MAX_FOURIER_MEASURE_WORK: usize = 16_777_216;
 const MAX_SCALAR_MODE_HORIZON_STEPS: u32 = 1_000_000;
 const MAX_DELAY_CANCELLATION_SAMPLES: usize = 1_000_000;
+const MAX_DELAY_HISTORY_WORK: usize = 4_194_304;
 const DIGEST_DOMAIN: &[u8] = b"symthaea.akpd.pulse-candidate.v0.1\0";
 
 /// Errors returned while parsing, validating or enumerating probe contracts.
@@ -2704,6 +2705,194 @@ pub struct MaxwellDelayCancellationObservation {
     pub interval_mean_current_transverse: Vec<f64>,
     pub interval_mean_gradient_electric_transverse: Vec<f64>,
     pub interval_mean_gradient_magnetic_transverse: Vec<f64>,
+}
+
+/// Time-stamped current and transverse field-gradient history over a delay window.
+///
+/// Each measurement is stored as [time_index][spatial_index]. The first and
+/// last timestamps must exactly match the requested integration interval; the
+/// integrator will not extrapolate missing history or silently change the
+/// delay window.
+#[derive(Clone, Debug, PartialEq)]
+pub struct MaxwellDelayHistorySamples {
+    pub sample_times_seconds: Vec<f64>,
+    pub current_longitudinal: Vec<Vec<f64>>,
+    pub current_transverse: Vec<Vec<f64>>,
+    pub gradient_electric_transverse: Vec<Vec<f64>>,
+    pub gradient_magnetic_transverse: Vec<Vec<f64>>,
+}
+
+/// Time-averaged current and field-gradient observations over a delay window.
+#[derive(Clone, Debug, PartialEq)]
+pub struct MaxwellDelayIntervalAverages {
+    pub current_longitudinal: Vec<f64>,
+    pub current_transverse: Vec<f64>,
+    pub gradient_electric_transverse: Vec<f64>,
+    pub gradient_magnetic_transverse: Vec<f64>,
+}
+
+/// Integrate sampled currents and field gradients over an exact delay window.
+///
+/// Nonuniform sample times are supported through piecewise-linear trapezoidal
+/// integration. Every history must share the same time and spatial axes.
+/// Incomplete windows, repeated/decreasing timestamps, ragged arrays, non-finite
+/// data and excessive time-space work are rejected rather than extrapolated.
+pub fn integrate_maxwell_delay_history(
+    history: &MaxwellDelayHistorySamples,
+    window_start_seconds: f64,
+    window_end_seconds: f64,
+) -> Result<MaxwellDelayIntervalAverages, ContractError> {
+    if !window_start_seconds.is_finite()
+        || !window_end_seconds.is_finite()
+        || window_end_seconds <= window_start_seconds
+    {
+        return Err(control_timing_error(
+            "delay_window",
+            "window endpoints must be finite and strictly increasing",
+        ));
+    }
+
+    let time_count = history.sample_times_seconds.len();
+    if !(2..=MAX_DELAY_CANCELLATION_SAMPLES).contains(&time_count) {
+        return Err(control_timing_error(
+            "delay_history",
+            "history must contain at least two and no more than the bounded number of samples",
+        ));
+    }
+    if history.sample_times_seconds[0] != window_start_seconds
+        || history.sample_times_seconds[time_count - 1] != window_end_seconds
+    {
+        return Err(control_timing_error(
+            "delay_history",
+            "history must include exact samples at both delay-window endpoints",
+        ));
+    }
+    if history
+        .sample_times_seconds
+        .iter()
+        .any(|time| !time.is_finite())
+        || history
+            .sample_times_seconds
+            .windows(2)
+            .any(|pair| pair[1] <= pair[0])
+    {
+        return Err(control_timing_error(
+            "delay_history.sample_times_seconds",
+            "timestamps must be finite and strictly increasing",
+        ));
+    }
+
+    let spatial_count = history.current_longitudinal.first().map_or(0, Vec::len);
+    let total_work = time_count
+        .checked_mul(spatial_count)
+        .ok_or_else(|| control_timing_error("delay_history", "time-space work overflowed"))?;
+    if spatial_count == 0 || spatial_count > MAX_DELAY_CANCELLATION_SAMPLES {
+        return Err(control_timing_error(
+            "delay_history",
+            "spatial axis must be non-empty and within the sample budget",
+        ));
+    }
+    if total_work > MAX_DELAY_HISTORY_WORK {
+        return Err(control_timing_error(
+            "delay_history",
+            "time-space history exceeds the bounded integration budget",
+        ));
+    }
+
+    for (field, values) in [
+        ("current_longitudinal", &history.current_longitudinal),
+        ("current_transverse", &history.current_transverse),
+        (
+            "gradient_electric_transverse",
+            &history.gradient_electric_transverse,
+        ),
+        (
+            "gradient_magnetic_transverse",
+            &history.gradient_magnetic_transverse,
+        ),
+    ] {
+        if values.len() != time_count
+            || values.iter().any(|row| {
+                row.len() != spatial_count || row.iter().any(|value| !value.is_finite())
+            })
+        {
+            return Err(control_timing_error(
+                field,
+                "every time row must match the common spatial axis and contain finite values",
+            ));
+        }
+    }
+
+    let interval_duration = window_end_seconds - window_start_seconds;
+    if !interval_duration.is_finite() || interval_duration <= 0.0 {
+        return Err(control_timing_error(
+            "delay_window",
+            "window duration must be finite and positive",
+        ));
+    }
+
+    let current_longitudinal = integrate_history_field(
+        &history.sample_times_seconds,
+        &history.current_longitudinal,
+        interval_duration,
+    )?;
+    let current_transverse = integrate_history_field(
+        &history.sample_times_seconds,
+        &history.current_transverse,
+        interval_duration,
+    )?;
+    let gradient_electric_transverse = integrate_history_field(
+        &history.sample_times_seconds,
+        &history.gradient_electric_transverse,
+        interval_duration,
+    )?;
+    let gradient_magnetic_transverse = integrate_history_field(
+        &history.sample_times_seconds,
+        &history.gradient_magnetic_transverse,
+        interval_duration,
+    )?;
+
+    Ok(MaxwellDelayIntervalAverages {
+        current_longitudinal,
+        current_transverse,
+        gradient_electric_transverse,
+        gradient_magnetic_transverse,
+    })
+}
+
+fn integrate_history_field(
+    sample_times: &[f64],
+    values: &[Vec<f64>],
+    interval_duration: f64,
+) -> Result<Vec<f64>, ContractError> {
+    let spatial_count = values.first().map_or(0, Vec::len);
+    let mut averages = Vec::with_capacity(spatial_count);
+    for spatial_index in 0..spatial_count {
+        let mut integral = 0.0;
+        let mut compensation = 0.0;
+        for time_index in 0..sample_times.len() - 1 {
+            let delta_time = sample_times[time_index + 1] - sample_times[time_index];
+            let endpoint_sum =
+                values[time_index][spatial_index] + values[time_index + 1][spatial_index];
+            let segment_integral = 0.5 * endpoint_sum * delta_time;
+            if !segment_integral.is_finite() {
+                return Err(control_timing_error(
+                    "delay_history",
+                    "trapezoidal integration produced a non-finite segment",
+                ));
+            }
+            kahan_add(segment_integral, &mut integral, &mut compensation);
+        }
+        let average = integral / interval_duration;
+        if !average.is_finite() {
+            return Err(control_timing_error(
+                "delay_history",
+                "interval mean is non-finite",
+            ));
+        }
+        averages.push(average);
+    }
+    Ok(averages)
 }
 
 /// Deterministic cancellation commands predicted from the Maxwell delay identities.
@@ -6582,6 +6771,93 @@ mod tests {
             interval_mean_gradient_electric_transverse: vec![-1.0, 0.2],
             interval_mean_gradient_magnetic_transverse: vec![0.6, -0.8],
         }
+    }
+
+    fn maxwell_delay_history_fixture() -> MaxwellDelayHistorySamples {
+        MaxwellDelayHistorySamples {
+            sample_times_seconds: vec![2.0, 2.25, 3.0],
+            current_longitudinal: vec![vec![1.0, 2.0], vec![1.25, 2.5], vec![2.0, 4.0]],
+            current_transverse: vec![vec![-1.0, 0.0], vec![-0.75, 0.5], vec![0.0, 2.0]],
+            gradient_electric_transverse: vec![
+                vec![2.0, -2.0],
+                vec![1.5, -1.5],
+                vec![0.0, 0.0],
+            ],
+            gradient_magnetic_transverse: vec![
+                vec![0.0, 1.0],
+                vec![0.5, 1.25],
+                vec![2.0, 2.0],
+            ],
+        }
+    }
+
+    #[test]
+    fn maxwell_delay_history_integrates_nonuniform_time_samples() {
+        let averages =
+            integrate_maxwell_delay_history(&maxwell_delay_history_fixture(), 2.0, 3.0)
+                .unwrap();
+        assert_eq!(averages.current_longitudinal, vec![1.5, 3.0]);
+        assert_eq!(averages.current_transverse, vec![-0.5, 1.0]);
+        assert_eq!(averages.gradient_electric_transverse, vec![1.0, -1.0]);
+        assert_eq!(averages.gradient_magnetic_transverse, vec![1.0, 1.5]);
+    }
+
+    #[test]
+    fn maxwell_delay_history_rejects_missing_endpoints_and_nonmonotone_time() {
+        let history = maxwell_delay_history_fixture();
+        assert!(matches!(
+            integrate_maxwell_delay_history(&history, 2.1, 3.0),
+            Err(ContractError::InvalidControlTimingField {
+                field: "delay_history",
+                ..
+            })
+        ));
+        let mut repeated_time = history;
+        repeated_time.sample_times_seconds[1] = 2.0;
+        assert!(matches!(
+            integrate_maxwell_delay_history(&repeated_time, 2.0, 3.0),
+            Err(ContractError::InvalidControlTimingField {
+                field: "delay_history.sample_times_seconds",
+                ..
+            })
+        ));
+    }
+
+    #[test]
+    fn maxwell_delay_history_rejects_ragged_nonfinite_and_excessive_work() {
+        let mut ragged = maxwell_delay_history_fixture();
+        ragged.current_transverse[1].pop();
+        assert!(matches!(
+            integrate_maxwell_delay_history(&ragged, 2.0, 3.0),
+            Err(ContractError::InvalidControlTimingField {
+                field: "current_transverse",
+                ..
+            })
+        ));
+        let mut nonfinite = maxwell_delay_history_fixture();
+        nonfinite.gradient_electric_transverse[1][0] = f64::NAN;
+        assert!(matches!(
+            integrate_maxwell_delay_history(&nonfinite, 2.0, 3.0),
+            Err(ContractError::InvalidControlTimingField {
+                field: "gradient_electric_transverse",
+                ..
+            })
+        ));
+        let wide = vec![0.0; MAX_DELAY_HISTORY_WORK / 2 + 1];
+        let excessive = MaxwellDelayHistorySamples {
+            sample_times_seconds: vec![0.0, 1.0],
+            current_longitudinal: vec![wide.clone(), wide.clone()],
+            current_transverse: vec![wide.clone(), wide.clone()],
+            gradient_electric_transverse: vec![wide.clone(), wide.clone()],
+            gradient_magnetic_transverse: vec![wide.clone(), wide],
+        };
+        assert!(matches!(
+            integrate_maxwell_delay_history(&excessive, 0.0, 1.0),
+            Err(ContractError::InvalidControlTimingField {
+                field: "delay_history",
+                ..
+            })
+        ));
     }
 
     #[test]
