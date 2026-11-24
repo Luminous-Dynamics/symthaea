@@ -40,7 +40,8 @@ The implementation validates:
 - duplicate parent-child edges and duplicate dependency dimensions;
 - cycle-free graph topology;
 - one K1 requalification receipt per snapshot;
-- each receipt's digest, historical manifest reference and read-only authority flags.
+- each receipt's digest, historical manifest reference and read-only authority flags;
+- per-label K1 row count, unique label IDs, K0/K1 receipt digests, aggregate eligible/unknown/blocked counts and overall disposition consistency.
 
 It uses deterministic Kahn topological sorting with snapshot-ID tie-breaks. Rebuild candidates are emitted in parent-before-child order.
 
