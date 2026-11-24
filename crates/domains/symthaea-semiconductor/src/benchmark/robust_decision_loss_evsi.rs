@@ -13,8 +13,8 @@ use thiserror::Error;
 
 use super::decision_loss_metrology_policy::{
     MetrologyCandidateEvsiReportV1, MetrologyCandidateStatusV1, MetrologyCandidateV1,
-    MetrologyDecisionLossModelV1, MetrologyDecisionLossPolicyV1, validate_policy,
-    score_candidate,
+    MetrologyDecisionLossModelV1, MetrologyDecisionLossPolicyV1, validate_decision_model,
+    validate_policy, score_candidate,
 };
 
 pub const ROBUST_EVSI_INPUT_SCHEMA_V1: &str =
@@ -321,6 +321,8 @@ fn score_robust_candidate(
             None => all_weight = false,
         }
 
+        validate_decision_model(&scenario.decision_loss_model)
+            .map_err(|error| RobustEvsiErrorV1(error.to_string()))?;
         let current_signature = model_identity_signature(&scenario.decision_loss_model);
         if let Some(expected) = &signature {
             if expected != &current_signature {
