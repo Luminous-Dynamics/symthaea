@@ -1,0 +1,97 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://github.com/Luminous-Dynamics/symthaea/blob/main/tools/neurotwin-cohort-audit/schema/cohort-receipt-v0.1.schema.json",
+  "title": "NeuroTwin aggregate BIDS cohort preflight receipt v0.1",
+  "type": "object",
+  "additionalProperties": false,
+  "required": [
+    "schema_version",
+    "status",
+    "bids_version",
+    "dataset_type",
+    "subject_directory_count",
+    "participants_tsv_present",
+    "participant_table_count",
+    "participant_ids_matched_to_directories",
+    "session_directory_count",
+    "modality_file_counts",
+    "findings",
+    "limitations"
+  ],
+  "properties": {
+    "schema_version": {
+      "const": "neurotwin-cohort-receipt-v0.1"
+    },
+    "status": {
+      "enum": ["PRELIMINARY_PASS", "REVIEW", "BLOCKED"]
+    },
+    "bids_version": {
+      "type": "string",
+      "minLength": 1
+    },
+    "dataset_type": {
+      "type": "string",
+      "enum": ["raw", "derivative", "raw (defaulted)", "invalid"]
+    },
+    "subject_directory_count": {
+      "type": "integer",
+      "minimum": 0
+    },
+    "participants_tsv_present": {
+      "type": "boolean"
+    },
+    "participant_table_count": {
+      "type": ["integer", "null"],
+      "minimum": 0
+    },
+    "participant_ids_matched_to_directories": {
+      "type": ["integer", "null"],
+      "minimum": 0
+    },
+    "session_directory_count": {
+      "type": "integer",
+      "minimum": 0
+    },
+    "modality_file_counts": {
+      "type": "object",
+      "propertyNames": {
+        "enum": ["anat", "beh", "dwi", "eeg", "fmap", "func", "ieeg", "meg", "micr", "motion", "nirs", "perf", "pet", "physio", "stim"]
+      },
+      "additionalProperties": {
+        "type": "integer",
+        "minimum": 0
+      }
+    },
+    "findings": {
+      "type": "array",
+      "items": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": ["code", "severity"],
+        "properties": {
+          "code": {
+            "type": "string",
+            "enum": [
+              "DERIVATIVE_MISSING_GENERATED_BY",
+              "INVALID_DATASET_TYPE",
+              "DATASET_TYPE_OMITTED_DEFAULTED_RAW",
+              "INVALID_SUBJECT_DIRECTORY_LABEL",
+              "NO_SUBJECT_DIRECTORIES",
+              "PARTICIPANTS_TABLE_MISSING_SUBJECT_DIRECTORY",
+              "PARTICIPANTS_TSV_ABSENT"
+            ]
+          },
+          "severity": {
+            "enum": ["info", "warning", "error"]
+          }
+        }
+      }
+    },
+    "limitations": {
+      "type": "array",
+      "items": {
+        "type": "string"
+      }
+    }
+  }
+}

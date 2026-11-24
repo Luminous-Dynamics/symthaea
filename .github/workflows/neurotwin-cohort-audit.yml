@@ -1,0 +1,38 @@
+name: NeuroTwin Cohort Audit
+
+on:
+  pull_request:
+    paths:
+      - "tools/neurotwin-cohort-audit/**"
+      - ".github/workflows/neurotwin-cohort-audit.yml"
+  push:
+    branches: [main]
+    paths:
+      - "tools/neurotwin-cohort-audit/**"
+      - ".github/workflows/neurotwin-cohort-audit.yml"
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: neurotwin-cohort-audit-${{ github.ref }}-${{ github.event_name == 'workflow_dispatch' && github.run_id || 'auto' }}
+  cancel-in-progress: true
+
+jobs:
+  test:
+    name: Rust format and tests
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Install pinned Rust toolchain
+        uses: dtolnay/rust-toolchain@1.96.0
+        with:
+          components: rustfmt
+
+      - name: Check formatting
+        run: cargo fmt --manifest-path tools/neurotwin-cohort-audit/Cargo.toml -- --check
+
+      - name: Run unit tests
+        run: cargo test --manifest-path tools/neurotwin-cohort-audit/Cargo.toml
