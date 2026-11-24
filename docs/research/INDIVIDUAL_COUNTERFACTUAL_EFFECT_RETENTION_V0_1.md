@@ -192,3 +192,6 @@ Links:
 - [Causal trajectory pairing #13375/#13377](https://github.com/Luminous-Dynamics/symthaea/pull/13377)
 - [Okita paper](https://www.mdpi.com/2504-4990/8/11/363)
 
+### Application-time outcomes are not pairing identities
+
+Each individual comparison now retains the baseline and alternative branch's actual `applied_at_us` plus the signed difference (alternative minus baseline). These timestamps are not required to match: delay introduced by compute, observation, queueing or execution is part of the treatment. The evaluator does not shift either branch onto an artificial common timestamp. The existing #13377 receipt must bind each realized utility to its own exact application timestamp, action digest and branch trajectory. The new Rust reference preserves those times for downstream paired/cluster analysis; it does not independently validate the trajectory tick or recompute the outcome.
