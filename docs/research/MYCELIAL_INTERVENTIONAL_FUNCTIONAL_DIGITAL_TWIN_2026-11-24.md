@@ -171,11 +171,18 @@ Hard constraints require exact calibration binding:
 - the exact compiled acquisition-plan digest and device-capability-manifest digest are bound to the active recorded session;
 - the spatial-footprint digest commits to coordinate frame, compiled plan, device capability and canonical source-region cell IDs;
 - each illuminated channel has a policy-bound wavelength band and calibration digest;
-- each optical action supplies a conservative dose estimate for every required illumination channel;
+- each channel has a specimen-plane maximum irradiance and maximum uninterrupted illumination duration;
+- each proposed optical action is scheduled against a monotonic session timebase and must satisfy the minimum recovery interval since the last specimen illumination;
+- each optical action supplies a conservative dose and irradiance upper bound, plus actual continuous illumination duration, for every required illumination channel;
 - each historical exposure records its source receipt and calibration digest; an unqualified or incompatible historical exposure blocks further optical acquisition until reconciled;
+- incomplete exposure history blocks optical acquisitions, but does not block non-optical human review;
 - overlapping spatial footprints are accumulated by canonical source-region cell identity, not by ROI label.
 
-The policy is advisory-only. It does not infer biological viability from photon counts, guarantee absence of phototoxicity, issue microscope commands or override a laboratory protocol. Dose and temperature bounds must be established for the specific specimen, fluorophore, modality, instrument and assay by qualified personnel.
+The policy is advisory-only. It does not infer biological viability from photon counts, guarantee absence of phototoxicity, issue microscope commands or override a laboratory protocol. Dose, irradiance, continuous-dwell, recovery and temperature bounds must be established for the specific specimen, fluorophore, modality, instrument and assay by qualified personnel.
+
+PhotoFiTT (Del Rosario et al., *Nature Communications*, 13 December 2025; https://doi.org/10.1038/s41467-025-66209-6) provides an important methodological reason not to reduce specimen illumination to one integrated dose number. In mammalian-cell confocal experiments, longer low-intensity scans produced greater mitotic delay than shorter high-intensity scans at the same total light dose. This supports treating irradiance and continuous illumination duration as separate dimensions, and recovery as a variable to test. It does **not** provide fungal phototoxicity thresholds; none of its numerical values should be copied into Mycelial policy. Fungal-specific dose-response and recovery experiments are required before any instrument actuation could be considered.
+
+Reproducible fluorescence microscopy guidance also emphasizes irradiance at the sample plane and illumination pattern, rather than nominal lamp power alone: https://doi.org/10.1038/s41592-021-01156-w.
 
 Evaluation must compare fixed schedules, random sampling, confidence-only, entropy-only, VOI-only and VOI-plus-health-constraints at equal measurement budgets. Report both:
 1. downstream decision regret at equal photon/time budget; and
@@ -348,6 +355,8 @@ That would move Mycelial from network visualization toward a genuinely testable 
 - Hyphal Highways Device (2026): https://doi.org/10.1093/femsml/uqag035
 - Smart microscopy interoperability roadmap (2026): https://doi.org/10.1515/mim-2025-0029
 - Adaptive smart-microscopy review (2026): https://doi.org/10.1038/s44303-026-00145-y
+- PhotoFiTT illumination-pattern / phototoxicity framework (2025): https://doi.org/10.1038/s41467-025-66209-6
+- Reproducible fluorescence microscopy recommendations (2021): https://doi.org/10.1038/s41592-021-01156-w
 - Outcome-driven optogenetic microscopy (2025/2026): https://doi.org/10.1038/s41467-025-67848-5
 - Sten 2D mycelium analysis (2024): https://doi.org/10.1016/j.ecoinf.2024.102670
 - Sten 3D z-stack reconstruction (2025): https://doi.org/10.1016/j.ecoinf.2025.103317
