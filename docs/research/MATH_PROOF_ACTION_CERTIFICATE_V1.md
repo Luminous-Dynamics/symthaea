@@ -173,3 +173,11 @@ A bounded pilot now exists for the three formal plan actions in the provisional 
 The focused workflow now replays this Lean source after verifying the source SHA-256, pinned Mathlib revision and toolchain. On success it generates a machine-readable receipt containing the Symthaea commit, Lean version, Mathlib revision, Lake manifest digest, proof-source and manifest digests, action declaration mapping, and the hash of the raw `#print axioms` log. The replay log and receipt are uploaded as a workflow artifact. The committed manifest deliberately remains `kernel_replay_pending`; only the generated exact-run receipt can record an accepted result.
 
 **Current evidence boundary:** the source and workflow have been committed, but this turn did not run the Lean toolchain locally and no exact-head replay result is yet available. The pilot checks the declared local propositions and their composed root theorem; it does not yet emit elaborated pre/post goal-state snapshots, binder identity or local-instance context digests, parse the axiom/admission closure into structured fields, or validate arbitrary plan graphs. The action-to-plan mapping and mathematical-role descriptions remain provisional and unreviewed.
+
+### 12.1. Wrong-proposition rejection control
+
+A pinned negative Lean source, [ProofActionCertificateAndCommNegative.lean](../../scripts/research/lean-proof-extractor/ProofActionCertificateAndCommNegative.lean), attempts to reuse `And.symm` for an identity proposition (`a ∧ b → a ∧ b`) rather than the declared swap proposition. The manifest pins this file's SHA-256 and requires the expected result `lean_type_error`.
+
+The focused workflow must: (a) run the positive local-action source successfully; (b) run the negative source and require a Lean type/application-type mismatch diagnostic; and (c) fail the job if the negative source is accepted. The replay artifact records both the positive log digest and the expected negative rejection log digest. A generic process failure does not satisfy the negative-control check.
+
+This is one seeded mismatch control only. It is not a comprehensive adversarial suite, and the negative-control result remains pending until an exact-head workflow run reports it.
