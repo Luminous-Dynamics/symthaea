@@ -178,13 +178,21 @@ jobs:
             docs/research/PROOF_PLAN_MUTATION_FIXTURES_V1.json >/dev/null
           echo "PROOF_PLAN_MUTATION_FIXTURE_PASS"
 
-          jq -e '.schema_version == "1.0.0"
+          jq -e '.schema_version == "1.1.0"
             and .candidate.task_class == "synthetic_control_not_model_evaluation"
             and .candidate.local_stage.verdict == "reject"
             and .candidate.global_stage.scope_binding == .candidate.local_stage.scope_binding
             and .evaluator_only.eligibility == "eligible"
             and .evaluator_only.independently_assessed_warrant == "invalid"
             and .evaluator_only.global_disposition == "used_directly"
+            and .evaluator_only.global_use_adjudication.disposition == .evaluator_only.global_disposition
+            and .evaluator_only.global_use_adjudication.reviewed_plan_sha256 == .candidate.global_stage.proof_plan_sha256
+            and .evaluator_only.global_use_adjudication.target_warrant_id == .candidate.global_stage.scope_binding.warrant_id
+            and .evaluator_only.global_use_adjudication.reviewed_entire_plan == true
+            and (.evaluator_only.global_use_adjudication.node_evidence | length) == 1
+            and .evaluator_only.global_use_adjudication.node_evidence[0].relation == "uses_as_rule"
+            and .evaluator_only.global_use_adjudication.node_evidence[0].material_use == true
+            and (.evaluator_only.global_use_adjudication.evidence_refs | index(.evaluator_only.global_use_adjudication.node_evidence[0].rationale_ref)) != null
             and .candidate.local_stage.scope_binding.premises == ["(p → q)"]
             and .candidate.local_stage.scope_binding.conclusion_text == "(q → p)"
             and .candidate.local_stage.scope_binding.root_goal_text == "(q → p)"
