@@ -34,7 +34,7 @@ jobs:
       - name: Verify shared Galileo handoff fixture fingerprint
         run: test "$(git hash-object crates/domains/symthaea-experiment-design/fixtures/galileo-discrimination-v0.1.json)" = "0548cf58562517e69c93e5f810bfee822acee1a2"
       - name: Verify covariance redundancy fixture fingerprint
-        run: test "$(git hash-object crates/domains/symthaea-experiment-design/fixtures/covariance-redundancy-v0.1.json)" = "17e4561b2ebbb0abaa090c4a38768fbac725172c"
+        run: test "$(git hash-object crates/domains/symthaea-experiment-design/fixtures/covariance-redundancy-v0.1.json)" = "1b8be1ebaf84e51bffcde02ccd7996c5156cc444"
       - name: Check planner formatting
         run: cargo fmt --package symthaea-experiment-design -- --check
       - name: Reconcile workspace lockfile and preserve exact diff
