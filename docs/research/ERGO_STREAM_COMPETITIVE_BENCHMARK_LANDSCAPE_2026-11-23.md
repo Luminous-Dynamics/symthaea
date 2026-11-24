@@ -16,6 +16,9 @@ Existing suites measure complementary capabilities. They should be used as adapt
 | Ansatz-free scientific discovery | [Unsatz](https://arxiv.org/abs/2611.03713) | Learner proposes variables, hidden state, interactions and measurement/model form, buys experiments and predicts held-out interventions/conditions/horizons | **Closest direct comparator** for structural/model-form discovery | Agent starts with a scientific task and a model-program language; it is not a generic pre-task acquisition benchmark. Reproduce its exact task protocol before comparing |
 | Industry scientific-agent harness | [OpenScience](https://www.openscience.sh/benchmark) | Reports 371 skills, 42 data connectors, seven specialist workers; public-terminal and internal end-to-end research benchmarks | Systems/harness comparator for workflow orchestration, domain procedures, evidence checks, tool connectivity and verification | The publisher disclosed evaluation-comparability issues and a planned rerun; internal benchmark and trial counts differ from public leaderboards. Do not treat its headline percentages as a common cross-benchmark SOTA score |
 | Scientific rediscovery | [FIRE-Bench](https://proceedings.mlr.press/v306/wang26d.html) | Agents rediscover established, documented findings from recent high-impact ML papers through independent experiment design, execution and evidence-backed conclusions | Direct comparator for scientific reproducibility and evidence validation after transfer | Rediscovery tasks are benchmark-specified; they do not establish novel discovery or pre-task structural acquisition |
+| Confidence calibration | [ConfidenceBench](https://confidencebench.com/) | Brier-scored verbalized confidence on private questions; published paper evaluates 15 frontier LLMs on 200 questions in four categories, while the live leaderboard has since expanded and reports Brier scores around 0.08 for top entries | Methodological and competitive reference for proper scoring and the fact that accuracy ≠ calibration | General multiple-choice/unknowable-answer confidence, not calibration of a particular structural-transfer claim; its score must not be directly compared with ErgoStream |
+| Project-level science agents | [ASI-Bench](https://asibench.apexin.ai/) | 60 research tasks across 11 scientific domains; B1–B4 progressively withdraw methodological guidance and add distractor robustness; 26 agent/model configurations on the Nov 10 snapshot | Strong benchmark for end-to-end scientific planning, method operationalization and project-level validation | Evaluation is task-exposed and its reported leaderboard aggregates supplied results; it does not isolate pre-task structural acquisition or transfer-claim calibration |
+| Scientific terminal workflows | [Terminal-Bench Science 0.1](https://www.terminal-bench-science.ai/announcement) | 70 expert-curated scientific workflows across life, physical, earth, mathematical and engineering sciences; executable workflow completion with isolated tests | External baseline for whether acquired structure improves real scientific workflow execution | A workflow-completion score is not structural transfer; compare full harness, task version, trials, tool access and resource budget rather than model names alone |
 | Interactive scientific research agents | [SciAgentArena](https://sciagentarena.github.io/) | ~200 stepwise-verified tasks across five scientific domains, four task categories and 18 evaluated agents; reports reliability, stability and cost as well as task outcomes | External reality check for whether acquired structural knowledge improves actual scientific workflows | Tasks are user/task exposed and span data-analysis workflows; it does not isolate pre-task structural acquisition or frozen cross-domain transfer |
 | Graph foundation model transfer | [GFMBenchmark](https://github.com/smufang/GFMBenchmark) | Eight graph foundation models over 33 datasets, seven topic domains and six graph-format domains; separates semantic/topic shifts from representation-format shifts | Direct graph transfer baseline and two-axis OOD test | Pretraining/adaptation benchmark, not task-agnostic relational acquisition or intervention validation |
 | Adaptive benchmark generation | [AutoSciBench](https://arxiv.org/abs/2610.05140) | Automatically revises scientific task/data/verification recipes from solver trajectories and judge feedback to close shortcuts | Strong model for an evaluator that refreshes hidden world families as agents learn benchmark shortcuts | Generated tasks are still recipe/judge-dependent; keep independent scientific review and frozen confirmatory cohorts |
@@ -63,13 +66,21 @@ Source: https://asb.open-ssi.org/about
 
 ### Calibration is a deployment-shift problem, not just a reliability score
 
-ErgoStream now has an evaluator-side empirical calibration metric for exact transfer claims: Brier score, log loss, fixed-bin ECE, and risk–coverage over assert/reject/abstain decisions. Its latest finite implementation reports these measures by evaluator-owned strata (representation-only, semantic/mechanism, combined shift and claim family). This is a scorecard, not a guarantee.
+ErgoStream now has an evaluator-side calibration metric for exact transfer claims: Brier score, log loss, fixed-bin ECE, per-stratum reports, Wilson reference intervals for risk/coverage, and tie-aware right-step AURC paired with decision coverage. Its split-conformal binary set predictor is deliberately narrower: one evaluator-owned preregistered stratum and marginal coverage under exchangeability assumptions. None of these metrics alone is a shift guarantee.
+
+External context:
+- **ConfidenceBench** evaluates verbalized LLM confidence using Brier score. Its paper reports 15 models on 200 private questions across spatial reasoning, high-precision mathematics, word lookup and unknowable questions; the initial paper's top Brier was 0.103. Its live leaderboard has since expanded: as of the 24 November 2026 page, Claude Fable 5.1 reports 0.080 and GPT-6 Astra 0.082. These are general question-answer confidence scores, not transfer-claim probabilities and not directly comparable to ErgoStream's binary outcome distribution.
+- **Terminal-Bench Science 0.1** measures 70 expert-curated, executable scientific workflows across five scientific areas. Official v0.1 results report 68.1% for GPT-6 Astra and 63.3% for Opus 5.5 on the published leaderboard snapshot. Third-party aggregators now circulate higher late-November model-reported figures for newer systems; keep those labelled provisional until they appear on the official task/version/runner scoreboard.
+- **ASI-Bench** evaluates 60 project-level research tasks across 11 scientific domains with a B1–B4 guidance gradient. Its 10 November 2026 snapshot lists GPT-6.1 Sol at 63.90 overall and GPT-6 Astra at 62.23. This measures broad project execution, not pre-task transfer calibration.
+- **Autonomous Science Bench 0.1** provides a complementary laboratory loop, including experiment selection and full configuration cost/time. Its six-task pilot reports GPT-6 Astra + Codex at 72.2%, $190.23 and 557 agent minutes; three trials per task make small gaps inconclusive.
+
+**Response:** reproduce ConfidenceBench-style Brier/log-loss methodology on a transfer-specific, sealed cohort; use Terminal-Bench Science, ASI-Bench and ASB as downstream workflow tracks; keep the metrics separate. Compare raw confidence, temperature/Platt, isotonic, ensemble/disagreement-derived confidence, split conformal, matched-coverage random abstention, always-reject and oracle abstention. Report calibration and selective risk per semantic/format/claim stratum, decision coverage, Brier/log loss, ECE sensitivity, AURC and dependence-aware intervals. Never present low ECE as a coverage guarantee.
 
 For a stronger comparison, separate four statistical regimes:
-1. **Split conformal under exchangeability** — finite-sample marginal coverage under the exchangeability assumptions.
+1. **Split conformal under exchangeability** — finite-sample marginal coverage under stated exchangeability.
 2. **Weighted conformal under covariate shift** — requires a defensible density-ratio/support model; extreme weights and poor overlap must be reported.
 3. **Finite shift-class / group-conditional guarantees** — define the admitted shift class or subgroup family in advance; do not imply universal exact conditional coverage.
-4. **Online/adaptive conformal under temporal dependence** — specify the predict/update timing, dependence assumptions, drift alarms, adaptation budget and long-run error criterion.
+4. **Online/adaptive conformal under temporal dependence** — specify predict/update timing, dependence assumptions, drift alarms, adaptation budget and long-run error criterion.
 
 Relevant current methods:
 - **CAP (JMLR 2025):** selection-conditional finite-sample coverage under its stated setup; dynamic conformal variant for long-run false coverage rate control. https://www.jmlr.org/beta/papers/v26/24-0452.html
@@ -77,7 +88,6 @@ Relevant current methods:
 - **Conformal prediction with conditional guarantees (JRSSB 2025):** useful finite-dimensional shift-class guarantees, alongside the impossibility of universal exact conditional coverage in finite samples. https://academic.oup.com/jrsssb/article/87/4/1100/8058684
 - **Weighted conformal under covariate shift:** compare known-ratio oracle and estimated-ratio variants; score support, weight concentration and effective sample size rather than treating reweighting as universally valid. https://arxiv.org/abs/1904.06019
 
-**Response:** keep the current Brier/ECE/risk–coverage evaluator as a diagnostic baseline. A later conformal adapter should be a separate validator with explicit assumptions, calibration cohort identity, temporal protocol and finite-sample guarantee. Never describe low ECE or Brier as a coverage guarantee.
 
 ### OpenScience is an industry-scale harness comparator (with a disclosed caveat)
 
@@ -241,7 +251,8 @@ All arms should receive the same stream, split, modality availability, observati
 6. **Scientific-discovery and causal controls:** Unsatz-compatible agent/program interface; ACDB-compatible PC + greedy active orientation, density-aware random-DAG and other admitted causal baselines; PySR or another pinned symbolic-regression baseline when the candidate grammar and task class match; SINDy only when its sparse-regression assumptions are satisfied; exact tiny-world enumeration as evaluator diagnostic only.
 7. **Scientific-agent and laboratory controls:** SciAgentArena for stepwise workflow validity/reliability/cost; Autonomous Science Bench 0.1 for experiment selection, sequential learning and held-out ranking across laboratory tasks; AgentIdeaBench for static-vs-active ideation and grounding; FIRE-Bench for full-cycle rediscovery of published findings. Keep each task-exposed downstream evaluation separate from ErgoStream's pre-task structural-acquisition estimand.
 8. **Benchmark hardening control:** AutoSciBench-style task recipe refresh to close discovered shortcuts; independently review generated worlds/oracles and keep a sealed, frozen confirmatory cohort distinct from the adaptive development corpus.
-9. **Human reference:** where the task supports meaningful human interaction, include a human sample-efficiency / action-efficiency reference. It is not a substitute for a matched machine baseline.
+9. **Calibration and reject-option baselines:** raw probability, temperature/Platt, isotonic, ensembles, per-stratum calibration, split conformal under a declared exchangeability cohort, matched-coverage random abstention, always-reject/always-abstain and oracle abstention. Report Brier/log loss, ECE sensitivity, tie-aware AURC **with decision coverage**, and risk/coverage at preregistered operating points.
+10. **Human reference:** where the task supports meaningful human interaction, include a human sample-efficiency / action-efficiency reference. It is not a substitute for a matched machine baseline.
 
 No name-only reproduction. Record exact code commit, weights, model/API revision, prompt, tool access, preprocessing, operator set, task subset, compute, retries, failed runs and licensing/data exclusions. For proprietary APIs, report black-box evaluation conditions and do not imply implementation-level parity.
 
@@ -280,6 +291,8 @@ These are prospective engineering targets, not external standards or achieved re
 - No false unique identification on evaluator-defined non-identifiable cases.
 - At least six structurally distinct generator families before a confirmatory transfer claim.
 - Stretch target: at least +10 percentage points in primary structural-transfer success over the strongest matched open baseline, **or** at least 20% lower all-in observation/compute cost at a preregistered non-inferiority margin no wider than 2 percentage points. These thresholds must be revisited if pilot variance/power analysis shows they are under- or over-demanding.
+- Calibration target: on a sealed family-held-out transfer cohort, reduce Brier and log loss by at least 10% against the strongest matched post-hoc/raw/ensemble baseline; fixed-bin ECE ≤ 0.03 at 10 bins with sensitivity across 5/10/15/20; at 80% decision coverage, at least 2× lower false-transfer risk under shift than the best matched nonselective baseline. These are prospective targets and require powered, cluster-aware confirmatory cohorts.
+- A high-confidence false-mechanism-transfer rate target of ≤1% is only meaningful when the cluster-aware 95% upper bound also falls below a preregistered ceiling; zero errors on a small synthetic cohort is not evidence of zero risk.
 - No SOTA statement unless the comparator was directly run under the same contract, source artifacts are pinned, complete costs and all failures are reported, and paired uncertainty intervals support the claim.
 
 ## 6. Recommended staged programme
@@ -303,7 +316,13 @@ These are prospective engineering targets, not external standards or achieved re
 - GFMBenchmark (8 models / 33 datasets / 7 topics / 6 formats): https://github.com/smufang/GFMBenchmark
 - AutoSciBench: https://arxiv.org/abs/2610.05140
 - AgentIdeaBench: https://arxiv.org/abs/2609.07611
-- Autonomous Science Bench 0.1: https://asb.open-ssi.org/about## 7. References
+- Autonomous Science Bench 0.1: https://asb.open-ssi.org/about
+- ASI-Bench 60-task project-level science benchmark and 10 Nov 2026 snapshot: https://asibench.apexin.ai/ · https://asibench.apexin.ai/leaderboard/
+
+- Terminal-Bench Science 0.1: https://www.terminal-bench-science.ai/announcement · leaderboard: https://snorkel.ai/leaderboard/terminal-bench-science/
+
+- ConfidenceBench paper: https://arxiv.org/abs/2607.20526 · live leaderboard: https://confidencebench.com/
+## 7. References
 - Weighted Conformal Prediction under Covariate Shift: https://arxiv.org/abs/1904.06019
 - Conformal Prediction with Conditional Guarantees (JRSSB 2025): https://academic.oup.com/jrsssb/article/87/4/1100/8058684
 - Online Martingale PAC-Bayes Certificates for Time Series Calibration (UAI 2026): https://proceedings.mlr.press/v337/huang26b.html
