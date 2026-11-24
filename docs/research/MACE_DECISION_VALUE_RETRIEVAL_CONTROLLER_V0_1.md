@@ -250,6 +250,8 @@ For each capability, freeze Phase II as max(Phase I, commercial reference +2); t
 
 Reference: [Agent Memory Leaderboard Cycle 2 official results, November 19, 2026](https://agentmemoryleaderboard.ai/results/cycle-2/). Scores and divisions are track-specific; do not combine textual, multimodal and coding points into a synthetic project score.
 
+AMA-Bench baseline reconciliation: the PMLR paper abstract reports AMA-Agent at 57.22% and +11.16 points over its strongest baseline, while the live AMA-Bench site currently surfaces 56.33% (+10.99%) in its main-results panel and separately describes the 57.22% paper result. Do not select one value opportunistically. Freeze a specific official artifact, dataset split, base model, QA subset, judge and evaluation script; report the paper reproduction and live leaderboard submission as separate rows until their manifests demonstrate they are the same protocol. The benchmark describes 207 samples, 2,482 QA pairs, six domains and four capabilities; report those task-family breakdowns and matched Qwen3-32B settings with any comparison. References: [PMLR paper](https://proceedings.mlr.press/v306/zhao26bs.html) and [AMA-Bench results/methods](https://ama-bench.github.io/).
+
 For AMA-Bench, after reproducing a strongest matched-backbone baseline, a proposed initial gate is at least +3 absolute accuracy points with a positive preregistered 95% confidence interval, without a task-family regression beyond 2 points. For MemoryArena, target at least +5 points in held-out multi-session task completion at matched tool/model budgets, with per-family transfer and worst-family results reported. These are proposed experimental gates, not official leaderboard targets.
 
 
