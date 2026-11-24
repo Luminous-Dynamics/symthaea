@@ -25,6 +25,8 @@ The current Rust library provides:
 - Candidate expected loss, worst-case risk-gate result and decision regret.
 - Exact finite-outcome expected value of sample information (EVSI), acquisition cost, net EVSI and mutual information in bits.
 - Probe permission, componentwise budget admission and decision-deadline checks.
+- A separate prior-free robust mode in `src/robust.rs`: set-valued outcome supports, worst-case minimax decision loss before/after an observation, and guaranteed worst-case decision-loss reduction without priors or likelihood magnitudes.
+- Permission, declared cost-budget and decision-deadline checks for the robust mode; acquisition cost remains separate from task loss and is never silently scalarized.
 - Fail-closed validation of prior mass, outcome likelihood normalization, missing decision losses, unknown observations/probes and mismatched public probe contracts.
 
 The current known-answer tests include:
@@ -50,6 +52,12 @@ cargo clippy --manifest-path research/decision-predictability-benchmark/Cargo.to
 Focused workflow: [Decision-Relevant Predictability Evaluator](https://github.com/Luminous-Dynamics/symthaea/actions/workflows/decision-predictability-benchmark.yml).
 
 A passing run qualifies only this small finite-world evaluator. It does not qualify the full #12546 benchmark, chaotic-system reference generators, external baselines or physical sensor measurements.
+
+## Decision-value modes and covariance integration
+
+Use the Bayesian evaluator only when prior probabilities and outcome likelihoods are justified. Use the robust evaluator when the defensible information is a set of possible states/outcomes and no probability model is warranted. Keep their outputs in separate fields and separate benchmark tables.
+
+The covariance-aware Stage-B planner (Symthaea PR #13453) supplies prior-free worst-case hypothesis-separation scores. Those distances can help rank experiments for discrimination, but they do not by themselves define observation outcome supports, calibrated likelihoods, or decision losses. A typed adapter must bind the actual experiment response model and downstream decision policy before any Stage-B score can feed the robust decision-value evaluator. Never relabel Mahalanobis separation as EVSI or EIG.
 
 ## Existing related implementations — separate owners
 
@@ -78,6 +86,6 @@ Before this becomes the complete #12546 benchmark:
 6. implement the complete active-observation policy tournament and Pareto resource accounting;
 7. publish paired confidence intervals, worst-regime results and full failure denominators.
 
-Resource dimensions are comparable only when units, measurement boundaries, hardware and workloads match. This crate does not measure physical energy or hardware performance. Expected information gain about hidden state is reported separately from EVSI; a probe can reduce entropy without changing the optimal decision.
+Resource dimensions are comparable only when units, measurement boundaries, hardware and workloads match. This crate does not measure physical energy or hardware performance. Expected information gain about hidden state is reported separately from EVSI; a probe can reduce entropy without changing the optimal decision. The prior-free robust module is a different estimand again: it reports a guaranteed worst-case loss reduction over declared outcome-support sets, not an expectation.
 
 No output from this crate establishes SOTA, physical reliability, causal reconstruction or consciousness.
