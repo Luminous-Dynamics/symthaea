@@ -2,6 +2,7 @@
 
 pub mod binary_metrics;
 pub mod calibration_requalification;
+pub mod decision_loss_metrology_policy;
 pub mod dtco_manifest;
 pub mod gated_streaming_adapter;
 pub mod label_consumption_guard;
@@ -148,4 +149,17 @@ pub use gated_streaming_adapter::{
     StreamingPredictionReceiptV1, StreamingUpdateDispositionV1, StreamingUpdateReasonV1,
     StreamingUpdateReceiptV1, create_gated_streaming_adapter_engine_v1,
     deliver_qualified_stream_label_v1, predict_and_register_stream_sample_v1,
+};
+
+pub use decision_loss_metrology_policy::{
+    METROLOGY_ASSAY_MODEL_SCHEMA_V1, METROLOGY_CANDIDATE_SCHEMA_V1,
+    METROLOGY_DECISION_LOSS_INPUT_SCHEMA_V1, METROLOGY_DECISION_LOSS_POLICY_SCHEMA_V1,
+    METROLOGY_EVSI_REPORT_SCHEMA_V1, METROLOGY_PORTFOLIO_REPORT_SCHEMA_V1,
+    METROLOGY_READINESS_SCHEMA_V1, MetrologyAssayModelV1, MetrologyAssayOutcomeV1,
+    MetrologyCandidateEvsiReportV1, MetrologyCandidateStatusV1, MetrologyCandidateV1,
+    MetrologyDecisionActionV1, MetrologyDecisionLossErrorV1, MetrologyDecisionLossInputV1,
+    MetrologyDecisionLossModelV1, MetrologyDecisionLossPolicyV1, MetrologyDecisionStateV1,
+    MetrologyPortfolioReportV1, MetrologyPortfolioStatusV1, MetrologyReadinessEvidenceV1,
+    MetrologyReadinessStatusV1, compute_expected_value_of_sample_information_v1,
+    optimize_metrology_decision_loss_portfolio_v1,
 };
