@@ -1610,6 +1610,93 @@ mod tests {
     }
 
     #[test]
+    fn v2_add_occurrence_action_must_recover_a_true_occurrence() {
+        let mut case = revision_case_v2(
+            vec![interval(100, 200), interval(500, 600)],
+            vec![interval(100, 200)],
+            vec![interval(100, 200), interval(500, 600)],
+        );
+        case.actions = vec![RevisionActionV1::AddOccurrence];
+        let report = audit_revision_v2(&case).unwrap();
+        assert_eq!(
+            report.edit_delta.as_ref().unwrap().observed_edit,
+            ObservedRevisionEditV1::OccurrenceCountIncreased
+        );
+        assert_eq!(report.declared_actions_consistent, Some(true));
+
+        case.final_prediction = raw_prediction(
+            &case.truth.artifact,
+            "query-v2",
+            vec![interval(100, 200), interval(800, 900)],
+        );
+        let report = audit_revision_v2(&case).unwrap();
+        assert_eq!(report.declared_actions_consistent, Some(false));
+    }
+
+    #[test]
+    fn v2_remove_occurrence_action_must_reduce_false_positives_without_losing_true_positives() {
+        let mut case = revision_case_v2(
+            vec![interval(100, 200)],
+            vec![interval(100, 200), interval(500, 600)],
+            vec![interval(100, 200)],
+        );
+        case.actions = vec![RevisionActionV1::RemoveOccurrence];
+        let report = audit_revision_v2(&case).unwrap();
+        assert_eq!(report.declared_actions_consistent, Some(true));
+
+        case.final_prediction = raw_prediction(
+            &case.truth.artifact,
+            "query-v2",
+            vec![interval(500, 600)],
+        );
+        let report = audit_revision_v2(&case).unwrap();
+        assert_eq!(report.declared_actions_consistent, Some(false));
+    }
+
+    #[test]
+    fn v2_boundary_action_must_improve_its_declared_boundary() {
+        let mut case = revision_case_v2(
+            vec![interval(100, 200)],
+            vec![interval(90, 210)],
+            vec![interval(100, 210)],
+        );
+        case.actions = vec![RevisionActionV1::AdjustStartBoundary];
+        let report = audit_revision_v2(&case).unwrap();
+        assert_eq!(report.declared_actions_consistent, Some(true));
+        assert!(
+            report
+                .edit_delta
+                .as_ref()
+                .unwrap()
+                .start_boundary_mae_delta_frames
+                .unwrap()
+                > 0.0
+        );
+
+        case.final_prediction = raw_prediction(
+            &case.truth.artifact,
+            "query-v2",
+            vec![interval(80, 210)],
+        );
+        let report = audit_revision_v2(&case).unwrap();
+        assert_eq!(report.declared_actions_consistent, Some(false));
+    }
+
+    #[test]
+    fn v2_edit_delta_does_not_create_a_second_interval_matcher() {
+        let case = revision_case_v2(
+            vec![interval(100, 200), interval(500, 600)],
+            vec![interval(100, 200)],
+            vec![interval(100, 200), interval(500, 600)],
+        );
+        let report = audit_revision_v2(&case).unwrap();
+        let delta = report.edit_delta.unwrap();
+        assert_eq!(delta.predicted_count_delta, 1);
+        assert_eq!(delta.true_positive_delta, 1);
+        assert_eq!(delta.false_negative_delta, -1);
+    }
+
+    #[test]
     fn v2_wrong_predicted_occurrence_count_is_gated_to_zero() {
         let case = revision_case_v2(
             vec![interval(100, 200), interval(500, 600)],
