@@ -428,3 +428,12 @@ The LocalGlobalPairV1 receipt has been migrated to schema 1.1.0 to separate warr
 The CIRR equation, exact-scope eligibility rule and unresolved-outcome bounds are unchanged. This is a stronger audit gate on how the evaluator disposition enters the existing metric, not a new metric and not an empirical CIRR result. Reviewer ID/authority fields are provenance labels, not cryptographic proof of identity, independence or competence.
 
 **Full focused-pipeline qualification:** run [45467622402](https://github.com/Luminous-Dynamics/symthaea/actions/runs/45467622402), code-bearing head `3e12aed548f9444aa52971983fc8440a873ecb62`, completed successfully across all four jobs: finite-reference, pinned Lean 4.37 extraction, Lean 4.29 direct extraction, and the four-theorem v4.29/v4.37 differential. The finite-reference job passed Rust formatting, schema/fixture assertions, **108 tests / 0 failures**, CLI and the separate 10-test differential utility. This is a focused research-lane pass; broad repository CI, Governance, Benchmark Suite and Showroom workflows remain skipped under draft policy.
+
+
+## 15. First Lean-kernel local-action pilot (2026-11-24)
+
+The proof-action workstream now has a bounded `And.comm` Lean source pilot. The candidate manifest maps `A_SPLIT_IFF`, `A_FORWARD` and `A_REVERSE` to exact theorem declarations, then records a root theorem composed from the directional certificates. The focused workflow verifies the source digest and pinned Lean/Mathlib environment, runs Lean, checks that all declarations were elaborated, captures `#print axioms` output, and emits an exact-run receipt artifact.
+
+**Status:** source, manifest, schema and workflow are committed; the new exact-head Lean replay has not yet been observed. The manifest remains `kernel_replay_pending` until a successful run emits an accepted receipt. This is an initial source-level kernel pilot, not a general ProofActionCertificateV1 implementation.
+
+**Not yet covered:** elaborated goal-state extraction, binder/hypothesis identity, local-instance context digests, generated subgoal-state receipts, machine-parsed axiom/admission closure, and automatic plan-graph composition validation. The proof-plan action mapping is still provisional; no expert-role review or human-transfer measurement has been collected.
