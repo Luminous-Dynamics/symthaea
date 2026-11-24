@@ -207,15 +207,19 @@ jobs:
         run: |
           set -euo pipefail
           export CARGO_TARGET_DIR="$RUNNER_TEMP/proof-plan-target"
-          cargo test --manifest-path scripts/research/proof-plan-contract/Cargo.toml
-          cargo run --manifest-path scripts/research/proof-plan-contract/Cargo.toml --bin proof-plan-contract -- \
+          cargo test --locked --manifest-path scripts/research/proof-plan-contract/Cargo.toml
+          cargo run --locked --manifest-path scripts/research/proof-plan-contract/Cargo.toml --bin proof-plan-contract -- \
             docs/research/PROOF_PLAN_AND_COMM_V1.json
-          cargo run --manifest-path scripts/research/proof-plan-contract/Cargo.toml --bin local-global -- \
+          cargo run --locked --manifest-path scripts/research/proof-plan-contract/Cargo.toml --bin local-global -- \
             docs/research/LOCAL_GLOBAL_PAIR_SYNTHETIC_V1.json | tee local-global-cli.out
           grep -Eq '^candidate_payload_sha256=[a-f0-9]{64}$' local-global-cli.out
           grep -Fq 'finite_truth_table=countermodel' local-global-cli.out
           grep -Fq 'stored_evaluator_witness_matches_minimum=true' local-global-cli.out
-            docs/research/MATH_PROOF_COMPREHENSION_THEOREM_SANDWICH_V1.json
+          cargo run --locked --manifest-path scripts/research/proof-plan-contract/Cargo.toml --bin theorem-sandwich -- \
+            docs/research/MATH_PROOF_COMPREHENSION_THEOREM_SANDWICH_V1.json | tee theorem-sandwich-cli.out
+          grep -Fq "THEOREM_SANDWICH_RECEIPT_VALID task_id=SYNTHETIC-SANDWICH-IMPLICATION-001" theorem-sandwich-cli.out
+          grep -Fq "classification=consistent_with_selected_controls" theorem-sandwich-cli.out
+          grep -Fq "evaluator_controls_passed=3 evaluator_controls_total=3" theorem-sandwich-cli.out
 
       - name: Export generated Cargo.lock for dependency pinning
         if: success()
@@ -224,6 +228,15 @@ jobs:
           name: proof-plan-contract-cargo-lock-bootstrap
           path: scripts/research/proof-plan-contract/Cargo.lock
           if-no-files-found: error
+
+      - name: Assert focused workflow job uniqueness
+        shell: bash
+        run: |
+          set -euo pipefail
+          test "$(grep -c '^  finite-reference:$' .github/workflows/math-proof-comprehension-pilot.yml)" -eq 1
+          test "$(grep -c '^  mathlib-elaborated-extraction:$' .github/workflows/math-proof-comprehension-pilot.yml)" -eq 1
+          test "$(grep -c '^  mathlib-v429-direct-edge-cohort:$' .github/workflows/math-proof-comprehension-pilot.yml)" -eq 1
+          test "$(grep -c '^  mathlib-source-snapshot-differential:$' .github/workflows/math-proof-comprehension-pilot.yml)" -eq 1
 
   mathlib-elaborated-extraction:
     name: Pinned Mathlib elaborated dependency extraction
@@ -448,25 +461,3 @@ jobs:
           name: proof-plan-contract-cargo-lock-bootstrap
           path: scripts/research/proof-plan-contract/Cargo.lock
           if-no-files-found: error
- local-global-cli.out
-          grep -Fq 'finite_truth_table=countermodel' local-global-cli.out
-          grep -Fq 'stored_evaluator_witness_matches_minimum=true' local-global-cli.out
-          cargo run --manifest-path scripts/research/proof-plan-contract/Cargo.toml --bin theorem-sandwich -- \
-            docs/research/MATH_PROOF_COMPREHENSION_THEOREM_SANDWICH_V1.json
-
-      - name: Export generated Cargo.lock for dependency pinning
-        if: success()
-        uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9
-        with:
-          name: proof-plan-contract-cargo-lock-bootstrap
-          path: scripts/research/proof-plan-contract/Cargo.lock
-          if-no-files-found: error
-
-      - name: Assert focused workflow job uniqueness
-        shell: bash
-        run: |
-          set -euo pipefail
-          test "$(grep -c '^  finite-reference:$' .github/workflows/math-proof-comprehension-pilot.yml)" -eq 1
-          test "$(grep -c '^  mathlib-elaborated-extraction:$' .github/workflows/math-proof-comprehension-pilot.yml)" -eq 1
-          test "$(grep -c '^  mathlib-v429-direct-edge-cohort:$' .github/workflows/math-proof-comprehension-pilot.yml)" -eq 1
-          test "$(grep -c '^  mathlib-source-snapshot-differential:$' .github/workflows/math-proof-comprehension-pilot.yml)" -eq 1
