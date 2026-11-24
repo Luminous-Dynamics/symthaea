@@ -25,19 +25,19 @@
       "input": {
         "individual_id": "unit-001",
         "posterior_draw_id": "draw-0007",
-        "posterior_draw_digest": "sha256:stable-parameter-draw-7",
+        "posterior_draw_digest": "sha256:7777777777777777777777777777777777777777777777777777777777777777",
         "branches": [
           {
             "action_id": "a0",
             "posterior_draw_id": "draw-0007",
-            "posterior_draw_digest": "sha256:stable-parameter-draw-7",
-            "branch_state_digest": "sha256:branch-a0"
+            "posterior_draw_digest": "sha256:7777777777777777777777777777777777777777777777777777777777777777",
+            "branch_state_digest": "sha256:aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa"
           },
           {
             "action_id": "a1",
             "posterior_draw_id": "draw-0007",
-            "posterior_draw_digest": "sha256:stable-parameter-draw-7",
-            "branch_state_digest": "sha256:branch-a1"
+            "posterior_draw_digest": "sha256:7777777777777777777777777777777777777777777777777777777777777777",
+            "branch_state_digest": "sha256:bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb"
           }
         ]
       },
@@ -53,12 +53,12 @@
           {
             "action_id": "a0",
             "posterior_draw_id": "draw-0007",
-            "posterior_draw_digest": "sha256:stable-parameter-draw-7"
+            "posterior_draw_digest": "sha256:7777777777777777777777777777777777777777777777777777777777777777"
           },
           {
             "action_id": "a1",
             "posterior_draw_id": "draw-0008",
-            "posterior_draw_digest": "sha256:stable-parameter-draw-8"
+            "posterior_draw_digest": "sha256:8888888888888888888888888888888888888888888888888888888888888888"
           }
         ]
       },
@@ -71,19 +71,19 @@
       "input": {
         "individual_id": "unit-001",
         "posterior_draw_id": "draw-0007",
-        "posterior_draw_digest": "sha256:stable-parameter-draw-7",
+        "posterior_draw_digest": "sha256:7777777777777777777777777777777777777777777777777777777777777777",
         "branches": [
           {
             "action_id": "a0",
             "posterior_draw_id": "draw-0007",
-            "posterior_draw_digest": "sha256:stable-parameter-draw-7",
-            "branch_state_digest": "sha256:state-after-a0"
+            "posterior_draw_digest": "sha256:7777777777777777777777777777777777777777777777777777777777777777",
+            "branch_state_digest": "sha256:cccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccc"
           },
           {
             "action_id": "a1",
             "posterior_draw_id": "draw-0007",
-            "posterior_draw_digest": "sha256:stable-parameter-draw-7",
-            "branch_state_digest": "sha256:state-after-a1"
+            "posterior_draw_digest": "sha256:7777777777777777777777777777777777777777777777777777777777777777",
+            "branch_state_digest": "sha256:dddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddd"
           }
         ]
       },
@@ -196,6 +196,66 @@
       },
       "expected": "REJECT",
       "reason": "Branch-local beliefs may update, but the paired sample's underlying stable-individual hypothesis remains fixed."
+    },
+    {
+      "id": "PCIR-F11-PAIRED-VARIANCE-KNOWN-ANSWER",
+      "purpose": "Show the exact variance inflation caused by independently sampling stable individual parameters across sibling interventions.",
+      "input": {
+        "posterior_support": [
+          -1,
+          1
+        ],
+        "sample_weights": [
+          0.5,
+          0.5
+        ],
+        "outcome_equations": {
+          "action_a0": "Y=5u",
+          "action_a1": "Y=7u"
+        },
+        "matched_same_u_effect_samples": [
+          -2,
+          2
+        ],
+        "matched_same_u_effect_variance": 4,
+        "independently_sampled_cross_branch_effect_samples": [
+          -12,
+          -2,
+          2,
+          12
+        ],
+        "independently_sampled_cross_branch_effect_variance": 74
+      },
+      "expected": "PRESERVE_PAIRED_VARIANCE",
+      "reason": "Independent branch draws mix variation in stable individual identity into the treatment contrast."
+    },
+    {
+      "id": "PCIR-F12-OUTER-CAUSAL-MECHANISM-AMBIGUITY",
+      "purpose": "Keep uncertainty over the causal mechanism separate from within-model uncertainty over stable individual traits.",
+      "input": {
+        "factual_history_digest": "sha256:aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+        "candidate_models": [
+          {
+            "model_id": "M1",
+            "factual_adequacy": "PASS",
+            "individual_effect_support": [
+              4,
+              4
+            ]
+          },
+          {
+            "model_id": "M2",
+            "factual_adequacy": "PASS",
+            "individual_effect_support": [
+              -4,
+              -4
+            ]
+          }
+        ],
+        "posterior_weights": null
+      },
+      "expected": "STRUCTURAL_AMBIGUITY_REMAINS",
+      "reason": "Two models fit the factual evidence but imply opposite intervention effects; do not average them into a false point certainty."
     }
   ],
   "reported_metrics": [
@@ -211,7 +271,10 @@
     "common_epsilon_good_action_set",
     "closed_loop_success_and_recovery",
     "inference_latency_p50_p95_p99",
-    "measured_memory_and_energy"
+    "measured_memory_and_energy",
+    "within_model_posterior_effect_variance",
+    "between_model_effect_disagreement",
+    "counterfactual_identified_set_width"
   ],
   "comparators": [
     "zero_effect",
@@ -243,7 +306,8 @@
     "No DMC replication or model benchmark executed.",
     "No physical experiment or simulator result generated.",
     "No SOTA or resource advantage demonstrated.",
-    "Semantic fixtures test the protocol only and are not hidden empirical qualification."
+    "Semantic fixtures test the protocol only and are not hidden empirical qualification.",
+    "No outer posterior or complete admissible set over structural causal mechanisms is implemented; the mechanism-ambiguity fixture is a reserved future-boundary control."
   ],
   "prior_art_boundary": {
     "same_exogenous_u": "Okita formalizes counterfactual pairs by holding the same individual-specific exogenous u and factual history fixed across interventions (Eq. 10). This is established semantics, not a PCIR novelty claim.",
