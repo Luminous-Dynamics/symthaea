@@ -2,6 +2,8 @@ use std::io::{self, Read};
 use std::process::ExitCode;
 
 use serde::Serialize;
+const MAX_INPUT_BYTES: u64 = 8 * 1024 * 1024;
+
 use symthaea_experiment_design::{
     ExperimentDesignInput, covariance::{
         CovarianceAwareDesignInput, covariance_redundancy_fixture,
@@ -96,7 +98,15 @@ fn main() -> ExitCode {
 
 fn read_stdin() -> io::Result<String> {
     let mut text = String::new();
-    io::stdin().read_to_string(&mut text)?;
+    io::stdin()
+        .take(MAX_INPUT_BYTES + 1)
+        .read_to_string(&mut text)?;
+    if text.len() as u64 > MAX_INPUT_BYTES {
+        return Err(io::Error::new(
+            io::ErrorKind::InvalidData,
+            format!("input exceeds the {MAX_INPUT_BYTES}-byte limit"),
+        ));
+    }
     Ok(text)
 }
 
