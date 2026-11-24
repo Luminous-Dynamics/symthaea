@@ -116,7 +116,6 @@ pub enum RobustEvaluationError {
         state_id: String,
     },
     UncoveredState(String),
-    NoRiskAdmissibleDecision,
     InformationIncreasedWorstCaseRisk {
         before_bits: u64,
         after_bits: u64,
@@ -192,10 +191,6 @@ impl Display for RobustEvaluationError {
             Self::UncoveredState(state) => write!(
                 formatter,
                 "probe outcome supports do not cover possible state {state}"
-            ),
-            Self::NoRiskAdmissibleDecision => write!(
-                formatter,
-                "no decision satisfies the frozen worst-case risk constraint"
             ),
             Self::InformationIncreasedWorstCaseRisk {
                 before_bits,
@@ -703,7 +698,16 @@ mod tests {
             &[("continue", &[("H_A", 0.0), ("H_B", 0.0)])],
             0.0,
         );
-        let value = evaluate_robust_probe(&problem, &perfect_probe(), &context()).unwrap();
+        let probe = RobustProbe {
+            probe_id: "reference".to_owned(),
+            acquisition_cost_units: 0.1,
+            result_delay_steps: 1,
+            outcomes: vec![RobustProbeOutcome {
+                outcome_id: "ambiguous".to_owned(),
+                possible_state_ids: vec!["H_A".to_owned(), "H_B".to_owned()],
+            }],
+        };
+        let value = evaluate_robust_probe(&problem, &probe, &context()).unwrap();
 
         assert!(value.current_risk_gate_passed);
         assert!(value.post_observation_risk_gate_passed);
