@@ -134,9 +134,10 @@ struct AddResponse {
 #[derive(Clone, Debug, Serialize)]
 struct SearchResponse { data: Vec<SearchItem> }
 
-#[derive(Serialize)]
+#[derive(Debug, Serialize, Deserialize)]
+#[serde(deny_unknown_fields)]
 struct SearchTraceReceiptPayloadV1 {
-    schema_version: &'static str,
+    schema_version: String,
     search_id: String,
     principal_id: String,
     tenant_id: String,
@@ -146,7 +147,7 @@ struct SearchTraceReceiptPayloadV1 {
     top_k: usize,
     ordered_memory_ids_sha256: String,
     response_sha256: String,
-    retrieval_policy: &'static str,
+    retrieval_policy: String,
     returned_at: String,
 }
 
@@ -581,7 +582,7 @@ fn search_query(state: &AppState, request: SearchRequest) -> Result<SearchRespon
     let response_bytes = serde_json::to_vec(&response).map_err(|_| ApiError::Internal)?;
     let response_sha256 = sha256_hex(&response_bytes);
     let receipt_payload = SearchTraceReceiptPayloadV1 {
-        schema_version: "mace.search-trace-receipt.v1",
+        schema_version: "mace.search-trace-receipt.v1".to_owned(),
         search_id: search_id.clone(),
         principal_id: state.principal_id.clone(),
         tenant_id: state.tenant_id.clone(),
@@ -591,7 +592,7 @@ fn search_query(state: &AppState, request: SearchRequest) -> Result<SearchRespon
         top_k: request.top_k,
         ordered_memory_ids_sha256: ordered_memory_ids_sha256.clone(),
         response_sha256: response_sha256.clone(),
-        retrieval_policy: "bm25_unicode_token_v1",
+        retrieval_policy: "bm25_unicode_token_v1".to_owned(),
         returned_at: returned_at.clone(),
     };
     let receipt_json = serde_json::to_string(&receipt_payload).map_err(|_| ApiError::Internal)?;
@@ -912,6 +913,17 @@ mod tests {
         assert!(!exceeds_wire_max_length(&valid, 4096));
         assert!(exceeds_wire_max_length(&too_long, 4096));
         assert!(valid.len() > 4096);
+    }
+
+    #[test]
+    fn search_receipt_fixture_deserializes_strictly() {
+        let fixture = include_str!("../data/fixtures/mace_search_trace_receipt_v1.example.json");
+        let receipt: SearchTraceReceiptPayloadV1 = serde_json::from_str(fixture).unwrap();
+        assert_eq!(receipt.schema_version, "mace.search-trace-receipt.v1");
+        assert_eq!(receipt.top_k, 10);
+        let mut value: serde_json::Value = serde_json::from_str(fixture).unwrap();
+        value.as_object_mut().unwrap().insert("unexpected".into(), serde_json::Value::Bool(true));
+        assert!(serde_json::from_value::<SearchTraceReceiptPayloadV1>(value).is_err());
     }
 
     #[test]
