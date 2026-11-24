@@ -246,6 +246,7 @@ pub struct MycelialProjectedChannelDose {
 pub struct MycelialSampleHealthBudgetReport {
     pub schema_version: u16,
     pub active_sensing_report_digest: String,
+    pub active_sensing_evidence_digest: String,
     pub policy_digest: String,
     pub sample_health_state_digest: String,
     pub proposal_inventory_digest: String,
@@ -1209,6 +1210,7 @@ pub fn evaluate_mycelial_sample_health_budget(
     let mut report = MycelialSampleHealthBudgetReport {
         schema_version: MYCELIAL_SAMPLE_HEALTH_BUDGET_SCHEMA_VERSION,
         active_sensing_report_digest: active_sensing_report_digest(active_sensing_report),
+        active_sensing_evidence_digest: active_sensing_evidence.source_evidence_digest(),
         policy_digest: policy_digest(budget),
         sample_health_state_digest: state_digest(state),
         proposal_inventory_digest: proposal_inventory_digest(proposals),
@@ -1230,6 +1232,7 @@ pub fn mycelial_sample_health_budget_report_digest(
     hasher.update(b"symthaea-mycelial-sample-health-budget-report-v1");
     hasher.update(&report.schema_version.to_le_bytes());
     hash_string(&mut hasher, &report.active_sensing_report_digest);
+    hash_string(&mut hasher, &report.active_sensing_evidence_digest);
     hash_string(&mut hasher, &report.policy_digest);
     hash_string(&mut hasher, &report.sample_health_state_digest);
     hash_string(&mut hasher, &report.proposal_inventory_digest);
@@ -1445,30 +1448,34 @@ mod tests {
             MycelialAcquisitionDecision {
                 decision_id: "accept-fusion".to_string(),
                 loss_scale_id: "decision-loss-v1".to_string(),
-                losses_by_hypothesis: vec![
-                    MycelialHypothesisLoss {
-                        accepted_candidate_ids: no_fusion.clone(),
-                        loss: 1_000.0,
-                    },
-                    MycelialHypothesisLoss {
-                        accepted_candidate_ids: fusion.clone(),
-                        loss: 0.0,
-                    },
-                ],
+                losses_by_hypothesis: posterior
+                    .hypotheses
+                    .iter()
+                    .map(|hypothesis| MycelialHypothesisLoss {
+                        accepted_candidate_ids: hypothesis.accepted_candidate_ids.clone(),
+                        loss: if hypothesis.accepted_candidate_ids.contains(&"bridge".to_string()) {
+                            0.0
+                        } else {
+                            1_000.0
+                        },
+                    })
+                    .collect(),
             },
             MycelialAcquisitionDecision {
                 decision_id: "reject-fusion".to_string(),
                 loss_scale_id: "decision-loss-v1".to_string(),
-                losses_by_hypothesis: vec![
-                    MycelialHypothesisLoss {
-                        accepted_candidate_ids: no_fusion.clone(),
-                        loss: 0.0,
-                    },
-                    MycelialHypothesisLoss {
-                        accepted_candidate_ids: fusion.clone(),
-                        loss: 1_000.0,
-                    },
-                ],
+                losses_by_hypothesis: posterior
+                    .hypotheses
+                    .iter()
+                    .map(|hypothesis| MycelialHypothesisLoss {
+                        accepted_candidate_ids: hypothesis.accepted_candidate_ids.clone(),
+                        loss: if hypothesis.accepted_candidate_ids.contains(&"bridge".to_string()) {
+                            1_000.0
+                        } else {
+                            0.0
+                        },
+                    })
+                    .collect(),
             },
         ];
         let actions = action_values
@@ -1485,29 +1492,33 @@ mod tests {
                 outcomes: vec![
                     MycelialAcquisitionOutcome {
                         outcome_id: "no-fusion".to_string(),
-                        likelihoods_by_hypothesis: vec![
-                            MycelialHypothesisLikelihood {
-                                accepted_candidate_ids: no_fusion.clone(),
-                                likelihood: 1.0,
-                            },
-                            MycelialHypothesisLikelihood {
-                                accepted_candidate_ids: fusion.clone(),
-                                likelihood: 0.0,
-                            },
-                        ],
+                        likelihoods_by_hypothesis: posterior
+                            .hypotheses
+                            .iter()
+                            .map(|hypothesis| MycelialHypothesisLikelihood {
+                                accepted_candidate_ids: hypothesis.accepted_candidate_ids.clone(),
+                                likelihood: if hypothesis.accepted_candidate_ids.contains(&"bridge".to_string()) {
+                                    0.0
+                                } else {
+                                    1.0
+                                },
+                            })
+                            .collect(),
                     },
                     MycelialAcquisitionOutcome {
                         outcome_id: "fusion".to_string(),
-                        likelihoods_by_hypothesis: vec![
-                            MycelialHypothesisLikelihood {
-                                accepted_candidate_ids: no_fusion.clone(),
-                                likelihood: 0.0,
-                            },
-                            MycelialHypothesisLikelihood {
-                                accepted_candidate_ids: fusion.clone(),
-                                likelihood: 1.0,
-                            },
-                        ],
+                        likelihoods_by_hypothesis: posterior
+                            .hypotheses
+                            .iter()
+                            .map(|hypothesis| MycelialHypothesisLikelihood {
+                                accepted_candidate_ids: hypothesis.accepted_candidate_ids.clone(),
+                                likelihood: if hypothesis.accepted_candidate_ids.contains(&"bridge".to_string()) {
+                                    1.0
+                                } else {
+                                    0.0
+                                },
+                            })
+                            .collect(),
                     },
                 ],
             })
@@ -1567,6 +1578,29 @@ mod tests {
                 }]
             },
         }
+    }
+
+    #[test]
+    fn active_sensing_evidence_bundle_rejects_tampered_voI_report() {
+        let qualified = active_report(vec![action(
+            "qualified",
+            MycelialAcquisitionActionKind::HumanAnnotation,
+            2.0,
+        )]);
+        let mut tampered_report = qualified.report.clone();
+        tampered_report.actions[0].net_value_of_information += 0.25;
+        let result = MycelialSampleHealthActiveSensingEvidence::new(
+            tampered_report,
+            qualified.skeleton.clone(),
+            qualified.candidates.clone(),
+            qualified.posterior.clone(),
+            qualified.decisions.clone(),
+            qualified.actions.clone(),
+        );
+        assert!(matches!(
+            result,
+            Err(MycelialSampleHealthBudgetError::InvalidActiveSensingReport(_))
+        ));
     }
 
     #[test]
