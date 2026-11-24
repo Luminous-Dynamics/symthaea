@@ -226,6 +226,9 @@ pub enum MycelialSampleHealthRejectionReason {
 #[serde(deny_unknown_fields)]
 pub struct MycelialSampleHealthRejection {
     pub action_id: String,
+    pub acquisition_plan_digest: String,
+    pub device_capability_manifest_digest: String,
+    pub spatial_footprint_digest: String,
     pub reasons: Vec<MycelialSampleHealthRejectionReason>,
 }
 
@@ -234,6 +237,10 @@ pub struct MycelialSampleHealthRejection {
 pub struct MycelialSampleHealthEligibleAction {
     pub action_id: String,
     pub action_kind: MycelialAcquisitionActionKind,
+    pub acquisition_plan_digest: String,
+    pub device_capability_manifest_digest: String,
+    pub spatial_footprint_digest: String,
+    pub health_model_digest: String,
     pub net_value_of_information: f64,
     pub projected_session_duration_ns: u64,
     pub projected_action_count: u32,
@@ -915,6 +922,10 @@ fn active_sensing_report_digest(report: &MycelialActiveSensingReport) -> String 
     hasher.update(&(actions.len() as u64).to_le_bytes());
     for action in actions {
         hash_string(&mut hasher, &action.action_id);
+        hash_string(&mut hasher, &action.acquisition_plan_digest);
+        hash_string(&mut hasher, &action.device_capability_manifest_digest);
+        hash_string(&mut hasher, &action.spatial_footprint_digest);
+        hash_string(&mut hasher, &action.health_model_digest);
         hasher.update(&[match action.action_kind {
             MycelialAcquisitionActionKind::AdditionalZPlane => 0,
             MycelialAcquisitionActionKind::HighResolutionCrop => 1,
@@ -1136,6 +1147,9 @@ fn evaluate_proposal(
     if !reasons.is_empty() {
         return Ok(Err(MycelialSampleHealthRejection {
             action_id: action_id.to_string(),
+            acquisition_plan_digest: proposal.acquisition_plan_digest.clone(),
+            device_capability_manifest_digest: proposal.device_capability_manifest_digest.clone(),
+            spatial_footprint_digest: proposal.spatial_footprint_digest.clone(),
             reasons,
         }));
     }
@@ -1154,6 +1168,10 @@ fn evaluate_proposal(
     Ok(Ok(MycelialSampleHealthEligibleAction {
         action_id: action_id.to_string(),
         action_kind,
+        acquisition_plan_digest: proposal.acquisition_plan_digest.clone(),
+        device_capability_manifest_digest: proposal.device_capability_manifest_digest.clone(),
+        spatial_footprint_digest: proposal.spatial_footprint_digest.clone(),
+        health_model_digest: proposal.health_model_digest.clone(),
         net_value_of_information: net_voi,
         projected_session_duration_ns: projected_duration,
         projected_action_count,
@@ -1324,6 +1342,9 @@ pub fn mycelial_sample_health_budget_report_digest(
     hasher.update(&(report.rejected_actions.len() as u64).to_le_bytes());
     for rejected in &report.rejected_actions {
         hash_string(&mut hasher, &rejected.action_id);
+        hash_string(&mut hasher, &rejected.acquisition_plan_digest);
+        hash_string(&mut hasher, &rejected.device_capability_manifest_digest);
+        hash_string(&mut hasher, &rejected.spatial_footprint_digest);
         hasher.update(&(rejected.reasons.len() as u64).to_le_bytes());
         for reason in &rejected.reasons {
             hasher.update(&[*reason as u8]);
@@ -1900,6 +1921,26 @@ mod tests {
             &MycelialSampleHealthRejectionReason::MissingOpticalDoseEstimate
         ));
         assert_eq!(result.recommended_action_id, None);
+    }
+
+    #[test]
+    fn proposal_device_capability_must_match_active_session() {
+        let evidence = active_report(vec![action(
+            "wrong-device",
+            MycelialAcquisitionActionKind::HumanAnnotation,
+            1.0,
+        )]);
+        let mut proposal = proposal(
+            "wrong-device",
+            &["cell-a"],
+            0.0,
+            MycelialAcquisitionActionKind::HumanAnnotation,
+        );
+        proposal.device_capability_manifest_digest = digest('z');
+        assert!(matches!(
+            evaluate_mycelial_sample_health_budget(&evidence, &budget(), &state(), &[proposal]),
+            Err(MycelialSampleHealthBudgetError::InvalidProposal(_))
+        ));
     }
 
     #[test]
