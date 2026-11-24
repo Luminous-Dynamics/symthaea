@@ -1,0 +1,132 @@
+{
+  "schema": "mel-closed-loop-episode-v1",
+  "episode_id": "synthetic-unobserved-001",
+  "session": {
+    "session_id": "session-003",
+    "turn_id": "turn-003",
+    "input_sequence": 100,
+    "target_window": {
+      "clock_domain": "fixture-clock-v1",
+      "start_ns": 5000000000,
+      "end_ns": 6000000000
+    }
+  },
+  "execution_identity": {
+    "kind": "synthetic_rule_fixture",
+    "policy_id": "rule-forecast-fixture",
+    "policy_version": "1",
+    "backend_id": "synthetic-offline",
+    "identity_sha256": "4444444444444444444444444444444444444444444444444444444444444444",
+    "model_artifact_sha256": null,
+    "configuration_sha256": "2222222222222222222222222222222222222222222222222222222222222222",
+    "tokenizer_sha256": null,
+    "adapter_sha256": "4545454545454545454545454545454545454545454545454545454545454545",
+    "runtime_sha256": "4646464646464646464646464646464646464646464646464646464646464646"
+  },
+  "forecast": {
+    "forecast_id": "forecast-003",
+    "revision": 0,
+    "committed_sequence": 101,
+    "input_through_sequence": 100,
+    "target_window": {
+      "clock_domain": "fixture-clock-v1",
+      "start_ns": 5000000000,
+      "end_ns": 6000000000
+    },
+    "expires_at_sequence": 120,
+    "uncertainty": "uncalibrated",
+    "receipt": {
+      "receipt_sha256": "4747474747474747474747474747474747474747474747474747474747474747",
+      "verifier_profile_id": "forecast-v1",
+      "verification_receipt_sha256": "4848484848484848484848484848484848484848484848484848484848484848"
+    }
+  },
+  "disposition": {
+    "action": "accept",
+    "forecast_id": "forecast-003",
+    "forecast_revision": 0,
+    "sequence": 102,
+    "actor_identity": "human-principal-fixture",
+    "scope_sha256": "4949494949494949494949494949494949494949494949494949494949494949",
+    "superseding_forecast_id": null,
+    "receipt": {
+      "receipt_sha256": "5050505050505050505050505050505050505050505050505050505050505050",
+      "verifier_profile_id": "disposition-v1",
+      "verification_receipt_sha256": "5151515151515151515151515151515151515151515151515151515151515151"
+    }
+  },
+  "decision": {
+    "action": "RESPOND",
+    "sequence": 103,
+    "observed_through_input_sequence": 100,
+    "forecast_id": "forecast-003",
+    "forecast_revision": 0,
+    "receipt": {
+      "receipt_sha256": "5252525252525252525252525252525252525252525252525252525252525252",
+      "verifier_profile_id": "turn-decision-v1",
+      "verification_receipt_sha256": "5353535353535353535353535353535353535353535353535353535353535353"
+    }
+  },
+  "effect": {
+    "reported_stage": "callback_observed",
+    "forecast_id": "forecast-003",
+    "forecast_revision": 0,
+    "decision_sequence": 103,
+    "producer_identity": "producer-fixture",
+    "output_artifact_sha256": "5454545454545454545454545454545454545454545454545454545454545454",
+    "receipt": {
+      "receipt_sha256": "5555555555555555555555555555555555555555555555555555555555555555",
+      "verifier_profile_id": "action-effect-v1",
+      "verification_receipt_sha256": "5656565656565656565656565656565656565656565656565656565656565656"
+    }
+  },
+  "capture": {
+    "capture_id": "capture-003",
+    "payload_sha256": "5757575757575757575757575757575757575757575757575757575757575757",
+    "recorder_identity": "recorder-fixture",
+    "target_window": {
+      "clock_domain": "fixture-clock-v1",
+      "start_ns": 5000000000,
+      "end_ns": 6000000000
+    },
+    "reported_closure": "ineligible",
+    "sequence_accounting": {
+      "expected": 100,
+      "observed": 98,
+      "missing": 2,
+      "duplicate": 0
+    },
+    "frame_accounting": {
+      "expected": 48000,
+      "observed": 47520,
+      "dropped": 480,
+      "xrun_count": 1
+    },
+    "terminal_watermark": 298,
+    "receipt": {
+      "receipt_sha256": "5858585858585858585858585858585858585858585858585858585858585858",
+      "verifier_profile_id": "capture-closure-v2",
+      "verification_receipt_sha256": "5959595959595959595959595959595959595959595959595959595959595959"
+    }
+  },
+  "observation": {
+    "detector_result": "unobserved",
+    "capture_id": "capture-003",
+    "capture_payload_sha256": "5757575757575757575757575757575757575757575757575757575757575757",
+    "observer_identity": "event-observer-fixture",
+    "detector_build_sha256": "6060606060606060606060606060606060606060606060606060606060606060",
+    "detector_config_sha256": "6161616161616161616161616161616161616161616161616161616161616161",
+    "qualification_status": "unknown",
+    "qualification_receipt": null,
+    "event_manifest_sha256": null,
+    "receipt": {
+      "receipt_sha256": "6262626262626262626262626262626262626262626262626262626262626262",
+      "verifier_profile_id": "event-manifest-v1",
+      "verification_receipt_sha256": "6363636363636363636363636363636363636363636363636363636363636363"
+    }
+  },
+  "provenance": {
+    "episode_verifier_profile": "mel-closed-loop-episode-verifier-v1",
+    "manifest_version": 1
+  }
+}
