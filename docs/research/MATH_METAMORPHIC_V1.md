@@ -180,3 +180,21 @@ The strict exact-scope local/global CIRR from [#13345](https://github.com/Lumino
 - A route failure is not theorem refutation.
 - A finite semantic oracle is complete only for its declared AST and atom budget.
 - No Symthaea metamorphic benchmark result has been collected.
+
+
+## 11. Initial executable finite contract (2026-11-24)
+
+The first bounded validator has now been added to the standalone Rust proof-plan contract crate:
+- `scripts/research/proof-plan-contract/src/metamorphic.rs` — typed candidate/evaluator pair, domain-separated sequent digest recomputation, finite semantic relation derivation, and transformation-class consistency checks.
+- `scripts/research/proof-plan-contract/src/bin/math-metamorphic.rs` — CLI that validates a fixture dataset and emits one machine-readable line per pair.
+- `docs/research/MATH_METAMORPHIC_PAIR_V1.schema.json` — strict JSON Schema for the typed pair dataset.
+- `docs/research/MATH_METAMORPHIC_PAIR_V1.json` — three controls: equivalent implication/disjunction rewrite, removed-hypothesis mutation, and proof-route-only change.
+
+The finite checker maps a typed sequent to the implication from the conjunction of its hypotheses and premises to its conclusion, then exhaustively checks entailment in both directions. For this bounded Boolean AST:
+- the equivalent rewrite must be bidirectionally entailed;
+- the removed-hypothesis case must be one-way related and cannot be labelled semantics-preserving;
+- the route-only case must keep the exact sequent digest while carrying two distinct, non-empty route digests.
+
+Candidate serialization omits evaluator-only gold relation and authority. The validator recomputes both typed-sequent digests and rejects a mismatch between the declared transformation class and the derived finite relation.
+
+**Status:** source and fixtures committed; focused exact-head CI execution is pending. The runtime environment used for this audit did not contain Cargo/Rust, so no local Rust compile or test pass is claimed. This finite contract is not Lean kernel replay, does not evaluate arbitrary mathematical propositions, and is not a model evaluation or CIRR score.
