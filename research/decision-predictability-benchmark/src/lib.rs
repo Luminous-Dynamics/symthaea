@@ -143,27 +143,58 @@ pub enum EvaluationError {
     InvalidRiskLimit(f64),
     EmptyStateSet,
     TooManyStates(usize),
-    InvalidIdentifier { field: &'static str },
-    DuplicateIdentifier { field: &'static str, id: String },
-    InvalidProbability { field: String, value: f64 },
-    ProbabilityMassNotNormalized { field: String, state_id: String, sum: f64 },
-    MissingStateProbability { field: String, state_id: String },
-    MissingDecisionLoss { decision_id: String, state_id: String },
-    InvalidDecisionLoss { decision_id: String, state_id: String, value: f64 },
+    InvalidIdentifier {
+        field: &'static str,
+    },
+    DuplicateIdentifier {
+        field: &'static str,
+        id: String,
+    },
+    InvalidProbability {
+        field: String,
+        value: f64,
+    },
+    ProbabilityMassNotNormalized {
+        field: String,
+        state_id: String,
+        sum: f64,
+    },
+    MissingStateProbability {
+        field: String,
+        state_id: String,
+    },
+    MissingDecisionLoss {
+        decision_id: String,
+        state_id: String,
+    },
+    InvalidDecisionLoss {
+        decision_id: String,
+        state_id: String,
+        value: f64,
+    },
     TooManyDecisions(usize),
     TooManyEvidenceItems(usize),
     TooManyProbes(usize),
     TooManyOutcomes(usize),
     ConditionalIndependenceNotDeclared,
     UnknownEvidenceChannel(String),
-    UnknownEvidenceOutcome { channel_id: String, outcome_id: String },
-    EvidenceHasZeroLikelihood { channel_id: String, outcome_id: String },
+    UnknownEvidenceOutcome {
+        channel_id: String,
+        outcome_id: String,
+    },
+    EvidenceHasZeroLikelihood {
+        channel_id: String,
+        outcome_id: String,
+    },
     UnknownDecision(String),
     NoRiskAdmissibleDecision,
     UnknownProbe(String),
     ProbeNotPermitted(String),
     ProbePublicContractMismatch(String),
-    NoPosteriorMassForProbeOutcome { probe_id: String, outcome_id: String },
+    NoPosteriorMassForProbeOutcome {
+        probe_id: String,
+        outcome_id: String,
+    },
     NumericalFailure(&'static str),
 }
 
@@ -172,32 +203,108 @@ impl Display for EvaluationError {
         match self {
             Self::EmptyEpisodeId => write!(formatter, "episode ID must be non-empty"),
             Self::InvalidStepWindow => write!(formatter, "decision deadline precedes current step"),
-            Self::InvalidBudget(value) => write!(formatter, "remaining probe budget is invalid: {value}"),
-            Self::InvalidRiskLimit(value) => write!(formatter, "maximum worst-case loss is invalid: {value}"),
+            Self::InvalidBudget(value) => {
+                write!(formatter, "remaining probe budget is invalid: {value}")
+            }
+            Self::InvalidRiskLimit(value) => {
+                write!(formatter, "maximum worst-case loss is invalid: {value}")
+            }
             Self::EmptyStateSet => write!(formatter, "evaluator world requires at least one state"),
-            Self::TooManyStates(count) => write!(formatter, "state count {count} exceeds {MAX_STATES}"),
-            Self::InvalidIdentifier { field } => write!(formatter, "{field} identifier must be non-empty"),
-            Self::DuplicateIdentifier { field, id } => write!(formatter, "duplicate {field} identifier: {id}"),
-            Self::InvalidProbability { field, value } => write!(formatter, "{field} has invalid probability {value}"),
-            Self::ProbabilityMassNotNormalized { field, state_id, sum } => write!(formatter, "{field} probabilities for state {state_id} sum to {sum}, expected 1"),
-            Self::MissingStateProbability { field, state_id } => write!(formatter, "{field} has no probability for state {state_id}"),
-            Self::MissingDecisionLoss { decision_id, state_id } => write!(formatter, "decision {decision_id} has no loss for state {state_id}"),
-            Self::InvalidDecisionLoss { decision_id, state_id, value } => write!(formatter, "decision {decision_id} has invalid loss {value} for state {state_id}"),
-            Self::TooManyDecisions(count) => write!(formatter, "decision count {count} exceeds {MAX_DECISIONS}"),
-            Self::TooManyEvidenceItems(count) => write!(formatter, "evidence count {count} exceeds {MAX_EVIDENCE}"),
-            Self::TooManyProbes(count) => write!(formatter, "probe count {count} exceeds {MAX_PROBES}"),
-            Self::TooManyOutcomes(count) => write!(formatter, "outcome count {count} exceeds {MAX_OUTCOMES}"),
-            Self::ConditionalIndependenceNotDeclared => write!(formatter, "multiple evidence channels require an explicit conditional-independence declaration"),
-            Self::UnknownEvidenceChannel(channel) => write!(formatter, "unknown evidence channel {channel}"),
-            Self::UnknownEvidenceOutcome { channel_id, outcome_id } => write!(formatter, "unknown outcome {outcome_id} for evidence channel {channel_id}"),
-            Self::EvidenceHasZeroLikelihood { channel_id, outcome_id } => write!(formatter, "observed outcome {outcome_id} has zero likelihood in channel {channel_id} under every state"),
+            Self::TooManyStates(count) => {
+                write!(formatter, "state count {count} exceeds {MAX_STATES}")
+            }
+            Self::InvalidIdentifier { field } => {
+                write!(formatter, "{field} identifier must be non-empty")
+            }
+            Self::DuplicateIdentifier { field, id } => {
+                write!(formatter, "duplicate {field} identifier: {id}")
+            }
+            Self::InvalidProbability { field, value } => {
+                write!(formatter, "{field} has invalid probability {value}")
+            }
+            Self::ProbabilityMassNotNormalized {
+                field,
+                state_id,
+                sum,
+            } => write!(
+                formatter,
+                "{field} probabilities for state {state_id} sum to {sum}, expected 1"
+            ),
+            Self::MissingStateProbability { field, state_id } => {
+                write!(formatter, "{field} has no probability for state {state_id}")
+            }
+            Self::MissingDecisionLoss {
+                decision_id,
+                state_id,
+            } => write!(
+                formatter,
+                "decision {decision_id} has no loss for state {state_id}"
+            ),
+            Self::InvalidDecisionLoss {
+                decision_id,
+                state_id,
+                value,
+            } => write!(
+                formatter,
+                "decision {decision_id} has invalid loss {value} for state {state_id}"
+            ),
+            Self::TooManyDecisions(count) => {
+                write!(formatter, "decision count {count} exceeds {MAX_DECISIONS}")
+            }
+            Self::TooManyEvidenceItems(count) => {
+                write!(formatter, "evidence count {count} exceeds {MAX_EVIDENCE}")
+            }
+            Self::TooManyProbes(count) => {
+                write!(formatter, "probe count {count} exceeds {MAX_PROBES}")
+            }
+            Self::TooManyOutcomes(count) => {
+                write!(formatter, "outcome count {count} exceeds {MAX_OUTCOMES}")
+            }
+            Self::ConditionalIndependenceNotDeclared => write!(
+                formatter,
+                "multiple evidence channels require an explicit conditional-independence declaration"
+            ),
+            Self::UnknownEvidenceChannel(channel) => {
+                write!(formatter, "unknown evidence channel {channel}")
+            }
+            Self::UnknownEvidenceOutcome {
+                channel_id,
+                outcome_id,
+            } => write!(
+                formatter,
+                "unknown outcome {outcome_id} for evidence channel {channel_id}"
+            ),
+            Self::EvidenceHasZeroLikelihood {
+                channel_id,
+                outcome_id,
+            } => write!(
+                formatter,
+                "observed outcome {outcome_id} has zero likelihood in channel {channel_id} under every state"
+            ),
             Self::UnknownDecision(decision) => write!(formatter, "unknown decision {decision}"),
-            Self::NoRiskAdmissibleDecision => write!(formatter, "no downstream decision passes the frozen worst-case risk limit"),
+            Self::NoRiskAdmissibleDecision => write!(
+                formatter,
+                "no downstream decision passes the frozen worst-case risk limit"
+            ),
             Self::UnknownProbe(probe) => write!(formatter, "unknown probe {probe}"),
-            Self::ProbeNotPermitted(probe) => write!(formatter, "probe {probe} is not in the candidate-visible permitted set"),
-            Self::ProbePublicContractMismatch(probe) => write!(formatter, "probe {probe} public cost/deadline contract does not match evaluator contract"),
-            Self::NoPosteriorMassForProbeOutcome { probe_id, outcome_id } => write!(formatter, "probe {probe_id} outcome {outcome_id} has no posterior mass"),
-            Self::NumericalFailure(message) => write!(formatter, "numerical evaluation failed: {message}"),
+            Self::ProbeNotPermitted(probe) => write!(
+                formatter,
+                "probe {probe} is not in the candidate-visible permitted set"
+            ),
+            Self::ProbePublicContractMismatch(probe) => write!(
+                formatter,
+                "probe {probe} public cost/deadline contract does not match evaluator contract"
+            ),
+            Self::NoPosteriorMassForProbeOutcome {
+                probe_id,
+                outcome_id,
+            } => write!(
+                formatter,
+                "probe {probe_id} outcome {outcome_id} has no posterior mass"
+            ),
+            Self::NumericalFailure(message) => {
+                write!(formatter, "numerical evaluation failed: {message}")
+            }
         }
     }
 }
@@ -249,7 +356,10 @@ fn validate_outcome_likelihoods(
                     field: field.to_owned(),
                     state_id: state.state_id.clone(),
                 })?;
-            finite_probability(format!("{field}.{}.{}", outcome.outcome_id, state.state_id), probability)?;
+            finite_probability(
+                format!("{field}.{}.{}", outcome.outcome_id, state.state_id),
+                probability,
+            )?;
             total += probability;
         }
         if !near_one(total) {
@@ -287,13 +397,17 @@ impl EvaluatorWorld {
             prior_total += state.prior_probability;
         }
         if !near_one(prior_total) {
-            return Err(EvaluationError::NumericalFailure("state prior mass is not normalized"));
+            return Err(EvaluationError::NumericalFailure(
+                "state prior mass is not normalized",
+            ));
         }
 
         let mut channel_ids = BTreeSet::new();
         for channel in &self.evidence_channels {
             if channel.channel_id.trim().is_empty() {
-                return Err(EvaluationError::InvalidIdentifier { field: "evidence channel" });
+                return Err(EvaluationError::InvalidIdentifier {
+                    field: "evidence channel",
+                });
             }
             if !channel_ids.insert(channel.channel_id.as_str()) {
                 return Err(EvaluationError::DuplicateIdentifier {
@@ -346,21 +460,32 @@ fn validate_episode(
         return Err(EvaluationError::InvalidStepWindow);
     }
     if !episode.remaining_probe_budget.is_finite() || episode.remaining_probe_budget < 0.0 {
-        return Err(EvaluationError::InvalidBudget(episode.remaining_probe_budget));
+        return Err(EvaluationError::InvalidBudget(
+            episode.remaining_probe_budget,
+        ));
     }
     if !episode.maximum_worst_case_loss.is_finite()
         || !(0.0..=1.0).contains(&episode.maximum_worst_case_loss)
     {
-        return Err(EvaluationError::InvalidRiskLimit(episode.maximum_worst_case_loss));
+        return Err(EvaluationError::InvalidRiskLimit(
+            episode.maximum_worst_case_loss,
+        ));
     }
-    if episode.allowed_decision_ids.is_empty() || episode.allowed_decision_ids.len() > MAX_DECISIONS {
-        return Err(EvaluationError::TooManyDecisions(episode.allowed_decision_ids.len()));
+    if episode.allowed_decision_ids.is_empty() || episode.allowed_decision_ids.len() > MAX_DECISIONS
+    {
+        return Err(EvaluationError::TooManyDecisions(
+            episode.allowed_decision_ids.len(),
+        ));
     }
     if episode.evidence.len() > MAX_EVIDENCE {
-        return Err(EvaluationError::TooManyEvidenceItems(episode.evidence.len()));
+        return Err(EvaluationError::TooManyEvidenceItems(
+            episode.evidence.len(),
+        ));
     }
     if episode.permitted_probes.len() > MAX_PROBES {
-        return Err(EvaluationError::TooManyProbes(episode.permitted_probes.len()));
+        return Err(EvaluationError::TooManyProbes(
+            episode.permitted_probes.len(),
+        ));
     }
 
     let mut decision_ids = BTreeSet::new();
@@ -375,12 +500,14 @@ fn validate_episode(
             });
         }
         for state in &world.states {
-            let loss = state.decision_loss.get(decision_id).copied().ok_or_else(|| {
-                EvaluationError::MissingDecisionLoss {
+            let loss = state
+                .decision_loss
+                .get(decision_id)
+                .copied()
+                .ok_or_else(|| EvaluationError::MissingDecisionLoss {
                     decision_id: decision_id.clone(),
                     state_id: state.state_id.clone(),
-                }
-            })?;
+                })?;
             if !loss.is_finite() || !(0.0..=1.0).contains(&loss) {
                 return Err(EvaluationError::InvalidDecisionLoss {
                     decision_id: decision_id.clone(),
@@ -396,10 +523,16 @@ fn validate_episode(
     }
 
     for observed in &episode.evidence {
-        let channel = world.evidence_channels.iter()
+        let channel = world
+            .evidence_channels
+            .iter()
             .find(|channel| channel.channel_id == observed.channel_id)
             .ok_or_else(|| EvaluationError::UnknownEvidenceChannel(observed.channel_id.clone()))?;
-        if !channel.outcomes.iter().any(|outcome| outcome.outcome_id == observed.outcome_id) {
+        if !channel
+            .outcomes
+            .iter()
+            .any(|outcome| outcome.outcome_id == observed.outcome_id)
+        {
             return Err(EvaluationError::UnknownEvidenceOutcome {
                 channel_id: observed.channel_id.clone(),
                 outcome_id: observed.outcome_id.clone(),
@@ -410,7 +543,9 @@ fn validate_episode(
     let mut permitted_ids = BTreeSet::new();
     for option in &episode.permitted_probes {
         if option.probe_id.trim().is_empty() {
-            return Err(EvaluationError::InvalidIdentifier { field: "permitted probe" });
+            return Err(EvaluationError::InvalidIdentifier {
+                field: "permitted probe",
+            });
         }
         if !permitted_ids.insert(option.probe_id.as_str()) {
             return Err(EvaluationError::DuplicateIdentifier {
@@ -418,7 +553,9 @@ fn validate_episode(
                 id: option.probe_id.clone(),
             });
         }
-        let probe = world.probes.iter()
+        let probe = world
+            .probes
+            .iter()
             .find(|probe| probe.probe_id == option.probe_id)
             .ok_or_else(|| EvaluationError::UnknownProbe(option.probe_id.clone()))?;
         if !option.acquisition_cost.is_finite()
@@ -426,7 +563,9 @@ fn validate_episode(
             || (option.acquisition_cost - probe.acquisition_cost).abs() > VALUE_TOLERANCE
             || option.result_delay_steps != probe.result_delay_steps
         {
-            return Err(EvaluationError::ProbePublicContractMismatch(option.probe_id.clone()));
+            return Err(EvaluationError::ProbePublicContractMismatch(
+                option.probe_id.clone(),
+            ));
         }
     }
     Ok(())
@@ -436,15 +575,21 @@ fn posterior_after_evidence(
     episode: &CandidateEpisode,
     world: &EvaluatorWorld,
 ) -> Result<BTreeMap<String, f64>, EvaluationError> {
-    let mut weights: BTreeMap<String, f64> = world.states.iter()
+    let mut weights: BTreeMap<String, f64> = world
+        .states
+        .iter()
         .map(|state| (state.state_id.clone(), state.prior_probability))
         .collect();
 
     for observed in &episode.evidence {
-        let channel = world.evidence_channels.iter()
+        let channel = world
+            .evidence_channels
+            .iter()
             .find(|channel| channel.channel_id == observed.channel_id)
             .ok_or_else(|| EvaluationError::UnknownEvidenceChannel(observed.channel_id.clone()))?;
-        let likelihood = channel.outcomes.iter()
+        let likelihood = channel
+            .outcomes
+            .iter()
             .find(|outcome| outcome.outcome_id == observed.outcome_id)
             .ok_or_else(|| EvaluationError::UnknownEvidenceOutcome {
                 channel_id: observed.channel_id.clone(),
@@ -452,13 +597,18 @@ fn posterior_after_evidence(
             })?;
         for state in &world.states {
             let probability = likelihood.probability_by_state[&state.state_id];
-            *weights.get_mut(&state.state_id).expect("world state is present in posterior") *= probability;
+            *weights
+                .get_mut(&state.state_id)
+                .expect("world state is present in posterior") *= probability;
         }
     }
 
     let normalizer: f64 = weights.values().sum();
     if !normalizer.is_finite() || normalizer <= 0.0 {
-        let last = episode.evidence.last().expect("caller can have no evidence");
+        let last = episode
+            .evidence
+            .last()
+            .expect("caller can have no evidence");
         return Err(EvaluationError::EvidenceHasZeroLikelihood {
             channel_id: last.channel_id.clone(),
             outcome_id: last.outcome_id.clone(),
@@ -477,7 +627,10 @@ fn decision_risk(
 ) -> Result<f64, EvaluationError> {
     let mut risk = 0.0;
     for state in &world.states {
-        let loss = state.decision_loss.get(decision_id).copied()
+        let loss = state
+            .decision_loss
+            .get(decision_id)
+            .copied()
             .ok_or_else(|| EvaluationError::MissingDecisionLoss {
                 decision_id: decision_id.to_owned(),
                 state_id: state.state_id.clone(),
@@ -491,13 +644,20 @@ fn decision_worst_case_loss(
     decision_id: &str,
     world: &EvaluatorWorld,
 ) -> Result<f64, EvaluationError> {
-    world.states.iter().map(|state| {
-        state.decision_loss.get(decision_id).copied()
-            .ok_or_else(|| EvaluationError::MissingDecisionLoss {
-                decision_id: decision_id.to_owned(),
-                state_id: state.state_id.clone(),
-            })
-    }).try_fold(0.0_f64, |maximum, loss| Ok(maximum.max(loss?)))
+    world
+        .states
+        .iter()
+        .map(|state| {
+            state
+                .decision_loss
+                .get(decision_id)
+                .copied()
+                .ok_or_else(|| EvaluationError::MissingDecisionLoss {
+                    decision_id: decision_id.to_owned(),
+                    state_id: state.state_id.clone(),
+                })
+        })
+        .try_fold(0.0_f64, |maximum, loss| Ok(maximum.max(loss?)))
 }
 
 fn admissible_decisions<'a>(
@@ -506,7 +666,9 @@ fn admissible_decisions<'a>(
 ) -> Result<Vec<&'a str>, EvaluationError> {
     let mut admissible = Vec::new();
     for decision in &episode.allowed_decision_ids {
-        if decision_worst_case_loss(decision, world)? <= episode.maximum_worst_case_loss + VALUE_TOLERANCE {
+        if decision_worst_case_loss(decision, world)?
+            <= episode.maximum_worst_case_loss + VALUE_TOLERANCE
+        {
             admissible.push(decision.as_str());
         }
     }
@@ -526,7 +688,9 @@ fn bayes_risk(
         best = best.min(decision_risk(decision, posterior, world)?);
     }
     if !best.is_finite() {
-        return Err(EvaluationError::NumericalFailure("Bayes risk is not finite"));
+        return Err(EvaluationError::NumericalFailure(
+            "Bayes risk is not finite",
+        ));
     }
     Ok(best)
 }
@@ -538,13 +702,16 @@ fn perfect_information_risk(
 ) -> Result<f64, EvaluationError> {
     let mut total = 0.0;
     for state in &world.states {
-        let state_best = decisions.iter()
+        let state_best = decisions
+            .iter()
             .map(|decision| state.decision_loss[*decision])
             .fold(f64::INFINITY, f64::min);
         total += posterior[&state.state_id] * state_best;
     }
     if !total.is_finite() {
-        return Err(EvaluationError::NumericalFailure("perfect information risk is not finite"));
+        return Err(EvaluationError::NumericalFailure(
+            "perfect information risk is not finite",
+        ));
     }
     Ok(total)
 }
@@ -560,17 +727,25 @@ fn probe_metrics(
     let mut mutual_information_bits = 0.0;
 
     for outcome in &probe.outcomes {
-        let outcome_probability: f64 = world.states.iter()
+        let outcome_probability: f64 = world
+            .states
+            .iter()
             .map(|state| posterior[&state.state_id] * outcome.probability_by_state[&state.state_id])
             .sum();
         if outcome_probability <= PROBABILITY_TOLERANCE {
             continue;
         }
-        let outcome_posterior: BTreeMap<String, f64> = world.states.iter().map(|state| {
-            let joint = posterior[&state.state_id] * outcome.probability_by_state[&state.state_id];
-            (state.state_id.clone(), joint / outcome_probability)
-        }).collect();
-        expected_after_risk += outcome_probability * bayes_risk(&outcome_posterior, world, decisions)?;
+        let outcome_posterior: BTreeMap<String, f64> = world
+            .states
+            .iter()
+            .map(|state| {
+                let joint =
+                    posterior[&state.state_id] * outcome.probability_by_state[&state.state_id];
+                (state.state_id.clone(), joint / outcome_probability)
+            })
+            .collect();
+        expected_after_risk +=
+            outcome_probability * bayes_risk(&outcome_posterior, world, decisions)?;
 
         for state in &world.states {
             let conditional = outcome.probability_by_state[&state.state_id];
@@ -582,10 +757,19 @@ fn probe_metrics(
     }
 
     let gross_evoi = current_risk - expected_after_risk;
-    if !expected_after_risk.is_finite() || !gross_evoi.is_finite() || !mutual_information_bits.is_finite() {
-        return Err(EvaluationError::NumericalFailure("probe expected value or information gain is not finite"));
+    if !expected_after_risk.is_finite()
+        || !gross_evoi.is_finite()
+        || !mutual_information_bits.is_finite()
+    {
+        return Err(EvaluationError::NumericalFailure(
+            "probe expected value or information gain is not finite",
+        ));
     }
-    Ok((expected_after_risk, gross_evoi, mutual_information_bits.max(0.0)))
+    Ok((
+        expected_after_risk,
+        gross_evoi,
+        mutual_information_bits.max(0.0),
+    ))
 }
 
 /// Evaluate one candidate decision and, optionally, the expected decision value
@@ -602,8 +786,14 @@ pub fn evaluate_candidate(
     world.validate()?;
     validate_episode(episode, world)?;
 
-    if !episode.allowed_decision_ids.iter().any(|id| id == &submission.decision_id) {
-        return Err(EvaluationError::UnknownDecision(submission.decision_id.clone()));
+    if !episode
+        .allowed_decision_ids
+        .iter()
+        .any(|id| id == &submission.decision_id)
+    {
+        return Err(EvaluationError::UnknownDecision(
+            submission.decision_id.clone(),
+        ));
     }
 
     let posterior = posterior_after_evidence(episode, world)?;
@@ -621,15 +811,31 @@ pub fn evaluate_candidate(
     let requested_probe = match &submission.requested_probe_id {
         None => None,
         Some(probe_id) => {
-            let probe = world.probes.iter()
+            let probe = world
+                .probes
+                .iter()
                 .find(|probe| &probe.probe_id == probe_id)
                 .ok_or_else(|| EvaluationError::UnknownProbe(probe_id.clone()))?;
-            let option = episode.permitted_probes.iter()
+            let option = episode
+                .permitted_probes
+                .iter()
                 .find(|option| &option.probe_id == probe_id);
             let admission = match option {
                 None => ProbeAdmission::NotPermitted,
-                Some(option) if option.acquisition_cost > episode.remaining_probe_budget + VALUE_TOLERANCE => ProbeAdmission::OverBudget,
-                Some(option) if episode.current_step.saturating_add(option.result_delay_steps) > episode.decision_deadline_step => ProbeAdmission::MissesDecisionDeadline,
+                Some(option)
+                    if option.acquisition_cost
+                        > episode.remaining_probe_budget + VALUE_TOLERANCE =>
+                {
+                    ProbeAdmission::OverBudget
+                }
+                Some(option)
+                    if episode
+                        .current_step
+                        .saturating_add(option.result_delay_steps)
+                        > episode.decision_deadline_step =>
+                {
+                    ProbeAdmission::MissesDecisionDeadline
+                }
                 Some(_) => ProbeAdmission::Eligible,
             };
             let (expected_after, gross_evoi, information_gain) =
@@ -670,18 +876,29 @@ mod tests {
         StateModel {
             state_id: id.to_owned(),
             prior_probability: prior,
-            decision_loss: losses.iter().map(|(name, loss)| ((*name).to_owned(), *loss)).collect(),
+            decision_loss: losses
+                .iter()
+                .map(|(name, loss)| ((*name).to_owned(), *loss))
+                .collect(),
         }
     }
 
     fn outcome(id: &str, likelihoods: &[(&str, f64)]) -> OutcomeLikelihood {
         OutcomeLikelihood {
             outcome_id: id.to_owned(),
-            probability_by_state: likelihoods.iter().map(|(state, p)| ((*state).to_owned(), *p)).collect(),
+            probability_by_state: likelihoods
+                .iter()
+                .map(|(state, p)| ((*state).to_owned(), *p))
+                .collect(),
         }
     }
 
-    fn episode(evidence: Vec<ObservedSignal>, max_loss: f64, budget: f64, deadline: u64) -> CandidateEpisode {
+    fn episode(
+        evidence: Vec<ObservedSignal>,
+        max_loss: f64,
+        budget: f64,
+        deadline: u64,
+    ) -> CandidateEpisode {
         CandidateEpisode {
             episode_id: "synthetic-episode".into(),
             current_step: 0,
@@ -701,8 +918,16 @@ mod tests {
     fn two_worlds(probe_outcomes: Vec<OutcomeLikelihood>) -> EvaluatorWorld {
         EvaluatorWorld {
             states: vec![
-                state("H_A", 0.5, &[("choose_A", 0.0), ("choose_B", 1.0), ("abstain", 0.4)]),
-                state("H_B", 0.5, &[("choose_A", 1.0), ("choose_B", 0.0), ("abstain", 0.4)]),
+                state(
+                    "H_A",
+                    0.5,
+                    &[("choose_A", 0.0), ("choose_B", 1.0), ("abstain", 0.4)],
+                ),
+                state(
+                    "H_B",
+                    0.5,
+                    &[("choose_A", 1.0), ("choose_B", 0.0), ("abstain", 0.4)],
+                ),
             ],
             evidence_channels: vec![EvidenceChannelModel {
                 channel_id: "primary".into(),
@@ -733,7 +958,10 @@ mod tests {
     fn passive_observational_equivalence_creates_irreducible_decision_risk() {
         let world = two_worlds(perfect_probe_outcomes());
         let task = episode(
-            vec![ObservedSignal { channel_id: "primary".into(), outcome_id: "ambiguous".into() }],
+            vec![ObservedSignal {
+                channel_id: "primary".into(),
+                outcome_id: "ambiguous".into(),
+            }],
             1.0,
             1.0,
             2,
@@ -741,8 +969,12 @@ mod tests {
         let result = evaluate_candidate(
             &task,
             &world,
-            &CandidateSubmission { decision_id: "choose_A".into(), requested_probe_id: None },
-        ).unwrap();
+            &CandidateSubmission {
+                decision_id: "choose_A".into(),
+                requested_probe_id: None,
+            },
+        )
+        .unwrap();
 
         assert!((result.posterior_by_state["H_A"] - 0.5).abs() < VALUE_TOLERANCE);
         assert!((result.posterior_by_state["H_B"] - 0.5).abs() < VALUE_TOLERANCE);
@@ -756,7 +988,10 @@ mod tests {
     fn decision_changing_probe_has_positive_net_evoi() {
         let world = two_worlds(perfect_probe_outcomes());
         let task = episode(
-            vec![ObservedSignal { channel_id: "primary".into(), outcome_id: "ambiguous".into() }],
+            vec![ObservedSignal {
+                channel_id: "primary".into(),
+                outcome_id: "ambiguous".into(),
+            }],
             1.0,
             1.0,
             2,
@@ -764,8 +999,12 @@ mod tests {
         let result = evaluate_candidate(
             &task,
             &world,
-            &CandidateSubmission { decision_id: "abstain".into(), requested_probe_id: Some("reference_probe".into()) },
-        ).unwrap();
+            &CandidateSubmission {
+                decision_id: "abstain".into(),
+                requested_probe_id: Some("reference_probe".into()),
+            },
+        )
+        .unwrap();
         let probe = result.requested_probe.unwrap();
 
         assert_eq!(probe.admission, ProbeAdmission::Eligible);
@@ -809,8 +1048,12 @@ mod tests {
         let result = evaluate_candidate(
             &task,
             &world,
-            &CandidateSubmission { decision_id: "continue".into(), requested_probe_id: Some("mechanism_diagnostic".into()) },
-        ).unwrap();
+            &CandidateSubmission {
+                decision_id: "continue".into(),
+                requested_probe_id: Some("mechanism_diagnostic".into()),
+            },
+        )
+        .unwrap();
         let probe = result.requested_probe.unwrap();
 
         assert!((probe.state_information_gain_bits - 1.0).abs() < VALUE_TOLERANCE);
@@ -822,7 +1065,10 @@ mod tests {
     fn risk_limit_vetoes_a_decision_even_when_its_expected_loss_is_competitive() {
         let world = two_worlds(perfect_probe_outcomes());
         let task = episode(
-            vec![ObservedSignal { channel_id: "primary".into(), outcome_id: "ambiguous".into() }],
+            vec![ObservedSignal {
+                channel_id: "primary".into(),
+                outcome_id: "ambiguous".into(),
+            }],
             0.4,
             1.0,
             2,
@@ -830,8 +1076,12 @@ mod tests {
         let result = evaluate_candidate(
             &task,
             &world,
-            &CandidateSubmission { decision_id: "choose_A".into(), requested_probe_id: None },
-        ).unwrap();
+            &CandidateSubmission {
+                decision_id: "choose_A".into(),
+                requested_probe_id: None,
+            },
+        )
+        .unwrap();
 
         assert!(!result.candidate_risk_gate_passed);
         assert!((result.candidate_expected_loss - 0.5).abs() < VALUE_TOLERANCE);
@@ -843,7 +1093,10 @@ mod tests {
     fn over_budget_probe_is_denied_without_erasing_its_estimated_value() {
         let world = two_worlds(perfect_probe_outcomes());
         let task = episode(
-            vec![ObservedSignal { channel_id: "primary".into(), outcome_id: "ambiguous".into() }],
+            vec![ObservedSignal {
+                channel_id: "primary".into(),
+                outcome_id: "ambiguous".into(),
+            }],
             1.0,
             0.05,
             2,
@@ -851,8 +1104,12 @@ mod tests {
         let result = evaluate_candidate(
             &task,
             &world,
-            &CandidateSubmission { decision_id: "abstain".into(), requested_probe_id: Some("reference_probe".into()) },
-        ).unwrap();
+            &CandidateSubmission {
+                decision_id: "abstain".into(),
+                requested_probe_id: Some("reference_probe".into()),
+            },
+        )
+        .unwrap();
         let probe = result.requested_probe.unwrap();
 
         assert_eq!(probe.admission, ProbeAdmission::OverBudget);
@@ -867,9 +1124,16 @@ mod tests {
         let result = evaluate_candidate(
             &task,
             &world,
-            &CandidateSubmission { decision_id: "abstain".into(), requested_probe_id: Some("reference_probe".into()) },
-        ).unwrap();
-        assert_eq!(result.requested_probe.unwrap().admission, ProbeAdmission::MissesDecisionDeadline);
+            &CandidateSubmission {
+                decision_id: "abstain".into(),
+                requested_probe_id: Some("reference_probe".into()),
+            },
+        )
+        .unwrap();
+        assert_eq!(
+            result.requested_probe.unwrap().admission,
+            ProbeAdmission::MissesDecisionDeadline
+        );
     }
 
     #[test]
@@ -879,7 +1143,10 @@ mod tests {
         let result = evaluate_candidate(
             &task,
             &world,
-            &CandidateSubmission { decision_id: "abstain".into(), requested_probe_id: Some("not-permitted".into()) },
+            &CandidateSubmission {
+                decision_id: "abstain".into(),
+                requested_probe_id: Some("not-permitted".into()),
+            },
         );
         assert!(matches!(result, Err(EvaluationError::UnknownProbe(_))));
 
@@ -888,9 +1155,16 @@ mod tests {
         let result = evaluate_candidate(
             &not_allowed,
             &world,
-            &CandidateSubmission { decision_id: "abstain".into(), requested_probe_id: Some("reference_probe".into()) },
-        ).unwrap();
-        assert_eq!(result.requested_probe.unwrap().admission, ProbeAdmission::NotPermitted);
+            &CandidateSubmission {
+                decision_id: "abstain".into(),
+                requested_probe_id: Some("reference_probe".into()),
+            },
+        )
+        .unwrap();
+        assert_eq!(
+            result.requested_probe.unwrap().admission,
+            ProbeAdmission::NotPermitted
+        );
     }
 
     #[test]
@@ -900,7 +1174,10 @@ mod tests {
             outcome("right", &[("H_A", 0.1), ("H_B", 0.1)]),
         ]);
         world.probes[0].acquisition_cost = 0.1;
-        assert!(matches!(world.validate(), Err(EvaluationError::ProbabilityMassNotNormalized { .. })));
+        assert!(matches!(
+            world.validate(),
+            Err(EvaluationError::ProbabilityMassNotNormalized { .. })
+        ));
     }
 
     #[test]
@@ -913,8 +1190,14 @@ mod tests {
         world.evidence_channels_conditionally_independent = false;
         let task = episode(
             vec![
-                ObservedSignal { channel_id: "primary".into(), outcome_id: "ambiguous".into() },
-                ObservedSignal { channel_id: "secondary".into(), outcome_id: "same".into() },
+                ObservedSignal {
+                    channel_id: "primary".into(),
+                    outcome_id: "ambiguous".into(),
+                },
+                ObservedSignal {
+                    channel_id: "secondary".into(),
+                    outcome_id: "same".into(),
+                },
             ],
             1.0,
             1.0,
@@ -923,8 +1206,14 @@ mod tests {
         let result = evaluate_candidate(
             &task,
             &world,
-            &CandidateSubmission { decision_id: "abstain".into(), requested_probe_id: None },
+            &CandidateSubmission {
+                decision_id: "abstain".into(),
+                requested_probe_id: None,
+            },
         );
-        assert!(matches!(result, Err(EvaluationError::ConditionalIndependenceNotDeclared)));
+        assert!(matches!(
+            result,
+            Err(EvaluationError::ConditionalIndependenceNotDeclared)
+        ));
     }
 }
