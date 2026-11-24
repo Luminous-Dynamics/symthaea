@@ -10,7 +10,9 @@ Can a world model represent uncertainty about the *same hidden individual* and c
 
 The current individual-effect programme correctly requires a common factual history, restored branch point, individual identity, shared exogenous-forcing commitment and paired action branches. It separately measures realized, frozen-latent and imagined-rollout contrasts in #13520.
 
-This protocol makes one missing model-side object explicit: a **posterior over stable individual characteristics**, together with a coupling rule that reuses each posterior draw across all sibling interventions.
+The causal semantics are already established in prior work. Okita formalizes abduction as a posterior over exogenous variables given the factual observations, maps the RSSM posterior q_phi(z_t | h_t, o_t) to that role at the level of computational structure, and defines counterfactual pairs by holding the same individual-specific u fixed across interventions (including the explicit same-u construction in Eq. 10). The paper also cautions that the learned latent's numerical correspondence to the true physical U is an empirical question, not guaranteed by the structural analogy.
+
+This protocol does **not** claim to invent posterior abduction, same-U counterfactuals or common-random-number coupling. Its narrower Symthaea question is whether an explicit, auditable factorization of stable physical traits from branch dynamics—and a traceable identity for each posterior sample—improves individual-effect and decision calibration over a strong RSSM-style control that clones the same branch-point latent across action branches.
 
 Examples of stable characteristics include mass, pole length, friction, actuator gain, morphology, sensor bias and persistent material properties. These are not the same thing as the branch-local dynamic state, nor the same thing as time-varying exogenous disturbances.
 
@@ -24,7 +26,7 @@ q_phi(u_i | h_i)
 
 be the model's posterior over those characteristics at the frozen branch point.
 
-A Monte Carlo draw u_(i,k) is one *hypothesis about the same individual*. It is not a new individual. For every paired rollout draw k, the exact same draw must be used for all intervention branches:
+A Monte Carlo draw u_(i,k) is one *hypothesis about the same individual*. It is not a new individual. For every paired rollout draw k, the exact same draw must be used for all intervention branches. This makes the learned posterior's individual-conditioning explicit; it instantiates, rather than invents, the same-U semantics required by structural counterfactuals.
 
 u_(i,k) sampled from q_phi(u_i | h_i)
 
@@ -58,7 +60,7 @@ This is not a claim that independent samples are invalid for every predictive-ge
 | Branch-local endogenous uncertainty | How does the state evolve after each alternative action? | Evolve independently under each branch's action and observations |
 | Exogenous/process stochasticity | Which external disturbances/events occur? | Share only when the task's event-correspondence contract proves they are the same event |
 
-A common seed is not by itself proof of common exogenous events. Use the existing source-to-address-to-draw and replay contracts where the task is stochastic. For deterministic DMC, do not invent a stochastic correspondence requirement.
+Structural causal models often place realised noise inside a broad exogenous variable U. PCIR proposes a more explicit engineering decomposition into stable individual traits and time-indexed environmental/process events so the two are not accidentally conflated. This is a representation and audit choice, not a claim that they are causally unrelated. A common seed is not by itself proof of common exogenous events. Use the existing source-to-address-to-draw and replay contracts where the task is stochastic. For deterministic DMC, do not invent a stochastic correspondence requirement.
 
 Likewise, a common individual draw does not mean sharing the entire post-action state trajectory. That would erase the very causal consequences being measured.
 
@@ -116,8 +118,9 @@ All comparisons use identical individuals, histories, branch points, interventio
 | A6 | HDC-only representation | Shared posterior draw |
 | A7 | CfC/LTC-only representation | Shared posterior draw |
 | A8 | HDC + CfC/LTC factorization | Shared posterior draw |
+| A9 | Standard RSSM-style posterior latent | Clone the same branch-point deterministic/stochastic latent across sibling actions; no explicit stable-trait factorization |
 
-Where faithful and budget-matched implementations exist, add GRU/RSSM and other strong recurrent world-model baselines. Do not treat a paper's RSSM or another environment's score as a matched result.
+A9 is mandatory, not optional: it is the closest architecture-level control for the paper's inference-to-imagination correspondence. Where faithful and budget-matched implementations exist, add further GRU/RSSM baselines and other strong recurrent world models. Do not treat another environment's score as a matched result.
 
 Required semantic controls:
 - **Same-individual control:** changing a posterior draw ID for one sibling action rejects the pair.
@@ -186,15 +189,15 @@ This protocol does not claim novelty for:
 - branching, rewind or alternative-action search;
 - uncertainty-aware HDC in general.
 
-Relevant prior art includes Okita's distinction between individual effects retained in a latent and those expressed in imagined rollouts; RSSM-style deterministic/stochastic state factorization; contrast-aware intervention loss; Causal-JEPA's object-level latent intervention; MRS.Q's warning that search can underperform despite model accuracy; World-In-World's closed-loop embodied evaluation; and Rollback's branch/backtracking experience. PCIR's contribution is a specific **testable protocol and architecture hypothesis** for coupling posterior hypotheses about one stable individual across sibling action rollouts, keeping that posterior separate from branch-local dynamics and event-level stochastic correspondence, and measuring the effect on decisions.
+Relevant prior art includes Okita's formal abduction posterior P(U | history), same-U counterfactual pairs, and RSSM posterior-to-abduction structural correspondence; contrast-aware intervention loss; Causal-JEPA's object-level latent intervention; MRS.Q's warning that search can underperform despite model accuracy; World-In-World's closed-loop embodied evaluation; and Rollback's branch/backtracking experience. These works rule out novelty claims for posterior abduction, fixed-individual counterfactual branches, contrast-aware training, latent intervention or branching search.
 
-That claim remains provisional until the negative controls and held-out ablations demonstrate a measurable advantage over point-estimate and independently sampled baselines.
+PCIR's proposed contribution is an **auditable Symthaea implementation and ablation protocol**: expose a stable-trait posterior/sample identity separately from branch-local dynamics, compare that explicit factorization against a standard RSSM that clones its branch-point latent across sibling actions, and measure whether the explicit factor improves the calibrated individual-effect-to-decision chain. If the explicit factor does not improve held-out individual effects, uncertainty quality or decision value at matched cost, the simpler RSSM-style representation should win.
 
 ## 11. Supplementary-source recovery for DMC Track A
 
-The Okita article links a supplementary file that includes section **S3, Simulator configuration**. This is a concrete recovery lead and should be inspected before treating simulator settings as irrecoverable. The file is linked from the article's Supplementary Materials section (https://www.mdpi.com/2504-4990/8/11/363#supplementary; supplementary asset https://www.mdpi.com/article/10.3390/make8110363/s1).
+The Okita article's public main text already formalizes the relevant causal semantics: (1) abduction computes P(U | factual observations); (2) the learned RSSM posterior q_phi(z_t | h_t, o_t) is structurally analogous to that abduction step, while its numerical correspondence to physical U remains empirical; and (3) simulator counterfactual pairs hold the same u_i and factual history fixed across interventions (Eq. 10). The paper also states that its supplementary file contains **S3, Simulator configuration**, and Appendix E.7 identifies the DMC family, physical-body perturbations (including pole length), six action sequences, fifteen pairs, twelve history blocks and 150 individuals per task.
 
-The current tool-side retrieval attempt could confirm the published link and S3 description but could not retrieve the binary asset. Therefore this protocol does **not** claim that S3 contains every missing DMC input or that the exact DMC formulation is recovered. After obtaining it, make a field-by-field coverage table against #13530's unresolved-input list: exact values, partially specified values, and still-missing values must be separated. Author correspondence may still be required for undocumented seeds, mask ordering, action sequence serialization or estimator code.
+The supplementary asset is publicly linked from the article's Supplementary Materials section (https://www.mdpi.com/2504-4990/8/11/363#supplementary; asset https://www.mdpi.com/article/10.3390/make8110363/s1). The current tool-side retrieval confirmed the link and S3 description but did not retrieve the binary. Therefore S3 is a **known published artifact awaiting inspection**, not an unavailable artifact; this protocol does not claim that S3 contains every missing DMC input or that exact replication is recovered. After obtaining it, make a field-by-field coverage table against #13530's unresolved-input list: exact values, partial descriptions and still-missing items must be distinguished.
 
 ## 12. Explicit non-claims
 
