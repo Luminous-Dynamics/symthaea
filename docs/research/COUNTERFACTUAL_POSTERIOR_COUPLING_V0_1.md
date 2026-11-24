@@ -52,6 +52,20 @@ If branch a samples u_(i,k) and branch b independently samples u_(i,j), the cont
 
 This is not a claim that independent samples are invalid for every predictive-generation task. It is specifically invalid for the paired estimand that asks: *what changes when the action changes while the individual is held fixed?*
 
+### Analytic known-answer: why the draw must be shared
+
+Let the same individual's posterior support be u in {-1,+1}, each with probability 1/2. Define two outcomes:
+
+Y(a=0,u) = 5u  
+Y(a=1,u) = 7u
+
+Under the same-u counterfactual estimand, the individual effect is always computed from the same draw: Δ(u) = 7u - 5u = 2u. The posterior effect samples are {-2,+2}, with variance 4.
+
+If the two action branches independently sample u_1 and u_0, the apparent contrast becomes 7u_1 - 5u_0, with support {-12,-2,+2,+12} and variance 74. The extra variance is not uncertainty about the action effect for one fixed hypothetical individual; it is contamination from comparing two different individual hypotheses.
+
+This toy example is a semantic known-answer control, not an empirical model result. It also shows why reporting only the posterior mean (zero in this symmetric example) is insufficient: the effect is non-zero in magnitude and its sign is uncertain.
+
+
 ## 3. Keep three kinds of uncertainty separate
 
 | Quantity | Meaning | Coupling rule |
@@ -209,6 +223,42 @@ This v0.1 change adds only a research contract and semantic fixtures. It does no
 - effect scoring, calibration, statistical inference or a decision authority.
 
 No DMC replication, trained model, HDC/CfC benefit, closed-loop gain, physical result, resource advantage or SOTA improvement is claimed.
+
+
+
+## 13. Next frontier: uncertainty over the causal mechanism itself
+
+PCIR v0.1 addresses uncertainty over the same individual's stable characteristics conditional on a specified model. It does **not** establish that the specified model's causal mechanism is identified by the available factual history.
+
+The next research step should distinguish two nested uncertainties:
+
+- **Within-model individual uncertainty:** q_m(u_i | h_i), the posterior over this individual's stable characteristics under model m.
+- **Between-model / structural uncertainty:** uncertainty over which causal mechanisms m remain compatible with the training evidence, physical constraints and held-out factual behavior.
+
+For each admitted model m, draw u_(i,m,k) from its individual posterior and couple that draw across sibling actions:
+
+Δ_(i,m,k)(a,b) = U(Y_m(a; u_(i,m,k))) - U(Y_m(b; u_(i,m,k)))
+
+Then report within-model posterior effect distributions separately from between-model disagreement. A finite model-set envelope may be written:
+
+[ min_(m,k) Δ_(i,m,k), max_(m,k) Δ_(i,m,k) ]
+
+but this is a certified bound only when the admitted model set is complete for the declared finite scope and each model's support is bounded. Otherwise it is an empirical sampled range and must be labelled as such.
+
+The crucial falsification case is two mechanisms that fit the factual history equally well, satisfy the same declared physical constraints, but predict opposite signs for an unobserved intervention. A single-model posterior over u cannot represent this structural ambiguity. Averaging the two model predictions to zero would hide the disagreement rather than resolve it.
+
+The follow-up protocol should:
+1. Freeze the model family, admissibility constraints, factual-fit tolerance, held-out split and candidate intervention set before confirmatory counterfactual outcomes are revealed.
+2. Admit models using independent factual prediction and physical-consistency evidence, not their counterfactual score alone.
+3. Preserve each model's provenance and the per-model q_m(u_i | h_i) distribution.
+4. Compute model-conditional individual effects and the between-model range without collapsing the two uncertainty layers.
+5. Pass the finite admissible model/effect worlds to the existing #13239/#13152 regret and decision-sufficiency evaluator; do not create a second regret engine.
+6. Use #10252's cross-model ranking idea as prior art/reference where relevant, while keeping its current vehicle-specific ownership intact.
+7. If models disagree enough to change the decision, return an ambiguity/unknown disposition or acquire discriminating evidence through the existing active-sensing and value-of-information owners. Do not self-authorize an action.
+
+The existing graph-level Shpitser–Pearl ID implementation and the generic CounterfactualUncertainty structure are not this evaluator: the former reasons over causal graphs and identification rules, while the latter's heuristic uncertainty propagation does not certify the completeness of a dynamic world-model set. The future work must integrate with them where appropriate without claiming they already solve individual dynamic mechanism ambiguity.
+
+This is a separate follow-on research direction, not implemented by the PCIR v0.1 contract. It is arguably the more important long-term paradigm shift: **not merely asking what a model predicts for this individual, but determining which parts of that counterfactual are identifiable across every plausible causal mechanism.**
 
 ## Sources
 
