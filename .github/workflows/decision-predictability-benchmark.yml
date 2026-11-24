@@ -1,0 +1,33 @@
+name: Decision-Relevant Predictability Evaluator
+
+on:
+  push:
+    branches: [main]
+    paths:
+      - "research/decision-predictability-benchmark/**"
+      - ".github/workflows/decision-predictability-benchmark.yml"
+  pull_request:
+    paths:
+      - "research/decision-predictability-benchmark/**"
+      - ".github/workflows/decision-predictability-benchmark.yml"
+
+permissions:
+  contents: read
+
+jobs:
+  qualify:
+    name: Finite-world evaluator known answers
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - name: Set up Rust
+        uses: dtolnay/rust-toolchain@stable
+        with:
+          toolchain: "1.96.0"
+          components: clippy, rustfmt
+      - name: Check formatting
+        run: cargo fmt --manifest-path research/decision-predictability-benchmark/Cargo.toml -- --check
+      - name: Run evaluator tests with locked dependencies
+        run: cargo test --manifest-path research/decision-predictability-benchmark/Cargo.toml --locked --all-targets
+      - name: Run strict Clippy
+        run: cargo clippy --manifest-path research/decision-predictability-benchmark/Cargo.toml --locked --all-targets -- -D warnings
