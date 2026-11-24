@@ -2447,6 +2447,8 @@ pub struct ScalarUnstableModeContract {
     pub controller_execution_latency_seconds: f64,
     pub minimum_bandwidth_multiple: f64,
     pub maximum_loop_latency_efold_fraction: f64,
+    pub minimum_observability_fisher_information: f64,
+    pub minimum_controllability_gramian: f64,
 }
 
 /// Exact scalar-mode observability / controllability and timing summary.
@@ -2473,6 +2475,8 @@ pub struct ScalarUnstableModeReport {
     pub actuator_delay_efold_fraction: f64,
     pub minimum_required_bandwidth_multiple: f64,
     pub maximum_allowed_loop_latency_efold_fraction: f64,
+    pub minimum_required_observability_fisher_information: f64,
+    pub minimum_required_controllability_gramian: f64,
     pub mode_interface_qualified: bool,
 }
 
@@ -2493,6 +2497,8 @@ pub fn evaluate_scalar_unstable_mode_interface(
         contract.actuator_bandwidth_hz,
         contract.minimum_bandwidth_multiple,
         contract.maximum_loop_latency_efold_fraction,
+        contract.minimum_observability_fisher_information,
+        contract.minimum_controllability_gramian,
     ];
     if positive_finite
         .iter()
@@ -2651,8 +2657,9 @@ pub fn evaluate_scalar_unstable_mode_interface(
 
     let mode_interface_qualified = observation_sample_count > 0
         && actuator_command_count > 0
-        && observability_fisher_information > 0.0
-        && controllability_gramian > 0.0
+        && observability_fisher_information
+            >= contract.minimum_observability_fisher_information
+        && controllability_gramian >= contract.minimum_controllability_gramian
         && diagnostic_bandwidth_multiple >= contract.minimum_bandwidth_multiple
         && actuator_bandwidth_multiple >= contract.minimum_bandwidth_multiple
         && loop_latency_efold_fraction <= contract.maximum_loop_latency_efold_fraction;
@@ -2673,6 +2680,9 @@ pub fn evaluate_scalar_unstable_mode_interface(
         actuator_delay_efold_fraction,
         minimum_required_bandwidth_multiple: contract.minimum_bandwidth_multiple,
         maximum_allowed_loop_latency_efold_fraction: contract.maximum_loop_latency_efold_fraction,
+        minimum_required_observability_fisher_information: contract
+            .minimum_observability_fisher_information,
+        minimum_required_controllability_gramian: contract.minimum_controllability_gramian,
         mode_interface_qualified,
     })
 }
@@ -4744,6 +4754,13 @@ mod tests {
             maximum_loop_latency_efold_fraction: controller["maximum_loop_latency_efold_fraction"]
                 .as_f64()
                 .unwrap(),
+            minimum_observability_fisher_information: controller
+                ["minimum_observability_fisher_information"]
+                .as_f64()
+                .unwrap(),
+            minimum_controllability_gramian: controller["minimum_controllability_gramian"]
+                .as_f64()
+                .unwrap(),
         }
     }
 
@@ -4988,6 +5005,13 @@ mod tests {
         assert!((report.loop_latency_efold_fraction - 0.0325).abs() < 1.0e-12);
         assert!((report.diagnostic_delay_efold_fraction - 0.005).abs() < 1.0e-12);
         assert!((report.actuator_delay_efold_fraction - 0.005).abs() < 1.0e-12);
+        assert!(
+            report.observability_fisher_information
+                >= report.minimum_required_observability_fisher_information
+        );
+        assert!(
+            report.controllability_gramian >= report.minimum_required_controllability_gramian
+        );
         assert!(report.mode_interface_qualified);
     }
 
@@ -5007,6 +5031,29 @@ mod tests {
         let report = evaluate_scalar_unstable_mode_interface(contract).unwrap();
         assert_eq!(report.actuator_command_count, 0);
         assert_eq!(report.controllability_gramian, 0.0);
+        assert!(!report.mode_interface_qualified);
+    }
+
+    #[test]
+    fn scalar_unstable_mode_oracle_rejects_insufficient_observation_information() {
+        let mut contract = scalar_unstable_mode_contract();
+        contract.diagnostic_noise_std = 10.0;
+        let report = evaluate_scalar_unstable_mode_interface(contract).unwrap();
+        assert!(
+            report.observability_fisher_information
+                < report.minimum_required_observability_fisher_information
+        );
+        assert!(!report.mode_interface_qualified);
+    }
+
+    #[test]
+    fn scalar_unstable_mode_oracle_rejects_insufficient_actuator_authority() {
+        let mut contract = scalar_unstable_mode_contract();
+        contract.actuator_gain = 0.01;
+        let report = evaluate_scalar_unstable_mode_interface(contract).unwrap();
+        assert!(
+            report.controllability_gramian < report.minimum_required_controllability_gramian
+        );
         assert!(!report.mode_interface_qualified);
     }
 
