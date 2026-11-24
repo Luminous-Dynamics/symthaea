@@ -18,7 +18,20 @@ use serde::{Deserialize, Serialize};
 
 use crate::mycelial_active_sensing::{
     MYCELIAL_ACTIVE_SENSING_SCHEMA_VERSION, MycelialActiveSensingReport,
-    MycelialAcquisitionActionKind,
+    MycelialAcquisitionAction, MycelialAcquisitionActionKind,
+    MycelialAcquisitionDecision, MycelialAcquisitionOutcome,
+    MycelialHypothesisLikelihood, MycelialHypothesisLoss, evaluate_mycelial_active_sensing,
+};
+use crate::mycelial_fusion_counterfactual::{
+    MycelialFusionBridgeLengthBasis, MycelialFusionCandidate, MycelialFusionTarget,
+};
+use crate::mycelial_graph_hypothesis_posterior::{
+    MycelialGraphHypothesisPosterior, evaluate_mycelial_graph_hypothesis_posterior,
+};
+use crate::mycelial_reconstruction_metrics::{
+    AnnotatedHyphaSegment, AnnotatedJunction, AnnotatedJunctionKind,
+    AnnotatedMycelialSkeleton, MYCELIAL_RECONSTRUCTION_SCHEMA_VERSION,
+    ReconstructionDimensionality, ReconstructionLengthUnit, ReconstructionPoint3,
 };
 
 pub const MYCELIAL_SAMPLE_HEALTH_BUDGET_SCHEMA_VERSION: u16 = 1;
@@ -29,6 +42,71 @@ pub const MAX_MYCELIAL_HEALTH_EXPOSURE_RECORDS: usize = 1_000_000;
 pub const MAX_MYCELIAL_HEALTH_BUDGET_EVALUATIONS: usize = 1_000_000;
 pub const MAX_MYCELIAL_HEALTH_ID_BYTES: usize = 128;
 const DIGEST_HEX_BYTES: usize = 64;
+
+/// Immutable input bundle for the upstream decision-value acquisition report.
+///
+/// Construction independently recomputes the report against the exact source
+/// skeleton, candidate inventory, posterior, decision table and action models.
+/// The fields remain private so downstream specimen-health filtering cannot
+/// receive an unqualified or post-construction-mutated VOI result.
+#[derive(Debug, Clone)]
+pub struct MycelialSampleHealthActiveSensingEvidence {
+    report: MycelialActiveSensingReport,
+    skeleton: AnnotatedMycelialSkeleton,
+    candidates: Vec<MycelialFusionCandidate>,
+    posterior: MycelialGraphHypothesisPosterior,
+    decisions: Vec<MycelialAcquisitionDecision>,
+    actions: Vec<MycelialAcquisitionAction>,
+}
+
+impl MycelialSampleHealthActiveSensingEvidence {
+    pub fn new(
+        report: MycelialActiveSensingReport,
+        skeleton: AnnotatedMycelialSkeleton,
+        candidates: Vec<MycelialFusionCandidate>,
+        posterior: MycelialGraphHypothesisPosterior,
+        decisions: Vec<MycelialAcquisitionDecision>,
+        actions: Vec<MycelialAcquisitionAction>,
+    ) -> Result<Self, MycelialSampleHealthBudgetError> {
+        report
+            .validate_against(&skeleton, &candidates, &posterior, &decisions, &actions)
+            .map_err(|_| {
+                MycelialSampleHealthBudgetError::InvalidActiveSensingReport(
+                    "report failed independent source/posterior/decision/action recomputation",
+                )
+            })?;
+        Ok(Self {
+            report,
+            skeleton,
+            candidates,
+            posterior,
+            decisions,
+            actions,
+        })
+    }
+
+    pub fn report(&self) -> &MycelialActiveSensingReport {
+        &self.report
+    }
+
+    /// Digest of the exact upstream scientific evidence used to qualify this report.
+    pub fn source_evidence_digest(&self) -> String {
+        let mut hasher = blake3::Hasher::new();
+        hasher.update(b"symthaea-mycelial-sample-health-active-sensing-evidence-v1");
+        hash_string(&mut hasher, &self.report.source_graph_digest);
+        hash_string(&mut hasher, &self.report.candidate_inventory_digest);
+        hash_string(&mut hasher, &self.report.posterior_inventory_digest);
+        hash_string(&mut hasher, &self.report.decision_inventory_digest);
+        hash_string(&mut hasher, &self.report.acquisition_action_inventory_digest);
+        hash_string(&mut hasher, &self.skeleton.source_observation_digest);
+        hash_string(&mut hasher, &self.skeleton.calibration_digest);
+        hasher.update(&(self.candidates.len() as u64).to_le_bytes());
+        hasher.update(&(self.posterior.hypotheses.len() as u64).to_le_bytes());
+        hasher.update(&(self.decisions.len() as u64).to_le_bytes());
+        hasher.update(&(self.actions.len() as u64).to_le_bytes());
+        finish_digest(hasher)
+    }
+}
 
 #[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
 #[serde(deny_unknown_fields)]
@@ -1032,13 +1110,14 @@ fn evaluate_proposal(
 /// that breaches a bound is returned with typed reasons and cannot be recommended.
 /// Among eligible proposals, the highest positive net VOI is recommended.
 pub fn evaluate_mycelial_sample_health_budget(
-    active_sensing_report: &MycelialActiveSensingReport,
+    active_sensing_evidence: &MycelialSampleHealthActiveSensingEvidence,
     budget: &MycelialSampleHealthBudget,
     state: &MycelialSampleHealthState,
     proposals: &[MycelialAcquisitionBudgetProposal],
 ) -> Result<MycelialSampleHealthBudgetReport, MycelialSampleHealthBudgetError> {
     validate_budget(budget)?;
     validate_state(state, budget)?;
+    let active_sensing_report = active_sensing_evidence.report();
     validate_active_sensing_report(active_sensing_report)?;
 
     if proposals.len() != active_sensing_report.actions.len()
@@ -1273,23 +1352,183 @@ mod tests {
         }
     }
 
-    fn active_report(actions: Vec<MycelialAcquisitionActionValue>) -> MycelialActiveSensingReport {
-        MycelialActiveSensingReport {
-            schema_version: MYCELIAL_ACTIVE_SENSING_SCHEMA_VERSION,
-            source_graph_digest: digest('1'),
-            candidate_inventory_digest: digest('2'),
-            posterior_inventory_digest: digest('3'),
-            posterior_hypothesis_count: 2,
-            posterior_entropy_nats: 0.5,
-            loss_scale_id: "decision-loss-v1".to_string(),
-            decision_inventory_digest: digest('4'),
-            acquisition_action_inventory_digest: digest('5'),
-            baseline_best_decision_id: "decision-1".to_string(),
-            baseline_bayes_risk: 1.0,
-            recommended_action_id: None,
-            actions,
-            advisory_only: true,
+    fn test_skeleton() -> AnnotatedMycelialSkeleton {
+        AnnotatedMycelialSkeleton {
+            schema_version: MYCELIAL_RECONSTRUCTION_SCHEMA_VERSION,
+            frame_id: "frame-health".to_string(),
+            coordinate_frame_id: "microscope-health".to_string(),
+            calibration_digest: digest('b'),
+            source_observation_digest: digest('a'),
+            dimensionality: ReconstructionDimensionality::TwoD,
+            length_unit: ReconstructionLengthUnit::Micrometer,
+            producer_id: "human-annotation".to_string(),
+            producer_version: "v1".to_string(),
+            junctions: vec![
+                AnnotatedJunction {
+                    id: "A".to_string(),
+                    kind: AnnotatedJunctionKind::Origin,
+                    position: ReconstructionPoint3 { x: 0.0, y: 0.0, z: 0.0 },
+                },
+                AnnotatedJunction {
+                    id: "B".to_string(),
+                    kind: AnnotatedJunctionKind::Tip,
+                    position: ReconstructionPoint3 { x: 1.0, y: 0.0, z: 0.0 },
+                },
+                AnnotatedJunction {
+                    id: "C".to_string(),
+                    kind: AnnotatedJunctionKind::Origin,
+                    position: ReconstructionPoint3 { x: 10.0, y: 0.0, z: 0.0 },
+                },
+                AnnotatedJunction {
+                    id: "D".to_string(),
+                    kind: AnnotatedJunctionKind::Tip,
+                    position: ReconstructionPoint3 { x: 11.0, y: 0.0, z: 0.0 },
+                },
+            ],
+            segments: vec![
+                AnnotatedHyphaSegment {
+                    id: "ab".to_string(),
+                    start_junction_id: "A".to_string(),
+                    end_junction_id: "B".to_string(),
+                    length: 1.0,
+                },
+                AnnotatedHyphaSegment {
+                    id: "cd".to_string(),
+                    start_junction_id: "C".to_string(),
+                    end_junction_id: "D".to_string(),
+                    length: 1.0,
+                },
+            ],
         }
+    }
+
+    fn test_candidate() -> MycelialFusionCandidate {
+        MycelialFusionCandidate {
+            candidate_id: "bridge".to_string(),
+            source_tip_junction_id: "B".to_string(),
+            target: MycelialFusionTarget::TipJunction {
+                junction_id: "D".to_string(),
+            },
+            bridge_length: 1.0,
+            bridge_length_unit: ReconstructionLengthUnit::Micrometer,
+            bridge_length_basis: MycelialFusionBridgeLengthBasis::Measured,
+            bridge_length_evidence_digest: digest('e'),
+            fusion_probability: 0.5,
+            calibration_policy_id: "calibration-v1".to_string(),
+            probability_evidence_digest: digest('f'),
+            conflict_group_id: None,
+        }
+    }
+
+    fn active_report(
+        action_values: Vec<MycelialAcquisitionActionValue>,
+    ) -> MycelialSampleHealthActiveSensingEvidence {
+        let skeleton = test_skeleton();
+        let candidates = vec![test_candidate()];
+        let posterior =
+            evaluate_mycelial_graph_hypothesis_posterior(&skeleton, &candidates).unwrap();
+        let no_fusion = posterior
+            .hypotheses
+            .iter()
+            .find(|hypothesis| hypothesis.accepted_candidate_ids.is_empty())
+            .expect("no-fusion hypothesis")
+            .accepted_candidate_ids
+            .clone();
+        let fusion = posterior
+            .hypotheses
+            .iter()
+            .find(|hypothesis| hypothesis.accepted_candidate_ids == vec!["bridge".to_string()])
+            .expect("fusion hypothesis")
+            .accepted_candidate_ids
+            .clone();
+        let decisions = vec![
+            MycelialAcquisitionDecision {
+                decision_id: "accept-fusion".to_string(),
+                loss_scale_id: "decision-loss-v1".to_string(),
+                losses_by_hypothesis: vec![
+                    MycelialHypothesisLoss {
+                        accepted_candidate_ids: no_fusion.clone(),
+                        loss: 1_000.0,
+                    },
+                    MycelialHypothesisLoss {
+                        accepted_candidate_ids: fusion.clone(),
+                        loss: 0.0,
+                    },
+                ],
+            },
+            MycelialAcquisitionDecision {
+                decision_id: "reject-fusion".to_string(),
+                loss_scale_id: "decision-loss-v1".to_string(),
+                losses_by_hypothesis: vec![
+                    MycelialHypothesisLoss {
+                        accepted_candidate_ids: no_fusion.clone(),
+                        loss: 0.0,
+                    },
+                    MycelialHypothesisLoss {
+                        accepted_candidate_ids: fusion.clone(),
+                        loss: 1_000.0,
+                    },
+                ],
+            },
+        ];
+        let actions = action_values
+            .iter()
+            .map(|value| MycelialAcquisitionAction {
+                action_id: value.action_id.clone(),
+                action_kind: value.action_kind,
+                acquisition_model_id: value.acquisition_model_id.clone(),
+                acquisition_model_version: value.acquisition_model_version.clone(),
+                acquisition_model_digest: value.acquisition_model_digest.clone(),
+                cost_evidence_digest: value.cost_evidence_digest.clone(),
+                cost_in_loss_units: 500.0 - value.net_value_of_information,
+                cost_scale_id: "decision-loss-v1".to_string(),
+                outcomes: vec![
+                    MycelialAcquisitionOutcome {
+                        outcome_id: "no-fusion".to_string(),
+                        likelihoods_by_hypothesis: vec![
+                            MycelialHypothesisLikelihood {
+                                accepted_candidate_ids: no_fusion.clone(),
+                                likelihood: 1.0,
+                            },
+                            MycelialHypothesisLikelihood {
+                                accepted_candidate_ids: fusion.clone(),
+                                likelihood: 0.0,
+                            },
+                        ],
+                    },
+                    MycelialAcquisitionOutcome {
+                        outcome_id: "fusion".to_string(),
+                        likelihoods_by_hypothesis: vec![
+                            MycelialHypothesisLikelihood {
+                                accepted_candidate_ids: no_fusion.clone(),
+                                likelihood: 0.0,
+                            },
+                            MycelialHypothesisLikelihood {
+                                accepted_candidate_ids: fusion.clone(),
+                                likelihood: 1.0,
+                            },
+                        ],
+                    },
+                ],
+            })
+            .collect::<Vec<_>>();
+        let report = evaluate_mycelial_active_sensing(
+            &skeleton,
+            &candidates,
+            &posterior,
+            &decisions,
+            &actions,
+        )
+        .unwrap();
+        MycelialSampleHealthActiveSensingEvidence::new(
+            report,
+            skeleton,
+            candidates,
+            posterior,
+            decisions,
+            actions,
+        )
+        .unwrap()
     }
 
     fn proposal(
