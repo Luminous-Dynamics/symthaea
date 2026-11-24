@@ -233,7 +233,7 @@ This table suggests two high-leverage research fronts. First, preserve and impro
 | Temporal reasoning | 34.23 | 40.12 | 39.23 | 42.12 |
 | Continual learning | 38.45 | 48.40 | 43.45 | 50.40 |
 | Personalization | 11.04 | 12.21 | 16.04 | 16.04 |
-| Evidence governance | 31.29 | 33.59 | 36.29 | 35.59 |
+| Evidence governance | 31.29 | 33.59 | 36.29 | 36.29 |
 
 | Coding measure | InsightMem open | MemoraX commercial | Phase I (+5) | Phase II (+2 commercial) |
 |---|---:|---:|---:|---:|
