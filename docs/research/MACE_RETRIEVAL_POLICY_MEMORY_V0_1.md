@@ -152,7 +152,7 @@ The reference API is in:
 research/broca-mace-transfer-bench-v0-1/aml-adapter/src/retrieval_policy_memory.rs
 
 - record_trace(trace) validates and records a trace; returns its receipt digest.
-- promote_strategy(refs, algorithm_revision, promoted_at, expires_at) deterministically creates a note from supporting traces.
+- promote_strategy(refs, algorithm_revision, promoted_at, expires_at) is retained as a legacy API but now fails closed for raw acquisition traces until separately qualified decision/outcome receipts and held-out counterfactual qualification are available.
 - applicable_notes(domain, environment_revision, tool_profile, now) returns only currently valid notes matching every scope/version constraint.
 
 The Rust unit tests cover invocation idempotency/rebinding, candidate-return status validation, legacy V1 replay, refusal to promote acquisition-only traces, duplicate query exclusion, domain/environment/tool-profile/strategy isolation, promotion-time bounds, resource accounting, invalid acquisition claims, insufficient search budgets, input-size limits, explicit byte-accounting completeness and a cross-language retrieval-trace receipt hash vector. These tests are authored; they remain unexecuted until a pinned Rust toolchain is available.
