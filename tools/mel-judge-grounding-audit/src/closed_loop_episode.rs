@@ -107,6 +107,28 @@ struct Effect {
     producer_identity: String,
     output_artifact_sha256: Option<String>,
     capture_id: Option<String>,
+    veto_race: Option<VetoRaceEvidence>,
+    receipt: ReceiptRef,
+}
+
+#[derive(Debug, Deserialize)]
+#[serde(deny_unknown_fields)]
+struct VetoRaceEvidence {
+    authorization_id: String,
+    admission_stage: String,
+    admission_event_sequence: u64,
+    veto_event_sequence: u64,
+    reported_stage_event_sequence: u64,
+    prior_output_epoch: u64,
+    veto_output_epoch: u64,
+    callback_disposition: String,
+    callback_event_sequence: Option<u64>,
+    callback_observed_epoch: Option<u64>,
+    callback_admitted_frames: u64,
+    stale_callback_discarded_frames: u64,
+    invalidated_application_frames: u64,
+    discarded_unconsumed_notes: u64,
+    post_veto_new_admissions: u64,
     receipt: ReceiptRef,
 }
 
@@ -204,6 +226,15 @@ pub enum ObservationOutcome {
     Unobserved,
 }
 
+#[derive(Debug, Clone, Serialize, PartialEq, Eq)]
+pub enum VetoRaceClassification {
+    QueuedOutputWithoutCallbackObservation,
+    ApplicationOutputStaleDiscardedBeforeCallback,
+    CallbackAdmittedBeforeVetoResidualPossible,
+    PostVetoPlaybackPredictionFromPreVetoCallbackAdmission,
+    PostVetoLoopbackObservedFromPreVetoCallbackAdmission,
+}
+
 #[derive(Debug, Clone, Serialize)]
 pub struct EpisodeReport {
     pub schema: String,
@@ -216,6 +247,12 @@ pub struct EpisodeReport {
     pub decision_action: String,
     pub effect_stage_reported: Option<String>,
     pub effect_capture_binding: bool,
+    pub veto_race_classification: Option<VetoRaceClassification>,
+    pub veto_callback_admitted_frames: Option<u64>,
+    pub veto_stale_callback_discarded_frames: Option<u64>,
+    pub veto_invalidated_application_frames: Option<u64>,
+    pub veto_discarded_unconsumed_notes: Option<u64>,
+    pub veto_post_boundary_new_admissions: Option<u64>,
     pub capture_source_kind: String,
     pub capture_sequence_accounting_consistent: bool,
     pub capture_frame_accounting_applicable: bool,
@@ -365,11 +402,16 @@ fn reduce_episode(episode: &Episode) -> Result<EpisodeReport, String> {
     if episode.decision.sequence > episode.forecast.expires_at_sequence {
         return Err("turn-taking decision occurred after forecast expiry".into());
     }
+    let veto_race_classification = validate_veto_race_for_episode(episode)?;
     let action_disposition = validate_action_semantics(episode)?;
     let effect_stage_reported = episode
         .effect
         .as_ref()
         .map(|effect| effect.reported_stage.clone());
+    let veto_race = episode
+        .effect
+        .as_ref()
+        .and_then(|effect| effect.veto_race.as_ref());
 
     if let Some(effect) = &episode.effect {
         validate_receipt(&effect.receipt, "effect.receipt")?;
@@ -582,6 +624,12 @@ fn reduce_episode(episode: &Episode) -> Result<EpisodeReport, String> {
         decision_action: episode.decision.action.clone(),
         effect_stage_reported,
         effect_capture_binding,
+        veto_race_classification,
+        veto_callback_admitted_frames: veto_race.map(|race| race.callback_admitted_frames),
+        veto_stale_callback_discarded_frames: veto_race.map(|race| race.stale_callback_discarded_frames),
+        veto_invalidated_application_frames: veto_race.map(|race| race.invalidated_application_frames),
+        veto_discarded_unconsumed_notes: veto_race.map(|race| race.discarded_unconsumed_notes),
+        veto_post_boundary_new_admissions: veto_race.map(|race| race.post_veto_new_admissions),
         capture_source_kind: episode.capture.source_kind.clone(),
         capture_sequence_accounting_consistent,
         capture_frame_accounting_applicable,
@@ -601,6 +649,8 @@ fn reduce_episode(episode: &Episode) -> Result<EpisodeReport, String> {
             "reported closure plus arithmetic consistency is structural eligibility, not proof of physical capture completeness".into(),
             "detector-reported absence is not ground-truth absence; held-out detector sensitivity and false-negative qualification remain separate".into(),
             "identity strings are compared structurally; authenticated principal/role separation is not established here".into(),
+            "late-veto admission/callback/epoch counts are untrusted structural projections; the owning action-effect verifier and veto-race verifier are not replayed here".into(),
+            "a pre-veto callback admission may remain in flight after veto; epoch invalidation is not proof of physical silence or DAC cancellation".into(),
             "no waveform decoding, acoustic latency, hardware, musician preference, causal collaboration or SOTA result is established".into(),
         ],
     })
@@ -635,9 +685,6 @@ fn validate_action_semantics(episode: &Episode) -> Result<ActionDisposition, Str
                 return Err(
                     "veto must dominate with YIELD; later RESPOND/CONTINUE is unauthorized".into(),
                 );
-            }
-            if effect_is_output {
-                return Err("output effect follows a veto; admission must fail closed".into());
             }
             Ok(ActionDisposition::Vetoed)
         }
@@ -683,6 +730,171 @@ fn validate_action_semantics(episode: &Episode) -> Result<ActionDisposition, Str
             Ok(ActionDisposition::Abstained)
         }
         other => Err(format!("unknown musician disposition action: {other}")),
+    }
+}
+
+fn validate_veto_race_for_episode(
+    episode: &Episode,
+) -> Result<Option<VetoRaceClassification>, String> {
+    let race = episode
+        .effect
+        .as_ref()
+        .and_then(|effect| effect.veto_race.as_ref());
+    if episode.disposition.action != "veto" {
+        if race.is_some() {
+            return Err("veto_race evidence is only valid for a veto disposition".into());
+        }
+        return Ok(None);
+    }
+
+    let Some(effect) = episode.effect.as_ref() else {
+        return Ok(None);
+    };
+    if !is_output_stage(&effect.reported_stage) {
+        if race.is_some() {
+            return Err("veto_race evidence is inconsistent with a non-output effect stage".into());
+        }
+        return Ok(None);
+    }
+    let race = race.ok_or_else(|| {
+        "veto with a reported output effect requires stage-aware veto_race evidence".to_string()
+    })?;
+    validate_veto_race(effect, race)?;
+
+    let classification = match race.callback_disposition.as_str() {
+        "not_observed" => VetoRaceClassification::QueuedOutputWithoutCallbackObservation,
+        "stale_discarded_after_veto" => {
+            VetoRaceClassification::ApplicationOutputStaleDiscardedBeforeCallback
+        }
+        "admitted_before_veto" => match effect.reported_stage.as_str() {
+            "loopback_observed" => {
+                VetoRaceClassification::PostVetoLoopbackObservedFromPreVetoCallbackAdmission
+            }
+            "cpal_predicted" => {
+                VetoRaceClassification::PostVetoPlaybackPredictionFromPreVetoCallbackAdmission
+            }
+            _ => VetoRaceClassification::CallbackAdmittedBeforeVetoResidualPossible,
+        },
+        _ => return Err("unknown callback disposition in veto_race evidence".into()),
+    };
+    Ok(Some(classification))
+}
+
+fn validate_veto_race(effect: &Effect, race: &VetoRaceEvidence) -> Result<(), String> {
+    require_text(&race.authorization_id, "effect.veto_race.authorization_id")?;
+    validate_receipt(&race.receipt, "effect.veto_race.receipt")?;
+
+    if !matches!(
+        race.admission_stage.as_str(),
+        "queue_applied" | "application_enqueued"
+    ) {
+        return Err("veto_race admission_stage must be queue_applied or application_enqueued".into());
+    }
+    if effect_stage_rank(&effect.reported_stage).is_none()
+        || effect_stage_rank(&race.admission_stage).is_none()
+        || effect_stage_rank(&effect.reported_stage) < effect_stage_rank(&race.admission_stage)
+    {
+        return Err("veto_race reported stage precedes or contradicts its admission stage".into());
+    }
+    if race.admission_event_sequence == 0
+        || race.admission_event_sequence >= race.veto_event_sequence
+        || race.reported_stage_event_sequence == 0
+    {
+        return Err("veto_race event sequence is invalid or admission did not precede veto".into());
+    }
+    if race.reported_stage_event_sequence < race.admission_event_sequence {
+        return Err("veto_race reported stage precedes output admission".into());
+    }
+    if race.veto_output_epoch != race.prior_output_epoch.checked_add(1).ok_or_else(|| {
+        "veto_race prior output epoch is exhausted".to_string()
+    })? {
+        return Err("veto_race veto must advance the prior output epoch exactly once".into());
+    }
+    if race.post_veto_new_admissions != 0 {
+        return Err("veto_race reports new output admission after the veto boundary".into());
+    }
+
+    match race.callback_disposition.as_str() {
+        "not_observed" => {
+            if race.callback_event_sequence.is_some()
+                || race.callback_observed_epoch.is_some()
+                || race.callback_admitted_frames != 0
+                || race.stale_callback_discarded_frames != 0
+            {
+                return Err("unobserved callback disposition must not carry callback event, epoch or frame counts".into());
+            }
+            if !matches!(
+                effect.reported_stage.as_str(),
+                "queue_applied" | "application_enqueued"
+            ) || race.reported_stage_event_sequence >= race.veto_event_sequence
+            {
+                return Err("unobserved callback is incompatible with the reported effect stage or event order".into());
+            }
+        }
+        "admitted_before_veto" => {
+            let callback_sequence = race.callback_event_sequence.ok_or_else(|| {
+                "pre-veto callback admission is missing its event sequence".to_string()
+            })?;
+            let callback_epoch = race.callback_observed_epoch.ok_or_else(|| {
+                "pre-veto callback admission is missing its observed output epoch".to_string()
+            })?;
+            if callback_sequence <= race.admission_event_sequence
+                || callback_sequence >= race.veto_event_sequence
+                || callback_epoch != race.prior_output_epoch
+                || race.callback_admitted_frames == 0
+                || race.stale_callback_discarded_frames != 0
+            {
+                return Err("callback admission is not proven to precede veto under the prior epoch".into());
+            }
+            if !matches!(
+                effect.reported_stage.as_str(),
+                "callback_observed" | "cpal_predicted" | "loopback_observed"
+            ) {
+                return Err("pre-veto callback admission is inconsistent with the reported effect stage".into());
+            }
+            if effect.reported_stage == "callback_observed"
+                && race.reported_stage_event_sequence != callback_sequence
+            {
+                return Err("callback_observed stage sequence does not match the callback admission event".into());
+            }
+            if matches!(
+                effect.reported_stage.as_str(),
+                "cpal_predicted" | "loopback_observed"
+            ) && race.reported_stage_event_sequence <= race.veto_event_sequence
+            {
+                return Err("post-veto playback/loopback observation must follow the veto event".into());
+            }
+        }
+        "stale_discarded_after_veto" => {
+            let callback_sequence = race.callback_event_sequence.ok_or_else(|| {
+                "stale callback discard is missing its event sequence".to_string()
+            })?;
+            let callback_epoch = race.callback_observed_epoch.ok_or_else(|| {
+                "stale callback discard is missing its observed output epoch".to_string()
+            })?;
+            if callback_sequence <= race.veto_event_sequence
+                || callback_epoch < race.veto_output_epoch
+                || race.callback_admitted_frames != 0
+                || race.stale_callback_discarded_frames == 0
+                || effect.reported_stage != "application_enqueued"
+                || race.reported_stage_event_sequence >= race.veto_event_sequence
+            {
+                return Err("stale callback discard is inconsistent with the post-veto epoch fence".into());
+            }
+        }
+        other => return Err(format!("unknown callback disposition in veto_race evidence: {other}")),
+    }
+    Ok(())
+}
+
+fn effect_stage_rank(stage: &str) -> Option<u8> {
+    match stage {
+        "queue_applied" => Some(1),
+        "application_enqueued" => Some(2),
+        "callback_observed" => Some(3),
+        "cpal_predicted" => Some(4),
+        "loopback_observed" => Some(5),
+        _ => None,
     }
 }
 
@@ -967,6 +1179,124 @@ mod tests {
         let raw = serde_json::to_string(&value).expect("serialize fixture");
         let report = parse_and_reduce(&raw).expect("clock mismatch must not become eligible");
         assert_eq!(report.observation_outcome, ObservationOutcome::Unobserved);
+    }
+
+    fn attach_valid_pre_veto_loopback_race(value: &mut serde_json::Value) {
+        value["disposition"]["action"] = serde_json::json!("veto");
+        value["decision"]["action"] = serde_json::json!("YIELD");
+        value["effect"]["reported_stage"] = serde_json::json!("loopback_observed");
+        value["effect"]["veto_race"] = serde_json::json!({
+            "authorization_id": "authorization-fixture",
+            "admission_stage": "application_enqueued",
+            "admission_event_sequence": 44,
+            "veto_event_sequence": 46,
+            "reported_stage_event_sequence": 48,
+            "prior_output_epoch": 7,
+            "veto_output_epoch": 8,
+            "callback_disposition": "admitted_before_veto",
+            "callback_event_sequence": 45,
+            "callback_observed_epoch": 7,
+            "callback_admitted_frames": 240,
+            "stale_callback_discarded_frames": 0,
+            "invalidated_application_frames": 120,
+            "discarded_unconsumed_notes": 3,
+            "post_veto_new_admissions": 0,
+            "receipt": {
+                "receipt_sha256": "2121212121212121212121212121212121212121212121212121212121212121",
+                "verifier_profile_id": "action-effect-veto-race-v1",
+                "verification_receipt_sha256": "2222222222222222222222222222222222222222222222222222222222222222"
+            }
+        });
+    }
+
+    #[test]
+    fn pre_veto_callback_can_be_observed_after_veto_without_false_unauthorized_admission() {
+        let mut value: serde_json::Value = serde_json::from_str(PRESENT).expect("fixture JSON");
+        attach_valid_pre_veto_loopback_race(&mut value);
+        let raw = serde_json::to_string(&value).expect("serialize fixture");
+        let report = parse_and_reduce(&raw).expect("pre-veto admission remains a valid residual");
+        assert_eq!(
+            report.veto_race_classification,
+            Some(VetoRaceClassification::PostVetoLoopbackObservedFromPreVetoCallbackAdmission)
+        );
+        assert_eq!(report.veto_callback_admitted_frames, Some(240));
+        assert_eq!(report.veto_post_boundary_new_admissions, Some(0));
+        assert_eq!(report.action_disposition, ActionDisposition::Vetoed);
+    }
+
+    #[test]
+    fn veto_output_without_owner_race_evidence_is_rejected() {
+        let mut value: serde_json::Value = serde_json::from_str(PRESENT).expect("fixture JSON");
+        value["disposition"]["action"] = serde_json::json!("veto");
+        value["decision"]["action"] = serde_json::json!("YIELD");
+        let raw = serde_json::to_string(&value).expect("serialize fixture");
+        assert!(parse_and_reduce(&raw).is_err());
+    }
+
+    #[test]
+    fn veto_race_rejects_callback_admission_after_veto() {
+        let mut value: serde_json::Value = serde_json::from_str(PRESENT).expect("fixture JSON");
+        attach_valid_pre_veto_loopback_race(&mut value);
+        value["effect"]["veto_race"]["callback_event_sequence"] = serde_json::json!(47);
+        let raw = serde_json::to_string(&value).expect("serialize fixture");
+        assert!(parse_and_reduce(&raw).is_err());
+    }
+
+    #[test]
+    fn veto_race_rejects_epoch_regression_or_multiple_advancement() {
+        let mut value: serde_json::Value = serde_json::from_str(PRESENT).expect("fixture JSON");
+        attach_valid_pre_veto_loopback_race(&mut value);
+        value["effect"]["veto_race"]["veto_output_epoch"] = serde_json::json!(9);
+        let raw = serde_json::to_string(&value).expect("serialize fixture");
+        assert!(parse_and_reduce(&raw).is_err());
+    }
+
+    #[test]
+    fn veto_race_rejects_any_new_admission_after_the_boundary() {
+        let mut value: serde_json::Value = serde_json::from_str(PRESENT).expect("fixture JSON");
+        attach_valid_pre_veto_loopback_race(&mut value);
+        value["effect"]["veto_race"]["post_veto_new_admissions"] = serde_json::json!(1);
+        let raw = serde_json::to_string(&value).expect("serialize fixture");
+        assert!(parse_and_reduce(&raw).is_err());
+    }
+
+    #[test]
+    fn veto_race_distinguishes_stale_discard_from_pre_veto_callback_admission() {
+        let mut value: serde_json::Value = serde_json::from_str(PRESENT).expect("fixture JSON");
+        value["disposition"]["action"] = serde_json::json!("veto");
+        value["decision"]["action"] = serde_json::json!("YIELD");
+        value["effect"]["reported_stage"] = serde_json::json!("application_enqueued");
+        value["effect"]["capture_id"] = serde_json::Value::Null;
+        value["effect"]["veto_race"] = serde_json::json!({
+            "authorization_id": "authorization-fixture",
+            "admission_stage": "application_enqueued",
+            "admission_event_sequence": 44,
+            "veto_event_sequence": 46,
+            "reported_stage_event_sequence": 44,
+            "prior_output_epoch": 7,
+            "veto_output_epoch": 8,
+            "callback_disposition": "stale_discarded_after_veto",
+            "callback_event_sequence": 47,
+            "callback_observed_epoch": 8,
+            "callback_admitted_frames": 0,
+            "stale_callback_discarded_frames": 240,
+            "invalidated_application_frames": 0,
+            "discarded_unconsumed_notes": 3,
+            "post_veto_new_admissions": 0,
+            "receipt": {
+                "receipt_sha256": "2323232323232323232323232323232323232323232323232323232323232323",
+                "verifier_profile_id": "action-effect-veto-race-v1",
+                "verification_receipt_sha256": "2424242424242424242424242424242424242424242424242424242424242424"
+            }
+        });
+        let raw = serde_json::to_string(&value).expect("serialize fixture");
+        let report = parse_and_reduce(&raw).expect("old-epoch frames are reported as stale");
+        assert_eq!(
+            report.veto_race_classification,
+            Some(VetoRaceClassification::ApplicationOutputStaleDiscardedBeforeCallback)
+        );
+        assert_eq!(report.veto_stale_callback_discarded_frames, Some(240));
+        assert_eq!(report.veto_callback_admitted_frames, Some(0));
     }
 
     #[test]
