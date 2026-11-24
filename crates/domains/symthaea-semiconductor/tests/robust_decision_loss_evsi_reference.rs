@@ -281,9 +281,11 @@ fn independent_portfolio(
             ids.push(candidate.candidate.candidate_id.clone());
             *groups.entry(candidate.candidate.group_key.clone()).or_insert(0_u32) += 1;
         }
-        if !feasible || quotas.iter().any(|(group, minimum)| {
-            groups.get(group).copied().unwrap_or(0) < *minimum
-        }) {
+        if !feasible
+            || quotas
+                .iter()
+                .any(|(group, minimum)| groups.get(group).copied().unwrap_or(0) < *minimum)
+        {
             continue;
         }
         if !found
