@@ -1,0 +1,36 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://luminousdynamics.io/schemas/mace_search_trace_receipt_v1.schema.json",
+  "title": "MACE Search exposure trace receipt v1",
+  "description": "Internal audit receipt for one Search response. Contains digests and opaque memory IDs, not raw query text or raw user identifiers. Hashes are integrity commitments, not signatures or anonymization.",
+  "type": "object",
+  "properties": {
+    "schema_version": { "const": "mace.search-trace-receipt.v1" },
+    "search_id": { "type": "string", "format": "uuid" },
+    "principal_id": { "type": "string", "minLength": 1 },
+    "tenant_id": { "type": "string", "minLength": 1 },
+    "user_scope_sha256": { "type": "string", "pattern": "^[0-9a-f]{64}$" },
+    "query_sha256": { "type": "string", "pattern": "^[0-9a-f]{64}$" },
+    "request_sha256": { "type": "string", "pattern": "^[0-9a-f]{64}$" },
+    "top_k": { "type": "integer", "minimum": 1, "maximum": 100 },
+    "ordered_memory_ids_sha256": { "type": "string", "pattern": "^[0-9a-f]{64}$" },
+    "response_sha256": { "type": "string", "pattern": "^[0-9a-f]{64}$" },
+    "retrieval_policy": { "type": "string", "minLength": 1 },
+    "returned_at": { "type": "string", "format": "date-time" }
+  },
+  "required": [
+    "schema_version",
+    "search_id",
+    "principal_id",
+    "tenant_id",
+    "user_scope_sha256",
+    "query_sha256",
+    "request_sha256",
+    "top_k",
+    "ordered_memory_ids_sha256",
+    "response_sha256",
+    "retrieval_policy",
+    "returned_at"
+  ],
+  "additionalProperties": false
+}

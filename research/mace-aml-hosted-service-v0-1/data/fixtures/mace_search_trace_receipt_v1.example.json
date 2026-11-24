@@ -1,0 +1,14 @@
+{
+  "schema_version": "mace.search-trace-receipt.v1",
+  "search_id": "9c7f4c4c-7f6a-4a4a-9ed4-3e58d5a44f31",
+  "principal_id": "mace-participant",
+  "tenant_id": "mace-evaluation",
+  "user_scope_sha256": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+  "query_sha256": "bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb",
+  "request_sha256": "cccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccc",
+  "top_k": 10,
+  "ordered_memory_ids_sha256": "dddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddd",
+  "response_sha256": "eeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeee",
+  "retrieval_policy": "bm25_unicode_token_v1",
+  "returned_at": "2026-11-24T12:00:00.000Z"
+}
