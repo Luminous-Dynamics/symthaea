@@ -1381,13 +1381,31 @@ mod tests {
     }
 
     #[test]
-    fn veto_race_rejects_cross_decision_or_disposition_receipt_binding() {
-        let mut value: serde_json::Value = serde_json::from_str(PRESENT).expect("fixture JSON");
-        attach_valid_pre_veto_loopback_race(&mut value);
-        value["effect"]["veto_race"]["decision_receipt_sha256"] =
-            serde_json::json!("2525252525252525252525252525252525252525252525252525252525252525");
-        let raw = serde_json::to_string(&value).expect("serialize fixture");
-        assert!(parse_and_reduce(&raw).is_err());
+    fn veto_race_rejects_cross_session_and_receipt_binding() {
+        let mutations = [
+            (
+                "decision_receipt_sha256",
+                serde_json::json!("2525252525252525252525252525252525252525252525252525252525252525"),
+            ),
+            (
+                "disposition_receipt_sha256",
+                serde_json::json!("2727272727272727272727272727272727272727272727272727272727272727"),
+            ),
+            (
+                "effect_receipt_sha256",
+                serde_json::json!("2828282828282828282828282828282828282828282828282828282828282828"),
+            ),
+            ("session_id", serde_json::json!("other-session")),
+            ("turn_id", serde_json::json!("other-turn")),
+        ];
+        for (field, replacement) in mutations {
+            let mut value: serde_json::Value =
+                serde_json::from_str(PRESENT).expect("fixture JSON");
+            attach_valid_pre_veto_loopback_race(&mut value);
+            value["effect"]["veto_race"][field] = replacement;
+            let raw = serde_json::to_string(&value).expect("serialize fixture");
+            assert!(parse_and_reduce(&raw).is_err(), "accepted mismatched {field}");
+        }
     }
 
     #[test]
@@ -1416,6 +1434,51 @@ mod tests {
         value["disposition"]["action"] = serde_json::json!("accept");
         let raw = serde_json::to_string(&value).expect("serialize fixture");
         assert!(parse_and_reduce(&raw).is_err());
+    }
+
+    #[test]
+    fn veto_race_reports_enqueued_output_without_claiming_callback_or_playback() {
+        let mut value: serde_json::Value = serde_json::from_str(PRESENT).expect("fixture JSON");
+        value["disposition"]["action"] = serde_json::json!("veto");
+        value["decision"]["action"] = serde_json::json!("YIELD");
+        value["effect"]["reported_stage"] = serde_json::json!("application_enqueued");
+        value["effect"]["capture_id"] = serde_json::Value::Null;
+        value["effect"]["veto_race"] = serde_json::json!({
+            "authorization_id": "authorization-fixture",
+            "session_id": "session-001",
+            "turn_id": "turn-001",
+            "decision_receipt_sha256": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+            "disposition_receipt_sha256": "8888888888888888888888888888888888888888888888888888888888888888",
+            "effect_receipt_sha256": "dddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddd",
+            "output_artifact_sha256": "cccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccc",
+            "admission_stage": "application_enqueued",
+            "admission_event_sequence": 44,
+            "veto_event_sequence": 46,
+            "reported_stage_event_sequence": 44,
+            "prior_output_epoch": 7,
+            "veto_output_epoch": 8,
+            "callback_disposition": "not_observed",
+            "callback_event_sequence": null,
+            "callback_observed_epoch": null,
+            "callback_admitted_frames": 0,
+            "stale_callback_discarded_frames": 0,
+            "invalidated_application_frames": 240,
+            "discarded_unconsumed_notes": 3,
+            "post_veto_new_admissions": 0,
+            "receipt": {
+                "receipt_sha256": "2929292929292929292929292929292929292929292929292929292929292929",
+                "verifier_profile_id": "action-effect-veto-race-v1",
+                "verification_receipt_sha256": "3030303030303030303030303030303030303030303030303030303030303030"
+            }
+        });
+        let raw = serde_json::to_string(&value).expect("serialize fixture");
+        let report = parse_and_reduce(&raw).expect("enqueued output remains distinct from callback playback");
+        assert_eq!(
+            report.veto_race_classification,
+            Some(VetoRaceClassification::QueuedOutputWithoutCallbackObservation)
+        );
+        assert_eq!(report.veto_callback_admitted_frames, Some(0));
+        assert_eq!(report.veto_invalidated_application_frames, Some(240));
     }
 
     #[test]
