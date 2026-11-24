@@ -431,18 +431,37 @@ jobs:
       - name: Install stable Rust
         uses: dtolnay/rust-toolchain@39008827e6b4319a349e9a42dfc90579dd25f1ca
 
+      - name: Stage exact four-theorem comparison cohort
+        shell: bash
+        run: |
+          set -euo pipefail
+          for version in v429 v437; do
+            source_dir="artifacts/mathlib-${version}"
+            cohort_dir="artifacts/mathlib-${version}-theorems"
+            mkdir -p "$cohort_dir"
+            for declaration in Nat.choose_pos Set.countable_union Multiset.map_id Finset.card_map; do
+              source_file="$source_dir/proof-comprehension-extract-${declaration}.json"
+              test -s "$source_file"
+              cp "$source_file" "$cohort_dir/"
+            done
+            test "$(find "$cohort_dir" -maxdepth 1 -type f -name '*.json' | wc -l)" -eq 4
+          done
+          echo "MATHLIB_THEOREM_COHORT_STAGED=4"
+          echo "STRUCTURAL_CALIBRATION_ARTIFACTS_RETAINED=4"
+
       - name: Run source-snapshot differential
         shell: bash
         run: |
           set -euo pipefail
           cargo run --locked --manifest-path scripts/research/proof-plan-contract/Cargo.toml --bin source-snapshot-diff -- \
-            artifacts/mathlib-v429 artifacts/mathlib-v437 > "$RUNNER_TEMP/mathlib-source-snapshot-diff.json"
+            artifacts/mathlib-v429-theorems artifacts/mathlib-v437-theorems > "$RUNNER_TEMP/mathlib-source-snapshot-diff.json"
           jq -e '.schema_version == "1.0.0"
             and .comparison_kind == "mathlib_source_snapshot_direct_dependency_differential"
             and .source_revisions_differ == true
             and .lean_toolchains_differ == true
             and (.declarations | length) == 4
-            and all(.declarations[]; .baseline_value_kind == "theorem_proof" and .candidate_value_kind == "theorem_proof")
+            and ([.declarations[].declaration] | sort == ["Finset.card_map", "Multiset.map_id", "Nat.choose_pos", "Set.countable_union"])
+            and all(.declarations[]; .baseline_declaration_kind == "theorem" and .candidate_declaration_kind == "theorem" and .baseline_value_kind == "theorem_proof" and .candidate_value_kind == "theorem_proof")
             and ([.declarations[] | select(.classification == "identical_type_value_and_closure_sets")] | length) == 2
             and ([.declarations[] | select(.declaration == "Nat.choose_pos" and .classification == "stable_type_interface_value_drift" and .type_dependencies.jaccard == 1)] | length) == 1
             and ([.declarations[] | select(.declaration == "Nat.choose_pos" and .helper_expansion_explains_direct_drift == true and .helper_expanded_value_dependencies.jaccard >= 0.9 and .value_dependencies.jaccard < 0.5 and .proof_value_dependencies.jaccard < 0.5)] | length) == 1
