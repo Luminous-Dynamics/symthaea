@@ -431,6 +431,54 @@ mod tests {
     }
 
     #[test]
+    fn free_atom_names_are_not_alpha_renamed() {
+        let base = BooleanSequent {
+            hypotheses: vec![atom("free_x")],
+            premises: vec![atom("R")],
+            conclusion: atom("S"),
+        };
+        let variant = BooleanSequent {
+            hypotheses: vec![atom("free_y")],
+            premises: vec![atom("R")],
+            conclusion: atom("S"),
+        };
+        assert_ne!(
+            normalized_sequent_sha256(&base).unwrap(),
+            normalized_sequent_sha256(&variant).unwrap()
+        );
+        assert_eq!(
+            derive_relation(&base, &variant).unwrap().0,
+            ScopeRelationV1::NotTier1Equivalent
+        );
+    }
+
+    #[test]
+    fn logically_equivalent_connective_rewrites_are_not_structural_tier1_matches() {
+        let base = BooleanSequent {
+            hypotheses: vec![atom("P")],
+            premises: vec![BooleanFormula::Implies {
+                left: Box::new(atom("P")),
+                right: Box::new(atom("Q")),
+            }],
+            conclusion: atom("R"),
+        };
+        let variant = BooleanSequent {
+            hypotheses: vec![atom("P")],
+            premises: vec![BooleanFormula::Or {
+                left: Box::new(BooleanFormula::Not {
+                    arg: Box::new(atom("P")),
+                }),
+                right: Box::new(atom("Q")),
+            }],
+            conclusion: atom("R"),
+        };
+        assert_eq!(
+            derive_relation(&base, &variant).unwrap().0,
+            ScopeRelationV1::NotTier1Equivalent
+        );
+    }
+
+    #[test]
     fn normalization_preserves_atom_names() {
         let mut sequent = fixture().pairs[1].candidate.base.clone();
         sequent.hypotheses.push(atom("R"));
