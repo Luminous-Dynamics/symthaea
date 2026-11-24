@@ -1,8 +1,9 @@
 //! Supervised probe — Phase 2 priority 2.
 //!
 //! Trains a one-vs-rest logistic regression over the 16,384D bipolar
-//! hypervectors produced by the encoder, on an 80/20 stratified split of
-//! the real EVTX-ATTACK-SAMPLES corpus (or synthetic fixtures for testing).
+//! hypervectors produced by the encoder. Real-corpus evaluation uses an
+//! 80/20 split grouped by source EVTX file, not by individual event, so events
+//! from one file cannot leak across train and test.
 //!
 //! Purpose: measure the encoder's **supervised ceiling**. Nearest-centroid
 //! gave 0.451 purity (below the 0.50 kill criterion), but NC averages
@@ -16,11 +17,11 @@
 //!   cargo run -p symthaea-logparse --example supervised_probe --release -- /tmp/evtx-staged
 //!   cargo run -p symthaea-logparse --example supervised_probe --release -- --synthetic
 
-use std::collections::HashMap;
+use std::collections::{HashMap, HashSet};
 use std::path::PathBuf;
 use symthaea_logparse::encoder::{Hdv, encode};
 use symthaea_logparse::fixtures::generate_synthetic_corpus;
-use symthaea_logparse::probe::{LogisticProbe, TrainConfig, stratified_split};
+use symthaea_logparse::probe::{LogisticProbe, TrainConfig, group_stratified_split};
 use symthaea_logparse::{LogEvent, evtx_source};
 
 fn main() -> Result<(), Box<dyn std::error::Error>> {
@@ -28,13 +29,16 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
         .nth(1)
         .ok_or("usage:\n  supervised_probe --synthetic\n  supervised_probe <corpus_dir>")?;
 
-    let (events, mode_label) = if arg == "--synthetic" {
+    let (events, group_ids, mode_label) = if arg == "--synthetic" {
         let corpus = generate_synthetic_corpus(100, 0xC0FFEE);
-        (corpus, "synthetic")
+        let groups = (0..corpus.len())
+            .map(|i| format!("synthetic-event-{i:06}"))
+            .collect();
+        (corpus, groups, "synthetic (one event per group)")
     } else {
         let corpus_dir = PathBuf::from(&arg);
-        let events = load_real_corpus(&corpus_dir)?;
-        (events, "real EVTX-ATTACK-SAMPLES")
+        let (events, groups) = load_real_corpus(&corpus_dir)?;
+        (events, groups, "real EVTX-ATTACK-SAMPLES (file-disjoint)")
     };
 
     println!("[probe] mode: {mode_label}");
@@ -57,12 +61,24 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
         println!("  {k:<22} {n}");
     }
 
-    // 80/20 stratified split
-    let (train_x, train_y, test_x, test_y) = stratified_split(&hvs, &labels, 0.8, 0xFACADE);
+    // 80/20 stratified split by provenance group. For real corpora the
+    // group is the source EVTX file name; synthetic mode uses one event/group.
+    let split = group_stratified_split(&hvs, &labels, &group_ids, 0.8, 0xFACADE)?;
+    let train_groups: HashSet<&str> = split.train_group_ids.iter().map(String::as_str).collect();
+    let test_groups: HashSet<&str> = split.test_group_ids.iter().map(String::as_str).collect();
+    if !train_groups.is_disjoint(&test_groups) {
+        return Err("provenance group leakage detected between train and test".into());
+    }
+    let train_x = split.train_hvs;
+    let train_y = split.train_labels;
+    let test_x = split.test_hvs;
+    let test_y = split.test_labels;
     println!(
-        "\n[probe] train={}, test={}, classes={}",
+        "\n[probe] train={} events/{} groups, test={} events/{} groups, classes={}",
         train_x.len(),
+        train_groups.len(),
         test_x.len(),
+        test_groups.len(),
         dist.len()
     );
 
@@ -88,8 +104,8 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
     println!("train accuracy:    {train_acc:.3}");
     println!("test accuracy:     {test_acc:.3}");
     println!("chance level:      {:.3}", 1.0 / dist.len() as f32);
-    println!("nc upper bound:    0.451 (for comparison, real corpus)");
-    println!("HDBSCAN best:      0.565 (for comparison, real corpus)");
+    println!("historical NC event-level reference: 0.451 (not directly comparable)");
+    println!("historical HDBSCAN event-level reference: 0.565 (not directly comparable)");
     println!("Phase 1 cutoff:    0.500");
 
     if test_acc >= 0.70 {
@@ -147,7 +163,9 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
     Ok(())
 }
 
-fn load_real_corpus(corpus_dir: &PathBuf) -> Result<Vec<LogEvent>, Box<dyn std::error::Error>> {
+fn load_real_corpus(
+    corpus_dir: &PathBuf,
+) -> Result<(Vec<LogEvent>, Vec<String>), Box<dyn std::error::Error>> {
     const MAX_PER_FILE: usize = 50;
     const MAX_TOTAL: usize = 1000;
 
@@ -163,7 +181,7 @@ fn load_real_corpus(corpus_dir: &PathBuf) -> Result<Vec<LogEvent>, Box<dyn std::
         }
     }
 
-    let mut by_label: HashMap<String, Vec<LogEvent>> = HashMap::new();
+    let mut by_label: HashMap<String, Vec<(LogEvent, String)>> = HashMap::new();
     for entry in std::fs::read_dir(corpus_dir)? {
         let entry = entry?;
         let path = entry.path();
@@ -188,7 +206,9 @@ fn load_real_corpus(corpus_dir: &PathBuf) -> Result<Vec<LogEvent>, Box<dyn std::
         let bucket = by_label.entry(label.clone()).or_default();
         for mut ev in capped {
             ev.label = Some(label.clone());
-            bucket.push(ev);
+            // Provenance only: this group ID is used by the split logic, not
+            // encoded as a model feature.
+            bucket.push((ev, fname.clone()));
         }
     }
 
@@ -196,10 +216,24 @@ fn load_real_corpus(corpus_dir: &PathBuf) -> Result<Vec<LogEvent>, Box<dyn std::
     let per_label_budget = MAX_TOTAL / n_labels;
 
     let mut events = Vec::new();
-    for (_, bucket) in by_label.iter() {
+    let mut group_ids = Vec::new();
+    for (label, bucket) in by_label.iter() {
         let take = bucket.len().min(per_label_budget);
         let stride = (bucket.len() / take.max(1)).max(1);
-        events.extend(bucket.iter().step_by(stride).take(take).cloned());
+        let sampled: Vec<(LogEvent, String)> =
+            bucket.iter().step_by(stride).take(take).cloned().collect();
+        for (event, group_id) in sampled {
+            events.push(event);
+            group_ids.push(group_id);
+        }
+        println!(
+            "[sample] {label}: {} events from {} source files",
+            events.iter().filter(|event| event.label.as_deref() == Some(label)).count(),
+            bucket.iter().map(|(_, group)| group).collect::<HashSet<_>>().len()
+        );
     }
-    Ok(events)
+    if events.len() != group_ids.len() {
+        return Err("internal corpus provenance alignment failure".into());
+    }
+    Ok((events, group_ids))
 }
