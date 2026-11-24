@@ -1,0 +1,227 @@
+{
+  "schema": "sfeb-mon003-sqlite-transactional-outbox-report-v1",
+  "status": "passed",
+  "node": "v22.16.0",
+  "sqlite": "3.49.1",
+  "deterministic_cases": 38,
+  "cases": [
+    {
+      "name": "local operation, resource intent and outbox commit atomically",
+      "result": "pass"
+    },
+    {
+      "name": "injected operation failure rolls all local writes back",
+      "result": "pass"
+    },
+    {
+      "name": "injected resource failure rolls all local writes back",
+      "result": "pass"
+    },
+    {
+      "name": "injected outbox failure rolls all local writes back",
+      "result": "pass"
+    },
+    {
+      "name": "stale owner fence blocks local mutation",
+      "result": "pass"
+    },
+    {
+      "name": "same objective identifier is isolated by tenant",
+      "result": "pass"
+    },
+    {
+      "name": "current action permission revocation blocks acceptance",
+      "result": "pass"
+    },
+    {
+      "name": "expired source receipt blocks acceptance",
+      "result": "pass"
+    },
+    {
+      "name": "append-only receipt revocation evidence blocks acceptance",
+      "result": "pass"
+    },
+    {
+      "name": "source receipt target/action substitution is rejected",
+      "result": "pass"
+    },
+    {
+      "name": "same key and same digest require reconciliation rather than re-execution",
+      "result": "pass"
+    },
+    {
+      "name": "same key with a changed request digest conflicts",
+      "result": "pass"
+    },
+    {
+      "name": "resource compare-and-set prevents double allocation by distinct keys",
+      "result": "pass"
+    },
+    {
+      "name": "auditor reconciliation is separate and payload-minimized",
+      "result": "pass"
+    },
+    {
+      "name": "action revocation does not revoke independent read-only reconciliation",
+      "result": "pass"
+    },
+    {
+      "name": "reader revocation invalidates extant grants",
+      "result": "pass"
+    },
+    {
+      "name": "expired reconciliation grants fail closed",
+      "result": "pass"
+    },
+    {
+      "name": "grant cannot be used by another authenticated principal",
+      "result": "pass"
+    },
+    {
+      "name": "grant cannot be minted for another tenant or objective operation",
+      "result": "pass"
+    },
+    {
+      "name": "remote sink rechecks current permission revision before effect",
+      "result": "pass"
+    },
+    {
+      "name": "remote sink checks tenant/objective fence at commit boundary",
+      "result": "pass"
+    },
+    {
+      "name": "remote precommit failure leaves local outbox pending and remote unchanged",
+      "result": "pass"
+    },
+    {
+      "name": "lost remote acknowledgement retries same key and commits exactly one mock effect",
+      "result": "pass"
+    },
+    {
+      "name": "independent postcondition mismatch leaves operation unknown",
+      "result": "pass"
+    },
+    {
+      "name": "remote same-key changed-digest conflict is not marked delivered",
+      "result": "pass"
+    },
+    {
+      "name": "file-backed ledger and sink survive close/reopen after local acceptance",
+      "result": "pass"
+    },
+    {
+      "name": "lost acknowledgement survives close/reopen and reconciles by same key",
+      "result": "pass"
+    },
+    {
+      "name": "outbox dispatch preserves insertion order for equal timestamps",
+      "result": "pass"
+    },
+    {
+      "name": "delivered outbox and remote_committed operation cannot regress",
+      "result": "pass"
+    },
+    {
+      "name": "operation and outbox evidence fields are immutable",
+      "result": "pass"
+    },
+    {
+      "name": "evidence journal records local causal sequence and verifies its hash chain",
+      "result": "pass"
+    },
+    {
+      "name": "evidence journal rows cannot be updated or deleted",
+      "result": "pass"
+    },
+    {
+      "name": "evidence chain detects payload tampering when an administrator bypasses append-only trigger",
+      "result": "pass"
+    },
+    {
+      "name": "lost acknowledgement and later readback are recorded as separate evidence events",
+      "result": "pass"
+    },
+    {
+      "name": "permission and receipt revocations enter the evidence journal",
+      "result": "pass"
+    },
+    {
+      "name": "source receipt evidence is immutable after intake",
+      "result": "pass"
+    },
+    {
+      "name": "source event identity is unique within a tenant/source scope",
+      "result": "pass"
+    },
+    {
+      "name": "SQLite BEGIN IMMEDIATE rejects a concurrent writer instead of interleaving",
+      "result": "pass"
+    }
+  ],
+  "smoke_benchmark": {
+    "cycles": 200,
+    "local_accept_ms": {
+      "p50": 0.52,
+      "p95": 1.06
+    },
+    "remote_dispatch_and_readback_ms": {
+      "p50": 1.324,
+      "p95": 1.941
+    },
+    "end_to_end_cycles_per_second": 485.3,
+    "environment": "single process, two file-backed SQLite DBs, warm sequential local-container storage, no network/broker",
+    "replicates": {
+      "fresh_process_runs": 5,
+      "cycles_per_run": 200,
+      "end_to_end_cycles_per_second_each": [
+        422.4,
+        519.1,
+        482.3,
+        430.2,
+        520.4
+      ],
+      "end_to_end_cycles_per_second_median": 482.3,
+      "end_to_end_cycles_per_second_min": 422.4,
+      "end_to_end_cycles_per_second_max": 520.4,
+      "local_accept_p95_ms_median": 1.023,
+      "remote_dispatch_readback_p95_ms_median": 1.98
+    }
+  },
+  "qualification": {
+    "localDatabase": "SQLite WAL, synchronous=FULL, BEGIN IMMEDIATE; operation/resource-intent/outbox/evidence journal are one local transaction",
+    "remoteDatabase": "Separate SQLite transaction with its own current permission revision and tenant/objective fence checks; idempotency key; independent read connection",
+    "tested": [
+      "Local failure injection at operation/resource/outbox writes",
+      "Read-grant expiry, revocation, principal and scope binding",
+      "Remote pre-commit failure and post-commit lost acknowledgement",
+      "Remote idempotency replay and changed-digest conflict",
+      "Independent postcondition readback",
+      "Close/reopen durability and two-connection writer-lock behavior",
+      "Append-only receipt revocation evidence and hash-chain tamper detection"
+    ],
+    "not_tested": [
+      "Process kill at arbitrary storage instructions or physical power loss",
+      "PostgreSQL isolation/replication, multi-host consensus, brokers or real HTTP services",
+      "Concurrent multi-process stress/linearizability beyond the writer-lock test",
+      "Production authentication, PKI/key lifecycle, live source attestations; source receipt issuer_id in fixture is trusted test data",
+      "Industry-equivalent throughput or production SLO; local sequential benchmark only",
+      "Privileged whole-database rewrite detection without an external chain-head anchor"
+    ]
+  },
+  "core_invariant": "The local objective operation, resource intent, outbox event and causally ordered evidence journal commit or roll back together; source receipts and revocations are append-only evidence; remote effects are separately idempotent and independently read back; lost acknowledgement remains outcome_unknown until same-key reconciliation. No distributed atomicity is claimed.",
+  "source": {
+    "repository_path": "benchmarks/frontend/monitoring/mon003-sqlite-transactional-outbox-v1.mjs",
+    "sha256": "919a5ee17ef02c15ec2154f8730344b223feefb33b043785e4720f3ed1356965",
+    "git_blob_sha": "5eed9db593b2cc0daf8a50dc06af87c26bc4a0a8",
+    "bytes": 41143,
+    "lines": 291,
+    "node_version": "v22.16.0",
+    "sqlite_version": "3.49.1",
+    "execution": [
+      "node --check mon003-sqlite-transactional-outbox-v1.mjs",
+      "node mon003-sqlite-transactional-outbox-v1.mjs"
+    ],
+    "qualification": "38 deterministic SQLite preflight cases plus five separate-process local smoke benchmark repetitions; no Rust, PostgreSQL, broker, network, real sink or production authentication executed."
+  },
+  "benchmark_interpretation": "The throughput values are local, warm, sequential SQLite cycles over two databases on one container host. They are not comparable to DBOS published throughput or production systems; no equivalent hardware, workload, network, persistence semantics or concurrency has been matched."
+}
