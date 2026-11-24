@@ -291,10 +291,10 @@ fn validate_license_policy(
 fn validate_relative_path(path: &str) -> bool {
     if path.trim().is_empty()
         || path.starts_with('/')
-        || path.starts_with('\\\\')
-        || path.contains('\\\\')
+        || path.starts_with('\\')
+        || path.contains('\\')
         || path.contains(':')
-        || path.contains('\\0')
+        || path.contains('\0')
     {
         return false;
     }
