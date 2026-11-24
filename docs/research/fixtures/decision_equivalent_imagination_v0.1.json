@@ -185,6 +185,41 @@
         "future_decision_is_sufficient": false,
         "single_snapshot_pass_authorizes_future_horizon": false
       }
+    },
+    {
+      "id": "F7_LOCAL_GAIN_CLOSED_LOOP_HARM",
+      "kind": "fixed_context_vs_branch_evolving_decision_value",
+      "setup": {
+        "utility_direction": "higher_is_better",
+        "same_initial_world": true,
+        "same_exogenous_forcing_commitment": true,
+        "branch_specific_state_evolution_after_action_divergence": true,
+        "shared_prerecorded_future_state_trajectory_after_divergence": false,
+        "low_budget": {
+          "chosen_action": "A",
+          "step_zero_utility": 0,
+          "future_utility_after_own_action_branch": 10,
+          "illustrative_compute_cost_units": 10
+        },
+        "higher_budget": {
+          "chosen_action": "B",
+          "step_zero_utility": 2,
+          "future_utility_after_own_action_branch": -20,
+          "illustrative_compute_cost_units": 20
+        }
+      },
+      "expected": {
+        "fixed_context_local_value_of_higher_budget": 2,
+        "low_budget_episode_utility_before_cost": 10,
+        "higher_budget_episode_utility_before_cost": -18,
+        "closed_loop_value_of_higher_budget": -28,
+        "local_value_sign": "positive",
+        "closed_loop_value_sign": "negative",
+        "sign_reversal": true,
+        "candidate_visible_future_trajectory": false,
+        "interpretation": "A higher-budget profile improves the immediate fixed-context decision but its selected action enters a worse future branch. Local escalation value is not closed-loop episode value.",
+        "note": "All utilities and compute costs are illustrative finite-fixture values, not measured robot outcomes or a claim about DEEP's results."
+      }
     }
   ]
 }
