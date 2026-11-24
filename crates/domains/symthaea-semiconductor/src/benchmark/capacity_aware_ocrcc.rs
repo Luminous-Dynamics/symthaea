@@ -15,8 +15,7 @@ use std::collections::{BTreeMap, BTreeSet};
 use thiserror::Error;
 
 use super::label_consumption_guard::{
-    LabelConsumptionEligibilityReportV1, LabelConsumptionEligibilityV1,
-    LabelEvidenceFrontierV1,
+    LabelConsumptionEligibilityReportV1, LabelConsumptionEligibilityV1, LabelEvidenceFrontierV1,
 };
 
 pub const CA_OCRC_SCHEMA_V1: &str = "luminous.semi-bench.ca-ocrc.v1";
@@ -270,9 +269,7 @@ fn policy_digest(policy: &CaOcrcPolicyV1) -> Result<String, CaOcrcErrorV1> {
     json_sha256(policy)
 }
 
-fn report_digest(
-    report: &LabelConsumptionEligibilityReportV1,
-) -> Result<String, CaOcrcErrorV1> {
+fn report_digest(report: &LabelConsumptionEligibilityReportV1) -> Result<String, CaOcrcErrorV1> {
     let mut canonical = report.clone();
     canonical.report_sha256.clear();
     json_sha256(&canonical)
@@ -310,17 +307,13 @@ fn state_digest(engine: &CaOcrcEngineV1) -> Result<String, CaOcrcErrorV1> {
     })
 }
 
-fn prediction_digest(
-    receipt: &CaOcrcPredictionReceiptV1,
-) -> Result<String, CaOcrcErrorV1> {
+fn prediction_digest(receipt: &CaOcrcPredictionReceiptV1) -> Result<String, CaOcrcErrorV1> {
     let mut canonical = receipt.clone();
     canonical.receipt_sha256.clear();
     json_sha256(&canonical)
 }
 
-fn round_receipt_digest(
-    receipt: &CaOcrcRoundReceiptV1,
-) -> Result<String, CaOcrcErrorV1> {
+fn round_receipt_digest(receipt: &CaOcrcRoundReceiptV1) -> Result<String, CaOcrcErrorV1> {
     let mut canonical = receipt.clone();
     canonical.receipt_sha256.clear();
     json_sha256(&canonical)
@@ -335,7 +328,10 @@ fn validate_distribution(
             "proxy delay distribution schema is unsupported".into(),
         ));
     }
-    require_text(&distribution.distribution_id, "distribution.distribution_id")?;
+    require_text(
+        &distribution.distribution_id,
+        "distribution.distribution_id",
+    )?;
     if distribution.maximum_proxy_delay != maximum_real_delay {
         return Err(CaOcrcErrorV1(
             "arbitrary bounded-delay v1 requires maximum proxy delay = maximum real delay".into(),
@@ -405,7 +401,9 @@ fn validate_policy(policy: &CaOcrcPolicyV1) -> Result<(), CaOcrcErrorV1> {
         || policy.score_bound <= 0.0
         || policy.tracking_capacity == 0
     {
-        return Err(CaOcrcErrorV1("CA-OCRC policy parameters are invalid".into()));
+        return Err(CaOcrcErrorV1(
+            "CA-OCRC policy parameters are invalid".into(),
+        ));
     }
     validate_distribution(&policy.proxy_distribution, policy.maximum_real_delay)?;
     let load = proxy_tracking_load_v1(&policy.proxy_distribution)?;
@@ -425,9 +423,7 @@ fn splitmix64_next(state: &mut u64) -> u64 {
     value ^ (value >> 31)
 }
 
-fn sample_proxy_delay(
-    engine: &mut CaOcrcEngineV1,
-) -> Result<i64, CaOcrcErrorV1> {
+fn sample_proxy_delay(engine: &mut CaOcrcEngineV1) -> Result<i64, CaOcrcErrorV1> {
     let draw = splitmix64_next(&mut engine.prng_state);
     let uniform = (draw >> 11) as f64 / ((1_u64 << 53) as f64);
     let mut cumulative = 0.0;
@@ -439,7 +435,9 @@ fn sample_proxy_delay(
         .enumerate()
     {
         cumulative += probability;
-        if uniform < cumulative || index + 1 == engine.policy.proxy_distribution.probability_mass.len() {
+        if uniform < cumulative
+            || index + 1 == engine.policy.proxy_distribution.probability_mass.len()
+        {
             return Ok(index as i64 - 1);
         }
     }
@@ -464,7 +462,12 @@ fn classify_set(
             "bounded prediction interval endpoints are invalid".into(),
         ));
     }
-    Ok((CaOcrcSetKindV1::BoundedInterval, Some(lower), Some(upper), None))
+    Ok((
+        CaOcrcSetKindV1::BoundedInterval,
+        Some(lower),
+        Some(upper),
+        None,
+    ))
 }
 
 fn validate_engine(engine: &CaOcrcEngineV1) -> Result<(), CaOcrcErrorV1> {
@@ -499,7 +502,10 @@ pub fn create_ca_ocrc_engine_v1(
 ) -> Result<CaOcrcEngineV1, CaOcrcErrorV1> {
     require_text(engine_id, "engine_id")?;
     require_text(clock_domain_id, "clock_domain_id")?;
-    if !initial_threshold.is_finite() || initial_threshold < 0.0 || initial_threshold > policy.score_bound {
+    if !initial_threshold.is_finite()
+        || initial_threshold < 0.0
+        || initial_threshold > policy.score_bound
+    {
         return Err(CaOcrcErrorV1(
             "initial threshold must be in [0, score_bound]".into(),
         ));
@@ -617,7 +623,9 @@ fn validate_delivery(
     if delivery.delivered_round < tracked.prediction.round {
         reasons.push(CaOcrcFeedbackReasonV1::WrongDeliveryRound);
     }
-    let actual_delay = delivery.delivered_round.saturating_sub(tracked.prediction.round);
+    let actual_delay = delivery
+        .delivered_round
+        .saturating_sub(tracked.prediction.round);
     if actual_delay > engine.policy.maximum_real_delay {
         reasons.push(CaOcrcFeedbackReasonV1::FeedbackDelayOutOfDeclaredBound);
     }
@@ -632,9 +640,7 @@ fn validate_delivery(
     if delivery.delivered_at_unix_seconds < delivery.label_available_at_unix_seconds {
         reasons.push(CaOcrcFeedbackReasonV1::LabelNotAvailableByDelivery);
     }
-    if delivery.label_available_at_unix_seconds
-        < tracked.prediction.event_time_unix_seconds
-    {
+    if delivery.label_available_at_unix_seconds < tracked.prediction.event_time_unix_seconds {
         reasons.push(CaOcrcFeedbackReasonV1::LabelAvailableBeforeMeasurement);
     }
     if delivery.delivered_at_unix_seconds < tracked.prediction.prediction_time_unix_seconds {
@@ -645,9 +651,7 @@ fn validate_delivery(
     {
         reasons.push(CaOcrcFeedbackReasonV1::ReportBeforeLabelAvailability);
     }
-    if delivery.delivered_at_unix_seconds
-        < delivery.eligibility_report_available_at_unix_seconds
-    {
+    if delivery.delivered_at_unix_seconds < delivery.eligibility_report_available_at_unix_seconds {
         reasons.push(CaOcrcFeedbackReasonV1::ReportNotAvailableByDelivery);
     }
     if !delivery.label_value.is_finite()
@@ -717,9 +721,17 @@ fn label_loss(prediction: &CaOcrcPredictionReceiptV1, label_value: f64) -> f64 {
         CaOcrcSetKindV1::FullRealLine => 0.0,
         CaOcrcSetKindV1::Empty => 1.0,
         CaOcrcSetKindV1::BoundedInterval => {
-            let lower = prediction.interval_lower.expect("bounded interval has lower endpoint");
-            let upper = prediction.interval_upper.expect("bounded interval has upper endpoint");
-            if label_value < lower || label_value > upper { 1.0 } else { 0.0 }
+            let lower = prediction
+                .interval_lower
+                .expect("bounded interval has lower endpoint");
+            let upper = prediction
+                .interval_upper
+                .expect("bounded interval has upper endpoint");
+            if label_value < lower || label_value > upper {
+                1.0
+            } else {
+                0.0
+            }
         }
     }
 }
@@ -737,7 +749,9 @@ fn process_round_inner(
 ) -> Result<CaOcrcRoundReceiptV1, CaOcrcErrorV1> {
     validate_engine(engine)?;
     if input.schema != CA_OCRC_ROUND_INPUT_SCHEMA_V1 {
-        return Err(CaOcrcErrorV1("CA-OCRC round input schema is unsupported".into()));
+        return Err(CaOcrcErrorV1(
+            "CA-OCRC round input schema is unsupported".into(),
+        ));
     }
     require_text(&input.sample_id, "input.sample_id")?;
     require_text(&input.measurement_event_id, "input.measurement_event_id")?;
@@ -747,7 +761,9 @@ fn process_round_inner(
         || !input.point_prediction.is_finite()
         || input.event_time_unix_seconds > input.prediction_time_unix_seconds
     {
-        return Err(CaOcrcErrorV1("CA-OCRC round input identity, clock or numeric fields are invalid".into()));
+        return Err(CaOcrcErrorV1(
+            "CA-OCRC round input identity, clock or numeric fields are invalid".into(),
+        ));
     }
     let expected_round = match engine.current_round {
         Some(previous) => previous
@@ -762,9 +778,13 @@ fn process_round_inner(
         )));
     }
     if engine.seen_sample_ids.contains(&input.sample_id)
-        || engine.seen_measurement_event_ids.contains(&input.measurement_event_id)
+        || engine
+            .seen_measurement_event_ids
+            .contains(&input.measurement_event_id)
     {
-        return Err(CaOcrcErrorV1("duplicate prediction sample/event identity".into()));
+        return Err(CaOcrcErrorV1(
+            "duplicate prediction sample/event identity".into(),
+        ));
     }
 
     let state_before = state_digest(engine)?;
@@ -775,16 +795,14 @@ fn process_round_inner(
         .tracking_set
         .iter()
         .filter_map(|(issue_round, tracked)| {
-            (issue_round.saturating_add(tracked.proxy_delay) < input.round)
-                .then_some(*issue_round)
+            (issue_round.saturating_add(tracked.proxy_delay) < input.round).then_some(*issue_round)
         })
         .collect();
     for issue_round in &expired {
         if let Some(evicted) = engine.tracking_set.remove(issue_round)
             && evicted.saw_unknown_feedback
         {
-            engine.guarantee_state =
-                CaOcrcGuaranteeStateV1::UncertifiedInvalidOrOutOfModelFeedback;
+            engine.guarantee_state = CaOcrcGuaranteeStateV1::UncertifiedInvalidOrOutOfModelFeedback;
         }
         engine.evicted_feedback_count = engine.evicted_feedback_count.saturating_add(1);
     }
@@ -825,7 +843,10 @@ fn process_round_inner(
     for delivery in deliveries {
         require_text(&delivery.sample_id, "delivery.sample_id")?;
         require_text(&delivery.label_id, "delivery.label_id")?;
-        require_text(&delivery.measurement_event_id, "delivery.measurement_event_id")?;
+        require_text(
+            &delivery.measurement_event_id,
+            "delivery.measurement_event_id",
+        )?;
         let revision_key = format!("{}:{}", delivery.label_id, delivery.label_revision);
         if engine.accepted_label_revisions.contains(&revision_key) {
             feedback_receipts.push(feedback_receipt(
@@ -890,8 +911,7 @@ fn process_round_inner(
             } else if only_blocked {
                 engine.guarantee_state =
                     CaOcrcGuaranteeStateV1::UncertifiedInvalidOrOutOfModelFeedback;
-                engine.rejected_feedback_count =
-                    engine.rejected_feedback_count.saturating_add(1);
+                engine.rejected_feedback_count = engine.rejected_feedback_count.saturating_add(1);
                 CaOcrcFeedbackDispositionV1::Blocked
             } else {
                 engine.guarantee_state =
@@ -919,10 +939,8 @@ fn process_round_inner(
         }
 
         let actual_delay = input.round - issue_round;
-        let survival = proxy_survival_probability_v1(
-            &engine.policy.proxy_distribution,
-            actual_delay,
-        )?;
+        let survival =
+            proxy_survival_probability_v1(&engine.policy.proxy_distribution, actual_delay)?;
         if survival <= 0.0 || actual_delay > tracked.proxy_delay {
             engine.guarantee_state =
                 CaOcrcGuaranteeStateV1::UncertifiedInvalidOrOutOfModelFeedback;
@@ -944,17 +962,16 @@ fn process_round_inner(
         }
         let loss = label_loss(&tracked.prediction, delivery.label_value);
         let weight = 1.0 / survival;
-        let threshold_update = engine.policy.learning_rate
-            * (loss - engine.policy.target_risk)
-            * weight;
+        let threshold_update =
+            engine.policy.learning_rate * (loss - engine.policy.target_risk) * weight;
         if !threshold_update.is_finite() {
-            return Err(CaOcrcErrorV1("CA-OCRC IPW threshold update is non-finite".into()));
+            return Err(CaOcrcErrorV1(
+                "CA-OCRC IPW threshold update is non-finite".into(),
+            ));
         }
         feedback_update_sum += threshold_update;
         engine.tracking_set.remove(&issue_round);
-        engine
-            .accepted_label_revisions
-            .insert(revision_key);
+        engine.accepted_label_revisions.insert(revision_key);
         engine.accepted_feedback_count = engine.accepted_feedback_count.saturating_add(1);
         feedback_receipts.push(feedback_receipt(
             delivery,
@@ -1035,14 +1052,18 @@ pub fn optimal_arbitrary_proxy_survival_v1(
     horizon: u64,
 ) -> Result<f64, CaOcrcErrorV1> {
     if capacity == 0 || horizon == 0 {
-        return Err(CaOcrcErrorV1("capacity and horizon must be positive".into()));
+        return Err(CaOcrcErrorV1(
+            "capacity and horizon must be positive".into(),
+        ));
     }
     if maximum_delay == 0 {
         return Ok(1.0);
     }
     let upper = (capacity as f64 / maximum_delay as f64).min(1.0);
     if upper <= 0.0 {
-        return Err(CaOcrcErrorV1("proxy survival search domain is empty".into()));
+        return Err(CaOcrcErrorV1(
+            "proxy survival search domain is empty".into(),
+        ));
     }
     let objective = |p: f64| {
         let x = maximum_delay as f64 * p / capacity as f64;
@@ -1236,8 +1257,8 @@ mod tests {
             calibration_certificate_id: "cal-cert-ca-ocrc".into(),
             frontier,
             eligibility: status,
-            downstream_consumption_allowed:
-                status == LabelConsumptionEligibilityV1::EligibleUnderDeclaredPolicy,
+            downstream_consumption_allowed: status
+                == LabelConsumptionEligibilityV1::EligibleUnderDeclaredPolicy,
             reasons: Vec::new(),
             label_sha256: payload.into(),
             measurement_sha256: SHA_B.into(),
@@ -1333,7 +1354,10 @@ mod tests {
         let receipt = process_ca_ocrc_round_v1(&mut engine, &input, &[label]).unwrap();
         assert_eq!(receipt.admission, CaOcrcAdmissionV1::Admitted);
         assert_eq!(receipt.feedback.len(), 1);
-        assert_eq!(receipt.feedback[0].disposition, CaOcrcFeedbackDispositionV1::Updated);
+        assert_eq!(
+            receipt.feedback[0].disposition,
+            CaOcrcFeedbackDispositionV1::Updated
+        );
         assert_eq!(receipt.feedback[0].actual_delay, Some(0));
         assert_eq!(receipt.feedback[0].proxy_survival_probability, Some(1.0));
         assert_eq!(receipt.feedback[0].inverse_probability_weight, Some(1.0));
@@ -1358,7 +1382,8 @@ mod tests {
             2,
             LabelConsumptionEligibilityV1::EligibleUnderDeclaredPolicy,
         );
-        let receipt = process_ca_ocrc_round_v1(&mut engine, &round(2, "s2", "e2", 10.0), &[label]).unwrap();
+        let receipt =
+            process_ca_ocrc_round_v1(&mut engine, &round(2, "s2", "e2", 10.0), &[label]).unwrap();
         let item = receipt
             .feedback
             .iter()
@@ -1375,12 +1400,9 @@ mod tests {
     fn full_and_empty_sets_update_from_known_losses_without_tracking() {
         let mut full_engine = engine(pmf_always_delay(2), 2, 1);
         full_engine.threshold = 10.0;
-        let full = process_ca_ocrc_round_v1(
-            &mut full_engine,
-            &round(0, "full", "full-event", 10.0),
-            &[],
-        )
-        .unwrap();
+        let full =
+            process_ca_ocrc_round_v1(&mut full_engine, &round(0, "full", "full-event", 10.0), &[])
+                .unwrap();
         assert_eq!(full.prediction.set_kind, CaOcrcSetKindV1::FullRealLine);
         assert_eq!(full.admission, CaOcrcAdmissionV1::TrivialSetNoTracking);
         assert_eq!(full.trivial_loss, Some(0.0));
@@ -1415,12 +1437,8 @@ mod tests {
             1,
             LabelConsumptionEligibilityV1::Unknown,
         );
-        let held = process_ca_ocrc_round_v1(
-            &mut engine,
-            &round(1, "s1", "e1", 10.0),
-            &[unknown],
-        )
-        .unwrap();
+        let held =
+            process_ca_ocrc_round_v1(&mut engine, &round(1, "s1", "e1", 10.0), &[unknown]).unwrap();
         assert_eq!(
             held.feedback[0].disposition,
             CaOcrcFeedbackDispositionV1::HeldUnknown
@@ -1438,12 +1456,9 @@ mod tests {
             2,
             LabelConsumptionEligibilityV1::EligibleUnderDeclaredPolicy,
         );
-        let accepted = process_ca_ocrc_round_v1(
-            &mut engine,
-            &round(2, "s2", "e2", 10.0),
-            &[qualified],
-        )
-        .unwrap();
+        let accepted =
+            process_ca_ocrc_round_v1(&mut engine, &round(2, "s2", "e2", 10.0), &[qualified])
+                .unwrap();
         assert_eq!(
             accepted.feedback[0].disposition,
             CaOcrcFeedbackDispositionV1::Updated
@@ -1465,13 +1480,12 @@ mod tests {
             1,
             LabelConsumptionEligibilityV1::Blocked,
         );
-        let receipt = process_ca_ocrc_round_v1(
-            &mut engine,
-            &round(1, "s1", "e1", 10.0),
-            &[blocked],
-        )
-        .unwrap();
-        assert_eq!(receipt.feedback[0].disposition, CaOcrcFeedbackDispositionV1::Blocked);
+        let receipt =
+            process_ca_ocrc_round_v1(&mut engine, &round(1, "s1", "e1", 10.0), &[blocked]).unwrap();
+        assert_eq!(
+            receipt.feedback[0].disposition,
+            CaOcrcFeedbackDispositionV1::Blocked
+        );
         assert_eq!(receipt.threshold_after, 0.0);
         assert_eq!(
             engine.guarantee_state,
@@ -1494,13 +1508,13 @@ mod tests {
             2,
             LabelConsumptionEligibilityV1::EligibleUnderDeclaredPolicy,
         );
-        let receipt = process_ca_ocrc_round_v1(
-            &mut engine,
-            &round(2, "s2", "e2", 10.0),
-            &[late],
-        )
-        .unwrap();
-        let feedback = receipt.feedback.iter().find(|x| x.sample_id == "s0").unwrap();
+        let receipt =
+            process_ca_ocrc_round_v1(&mut engine, &round(2, "s2", "e2", 10.0), &[late]).unwrap();
+        let feedback = receipt
+            .feedback
+            .iter()
+            .find(|x| x.sample_id == "s0")
+            .unwrap();
         assert_eq!(feedback.disposition, CaOcrcFeedbackDispositionV1::Untracked);
         assert_eq!(receipt.threshold_after, 0.0);
     }
@@ -1535,12 +1549,9 @@ mod tests {
             1,
             LabelConsumptionEligibilityV1::EligibleUnderDeclaredPolicy,
         );
-        let receipt = process_ca_ocrc_round_v1(
-            &mut engine,
-            &round(1, "s1", "e1", 10.0),
-            &[duplicate],
-        )
-        .unwrap();
+        let receipt =
+            process_ca_ocrc_round_v1(&mut engine, &round(1, "s1", "e1", 10.0), &[duplicate])
+                .unwrap();
         assert_eq!(
             receipt.feedback[0].disposition,
             CaOcrcFeedbackDispositionV1::Duplicate
@@ -1581,7 +1592,8 @@ mod tests {
     #[test]
     fn arbitrary_delay_risk_bound_matches_known_formula() {
         let distribution = bernoulli_proxy_distribution_v1("p", 2, 0.5).unwrap();
-        let bound = arbitrary_delay_ca_ocrc_risk_bound_v1(10.0, 0.2, 100, 2, &distribution).unwrap();
+        let bound =
+            arbitrary_delay_ca_ocrc_risk_bound_v1(10.0, 0.2, 100, 2, &distribution).unwrap();
         let load = 1.0;
         let h = load / 2.0 - 1.0 - (load / 2.0_f64).ln();
         let expected = 10.0 / (0.2 * 100.0) + 3.0 / (0.5 * 100.0) + (-2.0 * h).exp();
@@ -1597,14 +1609,22 @@ mod tests {
             for round_index in 0..50 {
                 let receipt = process_ca_ocrc_round_v1(
                     &mut engine,
-                    &round(round_index, &format!("s{round_index}"), &format!("e{round_index}"), 10.0),
+                    &round(
+                        round_index,
+                        &format!("s{round_index}"),
+                        &format!("e{round_index}"),
+                        10.0,
+                    ),
                     &[],
                 )
                 .unwrap();
                 assert!(receipt.tracking_count_after <= engine.policy.tracking_capacity);
                 receipts.push(receipt.receipt_sha256);
             }
-            (json_sha256(&receipts).unwrap(), engine.threshold_history_for_test())
+            (
+                json_sha256(&receipts).unwrap(),
+                engine.threshold_history_for_test(),
+            )
         }
         let first = run();
         let second = run();
