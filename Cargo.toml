@@ -7,6 +7,23 @@ members = [
     "crates/domains/*",
     "crates/bridges/*",
 ]
+exclude = [
+    "crates/core/nixward-web",
+    "crates/core/symthaea-zkproof/methods",
+    "crates/core/symthaea-zkproof/host",
+    "crates/domains/symthaea-spore/fuzz",
+    "crates/domains/spark-engine",
+    "crates/domains/symthaea-lab",
+    "crates/core/symthaea",
+    "crates/core/symthaea-iit",
+    "crates/core/symthaea-observation-attestation",
+    "crates/domains/symthaea-perception",
+    "crates/domains/symthaea-architecture-engineering",
+    "crates/domains/symthaea-dishwasher-design",
+    "crates/domains/symthaea-marine-geometry",
+    "crates/domains/symthaea-rea-compat",
+    "crates/domains/symthaea-rea-evidence-verifier",
+]
 # NOTE: the root package ("symthaea") is automatically a workspace member
 # because this manifest has both [package] and [workspace] — it does NOT
 # need (and must NOT have) an explicit "." entry here. Verified 2026-07-03:
