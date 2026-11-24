@@ -629,6 +629,38 @@ mod tests {
     }
 
     #[test]
+    fn reciprocal_rank_fusion_deduplicates_cross_channel_hits() {
+        let root = fixture_root("rrf-dedup");
+        let trajectory = fixture_trajectory(&root, b"rrf fixture image");
+        let config = fixture_config(root.clone());
+        let parsed = LongMemEvalV2TrajectoryV1::parse_jsonl_record(
+            &serde_json::to_string(&trajectory).expect("trajectory JSON")
+        ).expect("trajectory parse");
+        let bm25 = LongMemEvalV2Bm25IndexV1::build(
+            "web", &[parsed.clone()], 0, config.profile
+        ).expect("BM25 index");
+        let entity = LongMemEvalV2EntityLiteralIndexV1::build(
+            "web", &[parsed], 0
+        ).expect("entity-literal index");
+        let bm25_result = bm25.search("web", "42", 4, 0).expect("BM25 literal");
+        let entity_result = entity.search("web", "42", 4).expect("entity literal");
+        assert_eq!(bm25_result.hits.len(), 1);
+        assert_eq!(entity_result.hits.len(), 1);
+
+        let fused = hybrid_rrf_result(
+            &bm25_result.hits,
+            &entity_result.hits,
+            Vec::new(),
+            4,
+            10,
+        );
+        assert_eq!(fused.hits.len(), 1);
+        assert_eq!(fused.hits[0].rank, 1);
+        assert!((fused.hits[0].score - (2.0 / 61.0)).abs() < 1e-12);
+        fs::remove_dir_all(root).expect("cleanup");
+    }
+
+    #[test]
     fn official_memory_api_request_returns_text_and_verified_image_context_items() {
         let root = fixture_root("context");
         let image_bytes = b"verified screenshot bytes";
