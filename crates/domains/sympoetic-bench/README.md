@@ -90,6 +90,21 @@ Both return `None` when the coefficient is undefined. Negative coefficients are 
 - `summarize_capability_amplification_by_stratum`: reports treatment-control gain intervals and negative individual-gain rates separately for preregistered baseline task-capability strata. It does not infer demographic groups or hide harmed strata in a pooled mean.
 - `paired_cluster_bootstrap_difference`: seeded percentile bootstrap over one pre-aggregated value per participant cluster. It must not be used to treat conversation turns as independent samples.
 
+
+## Collective capability after AI withdrawal
+
+The team-level evaluator for Mycelix [DELIB-TEAM-RETENTION-001 #6597](https://github.com/Luminous-Dynamics/mycelix/issues/6597) compares the four AI-exposure × transactive-memory conditions. It reports immediate, delayed and transfer gain, unique-fact retention, expertise routing and agency as separate endpoints, with seeded percentile bootstrap intervals that resample teams rather than messages or turns.
+
+Run the checked-in synthetic known-answer fixture:
+
+```bash
+cargo run -p sympoetic-bench -- summarize-team-retention \\
+  --input docs/benchmarks/sympoetic/fixtures/team-retention-synthetic-v0.1.tsv \\
+  --draws 2000 --seed 42
+```
+
+Protocol and limitations: [TEAM_RETENTION_FACTORIAL_V0.1.md](../../../docs/benchmarks/sympoetic/TEAM_RETENTION_FACTORIAL_V0.1.md). The fixture is fictional. The estimator validates the declared AI-off receipt status and digest shape; it does not authenticate isolation or prove that an AI endpoint was actually unavailable.
+
 ## Status and limitations
 
 This is a first executable core, not a complete human-AI benchmark runner. It does not yet provide:
