@@ -1056,6 +1056,52 @@ pub fn validate_scorecard(scorecard: &Scorecard) -> Result<()> {
         bail!("quality_matched_diversity_ratio must be finite and non-negative");
     }
 
+    // Calibration errors, probabilities, AUCs, accuracies and process rates
+    // are bounded proportions. They are not signed capability deltas.
+    for (name, value) in [
+        ("agent_confidence_brier_score", scorecard.scores.agent_confidence_brier_score),
+        (
+            "agent_expected_calibration_error",
+            scorecard.scores.agent_expected_calibration_error,
+        ),
+        (
+            "agent_metacognitive_sensitivity_auc",
+            scorecard.scores.agent_metacognitive_sensitivity_auc,
+        ),
+        (
+            "agent_selective_accuracy_at_80pct_coverage",
+            scorecard.scores.agent_selective_accuracy_at_80pct_coverage,
+        ),
+        (
+            "participant_confidence_brier_score",
+            scorecard.scores.participant_confidence_brier_score,
+        ),
+        (
+            "participant_expected_calibration_error",
+            scorecard.scores.participant_expected_calibration_error,
+        ),
+        (
+            "participant_metacognitive_sensitivity_auc",
+            scorecard.scores.participant_metacognitive_sensitivity_auc,
+        ),
+        (
+            "participant_selective_accuracy_at_80pct_coverage",
+            scorecard.scores.participant_selective_accuracy_at_80pct_coverage,
+        ),
+        ("human_planning_rate", scorecard.scores.human_planning_rate),
+        ("human_first_attempt_rate", scorecard.scores.human_first_attempt_rate),
+        ("human_monitoring_rate", scorecard.scores.human_monitoring_rate),
+        ("human_reflection_rate", scorecard.scores.human_reflection_rate),
+        ("ai_core_step_supply_rate", scorecard.scores.ai_core_step_supply_rate),
+        (
+            "ai_core_step_substitution_rate",
+            scorecard.scores.ai_core_step_substitution_rate,
+        ),
+        ("human_verification_rate", scorecard.scores.human_verification_rate),
+    ] {
+        validate_optional_unit_interval(name, value)?;
+    }
+
     for (name, value) in [
         (
             "participant_capability_gain_delta",
