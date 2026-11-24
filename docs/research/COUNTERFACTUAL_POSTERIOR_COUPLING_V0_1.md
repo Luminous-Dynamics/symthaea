@@ -227,6 +227,9 @@ At least one result must be an end-to-end *decision* result: model-driven policy
 ## 9. Statistical and calibration ownership
 
 - Use #8578 for individual/episode cluster-level inference; fifteen action pairs from one DMC individual are not fifteen independent subjects.
+- Use #10372 for intervention support, cross-world coupling assumptions, point/set-identification dispositions and decision invariance across the admitted assumption set. PCIR supplies individual-conditioned model/posterior evidence; do not duplicate the support/identification evaluator.
+- Use #10356 only for its episode-specific abduction/action/prediction ownership in the autonomous-driving scope; #9010 owns matched direct-policy versus model-assisted decision-value comparisons in its CMAQ scope; #10252 owns vehicle-domain cross-model ranking sensitivity.
+- #9781/#9788 provide posterior ambiguity-set methods (TV/OT) under their own assumptions. A posterior ambiguity set is not automatically a causal identified set; compose only through an explicit assumption map.
 - Reuse #11655/#11659 for simultaneous calibration of expected-loss intervals across the frozen action × horizon scope when its assumptions and reference quantities match. Do not create a second conformal calibration implementation here.
 - Keep posterior parameter coverage distinct from expected-loss interval coverage. One does not imply the other.
 - Reuse #13239/#13152 for finite-set decision sufficiency and regret. Do not duplicate its minimax-regret oracle.
@@ -267,39 +270,29 @@ No DMC replication, trained model, HDC/CfC benefit, closed-loop gain, physical r
 
 
 
-## 13. Next frontier: uncertainty over the causal mechanism itself
+## 13. Integration frontier: structural ambiguity belongs to #10372
 
-PCIR v0.1 addresses uncertainty over the same individual's stable characteristics conditional on a specified model. It does **not** establish that the specified model's causal mechanism is identified by the available factual history.
+PCIR v0.1 addresses uncertainty over the same individual's full exogenous draw conditional on a named model. It does **not** establish that the named model's causal mechanism is identified by the available factual history.
 
-The next research step should distinguish two nested uncertainties:
+This is not an unowned gap. **#10372 (SAM-CF-SUPPORT-001) already owns intervention support, cross-world coupling assumptions, set-valued counterfactual identification and decision invariance across the admitted assumption set.** Its companion PR #10377 contains a dependency-free Rust fixture evaluator with twelve identification cases and a matched-marginal cross-world-coupling counterexample. The dedicated SAM Counterfactual Support Fixtures workflow passed twice on recorded exact head `fc270961936e47d7c2f207641f6861326d6d6686`. That is useful analytic conformance evidence, but the PR remains draft and the harness explicitly is not a general causal estimator, simulator or world-model adapter.
 
-- **Within-model individual uncertainty:** q_m(u_i | h_i), the posterior over this individual's stable characteristics under model m.
-- **Between-model / structural uncertainty:** uncertainty over which causal mechanisms m remain compatible with the training evidence, physical constraints and held-out factual behavior.
+The correct composition is:
 
-For each admitted model m, draw u_(i,m,k) from its individual posterior and couple that draw across sibling actions:
+1. PCIR emits model-conditioned individual effect distributions, per-model posterior draw identity, full-exogenous coupling evidence, provenance and held-out calibration.
+2. Each output is associated with a declared model/mechanism profile and factual support context. The adapter must not invent probabilities over epistemic model alternatives.
+3. #10372 evaluates whether the requested intervention is supported and whether the counterfactual is point-identified, set-identified, assumption-sensitive, unsupported, incomplete or out of scope under its declared cross-world / structural assumption family.
+4. #13239/#13152 retain finite-world regret and decision-sufficiency ownership. The candidate may act only when the admitted decision rule remains justified across the qualified set; otherwise it returns the relevant unknown/ambiguous disposition or requests discriminating evidence.
+5. For dynamic latent-state mechanism bounds, Haugh and Singal (ICML 2023) already optimize over possibly infinitely many causal mechanisms to compute upper/lower counterfactual bounds. A finite list of sampled models is not a substitute for a complete-class bound; PCIR must label any finite envelope as empirical unless completeness and support are established.
 
-Δ_(i,m,k)(a,b) = U(Y_m(a; u_(i,m,k))) - U(Y_m(b; u_(i,m,k)))
+The existing graph-level Shpitser–Pearl ID implementation is complementary, not a replacement: it reasons over causal graphs and identification rules rather than learned dynamic world-model outputs. The generic CounterfactualUncertainty structure also does not certify a complete dynamic mechanism set. The future implementation should adapt PCIR's outputs to #10372's contract or extend that owner with explicit owner review; it should **not** create a parallel cross-world identification evaluator inside PCIR.
 
-Then report within-model posterior effect distributions separately from between-model disagreement. A finite model-set envelope may be written:
+The main distinction remains two nested uncertainties:
+- **Within-model individual uncertainty:** (q_m(u_i mid h_i)), including the full exogenous draw and posterior effect distribution for one individual under model (m).
+- **Between-model / structural uncertainty:** which model/mechanism profiles remain admissible given independent factual fit, physical restrictions, support and evidence.
 
-[ min_(m,k) Δ_(i,m,k), max_(m,k) Δ_(i,m,k) ]
+Keep the two layers separate. If two factual-equivalent admissible mechanisms predict opposite intervention effects, preserve that disagreement in the #10372 assumption set; do not average the effects into a falsely precise zero. A finite candidate-model range is only a sampled range unless the model set is complete for the declared scope.
 
-but this is a certified bound only when the admitted model set is complete for the declared finite scope and each model's support is bounded. Otherwise it is an empirical sampled range and must be labelled as such.
-
-The crucial falsification case is two mechanisms that fit the factual history equally well, satisfy the same declared physical constraints, but predict opposite signs for an unobserved intervention. A single-model posterior over u cannot represent this structural ambiguity. Averaging the two model predictions to zero would hide the disagreement rather than resolve it.
-
-The follow-up protocol should:
-1. Freeze the model family, admissibility constraints, factual-fit tolerance, held-out split and candidate intervention set before confirmatory counterfactual outcomes are revealed.
-2. Admit models using independent factual prediction and physical-consistency evidence, not their counterfactual score alone.
-3. Preserve each model's provenance and the per-model q_m(u_i | h_i) distribution.
-4. Compute model-conditional individual effects and the between-model range without collapsing the two uncertainty layers.
-5. Pass the finite admissible model/effect worlds to the existing #13239/#13152 regret and decision-sufficiency evaluator; do not create a second regret engine.
-6. Use #10252's cross-model ranking idea as prior art/reference where relevant, while keeping its current vehicle-specific ownership intact.
-7. If models disagree enough to change the decision, return an ambiguity/unknown disposition or acquire discriminating evidence through the existing active-sensing and value-of-information owners. Do not self-authorize an action.
-
-The existing graph-level Shpitser–Pearl ID implementation and the generic CounterfactualUncertainty structure are not this evaluator: the former reasons over causal graphs and identification rules, while the latter's heuristic uncertainty propagation does not certify the completeness of a dynamic world-model set. Haugh and Singal (ICML 2023) already provide an optimization-based method for bounding counterfactual quantities over possibly infinitely many causal mechanisms in dynamic latent-state models. The Symthaea opportunity is therefore not to claim that bounds over causal models are new, but to create an evidence-qualified adapter that connects admissible mechanism sets and per-model individual posteriors to the existing decision-regret and model-use contracts. A finite sampled model range is not a substitute for their complete-class optimization and must be labelled accordingly.
-
-This is a separate follow-on research direction, not implemented by the PCIR v0.1 contract. It is arguably the more important long-term paradigm shift: **not merely asking what a model predicts for this individual, but determining which parts of that counterfactual are identifiable across every plausible causal mechanism.**
+A follow-on extension should first be proposed to the #10372 owner: a typed input contract for per-model conditional effect distributions, support receipts and model provenance, plus compatibility fixtures that preserve individual cluster identities and do not overstate set completeness. That extension is not implemented by PCIR v0.1.
 
 ## Sources
 
