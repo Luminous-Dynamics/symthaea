@@ -2847,7 +2847,9 @@ pub fn evaluate_coupled_two_mode_authority(
             break;
         }
         sample_step = next_sample_step;
-        power = multiply_mat2(power, a)?;
+        let sample_transition =
+            matrix_power_2x2(a, contract.diagnostic_sampling_stride_steps)?;
+        power = multiply_mat2(power, sample_transition)?;
     }
 
     let mut controllability = [0.0_f64; 3];
@@ -6568,6 +6570,26 @@ mod tests {
         assert!(!report.authority_qualified);
         assert_eq!(report.controllability_min_eigenvalue, 0.0);
         assert_eq!(report.controllability_condition_number, None);
+    }
+
+    #[test]
+    fn coupled_two_mode_authority_advances_by_the_declared_sensor_stride() {
+        let mut contract = coupled_two_mode_contract(
+            [1.2, 0.0, 0.0, 1.1],
+            [[1.0, 0.0], [0.0, 1.0]],
+            [1.0, 1.0],
+        );
+        contract.horizon_steps = 5;
+        contract.diagnostic_sampling_stride_steps = 2;
+        contract.actuator_update_stride_steps = 2;
+        let report = evaluate_coupled_two_mode_authority(contract).unwrap();
+        assert_eq!(report.observation_sample_count, 3);
+        assert_eq!(report.actuator_command_count, 3);
+        let expected_x = 1.0 + 1.2_f64.powi(4) + 1.2_f64.powi(8);
+        let expected_y = 1.0 + 1.1_f64.powi(4) + 1.1_f64.powi(8);
+        assert!((report.observability_gramian[0] - expected_x).abs() < 1.0e-10);
+        assert!(report.observability_gramian[1].abs() < 1.0e-12);
+        assert!((report.observability_gramian[2] - expected_y).abs() < 1.0e-10);
     }
 
     #[test]
