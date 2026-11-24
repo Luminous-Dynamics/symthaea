@@ -7,10 +7,9 @@ use std::collections::{BTreeMap, BTreeSet};
 use serde::{Deserialize, Serialize};
 
 use crate::temporal_grounding::{
-    score_temporal_grounding, validate_temporal_ground_truth,
-    validate_temporal_grounding_prediction, TemporalGroundingOutcomeV1,
-    TemporalGroundingPlanV1, TemporalGroundingPredictionV1, TemporalGroundingScoreV1,
-    TemporalGroundTruthV1,
+    TemporalGroundTruthV1, TemporalGroundingOutcomeV1, TemporalGroundingPlanV1,
+    TemporalGroundingPredictionV1, TemporalGroundingScoreV1, score_temporal_grounding,
+    validate_temporal_ground_truth, validate_temporal_grounding_prediction,
 };
 
 const REVISION_SCHEMA: &str = "mel-temporal-revision-case-v1";
@@ -245,7 +244,9 @@ pub fn compare_matched_evidence_arms(
                 EvidenceConditionV1::YokedRetrieved => &mut yoked,
             };
             if slot.replace(*case).is_some() {
-                return Err(format!("experiment unit {unit_id} repeats an evidence condition"));
+                return Err(format!(
+                    "experiment unit {unit_id} repeats an evidence condition"
+                ));
             }
         }
         let no_evidence = no_evidence
@@ -278,10 +279,8 @@ pub fn compare_matched_evidence_arms(
         let no_report = audit_revision_v2(no_evidence)?;
         let local_report = audit_revision_v2(local)?;
         let yoked_report = audit_revision_v2(yoked)?;
-        let local_minus_no_evidence_f1 = paired_delta(
-            local_report.final_score.f1,
-            no_report.final_score.f1,
-        );
+        let local_minus_no_evidence_f1 =
+            paired_delta(local_report.final_score.f1, no_report.final_score.f1);
         let local_minus_yoked_f1 =
             paired_delta(local_report.final_score.f1, yoked_report.final_score.f1);
         let local_minus_no_evidence_count_gated_f1 = paired_delta(
@@ -358,8 +357,7 @@ pub fn bootstrap_matched_evidence_contrasts(
                 contrast.experiment_unit_id
             ));
         }
-        if contrast.local_minus_no_evidence_f1.is_none()
-            || contrast.local_minus_yoked_f1.is_none()
+        if contrast.local_minus_no_evidence_f1.is_none() || contrast.local_minus_yoked_f1.is_none()
         {
             return Err("matched F1 contrasts must be present for every experiment unit".into());
         }
@@ -413,10 +411,10 @@ pub fn bootstrap_matched_evidence_contrasts(
         .collect();
 
     let mut rng_state = seed;
-    let estimate_local_no = lineage_f1.iter().map(|item| item.0).sum::<f64>()
-        / lineage_f1.len() as f64;
-    let estimate_local_yoked = lineage_f1.iter().map(|item| item.1).sum::<f64>()
-        / lineage_f1.len() as f64;
+    let estimate_local_no =
+        lineage_f1.iter().map(|item| item.0).sum::<f64>() / lineage_f1.len() as f64;
+    let estimate_local_yoked =
+        lineage_f1.iter().map(|item| item.1).sum::<f64>() / lineage_f1.len() as f64;
     let local_no_samples = bootstrap_cluster_means(
         &lineage_f1.iter().map(|item| item.0).collect::<Vec<_>>(),
         bootstrap_replicates,
@@ -435,16 +433,9 @@ pub fn bootstrap_matched_evidence_contrasts(
         let yoked_values: Vec<_> = lineage_count.iter().map(|item| item.1).collect();
         let no_estimate = no_values.iter().sum::<f64>() / no_values.len() as f64;
         let yoked_estimate = yoked_values.iter().sum::<f64>() / yoked_values.len() as f64;
-        let no_samples = bootstrap_cluster_means(
-            &no_values,
-            bootstrap_replicates,
-            &mut rng_state,
-        );
-        let yoked_samples = bootstrap_cluster_means(
-            &yoked_values,
-            bootstrap_replicates,
-            &mut rng_state,
-        );
+        let no_samples = bootstrap_cluster_means(&no_values, bootstrap_replicates, &mut rng_state);
+        let yoked_samples =
+            bootstrap_cluster_means(&yoked_values, bootstrap_replicates, &mut rng_state);
         Some((
             percentile_interval(no_estimate, no_samples),
             percentile_interval(yoked_estimate, yoked_samples),
@@ -466,8 +457,7 @@ pub fn bootstrap_matched_evidence_contrasts(
         local_minus_no_evidence_count_gated_f1: count_gated_intervals
             .as_ref()
             .map(|item| item.0.clone()),
-        local_minus_yoked_count_gated_f1: count_gated_intervals
-            .map(|item| item.1),
+        local_minus_yoked_count_gated_f1: count_gated_intervals.map(|item| item.1),
     })
 }
 
@@ -539,7 +529,10 @@ pub fn audit_revision_case_v2(input: &str) -> Result<RevisionReportV1, String> {
 /// exact audio clock and evaluator plan.
 pub fn audit_revision_v2(case: &RevisionCaseV2) -> Result<RevisionReportV1, String> {
     if case.schema != "mel-temporal-revision-case-v2" {
-        return Err(format!("unsupported temporal revision V2 schema: {}", case.schema));
+        return Err(format!(
+            "unsupported temporal revision V2 schema: {}",
+            case.schema
+        ));
     }
     require_text(&case.case_id, "case_id")?;
     require_text(&case.experiment_unit_id, "experiment_unit_id")?;
@@ -568,21 +561,15 @@ pub fn audit_revision_v2(case: &RevisionCaseV2) -> Result<RevisionReportV1, Stri
     if case.actions.as_slice() == [RevisionActionV1::NoChange]
         && case.draft_prediction != case.final_prediction
     {
-        return Err("NoChange action is incompatible with different draft/final predictions".into());
+        return Err(
+            "NoChange action is incompatible with different draft/final predictions".into(),
+        );
     }
 
-    let draft_score = score_temporal_grounding(
-        &case.truth,
-        &case.draft_prediction,
-        &case.plan,
-    )
-    .map_err(|issues| format!("draft score rejected by production evaluator: {issues:?}"))?;
-    let final_score = score_temporal_grounding(
-        &case.truth,
-        &case.final_prediction,
-        &case.plan,
-    )
-    .map_err(|issues| format!("final score rejected by production evaluator: {issues:?}"))?;
+    let draft_score = score_temporal_grounding(&case.truth, &case.draft_prediction, &case.plan)
+        .map_err(|issues| format!("draft score rejected by production evaluator: {issues:?}"))?;
+    let final_score = score_temporal_grounding(&case.truth, &case.final_prediction, &case.plan)
+        .map_err(|issues| format!("final score rejected by production evaluator: {issues:?}"))?;
     let legacy_case = RevisionCaseV1 {
         schema: REVISION_SCHEMA.into(),
         case_id: case.case_id.clone(),
@@ -615,9 +602,14 @@ fn validate_v2_evidence(case: &RevisionCaseV2) -> Result<(), String> {
         (EvidenceConditionV1::NoEvidence, Some(_)) => {
             Err("NoEvidence condition must not carry an evidence reference".into())
         }
-        (_, None) => Err("retrieved/yoked evidence condition requires an evidence reference".into()),
+        (_, None) => {
+            Err("retrieved/yoked evidence condition requires an evidence reference".into())
+        }
         (condition, Some(evidence)) => {
-            validate_digest(&evidence.source_audio_sha256, "evidence.source_audio_sha256")?;
+            validate_digest(
+                &evidence.source_audio_sha256,
+                "evidence.source_audio_sha256",
+            )?;
             validate_digest(
                 &evidence.evidence_payload_sha256,
                 "evidence.evidence_payload_sha256",
@@ -630,12 +622,12 @@ fn validate_v2_evidence(case: &RevisionCaseV2) -> Result<(), String> {
                 return Err("evidence sample rate and half-open frame window must be valid".into());
             }
             let same_audio_digest = evidence.source_audio_sha256 == scored_audio.audio_sha256;
-            let same_audio_clock = same_audio_digest
-                && evidence.source_sample_rate_hz == scored_audio.sample_rate_hz;
+            let same_audio_clock =
+                same_audio_digest && evidence.source_sample_rate_hz == scored_audio.sample_rate_hz;
             match condition {
-                EvidenceConditionV1::LocalRetrieved if !same_audio_clock => {
-                    Err("local evidence must bind the exact scored audio digest and sample rate".into())
-                }
+                EvidenceConditionV1::LocalRetrieved if !same_audio_clock => Err(
+                    "local evidence must bind the exact scored audio digest and sample rate".into(),
+                ),
                 EvidenceConditionV1::LocalRetrieved
                     if evidence.end_frame > scored_audio.total_frames =>
                 {
@@ -658,7 +650,10 @@ pub fn audit_revision_case(input: &str) -> Result<RevisionReportV1, String> {
 
 pub fn audit_revision(case: &RevisionCaseV1) -> Result<RevisionReportV1, String> {
     if case.schema != REVISION_SCHEMA {
-        return Err(format!("unsupported temporal revision schema: {}", case.schema));
+        return Err(format!(
+            "unsupported temporal revision schema: {}",
+            case.schema
+        ));
     }
     require_text(&case.case_id, "case_id")?;
     require_text(&case.experiment_unit_id, "experiment_unit_id")?;
@@ -671,23 +666,19 @@ pub fn audit_revision(case: &RevisionCaseV1) -> Result<RevisionReportV1, String>
     validate_score(&case.draft, "draft")?;
     validate_score(&case.final_score, "final_score")?;
     validate_score_pair(&case.draft, &case.final_score)?;
-    if case.actions.as_slice() == [RevisionActionV1::NoChange]
-        && case.draft != case.final_score
-    {
-        return Err("NoChange action is incompatible with different draft/final score records".into());
+    if case.actions.as_slice() == [RevisionActionV1::NoChange] && case.draft != case.final_score {
+        return Err(
+            "NoChange action is incompatible with different draft/final score records".into(),
+        );
     }
 
     let draft = snapshot(&case.draft);
     let final_score = snapshot(&case.final_score);
     let positive = case.draft.outcome == TemporalGroundingOutcomeV1::ScoredPresentQuery;
     let absent = case.draft.outcome == TemporalGroundingOutcomeV1::ScoredAbsentQuery;
-    let f1_delta = positive.then(|| {
-        final_score.f1.unwrap_or(0.0) - draft.f1.unwrap_or(0.0)
-    });
-    let count_gated_f1_delta = (positive && case.draft.ground_truth_occurrences > 1).then(|| {
-        final_score.count_gated_f1.unwrap_or(0.0)
-            - draft.count_gated_f1.unwrap_or(0.0)
-    });
+    let f1_delta = positive.then(|| final_score.f1.unwrap_or(0.0) - draft.f1.unwrap_or(0.0));
+    let count_gated_f1_delta = (positive && case.draft.ground_truth_occurrences > 1)
+        .then(|| final_score.count_gated_f1.unwrap_or(0.0) - draft.count_gated_f1.unwrap_or(0.0));
     let helpful_revision = f1_delta.map(|delta| delta > EPSILON);
     let harmful_revision = f1_delta.map(|delta| delta < -EPSILON);
     let draft_was_perfect = is_perfect(&case.draft);
@@ -818,8 +809,10 @@ pub fn aggregate_revision_reports(
         mean_count_gated_f1_delta: mean(&gated_deltas),
         absent_claims_scored: absent
             .iter()
-            .filter(|report| report.draft.correct_absence_claim.is_some()
-                || report.final_score.correct_absence_claim.is_some())
+            .filter(|report| {
+                report.draft.correct_absence_claim.is_some()
+                    || report.final_score.correct_absence_claim.is_some()
+            })
             .count(),
         correct_absence_before: absent
             .iter()
@@ -878,9 +871,14 @@ fn validate_evidence(case: &RevisionCaseV1) -> Result<(), String> {
         (EvidenceConditionV1::NoEvidence, Some(_)) => {
             Err("NoEvidence condition must not carry an evidence reference".into())
         }
-        (_, None) => Err("retrieved/yoked evidence condition requires an evidence reference".into()),
+        (_, None) => {
+            Err("retrieved/yoked evidence condition requires an evidence reference".into())
+        }
         (condition, Some(evidence)) => {
-            validate_digest(&evidence.source_audio_sha256, "evidence.source_audio_sha256")?;
+            validate_digest(
+                &evidence.source_audio_sha256,
+                "evidence.source_audio_sha256",
+            )?;
             validate_digest(
                 &evidence.evidence_payload_sha256,
                 "evidence.evidence_payload_sha256",
@@ -893,12 +891,12 @@ fn validate_evidence(case: &RevisionCaseV1) -> Result<(), String> {
                 return Err("evidence sample rate and half-open frame window must be valid".into());
             }
             let same_audio_digest = evidence.source_audio_sha256 == case.draft.audio_sha256;
-            let same_audio_clock = same_audio_digest
-                && evidence.source_sample_rate_hz == case.draft.sample_rate_hz;
+            let same_audio_clock =
+                same_audio_digest && evidence.source_sample_rate_hz == case.draft.sample_rate_hz;
             match condition {
-                EvidenceConditionV1::LocalRetrieved if !same_audio_clock => {
-                    Err("local evidence must bind the exact scored audio digest and sample rate".into())
-                }
+                EvidenceConditionV1::LocalRetrieved if !same_audio_clock => Err(
+                    "local evidence must bind the exact scored audio digest and sample rate".into(),
+                ),
                 EvidenceConditionV1::YokedRetrieved if same_audio_digest => {
                     Err("yoked evidence must originate from a different audio artifact".into())
                 }
@@ -908,11 +906,11 @@ fn validate_evidence(case: &RevisionCaseV1) -> Result<(), String> {
     }
 }
 
-fn validate_score(
-    score: &TemporalGroundingScoreV1,
-    label: &str,
-) -> Result<(), String> {
-    require_text(&score.evaluator_version, &format!("{label}.evaluator_version"))?;
+fn validate_score(score: &TemporalGroundingScoreV1, label: &str) -> Result<(), String> {
+    require_text(
+        &score.evaluator_version,
+        &format!("{label}.evaluator_version"),
+    )?;
     require_text(&score.query_id, &format!("{label}.query_id"))?;
     validate_digest(&score.audio_sha256, &format!("{label}.audio_sha256"))?;
     if score.sample_rate_hz == 0 {
@@ -940,14 +938,22 @@ fn validate_score(
             return Err(format!("{label} truth count does not equal TP + FN"));
         }
         if score.count_absolute_error
-            != Some(score.predicted_occurrences.abs_diff(score.ground_truth_occurrences))
+            != Some(
+                score
+                    .predicted_occurrences
+                    .abs_diff(score.ground_truth_occurrences),
+            )
             || score.exact_occurrence_count
                 != Some(score.predicted_occurrences == score.ground_truth_occurrences)
         {
-            return Err(format!("{label} occurrence-count diagnostics are inconsistent"));
+            return Err(format!(
+                "{label} occurrence-count diagnostics are inconsistent"
+            ));
         }
         if score.matches.len() != score.true_positives {
-            return Err(format!("{label} one-to-one match count differs from true_positives"));
+            return Err(format!(
+                "{label} one-to-one match count differs from true_positives"
+            ));
         }
         let mut prediction_indices = BTreeSet::new();
         let mut annotation_indices = BTreeSet::new();
@@ -959,7 +965,9 @@ fn validate_score(
                 || !matched.interval_iou.is_finite()
                 || !(0.0..=1.0).contains(&matched.interval_iou)
             {
-                return Err(format!("{label} match vector is not a valid one-to-one interval assignment"));
+                return Err(format!(
+                    "{label} match vector is not a valid one-to-one interval assignment"
+                ));
             }
         }
     }
@@ -971,7 +979,9 @@ fn validate_score(
             || score.false_negatives != 0
             || !score.matches.is_empty())
     {
-        return Err(format!("{label} absent-query score carries positive occurrence counts"));
+        return Err(format!(
+            "{label} absent-query score carries positive occurrence counts"
+        ));
     }
     match score.outcome {
         TemporalGroundingOutcomeV1::ScoredPresentQuery if !score.scored || score.f1.is_none() => {
@@ -1084,9 +1094,9 @@ fn mean(values: &[f64]) -> Option<f64> {
 mod tests {
     use super::*;
     use crate::temporal_grounding::{
-        AudioArtifactClockV1, FrameIntervalV1, GroundingPredictionKindV1,
-        GroundingPredictionStateV1, GroundTruthStateV1, TemporalGroundingOutcomeV1,
-        TemporalIntervalMatchV1, TEMPORAL_GROUNDING_SCHEMA_V1,
+        AudioArtifactClockV1, FrameIntervalV1, GroundTruthStateV1, GroundingPredictionKindV1,
+        GroundingPredictionStateV1, TEMPORAL_GROUNDING_SCHEMA_V1, TemporalGroundingOutcomeV1,
+        TemporalIntervalMatchV1,
     };
 
     const EVALUATOR: &str = "mel-temporal-grounding-v1";
@@ -1167,16 +1177,19 @@ mod tests {
         }
     }
 
-    fn positive_score(
-        f1: f64,
-        tp: usize,
-        fp: usize,
-        fn_: usize,
-    ) -> TemporalGroundingScoreV1 {
+    fn positive_score(f1: f64, tp: usize, fp: usize, fn_: usize) -> TemporalGroundingScoreV1 {
         let predicted = tp + fp;
         let truth = tp + fn_;
-        let precision = if predicted == 0 { 0.0 } else { tp as f64 / predicted as f64 };
-        let recall = if truth == 0 { 0.0 } else { tp as f64 / truth as f64 };
+        let precision = if predicted == 0 {
+            0.0
+        } else {
+            tp as f64 / predicted as f64
+        };
+        let recall = if truth == 0 {
+            0.0
+        } else {
+            tp as f64 / truth as f64
+        };
         TemporalGroundingScoreV1 {
             evaluator_version: EVALUATOR.into(),
             query_id: "query-1".into(),
@@ -1245,7 +1258,10 @@ mod tests {
         }
     }
 
-    fn case(draft: TemporalGroundingScoreV1, final_score: TemporalGroundingScoreV1) -> RevisionCaseV1 {
+    fn case(
+        draft: TemporalGroundingScoreV1,
+        final_score: TemporalGroundingScoreV1,
+    ) -> RevisionCaseV1 {
         RevisionCaseV1 {
             schema: REVISION_SCHEMA.into(),
             case_id: "case-1".into(),
@@ -1264,11 +1280,7 @@ mod tests {
     fn matched_evidence_triplet() -> [RevisionCaseV2; 3] {
         let truth = vec![interval(100, 200), interval(500, 600)];
         let draft = vec![interval(100, 200), interval(800, 900)];
-        let mut no_evidence = revision_case_v2(
-            truth.clone(),
-            draft.clone(),
-            draft.clone(),
-        );
+        let mut no_evidence = revision_case_v2(truth.clone(), draft.clone(), draft.clone());
         no_evidence.case_id = "unit-v2-no-evidence".into();
 
         let mut local = no_evidence.clone();
@@ -1282,15 +1294,14 @@ mod tests {
             start_frame: 0,
             end_frame: 48_000,
         });
-        local.final_prediction =
-            raw_prediction(&local.truth.artifact, "query-v2", truth.clone());
+        local.final_prediction = raw_prediction(&local.truth.artifact, "query-v2", truth.clone());
 
         let mut yoked = no_evidence.clone();
         yoked.case_id = "unit-v2-yoked".into();
         yoked.evidence_condition = EvidenceConditionV1::YokedRetrieved;
         yoked.evidence = Some(RevisionEvidenceV1 {
-            source_audio_sha256:
-                "1212121212121212121212121212121212121212121212121212121212121212".into(),
+            source_audio_sha256: "1212121212121212121212121212121212121212121212121212121212121212"
+                .into(),
             source_sample_rate_hz: 48_000,
             evidence_payload_sha256: RETRIEVAL.into(),
             retrieval_config_sha256: EVIDENCE.into(),
@@ -1308,8 +1319,7 @@ mod tests {
             case.experiment_unit_id = "unit-v2-second".into();
             case.case_id = format!("unit-v2-second-arm-{index}");
             case.source_lineage_id = "source-lineage-002".into();
-            let source_digest =
-                "1414141414141414141414141414141414141414141414141414141414141414";
+            let source_digest = "1414141414141414141414141414141414141414141414141414141414141414";
             case.truth.artifact.audio_sha256 = source_digest.into();
             case.draft_prediction.artifact.audio_sha256 = source_digest.into();
             case.final_prediction.artifact.audio_sha256 = source_digest.into();
@@ -1318,8 +1328,7 @@ mod tests {
                     evidence.source_audio_sha256 = source_digest.into();
                 } else if case.evidence_condition == EvidenceConditionV1::YokedRetrieved {
                     evidence.source_audio_sha256 =
-                        "1515151515151515151515151515151515151515151515151515151515151515"
-                            .into();
+                        "1515151515151515151515151515151515151515151515151515151515151515".into();
                 }
             }
         }
@@ -1330,10 +1339,8 @@ mod tests {
         assert_eq!(contrasts[0].source_lineage_id, "source-lineage-001");
         assert_eq!(contrasts[1].source_lineage_id, "source-lineage-002");
 
-        let first_run =
-            bootstrap_matched_evidence_contrasts(&contrasts, 1_000, 0xA11CE).unwrap();
-        let second_run =
-            bootstrap_matched_evidence_contrasts(&contrasts, 1_000, 0xA11CE).unwrap();
+        let first_run = bootstrap_matched_evidence_contrasts(&contrasts, 1_000, 0xA11CE).unwrap();
+        let second_run = bootstrap_matched_evidence_contrasts(&contrasts, 1_000, 0xA11CE).unwrap();
         assert_eq!(first_run, second_run);
         assert_eq!(first_run.experiment_units, 2);
         assert_eq!(first_run.source_work_clusters, 2);
@@ -1341,10 +1348,7 @@ mod tests {
         assert_eq!(first_run.recommended_confirmatory_cluster_floor, 30);
         assert!(!first_run.confirmatory_source_cluster_floor_met);
         assert!(!first_run.confirmatory_one_to_many_cluster_floor_met);
-        assert_eq!(
-            first_run.local_minus_no_evidence_f1.estimate,
-            0.5
-        );
+        assert_eq!(first_run.local_minus_no_evidence_f1.estimate, 0.5);
         assert_eq!(
             first_run
                 .local_minus_no_evidence_count_gated_f1
@@ -1373,14 +1377,8 @@ mod tests {
         assert_eq!(contrast.experiment_unit_id, "unit-v2");
         assert_eq!(contrast.local_minus_no_evidence_f1, Some(0.5));
         assert_eq!(contrast.local_minus_yoked_f1, Some(0.5));
-        assert_eq!(
-            contrast.local_minus_no_evidence_count_gated_f1,
-            Some(0.5)
-        );
-        assert_eq!(
-            contrast.local_minus_yoked_count_gated_f1,
-            Some(0.5)
-        );
+        assert_eq!(contrast.local_minus_no_evidence_count_gated_f1, Some(0.5));
+        assert_eq!(contrast.local_minus_yoked_count_gated_f1, Some(0.5));
         assert_eq!(contrast.local_beats_yoked, Some(true));
         assert_eq!(contrast.local_output_tokens, 128);
         assert_eq!(contrast.no_evidence_output_tokens, 128);
@@ -1567,36 +1565,28 @@ mod tests {
     fn cross_query_or_cross_audio_draft_final_pairs_are_rejected() {
         let draft = positive_score(0.5, 1, 1, 1);
         let mut final_score = positive_score(1.0, 2, 0, 0);
-        final_score.audio_sha256 = "1212121212121212121212121212121212121212121212121212121212121212".into();
+        final_score.audio_sha256 =
+            "1212121212121212121212121212121212121212121212121212121212121212".into();
         assert!(audit_revision(&case(draft, final_score)).is_err());
     }
 
     #[test]
     fn declared_no_change_cannot_hide_a_different_final_score() {
-        let mut revision = case(
-            positive_score(0.5, 1, 1, 1),
-            positive_score(1.0, 2, 0, 0),
-        );
+        let mut revision = case(positive_score(0.5, 1, 1, 1), positive_score(1.0, 2, 0, 0));
         revision.actions = vec![RevisionActionV1::NoChange];
         assert!(audit_revision(&revision).is_err());
     }
 
     #[test]
     fn absence_revision_reports_improvement_without_relabeling_abstention_as_absence() {
-        let absent = audit_revision(&case(
-            absent_score(Some(false)),
-            absent_score(Some(true)),
-        ))
-        .unwrap();
+        let absent =
+            audit_revision(&case(absent_score(Some(false)), absent_score(Some(true)))).unwrap();
         assert_eq!(absent.absence_improved, Some(true));
         assert_eq!(absent.absence_regressed, Some(false));
         assert_eq!(absent.f1_delta, None);
 
-        let abstained = audit_revision(&case(
-            absent_score(Some(false)),
-            absent_score(None),
-        ))
-        .unwrap();
+        let abstained =
+            audit_revision(&case(absent_score(Some(false)), absent_score(None))).unwrap();
         assert_eq!(abstained.absence_improved, Some(false));
         assert_eq!(abstained.absence_regressed, Some(false));
         assert_eq!(abstained.final_score.correct_absence_claim, None);
@@ -1607,7 +1597,8 @@ mod tests {
         let mut yoked = case(positive_score(0.5, 1, 1, 1), positive_score(1.0, 2, 0, 0));
         yoked.evidence_condition = EvidenceConditionV1::YokedRetrieved;
         yoked.evidence = Some(RevisionEvidenceV1 {
-            source_audio_sha256: "1212121212121212121212121212121212121212121212121212121212121212".into(),
+            source_audio_sha256: "1212121212121212121212121212121212121212121212121212121212121212"
+                .into(),
             source_sample_rate_hz: 44_100,
             evidence_payload_sha256: EVIDENCE.into(),
             retrieval_config_sha256: RETRIEVAL.into(),
@@ -1636,10 +1627,7 @@ mod tests {
 
     #[test]
     fn empty_experiment_unit_identity_is_rejected() {
-        let mut input = case(
-            positive_score(0.5, 1, 1, 1),
-            positive_score(1.0, 2, 0, 0),
-        );
+        let mut input = case(positive_score(0.5, 1, 1, 1), positive_score(1.0, 2, 0, 0));
         input.experiment_unit_id.clear();
         assert!(audit_revision(&input).is_err());
     }
@@ -1649,11 +1637,13 @@ mod tests {
         let improved = audit_revision(&case(
             positive_score(0.5, 1, 1, 1),
             positive_score(1.0, 2, 0, 0),
-        )).unwrap();
+        ))
+        .unwrap();
         let harmed = audit_revision(&case(
             positive_score(1.0, 2, 0, 0),
             positive_score(0.5, 1, 1, 1),
-        )).unwrap();
+        ))
+        .unwrap();
         let mut harmed = harmed;
         harmed.case_id = "case-2".into();
         let aggregate = aggregate_revision_reports(&[improved, harmed]).unwrap();

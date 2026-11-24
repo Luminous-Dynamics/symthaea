@@ -10,8 +10,8 @@ use std::io::{self, Read};
 use std::process::ExitCode;
 
 use mel_temporal_grounding_qualifier::temporal_revision::{
-    audit_revision_v2, bootstrap_matched_evidence_contrasts, compare_matched_evidence_arms,
     MatchedEvidenceBootstrapV1, MatchedEvidenceContrastV1, RevisionCaseV2, RevisionReportV1,
+    audit_revision_v2, bootstrap_matched_evidence_contrasts, compare_matched_evidence_arms,
 };
 use serde::Serialize;
 use serde_json::Value;
@@ -47,8 +47,8 @@ fn read_input() -> Result<String, String> {
 
 fn run() -> Result<String, String> {
     let input = read_input()?;
-    let value: Value = serde_json::from_str(&input)
-        .map_err(|error| format!("invalid JSON input: {error}"))?;
+    let value: Value =
+        serde_json::from_str(&input).map_err(|error| format!("invalid JSON input: {error}"))?;
     if value.is_array() {
         let cases: Vec<RevisionCaseV2> = serde_json::from_value(value)
             .map_err(|error| format!("invalid revision case batch: {error}"))?;
