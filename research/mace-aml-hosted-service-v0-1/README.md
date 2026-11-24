@@ -16,7 +16,7 @@ This crate implements the missing HTTP/storage boundary behind the frozen Add/Se
 - Deterministic lexical BM25 ranking with a stable memory-ID tie-break; Search returns source memory records only, not a generated answer.
 - Original ordered multimodal content parts and their Base64 data URIs are stored unchanged. JPEG/PNG/WebP signatures and decoded per-image / aggregate payload limits are checked at ingress.
 - A 48 MiB HTTP body bound, top-k bound of 100, and non-negative timestamp validation.
-- Eight focused Rust unit tests authored for read-after-write, duplicate retry, changed-payload conflict, user isolation, top-k rejection, media-signature validation, file-backed reopen recovery, and concurrent duplicate retries.
+- Nine focused Rust unit tests authored for read-after-write, duplicate retry, changed-payload conflict, user isolation, top-k rejection, media-signature validation, file-backed reopen recovery, and concurrent duplicate retries.
 
 ## Run locally
 
@@ -65,7 +65,7 @@ A caller must reuse the exact logical `request_id` and same request payload for 
 3. **Retrieval is a baseline.** BM25 is computed over the scoped in-process candidate set; this is adequate for a first deterministic correctness baseline, not a high-scale index. Image bytes are preserved but not decoded into visual features; image-only retrieval and multimodal semantic ranking are not implemented. Search's text projection uses text parts only.
 4. **Lifecycle mutation is not exposed here.** There are no public correction, revocation, deletion, or backup-restore routes. These must be governed internal events, externally witnessed, and reconciled before restored data can be served.
 5. **Operational hardening remains.** No rate limiter, distributed deployment, key rotation, database encryption, online backup protocol, migration protocol, observability/metrics endpoint, or independent tenant-key mapping is implemented. One process handles one principal/tenant. SQLite's single connection is serialized; capacity and latency must be measured.
-6. **No executed validation is claimed in this environment.** Eight tests are source-authored, but `cargo`, `rustc`, and `rustfmt` are unavailable in the current execution environment. Compilation, formatting, tests, stress tests, API smoke, public deployment, and AML evaluation remain pending. A skipped workflow is not a pass.
+6. **No executed validation is claimed in this environment.** Nine tests are source-authored, but `cargo`, `rustc`, and `rustfmt` are unavailable in the current execution environment. Compilation, formatting, tests, stress tests, API smoke, public deployment, and AML evaluation remain pending. A skipped workflow is not a pass.
 
 ## Required qualification ladder
 
