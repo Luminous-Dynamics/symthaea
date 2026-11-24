@@ -8,7 +8,7 @@
 use std::collections::{BTreeMap, HashSet};
 use std::fmt::Write as _;
 
-const HEADER: &str = "team_id\ttask_bundle_sha256\tai_configuration_sha256\tarm\tbaseline_accuracy\tassisted_accuracy\timmediate_ai_off_accuracy\tdelayed_ai_off_accuracy\ttransfer_accuracy\tunique_fact_retention\texpertise_routing_accuracy\tagency_score\tai_off_gate_status\tai_off_receipt_sha256";
+const HEADER: &str = "team_id\ttask_bundle_sha256\tai_configuration_sha256\ttms_configuration_sha256\tarm\tbaseline_accuracy\tassisted_accuracy\timmediate_ai_off_accuracy\tdelayed_ai_off_accuracy\ttransfer_accuracy\tunique_fact_retention\texpertise_routing_accuracy\tagency_score\tai_off_gate_status\tai_off_receipt_sha256";
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 enum Arm {
@@ -33,6 +33,10 @@ impl Arm {
         matches!(self, Self::HumanAi | Self::HumanAiTms)
     }
 
+    fn has_tms(self) -> bool {
+        matches!(self, Self::HumanTms | Self::HumanAiTms)
+    }
+
     fn index(self) -> usize {
         match self {
             Self::HumanOnly => 0,
@@ -46,6 +50,8 @@ impl Arm {
 #[derive(Debug, Clone)]
 struct TeamObservation {
     task_bundle_sha256: String,
+    ai_configuration_sha256: Option<String>,
+    tms_configuration_sha256: Option<String>,
     arm: Arm,
     baseline_accuracy: f64,
     assisted_accuracy: Option<f64>,
@@ -120,6 +126,8 @@ struct Analysis {
     endpoints: BTreeMap<&'static str, EndpointEstimate>,
     assisted_ai_arm_mean: Option<f64>,
     task_bundle_sha256: String,
+    ai_configuration_sha256: Option<String>,
+    tms_configuration_sha256: Option<String>,
     draws: usize,
     seed: u64,
 }
@@ -148,6 +156,7 @@ fn parse_tsv(input: &str) -> Result<Vec<TeamObservation>, String> {
     let mut receipt_digests = HashSet::new();
     let mut task_bundle_digest: Option<String> = None;
     let mut ai_configuration_digest: Option<String> = None;
+    let mut tms_configuration_digest: Option<String> = None;
 
     for (line_index, line) in lines.enumerate() {
         let line_number = line_index + 2;
@@ -178,7 +187,7 @@ fn parse_tsv(input: &str) -> Result<Vec<TeamObservation>, String> {
             _ => {}
         }
 
-        let arm = Arm::parse(fields[3]).map_err(|error| format!("line {line_number}: {error}"))?;
+        let arm = Arm::parse(fields[4]).map_err(|error| format!("line {line_number}: {error}"))?;
         let ai_digest = if fields[2] == "NA" {
             None
         } else {
@@ -206,11 +215,39 @@ fn parse_tsv(input: &str) -> Result<Vec<TeamObservation>, String> {
             ));
         }
 
-        let baseline_accuracy = parse_score(fields[4], "baseline_accuracy", line_number)?;
+
+        let tms_digest = if fields[3] == "NA" {
+            None
+        } else {
+            require_sha256(fields[3], "tms_configuration_sha256", line_number)?;
+            Some(fields[3].to_string())
+        };
+        if arm.has_tms() {
+            let digest = tms_digest.as_ref().ok_or_else(|| {
+                format!(
+                    "line {line_number}: TMS arms require a pinned TMS configuration digest"
+                )
+            })?;
+            match &tms_configuration_digest {
+                Some(expected) if expected != digest => {
+                    return Err(format!(
+                        "line {line_number}: TMS configuration digest differs across TMS arms"
+                    ));
+                }
+                None => tms_configuration_digest = Some(digest.clone()),
+                _ => {}
+            }
+        } else if tms_digest.is_some() {
+            return Err(format!(
+                "line {line_number}: non-TMS arms must use NA for tms_configuration_sha256"
+            ));
+        }
+
+        let baseline_accuracy = parse_score(fields[5], "baseline_accuracy", line_number)?;
         let assisted_accuracy = if fields[5] == "NA" {
             None
         } else {
-            Some(parse_score(fields[5], "assisted_accuracy", line_number)?)
+            Some(parse_score(fields[6], "assisted_accuracy", line_number)?)
         };
         if arm.has_ai() != assisted_accuracy.is_some() {
             return Err(format!(
@@ -219,23 +256,23 @@ fn parse_tsv(input: &str) -> Result<Vec<TeamObservation>, String> {
         }
 
         let immediate_ai_off_accuracy =
-            parse_score(fields[6], "immediate_ai_off_accuracy", line_number)?;
+            parse_score(fields[7], "immediate_ai_off_accuracy", line_number)?;
         let delayed_ai_off_accuracy =
-            parse_score(fields[7], "delayed_ai_off_accuracy", line_number)?;
-        let transfer_accuracy = parse_score(fields[8], "transfer_accuracy", line_number)?;
-        let unique_fact_retention = parse_score(fields[9], "unique_fact_retention", line_number)?;
+            parse_score(fields[8], "delayed_ai_off_accuracy", line_number)?;
+        let transfer_accuracy = parse_score(fields[9], "transfer_accuracy", line_number)?;
+        let unique_fact_retention = parse_score(fields[10], "unique_fact_retention", line_number)?;
         let expertise_routing_accuracy =
-            parse_score(fields[10], "expertise_routing_accuracy", line_number)?;
-        let agency_score = parse_score(fields[11], "agency_score", line_number)?;
+            parse_score(fields[11], "expertise_routing_accuracy", line_number)?;
+        let agency_score = parse_score(fields[12], "agency_score", line_number)?;
 
-        if fields[12] != "VERIFIED" {
+        if fields[13] != "VERIFIED" {
             return Err(format!(
                 "line {line_number}: AI-off gate is not VERIFIED ({:?}); fail closed",
-                fields[12]
+                fields[13]
             ));
         }
-        require_sha256(fields[13], "ai_off_receipt_sha256", line_number)?;
-        if !receipt_digests.insert(fields[13].to_string()) {
+        require_sha256(fields[14], "ai_off_receipt_sha256", line_number)?;
+        if !receipt_digests.insert(fields[14].to_string()) {
             return Err(format!(
                 "line {line_number}: duplicate AI-off receipt digest; receipts must be team/run-specific"
             ));
@@ -243,6 +280,8 @@ fn parse_tsv(input: &str) -> Result<Vec<TeamObservation>, String> {
 
         observations.push(TeamObservation {
             task_bundle_sha256: task_digest,
+            ai_configuration_sha256: ai_digest,
+            tms_configuration_sha256: tms_digest,
             arm,
             baseline_accuracy,
             assisted_accuracy,
@@ -338,6 +377,8 @@ fn analyze(observations: &[TeamObservation], draws: usize, seed: u64) -> Result<
         endpoints,
         assisted_ai_arm_mean,
         task_bundle_sha256: observations[0].task_bundle_sha256.clone(),
+        ai_configuration_sha256: observations.iter().find_map(|row| row.ai_configuration_sha256.clone()),
+        tms_configuration_sha256: observations.iter().find_map(|row| row.tms_configuration_sha256.clone()),
         draws,
         seed,
     })
@@ -470,6 +511,12 @@ impl Analysis {
             self.teams_per_arm[3]
         );
         let _ = writeln!(output, "task_bundle_sha256: {}", self.task_bundle_sha256);
+        if let Some(digest) = &self.ai_configuration_sha256 {
+            let _ = writeln!(output, "ai_configuration_sha256: {digest}");
+        }
+        if let Some(digest) = &self.tms_configuration_sha256 {
+            let _ = writeln!(output, "tms_configuration_sha256: {digest}");
+        }
         let _ = writeln!(
             output,
             "bootstrap: draws={}, seed={}, resampling_unit=team",
@@ -584,6 +631,8 @@ mod tests {
     fn row(_team: &str, arm: Arm, immediate: f64) -> TeamObservation {
         TeamObservation {
             task_bundle_sha256: repeated_hash('a'),
+            ai_configuration_sha256: arm.has_ai().then(|| repeated_hash('c')),
+            tms_configuration_sha256: arm.has_tms().then(|| repeated_hash('d')),
             arm,
             baseline_accuracy: 0.5,
             assisted_accuracy: if arm.has_ai() { Some(0.8) } else { None },
@@ -662,12 +711,18 @@ mod tests {
             } else {
                 repeated_hash('c')
             };
+            let tms_digest = if index == 1 || index == 3 {
+                repeated_hash('d')
+            } else {
+                "NA".to_string()
+            };
             let assisted = if index < 2 { "NA" } else { "0.8" };
             let receipt = unique_hash(arm);
             let line = format!(
-                "team-{index}\t{}\t{}\t{}\t0.5\t{}\t0.5\t0.4\t0.45\t0.6\t0.7\t0.8\tVERIFIED\t{}",
+                "team-{index}\t{}\t{}\t{}\t{}\t0.5\t{}\t0.5\t0.4\t0.45\t0.6\t0.7\t0.8\tVERIFIED\t{}",
                 repeated_hash('a'),
                 ai_digest,
+                tms_digest,
                 arm,
                 assisted,
                 receipt
@@ -677,6 +732,13 @@ mod tests {
         }
         assert!(parse_tsv(&input).is_ok());
         assert!(parse_tsv(&input.replace("VERIFIED", "UNKNOWN")).is_err());
+        assert!(parse_tsv(&input.replace(&repeated_hash('d'), "NA")).is_err());
+        let mismatched_tms = input.replacen(&repeated_hash('d'), &repeated_hash('e'), 1);
+        assert!(
+            parse_tsv(&mismatched_tms)
+                .unwrap_err()
+                .contains("TMS configuration digest differs")
+        );
         let duplicate_receipt =
             input.replace(&unique_hash("human_ai_tms"), &unique_hash("human_only"));
         assert!(
@@ -716,11 +778,17 @@ mod tests {
             } else {
                 repeated_hash('c')
             };
+            let tms_digest = if index == 1 || index == 3 {
+                repeated_hash('d')
+            } else {
+                "NA".to_string()
+            };
             let assisted = if index < 2 { "NA" } else { "0.8" };
             let line = format!(
-                "team-{index}\t{}\t{}\t{}\t0.5\t{}\t0.5\t0.4\t0.45\t0.6\t0.7\t0.8\tVERIFIED\t{}",
+                "team-{index}\t{}\t{}\t{}\t{}\t0.5\t{}\t0.5\t0.4\t0.45\t0.6\t0.7\t0.8\tVERIFIED\t{}",
                 repeated_hash('a'),
                 ai_digest,
+                tms_digest,
                 arm,
                 assisted,
                 unique_hash(&format!("team-{index}"))
