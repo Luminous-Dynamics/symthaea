@@ -88,7 +88,14 @@
           ]
         }
       }
-    }
+    },
+    "source_lineage_id": "synthetic-lineage-001",
+    "runtime_identity_sha256": "bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb",
+    "decoding_config_sha256": "cccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccc",
+    "max_output_tokens": 512,
+    "actual_output_tokens": 128,
+    "max_wall_time_ms": 30000,
+    "elapsed_wall_time_ms": 4000
   },
   {
     "schema": "mel-temporal-revision-case-v2",
@@ -186,7 +193,14 @@
           ]
         }
       }
-    }
+    },
+    "source_lineage_id": "synthetic-lineage-001",
+    "runtime_identity_sha256": "bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb",
+    "decoding_config_sha256": "cccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccc",
+    "max_output_tokens": 512,
+    "actual_output_tokens": 128,
+    "max_wall_time_ms": 30000,
+    "elapsed_wall_time_ms": 4000
   },
   {
     "schema": "mel-temporal-revision-case-v2",
@@ -284,6 +298,13 @@
           ]
         }
       }
-    }
+    },
+    "source_lineage_id": "synthetic-lineage-001",
+    "runtime_identity_sha256": "bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb",
+    "decoding_config_sha256": "cccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccc",
+    "max_output_tokens": 512,
+    "actual_output_tokens": 128,
+    "max_wall_time_ms": 30000,
+    "elapsed_wall_time_ms": 4000
   }
 ]
