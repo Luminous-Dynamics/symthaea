@@ -173,7 +173,7 @@
         0.00010886621079036345,
         0.00010886621079036345
       ],
-      "expected_magnitude_T": 0.000153952,
+      "expected_magnitude_T": 0.0001539600717839002,
       "analytic_check": "vector sum; field vector components are authoritative and magnitude is rounded",
       "absolute_tolerance_T": 1e-12
     }
