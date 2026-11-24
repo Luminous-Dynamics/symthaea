@@ -239,6 +239,42 @@ Plot a Pareto frontier of decision regret against cumulative photon dose, acquis
 
 Also report dose-bound violations, sample-health outcome drift, missed rare events, calibration, abstention and human overrides separately. A single composite score must not conceal a policy that improves inference by damaging the specimen.
 
+### 5.3 Randomized observer-effect trial registry
+
+Issue #13504 / draft PR #13505 implement the next layer: a preregistered trial registry that binds randomized allocation to the exact photobiological exposure and endpoint-observation records. This is a design/provenance contract, not a causal-effect estimator and not proof that the allocation process was random.
+
+The minimum trial contract records:
+- protocol and power-analysis digests, randomization algorithm/version, blocking/stratification strategy and an external allocation receipt;
+- explicit dark/ambient reference, handling sham, low-exposure imaging, continuous and fractionated imaging, deliberate photoperiod, photostimulation and photoinactivation arms;
+- sample, biological replicate, cultivation unit and **shared illumination/interference cluster** as separate identities;
+- immutable assignment commitments, allocation timestamps and the exact arm assigned to each cultivation unit;
+- endpoint-specific analysis unit, smallest effect size of interest (SESOI), equivalence margin and primary/secondary status;
+- endpoint-specific treatment-versus-reference estimands;
+- exact exposure IDs/digests and baseline/follow-up observations for every primary endpoint and randomized unit.
+
+The effective sample size is not the number of images, fields of view, or vessels. It is constrained by the unit at which treatment was independently assigned and interference can be ruled out. If several vessels share one illuminated chamber, those vessels do not become independent randomized units merely because they have separate IDs. The initial contract therefore counts independent interference clusters for power-plan bounds and rejects a cluster split across treatment arms. Repeated/crossover designs require a separate sequence and carry-over model with a justified washout period.
+
+The analysis benchmark must compare:
+1. naïve within-unit before/after differences;
+2. observational regression without randomized allocation;
+3. randomized treatment-arm contrasts;
+4. blocked/stratified allocation;
+5. cluster-robust inference or randomization inference that respects the allocation unit;
+6. endpoint-specific equivalence testing for claims of biological neutrality.
+
+A protocol may be described as endpoint-neutral only when its prespecified equivalence procedure places the uncertainty interval wholly inside the biologically justified equivalence margin. A conventional nonsignificant difference is not evidence of equivalence. Control family-wise or false-discovery error across multiple primary endpoints using a preregistered plan, and report every endpoint separately so an increase in growth cannot conceal a decrease in viability or a change in secondary metabolites.
+
+The current Rust registry checks allocation/arm/experiment identities, cluster consistency, assignment digest integrity, exposure linkage, endpoint type, baseline/post-exposure coverage and explicit missingness. It recomputes the trial receipt from the ordered assignment, exposure and observation inventories. It intentionally does not establish allocation randomness from a hash, estimate a causal effect, run a TOST procedure, prove no interference or establish biological neutrality; those conclusions require the external allocation receipt, a qualified statistical analysis and independent biological evidence.
+
+Proposed acceptance targets (not achieved):
+- 100% of assignments, exposures and endpoint observations bound to a trial receipt;
+- zero cultivation-unit reassignment after the allocation commit;
+- zero shared interference clusters split across treatment arms;
+- zero fields/frames/timepoints from one cultivation unit leaking across trial partitions;
+- 100% of primary endpoints have a unit, SESOI and equivalence margin before allocation;
+- zero biological-neutrality claims based solely on a nonsignificant test;
+- 100% endpoint-specific reporting, with no opaque composite that can conceal opposing outcomes.
+
 ## 6. Three-tier evaluation programme
 
 ### Tier 0 — synthetic known-truth oracle
@@ -327,6 +363,7 @@ For the three-cycle longitudinal *Agaricus* series, leave-one-cycle-out evaluati
 The comparison is intentionally a division of labor, not a claim that open software automatically outperforms commercial platforms.
 
 - ZEISS arivis Pro 4.6 (released 2 October 2026) advertises annotation-to-cloud training workflows, use of externally trained 3D ONNX semantic models, and analysis tools in its 4D viewer. This is a meaningful segmentation and workflow capability; Mycelial should accept its outputs and independently qualify their provenance and downstream biological consequences. Release notes: https://knowledge.zeiss.com/rms/en/arivis-pro/release-notes/arivis-pro-4-6
+- Interoperability should target stable OME-Zarr / OME-NGFF 0.5 first, with explicit schema-version negotiation and a tracked migration path to the 0.6 development line. The OME-NGFF specification lists 0.6.dev4 as a development version; do not silently emit it as though it were the stable production contract. Use OME-TIFF / OME-Zarr and useq-schema / Micro-Manager adapters rather than creating a proprietary image container. Spec: https://ngff.openmicroscopy.org/; version history: https://ngff.openmicroscopy.org/specifications/dev/index.html; foundational format paper: https://doi.org/10.1038/s41592-021-01326-w.
 - Imaris 11.1 (released 8 September 2026) adds a Training Hub and native CZI reader integration; its release history also lists machine-learning filters for spots and surfaces in 11.0. It is a mature visualization and analysis environment, not a weak straw-man baseline. Release notes: https://imaris.oxinst.com/support/imaris-release-notes/
 - Fiji SNT provides automated and semi-automated tracing, multidimensional data support, 3D visualization, time-lapse workflows, scripting and a big-data mode described as experimental for TB-scale datasets. It is a useful open tracing and curation reference, although its primary design domain is neuronal morphology. Documentation: https://imagej.net/plugins/snt/
 - Fungal Network Analysis (FNA) is a specialist reference for fungal image processing: noise/background correction, network enhancement, segmentation, skeletonization, width estimation and graph representation. Reproduce its standard pipeline and preserve parameters rather than treating graph metrics as a substitute for function. Record: https://zenodo.org/records/14931863
@@ -351,6 +388,7 @@ This protocol connects rather than duplicates the current portfolio:
 - PR #13379 — decision-value active acquisition.
 - Issue #13486 / draft PR #13487 — hard cumulative specimen-health admissibility after VOI ranking.
 - Issue #13488 / draft PR #13492 — photobiological exposure and response observations, distinct from phototoxicity.
+- Issue #13504 / draft PR #13505 — randomized observer-effect trial registry with independent illumination-cluster accounting, endpoint-specific estimands and replayable allocation/exposure/observation receipts.
 - Issue #13419 — posterior adequacy, candidate-generation coverage and common-cause residuals.
 - Issue #13352 — independent functional observations and transport benchmarks.
 - Issue #13423 — multiplex transport and causal perturbation programme.
@@ -403,6 +441,8 @@ That would move Mycelial from network visualization toward a genuinely testable 
 - Hyphal Highways Device (2026): https://doi.org/10.1093/femsml/uqag035
 - Smart microscopy interoperability roadmap (2026): https://doi.org/10.1515/mim-2025-0029
 - Adaptive smart-microscopy review (2026): https://doi.org/10.1038/s44303-026-00145-y
+- Multi-agent smart microscopy, observation-to-understanding framework (2026): https://doi.org/10.48550/arXiv.2601.09054
+- OME-NGFF foundational specification / format paper: https://doi.org/10.1038/s41592-021-01326-w
 - PhotoFiTT illumination-pattern / phototoxicity framework (2025): https://doi.org/10.1038/s41467-025-66209-6
 - Fungal photoreceptor / photobiology review (2025): https://doi.org/10.1128/mmbr.00149-22
 - *Gibberella zeae* wavelength/irradiance response (2025): https://doi.org/10.1016/j.funbio.2025.101690
