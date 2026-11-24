@@ -163,7 +163,8 @@ A hard limit is not a cost to be traded against expected information gain. An in
 The proposed Rust implementation is split into two layers:
 - PR #13379 computes expected reduction in Bayes decision risk minus declared acquisition cost.
 - Issue #13486 / draft PR #13487 adds specimen-health admissibility using cumulative dose, session time, ROI, temperature and channel-calibration evidence.
-- The sample-health gate accepts only a replay-qualified VOI evidence bundle: the upstream report is independently recomputed against the exact source skeleton, candidate inventory, posterior, decision table and acquisition-response models. The final sample-health receipt binds both the report and the qualified source-evidence digest.
+- The sample-health gate accepts only a replay-qualified VOI evidence bundle: the upstream report is independently recomputed against the exact source skeleton, candidate inventory, posterior, decision table and acquisition-response models.
+- The final sample-health receipt binds both the upstream report and qualified source-evidence digest. Its own `validate_against` operation replays the hard-constraint filtering and final recommendation against the exact policy, cumulative exposure ledger and acquisition proposals; a changed recommendation or receipt is rejected.
 
 Hard constraints require exact calibration binding:
 - the health-model digest in every acquisition proposal must match the versioned sample-health policy;
