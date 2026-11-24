@@ -153,8 +153,8 @@ mod tests {
         assert_eq!(summary.reattempted_after_setback.observed_count, 2);
         assert_eq!(summary.reattempted_after_setback.positive_count, 1);
         assert_eq!(summary.reattempted_after_setback.rate, Some(0.5));
-        assert_eq!(summary.requested_hint.rate, Some(0.25));
-        assert_eq!(summary.requested_full_solution.rate, Some(0.25));
+        assert_eq!(summary.requested_hint.rate, Some(1.0 / 3.0));
+        assert_eq!(summary.requested_full_solution.rate, Some(1.0 / 3.0));
         assert_eq!(summary.voluntarily_stopped.rate, Some(0.25));
     }
 
@@ -168,7 +168,8 @@ mod tests {
 
         assert_eq!(summary.attempted_before_support.observed_count, 1);
         assert_eq!(summary.attempted_before_support.rate, Some(1.0));
-        assert_eq!(summary.setback_observed.observed_count, 2);
+        assert_eq!(summary.setback_observed.observed_count, 1);
+        assert_eq!(summary.setback_observed.rate, Some(0.0));
         assert_eq!(summary.reattempted_after_setback.observed_count, 0);
         assert_eq!(summary.reattempted_after_setback.rate, None);
         assert_eq!(summary.requested_full_solution.observed_count, 0);
