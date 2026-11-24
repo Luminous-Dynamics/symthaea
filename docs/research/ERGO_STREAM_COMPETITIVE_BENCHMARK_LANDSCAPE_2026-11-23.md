@@ -322,6 +322,23 @@ These are prospective engineering targets, not external standards or achieved re
 - Terminal-Bench Science 0.1: https://www.terminal-bench-science.ai/announcement · leaderboard: https://snorkel.ai/leaderboard/terminal-bench-science/
 
 - ConfidenceBench paper: https://arxiv.org/abs/2607.20526 · live leaderboard: https://confidencebench.com/
+## Conformal transfer is now a direct competitive frontier
+
+The current split-conformal finite baseline in Symtropy #7173 is intentionally **within-stratum** and fail-closed. The wider literature provides three direct comparators:
+
+- **Domain-Shift-Aware CP (ICML 2026):** reweights calibration examples by proximity to the test prompt to improve coverage under LLM domain shift. Reproduce this as a shift-aware baseline, not as evidence that ordinary split conformal remains valid under mechanism shift. https://proceedings.mlr.press/v306/lin26t.html
+- **Transported Conformal Calibration (ICML 2026):** transfers labeled source calibration into target spaces using unlabeled paired observations, then uses label-free mismatch diagnostics and weighting. This is especially relevant to sensor/modalities and format changes in ErgoStream. https://proceedings.mlr.press/v306/doula26a.html
+- **KMM-CP (UAI 2026):** addresses covariate shift using kernel mean matching and explicitly restricts correction to regions with sufficient support overlap; its authors report over 50% reduction in coverage gap on molecular-property shifts. The key lesson is that weight correction becomes unstable when target support is poorly covered. https://proceedings.mlr.press/v337/laghuvarapu26a.html
+
+**ErgoStream advantage to test:** treat a structural/behavioural correspondence as an explicit transport map for calibration—not merely an embedding similarity. Compare raw source split-conformal, shift-aware reweighting, transported calibration, KMM support-restricted CP, and abstain-on-unmatched-structure controls. Score target marginal coverage, average prediction-set size, singleton decision coverage, false-transfer risk, shift-diagnostic power and cost. The calibration transport map must itself be validated; an invalid mechanism map must not be used to justify transported calibration.
+
+Important assumptions:
+- ordinary split conformal: exchangeability of calibration and future examples within the admitted cohort;
+- covariate-shift weighting: target/source support overlap and a justified density-ratio model;
+- paired transport: sufficient unlabeled paired data and validity of the transport/mismatch bound;
+- arbitrary concept/mechanism shift: no general distribution-free coverage claim without further assumptions or target labels.
+
+
 ## 7. References
 - Weighted Conformal Prediction under Covariate Shift: https://arxiv.org/abs/1904.06019
 - Conformal Prediction with Conditional Guarantees (JRSSB 2025): https://academic.oup.com/jrsssb/article/87/4/1100/8058684
@@ -359,3 +376,7 @@ These are prospective engineering targets, not external standards or achieved re
 - Heidelberg Graph Matching Benchmark (11 datasets / 451 instances): https://hci.iwr.uni-heidelberg.de/content/graph-matching-benchmark
 - SciAgentArena: https://sciagentarena.github.io/ · https://arxiv.org/abs/2606.12736
 - Physical-AI world-model survey (2026): https://link.springer.com/article/10.1007/s44163-026-02122-1
+- Domain-Shift-Aware Conformal Prediction (ICML 2026): https://proceedings.mlr.press/v306/lin26t.html
+- Conformal Calibration Transfer / Transported Conformal Calibration (ICML 2026): https://proceedings.mlr.press/v306/doula26a.html
+- KMM-CP (UAI 2026): https://proceedings.mlr.press/v337/laghuvarapu26a.html
+- AstaBench, described in Stanford AI Index 2026: https://hai.stanford.edu/assets/files/ai_index_report_2026_chapter_5_science.pdf
