@@ -267,9 +267,12 @@ After reproducing the official baselines with the exact model/harness, benchmark
 - **AS-Bench 0.1 resolution rate above 80%**, against the public 72.2% leader, while reporting discovery and learning gates separately and retaining every failed/incomplete trial;
 - **SciWorkBench mean above 65**, against the reported 57.38 best configuration;
 - **FIRE-Bench F1 above 60**, against the reported 46.7 best tested configuration;
-- **AstaBench E2E-Bench-Hard partial-completion score above 0.80** on the same 2026 scoring/judge snapshot, with exact perfect-completion reported as a separate metric. The historical 3% figure is not the denominator or comparator for the newer partial score.
+- **AstaBench E2E-Bench-Hard partial-completion score above 0.80** on the same 2026 scoring/judge snapshot, with exact perfect-completion reported as a separate metric. The historical 3% figure is not the denominator or comparator for the newer partial score;
+- **BIABench:** on the exact v1.0/basic-instruction/three-run/process-judge protocol, improve the strongest reproducible baseline by at least 10 percentage points on the combined *outcome* score while not regressing process/QC score; on preselected hard 3D/time-lapse tasks whose published per-task best is at or below 0.19, target over 0.30 outcome score with 10+ runs and uncertainty intervals. Report every task separately, and do not train on evaluation ground truth;
+- **LABBench2:** target at least a 5 percentage-point paired improvement over the strongest matched-cost baseline on predeclared held-out subtasks, while preserving all subtask denominators and no-regression guardrails. This is a proposed internal comparison, not a claim against a currently verified leaderboard;
+- **BioBasicsBench:** no numeric SOTA target until external task/rubric access enables an independent reproduction. The published provider score is a reference only.
 
-These are provisional stretch goals, not results. Small leaderboard gaps must not be described as significant without matched trials and uncertainty intervals. No combined score across these benchmarks is valid: the task units, harnesses, budgets, graders and outcome semantics differ.
+These are provisional stretch goals, not results. For AS-Bench, reproduce its published three-trial-per-task protocol first, then run a separately labelled confirmatory extension with at least 20 paired trials per task and matched resource budgets. Small leaderboard gaps must not be described as significant without matched trials and uncertainty intervals. No combined score across these benchmarks is valid: task units, harnesses, budgets, graders and outcome semantics differ.
 
 ### Qualified Knowledge Yield
 
