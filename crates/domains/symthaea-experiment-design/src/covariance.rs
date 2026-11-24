@@ -833,7 +833,7 @@ mod tests {
 
     #[test]
     fn jacobi_eigenvalues_match_independent_nalgebra_reference() {
-        use nalgebra::{DMatrix, SymmetricEigen};
+        use nalgebra::{DMatrix, linalg::SymmetricEigen};
 
         for (n, rank) in [(2, 2), (3, 3), (8, 4), (16, 7), (16, 16)] {
             let factor: Vec<Vec<f64>> = (0..n)
