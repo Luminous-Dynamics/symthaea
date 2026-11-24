@@ -40,16 +40,19 @@ CREATE TABLE IF NOT EXISTS sfeb.source_receipts (
     issued_at               timestamptz NOT NULL,
     expires_at              timestamptz NOT NULL,
     CHECK (expires_at > issued_at),
+    UNIQUE (tenant_id, receipt_id),
     UNIQUE (tenant_id, source_uri, event_id)
 );
 
 CREATE TABLE IF NOT EXISTS sfeb.source_receipt_revocations (
-    receipt_id             text PRIMARY KEY REFERENCES sfeb.source_receipts(receipt_id),
     tenant_id              text NOT NULL,
+    receipt_id             text NOT NULL,
     revoked_at              timestamptz NOT NULL,
     reason                  text NOT NULL,
     authority_id            text NOT NULL,
-    authority_receipt_sha256 bytea NOT NULL CHECK (octet_length(authority_receipt_sha256) = 32)
+    authority_receipt_sha256 bytea NOT NULL CHECK (octet_length(authority_receipt_sha256) = 32),
+    PRIMARY KEY (tenant_id, receipt_id),
+    FOREIGN KEY (tenant_id, receipt_id) REFERENCES sfeb.source_receipts(tenant_id, receipt_id)
 );
 -- Receipt rows and revocations are append-only in the application contract.
 -- Production should grant INSERT/SELECT only to the intake role and deny
@@ -70,13 +73,14 @@ CREATE TABLE IF NOT EXISTS sfeb.operations (
     request_digest         bytea NOT NULL CHECK (octet_length(request_digest) = 32),
     operation_id           uuid NOT NULL UNIQUE,
     objective_version      bigint NOT NULL CHECK (objective_version > 0),
-    receipt_id             text NOT NULL REFERENCES sfeb.source_receipts(receipt_id),
+    receipt_id             text NOT NULL,
     objective_fencing_epoch bigint NOT NULL CHECK (objective_fencing_epoch > 0),
     permission_revision    bigint NOT NULL CHECK (permission_revision > 0),
     status                 text NOT NULL CHECK (status IN ('prepared','outcome_unknown','remote_committed','rejected')),
     created_at             timestamptz NOT NULL DEFAULT clock_timestamp(),
     PRIMARY KEY (tenant_id, action_key),
-    FOREIGN KEY (tenant_id, objective_id) REFERENCES sfeb.objective_fences(tenant_id, objective_id)
+    FOREIGN KEY (tenant_id, objective_id) REFERENCES sfeb.objective_fences(tenant_id, objective_id),
+    FOREIGN KEY (tenant_id, receipt_id) REFERENCES sfeb.source_receipts(tenant_id, receipt_id)
 );
 
 CREATE TABLE IF NOT EXISTS sfeb.outbox (
