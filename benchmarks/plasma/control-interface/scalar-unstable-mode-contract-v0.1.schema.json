@@ -122,7 +122,9 @@
       "required": [
         "execution_latency_seconds",
         "minimum_bandwidth_multiple",
-        "maximum_loop_latency_efold_fraction"
+        "maximum_loop_latency_efold_fraction",
+        "minimum_observability_fisher_information",
+        "minimum_controllability_gramian"
       ],
       "properties": {
         "execution_latency_seconds": {
@@ -134,6 +136,14 @@
           "exclusiveMinimum": 0
         },
         "maximum_loop_latency_efold_fraction": {
+          "type": "number",
+          "exclusiveMinimum": 0
+        },
+        "minimum_observability_fisher_information": {
+          "type": "number",
+          "exclusiveMinimum": 0
+        },
+        "minimum_controllability_gramian": {
           "type": "number",
           "exclusiveMinimum": 0
         }
@@ -153,7 +163,9 @@
         "actuator_bandwidth_multiple",
         "conservative_loop_latency_seconds",
         "loop_latency_efold_fraction",
-        "mode_interface_qualified"
+        "mode_interface_qualified",
+        "minimum_required_observability_fisher_information",
+        "minimum_required_controllability_gramian"
       ],
       "properties": {
         "observation_sample_count": {
@@ -198,6 +210,14 @@
         },
         "mode_interface_qualified": {
           "type": "boolean"
+        },
+        "minimum_required_observability_fisher_information": {
+          "type": "number",
+          "minimum": 0
+        },
+        "minimum_required_controllability_gramian": {
+          "type": "number",
+          "minimum": 0
         }
       }
     },
