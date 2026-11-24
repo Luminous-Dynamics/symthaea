@@ -332,7 +332,10 @@ fn validate_distribution(
             "arbitrary bounded-delay v1 requires maximum proxy delay = maximum real delay".into(),
         ));
     }
-    let expected_len = usize::try_from(maximum_real_delay + 2)
+    let support_len = maximum_real_delay
+        .checked_add(2)
+        .ok_or_else(|| CaOcrcErrorV1("proxy delay support length overflow".into()))?;
+    let expected_len = usize::try_from(support_len)
         .map_err(|_| CaOcrcErrorV1("proxy delay support length overflow".into()))?;
     if distribution.probability_mass.len() != expected_len {
         return Err(CaOcrcErrorV1(
@@ -774,7 +777,7 @@ fn process_round_inner(
         engine.evicted_feedback_count = engine.evicted_feedback_count.saturating_add(1);
     }
 
-    let (set_kind, _, _, trivial_loss) = classify_set(
+    let (_, _, _, trivial_loss) = classify_set(
         engine.threshold,
         engine.policy.score_bound,
         input.point_prediction,
@@ -963,7 +966,6 @@ fn process_round_inner(
 
     let tracking_digest = tracking_set_digest(&engine.tracking_set)?;
     let state_after = state_digest(engine)?;
-    prediction.calibration_state_after_sha256 = state_before.clone();
     prediction.receipt_sha256 = prediction_digest(&prediction)?;
     let mut receipt = CaOcrcRoundReceiptV1 {
         schema: CA_OCRC_ROUND_RECEIPT_SCHEMA_V1.into(),
@@ -1074,7 +1076,10 @@ pub fn bernoulli_proxy_distribution_v1(
             "Bernoulli proxy survival probability must lie in (0,1]".into(),
         ));
     }
-    let length = usize::try_from(maximum_delay + 2)
+    let support_len = maximum_delay
+        .checked_add(2)
+        .ok_or_else(|| CaOcrcErrorV1("proxy PMF support length overflow".into()))?;
+    let length = usize::try_from(support_len)
         .map_err(|_| CaOcrcErrorV1("proxy PMF support length overflow".into()))?;
     let mut probability_mass = vec![0.0; length];
     probability_mass[0] = 1.0 - survival_probability;
@@ -1270,24 +1275,24 @@ mod tests {
 
     #[test]
     fn capacity_limit_proxy_eviction_and_paper_order_are_exact() {
-        let mut engine = engine(pmf_always_delay(2), 1, 7);
+        let mut engine = engine(pmf_always_delay(2), 2, 7);
         let r0 = process_ca_ocrc_round_v1(&mut engine, &round(0, "s0", "e0", 100.0), &[]).unwrap();
         assert_eq!(r0.admission, CaOcrcAdmissionV1::Admitted);
         assert_eq!(r0.tracking_count_after, 1);
 
         let r1 = process_ca_ocrc_round_v1(&mut engine, &round(1, "s1", "e1", 100.0), &[]).unwrap();
-        assert_eq!(r1.admission, CaOcrcAdmissionV1::CapacitySaturated);
-        assert_eq!(r1.tracking_count_after, 1);
+        assert_eq!(r1.admission, CaOcrcAdmissionV1::Admitted);
+        assert_eq!(r1.tracking_count_after, 2);
 
         let r2 = process_ca_ocrc_round_v1(&mut engine, &round(2, "s2", "e2", 100.0), &[]).unwrap();
         assert_eq!(r2.admission, CaOcrcAdmissionV1::CapacitySaturated);
         assert!(r2.evicted_rounds.is_empty());
-        assert_eq!(r2.tracking_count_after, 1);
+        assert_eq!(r2.tracking_count_after, 2);
 
         let r3 = process_ca_ocrc_round_v1(&mut engine, &round(3, "s3", "e3", 100.0), &[]).unwrap();
         assert_eq!(r3.evicted_rounds, vec![0]);
         assert_eq!(r3.admission, CaOcrcAdmissionV1::Admitted);
-        assert_eq!(r3.tracking_count_after, 1);
+        assert_eq!(r3.tracking_count_after, 2);
         assert!(r3.tracking_count_after <= engine.policy.tracking_capacity);
     }
 
@@ -1378,7 +1383,7 @@ mod tests {
 
     #[test]
     fn unknown_feedback_is_held_and_can_be_represented_as_qualified_before_expiry() {
-        let mut engine = engine(pmf_always_delay(2), 1, 1);
+        let mut engine = engine(pmf_always_delay(2), 2, 1);
         process_ca_ocrc_round_v1(&mut engine, &round(0, "s0", "e0", 10.0), &[]).unwrap();
         let unknown = delivery(
             "s0",
@@ -1530,7 +1535,7 @@ mod tests {
         assert!((proxy_survival_probability_v1(&bernoulli, 3).unwrap() - 0.25).abs() < 1.0e-12);
         assert!((proxy_tracking_load_v1(&bernoulli).unwrap() - 0.75).abs() < 1.0e-12);
         assert!(validate_policy(&policy(bernoulli, 1)).is_ok());
-        assert!(validate_policy(&policy(pmf_always_delay(3), 1)).is_err());
+        assert!(validate_policy(&policy(pmf_always_delay(3), 2)).is_err());
     }
 
     #[test]
