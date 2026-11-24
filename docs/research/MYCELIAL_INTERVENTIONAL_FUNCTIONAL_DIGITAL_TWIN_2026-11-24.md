@@ -161,10 +161,11 @@ Create separate, rights-qualified lanes:
 1. Sten 2D fungal images and crossing/overlap data.
 2. Sten 3D z-stack reconstruction and printed-prototype geometry, scored separately from biological images.
 3. Fungal Network Analysis (FNA) images and reference processing.
-4. 2025 AM-fungal travelling-wave growth and flow trajectories.
-5. 2026 *Agaricus* cordogenesis/fructification.
-6. 2026 *Agaricus* stable-isotope source-region attribution.
-7. Hyphal Highways Device microbial-dispersal measurements.
+4. SkelPy fungal-network images, manual-tracing subset and published throughput protocol.
+5. 2025 AM-fungal travelling-wave growth and flow trajectories.
+6. 2026 *Agaricus* cordogenesis/fructification.
+7. 2026 *Agaricus* stable-isotope source-region attribution.
+8. Hyphal Highways Device microbial-dispersal measurements.
 
 Never merge tasks just because all involve fungal or fungal-like networks. In particular, HHD is a microbial-dispersal lane; isotope incorporation is a source-region transfer lane; cytoplasmic trajectories are an intrahyphal-flow lane.
 
@@ -192,6 +193,7 @@ All values below are **research targets, not achieved results**. Report denomina
 |---|---|---|---|
 | 2D filament and crossing reconstruction | Sten published protocol; FNA/reference annotations | Filament F1, crossing F1, precision/recall, length error | First reproduce the published task and splits. Then target >=0.94 filament F1 and >=0.92 crossing F1 on a larger replicate-disjoint set, without increasing false fusion |
 | 3D geometry and topology | Sten 3D, printed known-geometry controls, adjudicated real z-stacks | Centerline/branch recall, crossing-versus-fusion error, geometric RMSE, graph-edit/topological error | Reproduce the narrow published 0.91–0.92 overlap result on its exact six-image scope before expanding; do not call it universal 3D SOTA |
+| Skeletonization / temporal phenotyping | SkelPy, FNA and manual trace references on matched images | Mean/maximum centerline distance, connected-component fragmentation, tip/branch counts, width error, runtime and peak memory | Reproduce SkelPy's published 15-image manual comparison and 180-image / 3,842-image throughput scopes separately; then evaluate on independent, replicate-disjoint fungal samples |
 | False fusion | Adjudicated crossing-negative and z-order controls | False-fusion rate, precision by contact type | <=0.5% on a sufficiently large, independently adjudicated difficult-negative set |
 | Graph adequacy | Exact bounded enumerator; deliberately incomplete candidate families | Exact agreement, severe-miss detection, false adequacy, false abstention | 100% exact-oracle agreement on bounded cases; >=95% detection of predefined severe misspecification with <=5% false adequacy; <=5% false abstention on matched adequate controls |
 | Morphogenesis forecasting | Persistence, linear trend, covariate-only, morphology-only and dynamic-structure baselines | MAE/RMSE, CRPS, event precision/recall, interval coverage | Beat persistence and linear trend on frozen forward-time, independent-unit holdouts; target >=10% relative error reduction over best matched morphology-only baseline |
@@ -215,6 +217,7 @@ For the three-cycle longitudinal *Agaricus* series, leave-one-cycle-out evaluati
 | Imaris | Mature 3D/4D visualization, segmentation and quantitative microscopy workflows | Interoperate with its outputs; do not rebuild its visualization stack |
 | Fiji SNT | Open, scriptable multidimensional tracing and time-lapse analysis | Use as a reproducible tracing baseline and preserve tracing provenance |
 | Fungal Network Analysis | Fungal-specific image processing, skeletonization, width estimation and weighted graph construction | Reproduce its pipeline; compare connectivity-preserving reconstruction and functional prediction |
+| SkelPy | GUI-based fungal skeletonization, customizable preprocessing, manual trace comparison and high-throughput image processing | Reproduce its skeleton-distance and runtime/memory measures; add topology, uncertainty and independent functional endpoints rather than comparing unlike metrics |
 | Sten methods | Explicit filament-overlap and 3D z-stack reconstruction reference methods | Reproduce published narrow evaluations before extending the benchmark |
 | Smart-microscopy ecosystems | Hardware interfaces, acquisition orchestration and interoperable formats | Reuse useq-schema, OME-TIFF/OME-Zarr and recorded-session adapters; Symthaea owns evidence qualification and advisory decisions |
 
@@ -226,6 +229,7 @@ The comparison is intentionally a division of labor, not a claim that open softw
 - Imaris 11.1 (released 8 September 2026) adds a Training Hub and native CZI reader integration; its release history also lists machine-learning filters for spots and surfaces in 11.0. It is a mature visualization and analysis environment, not a weak straw-man baseline. Release notes: https://imaris.oxinst.com/support/imaris-release-notes/
 - Fiji SNT provides automated and semi-automated tracing, multidimensional data support, 3D visualization, time-lapse workflows, scripting and a big-data mode described as experimental for TB-scale datasets. It is a useful open tracing and curation reference, although its primary design domain is neuronal morphology. Documentation: https://imagej.net/plugins/snt/
 - Fungal Network Analysis (FNA) is a specialist reference for fungal image processing: noise/background correction, network enhancement, segmentation, skeletonization, width estimation and graph representation. Reproduce its standard pipeline and preserve parameters rather than treating graph metrics as a substitute for function. Record: https://zenodo.org/records/14931863
+- SkelPy (2026) is a current GUI-based fungal skeletonization and phenotyping comparator. Its paper reports processing/accuracy evaluation on 180 images, a 15-image manual-tracing comparison subset, mean automated-versus-manual skeleton distance of 0.0046 image-width units (SD 0.0009), and a 3,842-image run taking 12.5 hours. These are distinct accuracy and throughput measures, not a filament/crossing F1 score; the manual subset is small and must not be treated as a large independent ground-truth test set. Paper: https://doi.org/10.1002/aps3.70049
 
 The field-level opportunity is the gap between image-analysis outputs and scientific claims. A commercial or open segmentation package may provide a very good graph; Mycelial should test whether that graph is adequately supported by the acquired source, whether alternative structures remain plausible, and whether the graph predicts independent functional outcomes.
 
@@ -298,6 +302,11 @@ That would move Mycelial from network visualization toward a genuinely testable 
 - Sten 2D mycelium analysis (2024): https://doi.org/10.1016/j.ecoinf.2024.102670
 - Sten 3D z-stack reconstruction (2025): https://doi.org/10.1016/j.ecoinf.2025.103317
 - Fungal Network Analysis (Fricker): https://zenodo.org/records/14931863
+- FNA multi-taxa image and parameter archive: https://doi.org/10.5281/zenodo.5725751
+- FNA four-species grazer time-series archive: https://doi.org/10.5281/zenodo.14931953
+- SkelPy paper: https://doi.org/10.1002/aps3.70049
+- SkelPy source: https://github.com/AaronMoseley/SkelPy
+- SkelPy downstream R analyses: https://github.com/melaniemadrigal07/Post.ImageProcessing
 - Sten mycelium-network-analysis-tool (2D filament / crossing reference): https://gitlab.iit.it/oscar.sten/mycelium-network-analysis-tool
 - Fiji SNT: https://imagej.net/plugins/snt/
 - OME-NGFF: https://ngff.openmicroscopy.org/
