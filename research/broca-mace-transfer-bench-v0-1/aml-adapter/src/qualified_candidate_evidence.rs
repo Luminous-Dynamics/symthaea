@@ -42,26 +42,116 @@ pub enum CandidateEvidenceAbstentionReasonV1 {
 /// A purpose-, DecisionNeed- and lifecycle-scoped evidence projection.
 /// This is not an action authorization capability.
 #[derive(Clone, Debug, PartialEq)]
+struct QualificationUseSnapshotV1 {
+    run_id: String,
+    query_invocation_id: String,
+    domain_id: String,
+    subject_scope_sha256: String,
+    environment_revision_sha256: String,
+    tool_profile_sha256: String,
+    query_sha256: String,
+    candidate_set_sha256: String,
+    candidate_evidence_ids: Vec<String>,
+    decision_need_sha256: String,
+    purpose_sha256: String,
+    qualification_policy_sha256: String,
+    lifecycle_snapshot_sha256: String,
+    verifier_profile_sha256: String,
+    verified_at_unix: u64,
+    expires_at_unix: u64,
+}
+
+impl QualificationUseSnapshotV1 {
+    fn from_binding(binding: &EvidenceQualificationBindingV1<'_>, expires_at_unix: u64) -> Self {
+        Self {
+            run_id: binding.run_id.to_owned(),
+            query_invocation_id: binding.query_invocation_id.to_owned(),
+            domain_id: binding.domain_id.to_owned(),
+            subject_scope_sha256: binding.subject_scope_sha256.to_owned(),
+            environment_revision_sha256: binding.environment_revision_sha256.to_owned(),
+            tool_profile_sha256: binding.tool_profile_sha256.to_owned(),
+            query_sha256: binding.query_sha256.to_owned(),
+            candidate_set_sha256: binding.candidate_set_sha256.to_owned(),
+            candidate_evidence_ids: binding.candidate_evidence_ids.to_vec(),
+            decision_need_sha256: binding.decision_need_sha256.to_owned(),
+            purpose_sha256: binding.purpose_sha256.to_owned(),
+            qualification_policy_sha256: binding.qualification_policy_sha256.to_owned(),
+            lifecycle_snapshot_sha256: binding.lifecycle_snapshot_sha256.to_owned(),
+            verifier_profile_sha256: binding.verifier_profile_sha256.to_owned(),
+            verified_at_unix: binding.now_unix,
+            expires_at_unix,
+        }
+    }
+
+    fn validate_at_use(
+        &self,
+        binding: &EvidenceQualificationBindingV1<'_>,
+    ) -> Result<(), EvidenceQualificationRejectV1> {
+        for (actual, expected) in [
+            (self.run_id.as_str(), binding.run_id),
+            (self.query_invocation_id.as_str(), binding.query_invocation_id),
+            (self.domain_id.as_str(), binding.domain_id),
+            (self.subject_scope_sha256.as_str(), binding.subject_scope_sha256),
+            (self.environment_revision_sha256.as_str(), binding.environment_revision_sha256),
+            (self.tool_profile_sha256.as_str(), binding.tool_profile_sha256),
+            (self.query_sha256.as_str(), binding.query_sha256),
+            (self.candidate_set_sha256.as_str(), binding.candidate_set_sha256),
+            (self.decision_need_sha256.as_str(), binding.decision_need_sha256),
+            (self.purpose_sha256.as_str(), binding.purpose_sha256),
+            (self.qualification_policy_sha256.as_str(), binding.qualification_policy_sha256),
+            (self.lifecycle_snapshot_sha256.as_str(), binding.lifecycle_snapshot_sha256),
+            (self.verifier_profile_sha256.as_str(), binding.verifier_profile_sha256),
+        ] {
+            if actual != expected {
+                return Err(EvidenceQualificationRejectV1::BindingMismatch);
+            }
+        }
+        if self.candidate_evidence_ids != binding.candidate_evidence_ids {
+            return Err(EvidenceQualificationRejectV1::BindingMismatch);
+        }
+        // A caller cannot move the consuming clock backward past the time at
+        // which the signed qualification was first verified for use.
+        if binding.now_unix < self.verified_at_unix {
+            return Err(EvidenceQualificationRejectV1::ReceiptNotYetValid);
+        }
+        if binding.now_unix >= self.expires_at_unix {
+            return Err(EvidenceQualificationRejectV1::ReceiptExpired);
+        }
+        Ok(())
+    }
+}
+
+/// A purpose-, DecisionNeed- and lifecycle-scoped evidence projection.
+/// This is not an action authorization capability. It is valid only for the
+/// exact use binding and trusted clock interval recorded at projection time.
+#[derive(Clone, Debug, PartialEq)]
 pub struct QualifiedCandidateEvidenceBatchV1 {
     batch: CandidateEvidenceBatchV1,
     source_candidate_set_sha256: String,
     qualification_receipt_sha256: String,
-    decision_need_sha256: String,
-    purpose_sha256: String,
-    lifecycle_snapshot_sha256: String,
-    qualification_expires_at_unix: u64,
+    use_snapshot: QualificationUseSnapshotV1,
 }
 
 impl QualifiedCandidateEvidenceBatchV1 {
+    /// Revalidate the exact context and time interval before every consumption.
+    /// Live authorization and lifecycle currentness remain separate mandatory
+    /// checks at the consequential read/action boundary.
+    pub fn validate_at_use(
+        &self,
+        binding: &EvidenceQualificationBindingV1<'_>,
+    ) -> Result<(), EvidenceQualificationRejectV1> {
+        self.use_snapshot.validate_at_use(binding)
+    }
+
     pub fn batch(&self) -> &CandidateEvidenceBatchV1 { &self.batch }
     pub fn evidence(&self) -> &[CandidateEvidenceV1] { &self.batch.evidence }
     pub fn source_candidate_set_sha256(&self) -> &str { &self.source_candidate_set_sha256 }
     pub fn qualified_candidate_set_sha256(&self) -> &str { &self.batch.candidate_set_sha256 }
     pub fn qualification_receipt_sha256(&self) -> &str { &self.qualification_receipt_sha256 }
-    pub fn decision_need_sha256(&self) -> &str { &self.decision_need_sha256 }
-    pub fn purpose_sha256(&self) -> &str { &self.purpose_sha256 }
-    pub fn lifecycle_snapshot_sha256(&self) -> &str { &self.lifecycle_snapshot_sha256 }
-    pub fn qualification_expires_at_unix(&self) -> u64 { self.qualification_expires_at_unix }
+    pub fn decision_need_sha256(&self) -> &str { &self.use_snapshot.decision_need_sha256 }
+    pub fn purpose_sha256(&self) -> &str { &self.use_snapshot.purpose_sha256 }
+    pub fn lifecycle_snapshot_sha256(&self) -> &str { &self.use_snapshot.lifecycle_snapshot_sha256 }
+    pub fn qualification_expires_at_unix(&self) -> u64 { self.use_snapshot.expires_at_unix }
 }
 
 #[derive(Clone, Debug, Eq, PartialEq)]
@@ -178,10 +268,10 @@ pub fn project_qualified_candidate_evidence_v1(
         batch: qualified_batch,
         source_candidate_set_sha256: batch.candidate_set_sha256.clone(),
         qualification_receipt_sha256: qualification.receipt_sha256().to_owned(),
-        decision_need_sha256: binding.decision_need_sha256.to_owned(),
-        purpose_sha256: binding.purpose_sha256.to_owned(),
-        lifecycle_snapshot_sha256: binding.lifecycle_snapshot_sha256.to_owned(),
-        qualification_expires_at_unix: qualification.expires_at_unix(),
+        use_snapshot: QualificationUseSnapshotV1::from_binding(
+            binding,
+            qualification.expires_at_unix(),
+        ),
     }))
 }
 
@@ -414,6 +504,66 @@ mod tests {
         let token = token(&binding, &[EvidenceDispositionV1::Admissible, EvidenceDispositionV1::Admissible]);
         assert_eq!(project_qualified_candidate_evidence_v1(&batch, &token, &binding, &expectation(&batch)),
             Err(CandidateEvidenceProjectionRejectV1::DependencyCycle));
+    }
+
+    #[test]
+    fn projected_evidence_expires_at_later_consumption() {
+        let batch = make_batch(&[record("a", 1, vec![])]);
+        let ids = ids(&batch);
+        let initial_binding = binding(&batch, &ids);
+        let token = token(&initial_binding, &[EvidenceDispositionV1::Admissible]);
+        let result = project_qualified_candidate_evidence_v1(
+            &batch, &token, &initial_binding, &expectation(&batch),
+        ).unwrap();
+        let CandidateEvidenceProjectionV1::Qualified(projected) = result else {
+            panic!("expected qualified projection");
+        };
+        let mut expired_binding = binding(&batch, &ids);
+        expired_binding.now_unix = 200;
+        assert_eq!(
+            projected.validate_at_use(&expired_binding),
+            Err(EvidenceQualificationRejectV1::ReceiptExpired)
+        );
+    }
+
+    #[test]
+    fn projected_evidence_cannot_be_reused_for_a_different_decision_context() {
+        let batch = make_batch(&[record("a", 1, vec![])]);
+        let ids = ids(&batch);
+        let initial_binding = binding(&batch, &ids);
+        let token = token(&initial_binding, &[EvidenceDispositionV1::Admissible]);
+        let result = project_qualified_candidate_evidence_v1(
+            &batch, &token, &initial_binding, &expectation(&batch),
+        ).unwrap();
+        let CandidateEvidenceProjectionV1::Qualified(projected) = result else {
+            panic!("expected qualified projection");
+        };
+        let mut changed_binding = binding(&batch, &ids);
+        changed_binding.purpose_sha256 = A;
+        assert_eq!(
+            projected.validate_at_use(&changed_binding),
+            Err(EvidenceQualificationRejectV1::BindingMismatch)
+        );
+    }
+
+    #[test]
+    fn projected_evidence_rejects_consuming_clock_rollback() {
+        let batch = make_batch(&[record("a", 1, vec![])]);
+        let ids = ids(&batch);
+        let initial_binding = binding(&batch, &ids);
+        let token = token(&initial_binding, &[EvidenceDispositionV1::Admissible]);
+        let result = project_qualified_candidate_evidence_v1(
+            &batch, &token, &initial_binding, &expectation(&batch),
+        ).unwrap();
+        let CandidateEvidenceProjectionV1::Qualified(projected) = result else {
+            panic!("expected qualified projection");
+        };
+        let mut rolled_back_binding = binding(&batch, &ids);
+        rolled_back_binding.now_unix = 99;
+        assert_eq!(
+            projected.validate_at_use(&rolled_back_binding),
+            Err(EvidenceQualificationRejectV1::ReceiptNotYetValid)
+        );
     }
 
     #[test]

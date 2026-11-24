@@ -20,7 +20,7 @@ The projection accepts a typed CandidateEvidenceBatchV1, a VerifiedEvidenceQuali
 8. Reject cycles in the remaining dependency graph with an iterative topological check.
 9. Re-encode the surviving subset and retain both its digest and the original batch digest, plus the qualification receipt digest.
 
-The qualified type does not include an authorized flag or issue an action permit.
+The qualified type does not include an authorized flag or issue an action permit. It also retains the complete use-binding snapshot and verified-at time. A consumer must call `validate_at_use` again before every later consumption; a different query, subject, DecisionNeed, purpose, policy, lifecycle snapshot, environment or verifier profile is rejected, as is expiry or a consuming-clock rollback. This is still not a substitute for live authorization and lifecycle revalidation.
 
 ## Parent closure
 
@@ -34,4 +34,4 @@ The current MACE signature is a versioned custom Ed25519 input, not DSSE. A foll
 
 ## Tests
 
-Eight Rust tests cover admissible-only projection, expected scope mismatch, stale-batch mutation, exact ID-set mismatch, rejected-parent propagation, missing-parent abstention, cycle rejection and zero-admissible abstention. They are authored but not executed. Rust compilation, formatting, Clippy, dependency resolution and exact-head CI remain unverified.
+Eleven Rust tests cover admissible-only projection, expected scope mismatch, stale-batch mutation, exact ID-set mismatch, rejected-parent propagation, missing-parent abstention, cycle rejection and zero-admissible abstention, projection expiry at later consumption, context-rebinding rejection and consuming-clock rollback. They are authored but not executed. Rust compilation, formatting, Clippy, dependency resolution and exact-head CI remain unverified.
