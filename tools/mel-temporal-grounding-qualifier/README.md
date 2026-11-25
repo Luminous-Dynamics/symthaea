@@ -30,3 +30,16 @@ Research protocol: `docs/research/MEL-GROUND-006-MULTI-ANNOTATOR-TEMPORAL-GROUND
 
 
 For each predicted occurrence, the report also derives a **per-event reference-boundary distribution** from the production scorer's existing prediction↔annotation match records. It reports the number and fraction of eligible Present annotators who match that event, plus min/median/max start and end frames and boundary spread. Events that match no eligible Present annotation appear in `unmatched_prediction_indices`. This is not an interval consensus: original annotation records remain intact, and the support denominator is visible.
+
+
+## Selective temporal grounding and reason-specific abstention
+
+The temporal_selective module accepts a frozen adjudicated ground-truth case, raw prediction, typed decision, model-declared decision confidence and shared model/runtime/decoding identity. It scores each answer through the production temporal-grounding scorer. Decision dispositions are distinct: Answer, ClaimAbsent, AbstainAmbiguous and AbstainNotEstimable.
+
+The report separates coverage, selective risk/accuracy, answer-only F1/recall/count-gated F1, false absence claims, ambiguity/not-estimable reason precision and recall, calibration bins/Brier/ECE, evidence-stratum summaries and a confidence-ranked risk-coverage curve/AURC. It includes always-answer, random-abstention and always-abstain baselines; always-abstain has zero coverage and is never treated as successful product behaviour.
+
+Run the synthetic selective-control panel:
+
+    cargo +1.96.0 run --locked --manifest-path tools/mel-temporal-grounding-qualifier/Cargo.toml --bin mel-selective-grounding-audit -- tools/mel-temporal-grounding-qualifier/fixtures/mel-selective-temporal.synthetic.json
+
+Decision confidence is self-reported. Runtime identity and evidence receipts are not authenticated by this evaluator, and it does not inspect hidden reasoning. Calibration thresholds must be selected on source-lineage-disjoint calibration data, not the held-out test. Do not compare a risk-coverage/AURC result to a multiple-choice abstention result without reproducing the same task, units and coverage protocol.
