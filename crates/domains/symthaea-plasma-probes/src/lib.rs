@@ -2444,6 +2444,13 @@ pub enum KineticPhysicalModelKind {
     VlasovPoissonLandau,
 }
 
+/// Sign convention for physical collisional entropy production.
+#[derive(Clone, Copy, Debug, PartialEq, Eq, Serialize, Deserialize)]
+#[serde(rename_all = "snake_case")]
+pub enum KineticPhysicalEntropySignConvention {
+    BoltzmannEntropyIncrease,
+}
+
 /// Operation class recorded in a kinetic information / irreversibility ledger.
 #[derive(Clone, Copy, Debug, PartialEq, Eq, Serialize, Deserialize)]
 #[serde(rename_all = "snake_case")]
@@ -2475,6 +2482,7 @@ pub struct KineticOperationRecord {
     pub discarded_effect_metric_id: Option<String>,
     pub discarded_effect_measure: Option<f64>,
     pub physical_entropy_measure_id: Option<String>,
+    pub physical_entropy_sign_convention: Option<KineticPhysicalEntropySignConvention>,
     pub physical_entropy_production: Option<f64>,
     pub numerical_entropy_measure_id: Option<String>,
     pub numerical_entropy_delta: Option<f64>,
@@ -2585,14 +2593,16 @@ impl KineticOperationLedger {
                     "discarded effect measure requires an explicit metric ID",
                 ));
             }
-            if event.physical_entropy_production.is_some()
-                != event
-                    .physical_entropy_measure_id
-                    .as_deref()
-                    .is_some_and(|metric| !metric.trim().is_empty())
+            let has_physical_entropy_measure_id = event
+                .physical_entropy_measure_id
+                .as_deref()
+                .is_some_and(|metric| !metric.trim().is_empty());
+            if event.physical_entropy_production.is_some() != has_physical_entropy_measure_id
+                || event.physical_entropy_production.is_some()
+                    != event.physical_entropy_sign_convention.is_some()
             {
                 return Err(ContractError::InvalidKineticOperationLedger(
-                    "physical entropy production requires an explicit physical quantity ID",
+                    "physical entropy production requires a quantity ID and explicit sign convention",
                 ));
             }
             if event.numerical_entropy_delta.is_some()
@@ -2624,17 +2634,21 @@ impl KineticOperationLedger {
                         ));
                     }
                     if event.physical_entropy_production.is_none()
+                        || event.physical_entropy_sign_convention
+                            != Some(KineticPhysicalEntropySignConvention::BoltzmannEntropyIncrease)
                         || event.numerical_entropy_delta.is_some()
                     {
                         return Err(ContractError::InvalidKineticOperationLedger(
-                            "physical collision requires physical entropy production and cannot relabel it numerical",
+                            "physical collision requires Boltzmann-entropy production and cannot relabel it numerical",
                         ));
                     }
                 }
                 _ => {
-                    if event.physical_entropy_production.is_some() {
+                    if event.physical_entropy_production.is_some()
+                        || event.physical_entropy_sign_convention.is_some()
+                    {
                         return Err(ContractError::InvalidKineticOperationLedger(
-                            "numerical operations cannot claim physical entropy production",
+                            "numerical operations cannot claim physical entropy production or its sign convention",
                         ));
                     }
                     if matches!(
@@ -12359,6 +12373,7 @@ mod tests {
             discarded_effect_metric_id: None,
             discarded_effect_measure: None,
             physical_entropy_measure_id: None,
+            physical_entropy_sign_convention: None,
             physical_entropy_production: None,
             numerical_entropy_measure_id: None,
             numerical_entropy_delta: None,
@@ -12394,6 +12409,8 @@ mod tests {
     fn kinetic_operation_ledger_accepts_physical_collision_only_for_collisional_models() {
         let mut collision = ledger_event("collision-1", 1.0, KineticOperationClass::PhysicalCollision);
         collision.physical_entropy_measure_id = Some("boltzmann-h-theorem-production".to_owned());
+        collision.physical_entropy_sign_convention =
+            Some(KineticPhysicalEntropySignConvention::BoltzmannEntropyIncrease);
         collision.physical_entropy_production = Some(0.04);
         let ledger = KineticOperationLedger::new(
             KineticPhysicalModelKind::VlasovFokkerPlanck,
@@ -12409,6 +12426,8 @@ mod tests {
     fn kinetic_operation_ledger_rejects_physical_collisions_in_collisionless_vlasov() {
         let mut collision = ledger_event("collision-1", 1.0, KineticOperationClass::PhysicalCollision);
         collision.physical_entropy_measure_id = Some("boltzmann-h-theorem-production".to_owned());
+        collision.physical_entropy_sign_convention =
+            Some(KineticPhysicalEntropySignConvention::BoltzmannEntropyIncrease);
         collision.physical_entropy_production = Some(0.04);
         assert!(matches!(
             KineticOperationLedger::new(
