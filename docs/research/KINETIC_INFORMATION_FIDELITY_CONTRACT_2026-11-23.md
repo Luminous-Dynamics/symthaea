@@ -747,6 +747,33 @@ The first generic Rust primitive is in [PR #13405](https://github.com/Luminous-D
 
 The next physical benchmark is a pair of phase-mixed states with nearly identical density / low-order moments but distinct response after a registered second pulse. Any claimed merge must be confirmed against independently refined full-order echo amplitude, phase, timing, waveform and branch identity, plus applicable invariant/structure gates. A finite probe suite remains empirical unless #13452's CIC assumptions provide a validated global cover.
 
+## Kinetic State Discrimination Design (KSDD)
+
+New companion programme: [#13598 — select interventions by expected information gain over kinetic state hypotheses](https://github.com/Luminous-Dynamics/symthaea/issues/13598).
+
+This is a third, distinct acquisition problem:
+- #12944 chooses which expensive new kinetic simulation to run to expand a model's qualified operating envelope;
+- #13404 searches for a discrepancy-maximizing intervention against one fixed candidate/reference state pair;
+- #13598 chooses the next intervention that best separates a finite posterior over competing state hypotheses / candidate quotient classes.
+
+For a finite hypothesis \(H\), candidate pulse \(u\), and registered complex response observation \(Y\), KSDD uses the Bayesian model-discrimination objective
+
+\[
+\operatorname{EIG}(u)=I(H;Y\mid u)
+=H(H)-\mathbb E_{Y\mid u}[H(H\mid Y,u)].
+\]
+
+The first reusable Rust primitive is in [PR #13405](https://github.com/Luminous-Dynamics/symthaea/pull/13405). It evaluates a finite set of complex response predictions under independent equal-variance Gaussian real/imaginary observation noise, integrates the expected information gain with deterministic \(9\times9\) Gauss–Hermite quadrature, and reports EIG in bits plus EIG per declared solver-cost second. Priors are max-scaled before normalization to avoid overflow; hypotheses, noise, evaluation cost and work budget are fail-closed.
+
+The checked-in synthetic known-answer cases cover identical predictions (zero information), phase-only separation, high-noise suppression and imbalanced priors. They are synthetic, not calibrated plasma likelihoods.
+
+Prior art is explicit:
+- Hainy et al. (2022), [Optimal Bayesian design for model discrimination via classification](https://doi.org/10.1007/s11222-022-10078-2), show how classifier-based model discrimination can reduce simulation requirements relative to ABC.
+- Doumbouya, Vidard & Zahm (2026), [Certified Bayesian optimal experimental design: from Expected Information Gain to Signal-to-Noise Ratio](https://arxiv.org/abs/2609.32282), derive conservative and incremental EIG bounds through Fisher/SNR structure under stated regularity assumptions.
+- T-optimal design, Bayesian model discrimination and causal active-intervention design are established foundations, not claims of novelty.
+
+The present implementation is deliberately narrow: one complex output coefficient, finite categorical hypotheses and homoscedastic independent Gaussian quadrature noise. Correlated QoIs, full waveforms, heteroscedastic noise, uncertain predictions, nonlinear branch switching and multi-fidelity reference discrepancy need explicit extension and independent calibration. An EIG-ranked intervention is a proposal, not a counterexample, physical certificate or global state-equivalence proof.
+
 ## Certified Intervention Coverage (CIC)
 
 New companion programme: [#13452 — certify compact intervention covers with validated response bounds](https://github.com/Luminous-Dynamics/symthaea/issues/13452).
