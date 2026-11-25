@@ -1,0 +1,340 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "SPECTRAL_DYNAMICAL_BENCHMARK_MANIFEST_V1.schema.json",
+  "title": "Spectral-Dynamical Cognition Bridge benchmark manifest v1",
+  "type": "object",
+  "additionalProperties": false,
+  "required": [
+    "schema_version",
+    "manifest_id",
+    "status",
+    "study_design",
+    "scope",
+    "hypotheses",
+    "tasks",
+    "model_profiles",
+    "baselines",
+    "negative_controls",
+    "metrics",
+    "resource_controls",
+    "reproducibility",
+    "evidence_policy"
+  ],
+  "properties": {
+    "schema_version": {
+      "const": "1.0.0"
+    },
+    "manifest_id": {
+      "type": "string",
+      "pattern": "^sdcb-v1-[a-z0-9-]+$"
+    },
+    "status": {
+      "enum": [
+        "design_only",
+        "synthetic_pilot",
+        "preregistered",
+        "executed",
+        "independently_reproduced"
+      ]
+    },
+    "study_design": {
+      "enum": [
+        "exploratory",
+        "confirmatory"
+      ]
+    },
+    "scope": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "claim_boundary",
+        "biological_data",
+        "rh_status_snapshot"
+      ],
+      "properties": {
+        "claim_boundary": {
+          "type": "string",
+          "minLength": 20
+        },
+        "biological_data": {
+          "enum": [
+            "excluded",
+            "ethics_review_required"
+          ]
+        },
+        "rh_status_snapshot": {
+          "type": "string",
+          "minLength": 10
+        }
+      }
+    },
+    "hypotheses": {
+      "type": "array",
+      "minItems": 1,
+      "items": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": [
+          "id",
+          "statement",
+          "positive_evidence",
+          "falsifier"
+        ],
+        "properties": {
+          "id": {
+            "type": "string",
+            "pattern": "^H[0-9]+$"
+          },
+          "statement": {
+            "type": "string",
+            "minLength": 10
+          },
+          "positive_evidence": {
+            "type": "string",
+            "minLength": 10
+          },
+          "falsifier": {
+            "type": "string",
+            "minLength": 10
+          }
+        }
+      }
+    },
+    "tasks": {
+      "type": "array",
+      "minItems": 1,
+      "items": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": [
+          "task_id",
+          "family",
+          "split",
+          "generator",
+          "parameters",
+          "target",
+          "controls"
+        ],
+        "properties": {
+          "task_id": {
+            "type": "string",
+            "pattern": "^SDCB-[A-Z0-9-]+$"
+          },
+          "family": {
+            "enum": [
+              "prime_explicit_formula",
+              "chaotic_system_identification",
+              "memory_interference",
+              "proof_obligation_graph",
+              "criticality_sweep",
+              "spectral_ablation"
+            ]
+          },
+          "split": {
+            "enum": [
+              "development",
+              "validation",
+              "hidden_specification"
+            ]
+          },
+          "generator": {
+            "type": "string",
+            "minLength": 5
+          },
+          "parameters": {
+            "type": "object"
+          },
+          "target": {
+            "type": "string",
+            "minLength": 5
+          },
+          "controls": {
+            "type": "array",
+            "minItems": 1,
+            "items": {
+              "type": "string",
+              "minLength": 2
+            }
+          }
+        }
+      }
+    },
+    "model_profiles": {
+      "type": "array",
+      "minItems": 1,
+      "items": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": [
+          "profile_id",
+          "family",
+          "checkpoint_policy"
+        ],
+        "properties": {
+          "profile_id": {
+            "type": "string"
+          },
+          "family": {
+            "enum": [
+              "hdc",
+              "cfc_ltc",
+              "hdc_cfc",
+              "reservoir",
+              "koopman",
+              "transformer",
+              "graph_retrieval",
+              "symbolic_oracle",
+              "random_control"
+            ]
+          },
+          "checkpoint_policy": {
+            "type": "string",
+            "minLength": 3
+          }
+        }
+      }
+    },
+    "baselines": {
+      "type": "array",
+      "minItems": 1,
+      "items": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": [
+          "baseline_id",
+          "method",
+          "matching"
+        ],
+        "properties": {
+          "baseline_id": {
+            "type": "string"
+          },
+          "method": {
+            "type": "string",
+            "minLength": 3
+          },
+          "matching": {
+            "type": "array",
+            "minItems": 1,
+            "items": {
+              "enum": [
+                "capacity",
+                "compute",
+                "deployment",
+                "data",
+                "context"
+              ]
+            }
+          }
+        }
+      }
+    },
+    "negative_controls": {
+      "type": "array",
+      "minItems": 8,
+      "uniqueItems": true,
+      "items": {
+        "type": "string",
+        "minLength": 4
+      }
+    },
+    "metrics": {
+      "type": "array",
+      "minItems": 1,
+      "uniqueItems": true,
+      "items": {
+        "type": "string",
+        "minLength": 3
+      }
+    },
+    "resource_controls": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "comparison_views",
+        "seeds",
+        "energy_measurement"
+      ],
+      "properties": {
+        "comparison_views": {
+          "type": "array",
+          "minItems": 3,
+          "uniqueItems": true,
+          "items": {
+            "enum": [
+              "capacity_matched",
+              "compute_matched",
+              "deployment_matched"
+            ]
+          }
+        },
+        "seeds": {
+          "type": "integer",
+          "minimum": 5
+        },
+        "energy_measurement": {
+          "enum": [
+            "calibrated_telemetry_only",
+            "unavailable_until_instrumented"
+          ]
+        }
+      }
+    },
+    "reproducibility": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "source_pins_required",
+        "generator_seeds_required",
+        "raw_per_seed_results",
+        "independent_reproduction"
+      ],
+      "properties": {
+        "source_pins_required": {
+          "const": true
+        },
+        "generator_seeds_required": {
+          "const": true
+        },
+        "raw_per_seed_results": {
+          "const": true
+        },
+        "independent_reproduction": {
+          "enum": [
+            "required_for_promotion",
+            "pending"
+          ]
+        }
+      }
+    },
+    "evidence_policy": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "no_scalar_score",
+        "claim_levels",
+        "negative_control_failure"
+      ],
+      "properties": {
+        "no_scalar_score": {
+          "const": true
+        },
+        "claim_levels": {
+          "type": "array",
+          "minItems": 4,
+          "items": {
+            "enum": [
+              "mathematical_statement",
+              "theoretical_prediction",
+              "measured_result",
+              "speculation"
+            ]
+          }
+        },
+        "negative_control_failure": {
+          "const": "invalidate_affected_comparison"
+        }
+      }
+    }
+  }
+}
