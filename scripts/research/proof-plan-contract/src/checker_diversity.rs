@@ -405,35 +405,36 @@ fn summarize(
             continue;
         };
 
-        if object_string(run, "input_export_sha256") != export {
-            push(
-                &mut errors,
-                format!("checker {checker_id} did not bind the exact subject export digest"),
-            );
-        }
-        if !nonempty_string(run, "checker_version")
-            || !nonempty_string(run, "implementation_revision")
-            || !nonempty_string(run, "binary_sha256")
-        {
-            push(
-                &mut errors,
-                format!("checker {checker_id} is missing pinned version/revision/binary identity"),
-            );
-        }
-        if let Some(binary_sha) = object_string(run, "binary_sha256") {
-            if !is_sha256(binary_sha) {
-                push(&mut errors, format!("checker {checker_id} has invalid binary_sha256"));
-            }
-        }
         let result = object_string(run, "result").unwrap_or("invalid");
-        if result != "not_run"
-            && object_string(run, "raw_receipt_sha256")
+        if result != "not_run" {
+            if object_string(run, "input_export_sha256") != export {
+                push(
+                    &mut errors,
+                    format!("checker {checker_id} did not bind the exact subject export digest"),
+                );
+            }
+            if !nonempty_string(run, "checker_version")
+                || !nonempty_string(run, "implementation_revision")
+                || !nonempty_string(run, "binary_sha256")
+            {
+                push(
+                    &mut errors,
+                    format!("checker {checker_id} is missing pinned version/revision/binary identity"),
+                );
+            }
+            if let Some(binary_sha) = object_string(run, "binary_sha256") {
+                if !is_sha256(binary_sha) {
+                    push(&mut errors, format!("checker {checker_id} has invalid binary_sha256"));
+                }
+            }
+            if object_string(run, "raw_receipt_sha256")
                 .is_none_or(|digest| !is_sha256(digest))
-        {
-            push(
-                &mut errors,
-                format!("checker {checker_id} requires a raw receipt digest"),
-            );
+            {
+                push(
+                    &mut errors,
+                    format!("checker {checker_id} requires a raw receipt digest"),
+                );
+            }
         }
         if result != "not_run" {
             executed_count += 1;
@@ -608,6 +609,33 @@ pub fn validate_profile(
     }
 
     let requested_count = summary.requested_count;
+    let paranoid_mode = profile
+        .get("orchestrator")
+        .and_then(|value| value.get("paranoid_mode"))
+        .and_then(Value::as_bool)
+        .unwrap_or(false);
+    if paranoid_mode {
+        let requested: BTreeSet<&str> = array(profile, "requested_checker_ids")
+            .into_iter()
+            .flatten()
+            .filter_map(Value::as_str)
+            .collect();
+        let bundle: BTreeSet<&str> = array(
+            registry.get("checker_set").unwrap_or(&Value::Null),
+            "comparator_paranoid_bundle",
+        )
+        .into_iter()
+        .flatten()
+        .filter_map(Value::as_str)
+        .collect();
+        if requested != bundle {
+            push(
+                &mut errors,
+                "paranoid_mode requires every checker in the pinned comparator bundle",
+            );
+        }
+    }
+
     let accepted_all = summary.accepted_count == requested_count
         && summary.executed_count == requested_count
         && summary.rejected_count == 0
