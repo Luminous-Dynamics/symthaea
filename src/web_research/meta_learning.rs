@@ -11,7 +11,7 @@
 use serde::{Deserialize, Serialize};
 use std::collections::{HashMap, VecDeque};
 
-use super::types::{ResearchSource, VerificationOutcome};
+use super::types::{AdjudicatedVerificationOutcome, ResearchSource, VerificationOutcome};
 
 /// Configuration for the epistemic learner
 #[derive(Debug, Clone, Serialize, Deserialize)]
@@ -219,13 +219,23 @@ impl EpistemicLearner {
         }
     }
 
-    /// Record an independently adjudicated ground-truth outcome for learning.
+    /// Record an outcome only when its independent-adjudication metadata is present.
     ///
-    /// Callers must not derive `was_correct` from predicted confidence,
-    /// epistemic status, source reputation, or the same verifier being
-    /// calibrated. The WebResearcher integration accepts these outcomes only
-    /// through its explicit adjudication boundary.
-    pub fn record_outcome(&mut self, outcome: VerificationOutcome) -> anyhow::Result<()> {
+    /// The wrapper validates required provenance fields and confidence bounds.
+    /// It does not authenticate the adjudicator or resolve the referenced
+    /// evidence; those remain responsibilities of the independent custody path.
+    pub fn record_adjudicated_outcome(
+        &mut self,
+        adjudicated: AdjudicatedVerificationOutcome,
+    ) -> anyhow::Result<()> {
+        let outcome = adjudicated
+            .into_outcome()
+            .map_err(anyhow::Error::msg)?;
+        self.record_outcome_verified(outcome)
+    }
+
+    /// Internal sink for outcomes already validated by the adjudication boundary.
+    fn record_outcome_verified(&mut self, outcome: VerificationOutcome) -> anyhow::Result<()> {
         // Update source credibility
         self.update_source_credibility(&outcome);
 
@@ -452,15 +462,20 @@ pub struct LearnerState {
 mod tests {
     use super::*;
 
-    fn make_outcome(domain: &str, source: &str, correct: bool) -> VerificationOutcome {
-        VerificationOutcome {
-            claim: "Test claim".to_string(),
-            source_domain: source.to_string(),
-            source_type: ResearchSource::Documentation,
-            was_correct: correct,
-            predicted_confidence: 0.8,
-            domain: domain.to_string(),
-            adjudication_provenance: None,
+    fn make_outcome(domain: &str, source: &str, correct: bool) -> AdjudicatedVerificationOutcome {
+        AdjudicatedVerificationOutcome {
+            outcome: VerificationOutcome {
+                claim: "Test claim".to_string(),
+                source_domain: source.to_string(),
+                source_type: ResearchSource::Documentation,
+                was_correct: correct,
+                predicted_confidence: 0.8,
+                domain: domain.to_string(),
+                adjudication_provenance: None,
+            },
+            adjudication_kind: super::types::AdjudicationKind::Other,
+            authority_id: "synthetic-unit-test-authority".to_owned(),
+            evidence_reference: "test-fixture://epistemic-outcome".to_owned(),
         }
     }
 
@@ -472,7 +487,7 @@ mod tests {
         for i in 0..10 {
             let correct = i % 3 != 0; // i=0,3,6,9 are wrong, rest are correct (6/10)
             learner
-                .record_outcome(make_outcome("programming", "rust-lang.org", correct))
+                .record_adjudicated_outcome(make_outcome("programming", "rust-lang.org", correct))
                 .unwrap();
         }
 
