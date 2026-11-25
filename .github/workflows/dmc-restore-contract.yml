@@ -25,14 +25,6 @@ permissions:
   contents: read
 
 jobs:
-  rust-evaluator:
-    name: Parent Rust DMC restore package (no changes in this PR)
-    runs-on: ubuntu-latest
-    steps:
-      - uses: actions/checkout@v4
-      - name: No Rust changes in this extension
-        run: echo "The Rust restore evaluator was qualified at parent PR #13568; this extension changes only the pinned Python adapter and workflow matrix."
-
   pinned-python-smoke:
     name: Pinned dm_control restore / replay (${{ matrix.task }})
     runs-on: ubuntu-latest
