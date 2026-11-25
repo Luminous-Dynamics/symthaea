@@ -41,6 +41,7 @@ pub struct DecisionOutcomePayloadV1 {
     pub decision_episode_id: String,
     pub episode_manifest_sha256: String,
     pub evaluation_manifest_sha256: String,
+    pub evaluation_manifest_commitment_receipt_sha256: String,
     pub qualification_receipt_sha256: Option<String>,
     pub decision_sufficiency_receipt_sha256: Option<String>,
     pub decision_record_sha256: String,
@@ -144,6 +145,8 @@ pub struct DecisionOutcomeExpectedBindingV1<'a> {
     pub decision_episode_id: &'a str,
     pub episode_manifest_sha256: &'a str,
     pub evaluation_manifest_sha256: &'a str,
+    /// Digest of the independently verified, pre-run commitment witness receipt.
+    pub evaluation_manifest_commitment_receipt_sha256: &'a str,
     pub qualification_receipt_sha256: Option<&'a str>,
     pub decision_sufficiency_receipt_sha256: Option<&'a str>,
     pub decision_record_sha256: &'a str,
@@ -276,6 +279,8 @@ pub fn validate_decision_outcome_receipt_v1(
     if receipt.payload.decision_episode_id != expected.decision_episode_id
         || receipt.payload.episode_manifest_sha256 != expected.episode_manifest_sha256
         || receipt.payload.evaluation_manifest_sha256 != expected.evaluation_manifest_sha256
+        || receipt.payload.evaluation_manifest_commitment_receipt_sha256
+            != expected.evaluation_manifest_commitment_receipt_sha256
         || receipt.payload.decision_record_sha256 != expected.decision_record_sha256
     {
         return Err(DecisionOutcomeReceiptRejectV1::BindingMismatch);
@@ -284,6 +289,7 @@ pub fn validate_decision_outcome_receipt_v1(
     for digest in [
         expected.episode_manifest_sha256,
         expected.evaluation_manifest_sha256,
+        expected.evaluation_manifest_commitment_receipt_sha256,
         expected.decision_record_sha256,
         expected.evaluator_profile_sha256,
         expected.verifier_profile_sha256,
@@ -662,6 +668,7 @@ mod tests {
         signer: SigningKey,
         episode_manifest_sha256: String,
         evaluation_manifest_sha256: String,
+        evaluation_manifest_commitment_receipt_sha256: String,
         qualification_receipt_sha256: Option<String>,
         decision_sufficiency_receipt_sha256: Option<String>,
         decision_record_sha256: String,
@@ -678,6 +685,7 @@ mod tests {
                 decision_episode_id: "episode-1",
                 episode_manifest_sha256: &self.episode_manifest_sha256,
                 evaluation_manifest_sha256: &self.evaluation_manifest_sha256,
+                evaluation_manifest_commitment_receipt_sha256: &self.evaluation_manifest_commitment_receipt_sha256,
                 qualification_receipt_sha256: self.qualification_receipt_sha256.as_deref(),
                 decision_sufficiency_receipt_sha256: self
                     .decision_sufficiency_receipt_sha256
@@ -741,6 +749,7 @@ mod tests {
 
         let episode_manifest_sha256 = digest('a');
         let evaluation_manifest_sha256 = digest('b');
+        let evaluation_manifest_commitment_receipt_sha256 = digest('9');
         let qualification_receipt_sha256 = Some(digest('c'));
         let decision_sufficiency_receipt_sha256 = Some(digest('d'));
         let decision_record_sha256 = digest('e');
@@ -762,6 +771,7 @@ mod tests {
                     decision_episode_id: "episode-1".to_owned(),
                     episode_manifest_sha256: episode_manifest_sha256.clone(),
                     evaluation_manifest_sha256: evaluation_manifest_sha256.clone(),
+                    evaluation_manifest_commitment_receipt_sha256: evaluation_manifest_commitment_receipt_sha256.clone(),
                     qualification_receipt_sha256: qualification_receipt_sha256.clone(),
                     decision_sufficiency_receipt_sha256: decision_sufficiency_receipt_sha256.clone(),
                     decision_record_sha256: decision_record_sha256.clone(),
@@ -804,6 +814,7 @@ mod tests {
             signer,
             episode_manifest_sha256,
             evaluation_manifest_sha256,
+            evaluation_manifest_commitment_receipt_sha256,
             qualification_receipt_sha256,
             decision_sufficiency_receipt_sha256,
             decision_record_sha256,
