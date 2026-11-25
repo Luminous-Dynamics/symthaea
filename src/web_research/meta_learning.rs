@@ -429,8 +429,10 @@ impl EpistemicLearner {
     }
 
     /// Export the adjudicated observations needed to deterministically rebuild
-    /// calibration state. Cached aggregates are deliberately not persisted as
-    /// an authority; they are recomputed from the provenance-bearing records.
+    /// source/domain/meta-Phi calibration state. Cached aggregates are deliberately
+    /// not persisted as an authority; they are recomputed from provenance-bearing
+    /// records. The separate strategy suggestion library is not persisted until
+    /// its success-rate updates have their own adjudication lineage.
     pub fn export_state(&self) -> LearnerState {
         LearnerState {
             adjudication_schema_version: ADJUDICATED_LEARNER_STATE_VERSION,
@@ -579,6 +581,48 @@ mod tests {
                 .unwrap()
                 .outcome_count,
             12
+        );
+    }
+
+    #[test]
+    fn rolling_window_state_roundtrips_after_more_than_one_thousand_outcomes() {
+        let mut learner = EpistemicLearner::new();
+        for index in 0..1_005 {
+            learner
+                .record_adjudicated_outcome(make_outcome(
+                    if index % 2 == 0 { "science" } else { "programming" },
+                    if index % 3 == 0 { "example.org" } else { "rust-lang.org" },
+                    index % 5 != 0,
+                ))
+                .unwrap();
+        }
+
+        let before = learner.stats();
+        let before_meta_phi = learner.meta_phi.clone();
+        let state = learner.export_state();
+        assert_eq!(state.adjudicated_outcomes.len(), MAX_PERSISTED_ADJUDICATED_OUTCOMES);
+
+        let serialized = serde_json::to_string(&state).unwrap();
+        let state: LearnerState = serde_json::from_str(&serialized).unwrap();
+        let mut restored = EpistemicLearner::new();
+        assert!(restored.import_state(state));
+
+        let after = restored.stats();
+        assert_eq!(after.total_outcomes, MAX_PERSISTED_ADJUDICATED_OUTCOMES);
+        assert_eq!(after.source_count, before.source_count);
+        assert_eq!(after.domain_count, before.domain_count);
+        assert_eq!(after.overall_accuracy, before.overall_accuracy);
+        assert_eq!(restored.meta_phi.value, before_meta_phi.value);
+        assert_eq!(restored.meta_phi.cycles, before_meta_phi.cycles);
+        assert_eq!(
+            restored
+                .get_source_credibility("rust-lang.org")
+                .unwrap()
+                .outcome_count,
+            learner
+                .get_source_credibility("rust-lang.org")
+                .unwrap()
+                .outcome_count
         );
     }
 
