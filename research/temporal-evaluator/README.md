@@ -72,7 +72,7 @@ The evaluator-side module `src/individual_decision_transfer.rs` measures whether
 
 - Each scorecard declares the complete expected action set before evaluation and binds every action row to one individual, factual history, full branch-point snapshot, shared exogenous-forcing manifest, task/loss/split/model profiles and the same latent state.
 - Every row must have a unique action/run identity, a verified upstream pairing/trajectory reference, and an applied outcome. Missing action rows or non-applied branches reject; no outcome is silently removed or imputed as zero.
-- Utilities use one frozen integer scale (higher is better). Ties are resolved by lexicographically smallest action ID for selection; all exact realized top-1 actions and the complete epsilon-good set remain reported.
+- Utilities use one frozen integer scale (higher is better). Ties are resolved by lexicographically smallest action ID for selection; all exact realized top-1 actions and the complete epsilon-good set remain reported, including cases where every action is epsilon-good but no single action is uniquely optimal.
 - The certificate separates latent and rollout choices, realized regret, top-1/epsilon-good membership, the paired rollout-minus-latent regret difference, and pairwise ranking concordance/discordance/ties. Ranking ties are retained so Kendall tau-b can be reconstructed.
 - Output is canonicalized by action ID and echoes the complete frozen decision context plus per-action pairing/trajectory digest references. It contains per-individual rows only; no confidence interval or cross-individual inference is computed. #8578 remains the independent-cluster inference owner.
 
