@@ -324,6 +324,83 @@ mod tests {
         assert!(ec.should_research(0.3)); // Low Phi, research needed
     }
 
+    fn test_consciousness() -> EpistemicConsciousness {
+        let (researcher, integrator, learner) = create_epistemic_system().unwrap();
+        EpistemicConsciousness {
+            researcher,
+            integrator,
+            learner,
+            phi_threshold: 0.6,
+            last_phi: 0.0,
+        }
+    }
+
+    fn adjudicated_outcome() -> AdjudicatedVerificationOutcome {
+        AdjudicatedVerificationOutcome {
+            outcome: VerificationOutcome {
+                claim: "The test result is independently reproducible".to_owned(),
+                source_domain: "example.org".to_owned(),
+                source_type: ResearchSource::Academic,
+                was_correct: true,
+                predicted_confidence: 0.9,
+                domain: "science".to_owned(),
+            },
+            adjudication_kind: AdjudicationKind::IndependentEvaluator,
+            authority_id: "independent-evaluator-test".to_owned(),
+            evidence_reference: "urn:example:receipt:sha256:0123456789abcdef".to_owned(),
+        }
+    }
+
+    #[test]
+    fn meta_learning_accepts_only_complete_adjudication_records() {
+        let mut consciousness = test_consciousness();
+        assert_eq!(consciousness.learner.stats().total_outcomes, 0);
+
+        let mut missing_authority = adjudicated_outcome();
+        missing_authority.authority_id.clear();
+        assert!(consciousness
+            .record_adjudicated_outcome(missing_authority)
+            .is_err());
+
+        let mut missing_evidence = adjudicated_outcome();
+        missing_evidence.evidence_reference.clear();
+        assert!(consciousness
+            .record_adjudicated_outcome(missing_evidence)
+            .is_err());
+
+        let mut invalid_confidence = adjudicated_outcome();
+        invalid_confidence.outcome.predicted_confidence = f32::NAN;
+        assert!(consciousness
+            .record_adjudicated_outcome(invalid_confidence)
+            .is_err());
+
+        let mut empty_claim = adjudicated_outcome();
+        empty_claim.outcome.claim = "   ".to_owned();
+        assert!(consciousness
+            .record_adjudicated_outcome(empty_claim)
+            .is_err());
+
+        assert_eq!(consciousness.learner.stats().total_outcomes, 0);
+    }
+
+    #[test]
+    fn independently_adjudicated_outcome_updates_the_existing_learner() {
+        let mut consciousness = test_consciousness();
+        consciousness
+            .record_adjudicated_outcome(adjudicated_outcome())
+            .unwrap();
+
+        assert_eq!(consciousness.learner.stats().total_outcomes, 1);
+        assert_eq!(
+            consciousness
+                .learner
+                .get_source_credibility("example.org")
+                .unwrap()
+                .outcome_count,
+            1
+        );
+    }
+
     #[test]
     fn test_epistemic_types() {
         // Test that all types are properly exported
@@ -333,5 +410,8 @@ mod tests {
 
         let source = ResearchSource::Documentation;
         assert_eq!(source.label(), "Documentation");
+
+        let adjudication = AdjudicationKind::IndependentEvaluator;
+        assert_eq!(adjudication, AdjudicationKind::IndependentEvaluator);
     }
 }
