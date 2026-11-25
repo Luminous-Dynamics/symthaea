@@ -217,6 +217,7 @@ def export_checkpoint(path: Path, task_name: str) -> None:
         return values
 
     payload = {
+        "task_id": np.asarray(task_name),
         "integration_state": full_state,
         "integration_state_size": np.asarray(expected_state_size, dtype=np.int64),
         "prefix_state_sha256": np.asarray(digest_array(full_state)),
