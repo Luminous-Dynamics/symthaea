@@ -80,7 +80,7 @@ Contradictions remain visible. The evaluator does not average contradictory evid
 
 ## Authored test coverage
 
-The module currently has 11 unit tests; the integration reference file has 3 tests. They cover:
+The module currently has 12 unit tests; the integration reference file has 3 tests. They cover:
 1. feature attribution never produces a causal claim;
 2. difference-in-differences known answer remains association-only;
 3. failed covariate balance downgrades identification;
