@@ -281,12 +281,19 @@
       "required": [
         "public_manifest_url",
         "public_file_source_script",
+        "public_file_source_script_git_blob_sha",
         "reported_public_data_license",
         "license_status",
         "immutable_manifest_sha256",
         "immutable_dataset_revision",
         "download_status",
-        "asset_or_weight_download_status"
+        "asset_or_weight_download_status",
+        "official_paper_linked_zenodo_record",
+        "mara_protocol_firebase_distribution",
+        "distribution_equivalence_status",
+        "secondary_catalogue_claims",
+        "license_review_status",
+        "archive_or_asset_download_status"
       ],
       "properties": {
         "public_manifest_url": {
@@ -344,7 +351,8 @@
             "archive_sha256",
             "visible_license_value",
             "license_status",
-            "archive_contents_described_by_record"
+            "archive_contents_described_by_record",
+            "record_data_volume_label"
           ],
           "properties": {
             "url": {
@@ -395,6 +403,9 @@
                 "programs/",
                 "color_dict.yaml"
               ]
+            },
+            "record_data_volume_label": {
+              "const": "12.9 MB"
             }
           }
         },

@@ -13,14 +13,14 @@ This complements CMAQ-002's finite EVoI simulator: EVoI measures which safe prob
 
 ## Source and data boundary
 
-The PMLR paper links directly to the Zenodo v1 archive record. Separately, the pinned MARAProtocol download script (blob a0eb99dfd39b8cab9ffa5e577d2e2e1b738301e9) points to a Firebase Storage manifest_public.json endpoint. These are currently two independent distribution routes; we have not downloaded either manifest/archive or matched their bytes. The Firebase manifest SHA-256 and Zenodo archive SHA-256 remain null. A download attempt from this execution environment failed at DNS resolution.
+The PMLR paper links directly to the Zenodo v1 archive record. Separately, the pinned MARAProtocol download script (blob a0eb99dfd39b8cab9ffa5e577d2e2e1b738301e9) points to a Firebase Storage manifest_public.json endpoint. These are currently two independent distribution routes; we have not downloaded either manifest/archive or matched their bytes. The Zenodo landing page displays MD5 f276390c6ea102187c072a0fafda9888 and no visible license value, but the archive was not retrieved to verify MD5 or compute SHA-256. The Firebase manifest SHA-256 and Zenodo archive SHA-256 remain null. Download attempts from this execution environment failed at DNS resolution.
 
 The lock pins:
 - Autumn.cpp at 0929d175c3d296de091ac4b998d09b9b55a38f67 (MIT; C++20 native interpreter, plus WASM/Python/Julia).
 - MARAProtocol at d0d4e9251151778415cc5195c5dfb8296a5ded24 (MIT; protocol buffers pinned by file blob SHA).
 - The public data manifest endpoint, without claiming immutable dataset identity or per-file checksums.
 
-The two pinned commits are unsigned. The official Zenodo landing page currently shows no license value. A secondary catalogue reports CC-BY-4.0, but this remains unverified and must not be treated as permission to redistribute. The dataset is not downloaded; per-file license and attribution review are still required. The MARA reference runner requires Python 3.12 and Protobuf tooling; Symthaea should implement a thin Rust adapter to the pinned protobuf contract rather than importing the Python runner into production. Use the native Autumn interpreter as a pinned external process; do not vendor code or data.
+The two pinned commits are unsigned. The official Zenodo landing page currently shows no license value. A secondary catalogue reports CC-BY-4.0, but this remains unverified and must not be treated as permission to redistribute. The MARA Firebase route has not been matched to the Zenodo archive. The dataset is not downloaded; per-file license and attribution review are still required. The MARA reference runner requires Python 3.12 and Protobuf tooling; Symthaea should implement a thin Rust adapter to the pinned protobuf contract rather than importing the Python runner into production. Use the native Autumn interpreter as a pinned external process; do not vendor code or data.
 
 ## Protocol custody
 

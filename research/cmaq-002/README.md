@@ -154,7 +154,7 @@ The full DEEP/ActiveArena visual perception adapter is owned by [VIS-DVPC issue 
 
 A separate metadata-only extension now tracks [WorldTest / AutumnBench](https://proceedings.mlr.press/v306/warrier26a.html). Its two-phase protocol separates reward-free exploration in a base environment from a later query in a related but different challenge environment. Query families are masked-frame prediction, change detection and planning.
 
-- The paper reports 43 environments / 129 tasks; the public release is reported as 20 / 60. The lock records both scopes explicitly. Public manifest hashes and per-file licensing remain unresolved; no dataset is downloaded.
+- The paper reports 43 environments / 129 tasks. The PMLR-linked Zenodo v1 archive is identified (DOI 10.5281/zenodo.19498269; published MD5 shown on its landing page), while the 20 / 60 public-subset count and secondary CC-BY label remain unverified. MARAProtocol also has a Firebase manifest route; it has not been byte-matched to Zenodo. No dataset is downloaded; SHA-256 and per-file licensing remain unresolved.
 - Source commits for the Autumn.cpp interpreter and MARAProtocol are pinned separately, with unsigned-commit and external-runtime caveats.
 - `worldtest_exploration.rs` adds a bounded Rust trace diagnostic for reset share and adjacent-segment LCS replay. Reset events are charged interactions; reset count and replay similarity are explanatory descriptors, not rewarded objectives. The LCS normalization is Symthaea-defined and is not claimed as an exact reproduction of the paper's figure.
 - `worldtest-adapter-contract.schema.json` plus its fixture separate reward-free exploration, the related test environment, candidate-visible task prompt and evaluator-only answer/truth.

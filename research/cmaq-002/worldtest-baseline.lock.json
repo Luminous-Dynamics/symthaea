@@ -102,7 +102,8 @@
         "answers/",
         "programs/",
         "color_dict.yaml"
-      ]
+      ],
+      "record_data_volume_label": "12.9 MB"
     },
     "mara_protocol_firebase_distribution": {
       "manifest_url": "https://firebasestorage.googleapis.com/v0/b/prolific-server-123.firebasestorage.app/o/manifest_public.json?alt=media",
@@ -122,7 +123,10 @@
     "immutable_dataset_revision": null,
     "license_review_status": "unresolved",
     "download_status": "not_downloaded",
-    "archive_or_asset_download_status": "not_applicable"
+    "archive_or_asset_download_status": "not_applicable",
+    "reported_public_data_license": null,
+    "license_status": "official_zenodo_license_value_not_visible; secondary_cc_by_claim_unverified",
+    "asset_or_weight_download_status": "not_applicable"
   },
   "reset_behavior_reference": {
     "source": "https://datvo06.github.io/assets/talks/worldtest/",

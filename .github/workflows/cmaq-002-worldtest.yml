@@ -72,15 +72,34 @@ jobs:
           assert baseline["status"] == "metadata_only_not_downloaded"
           assert baseline["benchmark"]["paper_environment_count"] == 43
           assert baseline["benchmark"]["paper_task_count"] == 129
-          assert baseline["benchmark"]["public_release_environment_count"] == 20
-          assert baseline["benchmark"]["public_release_task_count"] == 60
-          assert baseline["benchmark"]["withheld_environment_count_inferred"] == 23
-          assert baseline["benchmark"]["withheld_task_count_inferred"] == 69
+          assert baseline["benchmark"]["public_release_environment_count"] is None
+          assert baseline["benchmark"]["public_release_task_count"] is None
+          assert baseline["benchmark"]["withheld_environment_count_inferred"] is None
+          assert baseline["benchmark"]["withheld_task_count_inferred"] is None
+          assert "20 environments" in baseline["benchmark"]["public_release_count_basis"]
+          assert "unverified" in baseline["benchmark"]["public_release_count_basis"].lower()
           assert baseline["dataset"]["download_status"] == "not_downloaded"
           assert baseline["dataset"]["immutable_manifest_sha256"] is None
           assert baseline["dataset"]["immutable_dataset_revision"] is None
+          assert baseline["dataset"]["reported_public_data_license"] is None
           assert baseline["dataset"]["license_status"] == (
-              "reported_by_secondary_catalogue_pending_per_file_manifest_audit"
+              "official_zenodo_license_value_not_visible; secondary_cc_by_claim_unverified"
+          )
+          zenodo = baseline["dataset"]["official_paper_linked_zenodo_record"]
+          assert zenodo["doi"] == "10.5281/zenodo.19498269"
+          assert zenodo["published_md5"] == "f276390c6ea102187c072a0fafda9888"
+          assert zenodo["published_md5_locally_verified"] is False
+          assert zenodo["archive_sha256"] is None
+          assert zenodo["visible_license_value"] is None
+          assert zenodo["record_data_volume_label"] == "12.9 MB"
+          assert baseline["dataset"]["secondary_catalogue_claims"]["public_environment_count"] == 20
+          assert baseline["dataset"]["secondary_catalogue_claims"]["public_task_count"] == 60
+          assert baseline["dataset"]["secondary_catalogue_claims"]["verification_status"] == "unverified_secondary_source_only"
+          assert baseline["dataset"]["distribution_equivalence_status"] == (
+              "zenodo_archive_and_mara_firebase_manifest_not_yet_byte_matched"
+          )
+          assert baseline["dataset"]["public_file_source_script_git_blob_sha"] == (
+              "a0eb99dfd39b8cab9ffa5e577d2e2e1b738301e9"
           )
           assert baseline["sources"]["autumn_interpreter"]["commit_signature_status"] == "unsigned"
           assert baseline["sources"]["mara_protocol"]["commit_signature_status"] == "unsigned"
