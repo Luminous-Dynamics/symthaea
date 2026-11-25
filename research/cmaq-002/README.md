@@ -148,3 +148,16 @@ The custody schema is intentionally separate from the finite-mechanism CMAQ-002 
 ### Ownership of the full visual adapter
 
 The full DEEP/ActiveArena visual perception adapter is owned by [VIS-DVPC issue #8156](https://github.com/Luminous-Dynamics/symthaea/issues/8156), which already distinguishes current-frame compute escalation from physically acquiring a new viewpoint. The ActiveArena source lock and observation-custody schema in this PR are reusable provenance/qualification inputs for #8156, not a duplicate visual benchmark. CMAQ-002 continues to own the finite-mechanism causal-intervention/EVoI benchmark; its synthetic probe allowlist is not a camera or robot-action authorization policy.
+
+
+## WorldTest / AutumnBench: environment-level queries
+
+A separate metadata-only extension now tracks [WorldTest / AutumnBench](https://proceedings.mlr.press/v306/warrier26a.html). Its two-phase protocol separates reward-free exploration in a base environment from a later query in a related but different challenge environment. Query families are masked-frame prediction, change detection and planning.
+
+- The paper reports 43 environments / 129 tasks; the public release is reported as 20 / 60. The lock records both scopes explicitly. Public manifest hashes and per-file licensing remain unresolved; no dataset is downloaded.
+- Source commits for the Autumn.cpp interpreter and MARAProtocol are pinned separately, with unsigned-commit and external-runtime caveats.
+- `worldtest_exploration.rs` adds a bounded Rust trace diagnostic for reset share and adjacent-segment LCS replay. Reset events are charged interactions; reset count and replay similarity are explanatory descriptors, not rewarded objectives. The LCS normalization is Symthaea-defined and is not claimed as an exact reproduction of the paper's figure.
+- `worldtest-adapter-contract.schema.json` plus its fixture separate reward-free exploration, the related test environment, candidate-visible task prompt and evaluator-only answer/truth.
+- This is not the DEEP/ActiveArena camera-perception adapter in #8156, and it is not a completed AutumnBench run.
+
+Protocol: [WORLDTEST_ADAPTER_V0_1.md](WORLDTEST_ADAPTER_V0_1.md). Baseline lock: [worldtest-baseline.lock.json](worldtest-baseline.lock.json). Phase custody contract: [worldtest-adapter-contract.schema.json](worldtest-adapter-contract.schema.json).
