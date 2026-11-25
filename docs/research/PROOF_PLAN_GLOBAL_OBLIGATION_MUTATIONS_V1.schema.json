@@ -43,7 +43,8 @@
           "mutation",
           "expected",
           "expected_counts",
-          "claim_ceiling"
+          "claim_ceiling",
+          "mutation_kind"
         ],
         "properties": {
           "id": {
@@ -113,6 +114,21 @@
           "claim_ceiling": {
             "type": "string",
             "minLength": 1
+          },
+          "mutation_kind": {
+            "enum": [
+              "no_op",
+              "remove_discharge",
+              "double_discharge",
+              "orphan_subgoal",
+              "orphan_create_edge",
+              "declared_output_without_edge",
+              "transform_without_successor",
+              "accept_unresolved_plan",
+              "add_goal_transition_cycle",
+              "candidate_route_with_unresolved_goals",
+              "duplicate_primary_alternative"
+            ]
           }
         }
       }
