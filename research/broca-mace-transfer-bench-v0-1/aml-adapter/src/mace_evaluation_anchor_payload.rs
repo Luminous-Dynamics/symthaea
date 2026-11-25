@@ -54,6 +54,8 @@ pub struct MaceEvaluationAnchorPayloadV1 {
     pub candidate_access_profile_sha256: String,
     pub reveal_protocol_sha256: String,
     pub trace_seal_protocol_sha256: String,
+    pub candidate_readable_before_trace_seal: bool,
+    pub reveal_condition: String,
 }
 
 /// Consumer-owned profile pins. These must come from deployment/evaluator
@@ -246,6 +248,8 @@ pub fn build_mace_evaluation_anchor_payload_v1(
         candidate_access_profile_sha256: expected.candidate_access_profile_sha256.to_owned(),
         reveal_protocol_sha256: expected.reveal_protocol_sha256.to_owned(),
         trace_seal_protocol_sha256: manifest.anti_leakage.trace_seal_protocol_sha256.clone(),
+        candidate_readable_before_trace_seal: false,
+        reveal_condition: "all_candidate_traces_sealed".to_owned(),
     };
     let payload_sha256 = mace_evaluation_anchor_payload_sha256_v1(&payload)?;
     Ok(VerifiedMaceEvaluationAnchorPayloadV1 {
@@ -284,6 +288,12 @@ fn validate_payload_shape(
     }
     if payload.episode_count > 10_000 {
         return Err(MaceEvaluationAnchorPayloadRejectV1::TooManyEpisodes);
+    }
+    if payload.candidate_readable_before_trace_seal {
+        return Err(MaceEvaluationAnchorPayloadRejectV1::CandidateReadableBeforeTraceSeal);
+    }
+    if payload.reveal_condition != "all_candidate_traces_sealed" {
+        return Err(MaceEvaluationAnchorPayloadRejectV1::InvalidRevealCondition);
     }
     for digest in [
         payload.evaluation_protocol_sha256.as_str(),
@@ -346,7 +356,7 @@ mod tests {
         std::iter::repeat_n(ch, 64).collect()
     }
 
-    fn expected<'a>() -> MaceEvaluationAnchorExpectedBindingV1<'a> {
+    fn expected() -> MaceEvaluationAnchorExpectedBindingV1<'static> {
         MaceEvaluationAnchorExpectedBindingV1 {
             evaluator_profile_sha256: Box::leak(digest('b').into_boxed_str()),
             verifier_profile_sha256: Box::leak(digest('c').into_boxed_str()),
@@ -411,19 +421,24 @@ mod tests {
     #[test]
     fn witness_root_substitution_is_rejected() {
         let (manifest, verified, _) = test_verified_sealed_evaluation_fixture_v1();
-        let (_, _, wrong_witness) = test_verified_sealed_evaluation_fixture_v1();
-        // The two independent test capabilities bind the same suite/manifests;
-        // a payload root mutation is instead caught by the original sealed digest.
-        let mut altered = manifest.clone();
-        altered.episode_set.episode_manifest_root_sha256 = digest('9');
+        let wrong_witness =
+            crate::evaluation_manifest_commitment_receipt::test_verified_evaluation_manifest_commitment_v1_with_bindings(
+                &digest('9'),
+                verified.manifest_sha256(),
+                verified.arm_assignment_root_sha256(),
+                verified.pre_registration_root_sha256(),
+                verified.sealed_artifacts_root_sha256(),
+                &digest('1'),
+                &digest('2'),
+            );
         assert_eq!(
             build_mace_evaluation_anchor_payload_v1(
-                &altered,
+                &manifest,
                 &verified,
                 &wrong_witness,
                 &expected(),
             ),
-            Err(MaceEvaluationAnchorPayloadRejectV1::ManifestDigestMismatch)
+            Err(MaceEvaluationAnchorPayloadRejectV1::EpisodeSetBindingMismatch)
         );
     }
 
