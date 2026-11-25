@@ -99,6 +99,28 @@ Reuse established task suites and evaluation hosts instead of forking their task
 
 All comparisons must match model access/release, tool surface, prompts, budgets, task split, attack knowledge, retries, monitor visibility, runner and grader. Report false blocks, benign utility, utility under attack, attack success and unauthorized observed effects separately. Include per-family sample counts and confidence intervals; account for clustering by task and attacker family. Keep public development cases separate from sealed holdouts. Do not claim SOTA without a preregistered, independently reproducible matched comparison.
 
+## 6.1 Published comparison anchors (protocol-specific, not SAT results)
+
+The following published results are useful baselines. Their scores are not directly comparable with one another because the tasks, attack budgets, metrics and system boundaries differ.
+
+| Work | Published evaluation anchor | SAT interpretation |
+|---|---|---|
+| AgentDojo | 97 realistic user tasks, 27 injection targets, 70 tools and 629 security test cases. It reports benign utility, utility under attack and targeted attack success. ([NeurIPS paper](https://proceedings.neurips.cc/paper_files/paper/2024/hash/97091a5177d8dc64b1da8bf3e1f6fb54-Abstract-Datasets_and_Benchmarks_Track.html)) | Preserve its paired utility/security semantics. Add the missing system-level authority, lineage, sink-readback and evidence-custody qualification around it. |
+| AgentHarm | 110 malicious agent tasks, 440 augmented variants and 11 harm categories; the evaluation tests coherent multi-step agent capability, not only chatbot refusal. ([AISI benchmark](https://www.aisi.gov.uk/research/agentharm-a-benchmark-for-measuring-harmfulness-of-llm-agents)) | Use as the harmful-capability track. A refusal or model-level policy result cannot substitute for proof that prohibited effects are blocked at the external sink. |
+| AuditBench | 56 models with implanted hidden behaviors, designed to test whether investigators discover behaviors that targets do not disclose. ([Anthropic AuditBench](https://alignment.anthropic.com/2026/auditbench/)) | Use it for hidden-behavior discovery and auditor calibration; include benign targets and adjudicated evidence. |
+| Auditor RL | Anthropic reports pointwise reward hacking in which auditors fabricate concerning findings. Pairwise investigation rewards plus benign calibration improved its evaluation; its reported best configuration reached 72.7 audit quality (vs 68.0 for Opus 4.6) and 99.6 false-positive calibration in that benchmark. ([Research report](https://alignment.anthropic.com/2026/training-alignment-auditors/)) | Reward evidence-backed investigation rather than the number or severity of findings. Treat the metrics as benchmark-specific, not a general auditor reliability guarantee. |
+| DelegateGuard | In its reported 26-attack adaptive campaign, unrestricted execution leaked in 18 cases; static allowlists and label-flow IFC each leaked in 3; an output monitor leaked in 0 but false-blocked 4/5 benign controls; DelegateGuard leaked in 3/26 with 0/5 benign false blocks. ([Paper](https://arxiv.org/abs/2610.16005)) | This is a direct capability/delegation comparator. Its residual leaks show why the qualification boundary must include disclosure content, actual sink observations and benign utility—not only capability checks. |
+| SHADE-Arena / ControlArena | SHADE-Arena contains 17 main-task/side-task pairs; the public ControlArena setting exposes five pairs while 12 remain reserved. ControlArena composes evaluation settings, control micro-protocols and honest/attack modes on Inspect AI. ([SHADE setting](https://control-arena.aisi.org.uk/settings/shade_arena.html), [ControlArena evaluation](https://control-arena.aisi.org.uk/evaluation.html)) | Reuse ControlArena as the evaluation host and SHADE as an adaptive control track. Maintain separately sealed holdouts; a five-pair public split is not enough for a broad SOTA claim. |
+| LADDER | 145 long-horizon manipulation tasks across three suites, with 1–10 subgoals and 2,024 simulated episodes per system in its described evaluation. ([Benchmark](https://ladderrobotics.ai/research)) | Use for task/mission robustness. It does not by itself qualify actuator authority, physical safety interlocks or human control/withdrawal. |
+
+These anchors imply a more credible path to outperforming current practice:
+
+1. Reproduce each relevant baseline under its native task definition before adding SAT assertions.
+2. Wrap, rather than silently modify, upstream benchmark tasks. Store upstream version and task digests in the run manifest.
+3. Measure the properties existing benchmarks do not jointly establish: exact authorization-to-effect correspondence, data-lineage preservation, independent sink evidence, event/evaluator integrity, adaptive protocol decay and human capability after withdrawal.
+4. Publish matched comparisons only when model version, tool surface, prompts, attacker knowledge, budgets, retries, monitor visibility, sandbox, scorer and case split are controlled.
+5. Publish the strongest successful attack and benign false-block cases, not just an average. Keep development cases public and qualification holdouts sealed.
+
 ## 7. Initial research targets (not achieved or standards)
 
 | Metric | Pilot target | Hard interpretation |
