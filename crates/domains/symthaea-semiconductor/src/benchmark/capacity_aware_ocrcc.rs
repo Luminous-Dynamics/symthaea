@@ -23,6 +23,9 @@ pub const CA_OCRC_POLICY_SCHEMA_V1: &str = "luminous.semi-bench.ca-ocrc-policy.v
 pub const CA_OCRC_ROUND_INPUT_SCHEMA_V1: &str = "luminous.semi-bench.ca-ocrc-round-input.v1";
 pub const CA_OCRC_DELIVERY_SCHEMA_V1: &str = "luminous.semi-bench.ca-ocrc-label-delivery.v1";
 pub const CA_OCRC_ROUND_RECEIPT_SCHEMA_V1: &str = "luminous.semi-bench.ca-ocrc-round-receipt.v1";
+pub const CA_OCRC_SCORE_CONTRACT_V1: &str =
+    "luminous.semi-bench.score.capped-absolute-residual.v1";
+pub const CA_OCRC_PRNG_ALGORITHM_V1: &str = "splitmix64/v1";
 
 #[derive(Clone, Copy, Debug, Eq, PartialEq, Serialize, Deserialize)]
 #[serde(rename_all = "snake_case")]
@@ -104,7 +107,10 @@ pub struct CaOcrcPolicyV1 {
     pub revision: u64,
     pub target_risk: f64,
     pub learning_rate: f64,
+    /// Bound B for S_B(x,y)=min(|y-f(x)|, B).
     pub score_bound: f64,
+    /// Versioned score semantics are part of the policy digest.
+    pub score_contract: String,
     pub tracking_capacity: usize,
     pub maximum_real_delay: u64,
     pub proxy_distribution: CaOcrcProxyDelayDistributionV1,
@@ -134,6 +140,7 @@ pub struct CaOcrcPredictionReceiptV1 {
     pub event_time_unix_seconds: i64,
     pub prediction_time_unix_seconds: i64,
     pub point_prediction: f64,
+    pub score_contract: String,
     pub set_kind: CaOcrcSetKindV1,
     pub interval_lower: Option<f64>,
     pub interval_upper: Option<f64>,
@@ -396,6 +403,7 @@ fn validate_policy(policy: &CaOcrcPolicyV1) -> Result<(), CaOcrcErrorV1> {
     }
     require_text(&policy.policy_id, "policy.policy_id")?;
     if policy.revision == 0
+        || policy.score_contract != CA_OCRC_SCORE_CONTRACT_V1
         || !policy.target_risk.is_finite()
         || !(0.0..1.0).contains(&policy.target_risk)
         || !policy.learning_rate.is_finite()
@@ -564,6 +572,7 @@ fn build_prediction_receipt(
         event_time_unix_seconds: input.event_time_unix_seconds,
         prediction_time_unix_seconds: input.prediction_time_unix_seconds,
         point_prediction: input.point_prediction,
+        score_contract: engine.policy.score_contract.clone(),
         set_kind,
         interval_lower,
         interval_upper,
@@ -1020,7 +1029,6 @@ fn process_round_inner(
 
     let tracking_digest = tracking_set_digest(&engine.tracking_set)?;
     let state_after = state_digest(engine)?;
-    prediction.receipt_sha256 = prediction_digest(&prediction)?;
     let mut receipt = CaOcrcRoundReceiptV1 {
         schema: CA_OCRC_ROUND_RECEIPT_SCHEMA_V1.into(),
         engine_id: engine.engine_id.clone(),
@@ -1218,6 +1226,7 @@ mod tests {
             target_risk: 0.10,
             learning_rate: 0.20,
             score_bound: 10.0,
+            score_contract: CA_OCRC_SCORE_CONTRACT_V1.into(),
             tracking_capacity: capacity,
             maximum_real_delay: proxy.maximum_proxy_delay,
             proxy_distribution: proxy,
@@ -1303,7 +1312,7 @@ mod tests {
         revision: u64,
         event: &str,
         value: f64,
-        issue_round: u64,
+        _issue_round: u64,
         delivered_round: u64,
         status: LabelConsumptionEligibilityV1,
     ) -> CaOcrcLabelDeliveryV1 {
@@ -1616,6 +1625,15 @@ mod tests {
     }
 
     #[test]
+    #[test]
+    fn policy_binds_the_capped_residual_score_contract() {
+        let mut candidate = policy(pmf_always_delay(2), 2);
+        assert!(validate_policy(&candidate).is_ok());
+        candidate.score_contract = "luminous.semi-bench.score.unbounded-residual.v1".into();
+        assert!(validate_policy(&candidate).is_err());
+    }
+
+    #[test]
     fn proxy_pmf_survival_load_and_capacity_validation_are_exact() {
         let bernoulli = bernoulli_proxy_distribution_v1("p", 3, 0.25).unwrap();
         assert!((proxy_survival_probability_v1(&bernoulli, 0).unwrap() - 0.25).abs() < 1.0e-12);
@@ -1638,7 +1656,7 @@ mod tests {
         let objective = |p: f64| {
             let x = dmax as f64 * p / capacity as f64;
             (capacity as f64 + 1.0) / (p * horizon as f64)
-                + (-capacity as f64 * (x - 1.0 - x.ln())).exp()
+                + (-(capacity as f64) * (x - 1.0 - x.ln())).exp()
         };
         let grid_best = (1..=200_000)
             .map(|i| i as f64 / 200_000.0 * (capacity as f64 / dmax as f64))
