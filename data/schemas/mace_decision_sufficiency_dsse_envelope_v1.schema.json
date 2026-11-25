@@ -1,0 +1,48 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://luminousdynamics.io/schemas/mace_decision_sufficiency_dsse_envelope_v1.schema.json",
+  "title": "MACE Decision Sufficiency DSSE Envelope V1",
+  "description": "DSSE v1.0.2 JSON envelope for the MACE decision-sufficiency in-toto Statement. One Ed25519 signature is required by this MACE profile; standard and URL-safe Base64 are accepted and outer keyid is optional.",
+  "type": "object",
+  "additionalProperties": true,
+  "required": [
+    "payloadType",
+    "payload",
+    "signatures"
+  ],
+  "properties": {
+    "payloadType": {
+      "const": "application/vnd.in-toto+json"
+    },
+    "payload": {
+      "type": "string",
+      "minLength": 4,
+      "maxLength": 11184812,
+      "pattern": "^[A-Za-z0-9+/_-]+={0,2}$"
+    },
+    "signatures": {
+      "type": "array",
+      "minItems": 1,
+      "maxItems": 1,
+      "items": {
+        "type": "object",
+        "additionalProperties": true,
+        "required": [
+          "sig"
+        ],
+        "properties": {
+          "keyid": {
+            "type": "string",
+            "maxLength": 256
+          },
+          "sig": {
+            "type": "string",
+            "minLength": 86,
+            "maxLength": 88,
+            "pattern": "^[A-Za-z0-9+/_-]{86}(?:==)?$"
+          }
+        }
+      }
+    }
+  }
+}
