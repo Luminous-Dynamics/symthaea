@@ -54,10 +54,10 @@ impl WebResearcher {
         })
     }
 
-    /// Research and verify a query
+    /// Research a query and assess claims against explicit support classifications.
     ///
-    /// This is the main entry point for epistemic research.
-    /// Returns a research result with verified claims.
+    /// Retrieved pages remain evidence candidates until a claim-specific
+    /// support classifier labels them. Topical similarity alone is not entailment.
     pub async fn research_and_verify(&self, query: &str) -> Result<WebResearchResult> {
         // Build search queries
         let search_queries = self.plan_queries(query);
