@@ -65,17 +65,19 @@ The first implementation uses a two-stage, source-first design, stratified by a 
 
 1. In stratum (h), let (W_h) be the number of eligible source works and (K_h) the preregistered source-work draw.
 2. Select (K_h) source works uniformly without replacement.
-3. For each selected work (w), let (n_w) be the number of eligible query items. Select one item uniformly from those (n_w) items.
+3. For each selected work (w), let (n_w) be the number of eligible query items and (m_w=\min(m,n_w)), where (m\ge2) is the configured within-work item target. Select (m_w) items uniformly without replacement.
 
 For each work:
 [
-P(w	ext{ selected})=K_h/W_h
+P(w\text{ selected})=K_h/W_h
 ]
 
 For each eligible item (i) in work (w):
 [
-P(i	ext{ selected})=\frac{K_h}{W_h}\times\frac{1}{n_w}
+P(i\text{ selected})=\frac{K_h}{W_h}\times\frac{m_w}{n_w}
 ]
+
+When (n_w=1), the only eligible item is a within-work census. When (n_w\ge2), the design selects at least two items (up to (m)), enabling a future two-stage variance estimator to measure within-work variation rather than trying to estimate it from one observation.
 
 The output records all three values as exact rational fractions:
 - source-work inclusion probability;
@@ -88,7 +90,7 @@ This two-stage design gives each source work the same source-selection probabili
 
 ### 3.3 Estimation boundary
 
-The selection planner only supplies a probability sample and exact inclusion probabilities. It does **not** yet implement final weighted estimators or standard errors.
+The selection planner only supplies a probability sample and exact inclusion probabilities. It does **not** yet implement final weighted estimators or standard errors. Because it selects at least two items per multi-item work when available, a future estimator can calculate within-work sample variance; the work-level sampling variance must still be combined with the within-work component using the actual two-stage design.
 
 For a finite item-level total, Horvitz–Thompson estimation uses:
 [
