@@ -1,0 +1,948 @@
+{
+  "schema_version": "1.0.0",
+  "artifact_id": "LEAN-KERNEL-ARENA-LIVE-SNAPSHOT-2026-11-25",
+  "snapshot_status": "live_page_snapshot_not_frozen_round",
+  "captured_date": "2026-11-25",
+  "source": {
+    "url": "https://arena.lean-lang.org/",
+    "title": "Lean Kernel Arena — Round in progress",
+    "interpretation": "Live homepage snapshot. The arena states that checker/test results change over time and are comparable only within the same round.",
+    "raw_results_json_url": "https://arena.lean-lang.org/results.json",
+    "raw_results_json_size_bytes_approx": 9400000,
+    "raw_results_access": "not_retrieved_in_this_workflow; webpage content limit exceeded",
+    "test_tarball_url": "https://arena.lean-lang.org/lean-arena-tests.tar.gz",
+    "downloadable_test_tarball": {
+      "good_tests": 138,
+      "bad_tests": 92,
+      "approx_size_mb": 8,
+      "excludes_individual_tests_over_mb": 10
+    }
+  },
+  "visible_suite": {
+    "checker_count": 37,
+    "corner_case_count_per_checker": 30,
+    "outcome_groups": [
+      "invalid_proof_rejection",
+      "valid_proof_acceptance",
+      "corner_cases_without_prescribed_outcome"
+    ],
+    "metrics_note": "For invalid proofs: correct rejection, false acceptance, declined. For valid proofs: correct acceptance, false rejection, declined. Corner cases have accepted/declined counts only. A decline includes unsupported feature, crash or timeout per Arena rules.",
+    "mathlib_benchmark": {
+      "metric": "virtual_cpu_time_seconds",
+      "calculation": "Arena states that time is virtual CPU time derived from instruction count at 6.0 Ginstr/s; it does not capture parallel execution speed.",
+      "memory_metric": "peak_memory_gib",
+      "note": "Time/memory refer to the Mathlib-scale test and are unavailable for some checkers."
+    }
+  },
+  "comparator_bundle_overlap": {
+    "note": "This is the broad Arena landscape, not the Lake comparator --paranoid bundle. The latter remains separately modeled in LEAN_CHECKER_DIVERSITY_REGISTRY_V1.json.",
+    "matching_names": [
+      "con-ron",
+      "con-leche",
+      "nanoda",
+      "lean4lean",
+      "official"
+    ],
+    "comparator_only_or_other_status": [
+      "leanchecker-paranoid is a hardened comparator checker, not listed as a separate current Arena row."
+    ]
+  },
+  "checkers": [
+    {
+      "rank": 1,
+      "name": "nano-lean",
+      "language": "Rust",
+      "version": "v0.4.2 (5cd4a25)",
+      "invalid_proofs": {
+        "correct_rejections": 92,
+        "false_acceptances": 0,
+        "declined": 0
+      },
+      "valid_proofs": {
+        "correct_acceptances": 147,
+        "false_rejections": 0,
+        "declined": 1
+      },
+      "corner_cases": {
+        "accepted": 28,
+        "declined": 2
+      },
+      "mathlib_scale": {
+        "virtual_cpu_time_seconds": 65.8,
+        "peak_memory_gib": 5
+      }
+    },
+    {
+      "rank": 2,
+      "name": "gruszka",
+      "language": "Rust",
+      "version": "0.2.0",
+      "invalid_proofs": {
+        "correct_rejections": 92,
+        "false_acceptances": 0,
+        "declined": 0
+      },
+      "valid_proofs": {
+        "correct_acceptances": 148,
+        "false_rejections": 0,
+        "declined": 0
+      },
+      "corner_cases": {
+        "accepted": 30,
+        "declined": 0
+      },
+      "mathlib_scale": {
+        "virtual_cpu_time_seconds": 76.8,
+        "peak_memory_gib": 2.6
+      }
+    },
+    {
+      "rank": 3,
+      "name": "sokonanoda",
+      "language": "Rust",
+      "version": "9a021b6",
+      "invalid_proofs": {
+        "correct_rejections": 89,
+        "false_acceptances": 3,
+        "declined": 0
+      },
+      "valid_proofs": {
+        "correct_acceptances": 147,
+        "false_rejections": 0,
+        "declined": 1
+      },
+      "corner_cases": {
+        "accepted": 28,
+        "declined": 2
+      },
+      "mathlib_scale": {
+        "virtual_cpu_time_seconds": 87.9,
+        "peak_memory_gib": 5
+      }
+    },
+    {
+      "rank": 4,
+      "name": "rpylean",
+      "language": "Python",
+      "version": "v2026.11.11",
+      "invalid_proofs": {
+        "correct_rejections": 92,
+        "false_acceptances": 0,
+        "declined": 0
+      },
+      "valid_proofs": {
+        "correct_acceptances": 146,
+        "false_rejections": 0,
+        "declined": 2
+      },
+      "corner_cases": {
+        "accepted": 28,
+        "declined": 2
+      },
+      "mathlib_scale": {
+        "virtual_cpu_time_seconds": 96.3,
+        "peak_memory_gib": 4.4
+      }
+    },
+    {
+      "rank": 5,
+      "name": "pestka",
+      "language": "Aver",
+      "version": "cea66e6",
+      "invalid_proofs": {
+        "correct_rejections": 92,
+        "false_acceptances": 0,
+        "declined": 0
+      },
+      "valid_proofs": {
+        "correct_acceptances": 148,
+        "false_rejections": 0,
+        "declined": 0
+      },
+      "corner_cases": {
+        "accepted": 30,
+        "declined": 0
+      },
+      "mathlib_scale": {
+        "virtual_cpu_time_seconds": 246,
+        "peak_memory_gib": 3.5
+      }
+    },
+    {
+      "rank": 6,
+      "name": "kefir",
+      "language": "Rust",
+      "version": "4f69ffb",
+      "invalid_proofs": {
+        "correct_rejections": 92,
+        "false_acceptances": 0,
+        "declined": 0
+      },
+      "valid_proofs": {
+        "correct_acceptances": 148,
+        "false_rejections": 0,
+        "declined": 0
+      },
+      "corner_cases": {
+        "accepted": 30,
+        "declined": 0
+      },
+      "mathlib_scale": {
+        "virtual_cpu_time_seconds": 430.2,
+        "peak_memory_gib": 2.5
+      }
+    },
+    {
+      "rank": 7,
+      "name": "palladium",
+      "language": "Rust",
+      "version": "f9d85c0",
+      "invalid_proofs": {
+        "correct_rejections": 89,
+        "false_acceptances": 3,
+        "declined": 0
+      },
+      "valid_proofs": {
+        "correct_acceptances": 145,
+        "false_rejections": 0,
+        "declined": 3
+      },
+      "corner_cases": {
+        "accepted": 30,
+        "declined": 0
+      },
+      "mathlib_scale": {
+        "virtual_cpu_time_seconds": 472.2,
+        "peak_memory_gib": 3.8
+      }
+    },
+    {
+      "rank": 8,
+      "name": "con-ron",
+      "language": "Rust",
+      "version": "de06320",
+      "invalid_proofs": {
+        "correct_rejections": 88,
+        "false_acceptances": 4,
+        "declined": 0
+      },
+      "valid_proofs": {
+        "correct_acceptances": 142,
+        "false_rejections": 0,
+        "declined": 6
+      },
+      "corner_cases": {
+        "accepted": 30,
+        "declined": 0
+      },
+      "mathlib_scale": {
+        "virtual_cpu_time_seconds": 579,
+        "peak_memory_gib": 4.4
+      }
+    },
+    {
+      "rank": 9,
+      "name": "kefir-wasm",
+      "language": "Rust",
+      "version": "4f69ffb",
+      "invalid_proofs": {
+        "correct_rejections": 92,
+        "false_acceptances": 0,
+        "declined": 0
+      },
+      "valid_proofs": {
+        "correct_acceptances": 148,
+        "false_rejections": 0,
+        "declined": 0
+      },
+      "corner_cases": {
+        "accepted": 30,
+        "declined": 0
+      },
+      "mathlib_scale": {
+        "virtual_cpu_time_seconds": 583.2,
+        "peak_memory_gib": 2.7
+      }
+    },
+    {
+      "rank": 10,
+      "name": "con-agua",
+      "language": "x86-64 assembly",
+      "version": "fa516c1",
+      "invalid_proofs": {
+        "correct_rejections": 88,
+        "false_acceptances": 4,
+        "declined": 0
+      },
+      "valid_proofs": {
+        "correct_acceptances": 142,
+        "false_rejections": 0,
+        "declined": 6
+      },
+      "corner_cases": {
+        "accepted": 30,
+        "declined": 0
+      },
+      "mathlib_scale": {
+        "virtual_cpu_time_seconds": 654,
+        "peak_memory_gib": 11.8
+      }
+    },
+    {
+      "rank": 11,
+      "name": "nanobruijn",
+      "language": "Rust",
+      "version": "2712fa6",
+      "invalid_proofs": {
+        "correct_rejections": 92,
+        "false_acceptances": 0,
+        "declined": 0
+      },
+      "valid_proofs": {
+        "correct_acceptances": 148,
+        "false_rejections": 0,
+        "declined": 0
+      },
+      "corner_cases": {
+        "accepted": 28,
+        "declined": 2
+      },
+      "mathlib_scale": {
+        "virtual_cpu_time_seconds": 786,
+        "peak_memory_gib": 6.8
+      }
+    },
+    {
+      "rank": 12,
+      "name": "nanoda",
+      "language": "Rust",
+      "version": "0da9f98",
+      "invalid_proofs": {
+        "correct_rejections": 92,
+        "false_acceptances": 0,
+        "declined": 0
+      },
+      "valid_proofs": {
+        "correct_acceptances": 146,
+        "false_rejections": 0,
+        "declined": 2
+      },
+      "corner_cases": {
+        "accepted": 28,
+        "declined": 2
+      },
+      "mathlib_scale": {
+        "virtual_cpu_time_seconds": 960,
+        "peak_memory_gib": 5.9
+      }
+    },
+    {
+      "rank": 13,
+      "name": "con-leche",
+      "language": "Lean",
+      "version": "600d3b5",
+      "invalid_proofs": {
+        "correct_rejections": 88,
+        "false_acceptances": 4,
+        "declined": 0
+      },
+      "valid_proofs": {
+        "correct_acceptances": 141,
+        "false_rejections": 0,
+        "declined": 7
+      },
+      "corner_cases": {
+        "accepted": 30,
+        "declined": 0
+      },
+      "mathlib_scale": {
+        "virtual_cpu_time_seconds": 1020,
+        "peak_memory_gib": 4.8
+      }
+    },
+    {
+      "rank": 14,
+      "name": "pestka-wasm",
+      "language": "Aver",
+      "version": "cea66e6",
+      "invalid_proofs": {
+        "correct_rejections": 92,
+        "false_acceptances": 0,
+        "declined": 0
+      },
+      "valid_proofs": {
+        "correct_acceptances": 147,
+        "false_rejections": 0,
+        "declined": 1
+      },
+      "corner_cases": {
+        "accepted": 30,
+        "declined": 0
+      },
+      "mathlib_scale": {
+        "virtual_cpu_time_seconds": 1170,
+        "peak_memory_gib": 9.6
+      }
+    },
+    {
+      "rank": 15,
+      "name": "tenet-jvm",
+      "language": "Java",
+      "version": "0.1.6",
+      "invalid_proofs": {
+        "correct_rejections": 92,
+        "false_acceptances": 0,
+        "declined": 0
+      },
+      "valid_proofs": {
+        "correct_acceptances": 148,
+        "false_rejections": 0,
+        "declined": 0
+      },
+      "corner_cases": {
+        "accepted": 28,
+        "declined": 2
+      },
+      "mathlib_scale": {
+        "virtual_cpu_time_seconds": 1260,
+        "peak_memory_gib": 12.1
+      }
+    },
+    {
+      "rank": 16,
+      "name": "official-nightly",
+      "language": "C++",
+      "version": "nightly-2026-11-14",
+      "invalid_proofs": {
+        "correct_rejections": 92,
+        "false_acceptances": 0,
+        "declined": 0
+      },
+      "valid_proofs": {
+        "correct_acceptances": 148,
+        "false_rejections": 0,
+        "declined": 0
+      },
+      "corner_cases": {
+        "accepted": 30,
+        "declined": 0
+      },
+      "mathlib_scale": {
+        "virtual_cpu_time_seconds": 1638,
+        "peak_memory_gib": 9.9
+      }
+    },
+    {
+      "rank": 17,
+      "name": "eink0rn",
+      "language": "Haskell",
+      "version": "1.1.6",
+      "invalid_proofs": {
+        "correct_rejections": 92,
+        "false_acceptances": 0,
+        "declined": 0
+      },
+      "valid_proofs": {
+        "correct_acceptances": 144,
+        "false_rejections": 0,
+        "declined": 4
+      },
+      "corner_cases": {
+        "accepted": 28,
+        "declined": 2
+      },
+      "mathlib_scale": {
+        "virtual_cpu_time_seconds": 1770,
+        "peak_memory_gib": 13.4
+      }
+    },
+    {
+      "rank": 18,
+      "name": "official",
+      "language": "C++",
+      "version": "v4.35.0",
+      "invalid_proofs": {
+        "correct_rejections": 92,
+        "false_acceptances": 0,
+        "declined": 0
+      },
+      "valid_proofs": {
+        "correct_acceptances": 148,
+        "false_rejections": 0,
+        "declined": 0
+      },
+      "corner_cases": {
+        "accepted": 28,
+        "declined": 2
+      },
+      "mathlib_scale": {
+        "virtual_cpu_time_seconds": 2022,
+        "peak_memory_gib": 9.9
+      }
+    },
+    {
+      "rank": 19,
+      "name": "ind-models",
+      "language": "Lean",
+      "version": "86caadd",
+      "invalid_proofs": {
+        "correct_rejections": 92,
+        "false_acceptances": 0,
+        "declined": 0
+      },
+      "valid_proofs": {
+        "correct_acceptances": 148,
+        "false_rejections": 0,
+        "declined": 0
+      },
+      "corner_cases": {
+        "accepted": 28,
+        "declined": 2
+      },
+      "mathlib_scale": {
+        "virtual_cpu_time_seconds": 2160,
+        "peak_memory_gib": 6
+      }
+    },
+    {
+      "rank": 20,
+      "name": "tenet",
+      "language": "C#",
+      "version": "0.11.4",
+      "invalid_proofs": {
+        "correct_rejections": 92,
+        "false_acceptances": 0,
+        "declined": 0
+      },
+      "valid_proofs": {
+        "correct_acceptances": 148,
+        "false_rejections": 0,
+        "declined": 0
+      },
+      "corner_cases": {
+        "accepted": 30,
+        "declined": 0
+      },
+      "mathlib_scale": {
+        "virtual_cpu_time_seconds": 2838,
+        "peak_memory_gib": 11.4
+      }
+    },
+    {
+      "rank": 21,
+      "name": "tenet-hs",
+      "language": "Haskell",
+      "version": "0.1.4",
+      "invalid_proofs": {
+        "correct_rejections": 91,
+        "false_acceptances": 1,
+        "declined": 0
+      },
+      "valid_proofs": {
+        "correct_acceptances": 148,
+        "false_rejections": 0,
+        "declined": 0
+      },
+      "corner_cases": {
+        "accepted": 30,
+        "declined": 0
+      },
+      "mathlib_scale": {
+        "virtual_cpu_time_seconds": 3210,
+        "peak_memory_gib": 11.5
+      }
+    },
+    {
+      "rank": 22,
+      "name": "kiota",
+      "language": "Rust",
+      "version": "0.1.0",
+      "invalid_proofs": {
+        "correct_rejections": 90,
+        "false_acceptances": 2,
+        "declined": 0
+      },
+      "valid_proofs": {
+        "correct_acceptances": 145,
+        "false_rejections": 0,
+        "declined": 3
+      },
+      "corner_cases": {
+        "accepted": 30,
+        "declined": 0
+      },
+      "mathlib_scale": {
+        "virtual_cpu_time_seconds": null,
+        "peak_memory_gib": null
+      }
+    },
+    {
+      "rank": 23,
+      "name": "ocaml4lean",
+      "language": "OCaml",
+      "version": "6f94226",
+      "invalid_proofs": {
+        "correct_rejections": 92,
+        "false_acceptances": 0,
+        "declined": 0
+      },
+      "valid_proofs": {
+        "correct_acceptances": 145,
+        "false_rejections": 0,
+        "declined": 3
+      },
+      "corner_cases": {
+        "accepted": 28,
+        "declined": 2
+      },
+      "mathlib_scale": {
+        "virtual_cpu_time_seconds": null,
+        "peak_memory_gib": null
+      }
+    },
+    {
+      "rank": 24,
+      "name": "logos-kernel",
+      "language": "Rust",
+      "version": "1e6ad5b",
+      "invalid_proofs": {
+        "correct_rejections": 89,
+        "false_acceptances": 3,
+        "declined": 0
+      },
+      "valid_proofs": {
+        "correct_acceptances": 133,
+        "false_rejections": 0,
+        "declined": 15
+      },
+      "corner_cases": {
+        "accepted": 30,
+        "declined": 0
+      },
+      "mathlib_scale": {
+        "virtual_cpu_time_seconds": null,
+        "peak_memory_gib": null
+      }
+    },
+    {
+      "rank": 25,
+      "name": "evmlean",
+      "language": "Solidity",
+      "version": "0.5.0",
+      "invalid_proofs": {
+        "correct_rejections": 81,
+        "false_acceptances": 11,
+        "declined": 0
+      },
+      "valid_proofs": {
+        "correct_acceptances": 105,
+        "false_rejections": 0,
+        "declined": 43
+      },
+      "corner_cases": {
+        "accepted": 28,
+        "declined": 2
+      },
+      "mathlib_scale": {
+        "virtual_cpu_time_seconds": null,
+        "peak_memory_gib": null
+      }
+    },
+    {
+      "rank": 26,
+      "name": "mini",
+      "language": "Lean",
+      "version": "3a88e8c",
+      "invalid_proofs": {
+        "correct_rejections": 73,
+        "false_acceptances": 19,
+        "declined": 0
+      },
+      "valid_proofs": {
+        "correct_acceptances": 104,
+        "false_rejections": 0,
+        "declined": 44
+      },
+      "corner_cases": {
+        "accepted": 26,
+        "declined": 4
+      },
+      "mathlib_scale": {
+        "virtual_cpu_time_seconds": null,
+        "peak_memory_gib": null
+      }
+    },
+    {
+      "rank": 27,
+      "name": "overfull",
+      "language": "TeX",
+      "version": "b275736",
+      "invalid_proofs": {
+        "correct_rejections": 76,
+        "false_acceptances": 16,
+        "declined": 0
+      },
+      "valid_proofs": {
+        "correct_acceptances": 100,
+        "false_rejections": 0,
+        "declined": 48
+      },
+      "corner_cases": {
+        "accepted": 22,
+        "declined": 8
+      },
+      "mathlib_scale": {
+        "virtual_cpu_time_seconds": null,
+        "peak_memory_gib": null
+      }
+    },
+    {
+      "rank": 28,
+      "name": "lean4lean",
+      "language": "Lean",
+      "version": "arena (932afa1)",
+      "invalid_proofs": {
+        "correct_rejections": 92,
+        "false_acceptances": 0,
+        "declined": 0
+      },
+      "valid_proofs": {
+        "correct_acceptances": 141,
+        "false_rejections": 7,
+        "declined": 0
+      },
+      "corner_cases": {
+        "accepted": 30,
+        "declined": 0
+      },
+      "mathlib_scale": {
+        "virtual_cpu_time_seconds": 2418,
+        "peak_memory_gib": 9.9
+      }
+    },
+    {
+      "rank": 29,
+      "name": "lean4cobol",
+      "language": "COBOL",
+      "version": "d2e7b79",
+      "invalid_proofs": {
+        "correct_rejections": 89,
+        "false_acceptances": 3,
+        "declined": 0
+      },
+      "valid_proofs": {
+        "correct_acceptances": 121,
+        "false_rejections": 20,
+        "declined": 7
+      },
+      "corner_cases": {
+        "accepted": 28,
+        "declined": 2
+      },
+      "mathlib_scale": {
+        "virtual_cpu_time_seconds": null,
+        "peak_memory_gib": null
+      }
+    },
+    {
+      "rank": 30,
+      "name": "canonical-min",
+      "language": "Lean",
+      "version": "kernel-arena (0acb45d)",
+      "invalid_proofs": {
+        "correct_rejections": 35,
+        "false_acceptances": 1,
+        "declined": 56
+      },
+      "valid_proofs": {
+        "correct_acceptances": 42,
+        "false_rejections": 62,
+        "declined": 44
+      },
+      "corner_cases": {
+        "accepted": 18,
+        "declined": 12
+      },
+      "mathlib_scale": {
+        "virtual_cpu_time_seconds": null,
+        "peak_memory_gib": null
+      }
+    },
+    {
+      "rank": 31,
+      "name": "nanoclo",
+      "language": "Rust",
+      "version": "b8cefd0",
+      "invalid_proofs": {
+        "correct_rejections": 90,
+        "false_acceptances": 2,
+        "declined": 0
+      },
+      "valid_proofs": {
+        "correct_acceptances": 147,
+        "false_rejections": 1,
+        "declined": 0
+      },
+      "corner_cases": {
+        "accepted": 30,
+        "declined": 0
+      },
+      "mathlib_scale": {
+        "virtual_cpu_time_seconds": 502.2,
+        "peak_memory_gib": 7.4
+      }
+    },
+    {
+      "rank": 32,
+      "name": "vow-lean-kernel",
+      "language": "Vow",
+      "version": "da68038",
+      "invalid_proofs": {
+        "correct_rejections": 81,
+        "false_acceptances": 2,
+        "declined": 9
+      },
+      "valid_proofs": {
+        "correct_acceptances": 115,
+        "false_rejections": 1,
+        "declined": 32
+      },
+      "corner_cases": {
+        "accepted": 30,
+        "declined": 0
+      },
+      "mathlib_scale": {
+        "virtual_cpu_time_seconds": null,
+        "peak_memory_gib": null
+      }
+    },
+    {
+      "rank": 33,
+      "name": "metalean-slow",
+      "language": "Lean",
+      "version": "cc8ccb6",
+      "invalid_proofs": {
+        "correct_rejections": 71,
+        "false_acceptances": 3,
+        "declined": 18
+      },
+      "valid_proofs": {
+        "correct_acceptances": 104,
+        "false_rejections": 0,
+        "declined": 44
+      },
+      "corner_cases": {
+        "accepted": 23,
+        "declined": 7
+      },
+      "mathlib_scale": {
+        "virtual_cpu_time_seconds": null,
+        "peak_memory_gib": null
+      }
+    },
+    {
+      "rank": 34,
+      "name": "lazylean",
+      "language": "C++",
+      "version": "0.3.0",
+      "invalid_proofs": {
+        "correct_rejections": 89,
+        "false_acceptances": 3,
+        "declined": 0
+      },
+      "valid_proofs": {
+        "correct_acceptances": 143,
+        "false_rejections": 1,
+        "declined": 4
+      },
+      "corner_cases": {
+        "accepted": 28,
+        "declined": 2
+      },
+      "mathlib_scale": {
+        "virtual_cpu_time_seconds": null,
+        "peak_memory_gib": null
+      }
+    },
+    {
+      "rank": 35,
+      "name": "metalean-fast",
+      "language": "Lean",
+      "version": "cc8ccb6",
+      "invalid_proofs": {
+        "correct_rejections": 85,
+        "false_acceptances": 4,
+        "declined": 3
+      },
+      "valid_proofs": {
+        "correct_acceptances": 144,
+        "false_rejections": 1,
+        "declined": 3
+      },
+      "corner_cases": {
+        "accepted": 28,
+        "declined": 2
+      },
+      "mathlib_scale": {
+        "virtual_cpu_time_seconds": null,
+        "peak_memory_gib": null
+      }
+    },
+    {
+      "rank": 36,
+      "name": "nanoclo-fortran",
+      "language": "Fortran",
+      "version": "b3a13ef",
+      "invalid_proofs": {
+        "correct_rejections": 86,
+        "false_acceptances": 6,
+        "declined": 0
+      },
+      "valid_proofs": {
+        "correct_acceptances": 146,
+        "false_rejections": 0,
+        "declined": 2
+      },
+      "corner_cases": {
+        "accepted": 28,
+        "declined": 2
+      },
+      "mathlib_scale": {
+        "virtual_cpu_time_seconds": null,
+        "peak_memory_gib": null
+      }
+    },
+    {
+      "rank": 37,
+      "name": "mathgraph",
+      "language": "Rust",
+      "version": "flash",
+      "invalid_proofs": {
+        "correct_rejections": 84,
+        "false_acceptances": 8,
+        "declined": 0
+      },
+      "valid_proofs": {
+        "correct_acceptances": 147,
+        "false_rejections": 1,
+        "declined": 0
+      },
+      "corner_cases": {
+        "accepted": 28,
+        "declined": 2
+      },
+      "mathlib_scale": {
+        "virtual_cpu_time_seconds": 151.8,
+        "peak_memory_gib": 6.2
+      }
+    }
+  ],
+  "claim_ceiling": [
+    "This is a transcription of the mutable Arena homepage captured on 2026-11-25, not an immutable archived round or a raw results.json mirror.",
+    "Do not compare this snapshot to another homepage capture as though the corpus/checker revisions were fixed.",
+    "The 138-good/92-bad tarball count excludes individual tests larger than 10 MB; the table also contains 30 corner cases per checker.",
+    "A checker decline, crash or timeout is not counted as a false rejection or false acceptance by the Arena; it is reported separately.",
+    "Published outcome counts are evidence about this specific Arena test set only and do not establish general checker soundness or completeness.",
+    "Mathlib virtual CPU time is based on instructions at a fixed conversion rate and does not represent all parallel runtime behavior."
+  ]
+}
