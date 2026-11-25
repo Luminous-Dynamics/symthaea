@@ -11,7 +11,9 @@ use std::collections::BTreeMap;
 use std::fmt;
 
 use base64::Engine as _;
-use base64::engine::general_purpose::STANDARD;
+use base64::engine::general_purpose::{
+    STANDARD, STANDARD_NO_PAD, URL_SAFE, URL_SAFE_NO_PAD,
+};
 use serde::de::{Error as DeError, MapAccess, SeqAccess, Visitor};
 use serde::{Deserialize, Deserializer};
 use serde_json::{Map, Number, Value};
@@ -134,10 +136,8 @@ impl<'a> DsseQualificationSignatureVerifierV1<'a> {
         let envelope = envelope_value
             .as_object()
             .ok_or(EvidenceQualificationRejectV1::DsseInvalidEnvelope)?;
-        if envelope.len() != 3 {
-            return Err(EvidenceQualificationRejectV1::DsseInvalidEnvelope);
-        }
-
+        // DSSE requires known fields but future envelope extensions must be
+        // ignored. Duplicate keys remain rejected by parse_strict_json.
         let payload_type = envelope
             .get("payloadType")
             .and_then(Value::as_str)
@@ -150,7 +150,7 @@ impl<'a> DsseQualificationSignatureVerifierV1<'a> {
             .get("payload")
             .and_then(Value::as_str)
             .ok_or(EvidenceQualificationRejectV1::DsseInvalidEnvelope)?;
-        let payload = decode_canonical_base64(payload_b64)?;
+        let payload = decode_dsse_base64(payload_b64)?;
         if payload.len() > MAX_DSSE_PAYLOAD_BYTES_V1 {
             return Err(EvidenceQualificationRejectV1::DssePayloadTooLarge);
         }
@@ -165,20 +165,21 @@ impl<'a> DsseQualificationSignatureVerifierV1<'a> {
         let signature_object = signatures[0]
             .as_object()
             .ok_or(EvidenceQualificationRejectV1::DsseInvalidEnvelope)?;
-        if signature_object.len() != 2 {
-            return Err(EvidenceQualificationRejectV1::DsseInvalidEnvelope);
-        }
-        let key_id = signature_object
+        // DSSE keyid is OPTIONAL and unauthenticated. It is only a lookup
+        // hint; the authenticated key identity comes from the signed MACE
+        // predicate and is checked against the pinned profile.
+        let key_id_hint = signature_object
             .get("keyid")
             .and_then(Value::as_str)
-            .filter(|value| !value.trim().is_empty() && value.len() <= 256)
-            .ok_or(EvidenceQualificationRejectV1::DsseInvalidEnvelope)?
-            .to_owned();
+            .filter(|value| !value.is_empty());
+        if key_id_hint.is_some_and(|value| value.len() > 256) {
+            return Err(EvidenceQualificationRejectV1::DsseInvalidEnvelope);
+        }
         let signature_b64 = signature_object
             .get("sig")
             .and_then(Value::as_str)
             .ok_or(EvidenceQualificationRejectV1::DsseInvalidEnvelope)?;
-        let signature = decode_canonical_base64(signature_b64)?;
+        let signature = decode_dsse_base64(signature_b64)?;
         if signature.len() != 64 {
             return Err(EvidenceQualificationRejectV1::InvalidSignatureEncoding);
         }
@@ -187,8 +188,10 @@ impl<'a> DsseQualificationSignatureVerifierV1<'a> {
         let statement = statement_value
             .as_object()
             .ok_or(EvidenceQualificationRejectV1::DsseInvalidEnvelope)?;
-        if statement.len() != 4
-            || statement.get("_type").and_then(Value::as_str)
+        // in-toto Statement v1 extension fields are ignored. Only the
+        // standardized type, subject, predicate type and predicate drive
+        // this MACE profile.
+        if statement.get("_type").and_then(Value::as_str)
                 != Some(IN_TOTO_STATEMENT_TYPE_V1)
             || statement.get("predicateType").and_then(Value::as_str)
                 != Some(MACE_QUALIFICATION_PREDICATE_TYPE_V1)
@@ -207,8 +210,8 @@ impl<'a> DsseQualificationSignatureVerifierV1<'a> {
         }
 
         // Reconstruct the strict MACE receipt from the signed predicate and
-        // the outer DSSE signature. The envelope's keyid must also be present
-        // inside the signed predicate, so it is not trusted as an authority.
+        // the outer DSSE signature. The signed predicate carries the key ID;
+        // an optional outer keyid is only checked for consistency.
         let mut receipt_value = predicate.clone();
         let receipt_object = receipt_value
             .as_object_mut()
@@ -218,9 +221,10 @@ impl<'a> DsseQualificationSignatureVerifierV1<'a> {
             Value::Array(signature.iter().map(|byte| Value::from(*byte)).collect()),
         );
         let receipt = EvidenceQualificationReceiptV1::from_json_value(&receipt_value)?;
-        if receipt.key_id != key_id {
+        if key_id_hint.is_some_and(|hint| hint != receipt.key_id) {
             return Err(EvidenceQualificationRejectV1::DssePayloadBindingMismatch);
         }
+        let key_id = receipt.key_id.clone();
         if receipt.verifier_profile_sha256 != pinned.profile_sha256() {
             return Err(EvidenceQualificationRejectV1::TrustProfileDigestMismatch);
         }
@@ -235,9 +239,8 @@ impl<'a> DsseQualificationSignatureVerifierV1<'a> {
         let subject = subjects[0]
             .as_object()
             .ok_or(EvidenceQualificationRejectV1::DsseInvalidEnvelope)?;
-        if subject.len() != 2 {
-            return Err(EvidenceQualificationRejectV1::DsseInvalidEnvelope);
-        }
+        // Additional subject fields are ignored under the in-toto extension
+        // rules; the MACE subject name and SHA-256 digest remain exact.
         let expected_subject_name = format!(
             "urn:luminous:mace:candidate-set:v1:{}",
             receipt.candidate_set_sha256
@@ -249,8 +252,7 @@ impl<'a> DsseQualificationSignatureVerifierV1<'a> {
             .get("digest")
             .and_then(Value::as_object)
             .ok_or(EvidenceQualificationRejectV1::DsseInvalidEnvelope)?;
-        if digest.len() != 1
-            || digest.get("sha256").and_then(Value::as_str)
+        if digest.get("sha256").and_then(Value::as_str)
                 != Some(receipt.candidate_set_sha256.as_str())
         {
             return Err(EvidenceQualificationRejectV1::DssePayloadBindingMismatch);
@@ -336,14 +338,17 @@ pub fn verify_in_toto_qualification_envelope_v1(
     VerifiedEvidenceQualificationV1::verify_and_bind(verifier.receipt(), binding, &verifier)
 }
 
-fn decode_canonical_base64(value: &str) -> Result<Vec<u8>, EvidenceQualificationRejectV1> {
-    let decoded = STANDARD
-        .decode(value)
-        .map_err(|_| EvidenceQualificationRejectV1::DsseInvalidEnvelope)?;
-    if STANDARD.encode(&decoded) != value {
-        return Err(EvidenceQualificationRejectV1::DsseInvalidEnvelope);
+fn decode_dsse_base64(value: &str) -> Result<Vec<u8>, EvidenceQualificationRejectV1> {
+    // DSSE v1.0.2 requires support for standard and URL-safe base64. Accept
+    // padded and unpadded encodings, but reject non-canonical representations.
+    for engine in [&STANDARD, &STANDARD_NO_PAD, &URL_SAFE, &URL_SAFE_NO_PAD] {
+        if let Ok(decoded) = engine.decode(value) {
+            if engine.encode(&decoded) == value {
+                return Ok(decoded);
+            }
+        }
     }
-    Ok(decoded)
+    Err(EvidenceQualificationRejectV1::DsseInvalidEnvelope)
 }
 
 fn parse_strict_json(bytes: &[u8]) -> Result<Value, EvidenceQualificationRejectV1> {
