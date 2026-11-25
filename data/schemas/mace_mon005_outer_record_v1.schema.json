@@ -55,7 +55,7 @@
           "pattern": "^[0-9a-f]{64}$"
         },
         "macePayload": {
-          "$ref": "mace_evaluation_anchor_payload_v1.schema.json"
+          "$ref": "https://github.com/Luminous-Dynamics/symthaea/blob/main/data/schemas/mace_evaluation_anchor_payload_v1.schema.json"
         }
       }
     }
