@@ -736,7 +736,8 @@ mod tests {
             Err(RandomizedDecisionError::DecisionObservability(
                 DecisionObservabilityError::LossOutOfRange {
                     world_id: 1,
-                    action_id
+                    action_id,
+                    ..
                 }
             )) if action_id == "left"
         ));
