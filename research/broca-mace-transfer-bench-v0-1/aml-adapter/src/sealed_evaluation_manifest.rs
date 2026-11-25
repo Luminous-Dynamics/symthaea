@@ -825,20 +825,28 @@ mod tests {
 
     #[test]
     fn missing_or_surplus_episode_assignment_is_rejected() {
-        let mut fixture = Fixture::new();
-        fixture.manifest.assignments.pop();
+        let fixture = Fixture::new();
+        let witness = fixture.witness();
+        let mut altered = fixture.manifest.clone();
+        altered.assignments.pop();
         assert_eq!(
-            fixture.verify(),
+            validate_sealed_evaluation_manifest_v1(
+                &altered, &fixture.episodes, &witness, &fixture.expected
+            ),
             Err(SealedEvaluationManifestRejectV1::AssignmentCountMismatch)
         );
     }
 
     #[test]
     fn assignments_must_be_in_exact_public_episode_order() {
-        let mut fixture = Fixture::new();
-        fixture.manifest.assignments.swap(0, 1);
+        let fixture = Fixture::new();
+        let witness = fixture.witness();
+        let mut altered = fixture.manifest.clone();
+        altered.assignments.swap(0, 1);
         assert_eq!(
-            fixture.verify(),
+            validate_sealed_evaluation_manifest_v1(
+                &altered, &fixture.episodes, &witness, &fixture.expected
+            ),
             Err(SealedEvaluationManifestRejectV1::AssignmentEpisodeCoverageMismatch)
         );
     }
@@ -857,20 +865,28 @@ mod tests {
 
     #[test]
     fn public_seed_commitment_cannot_be_rebound() {
-        let mut fixture = Fixture::new();
-        fixture.manifest.assignments[0].seed_commitment_sha256 = digest('f');
+        let fixture = Fixture::new();
+        let witness = fixture.witness();
+        let mut altered = fixture.manifest.clone();
+        altered.assignments[0].seed_commitment_sha256 = digest('f');
         assert_eq!(
-            fixture.verify(),
+            validate_sealed_evaluation_manifest_v1(
+                &altered, &fixture.episodes, &witness, &fixture.expected
+            ),
             Err(SealedEvaluationManifestRejectV1::AssignmentSeedCommitmentMismatch)
         );
     }
 
     #[test]
     fn treatment_or_arm_change_breaks_public_assignment_commitment() {
-        let mut fixture = Fixture::new();
-        fixture.manifest.assignments[0].treatment_configuration_sha256 = digest('f');
+        let fixture = Fixture::new();
+        let witness = fixture.witness();
+        let mut altered = fixture.manifest.clone();
+        altered.assignments[0].treatment_configuration_sha256 = digest('f');
         assert_eq!(
-            fixture.verify(),
+            validate_sealed_evaluation_manifest_v1(
+                &altered, &fixture.episodes, &witness, &fixture.expected
+            ),
             Err(SealedEvaluationManifestRejectV1::AssignmentCommitmentMismatch)
         );
     }
