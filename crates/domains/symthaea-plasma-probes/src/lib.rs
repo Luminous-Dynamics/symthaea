@@ -25,6 +25,7 @@ const PI: f64 = std::f64::consts::PI;
 const MAX_PERIODIC_LIFT_HARMONICS: usize = 4_096;
 const MAX_MEASURE_PARTICLES: usize = 1_000_000;
 const MAX_KINETIC_PULSE_SEQUENCE_LENGTH: usize = 512;
+const MAX_KINETIC_OPERATION_LEDGER_EVENTS: usize = 16_384;
 const MAX_FOURIER_MEASURE_WORK: usize = 16_777_216;
 const MAX_SCALAR_MODE_HORIZON_STEPS: u32 = 1_000_000;
 const MAX_DELAY_CANCELLATION_SAMPLES: usize = 1_000_000;
@@ -93,6 +94,8 @@ pub enum ContractError {
     InvalidPulseSequenceObservationHorizon,
     #[error("kinetic path response signature is invalid: {0}")]
     InvalidKineticPathResponseSignature(&'static str),
+    #[error("kinetic operation ledger is invalid: {0}")]
+    InvalidKineticOperationLedger(&'static str),
     #[error("unknown response mode ID: {0}")]
     UnknownResponseMode(u32),
     #[error("response matrix dimensions overflow")]
@@ -2429,6 +2432,282 @@ impl PulseCandidate {
             phase_rad: normalize_phase(self.phase_rad + PI),
             ..self
         }
+    }
+}
+
+/// Physical model class used to interpret entropy and collision events.
+#[derive(Clone, Copy, Debug, PartialEq, Eq, Serialize, Deserialize)]
+pub enum KineticPhysicalModelKind {
+    CollisionlessVlasov,
+    VlasovFokkerPlanck,
+    VlasovPoissonLandau,
+}
+
+/// Operation class recorded in a kinetic information / irreversibility ledger.
+#[derive(Clone, Copy, Debug, PartialEq, Eq, Serialize, Deserialize)]
+pub enum KineticOperationClass {
+    PhysicalCollision,
+    NumericalFilter,
+    SpectralTruncation,
+    Hypercollision,
+    Projection,
+    Compression,
+    BasisTransition,
+    CoordinateRemap,
+    Fallback,
+}
+
+/// One operation applied to a kinetic state during a registered path.
+///
+/// Digests bind before/after states. Loss measures remain typed by metric ID;
+/// they are not added across unlike metrics. Physical entropy production and
+/// numerical entropy change are separate fields with separate quantity IDs.
+#[derive(Clone, Debug, PartialEq, Serialize, Deserialize)]
+pub struct KineticOperationRecord {
+    pub event_id: String,
+    pub operation_id: String,
+    pub application_time: f64,
+    pub operation_class: KineticOperationClass,
+    pub state_before_sha256: String,
+    pub state_after_sha256: String,
+    pub discarded_effect_metric_id: Option<String>,
+    pub discarded_effect_measure: Option<f64>,
+    pub physical_entropy_measure_id: Option<String>,
+    pub physical_entropy_production: Option<f64>,
+    pub numerical_entropy_measure_id: Option<String>,
+    pub numerical_entropy_delta: Option<f64>,
+    pub energy_exchange_measure_id: Option<String>,
+    pub energy_exchange: Option<f64>,
+    pub declared_reversible: bool,
+}
+
+/// Chronological record of physical and numerical operators applied to a path.
+///
+/// The ledger attributes operations; it does not infer physical dissipation
+/// from a filtered state and does not sum unrelated effect metrics.
+#[derive(Clone, Debug, PartialEq, Serialize)]
+pub struct KineticOperationLedger {
+    physical_model: KineticPhysicalModelKind,
+    maximum_time: f64,
+    events: Vec<KineticOperationRecord>,
+}
+
+impl KineticOperationLedger {
+    pub fn new(
+        physical_model: KineticPhysicalModelKind,
+        maximum_time: f64,
+        events: Vec<KineticOperationRecord>,
+    ) -> Result<Self, ContractError> {
+        if !maximum_time.is_finite() || maximum_time <= 0.0 {
+            return Err(ContractError::InvalidKineticOperationLedger(
+                "maximum_time must be positive and finite",
+            ));
+        }
+        if events.len() > MAX_KINETIC_OPERATION_LEDGER_EVENTS {
+            return Err(ContractError::InvalidKineticOperationLedger(
+                "event count exceeds the bounded ledger budget",
+            ));
+        }
+
+        let mut seen_ids = BTreeSet::new();
+        let mut previous_time = None;
+        for event in &events {
+            if event.event_id.trim().is_empty() || event.operation_id.trim().is_empty() {
+                return Err(ContractError::InvalidKineticOperationLedger(
+                    "event and operation IDs must be non-empty",
+                ));
+            }
+            if !seen_ids.insert(event.event_id.as_str()) {
+                return Err(ContractError::InvalidKineticOperationLedger(
+                    "event IDs must be unique",
+                ));
+            }
+            if !event.application_time.is_finite()
+                || event.application_time < 0.0
+                || event.application_time > maximum_time
+            {
+                return Err(ContractError::InvalidKineticOperationLedger(
+                    "event time must lie within the frozen physical horizon",
+                ));
+            }
+            if previous_time.is_some_and(|time| event.application_time < time) {
+                return Err(ContractError::InvalidKineticOperationLedger(
+                    "events must be recorded in nondecreasing physical time",
+                ));
+            }
+            previous_time = Some(event.application_time);
+
+            for digest in [&event.state_before_sha256, &event.state_after_sha256] {
+                if !is_sha256_hex(digest) {
+                    return Err(ContractError::InvalidKineticOperationLedger(
+                        "before/after state digests must be lowercase SHA-256 hex",
+                    ));
+                }
+            }
+
+            if event
+                .discarded_effect_measure
+                .is_some_and(|measure| !measure.is_finite() || measure < 0.0)
+            {
+                return Err(ContractError::InvalidKineticOperationLedger(
+                    "discarded effect measure must be finite and non-negative",
+                ));
+            }
+            if event
+                .physical_entropy_production
+                .is_some_and(|measure| !measure.is_finite() || measure < 0.0)
+            {
+                return Err(ContractError::InvalidKineticOperationLedger(
+                    "physical entropy production must be finite and non-negative",
+                ));
+            }
+            if event
+                .numerical_entropy_delta
+                .is_some_and(|delta| !delta.is_finite())
+                || event
+                    .energy_exchange
+                    .is_some_and(|exchange| !exchange.is_finite())
+            {
+                return Err(ContractError::InvalidKineticOperationLedger(
+                    "entropy and energy accounting values must be finite",
+                ));
+            }
+
+            if event.discarded_effect_measure.is_some()
+                != event
+                    .discarded_effect_metric_id
+                    .as_deref()
+                    .is_some_and(|metric| !metric.trim().is_empty())
+            {
+                return Err(ContractError::InvalidKineticOperationLedger(
+                    "discarded effect measure requires an explicit metric ID",
+                ));
+            }
+            if event.physical_entropy_production.is_some()
+                != event
+                    .physical_entropy_measure_id
+                    .as_deref()
+                    .is_some_and(|metric| !metric.trim().is_empty())
+            {
+                return Err(ContractError::InvalidKineticOperationLedger(
+                    "physical entropy production requires an explicit physical quantity ID",
+                ));
+            }
+            if event.numerical_entropy_delta.is_some()
+                != event
+                    .numerical_entropy_measure_id
+                    .as_deref()
+                    .is_some_and(|metric| !metric.trim().is_empty())
+            {
+                return Err(ContractError::InvalidKineticOperationLedger(
+                    "numerical entropy delta requires an explicit numerical quantity ID",
+                ));
+            }
+            if event.energy_exchange.is_some()
+                != event
+                    .energy_exchange_measure_id
+                    .as_deref()
+                    .is_some_and(|metric| !metric.trim().is_empty())
+            {
+                return Err(ContractError::InvalidKineticOperationLedger(
+                    "energy exchange requires an explicit quantity ID",
+                ));
+            }
+
+            match event.operation_class {
+                KineticOperationClass::PhysicalCollision => {
+                    if physical_model == KineticPhysicalModelKind::CollisionlessVlasov {
+                        return Err(ContractError::InvalidKineticOperationLedger(
+                            "physical collision cannot be recorded in a collisionless Vlasov cohort",
+                        ));
+                    }
+                    if event.physical_entropy_production.is_none()
+                        || event.numerical_entropy_delta.is_some()
+                    {
+                        return Err(ContractError::InvalidKineticOperationLedger(
+                            "physical collision requires physical entropy production and cannot relabel it numerical",
+                        ));
+                    }
+                }
+                _ => {
+                    if event.physical_entropy_production.is_some() {
+                        return Err(ContractError::InvalidKineticOperationLedger(
+                            "numerical operations cannot claim physical entropy production",
+                        ));
+                    }
+                    if matches!(
+                        event.operation_class,
+                        KineticOperationClass::NumericalFilter
+                            | KineticOperationClass::SpectralTruncation
+                            | KineticOperationClass::Hypercollision
+                            | KineticOperationClass::Projection
+                            | KineticOperationClass::Compression
+                    ) && event.discarded_effect_measure.is_none()
+                    {
+                        return Err(ContractError::InvalidKineticOperationLedger(
+                            "lossy numerical operations require a typed discarded-effect measure",
+                        ));
+                    }
+                }
+            }
+
+            if event.declared_reversible
+                && event.discarded_effect_measure.is_some_and(|measure| measure > 0.0)
+            {
+                return Err(ContractError::InvalidKineticOperationLedger(
+                    "a reversible operation cannot report a positive discarded-effect measure",
+                ));
+            }
+        }
+
+        Ok(Self {
+            physical_model,
+            maximum_time,
+            events,
+        })
+    }
+
+    pub fn physical_model(&self) -> KineticPhysicalModelKind {
+        self.physical_model
+    }
+
+    pub fn maximum_time(&self) -> f64 {
+        self.maximum_time
+    }
+
+    pub fn events(&self) -> &[KineticOperationRecord] {
+        &self.events
+    }
+
+    pub fn numerical_event_count(&self) -> usize {
+        self.events
+            .iter()
+            .filter(|event| event.operation_class != KineticOperationClass::PhysicalCollision)
+            .count()
+    }
+
+    pub fn physical_collision_count(&self) -> usize {
+        self.events
+            .iter()
+            .filter(|event| event.operation_class == KineticOperationClass::PhysicalCollision)
+            .count()
+    }
+
+    /// Sum one discarded-effect metric only; unlike metrics are never combined.
+    pub fn total_discarded_effect_for_metric(&self, metric_id: &str) -> Option<f64> {
+        let matching = self
+            .events
+            .iter()
+            .filter(|event| event.discarded_effect_metric_id.as_deref() == Some(metric_id))
+            .collect::<Vec<_>>();
+        if matching.is_empty() {
+            return None;
+        }
+        let total = matching
+            .iter()
+            .filter_map(|event| event.discarded_effect_measure)
+            .sum::<f64>();
+        total.is_finite().then_some(total)
     }
 }
 
@@ -12011,6 +12290,165 @@ mod tests {
                     .all(|pulse| pulse.application_time < sequence.observation_end_time())
             );
         }
+    }
+
+    fn ledger_event(
+        event_id: &str,
+        application_time: f64,
+        operation_class: KineticOperationClass,
+    ) -> KineticOperationRecord {
+        KineticOperationRecord {
+            event_id: event_id.to_owned(),
+            operation_id: format!("{operation_class:?}"),
+            application_time,
+            operation_class,
+            state_before_sha256: "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa".to_owned(),
+            state_after_sha256: "bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb".to_owned(),
+            discarded_effect_metric_id: None,
+            discarded_effect_measure: None,
+            physical_entropy_measure_id: None,
+            physical_entropy_production: None,
+            numerical_entropy_measure_id: None,
+            numerical_entropy_delta: None,
+            energy_exchange_measure_id: None,
+            energy_exchange: None,
+            declared_reversible: false,
+        }
+    }
+
+    #[test]
+    fn kinetic_operation_ledger_separates_numerical_filtering_from_physical_entropy() {
+        let mut filter = ledger_event("filter-1", 1.0, KineticOperationClass::NumericalFilter);
+        filter.discarded_effect_metric_id = Some("hermitian-modal-l2-squared".to_owned());
+        filter.discarded_effect_measure = Some(0.025);
+        filter.numerical_entropy_measure_id = Some("discrete-numerical-entropy-delta".to_owned());
+        filter.numerical_entropy_delta = Some(-0.01);
+        let ledger = KineticOperationLedger::new(
+            KineticPhysicalModelKind::CollisionlessVlasov,
+            10.0,
+            vec![filter],
+        )
+        .unwrap();
+        assert_eq!(ledger.physical_collision_count(), 0);
+        assert_eq!(ledger.numerical_event_count(), 1);
+        assert_eq!(
+            ledger.total_discarded_effect_for_metric("hermitian-modal-l2-squared"),
+            Some(0.025)
+        );
+        assert_eq!(ledger.total_discarded_effect_for_metric("other-metric"), None);
+    }
+
+    #[test]
+    fn kinetic_operation_ledger_accepts_physical_collision_only_for_collisional_models() {
+        let mut collision = ledger_event("collision-1", 1.0, KineticOperationClass::PhysicalCollision);
+        collision.physical_entropy_measure_id = Some("boltzmann-h-theorem-production".to_owned());
+        collision.physical_entropy_production = Some(0.04);
+        let ledger = KineticOperationLedger::new(
+            KineticPhysicalModelKind::VlasovFokkerPlanck,
+            10.0,
+            vec![collision],
+        )
+        .unwrap();
+        assert_eq!(ledger.physical_collision_count(), 1);
+        assert_eq!(ledger.numerical_event_count(), 0);
+    }
+
+    #[test]
+    fn kinetic_operation_ledger_rejects_physical_collisions_in_collisionless_vlasov() {
+        let mut collision = ledger_event("collision-1", 1.0, KineticOperationClass::PhysicalCollision);
+        collision.physical_entropy_measure_id = Some("boltzmann-h-theorem-production".to_owned());
+        collision.physical_entropy_production = Some(0.04);
+        assert!(matches!(
+            KineticOperationLedger::new(
+                KineticPhysicalModelKind::CollisionlessVlasov,
+                10.0,
+                vec![collision]
+            ),
+            Err(ContractError::InvalidKineticOperationLedger(_))
+        ));
+    }
+
+    #[test]
+    fn kinetic_operation_ledger_rejects_numerical_filter_claiming_physical_entropy() {
+        let mut filter = ledger_event("filter-1", 1.0, KineticOperationClass::NumericalFilter);
+        filter.discarded_effect_metric_id = Some("modal-l2".to_owned());
+        filter.discarded_effect_measure = Some(0.1);
+        filter.physical_entropy_measure_id = Some("physical-entropy".to_owned());
+        filter.physical_entropy_production = Some(0.1);
+        assert!(matches!(
+            KineticOperationLedger::new(
+                KineticPhysicalModelKind::CollisionlessVlasov,
+                10.0,
+                vec![filter]
+            ),
+            Err(ContractError::InvalidKineticOperationLedger(_))
+        ));
+    }
+
+    #[test]
+    fn kinetic_operation_ledger_requires_typed_loss_measure_for_lossy_operations() {
+        let filter = ledger_event("filter-1", 1.0, KineticOperationClass::NumericalFilter);
+        assert!(matches!(
+            KineticOperationLedger::new(
+                KineticPhysicalModelKind::CollisionlessVlasov,
+                10.0,
+                vec![filter]
+            ),
+            Err(ContractError::InvalidKineticOperationLedger(_))
+        ));
+    }
+
+    #[test]
+    fn kinetic_operation_ledger_rejects_reversible_events_with_nonzero_loss() {
+        let mut transition = ledger_event("transition-1", 1.0, KineticOperationClass::BasisTransition);
+        transition.discarded_effect_metric_id = Some("phase-space-l2".to_owned());
+        transition.discarded_effect_measure = Some(0.02);
+        transition.declared_reversible = true;
+        assert!(matches!(
+            KineticOperationLedger::new(
+                KineticPhysicalModelKind::CollisionlessVlasov,
+                10.0,
+                vec![transition]
+            ),
+            Err(ContractError::InvalidKineticOperationLedger(_))
+        ));
+    }
+
+    #[test]
+    fn kinetic_operation_ledger_rejects_nonchronological_or_duplicate_events() {
+        let first = ledger_event("event-a", 2.0, KineticOperationClass::CoordinateRemap);
+        let second = ledger_event("event-b", 1.0, KineticOperationClass::Fallback);
+        assert!(matches!(
+            KineticOperationLedger::new(
+                KineticPhysicalModelKind::CollisionlessVlasov,
+                10.0,
+                vec![first.clone(), second]
+            ),
+            Err(ContractError::InvalidKineticOperationLedger(_))
+        ));
+        let duplicate = ledger_event("event-a", 3.0, KineticOperationClass::Fallback);
+        assert!(matches!(
+            KineticOperationLedger::new(
+                KineticPhysicalModelKind::CollisionlessVlasov,
+                10.0,
+                vec![first, duplicate]
+            ),
+            Err(ContractError::InvalidKineticOperationLedger(_))
+        ));
+    }
+
+    #[test]
+    fn kinetic_operation_ledger_requires_explicit_quantity_ids() {
+        let mut event = ledger_event("event-a", 1.0, KineticOperationClass::PhysicalCollision);
+        event.physical_entropy_production = Some(0.1);
+        assert!(matches!(
+            KineticOperationLedger::new(
+                KineticPhysicalModelKind::VlasovPoissonLandau,
+                10.0,
+                vec![event]
+            ),
+            Err(ContractError::InvalidKineticOperationLedger(_))
+        ));
     }
 
     #[test]
