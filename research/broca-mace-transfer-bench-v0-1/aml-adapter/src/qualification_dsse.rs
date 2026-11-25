@@ -602,6 +602,67 @@ mod tests {
     }
 
     #[test]
+    fn dsse_interoperability_vector_matches_payload_pae_signature_and_profile() {
+        let fixture: Value = serde_json::from_str(include_str!(
+            "../../../../data/fixtures/mace/evidence_qualification_dsse_v1_golden.json"
+        )).unwrap();
+        let key = signing_key();
+        let public_key = key.verifying_key().to_bytes();
+        let key_id = qualification_key_id_v1(&public_key);
+        let verifier = pinned(&key, QualificationKeyStatusV1::Active, 1);
+        assert_eq!(key_id, fixture["key_id"].as_str().unwrap());
+        assert_eq!(
+            public_key.iter().map(|byte| format!("{byte:02x}")).collect::<String>(),
+            fixture["public_key_hex"].as_str().unwrap()
+        );
+        assert_eq!(
+            verifier.profile_sha256(),
+            fixture["verifier_profile_sha256"].as_str().unwrap()
+        );
+
+        let receipt = receipt(&key_id, verifier.profile_sha256());
+        assert_eq!(
+            receipt.candidate_evidence_ids_sha256,
+            fixture["candidate_evidence_ids_sha256"].as_str().unwrap()
+        );
+        let payload = in_toto_qualification_payload_v1(&receipt).unwrap();
+        assert_eq!(payload.len(), fixture["payload_bytes"].as_u64().unwrap() as usize);
+        assert_eq!(STANDARD.encode(&payload), fixture["payload_base64"].as_str().unwrap());
+
+        let pae = dsse_pae_v1(DSSE_PAYLOAD_TYPE_V1, &payload);
+        assert_eq!(pae.len(), fixture["pae_bytes"].as_u64().unwrap() as usize);
+        let signature = key.sign(&pae).to_bytes();
+        assert_eq!(
+            STANDARD.encode(signature),
+            fixture["signature_base64"].as_str().unwrap()
+        );
+
+        let envelope = encode_dsse_envelope_v1(&payload, &key_id, &signature).unwrap();
+        let envelope_value: Value = serde_json::from_str(&envelope).unwrap();
+        assert_eq!(envelope_value["payloadType"], fixture["payload_type"]);
+        assert_eq!(envelope_value["payload"], fixture["payload_base64"]);
+        assert_eq!(
+            envelope_value["signatures"][0]["sig"],
+            fixture["signature_base64"]
+        );
+
+        let ids = vec!["evidence-a".to_owned()];
+        let binding = binding(&receipt, &ids);
+        let verified = verify_in_toto_qualification_envelope_v1(
+            &envelope,
+            &binding,
+            &verifier,
+        ).expect("independent DSSE/in-toto vector verifies");
+        let current_verifier =
+            DsseQualificationSignatureVerifierV1::from_envelope_json(&envelope, &verifier)
+                .unwrap();
+        assert_eq!(
+            verified.admissible_evidence_ids_for_use(&binding, &current_verifier).unwrap(),
+            &["evidence-a".to_owned()]
+        );
+    }
+
+    #[test]
     fn pae_uses_byte_lengths_and_binds_payload_type() {
         assert_eq!(
             dsse_pae_v1(DSSE_PAYLOAD_TYPE_V1, b"{}"),
