@@ -87,7 +87,15 @@ jobs:
           custody = json.loads(
               Path("fixtures/worldtest-adapter-contract.example.json").read_text()
           )
-          validate(instance=custody, schema=custody_schema)
+          def validate_phase_record(record):
+              validate(instance=record, schema=custody_schema)
+              if (
+                  record["environment_pair"]["exploration_program_sha256"]
+                  == record["environment_pair"]["test_program_sha256"]
+              ):
+                  raise ValueError("exploration/test program identities must differ")
+
+          validate_phase_record(custody)
 
           assert custody["status"] == "metadata_only"
           assert custody["exploration"]["reward_visible"] is False
@@ -141,13 +149,12 @@ jobs:
           hostile["environment_pair"]["test_program_sha256"] = (
               hostile["environment_pair"]["exploration_program_sha256"]
           )
-          if (
-              hostile["environment_pair"]["test_program_sha256"]
-              != hostile["environment_pair"]["exploration_program_sha256"]
-          ):
-              raise AssertionError("same-program negative control failed")
-          # Equal program identity is deliberately disallowed by the adapter
-          # runner's cross-field check, not by a field-local JSON Schema rule.
+          try:
+              validate_phase_record(hostile)
+          except ValueError:
+              pass
+          else:
+              raise AssertionError("WorldTest custody admitted same exploration/test program")
 
           print(
               "WorldTest baseline lock, phase custody, public-subset boundary, "
