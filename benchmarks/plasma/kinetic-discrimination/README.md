@@ -27,3 +27,17 @@ This is a finite-hypothesis, single-complex-output, homoscedastic Gaussian obser
 The synthetic fixture's noise is not calibrated from plasma data, no Vlasov forward model is run, and no global state equivalence is claimed. Physical KSDD must estimate / bound noise from independent repeats and solver refinement, retain branch labels, and confirm selected probes on independent high-fidelity trajectories.
 
 See #13598 (KSDD), #13503 (state quotients), #13404 (adversarial probe search), #13415 (response spectroscopy) and #12944 (simulation acquisition).
+
+## Matched intervention portfolio
+
+`evaluate_kinetic_discrimination_portfolio` compares a finite set of candidate interventions under a **shared ordered hypothesis set, normalized prior distribution and observation-noise variance**. A portfolio that changes these between candidates is rejected, because its EIG values would not answer the same discrimination question.
+
+The report preserves each candidate's EIG and declared evaluation cost, returns the nondominated Pareto-front indices (maximize information, minimize cost), and separately returns the best EIG-per-cost index. The ratio is a selectable policy, not a replacement for the Pareto frontier.
+
+A synthetic Rust regression fixture includes:
+- a low-cost weakly discriminating pulse;
+- a high-cost strongly discriminating pulse;
+- a lower-information, higher-cost dominated pulse;
+- a strong low-cost pulse that dominates the high-cost version.
+
+This selector does not execute a Vlasov solver or choose from physical pulse families. Real acquisition still requires calibrated noise/reference uncertainty, boundary and amplitude admissibility, branch controls, independent replay and confirmation on whole held-out trajectories.
