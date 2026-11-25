@@ -367,6 +367,8 @@ pub fn validate_decision_outcome_receipt_v1(
     })
 }
 
+/// Digest only the signed outcome payload; the Ed25519 signature covers the
+/// separate attestation digest which binds this hash to signer and issuance metadata.
 pub fn decision_outcome_payload_sha256_v1(
     payload: &DecisionOutcomePayloadV1,
 ) -> Result<String, DecisionOutcomeReceiptRejectV1> {
