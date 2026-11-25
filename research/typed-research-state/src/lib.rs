@@ -1088,6 +1088,16 @@ mod tests {
         let updated_prefix = evidence_prefix_sha256("synthetic-episode", 1, &evidence);
         state["evidence_prefix"]["prefix_sha256"] = Value::String(updated_prefix.clone());
 
+        let claim_value = &state["claims"][0];
+        let claim_scope = claim_value["scope"].clone();
+        let claim_statement = claim_value["statement"].as_str().unwrap().to_owned();
+        let claim_reference_time = claim_value["reference_time"].as_str().unwrap().to_owned();
+        let claim_digest = scoped_claim_sha256(
+            "claim-a",
+            &claim_statement,
+            &claim_scope,
+            &claim_reference_time,
+        );
         let first_relation = &mut state["claims"][0]["evidence_relations"][0];
         first_relation["relation"] = Value::String("SUPPORTS".to_owned());
         first_relation["classifier_provenance"] = serde_json::json!({
@@ -1096,7 +1106,8 @@ mod tests {
             "output_digest": "e".repeat(64),
             "confidence": 0.9,
             "emitted_at": "2026-11-25T10:00:00Z",
-            "evidence_prefix_sha256": updated_prefix
+            "evidence_prefix_sha256": updated_prefix,
+            "claim_sha256": claim_digest
         });
         first_relation["quote_span"] = serde_json::json!({
             "byte_start": 0,
@@ -1113,7 +1124,8 @@ mod tests {
                 "output_digest": "c".repeat(64),
                 "confidence": 0.9,
                 "emitted_at": "2026-11-25T10:00:00Z",
-                "evidence_prefix_sha256": updated_prefix
+                "evidence_prefix_sha256": updated_prefix,
+                "claim_sha256": claim_digest
             },
             "quote_span": {
                 "byte_start": 0,
