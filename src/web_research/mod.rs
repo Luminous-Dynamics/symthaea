@@ -199,7 +199,7 @@ impl EpistemicConsciousness {
         &mut self,
         adjudicated: AdjudicatedVerificationOutcome,
     ) -> anyhow::Result<()> {
-        let outcome = &adjudicated.outcome;
+        let mut outcome = adjudicated.outcome;
         if outcome.claim.trim().is_empty() {
             anyhow::bail!("adjudicated verification claim must be non-empty");
         }
@@ -214,6 +214,9 @@ impl EpistemicConsciousness {
         {
             anyhow::bail!("adjudicated verification confidence must be finite and in [0, 1]");
         }
+        if outcome.adjudication_provenance.is_some() {
+            anyhow::bail!("verification outcome already contains adjudication provenance");
+        }
         if adjudicated.authority_id.trim().is_empty() {
             anyhow::bail!("adjudication authority ID must be non-empty");
         }
@@ -221,7 +224,12 @@ impl EpistemicConsciousness {
             anyhow::bail!("adjudication evidence reference must be non-empty");
         }
 
-        self.learner.record_outcome(adjudicated.outcome)
+        outcome.adjudication_provenance = Some(AdjudicationProvenance {
+            kind: adjudicated.adjudication_kind,
+            authority_id: adjudicated.authority_id,
+            evidence_reference: adjudicated.evidence_reference,
+        });
+        self.learner.record_outcome(outcome)
     }
 
     /// Get current epistemic stats
