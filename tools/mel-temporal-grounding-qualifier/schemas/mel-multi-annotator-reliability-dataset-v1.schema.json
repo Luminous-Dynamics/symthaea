@@ -1,0 +1,363 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://luminousdynamics.io/schemas/mel-multi-annotator-reliability-dataset-v1.schema.json",
+  "title": "MEL multi-annotator temporal reliability dataset v1",
+  "type": "object",
+  "additionalProperties": false,
+  "required": [
+    "schema",
+    "dataset_id",
+    "annotation_policy_version",
+    "minimum_raters_per_item",
+    "scoring_plan",
+    "bootstrap_replicates",
+    "bootstrap_seed",
+    "boundary_tolerances_ms",
+    "items"
+  ],
+  "properties": {
+    "schema": {
+      "const": "mel-multi-annotator-reliability-dataset-v1"
+    },
+    "dataset_id": {
+      "type": "string",
+      "minLength": 1
+    },
+    "annotation_policy_version": {
+      "type": "string",
+      "minLength": 1
+    },
+    "minimum_raters_per_item": {
+      "type": "integer",
+      "minimum": 2,
+      "maximum": 65535
+    },
+    "scoring_plan": {
+      "$ref": "#/$defs/scoringPlan"
+    },
+    "bootstrap_replicates": {
+      "type": "integer",
+      "minimum": 1000
+    },
+    "bootstrap_seed": {
+      "type": "integer",
+      "minimum": 1
+    },
+    "boundary_tolerances_ms": {
+      "type": "array",
+      "minItems": 1,
+      "uniqueItems": true,
+      "items": {
+        "type": "integer",
+        "minimum": 1
+      }
+    },
+    "items": {
+      "type": "array",
+      "minItems": 1,
+      "items": {
+        "$ref": "#/$defs/item"
+      }
+    }
+  },
+  "$defs": {
+    "digest": {
+      "type": "string",
+      "pattern": "^[0-9a-f]{64}$"
+    },
+    "artifact": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "audio_sha256",
+        "sample_rate_hz",
+        "channels",
+        "total_frames"
+      ],
+      "properties": {
+        "audio_sha256": {
+          "$ref": "#/$defs/digest"
+        },
+        "sample_rate_hz": {
+          "type": "integer",
+          "minimum": 1
+        },
+        "channels": {
+          "type": "integer",
+          "minimum": 1,
+          "maximum": 65535
+        },
+        "total_frames": {
+          "type": "integer",
+          "minimum": 1
+        }
+      }
+    },
+    "interval": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "start_frame",
+        "end_frame"
+      ],
+      "properties": {
+        "start_frame": {
+          "type": "integer",
+          "minimum": 0
+        },
+        "end_frame": {
+          "type": "integer",
+          "minimum": 1
+        }
+      }
+    },
+    "scoringPlan": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "evaluator_version",
+        "minimum_interval_iou"
+      ],
+      "properties": {
+        "evaluator_version": {
+          "type": "string",
+          "minLength": 1
+        },
+        "minimum_interval_iou": {
+          "type": "number",
+          "exclusiveMinimum": 0,
+          "maximum": 1
+        }
+      }
+    },
+    "annotation": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "annotator_id_sha256",
+        "annotation_sha256",
+        "state",
+        "intervals",
+        "status_reason"
+      ],
+      "properties": {
+        "annotator_id_sha256": {
+          "$ref": "#/$defs/digest"
+        },
+        "annotation_sha256": {
+          "$ref": "#/$defs/digest"
+        },
+        "state": {
+          "enum": [
+            "Present",
+            "Absent",
+            "Ambiguous",
+            "NotEstimable"
+          ]
+        },
+        "intervals": {
+          "type": "array",
+          "items": {
+            "$ref": "#/$defs/interval"
+          }
+        },
+        "status_reason": {
+          "type": [
+            "string",
+            "null"
+          ]
+        }
+      }
+    },
+    "predictionState": {
+      "oneOf": [
+        {
+          "const": "QueryAbsent"
+        },
+        {
+          "const": "NotDetected"
+        },
+        {
+          "type": "object",
+          "additionalProperties": false,
+          "required": [
+            "Occurrences"
+          ],
+          "properties": {
+            "Occurrences": {
+              "type": "object",
+              "additionalProperties": false,
+              "required": [
+                "intervals"
+              ],
+              "properties": {
+                "intervals": {
+                  "type": "array",
+                  "minItems": 1,
+                  "items": {
+                    "$ref": "#/$defs/interval"
+                  }
+                }
+              }
+            }
+          }
+        },
+        {
+          "type": "object",
+          "additionalProperties": false,
+          "required": [
+            "Ambiguous"
+          ],
+          "properties": {
+            "Ambiguous": {
+              "type": "object",
+              "additionalProperties": false,
+              "required": [
+                "candidate_intervals",
+                "reason"
+              ],
+              "properties": {
+                "candidate_intervals": {
+                  "type": "array",
+                  "minItems": 1,
+                  "items": {
+                    "$ref": "#/$defs/interval"
+                  }
+                },
+                "reason": {
+                  "type": "string",
+                  "minLength": 1
+                }
+              }
+            }
+          }
+        },
+        {
+          "type": "object",
+          "additionalProperties": false,
+          "required": [
+            "NotEstimable"
+          ],
+          "properties": {
+            "NotEstimable": {
+              "type": "object",
+              "additionalProperties": false,
+              "required": [
+                "reason"
+              ],
+              "properties": {
+                "reason": {
+                  "type": "string",
+                  "minLength": 1
+                }
+              }
+            }
+          }
+        }
+      ]
+    },
+    "prediction": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "schema_version",
+        "query_id",
+        "artifact",
+        "state"
+      ],
+      "properties": {
+        "schema_version": {
+          "const": "mel-temporal-grounding-v1"
+        },
+        "query_id": {
+          "type": "string",
+          "minLength": 1
+        },
+        "artifact": {
+          "$ref": "#/$defs/artifact"
+        },
+        "state": {
+          "$ref": "#/$defs/predictionState"
+        }
+      }
+    },
+    "case": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "schema",
+        "query_id",
+        "query_text",
+        "artifact",
+        "annotation_policy_version",
+        "annotation_manifest_sha256",
+        "minimum_annotator_count",
+        "plan",
+        "prediction",
+        "annotations"
+      ],
+      "properties": {
+        "schema": {
+          "const": "mel-multi-annotator-temporal-grounding-v1"
+        },
+        "query_id": {
+          "type": "string",
+          "minLength": 1
+        },
+        "query_text": {
+          "type": "string",
+          "minLength": 1
+        },
+        "artifact": {
+          "$ref": "#/$defs/artifact"
+        },
+        "annotation_policy_version": {
+          "type": "string",
+          "minLength": 1
+        },
+        "annotation_manifest_sha256": {
+          "$ref": "#/$defs/digest"
+        },
+        "minimum_annotator_count": {
+          "type": "integer",
+          "minimum": 2,
+          "maximum": 65535
+        },
+        "plan": {
+          "$ref": "#/$defs/scoringPlan"
+        },
+        "prediction": {
+          "$ref": "#/$defs/prediction"
+        },
+        "annotations": {
+          "type": "array",
+          "minItems": 2,
+          "items": {
+            "$ref": "#/$defs/annotation"
+          }
+        }
+      }
+    },
+    "item": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "item_id",
+        "source_work_id_sha256",
+        "case"
+      ],
+      "properties": {
+        "item_id": {
+          "type": "string",
+          "minLength": 1
+        },
+        "source_work_id_sha256": {
+          "$ref": "#/$defs/digest"
+        },
+        "case": {
+          "$ref": "#/$defs/case"
+        }
+      }
+    }
+  }
+}
