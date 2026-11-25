@@ -2,7 +2,8 @@ use symthaea_semiconductor::benchmark::{
     CAUSAL_DRIFT_EVIDENCE_SCHEMA_V1, CAUSAL_DRIFT_INPUT_SCHEMA_V1,
     CausalAssessmentStatusV1, CausalDriftDiagnosisInputV1, CausalDriftEvidenceKindV1,
     CausalDriftEvidenceV1, CausalDriftHypothesisInputV1, CausalDriftHypothesisKindV1,
-    CausalDriftPolicyV1, ControlledInterventionEvidenceV1, ExpectedEffectDirectionV1,
+    CausalDriftPolicyV1, ClusterDidSummaryV1, ClusteredDifferenceInDifferencesV1,
+    ControlledInterventionEvidenceV1, ExpectedEffectDirectionV1,
     MatchedDifferenceInDifferencesV1, NegativeControlEvidenceV1, diagnose_causal_drift_v1,
 };
 
@@ -70,6 +71,30 @@ fn hypothesis(
     }
 }
 
+fn clustered_contrast() -> ClusteredDifferenceInDifferencesV1 {
+    let clusters = (1..=10)
+        .map(|effect| ClusterDidSummaryV1 {
+            cluster_id: format!("cluster-{effect}"),
+            treated_pre_mean: 10.0,
+            treated_post_mean: 11.0 + effect as f64,
+            control_pre_mean: 10.0,
+            control_post_mean: 11.0,
+            treated_pre_count: 20,
+            treated_post_count: 20,
+            control_pre_count: 20,
+            control_post_count: 20,
+            maximum_absolute_covariate_smd: 0.05,
+            treated_pretrend_slope: 0.10,
+            control_pretrend_slope: 0.11,
+        })
+        .collect();
+    ClusteredDifferenceInDifferencesV1 {
+        clusters,
+        protocol_sha256: digest('b'),
+        source_summary_sha256: digest('c'),
+    }
+}
+
 fn input(hypotheses: Vec<CausalDriftHypothesisInputV1>) -> CausalDriftDiagnosisInputV1 {
     CausalDriftDiagnosisInputV1 {
         schema: CAUSAL_DRIFT_INPUT_SCHEMA_V1.into(),
@@ -113,6 +138,30 @@ fn difference_in_differences_matches_independent_known_answer_but_stays_associat
     assert!((estimate.lower_95 - (3.0 - 1.959_963_984_540_054 * 0.2)).abs() < 1.0e-12);
     assert_eq!(assessment.status, CausalAssessmentStatusV1::AssociationOnly);
     assert!(!assessment.causal_claim_authorized);
+}
+
+#[test]
+fn independent_cluster_mean_and_t_interval_match_known_answer() {
+    let mut candidate = hypothesis(
+        "process-change",
+        vec![evidence(
+            "process-change",
+            "clustered-matched",
+            CausalDriftEvidenceKindV1::MatchedContrast,
+        )],
+    );
+    candidate.clustered_matched_contrast = Some(clustered_contrast());
+    let report = diagnose_causal_drift_v1(&input(vec![candidate])).unwrap();
+    let estimate = report.status_by_hypothesis[0].matched_contrast.as_ref().unwrap();
+
+    let cluster_effects: Vec<f64> = (1..=10).map(|value| value as f64).collect();
+    let mean = 5.5_f64;
+    let sample_variance = cluster_effects.iter().map(|value| (value - mean).powi(2)).sum::<f64>() / 9.0;
+    let expected_se = (sample_variance / 10.0).sqrt();
+    assert!((estimate.estimate - mean).abs() < 1.0e-12);
+    assert!((estimate.standard_error - expected_se).abs() < 1.0e-12);
+    assert!((estimate.lower_95 - (mean - 2.262_157_162_740_992 * expected_se)).abs() < 1.0e-12);
+    assert_eq!(report.status_by_hypothesis[0].status, CausalAssessmentStatusV1::AssociationOnly);
 }
 
 #[test]
