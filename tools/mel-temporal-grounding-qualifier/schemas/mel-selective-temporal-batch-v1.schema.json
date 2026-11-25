@@ -1,0 +1,481 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://github.com/Luminous-Dynamics/symthaea/blob/main/tools/mel-temporal-grounding-qualifier/schemas/mel-selective-temporal-batch-v1.schema.json",
+  "title": "MEL Selective Temporal Grounding Batch V1",
+  "type": "object",
+  "additionalProperties": false,
+  "required": [
+    "schema",
+    "evaluation_id",
+    "model_identity_sha256",
+    "runtime_identity_sha256",
+    "decoding_config_sha256",
+    "plan",
+    "cases"
+  ],
+  "properties": {
+    "schema": {
+      "const": "mel-selective-temporal-batch-v1"
+    },
+    "evaluation_id": {
+      "type": "string",
+      "minLength": 1
+    },
+    "model_identity_sha256": {
+      "$ref": "#/$defs/digest"
+    },
+    "runtime_identity_sha256": {
+      "$ref": "#/$defs/digest"
+    },
+    "decoding_config_sha256": {
+      "$ref": "#/$defs/digest"
+    },
+    "plan": {
+      "$ref": "#/$defs/plan"
+    },
+    "cases": {
+      "type": "array",
+      "minItems": 1,
+      "items": {
+        "$ref": "#/$defs/case"
+      }
+    }
+  },
+  "$defs": {
+    "digest": {
+      "type": "string",
+      "pattern": "^[a-f0-9]{64}$"
+    },
+    "interval": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "start_frame",
+        "end_frame"
+      ],
+      "properties": {
+        "start_frame": {
+          "type": "integer",
+          "minimum": 0
+        },
+        "end_frame": {
+          "type": "integer",
+          "minimum": 1
+        }
+      }
+    },
+    "artifact": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "audio_sha256",
+        "sample_rate_hz",
+        "channels",
+        "total_frames"
+      ],
+      "properties": {
+        "audio_sha256": {
+          "$ref": "#/$defs/digest"
+        },
+        "sample_rate_hz": {
+          "type": "integer",
+          "minimum": 1
+        },
+        "channels": {
+          "type": "integer",
+          "minimum": 1
+        },
+        "total_frames": {
+          "type": "integer",
+          "minimum": 1
+        }
+      }
+    },
+    "plan": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "evaluator_version",
+        "minimum_interval_iou"
+      ],
+      "properties": {
+        "evaluator_version": {
+          "type": "string",
+          "minLength": 1
+        },
+        "minimum_interval_iou": {
+          "type": "number",
+          "exclusiveMinimum": 0,
+          "maximum": 1
+        }
+      }
+    },
+    "truth": {
+      "oneOf": [
+        {
+          "$ref": "#/$defs/presentTruth"
+        },
+        {
+          "$ref": "#/$defs/absentTruth"
+        },
+        {
+          "$ref": "#/$defs/ambiguousTruth"
+        },
+        {
+          "$ref": "#/$defs/notEstimableTruth"
+        }
+      ]
+    },
+    "truthCommon": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "schema_version",
+        "query_id",
+        "query_text",
+        "artifact",
+        "annotation_policy_version",
+        "annotation_set_sha256",
+        "annotator_count",
+        "state",
+        "intervals",
+        "status_reason"
+      ],
+      "properties": {
+        "schema_version": {
+          "const": "mel-temporal-grounding-v1"
+        },
+        "query_id": {
+          "type": "string",
+          "minLength": 1
+        },
+        "query_text": {
+          "type": "string",
+          "minLength": 1
+        },
+        "artifact": {
+          "$ref": "#/$defs/artifact"
+        },
+        "annotation_policy_version": {
+          "type": "string",
+          "minLength": 1
+        },
+        "annotation_set_sha256": {
+          "$ref": "#/$defs/digest"
+        },
+        "annotator_count": {
+          "type": "integer",
+          "minimum": 1,
+          "maximum": 65535
+        },
+        "state": {
+          "type": "string"
+        },
+        "intervals": {
+          "type": "array",
+          "items": {
+            "$ref": "#/$defs/interval"
+          }
+        },
+        "status_reason": {
+          "type": [
+            "string",
+            "null"
+          ]
+        }
+      }
+    },
+    "presentTruth": {
+      "allOf": [
+        {
+          "$ref": "#/$defs/truthCommon"
+        },
+        {
+          "properties": {
+            "state": {
+              "const": "Present"
+            },
+            "intervals": {
+              "minItems": 1
+            },
+            "status_reason": {
+              "type": "null"
+            }
+          }
+        }
+      ]
+    },
+    "absentTruth": {
+      "allOf": [
+        {
+          "$ref": "#/$defs/truthCommon"
+        },
+        {
+          "properties": {
+            "state": {
+              "const": "Absent"
+            },
+            "intervals": {
+              "maxItems": 0
+            },
+            "status_reason": {
+              "type": "null"
+            }
+          }
+        }
+      ]
+    },
+    "ambiguousTruth": {
+      "allOf": [
+        {
+          "$ref": "#/$defs/truthCommon"
+        },
+        {
+          "properties": {
+            "state": {
+              "const": "Ambiguous"
+            },
+            "intervals": {
+              "maxItems": 0
+            },
+            "status_reason": {
+              "type": "string",
+              "minLength": 1
+            }
+          }
+        }
+      ]
+    },
+    "notEstimableTruth": {
+      "allOf": [
+        {
+          "$ref": "#/$defs/truthCommon"
+        },
+        {
+          "properties": {
+            "state": {
+              "const": "NotEstimable"
+            },
+            "intervals": {
+              "maxItems": 0
+            },
+            "status_reason": {
+              "type": "string",
+              "minLength": 1
+            }
+          }
+        }
+      ]
+    },
+    "predictionState": {
+      "oneOf": [
+        {
+          "type": "string",
+          "enum": [
+            "QueryAbsent",
+            "NotDetected"
+          ]
+        },
+        {
+          "type": "object",
+          "required": [
+            "Occurrences"
+          ],
+          "additionalProperties": false,
+          "properties": {
+            "Occurrences": {
+              "type": "object",
+              "additionalProperties": false,
+              "required": [
+                "intervals"
+              ],
+              "properties": {
+                "intervals": {
+                  "type": "array",
+                  "minItems": 1,
+                  "items": {
+                    "$ref": "#/$defs/interval"
+                  }
+                }
+              }
+            }
+          }
+        },
+        {
+          "type": "object",
+          "required": [
+            "Ambiguous"
+          ],
+          "additionalProperties": false,
+          "properties": {
+            "Ambiguous": {
+              "type": "object",
+              "additionalProperties": false,
+              "required": [
+                "candidate_intervals",
+                "reason"
+              ],
+              "properties": {
+                "candidate_intervals": {
+                  "type": "array",
+                  "minItems": 1,
+                  "items": {
+                    "$ref": "#/$defs/interval"
+                  }
+                },
+                "reason": {
+                  "type": "string",
+                  "minLength": 1
+                }
+              }
+            }
+          }
+        },
+        {
+          "type": "object",
+          "required": [
+            "NotEstimable"
+          ],
+          "additionalProperties": false,
+          "properties": {
+            "NotEstimable": {
+              "type": "object",
+              "additionalProperties": false,
+              "required": [
+                "reason"
+              ],
+              "properties": {
+                "reason": {
+                  "type": "string",
+                  "minLength": 1
+                }
+              }
+            }
+          }
+        },
+        {
+          "type": "object",
+          "required": [
+            "Unparseable"
+          ],
+          "additionalProperties": false,
+          "properties": {
+            "Unparseable": {
+              "type": "object",
+              "additionalProperties": false,
+              "required": [
+                "raw_output_sha256",
+                "reason"
+              ],
+              "properties": {
+                "raw_output_sha256": {
+                  "$ref": "#/$defs/digest"
+                },
+                "reason": {
+                  "type": "string",
+                  "minLength": 1
+                }
+              }
+            }
+          }
+        }
+      ]
+    },
+    "prediction": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "schema_version",
+        "query_id",
+        "artifact",
+        "state"
+      ],
+      "properties": {
+        "schema_version": {
+          "const": "mel-temporal-grounding-v1"
+        },
+        "query_id": {
+          "type": "string",
+          "minLength": 1
+        },
+        "artifact": {
+          "$ref": "#/$defs/artifact"
+        },
+        "state": {
+          "$ref": "#/$defs/predictionState"
+        }
+      }
+    },
+    "case": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "schema",
+        "case_id",
+        "source_lineage_id",
+        "evidence_stratum",
+        "identifiability_basis",
+        "adjudication_profile_sha256",
+        "truth",
+        "prediction",
+        "unconditional_prediction",
+        "decision",
+        "decision_confidence"
+      ],
+      "properties": {
+        "schema": {
+          "const": "mel-selective-temporal-case-v1"
+        },
+        "case_id": {
+          "type": "string",
+          "minLength": 1
+        },
+        "source_lineage_id": {
+          "type": "string",
+          "minLength": 1
+        },
+        "evidence_stratum": {
+          "type": "string",
+          "minLength": 1
+        },
+        "identifiability_basis": {
+          "type": "string",
+          "enum": [
+            "ClearPositive",
+            "ClearAbsence",
+            "AnnotatorDisagreement",
+            "TaskAmbiguity",
+            "SignalInsufficient",
+            "UnsupportedQuery"
+          ]
+        },
+        "adjudication_profile_sha256": {
+          "$ref": "#/$defs/digest"
+        },
+        "truth": {
+          "$ref": "#/$defs/truth"
+        },
+        "prediction": {
+          "$ref": "#/$defs/prediction"
+        },
+        "unconditional_prediction": {
+          "$ref": "#/$defs/prediction"
+        },
+        "decision": {
+          "type": "string",
+          "enum": [
+            "Answer",
+            "ClaimAbsent",
+            "AbstainAmbiguous",
+            "AbstainNotEstimable"
+          ]
+        },
+        "decision_confidence": {
+          "type": "number",
+          "minimum": 0,
+          "maximum": 1
+        }
+      }
+    }
+  }
+}
