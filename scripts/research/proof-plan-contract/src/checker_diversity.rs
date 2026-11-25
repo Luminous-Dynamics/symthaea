@@ -771,9 +771,9 @@ mod tests {
         profile["diversity_summary"]["distinct_implementation_families"] = json!(5);
         profile["diversity_summary"]["distinct_algorithm_lineages"] = json!(3);
         profile["diversity_summary"]["distinct_languages"] = json!(3);
-        profile["diversity_summary"]["known_term_representation_families"] = json!(3);
-        profile["diversity_summary"]["known_parser_families"] = json!(1);
-        profile["diversity_summary"]["independent_external_algorithm_lineages"] = json!(2);
+        profile["diversity_summary"]["known_term_representation_families"] = json!(2);
+        profile["diversity_summary"]["known_parser_families"] = json!(0);
+        profile["diversity_summary"]["independent_external_algorithm_lineages"] = json!(1);
         let errors = validate_profile(&registry, &profile, REGISTRY.as_bytes());
         assert!(errors.is_empty(), "{errors:?}");
     }
@@ -790,8 +790,8 @@ mod tests {
         profile["diversity_summary"]["distinct_implementation_families"] = json!(5);
         profile["diversity_summary"]["distinct_algorithm_lineages"] = json!(3);
         profile["diversity_summary"]["distinct_languages"] = json!(3);
-        profile["diversity_summary"]["known_term_representation_families"] = json!(3);
-        profile["diversity_summary"]["known_parser_families"] = json!(1);
+        profile["diversity_summary"]["known_term_representation_families"] = json!(2);
+        profile["diversity_summary"]["known_parser_families"] = json!(0);
         profile["diversity_summary"]["independent_external_algorithm_lineages"] = json!(1);
         let errors = validate_profile(&registry, &profile, REGISTRY.as_bytes());
         assert!(errors.is_empty(), "{errors:?}");
