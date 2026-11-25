@@ -1,0 +1,74 @@
+{
+  "schema_version": "cmaq-002-worldtest-adapter-v0.1",
+  "status": "metadata_only",
+  "candidate_artifact_sha256": "1111111111111111111111111111111111111111111111111111111111111111",
+  "seed_commitment_sha256": "2222222222222222222222222222222222222222222222222222222222222222",
+  "interface_arm": "observation_only",
+  "environment_pair": {
+    "exploration_program_sha256": "3333333333333333333333333333333333333333333333333333333333333333",
+    "test_program_sha256": "4444444444444444444444444444444444444444444444444444444444444444",
+    "related_family_id": "fixture-family-alpha"
+  },
+  "exploration": {
+    "reset_enabled": true,
+    "event_trace": [
+      {
+        "event_index": 0,
+        "event_type": "action",
+        "action_id": "left",
+        "reward_feedback_value": 0
+      },
+      {
+        "event_index": 1,
+        "event_type": "action",
+        "action_id": "right",
+        "reward_feedback_value": 0
+      },
+      {
+        "event_index": 2,
+        "event_type": "reset",
+        "reward_feedback_value": 0
+      },
+      {
+        "event_index": 3,
+        "event_type": "action",
+        "action_id": "left",
+        "reward_feedback_value": 0
+      },
+      {
+        "event_index": 4,
+        "event_type": "action",
+        "action_id": "right",
+        "reward_feedback_value": 0
+      },
+      {
+        "event_index": 5,
+        "event_type": "noop",
+        "action_id": "noop",
+        "reward_feedback_value": 0
+      },
+      {
+        "event_index": 6,
+        "event_type": "action",
+        "action_id": "go-to-test",
+        "reward_feedback_value": 0
+      }
+    ],
+    "reward_feedback_policy": "constant_zero",
+    "reward_feedback_value": 0,
+    "nonzero_reward_permitted": false,
+    "phase_exit_action": "go-to-test"
+  },
+  "test": {
+    "query_family": "change_detection",
+    "task_prompt_candidate_visible": true,
+    "answer_key_candidate_visible": false,
+    "test_environment_interactive": true
+  },
+  "evaluator_only": {
+    "candidate_visible": false,
+    "answer_key_sha256": "5555555555555555555555555555555555555555555555555555555555555555",
+    "true_change_timestep": 12
+  },
+  "claim_ceiling": "metadata and exploration-trace mechanics only; no AutumnBench score, human comparison, model advantage or SOTA claim"
+}

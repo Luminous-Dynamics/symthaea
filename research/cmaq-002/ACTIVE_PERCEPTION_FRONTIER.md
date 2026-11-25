@@ -142,3 +142,10 @@ This contract is metadata-only. Its synthetic hashes are fixture values; no Acti
 The full visual active-perception / current-frame compute-escalation adapter belongs under **VIS-DVPC issue [#8156](https://github.com/Luminous-Dynamics/symthaea/issues/8156)**. That programme already owns the DEEP-style fixed-budget perception escalation experiment and explicitly distinguishes spending compute on the current frame from acquiring a causally new viewpoint/sample. The ActiveArena lock and custody schema added here are reusable baseline/provenance artifacts for #8156; they are not a second CMAQ-002 visual benchmark implementation.
 
 CMAQ-002 remains the finite-mechanism causal-probe and EVoI benchmark. Its six synthetic probe permissions are not a camera-movement or robot-actuation allowlist. Any actual ActiveArena policy adapter must be implemented and qualified under #8156, preserve ActiveArena's native head-camera and 18D action semantics, and consume the separate lock/custody gates described above.
+
+
+## Separate WorldTest / AutumnBench track (not a visual-perception adapter)
+
+The new [WorldTest protocol](WORLDTEST_ADAPTER_V0_1.md) is a distinct environment-level-query evaluation: reward-free exploration in one environment, then masked-frame prediction, change detection or planning in a related challenge environment. It must not be conflated with DEEP compute escalation or ActiveArena viewpoint/memory acquisition.
+
+CMAQ-002 now contains a metadata-only source lock, phase-custody schema/fixture, and a Rust reset/replay trace diagnostic. The reset metric is descriptive and charges resets to the interaction budget; it is not an objective to maximize. Public data remain un-downloaded pending immutable manifest, checksum and per-file license review. This track does not qualify ActiveArena or physical robotics.
