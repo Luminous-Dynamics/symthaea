@@ -6246,6 +6246,35 @@ mod tests {
     }
 
     #[test]
+    fn kird_audit_rejects_duplicate_centers_in_interval_cover() {
+        let mut value = certified_kird_value();
+        value["response_scope"]["coverage_domain"]["probe_centers_ticks"] =
+            serde_json::json!([0, 0]);
+        value["response_scope"]["registered_probe_count"] = serde_json::json!(2);
+        value["response_scope"]["confirmed_probe_count"] = serde_json::json!(2);
+        assert!(matches!(
+            validate_kird_record_value(&value),
+            Err(ContractError::InvalidKirdField {
+                field: "response_scope.coverage_domain.probe_centers_ticks",
+                ..
+            })
+        ));
+    }
+
+    #[test]
+    fn kird_audit_rejects_non_compact_or_degenerate_tick_domain() {
+        let mut value = certified_kird_value();
+        value["response_scope"]["coverage_domain"]["maximum_tick"] = serde_json::json!(0);
+        assert!(matches!(
+            validate_kird_record_value(&value),
+            Err(ContractError::InvalidKirdField {
+                field: "response_scope.coverage_domain",
+                ..
+            })
+        ));
+    }
+
+    #[test]
     fn kird_audit_rejects_understated_lipschitz_cover_bound() {
         let mut value = certified_kird_value();
         value["response_scope"]["global_normalized_error_bound"] = serde_json::json!(0.74);
