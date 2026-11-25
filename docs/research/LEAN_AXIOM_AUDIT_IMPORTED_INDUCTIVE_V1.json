@@ -8,11 +8,11 @@
   "sources": {
     "module_a": {
       "path": "scripts/research/lean-proof-extractor/axiom-audit-imported-inductive/A.lean",
-      "sha256": "e70af7d30ac091e8a50f219a1c53a7c85be5c750f2eb3ff127fcedc3b99a3003"
+      "sha256": "5a56efd8d8dd1d3921669564030c733497a43b37993d62f4b8eb900d73234966"
     },
     "module_b": {
       "path": "scripts/research/lean-proof-extractor/axiom-audit-imported-inductive/B.lean",
-      "sha256": "b3bc644eab2fd0c4036ff02a463637ad854d76a5fb7ddb6cbb761641b9da3b1a"
+      "sha256": "0f8cd55690b32793e885daefbaa6c198c6c9c97a06bef99c26dda16cf8e239b3"
     },
     "module_proof": {
       "path": "scripts/research/lean-proof-extractor/ProofActionCertificateAndComm.lean",
@@ -37,6 +37,40 @@
       "expected_fresh_axioms": [
         "Classical.choice"
       ]
+    },
+    {
+      "name": "auditDirectAxiom",
+      "expected_fresh_axioms": [
+        "auditDirectAxiom"
+      ]
+    },
+    {
+      "name": "auditTransitiveAxiom",
+      "expected_fresh_axioms": [
+        "auditDirectAxiom"
+      ]
+    },
+    {
+      "name": "usesTransitiveAxiom",
+      "expected_fresh_axioms": [
+        "auditDirectAxiom"
+      ]
+    },
+    {
+      "name": "Even",
+      "expected_fresh_axioms": []
+    },
+    {
+      "name": "Odd",
+      "expected_fresh_axioms": []
+    },
+    {
+      "name": "Even.succ",
+      "expected_fresh_axioms": []
+    },
+    {
+      "name": "Odd.succ",
+      "expected_fresh_axioms": []
     },
     {
       "name": "And.comm",
@@ -76,9 +110,47 @@
     "unresolved_policy": "preserve unresolved constant name in dependency set; exact expected-set assertion fails closed"
   },
   "claim_ceiling": [
-    "The project-side fresh DFS detected Classical.choice through the imported S9 inductive/constructor cycle and theorem usesS9, and returned an empty axiom set for And.comm plus all four local proof-action declarations, in this exact Lean environment.",
+    "This source-pinned 15-root corpus is designed to check the imported S9 inductive/constructor cycle, direct and transitive custom-axiom paths, a mutually recursive Even/Odd family, And.comm, and four proof-action declarations in the exact pinned Lean environment; no exact-head result is claimed until the focused workflow receipt is accepted.",
     "Native #print axioms output is captured as a diagnostic and is not the independent audit acceptance oracle.",
     "This is a research prototype, not a verified replacement for Lean's kernel or a complete repository-wide trust audit.",
-    "The reproduction covers one imported inductive/constructor cycle and one downstream theorem; mutual/nested inductives, all declaration forms and complete repository-wide trust closure require more adversarial cases."
-  ]
+    "The corpus includes one mutually recursive inductive family; nested inductives, all declaration forms, other Lean versions and complete repository-wide trust closure remain outside the current claim."
+  ],
+  "root_order_permutation": {
+    "status": "source_pinned_expected_pending_exact_head",
+    "expected_runs_per_root": 2,
+    "forward_order": [
+      "S9",
+      "S9.mk",
+      "usesS9",
+      "auditDirectAxiom",
+      "auditTransitiveAxiom",
+      "usesTransitiveAxiom",
+      "Even",
+      "Odd",
+      "Even.succ",
+      "Odd.succ",
+      "And.comm",
+      "ProofPlanActionCertificatePilot.and_comm_split_iff",
+      "ProofPlanActionCertificatePilot.and_comm_forward",
+      "ProofPlanActionCertificatePilot.and_comm_reverse",
+      "ProofPlanActionCertificatePilot.and_comm_plan_replay"
+    ],
+    "reverse_order": [
+      "ProofPlanActionCertificatePilot.and_comm_plan_replay",
+      "ProofPlanActionCertificatePilot.and_comm_reverse",
+      "ProofPlanActionCertificatePilot.and_comm_forward",
+      "ProofPlanActionCertificatePilot.and_comm_split_iff",
+      "And.comm",
+      "Odd.succ",
+      "Even.succ",
+      "Odd",
+      "Even",
+      "usesTransitiveAxiom",
+      "auditTransitiveAxiom",
+      "auditDirectAxiom",
+      "usesS9",
+      "S9.mk",
+      "S9"
+    ]
+  }
 }

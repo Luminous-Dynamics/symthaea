@@ -12,9 +12,10 @@
     "lean_core_revision",
     "mathlib_revision",
     "sources",
-    "roots",
     "audit_algorithm",
-    "claim_ceiling"
+    "claim_ceiling",
+    "roots",
+    "root_order_permutation"
   ],
   "properties": {
     "schema_version": {
@@ -99,8 +100,9 @@
     },
     "roots": {
       "type": "array",
-      "minItems": 8,
-      "maxItems": 8,
+      "minItems": 15,
+      "maxItems": 15,
+      "uniqueItems": true,
       "items": {
         "type": "object",
         "additionalProperties": false,
@@ -113,13 +115,27 @@
             "enum": [
               "S9",
               "S9.mk",
-              "usesS9"
+              "usesS9",
+              "auditDirectAxiom",
+              "auditTransitiveAxiom",
+              "usesTransitiveAxiom",
+              "Even",
+              "Odd",
+              "Even.succ",
+              "Odd.succ",
+              "And.comm",
+              "ProofPlanActionCertificatePilot.and_comm_split_iff",
+              "ProofPlanActionCertificatePilot.and_comm_forward",
+              "ProofPlanActionCertificatePilot.and_comm_reverse",
+              "ProofPlanActionCertificatePilot.and_comm_plan_replay"
             ]
           },
           "expected_fresh_axioms": {
-            "const": [
-              "Classical.choice"
-            ]
+            "type": "array",
+            "items": {
+              "type": "string",
+              "minLength": 1
+            }
           }
         },
         "oneOf": [
@@ -174,6 +190,124 @@
                 "const": [
                   "Classical.choice"
                 ]
+              }
+            }
+          },
+          {
+            "type": "object",
+            "additionalProperties": false,
+            "required": [
+              "name",
+              "expected_fresh_axioms"
+            ],
+            "properties": {
+              "name": {
+                "const": "auditDirectAxiom"
+              },
+              "expected_fresh_axioms": {
+                "const": [
+                  "auditDirectAxiom"
+                ]
+              }
+            }
+          },
+          {
+            "type": "object",
+            "additionalProperties": false,
+            "required": [
+              "name",
+              "expected_fresh_axioms"
+            ],
+            "properties": {
+              "name": {
+                "const": "auditTransitiveAxiom"
+              },
+              "expected_fresh_axioms": {
+                "const": [
+                  "auditDirectAxiom"
+                ]
+              }
+            }
+          },
+          {
+            "type": "object",
+            "additionalProperties": false,
+            "required": [
+              "name",
+              "expected_fresh_axioms"
+            ],
+            "properties": {
+              "name": {
+                "const": "usesTransitiveAxiom"
+              },
+              "expected_fresh_axioms": {
+                "const": [
+                  "auditDirectAxiom"
+                ]
+              }
+            }
+          },
+          {
+            "type": "object",
+            "additionalProperties": false,
+            "required": [
+              "name",
+              "expected_fresh_axioms"
+            ],
+            "properties": {
+              "name": {
+                "const": "Even"
+              },
+              "expected_fresh_axioms": {
+                "const": []
+              }
+            }
+          },
+          {
+            "type": "object",
+            "additionalProperties": false,
+            "required": [
+              "name",
+              "expected_fresh_axioms"
+            ],
+            "properties": {
+              "name": {
+                "const": "Odd"
+              },
+              "expected_fresh_axioms": {
+                "const": []
+              }
+            }
+          },
+          {
+            "type": "object",
+            "additionalProperties": false,
+            "required": [
+              "name",
+              "expected_fresh_axioms"
+            ],
+            "properties": {
+              "name": {
+                "const": "Even.succ"
+              },
+              "expected_fresh_axioms": {
+                "const": []
+              }
+            }
+          },
+          {
+            "type": "object",
+            "additionalProperties": false,
+            "required": [
+              "name",
+              "expected_fresh_axioms"
+            ],
+            "properties": {
+              "name": {
+                "const": "Odd.succ"
+              },
+              "expected_fresh_axioms": {
+                "const": []
               }
             }
           },
@@ -309,6 +443,62 @@
       "items": {
         "type": "string",
         "minLength": 1
+      }
+    },
+    "root_order_permutation": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "status",
+        "expected_runs_per_root",
+        "forward_order",
+        "reverse_order"
+      ],
+      "properties": {
+        "status": {
+          "const": "source_pinned_expected_pending_exact_head"
+        },
+        "expected_runs_per_root": {
+          "const": 2
+        },
+        "forward_order": {
+          "const": [
+            "S9",
+            "S9.mk",
+            "usesS9",
+            "auditDirectAxiom",
+            "auditTransitiveAxiom",
+            "usesTransitiveAxiom",
+            "Even",
+            "Odd",
+            "Even.succ",
+            "Odd.succ",
+            "And.comm",
+            "ProofPlanActionCertificatePilot.and_comm_split_iff",
+            "ProofPlanActionCertificatePilot.and_comm_forward",
+            "ProofPlanActionCertificatePilot.and_comm_reverse",
+            "ProofPlanActionCertificatePilot.and_comm_plan_replay"
+          ]
+        },
+        "reverse_order": {
+          "const": [
+            "ProofPlanActionCertificatePilot.and_comm_plan_replay",
+            "ProofPlanActionCertificatePilot.and_comm_reverse",
+            "ProofPlanActionCertificatePilot.and_comm_forward",
+            "ProofPlanActionCertificatePilot.and_comm_split_iff",
+            "And.comm",
+            "Odd.succ",
+            "Even.succ",
+            "Odd",
+            "Even",
+            "usesTransitiveAxiom",
+            "auditTransitiveAxiom",
+            "auditDirectAxiom",
+            "usesS9",
+            "S9.mk",
+            "S9"
+          ]
+        }
       }
     }
   }
