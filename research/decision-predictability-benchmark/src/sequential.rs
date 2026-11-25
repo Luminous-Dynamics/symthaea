@@ -1203,6 +1203,79 @@ mod tests {
     }
 
     #[test]
+    fn sub_tolerance_policy_improvement_is_not_discarded() {
+        let delta = 1.0e-13;
+        let problem = SequentialRobustProblem {
+            state_ids: vec!["s0".to_owned(), "s1".to_owned()],
+            decision_ids: vec!["d0".to_owned(), "d1".to_owned()],
+            decision_loss: BTreeMap::from([
+                (
+                    "d0".to_owned(),
+                    BTreeMap::from([
+                        ("s0".to_owned(), 0.5 - delta),
+                        ("s1".to_owned(), 0.5 + delta),
+                    ]),
+                ),
+                (
+                    "d1".to_owned(),
+                    BTreeMap::from([
+                        ("s0".to_owned(), 0.5 + delta),
+                        ("s1".to_owned(), 0.5 - delta),
+                    ]),
+                ),
+            ]),
+            maximum_worst_case_loss: 0.0,
+            initial_protocol_state_id: "root".to_owned(),
+            protocol_states: vec![
+                SequentialProtocolState {
+                    protocol_state_id: "root".to_owned(),
+                    legal_action_ids: vec!["observe".to_owned()],
+                },
+                SequentialProtocolState {
+                    protocol_state_id: "terminal_s0".to_owned(),
+                    legal_action_ids: Vec::new(),
+                },
+                SequentialProtocolState {
+                    protocol_state_id: "terminal_s1".to_owned(),
+                    legal_action_ids: Vec::new(),
+                },
+            ],
+            actions: vec![SequentialAction {
+                action_id: "observe".to_owned(),
+                resource_costs: cost(1),
+                result_delay_steps: 1,
+                outcomes: vec![
+                    SequentialOutcome {
+                        outcome_id: "s0".to_owned(),
+                        possible_state_ids: vec!["s0".to_owned()],
+                        next_protocol_state_id: "terminal_s0".to_owned(),
+                    },
+                    SequentialOutcome {
+                        outcome_id: "s1".to_owned(),
+                        possible_state_ids: vec!["s1".to_owned()],
+                        next_protocol_state_id: "terminal_s1".to_owned(),
+                    },
+                ],
+            }],
+            resource_budget: cost(1),
+            current_step: 0,
+            decision_deadline_step: 1,
+            maximum_actions: 1,
+        };
+
+        let dynamic = evaluate_sequential_robust(&problem).unwrap();
+        let exhaustive = enumerate_sequential_robust(&problem).unwrap();
+        assert!(dynamic.worst_case_terminal_loss < dynamic.current_minimax_loss);
+        assert!(dynamic.current_minimax_loss - dynamic.worst_case_terminal_loss < VALUE_TOLERANCE);
+        assert_eq!(
+            dynamic.worst_case_terminal_loss,
+            exhaustive.worst_case_terminal_loss
+        );
+        assert!(matches!(dynamic.policy, SequentialPolicyNode::Probe { .. }));
+        assert!(matches!(exhaustive.policy, SequentialPolicyNode::Probe { .. }));
+    }
+
+    #[test]
     fn generated_tiny_worlds_match_independent_exhaustive_policy_tree_oracle() {
         let mut rng = TinyRng(0x5a17_c3d1);
         for case_index in 0..96 {
