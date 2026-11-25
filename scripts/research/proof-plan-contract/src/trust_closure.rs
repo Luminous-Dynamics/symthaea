@@ -622,6 +622,16 @@ mod tests {
     }
 
     #[test]
+    fn accepts_capsule_with_digest_bound_qualified_checker_profile() {
+        let mut capsule = baseline();
+        capsule["disposition"] = json!("qualified_under_policy");
+        capsule["checker_diversity"]["status"] = json!("qualified_under_policy");
+        capsule["assurance_axes"]["independent_checker_replay"]["status"] = json!("satisfied");
+        let errors = validate_capsule(&capsule);
+        assert!(errors.is_empty(), "{errors:?}");
+    }
+
+    #[test]
     fn independent_replay_requires_a_qualified_checker_profile() {
         let mut capsule = baseline();
         capsule["disposition"] = json!("qualified_under_policy");
