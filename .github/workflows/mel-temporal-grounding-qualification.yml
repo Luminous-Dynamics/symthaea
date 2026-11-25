@@ -103,7 +103,12 @@ jobs:
             and .summary.random_abstention_baseline_risk == 0.8
             and .summary.random_abstention_baseline_aurc == 0.8
             and .summary.always_abstain_coverage == 0.0
+            and .summary.mean_forward_passes > 1.0
+            and .summary.p95_latency_multiplier <= 2.0
+            and .summary.mean_latency_multiplier > 1.0
             and .runtime_identity_authenticated == false
+            and .hardware_identity_authenticated == false
+            and .inference_cost_receipts_authenticated == false
             and .evidence_receipts_authenticated == false
             and .always_abstain_is_a_product_baseline == false
           ' "$RUNNER_TEMP/selective-grounding-report.json" > /dev/null
