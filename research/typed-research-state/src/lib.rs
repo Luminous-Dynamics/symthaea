@@ -288,6 +288,7 @@ fn validate_classifier(
     value: &Value,
     path: &str,
     prefix_sha256: &str,
+    claim_sha256: &str,
     issues: &mut Vec<ValidationIssue>,
 ) -> Option<String> {
     let Some(map) = object(value, path, issues) else {
@@ -300,6 +301,7 @@ fn validate_classifier(
         "confidence",
         "emitted_at",
         "evidence_prefix_sha256",
+        "claim_sha256",
     ];
     exact_keys(map, KEYS, path, issues);
     let classifier_id = string(map, "classifier_id", path, issues).map(str::to_owned);
@@ -320,6 +322,14 @@ fn validate_classifier(
             issues,
             format!("{path}.evidence_prefix_sha256"),
             "classifier output was produced against a different evidence prefix",
+        );
+    }
+    let actual_claim = digest_string(map, "claim_sha256", path, issues);
+    if actual_claim.as_deref() != Some(claim_sha256) {
+        issue(
+            issues,
+            format!("{path}.claim_sha256"),
+            "classifier output was produced for a different scoped claim",
         );
     }
     classifier_id
@@ -343,6 +353,7 @@ struct RelationValidationContext<'a> {
     claim_id: &'a str,
     evidence_ids: &'a HashMap<String, Option<String>>,
     prefix_sha256: &'a str,
+    claim_sha256: &'a str,
     classified_authorities: &'a mut HashSet<String>,
     supports: &'a mut HashSet<String>,
     refutes: &'a mut HashSet<String>,
@@ -423,6 +434,7 @@ fn validate_relation(
                 map.get("classifier_provenance").unwrap(),
                 &format!("{path}.classifier_provenance"),
                 context.prefix_sha256,
+                context.claim_sha256,
                 issues,
             );
             if let Some(classifier) = classifier {
@@ -568,7 +580,29 @@ fn validate_usability(
     }
 }
 
-pub fn evidence_prefix_sha256(
+pub fn scoped_claim_sha256(
+    claim_id: &str,
+    statement: &str,
+    scope: &Value,
+    reference_time: &str,
+) -> String {
+    // This ordered manifest binds a classifier relation to the exact claim
+    // text, scope and reference time, not merely to a reusable claim ID.
+    let manifest = serde_json::json!({
+        "claim_id": claim_id,
+        "statement": statement,
+        "scope": scope,
+        "reference_time": reference_time,
+    });
+    let bytes = serde_json::to_vec(&manifest)
+        .expect("serializing a serde_json::Value to JSON bytes is infallible");
+    Sha256::digest(bytes)
+        .iter()
+        .map(|byte| format!("{byte:02x}"))
+        .collect()
+}
+
+fn evidence_prefix_sha256(
     research_episode_id: &str,
     sequence_number: u64,
     evidence: &[Value],
@@ -729,7 +763,7 @@ fn validate_state(input: &str) -> Result<ValidationReport, Vec<ValidationIssue>>
         if !claim_ids.insert(claim_id.clone()) {
             issue(&mut issues, format!("{path}.claim_id"), "duplicate claim ID");
         }
-        string(claim, "statement", &path, &mut issues);
+        let statement = string(claim, "statement", &path, &mut issues).unwrap_or_default();
         if let Some(scope_value) = claim.get("scope") {
             if let Some(scope) = object(scope_value, &format!("{path}.scope"), &mut issues) {
                 const SCOPE_KEYS: &[&str] = &[
@@ -747,11 +781,18 @@ fn validate_state(input: &str) -> Result<ValidationReport, Vec<ValidationIssue>>
         } else {
             issue(&mut issues, format!("{path}.scope"), "claim scope is required");
         }
-        if let Some(time) = string(claim, "reference_time", &path, &mut issues) {
-            if !valid_time(time) {
-                issue(&mut issues, format!("{path}.reference_time"), "invalid RFC3339 timestamp");
-            }
+        let reference_time = string(claim, "reference_time", &path, &mut issues).unwrap_or_default();
+        if !valid_time(reference_time) {
+            issue(&mut issues, format!("{path}.reference_time"), "invalid RFC3339 timestamp");
         }
+        let null_scope = Value::Null;
+        let scope_value = claim.get("scope").unwrap_or(&null_scope);
+        let claim_sha256 = scoped_claim_sha256(
+            &claim_id,
+            statement,
+            scope_value,
+            reference_time,
+        );
 
         let mut pair_ids = HashSet::new();
         let mut classifier_ids = HashSet::new();
@@ -764,6 +805,7 @@ fn validate_state(input: &str) -> Result<ValidationReport, Vec<ValidationIssue>>
                     claim_id: &claim_id,
                     evidence_ids: &evidence_ids,
                     prefix_sha256: &prefix_sha256,
+                    claim_sha256: &claim_sha256,
                     classified_authorities: &mut classifier_ids,
                     supports: &mut support_families,
                     refutes: &mut refute_families,
