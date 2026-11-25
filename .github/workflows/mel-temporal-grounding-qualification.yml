@@ -206,6 +206,15 @@ jobs:
           cp crates/domains/symthaea-muse/src/temporal_grounding.rs "$evidence/"
           cp crates/domains/symthaea-muse/src/evidence_digest.rs "$evidence/"
           cp docs/research/MEL-GROUND-001-TEMPORAL-GROUNDING-SCORER-V1.md "$evidence/"
+          if [[ -f tools/mel-temporal-grounding-qualifier/src/temporal_selective.rs ]]; then
+            cp tools/mel-temporal-grounding-qualifier/src/temporal_selective.rs "$evidence/"
+            cp tools/mel-temporal-grounding-qualifier/src/bin/mel-selective-grounding-audit.rs "$evidence/"
+            cp tools/mel-temporal-grounding-qualifier/schemas/mel-selective-temporal-batch-v1.schema.json "$evidence/"
+            cp tools/mel-temporal-grounding-qualifier/fixtures/mel-selective-temporal.synthetic.json "$evidence/"
+            if [[ -f "$RUNNER_TEMP/selective-grounding-report.json" ]]; then
+              cp "$RUNNER_TEMP/selective-grounding-report.json" "$evidence/"
+            fi
+          fi
           if [[ -f tools/mel-temporal-grounding-qualifier/src/temporal_consensus.rs ]]; then
             cp tools/mel-temporal-grounding-qualifier/src/temporal_consensus.rs "$evidence/"
             cp tools/mel-temporal-grounding-qualifier/src/bin/mel-multi-annotator-grounding-audit.rs "$evidence/"
