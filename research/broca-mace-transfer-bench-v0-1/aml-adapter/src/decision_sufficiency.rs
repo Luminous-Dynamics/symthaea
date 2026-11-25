@@ -994,6 +994,30 @@ mod tests {
         ).unwrap()
     }
 
+    fn qualification_binding<'a>(
+        qualified: &'a QualifiedCandidateEvidenceBatchV1,
+        candidate_ids: &'a [String],
+        now_unix: u64,
+    ) -> EvidenceQualificationBindingV1<'a> {
+        EvidenceQualificationBindingV1 {
+            run_id: qualified.run_id(),
+            query_invocation_id: qualified.query_invocation_id(),
+            domain_id: qualified.domain_id(),
+            subject_scope_sha256: qualified.subject_scope_sha256(),
+            environment_revision_sha256: qualified.environment_revision_sha256(),
+            tool_profile_sha256: qualified.tool_profile_sha256(),
+            query_sha256: qualified.batch().query_sha256.as_str(),
+            candidate_set_sha256: qualified.source_candidate_set_sha256(),
+            candidate_evidence_ids: candidate_ids,
+            decision_need_sha256: qualified.decision_need_sha256(),
+            purpose_sha256: qualified.purpose_sha256(),
+            qualification_policy_sha256: qualified.qualification_policy_sha256(),
+            lifecycle_snapshot_sha256: qualified.lifecycle_snapshot_sha256(),
+            verifier_profile_sha256: qualified.qualification_verifier_profile_sha256(),
+            now_unix,
+        }
+    }
+
     fn use_binding<'a>(
         qualified: &'a QualifiedCandidateEvidenceBatchV1,
         issuer_profile_sha256: &'a str,
@@ -1130,13 +1154,25 @@ mod tests {
             Some(1000),
             Some(5000),
         );
+        let candidate_ids = vec!["evidence-1".to_owned()];
+        let qualification_binding = qualification_binding(&qualified, &candidate_ids, 160);
         let verified = verify_decision_sufficiency_v1(
-            &qualified, &binding, &envelope, &profile,
+            &qualified,
+            &qualification_binding,
+            &TestQualificationVerifier,
+            &binding,
+            &envelope,
+            &profile,
         ).expect("separately signed sufficient receipt");
         assert!(verified.is_sufficient());
         assert_eq!(verified.status(), DecisionSufficiencyStatusV1::Sufficient);
-        verified.validate_at_use(&qualified, &binding, &profile)
-            .expect("same DecisionNeed and current evaluator profile remain valid");
+        verified.validate_at_use(
+            &qualified,
+            &qualification_binding,
+            &TestQualificationVerifier,
+            &binding,
+            &profile,
+        ).expect("same DecisionNeed and current evaluator profile remain valid");
     }
 
     #[test]
@@ -1149,8 +1185,15 @@ mod tests {
             Some(10_000),
             Some(5000),
         );
+        let candidate_ids = vec!["evidence-1".to_owned()];
+        let qualification_binding = qualification_binding(&qualified, &candidate_ids, 160);
         let verified = verify_decision_sufficiency_v1(
-            &qualified, &binding, &envelope, &profile,
+            &qualified,
+            &qualification_binding,
+            &TestQualificationVerifier,
+            &binding,
+            &envelope,
+            &profile,
         ).expect("honest insufficient assessment");
         assert!(!verified.is_sufficient());
         assert_eq!(verified.status(), DecisionSufficiencyStatusV1::Insufficient);
@@ -1167,7 +1210,14 @@ mod tests {
             Some(5000),
         );
         assert_eq!(
-            verify_decision_sufficiency_v1(&qualified, &binding, &envelope, &profile),
+            verify_decision_sufficiency_v1(
+                &qualified,
+                &qualification_binding(&qualified, &["evidence-1".to_owned()], 160),
+                &TestQualificationVerifier,
+                &binding,
+                &envelope,
+                &profile,
+            ),
             Err(DecisionSufficiencyRejectV1::SufficientRequirementsNotMet)
         );
     }
@@ -1183,7 +1233,14 @@ mod tests {
             Some(5000),
         );
         assert_eq!(
-            verify_decision_sufficiency_v1(&qualified, &binding, &envelope, &profile),
+            verify_decision_sufficiency_v1(
+                &qualified,
+                &qualification_binding(&qualified, &["evidence-1".to_owned()], 160),
+                &TestQualificationVerifier,
+                &binding,
+                &envelope,
+                &profile,
+            ),
             Err(DecisionSufficiencyRejectV1::SufficientRiskBoundInvalid)
         );
     }
@@ -1201,7 +1258,14 @@ mod tests {
             Some(5000),
         );
         assert_eq!(
-            verify_decision_sufficiency_v1(&qualified, &binding, &envelope, &profile),
+            verify_decision_sufficiency_v1(
+                &qualified,
+                &qualification_binding(&qualified, &["evidence-1".to_owned()], 160),
+                &TestQualificationVerifier,
+                &binding,
+                &envelope,
+                &profile,
+            ),
             Err(DecisionSufficiencyRejectV1::SharedQualificationAuthority)
         );
     }
@@ -1216,8 +1280,15 @@ mod tests {
             Some(1000),
             Some(5000),
         );
+        let candidate_ids = vec!["evidence-1".to_owned()];
+        let qualification_binding = qualification_binding(&qualified, &candidate_ids, 160);
         let verified = verify_decision_sufficiency_v1(
-            &qualified, &binding, &envelope, &active_profile,
+            &qualified,
+            &qualification_binding,
+            &TestQualificationVerifier,
+            &binding,
+            &envelope,
+            &active_profile,
         ).unwrap();
 
         let signing_key = SigningKey::from_bytes(&[73; 32]);
@@ -1228,7 +1299,13 @@ mod tests {
             DECISION_SUFFICIENCY_VERIFIER_ID_V1,
         );
         assert_eq!(
-            verified.validate_at_use(&qualified, &binding, &revoked_profile),
+            verified.validate_at_use(
+                &qualified,
+                &qualification_binding,
+                &TestQualificationVerifier,
+                &binding,
+                &revoked_profile,
+            ),
             Err(DecisionSufficiencyRejectV1::ProfileDigestMismatch)
         );
     }
