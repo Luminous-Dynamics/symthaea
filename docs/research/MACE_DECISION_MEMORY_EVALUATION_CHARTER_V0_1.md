@@ -49,6 +49,20 @@ The official leaderboard score is the **LAFS gain over a fixed reference accurac
 
 A score is invalid as a comparison if the harness version, answer model, memory budget, evidence payload, or inference protocol differs without an explicit matched-control run.
 
+### 2.2a BEAM — coherent long-horizon memory at million-token scale
+
+Add **BEAM (Beyond a Million Tokens)** as a distinct long-horizon track, not as a substitute for LongMemEval-V2. BEAM is an ICLR 2026 benchmark of 100 coherent conversations and 2,000 validated questions, with generated conversations extending up to 10 million tokens. Its paper reports that models with 1M-token context windows still struggle as conversations lengthen; its LIGHT architecture combines long-term episodic memory, short-term working memory and a scratchpad, reporting 3.5–12.69% average improvement over strongest baselines depending on the backbone. These are paper-reported results, not MACE measurements. <https://proceedings.iclr.cc/paper_files/paper/2026/hash/d7f0cfa0fe759b033d5262e1bb7d4065-Abstract-Conference.html>
+
+**MACE evaluation design:**
+- Preserve the BEAM dataset, question set, official splits and scorer. Add size-stratified reporting by actual token count; do not invent official fixed-size tiers.
+- At matched reader/backbone and all-in resource budgets, compare no memory, full context, BM25/dense/hybrid retrieval, a multi-store LIGHT-like arm (episodic + working + scratchpad), and MACE's qualified decision-evidence arm.
+- Report accuracy by question ability and conversation-size stratum, contradiction and temporal error, query tokens, index/write/consolidation/verifier work, p50/p95 latency, and total monetary/energy cost where measurable.
+- Run at least one 1M-token and one largest-available near-10M-token operating point if the public fixture and implementation allow it; report exact counts rather than relabeling them as official tiers.
+- Initial MACE target: **+3 absolute accuracy points** over the strongest independently reproduced matched baseline at the same size and budget. Stretch: **+5 points** without worse temporal/contradiction performance and without exceeding the declared all-in cost envelope. These are proposed goals, not paper or MACE results.
+- Publish the full-context upper bound and the LIGHT-style multi-store baseline. Do not claim superiority based only on beating a weak vector-retrieval arm.
+
+BEAM is especially useful for testing MACE's central hypothesis: the right small set of sufficiently independent evidence can outperform indiscriminate context expansion while making its provenance and decision relevance inspectable.
+
 ### 2.3 Agentic and action-world memory
 
 Use both AMA-Bench and WorldMemArena; they measure related but non-identical tasks.
@@ -57,6 +71,26 @@ Use both AMA-Bench and WorldMemArena; they measure related but non-identical tas
 - **WorldMemArena:** evaluates 400 multi-session multimodal tasks through an action-world loop with write, maintain, retrieve, and use stages. Proposed target: **+3 points paired task success** over the best matched baseline at equal all-in budget, while reporting failures by lifecycle stage and domain.
 
 Do not use answer accuracy as a proxy for successful action. Report task completion, tool/action errors, unsafe action rate, recovery, cost, latency, and trajectory-level evidence quality.
+
+### 2.3a Procedural memory and verified skill transfer
+
+Add a dedicated **Procedural Memory Transfer** lane. The November 2026 Zep Agent Skills paper describes a production path that compiles verified execution traces into versioned, event-cited skills, then evaluates transfer on τ³-bench Banking, AppWorld, EnterpriseOps-Gym and ALFWorld. The paper reports 4.5–18.8 percentage-point pass-rate gains for three weaker executor models using skills compiled from a teacher model's verified traces; it also notes that most gains occur on tasks the teacher solved. These are paper-reported, configuration-dependent results and a strong new baseline—not MACE results. <https://arxiv.org/abs/2611.01386>
+
+Compare:
+1. No procedural memory.
+2. Raw prior execution traces.
+3. Unverified distilled procedure/skill.
+4. Verified-trace skill with version and citations.
+5. MACE-qualified skill: verified trace lineage plus explicit preconditions, environment/tool revision, scope, purpose, authority, expiry/revocation and pre-use applicability checks.
+6. Fine-tuning baseline where the paper's task/protocol supports it; keep training data and inference budgets visible.
+
+Use the paper's named environments where accessible and add held-out task variants, changed tool APIs, changed approval policies, revoked credentials, cross-user boundaries, dormant trigger-conditioned errors, and tasks not solved by the skill compiler's teacher. Keep task subsets separate: teacher-solved coverage is not the same as transfer/generalization.
+
+Report task completion, exact step/argument correctness, unsafe/unauthorized action rate, policy/approval violations, cross-model transfer, environment-drift sensitivity, skill coverage, false activation, abstention, update/revocation propagation time, token/latency and all-in cost.
+
+Proposed MACE target: **+3 absolute task-success points** over the strongest independently reproduced matched procedural-memory baseline; stretch **+5 points**, with zero unauthorized or wrong-scope actions in the deterministic safety suite. Also require that revoked/stale skills cannot be activated and that every skill field can be traced to its source events. These are research targets, not published or measured MACE scores.
+
+The architectural shift is from "remember successful behavior" to **compile verified procedures with explicit preconditions and authority, then prove that the current context still satisfies them**. A successful old trace is evidence of what happened in one environment; it is not universal permission to repeat the action.
 
 ### 2.4 Lifecycle-governed memory
 
@@ -145,8 +179,8 @@ MACE's novelty claim must not be "we use temporal graphs", "we combine vector an
 
 #### Vendor-reported performance must be versioned
 
-- Mem0's migration guide reports LoCoMo 91.6 and LongMemEval 93.4, while its dedicated evaluation page reports 92.5 and 94.4 using a top-200 retrieval budget. Its evaluation page also reports BEAM 64.1 at 1M tokens and 48.6 at 10M, averaging roughly 6.7–6.9K context tokens per query. These are vendor-published figures, not independent MACE reproductions. The difference between its public docs must be resolved to exact benchmark/reader/model revisions before any head-to-head claim.
-- Zep's Graphiti page reports 94.7 LoCoMo at 155 ms and 5,760 context tokens, and 90.2 LongMemEval at 162 ms and 4,408 context tokens. Treat these as vendor-reported operating points; benchmark version, reader, hardware and measurement boundaries must be matched before comparison.
+- Mem0's Platform v3 migration guide reports LoCoMo 91.6 and LongMemEval 93.4, while its dedicated evaluation page has reported a different score pair and a top-200 retrieval budget. Its 1M/10M BEAM operating points are also vendor-reported. The migration guide explicitly describes single-pass ADD-only extraction, automatic entity graph construction and hybrid retrieval; it separately recommends expiry or deletion APIs for memory-volume control. These figures must be version-pinned and independently reproduced.
+- Zep's Graphiti page reports LoCoMo 94.7 at 155 ms / 5,760 tokens and LongMemEval 90.2 at 162 ms / 4,408 tokens. Its benchmark page specifies 451/500 correct for LongMemEval and 1,459/1,540 for LoCoMo; these are vendor-reported original benchmark operating points. **Do not treat them as LongMemEval-V2 results.** Reproduce the official LongMemEval-V2 protocol separately with its own 451-question manifest and LAFS scoring.
 - AWS describes a lifecycle policy combining a 90-day default TTL with a configurable relevance score from creation recency, last-access recency and access frequency. Its consolidation workflow uses an LLM to compress related low-scoring memories, stores the summary, and then deletes originals; its workflow writes run outputs to S3 and logs failed deletions for review. This is a real lifecycle baseline and should be included in clean-utility and consolidation/repair experiments.
 - Zep's November 2026 Agent Skills research adds a procedural memory baseline: versioned skills compiled from verified runs with citations to the underlying events. This calls for a separate procedural-skill transfer lane, not merely a fact-recall score.
 
@@ -364,6 +398,11 @@ The benchmark protocols, leaderboard values and scope statements above should be
 - **Memora / FAMA, Findings of ACL 2026:** https://aclanthology.org/2026.findings-acl.1337/ . FAMA penalizes reliance on obsolete or invalidated memory.
 - **TimlMemBench, Findings of EMNLP 2026:** https://aclanthology.org/2026.findings-emnlp.507/ . The paper describes 208 reviewed bilingual samples, 1,566 sessions, 1,715 questions and 1,821 governance/activation cases.
 - **Agent Memory Integrity Internet-Draft:** https://datatracker.ietf.org/doc/draft-khandelwal-bpm-agent-memory-integrity/ . This is a work-in-progress Internet-Draft, not an RFC or IETF standard. It specifies T9 whole-store rollback and T10 erasure resurrection; report not-applicable controls separately from passes.
+- **BEAM, ICLR 2026:** https://proceedings.iclr.cc/paper_files/paper/2026/hash/d7f0cfa0fe759b033d5262e1bb7d4065-Abstract-Conference.html . 100 coherent conversations, 2,000 validated questions, up to 10M tokens; paper reports a LIGHT improvement range of 3.5–12.69% depending on backbone.
+- **Zep Agent Skills, November 2026:** https://arxiv.org/abs/2611.01386 . Procedural memory compiled from verified traces, with event citations and version gates; paper evaluates τ³-bench Banking, AppWorld, EnterpriseOps-Gym and ALFWorld.
+- **Mem0 Platform v3 migration guide:** https://github.com/mem0ai/mem0/blob/main/docs/migration/platform-v2-to-v3.mdx . Documents ADD-only extraction, built-in entity graph, hybrid retrieval and vendor-reported LoCoMo/LongMemEval scores.
+- **Zep Graphiti:** https://www.getzep.com/platform/graphiti/ and benchmark methodology https://www.getzep.com/research/memory-benchmarks/ . Vendor reports temporal graph retrieval and original LongMemEval/LoCoMo accuracy, latency and token operating points.
+- **AWS AgentCore memory lifecycle policy:** https://aws.amazon.com/blogs/machine-learning/designing-lifecycle-policies-for-agentcore-memory/ . Vendor reference for TTL, recency/access/frequency scoring and LLM-based consolidation/pruning.
 - **MemoryArena, ICML 2026:** https://proceedings.mlr.press/v306/he26am.html . Multi-session interdependent agentic tasks; its evaluation shows that recall-centric memory scores can miss downstream task performance.
 - **MemoryDojo, November 2026:** https://arxiv.org/abs/2611.09721 . 155 multi-session poisoning trajectories across four domains and five memory systems.
 - **MemSecBench, July 2026:** https://arxiv.org/abs/2607.27080 . 310 Write–Execute–Forget cases, 48 contexts, seven lifecycle checkpoints and selective repair.
