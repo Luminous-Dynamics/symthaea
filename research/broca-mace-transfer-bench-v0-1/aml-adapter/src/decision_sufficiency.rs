@@ -1,0 +1,774 @@
+// SPDX-License-Identifier: AGPL-3.0-or-later
+
+//! Consumer-side verification of independently issued DecisionSufficiency
+//! attestations. Qualification answers whether evidence may be considered;
+//! sufficiency answers whether the qualified set supports one exact decision.
+//! Neither receipt authorizes an action.
+
+use serde_json::{Map, Value, json};
+use sha2::{Digest, Sha256};
+
+use crate::qualification_dsse::{
+    DSSE_PAYLOAD_TYPE_V1,
+    IN_TOTO_STATEMENT_TYPE_V1,
+    MACE_DECISION_SUFFICIENCY_PREDICATE_TYPE_V1,
+    parse_dsse_envelope_v1,
+    parse_strict_json_bounded,
+};
+use crate::qualification_trust::PinnedEd25519QualificationVerifierV1;
+use crate::qualified_candidate_evidence::QualifiedCandidateEvidenceBatchV1;
+
+pub const DECISION_SUFFICIENCY_VERIFIER_ID_V1: &str =
+    "mace-independent-decision-sufficiency-evaluator";
+
+#[derive(Clone, Copy, Debug, Eq, PartialEq)]
+pub enum DecisionSufficiencyStatusV1 {
+    Sufficient,
+    Insufficient,
+    Indeterminate,
+    Abstained,
+}
+
+impl DecisionSufficiencyStatusV1 {
+    fn as_str(self) -> &'static str {
+        match self {
+            Self::Sufficient => "sufficient",
+            Self::Insufficient => "insufficient",
+            Self::Indeterminate => "indeterminate",
+            Self::Abstained => "abstained",
+        }
+    }
+
+    fn parse(value: &str) -> Result<Self, DecisionSufficiencyRejectV1> {
+        match value {
+            "sufficient" => Ok(Self::Sufficient),
+            "insufficient" => Ok(Self::Insufficient),
+            "indeterminate" => Ok(Self::Indeterminate),
+            "abstained" => Ok(Self::Abstained),
+            _ => Err(DecisionSufficiencyRejectV1::InvalidReceipt),
+        }
+    }
+}
+
+#[derive(Clone, Copy, Debug, Eq, PartialEq)]
+pub enum DecisionRequirementStatusV1 {
+    Met,
+    Unmet,
+    Unknown,
+}
+
+impl DecisionRequirementStatusV1 {
+    fn as_str(self) -> &'static str {
+        match self {
+            Self::Met => "met",
+            Self::Unmet => "unmet",
+            Self::Unknown => "unknown",
+        }
+    }
+
+    fn parse(value: &str) -> Result<Self, DecisionSufficiencyRejectV1> {
+        match value {
+            "met" => Ok(Self::Met),
+            "unmet" => Ok(Self::Unmet),
+            "unknown" => Ok(Self::Unknown),
+            _ => Err(DecisionSufficiencyRejectV1::InvalidReceipt),
+        }
+    }
+}
+
+#[derive(Clone, Debug, Eq, PartialEq)]
+pub struct DecisionSufficiencyRequirementV1 {
+    pub requirement_id: String,
+    pub status: DecisionRequirementStatusV1,
+    /// One or more independently verifiable receipts supporting the
+    /// evaluator's assessment of this requirement.
+    pub basis_receipt_sha256: Vec<String>,
+}
+
+#[derive(Clone, Debug, Eq, PartialEq)]
+pub struct DecisionSufficiencyReceiptV1 {
+    pub run_id: String,
+    pub query_invocation_id: String,
+    pub domain_id: String,
+    pub subject_scope_sha256: String,
+    pub environment_revision_sha256: String,
+    pub tool_profile_sha256: String,
+    pub query_sha256: String,
+    pub candidate_set_sha256: String,
+    pub qualified_evidence_set_sha256: String,
+    pub qualification_receipt_sha256: String,
+    pub decision_need_sha256: String,
+    pub purpose_sha256: String,
+    pub sufficiency_policy_sha256: String,
+    pub calibration_profile_sha256: String,
+    pub status: DecisionSufficiencyStatusV1,
+    pub requirements: Vec<DecisionSufficiencyRequirementV1>,
+    pub risk_upper_bound_ppm: Option<u32>,
+    pub risk_limit_ppm: Option<u32>,
+    pub confidence_level_ppm: Option<u32>,
+    pub calibration_receipt_sha256: Option<String>,
+    pub issued_at_unix: u64,
+    pub expires_at_unix: u64,
+    pub issuer_profile_sha256: String,
+    pub key_id: String,
+    /// DSSE carries this signature in its outer envelope. It is reconstructed
+    /// here only to preserve the existing typed receipt schema.
+    pub signature: Vec<u8>,
+}
+
+#[derive(Clone, Copy, Debug, Eq, PartialEq)]
+pub enum DecisionSufficiencyRejectV1 {
+    InvalidJson,
+    InvalidReceipt,
+    InvalidDigest,
+    InvalidIdentifier,
+    RequirementOrderInvalid,
+    DuplicateRequirement,
+    EmptyBasis,
+    SufficientRequirementsNotMet,
+    SufficientRiskBoundInvalid,
+    BindingMismatch,
+    SubjectMismatch,
+    WrongPredicateType,
+    WrongEvaluatorRole,
+    SharedQualificationAuthority,
+    ProfileDigestMismatch,
+    UnknownOrRevokedSigner,
+    NotYetValid,
+    Expired,
+    InvalidSignature,
+}
+
+#[derive(Clone, Debug, Eq, PartialEq)]
+pub struct DecisionSufficiencyUseBindingV1<'a> {
+    pub run_id: &'a str,
+    pub query_invocation_id: &'a str,
+    pub domain_id: &'a str,
+    pub subject_scope_sha256: &'a str,
+    pub environment_revision_sha256: &'a str,
+    pub tool_profile_sha256: &'a str,
+    pub query_sha256: &'a str,
+    pub candidate_set_sha256: &'a str,
+    pub qualified_evidence_set_sha256: &'a str,
+    pub qualification_receipt_sha256: &'a str,
+    pub decision_need_sha256: &'a str,
+    pub purpose_sha256: &'a str,
+    pub lifecycle_snapshot_sha256: &'a str,
+    pub sufficiency_policy_sha256: &'a str,
+    pub calibration_profile_sha256: &'a str,
+    pub issuer_profile_sha256: &'a str,
+    pub now_unix: u64,
+}
+
+impl DecisionSufficiencyReceiptV1 {
+    pub fn from_json_value(value: &Value) -> Result<Self, DecisionSufficiencyRejectV1> {
+        let object = value.as_object().ok_or(DecisionSufficiencyRejectV1::InvalidJson)?;
+        let known = [
+            "schema_version", "run_id", "query_invocation_id", "domain_id",
+            "subject_scope_sha256", "environment_revision_sha256", "tool_profile_sha256",
+            "query_sha256", "candidate_set_sha256", "qualified_evidence_set_sha256",
+            "qualification_receipt_sha256", "decision_need_sha256", "purpose_sha256",
+            "sufficiency_policy_sha256", "calibration_profile_sha256", "status",
+            "requirements", "risk_upper_bound_ppm", "risk_limit_ppm",
+            "confidence_level_ppm", "calibration_receipt_sha256", "issued_at_unix",
+            "expires_at_unix", "issuer_profile_sha256", "key_id", "signature",
+        ];
+        if object.keys().any(|key| !known.contains(&key.as_str()))
+            || object.get("schema_version").and_then(Value::as_str)
+                != Some("mace_decision_sufficiency_receipt_v1")
+        {
+            return Err(DecisionSufficiencyRejectV1::InvalidJson);
+        }
+
+        let required_string = |field: &str| -> Result<String, DecisionSufficiencyRejectV1> {
+            object.get(field).and_then(Value::as_str).map(str::to_owned)
+                .ok_or(DecisionSufficiencyRejectV1::InvalidJson)
+        };
+        let required_u64 = |field: &str| -> Result<u64, DecisionSufficiencyRejectV1> {
+            object.get(field).and_then(Value::as_u64)
+                .ok_or(DecisionSufficiencyRejectV1::InvalidJson)
+        };
+        let optional_u32 = |field: &str| -> Result<Option<u32>, DecisionSufficiencyRejectV1> {
+            match object.get(field) {
+                None | Some(Value::Null) => Ok(None),
+                Some(value) => value.as_u64()
+                    .and_then(|number| u32::try_from(number).ok())
+                    .map(Some)
+                    .ok_or(DecisionSufficiencyRejectV1::InvalidJson),
+            }
+        };
+        let optional_digest = |field: &str| -> Result<Option<String>, DecisionSufficiencyRejectV1> {
+            match object.get(field) {
+                None | Some(Value::Null) => Ok(None),
+                Some(Value::String(value)) => Ok(Some(value.clone())),
+                _ => Err(DecisionSufficiencyRejectV1::InvalidJson),
+            }
+        };
+
+        let requirement_values = object.get("requirements").and_then(Value::as_array)
+            .ok_or(DecisionSufficiencyRejectV1::InvalidJson)?;
+        if requirement_values.is_empty() || requirement_values.len() > 1024 {
+            return Err(DecisionSufficiencyRejectV1::InvalidReceipt);
+        }
+        let mut requirements = Vec::with_capacity(requirement_values.len());
+        for item in requirement_values {
+            let entry = item.as_object().ok_or(DecisionSufficiencyRejectV1::InvalidJson)?;
+            if entry.len() != 3
+                || entry.keys().any(|key| ![
+                    "requirement_id", "status", "basis_receipt_sha256"
+                ].contains(&key.as_str()))
+            {
+                return Err(DecisionSufficiencyRejectV1::InvalidJson);
+            }
+            let requirement_id = entry.get("requirement_id").and_then(Value::as_str)
+                .ok_or(DecisionSufficiencyRejectV1::InvalidJson)?.to_owned();
+            let status = entry.get("status").and_then(Value::as_str)
+                .ok_or(DecisionSufficiencyRejectV1::InvalidJson)?;
+            let basis_values = entry.get("basis_receipt_sha256").and_then(Value::as_array)
+                .ok_or(DecisionSufficiencyRejectV1::InvalidJson)?;
+            if basis_values.is_empty() || basis_values.len() > 256 {
+                return Err(DecisionSufficiencyRejectV1::EmptyBasis);
+            }
+            let basis_receipt_sha256 = basis_values.iter()
+                .map(|value| value.as_str().map(str::to_owned)
+                    .ok_or(DecisionSufficiencyRejectV1::InvalidJson))
+                .collect::<Result<Vec<_>, _>>()?;
+            requirements.push(DecisionSufficiencyRequirementV1 {
+                requirement_id,
+                status: DecisionRequirementStatusV1::parse(status)?,
+                basis_receipt_sha256,
+            });
+        }
+
+        let signature_values = object.get("signature").and_then(Value::as_array)
+            .ok_or(DecisionSufficiencyRejectV1::InvalidJson)?;
+        if signature_values.is_empty() || signature_values.len() > 4096 {
+            return Err(DecisionSufficiencyRejectV1::InvalidReceipt);
+        }
+        let signature = signature_values.iter()
+            .map(|value| value.as_u64().and_then(|byte| u8::try_from(byte).ok())
+                .ok_or(DecisionSufficiencyRejectV1::InvalidJson))
+            .collect::<Result<Vec<_>, _>>()?;
+
+        let receipt = Self {
+            run_id: required_string("run_id")?,
+            query_invocation_id: required_string("query_invocation_id")?,
+            domain_id: required_string("domain_id")?,
+            subject_scope_sha256: required_string("subject_scope_sha256")?,
+            environment_revision_sha256: required_string("environment_revision_sha256")?,
+            tool_profile_sha256: required_string("tool_profile_sha256")?,
+            query_sha256: required_string("query_sha256")?,
+            candidate_set_sha256: required_string("candidate_set_sha256")?,
+            qualified_evidence_set_sha256: required_string("qualified_evidence_set_sha256")?,
+            qualification_receipt_sha256: required_string("qualification_receipt_sha256")?,
+            decision_need_sha256: required_string("decision_need_sha256")?,
+            purpose_sha256: required_string("purpose_sha256")?,
+            sufficiency_policy_sha256: required_string("sufficiency_policy_sha256")?,
+            calibration_profile_sha256: required_string("calibration_profile_sha256")?,
+            status: DecisionSufficiencyStatusV1::parse(
+                object.get("status").and_then(Value::as_str)
+                    .ok_or(DecisionSufficiencyRejectV1::InvalidJson)?
+            )?,
+            requirements,
+            risk_upper_bound_ppm: optional_u32("risk_upper_bound_ppm")?,
+            risk_limit_ppm: optional_u32("risk_limit_ppm")?,
+            confidence_level_ppm: optional_u32("confidence_level_ppm")?,
+            calibration_receipt_sha256: optional_digest("calibration_receipt_sha256")?,
+            issued_at_unix: required_u64("issued_at_unix")?,
+            expires_at_unix: required_u64("expires_at_unix")?,
+            issuer_profile_sha256: required_string("issuer_profile_sha256")?,
+            key_id: required_string("key_id")?,
+            signature,
+        };
+        receipt.validate_shape()?;
+        Ok(receipt)
+    }
+
+    pub fn to_json_value(&self) -> Value {
+        let mut value = json!({
+            "schema_version": "mace_decision_sufficiency_receipt_v1",
+            "run_id": self.run_id,
+            "query_invocation_id": self.query_invocation_id,
+            "domain_id": self.domain_id,
+            "subject_scope_sha256": self.subject_scope_sha256,
+            "environment_revision_sha256": self.environment_revision_sha256,
+            "tool_profile_sha256": self.tool_profile_sha256,
+            "query_sha256": self.query_sha256,
+            "candidate_set_sha256": self.candidate_set_sha256,
+            "qualified_evidence_set_sha256": self.qualified_evidence_set_sha256,
+            "qualification_receipt_sha256": self.qualification_receipt_sha256,
+            "decision_need_sha256": self.decision_need_sha256,
+            "purpose_sha256": self.purpose_sha256,
+            "sufficiency_policy_sha256": self.sufficiency_policy_sha256,
+            "calibration_profile_sha256": self.calibration_profile_sha256,
+            "status": self.status.as_str(),
+            "requirements": self.requirements.iter().map(|requirement| json!({
+                "requirement_id": requirement.requirement_id,
+                "status": requirement.status.as_str(),
+                "basis_receipt_sha256": requirement.basis_receipt_sha256,
+            })).collect::<Vec<_>>(),
+            "issued_at_unix": self.issued_at_unix,
+            "expires_at_unix": self.expires_at_unix,
+            "issuer_profile_sha256": self.issuer_profile_sha256,
+            "key_id": self.key_id,
+            "signature": self.signature.iter().copied().map(Value::from).collect::<Vec<_>>(),
+        });
+        let object = value.as_object_mut().expect("json macro returns object");
+        if let Some(v) = self.risk_upper_bound_ppm {
+            object.insert("risk_upper_bound_ppm".into(), Value::from(v));
+        }
+        if let Some(v) = self.risk_limit_ppm {
+            object.insert("risk_limit_ppm".into(), Value::from(v));
+        }
+        if let Some(v) = self.confidence_level_ppm {
+            object.insert("confidence_level_ppm".into(), Value::from(v));
+        }
+        if let Some(v) = &self.calibration_receipt_sha256 {
+            object.insert("calibration_receipt_sha256".into(), Value::String(v.clone()));
+        }
+        value
+    }
+
+    pub fn unsigned_predicate_value(&self) -> Value {
+        let mut value = self.to_json_value();
+        value.as_object_mut().expect("receipt object").remove("signature");
+        value
+    }
+
+    pub fn receipt_sha256(&self) -> String {
+        let mut hasher = Sha256::new();
+        hasher.update(b"luminous:mace:decision-sufficiency-receipt:v1\0");
+        for value in [
+            self.run_id.as_str(),
+            self.query_invocation_id.as_str(),
+            self.domain_id.as_str(),
+            self.subject_scope_sha256.as_str(),
+            self.environment_revision_sha256.as_str(),
+            self.tool_profile_sha256.as_str(),
+            self.query_sha256.as_str(),
+            self.candidate_set_sha256.as_str(),
+            self.qualified_evidence_set_sha256.as_str(),
+            self.qualification_receipt_sha256.as_str(),
+            self.decision_need_sha256.as_str(),
+            self.purpose_sha256.as_str(),
+            self.sufficiency_policy_sha256.as_str(),
+            self.calibration_profile_sha256.as_str(),
+            self.issuer_profile_sha256.as_str(),
+            self.key_id.as_str(),
+        ] {
+            hash_field(&mut hasher, value);
+        }
+        hasher.update([match self.status {
+            DecisionSufficiencyStatusV1::Sufficient => 1,
+            DecisionSufficiencyStatusV1::Insufficient => 2,
+            DecisionSufficiencyStatusV1::Indeterminate => 3,
+            DecisionSufficiencyStatusV1::Abstained => 4,
+        }]);
+        hasher.update(self.issued_at_unix.to_be_bytes());
+        hasher.update(self.expires_at_unix.to_be_bytes());
+        for value in [
+            self.risk_upper_bound_ppm,
+            self.risk_limit_ppm,
+            self.confidence_level_ppm,
+        ] {
+            match value {
+                Some(v) => {
+                    hasher.update([1]);
+                    hasher.update(v.to_be_bytes());
+                }
+                None => hasher.update([0]),
+            }
+        }
+        if let Some(value) = &self.calibration_receipt_sha256 {
+            hasher.update([1]);
+            hash_field(&mut hasher, value);
+        } else {
+            hasher.update([0]);
+        }
+        hasher.update((self.requirements.len() as u64).to_be_bytes());
+        for requirement in &self.requirements {
+            hash_field(&mut hasher, &requirement.requirement_id);
+            hasher.update([match requirement.status {
+                DecisionRequirementStatusV1::Met => 1,
+                DecisionRequirementStatusV1::Unmet => 2,
+                DecisionRequirementStatusV1::Unknown => 3,
+            }]);
+            hasher.update((requirement.basis_receipt_sha256.len() as u64).to_be_bytes());
+            for digest in &requirement.basis_receipt_sha256 {
+                hash_field(&mut hasher, digest);
+            }
+        }
+        hex_digest(&hasher.finalize())
+    }
+
+    fn validate_shape(&self) -> Result<(), DecisionSufficiencyRejectV1> {
+        for value in [
+            self.subject_scope_sha256.as_str(),
+            self.environment_revision_sha256.as_str(),
+            self.tool_profile_sha256.as_str(),
+            self.query_sha256.as_str(),
+            self.candidate_set_sha256.as_str(),
+            self.qualified_evidence_set_sha256.as_str(),
+            self.qualification_receipt_sha256.as_str(),
+            self.decision_need_sha256.as_str(),
+            self.purpose_sha256.as_str(),
+            self.sufficiency_policy_sha256.as_str(),
+            self.calibration_profile_sha256.as_str(),
+            self.issuer_profile_sha256.as_str(),
+            self.key_id.as_str(),
+        ] {
+            if !valid_sha256(value) {
+                return Err(DecisionSufficiencyRejectV1::InvalidDigest);
+            }
+        }
+        for (value, maximum) in [
+            (self.run_id.as_str(), 256),
+            (self.query_invocation_id.as_str(), 256),
+            (self.domain_id.as_str(), 512),
+        ] {
+            if !valid_atom(value) || value.len() > maximum {
+                return Err(DecisionSufficiencyRejectV1::InvalidIdentifier);
+            }
+        }
+        if self.issued_at_unix >= self.expires_at_unix
+            || self.requirements.is_empty()
+            || self.requirements.len() > 1024
+            || self.signature.len() != 64
+        {
+            return Err(DecisionSufficiencyRejectV1::InvalidReceipt);
+        }
+        if self.requirements.windows(2).any(|pair| {
+            pair[0].requirement_id >= pair[1].requirement_id
+        }) {
+            return Err(DecisionSufficiencyRejectV1::RequirementOrderInvalid);
+        }
+        for requirement in &self.requirements {
+            if !valid_atom(&requirement.requirement_id)
+                || requirement.requirement_id.len() > 256
+            {
+                return Err(DecisionSufficiencyRejectV1::InvalidIdentifier);
+            }
+            if requirement.basis_receipt_sha256.is_empty()
+                || requirement.basis_receipt_sha256.len() > 256
+            {
+                return Err(DecisionSufficiencyRejectV1::EmptyBasis);
+            }
+            if requirement.basis_receipt_sha256.windows(2).any(|pair| pair[0] >= pair[1])
+                || requirement.basis_receipt_sha256.iter().any(|v| !valid_sha256(v))
+            {
+                return Err(DecisionSufficiencyRejectV1::InvalidDigest);
+            }
+        }
+        for value in [
+            self.risk_upper_bound_ppm,
+            self.risk_limit_ppm,
+        ].into_iter().flatten() {
+            if value > 1_000_000 {
+                return Err(DecisionSufficiencyRejectV1::InvalidReceipt);
+            }
+        }
+        if let Some(confidence) = self.confidence_level_ppm {
+            if !(500_000..=999_999).contains(&confidence) {
+                return Err(DecisionSufficiencyRejectV1::InvalidReceipt);
+            }
+        }
+        if self.calibration_receipt_sha256.as_ref().is_some_and(|v| !valid_sha256(v)) {
+            return Err(DecisionSufficiencyRejectV1::InvalidDigest);
+        }
+        if self.status == DecisionSufficiencyStatusV1::Sufficient {
+            if self.requirements.iter().any(|r| r.status != DecisionRequirementStatusV1::Met) {
+                return Err(DecisionSufficiencyRejectV1::SufficientRequirementsNotMet);
+            }
+            let (Some(upper), Some(limit), Some(confidence), Some(_calibration)) = (
+                self.risk_upper_bound_ppm,
+                self.risk_limit_ppm,
+                self.confidence_level_ppm,
+                self.calibration_receipt_sha256.as_ref(),
+            ) else {
+                return Err(DecisionSufficiencyRejectV1::SufficientRiskBoundInvalid);
+            };
+            if upper > limit || confidence < 500_000 {
+                return Err(DecisionSufficiencyRejectV1::SufficientRiskBoundInvalid);
+            }
+        }
+        Ok(())
+    }
+}
+
+/// Verified evaluator assessment. This is evidence that one exact DecisionNeed
+/// met the configured sufficiency policy; it is never an action authorization.
+#[derive(Clone, Debug)]
+pub struct VerifiedDecisionSufficiencyV1 {
+    receipt: DecisionSufficiencyReceiptV1,
+    pae: Vec<u8>,
+    signature: Vec<u8>,
+}
+
+impl VerifiedDecisionSufficiencyV1 {
+    pub fn status(&self) -> DecisionSufficiencyStatusV1 {
+        self.receipt.status
+    }
+
+    pub fn is_sufficient(&self) -> bool {
+        self.receipt.status == DecisionSufficiencyStatusV1::Sufficient
+    }
+
+    pub fn receipt_sha256(&self) -> String {
+        self.receipt.receipt_sha256()
+    }
+
+    pub fn validate_at_use(
+        &self,
+        qualified: &QualifiedCandidateEvidenceBatchV1,
+        binding: &DecisionSufficiencyUseBindingV1<'_>,
+        current_evaluator_profile: &PinnedEd25519QualificationVerifierV1,
+    ) -> Result<(), DecisionSufficiencyRejectV1> {
+        validate_binding_against_qualified(qualified, binding)?;
+        validate_evaluator_role(current_evaluator_profile, qualified, &self.receipt)?;
+        validate_receipt_binding(&self.receipt, binding)?;
+        if binding.now_unix < self.receipt.issued_at_unix {
+            return Err(DecisionSufficiencyRejectV1::NotYetValid);
+        }
+        if binding.now_unix >= self.receipt.expires_at_unix {
+            return Err(DecisionSufficiencyRejectV1::Expired);
+        }
+        current_evaluator_profile.verify_message(
+            &self.receipt.issuer_profile_sha256,
+            &self.receipt.key_id,
+            &self.pae,
+            &self.signature,
+            self.receipt.issued_at_unix,
+            binding.now_unix,
+        ).map_err(|error| match error {
+            crate::evidence_qualification_gate::EvidenceQualificationRejectV1::RevokedKey
+            | crate::evidence_qualification_gate::EvidenceQualificationRejectV1::UnknownKey =>
+                DecisionSufficiencyRejectV1::UnknownOrRevokedSigner,
+            crate::evidence_qualification_gate::EvidenceQualificationRejectV1::TrustProfileDigestMismatch =>
+                DecisionSufficiencyRejectV1::ProfileDigestMismatch,
+            crate::evidence_qualification_gate::EvidenceQualificationRejectV1::KeyNotYetValid =>
+                DecisionSufficiencyRejectV1::NotYetValid,
+            crate::evidence_qualification_gate::EvidenceQualificationRejectV1::KeyExpired =>
+                DecisionSufficiencyRejectV1::Expired,
+            _ => DecisionSufficiencyRejectV1::InvalidSignature,
+        })
+    }
+}
+
+/// Verify a separately issued DecisionSufficiency DSSE/in-toto attestation
+/// against one exact qualified projection and the consumer's DecisionNeed.
+pub fn verify_decision_sufficiency_v1(
+    qualified: &QualifiedCandidateEvidenceBatchV1,
+    binding: &DecisionSufficiencyUseBindingV1<'_>,
+    envelope_json: &str,
+    evaluator_profile: &PinnedEd25519QualificationVerifierV1,
+) -> Result<VerifiedDecisionSufficiencyV1, DecisionSufficiencyRejectV1> {
+    validate_binding_against_qualified(qualified, binding)?;
+    if evaluator_profile.profile_sha256() != binding.issuer_profile_sha256 {
+        return Err(DecisionSufficiencyRejectV1::ProfileDigestMismatch);
+    }
+    if evaluator_profile.verifier_id() != DECISION_SUFFICIENCY_VERIFIER_ID_V1 {
+        return Err(DecisionSufficiencyRejectV1::WrongEvaluatorRole);
+    }
+    if evaluator_profile.profile_sha256() == qualified.qualification_verifier_profile_sha256() {
+        return Err(DecisionSufficiencyRejectV1::SharedQualificationAuthority);
+    }
+
+    let envelope = parse_dsse_envelope_v1(envelope_json, DSSE_PAYLOAD_TYPE_V1)
+        .map_err(|_| DecisionSufficiencyRejectV1::InvalidJson)?;
+    let statement_value = parse_strict_json_bounded(&envelope.payload, 8 * 1024 * 1024)
+        .map_err(|_| DecisionSufficiencyRejectV1::InvalidJson)?;
+    let statement = statement_value.as_object()
+        .ok_or(DecisionSufficiencyRejectV1::InvalidJson)?;
+    if statement.get("_type").and_then(Value::as_str) != Some(IN_TOTO_STATEMENT_TYPE_V1)
+        || statement.get("predicateType").and_then(Value::as_str)
+            != Some(MACE_DECISION_SUFFICIENCY_PREDICATE_TYPE_V1)
+    {
+        return Err(DecisionSufficiencyRejectV1::WrongPredicateType);
+    }
+    let subjects = statement.get("subject").and_then(Value::as_array)
+        .ok_or(DecisionSufficiencyRejectV1::InvalidJson)?;
+    if subjects.len() != 1 {
+        return Err(DecisionSufficiencyRejectV1::SubjectMismatch);
+    }
+    let subject = subjects[0].as_object()
+        .ok_or(DecisionSufficiencyRejectV1::InvalidJson)?;
+    let expected_name = format!(
+        "urn:luminous:mace:qualified-evidence-set:v1:{}",
+        binding.qualified_evidence_set_sha256
+    );
+    if subject.get("name").and_then(Value::as_str) != Some(expected_name.as_str()) {
+        return Err(DecisionSufficiencyRejectV1::SubjectMismatch);
+    }
+    let digest = subject.get("digest").and_then(Value::as_object)
+        .ok_or(DecisionSufficiencyRejectV1::InvalidJson)?;
+    if digest.get("sha256").and_then(Value::as_str)
+        != Some(binding.qualified_evidence_set_sha256)
+    {
+        return Err(DecisionSufficiencyRejectV1::SubjectMismatch);
+    }
+
+    let predicate = statement.get("predicate")
+        .ok_or(DecisionSufficiencyRejectV1::InvalidJson)?;
+    let mut receipt_value = predicate.clone();
+    receipt_value.as_object_mut()
+        .ok_or(DecisionSufficiencyRejectV1::InvalidJson)?
+        .insert("signature".into(), Value::Array(
+            envelope.signature.iter().copied().map(Value::from).collect()
+        ));
+    let receipt = DecisionSufficiencyReceiptV1::from_json_value(&receipt_value)?;
+    if envelope.key_id_hint.as_ref().is_some_and(|hint| hint != &receipt.key_id) {
+        return Err(DecisionSufficiencyRejectV1::InvalidSignature);
+    }
+    if receipt.unsigned_predicate_value() != *predicate {
+        return Err(DecisionSufficiencyRejectV1::InvalidReceipt);
+    }
+    validate_receipt_binding(&receipt, binding)?;
+    validate_evaluator_role(evaluator_profile, qualified, &receipt)?;
+    if binding.now_unix < receipt.issued_at_unix {
+        return Err(DecisionSufficiencyRejectV1::NotYetValid);
+    }
+    if binding.now_unix >= receipt.expires_at_unix {
+        return Err(DecisionSufficiencyRejectV1::Expired);
+    }
+    evaluator_profile.verify_message(
+        &receipt.issuer_profile_sha256,
+        &receipt.key_id,
+        &envelope.pae,
+        &envelope.signature,
+        receipt.issued_at_unix,
+        binding.now_unix,
+    ).map_err(|error| match error {
+        crate::evidence_qualification_gate::EvidenceQualificationRejectV1::RevokedKey
+        | crate::evidence_qualification_gate::EvidenceQualificationRejectV1::UnknownKey =>
+            DecisionSufficiencyRejectV1::UnknownOrRevokedSigner,
+        crate::evidence_qualification_gate::EvidenceQualificationRejectV1::TrustProfileDigestMismatch =>
+            DecisionSufficiencyRejectV1::ProfileDigestMismatch,
+        crate::evidence_qualification_gate::EvidenceQualificationRejectV1::KeyNotYetValid =>
+            DecisionSufficiencyRejectV1::NotYetValid,
+        crate::evidence_qualification_gate::EvidenceQualificationRejectV1::KeyExpired =>
+            DecisionSufficiencyRejectV1::Expired,
+        _ => DecisionSufficiencyRejectV1::InvalidSignature,
+    })?;
+
+    Ok(VerifiedDecisionSufficiencyV1 {
+        receipt,
+        pae: envelope.pae,
+        signature: envelope.signature,
+    })
+}
+
+fn validate_binding_against_qualified(
+    qualified: &QualifiedCandidateEvidenceBatchV1,
+    binding: &DecisionSufficiencyUseBindingV1<'_>,
+) -> Result<(), DecisionSufficiencyRejectV1> {
+    for (actual, expected) in [
+        (qualified.run_id(), binding.run_id),
+        (qualified.query_invocation_id(), binding.query_invocation_id),
+        (qualified.domain_id(), binding.domain_id),
+        (qualified.subject_scope_sha256(), binding.subject_scope_sha256),
+        (qualified.environment_revision_sha256(), binding.environment_revision_sha256),
+        (qualified.tool_profile_sha256(), binding.tool_profile_sha256),
+        (&qualified.batch().query_sha256, binding.query_sha256),
+        (qualified.source_candidate_set_sha256(), binding.candidate_set_sha256),
+        (qualified.qualified_candidate_set_sha256(), binding.qualified_evidence_set_sha256),
+        (qualified.qualification_receipt_sha256(), binding.qualification_receipt_sha256),
+        (qualified.decision_need_sha256(), binding.decision_need_sha256),
+        (qualified.purpose_sha256(), binding.purpose_sha256),
+        (qualified.lifecycle_snapshot_sha256(), binding.lifecycle_snapshot_sha256),
+    ] {
+        if actual != expected {
+            return Err(DecisionSufficiencyRejectV1::BindingMismatch);
+        }
+    }
+    for value in [
+        binding.subject_scope_sha256, binding.environment_revision_sha256,
+        binding.tool_profile_sha256, binding.query_sha256, binding.candidate_set_sha256,
+        binding.qualified_evidence_set_sha256, binding.qualification_receipt_sha256,
+        binding.decision_need_sha256, binding.purpose_sha256, binding.lifecycle_snapshot_sha256,
+        binding.sufficiency_policy_sha256, binding.calibration_profile_sha256,
+        binding.issuer_profile_sha256,
+    ] {
+        if !valid_sha256(value) {
+            return Err(DecisionSufficiencyRejectV1::InvalidDigest);
+        }
+    }
+    if !valid_atom(binding.run_id) || !valid_atom(binding.query_invocation_id)
+        || !valid_atom(binding.domain_id)
+    {
+        return Err(DecisionSufficiencyRejectV1::InvalidIdentifier);
+    }
+    Ok(())
+}
+
+fn validate_receipt_binding(
+    receipt: &DecisionSufficiencyReceiptV1,
+    binding: &DecisionSufficiencyUseBindingV1<'_>,
+) -> Result<(), DecisionSufficiencyRejectV1> {
+    for (actual, expected) in [
+        (receipt.run_id.as_str(), binding.run_id),
+        (receipt.query_invocation_id.as_str(), binding.query_invocation_id),
+        (receipt.domain_id.as_str(), binding.domain_id),
+        (receipt.subject_scope_sha256.as_str(), binding.subject_scope_sha256),
+        (receipt.environment_revision_sha256.as_str(), binding.environment_revision_sha256),
+        (receipt.tool_profile_sha256.as_str(), binding.tool_profile_sha256),
+        (receipt.query_sha256.as_str(), binding.query_sha256),
+        (receipt.candidate_set_sha256.as_str(), binding.candidate_set_sha256),
+        (receipt.qualified_evidence_set_sha256.as_str(), binding.qualified_evidence_set_sha256),
+        (receipt.qualification_receipt_sha256.as_str(), binding.qualification_receipt_sha256),
+        (receipt.decision_need_sha256.as_str(), binding.decision_need_sha256),
+        (receipt.purpose_sha256.as_str(), binding.purpose_sha256),
+        (receipt.sufficiency_policy_sha256.as_str(), binding.sufficiency_policy_sha256),
+        (receipt.calibration_profile_sha256.as_str(), binding.calibration_profile_sha256),
+        (receipt.issuer_profile_sha256.as_str(), binding.issuer_profile_sha256),
+    ] {
+        if actual != expected {
+            return Err(DecisionSufficiencyRejectV1::BindingMismatch);
+        }
+    }
+    Ok(())
+}
+
+fn validate_evaluator_role(
+    profile: &PinnedEd25519QualificationVerifierV1,
+    qualified: &QualifiedCandidateEvidenceBatchV1,
+    receipt: &DecisionSufficiencyReceiptV1,
+) -> Result<(), DecisionSufficiencyRejectV1> {
+    if profile.verifier_id() != DECISION_SUFFICIENCY_VERIFIER_ID_V1 {
+        return Err(DecisionSufficiencyRejectV1::WrongEvaluatorRole);
+    }
+    if profile.profile_sha256() != receipt.issuer_profile_sha256 {
+        return Err(DecisionSufficiencyRejectV1::ProfileDigestMismatch);
+    }
+    if profile.profile_sha256() == qualified.qualification_verifier_profile_sha256()
+        || receipt.key_id == qualified.qualification_signer_key_id()
+    {
+        return Err(DecisionSufficiencyRejectV1::SharedQualificationAuthority);
+    }
+    Ok(())
+}
+
+fn valid_atom(value: &str) -> bool {
+    !value.trim().is_empty()
+        && value == value.trim()
+        && !value.chars().any(char::is_control)
+}
+
+fn valid_sha256(value: &str) -> bool {
+    value.len() == 64
+        && value.bytes().all(|byte| byte.is_ascii_digit() || (b'a'..=b'f').contains(&byte))
+}
+
+fn hash_field(hasher: &mut Sha256, value: &str) {
+    hasher.update((value.len() as u64).to_be_bytes());
+    hasher.update(value.as_bytes());
+}
+
+fn hex_digest(bytes: &[u8]) -> String {
+    const HEX: &[u8; 16] = b"0123456789abcdef";
+    let mut output = String::with_capacity(bytes.len() * 2);
+    for byte in bytes {
+        output.push(HEX[usize::from(byte >> 4)] as char);
+        output.push(HEX[usize::from(byte & 0x0f)] as char);
+    }
+    output
+}
