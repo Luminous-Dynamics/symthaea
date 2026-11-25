@@ -8,6 +8,7 @@ on:
       - research/mel-temporal-revision-audit-v1-20261124
       - research/mel-multi-annotator-grounding-v1-20261124
       - research/mel-annotator-reliability-v1-20261125
+      - research/mel-annotation-acquisition-v1-20261125
     paths:
       - "crates/domains/symthaea-muse/src/temporal_grounding.rs"
       - "crates/domains/symthaea-muse/src/evidence_digest.rs"
@@ -94,6 +95,31 @@ jobs:
 
       - name: Warnings-denied Clippy on exact production source
         run: cargo +1.96.0 clippy --locked --manifest-path tools/mel-temporal-grounding-qualifier/Cargo.toml --all-targets -- -D warnings
+
+      - name: Replay dual-stream annotation acquisition when module is present
+        if: hashFiles('tools/mel-temporal-grounding-qualifier/src/temporal_acquisition.rs') != ''
+        shell: bash
+        run: |
+          set -euo pipefail
+          cargo +1.96.0 run --locked --manifest-path tools/mel-temporal-grounding-qualifier/Cargo.toml --bin mel-annotation-acquisition-plan -- tools/mel-temporal-grounding-qualifier/fixtures/mel-annotation-acquisition.synthetic.json > "$RUNNER_TEMP/annotation-acquisition-report.json"
+          jq -e '
+            .schema == "mel-annotation-acquisition-report-v1"
+            and .candidate_count == 11
+            and (.active_refinement | length) == 4
+            and (.probability_audit | length) == 4
+            and .budget_usage.active_spent_units == 20
+            and .budget_usage.probability_audit_spent_units == 20
+            and .budget_usage.total_spent_units == 40
+            and .budget_usage.probability_audit_selected_source_works == 4
+            and .source_work_sets_are_disjoint == true
+            and .probability_audit_is_adaptive == false
+            and .active_stream_is_probability_sample == false
+            and .authorization_receipts_authenticated == false
+            and .selection_receipt_is_authentication == false
+            and (.selection_receipt_sha256 | test("^[0-9a-f]{64}$"))
+            and ([.probability_audit[].item_inclusion_probability | select(.numerator == 2 and .denominator == 3)] | length) == 4
+            and ([.active_refinement[].item_inclusion_probability | select(. != null)] | length) == 0
+          ' "$RUNNER_TEMP/annotation-acquisition-report.json" > /dev/null
 
       - name: Replay dataset-level inter-annotator reliability when module is present
         if: hashFiles('tools/mel-temporal-grounding-qualifier/src/temporal_reliability.rs') != ''
