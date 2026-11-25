@@ -34,6 +34,8 @@ const MAX_RESPONSE_SIGNATURE_CLUSTER_MEMBERS: usize = 128;
 const MAX_RESPONSE_SIGNATURE_CLUSTER_WORK: usize = 4_194_304;
 const MAX_KINETIC_DISCRIMINATION_HYPOTHESES: usize = 16;
 const MAX_KINETIC_DISCRIMINATION_WORK: usize = 32_768;
+const MAX_KINETIC_DISCRIMINATION_DESIGNS: usize = 128;
+const MAX_KINETIC_DISCRIMINATION_PORTFOLIO_WORK: usize = 4_194_304;
 const DIGEST_DOMAIN: &[u8] = b"symthaea.akpd.pulse-candidate.v0.1\0";
 
 /// Errors returned while parsing, validating or enumerating probe contracts.
@@ -130,6 +132,14 @@ pub enum ContractError {
     InvalidDiscriminationCost,
     #[error("kinetic discrimination quadrature exceeded its bounded work budget")]
     DiscriminationWorkBudgetExceeded,
+    #[error("kinetic discrimination portfolio must contain at least one design")]
+    EmptyDiscriminationPortfolio,
+    #[error("kinetic discrimination portfolio exceeds the bounded design/work budget")]
+    DiscriminationPortfolioWorkBudgetExceeded,
+    #[error("candidate designs do not share the same ordered hypotheses, priors and noise model")]
+    IncomparableDiscriminationDesigns,
+    #[error("kinetic discrimination portfolio contains duplicate intervention IDs")]
+    DuplicateDiscriminationIntervention,
     #[error("kinetic discrimination arithmetic produced an invalid information gain")]
     InvalidDiscriminationArithmetic,
     #[error("finite-amplitude response estimator requires positive finite pulse amplitudes")]
@@ -1103,6 +1113,172 @@ pub struct KineticDiscriminationReport {
     pub information_gain_bits_per_cost_second: f64,
     pub noise_variance_per_quadrature: f64,
     pub quadrature_order_per_axis: usize,
+}
+
+/// One evaluated candidate intervention in a matched design portfolio.
+#[derive(Clone, Debug, PartialEq, Serialize)]
+pub struct KineticDiscriminationCandidateReport {
+    pub intervention_id: String,
+    pub report: KineticDiscriminationReport,
+}
+
+/// Pareto analysis across candidate interventions evaluated against the same
+/// ordered state hypotheses, prior distribution and observation-noise model.
+#[derive(Clone, Debug, PartialEq, Serialize)]
+pub struct KineticDiscriminationPortfolioReport {
+    pub candidate_reports: Vec<KineticDiscriminationCandidateReport>,
+    pub pareto_front_indices: Vec<usize>,
+    pub best_information_gain_per_cost_index: usize,
+}
+
+/// Evaluate and compare a bounded set of candidate interventions.
+///
+/// Candidates must use exactly the same ordered hypothesis IDs and the same
+/// normalized prior distribution / observation-noise variance. This prevents
+/// design scores from being compared across changed hypothesis populations or
+/// incompatible measurement channels. The Pareto frontier maximizes EIG while
+/// minimizing declared evaluation cost; the best EIG-per-cost index is
+/// reported separately as one scalar policy option.
+pub fn evaluate_kinetic_discrimination_portfolio(
+    designs: &[KineticDiscriminationDesign],
+) -> Result<KineticDiscriminationPortfolioReport, ContractError> {
+    if designs.is_empty() {
+        return Err(ContractError::EmptyDiscriminationPortfolio);
+    }
+    if designs.len() > MAX_KINETIC_DISCRIMINATION_DESIGNS {
+        return Err(ContractError::DiscriminationPortfolioWorkBudgetExceeded);
+    }
+
+    let reference = &designs[0];
+    let reference_probabilities = normalized_discrimination_priors(&reference.hypotheses)?;
+    let reference_ids = reference
+        .hypotheses
+        .iter()
+        .map(|hypothesis| hypothesis.hypothesis_id.as_str())
+        .collect::<Vec<_>>();
+    let mut intervention_ids = BTreeSet::new();
+    let mut total_work = 0_usize;
+    let mut candidate_reports = Vec::with_capacity(designs.len());
+
+    for design in designs {
+        if !intervention_ids.insert(design.intervention_id.as_str()) {
+            return Err(ContractError::DuplicateDiscriminationIntervention);
+        }
+        if design.hypotheses.len() != reference.hypotheses.len()
+            || design.noise_variance_per_quadrature != reference.noise_variance_per_quadrature
+            || design
+                .hypotheses
+                .iter()
+                .map(|hypothesis| hypothesis.hypothesis_id.as_str())
+                .collect::<Vec<_>>()
+                != reference_ids
+        {
+            return Err(ContractError::IncomparableDiscriminationDesigns);
+        }
+        let probabilities = normalized_discrimination_priors(&design.hypotheses)?;
+        if probabilities
+            .iter()
+            .zip(&reference_probabilities)
+            .any(|(left, right)| (left - right).abs() > 1.0e-12)
+        {
+            return Err(ContractError::IncomparableDiscriminationDesigns);
+        }
+        let count = design.hypotheses.len();
+        let design_work = count
+            .checked_mul(count)
+            .and_then(|value| value.checked_mul(9 * 9))
+            .ok_or(ContractError::DiscriminationPortfolioWorkBudgetExceeded)?;
+        total_work = total_work
+            .checked_add(design_work)
+            .ok_or(ContractError::DiscriminationPortfolioWorkBudgetExceeded)?;
+        if total_work > MAX_KINETIC_DISCRIMINATION_PORTFOLIO_WORK {
+            return Err(ContractError::DiscriminationPortfolioWorkBudgetExceeded);
+        }
+
+        candidate_reports.push(KineticDiscriminationCandidateReport {
+            intervention_id: design.intervention_id.clone(),
+            report: evaluate_kinetic_discrimination_design(design)?,
+        });
+    }
+
+    let mut pareto_front_indices = Vec::new();
+    for candidate_index in 0..candidate_reports.len() {
+        let candidate = &candidate_reports[candidate_index].report;
+        let dominated = candidate_reports.iter().enumerate().any(|(other_index, other)| {
+            if other_index == candidate_index {
+                return false;
+            }
+            let no_worse_information =
+                other.report.expected_information_gain_bits
+                    >= candidate.expected_information_gain_bits;
+            let no_worse_cost = other.report.estimated_evaluation_cost_seconds
+                <= candidate.estimated_evaluation_cost_seconds;
+            let strictly_better = other.report.expected_information_gain_bits
+                > candidate.expected_information_gain_bits
+                || other.report.estimated_evaluation_cost_seconds
+                    < candidate.estimated_evaluation_cost_seconds;
+            no_worse_information && no_worse_cost && strictly_better
+        });
+        if !dominated {
+            pareto_front_indices.push(candidate_index);
+        }
+    }
+
+    let best_information_gain_per_cost_index = (0..candidate_reports.len())
+        .max_by(|left_index, right_index| {
+            let left = &candidate_reports[*left_index].report;
+            let right = &candidate_reports[*right_index].report;
+            left.information_gain_bits_per_cost_second
+                .total_cmp(&right.information_gain_bits_per_cost_second)
+                .then_with(|| {
+                    left.expected_information_gain_bits
+                        .total_cmp(&right.expected_information_gain_bits)
+                })
+                .then_with(|| {
+                    right
+                        .estimated_evaluation_cost_seconds
+                        .total_cmp(&left.estimated_evaluation_cost_seconds)
+                })
+        })
+        .ok_or(ContractError::EmptyDiscriminationPortfolio)?;
+
+    Ok(KineticDiscriminationPortfolioReport {
+        candidate_reports,
+        pareto_front_indices,
+        best_information_gain_per_cost_index,
+    })
+}
+
+fn normalized_discrimination_priors(
+    hypotheses: &[KineticDiscriminationHypothesis],
+) -> Result<Vec<f64>, ContractError> {
+    if hypotheses.len() < 2 || hypotheses.len() > MAX_KINETIC_DISCRIMINATION_HYPOTHESES {
+        return Err(ContractError::InsufficientDiscriminationHypotheses);
+    }
+    let mut seen_ids = BTreeSet::new();
+    let mut maximum_prior = 0.0_f64;
+    for hypothesis in hypotheses {
+        if hypothesis.hypothesis_id.trim().is_empty()
+            || !seen_ids.insert(hypothesis.hypothesis_id.as_str())
+        {
+            return Err(ContractError::InvalidDiscriminationHypothesisIdentity);
+        }
+        if !hypothesis.prior_probability.is_finite() || hypothesis.prior_probability <= 0.0 {
+            return Err(ContractError::InvalidDiscriminationPrior);
+        }
+        maximum_prior = maximum_prior.max(hypothesis.prior_probability);
+    }
+    let scaled_sum = hypotheses
+        .iter()
+        .map(|hypothesis| hypothesis.prior_probability / maximum_prior)
+        .sum::<f64>();
+    if !scaled_sum.is_finite() || scaled_sum <= 0.0 {
+        return Err(ContractError::InvalidDiscriminationPrior);
+    }
+    Ok(hypotheses
+        .iter()
+        .map(|hypothesis| (hypothesis.prior_probability / maximum_prior) / scaled_sum)
+        .collect())
 }
 
 /// Nine-point Gauss-Hermite rule for an expectation under a standard normal.
@@ -7487,6 +7663,83 @@ mod tests {
             noise_variance_per_quadrature: variance,
             estimated_evaluation_cost_seconds: cost_seconds,
         }
+    }
+
+    #[test]
+    fn kinetic_discrimination_portfolio_returns_pareto_front_and_best_ratio() {
+        let priors = [0.5, 0.5];
+        let weak = gaussian_discrimination_design(
+            &[(0.0, 0.0), (0.2, 0.0)],
+            &priors,
+            0.5,
+            1.0,
+        );
+        let strong_expensive = gaussian_discrimination_design(
+            &[(-2.0, 0.0), (2.0, 0.0)],
+            &priors,
+            0.5,
+            10.0,
+        );
+        let dominated = gaussian_discrimination_design(
+            &[(0.0, 0.0), (0.1, 0.0)],
+            &priors,
+            0.5,
+            2.0,
+        );
+        let strong_cheap = gaussian_discrimination_design(
+            &[(-2.0, 0.0), (2.0, 0.0)],
+            &priors,
+            0.5,
+            2.0,
+        );
+        let mut designs = vec![weak, strong_expensive, dominated, strong_cheap];
+        for (index, design) in designs.iter_mut().enumerate() {
+            design.intervention_id = format!("pulse-{index}");
+        }
+        let report = evaluate_kinetic_discrimination_portfolio(&designs).unwrap();
+        assert!(report.pareto_front_indices.contains(&0));
+        assert!(!report.pareto_front_indices.contains(&2));
+        assert!(report.pareto_front_indices.contains(&3));
+        assert_eq!(report.best_information_gain_per_cost_index, 3);
+    }
+
+    #[test]
+    fn kinetic_discrimination_portfolio_rejects_changed_hypothesis_priors_or_noise() {
+        let priors = [0.5, 0.5];
+        let first =
+            gaussian_discrimination_design(&[(-1.0, 0.0), (1.0, 0.0)], &priors, 0.1, 1.0);
+        let mut changed_prior =
+            gaussian_discrimination_design(&[(-0.5, 0.0), (0.5, 0.0)], &[0.9, 0.1], 0.1, 1.0);
+        changed_prior.intervention_id = "different-prior".to_owned();
+        assert_eq!(
+            evaluate_kinetic_discrimination_portfolio(&[first.clone(), changed_prior]),
+            Err(ContractError::IncomparableDiscriminationDesigns)
+        );
+        let mut changed_noise =
+            gaussian_discrimination_design(&[(-0.5, 0.0), (0.5, 0.0)], &priors, 0.2, 1.0);
+        changed_noise.intervention_id = "different-noise".to_owned();
+        assert_eq!(
+            evaluate_kinetic_discrimination_portfolio(&[first, changed_noise]),
+            Err(ContractError::IncomparableDiscriminationDesigns)
+        );
+    }
+
+    #[test]
+    fn kinetic_discrimination_portfolio_rejects_duplicates_and_empty_sets() {
+        let design = gaussian_discrimination_design(
+            &[(-1.0, 0.0), (1.0, 0.0)],
+            &[0.5, 0.5],
+            0.1,
+            1.0,
+        );
+        assert_eq!(
+            evaluate_kinetic_discrimination_portfolio(&[]),
+            Err(ContractError::EmptyDiscriminationPortfolio)
+        );
+        assert_eq!(
+            evaluate_kinetic_discrimination_portfolio(&[design.clone(), design]),
+            Err(ContractError::DuplicateDiscriminationIntervention)
+        );
     }
 
     #[test]
