@@ -899,10 +899,6 @@ fn rate(numerator: usize, denominator: usize) -> Option<f64> {
     (denominator > 0).then(|| numerator as f64 / denominator as f64)
 }
 
-fn mean_bool(values: &[bool]) -> Option<f64> {
-    rate(values.iter().filter(|value| **value).count(), values.len())
-}
-
 fn mean(values: &[f64]) -> Option<f64> {
     (!values.is_empty()).then(|| values.iter().sum::<f64>() / values.len() as f64)
 }
@@ -911,8 +907,8 @@ fn unbiased_index(state: &mut u64, upper_bound: usize) -> usize {
     let bound = upper_bound as u64;
     let limit = u64::MAX - (u64::MAX % bound);
     loop {
-        let mut value = state.wrapping_add(0x9E37_79B9_7F4A_7C15);
-        *state = value;
+        *state = (*state).wrapping_add(0x9E37_79B9_7F4A_7C15);
+        let mut value = *state;
         value = (value ^ (value >> 30)).wrapping_mul(0xBF58_476D_1CE4_E5B9);
         value = (value ^ (value >> 27)).wrapping_mul(0x94D0_49BB_1331_11EB);
         value ^= value >> 31;
