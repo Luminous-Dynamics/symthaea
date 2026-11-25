@@ -11,9 +11,9 @@ From the Symthaea workspace, run:
     cargo test -p symthaea-sat-trace-verifier
     cargo clippy -p symthaea-sat-trace-verifier --all-targets -- -D warnings
     cargo fmt --all -- --check
-    cargo run -p symthaea-sat-trace-verifier --bin sat-trace-verify -- <run-uuid> <manifest.json> <events.jsonl>
+    cargo run -p symthaea-sat-trace-verifier --bin sat-trace-verify -- <run-uuid> <manifest.json> <events.jsonl> [expected-head-digest]
 
-Pass "-" as the final argument to read JSONL from stdin. The CLI computes the manifest digest from the frozen manifest file using the SAT v0.1 domain-separated JCS profile.
+Pass "-" as the events argument to read JSONL from stdin. The CLI computes the manifest digest from the frozen manifest file using the SAT v0.1 domain-separated JCS profile. The optional final argument is an externally supplied expected head digest. Without it, the verifier reports internal chain consistency only; with it, the verifier compares the computed terminal digest to that value but does not authenticate the anchor source or signature.
 
 ## Reproducible example
 
@@ -23,8 +23,15 @@ From the repository root:
 
 Expected structural summary: 2 events, 1 authority binding, 1 disclosure binding,
 2 sink projections, 1 effect submission, 1 terminal observation, no unresolved
-attempts. The output must still report `signatures_verified=false` and
-`system_qualified=false`. This fixture is synthetic, not a production effect.
+attempts. Append the fixture's expected terminal digest
+`sha256:bb201acf3e03cd941e35e0db7d2e3a9e1a81f20378acce81f56412b142cc3fd0`
+to exercise the optional head comparison. The output must still report
+`signatures_verified=false` and `system_qualified=false`. The static example
+anchor is a test vector, not a qualified external witness or production effect.
+
+## Integrity boundary
+
+The unkeyed event hash chain establishes internal ordering and digest consistency. An attacker who can rewrite the entire trace can recompute the chain. To detect that, the terminal digest (or a checkpoint) must be stored with an independent, qualified witness or signed/custodied receipt. The optional CLI anchor only compares bytes; this crate does not authenticate the witness, signature, key status or custody.
 
 ## What it verifies
 
