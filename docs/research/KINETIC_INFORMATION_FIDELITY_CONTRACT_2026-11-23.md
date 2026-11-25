@@ -774,6 +774,24 @@ Prior art is explicit:
 
 The present implementation is deliberately narrow: one complex output coefficient, finite categorical hypotheses and homoscedastic independent Gaussian quadrature noise. Correlated QoIs, full waveforms, heteroscedastic noise, uncertain predictions, nonlinear branch switching and multi-fidelity reference discrepancy need explicit extension and independent calibration. An EIG-ranked intervention is a proposal, not a counterexample, physical certificate or global state-equivalence proof.
 
+## Response-Weighted Spectral Refinement (RWSR)
+
+New companion programme: [#13628 — refine kinetic spectral resolution by future response sensitivity](https://github.com/Luminous-Dynamics/symthaea/issues/13628).
+
+The 2026 adaptive Fourier spectral solver (Cho & Russo, arXiv:2607.12368) is an important tail-aware baseline: it monitors high-frequency Fourier coefficients and expands the spectral grid via zero-padding rather than filtering. Its analysis demonstrates exact mass and L2 preservation for the zero-padding refinement operation. However, the paper also reports that each spectral extension increases L1 and entropy errors due to positivity loss; the authors note small negative values near the truncated velocity boundaries. Therefore a fair invariant benchmark must not report mass/L2 alone: positivity, L1 and entropy also need explicit gates. The method uses a sufficiently wide fixed velocity domain and only refines spectral resolution.
+
+RWSR asks a different question from a spectral-tail trigger: which modes matter to future interventions and QoIs? For complex coefficient \(a_k\), response sensitivity \(G_{qk}\) and non-negative QoI weight \(w_q\), its conservative first-order mode loss indicator is
+
+\[
+b_k=|a_k|\sum_q w_q|G_{qk}|.
+\]
+
+The first reusable implementation is in [PR #13405](https://github.com/Luminous-Dynamics/symthaea/pull/13405): \`plan_response_weighted_refinement\` ranks known modes by this triangle-inequality response-loss bound per encoded byte and greedily discards only modes that fit within a registered cumulative loss budget. Missing response entries remain UNKNOWN and are retained. This is a deterministic greedy heuristic, not an optimal knapsack solution or a nonlinear global error bound.
+
+The checked-in [known-answer fixture](https://github.com/Luminous-Dynamics/symthaea/blob/main/benchmarks/plasma/adversarial-probes/fixtures/response-weighted-refinement-known-answer-v0.1.json) deliberately has a higher-energy mode with low future sensitivity and a lower-energy mode with high future sensitivity. The expected decision discards the former and retains the latter. It is a synthetic map, not a plasma result.
+
+Required comparisons: spectral-tail-only zero-padding; response-only mode ranking; adjoint/QoI-only refinement; hybrid tail + response + uncertainty; local time/energy-window ROM; adaptive Hermite; VlasovTT. Measure future echo amplitude/phase and waveform, invariant bundle (mass, positivity, L1, L2, entropy, energy as applicable), memory and complete adaptation/transition cost.
+
 ## Certified Intervention Coverage (CIC)
 
 New companion programme: [#13452 — certify compact intervention covers with validated response bounds](https://github.com/Luminous-Dynamics/symthaea/issues/13452).
