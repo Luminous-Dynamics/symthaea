@@ -1174,9 +1174,12 @@ mod tests {
         let mut ledger = AddIdempotencyLedger::default();
         assert_eq!(begin_textual(&mut ledger, &request), Ok(AddRetryState::New));
         assert_eq!(begin_textual(&mut ledger, &request), Ok(AddRetryState::InFlight));
-        ledger
-            .complete(Track::Textual, &request, verified_add(Track::Textual, &request))
-            .unwrap();
+        complete_textual(
+            &mut ledger,
+            &request,
+            verified_add(Track::Textual, &request),
+        )
+        .unwrap();
         assert_eq!(
             begin_textual(&mut ledger, &request),
             Ok(AddRetryState::Committed(verified_add(Track::Textual, &request)))
