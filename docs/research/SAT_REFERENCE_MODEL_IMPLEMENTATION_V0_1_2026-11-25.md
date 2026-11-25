@@ -43,7 +43,7 @@ The initial unit-test set covers:
 - non-delegable parent rejection;
 - future grant rejection.
 
-The 14 tests exercise a small reference-model subset. They do not reproduce
+The 17 tests exercise a small reference-model subset. They do not reproduce
 DelegateGuard's full dataset, tool adapters, adaptive attack campaign or
 end-to-end enterprise workflows.
 
