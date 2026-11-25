@@ -373,6 +373,16 @@ pub struct DecisionSufficiencyReceiptV1 {
     pub risk_limit_ppm: Option<u32>,
     pub confidence_level_ppm: Option<u32>,
     pub calibration_receipt_sha256: Option<String>,
+    /// Evaluator's conservative held-out decision-regret upper bound, in
+    /// micro-utility units, and the consumer-defined regret tolerance.
+    pub regret_upper_bound_micros: Option<u64>,
+    pub regret_limit_micros: Option<u64>,
+    /// Measured resource use for the exact evaluated decision/evidence set.
+    pub observed_cost_micros: Option<u64>,
+    pub observed_latency_ms: Option<u64>,
+    pub observed_context_tokens: Option<u64>,
+    pub observed_tool_calls: Option<u32>,
+    pub maximum_evidence_age_seconds: Option<u64>,
     pub issued_at_unix: u64,
     pub expires_at_unix: u64,
     pub issuer_profile_sha256: String,
@@ -443,7 +453,11 @@ impl DecisionSufficiencyReceiptV1 {
             "qualification_receipt_sha256", "decision_need_sha256", "purpose_sha256",
             "sufficiency_policy_sha256", "calibration_profile_sha256", "status",
             "requirements", "risk_upper_bound_ppm", "risk_limit_ppm",
-            "confidence_level_ppm", "calibration_receipt_sha256", "issued_at_unix",
+            "confidence_level_ppm", "calibration_receipt_sha256",
+            "regret_upper_bound_micros", "regret_limit_micros",
+            "observed_cost_micros", "observed_latency_ms",
+            "observed_context_tokens", "observed_tool_calls",
+            "maximum_evidence_age_seconds", "issued_at_unix",
             "expires_at_unix", "issuer_profile_sha256", "key_id", "signature",
         ];
         if object.keys().any(|key| !known.contains(&key.as_str()))
@@ -467,6 +481,13 @@ impl DecisionSufficiencyReceiptV1 {
                 Some(value) => value.as_u64()
                     .and_then(|number| u32::try_from(number).ok())
                     .map(Some)
+                    .ok_or(DecisionSufficiencyRejectV1::InvalidJson),
+            }
+        };
+        let optional_u64 = |field: &str| -> Result<Option<u64>, DecisionSufficiencyRejectV1> {
+            match object.get(field) {
+                None => Ok(None),
+                Some(value) => value.as_u64().map(Some)
                     .ok_or(DecisionSufficiencyRejectV1::InvalidJson),
             }
         };
@@ -547,6 +568,13 @@ impl DecisionSufficiencyReceiptV1 {
             risk_limit_ppm: optional_u32("risk_limit_ppm")?,
             confidence_level_ppm: optional_u32("confidence_level_ppm")?,
             calibration_receipt_sha256: optional_digest("calibration_receipt_sha256")?,
+            regret_upper_bound_micros: optional_u64("regret_upper_bound_micros")?,
+            regret_limit_micros: optional_u64("regret_limit_micros")?,
+            observed_cost_micros: optional_u64("observed_cost_micros")?,
+            observed_latency_ms: optional_u64("observed_latency_ms")?,
+            observed_context_tokens: optional_u64("observed_context_tokens")?,
+            observed_tool_calls: optional_u32("observed_tool_calls")?,
+            maximum_evidence_age_seconds: optional_u64("maximum_evidence_age_seconds")?,
             issued_at_unix: required_u64("issued_at_unix")?,
             expires_at_unix: required_u64("expires_at_unix")?,
             issuer_profile_sha256: required_string("issuer_profile_sha256")?,
@@ -598,6 +626,21 @@ impl DecisionSufficiencyReceiptV1 {
         }
         if let Some(v) = &self.calibration_receipt_sha256 {
             object.insert("calibration_receipt_sha256".into(), Value::String(v.clone()));
+        }
+        for (field, value) in [
+            ("regret_upper_bound_micros", self.regret_upper_bound_micros),
+            ("regret_limit_micros", self.regret_limit_micros),
+            ("observed_cost_micros", self.observed_cost_micros),
+            ("observed_latency_ms", self.observed_latency_ms),
+            ("observed_context_tokens", self.observed_context_tokens),
+            ("maximum_evidence_age_seconds", self.maximum_evidence_age_seconds),
+        ] {
+            if let Some(v) = value {
+                object.insert(field.into(), Value::from(v));
+            }
+        }
+        if let Some(v) = self.observed_tool_calls {
+            object.insert("observed_tool_calls".into(), Value::from(v));
         }
         value
     }
@@ -657,6 +700,29 @@ impl DecisionSufficiencyReceiptV1 {
             hash_field(&mut hasher, value);
         } else {
             hasher.update([0]);
+        }
+        for value in [
+            self.regret_upper_bound_micros,
+            self.regret_limit_micros,
+            self.observed_cost_micros,
+            self.observed_latency_ms,
+            self.observed_context_tokens,
+            self.maximum_evidence_age_seconds,
+        ] {
+            match value {
+                Some(number) => {
+                    hasher.update([1]);
+                    hasher.update(number.to_be_bytes());
+                }
+                None => hasher.update([0]),
+            }
+        }
+        match self.observed_tool_calls {
+            Some(number) => {
+                hasher.update([1]);
+                hasher.update(number.to_be_bytes());
+            }
+            None => hasher.update([0]),
         }
         hasher.update((self.requirements.len() as u64).to_be_bytes());
         for requirement in &self.requirements {
@@ -761,6 +827,28 @@ impl DecisionSufficiencyReceiptV1 {
                 return Err(DecisionSufficiencyRejectV1::SufficientRiskBoundInvalid);
             };
             if upper > limit || confidence < 500_000 {
+                return Err(DecisionSufficiencyRejectV1::SufficientRiskBoundInvalid);
+            }
+            let (
+                Some(regret_upper),
+                Some(regret_limit),
+                Some(_cost),
+                Some(_latency),
+                Some(_tokens),
+                Some(_tool_calls),
+                Some(_max_age),
+            ) = (
+                self.regret_upper_bound_micros,
+                self.regret_limit_micros,
+                self.observed_cost_micros,
+                self.observed_latency_ms,
+                self.observed_context_tokens,
+                self.observed_tool_calls,
+                self.maximum_evidence_age_seconds,
+            ) else {
+                return Err(DecisionSufficiencyRejectV1::SufficientRiskBoundInvalid);
+            };
+            if regret_upper > regret_limit {
                 return Err(DecisionSufficiencyRejectV1::SufficientRiskBoundInvalid);
             }
         }
@@ -1028,14 +1116,29 @@ fn validate_receipt_binding(
     {
         return Err(DecisionSufficiencyRejectV1::BindingMismatch);
     }
-    if receipt.status == DecisionSufficiencyStatusV1::Sufficient
-        && (receipt.risk_limit_ppm != Some(binding.risk_limit_ppm)
+    if receipt.status == DecisionSufficiencyStatusV1::Sufficient {
+        let need = binding.decision_need;
+        if receipt.risk_limit_ppm != Some(need.risk_limit_ppm)
             || receipt.confidence_level_ppm
-                .is_none_or(|confidence| confidence < binding.minimum_confidence_level_ppm)
+                .is_none_or(|confidence| confidence < need.minimum_confidence_level_ppm)
             || receipt.calibration_receipt_sha256.as_deref()
-                != Some(binding.calibration_receipt_sha256))
-    {
-        return Err(DecisionSufficiencyRejectV1::SufficientRiskBoundInvalid);
+                != Some(need.calibration_receipt_sha256.as_str())
+            || receipt.regret_limit_micros != Some(need.regret_tolerance_micros as u64)
+            || receipt.regret_upper_bound_micros
+                .is_none_or(|regret| regret > need.regret_tolerance_micros as u64)
+            || receipt.observed_cost_micros
+                .is_none_or(|value| value > need.maximum_cost_micros)
+            || receipt.observed_latency_ms
+                .is_none_or(|value| value > need.maximum_latency_ms)
+            || receipt.observed_context_tokens
+                .is_none_or(|value| value > need.maximum_context_tokens)
+            || receipt.observed_tool_calls
+                .is_none_or(|value| value > need.maximum_tool_calls)
+            || receipt.maximum_evidence_age_seconds
+                .is_none_or(|value| value > need.maximum_evidence_age_seconds)
+        {
+            return Err(DecisionSufficiencyRejectV1::SufficientRiskBoundInvalid);
+        }
     }
 
     for (actual, expected) in [
@@ -1448,6 +1551,20 @@ mod tests {
             confidence_level_ppm: (status == DecisionSufficiencyStatusV1::Sufficient).then_some(950_000),
             calibration_receipt_sha256: (status == DecisionSufficiencyStatusV1::Sufficient)
                 .then(|| CALIBRATION_RECEIPT.to_owned()),
+            regret_upper_bound_micros: (status == DecisionSufficiencyStatusV1::Sufficient)
+                .then_some(500),
+            regret_limit_micros: (status == DecisionSufficiencyStatusV1::Sufficient)
+                .then_some(1000),
+            observed_cost_micros: (status == DecisionSufficiencyStatusV1::Sufficient)
+                .then_some(50_000),
+            observed_latency_ms: (status == DecisionSufficiencyStatusV1::Sufficient)
+                .then_some(250),
+            observed_context_tokens: (status == DecisionSufficiencyStatusV1::Sufficient)
+                .then_some(2048),
+            observed_tool_calls: (status == DecisionSufficiencyStatusV1::Sufficient)
+                .then_some(2),
+            maximum_evidence_age_seconds: (status == DecisionSufficiencyStatusV1::Sufficient)
+                .then_some(900),
             issued_at_unix: 150,
             expires_at_unix: 200,
             issuer_profile_sha256: binding.issuer_profile_sha256.into(),
