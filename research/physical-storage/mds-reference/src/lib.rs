@@ -730,7 +730,7 @@ mod tests {
         // Exhaustively score all axis-aligned 2x2x1 boxes in this 4x4x3
         // fixture. The spatial-stride map keeps every box within one erasure
         // per stripe; row-major placement exceeds the two-erasure budget in
-        // 13 of 36 positions.
+        // 13 of 27 positions.
         assert_eq!(
             rectangular_fault_tournament(&layout, (2, 2, 1), false),
             (1, 0, 27)
@@ -740,8 +740,30 @@ mod tests {
             (4, 13, 27)
         );
 
+        // 3x3x1 boxes remain recoverable spatially; row-major fails every
+        // placement under the same two-erasure budget.
+        assert_eq!(
+            rectangular_fault_tournament(&layout, (3, 3, 1), false),
+            (2, 0, 12)
+        );
+        assert_eq!(
+            rectangular_fault_tournament(&layout, (3, 3, 1), true),
+            (5, 12, 12)
+        );
+
+        // The full x-y layer slice is also recoverable spatially; row-major
+        // exceeds the erasure budget in all three z positions.
+        assert_eq!(
+            rectangular_fault_tournament(&layout, (4, 4, 1), false),
+            (2, 0, 3)
+        );
+        assert_eq!(
+            rectangular_fault_tournament(&layout, (4, 4, 1), true),
+            (6, 3, 3)
+        );
+
         // 2x2x2 boxes remain recoverable under the spatial mapping; row-major
-        // fails 19 of 27 positions.
+        // fails 14 of 18 positions.
         assert_eq!(
             rectangular_fault_tournament(&layout, (2, 2, 2), false),
             (2, 0, 18)
@@ -752,7 +774,7 @@ mod tests {
         );
 
         // The measured design envelope has a visible boundary: 3x3x2 boxes
-        // exceed two erasures in eight of twelve positions.
+        // exceed two erasures in all eight positions.
         assert_eq!(
             rectangular_fault_tournament(&layout, (3, 3, 2), false),
             (4, 8, 8)
