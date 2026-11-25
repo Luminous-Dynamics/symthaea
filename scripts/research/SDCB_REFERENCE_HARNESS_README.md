@@ -52,6 +52,6 @@ rustc --edition=2024 scripts/research/sdcb_reference_receipt.rs -o /tmp/sdcb-ref
   > /tmp/sdcb-reference-receipt.json
 ```
 
-Validate the JSON structure against `docs/research/SDCB_REFERENCE_CONTROL_RECEIPT_V1.schema.json`. The runner exits zero only when every reference control passes. It records the source revision as **caller-supplied and not independently verified**, plus compiler/platform metadata and per-case dispositions. It does not sign the receipt or authenticate the source revision; those claims require the existing Luminous attestation/checkpoint infrastructure.
+Validate the JSON structure against `docs/research/SDCB_REFERENCE_CONTROL_RECEIPT_V1.schema.json`. The runner first verifies that the supplied source revision equals the repository's observed Git HEAD and that the working tree (including untracked, non-ignored files) is clean. It exits with a provenance error before running controls if either condition fails. The receipt records the observed HEAD, clean-tree status, compiler/platform metadata, RUSTFLAGS and per-case dispositions. The runner does not sign the receipt or prove that the Git repository itself has trusted custody; those claims require the existing Luminous attestation/checkpoint infrastructure.
 
 Receipt claim ceiling: `analytic_reference_controls_only`. A valid receipt is not an SDCB model benchmark, theorem proof, proof-checker qualification, physical experiment, or consciousness result.
