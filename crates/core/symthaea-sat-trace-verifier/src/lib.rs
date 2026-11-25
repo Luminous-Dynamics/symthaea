@@ -1842,6 +1842,33 @@ mod tests {
     }
 
     #[test]
+    fn committed_cross_language_example_verifies_end_to_end() {
+        const MANIFEST_JSON: &str = include_str!(
+            "../../../../docs/research/examples/sat-trace-verifier-manifest-v0.1.json"
+        );
+        const TRACE_JSONL: &str = include_str!(
+            "../../../../docs/research/examples/sat-trace-verifier-trace-v0.1.jsonl"
+        );
+        let manifest_digest = compute_manifest_digest(MANIFEST_JSON).unwrap();
+        assert_eq!(
+            manifest_digest,
+            "sha256:0fa06d577488566420fea82078b2f30fd70280af9363e26f558bcac66bb32f2d"
+        );
+        let manifest: Value = serde_json::from_str(MANIFEST_JSON).unwrap();
+        let run_id = manifest["run_id"].as_str().unwrap();
+        let report = verify_trace(TRACE_JSONL, run_id, &manifest_digest).unwrap();
+        assert_eq!(report.event_count, 2);
+        assert_eq!(report.authority_bindings_checked, 1);
+        assert_eq!(report.disclosure_bindings_checked, 1);
+        assert_eq!(report.sink_projections_checked, 2);
+        assert_eq!(report.effect_submissions, 1);
+        assert_eq!(report.terminal_effect_observations, 1);
+        assert!(!report.hold_required);
+        assert!(!report.signatures_verified);
+        assert!(!report.system_qualified);
+    }
+
+    #[test]
     fn manifest_digest_is_order_independent_and_rejects_duplicate_keys() {
         let first = r#"{"z":2,"a":{"b":1,"a":0}}"#;
         let reordered = r#"{"a":{"a":0,"b":1},"z":2}"#;
