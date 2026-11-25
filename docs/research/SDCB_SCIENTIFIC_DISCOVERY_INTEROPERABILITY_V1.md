@@ -108,7 +108,7 @@ These are project targets and must be revised only by a versioned amendment befo
 
 1. Add the four design-only sequential-experiment tasks to the SDCB pilot manifest.
 2. Reuse the current sensor-selection reference control as a tiny active-measurement oracle.
-3. Add a deterministic four-arm bandit reference fixture with known posterior updates and oracle regret.
+3. Added a deterministic Beta–Bernoulli posterior update and UCB1-style arm-selection reference with conjugate-posterior and exploration controls.
 4. Add a small synthetic response-surface fixture with fixed cost/observation noise and hidden held-out candidates.
 5. Define a common run/observation/experiment receipt that composes with the existing SDCB receipt and the Luminous evidence architecture.
 6. Build read-only adapters for ASB, FIRE-Bench, SciAgentArena, AstaBench and SorryDB; no adapter is allowed to change upstream scoring.
