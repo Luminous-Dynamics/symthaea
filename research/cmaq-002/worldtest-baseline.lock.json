@@ -1,0 +1,83 @@
+{
+  "schema_version": "cmaq-002-worldtest-baseline-v0.1",
+  "status": "metadata_only_not_downloaded",
+  "benchmark": {
+    "name": "AutumnBench",
+    "protocol": "WorldTest",
+    "paper_environment_count": 43,
+    "paper_task_count": 129,
+    "paper_query_families": [
+      "masked_frame_prediction",
+      "change_detection",
+      "planning"
+    ],
+    "grid_size_min": 3,
+    "grid_size_max": 25,
+    "stochastic_environment_count": 19,
+    "reported_human_participants": 517,
+    "reported_frontier_model_count": 5,
+    "public_release_environment_count": 20,
+    "public_release_task_count": 60,
+    "public_release_count_basis": "secondary public benchmark catalogue; verify against immutable manifest before execution",
+    "withheld_environment_count_inferred": 23,
+    "withheld_task_count_inferred": 69
+  },
+  "paper": {
+    "title": "Benchmarking World-Model Learning with Environment-Level Queries",
+    "authors_first": "Archana Warrier",
+    "venue": "ICML 2026",
+    "proceedings_url": "https://proceedings.mlr.press/v306/warrier26a.html",
+    "openreview_url": "https://openreview.net/forum?id=Ny6UYZ8ysN",
+    "arxiv_url": "https://arxiv.org/abs/2510.19788"
+  },
+  "sources": {
+    "autumn_interpreter": {
+      "repository": "https://github.com/BasisResearch/Autumn.cpp",
+      "commit": "0929d175c3d296de091ac4b998d09b9b55a38f67",
+      "commit_signature_status": "unsigned",
+      "repository_license": "MIT",
+      "license_file_url": "https://github.com/BasisResearch/Autumn.cpp/blob/0929d175c3d296de091ac4b998d09b9b55a38f67/LICENSE",
+      "runtime_options": ["native_cpp_cli", "wasm", "python_binding", "julia_binding"],
+      "required_native_build": "C++20 and CMake >= 3.18"
+    },
+    "mara_protocol": {
+      "repository": "https://github.com/BasisResearch/MARAProtocol",
+      "commit": "d0d4e9251151778415cc5195c5dfb8296a5ded24",
+      "commit_signature_status": "unsigned",
+      "repository_license": "MIT",
+      "license_file_url": "https://github.com/BasisResearch/MARAProtocol/blob/d0d4e9251151778415cc5195c5dfb8296a5ded24/LICENSE",
+      "runtime_requirements_in_reference_runner": ["Python >= 3.12", "Protocol Buffers compiler"],
+      "protocol_files": {
+        "agent": {"path": "protocols/mara_agent.proto", "git_blob_sha": "70ae75dad22be364af45417fb24007ddbfbe61a3"},
+        "environment": {"path": "protocols/mara_environment.proto", "git_blob_sha": "5fd1f2b8813fe7bf1cf333d5e38a1bad07933d10"},
+        "evaluation": {"path": "protocols/mara_evaluation.proto", "git_blob_sha": "9dfb0b0bee74394b020a7fd2d6d056ee5d6fa4d0"}
+      },
+      "reference_agents": [
+        "autumn_random_interactive_agent_v1",
+        "autumn_llm_unified_interactive_agent_v1",
+        "autumn_simple_wm_agent"
+      ],
+      "task_names": ["mfp", "cd", "planning"]
+    }
+  },
+  "dataset": {
+    "public_manifest_url": "https://firebasestorage.googleapis.com/v0/b/prolific-server-123.firebasestorage.app/o/manifest_public.json?alt=media",
+    "public_file_source_script": "https://github.com/BasisResearch/MARAProtocol/blob/d0d4e9251151778415cc5195c5dfb8296a5ded24/scripts/download_dataset.sh",
+    "reported_public_data_license": "CC-BY-4.0",
+    "license_status": "reported_by_secondary_catalogue_pending_per_file_manifest_audit",
+    "immutable_manifest_sha256": null,
+    "immutable_dataset_revision": null,
+    "download_status": "not_downloaded",
+    "asset_or_weight_download_status": "not_applicable"
+  },
+  "reset_behavior_reference": {
+    "source": "https://datvo06.github.io/assets/talks/worldtest/",
+    "human_reset_share_of_actions": 0.125,
+    "human_at_least_one_reset_per_environment": true,
+    "frontier_model_reset_share_range": [0.014, 0.071],
+    "human_reset_replay_lcs_ratio_mean": 0.827,
+    "human_reset_replay_lcs_ratio_median": 0.9,
+    "metric_status": "descriptive_paper_presentation_values_not_symthaea_results"
+  },
+  "claim_ceiling": "source and protocol metadata only; no AutumnBench adapter run, score reproduction, human comparison, SOTA claim, or Symthaea model result"
+}

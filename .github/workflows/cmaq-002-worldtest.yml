@@ -1,0 +1,203 @@
+name: CMAQ-002 WorldTest / AutumnBench trace and custody
+
+on:
+  push:
+    branches:
+      - research/cmaq-002-worldtest-exploration-v0-1-20261125
+    paths:
+      - "research/cmaq-002/src/worldtest_exploration.rs"
+      - "research/cmaq-002/src/worldtest_phase_contract.rs"
+      - "research/cmaq-002/src/worldtest_phase_contract.rs"
+      - "research/cmaq-002/worldtest-*"
+      - "research/cmaq-002/fixtures/worldtest-*"
+      - "research/cmaq-002/WORLDTEST_ADAPTER_V0_1.md"
+      - ".github/workflows/cmaq-002-worldtest.yml"
+  pull_request:
+    types: [opened, synchronize, reopened, ready_for_review]
+    branches:
+      - research/cmaq-002-safe-decision-value-allocation-2026-10-31
+    paths:
+      - "research/cmaq-002/src/worldtest_exploration.rs"
+      - "research/cmaq-002/src/worldtest_phase_contract.rs"
+      - "research/cmaq-002/worldtest-*"
+      - "research/cmaq-002/fixtures/worldtest-*"
+      - "research/cmaq-002/WORLDTEST_ADAPTER_V0_1.md"
+      - ".github/workflows/cmaq-002-worldtest.yml"
+
+permissions:
+  contents: read
+
+jobs:
+  worldtest-contract:
+    name: Rust 1.96 WorldTest trace / custody qualification
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Install pinned Rust toolchain
+        uses: dtolnay/rust-toolchain@1.96.0
+        with:
+          components: rustfmt, clippy
+
+      - name: Check formatting of the new Rust module
+        run: rustfmt --check --edition 2024 research/cmaq-002/src/worldtest_exploration.rs research/cmaq-002/src/worldtest_phase_contract.rs research/cmaq-002/src/worldtest_phase_contract.rs
+
+      - name: Run CMAQ-002 evaluator tests
+        working-directory: research/cmaq-002
+        run: cargo test --locked
+
+      - name: Run strict Clippy
+        working-directory: research/cmaq-002
+        run: cargo clippy --locked --all-targets -- -D warnings
+
+      - name: Install pinned JSON Schema validator
+        run: python3 -m pip install --disable-pip-version-check "jsonschema==4.25.1"
+
+      - name: Validate baseline lock, candidate/evaluator custody and hostile mutations
+        working-directory: research/cmaq-002
+        run: |
+          python3 - <<'PY'
+          import copy
+          import json
+          from pathlib import Path
+
+          from jsonschema import Draft202012Validator, ValidationError, validate
+
+          baseline_schema = json.loads(Path("worldtest-baseline.schema.json").read_text())
+          Draft202012Validator.check_schema(baseline_schema)
+          baseline = json.loads(Path("worldtest-baseline.lock.json").read_text())
+          validate(instance=baseline, schema=baseline_schema)
+
+          assert baseline["status"] == "metadata_only_not_downloaded"
+          assert baseline["benchmark"]["paper_environment_count"] == 43
+          assert baseline["benchmark"]["paper_task_count"] == 129
+          assert baseline["benchmark"]["public_release_environment_count"] == 20
+          assert baseline["benchmark"]["public_release_task_count"] == 60
+          assert baseline["benchmark"]["withheld_environment_count_inferred"] == 23
+          assert baseline["benchmark"]["withheld_task_count_inferred"] == 69
+          assert baseline["dataset"]["download_status"] == "not_downloaded"
+          assert baseline["dataset"]["immutable_manifest_sha256"] is None
+          assert baseline["dataset"]["immutable_dataset_revision"] is None
+          assert baseline["dataset"]["license_status"] == (
+              "reported_by_secondary_catalogue_pending_per_file_manifest_audit"
+          )
+          assert baseline["sources"]["autumn_interpreter"]["commit_signature_status"] == "unsigned"
+          assert baseline["sources"]["mara_protocol"]["commit_signature_status"] == "unsigned"
+
+          custody_schema = json.loads(Path("worldtest-adapter-contract.schema.json").read_text())
+          Draft202012Validator.check_schema(custody_schema)
+          custody = json.loads(
+              Path("fixtures/worldtest-adapter-contract.example.json").read_text()
+          )
+          def validate_phase_record(record):
+              validate(instance=record, schema=custody_schema)
+              if (
+                  record["environment_pair"]["exploration_program_sha256"]
+                  == record["environment_pair"]["test_program_sha256"]
+              ):
+                  raise ValueError("exploration/test program identities must differ")
+
+          validate_phase_record(custody)
+
+          assert custody["status"] == "metadata_only"
+          assert custody["exploration"]["reward_feedback_policy"] == "constant_zero"
+          assert custody["exploration"]["reward_feedback_value"] == 0
+          assert custody["exploration"]["nonzero_reward_permitted"] is False
+          assert custody["exploration"]["phase_exit_action"] == "go-to-test"
+          assert custody["exploration"]["reset_enabled"] is True
+          assert custody["test"]["answer_key_candidate_visible"] is False
+          assert custody["evaluator_only"]["candidate_visible"] is False
+          assert (
+              custody["environment_pair"]["exploration_program_sha256"]
+              != custody["environment_pair"]["test_program_sha256"]
+          )
+          events = custody["exploration"]["event_trace"]
+          assert [event["event_index"] for event in events] == list(range(len(events)))
+          assert all(event["event_type"] in {"action", "noop", "reset"} for event in events)
+          assert events[-1]["event_type"] == "action"
+          assert events[-1]["action_id"] == "go-to-test"
+
+          def reject_mutation(mutated, label):
+              try:
+                  validate(instance=mutated, schema=custody_schema)
+              except ValidationError:
+                  return
+              raise AssertionError(f"WorldTest custody admitted hostile mutation: {label}")
+
+          hostile = copy.deepcopy(custody)
+          hostile["exploration"]["reward_feedback_policy"] = "pass_through"
+          reject_mutation(hostile, "nonzero/pass-through reward during exploration")
+
+          hostile = copy.deepcopy(custody)
+          hostile["exploration"]["reward_feedback_value"] = 1
+          reject_mutation(hostile, "nonzero exploration reward")
+
+          hostile = copy.deepcopy(custody)
+          hostile["exploration"]["nonzero_reward_permitted"] = True
+          reject_mutation(hostile, "nonzero reward permitted during exploration")
+
+          hostile = copy.deepcopy(custody)
+          hostile["exploration"]["reset_enabled"] = False
+          reject_mutation(hostile, "reset capability silently disabled")
+
+          hostile = copy.deepcopy(custody)
+          hostile["test"]["answer_key_candidate_visible"] = True
+          reject_mutation(hostile, "answer key leaked to candidate")
+
+          hostile = copy.deepcopy(custody)
+          hostile["evaluator_only"]["candidate_visible"] = True
+          reject_mutation(hostile, "evaluator truth leaked to candidate")
+
+          hostile = copy.deepcopy(custody)
+          hostile["exploration"]["event_trace"].append({
+              "event_index": len(events),
+              "event_type": "forecast",
+              "action_id": "predicted-future"
+          })
+          reject_mutation(hostile, "predicted future promoted to acquired observation")
+
+          hostile = copy.deepcopy(custody)
+          hostile["test"]["query_family"] = "reward_prediction"
+          reject_mutation(hostile, "unregistered query family")
+
+          hostile = copy.deepcopy(custody)
+          hostile["environment_pair"]["test_program_sha256"] = (
+              hostile["environment_pair"]["exploration_program_sha256"]
+          )
+          try:
+              validate_phase_record(hostile)
+          except ValueError:
+              pass
+          else:
+              raise AssertionError("WorldTest custody admitted same exploration/test program")
+
+          print(
+              "WorldTest baseline lock, constant-zero reward custody, go-to-test "
+              "phase exit, public-subset boundary and hostile controls validated"
+          )
+          PY
+
+      - name: Validate pinned MARA runner reward and phase audit
+        working-directory: research/cmaq-002
+        run: |
+          python3 - <<'PY'
+          import copy
+          import json
+          from pathlib import Path
+          from jsonschema import Draft202012Validator, ValidationError, validate
+
+          schema = json.loads(Path("worldtest-runner-audit.schema.json").read_text())
+          Draft202012Validator.check_schema(schema)
+          audit = json.loads(Path("worldtest-runner-audit.lock.json").read_text())
+          validate(instance=audit, schema=schema)
+          observed = audit["observed_reference_behavior"]
+          assert observed["feedback_request_contains_reward_field"] is True
+          assert observed["evaluation_controller_forwards_step_reward_on_each_feedback"] is True
+          assert observed["exploration_ordinary_action_reward"] == 0
+          assert observed["explicit_reset_reward"] == 0
+          assert observed["go_to_test_action"] == "go-to-test"
+          assert observed["go_to_test_action_reward"] == 0
+          assert audit["adapter_requirements"]["reject_nonzero_exploration_reward"] is True
+          print("MARA constant-zero exploration reward and charged phase exit source audit validated")
+          PY

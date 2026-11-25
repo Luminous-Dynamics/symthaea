@@ -1,0 +1,202 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://luminousdynamics.io/schemas/cmaq-002-worldtest-adapter-v0.1.json",
+  "title": "CMAQ-002 WorldTest candidate/evaluator custody contract",
+  "type": "object",
+  "additionalProperties": false,
+  "required": [
+    "schema_version",
+    "status",
+    "candidate_artifact_sha256",
+    "seed_commitment_sha256",
+    "interface_arm",
+    "environment_pair",
+    "exploration",
+    "test",
+    "evaluator_only",
+    "claim_ceiling"
+  ],
+  "properties": {
+    "schema_version": {
+      "const": "cmaq-002-worldtest-adapter-v0.1"
+    },
+    "status": {
+      "const": "metadata_only"
+    },
+    "candidate_artifact_sha256": {
+      "type": "string",
+      "pattern": "^[0-9a-f]{64}$"
+    },
+    "seed_commitment_sha256": {
+      "type": "string",
+      "pattern": "^[0-9a-f]{64}$"
+    },
+    "interface_arm": {
+      "enum": [
+        "observation_only",
+        "program_visible_reference"
+      ]
+    },
+    "environment_pair": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "exploration_program_sha256",
+        "test_program_sha256",
+        "related_family_id"
+      ],
+      "properties": {
+        "exploration_program_sha256": {
+          "type": "string",
+          "pattern": "^[0-9a-f]{64}$"
+        },
+        "test_program_sha256": {
+          "type": "string",
+          "pattern": "^[0-9a-f]{64}$"
+        },
+        "related_family_id": {
+          "type": "string",
+          "minLength": 1,
+          "maxLength": 128
+        }
+      }
+    },
+    "exploration": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "reset_enabled",
+        "event_trace",
+        "reward_feedback_policy",
+        "reward_feedback_value",
+        "nonzero_reward_permitted",
+        "phase_exit_action"
+      ],
+      "properties": {
+        "reset_enabled": {
+          "const": true
+        },
+        "event_trace": {
+          "type": "array",
+          "minItems": 1,
+          "maxItems": 16384,
+          "items": {
+            "oneOf": [
+              {
+                "type": "object",
+                "additionalProperties": false,
+                "required": [
+                  "event_index",
+                  "event_type",
+                  "action_id"
+                ],
+                "properties": {
+                  "event_index": {
+                    "type": "integer",
+                    "minimum": 0
+                  },
+                  "event_type": {
+                    "enum": [
+                      "action",
+                      "noop"
+                    ]
+                  },
+                  "action_id": {
+                    "type": "string",
+                    "minLength": 1,
+                    "maxLength": 128
+                  }
+                }
+              },
+              {
+                "type": "object",
+                "additionalProperties": false,
+                "required": [
+                  "event_index",
+                  "event_type"
+                ],
+                "properties": {
+                  "event_index": {
+                    "type": "integer",
+                    "minimum": 0
+                  },
+                  "event_type": {
+                    "const": "reset"
+                  }
+                }
+              }
+            ]
+          }
+        },
+        "reward_feedback_policy": {
+          "const": "constant_zero"
+        },
+        "reward_feedback_value": {
+          "const": 0
+        },
+        "nonzero_reward_permitted": {
+          "const": false
+        },
+        "phase_exit_action": {
+          "const": "go-to-test"
+        }
+      }
+    },
+    "test": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "query_family",
+        "task_prompt_candidate_visible",
+        "answer_key_candidate_visible",
+        "test_environment_interactive"
+      ],
+      "properties": {
+        "query_family": {
+          "enum": [
+            "masked_frame_prediction",
+            "change_detection",
+            "planning"
+          ]
+        },
+        "task_prompt_candidate_visible": {
+          "const": true
+        },
+        "answer_key_candidate_visible": {
+          "const": false
+        },
+        "test_environment_interactive": {
+          "const": true
+        }
+      }
+    },
+    "evaluator_only": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "candidate_visible",
+        "answer_key_sha256",
+        "true_change_timestep"
+      ],
+      "properties": {
+        "candidate_visible": {
+          "const": false
+        },
+        "answer_key_sha256": {
+          "type": "string",
+          "pattern": "^[0-9a-f]{64}$"
+        },
+        "true_change_timestep": {
+          "type": [
+            "integer",
+            "null"
+          ],
+          "minimum": 0
+        }
+      }
+    },
+    "claim_ceiling": {
+      "const": "metadata and exploration-trace mechanics only; no AutumnBench score, human comparison, model advantage or SOTA claim"
+    }
+  }
+}

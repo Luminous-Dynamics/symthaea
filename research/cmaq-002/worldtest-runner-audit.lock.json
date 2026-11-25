@@ -1,0 +1,34 @@
+{
+  "schema_version": "cmaq-002-worldtest-runner-audit-v0.1",
+  "status": "source_audit_only_no_runtime_execution",
+  "repository": "BasisResearch/MARAProtocol",
+  "source_commit": "d0d4e9251151778415cc5195c5dfb8296a5ded24",
+  "source_blobs": {
+    "agent_proto": "70ae75dad22be364af45417fb24007ddbfbe61a3",
+    "environment_service_proto": "58069aa74cb1bf084155c115111dc2a2aa6b58c6",
+    "evaluation_controller_py": "8650b314b3f0e5f9301340dce89aed5aa4de0ae8",
+    "environment_interfaces_py": "7048358744b74f042db4c43f734d9271468f727b",
+    "concrete_envs_py": "961858e7f47ad1e572bc20936d27ae0b4fee000b"
+  },
+  "observed_reference_behavior": {
+    "feedback_request_contains_reward_field": true,
+    "evaluation_controller_forwards_step_reward_on_each_feedback": true,
+    "exploration_environment": "InteractiveEnvironment",
+    "exploration_ordinary_action_reward": 0,
+    "explicit_reset_reward": 0,
+    "go_to_test_action": "go-to-test",
+    "go_to_test_action_reward": 0,
+    "go_to_test_is_candidate_issued_action": true,
+    "test_phase_scoring_environment": "query-family-specific test environment",
+    "reward_semantics": "The reference controller forwards the reward field during exploration, but the pinned interactive environment returns constant zero for ordinary actions, reset and go-to-test. Test-phase task rewards are separate scoring interactions."
+  },
+  "adapter_requirements": {
+    "candidate_reward_field_policy": "constant_zero_during_exploration",
+    "reject_nonzero_exploration_reward": true,
+    "charge_reset_as_interaction": true,
+    "charge_go_to_test_as_exploration_interaction": true,
+    "append_terminal_test_phase_marker_after_go_to_test": true,
+    "never_promote_predicted_future_to_observation": true
+  },
+  "claim_ceiling": "Pinned source audit only. No MARA runtime, Autumn interpreter, dataset or benchmark episode was executed."
+}
