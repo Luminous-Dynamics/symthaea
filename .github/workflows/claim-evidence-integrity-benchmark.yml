@@ -1,0 +1,36 @@
+name: Claim-Evidence Integrity Benchmark
+
+on:
+  push:
+    branches: [main]
+    paths:
+      - "research/claim-evidence-integrity-benchmark/**"
+      - ".github/workflows/claim-evidence-integrity-benchmark.yml"
+  pull_request:
+    types: [opened, synchronize, reopened, ready_for_review]
+    paths:
+      - "research/claim-evidence-integrity-benchmark/**"
+      - ".github/workflows/claim-evidence-integrity-benchmark.yml"
+
+permissions:
+  contents: read
+
+jobs:
+  qualify:
+    name: Rust 1.96 fixture integrity and validator
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - name: Set up Rust
+        uses: dtolnay/rust-toolchain@stable
+        with:
+          toolchain: "1.96.0"
+          components: clippy, rustfmt
+      - name: Check formatting
+        run: cargo fmt --manifest-path research/claim-evidence-integrity-benchmark/Cargo.toml -- --check
+      - name: Run locked validator tests
+        run: cargo test --manifest-path research/claim-evidence-integrity-benchmark/Cargo.toml --locked --all-targets
+      - name: Run validator self-test
+        run: cargo run --manifest-path research/claim-evidence-integrity-benchmark/Cargo.toml --locked -- --self-test
+      - name: Run strict Clippy
+        run: cargo clippy --manifest-path research/claim-evidence-integrity-benchmark/Cargo.toml --locked --all-targets -- -D warnings
