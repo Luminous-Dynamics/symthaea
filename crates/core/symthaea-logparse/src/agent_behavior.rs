@@ -99,6 +99,10 @@ pub struct AgentTraceEvent {
     tenant_id: String,
     task_id: String,
     principal_id: String,
+    /// Digest of Nixward's AgentTaskNetworkContract; never a model-authored claim.
+    agent_task_contract_blake3: String,
+    /// Digest of the exact Nixward WorkloadIdentity bound by that contract.
+    workload_blake3: String,
     event_id: String,
     source: TelemetrySource,
     kind: AgentEventKind,
@@ -117,6 +121,8 @@ impl AgentTraceEvent {
         tenant_id: impl Into<String>,
         task_id: impl Into<String>,
         principal_id: impl Into<String>,
+        agent_task_contract_blake3: impl Into<String>,
+        workload_blake3: impl Into<String>,
         event_id: impl Into<String>,
         source: TelemetrySource,
         kind: AgentEventKind,
@@ -128,6 +134,8 @@ impl AgentTraceEvent {
         let tenant_id = tenant_id.into();
         let task_id = task_id.into();
         let principal_id = principal_id.into();
+        let agent_task_contract_blake3 = agent_task_contract_blake3.into();
+        let workload_blake3 = workload_blake3.into();
         let event_id = event_id.into();
         if tenant_id.trim().is_empty() {
             return Err(BehaviorError::MissingTenant);
@@ -141,6 +149,8 @@ impl AgentTraceEvent {
         if event_id.trim().is_empty() {
             return Err(BehaviorError::MissingEventId);
         }
+        validate_digest(&agent_task_contract_blake3)?;
+        validate_digest(&workload_blake3)?;
         if !source_matches_kind(source, kind) {
             return Err(BehaviorError::SourceKindMismatch { source, kind });
         }
@@ -149,6 +159,8 @@ impl AgentTraceEvent {
             tenant_id,
             task_id,
             principal_id,
+            agent_task_contract_blake3,
+            workload_blake3,
             event_id,
             source,
             kind,
@@ -173,6 +185,14 @@ impl AgentTraceEvent {
 
     pub fn principal_id(&self) -> &str {
         &self.principal_id
+    }
+
+    pub fn agent_task_contract_blake3(&self) -> &str {
+        &self.agent_task_contract_blake3
+    }
+
+    pub fn workload_blake3(&self) -> &str {
+        &self.workload_blake3
     }
 
     pub fn event_id(&self) -> &str {
@@ -300,6 +320,8 @@ pub struct BehaviorCounters {
 pub struct TaskWindowAssessment {
     pub tenant_id: String,
     pub task_id: String,
+    pub agent_task_contract_blake3: String,
+    pub workload_blake3: String,
     pub start: DateTime<Utc>,
     pub end: DateTime<Utc>,
     pub event_count: usize,
@@ -319,6 +341,14 @@ pub enum BehaviorError {
     MissingPrincipal,
     #[error("event identity is missing")]
     MissingEventId,
+    #[error("agent task contract digest is missing or invalid")]
+    InvalidTaskContractDigest,
+    #[error("workload identity digest is missing or invalid")]
+    InvalidWorkloadDigest,
+    #[error("task window mixes agent task contract digests")]
+    MixedTaskContract,
+    #[error("task window mixes workload identity digests")]
+    MixedWorkload,
     #[error("source receipt is missing or invalid")]
     MissingSourceReceipt,
     #[error("task window contains more than one tenant")]
@@ -365,6 +395,20 @@ fn source_matches_kind(source: TelemetrySource, kind: AgentEventKind) -> bool {
     }
 }
 
+fn validate_digest(value: &str) -> Result<(), BehaviorError> {
+    if value.len() == 64
+        && value
+            .bytes()
+            .all(|byte| byte.is_ascii_digit() || (b'a'..=b'f').contains(&byte))
+    {
+        Ok(())
+    } else if value.trim().is_empty() {
+        Err(BehaviorError::InvalidTaskContractDigest)
+    } else {
+        Err(BehaviorError::InvalidWorkloadDigest)
+    }
+}
+
 /// Analyze one task's normalized, source-verified event stream.
 ///
 /// No finding automatically triggers remediation. A hard-gate finding is a
@@ -388,6 +432,9 @@ pub fn analyze_task_window(
 
     let tenant_id = events[0].tenant_id.clone();
     let task_id = events[0].task_id.clone();
+    let agent_task_contract_blake3 = events[0].agent_task_contract_blake3.clone();
+    let workload_blake3 = events[0].workload_blake3.clone();
+    let principal_id = events[0].principal_id.clone();
     let mut seen_ids = BTreeSet::new();
     let mut ordered: Vec<&AgentTraceEvent> = events.iter().collect();
 
@@ -398,6 +445,17 @@ pub fn analyze_task_window(
         if event.task_id != task_id {
             return Err(BehaviorError::MixedTask);
         }
+        if event.agent_task_contract_blake3 != agent_task_contract_blake3 {
+            return Err(BehaviorError::MixedTaskContract);
+        }
+        if event.workload_blake3 != workload_blake3 {
+            return Err(BehaviorError::MixedWorkload);
+        }
+        if event.principal_id != principal_id {
+            return Err(BehaviorError::MissingPrincipal);
+        }
+        validate_digest(&event.agent_task_contract_blake3)?;
+        validate_digest(&event.workload_blake3)?;
         if event.tenant_id.trim().is_empty() {
             return Err(BehaviorError::MissingTenant);
         }
@@ -667,6 +725,8 @@ pub fn analyze_task_window(
     Ok(TaskWindowAssessment {
         tenant_id,
         task_id,
+        agent_task_contract_blake3,
+        workload_blake3,
         start,
         end,
         event_count: ordered.len(),
@@ -764,6 +824,8 @@ mod tests {
             tenant,
             task,
             "test-principal",
+            "c".repeat(64),
+            "d".repeat(64),
             id,
             match kind {
                 AgentEventKind::WorkerSpawned
@@ -842,6 +904,28 @@ mod tests {
         assert_eq!(
             VerifiedSourceReceipt::new("trusted-collector", " ").unwrap_err(),
             BehaviorError::MissingSourceReceipt
+        );
+    }
+
+    #[test]
+    fn rejects_mixed_task_contracts_in_one_window() {
+        let first = event("1", "tenant-a", "task-1", AgentEventKind::ApiRead, None);
+        let mut second = event("2", "tenant-a", "task-1", AgentEventKind::ApiRead, None);
+        second.agent_task_contract_blake3 = "e".repeat(64);
+        assert_eq!(
+            analyze_task_window(&[first, second], BehaviorWindowPolicy::default()).unwrap_err(),
+            BehaviorError::MixedTaskContract
+        );
+    }
+
+    #[test]
+    fn rejects_mixed_workload_identities_in_one_window() {
+        let first = event("1", "tenant-a", "task-1", AgentEventKind::ApiRead, None);
+        let mut second = event("2", "tenant-a", "task-1", AgentEventKind::ApiRead, None);
+        second.workload_blake3 = "f".repeat(64);
+        assert_eq!(
+            analyze_task_window(&[first, second], BehaviorWindowPolicy::default()).unwrap_err(),
+            BehaviorError::MixedWorkload
         );
     }
 
