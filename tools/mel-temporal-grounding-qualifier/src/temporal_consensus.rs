@@ -59,6 +59,10 @@ pub struct AnnotatorGroundingResultV1 {
     pub status_reason: Option<String>,
     pub score: TemporalGroundingScoreV1,
     pub fully_correct_for_this_annotation: Option<bool>,
+    pub start_boundary_mae_frames: Option<f64>,
+    pub start_boundary_p95_abs_error_frames: Option<f64>,
+    pub end_boundary_mae_frames: Option<f64>,
+    pub end_boundary_p95_abs_error_frames: Option<f64>,
 }
 
 #[derive(Debug, Clone, PartialEq, Serialize)]
@@ -241,6 +245,12 @@ pub fn audit_multi_annotator_case(
             })?;
         let fully_correct_for_this_annotation = fully_correct(&score);
 
+        let start_errors: Vec<_> = score.matches.iter()
+            .map(|matched| matched.start_error_frames.unsigned_abs() as f64)
+            .collect();
+        let end_errors: Vec<_> = score.matches.iter()
+            .map(|matched| matched.end_error_frames.unsigned_abs() as f64)
+            .collect();
         results.push(AnnotatorGroundingResultV1 {
             annotator_id_sha256: annotation.annotator_id_sha256.clone(),
             annotation_sha256: annotation.annotation_sha256.clone(),
@@ -249,6 +259,10 @@ pub fn audit_multi_annotator_case(
             status_reason: annotation.status_reason.clone(),
             score,
             fully_correct_for_this_annotation,
+            start_boundary_mae_frames: mean(&start_errors),
+            start_boundary_p95_abs_error_frames: percentile(&start_errors, 0.95),
+            end_boundary_mae_frames: mean(&end_errors),
+            end_boundary_p95_abs_error_frames: percentile(&end_errors, 0.95),
         });
     }
 
