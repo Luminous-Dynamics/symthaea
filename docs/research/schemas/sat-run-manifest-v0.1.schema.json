@@ -1,0 +1,77 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://luminousdynamics.io/sat/schemas/run-manifest/0.1",
+  "title": "SAT Run Manifest v0.1",
+  "type": "object",
+  "additionalProperties": false,
+  "required": ["schema_version", "run_id", "frozen_at", "system", "profile", "campaign", "harness", "roles", "frozen_inputs"],
+  "properties": {
+    "schema_version": {"const": "sat-run-manifest/v0.1"},
+    "run_id": {"type": "string", "format": "uuid"},
+    "frozen_at": {"type": "string", "format": "date-time"},
+    "system": {
+      "type": "object", "additionalProperties": false,
+      "required": ["system_id", "release_id", "implementation_kind", "configuration_digest", "identity_evidence"],
+      "properties": {
+        "system_id": {"type": "string", "minLength": 1},
+        "release_id": {"type": "string", "minLength": 1},
+        "implementation_kind": {"enum": ["open_source", "binary", "hosted_service", "hybrid", "physical_system"]},
+        "configuration_digest": {"$ref": "#/$defs/digest"},
+        "source_revision": {"type": "string", "minLength": 7},
+        "provider_model_revision": {"type": "string", "minLength": 1},
+        "identity_evidence": {"type": "array", "minItems": 1, "items": {"$ref": "#/$defs/evidence"}}
+      }
+    },
+    "profile": {
+      "type": "object", "additionalProperties": false,
+      "required": ["profile_id", "version", "track_ids", "threat_model"],
+      "properties": {
+        "profile_id": {"type": "string", "minLength": 1},
+        "version": {"type": "string", "minLength": 1},
+        "track_ids": {"type": "array", "minItems": 1, "uniqueItems": true, "items": {"enum": ["authority", "confidentiality", "disclosure", "adaptive_control", "auditor_integrity", "evidence_integrity", "human_agency", "recovery", "physical_effects"]}},
+        "threat_model": {
+          "type": "object", "additionalProperties": false,
+          "required": ["attacker_knowledge", "capabilities", "adaptive_rounds", "budget"],
+          "properties": {
+            "attacker_knowledge": {"enum": ["black_box", "gray_box", "white_box"]},
+            "capabilities": {"type": "array", "minItems": 1, "items": {"type": "string", "minLength": 1}},
+            "adaptive_rounds": {"type": "integer", "minimum": 0},
+            "budget": {"type": "object", "required": ["queries", "tool_calls", "wall_clock_seconds"], "additionalProperties": false, "properties": {"queries": {"type": "integer", "minimum": 0}, "tool_calls": {"type": "integer", "minimum": 0}, "wall_clock_seconds": {"type": "integer", "minimum": 1}}}
+          }
+        }
+      }
+    },
+    "campaign": {
+      "type": "object", "additionalProperties": false,
+      "required": ["dataset_id", "version", "digest", "split", "case_ids", "seed_policy"],
+      "properties": {
+        "dataset_id": {"type": "string", "minLength": 1},
+        "version": {"type": "string", "minLength": 1},
+        "digest": {"$ref": "#/$defs/digest"},
+        "split": {"enum": ["development", "public_smoke", "sealed_holdout", "external_benchmark", "production_shadow"]},
+        "case_ids": {"type": "array", "minItems": 1, "uniqueItems": true, "items": {"type": "string", "minLength": 1}},
+        "seed_policy": {"type": "object", "required": ["mode"], "additionalProperties": false, "properties": {"mode": {"enum": ["fixed", "preregistered_set", "system_managed", "unavailable"]}, "seed_ids": {"type": "array", "uniqueItems": true, "items": {"type": "string"}}, "unavailable_reason": {"type": "string"}}},
+        "case_order_digest": {"$ref": "#/$defs/digest"}
+      }
+    },
+    "harness": {
+      "type": "object", "additionalProperties": false,
+      "required": ["harness_id", "version", "adapter_id", "adapter_version", "isolation_profile"],
+      "properties": {"harness_id": {"type": "string"}, "version": {"type": "string"}, "adapter_id": {"type": "string"}, "adapter_version": {"type": "string"}, "runner_image_digest": {"$ref": "#/$defs/digest"}, "isolation_profile": {"enum": ["no_execution", "mock", "container", "microvm", "physical_test_cell", "provider_managed", "not_independently_verified"]}, "network_policy_digest": {"$ref": "#/$defs/digest"}, "resource_budget_digest": {"$ref": "#/$defs/digest"}}
+    },
+    "roles": {
+      "type": "object", "additionalProperties": false,
+      "required": ["evaluator_id", "sink_observer_ids", "auditor_ids", "role_separation_attested"],
+      "properties": {"evaluator_id": {"type": "string"}, "sink_observer_ids": {"type": "array", "minItems": 1, "uniqueItems": true, "items": {"type": "string"}}, "auditor_ids": {"type": "array", "minItems": 1, "uniqueItems": true, "items": {"type": "string"}}, "role_separation_attested": {"type": "boolean"}, "conflict_disclosures": {"type": "array", "items": {"type": "string"}}}
+    },
+    "frozen_inputs": {
+      "type": "object", "additionalProperties": false,
+      "required": ["system_configuration_digest", "scenario_pack_digest", "grading_policy_digest", "evidence_policy_digest"],
+      "properties": {"system_configuration_digest": {"$ref": "#/$defs/digest"}, "scenario_pack_digest": {"$ref": "#/$defs/digest"}, "grading_policy_digest": {"$ref": "#/$defs/digest"}, "evidence_policy_digest": {"$ref": "#/$defs/digest"}, "monitor_policy_digest": {"$ref": "#/$defs/digest"}}
+    }
+  },
+  "$defs": {
+    "digest": {"type": "string", "pattern": "^sha256:[0-9a-f]{64}$"},
+    "evidence": {"type": "object", "additionalProperties": false, "required": ["artifact_id", "digest", "source_id", "capture_method", "trust_basis"], "properties": {"artifact_id": {"type": "string", "minLength": 1}, "digest": {"$ref": "#/$defs/digest"}, "source_id": {"type": "string", "minLength": 1}, "capture_method": {"enum": ["native_export", "independent_api_read", "sink_snapshot", "packet_capture", "signed_receipt", "human_attestation", "other"]}, "trust_basis": {"enum": ["independently_verified", "provider_asserted", "operator_asserted", "not_verified"]}}}
+  }
+}
