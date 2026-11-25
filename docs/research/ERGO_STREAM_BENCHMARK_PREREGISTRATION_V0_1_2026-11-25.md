@@ -60,6 +60,28 @@ The first confirmatory release should include at least three independently gener
 | Cross-modal | paired audio/visual/action event alignment ([Symtropy #7442](https://github.com/Luminous-Dynamics/symtropy/issues/7442)) | shuffled alignment, clock offsets, delayed arrival, missing/disagreeing modality | cross-modal structure acquisition |
 | Embodied dynamics | source-to-target action and state mapping | target-side transition or latency changes | behavioural transfer and action utility |
 
+### Cross-modal factorization: timing is not semantics
+
+The first cross-modal campaign must be factorial rather than using one blended "synchronization" label. Use two independently controlled axes:
+
+- **Clock registration:** shared calibration anchors present / absent; affine offset and rate mismatch; timestamp jitter; delayed and out-of-order arrival; missing anchors.
+- **Event correspondence:** aligned; marginal-matched shuffled; periodic/repeated-pattern non-identifiability; missing or uninformative modality.
+
+Required crossed cells include:
+
+| Clock evidence | Event relation | Correct interpretation |
+|---|---|---|
+| Shared anchors; affine map identifiable | Aligned | clock and event correspondence can both be qualified independently |
+| Shared anchors; same clock schedule | Marginal-matched shuffled | clock map remains valid while same-time semantic/event pairing is false |
+| Shared anchors; affine map identifiable | Periodic event-phase ambiguity | clock is identifiable but event correspondence remains set-valued |
+| No shared anchors | Periodic event-phase ambiguity | both clock registration and event correspondence require abstention/set-valued output |
+
+Keep sensor measurement time, arrival/availability time and evaluator reference time separate. Delayed transport must not be absorbed into sensor-clock skew. Do not infer causality from temporal coincidence.
+
+This design follows the methodological separation in AV-SyncBench (temporal perturbations versus semantic substitutions) and the identifiability emphasis in MATH-SYNC's affine-clock work. They are complementary baselines, not ERGOstream results. The initial Symtropy implementation is tracked in #7442 / draft PR #7493; robust multi-anchor estimator comparisons are tracked in Symtropy #7495.
+
+Score clock offset/rate error, held-out anchor residual and false-identifiable rate separately from event-pair precision/recall, false-unique rate, set-valued correctness and held-out motif transfer. No aggregate synchronization score may conceal a valid clock estimate paired with a false event relation.
+
 For v0.1, keep the first three families tiny, deterministic, replayable and independently enumerable. Do not introduce raw high-dimensional video/audio or continuous physics before clock, provenance, cost and evaluator-custody contracts are qualified.
 
 ## 5. Visibility, freeze and custody contract
@@ -203,6 +225,8 @@ Report observations, interventions, wall time, CPU/GPU time, FLOPs if measured, 
 | Continual-ARC | Recurring ARC tasks return after dormant gaps with fresh instances; learner pays for feedback, and memory-/weight-based systems are compared under a common budget | Strong memory-versus-weight adaptation comparator. Include recurrence after dormancy and fresh-instance generalization; don't mistake demonstration caching for reusable structure. |
 | Compositional continual world models (2026) | Robot-manipulation curricula factor reuse across action, perception and full composition; modular dynamics trade off reuse and forgetting, with no complete solution reported | Physical-AI adapter for compositional transfer after continual acquisition; use matched simulator/task budgets and add explicit structural-library treatment arms. |
 | Memora / FAMA | Multi-session memory benchmark with explicit consolidation and mutation; reports frequent reuse of obsolete/invalidated memories | Lifecycle/retraction guardrail for structural entries. Adapt its obsolete-memory principle, but keep memory QA results distinct from structural transfer. |
+| AV-SyncBench (2026-07-01) | 3,269 in-the-wild clips / 38,390 samples; five models; separate temporal offset/jitter/speed challenges from semantic source/timbre changes under fixed timing | Direct multimodal baseline for decoupled temporal and semantic consistency. Compare the native audio-visual tasks where inputs match; preserve ERGOstream's hidden event-correspondence and pre-task acquisition estimands separately. |
+| MATH-SYNC (2026-10-13) | Robust identifiable affine-clock alignment; reports Huber-vs-OLS macro-RMSE reductions on a 10-participant Harvard cohort and external 15-participant WESAD schedule replay, preserving native sensor rates | Clock-registration baseline for offset/rate, outlier and missing-anchor cases. It is not an event-identity learner or a semantic correspondence benchmark; reproduce its assumptions and protocol before claiming a matched comparison. |
 | DS-CP / TCC / KMM-CP | 2026 work on domain-shift-aware or transported conformal calibration; TCC uses paired unlabeled source/target data, KMM-CP is selective under support overlap | Required calibration-transfer baselines. Do not transport calibration across invalid structural/mechanism maps or claim arbitrary-shift coverage. |
 
 These figures are reported by their respective papers or benchmark maintainers, not reproduced by Symthaea. Model/agent/harness configurations, trial counts, data budgets, hardware and scoring protocols differ. They cannot be ranked against ErgoStream without a matched adapter and protocol.
@@ -361,6 +385,8 @@ Advance only when the UPDATE branch beats its paired HOLD and strongest matched 
 - Dreamer 4 (world-model preprint): https://arxiv.org/abs/2509.24527
 - AgentIdeaBench: https://arxiv.org/abs/2609.07611
 - AutoSciBench: https://arxiv.org/abs/2610.05140
+- AV-SyncBench (2026): https://arxiv.org/abs/2607.00726
+- MATH-SYNC (2026): https://doi.org/10.3390/math14203720
 - DS-CP (ICML 2026): https://proceedings.mlr.press/v306/lin26t.html
 - Transported Conformal Calibration (ICML 2026): https://proceedings.mlr.press/v306/doula26a.html
 - KMM-CP (UAI 2026): https://proceedings.mlr.press/v337/laghuvarapu26a.html
