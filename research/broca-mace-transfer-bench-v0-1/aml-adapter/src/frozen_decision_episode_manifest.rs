@@ -15,6 +15,7 @@ use crate::evaluation_manifest_commitment_receipt::VerifiedEvaluationManifestCom
 pub const DECISION_EPISODE_MANIFEST_SCHEMA_V1: &str = "mace_decision_episode_manifest_v1";
 pub const MAX_DECISION_EPISODE_MANIFESTS_V1: usize = 10_000;
 pub const MAX_DECISION_EPISODE_IDENTIFIER_BYTES_V1: usize = 256;
+pub const MAX_DECISION_EPISODE_INDEX_V1: u64 = 1_000_000_000;
 pub const MAX_DECISION_EPISODE_UNIX_SECONDS_V1: u64 = 253_402_300_799;
 
 #[derive(Clone, Copy, Debug, Eq, PartialEq, Serialize, Deserialize)]
@@ -101,6 +102,7 @@ pub enum FrozenDecisionEpisodeManifestRejectV1 {
     InvalidIdentifier,
     InvalidDigest,
     InvalidTimestamp,
+    InvalidEpisodeIndex,
     NonCanonicalEpisodeOrder,
     DuplicateEpisodeId,
     MixedSuiteIdentity,
@@ -115,6 +117,7 @@ pub struct VerifiedFrozenDecisionEpisodeSetV1 {
     root_sha256: String,
     suite_id: String,
     suite_version: String,
+    split: DecisionEpisodeSplitV1,
     members: BTreeMap<String, String>,
 }
 
@@ -129,6 +132,10 @@ impl VerifiedFrozenDecisionEpisodeSetV1 {
 
     pub fn suite_version(&self) -> &str {
         &self.suite_version
+    }
+
+    pub fn split(&self) -> DecisionEpisodeSplitV1 {
+        self.split
     }
 
     pub fn len(&self) -> usize {
@@ -175,6 +182,7 @@ impl VerifiedFrozenDecisionEpisodeSetV1 {
             manifest_sha256: manifest_sha256.to_owned(),
             suite_id: self.suite_id.clone(),
             suite_version: self.suite_version.clone(),
+            split: self.split,
         })
     }
 }
@@ -189,6 +197,7 @@ pub struct VerifiedDecisionEpisodeMembershipV1 {
     manifest_sha256: String,
     suite_id: String,
     suite_version: String,
+    split: DecisionEpisodeSplitV1,
 }
 
 impl VerifiedDecisionEpisodeMembershipV1 {
@@ -210,6 +219,10 @@ impl VerifiedDecisionEpisodeMembershipV1 {
 
     pub fn suite_version(&self) -> &str {
         &self.suite_version
+    }
+
+    pub fn split(&self) -> DecisionEpisodeSplitV1 {
+        self.split
     }
 }
 
@@ -239,6 +252,9 @@ pub fn validate_frozen_decision_episode_manifest_v1(
     }
     if manifest.frozen_at_unix > MAX_DECISION_EPISODE_UNIX_SECONDS_V1 {
         return Err(FrozenDecisionEpisodeManifestRejectV1::InvalidTimestamp);
+    }
+    if manifest.suite.episode_index > MAX_DECISION_EPISODE_INDEX_V1 {
+        return Err(FrozenDecisionEpisodeManifestRejectV1::InvalidEpisodeIndex);
     }
     for digest in [
         manifest.task.task_input_sha256.as_str(),
@@ -291,6 +307,7 @@ pub fn verify_frozen_decision_episode_set_v1(
 
     let suite_id = manifests[0].suite.suite_id.clone();
     let suite_version = manifests[0].suite.suite_version.clone();
+    let split = manifests[0].suite.split;
     let mut members = BTreeMap::new();
     let mut previous_id: Option<&str> = None;
     let mut hasher = Sha256::new();
@@ -299,7 +316,10 @@ pub fn verify_frozen_decision_episode_set_v1(
 
     for manifest in manifests {
         validate_frozen_decision_episode_manifest_v1(manifest)?;
-        if manifest.suite.suite_id != suite_id || manifest.suite.suite_version != suite_version {
+        if manifest.suite.suite_id != suite_id
+            || manifest.suite.suite_version != suite_version
+            || manifest.suite.split != split
+        {
             return Err(FrozenDecisionEpisodeManifestRejectV1::MixedSuiteIdentity);
         }
         if let Some(previous) = previous_id {
@@ -326,6 +346,7 @@ pub fn verify_frozen_decision_episode_set_v1(
         root_sha256: hex_digest(&hasher.finalize()),
         suite_id,
         suite_version,
+        split,
         members,
     })
 }
@@ -471,6 +492,27 @@ mod tests {
         assert_eq!(
             verify_frozen_decision_episode_set_v1(&[a, b]),
             Err(FrozenDecisionEpisodeManifestRejectV1::MixedSuiteIdentity)
+        );
+    }
+
+    #[test]
+    fn mixed_development_and_held_out_splits_are_rejected() {
+        let a = fixture_manifest("episode-a");
+        let mut b = fixture_manifest("episode-b");
+        b.suite.split = DecisionEpisodeSplitV1::Development;
+        assert_eq!(
+            verify_frozen_decision_episode_set_v1(&[a, b]),
+            Err(FrozenDecisionEpisodeManifestRejectV1::MixedSuiteIdentity)
+        );
+    }
+
+    #[test]
+    fn episode_index_is_bounded_by_the_schema() {
+        let mut manifest = fixture_manifest("episode-a");
+        manifest.suite.episode_index = MAX_DECISION_EPISODE_INDEX_V1 + 1;
+        assert_eq!(
+            validate_frozen_decision_episode_manifest_v1(&manifest),
+            Err(FrozenDecisionEpisodeManifestRejectV1::InvalidEpisodeIndex)
         );
     }
 
