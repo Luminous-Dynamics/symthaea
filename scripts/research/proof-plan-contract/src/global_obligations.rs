@@ -404,6 +404,8 @@ mod tests {
 
     const FIXTURE: &str =
         include_str!("../../../../docs/research/PROOF_PLAN_AND_COMM_V1.json");
+    const MUTATION_CORPUS: &str =
+        include_str!("../../../../docs/research/PROOF_PLAN_GLOBAL_OBLIGATION_MUTATIONS_V1.json");
 
     fn fixture() -> crate::ProofPlan {
         parse_plan(FIXTURE).expect("valid provisional ProofPlan fixture")
@@ -425,10 +427,208 @@ mod tests {
         serde_json::from_str(FIXTURE).unwrap()
     }
 
+    fn apply_mutation(value: &mut Value, mutation_kind: &str) {
+        match mutation_kind {
+            "no_op" => {}
+            "remove_discharge" | "accept_unresolved_plan" => {
+                value["edges"].as_array_mut().unwrap().retain(|edge| {
+                    !(edge["source_id"] == "A_REVERSE"
+                        && edge["target_id"] == "G_REVERSE"
+                        && edge["relation"] == "discharges")
+                });
+                if mutation_kind == "accept_unresolved_plan" {
+                    value["status"] = Value::String("accepted".to_owned());
+                }
+            }
+            "double_discharge" => {
+                find_action_mut(value, "A_FORWARD")["action_spec"]["input_goal_ids"] =
+                    serde_json::json!(["G_FORWARD", "G_REVERSE"]);
+                value["edges"].as_array_mut().unwrap().push(serde_json::json!({
+                    "source_id":"A_FORWARD","target_id":"G_REVERSE",
+                    "relation":"discharges","evidence_refs":["E_SOURCE"]
+                }));
+            }
+            "orphan_subgoal" => {
+                value["nodes"].as_array_mut().unwrap().push(serde_json::json!({
+                    "id":"G_ORPHAN","kind":"subgoal","label":"orphan",
+                    "statement":"True","epistemic_class":"mathematical_interpretation",
+                    "evidence_refs":["E_SOURCE"]
+                }));
+                value["alternatives"][0]["node_ids"]
+                    .as_array_mut().unwrap().push(Value::String("G_ORPHAN".to_owned()));
+            }
+            "orphan_create_edge" => {
+                value["edges"].as_array_mut().unwrap().push(serde_json::json!({
+                    "source_id":"A_FORWARD","target_id":"G_REVERSE",
+                    "relation":"creates_subgoal","evidence_refs":["E_SOURCE"]
+                }));
+            }
+            "declared_output_without_edge" => {
+                value["nodes"].as_array_mut().unwrap().push(serde_json::json!({
+                    "id":"G_EXTRA","kind":"subgoal","label":"declared but unproduced",
+                    "statement":"True","epistemic_class":"mathematical_interpretation",
+                    "evidence_refs":["E_SOURCE"]
+                }));
+                value["alternatives"][0]["node_ids"]
+                    .as_array_mut().unwrap().push(Value::String("G_EXTRA".to_owned()));
+                find_action_mut(value, "A_FORWARD")["action_spec"]["output_subgoal_ids"] =
+                    serde_json::json!(["G_EXTRA"]);
+            }
+            "transform_without_successor" => {
+                for edge in value["edges"].as_array_mut().unwrap() {
+                    if edge["source_id"] == "A_FORWARD"
+                        && edge["target_id"] == "G_FORWARD"
+                        && edge["relation"] == "discharges"
+                    {
+                        edge["relation"] = Value::String("transforms".to_owned());
+                    }
+                }
+            }
+            "add_goal_transition_cycle" => {
+                value["nodes"].as_array_mut().unwrap().extend([
+                    serde_json::json!({
+                        "id":"G_LOOP_A","kind":"subgoal","label":"loop A",
+                        "statement":"True","epistemic_class":"mathematical_interpretation",
+                        "evidence_refs":["E_SOURCE"]
+                    }),
+                    serde_json::json!({
+                        "id":"G_LOOP_B","kind":"subgoal","label":"loop B",
+                        "statement":"True","epistemic_class":"mathematical_interpretation",
+                        "evidence_refs":["E_SOURCE"]
+                    }),
+                    serde_json::json!({
+                        "id":"A_CYCLE_A","kind":"plan_action","label":"cycle A",
+                        "epistemic_class":"mathematical_interpretation","evidence_refs":["E_SOURCE"],
+                        "action_spec":{
+                            "operation":"normalize","input_goal_ids":["G_LOOP_B"],
+                            "output_subgoal_ids":["G_LOOP_A"],"consumed_side_condition_ids":[],
+                            "justification_node_ids":["J_IFF"],"rationale":"synthetic cycle control",
+                            "evidence_refs":["E_SOURCE"]
+                        }
+                    }),
+                    serde_json::json!({
+                        "id":"A_CYCLE_B","kind":"plan_action","label":"cycle B",
+                        "epistemic_class":"mathematical_interpretation","evidence_refs":["E_SOURCE"],
+                        "action_spec":{
+                            "operation":"normalize","input_goal_ids":["G_LOOP_A"],
+                            "output_subgoal_ids":["G_LOOP_B"],"consumed_side_condition_ids":[],
+                            "justification_node_ids":["J_IFF"],"rationale":"synthetic cycle control",
+                            "evidence_refs":["E_SOURCE"]
+                        }
+                    })
+                ]);
+                value["alternatives"][0]["node_ids"].as_array_mut().unwrap().extend([
+                    Value::String("G_LOOP_A".to_owned()),
+                    Value::String("G_LOOP_B".to_owned()),
+                    Value::String("A_CYCLE_A".to_owned()),
+                    Value::String("A_CYCLE_B".to_owned())
+                ]);
+                value["edges"].as_array_mut().unwrap().extend([
+                    serde_json::json!({
+                        "source_id":"A_CYCLE_A","target_id":"G_LOOP_B",
+                        "relation":"transforms","evidence_refs":["E_SOURCE"]
+                    }),
+                    serde_json::json!({
+                        "source_id":"A_CYCLE_A","target_id":"G_LOOP_A",
+                        "relation":"creates_subgoal","evidence_refs":["E_SOURCE"]
+                    }),
+                    serde_json::json!({
+                        "source_id":"A_CYCLE_B","target_id":"G_LOOP_A",
+                        "relation":"transforms","evidence_refs":["E_SOURCE"]
+                    }),
+                    serde_json::json!({
+                        "source_id":"A_CYCLE_B","target_id":"G_LOOP_B",
+                        "relation":"creates_subgoal","evidence_refs":["E_SOURCE"]
+                    })
+                ]);
+            }
+            "candidate_route_with_unresolved_goals" => {
+                value["alternatives"].as_array_mut().unwrap().push(serde_json::json!({
+                    "id":"ALT_CANDIDATE",
+                    "label":"unfinished candidate route",
+                    "root_goal_id":"G_MAIN",
+                    "node_ids":["G_MAIN","A_SPLIT_IFF","G_FORWARD","G_REVERSE"],
+                    "status":"candidate"
+                }));
+            }
+            "duplicate_primary_alternative" => {
+                let mut second = value["alternatives"][0].clone();
+                second["id"] = Value::String("ALT_PRIMARY_2".to_owned());
+                value["alternatives"].as_array_mut().unwrap().push(second);
+                value["status"] = Value::String("accepted".to_owned());
+            }
+            other => panic!("unknown obligation mutation kind: {other}"),
+        }
+    }
+
     fn analyzed(value: &Value) -> GlobalObligationReport {
         let input = serde_json::to_string(value).unwrap();
         let plan = parse_plan(&input).unwrap();
         analyze_global_obligations(&plan)
+    }
+
+    #[test]
+    fn executable_mutation_corpus_matches_global_obligation_accounting() {
+        let corpus: Value =
+            serde_json::from_str(MUTATION_CORPUS).expect("mutation corpus JSON");
+        let cases = corpus["cases"].as_array().expect("mutation cases array");
+        assert_eq!(cases.len(), 11);
+
+        for case in cases {
+            let case_id = case["id"].as_str().expect("case ID");
+            let mutation_kind = case["mutation_kind"].as_str().expect("mutation kind");
+            let expected = case["expected"].as_str().expect("expected disposition");
+            let mut value = plan_value();
+            apply_mutation(&mut value, mutation_kind);
+
+            let input = serde_json::to_string(&value).expect("serialize mutated plan");
+            let plan = parse_plan(&input).expect("mutated plan remains parseable");
+            let report = analyze_global_obligations(&plan);
+
+            let counts = case["expected_counts"].as_object().expect("expected counts");
+            let total = |field: &str, select: fn(&AlternativeObligationReport) -> usize| {
+                let actual: usize = report.alternatives.iter().map(select).sum();
+                let expected = counts[field].as_u64().expect("expected count") as usize;
+                assert_eq!(actual, expected, "{case_id}: {field}");
+            };
+            total("produced_subgoals", |item| item.produced_subgoals.len());
+            total("transformed_goals", |item| item.transformed_goals.len());
+            total("discharged_goals", |item| item.discharged_goals.len());
+            total("unresolved_goals", |item| item.unresolved_goals.len());
+            total("cycle_nodes", |item| item.cycle_nodes.len());
+
+            let primary = report
+                .alternatives
+                .iter()
+                .find(|item| item.alternative_id == "ALT_PRIMARY")
+                .expect("primary alternative report");
+            let candidate = report
+                .alternatives
+                .iter()
+                .find(|item| item.alternative_id == "ALT_CANDIDATE");
+
+            match expected {
+                "complete" => {
+                    assert!(report.errors.is_empty(), "{case_id}: {:?}", report.errors);
+                    assert!(primary.unresolved_goals.is_empty(), "{case_id}");
+                    assert!(primary.cycle_nodes.is_empty(), "{case_id}");
+                    assert!(!primary.terminal_goals.is_empty(), "{case_id}");
+                }
+                "incomplete" => {
+                    assert!(report.errors.is_empty(), "{case_id}: {:?}", report.errors);
+                    assert!(!primary.unresolved_goals.is_empty(), "{case_id}");
+                }
+                "reject" => {
+                    assert!(!report.errors.is_empty(), "{case_id}: expected rejection");
+                }
+                "primary_complete_candidate_incomplete" => {
+                    assert!(report.errors.is_empty(), "{case_id}: {:?}", report.errors);
+                    assert!(primary.unresolved_goals.is_empty(), "{case_id}");
+                    assert!(candidate.is_some_and(|item| !item.unresolved_goals.is_empty()), "{case_id}");
+                }
+                other => panic!("{case_id}: unknown expected disposition {other}"),
+            }
+        }
     }
 
     #[test]
@@ -625,5 +825,4 @@ mod tests {
         let report = analyzed(&value);
         assert!(report.errors.iter().any(|error| error.contains("goal-transition cycle")));
     }
-}
 }
