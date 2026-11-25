@@ -1214,6 +1214,33 @@ mod tests {
     }
 
     #[test]
+    fn inference_cost_measurements_must_be_positive() {
+        let mut invalid = batch(vec![case(
+            "zero-cost",
+            GroundTruthStateV1::Present,
+            vec![crate::temporal_grounding::FrameIntervalV1 {
+                start_frame: 100,
+                end_frame: 200,
+            }],
+            None,
+            SelectiveDecisionV1::Answer,
+            GroundingPredictionStateV1::Occurrences {
+                intervals: vec![crate::temporal_grounding::FrameIntervalV1 {
+                    start_frame: 100,
+                    end_frame: 200,
+                }],
+            },
+            0.9,
+        )]);
+        invalid.cases[0].inference_cost.forward_passes = 0;
+        assert!(audit_selective_batch(&invalid).is_err());
+
+        invalid.cases[0].inference_cost.forward_passes = 1;
+        invalid.cases[0].inference_cost.one_pass_baseline_wall_time_ms = 0;
+        assert!(audit_selective_batch(&invalid).is_err());
+    }
+
+    #[test]
     fn confidence_and_case_metadata_are_validated() {
         let mut invalid = batch(vec![case(
             "bad-confidence",
