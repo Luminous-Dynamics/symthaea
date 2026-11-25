@@ -1,0 +1,116 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "SDCB_REFERENCE_CONTROL_RECEIPT_V1.schema.json",
+  "title": "SDCB reference control execution receipt v1",
+  "type": "object",
+  "additionalProperties": false,
+  "required": [
+    "schema_version",
+    "receipt_type",
+    "source_revision",
+    "source_revision_provenance",
+    "repository_head",
+    "git_working_tree_clean",
+    "build_command",
+    "rustflags",
+    "compiler_version",
+    "operating_system",
+    "architecture",
+    "created_unix_seconds",
+    "total_cases",
+    "passed_cases",
+    "failed_cases",
+    "overall_status",
+    "claim_ceiling",
+    "cases"
+  ],
+  "properties": {
+    "schema_version": {
+      "const": "1.0.0"
+    },
+    "receipt_type": {
+      "const": "sdcb_reference_control_run_v1"
+    },
+    "source_revision": {
+      "type": "string",
+      "pattern": "^[0-9a-f]{40}$"
+    },
+    "source_revision_provenance": {
+      "const": "observed_git_head_matches_clean_worktree"
+    },
+    "compiler_version": {
+      "type": "string",
+      "minLength": 1
+    },
+    "operating_system": {
+      "type": "string",
+      "minLength": 1
+    },
+    "architecture": {
+      "type": "string",
+      "minLength": 1
+    },
+    "created_unix_seconds": {
+      "type": "integer",
+      "minimum": 0
+    },
+    "total_cases": {
+      "type": "integer",
+      "minimum": 1
+    },
+    "passed_cases": {
+      "type": "integer",
+      "minimum": 0
+    },
+    "failed_cases": {
+      "type": "integer",
+      "minimum": 0
+    },
+    "overall_status": {
+      "enum": [
+        "passed",
+        "failed"
+      ]
+    },
+    "claim_ceiling": {
+      "const": "analytic_reference_controls_only"
+    },
+    "cases": {
+      "type": "array",
+      "minItems": 1,
+      "items": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": [
+          "case_id",
+          "status"
+        ],
+        "properties": {
+          "case_id": {
+            "type": "string",
+            "pattern": "^[a-z0-9_]+$"
+          },
+          "status": {
+            "enum": [
+              "passed",
+              "failed"
+            ]
+          }
+        }
+      }
+    },
+    "repository_head": {
+      "type": "string",
+      "pattern": "^[0-9a-f]{40}$"
+    },
+    "git_working_tree_clean": {
+      "const": true
+    },
+    "build_command": {
+      "const": "rustc --edition=2024 scripts/research/sdcb_reference_receipt.rs"
+    },
+    "rustflags": {
+      "type": "string"
+    }
+  }
+}

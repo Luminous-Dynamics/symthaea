@@ -1,0 +1,1096 @@
+{
+  "schema_version": "1.0.0",
+  "manifest_id": "sdcb-v1-exploratory-pilot",
+  "status": "design_only",
+  "study_design": "exploratory",
+  "scope": {
+    "claim_boundary": "No inference from RH, zeta spectra, random-matrix fits, or criticality to biological implementation, intelligence, or consciousness without a separately replicated causal mechanism.",
+    "biological_data": "excluded",
+    "rh_status_snapshot": "As of 2026-11-25, Clay lists RH as Active; a large Lean formalization is under public machine and human review, with no readable peer-reviewed proof."
+  },
+  "hypotheses": [
+    {
+      "id": "H0",
+      "statement": "Zeta-derived features have no special predictive advantage over matched generic spectral bases.",
+      "positive_evidence": "No special advantage is established; use equivalence bounds and matched controls.",
+      "falsifier": "A robust held-out zeta-specific gain beyond every matched basis and shuffle control."
+    },
+    {
+      "id": "H1",
+      "statement": "Spectral descriptors of model dynamics predict transfer, robustness, or memory.",
+      "positive_evidence": "Incremental held-out prediction across seeds and families.",
+      "falsifier": "Signal disappears under matched random-matrix controls or held-out families."
+    },
+    {
+      "id": "H2",
+      "statement": "Near-critical dynamics improve some computational trade-offs.",
+      "positive_evidence": "Replicated regime-dependent Pareto improvement with stability costs reported.",
+      "falsifier": "No replicable benefit or benefits vary by task and finite size."
+    },
+    {
+      "id": "H3",
+      "statement": "Both tails of learned singular spectra can carry task-relevant information.",
+      "positive_evidence": "Tail interventions impair performance beyond matched bulk and random interventions.",
+      "falsifier": "Tail effects vanish under norm/rank/conditioning-matched controls."
+    },
+    {
+      "id": "H4",
+      "statement": "Koopman/operator features improve multi-step and intervention prediction.",
+      "positive_evidence": "Held-out prediction or intervention fidelity improves at matched compute.",
+      "falsifier": "Gain disappears under capacity, compute, or regime-shift controls."
+    },
+    {
+      "id": "H5",
+      "statement": "Prime/logarithmic or zeta-ordinate bases help prime-structured tasks.",
+      "positive_evidence": "Held-out arithmetic-range gains beat Fourier, wavelet, random, and shuffled controls.",
+      "falsifier": "No advantage over matched bases or no transfer outside discovery ranges."
+    },
+    {
+      "id": "H6",
+      "statement": "Spectral-mode interventions have causal explanatory value.",
+      "positive_evidence": "Predicted perturbation effect and matched restoration replicate.",
+      "falsifier": "Descriptors correlate but interventions do not validate the proposed mechanism."
+    }
+  ],
+  "tasks": [
+    {
+      "task_id": "SDCB-PRIME-001",
+      "family": "prime_explicit_formula",
+      "split": "development",
+      "generator": "Pinned high-precision prime-counting / Chebyshev-function generator with a documented finite zeta-zero table.",
+      "parameters": {
+        "x_interval": [
+          1000,
+          100000
+        ],
+        "zero_count": 32,
+        "precision_bits": 256,
+        "held_out_by": "disjoint x-ranges"
+      },
+      "target": "Predict prime-counting fluctuation residuals; report truncation error and certified source precision.",
+      "controls": [
+        "shuffled zero ordinates",
+        "GUE spectrum matched by count and range",
+        "Fourier basis with equal feature count",
+        "random Fourier basis with equal feature count"
+      ]
+    },
+    {
+      "task_id": "SDCB-PRIME-002",
+      "family": "prime_explicit_formula",
+      "split": "development",
+      "generator": "Same pinned generator as SDCB-PRIME-001 with a distinct arithmetic interval.",
+      "parameters": {
+        "x_interval": [
+          100000,
+          500000
+        ],
+        "zero_count": 64,
+        "precision_bits": 256,
+        "held_out_by": "interval"
+      },
+      "target": "Estimate residual prediction under interval shift.",
+      "controls": [
+        "shuffled prime labels",
+        "shifted zero ordinates",
+        "wavelet basis with equal feature count"
+      ]
+    },
+    {
+      "task_id": "SDCB-PRIME-003",
+      "family": "prime_explicit_formula",
+      "split": "validation",
+      "generator": "Exact prime indicator / arithmetic progression generator.",
+      "parameters": {
+        "moduli": [
+          5,
+          7,
+          11
+        ],
+        "residue_classes": "coprime classes",
+        "held_out_by": "modulus"
+      },
+      "target": "Generalize to unseen residue classes and moduli.",
+      "controls": [
+        "permuted residue labels",
+        "matched Fourier basis",
+        "exact symbolic prime oracle"
+      ]
+    },
+    {
+      "task_id": "SDCB-PRIME-004",
+      "family": "prime_explicit_formula",
+      "split": "validation",
+      "generator": "Prime-gap sequence generator using a pinned deterministic primality implementation.",
+      "parameters": {
+        "n_ranges": [
+          [
+            10000,
+            20000
+          ],
+          [
+            500000,
+            510000
+          ]
+        ],
+        "held_out_by": "disjoint index ranges"
+      },
+      "target": "Predict gap statistics without leakage across adjacent ranges.",
+      "controls": [
+        "shuffled prime-gap order",
+        "random spectral basis",
+        "simple statistical baseline"
+      ]
+    },
+    {
+      "task_id": "SDCB-DYN-001",
+      "family": "chaotic_system_identification",
+      "split": "development",
+      "generator": "Lorenz-63 ODE with fixed integrator, tolerances, and initial conditions.",
+      "parameters": {
+        "sigma": 10,
+        "rho": 28,
+        "beta": 2.6666666667,
+        "dt": 0.01,
+        "train_duration": 100,
+        "test_duration": 50
+      },
+      "target": "Multi-step prediction and calibrated uncertainty.",
+      "controls": [
+        "time-reversed trajectories",
+        "phase-randomized inputs",
+        "linear autoregression"
+      ]
+    },
+    {
+      "task_id": "SDCB-DYN-002",
+      "family": "chaotic_system_identification",
+      "split": "development",
+      "generator": "Duffing oscillator with deterministic forcing and pinned numerical integration.",
+      "parameters": {
+        "forcing_frequency": 1,
+        "training_damping": [
+          0.15,
+          0.2
+        ],
+        "held_out_damping": [
+          0.25,
+          0.3
+        ],
+        "dt": 0.01
+      },
+      "target": "Parameter-shift generalization and intervention prediction.",
+      "controls": [
+        "randomized forcing phase",
+        "matched reservoir baseline",
+        "matched Koopman baseline"
+      ]
+    },
+    {
+      "task_id": "SDCB-DYN-003",
+      "family": "chaotic_system_identification",
+      "split": "validation",
+      "generator": "Kuramoto phase oscillator network with deterministic graph and frequency seeds.",
+      "parameters": {
+        "node_counts": [
+          32,
+          64
+        ],
+        "coupling_sweep": [
+          0.2,
+          0.4,
+          0.6,
+          0.8
+        ],
+        "held_out_graph_seeds": true
+      },
+      "target": "Predict synchronization onset and phase evolution on unseen graphs.",
+      "controls": [
+        "degree-preserving rewiring",
+        "frequency permutation",
+        "mean-field baseline"
+      ]
+    },
+    {
+      "task_id": "SDCB-DYN-004",
+      "family": "chaotic_system_identification",
+      "split": "validation",
+      "generator": "Piecewise dynamical system with an abrupt but known regime switch.",
+      "parameters": {
+        "regimes": [
+          "stable",
+          "oscillatory",
+          "chaotic"
+        ],
+        "switch_points": [
+          0.33,
+          0.66
+        ],
+        "held_out_switch_schedule": true
+      },
+      "target": "Detect regime change and predict post-switch dynamics.",
+      "controls": [
+        "shuffled switch labels",
+        "no-switch null",
+        "linear state-space baseline"
+      ]
+    },
+    {
+      "task_id": "SDCB-MEM-001",
+      "family": "memory_interference",
+      "split": "development",
+      "generator": "Deterministic HDC bind/bundle/retrieve sequence generator.",
+      "parameters": {
+        "dimension": 16384,
+        "items_per_bundle": [
+          4,
+          8,
+          16,
+          32
+        ],
+        "distractor_count": [
+          0,
+          1,
+          4,
+          8
+        ]
+      },
+      "target": "Recall accuracy, capacity curve, interference and recovery.",
+      "controls": [
+        "random codebook",
+        "item-order permutation",
+        "matched vector norm control"
+      ]
+    },
+    {
+      "task_id": "SDCB-MEM-002",
+      "family": "memory_interference",
+      "split": "development",
+      "generator": "Temporal sequence recall with controlled delay and distractor injection.",
+      "parameters": {
+        "sequence_lengths": [
+          8,
+          16,
+          32,
+          64
+        ],
+        "delays": [
+          1,
+          4,
+          16,
+          64
+        ],
+        "noise_levels": [
+          0,
+          0.05,
+          0.1
+        ]
+      },
+      "target": "Delayed recall and error recovery under distractors.",
+      "controls": [
+        "sequence shuffle",
+        "time reversal",
+        "no-distractor control"
+      ]
+    },
+    {
+      "task_id": "SDCB-MEM-003",
+      "family": "memory_interference",
+      "split": "validation",
+      "generator": "Counterfactual memory update task with stable item identities.",
+      "parameters": {
+        "updates_per_item": [
+          1,
+          2,
+          4
+        ],
+        "stale_recall_challenge": true
+      },
+      "target": "Distinguish latest valid state from stale and conflicting memories.",
+      "controls": [
+        "version-label shuffle",
+        "stale-state injection",
+        "exact table lookup oracle"
+      ]
+    },
+    {
+      "task_id": "SDCB-MEM-004",
+      "family": "memory_interference",
+      "split": "validation",
+      "generator": "Compositional role-binding and unbinding task.",
+      "parameters": {
+        "roles": [
+          "agent",
+          "action",
+          "object",
+          "time"
+        ],
+        "compositions": [
+          2,
+          4,
+          8
+        ]
+      },
+      "target": "Generalize binding to held-out role combinations.",
+      "controls": [
+        "role permutation",
+        "unbound bag-of-items baseline",
+        "random role vectors"
+      ]
+    },
+    {
+      "task_id": "SDCB-PROOF-001",
+      "family": "proof_obligation_graph",
+      "split": "development",
+      "generator": "Frozen acyclic proof-plan hypergraphs with unique producer / consumer accounting.",
+      "parameters": {
+        "root_count": 1,
+        "goal_count": 8,
+        "transformation_depth": 3,
+        "primary_route_count": 1
+      },
+      "target": "Recover exact primary-route obligation accounting.",
+      "controls": [
+        "remove one discharge",
+        "duplicate discharge",
+        "orphan subgoal",
+        "no-op mutation"
+      ]
+    },
+    {
+      "task_id": "SDCB-PROOF-002",
+      "family": "proof_obligation_graph",
+      "split": "development",
+      "generator": "Proof-plan graph with transformed goals and explicit successor obligations.",
+      "parameters": {
+        "goal_count": 12,
+        "transformation_depth": 4,
+        "candidate_routes": 2
+      },
+      "target": "Distinguish discharged, transformed, and unresolved obligations.",
+      "controls": [
+        "transform without successor",
+        "declared output without edge",
+        "cycle injection"
+      ]
+    },
+    {
+      "task_id": "SDCB-PROOF-003",
+      "family": "proof_obligation_graph",
+      "split": "validation",
+      "generator": "Held-out proof hypergraph topology and task-family generator.",
+      "parameters": {
+        "goal_count": 24,
+        "branching": [
+          2,
+          3,
+          4
+        ],
+        "candidate_routes": 3
+      },
+      "target": "Generalize accounting under changed graph size and branching.",
+      "controls": [
+        "candidate-route incompleteness",
+        "duplicate primary route",
+        "orphan edge"
+      ]
+    },
+    {
+      "task_id": "SDCB-PROOF-004",
+      "family": "proof_obligation_graph",
+      "split": "validation",
+      "generator": "Lean-backed miniature theorem corpus with exact statement identities.",
+      "parameters": {
+        "theorem_families": [
+          "propositional",
+          "algebraic",
+          "order"
+        ],
+        "kernel_replay_required": true
+      },
+      "target": "Separate plan quality from exact theorem statement and kernel validity.",
+      "controls": [
+        "wrong target proposition",
+        "injected axiom",
+        "statement mutation"
+      ]
+    },
+    {
+      "task_id": "SDCB-CRIT-001",
+      "family": "criticality_sweep",
+      "split": "development",
+      "generator": "Finite recurrent network with controllable gain and coupling.",
+      "parameters": {
+        "sizes": [
+          64,
+          128,
+          256
+        ],
+        "gain_sweep": [
+          0.5,
+          0.75,
+          0.9,
+          1,
+          1.1,
+          1.25
+        ],
+        "seeds": 5
+      },
+      "target": "Measure memory, susceptibility, stability, response and finite-size behaviour across regimes.",
+      "controls": [
+        "degree-preserving rewiring",
+        "matched random weights",
+        "permutation of node labels"
+      ]
+    },
+    {
+      "task_id": "SDCB-CRIT-002",
+      "family": "criticality_sweep",
+      "split": "development",
+      "generator": "Noise and perturbation response sweep at fixed model capacity.",
+      "parameters": {
+        "noise_levels": [
+          0,
+          0.01,
+          0.05,
+          0.1,
+          0.2
+        ],
+        "perturbation_modes": [
+          "state",
+          "weight",
+          "input"
+        ]
+      },
+      "target": "Estimate response/recovery frontier, not a single criticality score.",
+      "controls": [
+        "shuffled perturbation timing",
+        "no-perturbation control",
+        "matched norm perturbation"
+      ]
+    },
+    {
+      "task_id": "SDCB-CRIT-003",
+      "family": "criticality_sweep",
+      "split": "validation",
+      "generator": "Held-out network topologies and recurrent coupling values.",
+      "parameters": {
+        "sizes": [
+          96,
+          192
+        ],
+        "topologies": [
+          "ring",
+          "small_world",
+          "sparse_random"
+        ],
+        "held_out_couplings": true
+      },
+      "target": "Test transfer of regime diagnostics across size and topology.",
+      "controls": [
+        "random topology labels",
+        "mean-field approximation",
+        "finite-size null"
+      ]
+    },
+    {
+      "task_id": "SDCB-CRIT-004",
+      "family": "criticality_sweep",
+      "split": "validation",
+      "generator": "Dynamical-range and delayed-memory task over the same recurrent system.",
+      "parameters": {
+        "task_modes": [
+          "classification",
+          "sequence_prediction",
+          "delayed_recall"
+        ],
+        "noise_levels": [
+          0,
+          0.05,
+          0.1
+        ]
+      },
+      "target": "Compare whether an operating point is task-dependent.",
+      "controls": [
+        "fixed-gain baseline",
+        "adaptive-gain disabled",
+        "matched compute baseline"
+      ]
+    },
+    {
+      "task_id": "SDCB-SPEC-001",
+      "family": "spectral_ablation",
+      "split": "development",
+      "generator": "Pinned open transformer checkpoint and fixed layer/weight extraction.",
+      "parameters": {
+        "checkpoint": "to-be-pinned-before-run",
+        "layers": [
+          "early",
+          "middle",
+          "late"
+        ],
+        "precision": "float32"
+      },
+      "target": "Measure RMT deviations and activation-covariance overlap.",
+      "controls": [
+        "Marchenko-Pastur null",
+        "Porter-Thomas null",
+        "random orthogonal rotation"
+      ]
+    },
+    {
+      "task_id": "SDCB-SPEC-002",
+      "family": "spectral_ablation",
+      "split": "development",
+      "generator": "Same checkpoint as SDCB-SPEC-001 with controlled singular-subspace interventions.",
+      "parameters": {
+        "subspaces": [
+          "largest_tail",
+          "smallest_tail",
+          "bulk"
+        ],
+        "ablation_fraction": [
+          0.01,
+          0.05,
+          0.1
+        ]
+      },
+      "target": "Measure task/perplexity degradation and matched restoration.",
+      "controls": [
+        "rank-matched random ablation",
+        "condition-number-matched perturbation",
+        "sham intervention"
+      ]
+    },
+    {
+      "task_id": "SDCB-SPEC-003",
+      "family": "spectral_ablation",
+      "split": "validation",
+      "generator": "HDC/CfC/HDC+CfC model state and recurrent Jacobian extraction.",
+      "parameters": {
+        "model_variants": [
+          "hdc",
+          "cfc_ltc",
+          "hdc_cfc"
+        ],
+        "tasks": [
+          "memory",
+          "temporal_prediction",
+          "proof_route"
+        ],
+        "seeds": 5
+      },
+      "target": "Test whether spectral descriptors predict task outcome beyond model and task covariates.",
+      "controls": [
+        "randomized state vectors",
+        "spectrum-preserving eigenvector shuffle",
+        "state-label permutation"
+      ]
+    },
+    {
+      "task_id": "SDCB-SPEC-004",
+      "family": "spectral_ablation",
+      "split": "validation",
+      "generator": "Independent small transformer checkpoint with frozen tokenizer and task prompts.",
+      "parameters": {
+        "checkpoint": "to-be-pinned-before-run",
+        "tokenizer": "to-be-pinned-before-run",
+        "intervention_budget": "matched"
+      },
+      "target": "Test reproducibility of low/high spectral tail effects.",
+      "controls": [
+        "matched random subspace",
+        "layer permutation",
+        "no-op intervention"
+      ]
+    },
+    {
+      "task_id": "SDCB-ID-001",
+      "family": "identifiability_abstention",
+      "split": "development",
+      "generator": "Two diagonal two-state systems observed through the first coordinate only.",
+      "parameters": {
+        "system_a": [
+          [
+            0.5,
+            0
+          ],
+          [
+            0,
+            0.2
+          ]
+        ],
+        "system_b": [
+          [
+            0.5,
+            0
+          ],
+          [
+            0,
+            0.9
+          ]
+        ],
+        "sensor": [
+          1,
+          0
+        ],
+        "initial_state": [
+          1,
+          1
+        ],
+        "horizon": 8
+      },
+      "target": "Detect that the hidden eigenvalue is not identifiable from these observations and abstain from selecting between the systems.",
+      "controls": [
+        "full_state_sensor_positive_control",
+        "visible_eigenvalue_mutation",
+        "same_observation_different_hidden_mode"
+      ]
+    },
+    {
+      "task_id": "SDCB-ID-002",
+      "family": "identifiability_abstention",
+      "split": "development",
+      "generator": "Two-feature linear regressor with rank-deficient input excitation.",
+      "parameters": {
+        "input_rows": [
+          [
+            1,
+            0
+          ],
+          [
+            2,
+            0
+          ],
+          [
+            3,
+            0
+          ]
+        ],
+        "feature_count": 2
+      },
+      "target": "Report excitation rank one and refuse a unique two-parameter estimate.",
+      "controls": [
+        "orthogonal_excitation_positive_control",
+        "duplicate_input_rows",
+        "zero_input_sequence"
+      ]
+    },
+    {
+      "task_id": "SDCB-ID-003",
+      "family": "identifiability_abstention",
+      "split": "validation",
+      "generator": "Fully observable two-state linear system under independently varied initial states.",
+      "parameters": {
+        "system": [
+          [
+            0,
+            1
+          ],
+          [
+            -1,
+            0
+          ]
+        ],
+        "sensor": [
+          1,
+          0
+        ],
+        "initial_states": [
+          [
+            1,
+            0
+          ],
+          [
+            0,
+            1
+          ]
+        ],
+        "horizon": 12
+      },
+      "target": "Recover full observability rank and distinguish it from the hidden-mode negative control.",
+      "controls": [
+        "single_sensor_unobservable_control",
+        "state_initialization_permutation",
+        "noiseless_exact_reference"
+      ]
+    },
+    {
+      "task_id": "SDCB-ID-004",
+      "family": "identifiability_abstention",
+      "split": "validation",
+      "generator": "Finite noisy and intermittently observed two-state linear system with a pinned noise generator.",
+      "parameters": {
+        "noise_std": [
+          0,
+          0.01,
+          0.05,
+          0.1
+        ],
+        "observation_dropout": [
+          0,
+          0.1,
+          0.25
+        ],
+        "seed_policy": "independent_holdout_seed"
+      },
+      "target": "Distinguish structural observability from practical finite-data identifiability and abstain when uncertainty exceeds the declared bound.",
+      "controls": [
+        "noise_free_positive_control",
+        "sensor_dropout_ablation",
+        "noise_seed_permutation"
+      ]
+    },
+    {
+      "task_id": "SDCB-ID-005",
+      "family": "identifiability_abstention",
+      "split": "validation",
+      "generator": "Paired diagonal two-state systems that are indistinguishable under the current first-coordinate sensor.",
+      "parameters": {
+        "system_a": [
+          [
+            0.5,
+            0
+          ],
+          [
+            0,
+            0.2
+          ]
+        ],
+        "system_b": [
+          [
+            0.5,
+            0
+          ],
+          [
+            0,
+            0.9
+          ]
+        ],
+        "current_sensor": [
+          1,
+          0
+        ],
+        "candidate_sensors": [
+          [
+            0,
+            1
+          ],
+          [
+            1,
+            1
+          ]
+        ],
+        "initial_state": [
+          1,
+          1
+        ],
+        "horizon": 8
+      },
+      "target": "Identify that the hidden eigenvalue is unknown under the current sensor and select an additional sensor that makes the models distinguishable.",
+      "controls": [
+        "no_op_sensor_addition",
+        "sensor_order_permutation",
+        "identical_hidden_eigenvalues"
+      ]
+    },
+    {
+      "task_id": "SDCB-ID-006",
+      "family": "identifiability_abstention",
+      "split": "validation",
+      "generator": "Rank-deficient two-feature input excitation with a finite set of permitted control probes.",
+      "parameters": {
+        "observed_inputs": [
+          [
+            1,
+            0
+          ],
+          [
+            2,
+            0
+          ]
+        ],
+        "candidate_probes": [
+          [
+            0,
+            1
+          ],
+          [
+            1,
+            0
+          ],
+          [
+            1,
+            1
+          ]
+        ],
+        "probe_budget": 1
+      },
+      "target": "Choose a probe that increases regressor rank from one to two and report the remaining model/measurement assumptions.",
+      "controls": [
+        "duplicate_input_probe",
+        "zero_probe",
+        "orthogonal_probe_positive_control"
+      ]
+    },
+    {
+      "task_id": "SDCB-EXP-001",
+      "family": "sequential_experiment_design",
+      "split": "development",
+      "generator": "Four-arm Bernoulli laboratory-design simulator with frozen hidden reward probabilities and a finite measurement budget.",
+      "parameters": {
+        "arms": 4,
+        "budget": 12,
+        "hidden_reward_probabilities": [
+          0.15,
+          0.35,
+          0.65,
+          0.8
+        ],
+        "prior": "Beta(1,1)",
+        "public_prior_family": true
+      },
+      "target": "Select measurements sequentially to identify the best candidate while reporting cumulative regret and posterior calibration.",
+      "controls": [
+        "uniform_random_allocation",
+        "greedy_after_one_sample",
+        "oracle_best_arm_reference",
+        "reward_label_permutation"
+      ]
+    },
+    {
+      "task_id": "SDCB-EXP-002",
+      "family": "sequential_experiment_design",
+      "split": "development",
+      "generator": "Two-dimensional deterministic response surface with bounded observation noise and an explicit measurement cost for each candidate.",
+      "parameters": {
+        "domain": [
+          [
+            0,
+            1
+          ],
+          [
+            0,
+            1
+          ]
+        ],
+        "budget": 10,
+        "noise_std": 0.02,
+        "costs": "heterogeneous",
+        "surface_family": "smooth_multimodal"
+      },
+      "target": "Allocate a finite experiment budget to locate a high-value region and predict the ranking of unmeasured candidates.",
+      "controls": [
+        "space_filling_design",
+        "uniform_random_design",
+        "cost_blind_greedy",
+        "oracle_design"
+      ]
+    },
+    {
+      "task_id": "SDCB-EXP-003",
+      "family": "sequential_experiment_design",
+      "split": "validation",
+      "generator": "Sequential scientific-design task where the first batch is intentionally inconsistent with the model's initial prior.",
+      "parameters": {
+        "candidate_count": 16,
+        "budget": 8,
+        "prior_misspecification": "controlled",
+        "surprise_batch_after_round": 2
+      },
+      "target": "Detect model misspecification, revise the posterior or hypothesis set, and avoid continuing the obsolete design policy.",
+      "controls": [
+        "surprise_removed",
+        "prior_frozen",
+        "shuffled_feedback_order",
+        "oracle_change_point"
+      ]
+    },
+    {
+      "task_id": "SDCB-EXP-004",
+      "family": "sequential_experiment_design",
+      "split": "validation",
+      "generator": "Discovery-and-learning split with measured training designs and a held-out pool of never-measured candidates.",
+      "parameters": {
+        "measured_candidates": 8,
+        "unmeasured_candidates": 32,
+        "budget": 8,
+        "held_out_family_shift": true
+      },
+      "target": "Both choose high-value experiments and accurately rank designs that were never measured, with uncertainty and cost reported.",
+      "controls": [
+        "training_only_ranker",
+        "random_unmeasured_ranking",
+        "oracle_unmeasured_ranking",
+        "candidate_identity_shuffle"
+      ]
+    }
+  ],
+  "model_profiles": [
+    {
+      "profile_id": "hdc-only",
+      "family": "hdc",
+      "checkpoint_policy": "Pin source commit, dimension, codebook seed, and all encoding parameters."
+    },
+    {
+      "profile_id": "cfc-ltc-only",
+      "family": "cfc_ltc",
+      "checkpoint_policy": "Pin source commit, topology, initial state, and all continuous-time parameters."
+    },
+    {
+      "profile_id": "hdc-cfc-coupled",
+      "family": "hdc_cfc",
+      "checkpoint_policy": "Pin both component versions, coupling interface, dimensions, and seeds."
+    },
+    {
+      "profile_id": "reservoir-reference",
+      "family": "reservoir",
+      "checkpoint_policy": "Pin reservoir topology, spectral radius, leak rate, and readout training."
+    },
+    {
+      "profile_id": "koopman-reference",
+      "family": "koopman",
+      "checkpoint_policy": "Pin lifting basis, rank, regularization, and fit window."
+    },
+    {
+      "profile_id": "small-open-transformer",
+      "family": "transformer",
+      "checkpoint_policy": "Checkpoint and tokenizer must be pinned by digest before confirmatory evaluation."
+    },
+    {
+      "profile_id": "graph-retrieval-reference",
+      "family": "graph_retrieval",
+      "checkpoint_policy": "Pin graph construction, retriever, index digest, and retrieval budget."
+    },
+    {
+      "profile_id": "symbolic-oracle",
+      "family": "symbolic_oracle",
+      "checkpoint_policy": "Pin theorem/solver version and exact task semantics; oracle is a reference, not a learned competitor."
+    },
+    {
+      "profile_id": "random-control",
+      "family": "random_control",
+      "checkpoint_policy": "Record distribution, seed, moments, and matched parameter/compute budget."
+    }
+  ],
+  "baselines": [
+    {
+      "baseline_id": "linear-mlp",
+      "method": "Linear/ridge and small MLP",
+      "matching": [
+        "capacity",
+        "compute",
+        "data"
+      ]
+    },
+    {
+      "baseline_id": "fourier-wavelet",
+      "method": "Fourier, wavelet and random Fourier bases",
+      "matching": [
+        "capacity",
+        "compute",
+        "data"
+      ]
+    },
+    {
+      "baseline_id": "reservoir-koopman",
+      "method": "Reservoir/echo-state and Koopman/DMD",
+      "matching": [
+        "capacity",
+        "compute",
+        "deployment"
+      ]
+    },
+    {
+      "baseline_id": "small-transformer",
+      "method": "Frozen small open transformer",
+      "matching": [
+        "compute",
+        "deployment",
+        "data",
+        "context"
+      ]
+    },
+    {
+      "baseline_id": "exact-oracle",
+      "method": "Exact symbolic or analytic oracle where available",
+      "matching": [
+        "data"
+      ]
+    },
+    {
+      "baseline_id": "graph-aware-retrieval",
+      "method": "Graph-aware retrieval / LLM+Lean for proof tasks",
+      "matching": [
+        "compute",
+        "data",
+        "context"
+      ]
+    }
+  ],
+  "negative_controls": [
+    "random_orthogonal_rotation_preserving_singular_values",
+    "spectrum_preserving_eigenvector_shuffle",
+    "phase_randomized_inputs_preserving_power_spectrum",
+    "shuffled_prime_labels",
+    "shifted_or_wrong_zeta_ordinates",
+    "gue_goe_poisson_and_moment_matched_spectra",
+    "random_fourier_and_wavelet_bases_with_equal_feature_count",
+    "rank_norm_and_condition_number_matched_random_ablation",
+    "time_reversal_and_sequence_permutation",
+    "known_positive_known_negative_and_no_op_controls",
+    "different_hidden_dynamics_same_observations",
+    "rank_deficient_input_excitation",
+    "sensor_unobservable_mode",
+    "same_model_different_input_regime",
+    "active_sensor_must_reveal_hidden_mode",
+    "orthogonal_excitation_required_for_full_rank",
+    "randomized_experiment_order",
+    "feedback_label_swap",
+    "unmeasured_candidate_identity_shuffle",
+    "prior_misspecification_sentinel"
+  ],
+  "metrics": [
+    "exact_accuracy_or_normalized_error",
+    "ood_transfer_by_task_family",
+    "calibration_and_selective_risk",
+    "metamorphic_and_adversarial_robustness",
+    "causal_intervention_effect_and_restoration",
+    "memory_capacity_interference_retention_and_recovery",
+    "temporal_prediction_horizon_and_uncertainty",
+    "proof_plan_consistency_and_unresolved_obligations",
+    "latency_peak_memory_and_measured_energy",
+    "test_retest_and_independent_reproduction",
+    "identifiability_detection_and_selective_abstention_correctness",
+    "task_relative_identifiability_and_active_experiment_value",
+    "cumulative_regret_under_experiment_budget",
+    "best_candidate_discovery_rate",
+    "unmeasured_candidate_ranking_quality",
+    "posterior_calibration_after_sequential_feedback"
+  ],
+  "resource_controls": {
+    "comparison_views": [
+      "capacity_matched",
+      "compute_matched",
+      "deployment_matched"
+    ],
+    "seeds": 5,
+    "energy_measurement": "calibrated_telemetry_only"
+  },
+  "reproducibility": {
+    "source_pins_required": true,
+    "generator_seeds_required": true,
+    "raw_per_seed_results": true,
+    "independent_reproduction": "required_for_promotion"
+  },
+  "evidence_policy": {
+    "no_scalar_score": true,
+    "claim_levels": [
+      "mathematical_statement",
+      "theoretical_prediction",
+      "measured_result",
+      "speculation"
+    ],
+    "negative_control_failure": "invalidate_affected_comparison"
+  }
+}
