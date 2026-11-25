@@ -642,6 +642,9 @@ pub fn validate_plan(plan: &ProofPlan) -> Vec<String> {
         }
     }
 
+    let obligation_report = crate::global_obligations::analyze_global_obligations(plan);
+    errors.extend(obligation_report.errors);
+
     if plan.validation.lean_kernel_status == KernelStatus::Accepted {
         let has_kernel_receipt = evidence_by_id.values().any(|evidence| {
             evidence.kind == EvidenceKind::LeanKernelCheck
@@ -954,3 +957,5 @@ pub mod hard_mode;
 pub mod metamorphic;
 
 pub mod scope_equivalence;
+
+pub mod global_obligations;
