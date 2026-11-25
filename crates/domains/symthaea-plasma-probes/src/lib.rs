@@ -10135,7 +10135,7 @@ mod tests {
     }
 
     #[test]
-    fn small_positive_response_qp_fails_closed_on_kkt_multiplier_overflow() {
+    fn small_positive_response_qp_fails_closed_on_large_intermediate_overflow() {
         assert_eq!(
             solve_small_positive_mass_response_qp(
                 &[1.0e308, 1.0e308],
