@@ -582,7 +582,7 @@ fn solve_node(
 
         // Stop wins exact ties: the oracle does not buy an experiment that
         // cannot strictly improve the frozen terminal objective.
-        if action_worst_case_loss + VALUE_TOLERANCE < best.loss {
+        if action_worst_case_loss < best.loss {
             best = SolvedNode {
                 loss: action_worst_case_loss,
                 policy: SequentialPolicyNode::Probe {
@@ -896,7 +896,7 @@ pub fn enumerate_sequential_robust(
     for candidate in policies {
         let replace = match &best {
             None => true,
-            Some(current) => candidate.loss + VALUE_TOLERANCE < current.loss,
+            Some(current) => candidate.loss < current.loss,
         };
         if replace {
             best = Some(candidate);
@@ -1342,6 +1342,9 @@ mod tests {
         let value = evaluate_sequential_robust(&problem).unwrap();
         assert_eq!(value.worst_case_terminal_loss, 1.0);
         assert!(matches!(value.policy, SequentialPolicyNode::Stop { .. }));
+        let exhaustive = enumerate_sequential_robust(&problem).unwrap();
+        assert_eq!(exhaustive.worst_case_terminal_loss, 1.0);
+        assert!(matches!(exhaustive.policy, SequentialPolicyNode::Stop { .. }));
     }
 
     #[test]
