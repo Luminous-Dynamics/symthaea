@@ -50,15 +50,22 @@ fn main() -> ExitCode {
             let primary_id = plan
                 .alternatives
                 .iter()
-                .find(|alternative| matches!(&alternative.status, proof_plan_contract::AlternativeStatus::Primary))
+                .find(|alternative| {
+                    matches!(
+                        &alternative.status,
+                        proof_plan_contract::AlternativeStatus::Primary
+                    )
+                })
                 .map(|alternative| alternative.id.as_str());
             let primary = report
                 .alternatives
                 .iter()
                 .find(|alternative| Some(alternative.alternative_id.as_str()) == primary_id);
-            let primary_unresolved = primary.map_or(0, |alternative| alternative.unresolved_goals.len());
+            let primary_unresolved = primary
+                .map_or(0, |alternative| alternative.unresolved_goals.len());
             let primary_cycles = primary.map_or(0, |alternative| alternative.cycle_nodes.len());
-            let primary_terminal = primary.map_or(0, |alternative| alternative.terminal_goals.len());
+            let primary_terminal = primary
+                .map_or(0, |alternative| alternative.terminal_goals.len());
             let accounting_complete = report.errors.is_empty()
                 && primary_unresolved == 0
                 && primary_cycles == 0
@@ -90,10 +97,15 @@ fn main() -> ExitCode {
                     alternative.cycle_nodes.len()
                 );
                 for goal in &alternative.unresolved_goals {
-                    println!("UNRESOLVED_GOAL alternative={} goal={goal}", alternative.alternative_id);
+                    println!(
+                        "UNRESOLVED_GOAL alternative={} goal={goal}",
+                        alternative.alternative_id
+                    );
                 }
             }
-            println!("claim_ceiling=graph_and_obligation_accounting_only; no_mathematical_or_kernel_verdict");
+            println!(
+                "claim_ceiling=graph_and_obligation_accounting_only; no_mathematical_or_kernel_verdict"
+            );
             ExitCode::SUCCESS
         }
         Err(errors) => {
