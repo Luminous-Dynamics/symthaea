@@ -80,6 +80,58 @@ Especially important:
 
 Proposed gate: every applicable deterministic integrity attack must be rejected or reported on the read path before memory is supplied as context to an agent. Audit-only detection is reported separately and is not equivalent to read-time prevention. A hash chain without a protected external anchor is not a T9/T10 defense.
 
+### 2.5a Capability-level gap diagnosis and optimization order
+
+The official Cycle 2 component tables expose where open methods are actually behind the commercial reference. The gaps below are calculated as commercial leader minus open-source track leader, in the leaderboard's own component units. They are diagnostics, not causal explanations of why one system scored lower.
+
+**Textual — Resurface versus MemoraX**
+
+| Capability | Resurface | MemoraX | Gap | MACE stretch goal |
+|---|---:|---:|---:|---:|
+| Explicit fact recall | 62.98 | 70.85 | 7.87 | 72.85 |
+| Relational / multi-hop | 58.94 | 64.40 | 5.46 | 66.40 |
+| Temporal / event sequencing | 57.76 | 67.05 | 9.29 | 69.05 |
+| Memory governance | 76.55 | 78.10 | 1.55 | 80.10 |
+| Personalization / care | 38.82 | 54.70 | **15.88** | **56.70** |
+| Workflow execution | 59.67 | 61.20 | 1.53 | 63.20 |
+| Epistemic safety / privacy | 68.59 | 81.98 | **13.39** | **83.98** |
+| Streaming | 49.65 | 63.11 | **13.46** | **65.11** |
+
+**Multimodal — Khipu versus MemoraX**
+
+| Capability | Khipu | MemoraX | Gap | MACE stretch goal |
+|---|---:|---:|---:|---:|
+| Retrieval | 50.28 | 66.73 | **16.45** | **68.73** |
+| Relational reasoning | 45.82 | 53.87 | 8.05 | 55.87 |
+| Temporal reasoning | 34.23 | 40.12 | 5.89 | 42.12 |
+| Continual learning | 38.45 | 48.40 | **9.95** | **50.40** |
+| Personalization | 11.04 | 12.21 | 1.17 | 14.21 |
+| Evidence governance | 31.29 | 33.59 | 2.30 | 35.59 |
+
+**Coding — InsightMem versus MemoraX**
+
+| Dimension | InsightMem | MemoraX | Gap | Interpretation |
+|---|---:|---:|---:|---|
+| Overall resolved | 63.33% | 68.00% | 4.67 pp | Overall opportunity remains |
+| Relevant new feature | 74.51% | 70.59% | -3.92 pp | Open leader is ahead here |
+| Relevant bug fix | 57.58% | 65.66% | **8.08 pp** | Largest coding weakness |
+| Noisy overall resolved | 63.33% | 68.67% | 5.34 pp | Noise robustness matters |
+| Noisy new feature | 74.51% | 74.51% | 0 pp | Current open leader matches |
+| Noisy bug fix | 57.58% | 65.66% | **8.08 pp** | Prioritize bug-fix context |
+
+The MACE stretch goals in the first two tables are proposed as **commercial leader +2 component points**. They are not current measurements. The coding table reports the leaderboard's own task-stratum values; a MACE target should be commercial +2 pp for overall and each weak stratum while retaining the current open-source advantage on relevant new-feature tasks.
+
+#### Implementation implications
+
+1. **Personalization / care:** model preferences as scoped, revisable, source-attributed state—not unbounded psychological profiles. Distinguish user-declared preference, inferred preference, temporary context and stale preference. Require expiry, correction and user-visible provenance for consequential personalization.
+2. **Epistemic safety / privacy:** add calibrated conflict and abstention tasks, source-family independence, consent/purpose checks, private-field minimization, and tests where plausible but unauthorized information must not enter context. This is a likely MACE differentiator, not a reason to weaken performance targets.
+3. **Streaming:** add ordered event ingestion with stable identity, duplicate idempotence, gap detection, delayed events, backfill, correction and high-watermark rollback. Score freshness and decision exposure latency, not just average retrieval speed.
+4. **Multimodal retrieval:** bind visual/audio evidence to original source bytes, frame/time coordinates, extraction model/version and derivation parents. Compare image-native retrieval, text descriptions, hybrid retrieval and exact-source lookup under equal budgets. Retrieval similarity remains a candidate generator, not evidence qualification.
+5. **Continual learning:** test whether new visual evidence updates the correct scoped state without contaminating unrelated users/tasks, and whether old derived views are invalidated after corrections.
+6. **Coding bug fixes:** retain repository revision, file/symbol, test failure, dependency/configuration state, and exact patch lineage. Build separate bug-fix and noisy-bug-fix memory tasks; do not spend the whole coding budget chasing new-feature scores where the open leader is already competitive.
+
+**Priority order:** (a) privacy/scope-safe personalization and epistemic calibration; (b) streaming integrity and temporal correction; (c) multimodal retrieval plus continual update; (d) coding bug-fix and noisy-patch context. Run a capability-specific ablation for every intervention so an aggregate gain cannot hide a regression.
+
 ### 2.6 Interdependent multi-session and poisoning benchmarks
 
 Keep these protocols as separate external result lanes; they expose different missing capabilities.
