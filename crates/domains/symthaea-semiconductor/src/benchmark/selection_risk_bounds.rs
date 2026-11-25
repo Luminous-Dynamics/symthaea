@@ -323,6 +323,16 @@ fn estimate_from_independent_audit(
 pub fn evaluate_selection_adjusted_population_risk_v1(
     input: &SelectionRiskInputV1,
 ) -> Result<SelectionRiskReportV1, SelectionRiskErrorV1> {
+    let mut canonical_input = input.clone();
+    canonical_input.population_round_ids.sort_unstable();
+    canonical_input.qualified_round_ids.sort_unstable();
+    canonical_input.unknown_round_ids.sort_unstable();
+    canonical_input.blocked_round_ids.sort_unstable();
+    canonical_input.unmeasured_round_ids.sort_unstable();
+    canonical_input.qualified_losses.sort_by_key(|item| item.round_id);
+    canonical_input.independent_audit_losses.sort_by_key(|item| item.round_id);
+    let input = &canonical_input;
+
     if input.schema != SELECTION_RISK_INPUT_SCHEMA_V1 {
         return Err(SelectionRiskErrorV1("selection-risk input schema is unsupported".into()));
     }
@@ -571,6 +581,35 @@ mod tests {
             audit_measurement_receipt_sha256: digest('2'),
         }];
         assert!(evaluate_selection_adjusted_population_risk_v1(&data).is_err());
+    }
+
+    #[test]
+    fn input_order_permutations_preserve_risk_report_digest() {
+        let mut first = input();
+        first.audit_design = Some(audit_design());
+        first.independent_audit_losses = vec![
+            IndependentAuditLossObservationV1 {
+                round_id: 3,
+                loss: 1.0,
+                inclusion_probability: 0.5,
+                audit_measurement_receipt_sha256: digest('2'),
+            },
+            IndependentAuditLossObservationV1 {
+                round_id: 4,
+                loss: 0.0,
+                inclusion_probability: 1.0,
+                audit_measurement_receipt_sha256: digest('3'),
+            },
+        ];
+        let report_a = evaluate_selection_adjusted_population_risk_v1(&first).unwrap();
+        first.population_round_ids.reverse();
+        first.qualified_round_ids.reverse();
+        first.unknown_round_ids.reverse();
+        first.blocked_round_ids.reverse();
+        first.qualified_losses.reverse();
+        first.independent_audit_losses.reverse();
+        let report_b = evaluate_selection_adjusted_population_risk_v1(&first).unwrap();
+        assert_eq!(report_a.report_sha256, report_b.report_sha256);
     }
 
     #[test]
