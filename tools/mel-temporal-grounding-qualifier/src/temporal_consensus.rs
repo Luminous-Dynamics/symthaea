@@ -605,7 +605,13 @@ mod tests {
             end_frame: 200,
         }];
         let annotations = vec![
-            annotation('1', 'a', GroundTruthStateV1::Present, intervals.clone(), None),
+            annotation(
+                '1',
+                'a',
+                GroundTruthStateV1::Present,
+                intervals.clone(),
+                None,
+            ),
             annotation('2', 'b', GroundTruthStateV1::Present, intervals, None),
         ];
         let mut model_prediction = prediction(Vec::new());
@@ -622,7 +628,10 @@ mod tests {
         assert_eq!(report.summary.prediction_coverage, Some(0.0));
         assert_eq!(report.summary.present_prediction_coverage, Some(0.0));
         assert_eq!(report.summary.fully_correct_annotators, 0);
-        assert_eq!(report.summary.unanimous_correct_across_scored_annotators, Some(false));
+        assert_eq!(
+            report.summary.unanimous_correct_across_scored_annotators,
+            Some(false)
+        );
         assert!(!report.model_confidence_calibration_computed);
     }
 
@@ -633,7 +642,13 @@ mod tests {
             end_frame: 200,
         }];
         let annotations = vec![
-            annotation('1', 'a', GroundTruthStateV1::Present, intervals.clone(), None),
+            annotation(
+                '1',
+                'a',
+                GroundTruthStateV1::Present,
+                intervals.clone(),
+                None,
+            ),
             annotation('2', 'b', GroundTruthStateV1::Present, intervals, None),
         ];
         let mut model_prediction = prediction(Vec::new());
