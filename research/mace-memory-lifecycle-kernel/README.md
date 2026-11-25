@@ -39,6 +39,16 @@ The crate now includes `file_witness::FileBackedWitnessStore`, an append-only fi
 
 **Critical limitation:** if the witness directory is restored together with the memory database from the same snapshot/backup/VM image, both can be rolled back together. A local hash chain does not prevent whole-directory rollback or privileged offline replacement. Production still requires a separately administered witness service or hardware-backed monotonic facility with an independently authenticated trust anchor. See [FILE_BACKED_WITNESS.md](FILE_BACKED_WITNESS.md).
 
+## Control-aware T9/T10 result validation
+
+The new `at_rest_qualification` module validates MACE's evaluator-side evidence for the at-rest rollback cases. It keeps T9 whole-store rollback and T10 erasure resurrection as independent score families, requires C1 no-op reload and C2 genuine-write-after-restart controls, and computes C3 edit-landed checks from before/after inventories, full-store snapshot digests, and expected/observed normalized edit-delta commitments.
+
+For T9, the evidence must show exactly one acknowledged write through the SUT interface, restore the full pre-write snapshot while the SUT is stopped, restart, and invoke the ordinary read path. For T10, the evidence must show an acknowledged erasure through the SUT's own interface, restore the full pre-erasure snapshot while stopped, restart, and invoke the ordinary read path.
+
+Not Applicable and Error require reasons and are excluded from the applicable denominator; neither is credited as a pass. Read-time rejection/reporting and audit-only reporting remain distinct. The module is a typed result validator, not an actual snapshot/restore runner or live SUT adapter. See [MACE T9/T10 control-aware qualification v0.1](../../docs/research/MACE_T9_T10_CONTROL_AWARE_QUALIFICATION_V0_1.md).
+
+The eleven Rust tests are authored but have not been compiled or executed in this environment. No T9/T10 SUT result or security qualification is claimed.
+
 ## Next integration gates
 
 1. Supply a production `IdentityAuthority` backed by a real issuer/key registry and cryptographic receipt verifier.
