@@ -61,3 +61,27 @@ This counterexample separates three concepts:
 3. preserving a future response observable.
 
 The two-cell oracle proves only that these requirements can be jointly checked in a manufactured finite-dimensional fixture. It does not provide a multi-cell constrained optimizer, a nonlinear kinetic response approximation, or a physical echo guarantee.
+
+
+## Bounded small-system positivity/mass/response QP reference oracle
+
+The crate now exposes `solve_small_positive_mass_response_qp`, an exhaustive active-set reference solver for at most 16 cells.
+
+It minimizes the weighted correction norm
+
+`0.5 * sum_i v_i * (g_i - f_i)^2`
+
+subject to:
+- `g_i >= 0`;
+- `sum_i v_i * g_i = target_mass`;
+- `sum_i response_i * g_i = target_response`.
+
+For every candidate free/active cell set it solves the 2x2 dual system (or handles a rank-deficient free set when the response row is redundant with mass), then checks primal feasibility, dual feasibility, stationarity, complementarity and both equality residuals. It returns the feasible KKT point with minimum objective. Infeasible cases and requests above 16 cells are rejected.
+
+The checked-in three-cell known answer uses input [-0.1, 0.5, 0.6], unit cell volumes, mass 1 and response functional R(g)=g[0] with target 0.1. Its solution is [0.1, 0.4, 0.5], multipliers [0.1, -0.3], correction norm sqrt(0.06), objective 0.03, with zero KKT residuals up to floating-point tolerance.
+
+Replay it with:
+
+`cargo run --bin small_positive_response_qp_audit -- benchmarks/plasma/positivity-projection/fixtures/three-cell-positive-response-qp-known-answer-v0.1.json`
+
+This is a **small exhaustive reference oracle**, not a scalable method. It is intended to validate matrix-free Schur-complement or structured active-set solvers proposed in [#13633](https://github.com/Luminous-Dynamics/symthaea). It includes no Vlasov solver, learned response map or physical result.
