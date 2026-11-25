@@ -1,0 +1,1829 @@
+{
+  "schema": "luminous.orbital-joint-evidence-voi.scenarios.v0.1",
+  "benchmark_id": "ORBITAL-JOINT-EVIDENCE-VOI-001",
+  "evidence_class": "synthetic",
+  "claim_ceiling": "synthetic_decision_value_semantics_only",
+  "resource_dimensions": [
+    "engineering_hours",
+    "compute_core_hours",
+    "facility_hours",
+    "specimen_count",
+    "review_hours",
+    "external_cost_units"
+  ],
+  "loss_units": "synthetic decision-loss units; not currency, probability or a physical acceptance limit",
+  "observation_semantics": "deterministic outcome partitions for finite known-answer controls; not physical measurement models",
+  "policies_to_compare": [
+    "FIXED_SEQUENCE",
+    "ONE_FACTOR_AT_A_TIME",
+    "SPACE_FILLING",
+    "SEEDED_RANDOM",
+    "PREDICTION_DISAGREEMENT",
+    "HIGHEST_UNCERTAINTY",
+    "CALIBRATED_EVSI",
+    "DISTRIBUTION_FREE_MINIMAX_REGRET",
+    "HUMAN_BASELINE"
+  ],
+  "scenarios": [
+    {
+      "scenario_id": "JEV-001",
+      "claim_ceiling": "synthetic_decision_value_semantics_only",
+      "evidence_class": "synthetic",
+      "decision_regime": "distribution_free",
+      "states": [
+        "CAPABILITY_WITHIN_PROFILE",
+        "CRITICAL_CAPACITY_FAILURE"
+      ],
+      "loss_matrix": {
+        "ACCEPT": {
+          "CAPABILITY_WITHIN_PROFILE": 0,
+          "CRITICAL_CAPACITY_FAILURE": 100
+        },
+        "REJECT": {
+          "CAPABILITY_WITHIN_PROFILE": 5,
+          "CRITICAL_CAPACITY_FAILURE": 0
+        }
+      },
+      "prior": null,
+      "current_evidence_refs": [
+        "structural-profile://P1",
+        "requirement-profile://C1"
+      ],
+      "budget": {
+        "engineering_hours": 2,
+        "compute_core_hours": 1,
+        "facility_hours": 2,
+        "specimen_count": 1,
+        "review_hours": 2,
+        "external_cost_units": 2
+      },
+      "actions": [
+        {
+          "action_id": "A-MASS-ONLY",
+          "action_class": "metrology",
+          "target_claim_id": "STRUCTURAL-COMPATIBILITY-001",
+          "profile_ref": "provider-client-profile://P1-C1@cfg-r7",
+          "article_subject_ref": "physical-unit://JOINT-SPECIMEN-0001",
+          "configuration_id": "CFG-R7",
+          "icd_revision": "R3",
+          "method_ref": "synthetic-method://A-MASS-ONLY",
+          "admissibility": {
+            "state": "ADMISSIBLE",
+            "reason_codes": []
+          },
+          "resources": {
+            "engineering_hours": 0.5,
+            "compute_core_hours": 0,
+            "facility_hours": 0.25,
+            "specimen_count": 0,
+            "review_hours": 0.25,
+            "external_cost_units": 0.1
+          },
+          "observation_by_state": {
+            "CAPABILITY_WITHIN_PROFILE": "MASS-IN-RANGE",
+            "CRITICAL_CAPACITY_FAILURE": "MASS-IN-RANGE"
+          },
+          "dependencies": []
+        },
+        {
+          "action_id": "A-COUPON-INTERACTION",
+          "action_class": "coupon_test",
+          "target_claim_id": "STRUCTURAL-COMPATIBILITY-001",
+          "profile_ref": "provider-client-profile://P1-C1@cfg-r7",
+          "article_subject_ref": "physical-unit://JOINT-SPECIMEN-0001",
+          "configuration_id": "CFG-R7",
+          "icd_revision": "R3",
+          "method_ref": "synthetic-method://A-COUPON-INTERACTION",
+          "admissibility": {
+            "state": "ADMISSIBLE",
+            "reason_codes": []
+          },
+          "resources": {
+            "engineering_hours": 1,
+            "compute_core_hours": 0,
+            "facility_hours": 1,
+            "specimen_count": 1,
+            "review_hours": 0.5,
+            "external_cost_units": 1
+          },
+          "observation_by_state": {
+            "CAPABILITY_WITHIN_PROFILE": "PASS",
+            "CRITICAL_CAPACITY_FAILURE": "FAIL"
+          },
+          "dependencies": []
+        },
+        {
+          "action_id": "A-FULL-TRUSS-OVER-BUDGET",
+          "action_class": "assembled_structure_test",
+          "target_claim_id": "STRUCTURAL-COMPATIBILITY-001",
+          "profile_ref": "provider-client-profile://P1-C1@cfg-r7",
+          "article_subject_ref": "physical-unit://JOINT-SPECIMEN-0001",
+          "configuration_id": "CFG-R7",
+          "icd_revision": "R3",
+          "method_ref": "synthetic-method://A-FULL-TRUSS-OVER-BUDGET",
+          "admissibility": {
+            "state": "ADMISSIBLE",
+            "reason_codes": []
+          },
+          "resources": {
+            "engineering_hours": 1,
+            "compute_core_hours": 0.5,
+            "facility_hours": 4,
+            "specimen_count": 1,
+            "review_hours": 1,
+            "external_cost_units": 1.5
+          },
+          "observation_by_state": {
+            "CAPABILITY_WITHIN_PROFILE": "PASS",
+            "CRITICAL_CAPACITY_FAILURE": "FAIL"
+          },
+          "dependencies": []
+        }
+      ],
+      "expected": {
+        "baseline_minimax_regret": 5,
+        "best_action_id": "A-COUPON-INTERACTION",
+        "post_action_worst_case_regret": 0,
+        "abstain": false,
+        "must_not_select": [
+          "A-MASS-ONLY",
+          "A-FULL-TRUSS-OVER-BUDGET"
+        ],
+        "notes": "The mass-only action produces the same observation in both states. The coupon interaction test separates the two states; the full truss test exceeds the facility budget."
+      },
+      "target_claim_id": "STRUCTURAL-COMPATIBILITY-001",
+      "requires_independent_evidence": false,
+      "required_obligations": [],
+      "current_evidence_dependency_groups": {},
+      "decision_context": {
+        "profile_ref": "provider-client-profile://P1-C1@cfg-r7",
+        "article_subject_ref": "physical-unit://JOINT-SPECIMEN-0001",
+        "configuration_id": "CFG-R7",
+        "icd_revision": "R3"
+      }
+    },
+    {
+      "scenario_id": "JEV-002",
+      "claim_ceiling": "synthetic_decision_value_semantics_only",
+      "evidence_class": "synthetic",
+      "decision_regime": "calibrated_probability",
+      "states": [
+        "CAPABILITY_WITHIN_PROFILE",
+        "CRITICAL_CAPACITY_FAILURE"
+      ],
+      "loss_matrix": {
+        "ACCEPT": {
+          "CAPABILITY_WITHIN_PROFILE": 0,
+          "CRITICAL_CAPACITY_FAILURE": 100
+        },
+        "REJECT": {
+          "CAPABILITY_WITHIN_PROFILE": 5,
+          "CRITICAL_CAPACITY_FAILURE": 0
+        }
+      },
+      "prior": {
+        "CAPABILITY_WITHIN_PROFILE": 0.9,
+        "CRITICAL_CAPACITY_FAILURE": 0.1
+      },
+      "current_evidence_refs": [
+        "structural-profile://P1",
+        "requirement-profile://C1"
+      ],
+      "budget": {
+        "engineering_hours": 2,
+        "compute_core_hours": 1,
+        "facility_hours": 2,
+        "specimen_count": 1,
+        "review_hours": 2,
+        "external_cost_units": 2
+      },
+      "actions": [
+        {
+          "action_id": "A-CALIBRATED-TEST",
+          "action_class": "coupon_test",
+          "target_claim_id": "STRUCTURAL-COMPATIBILITY-001",
+          "profile_ref": "provider-client-profile://P1-C1@cfg-r7",
+          "article_subject_ref": "physical-unit://JOINT-SPECIMEN-0001",
+          "configuration_id": "CFG-R7",
+          "icd_revision": "R3",
+          "method_ref": "synthetic-method://A-CALIBRATED-TEST",
+          "admissibility": {
+            "state": "ADMISSIBLE",
+            "reason_codes": []
+          },
+          "resources": {
+            "engineering_hours": 1,
+            "compute_core_hours": 0,
+            "facility_hours": 1,
+            "specimen_count": 1,
+            "review_hours": 0.5,
+            "external_cost_units": 1
+          },
+          "observation_by_state": {
+            "CAPABILITY_WITHIN_PROFILE": "PASS",
+            "CRITICAL_CAPACITY_FAILURE": "FAIL"
+          },
+          "dependencies": [],
+          "probability_model_ref": "synthetic-calibrated-model://JEV-002",
+          "observation_likelihoods": {
+            "CAPABILITY_WITHIN_PROFILE": {
+              "PASS": 1,
+              "FAIL": 0
+            },
+            "CRITICAL_CAPACITY_FAILURE": {
+              "PASS": 0,
+              "FAIL": 1
+            }
+          },
+          "calibration_status": "calibrated_for_fixture_only"
+        },
+        {
+          "action_id": "A-UNCALIBRATED-LABEL",
+          "action_class": "model_score",
+          "target_claim_id": "STRUCTURAL-COMPATIBILITY-001",
+          "profile_ref": "provider-client-profile://P1-C1@cfg-r7",
+          "article_subject_ref": "physical-unit://JOINT-SPECIMEN-0001",
+          "configuration_id": "CFG-R7",
+          "icd_revision": "R3",
+          "method_ref": "synthetic-method://A-UNCALIBRATED-LABEL",
+          "admissibility": {
+            "state": "INADMISSIBLE",
+            "reason_codes": [
+              "UNCALIBRATED_PROBABILITY_MODEL"
+            ]
+          },
+          "resources": {
+            "engineering_hours": 0.1,
+            "compute_core_hours": 0.1,
+            "facility_hours": 0,
+            "specimen_count": 0,
+            "review_hours": 0,
+            "external_cost_units": 0
+          },
+          "observation_by_state": {
+            "CAPABILITY_WITHIN_PROFILE": "LOW_RISK",
+            "CRITICAL_CAPACITY_FAILURE": "LOW_RISK"
+          },
+          "dependencies": [],
+          "probability_model_ref": null,
+          "calibration_status": "not_calibrated"
+        }
+      ],
+      "expected": {
+        "baseline_expected_loss": 4.5,
+        "best_action_id": "A-CALIBRATED-TEST",
+        "post_action_expected_loss": 0,
+        "evsi": 4.5,
+        "abstain": false,
+        "must_not_select": [
+          "A-UNCALIBRATED-LABEL"
+        ],
+        "notes": "Prior probabilities are explicit synthetic fixture inputs, not derived from interval endpoints. The test is perfect for this two-state synthetic oracle."
+      },
+      "target_claim_id": "STRUCTURAL-COMPATIBILITY-001",
+      "requires_independent_evidence": false,
+      "required_obligations": [],
+      "current_evidence_dependency_groups": {},
+      "decision_context": {
+        "profile_ref": "provider-client-profile://P1-C1@cfg-r7",
+        "article_subject_ref": "physical-unit://JOINT-SPECIMEN-0001",
+        "configuration_id": "CFG-R7",
+        "icd_revision": "R3"
+      }
+    },
+    {
+      "scenario_id": "JEV-003",
+      "claim_ceiling": "synthetic_decision_value_semantics_only",
+      "evidence_class": "synthetic",
+      "decision_regime": "distribution_free",
+      "states": [
+        "CAPABILITY_WITHIN_PROFILE",
+        "CRITICAL_CAPACITY_FAILURE"
+      ],
+      "loss_matrix": {
+        "ACCEPT": {
+          "CAPABILITY_WITHIN_PROFILE": 0,
+          "CRITICAL_CAPACITY_FAILURE": 100
+        },
+        "REJECT": {
+          "CAPABILITY_WITHIN_PROFILE": 5,
+          "CRITICAL_CAPACITY_FAILURE": 0
+        }
+      },
+      "prior": null,
+      "current_evidence_refs": [
+        "structural-profile://P1",
+        "requirement-profile://C1"
+      ],
+      "budget": {
+        "engineering_hours": 2,
+        "compute_core_hours": 1,
+        "facility_hours": 2,
+        "specimen_count": 1,
+        "review_hours": 2,
+        "external_cost_units": 2
+      },
+      "actions": [
+        {
+          "action_id": "A-NO-INFORMATION",
+          "action_class": "non_discriminating_inspection",
+          "target_claim_id": "STRUCTURAL-COMPATIBILITY-001",
+          "profile_ref": "provider-client-profile://P1-C1@cfg-r7",
+          "article_subject_ref": "physical-unit://JOINT-SPECIMEN-0001",
+          "configuration_id": "CFG-R7",
+          "icd_revision": "R3",
+          "method_ref": "synthetic-method://A-NO-INFORMATION",
+          "admissibility": {
+            "state": "ADMISSIBLE",
+            "reason_codes": []
+          },
+          "resources": {
+            "engineering_hours": 0.5,
+            "compute_core_hours": 0,
+            "facility_hours": 0.5,
+            "specimen_count": 0,
+            "review_hours": 0.25,
+            "external_cost_units": 0.1
+          },
+          "observation_by_state": {
+            "CAPABILITY_WITHIN_PROFILE": "NO_INDICATION",
+            "CRITICAL_CAPACITY_FAILURE": "NO_INDICATION"
+          },
+          "dependencies": []
+        }
+      ],
+      "expected": {
+        "baseline_minimax_regret": 5,
+        "best_action_id": "ABSTAIN",
+        "post_action_worst_case_regret": 5,
+        "abstain": true,
+        "must_not_select": [
+          "A-NO-INFORMATION"
+        ],
+        "notes": "All admissible options produce identical observations in both possible states. No action changes the supported decision."
+      },
+      "target_claim_id": "STRUCTURAL-COMPATIBILITY-001",
+      "requires_independent_evidence": false,
+      "required_obligations": [],
+      "current_evidence_dependency_groups": {},
+      "decision_context": {
+        "profile_ref": "provider-client-profile://P1-C1@cfg-r7",
+        "article_subject_ref": "physical-unit://JOINT-SPECIMEN-0001",
+        "configuration_id": "CFG-R7",
+        "icd_revision": "R3"
+      }
+    },
+    {
+      "scenario_id": "JEV-004",
+      "claim_ceiling": "synthetic_decision_value_semantics_only",
+      "evidence_class": "synthetic",
+      "decision_regime": "distribution_free",
+      "states": [
+        "CAPABILITY_WITHIN_PROFILE",
+        "CRITICAL_CAPACITY_FAILURE"
+      ],
+      "loss_matrix": {
+        "ACCEPT": {
+          "CAPABILITY_WITHIN_PROFILE": 0,
+          "CRITICAL_CAPACITY_FAILURE": 100
+        },
+        "REJECT": {
+          "CAPABILITY_WITHIN_PROFILE": 5,
+          "CRITICAL_CAPACITY_FAILURE": 0
+        }
+      },
+      "prior": null,
+      "current_evidence_refs": [
+        "structural-profile://P1",
+        "requirement-profile://C1"
+      ],
+      "budget": {
+        "engineering_hours": 2,
+        "compute_core_hours": 1,
+        "facility_hours": 2,
+        "specimen_count": 1,
+        "review_hours": 2,
+        "external_cost_units": 2
+      },
+      "actions": [
+        {
+          "action_id": "A-PERFECT-BUT-OVER-BUDGET",
+          "action_class": "assembled_structure_test",
+          "target_claim_id": "STRUCTURAL-COMPATIBILITY-001",
+          "profile_ref": "provider-client-profile://P1-C1@cfg-r7",
+          "article_subject_ref": "physical-unit://JOINT-SPECIMEN-0001",
+          "configuration_id": "CFG-R7",
+          "icd_revision": "R3",
+          "method_ref": "synthetic-method://A-PERFECT-BUT-OVER-BUDGET",
+          "admissibility": {
+            "state": "ADMISSIBLE",
+            "reason_codes": []
+          },
+          "resources": {
+            "engineering_hours": 1.5,
+            "compute_core_hours": 1,
+            "facility_hours": 5,
+            "specimen_count": 2,
+            "review_hours": 1,
+            "external_cost_units": 4
+          },
+          "observation_by_state": {
+            "CAPABILITY_WITHIN_PROFILE": "PASS",
+            "CRITICAL_CAPACITY_FAILURE": "FAIL"
+          },
+          "dependencies": []
+        }
+      ],
+      "expected": {
+        "baseline_minimax_regret": 5,
+        "best_action_id": "ABSTAIN",
+        "post_action_worst_case_regret": 5,
+        "abstain": true,
+        "must_not_select": [
+          "A-PERFECT-BUT-OVER-BUDGET"
+        ],
+        "notes": "A theoretically perfect test exceeds the specimen and facility budgets. Decision value does not override hard resource constraints."
+      },
+      "target_claim_id": "STRUCTURAL-COMPATIBILITY-001",
+      "requires_independent_evidence": false,
+      "required_obligations": [],
+      "current_evidence_dependency_groups": {},
+      "decision_context": {
+        "profile_ref": "provider-client-profile://P1-C1@cfg-r7",
+        "article_subject_ref": "physical-unit://JOINT-SPECIMEN-0001",
+        "configuration_id": "CFG-R7",
+        "icd_revision": "R3"
+      }
+    },
+    {
+      "scenario_id": "JEV-005",
+      "claim_ceiling": "synthetic_decision_value_semantics_only",
+      "evidence_class": "synthetic",
+      "decision_regime": "distribution_free",
+      "states": [
+        "CAPABILITY_WITHIN_PROFILE",
+        "CRITICAL_CAPACITY_FAILURE"
+      ],
+      "loss_matrix": {
+        "ACCEPT": {
+          "CAPABILITY_WITHIN_PROFILE": 0,
+          "CRITICAL_CAPACITY_FAILURE": 100
+        },
+        "REJECT": {
+          "CAPABILITY_WITHIN_PROFILE": 5,
+          "CRITICAL_CAPACITY_FAILURE": 0
+        }
+      },
+      "prior": null,
+      "current_evidence_refs": [
+        "structural-profile://P1",
+        "requirement-profile://C1"
+      ],
+      "budget": {
+        "engineering_hours": 2,
+        "compute_core_hours": 1,
+        "facility_hours": 2,
+        "specimen_count": 1,
+        "review_hours": 2,
+        "external_cost_units": 2
+      },
+      "actions": [
+        {
+          "action_id": "A-STALE-CFG",
+          "action_class": "structural_analysis",
+          "target_claim_id": "STRUCTURAL-COMPATIBILITY-001",
+          "profile_ref": "provider-client-profile://P1-C1@cfg-r7",
+          "article_subject_ref": "physical-unit://JOINT-SPECIMEN-0001",
+          "configuration_id": "CFG-R6",
+          "icd_revision": "R3",
+          "method_ref": "synthetic-method://A-STALE-CFG",
+          "admissibility": {
+            "state": "INADMISSIBLE",
+            "reason_codes": [
+              "CONFIGURATION_STALE"
+            ]
+          },
+          "resources": {
+            "engineering_hours": 0.5,
+            "compute_core_hours": 0.5,
+            "facility_hours": 0,
+            "specimen_count": 0,
+            "review_hours": 0.25,
+            "external_cost_units": 0.2
+          },
+          "observation_by_state": {
+            "CAPABILITY_WITHIN_PROFILE": "PASS",
+            "CRITICAL_CAPACITY_FAILURE": "FAIL"
+          },
+          "dependencies": []
+        }
+      ],
+      "expected": {
+        "baseline_minimax_regret": 5,
+        "best_action_id": "ABSTAIN",
+        "post_action_worst_case_regret": 5,
+        "abstain": true,
+        "must_not_select": [
+          "A-STALE-CFG"
+        ],
+        "notes": "The only informative action targets a superseded geometry/configuration and therefore cannot resolve the current profile."
+      },
+      "target_claim_id": "STRUCTURAL-COMPATIBILITY-001",
+      "requires_independent_evidence": false,
+      "required_obligations": [],
+      "current_evidence_dependency_groups": {},
+      "decision_context": {
+        "profile_ref": "provider-client-profile://P1-C1@cfg-r7",
+        "article_subject_ref": "physical-unit://JOINT-SPECIMEN-0001",
+        "configuration_id": "CFG-R7",
+        "icd_revision": "R3"
+      }
+    },
+    {
+      "scenario_id": "JEV-006",
+      "claim_ceiling": "synthetic_decision_value_semantics_only",
+      "evidence_class": "synthetic",
+      "decision_regime": "distribution_free",
+      "states": [
+        "CAPABILITY_WITHIN_PROFILE",
+        "CRITICAL_CAPACITY_FAILURE"
+      ],
+      "loss_matrix": {
+        "ACCEPT": {
+          "CAPABILITY_WITHIN_PROFILE": 0,
+          "CRITICAL_CAPACITY_FAILURE": 100
+        },
+        "REJECT": {
+          "CAPABILITY_WITHIN_PROFILE": 5,
+          "CRITICAL_CAPACITY_FAILURE": 0
+        }
+      },
+      "prior": null,
+      "current_evidence_refs": [
+        "structural-profile://P1",
+        "requirement-profile://C1"
+      ],
+      "budget": {
+        "engineering_hours": 2,
+        "compute_core_hours": 1,
+        "facility_hours": 2,
+        "specimen_count": 1,
+        "review_hours": 2,
+        "external_cost_units": 2
+      },
+      "actions": [
+        {
+          "action_id": "A-UNCALIBRATED-NDE",
+          "action_class": "nde_inspection",
+          "target_claim_id": "STRUCTURAL-COMPATIBILITY-001",
+          "profile_ref": "provider-client-profile://P1-C1@cfg-r7",
+          "article_subject_ref": "physical-unit://JOINT-SPECIMEN-0001",
+          "configuration_id": "CFG-R7",
+          "icd_revision": "R3",
+          "method_ref": "synthetic-method://A-UNCALIBRATED-NDE",
+          "admissibility": {
+            "state": "INADMISSIBLE",
+            "reason_codes": [
+              "CALIBRATION_EXPIRED",
+              "COMMON_CAUSE_UNRESOLVED"
+            ]
+          },
+          "resources": {
+            "engineering_hours": 0.5,
+            "compute_core_hours": 0,
+            "facility_hours": 0.5,
+            "specimen_count": 0,
+            "review_hours": 0.25,
+            "external_cost_units": 0.2
+          },
+          "observation_by_state": {
+            "CAPABILITY_WITHIN_PROFILE": "CLEAR",
+            "CRITICAL_CAPACITY_FAILURE": "INDICATION"
+          },
+          "dependencies": [
+            "DAQ-CALIBRATION-ROOT-01",
+            "REFERENCE-LAB-01"
+          ]
+        }
+      ],
+      "expected": {
+        "baseline_minimax_regret": 5,
+        "best_action_id": "ABSTAIN",
+        "post_action_worst_case_regret": 5,
+        "abstain": true,
+        "must_not_select": [
+          "A-UNCALIBRATED-NDE"
+        ],
+        "notes": "Inspection action has expired calibration and a declared common-cause dependency with the existing reference. Do not count as independent corroboration."
+      },
+      "current_evidence_dependency_groups": {
+        "structural-profile://P1": [
+          "DAQ-CALIBRATION-ROOT-01",
+          "REFERENCE-LAB-01"
+        ],
+        "requirement-profile://C1": []
+      },
+      "target_claim_id": "STRUCTURAL-COMPATIBILITY-001",
+      "requires_independent_evidence": true,
+      "required_obligations": [],
+      "decision_context": {
+        "profile_ref": "provider-client-profile://P1-C1@cfg-r7",
+        "article_subject_ref": "physical-unit://JOINT-SPECIMEN-0001",
+        "configuration_id": "CFG-R7",
+        "icd_revision": "R3"
+      }
+    },
+    {
+      "scenario_id": "JEV-007",
+      "claim_ceiling": "synthetic_decision_value_semantics_only",
+      "evidence_class": "synthetic",
+      "decision_regime": "distribution_free",
+      "states": [
+        "CAPABILITY_WITHIN_PROFILE",
+        "CRITICAL_CAPACITY_FAILURE"
+      ],
+      "loss_matrix": {
+        "ACCEPT": {
+          "CAPABILITY_WITHIN_PROFILE": 0,
+          "CRITICAL_CAPACITY_FAILURE": 100
+        },
+        "REJECT": {
+          "CAPABILITY_WITHIN_PROFILE": 5,
+          "CRITICAL_CAPACITY_FAILURE": 0
+        }
+      },
+      "prior": null,
+      "current_evidence_refs": [
+        "structural-profile://P1",
+        "requirement-profile://C1"
+      ],
+      "budget": {
+        "engineering_hours": 2,
+        "compute_core_hours": 1,
+        "facility_hours": 2,
+        "specimen_count": 1,
+        "review_hours": 2,
+        "external_cost_units": 2
+      },
+      "actions": [
+        {
+          "action_id": "A-AXIAL-ONLY",
+          "action_class": "single_axis_coupon_test",
+          "target_claim_id": "STRUCTURAL-COMPATIBILITY-001",
+          "profile_ref": "provider-client-profile://P1-C1@cfg-r7",
+          "article_subject_ref": "physical-unit://JOINT-SPECIMEN-0001",
+          "configuration_id": "CFG-R7",
+          "icd_revision": "R3",
+          "method_ref": "synthetic-method://A-AXIAL-ONLY",
+          "admissibility": {
+            "state": "INADMISSIBLE",
+            "reason_codes": [
+              "LOAD_INTERACTION_MODEL_UNSUPPORTED"
+            ]
+          },
+          "resources": {
+            "engineering_hours": 0.5,
+            "compute_core_hours": 0,
+            "facility_hours": 0.5,
+            "specimen_count": 1,
+            "review_hours": 0.25,
+            "external_cost_units": 0.2
+          },
+          "observation_by_state": {
+            "CAPABILITY_WITHIN_PROFILE": "PASS",
+            "CRITICAL_CAPACITY_FAILURE": "PASS"
+          },
+          "dependencies": []
+        }
+      ],
+      "expected": {
+        "baseline_minimax_regret": 5,
+        "best_action_id": "ABSTAIN",
+        "post_action_worst_case_regret": 5,
+        "abstain": true,
+        "must_not_select": [
+          "A-AXIAL-ONLY"
+        ],
+        "notes": "Axial-only measurement cannot resolve a coupled axial/shear/bending/torsion interaction. No admitted interaction profile exists, so the proposed test cannot support the target claim."
+      },
+      "target_claim_id": "STRUCTURAL-COMPATIBILITY-001",
+      "requires_independent_evidence": false,
+      "required_obligations": [],
+      "current_evidence_dependency_groups": {},
+      "decision_context": {
+        "profile_ref": "provider-client-profile://P1-C1@cfg-r7",
+        "article_subject_ref": "physical-unit://JOINT-SPECIMEN-0001",
+        "configuration_id": "CFG-R7",
+        "icd_revision": "R3"
+      }
+    },
+    {
+      "scenario_id": "JEV-008",
+      "claim_ceiling": "synthetic_decision_value_semantics_only",
+      "evidence_class": "synthetic",
+      "decision_regime": "distribution_free",
+      "states": [
+        "CAPABILITY_WITHIN_PROFILE",
+        "CRITICAL_CAPACITY_FAILURE"
+      ],
+      "loss_matrix": {
+        "ACCEPT": {
+          "CAPABILITY_WITHIN_PROFILE": 0,
+          "CRITICAL_CAPACITY_FAILURE": 100
+        },
+        "REJECT": {
+          "CAPABILITY_WITHIN_PROFILE": 5,
+          "CRITICAL_CAPACITY_FAILURE": 0
+        }
+      },
+      "prior": null,
+      "current_evidence_refs": [
+        "structural-profile://P1",
+        "requirement-profile://C1"
+      ],
+      "budget": {
+        "engineering_hours": 2,
+        "compute_core_hours": 1,
+        "facility_hours": 2,
+        "specimen_count": 1,
+        "review_hours": 2,
+        "external_cost_units": 2
+      },
+      "actions": [
+        {
+          "action_id": "A-COUPON-ONLY",
+          "action_class": "material_coupon_test",
+          "target_claim_id": "STRUCTURAL-COMPATIBILITY-001",
+          "profile_ref": "provider-client-profile://P1-C1@cfg-r7",
+          "article_subject_ref": "physical-unit://JOINT-SPECIMEN-0001",
+          "configuration_id": "CFG-R7",
+          "icd_revision": "R3",
+          "method_ref": "synthetic-method://A-COUPON-ONLY",
+          "admissibility": {
+            "state": "SOURCE_SCALE_ONLY",
+            "reason_codes": [
+              "TRANSFER_BRIDGE_MISSING"
+            ]
+          },
+          "resources": {
+            "engineering_hours": 1,
+            "compute_core_hours": 0,
+            "facility_hours": 0.75,
+            "specimen_count": 1,
+            "review_hours": 0.5,
+            "external_cost_units": 0.5
+          },
+          "observation_by_state": {
+            "CAPABILITY_WITHIN_PROFILE": "PROPERTY-A",
+            "CRITICAL_CAPACITY_FAILURE": "PROPERTY-B"
+          },
+          "dependencies": [],
+          "source_scale": "coupon",
+          "target_scale": "production_joint"
+        }
+      ],
+      "expected": {
+        "baseline_minimax_regret": 5,
+        "best_action_id": "ABSTAIN",
+        "post_action_worst_case_regret": 5,
+        "abstain": true,
+        "must_not_select": [
+          "A-COUPON-ONLY"
+        ],
+        "notes": "Coupon action may support a source-scale material property but does not resolve the production-joint target claim without an admitted scale-transfer bridge."
+      },
+      "target_claim_id": "STRUCTURAL-COMPATIBILITY-001",
+      "requires_independent_evidence": false,
+      "required_obligations": [],
+      "current_evidence_dependency_groups": {},
+      "decision_context": {
+        "profile_ref": "provider-client-profile://P1-C1@cfg-r7",
+        "article_subject_ref": "physical-unit://JOINT-SPECIMEN-0001",
+        "configuration_id": "CFG-R7",
+        "icd_revision": "R3"
+      }
+    },
+    {
+      "scenario_id": "JEV-009",
+      "claim_ceiling": "synthetic_decision_value_semantics_only",
+      "evidence_class": "synthetic",
+      "decision_regime": "distribution_free",
+      "states": [
+        "CAPABILITY_WITHIN_PROFILE",
+        "CRITICAL_CAPACITY_FAILURE"
+      ],
+      "loss_matrix": {
+        "ACCEPT": {
+          "CAPABILITY_WITHIN_PROFILE": 0,
+          "CRITICAL_CAPACITY_FAILURE": 100
+        },
+        "REJECT": {
+          "CAPABILITY_WITHIN_PROFILE": 5,
+          "CRITICAL_CAPACITY_FAILURE": 0
+        }
+      },
+      "prior": null,
+      "current_evidence_refs": [
+        "structural-profile://P1",
+        "requirement-profile://C1"
+      ],
+      "budget": {
+        "engineering_hours": 2,
+        "compute_core_hours": 1,
+        "facility_hours": 2,
+        "specimen_count": 1,
+        "review_hours": 2,
+        "external_cost_units": 2
+      },
+      "actions": [
+        {
+          "action_id": "A-INFORMATION-ONLY",
+          "action_class": "metrology",
+          "target_claim_id": "STRUCTURAL-COMPATIBILITY-001",
+          "profile_ref": "provider-client-profile://P1-C1@cfg-r7",
+          "article_subject_ref": "physical-unit://JOINT-SPECIMEN-0001",
+          "configuration_id": "CFG-R7",
+          "icd_revision": "R3",
+          "method_ref": "synthetic-method://A-INFORMATION-ONLY",
+          "admissibility": {
+            "state": "ADMISSIBLE",
+            "reason_codes": []
+          },
+          "resources": {
+            "engineering_hours": 0.5,
+            "compute_core_hours": 0,
+            "facility_hours": 0.25,
+            "specimen_count": 0,
+            "review_hours": 0.25,
+            "external_cost_units": 0.1
+          },
+          "observation_by_state": {
+            "CAPABILITY_WITHIN_PROFILE": "MASS-IN-RANGE",
+            "CRITICAL_CAPACITY_FAILURE": "MASS-IN-RANGE"
+          },
+          "dependencies": [],
+          "test_obligations_covered": [],
+          "obligations_covered": []
+        },
+        {
+          "action_id": "A-CRITICAL-INTERACTION-COVERAGE",
+          "action_class": "coupon_test",
+          "target_claim_id": "STRUCTURAL-COMPATIBILITY-001",
+          "profile_ref": "provider-client-profile://P1-C1@cfg-r7",
+          "article_subject_ref": "physical-unit://JOINT-SPECIMEN-0001",
+          "configuration_id": "CFG-R7",
+          "icd_revision": "R3",
+          "method_ref": "synthetic-method://A-CRITICAL-INTERACTION-COVERAGE",
+          "admissibility": {
+            "state": "ADMISSIBLE",
+            "reason_codes": []
+          },
+          "resources": {
+            "engineering_hours": 1.5,
+            "compute_core_hours": 0,
+            "facility_hours": 1,
+            "specimen_count": 1,
+            "review_hours": 0.5,
+            "external_cost_units": 0.8
+          },
+          "observation_by_state": {
+            "CAPABILITY_WITHIN_PROFILE": "PASS",
+            "CRITICAL_CAPACITY_FAILURE": "FAIL"
+          },
+          "dependencies": [],
+          "test_obligations_covered": [
+            "LOAD-X-TEMP-X-EOL-001"
+          ],
+          "obligations_covered": [
+            "LOAD-X-TEMP-X-EOL-001"
+          ]
+        }
+      ],
+      "expected": {
+        "baseline_minimax_regret": 5,
+        "best_action_id": "A-CRITICAL-INTERACTION-COVERAGE",
+        "post_action_worst_case_regret": 0,
+        "abstain": false,
+        "must_not_select": [
+          "A-INFORMATION-ONLY"
+        ],
+        "notes": "The action must both distinguish the decision states and cover the pre-registered combined load × temperature × end-of-life obligation. A high-information mass-only action does not satisfy the campaign."
+      },
+      "required_obligations": [
+        "LOAD-X-TEMP-X-EOL-001"
+      ],
+      "target_claim_id": "STRUCTURAL-COMPATIBILITY-001",
+      "requires_independent_evidence": false,
+      "current_evidence_dependency_groups": {},
+      "decision_context": {
+        "profile_ref": "provider-client-profile://P1-C1@cfg-r7",
+        "article_subject_ref": "physical-unit://JOINT-SPECIMEN-0001",
+        "configuration_id": "CFG-R7",
+        "icd_revision": "R3"
+      }
+    },
+    {
+      "scenario_id": "JEV-010",
+      "claim_ceiling": "synthetic_decision_value_semantics_only",
+      "evidence_class": "synthetic",
+      "decision_regime": "distribution_free",
+      "states": [
+        "CAPABILITY_WITHIN_PROFILE",
+        "CRITICAL_CAPACITY_FAILURE"
+      ],
+      "loss_matrix": {
+        "ACCEPT": {
+          "CAPABILITY_WITHIN_PROFILE": 0,
+          "CRITICAL_CAPACITY_FAILURE": 100
+        },
+        "REJECT": {
+          "CAPABILITY_WITHIN_PROFILE": 5,
+          "CRITICAL_CAPACITY_FAILURE": 0
+        }
+      },
+      "prior": null,
+      "current_evidence_refs": [
+        "structural-profile://P1",
+        "requirement-profile://C1"
+      ],
+      "budget": {
+        "engineering_hours": 2,
+        "compute_core_hours": 1,
+        "facility_hours": 2,
+        "specimen_count": 1,
+        "review_hours": 2,
+        "external_cost_units": 2
+      },
+      "actions": [
+        {
+          "action_id": "A-FIRST-CYCLE-ONLY",
+          "action_class": "single_mating_test",
+          "target_claim_id": "INITIAL-MATE-COMPATIBILITY",
+          "profile_ref": "provider-client-profile://P1-C1@cfg-r7",
+          "article_subject_ref": "physical-unit://JOINT-SPECIMEN-0001",
+          "configuration_id": "CFG-R7",
+          "icd_revision": "R3",
+          "method_ref": "synthetic-method://A-FIRST-CYCLE-ONLY",
+          "admissibility": {
+            "state": "INADMISSIBLE",
+            "reason_codes": [
+              "CLAIM_SCOPE_MISMATCH"
+            ]
+          },
+          "resources": {
+            "engineering_hours": 0.25,
+            "compute_core_hours": 0,
+            "facility_hours": 0.25,
+            "specimen_count": 0,
+            "review_hours": 0.1,
+            "external_cost_units": 0.1
+          },
+          "observation_by_state": {
+            "CAPABILITY_WITHIN_PROFILE": "PASS",
+            "CRITICAL_CAPACITY_FAILURE": "FAIL"
+          },
+          "dependencies": [],
+          "claim_coverage": [
+            "INITIAL-MATE-COMPATIBILITY"
+          ],
+          "not_covered": [
+            "WEAR-LIFECYCLE-001"
+          ],
+          "obligations_covered": [
+            "INITIAL-MATE-COMPATIBILITY"
+          ]
+        },
+        {
+          "action_id": "A-REPEATED-MATING-WEAR",
+          "action_class": "repeated_mating_wear_test",
+          "target_claim_id": "WEAR-LIFECYCLE-001",
+          "profile_ref": "provider-client-profile://P1-C1@cfg-r7",
+          "article_subject_ref": "physical-unit://JOINT-SPECIMEN-0001",
+          "configuration_id": "CFG-R7",
+          "icd_revision": "R3",
+          "method_ref": "synthetic-method://A-REPEATED-MATING-WEAR",
+          "admissibility": {
+            "state": "ADMISSIBLE",
+            "reason_codes": []
+          },
+          "resources": {
+            "engineering_hours": 1.5,
+            "compute_core_hours": 0,
+            "facility_hours": 1.5,
+            "specimen_count": 1,
+            "review_hours": 0.5,
+            "external_cost_units": 0.9
+          },
+          "observation_by_state": {
+            "CAPABILITY_WITHIN_PROFILE": "PASS",
+            "CRITICAL_CAPACITY_FAILURE": "FAIL"
+          },
+          "dependencies": [],
+          "claim_coverage": [
+            "INITIAL-MATE-COMPATIBILITY",
+            "WEAR-LIFECYCLE-001"
+          ],
+          "obligations_covered": [
+            "INITIAL-MATE-COMPATIBILITY",
+            "WEAR-LIFECYCLE-001"
+          ]
+        }
+      ],
+      "expected": {
+        "baseline_minimax_regret": 5,
+        "best_action_id": "A-REPEATED-MATING-WEAR",
+        "post_action_worst_case_regret": 0,
+        "abstain": false,
+        "must_not_select": [
+          "A-FIRST-CYCLE-ONLY"
+        ],
+        "notes": "A first-mating test does not resolve wear/requalification claims. The repeated-mating action covers the declared lifecycle claim; the first-cycle action is source-event-only."
+      },
+      "required_obligations": [
+        "WEAR-LIFECYCLE-001"
+      ],
+      "target_claim_id": "WEAR-LIFECYCLE-001",
+      "requires_independent_evidence": false,
+      "current_evidence_dependency_groups": {},
+      "decision_context": {
+        "profile_ref": "provider-client-profile://P1-C1@cfg-r7",
+        "article_subject_ref": "physical-unit://JOINT-SPECIMEN-0001",
+        "configuration_id": "CFG-R7",
+        "icd_revision": "R3"
+      }
+    },
+    {
+      "scenario_id": "JEV-011",
+      "claim_ceiling": "synthetic_decision_value_semantics_only",
+      "evidence_class": "synthetic",
+      "decision_regime": "distribution_free",
+      "states": [
+        "CAPABILITY_WITHIN_PROFILE",
+        "CRITICAL_CAPACITY_FAILURE"
+      ],
+      "loss_matrix": {
+        "ACCEPT": {
+          "CAPABILITY_WITHIN_PROFILE": 0,
+          "CRITICAL_CAPACITY_FAILURE": 100
+        },
+        "REJECT": {
+          "CAPABILITY_WITHIN_PROFILE": 5,
+          "CRITICAL_CAPACITY_FAILURE": 0
+        }
+      },
+      "prior": null,
+      "current_evidence_refs": [
+        "structural-profile://P1",
+        "requirement-profile://C1"
+      ],
+      "budget": {
+        "engineering_hours": 2,
+        "compute_core_hours": 1,
+        "facility_hours": 2,
+        "specimen_count": 1,
+        "review_hours": 2,
+        "external_cost_units": 2
+      },
+      "actions": [
+        {
+          "action_id": "A-ABORTED-COUPON-TEST",
+          "action_class": "coupon_test",
+          "target_claim_id": "STRUCTURAL-COMPATIBILITY-001",
+          "profile_ref": "provider-client-profile://P1-C1@cfg-r7",
+          "article_subject_ref": "physical-unit://JOINT-SPECIMEN-0001",
+          "configuration_id": "CFG-R7",
+          "icd_revision": "R3",
+          "method_ref": "synthetic-method://A-ABORTED-COUPON-TEST",
+          "admissibility": {
+            "state": "ADMISSIBLE",
+            "reason_codes": []
+          },
+          "resources": {
+            "engineering_hours": 0.8,
+            "compute_core_hours": 0,
+            "facility_hours": 0.7,
+            "specimen_count": 1,
+            "review_hours": 0.2,
+            "external_cost_units": 0.6
+          },
+          "observation_by_state": {
+            "CAPABILITY_WITHIN_PROFILE": "NO-RESULT",
+            "CRITICAL_CAPACITY_FAILURE": "NO-RESULT"
+          },
+          "dependencies": [],
+          "observed_execution_state": "ABORTED",
+          "actual_resources": {
+            "engineering_hours": 0.6,
+            "compute_core_hours": 0,
+            "facility_hours": 0.4,
+            "specimen_count": 1,
+            "review_hours": 0.2,
+            "external_cost_units": 0.6
+          },
+          "evidence_disposition": "INCOMPLETE"
+        }
+      ],
+      "expected": {
+        "baseline_minimax_regret": 5,
+        "best_action_id": "REPLAN-AFTER-FAILED-ACTION",
+        "post_action_worst_case_regret": 5,
+        "abstain": true,
+        "must_not_select": [
+          "A-ABORTED-COUPON-TEST"
+        ],
+        "notes": "The only attempted test aborted after incurring resources and produced no admissible outcome. Preserve consumed cost and missing evidence; do not infer success."
+      },
+      "target_claim_id": "STRUCTURAL-COMPATIBILITY-001",
+      "requires_independent_evidence": false,
+      "required_obligations": [],
+      "current_evidence_dependency_groups": {},
+      "decision_context": {
+        "profile_ref": "provider-client-profile://P1-C1@cfg-r7",
+        "article_subject_ref": "physical-unit://JOINT-SPECIMEN-0001",
+        "configuration_id": "CFG-R7",
+        "icd_revision": "R3"
+      }
+    },
+    {
+      "scenario_id": "JEV-012",
+      "claim_ceiling": "synthetic_decision_value_semantics_only",
+      "evidence_class": "synthetic",
+      "decision_regime": "distribution_free",
+      "target_claim_id": "STRUCTURAL-COMPATIBILITY-001",
+      "requires_independent_evidence": false,
+      "states": [
+        "CAPABILITY_WITHIN_PROFILE",
+        "CRITICAL_CAPACITY_FAILURE"
+      ],
+      "loss_matrix": {
+        "ACCEPT": {
+          "CAPABILITY_WITHIN_PROFILE": 0,
+          "CRITICAL_CAPACITY_FAILURE": 100
+        },
+        "REJECT": {
+          "CAPABILITY_WITHIN_PROFILE": 5,
+          "CRITICAL_CAPACITY_FAILURE": 0
+        }
+      },
+      "prior": null,
+      "current_evidence_refs": [
+        "structural-profile://P1",
+        "requirement-profile://C1"
+      ],
+      "current_evidence_dependency_groups": {},
+      "required_obligations": [],
+      "budget": {
+        "engineering_hours": 2,
+        "compute_core_hours": 1,
+        "facility_hours": 2,
+        "specimen_count": 1,
+        "review_hours": 2,
+        "external_cost_units": 2
+      },
+      "actions": [
+        {
+          "action_id": "A-ABORTED-OVER-PLAN",
+          "action_class": "coupon_test",
+          "target_claim_id": "STRUCTURAL-COMPATIBILITY-001",
+          "profile_ref": "provider-client-profile://P1-C1@cfg-r7",
+          "article_subject_ref": "physical-unit://JOINT-SPECIMEN-0001",
+          "configuration_id": "CFG-R7",
+          "icd_revision": "R3",
+          "method_ref": "synthetic-method://aborted-coupon-test",
+          "admissibility": {
+            "state": "ADMISSIBLE",
+            "reason_codes": []
+          },
+          "resources": {
+            "engineering_hours": 0.5,
+            "compute_core_hours": 0,
+            "facility_hours": 0.5,
+            "specimen_count": 1,
+            "review_hours": 0.1,
+            "external_cost_units": 0.2
+          },
+          "observation_by_state": {
+            "CAPABILITY_WITHIN_PROFILE": "NO-RESULT",
+            "CRITICAL_CAPACITY_FAILURE": "NO-RESULT"
+          },
+          "dependencies": [],
+          "observed_execution_state": "ABORTED",
+          "actual_resources": {
+            "engineering_hours": 1.2,
+            "compute_core_hours": 0,
+            "facility_hours": 0.8,
+            "specimen_count": 1,
+            "review_hours": 0.4,
+            "external_cost_units": 0.5
+          },
+          "evidence_disposition": "INCOMPLETE"
+        }
+      ],
+      "expected": {
+        "baseline_minimax_regret": 5,
+        "best_action_id": "REPLAN-AFTER-FAILED-ACTION",
+        "post_action_worst_case_regret": 5,
+        "abstain": true,
+        "must_not_select": [
+          "A-ABORTED-OVER-PLAN"
+        ],
+        "notes": "The aborted coupon trial consumed more engineering, facility, review and external resources than estimated, but remained within the total scenario budget. Preserve actual consumption and flag plan variance."
+      },
+      "decision_context": {
+        "profile_ref": "provider-client-profile://P1-C1@cfg-r7",
+        "article_subject_ref": "physical-unit://JOINT-SPECIMEN-0001",
+        "configuration_id": "CFG-R7",
+        "icd_revision": "R3"
+      }
+    },
+    {
+      "scenario_id": "JEV-013",
+      "claim_ceiling": "synthetic_decision_value_semantics_only",
+      "evidence_class": "synthetic",
+      "decision_regime": "distribution_free",
+      "target_claim_id": "STRUCTURAL-COMPATIBILITY-001",
+      "requires_independent_evidence": false,
+      "states": [
+        "CAPABILITY_WITHIN_PROFILE",
+        "CRITICAL_CAPACITY_FAILURE"
+      ],
+      "loss_matrix": {
+        "ACCEPT": {
+          "CAPABILITY_WITHIN_PROFILE": 0,
+          "CRITICAL_CAPACITY_FAILURE": 100
+        },
+        "REJECT": {
+          "CAPABILITY_WITHIN_PROFILE": 5,
+          "CRITICAL_CAPACITY_FAILURE": 0
+        }
+      },
+      "prior": null,
+      "current_evidence_refs": [
+        "structural-profile://P1",
+        "requirement-profile://C1"
+      ],
+      "current_evidence_dependency_groups": {},
+      "required_obligations": [],
+      "budget": {
+        "engineering_hours": 2,
+        "compute_core_hours": 1,
+        "facility_hours": 2,
+        "specimen_count": 1,
+        "review_hours": 2,
+        "external_cost_units": 2
+      },
+      "actions": [
+        {
+          "action_id": "A-ABORTED-OVER-BUDGET",
+          "action_class": "coupon_test",
+          "target_claim_id": "STRUCTURAL-COMPATIBILITY-001",
+          "profile_ref": "provider-client-profile://P1-C1@cfg-r7",
+          "article_subject_ref": "physical-unit://JOINT-SPECIMEN-0001",
+          "configuration_id": "CFG-R7",
+          "icd_revision": "R3",
+          "method_ref": "synthetic-method://aborted-coupon-test",
+          "admissibility": {
+            "state": "ADMISSIBLE",
+            "reason_codes": []
+          },
+          "resources": {
+            "engineering_hours": 0.5,
+            "compute_core_hours": 0,
+            "facility_hours": 0.5,
+            "specimen_count": 1,
+            "review_hours": 0.1,
+            "external_cost_units": 0.2
+          },
+          "observation_by_state": {
+            "CAPABILITY_WITHIN_PROFILE": "NO-RESULT",
+            "CRITICAL_CAPACITY_FAILURE": "NO-RESULT"
+          },
+          "dependencies": [],
+          "observed_execution_state": "ABORTED",
+          "actual_resources": {
+            "engineering_hours": 2.4,
+            "compute_core_hours": 0.1,
+            "facility_hours": 2.5,
+            "specimen_count": 2,
+            "review_hours": 2.2,
+            "external_cost_units": 2.5
+          },
+          "evidence_disposition": "INCOMPLETE"
+        }
+      ],
+      "expected": {
+        "baseline_minimax_regret": 5,
+        "best_action_id": "REPLAN-AFTER-FAILED-ACTION",
+        "post_action_worst_case_regret": 5,
+        "abstain": true,
+        "must_not_select": [
+          "A-ABORTED-OVER-BUDGET"
+        ],
+        "notes": "The aborted coupon trial exceeded the planned estimate and the total scenario budget. Preserve actual consumption; report over-plan and over-budget rather than dropping or rejecting the cost record."
+      },
+      "decision_context": {
+        "profile_ref": "provider-client-profile://P1-C1@cfg-r7",
+        "article_subject_ref": "physical-unit://JOINT-SPECIMEN-0001",
+        "configuration_id": "CFG-R7",
+        "icd_revision": "R3"
+      }
+    },
+    {
+      "scenario_id": "JEV-014",
+      "claim_ceiling": "synthetic_decision_value_semantics_only",
+      "evidence_class": "synthetic",
+      "decision_regime": "distribution_free",
+      "states": [
+        "CAPABILITY_WITHIN_PROFILE",
+        "CRITICAL_CAPACITY_FAILURE"
+      ],
+      "loss_matrix": {
+        "ACCEPT": {
+          "CAPABILITY_WITHIN_PROFILE": 0,
+          "CRITICAL_CAPACITY_FAILURE": 100
+        },
+        "REJECT": {
+          "CAPABILITY_WITHIN_PROFILE": 5,
+          "CRITICAL_CAPACITY_FAILURE": 0
+        }
+      },
+      "prior": null,
+      "current_evidence_refs": [
+        "structural-profile://P1",
+        "requirement-profile://C1"
+      ],
+      "budget": {
+        "engineering_hours": 2,
+        "compute_core_hours": 1,
+        "facility_hours": 2,
+        "specimen_count": 1,
+        "review_hours": 2,
+        "external_cost_units": 2
+      },
+      "actions": [
+        {
+          "action_id": "A-LOW-ENGINEERING-HIGH-FACILITY",
+          "action_class": "coupon_test",
+          "target_claim_id": "STRUCTURAL-COMPATIBILITY-001",
+          "profile_ref": "provider-client-profile://P1-C1@cfg-r7",
+          "article_subject_ref": "physical-unit://JOINT-SPECIMEN-0001",
+          "configuration_id": "CFG-R7",
+          "icd_revision": "R3",
+          "method_ref": "synthetic-method://A-COUPON-INTERACTION",
+          "admissibility": {
+            "state": "ADMISSIBLE",
+            "reason_codes": []
+          },
+          "resources": {
+            "engineering_hours": 0.5,
+            "compute_core_hours": 0,
+            "facility_hours": 1.5,
+            "specimen_count": 1,
+            "review_hours": 0.5,
+            "external_cost_units": 1
+          },
+          "observation_by_state": {
+            "CAPABILITY_WITHIN_PROFILE": "PASS",
+            "CRITICAL_CAPACITY_FAILURE": "FAIL"
+          },
+          "dependencies": []
+        },
+        {
+          "action_id": "A-HIGH-ENGINEERING-LOW-FACILITY",
+          "action_class": "coupon_test",
+          "target_claim_id": "STRUCTURAL-COMPATIBILITY-001",
+          "profile_ref": "provider-client-profile://P1-C1@cfg-r7",
+          "article_subject_ref": "physical-unit://JOINT-SPECIMEN-0001",
+          "configuration_id": "CFG-R7",
+          "icd_revision": "R3",
+          "method_ref": "synthetic-method://A-COUPON-INTERACTION",
+          "admissibility": {
+            "state": "ADMISSIBLE",
+            "reason_codes": []
+          },
+          "resources": {
+            "engineering_hours": 1.5,
+            "compute_core_hours": 0,
+            "facility_hours": 0.5,
+            "specimen_count": 1,
+            "review_hours": 0.5,
+            "external_cost_units": 1
+          },
+          "observation_by_state": {
+            "CAPABILITY_WITHIN_PROFILE": "PASS",
+            "CRITICAL_CAPACITY_FAILURE": "FAIL"
+          },
+          "dependencies": []
+        }
+      ],
+      "expected": {
+        "baseline_minimax_regret": 5,
+        "best_action_id": "REPLAN-RESOURCE-PARETO-TIE",
+        "post_action_worst_case_regret": 5,
+        "abstain": true,
+        "must_not_select": [],
+        "notes": "The two admissible actions yield equal minimax-regret improvement but incomparable resource vectors: one consumes fewer engineering hours and more facility hours, the other the reverse. Do not invent a conversion rate between these dimensions; request human review."
+      },
+      "target_claim_id": "STRUCTURAL-COMPATIBILITY-001",
+      "requires_independent_evidence": false,
+      "required_obligations": [],
+      "current_evidence_dependency_groups": {},
+      "decision_context": {
+        "profile_ref": "provider-client-profile://P1-C1@cfg-r7",
+        "article_subject_ref": "physical-unit://JOINT-SPECIMEN-0001",
+        "configuration_id": "CFG-R7",
+        "icd_revision": "R3"
+      }
+    },
+    {
+      "scenario_id": "JEV-015",
+      "claim_ceiling": "synthetic_decision_value_semantics_only",
+      "evidence_class": "synthetic",
+      "decision_regime": "distribution_free",
+      "states": [
+        "CAPABILITY_WITHIN_PROFILE",
+        "CRITICAL_CAPACITY_FAILURE"
+      ],
+      "loss_matrix": {
+        "ACCEPT": {
+          "CAPABILITY_WITHIN_PROFILE": 0,
+          "CRITICAL_CAPACITY_FAILURE": 100
+        },
+        "REJECT": {
+          "CAPABILITY_WITHIN_PROFILE": 5,
+          "CRITICAL_CAPACITY_FAILURE": 0
+        }
+      },
+      "prior": null,
+      "current_evidence_refs": [
+        "structural-profile://P1",
+        "requirement-profile://C1"
+      ],
+      "budget": {
+        "engineering_hours": 2,
+        "compute_core_hours": 1,
+        "facility_hours": 2,
+        "specimen_count": 1,
+        "review_hours": 2,
+        "external_cost_units": 2
+      },
+      "actions": [
+        {
+          "action_id": "A-WRONG-PROFILE",
+          "action_class": "coupon_test",
+          "target_claim_id": "STRUCTURAL-COMPATIBILITY-001",
+          "profile_ref": "provider-client-profile://P1-C1@cfg-r6",
+          "article_subject_ref": "physical-unit://JOINT-SPECIMEN-0001",
+          "configuration_id": "CFG-R7",
+          "icd_revision": "R3",
+          "method_ref": "synthetic-method://A-COUPON-INTERACTION",
+          "admissibility": {
+            "state": "ADMISSIBLE",
+            "reason_codes": []
+          },
+          "resources": {
+            "engineering_hours": 1,
+            "compute_core_hours": 0,
+            "facility_hours": 1,
+            "specimen_count": 1,
+            "review_hours": 0.5,
+            "external_cost_units": 1
+          },
+          "observation_by_state": {
+            "CAPABILITY_WITHIN_PROFILE": "PASS",
+            "CRITICAL_CAPACITY_FAILURE": "FAIL"
+          },
+          "dependencies": []
+        },
+        {
+          "action_id": "A-WRONG-SERIAL",
+          "action_class": "coupon_test",
+          "target_claim_id": "STRUCTURAL-COMPATIBILITY-001",
+          "profile_ref": "provider-client-profile://P1-C1@cfg-r7",
+          "article_subject_ref": "physical-unit://JOINT-SPECIMEN-0002",
+          "configuration_id": "CFG-R7",
+          "icd_revision": "R3",
+          "method_ref": "synthetic-method://A-COUPON-INTERACTION",
+          "admissibility": {
+            "state": "ADMISSIBLE",
+            "reason_codes": []
+          },
+          "resources": {
+            "engineering_hours": 1,
+            "compute_core_hours": 0,
+            "facility_hours": 1,
+            "specimen_count": 1,
+            "review_hours": 0.5,
+            "external_cost_units": 1
+          },
+          "observation_by_state": {
+            "CAPABILITY_WITHIN_PROFILE": "PASS",
+            "CRITICAL_CAPACITY_FAILURE": "FAIL"
+          },
+          "dependencies": []
+        },
+        {
+          "action_id": "A-WRONG-CONFIGURATION",
+          "action_class": "coupon_test",
+          "target_claim_id": "STRUCTURAL-COMPATIBILITY-001",
+          "profile_ref": "provider-client-profile://P1-C1@cfg-r7",
+          "article_subject_ref": "physical-unit://JOINT-SPECIMEN-0001",
+          "configuration_id": "CFG-R6",
+          "icd_revision": "R3",
+          "method_ref": "synthetic-method://A-COUPON-INTERACTION",
+          "admissibility": {
+            "state": "ADMISSIBLE",
+            "reason_codes": []
+          },
+          "resources": {
+            "engineering_hours": 1,
+            "compute_core_hours": 0,
+            "facility_hours": 1,
+            "specimen_count": 1,
+            "review_hours": 0.5,
+            "external_cost_units": 1
+          },
+          "observation_by_state": {
+            "CAPABILITY_WITHIN_PROFILE": "PASS",
+            "CRITICAL_CAPACITY_FAILURE": "FAIL"
+          },
+          "dependencies": []
+        },
+        {
+          "action_id": "A-WRONG-ICD-REVISION",
+          "action_class": "coupon_test",
+          "target_claim_id": "STRUCTURAL-COMPATIBILITY-001",
+          "profile_ref": "provider-client-profile://P1-C1@cfg-r7",
+          "article_subject_ref": "physical-unit://JOINT-SPECIMEN-0001",
+          "configuration_id": "CFG-R7",
+          "icd_revision": "R2",
+          "method_ref": "synthetic-method://A-COUPON-INTERACTION",
+          "admissibility": {
+            "state": "ADMISSIBLE",
+            "reason_codes": []
+          },
+          "resources": {
+            "engineering_hours": 1,
+            "compute_core_hours": 0,
+            "facility_hours": 1,
+            "specimen_count": 1,
+            "review_hours": 0.5,
+            "external_cost_units": 1
+          },
+          "observation_by_state": {
+            "CAPABILITY_WITHIN_PROFILE": "PASS",
+            "CRITICAL_CAPACITY_FAILURE": "FAIL"
+          },
+          "dependencies": []
+        }
+      ],
+      "expected": {
+        "best_action_id": "ABSTAIN",
+        "abstain": true,
+        "must_not_select": [
+          "A-WRONG-PROFILE",
+          "A-WRONG-SERIAL",
+          "A-WRONG-CONFIGURATION",
+          "A-WRONG-ICD-REVISION"
+        ],
+        "notes": "All four offers advertise ADMISSIBLE and have positive synthetic information value, but each targets a different profile, serialized physical unit, configuration or ICD revision. The exact decision-context join is mandatory; reject all four and abstain.",
+        "baseline_minimax_regret": 5,
+        "post_action_worst_case_regret": 5
+      },
+      "target_claim_id": "STRUCTURAL-COMPATIBILITY-001",
+      "requires_independent_evidence": false,
+      "required_obligations": [],
+      "current_evidence_dependency_groups": {},
+      "decision_context": {
+        "profile_ref": "provider-client-profile://P1-C1@cfg-r7",
+        "article_subject_ref": "physical-unit://JOINT-SPECIMEN-0001",
+        "configuration_id": "CFG-R7",
+        "icd_revision": "R3"
+      }
+    },
+    {
+      "scenario_id": "JEV-016",
+      "claim_ceiling": "synthetic_decision_value_semantics_only",
+      "evidence_class": "synthetic",
+      "decision_regime": "distribution_free",
+      "states": [
+        "CAPABILITY_WITHIN_PROFILE",
+        "CRITICAL_CAPACITY_FAILURE"
+      ],
+      "loss_matrix": {
+        "ACCEPT": {
+          "CAPABILITY_WITHIN_PROFILE": 0,
+          "CRITICAL_CAPACITY_FAILURE": 100
+        },
+        "REJECT": {
+          "CAPABILITY_WITHIN_PROFILE": 5,
+          "CRITICAL_CAPACITY_FAILURE": 0
+        }
+      },
+      "prior": null,
+      "current_evidence_refs": [
+        "structural-profile://P1",
+        "requirement-profile://C1"
+      ],
+      "budget": {
+        "engineering_hours": 2,
+        "compute_core_hours": 1,
+        "facility_hours": 2,
+        "specimen_count": 1,
+        "review_hours": 2,
+        "external_cost_units": 2
+      },
+      "actions": [
+        {
+          "action_id": "A-TEST-WITH-INCOMPLETE-CHANGE-FRONTIER",
+          "action_class": "coupon_test",
+          "target_claim_id": "STRUCTURAL-COMPATIBILITY-001",
+          "profile_ref": "provider-client-profile://P1-C1@cfg-r7",
+          "article_subject_ref": "physical-unit://JOINT-SPECIMEN-0001",
+          "configuration_id": "CFG-R7",
+          "icd_revision": "R3",
+          "method_ref": "synthetic-method://A-COUPON-INTERACTION",
+          "admissibility": {
+            "state": "ADMISSIBLE",
+            "reason_codes": []
+          },
+          "resources": {
+            "engineering_hours": 1,
+            "compute_core_hours": 0,
+            "facility_hours": 1,
+            "specimen_count": 1,
+            "review_hours": 0.5,
+            "external_cost_units": 1
+          },
+          "observation_by_state": {
+            "CAPABILITY_WITHIN_PROFILE": "PASS",
+            "CRITICAL_CAPACITY_FAILURE": "FAIL"
+          },
+          "dependencies": [],
+          "requalification_claims_covered": [
+            "STRUCTURAL-INTERFACE-CAPABILITY-001"
+          ]
+        }
+      ],
+      "expected": {
+        "baseline_minimax_regret": 5,
+        "best_action_id": "ABSTAIN",
+        "post_action_worst_case_regret": 5,
+        "abstain": true,
+        "must_not_select": [
+          "A-TEST-WITH-INCOMPLETE-CHANGE-FRONTIER"
+        ],
+        "notes": "The proposed test is otherwise admissible, exact-context and decision-informative, but the owner-native change-event frontier is incomplete. Do not select or refresh any qualification until the omitted change coverage is reconciled."
+      },
+      "target_claim_id": "STRUCTURAL-COMPATIBILITY-001",
+      "requires_independent_evidence": false,
+      "required_obligations": [],
+      "current_evidence_dependency_groups": {},
+      "decision_context": {
+        "profile_ref": "provider-client-profile://P1-C1@cfg-r7",
+        "article_subject_ref": "physical-unit://JOINT-SPECIMEN-0001",
+        "configuration_id": "CFG-R7",
+        "icd_revision": "R3"
+      },
+      "change_impact": {
+        "source_owner": "mycelix:6219",
+        "receipt_ref": "mycelix-change-impact://EVENT-GAP-001",
+        "event_frontier_ref": "event-frontier://STRUCTURAL-AERO-GAP-001",
+        "completeness": "INCOMPLETE",
+        "required_requalification_claims": [
+          "STRUCTURAL-INTERFACE-CAPABILITY-001"
+        ],
+        "unaffected_claims": [
+          "DESIGN-IDENTITY-001"
+        ]
+      }
+    },
+    {
+      "scenario_id": "JEV-017",
+      "claim_ceiling": "synthetic_decision_value_semantics_only",
+      "evidence_class": "synthetic",
+      "decision_regime": "distribution_free",
+      "states": [
+        "CAPABILITY_WITHIN_PROFILE",
+        "CRITICAL_CAPACITY_FAILURE"
+      ],
+      "loss_matrix": {
+        "ACCEPT": {
+          "CAPABILITY_WITHIN_PROFILE": 0,
+          "CRITICAL_CAPACITY_FAILURE": 100
+        },
+        "REJECT": {
+          "CAPABILITY_WITHIN_PROFILE": 5,
+          "CRITICAL_CAPACITY_FAILURE": 0
+        }
+      },
+      "prior": null,
+      "current_evidence_refs": [
+        "structural-profile://P1",
+        "requirement-profile://C1"
+      ],
+      "budget": {
+        "engineering_hours": 2,
+        "compute_core_hours": 1,
+        "facility_hours": 2,
+        "specimen_count": 1,
+        "review_hours": 2,
+        "external_cost_units": 2
+      },
+      "actions": [
+        {
+          "action_id": "A-UNRELATED-DESIGN-RECHECK",
+          "action_class": "coupon_test",
+          "target_claim_id": "STRUCTURAL-COMPATIBILITY-001",
+          "profile_ref": "provider-client-profile://P2-C2@cfg-r8",
+          "article_subject_ref": "physical-unit://JOINT-SPECIMEN-0002",
+          "configuration_id": "CFG-R8",
+          "icd_revision": "R4",
+          "method_ref": "synthetic-method://A-COUPON-INTERACTION",
+          "admissibility": {
+            "state": "ADMISSIBLE",
+            "reason_codes": []
+          },
+          "resources": {
+            "engineering_hours": 1,
+            "compute_core_hours": 0,
+            "facility_hours": 1,
+            "specimen_count": 1,
+            "review_hours": 0.5,
+            "external_cost_units": 1
+          },
+          "observation_by_state": {
+            "CAPABILITY_WITHIN_PROFILE": "PASS",
+            "CRITICAL_CAPACITY_FAILURE": "FAIL"
+          },
+          "dependencies": [],
+          "requalification_claims_covered": [
+            "DESIGN-IDENTITY-001"
+          ]
+        },
+        {
+          "action_id": "A-TARGETED-STRUCTURAL-REQUALIFICATION",
+          "action_class": "coupon_test",
+          "target_claim_id": "STRUCTURAL-COMPATIBILITY-001",
+          "profile_ref": "provider-client-profile://P2-C2@cfg-r8",
+          "article_subject_ref": "physical-unit://JOINT-SPECIMEN-0002",
+          "configuration_id": "CFG-R8",
+          "icd_revision": "R4",
+          "method_ref": "synthetic-method://A-COUPON-INTERACTION",
+          "admissibility": {
+            "state": "ADMISSIBLE",
+            "reason_codes": []
+          },
+          "resources": {
+            "engineering_hours": 1,
+            "compute_core_hours": 0,
+            "facility_hours": 1,
+            "specimen_count": 1,
+            "review_hours": 0.5,
+            "external_cost_units": 1
+          },
+          "observation_by_state": {
+            "CAPABILITY_WITHIN_PROFILE": "PASS",
+            "CRITICAL_CAPACITY_FAILURE": "FAIL"
+          },
+          "dependencies": [],
+          "requalification_claims_covered": [
+            "STRUCTURAL-INTERFACE-CAPABILITY-001"
+          ]
+        }
+      ],
+      "expected": {
+        "baseline_minimax_regret": 5,
+        "best_action_id": "A-TARGETED-STRUCTURAL-REQUALIFICATION",
+        "post_action_worst_case_regret": 0,
+        "abstain": false,
+        "must_not_select": [
+          "A-UNRELATED-DESIGN-RECHECK"
+        ],
+        "notes": "The change-impact receipt is complete and identifies one required structural-interface capability for requalification plus an unaffected design-identity claim. An unrelated design recheck cannot resolve the affected structural claim; the exact targeted structural requalification action is selected."
+      },
+      "target_claim_id": "STRUCTURAL-COMPATIBILITY-001",
+      "requires_independent_evidence": false,
+      "required_obligations": [],
+      "current_evidence_dependency_groups": {},
+      "decision_context": {
+        "profile_ref": "provider-client-profile://P2-C2@cfg-r8",
+        "article_subject_ref": "physical-unit://JOINT-SPECIMEN-0002",
+        "configuration_id": "CFG-R8",
+        "icd_revision": "R4"
+      },
+      "change_impact": {
+        "source_owner": "mycelix:6219",
+        "receipt_ref": "mycelix-change-impact://MATERIAL-PROCESS-CHANGE-017",
+        "event_frontier_ref": "event-frontier://STRUCTURAL-AERO-COMPLETE-017",
+        "completeness": "COMPLETE",
+        "required_requalification_claims": [
+          "STRUCTURAL-INTERFACE-CAPABILITY-001"
+        ],
+        "unaffected_claims": [
+          "DESIGN-IDENTITY-001"
+        ]
+      }
+    }
+  ]
+}

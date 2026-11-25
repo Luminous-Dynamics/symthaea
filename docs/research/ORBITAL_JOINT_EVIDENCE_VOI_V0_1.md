@@ -1,0 +1,435 @@
+# Orbital Joint Evidence Value-of-Information Adapter v0.1
+
+**Tracker:** [ORBITAL-JOINT-EVIDENCE-VOI-001 #13111](https://github.com/Luminous-Dynamics/symthaea/issues/13111)  
+**Status:** research contract and synthetic scenario catalogue; no selection-performance result claimed.  
+**Claim ceiling:** synthetic evidence-action admissibility and decision-value semantics only.
+
+## 1. Purpose
+
+This adapter asks which engineering evaluation should happen next for an exact structural-interface decision: analytical bound, external solver run, mesh/fidelity refinement, material characterization, coupon test, NDE/inspectability study, metrology, repeated mating/wear study or assembled-structure test.
+
+The objective is not maximum entropy reduction, maximum model disagreement, maximum experiment count, or maximum Pareto hypervolume. It is improved engineering decisions under a finite and fully-accounted validation budget, without making a hard acceptance gate compensable.
+
+The decision pipeline is:
+
+`frozen decision context -> unresolved claims -> admissible evidence actions -> predicted decision consequences -> selected action or abstention -> independently recorded result and full cost -> evidence update`
+
+An action is a proposal. It is not an instruction to execute a solver, machine, fixture or physical test.
+
+## 2. Existing selector: useful baseline, not yet the aerospace solution
+
+Symthaea already provides a generic hypothesis-disagreement selector:
+- [experiment_selection.rs](https://github.com/Luminous-Dynamics/symthaea/blob/main/crates/core/symthaea-core/src/hdc/conjecture_engine/experiment_selection.rs) scores the population variance of candidate-hypothesis predictions and selects the most discriminating candidate.
+- [isru_material_experiment_selection.rs](https://github.com/Luminous-Dynamics/symthaea/blob/main/crates/core/symthaea-core/examples/isru_material_experiment_selection.rs) demonstrates hidden synthetic truth after action selection, deterministic baselines, a held-out OOD world and matched candidate cost/noise.
+
+The ISRU example is careful about its scope: it does not claim Bayesian mutual information or a cost-/noise-weighted acquisition function, and it gives every candidate equal cost and measurement noise. That makes it a useful baseline control, but it cannot distinguish (for example) a two-hour calibrated NDE inspection from a multi-day test-cell campaign, nor does prediction disagreement necessarily measure whether the result changes an engineering decision.
+
+This adapter therefore composes the existing selector and does not replace it. It adds aerospace-specific admissibility, hard-claim and cost semantics plus a decision-value evaluation contract.
+
+## 3. Canonical ownership
+
+### Symthaea
+
+- [SE-OPT-BENCH-001 #7803](https://github.com/Luminous-Dynamics/symthaea/issues/7803): generic decision-impact / VOI benchmark.
+- [AERO-ENGINEERING-LOOP-001 #10902](https://github.com/Luminous-Dynamics/symthaea/issues/10902): adaptive engineering evidence gathering.
+- [SPACE-STRUCT-CODESIGN-001 #12319](https://github.com/Luminous-Dynamics/symthaea/issues/12319): design-to-qualified-physics handoff.
+- [MAT-UQ-001 #6225](https://github.com/Luminous-Dynamics/symthaea/issues/6225): uncertainty, discrepancy, calibration and common-mode semantics.
+- [MFG-FOUNDATION-001I #5763](https://github.com/Luminous-Dynamics/symthaea/issues/5763), [MAT-PSPP-001 #6224](https://github.com/Luminous-Dynamics/symthaea/issues/6224), [MFG-PROC-000 #5686](https://github.com/Luminous-Dynamics/symthaea/issues/5686): material/process state and scale transfer.
+
+### Symtropy
+
+- [Structural interface profile / conformance #6523 and PR #6524](https://github.com/Luminous-Dynamics/symtropy/pull/6524).
+- [Qualification test-matrix adequacy #6540](https://github.com/Luminous-Dynamics/symtropy/issues/6540).
+- [Interface lifecycle qualification #6484](https://github.com/Luminous-Dynamics/symtropy/issues/6484).
+- [Ground test cell #6256](https://github.com/Luminous-Dynamics/symtropy/issues/6256).
+- [Aerospace inspectability / NDE #4165](https://github.com/Luminous-Dynamics/symtropy/issues/4165).
+- [Connector coupon characterization #5771](https://github.com/Luminous-Dynamics/symtropy/issues/5771).
+
+### Mycelix and Sol-Atlas
+
+- Mycelix [component build packet #6345](https://github.com/Luminous-Dynamics/mycelix/issues/6345) and [AP242/QIF semantic interoperability #6348](https://github.com/Luminous-Dynamics/mycelix/issues/6348) supply canonical article, configuration and evidence joins.
+- Sol-Atlas [South African space ecosystem #405](https://github.com/Luminous-Dynamics/sol-atlas-leptos/issues/405) supplies read-only site/facility/logistics context. Facility context is not proof of operational availability, calibration or process/test qualification.
+
+No second solver, optimizer, material ontology, provenance store, inspection authority, test-matrix evaluator or lifecycle state machine is introduced here.
+
+## 4. Paradigm shift: decision impact and admissibility before acquisition score
+
+A high-uncertainty parameter can be irrelevant to the current decision. A low-uncertainty parameter close to a hard boundary can be decisive. An expensive test can be inadmissible because the exact article, procedure, facility, instrument or calibration scope is wrong.
+
+Each candidate action must first pass a fail-closed admissibility gate. Only then may it be scored.
+
+### 4.1 Admissibility gates
+
+Every action must bind and satisfy, where relevant:
+
+1. exact client requirement, provider profile, serialized article, configuration, ICD and claim identity;
+2. the unresolved requirement or decision whose outcome could change;
+3. action method, procedure, model, solver, mesh or inspection revision and declared applicability;
+4. specimen/material/process lineage and transfer scope;
+5. instrument, calibration validity, range, uncertainty, timebase and raw-evidence method;
+6. facility asset, permitted activity, operational state and resource availability;
+7. the required pre-registered test obligation and critical interaction, if the action is a physical campaign item;
+8. required safety review, approvals, human witness and execution authority;
+9. a complete resource vector and budget availability;
+10. exact outputs expected, their independent verifier and claim ceiling.
+
+A syntactically valid but stale, out-of-domain, uncalibrated, wrong-serial or unsafe action is not “low value”; it is inadmissible. Do not let an acquisition score rank it above an admissible action.
+
+### 4.2 Keep two uncertainty regimes separate
+
+**Probability-bearing regime.** Expected value of sample information (EVSI) or expected decision regret is permitted only if the decision-state probabilities and observation likelihoods are explicitly supplied with provenance and calibration evidence for the exact domain/profile. The expected loss before action is:
+
+`R_0 = min_d sum_s p(s) L(d,s)`
+
+For action `a`, using observation likelihood `p(o|s,a)`, the expected post-action decision loss is:
+
+`R_a = sum_o p(o|a) min_d sum_s p(s|o,a) L(d,s)`
+
+`EVSI(a) = R_0 - R_a`
+
+The action's cost remains separately reported and budget-constrained. A cost penalty may be subtracted only when the decision owner supplies an explicit, auditable conversion from resources to decision utility. Never invent such a conversion.
+
+**Distribution-free regime.** When only hard sets, intervals or constraints are defensible, do not synthesize probabilities. Use a separately defined worst-case regret / robust-feasibility measure over the declared state set and observation partition. The result must retain whether the set is rectangular, correlated, or otherwise structured. An interval is not a probability distribution.
+
+A benchmark instance must choose one regime. It cannot silently move between expected and distribution-free calculations.
+
+### 4.3 Hard constraints remain non-compensatory
+
+A safety/structural hard constraint cannot be offset by mass, cost, schedule, expected information, or an attractive mean score. An action that does not resolve a blocking claim may still be useful, but it cannot make the design eligible by itself.
+
+Unknown, unsupported, missing, out-of-domain, non-converged or invalid evidence stays unresolved. No evidence is imputed into a favorable result.
+
+
+### Mycelix and Symtropy change-impact owners
+
+Use Mycelix [LISE-ASSURANCE-INVALIDATION-001 #6219](https://github.com/Luminous-Dynamics/mycelix/issues/6219) as the generic owner of event-driven evidence invalidation, dependency closure, historical preservation and targeted requalification. Reuse its existing owners for evidence leases (#181), applicability/subject drift (#1087), evidence epochs and causal ordering (#1207/#2631), bitemporal reconstruction (#6069), source/observer dependencies (#6140) and independent oracle separation (#4835). Do not add another generic graph or currentness service here.
+
+The aviation-specific application is Symtropy [AEROWEFT-MODEL-EVIDENCE-REQUALIFICATION-001 #5371](https://github.com/Luminous-Dynamics/symtropy/issues/5371). Structural lifecycle qualification remains under Symtropy #6484 and as-built structural acceptance under #4263.
+
+The aerospace evidence-action consumer should take the following event-to-claim relationships from those owners, not infer them from names:
+
+| Change event | Potentially affected claims | Non-automatic invalidation boundary |
+|---|---|---|
+| CAD / ICD / configuration revision | PMI joins, geometry/fit, mating, structural-model applicability, assembly plan, inspection coverage | independent sensor calibration, unrelated material history |
+| Serialized unit replacement | unit-specific build, inspection, test, assembly and as-built acceptance | component-family definition and other serial units |
+| Material batch / lot / condition | material/process characterization, process capability, allowables and derived structural claims | unchanged design geometry semantics |
+| Process route, machine or tooling change | process qualification, as-run build, material-state transfer and affected dimensional/structural claims | unchanged interface definition or unrelated instrument calibration |
+| Instrument / reference calibration | measurement claims within that instrument/reference scope | non-measurement design claims |
+| NDE method / procedure / probe / coverage | defect-, orientation- and method-specific inspectability/POD/false-call claims | unrelated structural simulation outputs |
+| Structural solver / mesh / model / material model | model applicability, correlation and derived model claims | independent physical observations |
+| Robot / tool / firmware / task-plan change | grasp, insertion, lock, verification and affected assembly claims | independently qualified material/design facts |
+| Repair / joint replacement | article lifecycle and affected joint acceptance/requalification | unaffected claims with verified independent dependencies |
+
+These are candidate mappings requiring owner-reviewed edges, not universal rules. A change can make an old claim historical-only or require requalification without proving the physical article has failed. An incomplete change feed is INDETERMINATE, not evidence that nothing changed.
+
+The selector's own frozen context tuple (profile reference, physical serial, configuration, ICD revision) is a final consumer-side false-join gate; it is not a substitute for #6219 dependency closure. Symthaea only ranks actions after the owner-native invalidation result and affected claim set are supplied. It must not promote a claim or decide which dependencies exist. JEV-016 freezes an incomplete event-frontier receipt and blocks selection; JEV-017 freezes a complete receipt requiring one structural claim to be requalified while an unrelated design claim remains unaffected.
+
+
+### Change-impact consumer contract v0.1
+
+The current synthetic selector accepts a benchmark-only `ChangeImpact` record with:
+- `source_owner = mycelix:6219`;
+- a receipt reference and event-frontier reference;
+- `completeness = COMPLETE | INCOMPLETE`;
+- exact `required_requalification_claims` and `unaffected_claims`.
+
+This is a consumer-side fixture contract, **not** a replacement for the Mycelix #6219 event schema, dependency graph, temporal model, evidence leases or invalidation oracle. References in the synthetic fixture are not authenticated or resolved against a production service.
+
+The selection rule is deliberately fail-closed:
+1. If the owner-native event frontier is incomplete, no action is eligible—even when a proposed test looks informative.
+2. If the frontier is complete, a requalification action must explicitly cover every required affected claim.
+3. A check of an unrelated or unaffected claim cannot satisfy the affected requalification obligation.
+4. Historical evidence remains historical; invalidation is not proof of physical failure.
+5. The adapter cannot infer dependency edges, decide that a claim is unaffected, or set the change-frontier completeness flag. Those are owner-native inputs.
+
+JEV-016 checks abstention under incomplete event coverage. JEV-017 checks that the target structural claim is requalified while an explicitly unaffected design-identity claim is not needlessly repeated. The production adapter remains future work and requires exact schema mapping plus authenticated, independently reviewed receipts from Mycelix #6219 and domain rules from Symtropy #5371/#6484/#4263.
+
+## 5. Resource accounting
+
+Keep the resource vector explicit:
+
+- engineering / reviewer hours;
+- solver or compute core-hours;
+- facility / instrument hours;
+- specimen count and material consumption;
+- calibration / setup / fixture preparation;
+- external tool or licensing cost;
+- post-processing and independent verification;
+- expected rework / repeat campaign reserve, when explicitly supported.
+
+A policy may only select an action whose declared resource vector fits the remaining component-wise budget and prerequisites. Record actual resource use after execution. Failed, aborted, invalid, censored, out-of-domain and incomplete attempts consume their actual resources and remain visible.
+
+Do not compare policies on nominal simulation cost while excluding test preparation, human review, independent replay, failed calls or follow-on physical validation.
+
+## 6. Action and result contract
+
+A future versioned action request should contain:
+
+`EvidenceActionProposalV1`
+
+- `action_id`, policy ID/version and proposal generation;
+- exact decision-context, requirement, provider/client profile, article, configuration and ICD references;
+- optional owner-native change-impact receipt reference, event/evidence frontier references, completeness state, affected claim set and unaffected claim set; a known change with an incomplete event frontier forces abstention until reconciled;
+- exact list of affected claims the proposed requalification action resolves; it must cover the full required requalification set, not only the easiest subset;
+- unresolved claim and why its resolution could change the decision;
+- action class and exact method/model/procedure revision;
+- applicability and admissibility evidence references;
+- prerequisite state and required human/safety approvals;
+- expected outputs, units, frame, coverage and independent verifier;
+- declared probability model/observation likelihood reference **or** uncertainty-set reference, never an ambiguous generic confidence;
+- resource vector and remaining-budget snapshot;
+- predicted decision-value output with regime, assumptions and limitations;
+- claim ceiling and no-actuation marker.
+
+Execution/result is a separate record:
+
+`EvidenceActionOutcomeV1`
+
+- proposal reference and exact input/configuration identity;
+- state: planned, admitted, executed, completed, failed, aborted, invalid, censored, out-of-domain, not-run or disputed;
+- actual resources and timestamps;
+- exact raw output references/digests and evidence lineage;
+- model/procedure/instrument/facility identities and currentness;
+- measured/modelled outcome and uncertainty semantics;
+- independent verifier and disposition;
+- discrepancy against prior predictions;
+- explicit non-promotion rule (simulation is not physical test; provenance is not truth).
+
+The adapter never starts the action or issues a qualification release.
+
+The machine-readable contract is [action-proposal-outcome.schema.json](../../fixtures/orbital-joint-evidence-voi/v0.1/action-proposal-outcome.schema.json). Rust typed fixtures are [a non-actuating proposal](../../fixtures/orbital-joint-evidence-voi/v0.1/action-proposal.synthetic.json) and [an aborted outcome with actual costs](../../fixtures/orbital-joint-evidence-voi/v0.1/action-outcome-aborted.synthetic.json). A proposal is always `authority_granted=false` and `no_actuation=true`. An attempted outcome must carry actual resource consumption and an external executing-owner/authority reference; an aborted/failed/indeterminate result cannot be promoted to qualification.
+
+## 7. Bounded benchmark v0.1
+
+The first synthetic benchmark should use the 44-case structural-interface compatibility corpus as an immutable decision input. Do not duplicate its evaluator or revise expected compatibility dispositions. Add a separate action-selection layer and independent action-value oracle.
+
+Scenario families for the first tournament:
+
+1. **Decision-irrelevant uncertainty:** one parameter has high predictive variance but does not change feasibility or the preferred robust candidate.
+2. **Narrow decision boundary:** one bounded parameter can reverse compatibility; one calibrated measurement has potential decision value.
+3. **Cheap-model bias:** a low-cost model is systematically optimistic near a hard feasibility boundary.
+4. **Coupled-load interaction:** scalar component measurements cannot resolve an unsupported combined-load interaction model.
+5. **No-information control:** every available action is inadmissible or cannot change the declared decision; the correct result is abstention.
+6. **Probability/interval confusion:** a policy attempts to score hard intervals as if they were calibrated probability distributions.
+7. **Common-cause duplication:** two nominally different tests share the same calibration/reference/analysis dependency and cannot be counted as independent evidence.
+8. **Stale configuration:** an attractive action targets an old geometry, material lot, procedure or ICD revision.
+9. **Calibration/facility block:** an inspection/test would be informative in principle but exact calibration or facility asset capability is invalid.
+10. **Scale-transfer gap:** coupon evidence cannot decide a component/joint/assembled-load-path claim without a supported transfer assessment.
+11. **Campaign adequacy:** a high-information action does not cover a mandatory or pre-registered critical interaction from #6540.
+12. **Lifecycle gap:** first-mate data cannot resolve wear, repair or requalification questions from #6484.
+13. **Cost cliff:** a proposal fits compute budget but exceeds the specimen/facility/reviewer budget, or omits follow-on validation.
+14. **Failed/censored action:** action fails or aborts; full incurred cost and missing evidence remain.
+15. **Preference/requirement change:** new decision preferences alter selection but historical evidence, full Pareto frontier and raw measurements are retained.
+
+### Baselines
+
+All policies receive identical admissible actions, initial evidence, decision context and total budget:
+
+- fixed canonical sequence;
+- one-factor-at-a-time / cycle-count shortcut;
+- space-filling / seeded random;
+- current Symthaea prediction-disagreement selector (as a baseline, not renamed as EVSI);
+- highest predictive uncertainty;
+- expected decision-value policy when calibrated probabilities exist;
+- distribution-free robust-feasibility / minimax-regret policy;
+- human engineer-selected next action, with time and rationale recorded.
+
+A separate oracle grades actions after the policy commits. The policy must not import or query the evaluator-only hidden truth. Use paired seeds and held-out scenario families.
+
+### Scorecard
+
+Report, separately:
+
+- false-feasible and missed-feasible rate;
+- action admissibility error and stale/incorrect identity rejection;
+- expected decision regret or worst-case regret (never blended);
+- decision-change yield and correct abstention;
+- mandatory/critical test-obligation coverage;
+- common-cause and independence handling;
+- total resource use by resource dimension;
+- failed/aborted/censored/invalid action accounting;
+- probability calibration where applicable;
+- held-out scenario performance and policy overhead;
+- engineering/reviewer time to a defensible decision.
+
+
+### 7.1 Finite-horizon sequential campaign planning
+
+The one-step selector is not enough for campaigns where two individually uninformative tests can be valuable as a contingent sequence. A separate bounded sequential fixture now exercises that case under two different declared frequency profiles.
+
+**SEQ-001** has four synthetic states (healthy, axial-capacity defect, thermal-wear defect and joint-retention defect), two actions, and an ACCEPT/REJECT/HOLD loss matrix. With no evidence, the terminal disposition is explicitly HOLD and has worst-case minimax regret 2. Either action alone leaves worst-case minimax regret at 2, so the myopic one-step rule stops. The fixed two-test campaign reaches regret 0. An exact depth-two policy also reaches regret 0, but executes the thermal inspection only after the first screen returns PASS; FAIL produces a rejection-basis obligation and terminates at REJECT; without a rejection basis or complete acceptance obligations, the decision is HOLD.
+
+The deterministic finite-horizon planner uses:
+- the full residual hidden-state set at every branch;
+- minimax regret for the terminal accept/reject decision;
+- strict action applicability against exact profile, serialized article, configuration and ICD revision;
+- component-wise resource feasibility on every path;
+- calibrated synthetic state-frequency weights **only** to estimate expected resources, never to change distribution-free acceptance risk;
+- an explicit stop/terminal action in every belief state;
+- Pareto comparison over expected resource vectors; incomparable plans must escalate to human review rather than being scalarized.
+
+For SEQ-001, adaptive expected use is 1.20 engineering hours, 1.55 facility hours, 1.70 specimen units, 0.24 review hours and 0.86 external-cost units. For SEQ-002 it is 1.15, 1.65, 1.30, 0.23 and 0.89. The fixed two-test campaign uses 1.50, 2.00, 2.00, 0.30 and 1.10 in both cases. Worst-case decision regret is zero for both adaptive and fixed campaigns. These are exact results for two hand-authored synthetic examples, not measured savings on physical campaigns.
+
+**Current sequential-design research comparator:** Cheng and Huan, *Optimal Stopping for Sequential Bayesian Experimental Design*, arXiv:2509.21734 (submitted 2025; revised June 2026). The work formulates experiment choice and stopping as coupled decisions in a finite-horizon MDP and studies learned policies/continuation values on simulated inference problems. This makes it a relevant SOTA comparator, not a novelty claim for adaptive stopping. The present Luminous fixture differs by maintaining distribution-free terminal decision risk, exact engineering article/configuration scope, hard non-compensatory gates, and vector-valued resource budgets. A future matched-budget tournament must compare against learned Bayesian stopping policies where their assumptions apply, plus fixed, random, space-filling, uncertainty/disagreement, myopic VOI and human-engineer baselines.
+
+Primary reference: https://arxiv.org/abs/2509.21734
+
+**Next benchmark phase:** scale from the small exact oracle to frozen held-out scenario families and matched-budget multi-step policy tournaments. Report per-scenario false acceptance, terminal regret, correct abstention, mandatory-obligation coverage, expected and worst-path resources by dimension, stop depth, test count, policy computation, and confidence intervals across repeated seeds where a stochastic policy is used. Do not blend distribution-free regret and expected loss into one score.
+
+
+### 7.2 Sequential planning: theory boundary and SOTA baselines
+
+The finite-horizon proof-of-concept is deliberately an **exact small-instance reference**, not a claim that a general aerospace test-selection problem is easy.
+
+Relevant research baselines:
+- Golovin and Krause's adaptive-submodularity framework proves greedy-policy guarantees for objectives satisfying adaptive monotonicity/submodularity assumptions. Those properties must be established for the particular objective; they do not automatically apply to worst-case decision regret with hard evidence-obligation gates. [JAIR 2011](https://ocs.aaai.org/Library/JAIR/Vol42/jair42-012.php).
+- Fujii and Sakaue introduce adaptive-submodularity ratios to extend guarantees to broader classes of adaptive objectives; this motivates testing a provable greedy approximation only after the ratio/assumptions are characterized for our decision objective. [ICML/PMLR 2019](https://proceedings.mlr.press/v97/fujii19a.html).
+- BINOCULARS provides an efficient non-myopic sequential-experimental-design approach using long-horizon information to inform the next batch/choice, and is a relevant approximation baseline against an exact finite-horizon policy. [ICML/PMLR 2020](https://proceedings.mlr.press/v119/jiang20b.html).
+- Dynamic programming has previously been used to plan beyond the next experiment rather than choosing myopically. Our differentiator to test is not “non-myopic planning exists”; it is **non-myopic planning under distribution-free worst-case decision regret, hard qualification obligations, exact article applicability and vector-valued resources**. [Cognition 2017](https://pmc.ncbi.nlm.nih.gov/articles/PMC5474365/).
+
+Our finite-state objective is:
+
+`min_policy max_hidden_state regret(terminal_disposition, state)`
+
+subject to path-specific resource budgets, exact decision context and mandatory evidence obligations at every terminal leaf. State-frequency weights are used solely for expected resource accounting. They never become acceptance probabilities or dilute worst-case regret.
+
+No approximation ratio is claimed. In particular, a test-selection objective with non-compensatory evidence obligations and minimax terminal regret need not be adaptive submodular or adaptively monotone. A greedy policy may therefore be useful as a baseline but must not inherit a theorem whose hypotheses have not been proved.
+
+### 7.3 Scale-up plan and next benchmark
+
+Exact finite-horizon dynamic programming is the ground-truth policy oracle for deliberately small cases. Its search tree can grow combinatorially with action count, outcome branching and horizon; the current proof-of-concept has no validated large-campaign scaling claim.
+
+Next benchmark increment:
+1. Freeze a generated family of finite decision problems with 3–8 hidden states, 3–32 candidate tests, 2–6 action depth, up to 4 observations/action, and six-dimensional resource budgets.
+2. Include common subproblems, duplicate information channels, redundant tests, test-order permutations, unusable/indeterminate outcomes, and cases where a nested child plan needs human review.
+3. Compare exact DP with fixed campaign, one-step myopic, highest uncertainty, greedy minimax-regret reduction, adaptive-greedy only on cases where its assumptions hold, and BINOCULARS-style non-myopic approximation where the input model supports it.
+4. Count search nodes, unique memoized states, dominance-pruned labels, wall time, peak memory, policy-tree size, and exact-oracle regret gap. Publish the whole frontier and failure cases, not only mean runtime.
+5. Verify the exact solver and all approximate policies against an independently enumerated oracle for small state/action counts. Preserve a sealed held-out family for policy comparison.
+
+Proposed engineering targets (not measured):
+- 100% exact-oracle agreement on enumerable small cases;
+- zero ACCEPT leaves missing any mandatory evidence obligation;
+- zero false-accepts on frozen critical negatives;
+- zero automatic selection when a tied candidate contains unresolved resource comparison;
+- deterministic policy tree under action-order permutation;
+- characterize the largest problem size solved exactly under a declared runtime/memory budget before selecting an approximation method.
+
+A necessary conservative rule is implemented in the sequential selector: if any best-regret top-level candidate contains a nested policy with unresolved expected resources, it remains on the human-review frontier. Another tied plan with a known cost may not be selected by silently discarding the unresolved alternative. This preserves uncertainty through recursive planning.
+
+### 7.4 Federated digital-thread baseline
+
+ISO 23247-5:2026 specifies digital-thread connectivity and lifecycle maintenance across design, planning, production and testing; ISO 23247-6:2026 describes integrated, unified and federated composition of independently developed twins. The preferred Luminous composition is federated: each owner retains native authority and schema, with typed references, revision/effectivity, exact subject/configuration and evidence digests. Do not claim conformance without a clause-by-clause assessment. [ISO 23247-5:2026](https://www.iso.org/standard/87425.html) · [ISO 23247-6:2026](https://www.iso.org/standard/87426.html).
+
+Hexagon PC-DMIS 2026.2 advertises STEP AP242 semantic-PMI import into QIF measurement planning, UUID-based mapping and Teamcenter traceability. This is a real integration target. Compare identical files, semantic assertions, QIF records and persistent IDs; do not claim we have surpassed its parsing or CMM programming capability. [PC-DMIS 2026.2 release, 29 October 2026](https://hexagon.com/about/news-media/media-alerts/2026/pc-dmis) · [PC-DMIS STEP/QIF workflow](https://hexagon.com/products/pc-dmis).
+
+NASA's 2026 ISAM State of Play is a useful capability map rather than a performance leaderboard. It reports 621 capability-area entries, 61 facilities and 169 developer profiles across 11 functional areas; inclusion requires physical ground prototype or flight hardware, not concept claims. Use it to identify missing real-world interfaces and demonstrator dependencies, not to assign a fabricated SOTA score to software repositories. [NASA 2026 ISAM State of Play](https://www.nasa.gov/isam/).
+
+## 8. Proposed gates, not achieved results
+
+- 100% attempted, rejected, failed, aborted, censored, invalid and abstained action accounting.
+- Zero hidden-oracle leakage in the benchmark protocol.
+- Zero false-feasible decisions on frozen critical negatives.
+- 100% detection of deliberately stale/wrong article, configuration, procedure and calibration cases.
+- 100% expected-output agreement with an independently implemented oracle.
+- No fabricated benefit on the no-information control.
+- Demonstrable decision-regret improvement over random and pure uncertainty/disagreement selection at matched total budget on preregistered held-out decision-relevant cases.
+- Prospective target: at least 20% lower total evidence-acquisition cost or review effort at equal or stronger false-feasible rate and critical-coverage performance. This remains a hypothesis until measured on a frozen, blinded benchmark.
+
+No single aggregate score may hide a critical miss, false acceptance, cost overrun or inadmissible action.
+
+## 9. Industry and SOTA positioning
+
+This adapter should not try to replace specialist optimizers, model-based systems engineering, CAE solvers, test management or PLM.
+
+- OpenMDAO and Dymos are useful multidisciplinary/trajectory optimization comparators; compare under matched model fidelity, constraints and resource budgets.
+- Bayesian optimization / multi-fidelity methods are relevant only where probability and surrogate assumptions are declared; do not present a hard-bound-only problem as Bayesian.
+- Space-filling and DOE methods are strong coverage baselines but do not necessarily target decision regret.
+- Highest uncertainty and current prediction-disagreement are meaningful ablations; the test is whether their selected experiment changes the decision enough to justify total cost.
+- Human domain engineers remain a necessary comparator and review authority.
+- Industry systems (Siemens, Dassault, Ansys, Hexagon) retain their mature specialist workflows; compare cross-tool evidence continuity, action traceability, applicability and review effort rather than unsupported feature superiority.
+
+SOTA claims require the same held-out problems, action catalogue, physics models, evidence availability, policy overhead and total resource budget. Report uncertainty and effect sizes, not just the best single seed.
+
+
+### 9.1 Standards and product baseline as of 22 November 2026
+
+The digital-thread baseline now includes a 2026 revision of the product-definition practice itself:
+
+- **ISO 23247-5:2026** specifies digital-thread principles for connecting, managing and maintaining manufacturing digital twins across design, planning, production and testing. Published 24 June 2026.
+- **ISO 23247-6:2026** specifies digital-twin composition and recognizes integrated, unified and federated compositions. It deliberately does not prescribe one common data format or communication protocol; the architecture must therefore preserve owner-native semantics and make mappings explicit. Published 14 July 2026.
+- **ASME Y14.41-2026** is now the listed edition for digital product-definition data practices. It concerns preparation and revision of digital product-definition datasets. Do not treat a STEP exchange profile as a substitute for the governing product-definition practice or project tailoring.
+- **CAx-IF AP242 Persistent IDs v1.8** is dated 13 March 2026. CAx-IF's **Cross-Domain Exchange for Downstream Uses v1.0** (29 January 2026) provides STEP/QIF trace-information practice and Test Cases 7/8 (sample files dated 16 December 2025). Its stated scope is metrology, supporting exchange between STEP AP242 Edition 4 and QIF 3.0; it says manufacturing use cases are a future expansion. Do not present these tests as proof of a complete factory manufacturing/inspection digital thread.
+- **NIST STEP File Analyzer and Viewer 5.41** supports STEP AP242 analysis, semantic and graphic PMI, validation properties and basic file-format checks. It is a useful independent parser/analyser baseline, not an end-to-end product acceptance oracle.
+
+Primary references: [ISO 23247-5:2026](https://www.iso.org/standard/87425.html), [ISO 23247-6:2026](https://www.iso.org/standard/87426.html), [ASME Y14.41](https://www.asme.org/codes-standards/find-codes-standards/y14-41-digital-product-definition-data-practices), [CAx-IF recommended practices and sample files](https://www.mbx-if.org/home/cax/recpractices/), [Cross-Domain Exchange v1.0 PDF](https://www.mbx-if.org/home/wp-content/uploads/2026/02/rec_prac_cross-domain_exchange_v10.pdf), [NIST STEP File Analyzer and Viewer 5.41](https://www.nist.gov/services-resources/software/step-file-analyzer-and-viewer).
+
+Hexagon's **PC-DMIS 2026.2** explicitly advertises importing STEP AP242 semantic PMI into QIF-based measurement planning, UUID mapping and Teamcenter traceability; its official version/release page lists **2026.2 SP1 (12 November 2026)** as the latest listed service pack at the time of this review. These are strong existing capabilities and must be treated as a direct commercial comparator, not ignored. The differentiator to test is whether a separate evidence layer can preserve exact serialized-unit/configuration joins, event-frontier invalidation and independently checkable semantic loss across more than one vendor's native systems.
+
+Primary references: [Hexagon PC-DMIS 2026.2 release, 29 October 2026](https://hexagon.com/about/news-media/media-alerts/2026/pc-dmis), [PC-DMIS version and release list](https://supportcenter.nexus.hexagon.com/service/s/article/PC-DMIS-Software-Versions-and-Release-Dates?language=en_US).
+
+NIST's analyser and published cross-domain fixtures should be consumed rather than reimplemented. The Luminous layer should compare normalized semantic assertions and exact identities, record every unsupported/lost assertion as UNKNOWN or an explicit loss, and keep parser/format conformance separate from physical measurement validity and engineering qualification.
+
+### 9.2 Commercial tools: integrate rather than clone
+
+The competitive baseline is already stronger than a simple CAD-to-QIF bridge:
+
+- **Hexagon PC-DMIS 2026.2** publicly describes STEP AP242 semantic-PMI import into QIF-based measurement planning, UUID mapping, AI-assisted edge detection, advanced point-cloud processing, and tighter Teamcenter traceability. That is the immediate shop-floor interoperability target.
+- **Siemens Teamcenter Simulation/SPDM** manages simulation and physical-test processes/data, multi-discipline traceability and integrated workflows.
+- **Dassault Systèmes 3DEXPERIENCE** is deployed at Airbus across future civil/military aircraft and helicopter programmes, with more than 20,000 users in the announced scope.
+- **Ansys/Minerva** positions simulation process/data management and model-based workflows as a digital-engineering ecosystem.
+
+References: [Hexagon PC-DMIS 2026.2 release](https://hexagon.com/about/news-media/media-alerts/2026/pc-dmis), [Siemens Teamcenter SPDM](https://www.siemens.com/en-us/products/teamcenter/solutions/simulation-process-data-management-spdm/), [Airbus–Dassault partnership](https://www.3ds.com/newsroom/press-releases/dassault-systemes-and-airbus-extend-strategic-partnership-use-virtual-twins-next-generation-programs), [Ansys digital engineering](https://www.ansys.com/blog/defense-digital-engineering).
+
+Do not claim these systems lack provenance, workflow control or evidence management. Their feature scope and commercial deployments are substantial. Luminous should operate as a vendor-neutral qualification/evidence and decision layer at the interfaces between them, preserving their native files and authoritative records.
+
+### 9.3 Luminous composition strategy: federated by default
+
+ISO 23247-6's composition framing supports a deliberate architecture choice:
+
+- **Mycelix** remains the authority for article identity, signer/role authority, custody, provenance and correction/revocation state.
+- **Symtropy** remains the authority for physics/structural/inspection/test calculations and qualification dispositions.
+- **Symthaea** consumes those outputs to propose designs and next evidence actions, with explicit uncertainty/decision regimes.
+- **Sol-Atlas** contributes spatial, facility, logistics and infrastructure context without converting a facility listing into an availability or qualification claim.
+
+Start with **federated composition**: each system retains its native schema and authority; exchanged records carry stable references, revisions, subject/configuration scope, evidence digest and claim ceiling. Introduce unified views for decision workflows only after the exact reference joins are verified. Do not create one monolithic universal twin or let one system overwrite another system's source of truth.
+
+This should be assessed against ISO 23247-5/-6 concepts, not described as standards-conformant without a clause-by-clause assessment. The architecture's differentiator is the non-compensatory evidence contract: a semantically valid link is not a physical pass; a signed record is not a verified measurement; a simulation is not a test; a coupon is not a production joint; and an unresolved claim stays unresolved.
+
+### 9.4 Interoperability tournament and measurable targets
+
+Use CAx-IF Test Cases 7/8 and the NIST SFA sample models as external reference inputs. Use PC-DMIS 2026.2 as a commercial workflow comparator where a rights-cleared evaluation environment or exported result is available. Compare at least:
+1. AP242 semantic-PMI → QIF plan assertion preservation;
+2. persistent UUID and requirement/feature/serial-unit join retention;
+3. measurement-result and calibration/instrument trace retention;
+4. semantic loss, ambiguity and unsupported-feature detection;
+5. stale revision, wrong serial and wrong configuration rejection;
+6. content/digest and custody/change history across exports;
+7. time and human re-entry required to repair broken links;
+8. evidence/action selection quality at matched resource budget.
+
+Proposed benchmark targets, not achieved results:
+- zero false joins across frozen wrong-subject/configuration/revision negatives;
+- 100% preservation of required semantic assertions supported by the declared test-case subset;
+- zero silent drops: every unsupported or lost assertion becomes an explicit loss/Unknown disposition;
+- deterministic outputs across input ordering and repeated replay;
+- 100% correct invalidation of evidence affected by stale/revoked identity or method revision;
+- at least 20% reduction in human reconciliation/review time on held-out cases at equal or higher semantic coverage, measured against a pre-registered manual and vendor-workflow baseline.
+
+Do not claim better semantic PMI conformance than Hexagon or NIST until the same models, assertions, versions and output evidence have been run independently. The stronger near-term claim is a reproducible evidence/decision layer across multiple tools and lifecycle owners, demonstrated with open fixtures.
+
+## 10. Physical test and safety boundary
+
+Any actual connector coupon, NDE, wear or ground test remains with Symtropy #6256/#5771 and the competent test/safety owners. Initial physical work, if approved, is non-flight, uncrewed and limited to benign, appropriately guarded test articles and rated fixtures. The issue supplies no pressure, force, energy or environmental limits. No propellants, cryogens, live spacecraft, flight-critical article or unsupervised machine actuation are introduced by this adapter.
+
+Symthaea proposes and ranks actions only. Competent human/test authorities approve and execute. Mycelix records appropriate provenance/authority references; Sol-Atlas supplies context only. No AI or benchmark outcome issues a test authorization, production release, structural acceptance or airworthiness finding.
+
+## 11. Deliverables
+
+P0: this contract and owner map.  
+P1: machine-readable scenario and proposal/outcome schemas, typed synthetic proposal/aborted-outcome examples, 17 one-step scenarios and a separate finite-horizon sequential campaign fixture.  
+P2: executable dry-run admissibility audit and one-step selector that ranks admissible actions by decision-regret/EVSI improvement, then resolves equal-value options only through resource-vector Pareto dominance or requests human review; it also audits claim identity, common-cause labels, mandatory obligations and actual resource consumption including aborted-test overruns. A separate finite-horizon exact policy planner selects contingent test/stop trees using distribution-free terminal minimax regret, path-wise resource budgets and a calibrated fixture frequency model used only for expected resource consumption. Independent standard-library Python oracles check the 17 one-step cases and the sequential campaign known answer. No solver or physical execution is invoked.  
+P3: matched-budget policy tournament against fixed, random, space-filling, uncertainty/disagreement, myopic VOI, learned optimal-stopping/BOED and human-engineer baselines; include held-out scenarios, repeated seeds and external policy implementations.  
+P4: adapter to Symtropy compatibility/test-matrix/lifecycle receipts and Mycelix/Sol-Atlas references.  
+P5: only after review, authorized human-supervised physical evidence handoff.
+
+**Current milestone:** P0 specification, P1 schema/scenario catalogue, and P2 are implemented on a public research branch: exact-context admissibility audit, one-step decision-value selector, digest-bound proposal/outcome verifier, and a finite-horizon contingent test/stop planner with path-wise resource budgets. Seventeen one-step scenarios and two sequential-campaign variants are checked against independent Python reference oracles. P3 matched-budget policy tournament and external system adapters remain future work. No selector-performance win over SOTA, physical test or certification claim is made. The audit includes owner-native change-frontier completeness and targeted claim requalification coverage.

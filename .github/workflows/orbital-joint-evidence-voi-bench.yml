@@ -1,0 +1,218 @@
+name: orbital-joint-evidence-voi-bench
+
+on:
+  push:
+    paths:
+      - "tools/orbital-joint-evidence-voi-bench/**"
+      - "fixtures/orbital-joint-evidence-voi/**"
+      - ".github/workflows/orbital-joint-evidence-voi-bench.yml"
+  pull_request:
+    paths:
+      - "tools/orbital-joint-evidence-voi-bench/**"
+      - "fixtures/orbital-joint-evidence-voi/**"
+      - ".github/workflows/orbital-joint-evidence-voi-bench.yml"
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: orbital-joint-evidence-voi-bench-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  verify:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: dtolnay/rust-toolchain@1.96.0
+        with:
+          components: clippy, rustfmt
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+      - name: Validate standalone action contract and example fixtures
+        run: |
+          jq -e '
+            .title == "EvidenceActionProposalOutcomeV1" and
+            (.oneOf | length == 2) and
+            ."\u0024defs".proposal.properties.no_actuation.const == true and
+            ."\u0024defs".outcome.properties.authority_granted.const == false
+          ' fixtures/orbital-joint-evidence-voi/v0.1/action-proposal-outcome.schema.json
+          jq -e '
+            .schema == "EvidenceActionProposalOutcomeV1" and
+            .record_kind == "PROPOSAL" and
+            .no_actuation == true and .authority_granted == false and
+            .record_revision == "v1" and
+            .change_impact.completeness == "COMPLETE" and
+            (.requalification_claims_covered | index("STRUCTURAL-INTERFACE-CAPABILITY-001") != null)
+          ' fixtures/orbital-joint-evidence-voi/v0.1/action-proposal.synthetic.json
+          jq -e '
+            .schema == "EvidenceActionProposalOutcomeV1" and
+            .record_kind == "OUTCOME" and
+            .execution_attempted == true and .execution_state == "ABORTED" and
+            .proposal_ref.kind == "evidence_action_proposal" and
+            .proposal_ref.revision == "v1" and
+            (.proposal_ref.sha256 | test("^[0-9a-f]{64}$")) and
+            .actual_resources != null and .verification.state == "INDETERMINATE" and
+            .authority_granted == false
+          ' fixtures/orbital-joint-evidence-voi/v0.1/action-outcome-aborted.synthetic.json
+          jq -e '
+            .title == "OrbitalJointSequentialPlanningCorpusV0_1" and
+            ."$defs".scenario.properties.max_actions.maximum == 8 and
+            ."$defs".scenario.properties.decisions.minItems == 3 and
+            (."$defs".scenario.properties.decision_obligations.required | index("HOLD") != null) and
+            (."$defs".scenario.required | index("decision_obligations") != null) and
+            (."$defs".action.required | index("obligations_by_observation") != null) and
+            ."$defs".action.properties.admissibility.enum == ["ADMISSIBLE","INADMISSIBLE"]
+          ' fixtures/orbital-joint-evidence-voi/v0.1/sequential-campaign.schema.json
+          jq -e '
+            .schema == "luminous.orbital-joint-evidence-voi.sequential.v0.1" and
+            .benchmark_id == "ORBITAL-JOINT-SEQUENTIAL-PLANNING-001" and
+            (.scenarios | length == 3) and
+            .scenarios[0].resource_frequency_model.used_for == "EXPECTED_RESOURCE_USE_ONLY" and
+            (.scenarios[0:2] | all(.decision_obligations.ACCEPT == ["COMBINED-LOAD-CAPABILITY-001","THERMAL-WEAR-INSPECTABILITY-001"])) and
+            .scenarios[2].scenario_id == "SEQ-003-AER01-NDE-STRUCTURAL" and
+            .scenarios[2].decision_obligations.ACCEPT == ["INSTRUMENT-CALIBRATION-001","STRUCTURAL-LOAD-PROOF-001","NDE-COVERAGE-001"] and
+            (.scenarios | all(.actions | all(.obligations_by_observation != null))) and
+            (.scenarios[0].actions | map(.decision_context) | unique | length == 1) and
+            (.scenarios[2].actions | map(.decision_context) | unique | length == 1)
+          ' fixtures/orbital-joint-evidence-voi/v0.1/sequential-campaign.synthetic.json
+      - name: Format
+        run: cargo fmt --manifest-path tools/orbital-joint-evidence-voi-bench/Cargo.toml --check
+      - name: Rust tests
+        run: cargo test --locked --manifest-path tools/orbital-joint-evidence-voi-bench/Cargo.toml
+      - name: Strict Clippy
+        run: cargo clippy --locked --manifest-path tools/orbital-joint-evidence-voi-bench/Cargo.toml --all-targets -- -D warnings
+      - name: Deterministic CLI and receipt assertions
+        shell: bash
+        run: |
+          cargo run --quiet --locked --manifest-path tools/orbital-joint-evidence-voi-bench/Cargo.toml --bin orbital-joint-evidence-voi-bench -- \
+            fixtures/orbital-joint-evidence-voi/v0.1/scenarios.json \
+            --source-commit "$GITHUB_SHA" > /tmp/evidence-voi-a.json
+          cargo run --quiet --locked --manifest-path tools/orbital-joint-evidence-voi-bench/Cargo.toml --bin orbital-joint-evidence-voi-bench -- \
+            fixtures/orbital-joint-evidence-voi/v0.1/scenarios.json \
+            --source-commit "$GITHUB_SHA" > /tmp/evidence-voi-b.json
+          cmp /tmp/evidence-voi-a.json /tmp/evidence-voi-b.json
+          jq -e '
+            .schema == "luminous.orbital-joint-evidence-voi.receipt.v0.1" and
+            .scenario_count == 17 and .oracle_matches == 17 and
+            .oracle_mismatches == 0 and .authority_granted == false and
+            .claim_ceiling == "synthetic_decision_value_semantics_only" and
+            (.scenarios | all(.selection_matches_oracle == true)) and
+            ([.scenarios[] | select(.scenario_id == "JEV-014" and .selection_disposition == "HUMAN_REVIEW_REQUIRED_RESOURCE_PARETO_TIE" and .selected_action_id == null)] | length == 1) and
+            ([.scenarios[] | select(.scenario_id == "JEV-015" and .selection_disposition == "ABSTAIN_NO_DECISION_VALUE" and .selected_action_id == null and .eligible_action_count == 0)] | length == 1) and
+            ([.scenarios[] | select(.scenario_id == "JEV-016" and .selection_disposition == "ABSTAIN_NO_DECISION_VALUE" and .selected_action_id == null and .eligible_action_count == 0)] | length == 1) and
+            ([.scenarios[] | select(.scenario_id == "JEV-017" and .selected_action_id == "A-TARGETED-STRUCTURAL-REQUALIFICATION" and .selection_matches_oracle == true)] | length == 1) and
+            (.input_sha256 | test("^[0-9a-f]{64}$"))
+          ' /tmp/evidence-voi-a.json
+      - name: Independent stdlib action-value oracle
+        run: |
+          python3 tools/orbital-joint-evidence-voi-bench/tests/reference_oracle.py \
+            fixtures/orbital-joint-evidence-voi/v0.1/scenarios.json \
+            "$GITHUB_SHA" > /tmp/evidence-voi-oracle.json
+          jq -e '.scenario_count == 17 and .oracle_matches == 17 and .oracle_mismatches == 0 and (.scenarios | all(.selection_matches_oracle == true)) and ([.scenarios[] | select(.scenario_id == "JEV-014" and .selection_disposition == "HUMAN_REVIEW_REQUIRED_RESOURCE_PARETO_TIE" and .selected_action_id == null)] | length == 1) and
+            ([.scenarios[] | select(.scenario_id == "JEV-015" and .selection_disposition == "ABSTAIN_NO_DECISION_VALUE" and .selected_action_id == null and .eligible_action_count == 0)] | length == 1) and
+            ([.scenarios[] | select(.scenario_id == "JEV-016" and .selection_disposition == "ABSTAIN_NO_DECISION_VALUE" and .selected_action_id == null and .eligible_action_count == 0)] | length == 1) and
+            ([.scenarios[] | select(.scenario_id == "JEV-017" and .selected_action_id == "A-TARGETED-STRUCTURAL-REQUALIFICATION" and .selection_matches_oracle == true)] | length == 1)' \
+            /tmp/evidence-voi-oracle.json
+      - name: Sequential campaign CLI and exact-policy assertions
+        run: |
+          cargo run --quiet --locked --manifest-path tools/orbital-joint-evidence-voi-bench/Cargo.toml --bin sequential-campaign -- \
+            fixtures/orbital-joint-evidence-voi/v0.1/sequential-campaign.synthetic.json \
+            --source-commit "$GITHUB_SHA" > /tmp/sequential-campaign-a.json
+          cargo run --quiet --locked --manifest-path tools/orbital-joint-evidence-voi-bench/Cargo.toml --bin sequential-campaign -- \
+            fixtures/orbital-joint-evidence-voi/v0.1/sequential-campaign.synthetic.json \
+            --source-commit "$GITHUB_SHA" > /tmp/sequential-campaign-b.json
+          cmp /tmp/sequential-campaign-a.json /tmp/sequential-campaign-b.json
+          jq '{scenario_count, oracle_matches, oracle_mismatches, scenarios: [.scenarios[] | {scenario_id, search_states_expanded, search_memo_hits, search_memo_entries, policy_tree_nodes, baseline_terminal_disposition, adaptive_first_action: .adaptive_campaign.first_action_id, adaptive_worst_case_regret: .adaptive_campaign.worst_case_regret, expected_resources: .adaptive_campaign.expected_resources}]}' /tmp/sequential-campaign-a.json
+          jq -e '
+            .scenario_count == 3 and .oracle_matches == 3 and
+            .oracle_mismatches == 0 and .authority_granted == false and
+            (.scenarios | all(.search_states_expanded > 0 and .search_memo_entries == .search_states_expanded and .policy_tree_nodes > 0)) and
+            .scenarios[0].baseline_terminal_disposition == "HOLD" and
+            .scenarios[0].baseline_worst_case_regret == 2 and
+            .scenarios[0].myopic.worst_case_regret == 2 and
+            .scenarios[0].myopic.stops_without_action == true and
+            .scenarios[0].fixed_campaign.worst_case_regret == 0 and
+            .scenarios[0].adaptive_campaign.worst_case_regret == 0 and
+            .scenarios[0].adaptive_campaign.first_action_id == "A-COMBINED-LOAD-SCREEN" and
+            .scenarios[0].adaptive_campaign.policy.branches.FAIL.decision == "REJECT" and
+            (.scenarios[0].adaptive_campaign.policy.branches.FAIL.covered_obligations == ["REJECTION-BASIS-001"]) and
+            .scenarios[0].adaptive_campaign.policy.branches.PASS.action_id == "B-THERMAL-INSPECTION" and
+            (.scenarios[0].adaptive_campaign.policy.branches.PASS.branches.CLEAR.covered_obligations | sort) == ["COMBINED-LOAD-CAPABILITY-001","THERMAL-WEAR-INSPECTABILITY-001"] and
+            .scenarios[0].adaptive_campaign.policy.branches.PASS.branches.CLEAR.decision == "ACCEPT" and
+            (.scenarios[0].adaptive_campaign.policy.branches.PASS.branches.INDICATION.covered_obligations | sort) == ["COMBINED-LOAD-CAPABILITY-001","REJECTION-BASIS-001"] and
+            .scenarios[0].adaptive_campaign.expected_resources.engineering_hours == 1.2 and
+            ((.scenarios[0].adaptive_campaign.expected_resources.facility_hours - 1.55) | fabs) < 0.000000001 and
+            .scenarios[1].baseline_terminal_disposition == "HOLD" and
+            .scenarios[1].scenario_id == "SEQ-002" and
+            .scenarios[1].adaptive_campaign.first_action_id == "B-THERMAL-INSPECTION" and
+            .scenarios[1].adaptive_campaign.worst_case_regret == 0 and
+            ((.scenarios[1].adaptive_campaign.expected_resources.engineering_hours - 1.15) | fabs) < 0.000000001 and
+            ((.scenarios[1].adaptive_campaign.expected_resources.facility_hours - 1.65) | fabs) < 0.000000001 and
+            .scenarios[1].adaptive_campaign.policy.branches.INDICATION.decision == "REJECT" and
+            (.scenarios[1].adaptive_campaign.policy.branches.INDICATION.covered_obligations | sort) == ["REJECTION-BASIS-001"] and
+            .scenarios[1].adaptive_campaign.policy.branches.CLEAR.action_id == "A-COMBINED-LOAD-SCREEN" and
+            .scenarios[1].adaptive_campaign.policy.branches.CLEAR.branches.PASS.decision == "ACCEPT" and
+            (.scenarios[1].adaptive_campaign.policy.branches.CLEAR.branches.PASS.covered_obligations | sort) == ["COMBINED-LOAD-CAPABILITY-001","THERMAL-WEAR-INSPECTABILITY-001"] and
+            .scenarios[1].adaptive_campaign.policy.branches.CLEAR.action_id == "A-COMBINED-LOAD-SCREEN" and
+            .scenarios[1].adaptive_campaign.policy.branches.CLEAR.branches.PASS.decision == "ACCEPT" and
+            (.scenarios[1].adaptive_campaign.policy.branches.CLEAR.branches.PASS.covered_obligations | sort) == ["COMBINED-LOAD-CAPABILITY-001","THERMAL-WEAR-INSPECTABILITY-001"] and
+            .scenarios[2].scenario_id == "SEQ-003-AER01-NDE-STRUCTURAL" and
+            .scenarios[2].baseline_terminal_disposition == "HOLD" and
+            .scenarios[2].baseline_worst_case_regret == 2 and
+            .scenarios[2].myopic.worst_case_regret == 2 and
+            .scenarios[2].myopic.stops_without_action == true and
+            .scenarios[2].fixed_campaign.worst_case_regret == 0 and
+            .scenarios[2].adaptive_campaign.first_action_id == "A-CALIBRATION-CHAIN" and
+            .scenarios[2].adaptive_campaign.worst_case_regret == 0 and
+            .scenarios[2].adaptive_campaign.policy.branches.INVALID.decision == "HOLD" and
+            .scenarios[2].adaptive_campaign.policy.branches.VALID.action_id == "B-LOAD-CAPACITY" and
+            .scenarios[2].adaptive_campaign.policy.branches.VALID.branches.FAIL.decision == "REJECT" and
+            .scenarios[2].adaptive_campaign.policy.branches.VALID.branches.PASS.action_id == "C-ULTRASONIC-NDE" and
+            .scenarios[2].adaptive_campaign.policy.branches.VALID.branches.PASS.branches.CLEAR.decision == "ACCEPT" and
+            .scenarios[2].adaptive_campaign.policy.branches.VALID.branches.PASS.branches.INDICATION.decision == "REJECT" and
+            ((.scenarios[2].adaptive_campaign.expected_resources.engineering_hours - 1.25) | fabs) < 0.000000001 and
+            ((.scenarios[2].adaptive_campaign.expected_resources.facility_hours - 1.215) | fabs) < 0.000000001 and
+            ((.scenarios[2].adaptive_campaign.expected_resources.specimen_count - 1.75) | fabs) < 0.000000001 and
+            ((.scenarios[2].adaptive_campaign.expected_resources.review_hours - 0.235) | fabs) < 0.000000001 and
+            ((.scenarios[2].adaptive_campaign.expected_resources.external_cost_units - 0.5275) | fabs) < 0.000000001
+          ' /tmp/sequential-campaign-a.json
+      - name: Independent stdlib sequential campaign oracle
+        run: |
+          python3 tools/orbital-joint-evidence-voi-bench/tests/sequential_reference_oracle.py \
+            fixtures/orbital-joint-evidence-voi/v0.1/sequential-campaign.synthetic.json \
+            "$GITHUB_SHA" > /tmp/sequential-campaign-oracle.json
+          jq -e '
+            .scenario_count == 3 and .oracle_matches == 3 and .oracle_mismatches == 0 and
+            .scenarios[0].adaptive_first_action == "A-COMBINED-LOAD-SCREEN" and
+            .scenarios[0].adaptive_worst_case_regret == 0 and
+            .scenarios[0].baseline_terminal_disposition == "HOLD" and
+            .scenarios[0].myopic_worst_case_regret == 2 and
+            .scenarios[0].fixed_campaign_worst_case_regret == 0 and
+            .scenarios[0].adaptive_expected_resources.engineering_hours == 1.2 and
+            ((.scenarios[0].adaptive_expected_resources.facility_hours - 1.55) | fabs) < 0.000000001 and
+            .scenarios[1].scenario_id == "SEQ-002" and
+            .scenarios[1].adaptive_first_action == "B-THERMAL-INSPECTION" and
+            .scenarios[1].adaptive_worst_case_regret == 0 and
+            ((.scenarios[1].adaptive_expected_resources.engineering_hours - 1.15) | fabs) < 0.000000001 and
+            ((.scenarios[1].adaptive_expected_resources.facility_hours - 1.65) | fabs) < 0.000000001 and
+            .scenarios[2].scenario_id == "SEQ-003-AER01-NDE-STRUCTURAL" and
+            .scenarios[2].baseline_terminal_disposition == "HOLD" and
+            .scenarios[2].myopic_worst_case_regret == 2 and
+            .scenarios[2].fixed_campaign_worst_case_regret == 0 and
+            .scenarios[2].adaptive_first_action == "A-CALIBRATION-CHAIN" and
+            .scenarios[2].adaptive_worst_case_regret == 0 and
+            .scenarios[2].adaptive_policy.branches.INVALID.decision == "HOLD" and
+            .scenarios[2].adaptive_policy.branches.VALID.action_id == "B-LOAD-CAPACITY" and
+            .scenarios[2].adaptive_policy.branches.VALID.branches.FAIL.decision == "REJECT" and
+            .scenarios[2].adaptive_policy.branches.VALID.branches.PASS.action_id == "C-ULTRASONIC-NDE" and
+            .scenarios[2].adaptive_policy.branches.VALID.branches.PASS.branches.CLEAR.decision == "ACCEPT" and
+            .scenarios[2].adaptive_policy.branches.VALID.branches.PASS.branches.INDICATION.decision == "REJECT" and
+            ((.scenarios[2].adaptive_expected_resources.engineering_hours - 1.25) | fabs) < 0.000000001 and
+            ((.scenarios[2].adaptive_expected_resources.facility_hours - 1.215) | fabs) < 0.000000001 and
+            ((.scenarios[2].adaptive_expected_resources.specimen_count - 1.75) | fabs) < 0.000000001 and
+            ((.scenarios[2].adaptive_expected_resources.review_hours - 0.235) | fabs) < 0.000000001 and
+            ((.scenarios[2].adaptive_expected_resources.external_cost_units - 0.5275) | fabs) < 0.000000001
+          ' /tmp/sequential-campaign-oracle.json

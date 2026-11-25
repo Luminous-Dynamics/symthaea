@@ -1,0 +1,567 @@
+{
+  "schema": "luminous.orbital-joint-evidence-voi.sequential.v0.1",
+  "benchmark_id": "ORBITAL-JOINT-SEQUENTIAL-PLANNING-001",
+  "evidence_class": "synthetic",
+  "claim_ceiling": "finite_horizon_sequential_campaign_semantics_only",
+  "resource_frequency_semantics": "Synthetic calibrated fixture frequencies are used only for expected resource consumption. Terminal decision risk is distribution-free minimax regret over the full residual state set.",
+  "policies_to_compare": [
+    "FIXED_FULL_CAMPAIGN",
+    "MYOPIC_ONE_STEP_MINIMAX",
+    "ADAPTIVE_FINITE_HORIZON_MINIMAX",
+    "HUMAN_ENGINEER_CAMPAIGN"
+  ],
+  "scenarios": [
+    {
+      "scenario_id": "SEQ-001",
+      "evidence_class": "synthetic",
+      "claim_ceiling": "finite_horizon_sequential_campaign_semantics_only",
+      "decision_context": {
+        "profile_ref": "provider-client-profile://P3-C3@cfg-r9",
+        "article_subject_ref": "physical-unit://JOINT-SEQUENTIAL-SPECIMEN-0003",
+        "configuration_id": "CFG-R9",
+        "icd_revision": "R5"
+      },
+      "states": [
+        "HEALTHY",
+        "AXIAL_CAPACITY_DEFECT",
+        "THERMAL_WEAR_DEFECT",
+        "JOINT_RETENTION_DEFECT"
+      ],
+      "decisions": [
+        "ACCEPT",
+        "REJECT",
+        "HOLD"
+      ],
+      "loss_matrix": {
+        "ACCEPT": {
+          "HEALTHY": 0,
+          "AXIAL_CAPACITY_DEFECT": 100,
+          "THERMAL_WEAR_DEFECT": 100,
+          "JOINT_RETENTION_DEFECT": 100
+        },
+        "REJECT": {
+          "HEALTHY": 5,
+          "AXIAL_CAPACITY_DEFECT": 0,
+          "THERMAL_WEAR_DEFECT": 0,
+          "JOINT_RETENTION_DEFECT": 0
+        },
+        "HOLD": {
+          "HEALTHY": 2,
+          "AXIAL_CAPACITY_DEFECT": 2,
+          "THERMAL_WEAR_DEFECT": 2,
+          "JOINT_RETENTION_DEFECT": 2
+        }
+      },
+      "resource_frequency_model": {
+        "model_ref": "synthetic-calibrated-frequency://SEQ-001-v1",
+        "calibration_status": "calibrated_for_fixture_only",
+        "used_for": "EXPECTED_RESOURCE_USE_ONLY",
+        "state_weights": {
+          "HEALTHY": 0.6,
+          "AXIAL_CAPACITY_DEFECT": 0.15,
+          "THERMAL_WEAR_DEFECT": 0.1,
+          "JOINT_RETENTION_DEFECT": 0.15
+        }
+      },
+      "budget": {
+        "engineering_hours": 2,
+        "compute_core_hours": 0,
+        "facility_hours": 2.5,
+        "specimen_count": 2,
+        "review_hours": 0.5,
+        "external_cost_units": 2
+      },
+      "max_actions": 2,
+      "fixed_campaign_sequence": [
+        "A-COMBINED-LOAD-SCREEN",
+        "B-THERMAL-INSPECTION"
+      ],
+      "actions": [
+        {
+          "action_id": "A-COMBINED-LOAD-SCREEN",
+          "action_class": "COMBINED_LOAD_SCREEN",
+          "decision_context": {
+            "profile_ref": "provider-client-profile://P3-C3@cfg-r9",
+            "article_subject_ref": "physical-unit://JOINT-SEQUENTIAL-SPECIMEN-0003",
+            "configuration_id": "CFG-R9",
+            "icd_revision": "R5"
+          },
+          "method_ref": "synthetic-method://A-COMBINED-LOAD-SCREEN",
+          "admissibility": "ADMISSIBLE",
+          "resource_plan": {
+            "engineering_hours": 0.5,
+            "compute_core_hours": 0,
+            "facility_hours": 0.5,
+            "specimen_count": 1,
+            "review_hours": 0.1,
+            "external_cost_units": 0.3
+          },
+          "observation_by_state": {
+            "HEALTHY": "PASS",
+            "AXIAL_CAPACITY_DEFECT": "FAIL",
+            "THERMAL_WEAR_DEFECT": "PASS",
+            "JOINT_RETENTION_DEFECT": "FAIL"
+          },
+          "obligations_by_observation": {
+            "PASS": [
+              "COMBINED-LOAD-CAPABILITY-001"
+            ],
+            "FAIL": [
+              "REJECTION-BASIS-001"
+            ]
+          }
+        },
+        {
+          "action_id": "B-THERMAL-INSPECTION",
+          "action_class": "THERMAL_INSPECTION",
+          "decision_context": {
+            "profile_ref": "provider-client-profile://P3-C3@cfg-r9",
+            "article_subject_ref": "physical-unit://JOINT-SEQUENTIAL-SPECIMEN-0003",
+            "configuration_id": "CFG-R9",
+            "icd_revision": "R5"
+          },
+          "method_ref": "synthetic-method://B-THERMAL-INSPECTION",
+          "admissibility": "ADMISSIBLE",
+          "resource_plan": {
+            "engineering_hours": 1,
+            "compute_core_hours": 0,
+            "facility_hours": 1.5,
+            "specimen_count": 1,
+            "review_hours": 0.2,
+            "external_cost_units": 0.8
+          },
+          "observation_by_state": {
+            "HEALTHY": "CLEAR",
+            "AXIAL_CAPACITY_DEFECT": "CLEAR",
+            "THERMAL_WEAR_DEFECT": "INDICATION",
+            "JOINT_RETENTION_DEFECT": "CLEAR"
+          },
+          "obligations_by_observation": {
+            "CLEAR": [
+              "THERMAL-WEAR-INSPECTABILITY-001"
+            ],
+            "INDICATION": [
+              "REJECTION-BASIS-001"
+            ]
+          }
+        }
+      ],
+      "expected": {
+        "baseline_worst_case_regret": 2,
+        "myopic_worst_case_regret": 2,
+        "myopic_stops_without_action": true,
+        "fixed_campaign_worst_case_regret": 0,
+        "adaptive_worst_case_regret": 0,
+        "adaptive_first_action": "A-COMBINED-LOAD-SCREEN",
+        "adaptive_expected_resources": {
+          "engineering_hours": 1.2,
+          "compute_core_hours": 0,
+          "facility_hours": 1.55,
+          "specimen_count": 1.7,
+          "review_hours": 0.24,
+          "external_cost_units": 0.86
+        },
+        "fixed_expected_resources": {
+          "engineering_hours": 1.5,
+          "compute_core_hours": 0,
+          "facility_hours": 2,
+          "specimen_count": 2,
+          "review_hours": 0.3,
+          "external_cost_units": 1.1
+        },
+        "require_adaptive_resource_pareto_dominates_fixed": true,
+        "notes": "Neither test alone improves distribution-free minimax regret. A two-step contingent policy screens combined load first; FAIL means every remaining state is defective and terminates at REJECT. PASS leaves healthy/thermal-wear states, so the thermal inspection is then selected and determines ACCEPT versus REJECT. The state-frequency weights are an explicitly synthetic calibrated fixture model used only for expected resource-use accounting; they never enter the minimax-regret/acceptance decision."
+      },
+      "decision_obligations": {
+        "ACCEPT": [
+          "COMBINED-LOAD-CAPABILITY-001",
+          "THERMAL-WEAR-INSPECTABILITY-001"
+        ],
+        "REJECT": [
+          "REJECTION-BASIS-001"
+        ],
+        "HOLD": []
+      }
+    },
+    {
+      "scenario_id": "SEQ-002",
+      "evidence_class": "synthetic",
+      "claim_ceiling": "finite_horizon_sequential_campaign_semantics_only",
+      "decision_context": {
+        "profile_ref": "provider-client-profile://P3-C3@cfg-r9",
+        "article_subject_ref": "physical-unit://JOINT-SEQUENTIAL-SPECIMEN-0003",
+        "configuration_id": "CFG-R9",
+        "icd_revision": "R5"
+      },
+      "states": [
+        "HEALTHY",
+        "AXIAL_CAPACITY_DEFECT",
+        "THERMAL_WEAR_DEFECT",
+        "JOINT_RETENTION_DEFECT"
+      ],
+      "decisions": [
+        "ACCEPT",
+        "REJECT",
+        "HOLD"
+      ],
+      "loss_matrix": {
+        "ACCEPT": {
+          "HEALTHY": 0,
+          "AXIAL_CAPACITY_DEFECT": 100,
+          "THERMAL_WEAR_DEFECT": 100,
+          "JOINT_RETENTION_DEFECT": 100
+        },
+        "REJECT": {
+          "HEALTHY": 5,
+          "AXIAL_CAPACITY_DEFECT": 0,
+          "THERMAL_WEAR_DEFECT": 0,
+          "JOINT_RETENTION_DEFECT": 0
+        },
+        "HOLD": {
+          "HEALTHY": 2,
+          "AXIAL_CAPACITY_DEFECT": 2,
+          "THERMAL_WEAR_DEFECT": 2,
+          "JOINT_RETENTION_DEFECT": 2
+        }
+      },
+      "resource_frequency_model": {
+        "model_ref": "synthetic-calibrated-frequency://SEQ-002-v1",
+        "calibration_status": "calibrated_for_fixture_only",
+        "used_for": "EXPECTED_RESOURCE_USE_ONLY",
+        "state_weights": {
+          "HEALTHY": 0.1,
+          "AXIAL_CAPACITY_DEFECT": 0.1,
+          "THERMAL_WEAR_DEFECT": 0.7,
+          "JOINT_RETENTION_DEFECT": 0.1
+        }
+      },
+      "budget": {
+        "engineering_hours": 2,
+        "compute_core_hours": 0,
+        "facility_hours": 2.5,
+        "specimen_count": 2,
+        "review_hours": 0.5,
+        "external_cost_units": 2
+      },
+      "max_actions": 2,
+      "fixed_campaign_sequence": [
+        "A-COMBINED-LOAD-SCREEN",
+        "B-THERMAL-INSPECTION"
+      ],
+      "actions": [
+        {
+          "action_id": "A-COMBINED-LOAD-SCREEN",
+          "action_class": "COMBINED_LOAD_SCREEN",
+          "decision_context": {
+            "profile_ref": "provider-client-profile://P3-C3@cfg-r9",
+            "article_subject_ref": "physical-unit://JOINT-SEQUENTIAL-SPECIMEN-0003",
+            "configuration_id": "CFG-R9",
+            "icd_revision": "R5"
+          },
+          "method_ref": "synthetic-method://A-COMBINED-LOAD-SCREEN",
+          "admissibility": "ADMISSIBLE",
+          "resource_plan": {
+            "engineering_hours": 0.5,
+            "compute_core_hours": 0,
+            "facility_hours": 0.5,
+            "specimen_count": 1,
+            "review_hours": 0.1,
+            "external_cost_units": 0.3
+          },
+          "observation_by_state": {
+            "HEALTHY": "PASS",
+            "AXIAL_CAPACITY_DEFECT": "FAIL",
+            "THERMAL_WEAR_DEFECT": "PASS",
+            "JOINT_RETENTION_DEFECT": "FAIL"
+          },
+          "obligations_by_observation": {
+            "PASS": [
+              "COMBINED-LOAD-CAPABILITY-001"
+            ],
+            "FAIL": [
+              "REJECTION-BASIS-001"
+            ]
+          }
+        },
+        {
+          "action_id": "B-THERMAL-INSPECTION",
+          "action_class": "THERMAL_INSPECTION",
+          "decision_context": {
+            "profile_ref": "provider-client-profile://P3-C3@cfg-r9",
+            "article_subject_ref": "physical-unit://JOINT-SEQUENTIAL-SPECIMEN-0003",
+            "configuration_id": "CFG-R9",
+            "icd_revision": "R5"
+          },
+          "method_ref": "synthetic-method://B-THERMAL-INSPECTION",
+          "admissibility": "ADMISSIBLE",
+          "resource_plan": {
+            "engineering_hours": 1,
+            "compute_core_hours": 0,
+            "facility_hours": 1.5,
+            "specimen_count": 1,
+            "review_hours": 0.2,
+            "external_cost_units": 0.8
+          },
+          "observation_by_state": {
+            "HEALTHY": "CLEAR",
+            "AXIAL_CAPACITY_DEFECT": "CLEAR",
+            "THERMAL_WEAR_DEFECT": "INDICATION",
+            "JOINT_RETENTION_DEFECT": "CLEAR"
+          },
+          "obligations_by_observation": {
+            "CLEAR": [
+              "THERMAL-WEAR-INSPECTABILITY-001"
+            ],
+            "INDICATION": [
+              "REJECTION-BASIS-001"
+            ]
+          }
+        }
+      ],
+      "expected": {
+        "baseline_worst_case_regret": 2,
+        "myopic_worst_case_regret": 2,
+        "myopic_stops_without_action": true,
+        "fixed_campaign_worst_case_regret": 0,
+        "adaptive_worst_case_regret": 0,
+        "adaptive_first_action": "B-THERMAL-INSPECTION",
+        "adaptive_expected_resources": {
+          "engineering_hours": 1.15,
+          "compute_core_hours": 0,
+          "facility_hours": 1.65,
+          "specimen_count": 1.3,
+          "review_hours": 0.23,
+          "external_cost_units": 0.89
+        },
+        "fixed_expected_resources": {
+          "engineering_hours": 1.5,
+          "compute_core_hours": 0,
+          "facility_hours": 2,
+          "specimen_count": 2,
+          "review_hours": 0.3,
+          "external_cost_units": 1.1
+        },
+        "require_adaptive_resource_pareto_dominates_fixed": true,
+        "notes": "Same physical decision states, tests, loss matrix and non-compensatory robust terminal criterion as SEQ-001, but with a different explicit synthetic state-frequency model. The exact finite-horizon planner chooses thermal inspection first because the declared frequency profile makes B-first followed by A only on CLEAR use fewer expected resources in every dimension. The frequency model changes expected cost/order only; the worst-case minimax regret remains zero."
+      },
+      "decision_obligations": {
+        "ACCEPT": [
+          "COMBINED-LOAD-CAPABILITY-001",
+          "THERMAL-WEAR-INSPECTABILITY-001"
+        ],
+        "REJECT": [
+          "REJECTION-BASIS-001"
+        ],
+        "HOLD": []
+      }
+    },
+    {
+      "scenario_id": "SEQ-003-AER01-NDE-STRUCTURAL",
+      "evidence_class": "synthetic",
+      "claim_ceiling": "finite_horizon_sequential_campaign_semantics_only",
+      "decision_context": {
+        "profile_ref": "provider-client-profile://AER01@cfg-A1",
+        "article_subject_ref": "physical-unit://AER01-COUPON-SET-0007",
+        "configuration_id": "AER01-CFG-A1",
+        "icd_revision": "R1"
+      },
+      "states": [
+        "HEALTHY",
+        "DELAMINATION",
+        "JOINT_RETENTION_DEFECT",
+        "COMMON_CAUSE_INSTRUMENT_DRIFT"
+      ],
+      "decisions": [
+        "ACCEPT",
+        "REJECT",
+        "HOLD"
+      ],
+      "decision_obligations": {
+        "ACCEPT": [
+          "INSTRUMENT-CALIBRATION-001",
+          "STRUCTURAL-LOAD-PROOF-001",
+          "NDE-COVERAGE-001"
+        ],
+        "REJECT": [
+          "REJECTION-BASIS-001"
+        ],
+        "HOLD": []
+      },
+      "loss_matrix": {
+        "ACCEPT": {
+          "HEALTHY": 0,
+          "DELAMINATION": 100,
+          "JOINT_RETENTION_DEFECT": 100,
+          "COMMON_CAUSE_INSTRUMENT_DRIFT": 100
+        },
+        "REJECT": {
+          "HEALTHY": 5,
+          "DELAMINATION": 0,
+          "JOINT_RETENTION_DEFECT": 0,
+          "COMMON_CAUSE_INSTRUMENT_DRIFT": 5
+        },
+        "HOLD": {
+          "HEALTHY": 2,
+          "DELAMINATION": 2,
+          "JOINT_RETENTION_DEFECT": 2,
+          "COMMON_CAUSE_INSTRUMENT_DRIFT": 0
+        }
+      },
+      "resource_frequency_model": {
+        "model_ref": "synthetic-calibrated-frequency://SEQ-003-v1",
+        "calibration_status": "calibrated_for_fixture_only",
+        "used_for": "EXPECTED_RESOURCE_USE_ONLY",
+        "state_weights": {
+          "HEALTHY": 0.65,
+          "DELAMINATION": 0.15,
+          "JOINT_RETENTION_DEFECT": 0.15,
+          "COMMON_CAUSE_INSTRUMENT_DRIFT": 0.05
+        }
+      },
+      "budget": {
+        "engineering_hours": 2,
+        "compute_core_hours": 0,
+        "facility_hours": 2,
+        "specimen_count": 2,
+        "review_hours": 0.5,
+        "external_cost_units": 1
+      },
+      "max_actions": 3,
+      "fixed_campaign_sequence": [
+        "A-CALIBRATION-CHAIN",
+        "B-LOAD-CAPACITY",
+        "C-ULTRASONIC-NDE"
+      ],
+      "actions": [
+        {
+          "action_id": "A-CALIBRATION-CHAIN",
+          "action_class": "INDEPENDENT_CALIBRATION_CHAIN_AUDIT",
+          "decision_context": {
+            "profile_ref": "provider-client-profile://AER01@cfg-A1",
+            "article_subject_ref": "physical-unit://AER01-COUPON-SET-0007",
+            "configuration_id": "AER01-CFG-A1",
+            "icd_revision": "R1"
+          },
+          "method_ref": "synthetic-method://CAL-CHAIN-R1",
+          "admissibility": "ADMISSIBLE",
+          "resource_plan": {
+            "engineering_hours": 0.2,
+            "compute_core_hours": 0,
+            "facility_hours": 0.1,
+            "specimen_count": 0,
+            "review_hours": 0.02,
+            "external_cost_units": 0.05
+          },
+          "observation_by_state": {
+            "HEALTHY": "VALID",
+            "DELAMINATION": "VALID",
+            "JOINT_RETENTION_DEFECT": "VALID",
+            "COMMON_CAUSE_INSTRUMENT_DRIFT": "INVALID"
+          },
+          "obligations_by_observation": {
+            "VALID": [
+              "INSTRUMENT-CALIBRATION-001"
+            ],
+            "INVALID": []
+          }
+        },
+        {
+          "action_id": "B-LOAD-CAPACITY",
+          "action_class": "NON_DESTRUCTIVE_COMBINED_LOAD_COUPON",
+          "decision_context": {
+            "profile_ref": "provider-client-profile://AER01@cfg-A1",
+            "article_subject_ref": "physical-unit://AER01-COUPON-SET-0007",
+            "configuration_id": "AER01-CFG-A1",
+            "icd_revision": "R1"
+          },
+          "method_ref": "synthetic-method://LOAD-CAPACITY-R1",
+          "admissibility": "ADMISSIBLE",
+          "resource_plan": {
+            "engineering_hours": 0.6,
+            "compute_core_hours": 0,
+            "facility_hours": 0.5,
+            "specimen_count": 1,
+            "review_hours": 0.1,
+            "external_cost_units": 0.25
+          },
+          "observation_by_state": {
+            "HEALTHY": "PASS",
+            "DELAMINATION": "PASS",
+            "JOINT_RETENTION_DEFECT": "FAIL",
+            "COMMON_CAUSE_INSTRUMENT_DRIFT": "UNTRUSTED"
+          },
+          "obligations_by_observation": {
+            "PASS": [
+              "STRUCTURAL-LOAD-PROOF-001"
+            ],
+            "FAIL": [
+              "REJECTION-BASIS-001"
+            ],
+            "UNTRUSTED": []
+          }
+        },
+        {
+          "action_id": "C-ULTRASONIC-NDE",
+          "action_class": "FIXED_TARGET_ULTRASONIC_SCREEN",
+          "decision_context": {
+            "profile_ref": "provider-client-profile://AER01@cfg-A1",
+            "article_subject_ref": "physical-unit://AER01-COUPON-SET-0007",
+            "configuration_id": "AER01-CFG-A1",
+            "icd_revision": "R1"
+          },
+          "method_ref": "synthetic-method://UT-DELAMINATION-R1",
+          "admissibility": "ADMISSIBLE",
+          "resource_plan": {
+            "engineering_hours": 0.6,
+            "compute_core_hours": 0,
+            "facility_hours": 0.8,
+            "specimen_count": 1,
+            "review_hours": 0.15,
+            "external_cost_units": 0.3
+          },
+          "observation_by_state": {
+            "HEALTHY": "CLEAR",
+            "DELAMINATION": "INDICATION",
+            "JOINT_RETENTION_DEFECT": "CLEAR",
+            "COMMON_CAUSE_INSTRUMENT_DRIFT": "UNTRUSTED"
+          },
+          "obligations_by_observation": {
+            "CLEAR": [
+              "NDE-COVERAGE-001"
+            ],
+            "INDICATION": [
+              "REJECTION-BASIS-001"
+            ],
+            "UNTRUSTED": []
+          }
+        }
+      ],
+      "expected": {
+        "baseline_worst_case_regret": 2,
+        "myopic_worst_case_regret": 2,
+        "myopic_stops_without_action": true,
+        "fixed_campaign_worst_case_regret": 0,
+        "adaptive_worst_case_regret": 0,
+        "adaptive_first_action": "A-CALIBRATION-CHAIN",
+        "adaptive_expected_resources": {
+          "engineering_hours": 1.25,
+          "compute_core_hours": 0,
+          "facility_hours": 1.215,
+          "specimen_count": 1.75,
+          "review_hours": 0.235,
+          "external_cost_units": 0.5275
+        },
+        "fixed_expected_resources": {
+          "engineering_hours": 1.4,
+          "compute_core_hours": 0,
+          "facility_hours": 1.4,
+          "specimen_count": 2,
+          "review_hours": 0.27,
+          "external_cost_units": 0.6
+        },
+        "require_adaptive_resource_pareto_dominates_fixed": true,
+        "notes": "Synthetic AER-01 inspection campaign only. The decision context identifies a coupon set with separately identified load and NDE specimens. An independent calibration-chain audit runs first. Invalid calibration/correlation evidence terminates in HOLD. A valid chain permits a non-destructive combined-load proof screen on the load coupon; FAIL produces an outcome-specific rejection basis and stops. PASS permits fixed-target ultrasonic inspection on the separate NDE coupon. CLEAR completes the calibration, load and NDE obligations required for ACCEPT; INDICATION produces a rejection basis. Frequency weights affect expected resource use only; worst-case regret remains distribution-free. All observations, costs, specimen counts, calibration status and method applicability are synthetic and are not physical NDE or structural evidence."
+      }
+    }
+  ]
+}
