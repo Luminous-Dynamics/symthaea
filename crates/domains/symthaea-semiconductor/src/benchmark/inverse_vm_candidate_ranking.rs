@@ -43,6 +43,7 @@ pub enum CandidateDispositionV1 {
 pub enum CandidateRejectionReasonV1 {
     CandidateSchemaUnsupported,
     CandidateDigestMismatch,
+    RecipeSchemaMismatch,
     CandidateIdEmpty,
     DuplicateCandidateId,
     MalformedModelArtifactDigest,
@@ -245,6 +246,12 @@ fn candidate_digest(
 fn input_digest(input: &InverseVmRankingInputV1) -> Result<String, InverseVmRankingErrorV1> {
     let mut canonical = input.clone();
     canonical.candidates.sort_by(|a, b| a.candidate_id.cmp(&b.candidate_id));
+    for candidate in &mut canonical.candidates {
+        candidate.target_predictions.sort_by(|a, b| a.target_id.cmp(&b.target_id));
+        candidate
+            .constraint_predictions
+            .sort_by(|a, b| a.constraint_id.cmp(&b.constraint_id));
+    }
     canonical.control_bounds.sort_by(|a, b| a.control_id.cmp(&b.control_id));
     canonical.target_specs.sort_by(|a, b| a.target_id.cmp(&b.target_id));
     canonical
@@ -396,7 +403,7 @@ fn evaluate_candidate(
     if !valid_sha256(&candidate.recipe_schema_sha256)
         || candidate.recipe_schema_sha256 != input.recipe_schema_sha256
     {
-        set(CandidateDispositionV1::Rejected, CandidateRejectionReasonV1::CandidateDigestMismatch);
+        set(CandidateDispositionV1::Rejected, CandidateRejectionReasonV1::RecipeSchemaMismatch);
     }
     if !valid_sha256(&candidate.model_artifact_sha256) {
         set(CandidateDispositionV1::Rejected, CandidateRejectionReasonV1::MalformedModelArtifactDigest);
@@ -667,16 +674,8 @@ pub fn rank_feasible_inverse_vm_candidates_v1(
                 candidate.candidate_id
             )));
         }
-        let mut evaluation = evaluate_candidate(input, candidate)?;
+        let evaluation = evaluate_candidate(input, candidate)?;
         if evaluation.disposition == CandidateDispositionV1::Eligible {
-            let normalized_controls: Vec<f64> = input
-                .control_bounds
-                .iter()
-                .map(|bound| {
-                    let value = candidate.control_values[&bound.control_id];
-                    (value - bound.minimum) / (bound.maximum - bound.minimum)
-                })
-                .collect();
             eligible.push(FeasibleCandidate {
                 evaluation_index: evaluations.len(),
                 candidate: candidate.clone(),
