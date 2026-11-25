@@ -740,6 +740,98 @@
         "sensor_dropout_ablation",
         "noise_seed_permutation"
       ]
+    },
+    {
+      "task_id": "SDCB-ID-005",
+      "family": "identifiability_abstention",
+      "split": "validation",
+      "generator": "Paired diagonal two-state systems that are indistinguishable under the current first-coordinate sensor.",
+      "parameters": {
+        "system_a": [
+          [
+            0.5,
+            0
+          ],
+          [
+            0,
+            0.2
+          ]
+        ],
+        "system_b": [
+          [
+            0.5,
+            0
+          ],
+          [
+            0,
+            0.9
+          ]
+        ],
+        "current_sensor": [
+          1,
+          0
+        ],
+        "candidate_sensors": [
+          [
+            0,
+            1
+          ],
+          [
+            1,
+            1
+          ]
+        ],
+        "initial_state": [
+          1,
+          1
+        ],
+        "horizon": 8
+      },
+      "target": "Identify that the hidden eigenvalue is unknown under the current sensor and select an additional sensor that makes the models distinguishable.",
+      "controls": [
+        "no_op_sensor_addition",
+        "sensor_order_permutation",
+        "identical_hidden_eigenvalues"
+      ]
+    },
+    {
+      "task_id": "SDCB-ID-006",
+      "family": "identifiability_abstention",
+      "split": "validation",
+      "generator": "Rank-deficient two-feature input excitation with a finite set of permitted control probes.",
+      "parameters": {
+        "observed_inputs": [
+          [
+            1,
+            0
+          ],
+          [
+            2,
+            0
+          ]
+        ],
+        "candidate_probes": [
+          [
+            0,
+            1
+          ],
+          [
+            1,
+            0
+          ],
+          [
+            1,
+            1
+          ]
+        ],
+        "probe_budget": 1
+      },
+      "target": "Choose a probe that increases regressor rank from one to two and report the remaining model/measurement assumptions.",
+      "controls": [
+        "duplicate_input_probe",
+        "zero_probe",
+        "orthogonal_probe_positive_control"
+      ]
     }
   ],
   "model_profiles": [
@@ -858,7 +950,9 @@
     "different_hidden_dynamics_same_observations",
     "rank_deficient_input_excitation",
     "sensor_unobservable_mode",
-    "same_model_different_input_regime"
+    "same_model_different_input_regime",
+    "active_sensor_must_reveal_hidden_mode",
+    "orthogonal_excitation_required_for_full_rank"
   ],
   "metrics": [
     "exact_accuracy_or_normalized_error",
@@ -871,7 +965,8 @@
     "proof_plan_consistency_and_unresolved_obligations",
     "latency_peak_memory_and_measured_energy",
     "test_retest_and_independent_reproduction",
-    "identifiability_detection_and_selective_abstention_correctness"
+    "identifiability_detection_and_selective_abstention_correctness",
+    "task_relative_identifiability_and_active_experiment_value"
   ],
   "resource_controls": {
     "comparison_views": [
