@@ -724,7 +724,7 @@ jobs:
             and .lean_toolchain == "leanprover/lean4:v4.37.0-rc1"
             and .lean_core_revision == "0b77e12952ad39077d80d8bd6b66d601f225c321"
             and .sources.module_a.sha256 == "e70af7d30ac091e8a50f219a1c53a7c85be5c750f2eb3ff127fcedc3b99a3003"
-            and .sources.module_b.sha256 == "18ca5b91051479397d826fe37432bca2e35320e9bbb47adb115186e7dfee9e09"
+            and .sources.module_b.sha256 == "eb194ed45ae694adcd963a6fef0294e98dcf2e9833b143dc7829794e7a2d614c"
             and ([.roots[].name] == ["S9", "S9.mk", "usesS9"])' "$manifest" >/dev/null
           jq -e '."$schema" == "https://json-schema.org/draft/2020-12/schema"
             and .properties.status.const == "independent_audit_pending"
@@ -815,7 +815,7 @@ jobs:
                 traversal: "fresh per-root DFS",
                 memoization: "visited names only; no partial axiom result cache",
                 inductive_edges: "inductive type plus constructors",
-                unresolved_policy: "sorryAx sentinel; expected dependency assertion fails closed"
+                unresolved_policy: "preserve unresolved constant name; exact expected-set assertion fails closed"
               },
               claim_ceiling: [
                 "The project-side fresh DFS detected Classical.choice through the imported S9 inductive/constructor cycle and the theorem usesS9 in this exact Lean environment.",
