@@ -696,7 +696,15 @@ fn assess_hypothesis(
         .evidence
         .iter()
         .any(|evidence| evidence.evidence_kind == CausalDriftEvidenceKindV1::ControlledIntervention);
-    if hypothesis.matched_contrast.is_some() && !has_matched_evidence {
+    if hypothesis.matched_contrast.is_some() && hypothesis.clustered_matched_contrast.is_some() {
+        return Err(CausalDriftDiagnosisErrorV1(format!(
+            "hypothesis {} cannot supply both cell-level and cluster-level matched contrasts",
+            hypothesis.hypothesis_id
+        )));
+    }
+    if (hypothesis.matched_contrast.is_some() || hypothesis.clustered_matched_contrast.is_some())
+        && !has_matched_evidence
+    {
         return Err(CausalDriftDiagnosisErrorV1(format!(
             "hypothesis {} has a matched contrast without a typed evidence record",
             hypothesis.hypothesis_id
@@ -732,6 +740,25 @@ fn assess_hypothesis(
                 reasons.push("matched_contrast_is_association_not_causal_proof".into());
                 if !effect_consistent(&effect, hypothesis.expected_effect_direction) {
                     reasons.push("matched_effect_not_separated_from_zero".into());
+                }
+                if !hypothesis.unmeasured_confounders.is_empty() {
+                    reasons.push("unmeasured_confounders_remain".into());
+                }
+            }
+        } else if let Some(contrast) = &hypothesis.clustered_matched_contrast {
+            let (effect, diagnostics_ok) = estimate_clustered_contrast(contrast, &input.policy)?;
+            matched_effect = Some(effect.clone());
+            if !diagnostics_ok {
+                status = CausalAssessmentStatusV1::Unidentifiable;
+                reasons.push("clustered_balance_or_parallel_trend_gate_failed".into());
+            } else if effect_contradicts(&effect, hypothesis.expected_effect_direction) {
+                status = CausalAssessmentStatusV1::Contradicted;
+                reasons.push("clustered_contrast_interval_opposes_hypothesis".into());
+            } else {
+                status = CausalAssessmentStatusV1::AssociationOnly;
+                reasons.push("clustered_contrast_is_association_not_causal_proof".into());
+                if !effect_consistent(&effect, hypothesis.expected_effect_direction) {
+                    reasons.push("clustered_effect_not_separated_from_zero".into());
                 }
                 if !hypothesis.unmeasured_confounders.is_empty() {
                     reasons.push("unmeasured_confounders_remain".into());
@@ -832,13 +859,14 @@ pub fn diagnose_causal_drift_v1(
         ));
     }
     if input.policy.minimum_group_count < 2
+        || input.policy.minimum_independent_clusters < 10
         || !input.policy.maximum_covariate_smd.is_finite()
         || input.policy.maximum_covariate_smd < 0.0
         || !input.policy.maximum_pretrend_slope_difference.is_finite()
         || input.policy.maximum_pretrend_slope_difference < 0.0
     {
         return Err(CausalDriftDiagnosisErrorV1(
-            "causal diagnosis policy contains invalid thresholds".into(),
+            "causal diagnosis policy contains invalid thresholds or fewer than 10 independent clusters".into(),
         ));
     }
     if input.hypotheses.is_empty() {
