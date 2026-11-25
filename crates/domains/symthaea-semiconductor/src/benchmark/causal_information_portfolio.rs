@@ -1107,6 +1107,32 @@ mod tests {
         }
     }
 
+    fn stress_candidate(
+        id: &str,
+        p_h1_alarm: f64,
+        p_h2_alarm: f64,
+    ) -> CandidateLikelihoodStressV1 {
+        CandidateLikelihoodStressV1 {
+            candidate_id: id.into(),
+            outcomes: vec![
+                CandidateOutcomeLikelihoodV1 {
+                    outcome_id: "alarm".into(),
+                    probability_by_hypothesis: BTreeMap::from([
+                        ("h1".into(), p_h1_alarm),
+                        ("h2".into(), p_h2_alarm),
+                    ]),
+                },
+                CandidateOutcomeLikelihoodV1 {
+                    outcome_id: "quiet".into(),
+                    probability_by_hypothesis: BTreeMap::from([
+                        ("h1".into(), 1.0 - p_h1_alarm),
+                        ("h2".into(), 1.0 - p_h2_alarm),
+                    ]),
+                },
+            ],
+        }
+    }
+
     fn input(candidates: Vec<CausalMeasurementCandidateV1>) -> CausalInformationPortfolioInputV1 {
         CausalInformationPortfolioInputV1 {
             schema: CAUSAL_PORTFOLIO_INPUT_SCHEMA_V1.into(),
@@ -1319,6 +1345,62 @@ mod tests {
         let report = optimize_causal_information_portfolio_v1(&input(vec![invalid])).unwrap();
         assert_eq!(report.status, CausalPortfolioStatusV1::NoFeasiblePortfolio);
         assert!(report.selected_portfolio.is_none());
+    }
+
+    #[test]
+    fn robust_objective_avoids_candidate_whose_information_collapses_under_stress() {
+        let brittle = candidate("brittle", "ref-a", 0.99, 0.01, 1.0, false);
+        let stable = candidate("stable", "ref-b", 0.80, 0.20, 1.0, false);
+        let mut value = input(vec![brittle, stable]);
+        value.likelihood_stress_scenarios = vec![PortfolioLikelihoodStressScenarioV1 {
+            scenario_id: "sensor-miscalibration-stress".into(),
+            scenario_protocol_sha256: digest('c'),
+            candidate_likelihoods: vec![
+                stress_candidate("brittle", 0.50, 0.50),
+                stress_candidate("stable", 0.70, 0.30),
+            ],
+        }];
+        value.objective_weights.information_gain_weight = 0.0;
+        value.objective_weights.robust_information_gain_weight = 1.0;
+        value.physical_cost_budget = 1.0;
+        value.maximum_capacity_units = 1;
+
+        let report = optimize_causal_information_portfolio_v1(&value).unwrap();
+        let selected = report.selected_portfolio.unwrap();
+        assert_eq!(selected.candidate_ids, vec!["stable"]);
+        assert_eq!(selected.likelihood_stress_scenario_count, 1);
+        assert!(selected.minimum_stress_information_gain_bits > 0.0);
+        assert!(
+            selected.maximum_stress_information_gain_bits
+                > selected.minimum_stress_information_gain_bits
+        );
+        assert!(selected.likelihood_model_sensitivity_range_bits > 0.0);
+    }
+
+    #[test]
+    fn malformed_likelihood_stress_scenario_is_rejected() {
+        let mut value = input(vec![
+            candidate("a", "ref-a", 0.9, 0.1, 1.0, false),
+            candidate("b", "ref-b", 0.8, 0.2, 1.0, false),
+        ]);
+        value.likelihood_stress_scenarios = vec![PortfolioLikelihoodStressScenarioV1 {
+            scenario_id: "incomplete-stress".into(),
+            scenario_protocol_sha256: digest('c'),
+            candidate_likelihoods: vec![stress_candidate("a", 0.7, 0.3)],
+        }];
+        assert!(optimize_causal_information_portfolio_v1(&value).is_err());
+
+        let mut invalid = input(vec![candidate("a", "ref-a", 0.9, 0.1, 1.0, false)]);
+        let mut bad_candidate = stress_candidate("a", 0.7, 0.3);
+        bad_candidate.outcomes[1]
+            .probability_by_hypothesis
+            .insert("h1".into(), 0.5);
+        invalid.likelihood_stress_scenarios = vec![PortfolioLikelihoodStressScenarioV1 {
+            scenario_id: "unnormalized-stress".into(),
+            scenario_protocol_sha256: digest('d'),
+            candidate_likelihoods: vec![bad_candidate],
+        }];
+        assert!(optimize_causal_information_portfolio_v1(&invalid).is_err());
     }
 
     #[test]
