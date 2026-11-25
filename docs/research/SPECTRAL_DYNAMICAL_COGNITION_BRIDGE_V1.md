@@ -228,3 +228,14 @@ When a source changes, preserve an archived copy, capture date, content digest, 
 - Goedel-Architect preliminary paper: https://openreview.net/pdf/23d889a527e56c9e2b43596e463b086dfe16d5a3.pdf
 - Exgentic Open Agent Leaderboard: https://www.exgentic.ai/
 - Akhunzada et al., “From benchmarks to deployment: a comprehensive review of agentic AI evaluation” (2026): https://doi.org/10.1007/s10462-026-11571-0
+
+
+## 12. Extended benchmark governance and implementation links
+
+The following supporting artifacts extend this protocol:
+
+- [Industry and research benchmark landscape snapshot](SDCB_INDUSTRY_BENCHMARK_LANDSCAPE_2026_11_25.md): current external baselines, reported metrics, comparison caveats, and SDCB promotion gates.
+- [Hidden evaluation and reproducibility protocol](SDCB_HIDDEN_EVALUATION_AND_REPRODUCIBILITY_V1.md): sealed holdouts, salted commitments, anti-leakage, exact system identity, independent evaluator and delayed reveal.
+- [Dependency-free Rust analytic reference harness](../../scripts/research/sdcb_reference.rs) with [run instructions and limitations](../../scripts/research/SDCB_REFERENCE_HARNESS_README.md).
+
+A key refinement from current Koopman/system-identification work is to evaluate *identifiability*, not just prediction accuracy. Each dynamical experiment must state persistent excitation, observability, sampling, noise, stationarity or regime assumptions, sequence length, and approximation error. Include adversarial non-identifiable trajectories and allow the correct result to be “insufficient evidence to identify the dynamics.”
