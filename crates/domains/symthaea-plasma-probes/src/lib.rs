@@ -30,6 +30,8 @@ const MAX_DELAY_CANCELLATION_SAMPLES: usize = 1_000_000;
 const MAX_DELAY_HISTORY_WORK: usize = 4_194_304;
 const MAX_PERIODIC_DERIVATIVE_SAMPLES: usize = 65_536;
 const MAX_PERIODIC_DERIVATIVE_WORK: usize = 8_388_608;
+const MAX_RESPONSE_SIGNATURE_CLUSTER_MEMBERS: usize = 128;
+const MAX_RESPONSE_SIGNATURE_CLUSTER_WORK: usize = 4_194_304;
 const DIGEST_DOMAIN: &[u8] = b"symthaea.akpd.pulse-candidate.v0.1\0";
 
 /// Errors returned while parsing, validating or enumerating probe contracts.
@@ -110,6 +112,10 @@ pub enum ContractError {
     InvalidResponseSignatureScale,
     #[error("response signature tolerance must be finite and non-negative")]
     InvalidResponseSignatureTolerance,
+    #[error("response signature cluster must contain at least one member")]
+    EmptyResponseSignatureCluster,
+    #[error("response signature cluster exceeds its member or pairwise work budget")]
+    ResponseSignatureClusterWorkBudgetExceeded,
     #[error("finite-amplitude response estimator requires positive finite pulse amplitudes")]
     InvalidResponseAmplitude,
     #[error("storage byte-count arithmetic overflowed")]
@@ -1033,12 +1039,114 @@ pub struct KineticResponseSignatureInput {
 pub struct ResponseSignatureComparison {
     /// RMS complex-response discrepancy normalized by a task-fixed scale.
     pub normalized_response_distance: Option<f64>,
+    /// Worst normalized complex-response error across all measured signature entries.
+    pub maximum_normalized_entry_error: Option<f64>,
     pub absolute_frobenius_error: f64,
     pub measured_entry_count: usize,
     pub missing_response_count: usize,
     pub branch_mismatch_count: usize,
     pub unresolved_branch_count: usize,
     pub structure_class_compatible: bool,
+}
+
+/// Finite all-pairs diameter audit for a proposed response-equivalence class.
+///
+/// This report establishes only a diameter bound on the supplied finite set of
+/// response signatures. It does not establish equivalence for untested states
+/// or interventions, and it is not a global quotient certificate.
+#[derive(Clone, Copy, Debug, PartialEq, Serialize)]
+pub struct ResponseSignatureClusterAudit {
+    pub member_count: usize,
+    pub compared_pair_count: usize,
+    pub compatible_pair_count: usize,
+    pub incompatible_pair_count: usize,
+    pub maximum_pairwise_normalized_rms_distance: Option<f64>,
+    pub maximum_pairwise_normalized_entry_error: Option<f64>,
+    pub complete_response_coverage: bool,
+    pub stable_branch_association: bool,
+    pub compatible_structure_class: bool,
+    pub within_finite_class_diameter: bool,
+}
+
+/// Audit every pair in a proposed finite state class.
+///
+/// Unlike connected-component clustering of pairwise-compatible edges, this
+/// requires every pair in the proposed class to satisfy the frozen tolerance.
+/// Admission uses the maximum normalized complex-response error at any
+/// intervention/QoI/time entry, while retaining RMS distance as a diagnostic.
+pub fn audit_response_signature_cluster(
+    signatures: &[KineticResponseSignature],
+    tolerance: f64,
+) -> Result<ResponseSignatureClusterAudit, ContractError> {
+    if signatures.is_empty() {
+        return Err(ContractError::EmptyResponseSignatureCluster);
+    }
+    if signatures.len() > MAX_RESPONSE_SIGNATURE_CLUSTER_MEMBERS {
+        return Err(ContractError::ResponseSignatureClusterWorkBudgetExceeded);
+    }
+    if !tolerance.is_finite() || tolerance < 0.0 {
+        return Err(ContractError::InvalidResponseSignatureTolerance);
+    }
+
+    let member_count = signatures.len();
+    let pair_count = member_count
+        .checked_mul(member_count.saturating_sub(1))
+        .and_then(|count| count.checked_div(2))
+        .ok_or(ContractError::ResponseSignatureClusterWorkBudgetExceeded)?;
+    let entries_per_signature = signatures[0].responses.len();
+    let comparison_work = pair_count
+        .checked_mul(entries_per_signature)
+        .ok_or(ContractError::ResponseSignatureClusterWorkBudgetExceeded)?;
+    if comparison_work > MAX_RESPONSE_SIGNATURE_CLUSTER_WORK {
+        return Err(ContractError::ResponseSignatureClusterWorkBudgetExceeded);
+    }
+
+    let mut compatible_pair_count = 0_usize;
+    let mut maximum_pairwise_normalized_rms_distance = None::<f64>;
+    let mut maximum_pairwise_normalized_entry_error = None::<f64>;
+    let mut complete_response_coverage = true;
+    let mut stable_branch_association = true;
+    let mut compatible_structure_class = true;
+
+    for left_index in 0..member_count {
+        for right_index in (left_index + 1)..member_count {
+            let comparison = signatures[left_index].compare(&signatures[right_index])?;
+            complete_response_coverage &= comparison.missing_response_count == 0;
+            stable_branch_association &=
+                comparison.branch_mismatch_count == 0 && comparison.unresolved_branch_count == 0;
+            compatible_structure_class &= comparison.structure_class_compatible;
+
+            if let Some(distance) = comparison.normalized_response_distance {
+                maximum_pairwise_normalized_rms_distance = Some(
+                    maximum_pairwise_normalized_rms_distance
+                        .map_or(distance, |current| current.max(distance)),
+                );
+            }
+            if let Some(error) = comparison.maximum_normalized_entry_error {
+                maximum_pairwise_normalized_entry_error = Some(
+                    maximum_pairwise_normalized_entry_error
+                        .map_or(error, |current| current.max(error)),
+                );
+            }
+            if KineticResponseSignature::pairwise_compatible(comparison, tolerance)? {
+                compatible_pair_count += 1;
+            }
+        }
+    }
+
+    let incompatible_pair_count = pair_count - compatible_pair_count;
+    Ok(ResponseSignatureClusterAudit {
+        member_count,
+        compared_pair_count: pair_count,
+        compatible_pair_count,
+        incompatible_pair_count,
+        maximum_pairwise_normalized_rms_distance,
+        maximum_pairwise_normalized_entry_error,
+        complete_response_coverage,
+        stable_branch_association,
+        compatible_structure_class,
+        within_finite_class_diameter: incompatible_pair_count == 0,
+    })
 }
 
 impl KineticResponseSignature {
@@ -1135,6 +1243,7 @@ impl KineticResponseSignature {
 
         let mut squared_error = 0.0_f64;
         let mut squared_normalized_error = 0.0_f64;
+        let mut maximum_normalized_entry_error = None::<f64>;
         let mut measured_entry_count = 0_usize;
         let mut missing_response_count = 0_usize;
         let mut branch_mismatch_count = 0_usize;
@@ -1157,6 +1266,16 @@ impl KineticResponseSignature {
                     let squared_delta = real_delta.mul_add(real_delta, imag_delta * imag_delta);
                     let qoi_index = (index / time_count) % qoi_count;
                     let scale = self.qoi_scales[qoi_index];
+                    let normalized_entry_error = squared_delta.sqrt() / scale;
+                    if !normalized_entry_error.is_finite() {
+                        return Err(ContractError::InvalidGramianArithmetic);
+                    }
+                    maximum_normalized_entry_error = Some(
+                        maximum_normalized_entry_error
+                            .map_or(normalized_entry_error, |current| {
+                                current.max(normalized_entry_error)
+                            }),
+                    );
                     squared_error += squared_delta;
                     squared_normalized_error += squared_delta / (scale * scale);
                     measured_entry_count += 1;
@@ -1184,6 +1303,7 @@ impl KineticResponseSignature {
 
         Ok(ResponseSignatureComparison {
             normalized_response_distance,
+            maximum_normalized_entry_error,
             absolute_frobenius_error,
             measured_entry_count,
             missing_response_count,
@@ -1210,8 +1330,8 @@ impl KineticResponseSignature {
             && comparison.unresolved_branch_count == 0
             && comparison.structure_class_compatible
             && comparison
-                .normalized_response_distance
-                .is_some_and(|distance| distance <= tolerance))
+                .maximum_normalized_entry_error
+                .is_some_and(|error| error <= tolerance))
     }
 
     pub fn contract_id(&self) -> &str {
@@ -6921,6 +7041,120 @@ mod tests {
         let compared = left.compare(&right).unwrap();
         let expected = ((1.0_f64.powi(2) + 0.1_f64.powi(2)) / 2.0).sqrt();
         assert!((compared.normalized_response_distance.unwrap() - expected).abs() < 1.0e-12);
+    }
+
+    #[test]
+    fn response_signature_admission_uses_worst_entry_not_rms_average() {
+        let left = KineticResponseSignature::new(KineticResponseSignatureInput {
+            contract_id: "contract".to_owned(),
+            structure_class_id: "class".to_owned(),
+            intervention_ids: vec!["pulse".to_owned()],
+            qoi_ids: vec!["field".to_owned()],
+            qoi_scales: vec![1.0],
+            time_samples: (0..10).map(f64::from).collect(),
+            responses: (0..10)
+                .map(|_| Some(ComplexResponse::new(0.0, 0.0).unwrap()))
+                .collect(),
+            branch_ids: (0..10).map(|_| Some("branch".to_owned())).collect(),
+        })
+        .unwrap();
+        let mut right_input = KineticResponseSignatureInput {
+            contract_id: "contract".to_owned(),
+            structure_class_id: "class".to_owned(),
+            intervention_ids: vec!["pulse".to_owned()],
+            qoi_ids: vec!["field".to_owned()],
+            qoi_scales: vec![1.0],
+            time_samples: (0..10).map(f64::from).collect(),
+            responses: (0..10)
+                .map(|_| Some(ComplexResponse::new(0.0, 0.0).unwrap()))
+                .collect(),
+            branch_ids: (0..10).map(|_| Some("branch".to_owned())).collect(),
+        };
+        right_input.responses[9] = Some(ComplexResponse::new(2.0, 0.0).unwrap());
+        let right = KineticResponseSignature::new(right_input).unwrap();
+        let comparison = left.compare(&right).unwrap();
+        assert!(comparison.normalized_response_distance.unwrap() < 1.0);
+        assert_eq!(comparison.maximum_normalized_entry_error, Some(2.0));
+        assert!(!KineticResponseSignature::pairwise_compatible(comparison, 1.0).unwrap());
+    }
+
+    #[test]
+    fn response_signature_cluster_audit_rejects_nontransitive_chain_merge() {
+        let state_a = make_kinetic_response_signature(0.0, "contract-a", "class-a", Some("branch"));
+        let state_b =
+            make_kinetic_response_signature(0.75, "contract-a", "class-a", Some("branch"));
+        let state_c = make_kinetic_response_signature(1.5, "contract-a", "class-a", Some("branch"));
+        assert!(KineticResponseSignature::pairwise_compatible(
+            state_a.compare(&state_b).unwrap(),
+            1.0
+        )
+        .unwrap());
+        assert!(KineticResponseSignature::pairwise_compatible(
+            state_b.compare(&state_c).unwrap(),
+            1.0
+        )
+        .unwrap());
+        let audit = audit_response_signature_cluster(&[state_a, state_b, state_c], 1.0).unwrap();
+        assert_eq!(audit.member_count, 3);
+        assert_eq!(audit.compared_pair_count, 3);
+        assert_eq!(audit.compatible_pair_count, 2);
+        assert_eq!(audit.incompatible_pair_count, 1);
+        assert_eq!(audit.maximum_pairwise_normalized_entry_error, Some(1.5));
+        assert!(!audit.within_finite_class_diameter);
+    }
+
+    #[test]
+    fn response_signature_cluster_audit_accepts_only_complete_bounded_classes() {
+        let state_a = make_kinetic_response_signature(0.0, "contract-a", "class-a", Some("branch"));
+        let state_b =
+            make_kinetic_response_signature(0.25, "contract-a", "class-a", Some("branch"));
+        let audit = audit_response_signature_cluster(&[state_a, state_b], 0.25).unwrap();
+        assert_eq!(audit.compared_pair_count, 1);
+        assert_eq!(audit.compatible_pair_count, 1);
+        assert!(audit.complete_response_coverage);
+        assert!(audit.stable_branch_association);
+        assert!(audit.compatible_structure_class);
+        assert!(audit.within_finite_class_diameter);
+    }
+
+    #[test]
+    fn response_signature_cluster_audit_rejects_missing_or_unresolved_response() {
+        let mut incomplete = KineticResponseSignatureInput {
+            contract_id: "contract".to_owned(),
+            structure_class_id: "class".to_owned(),
+            intervention_ids: vec!["pulse".to_owned()],
+            qoi_ids: vec!["field".to_owned()],
+            qoi_scales: vec![1.0],
+            time_samples: vec![0.0],
+            responses: vec![None],
+            branch_ids: vec![None],
+        };
+        let left = make_kinetic_response_signature(0.0, "contract", "class", Some("branch"));
+        let right = KineticResponseSignature::new(incomplete.clone()).unwrap();
+        let audit = audit_response_signature_cluster(&[left, right], 1.0).unwrap();
+        assert_eq!(audit.incompatible_pair_count, 1);
+        assert!(!audit.complete_response_coverage);
+        assert!(!audit.stable_branch_association);
+        assert!(!audit.within_finite_class_diameter);
+        incomplete.responses = vec![Some(ComplexResponse::new(0.0, 0.0).unwrap())];
+        incomplete.branch_ids = vec![Some("branch".to_owned())];
+    }
+
+    #[test]
+    fn response_signature_cluster_audit_is_bounded_and_fail_closed() {
+        assert_eq!(
+            audit_response_signature_cluster(&[], 1.0),
+            Err(ContractError::EmptyResponseSignatureCluster)
+        );
+        let signatures = (0..=MAX_RESPONSE_SIGNATURE_CLUSTER_MEMBERS)
+            .map(|_| make_kinetic_response_signature(0.0, "contract", "class", Some("branch")))
+            .collect::<Vec<_>>();
+        assert_eq!(
+            audit_response_signature_cluster(&signatures, 1.0),
+            Err(ContractError::ResponseSignatureClusterWorkBudgetExceeded)
+        );
+        let one = [make_kinetic_response_signature(0.0, "contract", "class", Some("branch"))];
+        assert!(audit_response_signature_cluster(&one, f64::NAN).is_err());
     }
 
     #[test]
