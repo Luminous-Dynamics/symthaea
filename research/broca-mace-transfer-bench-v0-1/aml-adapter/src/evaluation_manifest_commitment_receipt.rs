@@ -150,6 +150,8 @@ pub struct VerifiedEvaluationManifestCommitmentV1 {
     anchor_log_id: String,
     anchor_entry_id: String,
     witness_profile_sha256: String,
+    candidate_access_profile_sha256: String,
+    reveal_protocol_sha256: String,
 }
 
 impl VerifiedEvaluationManifestCommitmentV1 {
@@ -209,6 +211,17 @@ impl VerifiedEvaluationManifestCommitmentV1 {
         &self.witness_profile_sha256
     }
 }
+
+    /// Candidate-access profile committed by the witness and checked against
+    /// the consumer-owned runner/custody profile.
+    pub fn candidate_access_profile_sha256(&self) -> &str {
+        &self.candidate_access_profile_sha256
+    }
+
+    /// Reveal protocol committed before candidate execution.
+    pub fn reveal_protocol_sha256(&self) -> &str {
+        &self.reveal_protocol_sha256
+    }
 
 pub fn parse_and_verify_evaluation_manifest_commitment_receipt_v1(
     wire: &[u8],
@@ -390,6 +403,8 @@ pub fn validate_evaluation_manifest_commitment_receipt_v1(
         anchor_log_id: receipt.payload.anchor_log_id.clone(),
         anchor_entry_id: receipt.payload.anchor_entry_id.clone(),
         witness_profile_sha256: receipt.attestation.witness_profile_sha256.clone(),
+        candidate_access_profile_sha256: receipt.payload.candidate_access_profile_sha256.clone(),
+        reveal_protocol_sha256: receipt.payload.reveal_protocol_sha256.clone(),
     })
 }
 
@@ -688,6 +703,37 @@ mod tests {
         fixture.verify(250, &expected, &AcceptLog).unwrap()
     }
 
+    pub(super) fn verified_fixture_capability_with_bindings(
+        episode_root: &str,
+        sealed_digest: &str,
+        assignment_root: &str,
+        preregistration_root: &str,
+        artifacts_root: &str,
+        candidate_access_profile: &str,
+        reveal_protocol: &str,
+    ) -> VerifiedEvaluationManifestCommitmentV1 {
+        let mut fixture = fixture();
+        fixture.episode_manifest_root_sha256 = episode_root.to_owned();
+        fixture.sealed_evaluation_manifest_sha256 = sealed_digest.to_owned();
+        fixture.arm_assignment_root_sha256 = assignment_root.to_owned();
+        fixture.pre_registration_root_sha256 = preregistration_root.to_owned();
+        fixture.sealed_artifacts_root_sha256 = artifacts_root.to_owned();
+        fixture.candidate_access_profile_sha256 = candidate_access_profile.to_owned();
+        fixture.reveal_protocol_sha256 = reveal_protocol.to_owned();
+
+        fixture.receipt.payload.episode_manifest_root_sha256 = episode_root.to_owned();
+        fixture.receipt.payload.sealed_evaluation_manifest_sha256 = sealed_digest.to_owned();
+        fixture.receipt.payload.arm_assignment_root_sha256 = assignment_root.to_owned();
+        fixture.receipt.payload.pre_registration_root_sha256 = preregistration_root.to_owned();
+        fixture.receipt.payload.sealed_artifacts_root_sha256 = artifacts_root.to_owned();
+        fixture.receipt.payload.candidate_access_profile_sha256 = candidate_access_profile.to_owned();
+        fixture.receipt.payload.reveal_protocol_sha256 = reveal_protocol.to_owned();
+        fixture.resign();
+
+        let expected = fixture.expected();
+        fixture.verify(250, &expected, &AcceptLog).unwrap()
+    }
+
     #[test]
     fn valid_witness_requires_signature_and_log_inclusion() {
         let fixture = fixture();
@@ -801,4 +847,25 @@ pub(crate) fn test_verified_evaluation_manifest_commitment_with_episode_root_v1(
     root: &str,
 ) -> VerifiedEvaluationManifestCommitmentV1 {
     tests::verified_fixture_capability_with_episode_root(root)
+}
+
+#[cfg(test)]
+pub(crate) fn test_verified_evaluation_manifest_commitment_v1_with_bindings(
+    episode_root: &str,
+    sealed_digest: &str,
+    assignment_root: &str,
+    preregistration_root: &str,
+    artifacts_root: &str,
+    candidate_access_profile: &str,
+    reveal_protocol: &str,
+) -> VerifiedEvaluationManifestCommitmentV1 {
+    tests::verified_fixture_capability_with_bindings(
+        episode_root,
+        sealed_digest,
+        assignment_root,
+        preregistration_root,
+        artifacts_root,
+        candidate_access_profile,
+        reveal_protocol,
+    )
 }
