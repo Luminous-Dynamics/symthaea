@@ -1,8 +1,9 @@
 # Symthaea SAT Reference Model
 
 An independent, dependency-free Rust oracle for a narrow subset of the
-Sovereignty Assurance Tournament (SAT): exact-effect capability scope,
-delegation attenuation, lineage revocation and validity windows.
+Sovereignty Assurance Tournament (SAT): purpose-bound effect scopes covering action, resource, sink, purpose, parameter
+digest and payload labels; delegation attenuation, lineage revocation and
+validity windows.
 
 ## Run
 
@@ -20,15 +21,26 @@ The crate is included by the root workspace's `crates/core/*` member glob.
 
 This is a **reference model for tests**, not production authorization code.
 It does not authenticate root issuers, verify signatures, canonicalize or hash
-effect parameters, persist revocation state, obtain trusted time, fence an
+effect parameters, establish payload-label provenance, perform declassification
+or content inspection, persist revocation state, obtain trusted time, fence an
 external sink, or provide process isolation. Root grants are trusted fixture
 inputs. Production authority and evidence adapters must remain independently
 implemented and must be checked against this oracle rather than delegating
 their trust decisions to it.
 
 The authority API has no model-intelligence, confidence, consciousness,
-collective-score or reputation parameter. An exact grant binds action,
-resource and an opaque digest of canonical operation parameters.
+collective-score or reputation parameter. A grant binds action, resource, sink,
+purpose and an opaque digest of canonical operation parameters; payload labels
+must be contained by its scope. Labels remain caller-supplied evidence, not
+verified facts.
+
+Closest research comparator: [DelegateGuard (2026)](https://arxiv.org/abs/2610.16005).
+This reference model is intentionally a narrow Rust conformance oracle, not a
+claim to originate purpose-bound capability enforcement. The paper's key
+limitation also applies here: a capability check cannot decide whether
+sensitive content is safe to disclose through an otherwise authorized,
+externally observable sink. That requires separately qualified content
+governance or declassification.
 
 Unknown external mutation outcomes and retry/reconciliation semantics remain
 owned by Symtropy MISSION-SUPERVISOR-001 (#6498) and the authority-linearized
