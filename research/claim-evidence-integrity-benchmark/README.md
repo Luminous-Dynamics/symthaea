@@ -71,7 +71,25 @@ A source family identifies common origin, syndication or copied lineage. Three m
 
 - `fixtures/claim-evidence-integrity-v0.1.json`: 15 known-answer synthetic fixtures.
 - `schemas/claim-evidence-integrity-v0.1.schema.json`: strict JSON Schema.
-- Every synthetic evidence artifact includes an SHA-256 digest of its exact text and a byte span for the quoted passage.
+- `src/lib.rs`: deterministic validator for keys, fixture identity, timestamps, exact quote byte spans and artifact SHA-256.
+- `src/bin/validate.rs`: validation CLI and negative-control self-test.
+- `Cargo.lock`: pinned standalone dependency resolution.
+- `.github/workflows/claim-evidence-integrity-benchmark.yml`: exact Rust 1.96 format/test/self-test/Clippy workflow.
+
+Every synthetic evidence artifact includes an SHA-256 digest of its exact text and a byte span for the quoted passage.
+
+## Local execution
+
+From the repository root:
+
+```bash
+cargo fmt --manifest-path research/claim-evidence-integrity-benchmark/Cargo.toml -- --check
+cargo test --manifest-path research/claim-evidence-integrity-benchmark/Cargo.toml --locked --all-targets
+cargo run --manifest-path research/claim-evidence-integrity-benchmark/Cargo.toml --locked -- --self-test
+cargo clippy --manifest-path research/claim-evidence-integrity-benchmark/Cargo.toml --locked --all-targets -- -D warnings
+```
+
+The self-test runs negative controls for modified artifact bytes, altered quote spans and duplicate fixture IDs. The validator proves pack integrity and contract shape only; it does not decide whether natural-language evidence entails a claim.
 
 ## Synthetic fixture families
 
