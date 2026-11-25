@@ -50,3 +50,10 @@ Decision confidence is self-reported. Runtime identity and evidence receipts are
 Every case carries one adjudicated basis: ClearPositive, ClearAbsence, AnnotatorDisagreement, TaskAmbiguity, SignalInsufficient or UnsupportedQuery. The evaluator checks the basis against the adjudicated truth state and reports reason correctness by basis. Annotator disagreement is not silently treated as sensor/signal insufficiency, and a not-estimable case cannot be relabelled as mere annotator disagreement.
 
 The basis is an adjudication label backed by a frozen policy digest; it is not independently authenticated by this adapter. Use #13560 to retain the underlying per-annotator evidence.
+
+
+### Counterfactual always-answer baseline
+
+Each case retains both the selected prediction and the unconditional pre-abstention candidate. Covered Answer/ClaimAbsent decisions must use the same prediction as this candidate; abstained cases can retain the candidate that the selective policy suppressed. The evaluator scores the unconditional candidate against the same truth to calculate a paired always-answer baseline. Random-abstention risk is the expected error rate when retaining those candidates independently of confidence. The output includes both predictions and both scorer records per case.
+
+The 10-case synthetic fixture has 2 correct unconditional candidates and 8 incorrect ones, so its always-answer and random-retention risk are 0.8. This is a deliberately adversarial evaluator control, not a performance result for Melothaea.
