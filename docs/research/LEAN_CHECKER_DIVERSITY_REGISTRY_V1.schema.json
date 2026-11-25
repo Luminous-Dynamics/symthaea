@@ -14,7 +14,9 @@
     "relationships",
     "common_mode_domains",
     "diversity_dimensions",
-    "claim_ceiling"
+    "claim_ceiling",
+    "scope",
+    "external_landscape"
   ],
   "properties": {
     "schema_version": {
@@ -256,6 +258,65 @@
       "items": {
         "type": "string",
         "minLength": 1
+      }
+    },
+    "scope": {
+      "const": "lake_comparator_paranoid_bundle_only"
+    },
+    "external_landscape": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "source_url",
+        "captured_date",
+        "snapshot_issue",
+        "visible_checker_count",
+        "reported_languages",
+        "downloadable_suite",
+        "round_status",
+        "note"
+      ],
+      "properties": {
+        "source_url": {
+          "type": "string",
+          "format": "uri"
+        },
+        "captured_date": {
+          "const": "2026-11-25"
+        },
+        "snapshot_issue": {
+          "type": "string",
+          "format": "uri"
+        },
+        "visible_checker_count": {
+          "const": 37
+        },
+        "reported_languages": {
+          "const": 15
+        },
+        "downloadable_suite": {
+          "type": "object",
+          "additionalProperties": false,
+          "required": [
+            "good_tests",
+            "bad_tests"
+          ],
+          "properties": {
+            "good_tests": {
+              "const": 138
+            },
+            "bad_tests": {
+              "const": 92
+            }
+          }
+        },
+        "round_status": {
+          "const": "mutable_current_round_not_archived"
+        },
+        "note": {
+          "type": "string",
+          "minLength": 1
+        }
       }
     }
   }
