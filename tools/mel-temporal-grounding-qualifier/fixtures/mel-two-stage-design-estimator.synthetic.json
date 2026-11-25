@@ -82,13 +82,26 @@
   "observed_audit_outcomes": [
     {
       "item_id": "work-a-query-1",
+      "source_work_id_sha256": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+      "scoring_report_sha256": "3333333333333333333333333333333333333333333333333333333333333333",
+      "model_identity_sha256": "1111111111111111111111111111111111111111111111111111111111111111",
+      "evaluator_version": "mel-grounding-model-eval-v1",
+      "scoring_plan_sha256": "2222222222222222222222222222222222222222222222222222222222222222",
       "metric_id": "grounded-event-correct",
       "value_ppm": 750000
     },
     {
       "item_id": "work-a-query-2",
+      "source_work_id_sha256": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+      "scoring_report_sha256": "4444444444444444444444444444444444444444444444444444444444444444",
+      "model_identity_sha256": "1111111111111111111111111111111111111111111111111111111111111111",
+      "evaluator_version": "mel-grounding-model-eval-v1",
+      "scoring_plan_sha256": "2222222222222222222222222222222222222222222222222222222222222222",
       "metric_id": "grounded-event-correct",
       "value_ppm": 250000
     }
-  ]
+  ],
+  "model_identity_sha256": "1111111111111111111111111111111111111111111111111111111111111111",
+  "evaluator_version": "mel-grounding-model-eval-v1",
+  "scoring_plan_sha256": "2222222222222222222222222222222222222222222222222222222222222222"
 }
