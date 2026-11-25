@@ -407,6 +407,125 @@ pub fn diagonal_observation_trace(
     }
 }
 
+
+/// Result of selecting a sensor that separates competing hidden-state models.
+#[derive(Debug, Clone, Copy, PartialEq)]
+pub struct SensorSelection {
+    /// Zero-based index into the caller's candidate-sensor list.
+    pub candidate_index: usize,
+    /// Minimum pairwise prediction distance across all model hypotheses.
+    pub minimum_pairwise_separation: f64,
+    /// Sum of pairwise prediction distances across all model hypotheses.
+    pub total_pairwise_separation: f64,
+}
+
+/// Select a unit-norm sensor that best separates competing diagonal two-state models.
+///
+/// All candidate sensors are normalized to unit Euclidean norm, so a sensor
+/// cannot win merely by multiplying its gain. The objective is lexicographic:
+/// maximize the minimum pairwise prediction separation, then total separation.
+/// This is a tiny deterministic active-measurement reference control, not a
+/// general Bayesian experimental-design algorithm. Equal sensor noise/cost is
+/// assumed; real experiments must model both explicitly.
+pub fn select_discriminating_sensor(
+    visible_eigenvalue: f64,
+    hidden_eigenvalues: &[f64],
+    initial_state: [f64; 2],
+    candidate_sensors: &[[f64; 2]],
+    steps: usize,
+    minimum_separation: f64,
+) -> Result<Option<SensorSelection>, &'static str> {
+    if !finite(&[
+        visible_eigenvalue,
+        initial_state[0],
+        initial_state[1],
+        minimum_separation,
+    ]) || hidden_eigenvalues.iter().any(|value| !value.is_finite())
+        || candidate_sensors.iter().flatten().any(|value| !value.is_finite())
+    {
+        return Err("experiment-design inputs must be finite");
+    }
+    if hidden_eigenvalues.len() < 2 {
+        return Err("at least two competing hidden models are required");
+    }
+    if candidate_sensors.is_empty() {
+        return Err("at least one candidate sensor is required");
+    }
+    if steps == 0 {
+        return Err("experiment horizon must be nonzero");
+    }
+    if minimum_separation < 0.0 {
+        return Err("minimum separation must be nonnegative");
+    }
+
+    let mut best: Option<SensorSelection> = None;
+    for (candidate_index, candidate) in candidate_sensors.iter().enumerate() {
+        let norm = candidate[0].hypot(candidate[1]);
+        if !norm.is_finite() || norm == 0.0 {
+            return Err("candidate sensor must have a finite nonzero norm");
+        }
+        let sensor = [candidate[0] / norm, candidate[1] / norm];
+        let mut traces = Vec::with_capacity(hidden_eigenvalues.len());
+        for hidden_eigenvalue in hidden_eigenvalues {
+            traces.push(diagonal_observation_trace(
+                visible_eigenvalue,
+                *hidden_eigenvalue,
+                initial_state[0],
+                initial_state[1],
+                sensor[0],
+                sensor[1],
+                steps,
+            )?);
+        }
+
+        let mut minimum_pairwise_separation = f64::INFINITY;
+        let mut total_pairwise_separation = 0.0;
+        for left in 0..traces.len() {
+            for right in (left + 1)..traces.len() {
+                let mut squared_distance = 0.0;
+                for (left_value, right_value) in traces[left].iter().zip(&traces[right]) {
+                    let difference = left_value - right_value;
+                    squared_distance += difference * difference;
+                }
+                let distance = squared_distance.sqrt();
+                if !distance.is_finite() {
+                    return Err("prediction separation overflowed");
+                }
+                minimum_pairwise_separation =
+                    minimum_pairwise_separation.min(distance);
+                total_pairwise_separation += distance;
+            }
+        }
+        if !total_pairwise_separation.is_finite() {
+            return Err("total prediction separation overflowed");
+        }
+
+        let candidate_result = SensorSelection {
+            candidate_index,
+            minimum_pairwise_separation,
+            total_pairwise_separation,
+        };
+        let should_replace = match best {
+            None => true,
+            Some(current) => {
+                candidate_result.minimum_pairwise_separation
+                    > current.minimum_pairwise_separation
+                    || (candidate_result.minimum_pairwise_separation
+                        == current.minimum_pairwise_separation
+                        && candidate_result.total_pairwise_separation
+                            > current.total_pairwise_separation)
+            }
+        };
+        if should_replace {
+            best = Some(candidate_result);
+        }
+    }
+
+    Ok(best.filter(|selection| {
+        selection.minimum_pairwise_separation > minimum_separation
+    }))
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -618,6 +737,52 @@ mod tests {
             input_regressor_rank_2d(&[[1e-8, 0.0], [0.0, 1e-8]], 1e-12).unwrap(),
             MatrixRank::Two
         );
+    }
+
+    #[test]
+    fn active_sensor_selection_prefers_sensor_that_separates_hidden_models() {
+        let selected = select_discriminating_sensor(
+            0.5,
+            &[0.2, 0.9],
+            [1.0, 1.0],
+            &[[1.0, 0.0], [0.0, 5.0]],
+            8,
+            1e-12,
+        )
+        .unwrap()
+        .unwrap();
+        assert_eq!(selected.candidate_index, 1);
+        assert!(selected.minimum_pairwise_separation > 0.0);
+        assert!(selected.total_pairwise_separation > 0.0);
+    }
+
+    #[test]
+    fn active_sensor_selection_abstains_when_no_candidate_separates_models() {
+        let selected = select_discriminating_sensor(
+            0.5,
+            &[0.2, 0.9],
+            [1.0, 1.0],
+            &[[1.0, 0.0]],
+            8,
+            1e-12,
+        )
+        .unwrap();
+        assert!(selected.is_none());
+    }
+
+    #[test]
+    fn active_sensor_selection_is_invariant_to_sensor_gain() {
+        let selected = select_discriminating_sensor(
+            0.5,
+            &[0.2, 0.9],
+            [1.0, 1.0],
+            &[[0.0, 1.0], [0.0, 10.0]],
+            8,
+            1e-12,
+        )
+        .unwrap()
+        .unwrap();
+        assert_eq!(selected.candidate_index, 0);
     }
 
     #[test]
