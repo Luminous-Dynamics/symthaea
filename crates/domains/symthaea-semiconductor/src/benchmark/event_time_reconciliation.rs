@@ -810,16 +810,16 @@ mod tests {
         };
         let correction = envelope(
             "c1",
-            110,
-            115,
+            118,
+            119,
             2,
             StreamingReconstructionPayloadV1::EligibilityCorrection {
                 sample_id: "s1".into(),
                 label_id: "l1".into(),
                 label_revision: 1,
                 measurement_event_id: "m1".into(),
-                effective_at_unix_seconds: 105,
-                report_available_at_unix_seconds: 110,
+                effective_at_unix_seconds: 117,
+                report_available_at_unix_seconds: 118,
                 report: corrected,
             },
         );
