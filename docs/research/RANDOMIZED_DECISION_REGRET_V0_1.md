@@ -135,6 +135,19 @@ A next-generation system should:
 
 This is a decision-sufficient, evidence-carrying world model—not a claim that one model architecture dominates every task.
 
+## 7A. Existing randomized-mixture work: do not duplicate the optimizer
+
+The repository already has a randomized minimax policy-frontier programme in #8646 (with the benchmark work in #8493). Its recorded horizon-two experiment found only a negligible average randomized-mixture gain on the tested grid (0.000064 bits). Its column-generation path was approximately 2.56× slower than exhaustive-frontier plus LP over the reported 36-case aggregate. Epsilon-frontier pruning reduced the largest horizon-two kernel frontier from 450 to 131 at epsilon 0.01, with no observed regret on that tested grid; the issue explicitly does not claim a general regret theorem.
+
+This materially changes the implementation boundary:
+
+- #13592 measures any supplied stochastic action distribution over candidate-observationally-equivalent worlds. It is not a randomized policy optimizer.
+- #8646 remains the owner of randomized minimax mixture optimization, frontier pruning and the approximation-error proof obligation.
+- Future integration should feed #8646's selected mixture into this evaluator and compare its exact expected-regret certificate against deterministic, direct/no-model, and learned stochastic policies.
+- A uniform mixture's improvement in the two-world semantic fixture is an arithmetic sanity check only. It is not evidence that stochastic mixtures improve real tasks or that the minimax solver is useful on the target benchmark.
+
+The next research question is not "can we randomize?" but "does the particular uncertainty set and individual-effect task distribution contain a real robust decision improvement after the full compute/runtime cost of mixture construction?" The benchmark must report the solver's certified/actual regret gap, policy support, query/compute cost and comparison with exhaustive-frontier plus LP. Do not create a second solver in this PR.
+
 ## 8. Ownership and non-claims
 
 - #13520: individual-effect arithmetic.
@@ -144,6 +157,8 @@ This is a decision-sufficient, evidence-carrying world model—not a claim that 
 - #13239/#13152 and existing decision-observability modules: deterministic decision sufficiency and regret.
 - #9094 (CMAQ-011) owns the external decision-centric benchmark bridge; #9289 (CMAQ-013) owns causal advantage-of-prediction/sham-model controls; #9396 (CMAQ-016) owns optimizer exploitability. This PR adds a randomized-policy scoring lane for those programmes; it does not replace their environment adapters or broad benchmark ownership.
 - #10693 (HLB-002) owns HDC/CfC neuron correctness and gradient qualification. Its one-step-vs-sequence-BPTT boundary must be resolved before any HDC/LTC temporal trainer result is described as sequence-level learning.
+- #8646/#8493: randomized minimax policy-frontier/mixture optimization and epsilon-pruning claims. This PR only scores supplied mixed policies; it does not duplicate that optimizer.
+- #11105: robust discounted state-action-rectangular MDP LPs; a distinct model/uncertainty semantics.
 - #9437: candidate/evaluator process isolation.
 - #8578: independent-cluster inference.
 
