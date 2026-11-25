@@ -517,6 +517,44 @@ mod tests {
     }
 
     #[test]
+    fn episode_membership_requires_the_exact_witnessed_root_and_digest() {
+        let manifest = fixture_manifest("episode-a");
+        let manifest_sha256 = frozen_decision_episode_manifest_sha256_v1(&manifest).unwrap();
+        let set = verify_frozen_decision_episode_set_v1(&[manifest.clone()]).unwrap();
+        let witness =
+            crate::evaluation_manifest_commitment_receipt::test_verified_evaluation_manifest_commitment_with_episode_root_v1(
+                set.root_sha256(),
+            );
+        let membership = set
+            .bind_episode(&manifest.episode_id, &manifest_sha256, &witness)
+            .unwrap();
+        assert_eq!(membership.episode_id(), "episode-a");
+        assert_eq!(membership.manifest_sha256(), manifest_sha256);
+        assert_eq!(membership.episode_set_root_sha256(), witness.episode_manifest_root_sha256());
+
+        let wrong_digest = digest('0');
+        assert_eq!(
+            set.bind_episode(&manifest.episode_id, &wrong_digest, &witness),
+            Err(FrozenDecisionEpisodeManifestRejectV1::EpisodeNotInWitnessedSet)
+        );
+    }
+
+    #[test]
+    fn episode_set_root_must_match_detached_witness() {
+        let manifest = fixture_manifest("episode-a");
+        let set = verify_frozen_decision_episode_set_v1(&[manifest]).unwrap();
+        let wrong_root = digest('0');
+        let witness =
+            crate::evaluation_manifest_commitment_receipt::test_verified_evaluation_manifest_commitment_with_episode_root_v1(
+                &wrong_root,
+            );
+        assert_eq!(
+            set.verify_against_witness(&witness),
+            Err(FrozenDecisionEpisodeManifestRejectV1::EpisodeSetRootMismatch)
+        );
+    }
+
+    #[test]
     fn malformed_digest_and_unknown_json_fields_are_rejected() {
         let mut a = fixture_manifest("episode-a");
         a.task.task_input_sha256 = "not-a-digest".to_owned();
