@@ -5059,11 +5059,17 @@ pub fn solve_small_positive_mass_response_qp(
                         return Err(ContractError::PositivityProjectionArithmeticOverflow);
                     }
                     if slope > 0.0 {
-                        lower_lambda =
-                            lower_lambda.max((-1.0e-10 - base) / slope);
+                        let bound = (-1.0e-10 - base) / slope;
+                        if !bound.is_finite() {
+                            return Err(ContractError::PositivityProjectionArithmeticOverflow);
+                        }
+                        lower_lambda = lower_lambda.max(bound);
                     } else if slope < 0.0 {
-                        upper_lambda =
-                            upper_lambda.min((-1.0e-10 - base) / slope);
+                        let bound = (-1.0e-10 - base) / slope;
+                        if !bound.is_finite() {
+                            return Err(ContractError::PositivityProjectionArithmeticOverflow);
+                        }
+                        upper_lambda = upper_lambda.min(bound);
                     } else if base < -1.0e-10 {
                         dual_interval_feasible = false;
                         break;
@@ -5076,7 +5082,7 @@ pub fn solve_small_positive_mass_response_qp(
                     lower_lambda.is_finite(),
                     upper_lambda.is_finite(),
                 ) {
-                    (true, true) => 0.5 * (lower_lambda + upper_lambda),
+                    (true, true) => 0.5 * lower_lambda + 0.5 * upper_lambda,
                     (true, false) => lower_lambda,
                     (false, true) => upper_lambda,
                     (false, false) => 0.0,
