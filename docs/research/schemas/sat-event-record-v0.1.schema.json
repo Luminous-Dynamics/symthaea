@@ -7,6 +7,7 @@
   "required": [
     "schema_version",
     "run_id",
+    "manifest_digest",
     "event_id",
     "sequence",
     "occurred_at",
@@ -457,6 +458,9 @@
           "minLength": 1
         }
       }
+    },
+    "manifest_digest": {
+      "$ref": "#/$defs/digest"
     }
   },
   "$defs": {
