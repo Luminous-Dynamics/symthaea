@@ -9,3 +9,4 @@ description = "Independent strict event-trace integrity and effect-reconciliatio
 serde = { workspace = true }
 serde_json = { workspace = true }
 sha2 = { workspace = true }
+chrono = { workspace = true }
