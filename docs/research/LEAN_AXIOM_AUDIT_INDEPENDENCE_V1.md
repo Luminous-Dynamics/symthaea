@@ -15,12 +15,13 @@ The current source pair is:
 - [Module A](../../scripts/research/lean-proof-extractor/axiom-audit-imported-inductive/A.lean): defines `pick := Classical.choice ...` and `S9`, whose field type depends on `pick`; records native axiom output at the defining module.
 - [Module B](../../scripts/research/lean-proof-extractor/axiom-audit-imported-inductive/B.lean): imports A and the `And.comm` proof-action module, records native `#print axioms` output, and runs a separate fresh per-root dependency walk.
 
-The audited roots are intentionally paired:
+The audited roots are intentionally divided into three dependency classes:
 
 | Roots | Expected fresh dependency set |
 |---|---|
 | `S9`, `S9.mk`, `usesS9` | exactly `{Classical.choice}` |
-| `And.comm`, `and_comm_split_iff`, `and_comm_forward`, `and_comm_reverse`, `and_comm_plan_replay` | empty |
+| `auditDirectAxiom`, `auditTransitiveAxiom`, `usesTransitiveAxiom` | exactly `{auditDirectAxiom}` |
+| `Even`, `Odd`, `Even.succ`, `Odd.succ`, `And.comm`, `and_comm_split_iff`, `and_comm_forward`, `and_comm_reverse`, `and_comm_plan_replay` | empty |
 
 The same exact expected set is required for each root. An unresolved constant is retained by name and makes the exact-set assertion fail. It must never silently become an empty dependency result.
 
@@ -43,7 +44,7 @@ The focused workflow pins both source hashes, the Lean toolchain, Lean core revi
 
 Native `#print axioms` is recorded as a comparison channel only. A native “does not depend on any axioms” line is not by itself accepted as evidence of a complete trust closure.
 
-The expected receipt has eight roots: three positive controls with exactly `Classical.choice`, and five roots with an empty set. The run must fail if any root is unresolved, contains an additional axiom, or omits the expected one.
+The expected receipt has fifteen roots: three roots with exactly `Classical.choice`, three roots with exactly the custom `auditDirectAxiom`, and nine roots with an empty set. Each root is audited twice in opposite root orders; the log must contain identical exact sets. The run must fail if any root is unresolved, contains an additional axiom, or omits the expected one.
 
 ## 5. Acceptance targets
 
