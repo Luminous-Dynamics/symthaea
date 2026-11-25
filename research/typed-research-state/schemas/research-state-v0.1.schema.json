@@ -387,6 +387,7 @@
         "canonical_source_ref",
         "published_at",
         "captured_at",
+        "source_role",
         "source_lineage",
         "integrity_status",
         "correction_status",
@@ -474,6 +475,15 @@
             "CAPTURED",
             "DIGEST_MISMATCH",
             "UNATTRIBUTED"
+          ]
+        },
+        "source_role": {
+          "enum": [
+            "UNKNOWN",
+            "PRIMARY",
+            "SECONDARY",
+            "REGISTRY",
+            "SYNDICATED"
           ]
         }
       }
