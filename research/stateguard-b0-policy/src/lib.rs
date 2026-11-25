@@ -164,10 +164,7 @@ fn need_for_claim(
         let retrieval = get_str(item, "retrieval_state").unwrap_or("UNKNOWN");
         let integrity = get_str(item, "integrity_status").unwrap_or("UNKNOWN");
         let correction = get_str(item, "correction_status").unwrap_or("UNKNOWN");
-        if retrieval != "CAPTURED"
-            || integrity != "CLEAN"
-            || ["CORRECTED", "RETRACTED", "SUPERSEDED"].contains(&correction)
-        {
+        if retrieval != "CAPTURED" || integrity != "CLEAN" || correction != "NONE" {
             let evidence_id = get_str(item, "evidence_id").map(str::to_owned);
             let source_changed = ["CORRECTED", "RETRACTED", "SUPERSEDED"].contains(&correction);
             return Some(PolicyNeed {
@@ -181,6 +178,8 @@ fn need_for_claim(
                 ],
                 reason_codes: vec![if source_changed {
                     "SOURCE_CORRECTED_RETRACTED_OR_SUPERSEDED".to_owned()
+                } else if correction == "UNKNOWN" {
+                    "SOURCE_CORRECTION_STATUS_NOT_YET_VERIFIED".to_owned()
                 } else if integrity == "UNKNOWN" || retrieval != "CAPTURED" {
                     "ARTIFACT_NOT_YET_CAPTURED_AND_INTEGRITY_VERIFIED".to_owned()
                 } else {
@@ -597,6 +596,9 @@ mod tests {
             if item["integrity_status"] == "UNKNOWN" {
                 item["integrity_status"] = Value::String("CLEAN".to_owned());
             }
+            if item["correction_status"] == "UNKNOWN" {
+                item["correction_status"] = Value::String("NONE".to_owned());
+            }
         }
         let evidence = state["evidence"].as_array().unwrap().clone();
         let episode = get_str(&state, "research_episode_id").unwrap().to_owned();
@@ -699,6 +701,28 @@ mod tests {
         assert_eq!(
             decision.reason_codes,
             vec!["ARTIFACT_NOT_YET_CAPTURED_AND_INTEGRITY_VERIFIED"]
+        );
+    }
+
+    #[test]
+    fn unknown_correction_status_must_be_resolved_before_claim_use() {
+        let mut state: Value = serde_json::from_str(&artifact_verified_state(0)).unwrap();
+        state["evidence"][0]["correction_status"] = Value::String("UNKNOWN".to_owned());
+        let input = input(
+            state.to_string(),
+            vec![offer(
+                "check-source-corrections",
+                ActionKind::VerifyArtifact,
+                Some("claim-a"),
+                Some("ev-a1"),
+                &[("query_units", 0), ("experiment_units", 0), ("review_minutes", 1)],
+            )],
+        );
+        let decision = decide(&input).unwrap();
+        assert_eq!(decision.selected_offer_id.as_deref(), Some("check-source-corrections"));
+        assert_eq!(
+            decision.reason_codes,
+            vec!["SOURCE_CORRECTION_STATUS_NOT_YET_VERIFIED"]
         );
     }
 
