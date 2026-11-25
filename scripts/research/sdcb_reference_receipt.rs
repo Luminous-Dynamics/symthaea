@@ -13,10 +13,12 @@
 mod reference;
 
 use reference::{
-    adjacent_gap_ratios, classify_discrete_stability, continuous_time_hurwitz_2x2,
+    adjacent_gap_ratios, beta_bernoulli_mean, beta_bernoulli_update,
+    classify_discrete_stability, continuous_time_hurwitz_2x2,
     deterministic_codeword, hamming_distance, input_regressor_rank_2d,
     majority_bundle, observability_rank_2x2, prime_sieve, select_discriminating_sensor,
-    spectral_radius_2x2, symmetric_eigenvalues_2x2, xor_bind, xor_unbind,
+    select_bernoulli_ucb_arm, spectral_radius_2x2, symmetric_eigenvalues_2x2,
+    xor_bind, xor_unbind, BetaBernoulliPosterior,
     DiscreteStability, MatrixRank,
 };
 use std::env;
@@ -309,6 +311,51 @@ fn build_cases() -> Vec<CaseResult> {
         passed: sensor_gain_invariant
             .map(|selection| selection.map(|choice| choice.candidate_index) == Some(0))
             .unwrap_or(false),
+    });
+
+    let posterior = beta_bernoulli_update(1.0, 1.0, 3, 1);
+    cases.push(CaseResult {
+        id: "beta_bernoulli_conjugate_update",
+        passed: posterior
+            == Ok(BetaBernoulliPosterior {
+                alpha: 4.0,
+                beta: 2.0,
+            }),
+    });
+    cases.push(CaseResult {
+        id: "beta_bernoulli_posterior_mean",
+        passed: posterior
+            .and_then(beta_bernoulli_mean)
+            .map(|mean| (mean - (2.0 / 3.0)).abs() < 1e-12)
+            .unwrap_or(false),
+    });
+    let priors = [BetaBernoulliPosterior {
+        alpha: 1.0,
+        beta: 1.0,
+    }; 3];
+    cases.push(CaseResult {
+        id: "ucb_selects_first_untried_arm",
+        passed: select_bernoulli_ucb_arm(&priors, &[5, 0, 2], 1.0) == Ok(1),
+    });
+    let measured = [
+        BetaBernoulliPosterior {
+            alpha: 8.0,
+            beta: 2.0,
+        },
+        BetaBernoulliPosterior {
+            alpha: 3.0,
+            beta: 7.0,
+        },
+    ];
+    cases.push(CaseResult {
+        id: "ucb_greedy_limit_selects_best_mean",
+        passed: select_bernoulli_ucb_arm(&measured, &[20, 20], 0.0) == Ok(0),
+    });
+    cases.push(CaseResult {
+        id: "beta_ucb_invalid_input_rejected",
+        passed: beta_bernoulli_update(0.0, 1.0, 1, 0).is_err()
+            && select_bernoulli_ucb_arm(&[], &[], 1.0).is_err()
+            && select_bernoulli_ucb_arm(&priors, &[u64::MAX, 1, 0], 1.0).is_err(),
     });
 
     cases
