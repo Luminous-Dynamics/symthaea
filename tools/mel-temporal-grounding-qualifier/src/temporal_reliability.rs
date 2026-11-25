@@ -12,7 +12,8 @@ use std::collections::{BTreeMap, BTreeSet};
 use serde::{Deserialize, Serialize};
 
 use crate::temporal_consensus::{
-    audit_multi_annotator_case, IndependentTemporalAnnotationV1,
+    audit_multi_annotator_case, AnnotatorGroundingResultV1,
+    IndependentTemporalAnnotationV1, MultiAnnotatorGroundingSummaryV1,
     MultiAnnotatorTemporalCaseV1,
 };
 use crate::temporal_grounding::{
@@ -161,6 +162,34 @@ pub struct MultiAnnotatorReliabilityBootstrapV1 {
     pub boundary_tolerance_agreement: Vec<BoundaryToleranceBootstrapV1>,
 }
 
+/// Per-query model performance evaluated independently against every
+/// annotator through the #13560 adapter. This is deliberately separate from
+/// the annotator-vs-annotator reliability estimates.
+#[derive(Debug, Clone, PartialEq, Serialize)]
+pub struct ModelGroundingItemReliabilityV1 {
+    pub item_id: String,
+    pub query_id: String,
+    pub source_work_id_sha256: String,
+    pub summary: MultiAnnotatorGroundingSummaryV1,
+    pub annotator_results: Vec<AnnotatorGroundingResultV1>,
+}
+
+#[derive(Debug, Clone, PartialEq, Serialize)]
+pub struct ModelGroundingDatasetSummaryV1 {
+    pub query_items: usize,
+    pub source_work_clusters: usize,
+    pub present_items: usize,
+    pub one_to_many_items: usize,
+    pub absent_items: usize,
+    pub source_work_macro_present_mean_f1: Option<f64>,
+    pub source_work_macro_present_exact_count_accuracy: Option<f64>,
+    pub source_work_macro_one_to_many_count_gated_f1: Option<f64>,
+    pub source_work_macro_absent_claim_accuracy: Option<f64>,
+    pub source_work_macro_prediction_coverage: Option<f64>,
+    pub source_work_macro_fully_correct_rate: Option<f64>,
+    pub model_confidence_calibration_computed: bool,
+}
+
 #[derive(Debug, Clone, PartialEq, Serialize)]
 pub struct MultiAnnotatorReliabilityReportV1 {
     pub schema: &'static str,
@@ -168,6 +197,9 @@ pub struct MultiAnnotatorReliabilityReportV1 {
     pub dataset_id: String,
     pub annotation_policy_version: String,
     pub summary: MultiAnnotatorReliabilitySummaryV1,
+    /// Model-vs-each-human scores, kept separate from human-vs-human reliability.
+    pub model_grounding_summary: ModelGroundingDatasetSummaryV1,
+    pub model_grounding_by_item: Vec<ModelGroundingItemReliabilityV1>,
     pub bootstrap: Option<MultiAnnotatorReliabilityBootstrapV1>,
     pub pairwise_results: Vec<PairwiseAnnotationReliabilityV1>,
     pub item_count: usize,
@@ -195,13 +227,24 @@ pub fn audit_multi_annotator_dataset(
 
     let mut unique_annotators = BTreeSet::new();
     let mut pairwise_results = Vec::new();
+    let mut model_grounding_by_item = Vec::with_capacity(dataset.items.len());
     for item in &dataset.items {
         for annotation in &item.case.annotations {
             unique_annotators.insert(annotation.annotator_id_sha256.as_str());
         }
         pairwise_results.extend(pairwise_item_results(item)?);
+        let model_report = audit_multi_annotator_case(&item.case)
+            .map_err(|error| format!("item {} rejected by per-annotator model scorer: {error}", item.item_id))?;
+        model_grounding_by_item.push(ModelGroundingItemReliabilityV1 {
+            item_id: item.item_id.clone(),
+            query_id: item.case.query_id.clone(),
+            source_work_id_sha256: item.source_work_id_sha256.clone(),
+            summary: model_report.summary,
+            annotator_results: model_report.annotator_results,
+        });
     }
 
+    let model_grounding_summary = summarize_model_grounding(&model_grounding_by_item);
     let alpha = nominal_alpha(&dataset.items);
     let summary = summarize_dataset(
         &dataset.items,
@@ -232,6 +275,8 @@ pub fn audit_multi_annotator_dataset(
         dataset_id: dataset.dataset_id.clone(),
         annotation_policy_version: dataset.annotation_policy_version.clone(),
         summary,
+        model_grounding_summary,
+        model_grounding_by_item,
         bootstrap,
         pairwise_results,
         item_count: dataset.items.len(),
@@ -319,8 +364,6 @@ fn validate_dataset(dataset: &MultiAnnotatorReliabilityDatasetV1) -> Result<(), 
                 dataset.minimum_raters_per_item
             ));
         }
-        audit_multi_annotator_case(&item.case)
-            .map_err(|error| format!("item {} rejected by the per-annotator evaluator: {error}", item.item_id))?;
     }
     Ok(())
 }
@@ -529,6 +572,79 @@ fn nominal_alpha(items: &[MultiAnnotatorReliabilityItemV1]) -> KrippendorffAlpha
         ordered_coincidences: ordered_coincidences as usize,
         unordered_rater_pairs: unordered_rater_pairs as usize,
     }
+}
+
+fn summarize_model_grounding(
+    items: &[ModelGroundingItemReliabilityV1],
+) -> ModelGroundingDatasetSummaryV1 {
+    let clusters = items
+        .iter()
+        .map(|item| item.source_work_id_sha256.as_str())
+        .collect::<BTreeSet<_>>();
+    let present_items = items
+        .iter()
+        .filter(|item| item.summary.present_annotators > 0)
+        .count();
+    let one_to_many_items = items
+        .iter()
+        .filter(|item| item.summary.one_to_many_annotators > 0)
+        .count();
+    let absent_items = items
+        .iter()
+        .filter(|item| item.summary.absent_annotators > 0)
+        .count();
+    ModelGroundingDatasetSummaryV1 {
+        query_items: items.len(),
+        source_work_clusters: clusters.len(),
+        present_items,
+        one_to_many_items,
+        absent_items,
+        source_work_macro_present_mean_f1: mean_item_metric(
+            items,
+            |summary| summary.present_mean_f1,
+        ),
+        source_work_macro_present_exact_count_accuracy: mean_item_metric(
+            items,
+            |summary| summary.present_exact_count_accuracy,
+        ),
+        source_work_macro_one_to_many_count_gated_f1: mean_item_metric(
+            items,
+            |summary| summary.one_to_many_mean_count_gated_f1,
+        ),
+        source_work_macro_absent_claim_accuracy: mean_item_metric(
+            items,
+            |summary| summary.absent_claim_accuracy,
+        ),
+        source_work_macro_prediction_coverage: mean_item_metric(
+            items,
+            |summary| summary.prediction_coverage,
+        ),
+        source_work_macro_fully_correct_rate: mean_item_metric(
+            items,
+            |summary| summary.fully_correct_rate,
+        ),
+        model_confidence_calibration_computed: false,
+    }
+}
+
+fn mean_item_metric(
+    items: &[ModelGroundingItemReliabilityV1],
+    field: impl Fn(&MultiAnnotatorGroundingSummaryV1) -> Option<f64>,
+) -> Option<f64> {
+    let mut by_source_work: BTreeMap<&str, Vec<f64>> = BTreeMap::new();
+    for item in items {
+        if let Some(value) = field(&item.summary) {
+            by_source_work
+                .entry(item.source_work_id_sha256.as_str())
+                .or_default()
+                .push(value);
+        }
+    }
+    let source_means: Vec<_> = by_source_work
+        .values()
+        .filter_map(|values| mean(values))
+        .collect();
+    mean(&source_means)
 }
 
 fn cluster_boundary_tolerance(
