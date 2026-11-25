@@ -47,7 +47,8 @@
         "occurrence_count_disagreement_threshold_ppm",
         "minimum_prediction_coverage_ppm",
         "boundary_dispersion_threshold_ms",
-        "stratum_quotas"
+        "stratum_quotas",
+        "audit_items_per_source_work"
       ],
       "properties": {
         "schema": {
@@ -112,6 +113,10 @@
           "items": {
             "$ref": "#/$defs/quota"
           }
+        },
+        "audit_items_per_source_work": {
+          "type": "integer",
+          "minimum": 2
         }
       }
     },
