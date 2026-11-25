@@ -1,0 +1,99 @@
+{
+  "benchmark": "sfeb-mon007-semantic-assurance-model-v1",
+  "runs": 5,
+  "runtime": "v22.16.0",
+  "platform": "linux-6.18.57",
+  "architecture": "x64",
+  "logicalCpuCount": 3,
+  "iterationsPerRun": 30000,
+  "samplesPerRun": 30,
+  "warmupPerRun": 3000,
+  "all_runs_verified": true,
+  "throughput_ops_per_second": {
+    "runs": [
+      39768,
+      38208,
+      37314,
+      36847,
+      40483
+    ],
+    "median": 38208,
+    "range": [
+      36847,
+      40483
+    ]
+  },
+  "per_evaluation_ms": {
+    "p50_median_across_runs": 0.024556,
+    "p95_median_across_runs": 0.033526,
+    "p99_median_across_runs": 0.044903
+  },
+  "run_details": [
+    {
+      "iterations": 30000,
+      "samples": 30,
+      "warmup": 3000,
+      "verified": 30000,
+      "wallMs": 754.378,
+      "throughputOpsPerSecond": 39768,
+      "perEvaluationMs": {
+        "p50": 0.024217,
+        "p95": 0.034763,
+        "p99": 0.040298
+      }
+    },
+    {
+      "iterations": 30000,
+      "samples": 30,
+      "warmup": 3000,
+      "verified": 30000,
+      "wallMs": 785.166,
+      "throughputOpsPerSecond": 38208,
+      "perEvaluationMs": {
+        "p50": 0.024556,
+        "p95": 0.030484,
+        "p99": 0.046103
+      }
+    },
+    {
+      "iterations": 30000,
+      "samples": 30,
+      "warmup": 3000,
+      "verified": 30000,
+      "wallMs": 803.997,
+      "throughputOpsPerSecond": 37314,
+      "perEvaluationMs": {
+        "p50": 0.025028,
+        "p95": 0.039529,
+        "p99": 0.043765
+      }
+    },
+    {
+      "iterations": 30000,
+      "samples": 30,
+      "warmup": 3000,
+      "verified": 30000,
+      "wallMs": 814.185,
+      "throughputOpsPerSecond": 36847,
+      "perEvaluationMs": {
+        "p50": 0.02574,
+        "p95": 0.033526,
+        "p99": 0.048061
+      }
+    },
+    {
+      "iterations": 30000,
+      "samples": 30,
+      "warmup": 3000,
+      "verified": 30000,
+      "wallMs": 741.051,
+      "throughputOpsPerSecond": 40483,
+      "perEvaluationMs": {
+        "p50": 0.023606,
+        "p95": 0.0332,
+        "p99": 0.044903
+      }
+    }
+  ],
+  "scope": "Pure in-process semantic model only; excludes signatures, CBOR/COSE, Merkle proofs, network, storage, source/sink adapters and external readback. Not comparable to product/SOTA throughput."
+}

@@ -1,0 +1,103 @@
+{
+  "schema": "sfeb-mon007-go-preflight-report-v2",
+  "date": "2026-11-25",
+  "implementation": "Go standard library only",
+  "goVersion": "go1.23.2",
+  "platform": "linux/amd64",
+  "hostCPU": "AMD EPYC 9V74",
+  "benchmarkParallelism": 3,
+  "testEvidence": {
+    "testFunctionsPerSuite": 29,
+    "suiteRepetitions": 3,
+    "externalEffectSemanticTests": 18,
+    "rfc9162InclusionTests": 5,
+    "rfc9162ConsistencyTests": 6,
+    "inclusionProofChecks": 32896,
+    "consistencyProofChecks": 32640,
+    "totalGeneratedMerkleProofChecks": 65536,
+    "rfc9162Section215WorkedExamples": 3,
+    "goTest": "passed",
+    "goTestRace": "passed",
+    "goVet": "passed",
+    "externalEffectStatementCoveragePercent": 72.9,
+    "rfc9162StatementCoveragePercent": 95.5,
+    "inclusionVerifierStatementCoveragePercent": 100,
+    "consistencyVerifierStatementCoveragePercent": 100,
+    "sharedGoldenVectors": 9,
+    "javascriptStatusesAndReasonCodesMatch": true
+  },
+  "microbenchmarks": {
+    "runsPerCase": 5,
+    "benchtime": "300ms",
+    "bytesPerOperation": 0,
+    "allocationsPerOperation": 0,
+    "consistency": {
+      "16_to_256_ns_per_op": [
+        537.7,
+        524.3,
+        534.5,
+        537.3,
+        526.2
+      ],
+      "16_to_256_median_ns_per_op": 534.5,
+      "256_to_4096_ns_per_op": [
+        532.8,
+        521,
+        541.7,
+        523.5,
+        529.3
+      ],
+      "256_to_4096_median_ns_per_op": 529.3,
+      "4096_to_65536_ns_per_op": [
+        528.9,
+        527.5,
+        537.8,
+        521.5,
+        525.5
+      ],
+      "4096_to_65536_median_ns_per_op": 527.5
+    },
+    "inclusion": {
+      "tree_16_ns_per_op": [
+        525.9,
+        533.9,
+        525.7,
+        516.5,
+        529.7
+      ],
+      "tree_16_median_ns_per_op": 525.9,
+      "tree_256_ns_per_op": [
+        1060,
+        1045,
+        1067,
+        1044,
+        1046
+      ],
+      "tree_256_median_ns_per_op": 1046,
+      "tree_4096_ns_per_op": [
+        1576,
+        1564,
+        1566,
+        1548,
+        1541
+      ],
+      "tree_4096_median_ns_per_op": 1564
+    }
+  },
+  "sourceFiles": {
+    "README.md": "b6d655ce1d19b4e417c21872b426e05b3d1226daac94c097f2f0d906de2b9014",
+    "sfeb-action-assurance-model-v1.mjs": "6588459c94abf588ccf9cf563320303b4667382785117795c6c6cdbfb4b138ba",
+    "sfeb-action-assurance-model-v1.test.mjs": "12b50717eddd48738ffdb2dfffb390279eb3499c00e8b550e9fc6604a4b594d6",
+    "benchmark.mjs": "0ee1ba750edc4ea761128af3d2f4138ea0c2cfa89f73ffe6b8d84f469e46a5bb",
+    "go/README.md": "6e2b338c81de42abef181fae78dacc2298b0bf9ed5751b39869f4054898f8150",
+    "go/go.mod": "404469a25027b324c4728c03c17d27917f5214c3fda0781f29fd48fb2f8bba44",
+    "go/model.go": "43e2e054e57e8fd87281ec9144cc500caa995ae4b5a5ac80ed3e1bd600f55b55",
+    "go/model_test.go": "237800abb67a17335568714c086eab854dcb4e1f8cdb22fd4d3ed5c5a6e6b1bf",
+    "go/testdata/effect-core-vectors-v1.json": "b22d44e4071c9c5482403fc8e4769fa0e0199c0d45250da0f086df0b06e65209",
+    "go/rfc9162/README.md": "98f1e98295cdd4040e73be6a88e160ed787966b38af09763496273a1806da780",
+    "go/rfc9162/merkle.go": "a0335a7d94046bacaaade821e48cfef24976595908524060ef8c76d27082f7bb",
+    "go/rfc9162/merkle_test.go": "c1f6be277a9db24c2e79e574d26b6be479294969429e0db403223cc70f2f85fb",
+    "go/rfc9162/consistency.go": "aa11e1de0c44989a692a72a705f210760efca0601359589ee23ae045dc951164",
+    "go/rfc9162/consistency_test.go": "47058a2423d7fa03fda8baa7391fcbbca87ead5d74ccbdcc4ba4c190669ebab0"
+  }
+}

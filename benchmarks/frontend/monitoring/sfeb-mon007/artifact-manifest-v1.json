@@ -1,0 +1,50 @@
+{
+  "schema": "sfeb-mon007-local-artifact-manifest-v1",
+  "date": "2026-11-25",
+  "qualification": "semantic model only; no cryptographic, distributed, sink or production qualification",
+  "files": {
+    "sfeb-action-assurance-model-v1.mjs.gz": {
+      "sha256": "c9425d19d0e3821ad9b5dbbaa00645b4c460cf25dc240964cd8609c8f9c43a43",
+      "bytes": 6320,
+      "sourceSha256": "4eb79b763ab03981fab2dbb4aac002f80a706d0125ccc4e7f5d45d7883f54f51"
+    },
+    "sfeb-action-assurance-model-v1.test.mjs.gz": {
+      "sha256": "eaf16bd51c272ea691f66ca960db366b9832000bf395416afd7da860819394a8",
+      "bytes": 3987,
+      "sourceSha256": "9bb81580e84d070017283f4c2710ee19745599d742a925349df52bdb8bcb2d5b"
+    },
+    "benchmark.mjs.gz": {
+      "sha256": "b7fd789ca6affa865de20bf13c2ecf3cf8a8a7132b089c70df1b32c764b95ff0",
+      "sourceSha256": "6bab8e51789009f9bf831000820dfadc40453c521861fa690bf6f74286285412"
+    },
+    "benchmark-report-v1.json": {
+      "sha256": "a117dac6211123d2a0f79cb95a7df0d50029b233eb2163b50045f44c830ffb61"
+    },
+    "README.md": {
+      "sha256": "updated-in-this-commit"
+    }
+  },
+  "tests": {
+    "cases": 28,
+    "freshInvocations": 5,
+    "totalExecutions": 140,
+    "failures": 0,
+    "mutatedSecurityCriticalFields": 36
+  },
+  "benchmark": {
+    "runs": 5,
+    "warmupPerRun": 3000,
+    "iterationsPerRun": 30000,
+    "medianEvaluationsPerSecond": 38208,
+    "throughputRange": [
+      36847,
+      40483
+    ],
+    "latencyMilliseconds": {
+      "p50": 0.024556,
+      "p95": 0.033526,
+      "p99": 0.044903
+    }
+  },
+  "explicitScope": "Pure in-process semantic evaluator; excludes signatures, CBOR/COSE, Merkle proofs, network, storage, source/sink adapters and external readback."
+}

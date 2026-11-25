@@ -1,0 +1,132 @@
+{
+  "benchmark": "sfeb-mon007-semantic-assurance-model-v1",
+  "date": "2026-11-25",
+  "runs": 5,
+  "runtime": "v22.16.0",
+  "platform": "linux-6.18.57",
+  "architecture": "x64",
+  "logicalCpuCount": 3,
+  "iterationsPerRun": 30000,
+  "samplesPerRun": 30,
+  "warmupPerRun": 3000,
+  "allRunsVerified": true,
+  "verifiedPerRun": [
+    30000,
+    30000,
+    30000,
+    30000,
+    30000
+  ],
+  "throughputOpsPerSecond": {
+    "runs": [
+      38182,
+      39662,
+      39124,
+      38070,
+      41198
+    ],
+    "median": 39124,
+    "range": [
+      38070,
+      41198
+    ]
+  },
+  "perEvaluationMs": {
+    "p50MedianAcrossRuns": 0.024361,
+    "p95MedianAcrossRuns": 0.028215,
+    "p99MedianAcrossRuns": 0.047588
+  },
+  "runDetails": [
+    {
+      "benchmark": "sfeb-mon007-semantic-assurance-model-v1",
+      "runtime": "v22.16.0",
+      "platform": "linux-6.18.57",
+      "architecture": "x64",
+      "logicalCpuCount": 3,
+      "iterations": 30000,
+      "samples": 30,
+      "warmup": 3000,
+      "verified": 30000,
+      "wallMs": 785.706,
+      "throughputOpsPerSecond": 38182,
+      "perEvaluationMs": {
+        "p50": 0.025266,
+        "p95": 0.027681,
+        "p99": 0.047768
+      }
+    },
+    {
+      "benchmark": "sfeb-mon007-semantic-assurance-model-v1",
+      "runtime": "v22.16.0",
+      "platform": "linux-6.18.57",
+      "architecture": "x64",
+      "logicalCpuCount": 3,
+      "iterations": 30000,
+      "samples": 30,
+      "warmup": 3000,
+      "verified": 30000,
+      "wallMs": 756.397,
+      "throughputOpsPerSecond": 39662,
+      "perEvaluationMs": {
+        "p50": 0.023823,
+        "p95": 0.034892,
+        "p99": 0.04601
+      }
+    },
+    {
+      "benchmark": "sfeb-mon007-semantic-assurance-model-v1",
+      "runtime": "v22.16.0",
+      "platform": "linux-6.18.57",
+      "architecture": "x64",
+      "logicalCpuCount": 3,
+      "iterations": 30000,
+      "samples": 30,
+      "warmup": 3000,
+      "verified": 30000,
+      "wallMs": 766.79,
+      "throughputOpsPerSecond": 39124,
+      "perEvaluationMs": {
+        "p50": 0.024959,
+        "p95": 0.027897,
+        "p99": 0.04172
+      }
+    },
+    {
+      "benchmark": "sfeb-mon007-semantic-assurance-model-v1",
+      "runtime": "v22.16.0",
+      "platform": "linux-6.18.57",
+      "architecture": "x64",
+      "logicalCpuCount": 3,
+      "iterations": 30000,
+      "samples": 30,
+      "warmup": 3000,
+      "verified": 30000,
+      "wallMs": 788.016,
+      "throughputOpsPerSecond": 38070,
+      "perEvaluationMs": {
+        "p50": 0.024361,
+        "p95": 0.038489,
+        "p99": 0.060209
+      }
+    },
+    {
+      "benchmark": "sfeb-mon007-semantic-assurance-model-v1",
+      "runtime": "v22.16.0",
+      "platform": "linux-6.18.57",
+      "architecture": "x64",
+      "logicalCpuCount": 3,
+      "iterations": 30000,
+      "samples": 30,
+      "warmup": 3000,
+      "verified": 30000,
+      "wallMs": 728.197,
+      "throughputOpsPerSecond": 41198,
+      "perEvaluationMs": {
+        "p50": 0.023197,
+        "p95": 0.028215,
+        "p99": 0.047588
+      }
+    }
+  ],
+  "scope": "Pure in-process semantic evaluator only. Excludes cryptography, COSE/CBOR, Merkle proofs, network, storage, source/sink adapters and external readback. Not comparable to workflow engines, vendor sizing, or product/SOTA throughput."
+}

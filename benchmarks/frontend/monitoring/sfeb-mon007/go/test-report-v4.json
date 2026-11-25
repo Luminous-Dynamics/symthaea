@@ -1,0 +1,96 @@
+{
+  "schema": "sfeb-mon007-go-preflight-report-v4",
+  "date": "2026-11-25",
+  "implementation": "Go standard library only",
+  "goVersion": "go1.23.2",
+  "platform": "linux/amd64",
+  "hostCPU": "AMD EPYC 9V74",
+  "benchmarkParallelism": 3,
+  "testEvidence": {
+    "testFunctionsPerSuite": 30,
+    "suiteRepetitions": 3,
+    "successfulTestFunctionExecutions": 90,
+    "externalEffectSemanticTests": 18,
+    "rfc9162InclusionTests": 5,
+    "rfc9162ConsistencyTests": 6,
+    "crossImplementationDifferentialTestFunctions": 1,
+    "goTest": "passed",
+    "goTestRace": "passed",
+    "goVet": "passed",
+    "externalEffectStatementCoveragePercent": 72.9,
+    "rfc9162StatementCoveragePercent": 95.5,
+    "inclusionVerifierStatementCoveragePercent": 100,
+    "consistencyVerifierStatementCoveragePercent": 100,
+    "inclusionProofChecks": 32896,
+    "consistencyProofChecks": 32640,
+    "totalGeneratedMerkleProofChecks": 65536,
+    "maxTreeSize": 256,
+    "rfc9162Section215WorkedExamples": 3,
+    "sharedGoldenVectors": 9,
+    "nodeGeneratedInclusionVectorsVerifiedByGo": 136,
+    "nodeGeneratedConsistencyVectorsVerifiedByGo": 120,
+    "goGeneratedInclusionVectorsVerifiedByNode": 136,
+    "goGeneratedConsistencyVectorsVerifiedByNode": 120,
+    "independentFixtureBuildersMatchRootsAndProofPaths": true
+  },
+  "microbenchmarks": {
+    "runsPerCase": 5,
+    "benchtime": "300ms",
+    "bytesPerOperation": 0,
+    "allocationsPerOperation": 0,
+    "consistency": {
+      "16_to_256_ns_per_op": [
+        537.7,
+        524.3,
+        534.5,
+        537.3,
+        526.2
+      ],
+      "16_to_256_median_ns_per_op": 534.5,
+      "256_to_4096_ns_per_op": [
+        532.8,
+        521,
+        541.7,
+        523.5,
+        529.3
+      ],
+      "256_to_4096_median_ns_per_op": 529.3,
+      "4096_to_65536_ns_per_op": [
+        528.9,
+        527.5,
+        537.8,
+        521.5,
+        525.5
+      ],
+      "4096_to_65536_median_ns_per_op": 527.5
+    },
+    "inclusion": {
+      "tree_16_ns_per_op": [
+        525.9,
+        533.9,
+        525.7,
+        516.5,
+        529.7
+      ],
+      "tree_16_median_ns_per_op": 525.9,
+      "tree_256_ns_per_op": [
+        1060,
+        1045,
+        1067,
+        1044,
+        1046
+      ],
+      "tree_256_median_ns_per_op": 1046,
+      "tree_4096_ns_per_op": [
+        1576,
+        1564,
+        1566,
+        1548,
+        1541
+      ],
+      "tree_4096_median_ns_per_op": 1564
+    }
+  },
+  "qualification": "Go semantic subset and independent Go/Node RFC 9162 inclusion/consistency primitives with bidirectional differential vectors; not checkpoint authentication, COSE/SCITT or production qualification.",
+  "cleanRerunNote": "Three complete fresh non-race suite runs, race detector and go vet passed on this source set. In the latest combined clean-extraction command, race tests for the semantic package passed before the execution time limit interrupted the larger RFC 9162 race package; a prior complete race run on the same source set passed."
+}
