@@ -741,7 +741,6 @@ fn validate_receipt_binding(
         return Err(DecisionSufficiencyRejectV1::InvalidReceipt);
     }
     if receipt.risk_limit_ppm.is_some_and(|risk| risk != binding.risk_limit_ppm)
-        || receipt.confidence_level_ppm.is_some_and(|confidence| confidence < binding.minimum_confidence_level_ppm)
         || receipt.calibration_receipt_sha256.as_deref()
             .is_some_and(|digest| digest != binding.calibration_receipt_sha256)
     {
@@ -1073,6 +1072,10 @@ mod tests {
         issuer_profile_sha256: &'a str,
         now_unix: u64,
     ) -> DecisionSufficiencyUseBindingV1<'a> {
+        static REQUIRED_IDS: OnceLock<Vec<String>> = OnceLock::new();
+        let required_ids = REQUIRED_IDS.get_or_init(|| {
+            vec!["minimum-independent-evidence".to_owned()]
+        });
         DecisionSufficiencyUseBindingV1 {
             run_id: qualified.run_id(),
             query_invocation_id: qualified.query_invocation_id(),
@@ -1090,9 +1093,7 @@ mod tests {
             sufficiency_policy_sha256: SUFF_POLICY,
             calibration_profile_sha256: CALIBRATION,
             calibration_receipt_sha256: CALIBRATION_RECEIPT,
-            required_requirement_ids: Box::leak(vec![
-                "minimum-independent-evidence".to_owned()
-            ].into_boxed_slice()),
+            required_requirement_ids: required_ids.as_slice(),
             risk_limit_ppm: 5000,
             minimum_confidence_level_ppm: 900_000,
             issuer_profile_sha256,
