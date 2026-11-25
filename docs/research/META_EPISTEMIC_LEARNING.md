@@ -1,5 +1,8 @@
 # 🧠 Meta-Epistemic Learning - Self-Improving Verification
 
+> **Ground-truth boundary (updated 2026-11-25):** this document's older `record_outcome` examples describe the original design and are superseded by the current WebResearcher API. Confidence or local epistemic-verifier status must never be converted into `was_correct`. The live learner accepts `AdjudicatedVerificationOutcome` through `record_adjudicated_outcome()`, requiring an adjudication kind, authority ID and evidence reference; provenance is retained with the outcome. These fields are audit metadata, not cryptographic authentication. See [`src/web_research/types.rs`](../../src/web_research/types.rs), [`meta_learning.rs`](../../src/web_research/meta_learning.rs) and [`mod.rs`](../../src/web_research/mod.rs).
+
+
 **Status**: ✅ **COMPLETE** - Revolutionary meta-consciousness achieved
 **Date**: December 22, 2025
 **Paradigm Shift**: First AI that improves its own epistemic standards through meta-cognitive monitoring
