@@ -216,3 +216,15 @@ The 15-root axiom-audit prototype in this repository is a small, separate fixtur
 11. **Dated report on the 20 November 2026 Lean submission:** [Cairn Commons status guide, updated 24 November 2026](https://cairn-commons.com/guides/riemann-hypothesis-proof-claim-november-2026). Used only for a dated summary of reported machine-check milestones and remaining human-understanding/peer-review work; it is not itself a formal verification receipt or institutional ruling.
 
 When a source changes, preserve an archived copy, capture date, content digest, and the exact claim it supports. The live Clay status and the RH formalization status must be rechecked before future publication.
+
+## Additional references and competitive comparators
+
+- Staats, Thamm & Rosenow, “Small Singular Values Matter: A Random Matrix Analysis of Transformer Models,” NeurIPS 2025: https://proceedings.neurips.cc/paper_files/paper/2025/hash/e1a8f3e897b25df1f82ebfc79991f5b4-Abstract-Conference.html
+- “Is criticality a unified setpoint of brain function?”, *Neuron* (2025): https://pubmed.ncbi.nlm.nih.gov/40555236/
+- CoDBench (2024): https://pubs.rsc.org/en/content/articlehtml/2024/dd/d4dd00028e
+- “An overview of Koopman-based control: From error bounds to closed-loop guarantees” (2025): https://doi.org/10.1016/j.arcontrol.2025.101035
+- “Adversarial dynamical systems characterize when data-driven learning succeeds or fails” (2026): https://pubmed.ncbi.nlm.nih.gov/42448691/
+- LeanGraphSearch live results and methodology: https://pluslabnlp.github.io/LeanGraphSearch/
+- Goedel-Architect preliminary paper: https://openreview.net/pdf/23d889a527e56c9e2b43596e463b086dfe16d5a3.pdf
+- Exgentic Open Agent Leaderboard: https://www.exgentic.ai/
+- Akhunzada et al., “From benchmarks to deployment: a comprehensive review of agentic AI evaluation” (2026): https://doi.org/10.1007/s10462-026-11571-0
