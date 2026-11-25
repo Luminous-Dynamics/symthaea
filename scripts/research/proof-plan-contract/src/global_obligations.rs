@@ -35,6 +35,11 @@ fn report_for_alternative(
     let node_ids: HashSet<&str> = alternative.node_ids.iter().map(String::as_str).collect();
     let nodes: HashMap<&str, _> = plan.nodes.iter().map(|node| (node.id.as_str(), node)).collect();
 
+    let unique_node_ids: HashSet<&str> = alternative.node_ids.iter().map(String::as_str).collect();
+    if unique_node_ids.len() != alternative.node_ids.len() {
+        errors.push(format!("alternative {} repeats node IDs", alternative.id));
+    }
+
     let mut creators = HashMap::<String, Vec<String>>::new();
     let mut consumers = HashMap::<String, Vec<(String, EdgeRelation)>>::new();
     let mut transitions = HashMap::<String, Vec<String>>::new();
@@ -54,6 +59,26 @@ fn report_for_alternative(
                 .entry(edge.target_id.clone())
                 .or_default()
                 .push(edge.source_id.clone());
+        }
+    }
+
+    // Every consumption edge must be represented in the action's declared inputs.
+    for edge in &plan.edges {
+        if !node_ids.contains(edge.source_id.as_str())
+            || !node_ids.contains(edge.target_id.as_str())
+            || !matches!(edge.relation, EdgeRelation::Discharges | EdgeRelation::Transforms)
+        {
+            continue;
+        }
+        let source = nodes.get(edge.source_id.as_str());
+        let declared = source
+            .and_then(|node| node.action_spec.as_ref())
+            .is_some_and(|action| action.input_goal_ids.contains(&edge.target_id));
+        if !declared {
+            errors.push(format!(
+                "alternative {} action edge {} -> {} consumes a goal absent from action_spec.input_goal_ids",
+                alternative.id, edge.source_id, edge.target_id
+            ));
         }
     }
 
@@ -291,7 +316,7 @@ pub fn analyze_global_obligations(plan: &ProofPlan) -> GlobalObligationReport {
     let primary_alternatives: Vec<&PlanAlternative> = plan
         .alternatives
         .iter()
-        .filter(|alternative| matches!(alternative.status, AlternativeStatus::Primary))
+        .filter(|alternative| matches!(&alternative.status, AlternativeStatus::Primary))
         .collect();
     let primary_alternative_count = primary_alternatives.len();
 
@@ -410,6 +435,8 @@ mod tests {
     #[test]
     fn double_discharge_is_rejected() {
         let mut value = plan_value();
+        find_action_mut(&mut value, "A_FORWARD")["action_spec"]["input_goal_ids"] =
+            serde_json::json!(["G_FORWARD", "G_REVERSE"]);
         value["edges"].as_array_mut().unwrap().push(serde_json::json!({
             "source_id":"A_FORWARD","target_id":"G_REVERSE",
             "relation":"discharges","evidence_refs":["E_SOURCE"]
@@ -487,24 +514,63 @@ mod tests {
     #[test]
     fn goal_transition_cycle_is_detected() {
         let mut value = plan_value();
-        // Re-label the reverse action as a transformation back to the forward
-        // goal, producing a cycle in the obligation graph. A second producer
-        // is independently invalid and is reported as well.
-        find_action_mut(&mut value, "A_REVERSE")["action_spec"]["output_subgoal_ids"] =
-            serde_json::json!(["G_FORWARD"]);
-        for edge in value["edges"].as_array_mut().unwrap() {
-            if edge["source_id"] == "A_REVERSE"
-                && edge["target_id"] == "G_REVERSE"
-                && edge["relation"] == "discharges"
-            {
-                edge["relation"] = Value::String("transforms".to_owned());
-            }
-        }
-        value["edges"].as_array_mut().unwrap().push(serde_json::json!({
-            "source_id":"A_REVERSE","target_id":"G_FORWARD",
-            "relation":"creates_subgoal","evidence_refs":["E_SOURCE"]
-        }));
+        value["nodes"].as_array_mut().unwrap().extend([
+            serde_json::json!({
+                "id":"G_LOOP_A","kind":"subgoal","label":"loop A",
+                "statement":"True","epistemic_class":"mathematical_interpretation",
+                "evidence_refs":["E_SOURCE"]
+            }),
+            serde_json::json!({
+                "id":"G_LOOP_B","kind":"subgoal","label":"loop B",
+                "statement":"True","epistemic_class":"mathematical_interpretation",
+                "evidence_refs":["E_SOURCE"]
+            }),
+            serde_json::json!({
+                "id":"A_CYCLE_A","kind":"plan_action","label":"cycle A",
+                "epistemic_class":"mathematical_interpretation","evidence_refs":["E_SOURCE"],
+                "action_spec":{
+                    "operation":"normalize","input_goal_ids":["G_LOOP_B"],
+                    "output_subgoal_ids":["G_LOOP_A"],"consumed_side_condition_ids":[],
+                    "justification_node_ids":["J_IFF"],"rationale":"synthetic cycle control",
+                    "evidence_refs":["E_SOURCE"]
+                }
+            }),
+            serde_json::json!({
+                "id":"A_CYCLE_B","kind":"plan_action","label":"cycle B",
+                "epistemic_class":"mathematical_interpretation","evidence_refs":["E_SOURCE"],
+                "action_spec":{
+                    "operation":"normalize","input_goal_ids":["G_LOOP_A"],
+                    "output_subgoal_ids":["G_LOOP_B"],"consumed_side_condition_ids":[],
+                    "justification_node_ids":["J_IFF"],"rationale":"synthetic cycle control",
+                    "evidence_refs":["E_SOURCE"]
+                }
+            })
+        ]);
+        value["alternatives"][0]["node_ids"].as_array_mut().unwrap().extend([
+            Value::String("G_LOOP_A".to_owned()),
+            Value::String("G_LOOP_B".to_owned()),
+            Value::String("A_CYCLE_A".to_owned()),
+            Value::String("A_CYCLE_B".to_owned())
+        ]);
+        value["edges"].as_array_mut().unwrap().extend([
+            serde_json::json!({
+                "source_id":"A_CYCLE_A","target_id":"G_LOOP_B",
+                "relation":"transforms","evidence_refs":["E_SOURCE"]
+            }),
+            serde_json::json!({
+                "source_id":"A_CYCLE_A","target_id":"G_LOOP_A",
+                "relation":"creates_subgoal","evidence_refs":["E_SOURCE"]
+            }),
+            serde_json::json!({
+                "source_id":"A_CYCLE_B","target_id":"G_LOOP_A",
+                "relation":"transforms","evidence_refs":["E_SOURCE"]
+            }),
+            serde_json::json!({
+                "source_id":"A_CYCLE_B","target_id":"G_LOOP_B",
+                "relation":"creates_subgoal","evidence_refs":["E_SOURCE"]
+            })
+        ]);
         let report = analyzed(&value);
         assert!(report.errors.iter().any(|error| error.contains("goal-transition cycle")));
     }
-}
+}}
