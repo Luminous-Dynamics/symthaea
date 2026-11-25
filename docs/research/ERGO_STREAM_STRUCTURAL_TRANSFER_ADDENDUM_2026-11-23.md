@@ -365,3 +365,40 @@ Narrow or reject the research claim if:
 ## 10. Claim boundary
 
 This research direction does not establish a universal learning algorithm, biological equivalence, consciousness, broad scientific discovery, causal understanding, or SOTA performance. A valid finite correspondence is a validated result about a declared finite representation only. Real-world transfer requires independent domain evidence, authentic interventions, rights-cleared data and domain-specific safety review.
+
+
+## Sequential policy evaluation: compose with the exact tiny-world oracle (25 November 2026)
+
+A new adjacent capability should be composed rather than reimplemented:
+
+- Symthaea #13567 tracks exact sequential research-policy evaluation.
+- [#13569](https://github.com/Luminous-Dynamics/symthaea/pull/13569) specifies separate prior-free robust and Bayesian finite-horizon dynamic programmes, public-history policy semantics, component-wise resource budgets, deadlines, exhaustive policy-tree cross-checks and a non-myopic branch-unlock fixture.
+- [#13571](https://github.com/Luminous-Dynamics/symthaea/pull/13571) stages the prior-free robust implementation in `research/decision-predictability-benchmark/src/sequential.rs`, including a separately written exhaustive policy-tree enumerator and generated tiny-world agreement tests.
+
+**Qualification boundary as of 2026-11-25:** #13571's exact-head Rust workflow is queued; the new module is explicitly documented as uncompiled/untested. It is an evaluator-side finite policy oracle, not a qualified production scheduler, not a Bayesian EVSI implementation, and not the actual Symthaea research policy. Do not treat the queued run or authored tests as PASS.
+
+### Why it matters to ErgoStream
+
+ERGOstream now has a one-step exact finite EVSI reference in Symtropy #7173. That answers which single experiment reduces expected terminal decision loss in a declared finite problem. The sequential oracle asks a different question: which complete contingent action tree gives the best terminal decision when an early action can unlock a more informative branch-specific follow-up?
+
+The public 16-state branch-unlock fixture distinguishes these objectives:
+- Action A reveals two nuisance bits but leaves worst-case terminal decision loss unchanged.
+- Action B reveals one branch bit and also leaves immediate worst-case loss unchanged.
+- B followed by the branch-specific C action resolves the decision-relevant state and reaches zero terminal loss.
+
+This is a deliberately small known-answer fixture. The uniform distribution used for the entropy diagnostic is not used by the prior-free robust oracle; it must not be confused with a posterior or expected utility.
+
+### Integration rule
+
+Keep four results separate:
+
+1. **Acquisition quality:** what reusable structure was learned before the task was disclosed?
+2. **Transfer validity:** does the frozen structural/dynamics/mechanism claim survive independent evidence?
+3. **Sequential policy quality:** how much terminal regret remains versus the tiny-world policy oracle?
+4. **Decision-value quality:** does the chosen action improve the decision under its declared probability/loss model and inclusive costs?
+
+Use the sequential oracle only on tiny public development worlds for debugging and on separately sealed confirmatory variants after its own exact-head qualification. The candidate receives only public AgentView-equivalent history and legal actions; it never receives the oracle tree, hidden supports, future outcomes, hidden states or evaluator score. Reuse #11060's process shell and #11171's adapter ownership. Do not add a second scheduler or let the evaluator oracle authorize physical execution.
+
+### Recommended policy comparison
+
+On common world/seed pairs, compare fixed workflow, random legal action, maximum-partition/minimax/entropy baselines, prediction-disagreement, calibrated one-step EVSI where its likelihood model is admitted, and the pinned Symthaea incumbent. Report sequential-policy regret only on tiny worlds where the independent exact oracle is feasible. Keep acquisition, transfer and policy metrics disaggregated; a low policy regret on a toy world does not establish task-agnostic acquisition or real-world scientific competence.
