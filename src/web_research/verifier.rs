@@ -440,6 +440,28 @@ mod tests {
     }
 
     #[test]
+    fn aggregate_research_result_confidence_is_not_claim_support() {
+        let verifier = EpistemicVerifier::new();
+        let result = WebResearchResult {
+            url: "https://research.example/topic".to_owned(),
+            summary: "A highly relevant summary from an earlier retrieval".to_owned(),
+            relevance: 1.0,
+            confidence: 0.99,
+            ..WebResearchResult::default()
+        };
+
+        let verified = verifier.verify_from_results(
+            "A new, specific claim that has not been classified against the source",
+            &[result],
+        );
+
+        assert!(verified.supporting_sources.is_empty());
+        assert!(verified.contradicting_sources.is_empty());
+        assert_eq!(verified.status, EpistemicStatus::InsufficientEvidence);
+        assert_eq!(verified.confidence, 0.2);
+    }
+
+    #[test]
     fn test_verify_with_supporting_sources() {
         let verifier = EpistemicVerifier::new();
         let context = VerificationContext {
