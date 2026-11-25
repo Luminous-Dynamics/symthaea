@@ -507,6 +507,7 @@ struct UsabilityValidationContext<'a> {
     adjudicated: bool,
     adjudication_result: Option<&'a str>,
     has_conflict: bool,
+    has_support: bool,
 }
 
 fn validate_usability(
@@ -544,6 +545,13 @@ fn validate_usability(
                 issue(issues, format!("{path}.reason_codes[{index}]"), "reason code must be non-empty");
             }
         }
+    }
+    if status == Some("SUFFICIENT") && !context.has_support {
+        issue(
+            issues,
+            format!("{path}.status"),
+            "decision sufficiency requires at least one explicit claim-specific SUPPORTS relation",
+        );
     }
     if status == Some("SUFFICIENT") && context.has_conflict {
         issue(issues, format!("{path}.status"), "conflicting support/refutation cannot be decision-sufficient");
@@ -789,6 +797,7 @@ fn validate_state(input: &str) -> Result<ValidationReport, Vec<ValidationIssue>>
             }
         };
         let has_conflict = !support_families.is_empty() && !refute_families.is_empty();
+        let has_support = !support_families.is_empty();
         if let Some(usability) = claim.get("decision_usability") {
             let usability_context = UsabilityValidationContext {
                 decision_id: &decision_id,
@@ -796,6 +805,7 @@ fn validate_state(input: &str) -> Result<ValidationReport, Vec<ValidationIssue>>
                 adjudicated,
                 adjudication_result: result.as_deref(),
                 has_conflict,
+                has_support,
             };
             validate_usability(
                 usability,
@@ -1063,6 +1073,14 @@ mod tests {
         state["claims"][0]["decision_usability"]["status"] =
             Value::String("SUFFICIENT".to_owned());
 
+        assert!(validate_state(&state.to_string()).is_err());
+    }
+
+    #[test]
+    fn unclassified_retrieval_cannot_be_marked_sufficient() {
+        let mut state = first_state();
+        state["claims"][0]["decision_usability"]["status"] =
+            Value::String("SUFFICIENT".to_owned());
         assert!(validate_state(&state.to_string()).is_err());
     }
 
