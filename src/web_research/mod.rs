@@ -182,22 +182,46 @@ impl EpistemicConsciousness {
         // Update last Phi
         self.last_phi = integration.phi_after;
 
-        // Record outcomes for meta-learning
-        for claim in &result.claims {
-            // For now, assume high-confidence claims are correct
-            // In a real system, this would be based on user feedback
-            let outcome = VerificationOutcome {
-                claim: claim.text.clone(),
-                source_domain: self.extract_domain(&result.url),
-                source_type: result.source_type,
-                was_correct: claim.confidence > 0.7,
-                predicted_confidence: claim.confidence,
-                domain: self.detect_domain(query),
-            };
-            self.learner.record_outcome(outcome)?;
+        // Do not feed the local verifier's own confidence/status back as
+        // correctness labels. Meta-learning requires independent ground truth;
+        // callers can supply that later via record_adjudicated_outcome().
+        Ok(result)
+    }
+
+    /// Record a verification outcome only after independent adjudication.
+    ///
+    /// The authority/evidence fields make the provenance requirement explicit,
+    /// but this method does not authenticate the authority or resolve the
+    /// referenced evidence. Callers must use the existing human-review or
+    /// independent-evaluator process; never derive `was_correct` from model
+    /// confidence or the local `EpistemicVerifier` result.
+    pub fn record_adjudicated_outcome(
+        &mut self,
+        adjudicated: AdjudicatedVerificationOutcome,
+    ) -> anyhow::Result<()> {
+        let outcome = &adjudicated.outcome;
+        if outcome.claim.trim().is_empty() {
+            anyhow::bail!("adjudicated verification claim must be non-empty");
+        }
+        if outcome.source_domain.trim().is_empty() {
+            anyhow::bail!("adjudicated verification source domain must be non-empty");
+        }
+        if outcome.domain.trim().is_empty() {
+            anyhow::bail!("adjudicated verification topic domain must be non-empty");
+        }
+        if !outcome.predicted_confidence.is_finite()
+            || !(0.0..=1.0).contains(&outcome.predicted_confidence)
+        {
+            anyhow::bail!("adjudicated verification confidence must be finite and in [0, 1]");
+        }
+        if adjudicated.authority_id.trim().is_empty() {
+            anyhow::bail!("adjudication authority ID must be non-empty");
+        }
+        if adjudicated.evidence_reference.trim().is_empty() {
+            anyhow::bail!("adjudication evidence reference must be non-empty");
         }
 
-        Ok(result)
+        self.learner.record_outcome(adjudicated.outcome)
     }
 
     /// Get current epistemic stats
