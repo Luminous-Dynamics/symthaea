@@ -348,8 +348,8 @@ pub fn analyze_task_window(
             .then_with(|| a.event_id.cmp(&b.event_id))
     });
 
-    let start = ordered.first().expect("non-empty checked").timestamp;
-    let end = ordered.last().expect("non-empty checked").timestamp;
+    let start = ordered.first().expect("non-empty checked").timestamp.clone();
+    let end = ordered.last().expect("non-empty checked").timestamp.clone();
     let mut counters = BehaviorCounters::default();
     let mut destinations = BTreeSet::new();
 
@@ -704,6 +704,14 @@ mod tests {
             .iter()
             .find(|finding| finding.code == code)
             .expect("expected finding")
+    }
+
+    #[test]
+    fn rejects_blank_source_receipt() {
+        assert_eq!(
+            VerifiedSourceReceipt::new("trusted-collector", " ").unwrap_err(),
+            BehaviorError::MissingSourceReceipt
+        );
     }
 
     #[test]
