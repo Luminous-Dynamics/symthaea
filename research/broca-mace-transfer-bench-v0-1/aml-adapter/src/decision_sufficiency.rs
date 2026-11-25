@@ -497,7 +497,7 @@ impl DecisionSufficiencyReceiptV1 {
 
 /// Verified evaluator assessment. This is evidence that one exact DecisionNeed
 /// met the configured sufficiency policy; it is never an action authorization.
-#[derive(Clone, Debug)]
+#[derive(Clone, Debug, PartialEq)]
 pub struct VerifiedDecisionSufficiencyV1 {
     receipt: DecisionSufficiencyReceiptV1,
     pae: Vec<u8>,
@@ -994,8 +994,8 @@ mod tests {
             decision_need_sha256: qualified.decision_need_sha256(),
             purpose_sha256: qualified.purpose_sha256(),
             lifecycle_snapshot_sha256: qualified.lifecycle_snapshot_sha256(),
-            sufficiency_policy_sha256: &repeat('a'),
-            calibration_profile_sha256: &repeat('b'),
+            sufficiency_policy_sha256: SUFF_POLICY,
+            calibration_profile_sha256: CALIBRATION,
             issuer_profile_sha256,
             now_unix,
         }
@@ -1069,19 +1069,19 @@ mod tests {
         encode_dsse_envelope_v1(&payload, &receipt.key_id, &signature).unwrap()
     }
 
-    fn build_valid_assessment(
-        qualified: &QualifiedCandidateEvidenceBatchV1,
+    fn build_valid_assessment<'a>(
+        qualified: &'a QualifiedCandidateEvidenceBatchV1,
         status: DecisionSufficiencyStatusV1,
         requirement_status: DecisionRequirementStatusV1,
         risk_upper: Option<u32>,
         risk_limit: Option<u32>,
     ) -> (
-        DecisionSufficiencyUseBindingV1<'static>,
+        DecisionSufficiencyUseBindingV1<'a>,
         PinnedEd25519QualificationVerifierV1,
         String,
     ) {
-        // This test helper owns its fixture strings for the lifetime of the
-        // binding, avoiding references to temporary digest values.
+        // Only the immutable evaluator-profile digest is leaked in this test
+        // helper; all evidence and request fields borrow from the projection.
         let signing_key = SigningKey::from_bytes(&[73; 32]);
         let profile = evaluator_profile(
             &signing_key,
@@ -1090,19 +1090,14 @@ mod tests {
             DECISION_SUFFICIENCY_VERIFIER_ID_V1,
         );
         let profile_digest = profile.profile_sha256().to_owned();
-        let binding = use_binding(qualified, Box::leak(profile_digest.clone().into_boxed_str()), 160);
+        let issuer_profile: &'a str = Box::leak(profile_digest.into_boxed_str());
+        let binding = use_binding(qualified, issuer_profile, 160);
         let evaluator_key_id = qualification_key_id_v1(&signing_key.verifying_key().to_bytes());
-        let mut assessment = receipt(
+        let assessment = receipt(
             qualified, &binding, &evaluator_key_id, status, requirement_status,
             risk_upper, risk_limit,
         );
         let envelope = signed_envelope(&assessment, &signing_key);
-        // The receipt signature field is reconstructed by the DSSE verifier;
-        // keep the unsigned typed receipt in the helper's returned envelope.
-        let _ = &mut assessment;
-        // The binding contains references into the qualified projection and
-        // leaked, immutable policy/calibration digests. The evaluator profile
-        // is returned so the caller can revalidate at use.
         (binding, profile, envelope)
     }
 
