@@ -162,6 +162,10 @@ pub enum ContractError {
     NonFiniteNormalizationCoordinate,
     #[error("periodic Fourier lift harmonic budget must be positive")]
     InvalidHarmonicBudget,
+    #[error("response-weighted refinement budget or input registry is invalid")]
+    InvalidResponseRefinementInput,
+    #[error("response-weighted refinement byte accounting overflow")]
+    ResponseRefinementByteOverflow,
     #[error("open-boundary coordinate must lie in [0, 1]")]
     InvalidOpenBoundaryCoordinate,
     #[error("particle position and weight arrays must be non-empty and have equal lengths")]
@@ -1031,6 +1035,183 @@ impl ModeResponseMatrix {
             .ok_or(ContractError::UnknownResponseMode(output_mode))?;
         Ok(output_index * self.input_modes.len() + input_index)
     }
+}
+
+/// Action assigned to a spectral mode by the response-weighted coarsening planner.
+#[derive(Clone, Copy, Debug, PartialEq, Eq, Serialize)]
+#[serde(rename_all = "snake_case")]
+pub enum ModeRefinementDisposition {
+    DiscardedWithinBudget,
+    RetainedBudgetExceeded,
+    RetainedUnknownResponse,
+}
+
+/// Per-mode evidence produced by response-weighted spectral refinement.
+#[derive(Clone, Debug, PartialEq, Serialize)]
+pub struct ModeRefinementDecision {
+    pub input_mode: u32,
+    pub coefficient_magnitude: f64,
+    pub spectral_energy: f64,
+    pub weighted_response_gain: Option<f64>,
+    pub response_loss_bound: Option<f64>,
+    pub encoded_bytes: u64,
+    pub disposition: ModeRefinementDisposition,
+}
+
+/// Conservative response-loss budget plan for a proposed mode truncation.
+///
+/// For each known mode k, the loss bound is
+/// |a_k| * sum_q w_q * |G[q,k]|. Missing response entries remain UNKNOWN and
+/// are always retained. Known modes are considered in ascending loss-per-byte
+/// order; this is a deterministic greedy policy, not an optimal knapsack
+/// solution and not a global nonlinear error bound.
+#[derive(Clone, Debug, PartialEq, Serialize)]
+pub struct ResponseWeightedRefinementPlan {
+    pub response_loss_budget: f64,
+    pub accumulated_discarded_response_bound: f64,
+    pub discarded_state_bytes: u64,
+    pub decisions: Vec<ModeRefinementDecision>,
+}
+
+/// Plan a conservative mode coarsening decision from a phase-resolved response matrix.
+///
+/// All input modes must have exactly one complex coefficient and one positive
+/// encoded-byte count. Every output mode has a finite, non-negative QoI weight;
+/// at least one weight must be positive. Any unmeasured response entry prevents
+/// that input mode from being discarded.
+pub fn plan_response_weighted_refinement(
+    response: &ModeResponseMatrix,
+    coefficients: &[(u32, ComplexResponse)],
+    encoded_bytes: &[(u32, u64)],
+    output_weights: &[f64],
+    response_loss_budget: f64,
+) -> Result<ResponseWeightedRefinementPlan, ContractError> {
+    if !response_loss_budget.is_finite()
+        || response_loss_budget < 0.0
+        || output_weights.len() != response.output_modes().len()
+        || output_weights.iter().any(|weight| !weight.is_finite() || *weight < 0.0)
+        || !output_weights.iter().any(|weight| *weight > 0.0)
+        || coefficients.len() != response.input_modes().len()
+        || encoded_bytes.len() != response.input_modes().len()
+    {
+        return Err(ContractError::InvalidResponseRefinementInput);
+    }
+
+    let mut coefficient_ids = BTreeSet::new();
+    for (mode, coefficient) in coefficients {
+        if !coefficient_ids.insert(*mode)
+            || !response.input_modes().contains(mode)
+            || !coefficient.real.is_finite()
+            || !coefficient.imag.is_finite()
+        {
+            return Err(ContractError::InvalidResponseRefinementInput);
+        }
+    }
+    let mut byte_ids = BTreeSet::new();
+    for (mode, bytes) in encoded_bytes {
+        if !byte_ids.insert(*mode) || *bytes == 0 || !response.input_modes().contains(mode) {
+            return Err(ContractError::InvalidResponseRefinementInput);
+        }
+    }
+    let expected_ids = response.input_modes().iter().copied().collect::<BTreeSet<_>>();
+    if coefficient_ids != expected_ids || byte_ids != expected_ids {
+        return Err(ContractError::InvalidResponseRefinementInput);
+    }
+
+    let mut decisions = Vec::with_capacity(response.input_modes().len());
+    for mode in response.input_modes() {
+        let coefficient = coefficients
+            .iter()
+            .find(|(candidate, _)| candidate == mode)
+            .map(|(_, value)| *value)
+            .ok_or(ContractError::InvalidResponseRefinementInput)?;
+        let bytes = encoded_bytes
+            .iter()
+            .find(|(candidate, _)| candidate == mode)
+            .map(|(_, value)| *value)
+            .ok_or(ContractError::InvalidResponseRefinementInput)?;
+        let mut weighted_gain = 0.0_f64;
+        let mut complete = true;
+        for (output_index, output_mode) in response.output_modes().iter().enumerate() {
+            match response.get(*mode, *output_mode)? {
+                Some(value) => {
+                    weighted_gain += output_weights[output_index] * value.magnitude();
+                    if !weighted_gain.is_finite() {
+                        return Err(ContractError::InvalidGramianArithmetic);
+                    }
+                }
+                None => complete = false,
+            }
+        }
+        let coefficient_magnitude = coefficient.magnitude();
+        let spectral_energy = coefficient.norm_squared();
+        if !coefficient_magnitude.is_finite() || !spectral_energy.is_finite() {
+            return Err(ContractError::InvalidGramianArithmetic);
+        }
+        let response_loss_bound = if complete {
+            let bound = coefficient_magnitude * weighted_gain;
+            if !bound.is_finite() {
+                return Err(ContractError::InvalidGramianArithmetic);
+            }
+            Some(bound)
+        } else {
+            None
+        };
+        decisions.push(ModeRefinementDecision {
+            input_mode: *mode,
+            coefficient_magnitude,
+            spectral_energy,
+            weighted_response_gain: complete.then_some(weighted_gain),
+            response_loss_bound,
+            encoded_bytes: bytes,
+            disposition: if complete {
+                ModeRefinementDisposition::RetainedBudgetExceeded
+            } else {
+                ModeRefinementDisposition::RetainedUnknownResponse
+            },
+        });
+    }
+
+    let mut candidates = decisions
+        .iter()
+        .enumerate()
+        .filter_map(|(index, decision)| {
+            decision.response_loss_bound.map(|bound| {
+                (
+                    index,
+                    bound / decision.encoded_bytes as f64,
+                    decision.input_mode,
+                    bound,
+                    decision.encoded_bytes,
+                )
+            })
+        })
+        .collect::<Vec<_>>();
+    candidates.sort_by(|left, right| {
+        left.1
+            .total_cmp(&right.1)
+            .then_with(|| left.2.cmp(&right.2))
+    });
+
+    let mut accumulated_discarded_response_bound = 0.0_f64;
+    let mut discarded_state_bytes = 0_u64;
+    for (index, _, _, bound, bytes) in candidates {
+        let proposed_bound = accumulated_discarded_response_bound + bound;
+        if proposed_bound.is_finite() && proposed_bound <= response_loss_budget {
+            accumulated_discarded_response_bound = proposed_bound;
+            discarded_state_bytes = discarded_state_bytes
+                .checked_add(bytes)
+                .ok_or(ContractError::ResponseRefinementByteOverflow)?;
+            decisions[index].disposition = ModeRefinementDisposition::DiscardedWithinBudget;
+        }
+    }
+
+    Ok(ResponseWeightedRefinementPlan {
+        response_loss_budget,
+        accumulated_discarded_response_bound,
+        discarded_state_bytes,
+        decisions,
+    })
 }
 
 /// A frozen task-conditioned signature of a kinetic state's future responses.
@@ -8930,6 +9111,83 @@ mod tests {
             evaluate_coupled_two_mode_authority(contract),
             Err(ContractError::InvalidCoupledModeAuthority(_))
         ));
+    }
+
+    #[test]
+    fn response_weighted_refinement_retains_low_energy_future_critical_mode() {
+        let mut matrix = ModeResponseMatrix::new(vec![1, 2], vec![10]).unwrap();
+        matrix.set(1, 10, ComplexResponse::new(0.01, 0.0).unwrap()).unwrap();
+        matrix.set(2, 10, ComplexResponse::new(100.0, 0.0).unwrap()).unwrap();
+        let plan = plan_response_weighted_refinement(
+            &matrix,
+            &[
+                (1, ComplexResponse::new(1.0, 0.0).unwrap()),
+                (2, ComplexResponse::new(1.0e-4, 0.0).unwrap()),
+            ],
+            &[(1, 100), (2, 100)],
+            &[1.0],
+            0.02,
+        )
+        .unwrap();
+        let mode_one = plan.decisions.iter().find(|item| item.input_mode == 1).unwrap();
+        let mode_two = plan.decisions.iter().find(|item| item.input_mode == 2).unwrap();
+        assert!(mode_two.spectral_energy < mode_one.spectral_energy);
+        assert_eq!(mode_one.disposition, ModeRefinementDisposition::DiscardedWithinBudget);
+        assert_eq!(mode_two.disposition, ModeRefinementDisposition::RetainedBudgetExceeded);
+        assert!((plan.accumulated_discarded_response_bound - 0.01).abs() < 1.0e-12);
+        assert_eq!(plan.discarded_state_bytes, 100);
+    }
+
+    #[test]
+    fn response_weighted_refinement_retains_modes_with_missing_response_entries() {
+        let mut matrix = ModeResponseMatrix::new(vec![1, 2], vec![10]).unwrap();
+        matrix.set(1, 10, ComplexResponse::new(0.1, 0.0).unwrap()).unwrap();
+        let plan = plan_response_weighted_refinement(
+            &matrix,
+            &[
+                (1, ComplexResponse::new(1.0, 0.0).unwrap()),
+                (2, ComplexResponse::new(1.0e-8, 0.0).unwrap()),
+            ],
+            &[(1, 64), (2, 64)],
+            &[1.0],
+            1.0,
+        )
+        .unwrap();
+        let missing = plan.decisions.iter().find(|item| item.input_mode == 2).unwrap();
+        assert_eq!(missing.weighted_response_gain, None);
+        assert_eq!(missing.response_loss_bound, None);
+        assert_eq!(missing.disposition, ModeRefinementDisposition::RetainedUnknownResponse);
+    }
+
+    #[test]
+    fn response_weighted_refinement_rejects_duplicate_or_missing_mode_metadata() {
+        let matrix = ModeResponseMatrix::new(vec![1, 2], vec![10]).unwrap();
+        let result = plan_response_weighted_refinement(
+            &matrix,
+            &[
+                (1, ComplexResponse::new(1.0, 0.0).unwrap()),
+                (1, ComplexResponse::new(1.0, 0.0).unwrap()),
+            ],
+            &[(1, 8), (2, 8)],
+            &[1.0],
+            1.0,
+        );
+        assert_eq!(result, Err(ContractError::InvalidResponseRefinementInput));
+    }
+
+    #[test]
+    fn response_weighted_refinement_rejects_invalid_weights_and_budget() {
+        let matrix = ModeResponseMatrix::new(vec![1], vec![10]).unwrap();
+        let coefficients = [(1, ComplexResponse::new(1.0, 0.0).unwrap())];
+        let bytes = [(1, 8)];
+        assert_eq!(
+            plan_response_weighted_refinement(&matrix, &coefficients, &bytes, &[-1.0], 1.0),
+            Err(ContractError::InvalidResponseRefinementInput)
+        );
+        assert_eq!(
+            plan_response_weighted_refinement(&matrix, &coefficients, &bytes, &[1.0], f64::NAN),
+            Err(ContractError::InvalidResponseRefinementInput)
+        );
     }
 
     #[test]
