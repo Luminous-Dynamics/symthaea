@@ -1755,6 +1755,22 @@ mod tests {
     }
 
     #[test]
+    fn manifest_digest_is_order_independent_and_rejects_duplicate_keys() {
+        let first = r#"{"z":2,"a":{"b":1,"a":0}}"#;
+        let reordered = r#"{"a":{"a":0,"b":1},"z":2}"#;
+        assert_eq!(
+            compute_manifest_digest(first).unwrap(),
+            compute_manifest_digest(reordered).unwrap()
+        );
+        assert!(matches!(
+            compute_manifest_digest(r#"{"run_id":"a","run_id":"b"}"#)
+                .unwrap_err()
+                .code,
+            VerificationErrorCode::DuplicateJsonKey(_)
+        ));
+    }
+
+    #[test]
     fn canonicalizer_sorts_recursively_and_preserves_array_order() {
         let raw: StrictJson =
             serde_json::from_str(r#"{"z":1,"a":{"b":2,"a":3},"arr":[{"z":0,"a":1}]}"#)
