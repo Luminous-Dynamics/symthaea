@@ -168,11 +168,11 @@ impl EpistemicVerifier {
             match source.supports {
                 Some(true) => {
                     supporting.push(source.url.clone());
-                    total_support_score += credibility * source.similarity;
+                    total_support_score += credibility;
                 }
                 Some(false) => {
                     contradicting.push(source.url.clone());
-                    total_contradict_score += credibility * source.similarity;
+                    total_contradict_score += credibility;
                 }
                 // Unclassified evidence is neutral. Query relevance
                 // cannot be substituted for claim-level support or contradiction.
