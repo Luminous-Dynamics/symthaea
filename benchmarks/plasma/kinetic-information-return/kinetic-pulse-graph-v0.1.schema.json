@@ -1,0 +1,216 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://github.com/Luminous-Dynamics/symthaea/blob/main/benchmarks/plasma/kinetic-information-return/kinetic-pulse-graph-v0.1.schema.json",
+  "title": "Kinetic Information Return pulse graph contract v0.1",
+  "description": "An immutable sequence of controlled kinetic interventions and observation horizon. Schema validates wire shape; it does not calculate an echo or qualify a physical solver.",
+  "type": "object",
+  "additionalProperties": false,
+  "required": [
+    "schema_version",
+    "record_status",
+    "graph_id",
+    "cohort",
+    "paths",
+    "claim_boundary"
+  ],
+  "properties": {
+    "schema_version": {
+      "const": "0.1"
+    },
+    "record_status": {
+      "const": "synthetic_pulse_sequence_contract_only"
+    },
+    "graph_id": {
+      "type": "string",
+      "minLength": 1
+    },
+    "cohort": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "equation_id",
+        "collision_model",
+        "boundary_topology",
+        "time_unit",
+        "maximum_time",
+        "pulse_family_fixture"
+      ],
+      "properties": {
+        "equation_id": {
+          "const": "periodic_1d1v_collisionless_vlasov_poisson"
+        },
+        "collision_model": {
+          "const": "collisionless"
+        },
+        "boundary_topology": {
+          "const": "periodic_torus"
+        },
+        "time_unit": {
+          "type": "string",
+          "minLength": 1
+        },
+        "maximum_time": {
+          "type": "number",
+          "exclusiveMinimum": 0
+        },
+        "pulse_family_fixture": {
+          "const": "synthetic-pulse-family-v0.1.json"
+        }
+      }
+    },
+    "paths": {
+      "type": "array",
+      "minItems": 1,
+      "maxItems": 128,
+      "items": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": [
+          "path_id",
+          "path_kind",
+          "observation_end_time",
+          "pulses"
+        ],
+        "properties": {
+          "path_id": {
+            "type": "string",
+            "minLength": 1
+          },
+          "path_kind": {
+            "enum": [
+              "baseline",
+              "two_pulse_echo",
+              "multi_pulse_cascade"
+            ]
+          },
+          "observation_end_time": {
+            "type": "number",
+            "exclusiveMinimum": 0
+          },
+          "pulses": {
+            "type": "array",
+            "maxItems": 512,
+            "items": {
+              "type": "object",
+              "additionalProperties": false,
+              "required": [
+                "pulse_id",
+                "spatial_mode",
+                "phase_rad",
+                "kick_velocity_amplitude",
+                "application_time"
+              ],
+              "properties": {
+                "pulse_id": {
+                  "type": "string",
+                  "minLength": 1
+                },
+                "spatial_mode": {
+                  "type": "integer",
+                  "minimum": 1,
+                  "maximum": 4
+                },
+                "phase_rad": {
+                  "type": "number",
+                  "minimum": -3.141592653589793,
+                  "maximum": 3.141592653589793
+                },
+                "kick_velocity_amplitude": {
+                  "type": "number",
+                  "minimum": 0,
+                  "maximum": 0.02
+                },
+                "application_time": {
+                  "type": "number",
+                  "minimum": 0,
+                  "maximum": 20
+                }
+              }
+            }
+          }
+        },
+        "allOf": [
+          {
+            "if": {
+              "properties": {
+                "path_kind": {
+                  "const": "baseline"
+                }
+              },
+              "required": [
+                "path_kind"
+              ]
+            },
+            "then": {
+              "properties": {
+                "pulses": {
+                  "maxItems": 0
+                }
+              }
+            }
+          },
+          {
+            "if": {
+              "properties": {
+                "path_kind": {
+                  "const": "two_pulse_echo"
+                }
+              },
+              "required": [
+                "path_kind"
+              ]
+            },
+            "then": {
+              "properties": {
+                "pulses": {
+                  "minItems": 2,
+                  "maxItems": 2
+                }
+              }
+            }
+          },
+          {
+            "if": {
+              "properties": {
+                "path_kind": {
+                  "const": "multi_pulse_cascade"
+                }
+              },
+              "required": [
+                "path_kind"
+              ]
+            },
+            "then": {
+              "properties": {
+                "pulses": {
+                  "minItems": 3,
+                  "maxItems": 512
+                }
+              }
+            }
+          }
+        ]
+      }
+    },
+    "claim_boundary": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "no_vlasov_solver_executed",
+        "no_echo_response_measured",
+        "no_global_memory_claim"
+      ],
+      "properties": {
+        "no_vlasov_solver_executed": {
+          "const": true
+        },
+        "no_echo_response_measured": {
+          "const": true
+        },
+        "no_global_memory_claim": {
+          "const": true
+        }
+      }
+    }
+  }
+}
