@@ -24,6 +24,7 @@ const TAU: f64 = std::f64::consts::TAU;
 const PI: f64 = std::f64::consts::PI;
 const MAX_PERIODIC_LIFT_HARMONICS: usize = 4_096;
 const MAX_MEASURE_PARTICLES: usize = 1_000_000;
+const MAX_KINETIC_PULSE_SEQUENCE_LENGTH: usize = 512;
 const MAX_FOURIER_MEASURE_WORK: usize = 16_777_216;
 const MAX_SCALAR_MODE_HORIZON_STEPS: u32 = 1_000_000;
 const MAX_DELAY_CANCELLATION_SAMPLES: usize = 1_000_000;
@@ -84,6 +85,12 @@ pub enum ContractError {
     EmptyResponseModeRegistry,
     #[error("response mode registry contains duplicate mode IDs")]
     DuplicateResponseMode,
+    #[error("kinetic pulse sequence exceeds its bounded pulse-count budget")]
+    KineticPulseSequenceTooLong,
+    #[error("kinetic pulse sequence has decreasing application times")]
+    NonMonotonicKineticPulseSequence,
+    #[error("pulse sequence observation horizon is invalid")]
+    InvalidPulseSequenceObservationHorizon,
     #[error("unknown response mode ID: {0}")]
     UnknownResponseMode(u32),
     #[error("response matrix dimensions overflow")]
@@ -2420,6 +2427,86 @@ impl PulseCandidate {
             phase_rad: normalize_phase(self.phase_rad + PI),
             ..self
         }
+    }
+}
+
+/// Ordered, content-addressed pulse sequence with a declared observation horizon.
+///
+/// Pulse order is preserved in the digest. Zero-amplitude no-op pulses are
+/// validated against the frozen family and then removed from the physical path
+/// identity. Application times must be nondecreasing and the observation
+/// horizon must lie after the final non-noop pulse and within the cohort horizon.
+#[derive(Clone, Debug, PartialEq)]
+pub struct KineticPulseSequence {
+    pulses: Vec<PulseCandidate>,
+    observation_end_time: f64,
+    digest: String,
+}
+
+impl KineticPulseSequence {
+    pub fn new(
+        contract: &PulseFamilyContract,
+        pulses: &[PulseCandidate],
+        observation_end_time: f64,
+    ) -> Result<Self, ContractError> {
+        contract.validate()?;
+        if pulses.len() > MAX_KINETIC_PULSE_SEQUENCE_LENGTH {
+            return Err(ContractError::KineticPulseSequenceTooLong);
+        }
+        if !observation_end_time.is_finite()
+            || observation_end_time <= 0.0
+            || observation_end_time > contract.physics_cohort.maximum_time
+        {
+            return Err(ContractError::InvalidPulseSequenceObservationHorizon);
+        }
+
+        let mut physical_pulses = Vec::with_capacity(pulses.len());
+        let mut previous_time = None;
+        for pulse in pulses {
+            pulse.validate_for(contract)?;
+            if pulse.kick_velocity_amplitude == 0.0 {
+                continue;
+            }
+            if previous_time.is_some_and(|time| pulse.application_time < time) {
+                return Err(ContractError::NonMonotonicKineticPulseSequence);
+            }
+            if pulse.application_time >= observation_end_time {
+                return Err(ContractError::InvalidPulseSequenceObservationHorizon);
+            }
+            previous_time = Some(pulse.application_time);
+            physical_pulses.push(*pulse);
+        }
+
+        let mut hasher = blake3::Hasher::new();
+        hasher.update(b"symthaea.kinetic-pulse-sequence.v0.1\0");
+        update_length_prefixed(
+            &mut hasher,
+            contract.family_fingerprint().as_bytes(),
+        );
+        update_f64(&mut hasher, observation_end_time);
+        hasher.update(&(physical_pulses.len() as u64).to_le_bytes());
+        for pulse in &physical_pulses {
+            let digest = pulse.canonical_digest(contract)?;
+            update_length_prefixed(&mut hasher, digest.as_bytes());
+        }
+
+        Ok(Self {
+            pulses: physical_pulses,
+            observation_end_time: canonical_zero(observation_end_time),
+            digest: hasher.finalize().to_hex().to_string(),
+        })
+    }
+
+    pub fn pulses(&self) -> &[PulseCandidate] {
+        &self.pulses
+    }
+
+    pub fn observation_end_time(&self) -> f64 {
+        self.observation_end_time
+    }
+
+    pub fn digest(&self) -> &str {
+        &self.digest
     }
 }
 
@@ -11229,6 +11316,88 @@ mod tests {
         assert_ne!(
             pulse.canonical_digest(&family).unwrap(),
             reversed.canonical_digest(&family).unwrap()
+        );
+    }
+
+    #[test]
+    fn kinetic_pulse_sequence_digest_is_deterministic_and_order_sensitive() {
+        let family = contract();
+        let first = candidate(1, 0.2, 0.01, 1.0);
+        let second = candidate(2, 0.4, 0.02, 2.0);
+        let a = KineticPulseSequence::new(&family, &[first, second], 5.0).unwrap();
+        let b = KineticPulseSequence::new(&family, &[first, second], 5.0).unwrap();
+        let reordered = KineticPulseSequence::new(
+            &family,
+            &[
+                candidate(2, 0.4, 0.02, 1.0),
+                candidate(1, 0.2, 0.01, 2.0),
+            ],
+            5.0,
+        )
+        .unwrap();
+        assert_eq!(a.digest(), b.digest());
+        assert_ne!(a.digest(), reordered.digest());
+        assert_eq!(a.pulses().len(), 2);
+        assert_eq!(a.observation_end_time(), 5.0);
+    }
+
+    #[test]
+    fn kinetic_pulse_sequence_removes_validated_noop_pulses_from_identity() {
+        let family = contract();
+        let pulse = candidate(2, 0.4, 0.02, 1.0);
+        let baseline = KineticPulseSequence::new(&family, &[pulse], 5.0).unwrap();
+        let with_noop = KineticPulseSequence::new(
+            &family,
+            &[
+                candidate(4, PI, 0.0, 0.5),
+                pulse,
+                candidate(1, -PI, -0.0, 4.0),
+            ],
+            5.0,
+        )
+        .unwrap();
+        assert_eq!(baseline.digest(), with_noop.digest());
+        assert_eq!(with_noop.pulses().len(), 1);
+    }
+
+    #[test]
+    fn kinetic_pulse_sequence_rejects_decreasing_times_and_late_observation() {
+        let family = contract();
+        let error = KineticPulseSequence::new(
+            &family,
+            &[
+                candidate(1, 0.0, 0.01, 2.0),
+                candidate(2, 0.0, 0.01, 1.0),
+            ],
+            5.0,
+        );
+        assert_eq!(error, Err(ContractError::NonMonotonicKineticPulseSequence));
+
+        let late = KineticPulseSequence::new(
+            &family,
+            &[candidate(1, 0.0, 0.01, 5.0)],
+            5.0,
+        );
+        assert_eq!(late, Err(ContractError::InvalidPulseSequenceObservationHorizon));
+    }
+
+    #[test]
+    fn kinetic_pulse_sequence_allows_a_baseline_path_with_no_interventions() {
+        let family = contract();
+        let baseline = KineticPulseSequence::new(&family, &[], 5.0).unwrap();
+        assert!(baseline.pulses().is_empty());
+        assert_eq!(baseline.observation_end_time(), 5.0);
+        assert_eq!(baseline.digest().len(), 64);
+    }
+
+    #[test]
+    fn kinetic_pulse_sequence_rejects_excessive_path_length() {
+        let family = contract();
+        let pulse = candidate(1, 0.0, 0.01, 1.0);
+        let pulses = vec![pulse; MAX_KINETIC_PULSE_SEQUENCE_LENGTH + 1];
+        assert_eq!(
+            KineticPulseSequence::new(&family, &pulses, 5.0),
+            Err(ContractError::KineticPulseSequenceTooLong)
         );
     }
 
