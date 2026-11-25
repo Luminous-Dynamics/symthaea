@@ -93,17 +93,11 @@ The witness MUST establish that `committed_at_unix` precedes the first episode's
 
 Decision Outcome Receipt v1 now includes `evaluation_manifest_commitment_receipt_sha256` in addition to `evaluation_manifest_sha256`.
 
-The consumer must independently verify the detached witness receipt, pin its full-receipt digest, and supply that expected digest to the outcome-receipt verifier. The verifier compares the outcome payload against the consumer-owned expected digest. This increment adds the binding field but does not yet implement the witness-receipt Rust verifier. Passing an arbitrary caller-provided hash is not verification.
+The AML adapter now contains `evaluation_manifest_commitment_receipt.rs`, a strict consumer-side detached-witness verifier. It checks payload and attestation digest recomputation, the witness signature under a separately pinned MACE Ed25519 verifier profile, exact consumer-owned suite/manifest/root/access/reveal bindings, trusted issue time, and strict commit-before-candidate-access / commit-before-first-episode ordering.
 
-The witness receipt verifier must check:
-- payload and attestation digest recomputation;
-- signature under a separately pinned witness-service profile;
-- the public episode root, sealed evaluation manifest, arm-assignment root, preregistration root and sealed-artifact root;
-- unique/exact episode and assignment membership;
-- trusted commit time and append-only log inclusion;
-- commit-before-run and commit-before-candidate-access ordering.
+Append-only log inclusion and consistency are mandatory through the `AppendOnlyManifestWitnessLogVerifierV1` interface. The adapter deliberately does not implement a concrete log client or trust anchor: production must provide a separately administered verifier that checks inclusion against an anchored checkpoint and consistency from a previously pinned checkpoint. A local signature without that proof is insufficient.
 
-Outcome verification must reject a valid evaluator signature if the independently verified witness receipt is absent, stale, invalid, or bound to another evaluation manifest.
+The verifier returns a private-field `VerifiedEvaluationManifestCommitmentV1` capability only after all checks, including the injected log verifier, pass. The outcome verifier now requires this capability rather than a caller-supplied hash string; it derives the exact sealed-manifest and witness-receipt digests from the capability. This prevents an application from accidentally passing an arbitrary digest without first verifying the detached witness.
 
 ## 6. Commit, run, seal, reveal protocol
 
@@ -137,13 +131,14 @@ For each test, preserve the raw witness response, storage/object digest, ACL dec
 
 ## 8. Claim boundary and implementation sequence
 
-This increment supplies schemas and protocol semantics only. It does not implement the witness service, transparency log, sealed-store isolation, manifest canonicalization/verifier, manifest-set root builder, trace-sealing service, or full benchmark runner.
+This increment supplies three JSON Schemas, protocol semantics, and the consumer-side detached-witness receipt verifier. It does not implement a concrete transparency-log client/checkpoint trust, public/sealed manifest root builder/validator, independent witness service, sealed-store isolation, trace-sealing service, or full benchmark runner. Rust compilation/tests remain unexecuted in the current environment.
 
 Next engineering steps:
-1. Implement shared Rust canonical digest helpers and fixed cross-language JCS vectors for all three manifest/receipt types.
-2. Implement strict manifest and detached witness-receipt validators; bind the witness receipt into the outcome verifier from a private-field verified capability, not a caller-supplied string alone.
-3. Implement evaluator-side sealed storage with separate principal, KMS key, ACL and append-only witness log.
-4. Implement trace sealing and delayed reveal.
-5. Run paired arms and publish externally reproducible manifests, receipts and per-case results.
+1. Implement canonical digest/root builders and fixed cross-language JCS vectors for public episode, sealed evaluation and witness receipt objects.
+2. Implement strict public/sealed manifest decoders, exact episode-to-assignment coverage checks and artifact/assignment-root recomputation.
+3. Implement a concrete append-only witness-log verifier with pinned checkpoints, inclusion and consistency proofs, fork detection and rollback controls.
+4. Deploy evaluator/witness principals with separate credentials, KMS keys, ACLs, storage and protected clocks.
+5. Implement trace sealing and delayed reveal so evaluator labels never enter candidate-readable state.
+6. Run paired arms and publish externally reproducible manifests, receipts and per-case results.
 
 No benchmark outcome is claimed by these schemas. The goal is to make evaluator independence and pre-registration verifiable properties of the run, rather than promises in a benchmark README.
