@@ -128,7 +128,8 @@
               "proof_obligation_graph",
               "criticality_sweep",
               "spectral_ablation",
-              "identifiability_abstention"
+              "identifiability_abstention",
+              "sequential_experiment_design"
             ]
           },
           "split": {
