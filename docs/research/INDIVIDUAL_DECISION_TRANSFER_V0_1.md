@@ -58,7 +58,7 @@ The unit suite covers:
 - latent readout selects the realized best action while rollout selects a worse action;
 - rollout selects the realized best action while latent readout selects a worse action;
 - shuffled rows and expected-action order yield identical canonical certificates;
-- epsilon-good sets include all actions within the declared tolerance;
+- epsilon-good sets include all actions within the declared tolerance, including a positive control where every action is epsilon-good but the selected action is not exact top-1;
 - exact argmax ties use the stable lexical rule while all tied realized winners remain top-1;
 - predicted and realized ranking ties are retained in distinct counters;
 - a common additive utility shift does not change action choices or regret;
