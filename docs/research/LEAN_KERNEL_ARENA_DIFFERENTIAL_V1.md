@@ -48,6 +48,17 @@ The current live table shows why raw theorem checking and performance must be me
 
 These are table transcriptions for this one homepage capture. They are not estimates of the checkers' general false-acceptance probabilities. The small control set does not support a general soundness ranking. For example, gruszka has a better displayed Mathlib time and memory than the official v4.35.0 row on this snapshot, while the official checker has a different implementation/trust status and a different assurance role. A single Mathlib time does not capture all resource profiles, supported constructs, proof parser behavior or metatheoretic assurance.
 
+### Distribution across all 37 visible rows
+
+Recomputing the counts from the captured table:
+- 17/37 have zero false acceptances on the 92 invalid-proof cases; 20/37 have at least one.
+- 29/37 have zero false rejections on the 148 valid-proof cases; 8/37 have at least one.
+- 4/37 have at least one decline on the invalid-proof cohort; 23/37 have at least one decline on the valid-proof cohort.
+- The largest displayed false-acceptance counts are `mini` (19/92), `overfull` (16/92), `evmlean` (11/92), `mathgraph` (8/92), and `nanoclo-fortran` (6/92).
+- The largest displayed false-rejection counts are `canonical-min` (62/148), `lean4cobol` (20/148), and `lean4lean` (7/148).
+
+This distribution is a reason to keep the outcomes separate, not a definitive checker ranking. A small frozen cohort can reveal specific seeded failure modes, but cannot establish a general soundness probability. The current page is also a live round, so the counts must always be paired with the capture date and source snapshot digest.
+
 ## 4. Full 37-checker snapshot
 
 The complete transcription, including all published versions, languages, invalid/valid/corner outcome counts, and Mathlib time/memory where available, is in [LEAN_KERNEL_ARENA_LIVE_SNAPSHOT_2026_11_25.json](LEAN_KERNEL_ARENA_LIVE_SNAPSHOT_2026_11_25.json). Its strict schema is [LEAN_KERNEL_ARENA_LIVE_SNAPSHOT_2026_11_25.schema.json](LEAN_KERNEL_ARENA_LIVE_SNAPSHOT_2026_11_25.schema.json).
