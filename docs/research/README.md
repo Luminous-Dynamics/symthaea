@@ -389,9 +389,14 @@ A falsifiable programme for spectral statistics, RH/prime-structure controls, ne
 - [Research protocol](SPECTRAL_DYNAMICAL_COGNITION_BRIDGE_V1.md)
 - [Industry and research benchmark landscape (2026-11-25)](SDCB_INDUSTRY_BENCHMARK_LANDSCAPE_2026_11_25.md)
 - [Hidden evaluation and reproducibility protocol](SDCB_HIDDEN_EVALUATION_AND_REPRODUCIBILITY_V1.md)
-- [30-task exploratory pilot manifest](SPECTRAL_DYNAMICAL_PILOT_V1.json)
+- [34-task exploratory pilot manifest](SPECTRAL_DYNAMICAL_PILOT_V1.json)
 - [Benchmark manifest schema](SPECTRAL_DYNAMICAL_BENCHMARK_MANIFEST_V1.schema.json)
 - [Dependency-free Rust analytic reference harness](../../scripts/research/sdcb_reference.rs)
 - [Reference harness run instructions and limits](../../scripts/research/SDCB_REFERENCE_HARNESS_README.md)
 
 **Evidence boundary:** artifacts are research specifications and authored reference tests. Rust compilation/tests, model inference, generated trajectory experiments, hidden-set creation, external baseline reproduction, and scientific results remain pending.
+
+
+### Scientific-discovery benchmark interoperability
+
+- [Scientific-discovery benchmark interoperability](SDCB_SCIENTIFIC_DISCOVERY_INTEROPERABILITY_V1.md): adapters and matched evaluation plans for Autonomous Science Bench, FIRE-Bench, SciAgentArena, AstaBench, SorryDB, Goedel-Prover-V2 and the Open Agent Leaderboard.
