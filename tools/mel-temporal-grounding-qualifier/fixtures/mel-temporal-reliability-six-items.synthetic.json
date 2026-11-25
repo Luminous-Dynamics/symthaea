@@ -1,0 +1,531 @@
+{
+  "schema": "mel-multi-annotator-reliability-dataset-v1",
+  "dataset_id": "synthetic-mel-source-cluster-reliability-v1",
+  "annotation_policy_version": "musician-annotation-v1",
+  "minimum_raters_per_item": 3,
+  "scoring_plan": {
+    "evaluator_version": "mel-temporal-grounding-evaluator-v1",
+    "minimum_interval_iou": 0.5
+  },
+  "bootstrap_replicates": 1000,
+  "bootstrap_seed": 79255,
+  "boundary_tolerances_ms": [
+    25,
+    50,
+    100
+  ],
+  "items": [
+    {
+      "item_id": "a-present-item",
+      "source_work_id_sha256": "00000000000000000000000000000000000000000000000000000000000000c2",
+      "case": {
+        "schema": "mel-multi-annotator-temporal-grounding-v1",
+        "query_id": "a-piano-present",
+        "query_text": "Every piano entrance",
+        "artifact": {
+          "audio_sha256": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+          "sample_rate_hz": 48000,
+          "channels": 2,
+          "total_frames": 2880000
+        },
+        "annotation_policy_version": "musician-annotation-v1",
+        "annotation_manifest_sha256": "0000000000000000000000000000000000000000000000000000000000000320",
+        "minimum_annotator_count": 3,
+        "plan": {
+          "evaluator_version": "mel-temporal-grounding-evaluator-v1",
+          "minimum_interval_iou": 0.5
+        },
+        "prediction": {
+          "schema_version": "mel-temporal-grounding-v1",
+          "query_id": "a-piano-present",
+          "artifact": {
+            "audio_sha256": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+            "sample_rate_hz": 48000,
+            "channels": 2,
+            "total_frames": 2880000
+          },
+          "state": {
+            "Occurrences": {
+              "intervals": [
+                {
+                  "start_frame": 48000,
+                  "end_frame": 52800
+                },
+                {
+                  "start_frame": 120000,
+                  "end_frame": 124800
+                }
+              ]
+            }
+          }
+        },
+        "annotations": [
+          {
+            "annotator_id_sha256": "0000000000000000000000000000000000000000000000000000000000000001",
+            "annotation_sha256": "0000000000000000000000000000000000000000000000000000000000000001",
+            "state": "Present",
+            "intervals": [
+              {
+                "start_frame": 48000,
+                "end_frame": 52800
+              },
+              {
+                "start_frame": 120000,
+                "end_frame": 124800
+              }
+            ],
+            "status_reason": null
+          },
+          {
+            "annotator_id_sha256": "0000000000000000000000000000000000000000000000000000000000000002",
+            "annotation_sha256": "0000000000000000000000000000000000000000000000000000000000000002",
+            "state": "Present",
+            "intervals": [
+              {
+                "start_frame": 48000,
+                "end_frame": 52800
+              },
+              {
+                "start_frame": 120000,
+                "end_frame": 124800
+              }
+            ],
+            "status_reason": null
+          },
+          {
+            "annotator_id_sha256": "0000000000000000000000000000000000000000000000000000000000000003",
+            "annotation_sha256": "0000000000000000000000000000000000000000000000000000000000000003",
+            "state": "Present",
+            "intervals": [
+              {
+                "start_frame": 48000,
+                "end_frame": 52800
+              },
+              {
+                "start_frame": 120000,
+                "end_frame": 124800
+              }
+            ],
+            "status_reason": null
+          },
+          {
+            "annotator_id_sha256": "0000000000000000000000000000000000000000000000000000000000000004",
+            "annotation_sha256": "0000000000000000000000000000000000000000000000000000000000000004",
+            "state": "Present",
+            "intervals": [
+              {
+                "start_frame": 48000,
+                "end_frame": 52800
+              },
+              {
+                "start_frame": 120000,
+                "end_frame": 124800
+              }
+            ],
+            "status_reason": null
+          }
+        ]
+      }
+    },
+    {
+      "item_id": "a-absent-item",
+      "source_work_id_sha256": "00000000000000000000000000000000000000000000000000000000000000c2",
+      "case": {
+        "schema": "mel-multi-annotator-temporal-grounding-v1",
+        "query_id": "a-piano-absent",
+        "query_text": "Is there any piano entrance during the final section?",
+        "artifact": {
+          "audio_sha256": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+          "sample_rate_hz": 48000,
+          "channels": 2,
+          "total_frames": 2880000
+        },
+        "annotation_policy_version": "musician-annotation-v1",
+        "annotation_manifest_sha256": "0000000000000000000000000000000000000000000000000000000000000384",
+        "minimum_annotator_count": 3,
+        "plan": {
+          "evaluator_version": "mel-temporal-grounding-evaluator-v1",
+          "minimum_interval_iou": 0.5
+        },
+        "prediction": {
+          "schema_version": "mel-temporal-grounding-v1",
+          "query_id": "a-piano-absent",
+          "artifact": {
+            "audio_sha256": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+            "sample_rate_hz": 48000,
+            "channels": 2,
+            "total_frames": 2880000
+          },
+          "state": "QueryAbsent"
+        },
+        "annotations": [
+          {
+            "annotator_id_sha256": "0000000000000000000000000000000000000000000000000000000000000001",
+            "annotation_sha256": "0000000000000000000000000000000000000000000000000000000000000005",
+            "state": "Absent",
+            "intervals": [],
+            "status_reason": null
+          },
+          {
+            "annotator_id_sha256": "0000000000000000000000000000000000000000000000000000000000000002",
+            "annotation_sha256": "0000000000000000000000000000000000000000000000000000000000000006",
+            "state": "Absent",
+            "intervals": [],
+            "status_reason": null
+          },
+          {
+            "annotator_id_sha256": "0000000000000000000000000000000000000000000000000000000000000003",
+            "annotation_sha256": "0000000000000000000000000000000000000000000000000000000000000007",
+            "state": "Absent",
+            "intervals": [],
+            "status_reason": null
+          },
+          {
+            "annotator_id_sha256": "0000000000000000000000000000000000000000000000000000000000000004",
+            "annotation_sha256": "0000000000000000000000000000000000000000000000000000000000000008",
+            "state": "Ambiguous",
+            "intervals": [],
+            "status_reason": "gradual onset not separable from sustained texture"
+          }
+        ]
+      }
+    },
+    {
+      "item_id": "b-present-item",
+      "source_work_id_sha256": "00000000000000000000000000000000000000000000000000000000000000c3",
+      "case": {
+        "schema": "mel-multi-annotator-temporal-grounding-v1",
+        "query_id": "b-piano-present",
+        "query_text": "Every piano entrance",
+        "artifact": {
+          "audio_sha256": "bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb",
+          "sample_rate_hz": 48000,
+          "channels": 2,
+          "total_frames": 2880000
+        },
+        "annotation_policy_version": "musician-annotation-v1",
+        "annotation_manifest_sha256": "0000000000000000000000000000000000000000000000000000000000000384",
+        "minimum_annotator_count": 3,
+        "plan": {
+          "evaluator_version": "mel-temporal-grounding-evaluator-v1",
+          "minimum_interval_iou": 0.5
+        },
+        "prediction": {
+          "schema_version": "mel-temporal-grounding-v1",
+          "query_id": "b-piano-present",
+          "artifact": {
+            "audio_sha256": "bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb",
+            "sample_rate_hz": 48000,
+            "channels": 2,
+            "total_frames": 2880000
+          },
+          "state": {
+            "Occurrences": {
+              "intervals": [
+                {
+                  "start_frame": 48000,
+                  "end_frame": 52800
+                },
+                {
+                  "start_frame": 120000,
+                  "end_frame": 124800
+                }
+              ]
+            }
+          }
+        },
+        "annotations": [
+          {
+            "annotator_id_sha256": "0000000000000000000000000000000000000000000000000000000000000001",
+            "annotation_sha256": "0000000000000000000000000000000000000000000000000000000000000009",
+            "state": "Present",
+            "intervals": [
+              {
+                "start_frame": 48000,
+                "end_frame": 52800
+              },
+              {
+                "start_frame": 120000,
+                "end_frame": 124800
+              }
+            ],
+            "status_reason": null
+          },
+          {
+            "annotator_id_sha256": "0000000000000000000000000000000000000000000000000000000000000002",
+            "annotation_sha256": "000000000000000000000000000000000000000000000000000000000000000a",
+            "state": "Present",
+            "intervals": [
+              {
+                "start_frame": 48000,
+                "end_frame": 52800
+              },
+              {
+                "start_frame": 120000,
+                "end_frame": 124800
+              }
+            ],
+            "status_reason": null
+          },
+          {
+            "annotator_id_sha256": "0000000000000000000000000000000000000000000000000000000000000003",
+            "annotation_sha256": "000000000000000000000000000000000000000000000000000000000000000b",
+            "state": "Present",
+            "intervals": [
+              {
+                "start_frame": 48000,
+                "end_frame": 52800
+              }
+            ],
+            "status_reason": null
+          },
+          {
+            "annotator_id_sha256": "0000000000000000000000000000000000000000000000000000000000000004",
+            "annotation_sha256": "000000000000000000000000000000000000000000000000000000000000000c",
+            "state": "Absent",
+            "intervals": [],
+            "status_reason": null
+          }
+        ]
+      }
+    },
+    {
+      "item_id": "b-absent-item",
+      "source_work_id_sha256": "00000000000000000000000000000000000000000000000000000000000000c3",
+      "case": {
+        "schema": "mel-multi-annotator-temporal-grounding-v1",
+        "query_id": "b-piano-absent",
+        "query_text": "Is there any piano entrance during the final section?",
+        "artifact": {
+          "audio_sha256": "bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb",
+          "sample_rate_hz": 48000,
+          "channels": 2,
+          "total_frames": 2880000
+        },
+        "annotation_policy_version": "musician-annotation-v1",
+        "annotation_manifest_sha256": "00000000000000000000000000000000000000000000000000000000000003e8",
+        "minimum_annotator_count": 3,
+        "plan": {
+          "evaluator_version": "mel-temporal-grounding-evaluator-v1",
+          "minimum_interval_iou": 0.5
+        },
+        "prediction": {
+          "schema_version": "mel-temporal-grounding-v1",
+          "query_id": "b-piano-absent",
+          "artifact": {
+            "audio_sha256": "bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb",
+            "sample_rate_hz": 48000,
+            "channels": 2,
+            "total_frames": 2880000
+          },
+          "state": "QueryAbsent"
+        },
+        "annotations": [
+          {
+            "annotator_id_sha256": "0000000000000000000000000000000000000000000000000000000000000001",
+            "annotation_sha256": "000000000000000000000000000000000000000000000000000000000000000d",
+            "state": "Absent",
+            "intervals": [],
+            "status_reason": null
+          },
+          {
+            "annotator_id_sha256": "0000000000000000000000000000000000000000000000000000000000000002",
+            "annotation_sha256": "000000000000000000000000000000000000000000000000000000000000000e",
+            "state": "Absent",
+            "intervals": [],
+            "status_reason": null
+          },
+          {
+            "annotator_id_sha256": "0000000000000000000000000000000000000000000000000000000000000003",
+            "annotation_sha256": "000000000000000000000000000000000000000000000000000000000000000f",
+            "state": "Absent",
+            "intervals": [],
+            "status_reason": null
+          },
+          {
+            "annotator_id_sha256": "0000000000000000000000000000000000000000000000000000000000000004",
+            "annotation_sha256": "0000000000000000000000000000000000000000000000000000000000000010",
+            "state": "NotEstimable",
+            "intervals": [],
+            "status_reason": "masking and overlapping voices prevent reliable judgement"
+          }
+        ]
+      }
+    },
+    {
+      "item_id": "c-present-item",
+      "source_work_id_sha256": "00000000000000000000000000000000000000000000000000000000000000c4",
+      "case": {
+        "schema": "mel-multi-annotator-temporal-grounding-v1",
+        "query_id": "c-piano-present",
+        "query_text": "Every piano entrance",
+        "artifact": {
+          "audio_sha256": "cccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccc",
+          "sample_rate_hz": 48000,
+          "channels": 2,
+          "total_frames": 2880000
+        },
+        "annotation_policy_version": "musician-annotation-v1",
+        "annotation_manifest_sha256": "00000000000000000000000000000000000000000000000000000000000003e8",
+        "minimum_annotator_count": 3,
+        "plan": {
+          "evaluator_version": "mel-temporal-grounding-evaluator-v1",
+          "minimum_interval_iou": 0.5
+        },
+        "prediction": {
+          "schema_version": "mel-temporal-grounding-v1",
+          "query_id": "c-piano-present",
+          "artifact": {
+            "audio_sha256": "cccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccc",
+            "sample_rate_hz": 48000,
+            "channels": 2,
+            "total_frames": 2880000
+          },
+          "state": {
+            "Occurrences": {
+              "intervals": [
+                {
+                  "start_frame": 48000,
+                  "end_frame": 52800
+                },
+                {
+                  "start_frame": 120000,
+                  "end_frame": 124800
+                }
+              ]
+            }
+          }
+        },
+        "annotations": [
+          {
+            "annotator_id_sha256": "0000000000000000000000000000000000000000000000000000000000000001",
+            "annotation_sha256": "0000000000000000000000000000000000000000000000000000000000000011",
+            "state": "Present",
+            "intervals": [
+              {
+                "start_frame": 48000,
+                "end_frame": 52800
+              },
+              {
+                "start_frame": 120000,
+                "end_frame": 124800
+              }
+            ],
+            "status_reason": null
+          },
+          {
+            "annotator_id_sha256": "0000000000000000000000000000000000000000000000000000000000000002",
+            "annotation_sha256": "0000000000000000000000000000000000000000000000000000000000000012",
+            "state": "Present",
+            "intervals": [
+              {
+                "start_frame": 49200,
+                "end_frame": 54000
+              },
+              {
+                "start_frame": 120000,
+                "end_frame": 124800
+              }
+            ],
+            "status_reason": null
+          },
+          {
+            "annotator_id_sha256": "0000000000000000000000000000000000000000000000000000000000000003",
+            "annotation_sha256": "0000000000000000000000000000000000000000000000000000000000000013",
+            "state": "Present",
+            "intervals": [
+              {
+                "start_frame": 48000,
+                "end_frame": 52800
+              },
+              {
+                "start_frame": 120000,
+                "end_frame": 124800
+              }
+            ],
+            "status_reason": null
+          },
+          {
+            "annotator_id_sha256": "0000000000000000000000000000000000000000000000000000000000000004",
+            "annotation_sha256": "0000000000000000000000000000000000000000000000000000000000000014",
+            "state": "Present",
+            "intervals": [
+              {
+                "start_frame": 48000,
+                "end_frame": 52800
+              },
+              {
+                "start_frame": 120000,
+                "end_frame": 124800
+              }
+            ],
+            "status_reason": null
+          }
+        ]
+      }
+    },
+    {
+      "item_id": "c-absent-item",
+      "source_work_id_sha256": "00000000000000000000000000000000000000000000000000000000000000c4",
+      "case": {
+        "schema": "mel-multi-annotator-temporal-grounding-v1",
+        "query_id": "c-piano-absent",
+        "query_text": "Is there any piano entrance during the final section?",
+        "artifact": {
+          "audio_sha256": "cccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccc",
+          "sample_rate_hz": 48000,
+          "channels": 2,
+          "total_frames": 2880000
+        },
+        "annotation_policy_version": "musician-annotation-v1",
+        "annotation_manifest_sha256": "000000000000000000000000000000000000000000000000000000000000044c",
+        "minimum_annotator_count": 3,
+        "plan": {
+          "evaluator_version": "mel-temporal-grounding-evaluator-v1",
+          "minimum_interval_iou": 0.5
+        },
+        "prediction": {
+          "schema_version": "mel-temporal-grounding-v1",
+          "query_id": "c-piano-absent",
+          "artifact": {
+            "audio_sha256": "cccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccc",
+            "sample_rate_hz": 48000,
+            "channels": 2,
+            "total_frames": 2880000
+          },
+          "state": "QueryAbsent"
+        },
+        "annotations": [
+          {
+            "annotator_id_sha256": "0000000000000000000000000000000000000000000000000000000000000001",
+            "annotation_sha256": "0000000000000000000000000000000000000000000000000000000000000015",
+            "state": "Absent",
+            "intervals": [],
+            "status_reason": null
+          },
+          {
+            "annotator_id_sha256": "0000000000000000000000000000000000000000000000000000000000000002",
+            "annotation_sha256": "0000000000000000000000000000000000000000000000000000000000000016",
+            "state": "Absent",
+            "intervals": [],
+            "status_reason": null
+          },
+          {
+            "annotator_id_sha256": "0000000000000000000000000000000000000000000000000000000000000003",
+            "annotation_sha256": "0000000000000000000000000000000000000000000000000000000000000017",
+            "state": "Absent",
+            "intervals": [],
+            "status_reason": null
+          },
+          {
+            "annotator_id_sha256": "0000000000000000000000000000000000000000000000000000000000000004",
+            "annotation_sha256": "0000000000000000000000000000000000000000000000000000000000000018",
+            "state": "Absent",
+            "intervals": [],
+            "status_reason": null
+          }
+        ]
+      }
+    }
+  ]
+}
