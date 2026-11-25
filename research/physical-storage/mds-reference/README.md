@@ -25,6 +25,20 @@ cargo test --manifest-path research/physical-storage/mds-reference/Cargo.toml --
 cargo run --manifest-path research/physical-storage/mds-reference/Cargo.toml --bin run_cases
 ```
 
+## Initial spatial-interleaver comparison
+
+A deterministic exhaustive geometry tournament compared the spatial-stride layout with a naive row-major assignment of each stripe's six shards to six consecutive available tiles. Under the same two-erasure-per-stripe MDS budget:
+
+| Contiguous fault region | Spatial-stride failures | Row-major failures |
+|---|---:|---:|
+| 2 × 2 × 1 boxes | 0 / 36 | 13 / 36 |
+| 3 × 3 × 1 boxes | 0 / 16 | 12 / 16 |
+| 2 × 2 × 2 boxes | 0 / 27 | 19 / 27 |
+| 3 × 3 × 2 boxes | 8 / 12 | 12 / 12 |
+| Any one complete layer | 0 / 3 | 3 / 3 |
+
+The spatial-stride map is materially better than row-major for these synthetic cases, but it has a clear failure boundary: some 3 × 3 × 2 damage regions exceed the two-erasure budget. This is deterministic combinatorial evidence about the declared toy geometry—not a physical defect probability or storage-device result. Matching Rust unit tests are authored; their Cargo execution remains pending.
+
 ## Deliberately limited claims
 
 The 3-layer demonstration is a severe synthetic stress case: every complete layer contains two shards from every stripe, so any one of the three layers can be erased and reconstructed. The complete toy layout carries 224 payload bytes in 48 × 8 = 384 physical tile bytes, or 58.33% net payload efficiency after parity, controls and spare tiles. The low rate is intentional for a one-third-volume erasure proof; it is not an optimized capacity result.
