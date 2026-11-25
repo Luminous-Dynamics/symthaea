@@ -1144,6 +1144,9 @@ pub fn plan_response_weighted_refinement(
         let mut weighted_gain = 0.0_f64;
         let mut complete = true;
         for (output_index, output_mode) in response.output_modes().iter().enumerate() {
+            if output_weights[output_index] == 0.0 {
+                continue;
+            }
             match response.get(*mode, *output_mode)? {
                 Some(value) => {
                     weighted_gain += output_weights[output_index] * value.magnitude();
@@ -5194,6 +5197,13 @@ pub fn validate_kird_record_json(input: &str) -> Result<KirdRecordSummary, Contr
 pub fn validate_kird_record_value(
     value: &serde_json::Value,
 ) -> Result<KirdRecordSummary, ContractError> {
+    let schema_version = kird_string(value, "schema_version")?;
+    if schema_version != "0.1" {
+        return Err(kird_error(
+            "schema_version",
+            "unsupported KIRD schema version",
+        ));
+    }
     let record_id = kird_string(value, "record_id")?;
     if !record_id.starts_with("KIRD-") {
         return Err(kird_error("record_id", "must use the KIRD- prefix"));
@@ -6380,6 +6390,20 @@ mod tests {
         assert_eq!(report.response_coverage_kind, "none");
         assert!(!report.globally_bounded);
         assert_eq!(report.physical_gate_status, "UNKNOWN");
+    }
+
+    #[test]
+    fn kird_audit_rejects_unsupported_schema_version() {
+        let mut value: serde_json::Value =
+            serde_json::from_str(KIRD_SYNTHETIC_FIXTURE).unwrap();
+        value["schema_version"] = serde_json::json!("0.2");
+        assert!(matches!(
+            validate_kird_record_value(&value),
+            Err(ContractError::InvalidKirdField {
+                field: "schema_version",
+                ..
+            })
+        ));
     }
 
     #[test]
@@ -9586,6 +9610,55 @@ mod tests {
         assert_eq!(missing.weighted_response_gain, None);
         assert_eq!(missing.response_loss_bound, None);
         assert_eq!(missing.disposition, ModeRefinementDisposition::RetainedUnknownResponse);
+    }
+
+    #[test]
+    fn response_weighted_refinement_ignores_missing_zero_weight_qoi_entries() {
+        let mut matrix = ModeResponseMatrix::new(vec![1], vec![10, 20]).unwrap();
+        matrix.set(1, 10, ComplexResponse::new(0.5, 0.0).unwrap()).unwrap();
+        let plan = plan_response_weighted_refinement(
+            &matrix,
+            &[(1, ComplexResponse::new(0.2, 0.0).unwrap())],
+            &[(1, 32)],
+            &[1.0, 0.0],
+            0.2,
+        )
+        .unwrap();
+        let decision = &plan.decisions[0];
+        assert_eq!(decision.weighted_response_gain, Some(0.5));
+        assert_eq!(decision.response_loss_bound, Some(0.1));
+        assert_eq!(
+            decision.disposition,
+            ModeRefinementDisposition::DiscardedWithinBudget
+        );
+    }
+
+    #[test]
+    fn response_weighted_refinement_still_requires_positive_weight_qoi_entries() {
+        let matrix = ModeResponseMatrix::new(vec![1], vec![10, 20]).unwrap();
+        assert_eq!(
+            plan_response_weighted_refinement(
+                &matrix,
+                &[(1, ComplexResponse::new(0.2, 0.0).unwrap())],
+                &[(1, 32)],
+                &[1.0, 0.0],
+                0.2,
+            ),
+            Ok(ResponseWeightedRefinementPlan {
+                response_loss_budget: 0.2,
+                accumulated_discarded_response_bound: 0.0,
+                discarded_state_bytes: 0,
+                decisions: vec![ModeRefinementDecision {
+                    input_mode: 1,
+                    coefficient_magnitude: 0.2,
+                    spectral_energy: 0.04,
+                    weighted_response_gain: None,
+                    response_loss_bound: None,
+                    encoded_bytes: 32,
+                    disposition: ModeRefinementDisposition::RetainedUnknownResponse,
+                }]
+            })
+        );
     }
 
     #[test]
