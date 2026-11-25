@@ -15,6 +15,8 @@ on:
       - "docs/research/MATH_SCOPE_EQUIVALENCE_TIER1_V1.*"
       - "docs/research/MATH_SCOPE_EQUIVALENCE_TIER2_AND_COMM_V1.*"
       - "docs/research/LEAN_AXIOM_AUDIT_IMPORTED_INDUCTIVE_V1.*"
+      - "scripts/research/lean-proof-extractor/axiom-audit-imported-inductive/**"
+      - "scripts/research/lean-proof-extractor/ProofActionCertificateAndComm.lean"
       - "docs/research/MATH_HARDMODE_*"
       - "docs/research/PROOF_ACTION_CERTIFICATE_AND_COMM_V1.*"
       - "docs/research/PROOF_PLAN_*.md"
@@ -862,6 +864,8 @@ jobs:
           path: |
             mathlib4/axiom-audit-imported-inductive-repro/lean-imported-inductive-axiom-audit-receipt.json
             mathlib4/axiom-audit-imported-inductive-repro/module-a-build.log
+            mathlib4/axiom-audit-imported-inductive-repro/A.olean
+            mathlib4/axiom-audit-imported-inductive-repro/ProofActionCertificateAndComm.olean
             mathlib4/axiom-audit-imported-inductive-repro/proof-module-build.log
             mathlib4/axiom-audit-imported-inductive-repro/ProofActionCertificateAndComm.lean
             mathlib4/axiom-audit-imported-inductive-repro/module-b-import-audit.log
