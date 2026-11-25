@@ -1,0 +1,38 @@
+name: StateGuard B0 Public-State Policy Baseline
+
+on:
+  push:
+    branches: [main]
+    paths:
+      - "research/stateguard-b0-policy/**"
+      - "research/typed-research-state/**"
+      - ".github/workflows/stateguard-b0-policy.yml"
+  pull_request:
+    types: [opened, synchronize, reopened, ready_for_review]
+    paths:
+      - "research/stateguard-b0-policy/**"
+      - "research/typed-research-state/**"
+      - ".github/workflows/stateguard-b0-policy.yml"
+
+permissions:
+  contents: read
+
+jobs:
+  qualify:
+    name: Rust 1.96 StateGuard B0 tests and replay
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - name: Set up Rust
+        uses: dtolnay/rust-toolchain@stable
+        with:
+          toolchain: "1.96.0"
+          components: clippy, rustfmt
+      - name: Check formatting
+        run: cargo fmt --manifest-path research/stateguard-b0-policy/Cargo.toml -- --check
+      - name: Run locked policy tests
+        run: cargo test --manifest-path research/stateguard-b0-policy/Cargo.toml --locked --all-targets
+      - name: Run synthetic policy input
+        run: cargo run --manifest-path research/stateguard-b0-policy/Cargo.toml --locked -- research/stateguard-b0-policy/fixtures/policy-input-synthetic-example-v0.1.json
+      - name: Run strict Clippy
+        run: cargo clippy --manifest-path research/stateguard-b0-policy/Cargo.toml --locked --all-targets -- -D warnings
