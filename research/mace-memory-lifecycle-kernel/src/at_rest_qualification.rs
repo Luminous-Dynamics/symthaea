@@ -1021,6 +1021,31 @@ mod tests {
         }
     }
 
+    #[test]
+    fn fixed_python_event_trace_vectors_match_t9_t10_and_control_receipts() {
+        let t9 = event_trace("t9-run-1", AtRestCaseIdV1::T9WholeStoreRollback, &digest('e'));
+        let t10 = event_trace("t10-run-1", AtRestCaseIdV1::T10ErasureResurrection, &digest('f'));
+        let c1 = control_event_trace(AtRestControlIdV1::C1NoOpReload, "c1-run-1");
+        let c2 = control_event_trace(AtRestControlIdV1::C2GenuineWriteAfterRestart, "c2-run-1");
+
+        assert_eq!(
+            event_trace_sha256_v1(&t9).unwrap(),
+            "783cd5060014ac6207f88ec1fc04999b500db95d0752af0f5c1520a00ba1dc61"
+        );
+        assert_eq!(
+            event_trace_sha256_v1(&t10).unwrap(),
+            "c8a1ed06770d71e8ffd7942a5b46522d94de7aa47293499b96dc110a7f70442f"
+        );
+        assert_eq!(
+            event_trace_sha256_v1(&c1).unwrap(),
+            "b007969ea593e0fd9a63f672fb1993fa7a0f87dae15aaa5132d38a313e6fad1f"
+        );
+        assert_eq!(
+            event_trace_sha256_v1(&c2).unwrap(),
+            "5981de16e109a496de49bdc069ab16e88579b6e7eb09038f983ae1dee01c56a9"
+        );
+    }
+
     fn rejected_on_read() -> AtRestObservationV1 {
         AtRestObservationV1 {
             verdict: AtRestVerdictV1::Rejected,
