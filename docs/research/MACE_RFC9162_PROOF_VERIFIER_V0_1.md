@@ -56,6 +56,16 @@ Authored tests cover:
 
 An independent Python implementation was exercised against all 2,080 inclusion paths and 2,016 consistency pairs for the same tree shape during authoring. That is a local algorithmic cross-check, not execution of the Rust source, an official RFC vector suite, or differential interoperability against a third-party CT implementation.
 
+### Fixed cross-language reference vector
+
+The Rust tests also pin a 13-leaf inclusion proof and an 11-to-13 consistency proof generated independently in Python. The deterministic leaves are the UTF-8 strings `mace-rfc9162-fixture-leaf-{i}` for indices 0 through 12.
+
+- Tree size 13 root: `6adfcbd4eb5db2afdffcdaf31ee4231e0b899dc28228716130b5d3f202ceddf8`
+- Leaf 7 hash: `806c793bf78be40e761f9baf94ff64166614a684e190ee363e8687711e345901`
+- Tree size 11 root: `7f199e2a6d6e4a05e029092dd52e806710ab4068200d11b5108360e2f84e3517`
+
+The inclusion audit path and consistency proof nodes are embedded verbatim in the Rust test. Their independent origin is a useful regression check, but a Rust test still has to execute before parity is established.
+
 ## Next integration steps
 
 1. Run the Rust module tests, formatting and strict Clippy on the exact PR head.
