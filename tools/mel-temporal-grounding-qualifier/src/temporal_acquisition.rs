@@ -135,6 +135,9 @@ pub struct AnnotationAcquisitionConfigV1 {
     pub seed: u64,
     pub minimum_panel_count: u16,
     pub maximum_active_items_per_source_work: u32,
+    /// Number of query items sampled within each audit source work; at least two,
+    /// with a census when a source work has fewer eligible query items.
+    pub audit_items_per_source_work: u32,
     pub total_budget_units: u64,
     pub active_budget_units: u64,
     pub probability_audit_budget_units: u64,
@@ -175,6 +178,23 @@ pub struct AnnotationSelectionRecordV1 {
     pub item_given_source_work_probability: Option<ProbabilityFractionV1>,
     /// Product of source-work and conditional item probabilities.
     pub item_inclusion_probability: Option<ProbabilityFractionV1>,
+    pub eligible_source_works_in_stratum: Option<usize>,
+    pub selected_source_works_in_stratum: Option<usize>,
+    pub eligible_items_in_source_work: Option<usize>,
+    pub selected_items_in_source_work: Option<usize>,
+}
+
+#[derive(Debug, Clone, PartialEq, Serialize)]
+pub struct ProbabilityAuditStratumDesignV1 {
+    pub source_stratum_id: String,
+    pub eligible_source_works: usize,
+    pub eligible_query_items: usize,
+    pub selected_source_works: usize,
+    pub selected_query_items: usize,
+    pub items_per_source_work_cap: u32,
+    /// Fixed worst-case reservation computed before random sampling.
+    pub worst_case_reserved_cost_units: u64,
+    pub actual_spent_cost_units: u64,
 }
 
 #[derive(Debug, Clone, PartialEq, Serialize)]
@@ -225,6 +245,7 @@ pub struct AnnotationAcquisitionReportV1 {
     pub normalized_config_sha256: String,
     pub active_refinement: Vec<AnnotationSelectionRecordV1>,
     pub probability_audit: Vec<AnnotationSelectionRecordV1>,
+    pub probability_audit_design: Vec<ProbabilityAuditStratumDesignV1>,
     pub rejected_candidates: Vec<RejectedAnnotationCandidateV1>,
     pub eligible_but_unselected: Vec<UnselectedAnnotationCandidateV1>,
     pub unmet_quotas: Vec<UnmetAnnotationQuotaV1>,
@@ -246,6 +267,7 @@ struct SelectionReceiptPayloadV1<'a> {
     normalized_config_sha256: &'a str,
     active_refinement: &'a [AnnotationSelectionRecordV1],
     probability_audit: &'a [AnnotationSelectionRecordV1],
+    probability_audit_design: &'a [ProbabilityAuditStratumDesignV1],
     rejected_candidates: &'a [RejectedAnnotationCandidateV1],
     eligible_but_unselected: &'a [UnselectedAnnotationCandidateV1],
     unmet_quotas: &'a [UnmetAnnotationQuotaV1],
@@ -488,6 +510,9 @@ fn validate_config(config: &AnnotationAcquisitionConfigV1) -> Result<(), String>
     }
     if config.minimum_panel_count == 0 || config.maximum_active_items_per_source_work == 0 {
         return Err("panel minimum and active source-work cap must be positive".into());
+    }
+    if config.audit_items_per_source_work < 2 {
+        return Err("audit_items_per_source_work must be at least two".into());
     }
     if config.total_budget_units == 0 {
         return Err("total annotation budget must be positive".into());
