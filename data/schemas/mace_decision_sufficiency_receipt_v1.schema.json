@@ -1,0 +1,239 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://github.com/Luminous-Dynamics/symthaea/blob/main/data/schemas/mace_decision_sufficiency_receipt_v1.schema.json",
+  "title": "MACE Decision Sufficiency Receipt v1",
+  "type": "object",
+  "additionalProperties": false,
+  "required": [
+    "schema_version",
+    "payload",
+    "attestation"
+  ],
+  "properties": {
+    "schema_version": {
+      "const": "mace_decision_sufficiency_receipt_v1"
+    },
+    "payload": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "schema_version",
+        "decision_episode_id",
+        "decision_invocation_id",
+        "binding",
+        "assessment"
+      ],
+      "properties": {
+        "schema_version": {
+          "const": "mace_decision_sufficiency_payload_v1"
+        },
+        "decision_episode_id": {
+          "type": "string",
+          "minLength": 1,
+          "maxLength": 256
+        },
+        "decision_invocation_id": {
+          "type": "string",
+          "minLength": 1,
+          "maxLength": 256
+        },
+        "binding": {
+          "type": "object",
+          "additionalProperties": false,
+          "required": [
+            "subject_scope_sha256",
+            "purpose_sha256",
+            "decision_need_sha256",
+            "option_set_sha256",
+            "constraint_set_sha256",
+            "environment_revision_sha256",
+            "lifecycle_snapshot_sha256",
+            "qualification_receipt_sha256",
+            "qualified_evidence_set_sha256",
+            "reader_input_sha256",
+            "reader_profile_sha256",
+            "decision_policy_sha256"
+          ],
+          "properties": {
+            "subject_scope_sha256": {
+              "$ref": "#/$defs/sha256"
+            },
+            "purpose_sha256": {
+              "$ref": "#/$defs/sha256"
+            },
+            "decision_need_sha256": {
+              "$ref": "#/$defs/sha256"
+            },
+            "option_set_sha256": {
+              "$ref": "#/$defs/sha256"
+            },
+            "constraint_set_sha256": {
+              "$ref": "#/$defs/sha256"
+            },
+            "environment_revision_sha256": {
+              "$ref": "#/$defs/sha256"
+            },
+            "lifecycle_snapshot_sha256": {
+              "$ref": "#/$defs/sha256"
+            },
+            "qualification_receipt_sha256": {
+              "$ref": "#/$defs/sha256"
+            },
+            "qualified_evidence_set_sha256": {
+              "$ref": "#/$defs/sha256"
+            },
+            "reader_input_sha256": {
+              "$ref": "#/$defs/sha256"
+            },
+            "reader_profile_sha256": {
+              "$ref": "#/$defs/sha256"
+            },
+            "decision_policy_sha256": {
+              "$ref": "#/$defs/sha256"
+            }
+          }
+        },
+        "assessment": {
+          "type": "object",
+          "additionalProperties": false,
+          "required": [
+            "disposition",
+            "admissible_evidence_ids",
+            "applicable_requirement_ids",
+            "satisfied_requirement_ids",
+            "missing_requirement_ids",
+            "unresolved_contradiction_ids",
+            "coverage_report_sha256",
+            "contradiction_report_sha256",
+            "uncertainty_report_sha256"
+          ],
+          "properties": {
+            "disposition": {
+              "enum": [
+                "sufficient",
+                "insufficient",
+                "indeterminate"
+              ]
+            },
+            "admissible_evidence_ids": {
+              "$ref": "#/$defs/sortedIdentifiers"
+            },
+            "applicable_requirement_ids": {
+              "$ref": "#/$defs/sortedIdentifiers"
+            },
+            "satisfied_requirement_ids": {
+              "$ref": "#/$defs/sortedIdentifiers"
+            },
+            "missing_requirement_ids": {
+              "$ref": "#/$defs/sortedIdentifiers"
+            },
+            "unresolved_contradiction_ids": {
+              "$ref": "#/$defs/sortedIdentifiers"
+            },
+            "coverage_report_sha256": {
+              "$ref": "#/$defs/sha256"
+            },
+            "contradiction_report_sha256": {
+              "$ref": "#/$defs/sha256"
+            },
+            "uncertainty_report_sha256": {
+              "$ref": "#/$defs/sha256"
+            }
+          },
+          "allOf": [
+            {
+              "if": {
+                "properties": {
+                  "disposition": {
+                    "const": "sufficient"
+                  }
+                },
+                "required": [
+                  "disposition"
+                ]
+              },
+              "then": {
+                "properties": {
+                  "missing_requirement_ids": {
+                    "maxItems": 0
+                  },
+                  "unresolved_contradiction_ids": {
+                    "maxItems": 0
+                  }
+                }
+              }
+            }
+          ]
+        }
+      }
+    },
+    "attestation": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "assessor_profile_sha256",
+        "verifier_profile_sha256",
+        "key_id",
+        "issued_at_unix",
+        "expires_at_unix",
+        "payload_sha256",
+        "attestation_sha256",
+        "signature_base64"
+      ],
+      "properties": {
+        "assessor_profile_sha256": {
+          "$ref": "#/$defs/sha256"
+        },
+        "verifier_profile_sha256": {
+          "$ref": "#/$defs/sha256"
+        },
+        "key_id": {
+          "type": "string",
+          "minLength": 1,
+          "maxLength": 256
+        },
+        "issued_at_unix": {
+          "type": "integer",
+          "minimum": 0,
+          "maximum": 253402300799
+        },
+        "expires_at_unix": {
+          "type": "integer",
+          "minimum": 0,
+          "maximum": 253402300799
+        },
+        "payload_sha256": {
+          "$ref": "#/$defs/sha256"
+        },
+        "signature_base64": {
+          "type": "string",
+          "minLength": 88,
+          "maxLength": 88,
+          "pattern": "^[A-Za-z0-9+/]{86}==$",
+          "contentEncoding": "base64",
+          "description": "Canonical padded Base64 encoding of a 64-byte Ed25519 signature."
+        },
+        "attestation_sha256": {
+          "$ref": "#/$defs/sha256"
+        }
+      }
+    }
+  },
+  "$defs": {
+    "sha256": {
+      "type": "string",
+      "pattern": "^[0-9a-f]{64}$"
+    },
+    "sortedIdentifiers": {
+      "type": "array",
+      "maxItems": 10000,
+      "uniqueItems": true,
+      "items": {
+        "type": "string",
+        "minLength": 1,
+        "maxLength": 256
+      },
+      "description": "Protocol validators MUST require strict ascending UTF-8 byte order. JSON Schema uniqueItems does not enforce ordering."
+    }
+  }
+}
