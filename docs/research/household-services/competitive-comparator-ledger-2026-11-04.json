@@ -1,0 +1,818 @@
+{
+  "schema_version": "0.5",
+  "snapshot_date": "2026-11-22",
+  "purpose": "Source-backed competitive comparator ledger for Verified Household Services. Manufacturer-declared specifications and announced product features are not independent physical test results. Snapshot refreshed 2026-11-22 with current Topten European desk references and the direct-DC PV-water-heating research frontier; all added catalogue values remain supplier-declared/database/modelled evidence, not Luminous physical results. South African direct-PV water-heating incumbents and the IEC 63349 controller standards family added 2026-11-22; all manufacturer performance data are claims, not independent measurements.",
+  "claim_ceiling": [
+    "Manufacturer product fiches are source evidence for what the manufacturer declares, not independent performance verification.",
+    "Numbers from different programmes, markets, standards editions or loading protocols are not directly comparable without a matched test.",
+    "Announced products and concept studies are roadmap/context evidence, not purchasable test units.",
+    "Null metrics mean no applicable public quantitative value was found in the cited source; they must not be imputed."
+  ],
+  "comparators": [
+    {
+      "id": "MIELE-G7655-SCVI-XXL-AUTODOS-ECO",
+      "category": "household_dishwasher",
+      "manufacturer": "Miele",
+      "model": "G 7655 SCVi XXL AutoDos",
+      "market_variant": "GB product fiche",
+      "evidence_status": "manufacturer_declared_product_fiche",
+      "independent_measurement_status": "not_independently_verified",
+      "availability_status": "listed_product",
+      "functional_unit": "one Eco programme cycle",
+      "programme": "Eco",
+      "capacity_place_settings": 14,
+      "metrics": {
+        "electricity_kwh_per_cycle": 0.54,
+        "water_l_per_cycle": 8.4,
+        "duration_min_per_cycle": 230,
+        "noise_dba": 42,
+        "networked_standby_w": 0.9
+      },
+      "features": [
+        "AutoDos",
+        "SensorDry",
+        "AutoOpen drying",
+        "network connectivity",
+        "AI Diagnostics",
+        "Smart Home Integration"
+      ],
+      "notes": [
+        "Manufacturer product-sheet values.",
+        "The fiche also contains a manufacturer endurance statement; that is not a warranty or field-derived lifetime reliability distribution."
+      ],
+      "source": {
+        "title": "Miele G 7655 SCVi XXL AutoDos product data sheet",
+        "url": "https://media.miele.com/downloads/n-/gb/FS_12423980_GBE_GB-en-GB.pdf",
+        "source_date": null,
+        "retrieved_date": "2026-11-04"
+      }
+    },
+    {
+      "id": "MIELE-G7655-SCVI-XXL-AUTODOS-AUTOMATIC",
+      "category": "household_dishwasher",
+      "manufacturer": "Miele",
+      "model": "G 7655 SCVi XXL AutoDos",
+      "market_variant": "GB product fiche",
+      "evidence_status": "manufacturer_declared_product_fiche",
+      "independent_measurement_status": "not_independently_verified",
+      "availability_status": "listed_product",
+      "functional_unit": "one Automatic programme cycle",
+      "programme": "Automatic",
+      "capacity_place_settings": 14,
+      "metrics": {
+        "electricity_kwh_per_cycle": null,
+        "water_l_per_cycle_from": 6,
+        "duration_min_per_cycle": null,
+        "noise_dba": null
+      },
+      "notes": [
+        "The 6.0 L value belongs to Automatic, not Eco.",
+        "Do not combine this value with the Eco 0.54 kWh figure as though both describe the same programme."
+      ],
+      "source": {
+        "title": "Miele G 7655 SCVi XXL AutoDos product data sheet",
+        "url": "https://media.miele.com/downloads/n-/gb/FS_12423980_GBE_GB-en-GB.pdf",
+        "source_date": null,
+        "retrieved_date": "2026-11-04"
+      }
+    },
+    {
+      "id": "BEKO-DIN28428-ZA",
+      "category": "household_dishwasher",
+      "manufacturer": "Beko",
+      "model": "DIN28428",
+      "market_variant": "South Africa",
+      "evidence_status": "manufacturer_declared_product_page",
+      "independent_measurement_status": "not_independently_verified",
+      "availability_status": "listed_regional_product",
+      "functional_unit": "one manufacturer-declared programme cycle; programme-specific split not supplied for the headline values",
+      "programme": "headline per-cycle values; do not assume equivalence to Eco without a matched protocol",
+      "capacity_place_settings": 14,
+      "metrics": {
+        "electricity_kwh_per_cycle": 0.93,
+        "water_l_per_cycle": 9.5,
+        "duration_min_per_cycle": null,
+        "noise_dba": 46
+      },
+      "label": {
+        "value": "A++",
+        "note": "Older regional label scale; do not map directly to the current EU A-G scale."
+      },
+      "notes": [
+        "South African market comparator.",
+        "Freeze exact local product revision, programme and test method before a physical comparison."
+      ],
+      "source": {
+        "title": "Beko South Africa DIN28428 product page",
+        "url": "https://www.beko.com/za-en/products/integrated-dishwashers/dishwasher-14-place-settings-full-size-din28428",
+        "source_date": null,
+        "retrieved_date": "2026-11-04"
+      }
+    },
+    {
+      "id": "MIELE-G8-DIAMOND",
+      "category": "household_dishwasher",
+      "manufacturer": "Miele",
+      "model": "G8 Diamond",
+      "market_variant": "announced DE/AT/CH launch first",
+      "evidence_status": "manufacturer_announcement",
+      "independent_measurement_status": "not_independently_verified",
+      "availability_status": "announced_future_product",
+      "planned_launch": "2027-04",
+      "capacity_place_settings": null,
+      "metrics": {
+        "electricity_kwh_per_cycle": null,
+        "water_l_per_cycle": null,
+        "duration_min_per_cycle": null,
+        "cleaning_performance": null,
+        "rinse_residue": null,
+        "drying_performance": null
+      },
+      "announced_features": [
+        "integrated camera",
+        "AI-assisted load recognition and wash adaptation",
+        "automatic dispensing",
+        "variable hot-air drying",
+        "app-based preference/start automation"
+      ],
+      "notes": [
+        "Miele states launch in Germany, Austria and Switzerland in April 2027, with additional countries later.",
+        "As of 2026-11-04 this is a roadmap comparator, not a retail unit available for matched physical testing."
+      ],
+      "source": {
+        "title": "Miele world premiere for the G8 Diamond",
+        "url": "https://www.miele.de/en/m/world-premiere-for-the-g8-diamond-8453.htm",
+        "source_date": "2026-09-02",
+        "retrieved_date": "2026-11-04"
+      }
+    },
+    {
+      "id": "MIELE-CARY",
+      "category": "laundry_care",
+      "manufacturer": "Miele",
+      "model": "Cary",
+      "market_variant": "concept study",
+      "evidence_status": "manufacturer_concept_study",
+      "independent_measurement_status": "not_independently_verified",
+      "availability_status": "concept_only",
+      "metrics": {
+        "cleaning_performance": null,
+        "textile_damage": null,
+        "energy": null,
+        "water": null
+      },
+      "announced_features": [
+        "sensor/AI-assisted textile recognition",
+        "tailored wash-care process"
+      ],
+      "notes": [
+        "Concept study, not an established retail product or a matched benchmark unit."
+      ],
+      "source": {
+        "title": "How Miele eliminates household decisions — Cary concept",
+        "url": "https://www.miele.de/en/m/how-miele-eliminates-household-decisions-8441.htm",
+        "source_date": "2026-09-02",
+        "retrieved_date": "2026-11-04"
+      }
+    },
+    {
+      "id": "SAMSUNG-BESPOKE-AI-DW80H77KBFFFA-ZA",
+      "category": "household_dishwasher",
+      "manufacturer": "Samsung",
+      "model": "DW80H77KBFFFA — Bespoke AI Dishwasher",
+      "market_variant": "South Africa official product page",
+      "evidence_status": "manufacturer_declared_product_page_and_regional_launch_announcement",
+      "independent_measurement_status": "not_independently_verified",
+      "availability_status": "live_product_page_currently_displays_not_for_sale",
+      "functional_unit": "one Eco programme cycle for stated energy/water/time headline values",
+      "programme": "Eco",
+      "capacity_place_settings": 14,
+      "metrics": {
+        "electricity_kwh_per_cycle": 0.69,
+        "water_l_per_cycle": 8,
+        "duration_min_per_cycle": 235,
+        "noise_dba": 42,
+        "annual_energy_kwh": 198
+      },
+      "label": {
+        "value": "A+++",
+        "note": "Legacy product-page class; do not map directly onto the current EU A-G label scale."
+      },
+      "features": [
+        "AI Wash using a high-resolution turbidity sensor and machine-learning-assisted adaptation",
+        "12 programmes",
+        "AutoRelease door opening",
+        "third rack / glide rail",
+        "Hygiene Plus final-rinse programme"
+      ],
+      "notes": [
+        "Samsung's South African product page currently shows the product as Not for sale; confirm exact availability before procurement.",
+        "Regional Samsung newsroom material describes the Bespoke dishwasher as launched in South Africa in 2025; the currently listed model and sales status must be verified at acquisition.",
+        "The product page's AI Wash is already a mainstream adaptive-control capability. Its declared sensor/ML feature is not evidence of independently verified cleaning quality or resource saving.",
+        "Eco headline values are manufacturer-declared values and require matched physical comparison before competitive claims."
+      ],
+      "source": {
+        "title": "Samsung South Africa Bespoke AI Dishwasher DW80H77KBFFFA",
+        "url": "https://www.samsung.com/za/dishwashers/built-under/dw90h24-dish-washer-energy-efficiency-ai-wash-3rd-rack-washing-system-14-place-settings-black-dw80h77kbfffa/",
+        "source_date": null,
+        "retrieved_date": "2026-11-04"
+      },
+      "regional_launch_source": {
+        "title": "Samsung South Africa — Bespoke dishwashers combine powerful performance with great design",
+        "url": "https://news.samsung.com/za/samsung-bespoke-dishwashers-combine-powerful-performance-with-great-design",
+        "source_date": "2025-10-28",
+        "retrieved_date": "2026-11-04"
+      }
+    },
+    {
+      "id": "DEFY-DDW366-ZA",
+      "category": "household_dishwasher",
+      "manufacturer": "Defy",
+      "model": "DDW366",
+      "market_variant": "South Africa official product page",
+      "evidence_status": "manufacturer_declared_product_page",
+      "independent_measurement_status": "not_independently_verified",
+      "availability_status": "listed_regional_product",
+      "functional_unit": "one manufacturer-declared cycle; headline water and duration are not asserted to match Eco unless exact test mode is confirmed",
+      "programme": "programme-specific headline split requires confirmation from product manual/energy label",
+      "capacity_place_settings": 15,
+      "metrics": {
+        "electricity_kwh_per_cycle": null,
+        "water_l_per_cycle": 9.5,
+        "duration_min_per_cycle": 245,
+        "noise_dba": null,
+        "left_on_power_w": 1,
+        "off_mode_power_w": 0.5
+      },
+      "label": {
+        "value": "A++",
+        "note": "Legacy regional label; do not map directly onto current EU A-G scale."
+      },
+      "features": [
+        "CornerWash",
+        "dirt sensor",
+        "8 programmes",
+        "three spray levels",
+        "Aquastop / overflow protection",
+        "active ventilation"
+      ],
+      "notes": [
+        "Current Defy South Africa product page declares 15 place settings, 9.5 L and a 245-minute programme duration.",
+        "The official current product page does not provide a directly comparable kWh-per-cycle headline value; do not infer one from its old A++ class.",
+        "An older catalogue result carries different water/noise values; retain the current product-page values as the source-ledger baseline and resolve exact revision/manual before testing."
+      ],
+      "source": {
+        "title": "Defy South Africa DDW366 dishwasher",
+        "url": "https://www.defy.co.za/products/dishwashers/kitchen-dishwashes-ddw-366",
+        "source_date": null,
+        "retrieved_date": "2026-11-04"
+      }
+    },
+    {
+      "id": "AEG-LR9WW80409-TOPTEN-2026",
+      "category": "front_load_washer",
+      "manufacturer": "AEG",
+      "model": "LR9WW80409",
+      "market_variant": "Europe / Topten European selection database",
+      "evidence_status": "third_party_selection_database_supplier_declared_label_data",
+      "independent_measurement_status": "not_independently_verified",
+      "availability_status": "listed_in_Topten_Europe; South African market availability not established",
+      "functional_unit": "one EU Eco 40-60 declared cycle; energy value per 100 label cycles",
+      "programme": "Eco 40-60",
+      "capacity_kg": 10,
+      "metrics": {
+        "electricity_kwh_per_100_cycles": 20,
+        "water_l_per_cycle": 50,
+        "duration_min_per_cycle": 235,
+        "spin_drying_class": "B",
+        "maximum_spin_speed_rpm": 1351,
+        "noise_class": "A"
+      },
+      "notes": [
+        "Topten page last updated 17 August 2026; its selection methodology states data sources include supplier declarations, National Topten sites and Encodex.",
+        "Values are label/database discovery evidence, not an independent physical test by Topten or Luminous.",
+        "European label/programme basis is not automatically comparable with legacy South African labels or household cycles.",
+        "Exact regional type plate, firmware, availability, price, warranty, spare parts and local approval must be verified before selecting a physical control."
+      ],
+      "source": {
+        "title": "Topten — best washing machines on the European Market (2026)",
+        "url": "https://www.topten.eu/private/products/washing_machines",
+        "source_date": "2026-08-17",
+        "retrieved_date": "2026-11-22"
+      }
+    },
+    {
+      "id": "AEG-TR9HH9AY-TOPTEN-2026",
+      "category": "heat_pump_tumble_dryer",
+      "manufacturer": "AEG",
+      "model": "TR9HH9AY",
+      "market_variant": "Europe / Topten European selection database",
+      "evidence_status": "third_party_selection_database_supplier_declared_label_data",
+      "independent_measurement_status": "not_independently_verified",
+      "availability_status": "listed_in_Topten_Europe; South African market availability not established",
+      "functional_unit": "one declared Eco cycle; energy value per 100 label cycles",
+      "programme": "Eco",
+      "capacity_kg": 9,
+      "metrics": {
+        "electricity_kwh_per_100_cycles": 79,
+        "energy_efficiency_index_percent": 42.9,
+        "condenser_efficiency_class": "A",
+        "noise_class": "A"
+      },
+      "notes": [
+        "Topten page last updated 19 May 2026; its product-list values are selection-database/label evidence, not independent physical test results.",
+        "Noise class is not a numeric sound-pressure measurement and must not be converted to dB.",
+        "Confirm exact PNC, local variant, programme and label fiche before selecting a physical control."
+      ],
+      "source": {
+        "title": "Topten — best tumble driers on the European Market (2026)",
+        "url": "https://www.topten.eu/private/products/tumble_driers",
+        "source_date": "2026-05-19",
+        "retrieved_date": "2026-11-22"
+      }
+    },
+    {
+      "id": "AEG-TR948V4BC-TOPTEN-2026",
+      "category": "heat_pump_tumble_dryer",
+      "manufacturer": "AEG",
+      "model": "TR948V4BC",
+      "market_variant": "Europe / Topten European selection database",
+      "evidence_status": "third_party_selection_database_supplier_declared_label_data",
+      "independent_measurement_status": "not_independently_verified",
+      "availability_status": "listed_in_Topten_Europe; South African market availability not established",
+      "functional_unit": "one declared Eco cycle; energy value per 100 label cycles",
+      "programme": "Eco",
+      "capacity_kg": 8,
+      "metrics": {
+        "electricity_kwh_per_100_cycles": 73,
+        "energy_efficiency_index_percent": 42.9,
+        "condenser_efficiency_class": "A",
+        "noise_class": "A"
+      },
+      "notes": [
+        "Topten lists this 8 kg model at 73 kWh/100 cycles; this does not imply the same throughput or drying result as a 9 kg model.",
+        "Topten page last updated 19 May 2026; values are database/label evidence, not independent physical testing.",
+        "Use the exact PNC 916900129 and region-specific fiche for control admission; other model numbers are not assumed equivalent."
+      ],
+      "source": {
+        "title": "Topten — best tumble driers on the European Market (2026)",
+        "url": "https://www.topten.eu/private/products/tumble_driers",
+        "source_date": "2026-05-19",
+        "retrieved_date": "2026-11-22"
+      }
+    },
+    {
+      "id": "LIEBHERR-CBNBSA20-575I-TOPTEN-2026",
+      "category": "refrigerator_freezer",
+      "manufacturer": "Liebherr",
+      "model": "CBNbsa20 575i",
+      "market_variant": "Europe / Topten European selection database",
+      "evidence_status": "third_party_selection_database_supplier_declared_label_data",
+      "independent_measurement_status": "not_independently_verified",
+      "availability_status": "listed_in_Topten_Europe; South African market availability not established",
+      "functional_unit": "standardized annual energy label declaration for one refrigerator-freezer",
+      "metrics": {
+        "energy_kwh_per_year": 92,
+        "total_net_volume_l": 362,
+        "refrigerator_net_volume_l": 259,
+        "freezer_net_volume_l": 103,
+        "ambient_temperature_min_c": 10,
+        "ambient_temperature_max_c": 43,
+        "noise_class": "A",
+        "frost_free": true
+      },
+      "notes": [
+        "Topten page last updated 10 September 2026.",
+        "The 10–43°C ambient range is a published operating class/specification, not evidence of equal energy or temperature performance across all ambient conditions.",
+        "Annual label energy does not establish outage holdover, loaded temperature uniformity, warm-load pull-down or food safety.",
+        "Not a South African physical comparator until exact local SKU, type plate, approval, service/spares and market availability are verified."
+      ],
+      "source": {
+        "title": "Topten — best refrigerators on the European Market (2026)",
+        "url": "https://www.topten.eu/private/products/refrigerators",
+        "source_date": "2026-09-10",
+        "retrieved_date": "2026-11-22"
+      }
+    }
+  ],
+  "research_frontier": [
+    {
+      "id": "DISHWASHER-MECHANISTIC-GA-OPTIMIZATION-2026",
+      "category": "optimization_method",
+      "publication_date": "2026-10",
+      "doi": "10.1016/j.compchemeng.2026.109771",
+      "title": "Optimization framework for detergent and wash cycle design in household automatic dishwashers",
+      "reported_results": {
+        "wash_time_reduction_percent": 31,
+        "drying_time_reduction_percent": 59,
+        "stain_removal_index_increase_percent": 5
+      },
+      "method": [
+        "mechanistic models of cycle stages",
+        "event-based coupling",
+        "genetic-algorithm optimization"
+      ],
+      "data_availability": "confidential",
+      "claim_ceiling": "Published result on the paper's reference formula/cycle; raw data are confidential, so full independent reproduction is not established."
+    },
+    {
+      "id": "DISHWASHER-FLUORESCENCE-OATMEAL-2026",
+      "category": "outcome_assay_method",
+      "publication_date": "2026-05-31",
+      "doi": "10.1016/j.foodres.2026.118853",
+      "title": "Classification of oatmeal residue levels on bowls using fluorescence imaging",
+      "method": [
+        "365 nm excitation",
+        "chromatic adaptation",
+        "FM-YOLO image model",
+        "bowl-surface area correction"
+      ],
+      "substrate_and_soil": "oatmeal/porridge residue on rice bowls",
+      "reported_overall_accuracy_percent": 86.7,
+      "reported_class_accuracy_percent": {
+        "score_5": 100,
+        "score_4": 100,
+        "score_3": 85,
+        "score_2": 65,
+        "score_1": 70,
+        "score_0": 100
+      },
+      "claim_ceiling": "Narrow soil/substrate assay lead, not a universal cleanliness detector. Intermediate-class accuracy and external assay validity require further qualification."
+    },
+    {
+      "id": "DIRECT-DC-PV-EWH-SUBSAHARAN-2026",
+      "category": "household_thermal_service_simulation",
+      "publication_date": "2026-10",
+      "doi": "10.1016/j.esd.2026.102053",
+      "title": "Assessment of solar PV-assisted domestic water heating in Sub-Saharan African cities",
+      "authors": [
+        "Felix Walker",
+        "Bernd Thomas",
+        "M.J. Booysen"
+      ],
+      "method": [
+        "1.68 kWp four-module direct-DC-PV-to-electric-water-heater configuration",
+        "five-minute simulation",
+        "two-node thermal stratification model",
+        "stochastic hot-water draw-off profiles",
+        "2024 satellite-derived meteorology",
+        "seven Sub-Saharan African cities including Johannesburg"
+      ],
+      "reported_results": {
+        "johannesburg_heavy_user_annual_solar_energy_accepted_kwh": ">2200",
+        "savings_percent_across_cities_and_demand_profiles": "21–47",
+        "johannesburg_heavy_user_avoidable_cold_draw_percent": 10.3
+      },
+      "data_availability": "authors report public simulation code and results; exact code/data revision correspondence to the journal paper requires independent verification",
+      "code_repository": "https://github.com/WalkerFelix/Simulation-Based-Solar-PV-Assisted-Domestic-Water-Heating-in-Sub-Saharan-African-Cities",
+      "claim_ceiling": "Peer-reviewed journal simulation, not physical product qualification or an independently reproduced Luminous result. Public repository code currently has reproducibility questions recorded in HEATBANK-DIRECTPV-REPRO-001; do not treat reported savings or comfort as guaranteed. The nine-city config may correspond to the June 2026 South Africa-only SSRN preprint; this version relationship remains to be confirmed by exact commit/data/output mapping.",
+      "related_preprint": {
+        "title": "Simulation-Based Assessment of Solar PV-Assisted Domestic Water Heating in South African Cities",
+        "publication_type": "SSRN preprint",
+        "posted_date": "2026-06-13",
+        "scope": "nine South African cities",
+        "url": "https://papers.ssrn.com/sol3/Delivery.cfm/82011b4b-e1c6-4d6a-b907-e55e6f9fef0b-MECA.pdf?abstractid=6929312",
+        "relation_to_journal_article": "Related earlier manuscript; not assumed identical to the October 2026 seven-city journal article."
+      },
+      "code_repository_correspondence": {
+        "observed_public_repo_config_scope": "nine South African city keys",
+        "likely_relationship": "appears consistent with the June 2026 South Africa-only preprint",
+        "exact_code_commit_to_paper_mapping": "unverified",
+        "exact_input_data_and_result_bundle_mapping": "unverified",
+        "claim_ceiling": "Do not claim the public repository reproduces the seven-city October journal article or the nine-city June preprint until commit, input data and result outputs are matched to each version."
+      }
+    }
+  ],
+  "standards_and_adjacent_baselines": [
+    {
+      "id": "IEC-60436-2025-COR1-2026",
+      "category": "dishwasher_performance_method",
+      "version": "IEC 60436:2025, corrected version 2026-04",
+      "status": "current_research_baseline",
+      "relevant_changes": [
+        "new reference machine",
+        "reference detergent type E",
+        "low-power and network-standby measurement",
+        "unit-variation method",
+        "multi-compartment testing"
+      ],
+      "safety_or_minimum_performance_standard": false,
+      "source": {
+        "title": "IEC 60436:2025",
+        "url": "https://webstore.iec.ch/en/publication/80459",
+        "retrieved_date": "2026-11-04"
+      }
+    },
+    {
+      "id": "JOJO-MUNICIPAL-BACKUP",
+      "category": "water_continuity_product",
+      "manufacturer": "JoJo Tanks",
+      "market": "South Africa",
+      "existing_capabilities": [
+        "automatic municipal tank fill",
+        "household backup storage",
+        "pump delivery to home",
+        "pressure-controller pump start/stop"
+      ],
+      "novelty_warning": "Tank, pump and pressure-controlled municipal backup are existing capabilities; WaterLoop must prove improved end-use-qualified service.",
+      "source": {
+        "title": "JoJo Municipal Backup Water Storage Solutions",
+        "url": "https://www.jojo.co.za/water-storage-solutions/municipal-backup-water-storage-solutions/",
+        "retrieved_date": "2026-11-04"
+      }
+    },
+    {
+      "id": "MOEN-FLO",
+      "category": "water_monitoring_and_shutoff",
+      "manufacturer": "Moen",
+      "existing_capabilities": [
+        "flow/temperature/pressure monitoring",
+        "AI-assisted usage learning",
+        "daily micro-leak tests",
+        "real-time notifications",
+        "automatic water shutoff"
+      ],
+      "novelty_warning": "Smart leak monitoring and automatic shutoff are existing features; WaterLoop must prove qualified continuity and low false-shutoff burden.",
+      "source": {
+        "title": "Moen Flo Smart Water Monitor and Shutoff",
+        "url": "https://flo.moen.com/pages/flo-smart-water-monitor",
+        "retrieved_date": "2026-11-04"
+      }
+    },
+    {
+      "id": "FRANCE-REPAIRABILITY-INDEX",
+      "category": "repairability_disclosure",
+      "existing_criteria": [
+        "technical documentation",
+        "disassembly/access/tools/fasteners",
+        "spare-parts availability and delivery",
+        "spare-parts price",
+        "category-specific criteria"
+      ],
+      "score_scale": "0-10",
+      "novelty_warning": "A repairability score alone is not novel; HomeRenew should measure actual qualified restoration and recurrence.",
+      "source": {
+        "title": "French repairability index",
+        "url": "https://www.ecologie.gouv.fr/politiques-publiques/indice-reparabilite",
+        "retrieved_date": "2026-11-04"
+      }
+    },
+    {
+      "id": "IEC-60379-2023-SCOPE",
+      "category": "electric_storage_water_heater_performance_method",
+      "version": "IEC 60379:2023 Edition 4",
+      "status": "current_research_reference_scope_limited",
+      "relevant_changes": [
+        "Methods for measuring electric storage water-heater performance for household purposes.",
+        "Does not apply to storage water heaters that use electricity as a secondary source of heating the water.",
+        "Does not specify product safety; safety is separately addressed by IEC 60335-1 with IEC 60335-2-21."
+      ],
+      "source": {
+        "title": "IEC 60379:2023",
+        "url": "https://webstore.iec.ch/en/publication/61520",
+        "retrieved_date": "2026-11-22"
+      }
+    },
+    {
+      "id": "ISO-9459-4-2013-SOLAR-BACKUP",
+      "category": "solar_water_heater_system_performance",
+      "version": "ISO 9459-4:2013",
+      "status": "published_confirmed_2022",
+      "relevant_changes": [
+        "Evaluates annual solar water-heater energy performance using component tests plus a mathematical model.",
+        "Scope includes solar water heaters with integral backup or preheating into a conventional storage or instantaneous water heater.",
+        "Does not provide product design or operation requirements."
+      ],
+      "source": {
+        "title": "ISO 9459-4:2013",
+        "url": "https://www.iso.org/standard/41695.html",
+        "retrieved_date": "2026-11-22"
+      }
+    },
+    {
+      "id": "ISO-9459-2-1995-UNDER-REVISION",
+      "category": "solar_only_water_heater_outdoor_performance_method",
+      "version": "ISO 9459-2:1995; revision project ISO/AWI 9459-2 registered 2026",
+      "status": "published_edition_current_revision_in_progress",
+      "relevant_changes": [
+        "Outdoor test methods for performance characterization and yearly prediction of solar-only domestic water-heating systems.",
+        "ISO/AWI 9459-2 Edition 2 was registered in September 2026 and will replace the 1995 edition when published; do not describe the work item as a published standard."
+      ],
+      "source": {
+        "title": "ISO 9459-2:1995 and ISO/AWI 9459-2",
+        "url": "https://www.iso.org/standard/17187.html",
+        "retrieved_date": "2026-11-22"
+      }
+    },
+    {
+      "id": "IEC-63349-1-2025",
+      "category": "pv_direct_driven_appliance_controller",
+      "version": "IEC 63349-1:2025 Edition 1",
+      "status": "published_international_standard",
+      "relevant_changes": [
+        "Defines control functions and operational performance requirements for PV direct-driven appliance controllers coordinating power from sources such as PV, grid and storage to appliances such as heaters, refrigeration, air-conditioning and pumps.",
+        "Controller requirements apply to systems up to 1 500 V DC or 1 000 V AC.",
+        "Safety and EMC requirements for the controller are explicitly not covered by this document.",
+        "It references separate safety requirements for PV, grid and storage converters, and converter performance references IEC 62093."
+      ],
+      "source": {
+        "title": "IEC 63349-1:2025 — Photovoltaic direct-driven appliance controllers, Part 1",
+        "url": "https://webstore.iec.ch/en/publication/67424",
+        "source_date": "2025-12-04",
+        "retrieved_date": "2026-11-22"
+      }
+    },
+    {
+      "id": "IEC-TS-63349-2-2022",
+      "category": "pv_direct_driven_appliance_controller_user_modes",
+      "version": "IEC TS 63349-2:2022 Edition 1",
+      "status": "published_technical_specification",
+      "relevant_changes": [
+        "Defines operation modes for PV direct-driven appliance controllers and describes one example graphic display.",
+        "The display example aims to show connected equipment, generation and consumption in an understandable format.",
+        "This is a technical specification on operating modes/display, not product safety certification."
+      ],
+      "source": {
+        "title": "IEC TS 63349-2:2022 — Operation modes and graphic display",
+        "url": "https://webstore.iec.ch/en/publication/67425",
+        "source_date": "2022-02-03",
+        "retrieved_date": "2026-11-22"
+      }
+    },
+    {
+      "id": "SOUTH-AFRICA-MICROCARE-HWG-2025",
+      "category": "direct_pv_water_heating_incumbent",
+      "manufacturer": "Microcare Solar Energy",
+      "product": "Hot Water Generator (HWG / Kushushu)",
+      "market": "South Africa",
+      "evidence_status": "manufacturer_manual_and_datasheet_claims",
+      "existing_capabilities": [
+        "retrofit to existing geyser and 2 kW, 3 kW or 4 kW elements",
+        "PV input with AC mains override when solar is insufficient",
+        "uses thermistor sensing and existing thermostat / element where compatible",
+        "manufacturer manual states solar heating efficiency greater than 95%; separate product datasheet claims greater than 96%"
+      ],
+      "product_data": {
+        "version": "User manual 2025.1",
+        "datasheet_date": "2025-08",
+        "max_pv_input_voltage_Voc_v": 275,
+        "max_pv_input_power_kw": 2,
+        "recommended_min_pv_power_kw": 0.9,
+        "supported_element_kw": [
+          2,
+          3,
+          4
+        ],
+        "ac_input_voltage_v": 230,
+        "rated_ac_input_current_a": 20,
+        "warranty_months": 24
+      },
+      "notes": [
+        "All efficiency and savings figures are manufacturer claims and not independent Luminous test results.",
+        "Different manual and datasheet values (>95% vs >96%) should be retained as separate source-specific claims, not averaged.",
+        "The manual requires installation by a qualified registered electrician with a valid Wireman's Licence and warns against opening/modifying the controller.",
+        "Exact controller revision, PV string envelope, protective devices, local conformity and test scope must be checked before a physical comparator is admitted."
+      ],
+      "sources": [
+        {
+          "title": "Microcare Hot Water Generator User Manual v2025.1",
+          "url": "https://microcare.co.za/wp-content/uploads/2025/09/Microcare-HWG-Manual-2025v1.1.pdf"
+        },
+        {
+          "title": "Microcare Hot Water Generator product data sheet",
+          "url": "https://microcare.co.za/wp-content/uploads/2025/08/Microcare-Solar-Geyser-SolutionData-Sheet.pdf"
+        }
+      ],
+      "retrieved_date": "2026-11-22"
+    },
+    {
+      "id": "SOUTH-AFRICA-GEYSERWISE-PV-HEATING",
+      "category": "direct_pv_water_heating_incumbent",
+      "manufacturer": "Geyserwise",
+      "product": "PV Water Heating Systems / PV2Heat / MWS controller family",
+      "market": "South Africa",
+      "evidence_status": "manufacturer_public_product_pages_and_installation_manual",
+      "existing_capabilities": [
+        "retrofits existing geysers and offers 100 L, 150 L and 200 L system configurations",
+        "uses a PTC AC/DC element for PV and grid-compatible heating",
+        "no additional water-loop plumbing or solar-thermal circulation pump is required for direct-PV conversion",
+        "Geyserwise MWS controller page declares MPPT maximum performance 99% within its stated 120–350 V DC range",
+        "Geyserwise Dual offers AC/DC temperature control, timer, fault codes and mechanical thermal cut-out"
+      ],
+      "product_data": {
+        "mws_controller_mppt_efficiency_claim_percent": 99,
+        "mws_controller_mppt_input_voltage_range_vdc": "120–350",
+        "pv_system_nominal_tank_capacities_l": [
+          100,
+          150,
+          200
+        ],
+        "geyserwise_dual_ac_temperature_setpoint_range_c": [
+          30,
+          65
+        ],
+        "geyserwise_dual_dc_temperature_setpoint_range_c": [
+          50,
+          75
+        ],
+        "geyserwise_dual_mechanical_cutout_c": 90
+      },
+      "notes": [
+        "Values are manufacturer-declared product-page/manual values, not independent test results.",
+        "The MWS controller page, PV kit product page and Dual controller page describe related product-family capabilities; do not assume all values describe one identical kit/revision.",
+        "The 2021 PV installation guide and current pages must be reconciled to the exact comparator revision before acquisition."
+      ],
+      "sources": [
+        {
+          "title": "Geyserwise PV Water Heating Systems",
+          "url": "https://www.geyserwise.com/our-products/pv-water-heating-systems/"
+        },
+        {
+          "title": "Geyserwise MWS Controller",
+          "url": "https://www.geyserwise.com/mws-controller/"
+        },
+        {
+          "title": "Geyserwise Dual controller",
+          "url": "https://www.geyserwise.com/our-products/geyserwise-electronic-thermostats/geyserwise-dual/"
+        },
+        {
+          "title": "Geyserwise PV system installation manual",
+          "url": "https://www.geyserwise.com/wp-content/uploads/2022/01/13052021-PV-system-installation-manual-6.pdf"
+        }
+      ],
+      "retrieved_date": "2026-11-22"
+    },
+    {
+      "id": "SOUTH-AFRICA-APOLLO-NEOPV",
+      "category": "direct_pv_water_heating_incumbent",
+      "manufacturer": "Apollo Solar Technology",
+      "product": "NeoPV MPPT Smart Solar Water Heating System",
+      "market": "South Africa",
+      "evidence_status": "manufacturer_product_page",
+      "existing_capabilities": [
+        "retrofits existing geysers with DC-PV MPPT and AC mains bypass/backup",
+        "optional cloud-connected ESP32 monitoring dashboard",
+        "listed 100/150 L, 200 L and 300 L tank configurations with specified PV module counts",
+        "page lists MPPT efficiency greater than 99%"
+      ],
+      "product_data": {
+        "pv_modules_100_150_l": [
+          3,
+          580
+        ],
+        "pv_modules_200_l": [
+          4,
+          580
+        ],
+        "pv_modules_300_l": [
+          5,
+          580
+        ],
+        "max_solar_input_power_w": 4000,
+        "mppt_efficiency_claim_percent": 99,
+        "solar_input_voltage_range_vdc": "160–350 or 110–300 depending on listed configuration",
+        "ac_bypass_rated_voltage_v": 230,
+        "ac_bypass_rated_power_w": 4000,
+        "minimum_element_resistance_ohm": 13
+      },
+      "notes": [
+        "The product page displays both configuration families but the mapping of the two voltage/input-power columns to exact SKUs requires written clarification.",
+        "The advertised 60–90% water-heating-bill reduction is manufacturer marketing and not a matched independent test.",
+        "Cloud dashboard presence is not proof that basic safe control works offline; this should be a benchmark challenge.",
+        "No independent MPPT, thermal delivery, grid import, safety or lifecycle result is implied."
+      ],
+      "sources": [
+        {
+          "title": "Apollo NeoPV Smart Water Heating",
+          "url": "https://apollotechnology.co.za/neo-pv/"
+        }
+      ],
+      "retrieved_date": "2026-11-22"
+    }
+  ],
+  "research_targets": {
+    "target_id": "INSTANTCLEAN-STRETCH-2026-11",
+    "evidence_status": "research_target_only_not_measured",
+    "functional_unit": "one matched Eco-equivalent full-load service with all prescribed independent item endpoints passed",
+    "targets": {
+      "place_settings": 16,
+      "electricity_kwh_per_cycle": 0.39,
+      "water_l_per_cycle": 6
+    },
+    "arithmetic_comparisons_only": [
+      {
+        "comparator_id": "SAMSUNG-BESPOKE-AI-DW80H77KBFFFA-ZA",
+        "implied_energy_reduction_percent": 43.4782608696,
+        "implied_water_reduction_percent": 25,
+        "implied_capacity_increase_percent": 14.2857142857
+      },
+      {
+        "comparator_id": "MIELE-G7655-SCVI-XXL-AUTODOS-ECO",
+        "implied_energy_reduction_percent": 27.7777777778,
+        "implied_water_reduction_percent": 28.5714285714,
+        "implied_capacity_increase_percent": 14.2857142857
+      }
+    ],
+    "caveat": "These are arithmetic comparisons between declared source values and aspirational targets only. Programmes, standard editions, load protocols, reference detergent, endpoints, market revisions and measurement boundaries are not yet matched. They are not independently verified superiority results."
+  }
+}

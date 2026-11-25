@@ -1,0 +1,203 @@
+{
+  "schema_version": "0.1",
+  "corpus_id": "HOME-REPAIR-QUAL-001-SYNTHETIC-REPAIR-TASKS-001",
+  "status": "synthetic_test_fixture_only",
+  "created_date": "2026-11-04",
+  "claim_ceiling": [
+    "synthetic_task_results_do_not_establish_actual_repairability",
+    "no_task_authorizes_bypassing_safety_protection",
+    "no_task_establishes_legal_compliance_or_spare_part_availability",
+    "no_repair_is_successful_without_post_repair_function_and_required_safety_checks"
+  ],
+  "task_profiles": [
+    {
+      "id": "REPAIR-001",
+      "title": "replace a declared user-serviceable inlet filter cartridge",
+      "product_class": "water_appliance",
+      "task_class": "routine_user_maintenance",
+      "tool_class": "hand_operated_non_specialist",
+      "synthetic_baseline": {
+        "access_fasteners": 2,
+        "disassembly_steps": 4,
+        "part_lead_time_days": 2,
+        "repair_instruction_available": true,
+        "offline_access": true
+      },
+      "expected_disposition": "repairable_if_exact_part_and_post_service_leak_check_pass",
+      "invariants": [
+        "part_identity_and_compatibility_are_verified",
+        "system_is_in_declared_safe_state_before_service",
+        "seal_is_inspected_and_leak_test_required",
+        "service_counter_and_filter_history_are_not_erased"
+      ]
+    },
+    {
+      "id": "REPAIR-002",
+      "title": "replace pump module using trained technician procedure",
+      "product_class": "water_appliance",
+      "task_class": "trained_service_repair",
+      "tool_class": "declared_service_tool_set",
+      "synthetic_baseline": {
+        "access_fasteners": 6,
+        "disassembly_steps": 12,
+        "part_lead_time_days": 7,
+        "repair_instruction_available": true,
+        "offline_access": true
+      },
+      "expected_disposition": "repairable_only_after_hydraulic_electrical_and_functional_requalification",
+      "invariants": [
+        "electrical_and_fluid_isolation_are_verified",
+        "replacement_part_revision_is_compatible",
+        "pressure_flow_leak_and_protection_checks_are_repeated",
+        "qualification_is_reopened_for_affected_interfaces"
+      ]
+    },
+    {
+      "id": "REPAIR-003",
+      "title": "replace door seal and verify enclosure integrity",
+      "product_class": "dishwasher",
+      "task_class": "trained_service_repair",
+      "tool_class": "declared_service_tool_set",
+      "synthetic_baseline": {
+        "access_fasteners": 8,
+        "disassembly_steps": 14,
+        "adhesive_or_destructive_disassembly": false,
+        "repair_instruction_available": true
+      },
+      "expected_disposition": "repairable_if_seal_and_integrity_checks_pass",
+      "invariants": [
+        "correct_seal_material_and_revision_are_verified",
+        "closure_and_leak_checks_are_performed",
+        "hygiene_or_cross_cell_boundaries_are_requalified_if_affected"
+      ]
+    },
+    {
+      "id": "REPAIR-004",
+      "title": "replace sensor and restore traceable calibration",
+      "product_class": "household_appliance",
+      "task_class": "trained_service_repair",
+      "tool_class": "calibration_fixture_required",
+      "synthetic_baseline": {
+        "part_lead_time_days": 5,
+        "calibration_required": true,
+        "firmware_update_required": false
+      },
+      "expected_disposition": "unqualified_until_calibration_and_independent_check_pass",
+      "invariants": [
+        "old_calibration_is_not_inherited",
+        "calibration_artifact_matches_sensor_serial_and_revision",
+        "independent_reference_check_is_recorded"
+      ]
+    },
+    {
+      "id": "REPAIR-005",
+      "title": "firmware rollback after interrupted update",
+      "product_class": "connected_household_appliance",
+      "task_class": "software_recovery",
+      "tool_class": "local_service_interface",
+      "synthetic_baseline": {
+        "internet_available": false,
+        "signed_image_available": true,
+        "previous_known_good_image_available": true
+      },
+      "expected_disposition": "safe_local_recovery_without_cloud_dependency",
+      "invariants": [
+        "image_signature_and_compatibility_are_verified",
+        "rollback_does_not_disable_safety_functions",
+        "basic_safe_operation_does_not_require_cloud",
+        "version_and_recovery_event_are_preserved"
+      ]
+    },
+    {
+      "id": "REPAIR-006",
+      "title": "catalog part exists but is unavailable in target market",
+      "product_class": "household_appliance",
+      "task_class": "parts_availability_adversarial",
+      "tool_class": "none",
+      "synthetic_baseline": {
+        "catalog_part_exists": true,
+        "local_stock": false,
+        "quoted_lead_time_days": null,
+        "approved_substitute": false
+      },
+      "expected_disposition": "repair_blocked_parts_unavailable",
+      "invariants": [
+        "catalog_presence_is_not_supply_availability",
+        "unknown_lead_time_is_not_zero",
+        "unapproved_substitute_is_not_used"
+      ]
+    },
+    {
+      "id": "REPAIR-007",
+      "title": "mechanically fitting but unqualified substitute module",
+      "product_class": "water_appliance",
+      "task_class": "substitution_adversarial",
+      "tool_class": "declared_service_tool_set",
+      "synthetic_baseline": {
+        "physical_fit": true,
+        "electrical_interface_match": true,
+        "material_grade_known": false,
+        "firmware_compatibility": "unknown",
+        "qualification_state": "unqualified"
+      },
+      "expected_disposition": "substitution_rejected_or_held_for_qualification",
+      "invariants": [
+        "physical_fit_does_not_establish_functional_compatibility",
+        "unknown_material_grade_blocks_qualification",
+        "firmware_and_control_compatibility_are_explicit"
+      ]
+    },
+    {
+      "id": "REPAIR-008",
+      "title": "repair succeeds immediately but same fault recurs",
+      "product_class": "household_appliance",
+      "task_class": "durability_follow_up",
+      "tool_class": "instrumented_test",
+      "synthetic_baseline": {
+        "initial_post_repair_function_pass": true,
+        "recurrence_observed_after_30_days": true
+      },
+      "expected_disposition": "initial_function_restored_durable_repair_failed",
+      "invariants": [
+        "initial_restoration_and_durable_success_are_separate_outcomes",
+        "recurrence_is_not_hidden_by_closing_the_work_order",
+        "lost_to_follow_up_is_unknown_not_success"
+      ]
+    },
+    {
+      "id": "REPAIR-009",
+      "title": "service manual requires vendor cloud account unavailable to independent repairer",
+      "product_class": "connected_household_appliance",
+      "task_class": "service_access_adversarial",
+      "tool_class": "local_service_interface",
+      "synthetic_baseline": {
+        "vendor_cloud_available": false,
+        "offline_diagnostics_available": false,
+        "manual_available": true
+      },
+      "expected_disposition": "service_access_blocked_and_reported",
+      "invariants": [
+        "cloud_dependency_is_reported_as_a_repairability_failure",
+        "manual_availability_does_not_imply_diagnostic_access",
+        "no_security_or_safety_bypass_is_permitted"
+      ]
+    },
+    {
+      "id": "REPAIR-010",
+      "title": "repair changes a critical safety or hygiene interface",
+      "product_class": "household_appliance",
+      "task_class": "post_repair_qualification",
+      "tool_class": "product_specific_test_fixture_required",
+      "synthetic_baseline": {
+        "critical_interface_changed": true,
+        "post_repair_test_available": false
+      },
+      "expected_disposition": "not_released_until_product_specific_requalification",
+      "invariants": [
+        "repair_completion_does_not_equal_safe_release",
+        "critical_interface_change_reopens_affected_qualification",
+        "missing_test_capability_requires_hold_or_qualified_referral"
+      ]
+    }
+  ]
+}

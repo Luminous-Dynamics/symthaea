@@ -1,0 +1,233 @@
+{
+  "schema_version": "0.1",
+  "corpus_id": "HOME-UTILITY-COORD-001-WATER-CONTINUITY-SYNTHETIC-001",
+  "status": "synthetic_test_fixture_only",
+  "created_date": "2026-11-04",
+  "units": {
+    "volume": "L",
+    "flow": "L/min",
+    "pressure": "kPa",
+    "duration": "h",
+    "energy": "kWh"
+  },
+  "assumptions": {
+    "all_values_are_synthetic": true,
+    "household_profile": "arbitrary_four_person_reference_household_for_software_fixture_only",
+    "storage_capacity_l": 500,
+    "rated_draw_pressure_kpa": 150,
+    "potable_quality": "unknown_unqualified",
+    "non_potable_reuse": "physically_separate_and_not_enabled",
+    "pump_required_for_fixture_delivery": true,
+    "no_live_actuation_authority": true
+  },
+  "claim_ceiling": [
+    "does_not_validate_a_real_tank_size_or_pump",
+    "does_not_establish_potable_water_safety",
+    "does_not_establish_plumbing_or_electrical_compliance",
+    "does_not_authorize_automatic_shutoff_or_source_switching",
+    "does_not_establish_household_demand_or_outage_forecast"
+  ],
+  "scenarios": [
+    {
+      "id": "WCONT-001",
+      "title": "stable municipal supply and normal demand",
+      "input": {
+        "duration_h": 24,
+        "municipal_inlet_flow_l_min": 8,
+        "household_draw_profile": "synthetic_normal_24h",
+        "tank_level_sensor_l": 320,
+        "independent_reference_tank_level_l": 320,
+        "grid_available": true,
+        "pump_available": true,
+        "leak_detected": false,
+        "stored_water_quality_evidence": "not_provided"
+      },
+      "expected_disposition": "process_accounting_only",
+      "invariants": [
+        "inlet_and_outlet_volume_balance_within_declared_meter_uncertainty",
+        "tank_sensor_is_not_water_quality_evidence",
+        "all_resource_boundaries_are_explicit"
+      ]
+    },
+    {
+      "id": "WCONT-002",
+      "title": "municipal pressure loss for 48 hours",
+      "input": {
+        "duration_h": 48,
+        "municipal_inlet_flow_l_min": 0,
+        "household_draw_profile": "synthetic_essential_only",
+        "tank_level_sensor_l": 320,
+        "independent_reference_tank_level_l": 320,
+        "grid_available": true,
+        "pump_available": true,
+        "leak_detected": false,
+        "stored_water_quality_evidence": "not_provided"
+      },
+      "expected_disposition": "reserve_estimate_with_uncertainty",
+      "invariants": [
+        "no_municipal_inflow_is_counted_during_zero_flow_interval",
+        "deliverable_volume_is_limited_by_verified_outlet_flow_and_pressure",
+        "reserve_duration_is_reported_as_a_range_or_unresolved_if_demand_is_unknown",
+        "no_potable_quality_claim"
+      ]
+    },
+    {
+      "id": "WCONT-003",
+      "title": "staggered municipal restoration with low pressure",
+      "input": {
+        "duration_h": 12,
+        "municipal_inlet_flow_l_min": 0.8,
+        "household_draw_profile": "synthetic_restricted_demand",
+        "tank_level_sensor_l": 145,
+        "independent_reference_tank_level_l": 145,
+        "grid_available": true,
+        "pump_available": true,
+        "leak_detected": false,
+        "supply_pressure_profile": "intermittent_below_nominal"
+      },
+      "expected_disposition": "degraded_service_and_recovery_tracking",
+      "invariants": [
+        "inflow_is_integrated_from_measured_flow_not_commanded_valve_state",
+        "recovery_is_not_assumed_from_municipal_availability_alone",
+        "storage_is_not_overfilled_or_double_counted",
+        "reported_pressure_is_measured_at_delivery_boundary"
+      ]
+    },
+    {
+      "id": "WCONT-004",
+      "title": "tank-level sensor stuck while real reserve declines",
+      "input": {
+        "duration_h": 6,
+        "household_draw_profile": "synthetic_high_draw",
+        "tank_level_sensor_l": 300,
+        "independent_reference_tank_level_l": 218,
+        "grid_available": true,
+        "pump_available": true,
+        "leak_detected": false,
+        "sensor_fault": "stuck_value"
+      },
+      "expected_disposition": "sensor_disagreement_unresolved",
+      "invariants": [
+        "stale_or_disagreeing_level_sensor_cannot_support_precise_reserve_claim",
+        "independent_reference_is_preserved_as_separate_evidence",
+        "controller_estimate_does_not_override_measurement_disagreement"
+      ]
+    },
+    {
+      "id": "WCONT-005",
+      "title": "small continuous downstream leak",
+      "input": {
+        "duration_h": 8,
+        "household_draw_profile": "synthetic_low_baseline",
+        "measured_unexplained_flow_l_min": 0.5,
+        "grid_available": true,
+        "pump_available": true,
+        "leak_detected": "candidate_alarm"
+      },
+      "expected_disposition": "suspected_leak_human_review_or_qualified_isolation",
+      "invariants": [
+        "unexplained_flow_is_not_attributed_to_household_use_without_evidence",
+        "false_shutoff_cost_and_missed_leak_rate_are_both_counted",
+        "automatic_isolation_requires_separate_hardware_and_safety_qualification"
+      ]
+    },
+    {
+      "id": "WCONT-006",
+      "title": "simultaneous municipal outage and grid interruption",
+      "input": {
+        "duration_h": 10,
+        "municipal_inlet_flow_l_min": 0,
+        "household_draw_profile": "synthetic_essential_only",
+        "tank_level_sensor_l": 210,
+        "independent_reference_tank_level_l": 210,
+        "grid_available": false,
+        "pump_available": false,
+        "backup_power_available": false
+      },
+      "expected_disposition": "delivery_unavailable_pump_dependent_service",
+      "invariants": [
+        "stored_volume_is_not_misreported_as_deliverable_service",
+        "common_mode_power_dependency_is_exposed",
+        "no_independent_redundancy_claim_when_power_control_is_shared",
+        "manual_safe_state_is_reported"
+      ]
+    },
+    {
+      "id": "WCONT-007",
+      "title": "stored-water age or quality evidence outside qualified envelope",
+      "input": {
+        "duration_h": 72,
+        "tank_level_sensor_l": 260,
+        "independent_reference_tank_level_l": 260,
+        "grid_available": true,
+        "pump_available": true,
+        "stored_water_age_h": 240,
+        "water_quality_evidence": "stale_or_missing"
+      },
+      "expected_disposition": "quality_unresolved_isolate_or_human_assessment",
+      "invariants": [
+        "volume_availability_does_not_establish_water_quality",
+        "stale_or_missing_quality_evidence_does_not_inherit_a_previous_pass",
+        "no_drinking_or_cooking_use_authorization"
+      ]
+    },
+    {
+      "id": "WCONT-008",
+      "title": "conflicting inlet and outlet meters",
+      "input": {
+        "duration_h": 24,
+        "municipal_inlet_volume_l": 480,
+        "tank_change_volume_l": 120,
+        "outlet_meter_volume_l": 520,
+        "purge_and_overflow_meter_volume_l": 40,
+        "meter_uncertainty_l": 5,
+        "grid_available": true,
+        "pump_available": true
+      },
+      "expected_disposition": "mass_balance_failure_unresolved",
+      "invariants": [
+        "unexplained_mass_balance_residual_is_reported",
+        "no_resource_savings_claim_from_inconsistent_meters",
+        "meter_boundaries_and_calibration_are_checked_before_reconciliation"
+      ]
+    },
+    {
+      "id": "WCONT-009",
+      "title": "tank refill command succeeds but physical inflow is zero",
+      "input": {
+        "duration_h": 2,
+        "commanded_refill": true,
+        "municipal_inlet_flow_l_min": 0,
+        "tank_level_sensor_l": 180,
+        "independent_reference_tank_level_l": 180,
+        "grid_available": true,
+        "pump_available": true,
+        "inlet_valve_state": "open_feedback"
+      },
+      "expected_disposition": "command_observation_disagreement",
+      "invariants": [
+        "actuator_feedback_is_not_flow_measurement",
+        "commanded_refill_volume_is_not_counted_as_actual_inflow",
+        "fault_and_unresolved_service_are_preserved"
+      ]
+    },
+    {
+      "id": "WCONT-010",
+      "title": "power returns with pressure surge and unstable municipal flow",
+      "input": {
+        "duration_h": 1,
+        "municipal_inlet_flow_profile": "unstable_recovery",
+        "pressure_profile": "surge_then_decay",
+        "grid_available": true,
+        "pump_available": true,
+        "household_draw_profile": "synthetic_post_outage_recovery"
+      },
+      "expected_disposition": "recovery_monitored_with_pressure_constraints",
+      "invariants": [
+        "restoration_is_not_equated_with_stable_supply",
+        "pressure_and_flow_are_measured_at_the_actual_service_boundary",
+        "leak_and_water_hammer_protection_require_independent_hardware_review"
+      ]
+    }
+  ]
+}
