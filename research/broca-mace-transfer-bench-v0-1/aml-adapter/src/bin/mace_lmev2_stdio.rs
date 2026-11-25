@@ -241,13 +241,110 @@ fn entity_literal_action_template_sha256(config: &Config) -> String {
     sha256_hex(template.as_bytes())
 }
 
-fn trace_evidence_ids(hits: &[LongMemEvalV2HitV1]) -> Vec<String> {
+fn trace_evidence_ids(
+    hits: &[LongMemEvalV2HitV1],
+    neighbors: &[broca_aml_adapter::longmemeval_v2::LongMemEvalV2NeighborV1],
+) -> Vec<String> {
     let mut identifiers = hits.iter()
         .map(|hit| format!("lmev2:text:{}:{}", hit.trajectory_id, hit.chunk_id))
         .collect::<Vec<_>>();
+    identifiers.extend(neighbors.iter().map(|neighbor| {
+        format!(
+            "lmev2:neighbor:{}:{}",
+            neighbor.chunk.trajectory_id,
+            neighbor.chunk.chunk_sha256
+        )
+    }));
     identifiers.sort();
     identifiers.dedup();
     identifiers
+}
+
+/// Bind the LMEv2 adapter's retrieval outputs and deterministic projections
+/// back to the acquisition operations. Search hits and neighbor expansions
+/// must be named by an operation; source-state and screenshot records must be
+/// reachable through the exact parent edges emitted by those search results.
+fn verify_lmev2_candidate_operation_binding(
+    receipt: &AcquisitionReceiptV2,
+    batch: &broca_aml_adapter::candidate_evidence::CandidateEvidenceBatchV1,
+) -> Result<(), String> {
+    if batch.backend_revision_sha256 != receipt.tool_profile_sha256 {
+        return Err("candidate backend revision does not match acquisition tool profile".into());
+    }
+    let expected_scope = format!("longmemeval-v2:domain:{}", receipt.domain_id);
+    if batch.query_scope != expected_scope || batch.query_purpose != "benchmark:memory-context" {
+        return Err("candidate scope or purpose does not match the acquisition domain".into());
+    }
+
+    let operation_ids = receipt.operations.iter()
+        .flat_map(|operation| operation.observed_evidence_ids.iter().map(String::as_str))
+        .collect::<BTreeSet<_>>();
+    let state_ids = batch.evidence.iter()
+        .filter(|evidence| evidence.retrieval_channel == "source_state_lineage")
+        .map(|evidence| evidence.evidence_id.as_str())
+        .collect::<BTreeSet<_>>();
+    let retrieved = batch.evidence.iter()
+        .filter(|evidence| matches!(
+            evidence.retrieval_channel.as_str(),
+            "trajectory_bm25_text"
+                | "trajectory_entity_literal"
+                | "hybrid_rrf_bm25_entity"
+                | "trajectory_neighbor_expansion"
+        ))
+        .collect::<Vec<_>>();
+
+    if retrieved.is_empty() {
+        return Err("candidate batch contains no operation-backed retrieval records".into());
+    }
+    for evidence in &retrieved {
+        if !operation_ids.contains(evidence.evidence_id.as_str()) {
+            return Err(format!(
+                "retrieval output {} is absent from acquisition operation observations",
+                evidence.evidence_id
+            ));
+        }
+        if evidence.parent_evidence_ids.is_empty()
+            || evidence.parent_evidence_ids.iter().any(|parent| !state_ids.contains(parent.as_str()))
+        {
+            return Err(format!(
+                "retrieval output {} has missing or unbound source-state parents",
+                evidence.evidence_id
+            ));
+        }
+    }
+
+    let mut referenced_state_ids = BTreeSet::new();
+    for evidence in &retrieved {
+        referenced_state_ids.extend(evidence.parent_evidence_ids.iter().map(String::as_str));
+    }
+    for evidence in &batch.evidence {
+        match evidence.retrieval_channel.as_str() {
+            "trajectory_bm25_text"
+            | "trajectory_entity_literal"
+            | "hybrid_rrf_bm25_entity"
+            | "trajectory_neighbor_expansion" => {}
+            "source_state_lineage" => {
+                if !referenced_state_ids.contains(evidence.evidence_id.as_str()) {
+                    return Err(format!(
+                        "source-state record {} is not referenced by a retrieved result",
+                        evidence.evidence_id
+                    ));
+                }
+            }
+            "attached_image_evidence" => {
+                if evidence.parent_evidence_ids.len() != 1
+                    || !state_ids.contains(evidence.parent_evidence_ids[0].as_str())
+                {
+                    return Err(format!(
+                        "screenshot record {} is not bound to exactly one source-state record",
+                        evidence.evidence_id
+                    ));
+                }
+            }
+            other => return Err(format!("unsupported LMEv2 candidate channel: {other}")),
+        }
+    }
+    Ok(())
 }
 
 fn hybrid_rrf_result(
@@ -435,7 +532,7 @@ fn handle_request(
                         tool_id: "trajectory.bm25.search".to_owned(),
                         tool_revision_sha256: config.backend_revision_sha256.clone(),
                         action_template_sha256: bm25_action_template_sha256(config),
-                        observed_evidence_ids: trace_evidence_ids(&retrieved.hits),
+                        observed_evidence_ids: trace_evidence_ids(&retrieved.hits, &retrieved.neighbor_context),
                         outcome: if retrieved.hits.is_empty() {
                             RetrievalOperationOutcomeV1::NoEvidence
                         } else {
@@ -461,7 +558,7 @@ fn handle_request(
                         tool_id: "trajectory.entity_literal.search".to_owned(),
                         tool_revision_sha256: config.backend_revision_sha256.clone(),
                         action_template_sha256: entity_literal_action_template_sha256(config),
-                        observed_evidence_ids: trace_evidence_ids(&retrieved.hits),
+                        observed_evidence_ids: trace_evidence_ids(&retrieved.hits, &[]),
                         outcome: if retrieved.hits.is_empty() {
                             RetrievalOperationOutcomeV1::NoEvidence
                         } else {
@@ -492,7 +589,7 @@ fn handle_request(
                         tool_id: "trajectory.bm25.search".to_owned(),
                         tool_revision_sha256: config.backend_revision_sha256.clone(),
                         action_template_sha256: bm25_action_template_sha256(config),
-                        observed_evidence_ids: trace_evidence_ids(&bm25.hits),
+                        observed_evidence_ids: trace_evidence_ids(&bm25.hits, &bm25.neighbor_context),
                         outcome: if bm25.hits.is_empty() {
                             RetrievalOperationOutcomeV1::NoEvidence
                         } else {
@@ -506,7 +603,7 @@ fn handle_request(
                         tool_id: "trajectory.entity_literal.search".to_owned(),
                         tool_revision_sha256: config.backend_revision_sha256.clone(),
                         action_template_sha256: entity_literal_action_template_sha256(config),
-                        observed_evidence_ids: trace_evidence_ids(&entity.hits),
+                        observed_evidence_ids: trace_evidence_ids(&entity.hits, &[]),
                         outcome: if entity.hits.is_empty() {
                             RetrievalOperationOutcomeV1::NoEvidence
                         } else {
@@ -698,6 +795,7 @@ fn handle_request(
             acquisition_v2.validate().map_err(|error| format!("V2 acquisition receipt: {error:?}"))?;
             if let Some(batch) = &candidate_evidence {
                 verify_candidate_batch(&acquisition_v2, batch).map_err(|error| format!("V2 candidate binding: {error:?}"))?;
+                verify_lmev2_candidate_operation_binding(&acquisition_v2, batch)?;
             }
             let v2_receipt_path = config.policy_trace_dir.with_file_name("policy-acquisition-v2.jsonl");
             append_jsonl(&v2_receipt_path, &acquisition_v2).map_err(|error| format!("persist V2 acquisition receipt: {error:?}"))?;
@@ -843,6 +941,169 @@ mod tests {
                 "mace_screenshot_sha256": sha256_hex(image_bytes)
             }]
         })
+    }
+
+    fn operation_binding_fixture() -> (
+        AcquisitionReceiptV2,
+        broca_aml_adapter::candidate_evidence::CandidateEvidenceBatchV1,
+    ) {
+        use broca_aml_adapter::candidate_evidence::{
+            CandidateEvidenceV1, EvidenceModalityV1, encode_candidate_evidence_jsonl,
+        };
+
+        let revision = "11".repeat(32);
+        let state_digest = "22".repeat(32);
+        let source_digest = "33".repeat(32);
+        let chunk_digest = "44".repeat(32);
+        let image_digest = "55".repeat(32);
+        let query_digest = sha256_hex(b"fixture query");
+        let state_id = format!("lmev2:state:trajectory-1:0:{state_digest}");
+        let text_id = format!("lmev2:text:trajectory-1:{chunk_digest}");
+        let image_id = format!("lmev2:image:trajectory-1:0:{image_digest}");
+
+        let common = |evidence_id: String,
+                      modality: EvidenceModalityV1,
+                      retrieval_channel: &str,
+                      retrieval_rank: u32,
+                      parents: Vec<String>,
+                      derivation_receipt_sha256: Option<String>,
+                      payload_sha256: String,
+                      payload_ref: String,
+                      retrieval_score: Option<f64>| CandidateEvidenceV1 {
+            run_id: "fixture-run".into(),
+            candidate_id: "fixture-invocation".into(),
+            backend_id: "mace_lmev2_bm25_only".into(),
+            backend_revision_sha256: revision.clone(),
+            query_scope: "longmemeval-v2:domain:web".into(),
+            query_purpose: "benchmark:memory-context".into(),
+            query_sha256: query_digest.clone(),
+            evidence_id,
+            source_id: "trajectory-1".into(),
+            source_sha256: source_digest.clone(),
+            payload_sha256,
+            payload_ref,
+            modality,
+            retrieval_channel: retrieval_channel.into(),
+            retrieval_rank,
+            retrieval_score,
+            parent_evidence_ids: parents,
+            derivation_receipt_sha256,
+        };
+
+        let records = vec![
+            common(
+                state_id.clone(),
+                EvidenceModalityV1::Structured,
+                "source_state_lineage",
+                1,
+                Vec::new(),
+                None,
+                state_digest.clone(),
+                "lmev2://web/trajectories/trajectory-1/states/0/raw-json".into(),
+                None,
+            ),
+            common(
+                text_id.clone(),
+                EvidenceModalityV1::Text,
+                "trajectory_bm25_text",
+                1,
+                vec![state_id.clone()],
+                Some(chunk_digest.clone()),
+                chunk_digest.clone(),
+                format!("lmev2://web/trajectories/trajectory-1/chunks/{chunk_digest}"),
+                Some(1.0),
+            ),
+            common(
+                image_id,
+                EvidenceModalityV1::Image,
+                "attached_image_evidence",
+                1,
+                vec![state_id],
+                Some(sha256_hex(b"screenshot binding")),
+                image_digest.clone(),
+                format!("lmev2://web/trajectories/trajectory-1/states/0/screenshots/{image_digest}"),
+                None,
+            ),
+        ];
+        let batch = encode_candidate_evidence_jsonl(&records).expect("canonical candidate batch");
+        let receipt = AcquisitionReceiptV2 {
+            run_id: "fixture-run".into(),
+            query_invocation_id: "fixture-invocation".into(),
+            domain_id: "web".into(),
+            environment_revision_sha256: "66".repeat(32),
+            tool_profile_sha256: revision.clone(),
+            query_sha256: query_digest,
+            candidate_set_sha256: Some(batch.candidate_set_sha256.clone()),
+            operations: vec![AcquisitionOperationV2 {
+                tool_id: "trajectory.bm25.search".into(),
+                tool_revision_sha256: revision,
+                action_template_sha256: "77".repeat(32),
+                observed_evidence_ids: vec![text_id],
+                outcome: OperationOutcomeV2::EvidenceObserved,
+                elapsed_ns: 10,
+                inspected_bytes: 0,
+                inspected_bytes_measured: false,
+            }],
+            acquisition_status: AcquisitionStatusV2::CandidatesReturned,
+            tool_call_budget: 1,
+            tool_calls_used: 1,
+            elapsed_ns: 10,
+            inspected_bytes: 0,
+            inspected_bytes_complete: false,
+            created_at_unix: 100,
+        };
+        (receipt, batch)
+    }
+
+    #[test]
+    fn candidate_projection_is_bound_to_acquisition_operations_and_source_parents() {
+        let (receipt, batch) = operation_binding_fixture();
+        verify_candidate_batch(&receipt, &batch).expect("receipt candidate digest");
+        verify_lmev2_candidate_operation_binding(&receipt, &batch)
+            .expect("operation and parent binding");
+
+        let mut missing_observation = receipt.clone();
+        missing_observation.operations[0].observed_evidence_ids.clear();
+        assert!(
+            verify_lmev2_candidate_operation_binding(&missing_observation, &batch).is_err()
+        );
+
+        let mut wrong_revision = receipt;
+        wrong_revision.tool_profile_sha256 = "88".repeat(32);
+        assert!(
+            verify_lmev2_candidate_operation_binding(&wrong_revision, &batch).is_err()
+        );
+    }
+
+    #[test]
+    fn neighbor_evidence_is_included_in_the_search_operation_observation_set() {
+        use broca_aml_adapter::longmemeval_v2::{
+            LongMemEvalV2EvidenceChunkV1, LongMemEvalV2NeighborV1,
+        };
+
+        let neighbor = LongMemEvalV2NeighborV1 {
+            chunk: LongMemEvalV2EvidenceChunkV1 {
+                chunk_id: "chunk-id".into(),
+                trajectory_id: "trajectory-1".into(),
+                domain: "web".into(),
+                goal: "goal".into(),
+                start_url: "https://example.test".into(),
+                center_state_ordinal: 1,
+                window_start_ordinal: 0,
+                window_end_ordinal_exclusive: 2,
+                source_trajectory_sha256: "11".repeat(32),
+                state_window: Vec::new(),
+                screenshot_references: Vec::new(),
+                chunk_sha256: "22".repeat(32),
+                evidence_text: "neighbor context".into(),
+            },
+            expanded_from_hit_rank: 1,
+            relative_state_offset: -1,
+        };
+        assert_eq!(
+            trace_evidence_ids(&[], &[neighbor]),
+            vec!["lmev2:neighbor:trajectory-1:".to_owned() + &"22".repeat(32)]
+        );
     }
 
     #[test]
