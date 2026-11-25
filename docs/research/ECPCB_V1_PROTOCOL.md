@@ -77,7 +77,7 @@ For a full ECPCB submission, the system returns:
 - global subgoal and terminal-goal accounting;
 - explanation claims with evidence references and epistemic classes;
 - counterfactual disposition: still_provable, refuted_by_checked_witness, unknown, ill_formed, or proof_route_changed_only;
-- trust-closure capsule;
+- trust-closure capsule with an explicit checker-diversity profile reference (registry digest, profile ID and profile digest; `not_assessed` is explicit when no same-export run exists);
 - calibrated uncertainty/abstention;
 - runtime, token, tool-call and compute receipts.
 
@@ -243,7 +243,7 @@ Metrics:
 
 ### 6.5 Trust closure and independent replay
 
-Use the multi-axis assurance capsule from [#13603](https://github.com/Luminous-Dynamics/symthaea/issues/13603).
+Use the multi-axis assurance capsule from [#13603](https://github.com/Luminous-Dynamics/symthaea/issues/13603), including its digest-bound checker-diversity profile reference. The task contract requires an explicit status even when the profile is `not_assessed`; no independent-replay claim can inherit from a synthetic profile.
 
 Report:
 - seeded logical dependency recall and false-negative count;
