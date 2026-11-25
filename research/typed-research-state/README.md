@@ -24,7 +24,8 @@ cargo clippy --manifest-path research/typed-research-state/Cargo.toml --locked -
 
 - Retrieved evidence cannot implicitly acquire a claim-source relation.
 - Claim-source classifier provenance is distinct from truth adjudication.
-- Every classifier output binds the exact evidence-prefix digest it consumed; the validator recomputes this digest from the public evidence manifest before accepting any relation.
+- A classifier relation is bound to the exact claim text and scope, not merely to a reusable claim ID.
+- Every classifier output binds both the exact evidence-prefix digest and a scoped-claim digest over claim ID, statement, scope and reference time; the validator recomputes both before accepting the relation.
 - The prefix digest is SHA-256 over compact JSON for the ordered object `{research_episode_id, sequence_number, evidence}`, using the exact evidence records in their existing order. The validator rejects any prefix digest that does not match this manifest.
 - Every relation binds one claim ID and one evidence ID.
 - Exact quote byte spans are represented by offsets plus quote digest; artifact custody remains upstream.
