@@ -14,6 +14,8 @@ on:
       - "Cargo.toml"
       - "Cargo.lock"
       - ".github/workflows/mel-temporal-grounding-qualification.yml"
+      - ".github/scripts/check-workflow-draft-safety.py"
+      - ".github/scripts/check-workflow-draft-safety.py"
   pull_request:
     types: [opened, synchronize, reopened, ready_for_review]
     branches:
