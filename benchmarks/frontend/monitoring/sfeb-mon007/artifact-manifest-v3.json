@@ -1,0 +1,232 @@
+{
+  "schema": "sfeb-mon007-artifact-manifest-v3",
+  "date": "2026-11-25",
+  "qualification": "JavaScript/Go semantic preflight plus Go RFC 9162 Merkle inclusion and consistency primitive tests; not full cryptographic, SCITT, production, or SOTA qualification",
+  "sourceHashes": {
+    "README.md": "b6d655ce1d19b4e417c21872b426e05b3d1226daac94c097f2f0d906de2b9014",
+    "sfeb-action-assurance-model-v1.mjs": "6588459c94abf588ccf9cf563320303b4667382785117795c6c6cdbfb4b138ba",
+    "sfeb-action-assurance-model-v1.test.mjs": "12b50717eddd48738ffdb2dfffb390279eb3499c00e8b550e9fc6604a4b594d6",
+    "benchmark.mjs": "0ee1ba750edc4ea761128af3d2f4138ea0c2cfa89f73ffe6b8d84f469e46a5bb",
+    "go/README.md": "6e2b338c81de42abef181fae78dacc2298b0bf9ed5751b39869f4054898f8150",
+    "go/go.mod": "404469a25027b324c4728c03c17d27917f5214c3fda0781f29fd48fb2f8bba44",
+    "go/model.go": "43e2e054e57e8fd87281ec9144cc500caa995ae4b5a5ac80ed3e1bd600f55b55",
+    "go/model_test.go": "237800abb67a17335568714c086eab854dcb4e1f8cdb22fd4d3ed5c5a6e6b1bf",
+    "go/testdata/effect-core-vectors-v1.json": "b22d44e4071c9c5482403fc8e4769fa0e0199c0d45250da0f086df0b06e65209",
+    "go/rfc9162/README.md": "98f1e98295cdd4040e73be6a88e160ed787966b38af09763496273a1806da780",
+    "go/rfc9162/merkle.go": "a0335a7d94046bacaaade821e48cfef24976595908524060ef8c76d27082f7bb",
+    "go/rfc9162/merkle_test.go": "c1f6be277a9db24c2e79e574d26b6be479294969429e0db403223cc70f2f85fb",
+    "go/rfc9162/consistency.go": "aa11e1de0c44989a692a72a705f210760efca0601359589ee23ae045dc951164",
+    "go/rfc9162/consistency_test.go": "47058a2423d7fa03fda8baa7391fcbbca87ead5d74ccbdcc4ba4c190669ebab0"
+  },
+  "compressedArtifacts": {
+    "sfeb-action-assurance-model-v1.test.mjs.gz": {
+      "sha256": "ef9e9ac195f72056cd63ac5efacf5f35ad94157c745d98dbddc1d0fa1d8c7a1e",
+      "bytes": 4401,
+      "source_sha256": "12b50717eddd48738ffdb2d2fffb390279eb3499c00e8b550e9fc6604a4b594d6",
+      "source_bytes": 22523
+    },
+    "go/model_test.go.gz": {
+      "sha256": "ebb48e378bd35bb4ae1a8f1a7f40918dba0c82170967652e198837e285bc2238",
+      "bytes": 2754,
+      "source_sha256": "237800abb67a17335568714c086eab854dcb4e1f8cdb22fd4d3ed5c5a6e6b1bf",
+      "source_bytes": 11047
+    },
+    "go/testdata/effect-core-vectors-v1.json.gz": {
+      "sha256": "d5979ea3fdfcf93ff870c3ba86359f40e0465b1aef5fbdc44e6797e3740e2d24",
+      "bytes": 2102,
+      "source_sha256": "b22d44e4071c9c5482403fc8e4769fa0e0199c0d45250da0f086df0b06e65209",
+      "source_bytes": 62205
+    },
+    "go/rfc9162/merkle.go.gz": {
+      "sha256": "58fdf408192825d652695a9ae08cd21e2825e319b4711c206d8cf40769ea32f8",
+      "bytes": 1511,
+      "source_sha256": "a0335a7d94046bacaaade821e48cfef24976595908524060ef8c76d27082f7bb",
+      "source_bytes": 3875
+    },
+    "go/rfc9162/merkle_test.go.gz": {
+      "sha256": "20a2ec8fdfc9aa8f867b10df03de350cacba439fc2240d7a083707d9d49ccc87",
+      "bytes": 1156,
+      "source_sha256": "c1f6be277a9db24c2e79e574d26b6be479294969429e0db403223cc70f2f85fb",
+      "source_bytes": 3647
+    },
+    "go/rfc9162/consistency.go.gz": {
+      "sha256": "722b14aaa043d1a6e3d014134ca00ec1e54e0ac7ba4c45a3d184f9a876af9ece",
+      "bytes": 1376,
+      "source_sha256": "aa11e1de0c44989a692a72a705f210760efca0601359589ee23ae045dc951164",
+      "source_bytes": 3566
+    },
+    "go/rfc9162/consistency_test.go.gz": {
+      "sha256": "8f261256c13b782d617e233f76d194fd1df69d1a20db8931b674788d725ce560",
+      "bytes": 1611,
+      "source_sha256": "47058a2423d7fa03fda8baa7391fcbbca87ead5d74ccbdcc4ba4c190669ebab0",
+      "source_bytes": 6175
+    }
+  },
+  "javascriptTests": {
+    "cases": 31,
+    "freshInvocations": 5,
+    "successfulExecutions": 155,
+    "failures": 0,
+    "singleFieldMutationCases": 36,
+    "sharedGoldenVectors": 9
+  },
+  "goTests": {
+    "testFunctionsPerSuite": 29,
+    "freshSuiteInvocations": 3,
+    "raceDetector": "passed",
+    "goVet": "passed",
+    "externalEffectStatementCoveragePercent": 72.9,
+    "rfc9162StatementCoveragePercent": 95.5,
+    "inclusionChecks": 32896,
+    "consistencyChecks": 32640,
+    "totalMerkleProofChecks": 65536
+  },
+  "goMerkleMicrobenchmarks": {
+    "runsPerCase": 5,
+    "bytesPerOperation": 0,
+    "allocationsPerOperation": 0,
+    "medianConsistencyNsPerOperation": {
+      "16_to_256": 534.5,
+      "256_to_4096": 529.3,
+      "4096_to_65536": 527.5
+    },
+    "medianInclusionNsPerOperation": {
+      "tree_16": 525.9,
+      "tree_256": 1046,
+      "tree_4096": 1564
+    }
+  },
+  "javascriptSemanticBenchmark": {
+    "benchmark": "sfeb-mon007-semantic-assurance-model-v1",
+    "date": "2026-11-25",
+    "runs": 5,
+    "runtime": "v22.16.0",
+    "platform": "linux-6.18.57",
+    "architecture": "x64",
+    "logicalCpuCount": 3,
+    "iterationsPerRun": 30000,
+    "samplesPerRun": 30,
+    "warmupPerRun": 3000,
+    "allRunsVerified": true,
+    "verifiedPerRun": [
+      30000,
+      30000,
+      30000,
+      30000,
+      30000
+    ],
+    "throughputOpsPerSecond": {
+      "runs": [
+        38182,
+        39662,
+        39124,
+        38070,
+        41198
+      ],
+      "median": 39124,
+      "range": [
+        38070,
+        41198
+      ]
+    },
+    "perEvaluationMs": {
+      "p50MedianAcrossRuns": 0.024361,
+      "p95MedianAcrossRuns": 0.028215,
+      "p99MedianAcrossRuns": 0.047588
+    },
+    "runDetails": [
+      {
+        "benchmark": "sfeb-mon007-semantic-assurance-model-v1",
+        "runtime": "v22.16.0",
+        "platform": "linux-6.18.57",
+        "architecture": "x64",
+        "logicalCpuCount": 3,
+        "iterations": 30000,
+        "samples": 30,
+        "warmup": 3000,
+        "verified": 30000,
+        "wallMs": 785.706,
+        "throughputOpsPerSecond": 38182,
+        "perEvaluationMs": {
+          "p50": 0.025266,
+          "p95": 0.027681,
+          "p99": 0.047768
+        }
+      },
+      {
+        "benchmark": "sfeb-mon007-semantic-assurance-model-v1",
+        "runtime": "v22.16.0",
+        "platform": "linux-6.18.57",
+        "architecture": "x64",
+        "logicalCpuCount": 3,
+        "iterations": 30000,
+        "samples": 30,
+        "warmup": 3000,
+        "verified": 30000,
+        "wallMs": 756.397,
+        "throughputOpsPerSecond": 39662,
+        "perEvaluationMs": {
+          "p50": 0.023823,
+          "p95": 0.034892,
+          "p99": 0.04601
+        }
+      },
+      {
+        "benchmark": "sfeb-mon007-semantic-assurance-model-v1",
+        "runtime": "v22.16.0",
+        "platform": "linux-6.18.57",
+        "architecture": "x64",
+        "logicalCpuCount": 3,
+        "iterations": 30000,
+        "samples": 30,
+        "warmup": 3000,
+        "verified": 30000,
+        "wallMs": 766.79,
+        "throughputOpsPerSecond": 39124,
+        "perEvaluationMs": {
+          "p50": 0.024959,
+          "p95": 0.027897,
+          "p99": 0.04172
+        }
+      },
+      {
+        "benchmark": "sfeb-mon007-semantic-assurance-model-v1",
+        "runtime": "v22.16.0",
+        "platform": "linux-6.18.57",
+        "architecture": "x64",
+        "logicalCpuCount": 3,
+        "iterations": 30000,
+        "samples": 30,
+        "warmup": 3000,
+        "verified": 30000,
+        "wallMs": 788.016,
+        "throughputOpsPerSecond": 38070,
+        "perEvaluationMs": {
+          "p50": 0.024361,
+          "p95": 0.038489,
+          "p99": 0.060209
+        }
+      },
+      {
+        "benchmark": "sfeb-mon007-semantic-assurance-model-v1",
+        "runtime": "v22.16.0",
+        "platform": "linux-6.18.57",
+        "architecture": "x64",
+        "logicalCpuCount": 3,
+        "iterations": 30000,
+        "samples": 30,
+        "warmup": 3000,
+        "verified": 30000,
+        "wallMs": 728.197,
+        "throughputOpsPerSecond": 41198,
+        "perEvaluationMs": {
+          "p50": 0.023197,
+          "p95": 0.028215,
+          "p99": 0.047588
+        }
+      }
+    ],
+    "scope": "Pure in-process semantic evaluator only. Excludes cryptography, COSE/CBOR, Merkle proofs, network, storage, source/sink adapters and external readback. Not comparable to workflow engines, vendor sizing, or product/SOTA throughput."
+  },
+  "scope": "JS semantic evaluator and Go external-effect semantic subset plus Go RFC 9162 inclusion/consistency primitives. Excludes COSE/CBOR, Ed25519, RFC 9942 receipt, RFC 9943 registration policy, authenticated checkpoints, witness gossip/split-view detection, live sink, and independent external readback."
+}

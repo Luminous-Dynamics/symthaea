@@ -1,34 +1,34 @@
-# SFEB MON-007 independent Go core preflight
+# MON-007 Go semantic and Merkle preflight
 
-This directory contains a dependency-free Go implementation of the **external-effect semantic core** of MON-007. It independently models source provenance, tenant/resource scope, authority-at-commit, sink-enforced fencing, stable operation identity, sink acceptance, separate-reader postcondition readback, and causal links between source, operation, sink transaction, and resource revision.
+This workspace contains a standard-library-only external-effect semantic model plus an RFC 9162 SHA-256 Merkle proof package. The semantic model covers source identity/digest, tenant/resource scope, authority-at-commit, sink fencing, stable operation identity, sink receipt, separate-reader readback and causality. The Merkle package handles inclusion and append-only consistency proofs over already-decoded 32-byte digests.
 
-It is deliberately narrower than the JavaScript semantic model. It does not implement or verify COSE/CBOR, Ed25519 signatures, RFC 9942 receipts, RFC 9162 Merkle proofs, SCITT registration policies, transparency-service APIs, distributed witnesses, cryptographic trust-root rotation, a live source/sink, or real readback. The `*Verified` values and `VerifiedFields` snapshots are pre-verified facts that production adapters must derive from the exact authenticated bytes/observations. A unit-test pass is not a security or standards-conformance claim.
-
-## Run
-
-Extract to a temporary directory from the repository root:
+## Reproduce from the repository root
 
 ```sh
-mkdir -p /tmp/sfeb-mon007-go
+mkdir -p /tmp/sfeb-mon007-go/testdata /tmp/sfeb-mon007-go/rfc9162
 gzip -dc benchmarks/frontend/monitoring/sfeb-mon007/go/model.go.gz > /tmp/sfeb-mon007-go/model.go
 gzip -dc benchmarks/frontend/monitoring/sfeb-mon007/go/model_test.go.gz > /tmp/sfeb-mon007-go/model_test.go
 cp benchmarks/frontend/monitoring/sfeb-mon007/go/go.mod /tmp/sfeb-mon007-go/go.mod
+cp benchmarks/frontend/monitoring/sfeb-mon007/go/testdata/effect-core-vectors-v1.json.gz /tmp/sfeb-mon007-go/testdata/
+for f in merkle.go merkle_test.go consistency.go consistency_test.go; do
+  gzip -dc "benchmarks/frontend/monitoring/sfeb-mon007/go/rfc9162/${f}.gz" > "/tmp/sfeb-mon007-go/rfc9162/${f}"
+done
+cp benchmarks/frontend/monitoring/sfeb-mon007/go/rfc9162/README.md /tmp/sfeb-mon007-go/rfc9162/
 cd /tmp/sfeb-mon007-go
-go test ./...
-go test -race ./...
+go test -count=1 ./...
+go test -race -count=1 ./...
 go vet ./...
 go test -cover ./...
+go test -run '^$' -bench 'Verify(Inclusion|Consistency)' -benchmem ./rfc9162
 ```
-
-No third-party Go dependencies, network access, npm, database, container, or CI runner is required.
 
 ## Local evidence (2026-11-25)
 
-- Go 1.23.2, linux/amd64.
-- **17/17 tests passed**, including 5 repeated test-suite invocations and 2 repeated race-detector invocations.
-- `go vet ./...` passed.
-- Statement coverage: **72.6%**.
-- Additional negative controls bind the source identity and source digest into the action and sink receipt; a substituted source digest breaks both sink acceptance and the causal edge.
-- Missing authority is reported as missing evidence rather than inventing a successful authorization decision.
+- Go 1.23.2, linux/amd64, AMD EPYC 9V74.
+- 29 test functions: 18 semantic, 5 inclusion, 6 consistency. Three fresh suite runs passed; race detector and `go vet` passed.
+- 65,536 Merkle proof checks: 32,896 inclusion positions and 32,640 consistency size-pairs for tree sizes through 256. Three seven-leaf RFC examples are checked.
+- Coverage: 72.9% semantic core; 95.5% RFC 9162 package. Inclusion and consistency verifier functions each have 100% statement coverage.
+- Nine common JS/Go semantic vectors produce identical statuses and reason-code sets.
+- Five-run proof microbenchmarks: zero allocations/op. Median consistency: 534.5 ns (16→256), 529.3 ns (256→4,096), 527.5 ns (4,096→65,536). Median inclusion: 525.9 ns (16 leaves), 1,046 ns (256), 1,564 ns (4,096).
 
-The Go implementation is an independent core preflight, not yet a cross-language conformance verifier. No JS↔Go differential corpus has been run. The next step is to define canonical typed fixtures and assert equivalent predicate/status/reason outputs across implementations, then connect independently maintained cryptographic and SCITT/COSE verifier libraries.
+The semantic `*Verified` flags and `VerifiedFields` snapshots are pre-verified facts; real adapters must derive them from authenticated bytes and observations. The Merkle package does not authenticate checkpoints or parse COSE. There is no RFC 9942 receipt verifier, SCITT policy-history verifier, witness gossip, split-view protection, or live external sink here. The Go Merkle implementation still needs differential testing against a second independently maintained implementation.
