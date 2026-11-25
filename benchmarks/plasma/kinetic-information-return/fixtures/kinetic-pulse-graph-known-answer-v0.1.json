@@ -1,0 +1,75 @@
+{
+  "schema_version": "0.1",
+  "record_status": "synthetic_pulse_sequence_contract_only",
+  "graph_id": "KIRR-SYNTHETIC-PULSE-GRAPH-001",
+  "cohort": {
+    "equation_id": "periodic_1d1v_collisionless_vlasov_poisson",
+    "collision_model": "collisionless",
+    "boundary_topology": "periodic_torus",
+    "time_unit": "omega_pe^-1",
+    "maximum_time": 30,
+    "pulse_family_fixture": "synthetic-pulse-family-v0.1.json"
+  },
+  "paths": [
+    {
+      "path_id": "baseline-no-intervention",
+      "path_kind": "baseline",
+      "observation_end_time": 6,
+      "pulses": []
+    },
+    {
+      "path_id": "two-pulse-echo-anchor",
+      "path_kind": "two_pulse_echo",
+      "observation_end_time": 8,
+      "pulses": [
+        {
+          "pulse_id": "kick-a",
+          "spatial_mode": 1,
+          "phase_rad": 0.2,
+          "kick_velocity_amplitude": 0.01,
+          "application_time": 1
+        },
+        {
+          "pulse_id": "kick-b",
+          "spatial_mode": 2,
+          "phase_rad": -0.3,
+          "kick_velocity_amplitude": 0.008,
+          "application_time": 3
+        }
+      ]
+    },
+    {
+      "path_id": "three-pulse-cascade",
+      "path_kind": "multi_pulse_cascade",
+      "observation_end_time": 10,
+      "pulses": [
+        {
+          "pulse_id": "kick-a",
+          "spatial_mode": 1,
+          "phase_rad": 0.2,
+          "kick_velocity_amplitude": 0.01,
+          "application_time": 1
+        },
+        {
+          "pulse_id": "kick-b",
+          "spatial_mode": 2,
+          "phase_rad": -0.3,
+          "kick_velocity_amplitude": 0.008,
+          "application_time": 3
+        },
+        {
+          "pulse_id": "kick-c",
+          "spatial_mode": 1,
+          "phase_rad": 1.1,
+          "kick_velocity_amplitude": 0.006,
+          "application_time": 5
+        }
+      ]
+    }
+  ],
+  "claim_boundary": {
+    "no_vlasov_solver_executed": true,
+    "no_echo_response_measured": true,
+    "no_global_memory_claim": true
+  }
+}
