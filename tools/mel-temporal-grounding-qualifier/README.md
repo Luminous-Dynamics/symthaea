@@ -94,3 +94,25 @@ Run the synthetic complete-work census example with:
     cargo +1.96.0 run --locked --manifest-path tools/mel-temporal-grounding-qualifier/Cargo.toml --bin mel-two-stage-design-estimator -- tools/mel-temporal-grounding-qualifier/fixtures/mel-two-stage-design-estimator.synthetic.json
 
 The fixture fully observes one selected source work with two queries, so its item total and mean are exact and its design variance is zero. The Rust exhaustive oracle test separately enumerates all three possible two-of-three source-work samples and verifies that the average HT total equals the known population total and the average estimated variance equals the exact design variance. This is deterministic synthetic validation, not a field estimate.
+
+
+## Two-stage finite-population HT estimator
+
+The temporal_design_estimator module replays the source-balanced acquisition planner from the exact candidate frame, config and seed. Reviewed runs should supply expected_selection_receipt_sha256; a mismatch is rejected. A null expected digest is allowed only for a fresh deterministic demonstration and is explicitly marked selection_receipt_match_verified=false.
+
+Only completed outcomes for selected ProbabilityAudit items are accepted. Missing, duplicate, extra, wrong-metric, non-audit and out-of-range outcomes are rejected. The report provides two separate estimands:
+
+- Item-weighted finite-population total and mean, with each eligible query item having equal target weight.
+- Source-work-weighted total and mean, with each source work receiving equal target weight, independent of how many queries it contributes.
+
+The source-work estimator uses item outcome y_wi/N_w inside the same HT machinery. The item and source-work variances are calculated separately; neither is silently substituted for the other.
+
+For a two-stage stratum, the estimator uses first-order inclusion pi_i = (K/W)(m_w/N_w), same-work pair inclusion pi_ij = (K/W)(m_w(m_w-1)/(N_w(N_w-1))), and different-work pair inclusion pi_ij = (K(K-1)/(W(W-1)))(m_w/N_w)(m_v/N_v). The general HT variance estimator includes diagonal and off-diagonal terms and does not assume a constant total number of selected query items across works.
+
+Variance is reported unavailable when the design cannot estimate between-work variation (for example, K<2 when W>1), a required pair inclusion is zero, or the estimate is negative/non-finite. The report includes source-work and within-work finite-population corrections. It never emits a confidence interval from an invalid variance estimate.
+
+Run the synthetic complete-work census example with:
+
+    cargo +1.96.0 run --locked --manifest-path tools/mel-temporal-grounding-qualifier/Cargo.toml --bin mel-two-stage-design-estimator -- tools/mel-temporal-grounding-qualifier/fixtures/mel-two-stage-design-estimator.synthetic.json
+
+The fixture fully observes one selected two-query source work, so the item and source-work means are both 0.5 and both design variances are zero. The Rust exhaustive oracle test separately enumerates all three possible two-of-three source-work samples, verifying that the average HT item total is 3.0 and that the average estimated item-total variance is the exact design variance of 1.5. This is synthetic estimator qualification, not a field estimate or authenticated outcome record.
