@@ -158,7 +158,13 @@ fn validate_evidence(
     let digest = required_string(map, "artifact_sha256", path, issues);
     let relation = required_string(map, "relation_to_claim", path, issues);
     let correction = required_string(map, "correction_status", path, issues);
-    required_string(map, "relationship_notes", path, issues);
+    if !map.get("relationship_notes").is_some_and(Value::is_string) {
+        issue(
+            issues,
+            format!("{path}.relationship_notes"),
+            "relationship_notes must be a string (empty is allowed)",
+        );
+    }
 
     if let Some(role) = source_role {
         if !["primary", "secondary", "registry", "syndicated", "unknown"].contains(&role) {
