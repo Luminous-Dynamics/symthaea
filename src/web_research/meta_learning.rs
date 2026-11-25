@@ -11,7 +11,9 @@
 use serde::{Deserialize, Serialize};
 use std::collections::{HashMap, VecDeque};
 
-use super::types::{AdjudicatedVerificationOutcome, AdjudicationKind, ResearchSource, VerificationOutcome};
+use super::types::{AdjudicatedVerificationOutcome, ResearchSource, VerificationOutcome};
+#[cfg(test)]
+use super::types::AdjudicationKind;
 
 /// Configuration for the epistemic learner
 #[derive(Debug, Clone, Serialize, Deserialize)]
