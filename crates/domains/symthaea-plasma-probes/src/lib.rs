@@ -4930,33 +4930,37 @@ pub fn solve_two_cell_positive_mass_response_projection(
         return Err(ContractError::InvalidPositivityProjectionInput);
     }
 
-    let determinant = cell_volumes[0].mul_add(
-        response_coefficients[1],
-        -(cell_volumes[1] * response_coefficients[0]),
-    );
-    let determinant_scale = (cell_volumes[0] * response_coefficients[1])
-        .abs()
-        .max((cell_volumes[1] * response_coefficients[0]).abs())
-        .max(1.0);
-    if !determinant.is_finite()
-        || determinant.abs() <= 1.0e-12 * determinant_scale
-    {
+    let determinant_term_a = cell_volumes[0] * response_coefficients[1];
+    let determinant_term_b = cell_volumes[1] * response_coefficients[0];
+    if !determinant_term_a.is_finite() || !determinant_term_b.is_finite() {
+        return Err(ContractError::PositivityProjectionArithmeticOverflow);
+    }
+    let determinant = determinant_term_a - determinant_term_b;
+    let determinant_scale = determinant_term_a.abs().max(determinant_term_b.abs());
+    if !determinant.is_finite() {
+        return Err(ContractError::PositivityProjectionArithmeticOverflow);
+    }
+    if determinant_scale == 0.0 || determinant.abs() <= 1.0e-12 * determinant_scale {
         return Err(ContractError::InfeasibleTwoCellResponseProjection);
     }
 
-    let projected_first = target_mass.mul_add(
+    let numerator_first = target_mass.mul_add(
         response_coefficients[1],
         -(cell_volumes[1] * target_response),
-    ) / determinant;
-    let projected_second = cell_volumes[0].mul_add(
+    );
+    let numerator_second = cell_volumes[0].mul_add(
         target_response,
         -(response_coefficients[0] * target_mass),
-    ) / determinant;
-    if !projected_first.is_finite()
-        || !projected_second.is_finite()
-        || projected_first < 0.0
-        || projected_second < 0.0
-    {
+    );
+    if !numerator_first.is_finite() || !numerator_second.is_finite() {
+        return Err(ContractError::PositivityProjectionArithmeticOverflow);
+    }
+    let projected_first = numerator_first / determinant;
+    let projected_second = numerator_second / determinant;
+    if !projected_first.is_finite() || !projected_second.is_finite() {
+        return Err(ContractError::PositivityProjectionArithmeticOverflow);
+    }
+    if projected_first < 0.0 || projected_second < 0.0 {
         return Err(ContractError::InfeasibleTwoCellResponseProjection);
     }
 
@@ -9688,6 +9692,35 @@ mod tests {
         assert!(joint.minimum_projected_value >= 0.0);
         assert!(joint.mass_residual.abs() < 1.0e-12);
         assert!(joint.response_residual.abs() < 1.0e-12);
+    }
+
+    #[test]
+    fn joint_two_cell_projection_is_scale_invariant_for_small_response_units() {
+        let report = solve_two_cell_positive_mass_response_projection(
+            [-0.1, 1.1],
+            [1.0, 1.0],
+            [1.0e-15, 0.0],
+            1.0,
+            1.0e-16,
+        )
+        .unwrap();
+        assert!((report.projected_values[0] - 0.1).abs() < 1.0e-12);
+        assert!((report.projected_values[1] - 0.9).abs() < 1.0e-12);
+        assert!(report.response_residual.abs() < 1.0e-27);
+    }
+
+    #[test]
+    fn joint_two_cell_projection_distinguishes_determinant_overflow_from_infeasibility() {
+        assert_eq!(
+            solve_two_cell_positive_mass_response_projection(
+                [0.5, 0.5],
+                [1.0e308, 1.0],
+                [1.0e308, 0.0],
+                1.0,
+                0.5,
+            ),
+            Err(ContractError::PositivityProjectionArithmeticOverflow)
+        );
     }
 
     #[test]
