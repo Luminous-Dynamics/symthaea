@@ -108,6 +108,9 @@ impl PhysicalLayout {
 #[derive(Debug, Clone)]
 pub struct MediaImage {
     cells: [Option<[u8; BLOCK_BYTES]>; TILE_COUNT],
+    /// Expected digest retained outside the simulated physical tile array.
+    /// This models an independently preserved archive manifest entry.
+    expected_payload_sha256: [u8; 32],
 }
 
 #[derive(Debug, Clone, PartialEq, Eq)]
@@ -177,7 +180,10 @@ impl MediaImage {
             }
         }
 
-        Ok(Self { cells })
+        Ok(Self {
+            cells,
+            expected_payload_sha256: sha256(payload),
+        })
     }
 
     /// Erase physical tiles. This models known erasures, not arbitrary bit
@@ -247,7 +253,7 @@ impl MediaImage {
         }
 
         let payload_sha256 = hex_digest(&sha256(&payload));
-        let expected_sha256 = EXPECTED_PAYLOAD_SHA256.to_owned();
+        let expected_sha256 = hex_digest(&self.expected_payload_sha256);
         let digest_matches = payload_sha256 == expected_sha256;
         let exact_recovery = control_metadata_available
             && uncorrectable_stripes.is_empty()
@@ -796,6 +802,24 @@ mod tests {
             assert_eq!(worst_erasures(&layout, &mask, false), 2);
             assert_eq!(worst_erasures(&layout, &mask, true), 6);
         }
+    }
+
+    #[test]
+    fn arbitrary_payload_round_trips_against_its_out_of_band_manifest_digest() {
+        let layout = PhysicalLayout::new();
+        let payload: Vec<u8> = (0..PAYLOAD_BYTES)
+            .map(|index| (index as u8).wrapping_mul(37).wrapping_add(11))
+            .collect();
+        let mut image = MediaImage::write_reference(&payload, &layout).unwrap();
+
+        let erasures: Vec<usize> = (0..STRIPE_COUNT)
+            .map(|stripe| layout.shard_tile(stripe, 4).unwrap())
+            .collect();
+        image.erase_tiles(&erasures).unwrap();
+
+        let receipt = image.read_and_recover(&layout);
+        assert!(receipt.exact_recovery, "{}", receipt.to_json());
+        assert_eq!(receipt.payload_sha256, hex_digest(&sha256(&payload)));
     }
 
     #[test]
