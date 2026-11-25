@@ -106,6 +106,15 @@ jobs:
             and .summary.dataset_items == 6
             and .summary.source_work_clusters == 3
             and .summary.unique_annotator_identities == 4
+            and .model_grounding_summary.query_items == 6
+            and .model_grounding_summary.present_items == 3
+            and .model_grounding_summary.one_to_many_items == 3
+            and .model_grounding_summary.absent_items == 3
+            and .model_grounding_summary.prediction_coverage == 1.0
+            and .model_grounding_summary.model_confidence_calibration_computed == false
+            and (.model_grounding_by_item | length) == 6
+            and .model_grounding_by_item[0].prediction.query_id == .model_grounding_by_item[0].query_id
+            and (.model_grounding_by_item[0].annotations | length) == 4
             and .summary.nominal_state_agreement_pairs > 0
             and .summary.state_reliability.alpha != null
             and .summary.state_reliability.alpha < 1.0
