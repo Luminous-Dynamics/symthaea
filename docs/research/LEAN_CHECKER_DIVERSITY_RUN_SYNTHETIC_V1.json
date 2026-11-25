@@ -3,7 +3,7 @@
   "artifact_id": "LEAN-CHECKER-DIVERSITY-RUN-001",
   "profile_status": "synthetic_fixture_not_execution",
   "profile_id": "CHECKER-DIVERSITY-SYNTHETIC-ALL-ACCEPT-001",
-  "registry_sha256": "e17c063f20c7338dda1352e5493793f36a0bdb688a5b320503e4906000beb813",
+  "registry_sha256": "4f273d8894aac173f2d97492ae7cecbb62bd875cbbe15cddb14ffb5692ca4632",
   "subject": {
     "export_sha256": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
     "export_format": "Lean 4.35.0 export NDJSON",
