@@ -46,3 +46,10 @@ This selector does not execute a Vlasov solver or choose from physical pulse fam
 The fixture also contains a matched four-candidate portfolio. All candidates share identical state hypotheses, prior probabilities and noise variance. The expected Pareto frontier contains the weak/low-cost and strong/low-cost interventions; the strong/high-cost design is dominated by the equal-information strong/low-cost design, and the weak/expensive design is dominated by the weak/low-cost design. The best EIG-per-cost selector is the strong/low-cost option.
 
 The selector rejects portfolios that change hypothesis ordering, normalized priors or the observation-noise model between candidate interventions. It returns the Pareto indices and scalar EIG/cost choice separately, so the scalar decision does not erase the frontier.
+
+
+## Noise-envelope sensitivity
+
+`evaluate_kinetic_discrimination_noise_envelope` evaluates the same candidate design at the minimum and maximum of a caller-declared positive observation-noise variance interval. Under the stated additive independent Gaussian model, the higher-variance response is a degraded channel (it can be obtained by adding independent Gaussian noise to the lower-variance observation). The data-processing inequality therefore implies non-increasing EIG as variance increases.
+
+The helper checks the endpoint ordering numerically and reports both endpoint EIG and cost-normalized EIG. This is a model-conditional sensitivity check; it does not certify that real instrument noise, numerical reference error or correlated QoI uncertainty lies inside the interval.
