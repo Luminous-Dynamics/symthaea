@@ -798,7 +798,9 @@ The first implementation in [PR #13405](https://github.com/Luminous-Dynamics/sym
 
 It uses the active-set form \(g_i=\max(0,\tilde f_i-\lambda)\), reporting the multiplier, positive-cell count, achieved mass, residual, minimum output and weighted correction norm. A negative-overshoot fixture \([-0.1,1.1]\mapsto[0,1]\) is schema-checked and replayed through a small CLI.
 
-This first primitive preserves positivity and one discrete mass only. It does not preserve momentum, energy, \(L^1\), \(L^2\), entropy, the full Casimir family, Poisson residual or future response. The next stages require multi-constraint feasibility/KKT evidence and post-transition response validation; infeasible low-rank transitions must be refused or trigger rank increase rather than silently clipping away the conflict.
+A second manufactured primitive, \`solve_two_cell_positive_mass_response_projection\`, checks the trade-off directly. For a two-cell candidate [-0.1,1.1], target mass 1 and a separately registered linear response R(g)=g[0] with target 0.1, positivity-plus-mass alone returns [0,1] and misses the response target; the exact two-cell joint solve returns [0.1,0.9]. A target response that would force a negative cell is refused. This is a two-variable feasibility oracle, not a general multi-cell QP or nonlinear kinetic response model.
+
+The first primitive preserves positivity and one discrete mass only; the second enforces positivity, mass and one scalar linear response only in a two-cell manufactured fixture. Neither preserves momentum, energy, \(L^1\), \(L^2\), entropy, the full Casimir family, Poisson residual or a physical future response. The next stages require multi-constraint feasibility/KKT evidence and independently measured post-transition response validation; infeasible low-rank transitions must be refused or trigger rank increase rather than silently clipping away the conflict.
 
 ## Response-Weighted Spectral Refinement (RWSR)
 
