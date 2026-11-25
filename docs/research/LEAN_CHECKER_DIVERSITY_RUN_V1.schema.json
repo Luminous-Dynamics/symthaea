@@ -169,8 +169,7 @@
           "implementation_revision",
           "binary_sha256",
           "input_export_sha256",
-          "result",
-          "raw_receipt_sha256"
+          "result"
         ],
         "properties": {
           "checker_id": {
