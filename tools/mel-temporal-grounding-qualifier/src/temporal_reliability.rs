@@ -1083,6 +1083,33 @@ mod tests {
     }
 
     #[test]
+    fn source_work_alpha_bootstrap_keeps_degenerate_alpha_undefined() {
+        let json = include_str!("../fixtures/mel-temporal-reliability-corpus.synthetic.json");
+        let mut corpus: TemporalReliabilityCorpusV1 = serde_json::from_str(json).unwrap();
+        for unit in &mut corpus.units {
+            for annotation in &mut unit.annotations {
+                annotation.state = GroundTruthStateV1::Absent;
+                annotation.intervals.clear();
+                annotation.status_reason = None;
+            }
+        }
+        let report =
+            audit_reliability_corpus_with_source_bootstrap(&corpus, 1_000, 0x2026_1125)
+                .unwrap();
+        let bootstrap = report
+            .disposition_alpha_source_work_bootstrap
+            .as_ref()
+            .unwrap();
+        assert_eq!(report.disposition_alpha.alpha, None);
+        assert_eq!(bootstrap.estimate, None);
+        assert_eq!(bootstrap.bootstrap_replicates_valid, 0);
+        assert_eq!(bootstrap.percentile_95_low, None);
+        assert_eq!(bootstrap.percentile_95_high, None);
+        assert!(bootstrap.status_reason.is_some());
+        assert!(!bootstrap.confirmatory_cluster_floor_met);
+    }
+
+    #[test]
     fn source_work_alpha_bootstrap_requires_multiple_lineages_and_valid_seed() {
         let json = include_str!("../fixtures/mel-temporal-reliability-corpus.synthetic.json");
         let mut corpus: TemporalReliabilityCorpusV1 = serde_json::from_str(json).unwrap();
