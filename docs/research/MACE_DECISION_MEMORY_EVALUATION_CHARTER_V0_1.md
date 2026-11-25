@@ -132,6 +132,40 @@ The MACE stretch goals in the first two tables are proposed as **commercial lead
 
 **Priority order:** (a) privacy/scope-safe personalization and epistemic calibration; (b) streaming integrity and temporal correction; (c) multimodal retrieval plus continual update; (d) coding bug-fix and noisy-patch context. Run a capability-specific ablation for every intervention so an aggregate gain cannot hide a regression.
 
+### 2.5b Industry systems: matched baselines, not strawmen
+
+MACE's novelty claim must not be "we use temporal graphs", "we combine vector and graph retrieval", or "we consolidate memories". Those capabilities now exist in public commercial systems.
+
+| System | Publicly documented strengths | Fair MACE comparison | What is not established by those docs |
+|---|---|---|---|
+| Mem0 Platform v3 | Single-pass ADD-only extraction; built-in entity graph; multi-signal hybrid retrieval; temporal context retained as new facts arrive | Match LoCoMo, LongMemEval, BEAM, retrieval depth, model and token budget; test correction, expiry, delete and T10 separately | ADD-only extraction is not itself proof of erasure failure; the docs describe expiry/delete options but do not establish independent rollback-resistant erasure |
+| Zep / Graphiti | Temporal context graph with valid/invalid and learned/invalidated times; vector + full-text + graph retrieval; stale facts invalidated from current state while history is retained | Match LongMemEval and BEAM under identical reader/model, context budget and latency accounting; measure temporal correction and query cost | Temporal invalidation is not the same as independently witnessed T9/T10 rollback resistance or proof of source rights |
+| AWS Bedrock AgentCore Memory | Lifecycle workflow with TTL, recency/access/frequency scoring, LLM consolidation, deletion of originals and run outputs written to S3 | Compare retention utility, clean-task loss, consolidation quality, recovery, deletion propagation, cost and lifecycle latency | A scored/pruned lifecycle policy does not by itself establish non-transitive provenance, exact derived-view erasure, external witness currentness or causal repair |
+| Zep Agent Skills | Procedural memory compiled from verified execution traces into versioned skills, with trace citations and pre-use checks | Evaluate skill reuse on held-out tasks, cross-model transfer, environment drift, provenance and harmful strategy persistence | Verified trace lineage and version checks do not alone establish that a learned skill is authorized for every target or that downstream effects are safe |
+
+#### Vendor-reported performance must be versioned
+
+- Mem0's migration guide reports LoCoMo 91.6 and LongMemEval 93.4, while its dedicated evaluation page reports 92.5 and 94.4 using a top-200 retrieval budget. Its evaluation page also reports BEAM 64.1 at 1M tokens and 48.6 at 10M, averaging roughly 6.7–6.9K context tokens per query. These are vendor-published figures, not independent MACE reproductions. The difference between its public docs must be resolved to exact benchmark/reader/model revisions before any head-to-head claim.
+- Zep's Graphiti page reports 94.7 LoCoMo at 155 ms and 5,760 context tokens, and 90.2 LongMemEval at 162 ms and 4,408 context tokens. Treat these as vendor-reported operating points; benchmark version, reader, hardware and measurement boundaries must be matched before comparison.
+- AWS describes a lifecycle policy combining a 90-day default TTL with a configurable relevance score from creation recency, last-access recency and access frequency. Its consolidation workflow uses an LLM to compress related low-scoring memories, stores the summary, and then deletes originals; its workflow writes run outputs to S3 and logs failed deletions for review. This is a real lifecycle baseline and should be included in clean-utility and consolidation/repair experiments.
+- Zep's November 2026 Agent Skills research adds a procedural memory baseline: versioned skills compiled from verified runs with citations to the underlying events. This calls for a separate procedural-skill transfer lane, not merely a fact-recall score.
+
+Because vendor pages can change independently of benchmark versions, preserve the exact fetched source, page revision, date, benchmark manifest, model/reader, top-k, context tokens, latency boundary and raw response artifacts for every comparison. Do not select whichever public page currently has the most favorable score.
+
+#### MACE's differentiator must be stronger
+
+MACE should compete on a **verifiable decision-and-lifecycle contract**, not on storage topology:
+
+1. **Evidence authority:** prove issuer, scope, purpose, rights, revocation and currentness at use time.
+2. **Derivation closure:** every summary, graph edge, skill, embedding and cache carries its parents and transformation receipt; a derived memory cannot gain authority.
+3. **Decision sufficiency:** show that qualified evidence covers the actual DecisionNeed, including contradictions and missing evidence; retrieval relevance alone is insufficient.
+4. **Causal utility:** measure whether the memory changed a downstream decision and whether the change improved the outcome.
+5. **Verified lifecycle:** distinguish correction, supersession, logical erasure, derived-view invalidation, backup restore and T10 resurrection.
+6. **Independent evaluation:** freeze assignments, seal evaluator artifacts, commit candidate traces before reveal, and independently verify result commitments.
+7. **Procedural transfer:** learned skills remain advisory until their trace provenance, environment preconditions, authority and current applicability are verified.
+
+The evaluation charter should compare Mem0, Zep/Graphiti, AgentCore Memory and Zep Agent Skills as real architecture baselines alongside simple retrieval arms. A baseline may be strong at retrieval and still be unqualified for a governed action; that is a separate measured dimension, not a presumed vulnerability.
+
 ### 2.6 Interdependent multi-session and poisoning benchmarks
 
 Keep these protocols as separate external result lanes; they expose different missing capabilities.
