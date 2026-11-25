@@ -131,7 +131,7 @@ Do not claim "beats DBOS" by comparing a 15-case Go preflight to DBOS's no-op th
 - RFC 9943, *An Architecture for Trustworthy and Transparent Digital Supply Chains*: https://www.rfc-editor.org/rfc/rfc9943
 - Figure Statements -00, Internet-Draft: https://datatracker.ietf.org/doc/html/draft-yetis-scitt-figure-receipts-00
 - Decision Provenance -03, Internet-Draft: https://datatracker.ietf.org/doc/html/draft-lemonnier-scitt-decision-provenance-03
-- Measurement Capsules -01, Internet-Draft: https://datatracker.ietf.org/doc/html/draft-ietf-scitt-measurement-capsules-01
-- Agent Action Capsule -05, Internet-Draft: https://datatracker.ietf.org/doc/html/draft-ietf-scitt-agent-action-capsule-05
+- Measurement Capsules -01, Internet-Draft: https://datatracker.ietf.org/doc/draft-templeman-scitt-measurement-capsule/01/
+- Agent Action Capsule -05, Internet-Draft: https://datatracker.ietf.org/doc/draft-mih-scitt-agent-action-capsule/05/
 
 **Evidence boundary:** this document defines the fair comparison protocol and target gates only. It does not contain new benchmark measurements or product results.
