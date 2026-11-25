@@ -1521,16 +1521,27 @@ mod tests {
         dataset.config.stratum_quotas[0].audit_source_work_count = 1;
         dataset.config.stratum_quotas[1].audit_source_work_count = 1;
 
-        // stratum-a now has two eligible source works: work f has two items,
-        // while work h has one. The sampled item's conditional probability
-        // must reflect its work's eligible item count.
+        // Work f has three query candidates (two are aliased into the same
+        // source work); work h has one. The configured two-item within-work
+        // draw has conditional probability 2/3 for f and 1 for h.
         dataset.candidates[6].source_work_id_sha256 =
             dataset.candidates[5].source_work_id_sha256.clone();
         dataset.candidates[6].recording_sha256 =
             dataset.candidates[5].recording_sha256.clone();
+        let mut third = candidate(
+            "audit-a4",
+            'f',
+            "stratum-a",
+            AnnotationCohortRoleV1::ConfirmatoryAudit,
+            0,
+            0,
+        );
+        third.recording_sha256 = dataset.candidates[5].recording_sha256.clone();
+        dataset.candidates.push(third);
 
         let report = plan_annotation_acquisition(&dataset).unwrap();
-        assert_eq!(report.probability_audit.len(), 2);
+        assert!(report.probability_audit.len() >= 2);
+        assert!(report.probability_audit.len() <= 3);
         for item in &report.probability_audit {
             assert_eq!(
                 item.source_work_inclusion_probability.unwrap(),
@@ -1539,15 +1550,21 @@ mod tests {
                     denominator: 2,
                 }
             );
+            assert_eq!(item.eligible_source_works_in_stratum, Some(2));
+            assert_eq!(item.selected_source_works_in_stratum, Some(1));
             let conditional = item.item_given_source_work_probability.unwrap();
             let expected = if item.source_work_id_sha256
                 == dataset.candidates[5].source_work_id_sha256
             {
+                assert_eq!(item.eligible_items_in_source_work, Some(3));
+                assert_eq!(item.selected_items_in_source_work, Some(2));
                 ProbabilityFractionV1 {
-                    numerator: 1,
-                    denominator: 2,
+                    numerator: 2,
+                    denominator: 3,
                 }
             } else {
+                assert_eq!(item.eligible_items_in_source_work, Some(1));
+                assert_eq!(item.selected_items_in_source_work, Some(1));
                 ProbabilityFractionV1 {
                     numerator: 1,
                     denominator: 1,
@@ -1555,13 +1572,18 @@ mod tests {
             };
             assert_eq!(conditional, expected);
             let item_probability = item.item_inclusion_probability.unwrap();
-            let lhs = item_probability.numerator
-                * (item.source_work_inclusion_probability.unwrap().denominator)
-                * conditional.denominator;
-            let rhs = item.source_work_inclusion_probability.unwrap().numerator
-                * conditional.numerator
-                * item_probability.denominator;
-            assert_eq!(lhs, rhs);
+            let expected_item_probability = if expected.denominator == 3 {
+                ProbabilityFractionV1 {
+                    numerator: 1,
+                    denominator: 3,
+                }
+            } else {
+                ProbabilityFractionV1 {
+                    numerator: 1,
+                    denominator: 2,
+                }
+            };
+            assert_eq!(item_probability, expected_item_probability);
         }
     }
 
@@ -1570,32 +1592,48 @@ mod tests {
         for seed in 1_u64..=64 {
             let mut dataset = synthetic_dataset();
             dataset.config.seed = seed;
-            dataset.config.probability_audit_budget_units = 9;
+            dataset.config.probability_audit_budget_units = 10;
             dataset.config.stratum_quotas[0].audit_source_work_count = 1;
             dataset.config.stratum_quotas[1].audit_source_work_count = 1;
-            // Work f has two candidate queries with different costs. One is
-            // cheap, one expensive. Its random item draw must not change the
-            // pre-reserved source-work sample size in stratum-b.
             dataset.candidates[6].source_work_id_sha256 =
                 dataset.candidates[5].source_work_id_sha256.clone();
             dataset.candidates[6].recording_sha256 =
                 dataset.candidates[5].recording_sha256.clone();
             dataset.candidates[6].annotation_cost_units = 1;
-
-            let report = plan_annotation_acquisition(&dataset).unwrap();
-            assert_eq!(report.probability_audit.len(), 1);
-            assert_eq!(report.probability_audit[0].source_stratum_id, "stratum-a");
-            assert!(report.budget_usage.probability_audit_spent_units <= 5);
-            assert_eq!(
-                report.unmet_quotas
-                    .iter()
-                    .find(|quota| {
-                        quota.stream == QuotaStreamV1::ProbabilityAudit
-                            && quota.source_stratum_id == "stratum-b"
-                    })
-                    .map(|quota| quota.selected),
-                Some(0)
+            let mut third = candidate(
+                "audit-a4",
+                'f',
+                "stratum-a",
+                AnnotationCohortRoleV1::ConfirmatoryAudit,
+                0,
+                0,
             );
+            third.recording_sha256 = dataset.candidates[5].recording_sha256.clone();
+            third.annotation_cost_units = 1;
+            dataset.candidates.push(third);
+
+            // Work f has three items with costs 5, 1, 1; sampling two costs
+            // at most 6. Reserving that maximum leaves only 4, so stratum-b
+            // cannot gain a source-work draw regardless of which two items
+            // were selected in stratum-a.
+            let report = plan_annotation_acquisition(&dataset).unwrap();
+            assert_eq!(report.probability_audit.len(), 2);
+            assert!(
+                report
+                    .probability_audit
+                    .iter()
+                    .all(|item| item.source_stratum_id == "stratum-a")
+            );
+            assert_eq!(
+                report
+                    .probability_audit_design
+                    .iter()
+                    .find(|design| design.source_stratum_id == "stratum-b")
+                    .unwrap()
+                    .selected_source_works,
+                0
+            );
+            assert!(report.budget_usage.probability_audit_spent_units <= 6);
         }
     }
 
