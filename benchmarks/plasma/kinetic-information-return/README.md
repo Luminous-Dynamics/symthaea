@@ -25,3 +25,16 @@ Its semantic checks:
 - candidate/reference comparisons are allowed only for the same sequence digest and then retain KRS's QoI scaling, time axes, branch mismatch and structure-class diagnostics.
 
 This prevents accidental comparison of two different pulse paths under a shared label. It still does not infer echo branches or compute a physical response; the KRS signature must be populated from an independently executed candidate/reference pair.
+
+
+## Path-response disposition semantics
+
+`KineticPulsePathResponseSignature::qualify_against` returns a finite empirical disposition:
+- `Pass`: complete complex-response coverage, resolved and matching branches, compatible structure class, and maximum normalized entry error within the frozen tolerance;
+- `Fail`: a measured branch mismatch or a confirmed response error above tolerance;
+- `Unknown`: one or more response entries or branch associations are missing/unresolved;
+- `Unsupported`: the compared structure classes are not declared compatible.
+
+No missing response is assigned zero. A path can only be compared against a candidate/reference signature bound to the same sequence digest. The report carries maximum normalized entry error, RMS normalized distance, missing count, branch mismatch count and structure compatibility.
+
+This is an empirical disposition over the registered pulse path and sampled observation times. It is not a certified bound over untested pulse sequences or a global nonlinear echo theorem; that remains subject to CIC #13452 and independent reference coverage.
