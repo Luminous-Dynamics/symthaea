@@ -668,7 +668,7 @@ fn validate_binding_against_qualified(
         (qualified.subject_scope_sha256(), binding.subject_scope_sha256),
         (qualified.environment_revision_sha256(), binding.environment_revision_sha256),
         (qualified.tool_profile_sha256(), binding.tool_profile_sha256),
-        (&qualified.batch().query_sha256, binding.query_sha256),
+        (qualified.batch().query_sha256.as_str(), binding.query_sha256),
         (qualified.source_candidate_set_sha256(), binding.candidate_set_sha256),
         (qualified.qualified_candidate_set_sha256(), binding.qualified_evidence_set_sha256),
         (qualified.qualification_receipt_sha256(), binding.qualification_receipt_sha256),
