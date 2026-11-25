@@ -958,6 +958,34 @@ mod tests {
         }
     }
 
+    fn clustered_contrast_with_count(count: usize) -> ClusteredDifferenceInDifferencesV1 {
+        let clusters = (1..=count)
+            .map(|effect| ClusterDidSummaryV1 {
+                cluster_id: format!("chamber-{effect}"),
+                treated_pre_mean: 10.0,
+                treated_post_mean: 11.0 + effect as f64,
+                control_pre_mean: 10.0,
+                control_post_mean: 11.0,
+                treated_pre_count: 20,
+                treated_post_count: 20,
+                control_pre_count: 20,
+                control_post_count: 20,
+                maximum_absolute_covariate_smd: 0.05,
+                treated_pretrend_slope: 0.10,
+                control_pretrend_slope: 0.11,
+            })
+            .collect();
+        ClusteredDifferenceInDifferencesV1 {
+            clusters,
+            protocol_sha256: digest('b'),
+            source_summary_sha256: digest('c'),
+        }
+    }
+
+    fn clustered_contrast() -> ClusteredDifferenceInDifferencesV1 {
+        clustered_contrast_with_count(10)
+    }
+
     fn hypothesis(
         id: &str,
         kind: CausalDriftHypothesisKindV1,
@@ -1048,6 +1076,59 @@ mod tests {
         let estimate = assessment.matched_contrast.as_ref().unwrap();
         assert!((estimate.estimate - 3.0).abs() < 1.0e-12);
         assert!(!assessment.causal_claim_authorized);
+    }
+
+    #[test]
+    fn clustered_did_uses_between_cluster_variance_and_stays_association_only() {
+        let mut candidate = hypothesis(
+            "process",
+            CausalDriftHypothesisKindV1::RecipeOrProcessChange,
+            vec![evidence(
+                "process",
+                "clustered-matched",
+                CausalDriftEvidenceKindV1::MatchedContrast,
+            )],
+        );
+        candidate.clustered_matched_contrast = Some(clustered_contrast());
+        let report = diagnose_causal_drift_v1(&input(vec![candidate])).unwrap();
+        let assessment = &report.status_by_hypothesis[0];
+        assert_eq!(assessment.status, CausalAssessmentStatusV1::AssociationOnly);
+        let estimate = assessment.matched_contrast.as_ref().unwrap();
+        assert!((estimate.estimate - 5.5).abs() < 1.0e-12);
+        assert!((estimate.standard_error - (11.0_f64 / 12.0).sqrt()).abs() < 1.0e-12);
+        assert!(estimate.method.contains("cluster_mean"));
+        assert!(!assessment.causal_claim_authorized);
+    }
+
+    #[test]
+    fn clustered_did_rejects_insufficient_independent_clusters() {
+        let mut candidate = hypothesis(
+            "process",
+            CausalDriftHypothesisKindV1::RecipeOrProcessChange,
+            vec![evidence(
+                "process",
+                "clustered-matched",
+                CausalDriftEvidenceKindV1::MatchedContrast,
+            )],
+        );
+        candidate.clustered_matched_contrast = Some(clustered_contrast_with_count(9));
+        assert!(diagnose_causal_drift_v1(&input(vec![candidate])).is_err());
+    }
+
+    #[test]
+    fn cell_and_cluster_matched_contrasts_cannot_be_mixed() {
+        let mut candidate = hypothesis(
+            "process",
+            CausalDriftHypothesisKindV1::RecipeOrProcessChange,
+            vec![evidence(
+                "process",
+                "matched",
+                CausalDriftEvidenceKindV1::MatchedContrast,
+            )],
+        );
+        candidate.matched_contrast = Some(contrast());
+        candidate.clustered_matched_contrast = Some(clustered_contrast());
+        assert!(diagnose_causal_drift_v1(&input(vec![candidate])).is_err());
     }
 
     #[test]
