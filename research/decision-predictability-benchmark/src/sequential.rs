@@ -1122,7 +1122,7 @@ mod tests {
             .iter_mut()
             .find(|action| action.action_id == "B")
             .unwrap();
-        action.outcomes[0].possible_state_ids.clear();
+        action.outcomes[0].possible_state_ids.pop();
         assert!(matches!(
             evaluate_sequential_robust(&problem),
             Err(SequentialOracleError::UncoveredState { .. })
