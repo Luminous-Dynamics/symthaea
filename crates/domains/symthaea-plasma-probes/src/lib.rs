@@ -7592,6 +7592,39 @@ mod tests {
     }
 
     #[test]
+    fn wasserstein_measure_renormalizes_mass_and_ignores_zero_mass_atoms() {
+        let unnormalized = WeightedEmpiricalMeasure1D::new(
+            &[0.2, 0.5, 0.8],
+            &[2.0, 0.0, 6.0],
+            0.0,
+            1.0,
+        )
+        .unwrap();
+        let probability = WeightedEmpiricalMeasure1D::new(
+            &[0.2, 0.8],
+            &[0.25, 0.75],
+            0.0,
+            1.0,
+        )
+        .unwrap();
+        assert_eq!(unnormalized.atoms(), probability.atoms());
+        assert_eq!(unnormalized.wasserstein1(&probability), Ok(0.0));
+    }
+
+    #[test]
+    fn wasserstein_measure_satisfies_triangle_inequality_on_single_atoms() {
+        let a = WeightedEmpiricalMeasure1D::new(&[0.2], &[1.0], 0.0, 1.0).unwrap();
+        let b = WeightedEmpiricalMeasure1D::new(&[0.5], &[1.0], 0.0, 1.0).unwrap();
+        let c = WeightedEmpiricalMeasure1D::new(&[0.8], &[1.0], 0.0, 1.0).unwrap();
+        let ab = a.wasserstein1(&b).unwrap();
+        let bc = b.wasserstein1(&c).unwrap();
+        let ac = a.wasserstein1(&c).unwrap();
+        assert!((ab - 0.3).abs() < 1.0e-15);
+        assert!((bc - 0.3).abs() < 1.0e-15);
+        assert!(ac <= ab + bc + 1.0e-15);
+    }
+
+    #[test]
     fn wasserstein_measure_handles_weight_scale_without_overflow() {
         let ordinary = WeightedEmpiricalMeasure1D::new(
             &[0.2, 0.8],
