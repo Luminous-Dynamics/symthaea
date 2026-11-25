@@ -661,6 +661,60 @@
           }
         }
       }
+    },
+    {
+      "if": {
+        "properties": {
+          "event_type": {
+            "const": "effect_submitted"
+          },
+          "authority_decision": {
+            "properties": {
+              "decision": {
+                "const": "allow"
+              }
+            },
+            "required": [
+              "decision"
+            ]
+          }
+        },
+        "required": [
+          "event_type",
+          "authority_decision"
+        ]
+      },
+      "then": {
+        "properties": {
+          "authority_decision": {
+            "required": [
+              "decision_receipt_ref",
+              "valid_until"
+            ]
+          }
+        }
+      }
+    },
+    {
+      "if": {
+        "properties": {
+          "event_type": {
+            "const": "effect_reconciled"
+          }
+        },
+        "required": [
+          "event_type"
+        ]
+      },
+      "then": {
+        "properties": {
+          "effect_observation": {
+            "required": [
+              "reconciliation_ref"
+            ]
+          }
+        }
+      }
     }
   ]
 }
