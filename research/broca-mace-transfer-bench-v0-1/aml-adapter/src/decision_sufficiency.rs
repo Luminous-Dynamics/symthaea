@@ -25,6 +25,171 @@ use crate::evidence_qualification_gate::{
 pub const DECISION_SUFFICIENCY_VERIFIER_ID_V1: &str =
     "mace-independent-decision-sufficiency-evaluator";
 
+/// One explicit obligation that must be met before a particular decision can
+/// be considered sufficient. Independent-root counts refer to verified source
+/// families, not the number of copied documents or derived chunks.
+#[derive(Clone, Debug, Eq, PartialEq)]
+pub struct DecisionNeedRequirementV1 {
+    pub requirement_id: String,
+    pub evidence_class_sha256: String,
+    pub minimum_independent_root_families: u32,
+    pub maximum_evidence_age_seconds: u64,
+}
+
+/// Consumer-owned, versioned specification of one decision.
+///
+/// This is loaded from a trusted consumer policy registry, not from candidate
+/// memory or the qualifier response. Its digest pins the allowed action set,
+/// utility model, risk limit, confidence floor, calibration artifact, resource
+/// budget and complete sorted requirement set. The evaluator may assess this
+/// contract but may not choose or weaken it.
+#[derive(Clone, Debug, Eq, PartialEq)]
+pub struct DecisionNeedV1 {
+    pub decision_need_id: String,
+    pub domain_id: String,
+    pub subject_scope_sha256: String,
+    pub purpose_sha256: String,
+    pub action_set_sha256: String,
+    pub utility_profile_sha256: String,
+    pub risk_limit_ppm: u32,
+    pub minimum_confidence_level_ppm: u32,
+    pub regret_tolerance_micros: i64,
+    pub sufficiency_policy_sha256: String,
+    pub calibration_profile_sha256: String,
+    pub calibration_receipt_sha256: String,
+    pub maximum_evidence_age_seconds: u64,
+    pub maximum_context_tokens: u64,
+    pub maximum_tool_calls: u32,
+    pub maximum_cost_micros: u64,
+    pub maximum_latency_ms: u64,
+    pub requirements: Vec<DecisionNeedRequirementV1>,
+}
+
+impl DecisionNeedV1 {
+    pub fn validate(&self) -> Result<(), DecisionSufficiencyRejectV1> {
+        if !valid_atom(&self.decision_need_id)
+            || self.decision_need_id.len() > 256
+            || !valid_atom(&self.domain_id)
+            || self.domain_id.len() > 512
+        {
+            return Err(DecisionSufficiencyRejectV1::InvalidIdentifier);
+        }
+        for digest in [
+            self.subject_scope_sha256.as_str(),
+            self.purpose_sha256.as_str(),
+            self.action_set_sha256.as_str(),
+            self.utility_profile_sha256.as_str(),
+            self.sufficiency_policy_sha256.as_str(),
+            self.calibration_profile_sha256.as_str(),
+            self.calibration_receipt_sha256.as_str(),
+        ] {
+            if !valid_sha256(digest) {
+                return Err(DecisionSufficiencyRejectV1::InvalidDigest);
+            }
+        }
+        if self.risk_limit_ppm > 1_000_000
+            || !(500_000..=999_999).contains(&self.minimum_confidence_level_ppm)
+            || self.regret_tolerance_micros < 0
+            || self.maximum_evidence_age_seconds == 0
+            || self.maximum_context_tokens == 0
+            || self.maximum_tool_calls == 0
+            || self.maximum_cost_micros == 0
+            || self.maximum_latency_ms == 0
+            || self.requirements.is_empty()
+            || self.requirements.len() > 1024
+        {
+            return Err(DecisionSufficiencyRejectV1::InvalidDecisionNeed);
+        }
+        if self.requirements.windows(2).any(|pair| {
+            pair[0].requirement_id >= pair[1].requirement_id
+        }) {
+            return Err(DecisionSufficiencyRejectV1::RequirementOrderInvalid);
+        }
+        for requirement in &self.requirements {
+            if !valid_atom(&requirement.requirement_id)
+                || requirement.requirement_id.len() > 256
+                || !valid_sha256(&requirement.evidence_class_sha256)
+                || requirement.minimum_independent_root_families == 0
+                || requirement.maximum_evidence_age_seconds == 0
+                || requirement.maximum_evidence_age_seconds > self.maximum_evidence_age_seconds
+            {
+                return Err(DecisionSufficiencyRejectV1::InvalidDecisionNeed);
+            }
+        }
+        Ok(())
+    }
+
+    /// Domain-separated digest over the complete typed decision contract.
+    pub fn digest(&self) -> Result<String, DecisionSufficiencyRejectV1> {
+        self.validate()?;
+        let mut hasher = Sha256::new();
+        hasher.update(b"luminous:mace:decision-need:v1\\0");
+        for value in [
+            self.decision_need_id.as_str(),
+            self.domain_id.as_str(),
+            self.subject_scope_sha256.as_str(),
+            self.purpose_sha256.as_str(),
+            self.action_set_sha256.as_str(),
+            self.utility_profile_sha256.as_str(),
+            self.sufficiency_policy_sha256.as_str(),
+            self.calibration_profile_sha256.as_str(),
+            self.calibration_receipt_sha256.as_str(),
+        ] {
+            hash_field(&mut hasher, value);
+        }
+        hasher.update(self.risk_limit_ppm.to_be_bytes());
+        hasher.update(self.minimum_confidence_level_ppm.to_be_bytes());
+        hasher.update(self.regret_tolerance_micros.to_be_bytes());
+        hasher.update(self.maximum_evidence_age_seconds.to_be_bytes());
+        hasher.update(self.maximum_context_tokens.to_be_bytes());
+        hasher.update(self.maximum_tool_calls.to_be_bytes());
+        hasher.update(self.maximum_cost_micros.to_be_bytes());
+        hasher.update(self.maximum_latency_ms.to_be_bytes());
+        hasher.update((self.requirements.len() as u64).to_be_bytes());
+        for requirement in &self.requirements {
+            hash_field(&mut hasher, &requirement.requirement_id);
+            hash_field(&mut hasher, &requirement.evidence_class_sha256);
+            hasher.update(requirement.minimum_independent_root_families.to_be_bytes());
+            hasher.update(requirement.maximum_evidence_age_seconds.to_be_bytes());
+        }
+        Ok(hex_digest(&hasher.finalize()))
+    }
+
+    pub fn requirement_ids(&self) -> Vec<String> {
+        self.requirements.iter().map(|item| item.requirement_id.clone()).collect()
+    }
+
+    pub fn to_json_value(&self) -> Result<Value, DecisionSufficiencyRejectV1> {
+        self.validate()?;
+        Ok(json!({
+            "schema_version": "mace_decision_need_v1",
+            "decision_need_id": self.decision_need_id,
+            "domain_id": self.domain_id,
+            "subject_scope_sha256": self.subject_scope_sha256,
+            "purpose_sha256": self.purpose_sha256,
+            "action_set_sha256": self.action_set_sha256,
+            "utility_profile_sha256": self.utility_profile_sha256,
+            "risk_limit_ppm": self.risk_limit_ppm,
+            "minimum_confidence_level_ppm": self.minimum_confidence_level_ppm,
+            "regret_tolerance_micros": self.regret_tolerance_micros,
+            "sufficiency_policy_sha256": self.sufficiency_policy_sha256,
+            "calibration_profile_sha256": self.calibration_profile_sha256,
+            "calibration_receipt_sha256": self.calibration_receipt_sha256,
+            "maximum_evidence_age_seconds": self.maximum_evidence_age_seconds,
+            "maximum_context_tokens": self.maximum_context_tokens,
+            "maximum_tool_calls": self.maximum_tool_calls,
+            "maximum_cost_micros": self.maximum_cost_micros,
+            "maximum_latency_ms": self.maximum_latency_ms,
+            "requirements": self.requirements.iter().map(|item| json!({
+                "requirement_id": item.requirement_id,
+                "evidence_class_sha256": item.evidence_class_sha256,
+                "minimum_independent_root_families": item.minimum_independent_root_families,
+                "maximum_evidence_age_seconds": item.maximum_evidence_age_seconds
+            })).collect::<Vec<_>>()
+        }))
+    }
+}
+
 #[derive(Clone, Copy, Debug, Eq, PartialEq)]
 pub enum DecisionSufficiencyStatusV1 {
     Sufficient,
@@ -124,6 +289,7 @@ pub struct DecisionSufficiencyReceiptV1 {
 pub enum DecisionSufficiencyRejectV1 {
     InvalidJson,
     InvalidReceipt,
+    InvalidDecisionNeed,
     InvalidDigest,
     InvalidIdentifier,
     RequirementOrderInvalid,
@@ -159,6 +325,7 @@ pub struct DecisionSufficiencyUseBindingV1<'a> {
     pub decision_need_sha256: &'a str,
     pub purpose_sha256: &'a str,
     pub lifecycle_snapshot_sha256: &'a str,
+    pub decision_need: &'a DecisionNeedV1,
     pub sufficiency_policy_sha256: &'a str,
     pub calibration_profile_sha256: &'a str,
     pub calibration_receipt_sha256: &'a str,
@@ -684,6 +851,23 @@ fn validate_binding_against_qualified(
     qualified: &QualifiedCandidateEvidenceBatchV1,
     binding: &DecisionSufficiencyUseBindingV1<'_>,
 ) -> Result<(), DecisionSufficiencyRejectV1> {
+    let need = binding.decision_need;
+    let need_digest = need.digest()?;
+    if qualified.decision_need_sha256() != need_digest
+        || qualified.domain_id() != need.domain_id
+        || qualified.subject_scope_sha256() != need.subject_scope_sha256
+        || qualified.purpose_sha256() != need.purpose_sha256
+        || binding.decision_need_sha256 != need_digest
+        || binding.purpose_sha256 != need.purpose_sha256
+        || binding.sufficiency_policy_sha256 != need.sufficiency_policy_sha256
+        || binding.calibration_profile_sha256 != need.calibration_profile_sha256
+        || binding.calibration_receipt_sha256 != need.calibration_receipt_sha256
+        || binding.risk_limit_ppm != need.risk_limit_ppm
+        || binding.minimum_confidence_level_ppm != need.minimum_confidence_level_ppm
+        || binding.required_requirement_ids.as_slice() != need.requirement_ids().as_slice()
+    {
+        return Err(DecisionSufficiencyRejectV1::BindingMismatch);
+    }
     for (actual, expected) in [
         (qualified.run_id(), binding.run_id),
         (qualified.query_invocation_id(), binding.query_invocation_id),
@@ -956,8 +1140,8 @@ mod tests {
             query_sha256: batch.query_sha256.clone(),
             candidate_set_sha256: batch.candidate_set_sha256.clone(),
             candidate_evidence_ids_sha256: candidate_ids_digest(&ids),
-            decision_need_sha256: repeat('5'),
-            purpose_sha256: repeat('6'),
+            decision_need_sha256: test_decision_need().digest().unwrap(),
+            purpose_sha256: test_decision_need().purpose_sha256.clone(),
             qualification_policy_sha256: repeat('7'),
             lifecycle_snapshot_sha256: repeat('8'),
             verifier_profile_sha256: repeat('9'),
@@ -1067,6 +1251,35 @@ mod tests {
         }
     }
 
+    fn test_decision_need() -> &'static DecisionNeedV1 {
+        static NEED: OnceLock<DecisionNeedV1> = OnceLock::new();
+        NEED.get_or_init(|| DecisionNeedV1 {
+            decision_need_id: "workflow-completion".into(),
+            domain_id: "web".into(),
+            subject_scope_sha256: repeat('1'),
+            purpose_sha256: repeat('6'),
+            action_set_sha256: repeat('c'),
+            utility_profile_sha256: repeat('e'),
+            risk_limit_ppm: 5000,
+            minimum_confidence_level_ppm: 900_000,
+            regret_tolerance_micros: 1000,
+            sufficiency_policy_sha256: SUFF_POLICY.into(),
+            calibration_profile_sha256: CALIBRATION.into(),
+            calibration_receipt_sha256: CALIBRATION_RECEIPT.into(),
+            maximum_evidence_age_seconds: 86_400,
+            maximum_context_tokens: 16_384,
+            maximum_tool_calls: 8,
+            maximum_cost_micros: 1_000_000,
+            maximum_latency_ms: 5_000,
+            requirements: vec![DecisionNeedRequirementV1 {
+                requirement_id: "minimum-independent-evidence".into(),
+                evidence_class_sha256: repeat('c'),
+                minimum_independent_root_families: 2,
+                maximum_evidence_age_seconds: 3_600,
+            }],
+        })
+    }
+
     fn use_binding<'a>(
         qualified: &'a QualifiedCandidateEvidenceBatchV1,
         issuer_profile_sha256: &'a str,
@@ -1077,6 +1290,7 @@ mod tests {
             vec!["minimum-independent-evidence".to_owned()]
         });
         DecisionSufficiencyUseBindingV1 {
+            decision_need: test_decision_need(),
             run_id: qualified.run_id(),
             query_invocation_id: qualified.query_invocation_id(),
             domain_id: qualified.domain_id(),
