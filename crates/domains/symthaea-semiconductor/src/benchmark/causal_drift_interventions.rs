@@ -202,6 +202,33 @@ fn canonical_input_digest(input: &CausalDriftInputV1) -> Result<String, CausalDr
     json_sha256(&canonical)
 }
 
+fn unknown_report(
+    input: &CausalDriftInputV1,
+    mut reasons: Vec<CausalDriftReasonV1>,
+) -> Result<CausalDriftDiagnosisV1, CausalDriftErrorV1> {
+    reasons.sort();
+    reasons.dedup();
+    let mut report = CausalDriftDiagnosisV1 {
+        schema: CAUSAL_DRIFT_REPORT_SCHEMA_V1.into(),
+        scenario_id: input.scenario_id.clone(),
+        intervention_event_id: input.intervention_event_id.clone(),
+        status: CausalIdentificationStatusV1::UnknownNotIdentifiable,
+        cause: None,
+        reason_codes: reasons,
+        channel_deltas: Vec::new(),
+        negative_controls_passed: false,
+        knowledge_cutoff_unix_seconds: input.diagnosis_knowledge_cutoff_unix_seconds,
+        evidence_input_sha256: canonical_input_digest(input)?,
+        diagnosis_sha256: String::new(),
+        source_authenticity_proven: false,
+        physical_root_cause_proven: false,
+        intervention_executed: false,
+        equipment_control_authority: false,
+    };
+    report.diagnosis_sha256 = diagnosis_digest(&report)?;
+    Ok(report)
+}
+
 fn invalid_report(
     input: &CausalDriftInputV1,
     reasons: Vec<CausalDriftReasonV1>,
@@ -327,6 +354,19 @@ pub fn diagnose_causal_drift_v1(
     reasons.sort();
     reasons.dedup();
     if !reasons.is_empty() {
+        let non_identifying_reasons = reasons.iter().all(|reason| {
+            matches!(
+                reason,
+                CausalDriftReasonV1::RequiredChannelMissing
+                    | CausalDriftReasonV1::InsufficientBaselineSupport
+                    | CausalDriftReasonV1::InsufficientPostInterventionSupport
+                    | CausalDriftReasonV1::ChannelsNotIndependent
+                    | CausalDriftReasonV1::EvidenceUnavailableAtKnowledgeCutoff
+            )
+        });
+        if non_identifying_reasons {
+            return unknown_report(input, reasons);
+        }
         return invalid_report(input, reasons);
     }
 
@@ -665,7 +705,7 @@ mod tests {
         let result = diagnose_causal_drift_v1(&fixture.input).unwrap();
         assert_eq!(
             result.status,
-            CausalIdentificationStatusV1::RejectedInvalidEvidence
+            CausalIdentificationStatusV1::UnknownNotIdentifiable
         );
         assert!(result.reason_codes.contains(&CausalDriftReasonV1::RequiredChannelMissing));
         assert!(!result.negative_controls_passed);
@@ -705,7 +745,7 @@ mod tests {
         let result = diagnose_causal_drift_v1(&future).unwrap();
         assert_eq!(
             result.status,
-            CausalIdentificationStatusV1::RejectedInvalidEvidence
+            CausalIdentificationStatusV1::UnknownNotIdentifiable
         );
         assert!(result.reason_codes.contains(&CausalDriftReasonV1::EvidenceUnavailableAtKnowledgeCutoff));
     }
@@ -777,6 +817,62 @@ mod tests {
             "recipe-A",
         );
         assert!(generate_causal_drift_fixture_v1(&wrong).is_err());
+    }
+
+    #[test]
+    fn observationally_equivalent_causal_worlds_both_require_abstention() {
+        let mut process_world = manifest(
+            "observationally-equivalent-process",
+            CausalDriftCauseV1::ProcessStateShift,
+            2.0,
+            0.0,
+            0.0,
+            "recipe-A",
+        );
+        process_world.omit_channels = vec![
+            CausalDriftChannelV1::IndependentProcessSensor,
+            CausalDriftChannelV1::ReferenceCheckStandard,
+        ];
+        let mut mixed_world = manifest(
+            "observationally-equivalent-mixed",
+            CausalDriftCauseV1::UnknownOrConfounded,
+            0.0,
+            2.0,
+            2.0,
+            "recipe-A",
+        );
+        mixed_world.omit_channels = process_world.omit_channels.clone();
+
+        let left = generate_causal_drift_fixture_v1(&process_world).unwrap();
+        let right = generate_causal_drift_fixture_v1(&mixed_world).unwrap();
+        let observed = |fixture: &CausalDriftSyntheticFixtureV1| {
+            fixture
+                .input
+                .channels
+                .iter()
+                .map(|channel| {
+                    (
+                        channel.channel,
+                        channel.before_values.clone(),
+                        channel.after_values.clone(),
+                    )
+                })
+                .collect::<Vec<_>>()
+        };
+        assert_eq!(observed(&left), observed(&right));
+
+        let left_result = diagnose_causal_drift_v1(&left.input).unwrap();
+        let right_result = diagnose_causal_drift_v1(&right.input).unwrap();
+        assert_eq!(
+            left_result.status,
+            CausalIdentificationStatusV1::UnknownNotIdentifiable
+        );
+        assert_eq!(
+            right_result.status,
+            CausalIdentificationStatusV1::UnknownNotIdentifiable
+        );
+        assert_eq!(left_result.cause, None);
+        assert_eq!(right_result.cause, None);
     }
 
     #[test]
