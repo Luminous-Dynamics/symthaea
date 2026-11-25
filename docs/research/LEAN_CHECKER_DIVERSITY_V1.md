@@ -4,6 +4,8 @@
 **Parent assurance capsule:** [#13606 — LEAN-TRUST-CLOSURE-CAPSULE-001](https://github.com/Luminous-Dynamics/symthaea/pull/13606)  
 **Status:** source-grounded registry, strict run-profile schema, synthetic fixture, and Rust semantic-validator prototype. No checker was executed by this work and no proof is qualified by the synthetic profile.
 
+**Registry scope:** the six Lake `comparator --paranoid` execution paths only. The wider 37-entrant Lean Kernel Arena is a separate research differential benchmark, captured as a mutable-page snapshot in [issue #13643](https://github.com/Luminous-Dynamics/symthaea/issues/13643).
+
 ## 1. The paradigm shift: checker count is not checker diversity
 
 A naive assurance report says “six checkers passed.” That is not enough.
@@ -30,6 +32,8 @@ This yields a conservative source-grounded topology:
 **Conservative diversity vector for the full six-path set:** six execution records; six implementation families; three algorithm-lineage families; three implementation languages; two independently implemented external algorithm lineages (nanoda and con-leche). Known term-representation and parser-family counts are reported only where the registry has evidence. Unknown is never silently converted into diversity.
 
 The registry is not a ranking and does not produce an independence score.
+
+The registry JSON also links the wider Arena snapshot metadata (37 visible checker entrants, 15 reported languages, 138 good / 92 bad downloadable controls on 2026-11-25) without adding those entrants to the comparator registry. See [ARENA-DIFFERENTIAL-001](https://github.com/Luminous-Dynamics/symthaea/issues/13643) and the separate [live snapshot schema/artifact](https://github.com/Luminous-Dynamics/symthaea/tree/research/lean-arena-differential-v1/docs/research). The Arena homepage is mutable and explicitly forbids cross-round performance comparisons; its page capture must not be treated as a frozen test archive.
 
 ## 2. Source-grounded registry
 
