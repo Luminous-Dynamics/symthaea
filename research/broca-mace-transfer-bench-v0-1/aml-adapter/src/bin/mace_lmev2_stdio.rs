@@ -241,13 +241,110 @@ fn entity_literal_action_template_sha256(config: &Config) -> String {
     sha256_hex(template.as_bytes())
 }
 
-fn trace_evidence_ids(hits: &[LongMemEvalV2HitV1]) -> Vec<String> {
+fn trace_evidence_ids(
+    hits: &[LongMemEvalV2HitV1],
+    neighbors: &[broca_aml_adapter::longmemeval_v2::LongMemEvalV2NeighborV1],
+) -> Vec<String> {
     let mut identifiers = hits.iter()
         .map(|hit| format!("lmev2:text:{}:{}", hit.trajectory_id, hit.chunk_id))
         .collect::<Vec<_>>();
+    identifiers.extend(neighbors.iter().map(|neighbor| {
+        format!(
+            "lmev2:neighbor:{}:{}",
+            neighbor.chunk.trajectory_id,
+            neighbor.chunk.chunk_sha256
+        )
+    }));
     identifiers.sort();
     identifiers.dedup();
     identifiers
+}
+
+/// Bind the LMEv2 adapter's retrieval outputs and deterministic projections
+/// back to the acquisition operations. Search hits and neighbor expansions
+/// must be named by an operation; source-state and screenshot records must be
+/// reachable through the exact parent edges emitted by those search results.
+fn verify_lmev2_candidate_operation_binding(
+    receipt: &AcquisitionReceiptV2,
+    batch: &broca_aml_adapter::candidate_evidence::CandidateEvidenceBatchV1,
+) -> Result<(), String> {
+    if batch.backend_revision_sha256 != receipt.tool_profile_sha256 {
+        return Err("candidate backend revision does not match acquisition tool profile".into());
+    }
+    let expected_scope = format!("longmemeval-v2:domain:{}", receipt.domain_id);
+    if batch.query_scope != expected_scope || batch.query_purpose != "benchmark:memory-context" {
+        return Err("candidate scope or purpose does not match the acquisition domain".into());
+    }
+
+    let operation_ids = receipt.operations.iter()
+        .flat_map(|operation| operation.observed_evidence_ids.iter().map(String::as_str))
+        .collect::<BTreeSet<_>>();
+    let state_ids = batch.evidence.iter()
+        .filter(|evidence| evidence.retrieval_channel == "source_state_lineage")
+        .map(|evidence| evidence.evidence_id.as_str())
+        .collect::<BTreeSet<_>>();
+    let retrieved = batch.evidence.iter()
+        .filter(|evidence| matches!(
+            evidence.retrieval_channel.as_str(),
+            "trajectory_bm25_text"
+                | "trajectory_entity_literal"
+                | "hybrid_rrf_bm25_entity"
+                | "trajectory_neighbor_expansion"
+        ))
+        .collect::<Vec<_>>();
+
+    if retrieved.is_empty() {
+        return Err("candidate batch contains no operation-backed retrieval records".into());
+    }
+    for evidence in &retrieved {
+        if !operation_ids.contains(evidence.evidence_id.as_str()) {
+            return Err(format!(
+                "retrieval output {} is absent from acquisition operation observations",
+                evidence.evidence_id
+            ));
+        }
+        if evidence.parent_evidence_ids.is_empty()
+            || evidence.parent_evidence_ids.iter().any(|parent| !state_ids.contains(parent.as_str()))
+        {
+            return Err(format!(
+                "retrieval output {} has missing or unbound source-state parents",
+                evidence.evidence_id
+            ));
+        }
+    }
+
+    let mut referenced_state_ids = BTreeSet::new();
+    for evidence in &retrieved {
+        referenced_state_ids.extend(evidence.parent_evidence_ids.iter().map(String::as_str));
+    }
+    for evidence in &batch.evidence {
+        match evidence.retrieval_channel.as_str() {
+            "trajectory_bm25_text"
+            | "trajectory_entity_literal"
+            | "hybrid_rrf_bm25_entity"
+            | "trajectory_neighbor_expansion" => {}
+            "source_state_lineage" => {
+                if !referenced_state_ids.contains(evidence.evidence_id.as_str()) {
+                    return Err(format!(
+                        "source-state record {} is not referenced by a retrieved result",
+                        evidence.evidence_id
+                    ));
+                }
+            }
+            "attached_image_evidence" => {
+                if evidence.parent_evidence_ids.len() != 1
+                    || !state_ids.contains(evidence.parent_evidence_ids[0].as_str())
+                {
+                    return Err(format!(
+                        "screenshot record {} is not bound to exactly one source-state record",
+                        evidence.evidence_id
+                    ));
+                }
+            }
+            other => return Err(format!("unsupported LMEv2 candidate channel: {other}")),
+        }
+    }
+    Ok(())
 }
 
 fn hybrid_rrf_result(
@@ -435,7 +532,7 @@ fn handle_request(
                         tool_id: "trajectory.bm25.search".to_owned(),
                         tool_revision_sha256: config.backend_revision_sha256.clone(),
                         action_template_sha256: bm25_action_template_sha256(config),
-                        observed_evidence_ids: trace_evidence_ids(&retrieved.hits),
+                        observed_evidence_ids: trace_evidence_ids(&retrieved.hits, &retrieved.neighbor_context),
                         outcome: if retrieved.hits.is_empty() {
                             RetrievalOperationOutcomeV1::NoEvidence
                         } else {
@@ -461,7 +558,7 @@ fn handle_request(
                         tool_id: "trajectory.entity_literal.search".to_owned(),
                         tool_revision_sha256: config.backend_revision_sha256.clone(),
                         action_template_sha256: entity_literal_action_template_sha256(config),
-                        observed_evidence_ids: trace_evidence_ids(&retrieved.hits),
+                        observed_evidence_ids: trace_evidence_ids(&retrieved.hits, &retrieved.neighbor_context),
                         outcome: if retrieved.hits.is_empty() {
                             RetrievalOperationOutcomeV1::NoEvidence
                         } else {
@@ -492,7 +589,7 @@ fn handle_request(
                         tool_id: "trajectory.bm25.search".to_owned(),
                         tool_revision_sha256: config.backend_revision_sha256.clone(),
                         action_template_sha256: bm25_action_template_sha256(config),
-                        observed_evidence_ids: trace_evidence_ids(&bm25.hits),
+                        observed_evidence_ids: trace_evidence_ids(&bm25.hits, &bm25.neighbor_context),
                         outcome: if bm25.hits.is_empty() {
                             RetrievalOperationOutcomeV1::NoEvidence
                         } else {
@@ -506,7 +603,7 @@ fn handle_request(
                         tool_id: "trajectory.entity_literal.search".to_owned(),
                         tool_revision_sha256: config.backend_revision_sha256.clone(),
                         action_template_sha256: entity_literal_action_template_sha256(config),
-                        observed_evidence_ids: trace_evidence_ids(&entity.hits),
+                        observed_evidence_ids: trace_evidence_ids(&entity.hits, &[]),
                         outcome: if entity.hits.is_empty() {
                             RetrievalOperationOutcomeV1::NoEvidence
                         } else {
@@ -698,6 +795,7 @@ fn handle_request(
             acquisition_v2.validate().map_err(|error| format!("V2 acquisition receipt: {error:?}"))?;
             if let Some(batch) = &candidate_evidence {
                 verify_candidate_batch(&acquisition_v2, batch).map_err(|error| format!("V2 candidate binding: {error:?}"))?;
+                verify_lmev2_candidate_operation_binding(&acquisition_v2, batch)?;
             }
             let v2_receipt_path = config.policy_trace_dir.with_file_name("policy-acquisition-v2.jsonl");
             append_jsonl(&v2_receipt_path, &acquisition_v2).map_err(|error| format!("persist V2 acquisition receipt: {error:?}"))?;
