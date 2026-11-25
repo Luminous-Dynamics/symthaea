@@ -16,9 +16,8 @@ use crate::temporal_consensus::{
     MultiAnnotatorTemporalCaseV1,
 };
 use crate::temporal_grounding::{
-    score_temporal_grounding, AudioArtifactClockV1, FrameIntervalV1, GroundTruthStateV1,
-    GroundingPredictionStateV1, TemporalGroundTruthV1, TemporalGroundingOutcomeV1,
-    TemporalGroundingPlanV1, TemporalGroundingPredictionV1, TemporalGroundingScoreV1,
+    score_temporal_grounding, GroundTruthStateV1, GroundingPredictionStateV1,
+    TemporalGroundTruthV1, TemporalGroundingPredictionV1, TemporalGroundingScoreV1,
     TEMPORAL_GROUNDING_SCHEMA_V1,
 };
 
@@ -907,7 +906,10 @@ fn require_text(value: &str, label: &str) -> Result<(), String> {
 #[cfg(test)]
 mod tests {
     use super::*;
-    use crate::temporal_grounding::TEMPORAL_GROUNDING_EVALUATOR_V1;
+    use crate::temporal_grounding::{
+        AudioArtifactClockV1, FrameIntervalV1, TemporalGroundingPlanV1,
+        TEMPORAL_GROUNDING_EVALUATOR_V1,
+    };
 
     const MANIFEST: &str = "eeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeee";
     const MODEL_AUDIO: &str = "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa";
@@ -927,14 +929,14 @@ mod tests {
 
     fn annotation(
         annotator: char,
-        digest_char: char,
+        receipt_id: u64,
         state: GroundTruthStateV1,
         intervals: Vec<FrameIntervalV1>,
         reason: Option<&str>,
     ) -> IndependentTemporalAnnotationV1 {
         IndependentTemporalAnnotationV1 {
             annotator_id_sha256: digest(annotator),
-            annotation_sha256: digest(digest_char),
+            annotation_sha256: format!("{receipt_id:064x}"),
             state,
             intervals,
             status_reason: reason.map(str::to_owned),
@@ -974,6 +976,10 @@ mod tests {
             dataset_id: "synthetic-reliability-v1".into(),
             annotation_policy_version: "musician-annotation-v1".into(),
             minimum_raters_per_item: 2,
+            scoring_plan: TemporalGroundingPlanV1 {
+                evaluator_version: TEMPORAL_GROUNDING_EVALUATOR_V1.into(),
+                minimum_interval_iou: 0.5,
+            },
             bootstrap_replicates: 1_000,
             bootstrap_seed: 0x13617,
             boundary_tolerances_ms: vec![25, 50, 100],
@@ -988,19 +994,19 @@ mod tests {
         state: GroundTruthStateV1,
         intervals: Vec<FrameIntervalV1>,
     ) -> MultiAnnotatorReliabilityItemV1 {
-        let annotations = if state == GroundTruthStateV1::Present {
-            vec![
-                annotation('1', '1', state, intervals.clone(), None),
-                annotation('2', '2', state, intervals.clone(), None),
-                annotation('3', '3', state, intervals.clone(), None),
-            ]
+        let item_key = id.bytes().fold(7_u64, |acc, byte| {
+            acc.wrapping_mul(257).wrapping_add(byte as u64)
+        });
+        let annotation_intervals = if state == GroundTruthStateV1::Present {
+            intervals.clone()
         } else {
-            vec![
-                annotation('1', '1', state, Vec::new(), None),
-                annotation('2', '2', state, Vec::new(), None),
-                annotation('3', '3', state, Vec::new(), None),
-            ]
+            Vec::new()
         };
+        let annotations = vec![
+            annotation('1', item_key * 4 + 1, state, annotation_intervals.clone(), None),
+            annotation('2', item_key * 4 + 2, state, annotation_intervals.clone(), None),
+            annotation('3', item_key * 4 + 3, state, annotation_intervals, None),
+        ];
         MultiAnnotatorReliabilityItemV1 {
             item_id: id.into(),
             source_work_id_sha256: digest(cluster),
@@ -1075,14 +1081,16 @@ mod tests {
     #[test]
     fn slight_boundary_shift_preserves_count_but_changes_temporal_agreement() {
         let mut data = balanced_agreement_dataset();
-        let present_item = &mut data.items[0];
-        present_item.case.annotations[1].intervals[0].start_frame += 480;
-        present_item.case.annotations[1].intervals[0].end_frame += 480;
+        let query_id = data.items[0].case.query_id.clone();
+        let annotator_a = data.items[0].case.annotations[0].annotator_id_sha256.clone();
+        let annotator_b = data.items[0].case.annotations[1].annotator_id_sha256.clone();
+        data.items[0].case.annotations[1].intervals[0].start_frame += 480;
+        data.items[0].case.annotations[1].intervals[0].end_frame += 480;
         let report = audit_multi_annotator_dataset(&data).unwrap();
         let pair = report.pairwise_results.iter().find(|pair| {
-            pair.query_id == present_item.case.query_id
-                && pair.annotator_a_sha256 == present_item.case.annotations[0].annotator_id_sha256
-                && pair.annotator_b_sha256 == present_item.case.annotations[1].annotator_id_sha256
+            pair.query_id == query_id
+                && pair.annotator_a_sha256 == annotator_a
+                && pair.annotator_b_sha256 == annotator_b
         }).unwrap();
         assert_eq!(pair.exact_occurrence_count_agreement, Some(true));
         assert!(pair.interval_f1_symmetric.unwrap() < 1.0);
@@ -1125,6 +1133,8 @@ mod tests {
         assert_eq!(bootstrap.source_work_clusters, 3);
         assert!(!bootstrap.confirmatory_source_cluster_floor_met);
         assert_eq!(bootstrap.state_alpha_nominal.unwrap().estimate, 1.0);
+        assert!(!report_a.population_confidence_claim_permitted);
+        assert!(!report_a.proposed_confirmatory_cluster_floor_met);
         assert_eq!(report_a.summary.dataset_items, 6);
         assert_eq!(report_a.summary.source_work_clusters, 3);
     }
