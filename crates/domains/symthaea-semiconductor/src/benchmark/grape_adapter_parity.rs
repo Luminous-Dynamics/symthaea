@@ -260,3 +260,184 @@ impl GrapeHierarchicalContextStateV1 {
         Ok(result)
     }
 }
+
+
+#[derive(Clone, Debug, PartialEq, Serialize, Deserialize)]
+pub struct GrapeTemporalResidualStateV1 {
+    pub ema_alpha: f64,
+    pub activation_threshold: f64,
+    pub residual_ema: f64,
+}
+
+impl GrapeTemporalResidualStateV1 {
+    pub fn new(ema_alpha: f64, activation_threshold: f64) -> Result<Self, GrapeAdapterParityErrorV1> {
+        finite(ema_alpha, "temporal EMA alpha")?;
+        finite(activation_threshold, "temporal activation threshold")?;
+        if !(0.0..=1.0).contains(&ema_alpha) || activation_threshold < 0.0 {
+            return Err(GrapeAdapterParityErrorV1("temporal policy is out of range".into()));
+        }
+        Ok(Self { ema_alpha, activation_threshold, residual_ema: 0.0 })
+    }
+
+    pub fn calibrate(
+        &mut self,
+        training_residuals: &[f64],
+        percentile: f64,
+    ) -> Result<(), GrapeAdapterParityErrorV1> {
+        finite(percentile, "temporal percentile")?;
+        if !(0.0..=100.0).contains(&percentile) || training_residuals.iter().any(|v| !v.is_finite()) {
+            return Err(GrapeAdapterParityErrorV1("invalid temporal calibration input".into()));
+        }
+        if training_residuals.is_empty() {
+            self.activation_threshold = self.activation_threshold.max(1.0e-6);
+            return Ok(());
+        }
+        let mut values: Vec<f64> = training_residuals.iter().map(|v| v.abs()).collect();
+        values.sort_by(f64::total_cmp);
+        let pos = (values.len() - 1) as f64 * percentile / 100.0;
+        let lo = pos.floor() as usize;
+        let hi = pos.ceil() as usize;
+        let fraction = pos - lo as f64;
+        self.activation_threshold = (values[lo] * (1.0 - fraction) + values[hi] * fraction).max(1.0e-6);
+        Ok(())
+    }
+
+    pub fn correction(&self) -> f64 {
+        if self.residual_ema.abs() < self.activation_threshold { 0.0 } else { self.residual_ema }
+    }
+
+    pub fn update(&mut self, residual: f64) -> Result<(), GrapeAdapterParityErrorV1> {
+        finite(residual, "temporal residual")?;
+        let next = (1.0 - self.ema_alpha) * self.residual_ema + self.ema_alpha * residual;
+        finite(next, "temporal residual EMA")?;
+        self.residual_ema = next;
+        Ok(())
+    }
+}
+
+pub fn create_grape_feature_adapter_v1(
+    kind: GrapeAdapterKindV1,
+    dimension: usize,
+    policy: &GrapeAdapterPolicyV1,
+) -> Result<GrapeFeatureAdapterStateV1, GrapeAdapterParityErrorV1> {
+    validate_policy(policy)?;
+    if dimension == 0 || kind != policy.adapter_kind {
+        return Err(GrapeAdapterParityErrorV1("adapter dimension or kind is invalid".into()));
+    }
+    let covariance = if kind == GrapeAdapterKindV1::Rls {
+        let diagonal = 1.0 / policy.rls_ridge_initial;
+        Some((0..dimension).map(|row| {
+            (0..dimension).map(|col| if row == col { diagonal } else { 0.0 }).collect()
+        }).collect())
+    } else {
+        None
+    };
+    Ok(GrapeFeatureAdapterStateV1 { kind, weights: vec![0.0; dimension], covariance })
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    fn policy(kind: GrapeAdapterKindV1) -> GrapeAdapterPolicyV1 {
+        GrapeAdapterPolicyV1 {
+            schema: GRAPE_ADAPTER_PARITY_SCHEMA_V1.into(),
+            adapter_kind: kind,
+            nlms_learning_rate: 0.01,
+            rls_forgetting_factor: 0.99,
+            rls_ridge_initial: 1.0,
+            nlms_norm_floor: 1.0e-3,
+            positive_definite_tolerance: 1.0e-12,
+        }
+    }
+
+    #[test]
+    fn rls_scalar_update_matches_hand_computed_reference() {
+        let p = policy(GrapeAdapterKindV1::Rls);
+        let mut adapter = create_grape_feature_adapter_v1(GrapeAdapterKindV1::Rls, 1, &p).unwrap();
+        adapter.update(&p, &[2.0], 0.5).unwrap();
+        let expected_gain = 2.0 / 4.99;
+        let expected_p = (1.0 - expected_gain * 2.0) / 0.99;
+        assert!((adapter.weights[0] - expected_gain * 0.5).abs() < 1.0e-12);
+        assert!((adapter.covariance.as_ref().unwrap()[0][0] - expected_p).abs() < 1.0e-12);
+    }
+
+    #[test]
+    fn rls_covariance_stays_symmetric_positive_definite_under_updates() {
+        let p = policy(GrapeAdapterKindV1::Rls);
+        let mut adapter = create_grape_feature_adapter_v1(GrapeAdapterKindV1::Rls, 3, &p).unwrap();
+        for i in 0..200 {
+            let x = [
+                ((i * 7 % 19) as f64 - 9.0) / 5.0,
+                ((i * 11 % 23) as f64 - 11.0) / 7.0,
+                ((i * 13 % 29) as f64 - 14.0) / 9.0,
+            ];
+            adapter.update(&p, &x, ((i % 17) as f64 - 8.0) / 4.0).unwrap();
+        }
+        validate_covariance(adapter.covariance.as_ref().unwrap(), 3, p.positive_definite_tolerance).unwrap();
+    }
+
+    #[test]
+    fn nlms_scalar_update_matches_upstream_equation() {
+        let p = policy(GrapeAdapterKindV1::Nlms);
+        let mut adapter = create_grape_feature_adapter_v1(GrapeAdapterKindV1::Nlms, 1, &p).unwrap();
+        adapter.update(&p, &[2.0], 0.5).unwrap();
+        assert!((adapter.weights[0] - (0.01 * 0.5 * 2.0 / 4.001)).abs() < 1.0e-12);
+    }
+
+    #[test]
+    fn failed_rls_update_is_atomic() {
+        let p = policy(GrapeAdapterKindV1::Rls);
+        let mut adapter = create_grape_feature_adapter_v1(GrapeAdapterKindV1::Rls, 2, &p).unwrap();
+        let before = adapter.clone();
+        assert!(adapter.update(&p, &[f64::NAN, 1.0], 0.5).is_err());
+        assert_eq!(adapter, before);
+    }
+
+    #[test]
+    fn hierarchical_context_matches_four_level_reliability_weighting() {
+        let mut context = GrapeHierarchicalContextStateV1::new(0.5, 2).unwrap();
+        context.update(Some("eqpA_ch1"), 2.0).unwrap();
+        context.update(Some("eqpA_ch2"), 6.0).unwrap();
+        context.update(Some("eqpB_ch1"), 10.0).unwrap();
+        let actual = context.correction(Some("eqpA_ch1")).unwrap();
+
+        let weighted = [
+            (context.global_mean, reliability(context.global_count, 2)),
+            (context.equipment["eqpA"].mean, reliability(2, 2)),
+            (context.chamber["ch1"].mean, reliability(2, 2)),
+            (context.equipment_chamber["eqpA_ch1"].mean, reliability(1, 2)),
+        ];
+        let expected = weighted.iter().map(|(v,w)| v*w).sum::<f64>()
+            / weighted.iter().map(|(_,w)| w).sum::<f64>();
+        assert!((actual - expected).abs() < 1.0e-12);
+    }
+
+    #[test]
+    fn unseen_context_falls_back_to_global_not_another_local_bucket() {
+        let mut context = GrapeHierarchicalContextStateV1::new(0.1, 10).unwrap();
+        context.update(Some("eqpA_ch1"), 8.0).unwrap();
+        assert_eq!(context.correction(Some("eqpB_ch9")).unwrap(), context.global_mean);
+        assert!(!context.equipment.contains_key("eqpB"));
+        assert!(!context.equipment_chamber.contains_key("eqpB_ch9"));
+    }
+
+    #[test]
+    fn context_count_overflow_does_not_mutate_hierarchy() {
+        let mut context = GrapeHierarchicalContextStateV1::new(0.5, 2).unwrap();
+        context.global_count = u64::MAX;
+        let before = context.clone();
+        assert!(context.update(Some("eqpA_ch1"), 2.0).is_err());
+        assert_eq!(context, before);
+    }
+
+    #[test]
+    fn temporal_threshold_uses_linear_percentile_and_ema_activation() {
+        let mut temporal = GrapeTemporalResidualStateV1::new(0.5, 0.1).unwrap();
+        temporal.calibrate(&[-1.0, 2.0, -3.0, 4.0], 50.0).unwrap();
+        assert!((temporal.activation_threshold - 2.5).abs() < 1.0e-12);
+        temporal.update(6.0).unwrap();
+        assert_eq!(temporal.residual_ema, 3.0);
+        assert_eq!(temporal.correction(), 3.0);
+    }
+}
