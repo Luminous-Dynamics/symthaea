@@ -177,11 +177,6 @@ fn json_sha256<T: Serialize + ?Sized>(value: &T) -> Result<String, CausalDriftEr
     Ok(sha256_hex(&bytes))
 }
 
-fn channel_digest(channel: CausalDriftChannelV1) -> String {
-    let encoded = serde_json::to_vec(&channel).expect("enum serialization is infallible");
-    sha256_hex(&encoded)
-}
-
 fn mean(values: &[f64]) -> f64 {
     values.iter().sum::<f64>() / values.len() as f64
 }
@@ -201,6 +196,12 @@ fn build_delta(
     }
 }
 
+fn canonical_input_digest(input: &CausalDriftInputV1) -> Result<String, CausalDriftErrorV1> {
+    let mut canonical = input.clone();
+    canonical.channels.sort_by_key(|channel| channel.channel);
+    json_sha256(&canonical)
+}
+
 fn invalid_report(
     input: &CausalDriftInputV1,
     reasons: Vec<CausalDriftReasonV1>,
@@ -215,7 +216,7 @@ fn invalid_report(
         channel_deltas: Vec::new(),
         negative_controls_passed: false,
         knowledge_cutoff_unix_seconds: input.diagnosis_knowledge_cutoff_unix_seconds,
-        evidence_input_sha256: json_sha256(input)?,
+        evidence_input_sha256: canonical_input_digest(input)?,
         diagnosis_sha256: String::new(),
         source_authenticity_proven: false,
         physical_root_cause_proven: false,
@@ -443,6 +444,43 @@ pub fn generate_causal_drift_fixture_v1(
         (manifest.reference_bias_delta, "reference_bias_delta"),
     ] {
         finite(value, field)?;
+    }
+
+    let tolerance = 0.25;
+    let process_active = manifest.process_delta.abs() > tolerance;
+    let sensor_active = manifest.primary_sensor_bias_delta.abs() > tolerance;
+    let reference_active = manifest.reference_bias_delta.abs() > tolerance;
+    let signature_matches = match manifest.expected_cause {
+        CausalDriftCauseV1::ProcessStateShift => {
+            process_active && !sensor_active && !reference_active
+        }
+        CausalDriftCauseV1::PrimarySensorDrift => {
+            !process_active && sensor_active && !reference_active
+        }
+        CausalDriftCauseV1::MetrologyReferenceDrift => {
+            !process_active && !sensor_active && reference_active
+        }
+        CausalDriftCauseV1::ContextOnlyShift => {
+            !process_active
+                && !sensor_active
+                && !reference_active
+                && manifest.context_after != "recipe-A"
+        }
+        CausalDriftCauseV1::UnknownOrConfounded => {
+            let known_single_cause = (process_active && !sensor_active && !reference_active)
+                || (!process_active && sensor_active && !reference_active)
+                || (!process_active && !sensor_active && reference_active)
+                || (!process_active
+                    && !sensor_active
+                    && !reference_active
+                    && manifest.context_after != "recipe-A");
+            !known_single_cause
+        }
+    };
+    if !signature_matches || manifest.available_at_unix_seconds < 100 {
+        return Err(CausalDriftErrorV1(
+            "intervention manifest does not match its declared causal class or availability".into(),
+        ));
     }
 
     let mut channels = Vec::new();
@@ -726,6 +764,19 @@ mod tests {
         permuted.channels.reverse();
         let second = diagnose_causal_drift_v1(&permuted).unwrap();
         assert_eq!(first.diagnosis_sha256, second.diagnosis_sha256);
+    }
+
+    #[test]
+    fn intervention_manifest_cannot_mislabel_its_declared_causal_signature() {
+        let wrong = manifest(
+            "wrong-cause",
+            CausalDriftCauseV1::ProcessStateShift,
+            0.0,
+            2.0,
+            0.0,
+            "recipe-A",
+        );
+        assert!(generate_causal_drift_fixture_v1(&wrong).is_err());
     }
 
     #[test]
