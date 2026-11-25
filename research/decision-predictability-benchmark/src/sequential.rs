@@ -103,13 +103,21 @@ pub enum SequentialPolicyNode {
 pub struct SequentialResourceStep {
     pub action_id: String,
     pub outcome_id: String,
+    /// Evaluator-side support remaining after this public outcome.
+    pub possible_state_ids: Vec<String>,
 }
 
-/// Exact component-wise cost on one terminal branch of the selected policy.
-#[derive(Clone, Debug, PartialEq, Eq)]
+/// Exact resource and terminal-decision receipt for one policy branch.
+#[derive(Clone, Debug, PartialEq)]
 pub struct SequentialTerminalResourcePath {
     /// Action/outcome sequence from the root to this terminal node.
     pub steps: Vec<SequentialResourceStep>,
+    /// Compatible hidden states remaining at the terminal decision.
+    pub terminal_possible_state_ids: Vec<String>,
+    /// Decision selected at this terminal leaf.
+    pub terminal_decision_id: String,
+    /// Worst-case task loss of the selected decision on this terminal support.
+    pub terminal_worst_case_loss: f64,
     /// Total resource units along this path, kept separate by dimension.
     pub resource_usage: BTreeMap<String, u64>,
 }
@@ -640,7 +648,7 @@ pub fn evaluate_sequential_robust(
         problem.maximum_actions,
         &mut nodes,
     )?;
-    let terminal_resource_paths = terminal_resource_paths(problem, &solved.policy)?;
+    let terminal_resource_paths = terminal_resource_paths(problem, &solved.policy, &possible_states)?;
     Ok(SequentialPolicyValue {
         current_minimax_loss,
         current_risk_gate_passed: current_minimax_loss
@@ -657,10 +665,17 @@ pub fn evaluate_sequential_robust(
 fn terminal_resource_paths(
     problem: &SequentialRobustProblem,
     policy: &SequentialPolicyNode,
+    possible_states: &[String],
 ) -> Result<Vec<SequentialTerminalResourcePath>, SequentialOracleError> {
     match policy {
-        SequentialPolicyNode::Stop { .. } => Ok(vec![SequentialTerminalResourcePath {
+        SequentialPolicyNode::Stop {
+            decision_id,
+            worst_case_terminal_loss,
+        } => Ok(vec![SequentialTerminalResourcePath {
             steps: Vec::new(),
+            terminal_possible_state_ids: possible_states.to_vec(),
+            terminal_decision_id: decision_id.clone(),
+            terminal_worst_case_loss: *worst_case_terminal_loss,
             resource_usage: problem
                 .resource_budget
                 .keys()
@@ -679,12 +694,17 @@ fn terminal_resource_paths(
             let mut paths = Vec::new();
 
             for branch in branches {
-                let child_paths = terminal_resource_paths(problem, &branch.continuation)?;
+                let child_paths = terminal_resource_paths(
+                    problem,
+                    &branch.continuation,
+                    &branch.possible_state_ids,
+                )?;
                 for mut child in child_paths {
                     let mut steps = Vec::with_capacity(child.steps.len() + 1);
                     steps.push(SequentialResourceStep {
                         action_id: action_id.clone(),
                         outcome_id: branch.outcome_id.clone(),
+                        possible_state_ids: branch.possible_state_ids.clone(),
                     });
                     steps.append(&mut child.steps);
                     child.steps = steps;
@@ -987,7 +1007,7 @@ pub fn enumerate_sequential_robust(
         }
     }
     let best = best.ok_or(SequentialOracleError::NoPolicy)?;
-    let terminal_resource_paths = terminal_resource_paths(problem, &best.policy)?;
+    let terminal_resource_paths = terminal_resource_paths(problem, &best.policy, &possible_states)?;
     Ok(SequentialPolicyValue {
         current_minimax_loss,
         current_risk_gate_passed: current_minimax_loss
@@ -1467,7 +1487,7 @@ mod tests {
         let dynamic = evaluate_sequential_robust(&problem).unwrap();
         let exhaustive = enumerate_sequential_robust(&problem).unwrap();
 
-        assert_eq!(dynamic.terminal_resource_paths.len(), 2);
+        assert_eq!(dynamic.terminal_resource_paths.len(), 4);
         assert_eq!(
             dynamic.terminal_resource_paths,
             exhaustive.terminal_resource_paths
@@ -1475,10 +1495,27 @@ mod tests {
         for path in &dynamic.terminal_resource_paths {
             assert_eq!(path.steps.len(), 2);
             assert_eq!(path.steps[0].action_id, "B");
-            assert!(path.steps[1].action_id == "C0" || path.steps[1].action_id == "C1");
+            assert_eq!(path.steps[0].possible_state_ids.len(), 8);
+            assert!(
+                path.steps[1].action_id == "C0" || path.steps[1].action_id == "C1"
+            );
+            assert_eq!(path.steps[1].possible_state_ids.len(), 4);
+            assert_eq!(path.terminal_possible_state_ids.len(), 2);
             assert_eq!(path.resource_usage["experiment_units"], 2);
             let expected_compute = if path.steps[1].action_id == "C0" { 0 } else { 1 };
             assert_eq!(path.resource_usage["compute_units"], expected_compute);
+
+            let terminal_x = path.terminal_possible_state_ids[0]
+                .strip_prefix('x')
+                .unwrap()
+                .chars()
+                .next()
+                .unwrap();
+            assert!(path.terminal_possible_state_ids.iter().all(|state| {
+                state.starts_with(&format!("x{terminal_x}_"))
+            }));
+            assert_eq!(path.terminal_decision_id, format!("d{terminal_x}"));
+            assert_eq!(path.terminal_worst_case_loss, 0.0);
         }
     }
 
