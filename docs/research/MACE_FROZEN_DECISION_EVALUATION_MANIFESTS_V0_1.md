@@ -34,11 +34,13 @@ The manifest's JCS digest is:
 
 `SHA-256("luminous:mace:decision-episode-manifest:v1" || 0x00 || JCS(manifest))`
 
-The public episode-set root is a deterministic ordered commitment, not a self-referential field. Sort by UTF-8 episode ID; reject duplicates. Compute:
+The public episode-set root is a deterministic ordered commitment, not a self-referential field. The verifier accepts at most 10,000 manifests, requires every manifest to share one suite ID, suite version and split, enforces the per-episode index bound of 1,000,000,000, sorts by UTF-8 episode ID and rejects duplicates/non-canonical input order. Compute:
 
 `SHA-256("luminous:mace:decision-episode-set:v1" || 0x00 || u64_be(count) || Σ(u64_be(id_bytes_len) || id_utf8 || manifest_sha256_raw32))`
 
 The public `episode_seed_commitment_sha256` is computed from JCS of `{episode_id, seed}` under `luminous:mace:episode-seed:v1`. The public `arm_assignment_commitment_sha256` is computed from JCS of `{episode_id, arm_id, seed_commitment_sha256, treatment_configuration_sha256}` under `luminous:mace:arm-assignment:v1`. Use the exact same field names and UTF-8 values in the sealed assignment record.
+
+The AML adapter includes fixed digest vectors for two deterministic fixture manifests and their set root: episode-a `2212e3c096e6824f5dfa99a1c37ad62f3dc71d239a7bfab97e5eac1cb516cedf`, episode-b `05ecb82425cd61ea9cff22a0bea45ad35a198a63980313c49cf62638dbbe8c62`, set root `584accd5e64dff749f3fa7840857728bc44d5df669991df00b31f958e5452a31`. These are test vectors, not benchmark results.
 
 ## 3. Sealed evaluation manifest v1
 
@@ -99,7 +101,7 @@ Append-only log inclusion and consistency are mandatory through the `AppendOnlyM
 
 The verifier returns a private-field `VerifiedEvaluationManifestCommitmentV1` capability only after all checks, including the injected log verifier, pass. The outcome verifier now requires this capability rather than a caller-supplied hash string; it derives the exact sealed-manifest and witness-receipt digests from the capability. This prevents an application from accidentally passing an arbitrary digest without first verifying the detached witness.
 
-The AML adapter also contains `frozen_decision_episode_manifest.rs`. It performs strict typed decoding, per-manifest JCS digest computation, ordered/unique episode-set validation, suite-identity consistency, and the canonical length-prefixed episode-set root computation. Its `VerifiedFrozenDecisionEpisodeSetV1` checks that root and suite against the verified witness, then issues a private `VerifiedDecisionEpisodeMembershipV1` capability for one exact episode. The outcome verifier requires both the witness capability and this per-episode membership capability; it checks the episode digest, episode ID, suite identity and set root. This closes the gap between a suite-level pre-run commitment and the exact episode whose outcome is being attested.
+The AML adapter also contains `frozen_decision_episode_manifest.rs`. It performs strict typed decoding, per-manifest JCS digest computation, ordered/unique episode-set validation, suite-identity consistency, and the canonical length-prefixed episode-set root computation. Its `VerifiedFrozenDecisionEpisodeSetV1` checks that root and suite against the verified witness, then issues a private `VerifiedDecisionEpisodeMembershipV1` capability for one exact episode. The outcome verifier requires both the witness capability and this per-episode membership capability; it checks the episode digest, episode ID, suite identity, set root and the consumer-required split (for headline benchmark scoring, that must be `held_out`). This closes the gap between a suite-level pre-run commitment and the exact episode whose outcome is being attested.
 
 ## 6. Commit, run, seal, reveal protocol
 
