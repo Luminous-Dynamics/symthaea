@@ -80,3 +80,28 @@ SDCB should reuse existing physics and formal-assurance work rather than buildin
 - **#13672 — SDCB parent research programme.** Owns the cross-domain protocol, analytic reference controls, identifiability/abstention track, benchmark governance and external comparison ledger.
 
 The shared methodology is: exact state/source identity → declared observables → identifiability conditions → controlled intervention → independent response measurement → uncertainty/resource receipt. A successful physical invariant check does not validate a cognitive mechanism; a successful cognitive benchmark does not validate a physical solver. Reuse the evidence and measurement infrastructure, not domain-specific truth claims.
+
+
+## 9. Scientific-discovery and realistic-workflow benchmarks (expanded 25 November 2026)
+
+| Reference | Captured scope / reported results | SDCB use |
+|---|---|---|
+| Autonomous Science Bench 0.1 | Six real laboratory pilot tasks across three domains. Current public page lists GPT-6 Astra Codex at 72.2% and Opus 5.5 Claude Code at 66.7%. It explicitly evaluates experiment discovery and learning about designs never measured. | Highest-priority comparison for active experiment selection, exploration/exploitation, and unmeasured-design ranking. Keep the six-task pilot limitation visible. |
+| FIRE-Bench, ICML 2026 | Agents rediscover documented findings from recent high-impact ML work through experiment design, execution, and evidence-backed conclusions. The paper reports the strongest evaluated agents below 50 F1, high run-to-run variance, and failures in experiment design/execution/evidence reasoning. | A verifiable scientific rediscovery track. This directly addresses the weakness of LLM-as-judge paper scoring. |
+| SciAgentArena, June 2026 | Approximately 200 interactive, agent-agnostic scientific research tasks with stepwise verification; reports current agents are better on well-specified data analysis than novel insight and self-directed exploration. | Interactive full-loop adapter and held-out research-family evaluation. |
+| AstaBench / Stanford AI Index 2026 | More than 2,400 scientific research problems and 57 evaluated agents across 22 agent classes; the AI Index summary reports a best score around 0.53 at about $3.40 per problem in the captured leaderboard snapshot. | Broad workflow coverage and cost-efficiency comparison. Preserve the precise AstaBench snapshot and scoring protocol. |
+| SorryDB (ICML 2026) | Dynamic tasks from 78 real Lean formalization projects; the public January 2026 snapshot has 1,000 open proof obligations. Each task binds repository, commit, Lean version and source location; candidate proofs are independently compiled in the original project. Public snapshot currently reports Aleph Prover at 57.2% pass@1. | Real-world mathematical maintenance and fresh source-lineage evaluation; add SDCB proof-plan/scope/explanation metrics as a separate report. |
+| Goedel-Prover-V2, ICLR 2026 | Open Lean prover: 8B reports 84.6% MiniF2F pass@32; 32B reports 88.1% standard and 90.4% self-correction pass@32; 86 PutnamBench problems at pass@184. | Strong formal-proving comparator. Keep pass@k, model scale and inference budget separate; this is not explanation-quality evidence. |
+| Open Agent Leaderboard / Exgentic | Full-system open evaluation; reports both performance and cost. Its launch write-up reports unsuccessful runs cost 20–54% more than successful runs and tool shortlisting improved performance across tested models. | Report cost of failure, tool-selection ablations, system scaffold identity and trajectory quality, not only success rate. |
+
+**Strategic conclusion:** SDCB should become an interoperability layer and a harder, narrowly targeted extension—not a replacement for these upstream benchmarks. The differentiating measurements are task-relative identifiability, active sensor/probe selection, surprise recovery, unmeasured-candidate learning, exact evidence provenance, and independent replay. See [SDCB scientific-discovery benchmark interoperability](SDCB_SCIENTIFIC_DISCOVERY_INTEROPERABILITY_V1.md).
+
+## 10. Source links for the expanded benchmark snapshot
+
+- Autonomous Science Bench 0.1, written 1 October 2026: https://asb.open-ssi.org/about
+- FIRE-Bench, Proceedings of Machine Learning Research volume 306 (ICML 2026): https://proceedings.mlr.press/v306/wang26d.html
+- SciAgentArena, Microsoft Research, June 2026: https://www.microsoft.com/en-us/research/publication/benchmarking-ai-agents-for-addressing-scientific-challenges-across-scales/
+- Stanford AI Index Report 2026, Section 5.3 (AstaBench summary): https://hai.stanford.edu/assets/files/ai_index_report_2026.pdf
+- SorryDB public leaderboard and evaluation pipeline: https://sorrydb.org/
+- Goedel-Prover-V2, ICLR 2026: https://proceedings.iclr.cc/paper_files/paper/2026/hash/13e8be77982beb73d7ed0bbf122f9f3c-Abstract-Conference.html
+- Open Agent Leaderboard / Exgentic launch article: https://huggingface.co/blog/ibm-research/open-agent-leaderboard
