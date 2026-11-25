@@ -748,6 +748,7 @@ fn select_probability_audit(
         Vec<UnmetAnnotationQuotaV1>,
         u64,
         usize,
+        Vec<ProbabilityAuditStratumDesignV1>,
     ),
     String,
 > {
@@ -778,120 +779,166 @@ fn select_probability_audit(
         .collect();
 
     // Determine every stratum's fixed source-work sample size before drawing
-    // any random source or item. Reserve worst-case item cost for each planned
-    // source. Thus the sample size in later strata cannot depend on whether an
-    // earlier random draw happened to select a cheap or expensive item.
+    // any random source or item. A selected work contributes up to the
+    // configured number of query items. Reserve the maximum possible cost of
+    // that item subset for each planned source work. Later stratum sample sizes
+    // therefore cannot depend on the actual cost of earlier random item draws.
     let mut reserved_budget = config.probability_audit_budget_units;
-    let mut sample_size_by_stratum: BTreeMap<&str, usize> = BTreeMap::new();
+    let mut sample_size_by_stratum: BTreeMap<&str, (usize, u64)> = BTreeMap::new();
     for (stratum, source_items) in &by_stratum {
         let quota = quotas
             .get(stratum)
             .copied()
             .ok_or_else(|| format!("eligible audit stratum {stratum} has no quota"))?;
-        let maximum_item_cost = source_items
-            .values()
-            .flat_map(|items| items.iter().map(|index| candidates[*index].annotation_cost_units))
-            .max()
-            .unwrap_or(0);
-        if maximum_item_cost == 0 {
-            sample_size_by_stratum.insert(*stratum, 0);
+
+        let mut maximum_work_sample_cost = 0_u64;
+        for items in source_items.values() {
+            let sample_count = (config.audit_items_per_source_work as usize).min(items.len());
+            let mut costs: Vec<_> = items
+                .iter()
+                .map(|index| candidates[*index].annotation_cost_units)
+                .collect();
+            costs.sort_unstable_by(|left, right| right.cmp(left));
+            let work_cost = costs
+                .into_iter()
+                .take(sample_count)
+                .try_fold(0_u64, |sum, cost| sum.checked_add(cost))
+                .ok_or_else(|| "audit work-sample cost overflow".to_string())?;
+            maximum_work_sample_cost = maximum_work_sample_cost.max(work_cost);
+        }
+
+        if maximum_work_sample_cost == 0 {
+            sample_size_by_stratum.insert(*stratum, (0, 0));
             continue;
         }
         let selected_sources = (quota.audit_source_work_count as usize)
             .min(source_items.len())
-            .min((reserved_budget / maximum_item_cost) as usize);
+            .min((reserved_budget / maximum_work_sample_cost) as usize);
         let reservation = (selected_sources as u64)
-            .checked_mul(maximum_item_cost)
+            .checked_mul(maximum_work_sample_cost)
             .ok_or_else(|| "audit worst-case budget reservation overflow".to_string())?;
         reserved_budget = reserved_budget
             .checked_sub(reservation)
             .ok_or_else(|| "audit worst-case budget reservation underflow".to_string())?;
-        sample_size_by_stratum.insert(*stratum, selected_sources);
+        sample_size_by_stratum.insert(*stratum, (selected_sources, reservation));
     }
 
     let mut selections = Vec::new();
     let mut unmet = Vec::new();
+    let mut design = Vec::new();
     let mut spent = 0_u64;
     let mut selected_source_count = 0_usize;
 
     for (stratum, quota) in quotas {
         let requested = quota.audit_source_work_count as usize;
-        if requested == 0 {
-            continue;
-        }
-        let Some(source_items) = by_stratum.get(stratum) else {
-            unmet.push(UnmetAnnotationQuotaV1 {
-                source_stratum_id: stratum.to_string(),
-                stream: QuotaStreamV1::ProbabilityAudit,
-                requested: requested as u32,
-                selected: 0,
-            });
-            continue;
-        };
-        let eligible_sources = source_items.len();
-        let selected_sources = sample_size_by_stratum
+        let source_items = by_stratum.get(stratum);
+        let eligible_sources = source_items.map_or(0, |works| works.len());
+        let eligible_query_items = source_items.map_or(0, |works| {
+            works.values().map(Vec::len).sum::<usize>()
+        });
+        let (selected_sources, worst_case_reserved_cost_units) = sample_size_by_stratum
             .get(stratum)
             .copied()
-            .unwrap_or(0);
+            .unwrap_or((0, 0));
+        let mut selected_query_items = 0_usize;
+        let mut stratum_actual_spent = 0_u64;
 
-        let mut source_ids: Vec<_> = source_items.keys().copied().collect();
-        for index in (1..source_ids.len()).rev() {
-            let selected = unbiased_index(rng, index + 1);
-            source_ids.swap(index, selected);
-        }
+        if requested > 0 {
+            if let Some(source_items) = source_items {
+                let mut source_ids: Vec<_> = source_items.keys().copied().collect();
+                for index in (1..source_ids.len()).rev() {
+                    let selected = unbiased_index(rng, index + 1);
+                    source_ids.swap(index, selected);
+                }
 
-        for source_id in source_ids.into_iter().take(selected_sources) {
-            let items = source_items
-                .get(source_id)
-                .ok_or_else(|| "selected audit source work has no candidate items".to_string())?;
-            let item_index = items[unbiased_index(rng, items.len())];
-            let candidate = &candidates[item_index];
-            let denominator = (eligible_sources as u64)
-                .checked_mul(items.len() as u64)
-                .ok_or_else(|| "audit item inclusion probability denominator overflow".to_string())?;
-            if denominator == 0 {
-                return Err("audit item inclusion probability denominator is zero".into());
+                for source_id in source_ids.into_iter().take(selected_sources) {
+                    let items = source_items
+                        .get(source_id)
+                        .ok_or_else(|| "selected audit source work has no candidate items".to_string())?;
+                    let eligible_items_in_source_work = items.len();
+                    let selected_items_in_source_work = (config.audit_items_per_source_work as usize)
+                        .min(eligible_items_in_source_work);
+
+                    let mut item_indices = items.clone();
+                    for index in (1..item_indices.len()).rev() {
+                        let selected = unbiased_index(rng, index + 1);
+                        item_indices.swap(index, selected);
+                    }
+
+                    let source_probability = ProbabilityFractionV1 {
+                        numerator: selected_sources as u64,
+                        denominator: eligible_sources as u64,
+                    };
+                    let conditional_probability = ProbabilityFractionV1 {
+                        numerator: selected_items_in_source_work as u64,
+                        denominator: eligible_items_in_source_work as u64,
+                    };
+                    let inclusion_numerator = (selected_sources as u64)
+                        .checked_mul(selected_items_in_source_work as u64)
+                        .ok_or_else(|| "audit item inclusion numerator overflow".to_string())?;
+                    let inclusion_denominator = (eligible_sources as u64)
+                        .checked_mul(eligible_items_in_source_work as u64)
+                        .ok_or_else(|| "audit item inclusion denominator overflow".to_string())?;
+                    let inclusion_probability = ProbabilityFractionV1 {
+                        numerator: inclusion_numerator,
+                        denominator: inclusion_denominator,
+                    };
+
+                    for item_index in item_indices.into_iter().take(selected_items_in_source_work) {
+                        let candidate = &candidates[item_index];
+                        selections.push(selection_record(
+                            candidate,
+                            SelectionStreamV1::ProbabilityAudit,
+                            None,
+                            SelectionReasonV1::UniformSourceWorkProbabilityDraw,
+                            Some(source_probability),
+                            Some(conditional_probability),
+                            Some(inclusion_probability),
+                            Some(eligible_sources),
+                            Some(selected_sources),
+                            Some(eligible_items_in_source_work),
+                            Some(selected_items_in_source_work),
+                        ));
+                        spent = spent
+                            .checked_add(candidate.annotation_cost_units)
+                            .ok_or_else(|| "audit budget usage overflow".to_string())?;
+                        stratum_actual_spent = stratum_actual_spent
+                            .checked_add(candidate.annotation_cost_units)
+                            .ok_or_else(|| "stratum audit spend overflow".to_string())?;
+                        selected_query_items += 1;
+                    }
+                    selected_source_count += 1;
+                }
             }
-            let probability = ProbabilityFractionV1 {
-                numerator: selected_sources as u64,
-                denominator,
-            };
-            selections.push(selection_record(
-                candidate,
-                SelectionStreamV1::ProbabilityAudit,
-                None,
-                SelectionReasonV1::UniformSourceWorkProbabilityDraw,
-                Some(ProbabilityFractionV1 {
-                    numerator: selected_sources as u64,
-                    denominator: eligible_sources as u64,
-                }),
-                Some(ProbabilityFractionV1 {
-                    numerator: 1,
-                    denominator: items.len() as u64,
-                }),
-                Some(probability),
-            ));
-            spent = spent
-                .checked_add(candidate.annotation_cost_units)
-                .ok_or_else(|| "audit budget usage overflow".to_string())?;
-            selected_source_count += 1;
+
+            if selected_sources < requested {
+                unmet.push(UnmetAnnotationQuotaV1 {
+                    source_stratum_id: stratum.to_string(),
+                    stream: QuotaStreamV1::ProbabilityAudit,
+                    requested: requested as u32,
+                    selected: selected_sources as u32,
+                });
+            }
         }
 
-        if selected_sources < requested {
-            unmet.push(UnmetAnnotationQuotaV1 {
-                source_stratum_id: stratum.to_string(),
-                stream: QuotaStreamV1::ProbabilityAudit,
-                requested: requested as u32,
-                selected: selected_sources as u32,
-            });
-        }
+        design.push(ProbabilityAuditStratumDesignV1 {
+            source_stratum_id: stratum.to_string(),
+            eligible_source_works: eligible_sources,
+            eligible_query_items,
+            selected_source_works: selected_sources,
+            selected_query_items,
+            items_per_source_work_cap: config.audit_items_per_source_work,
+            worst_case_reserved_cost_units,
+            actual_spent_cost_units: stratum_actual_spent,
+        });
     }
 
     if spent > config.probability_audit_budget_units {
         return Err("probability audit exceeded its reserved budget".into());
     }
-    // Preserve randomized source-work draw order in the replayable receipt.
-    Ok((selections, unmet, spent, selected_source_count))
+    // Preserve randomized source-work and within-work draw order in the
+    // replayable receipt.
+    Ok((selections, unmet, spent, selected_source_count, design))
 }
 
 fn select_active(
