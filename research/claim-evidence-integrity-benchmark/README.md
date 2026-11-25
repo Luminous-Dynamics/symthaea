@@ -69,9 +69,11 @@ A source family identifies common origin, syndication or copied lineage. Three m
 
 ## Files
 
-- `fixtures/claim-evidence-integrity-v0.1.json`: 15 known-answer synthetic fixtures.
-- `schemas/claim-evidence-integrity-v0.1.schema.json`: strict JSON Schema.
-- `src/lib.rs`: deterministic validator for keys, fixture identity, timestamps, exact quote byte spans and artifact SHA-256.
+- `fixtures/candidate-inputs-v0.1.json`: candidate-visible claims, declared scope, temporal axes and raw evidence artifacts only.
+- `fixtures/evaluator-key-v0.1.json`: separate evaluator-only expected verdicts, claim-source relations, source-family lineage, compromise/retraction labels and gold quote spans.
+- `fixtures/claim-evidence-integrity-v0.1.json`: authoring/master representation used to generate and validate the two views; never pass it to a candidate policy.
+- `schemas/claim-evidence-integrity-v0.1.schema.json`, `schemas/candidate-inputs-v0.1.schema.json` and `schemas/evaluator-key-v0.1.schema.json`: strict master, candidate and evaluator schemas.
+- `src/lib.rs`: deterministic validators for keys, fixture identity, timestamps, exact quote byte spans, artifact SHA-256, candidate/evaluator separation and digest cross-binding.
 - `src/bin/validate.rs`: validation CLI and negative-control self-test.
 - `Cargo.lock`: pinned standalone dependency resolution.
 - `.github/workflows/claim-evidence-integrity-benchmark.yml`: exact Rust 1.96 format/test/self-test/Clippy workflow.
@@ -89,7 +91,9 @@ cargo run --manifest-path research/claim-evidence-integrity-benchmark/Cargo.toml
 cargo clippy --manifest-path research/claim-evidence-integrity-benchmark/Cargo.toml --locked --all-targets -- -D warnings
 ```
 
-The self-test runs negative controls for modified artifact bytes, altered quote spans and duplicate fixture IDs. Unit tests also reject missing claim scope, unsupported relation enums, missing temporal axes, duplicate evidence IDs and candidate-visible synthetic labels. The validator proves pack integrity and contract shape only; it does not decide whether natural-language evidence entails a claim.
+The self-test validates both the master fixture and the separated candidate/evaluator views. It runs negative controls for modified artifact bytes, altered quote spans and duplicate fixture IDs. Unit tests also reject missing claim scope, unsupported relation enums, missing temporal axes, duplicate evidence IDs, candidate-visible synthetic labels and evaluator keys detached from the exact candidate artifact digest.
+
+The candidate input schema does not contain expected verdicts, source-family gold labels, claim-source relation labels, gold quote spans, retraction labels or compromise labels. The evaluator key does not contain full artifact text. The public synthetic evaluator key remains visible in this repository for transparency; it is **not a sealed benchmark**. Real blind evaluation must keep the answer key in an independent evaluator/custody boundary. The validator proves pack integrity and contract shape only; it does not decide whether natural-language evidence entails a claim.
 
 ## Synthetic fixture families
 
