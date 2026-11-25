@@ -1,0 +1,83 @@
+{
+  "schema_version": "sat-run-manifest/v0.1",
+  "run_id": "00000000-0000-4000-8000-000000000001",
+  "frozen_at": "2026-11-25T10:00:00Z",
+  "system": {
+    "system_id": "example-agent",
+    "release_id": "0.1.0-example",
+    "implementation_kind": "open_source",
+    "configuration_digest": "sha256:aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+    "source_revision": "0123456789abcdef0123456789abcdef01234567",
+    "identity_evidence": [
+      {
+        "artifact_id": "source-revision-record",
+        "digest": "sha256:bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb",
+        "source_id": "example-git-host",
+        "capture_method": "native_export",
+        "trust_basis": "provider_asserted"
+      }
+    ]
+  },
+  "profile": {
+    "profile_id": "sat-core-example",
+    "version": "0.1",
+    "track_ids": [
+      "authority",
+      "disclosure",
+      "evidence_integrity"
+    ],
+    "threat_model": {
+      "attacker_knowledge": "gray_box",
+      "capabilities": [
+        "prompt_injection",
+        "tool_misuse"
+      ],
+      "adaptive_rounds": 2,
+      "budget": {
+        "queries": 50,
+        "tool_calls": 20,
+        "wall_clock_seconds": 1800
+      }
+    }
+  },
+  "campaign": {
+    "dataset_id": "sat-example",
+    "version": "0.1",
+    "digest": "sha256:cccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccc",
+    "split": "public_smoke",
+    "case_ids": [
+      "SAT-EXAMPLE-001"
+    ],
+    "seed_policy": {
+      "mode": "fixed",
+      "seed_ids": [
+        "seed-001"
+      ]
+    }
+  },
+  "harness": {
+    "harness_id": "sat-example-harness",
+    "version": "0.1",
+    "adapter_id": "example-adapter",
+    "adapter_version": "0.1",
+    "isolation_profile": "mock"
+  },
+  "roles": {
+    "evaluator_id": "independent-evaluator-01",
+    "sink_observer_ids": [
+      "bank-observer-01"
+    ],
+    "auditor_ids": [
+      "auditor-01",
+      "auditor-02"
+    ],
+    "role_separation_attested": true,
+    "conflict_disclosures": []
+  },
+  "frozen_inputs": {
+    "system_configuration_digest": "sha256:dddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddd",
+    "scenario_pack_digest": "sha256:eeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeee",
+    "grading_policy_digest": "sha256:ffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffff",
+    "evidence_policy_digest": "sha256:1111111111111111111111111111111111111111111111111111111111111111"
+  }
+}
