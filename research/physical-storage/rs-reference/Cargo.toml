@@ -1,0 +1,9 @@
+[package]
+name = "physical-storage-rs-reference"
+version = "0.1.0"
+edition = "2024"
+license = "AGPL-3.0-or-later"
+publish = false
+description = "Zero-dependency exact-recovery reference for spatially interleaved physical storage"
+
+[workspace]
