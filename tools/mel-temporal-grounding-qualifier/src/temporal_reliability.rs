@@ -1058,8 +1058,14 @@ mod tests {
 
     fn balanced_agreement_dataset() -> MultiAnnotatorReliabilityDatasetV1 {
         let two_events = vec![
-            FrameIntervalV1 { start_frame: 100, end_frame: 200 },
-            FrameIntervalV1 { start_frame: 500, end_frame: 600 },
+            FrameIntervalV1 {
+                start_frame: 48_000,
+                end_frame: 52_800,
+            },
+            FrameIntervalV1 {
+                start_frame: 120_000,
+                end_frame: 124_800,
+            },
         ];
         let mut items = Vec::new();
         for cluster in ['a', 'b', 'c'] {
@@ -1118,8 +1124,8 @@ mod tests {
         let query_id = data.items[0].case.query_id.clone();
         let annotator_a = data.items[0].case.annotations[0].annotator_id_sha256.clone();
         let annotator_b = data.items[0].case.annotations[1].annotator_id_sha256.clone();
-        data.items[0].case.annotations[1].intervals[0].start_frame += 480;
-        data.items[0].case.annotations[1].intervals[0].end_frame += 480;
+        data.items[0].case.annotations[1].intervals[0].start_frame += 1_200;
+        data.items[0].case.annotations[1].intervals[0].end_frame += 1_200;
         let report = audit_multi_annotator_dataset(&data).unwrap();
         let pair = report.pairwise_results.iter().find(|pair| {
             pair.query_id == query_id
@@ -1127,8 +1133,9 @@ mod tests {
                 && pair.annotator_b_sha256 == annotator_b
         }).unwrap();
         assert_eq!(pair.exact_occurrence_count_agreement, Some(true));
-        assert!(pair.interval_f1_symmetric.unwrap() < 1.0);
-        assert!(pair.start_boundary_mae_ms.unwrap() > 0.0);
+        assert_eq!(pair.interval_f1_symmetric, Some(1.0));
+        assert!(pair.matched_iou_symmetric.unwrap() < 1.0);
+        assert_eq!(pair.start_boundary_mae_ms, Some(25.0));
     }
 
     #[test]
