@@ -127,7 +127,8 @@
               "memory_interference",
               "proof_obligation_graph",
               "criticality_sweep",
-              "spectral_ablation"
+              "spectral_ablation",
+              "identifiability_abstention"
             ]
           },
           "split": {
