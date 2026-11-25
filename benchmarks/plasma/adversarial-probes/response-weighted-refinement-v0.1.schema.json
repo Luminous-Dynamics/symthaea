@@ -1,0 +1,208 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://github.com/Luminous-Dynamics/symthaea/blob/main/benchmarks/plasma/adversarial-probes/response-weighted-refinement-v0.1.schema.json",
+  "title": "Response-weighted spectral refinement known-answer fixture v0.1",
+  "type": "object",
+  "additionalProperties": false,
+  "required": [
+    "schema_version",
+    "case_id",
+    "input_modes",
+    "output_modes",
+    "response_entries",
+    "coefficients",
+    "encoded_bytes",
+    "output_qoi_weights",
+    "response_loss_budget",
+    "expected",
+    "claim_boundary"
+  ],
+  "properties": {
+    "schema_version": {
+      "const": "0.1"
+    },
+    "case_id": {
+      "type": "string",
+      "minLength": 1
+    },
+    "input_modes": {
+      "type": "array",
+      "minItems": 1,
+      "uniqueItems": true,
+      "items": {
+        "type": "integer",
+        "minimum": 0
+      }
+    },
+    "output_modes": {
+      "type": "array",
+      "minItems": 1,
+      "uniqueItems": true,
+      "items": {
+        "type": "integer",
+        "minimum": 0
+      }
+    },
+    "response_entries": {
+      "type": "array",
+      "items": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": [
+          "input_mode",
+          "output_mode",
+          "real",
+          "imag"
+        ],
+        "properties": {
+          "input_mode": {
+            "type": "integer",
+            "minimum": 0
+          },
+          "output_mode": {
+            "type": "integer",
+            "minimum": 0
+          },
+          "real": {
+            "type": "number"
+          },
+          "imag": {
+            "type": "number"
+          }
+        }
+      }
+    },
+    "coefficients": {
+      "type": "array",
+      "minItems": 1,
+      "items": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": [
+          "mode",
+          "real",
+          "imag"
+        ],
+        "properties": {
+          "mode": {
+            "type": "integer",
+            "minimum": 0
+          },
+          "real": {
+            "type": "number"
+          },
+          "imag": {
+            "type": "number"
+          }
+        }
+      }
+    },
+    "encoded_bytes": {
+      "type": "array",
+      "minItems": 1,
+      "items": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": [
+          "mode",
+          "bytes"
+        ],
+        "properties": {
+          "mode": {
+            "type": "integer",
+            "minimum": 0
+          },
+          "bytes": {
+            "type": "integer",
+            "minimum": 1
+          }
+        }
+      }
+    },
+    "output_qoi_weights": {
+      "type": "array",
+      "minItems": 1,
+      "items": {
+        "type": "number",
+        "minimum": 0
+      }
+    },
+    "response_loss_budget": {
+      "type": "number",
+      "minimum": 0
+    },
+    "expected": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "discarded_state_bytes",
+        "accumulated_discarded_response_bound",
+        "decisions"
+      ],
+      "properties": {
+        "discarded_state_bytes": {
+          "type": "integer",
+          "minimum": 0
+        },
+        "accumulated_discarded_response_bound": {
+          "type": "number",
+          "minimum": 0
+        },
+        "decisions": {
+          "type": "array",
+          "items": {
+            "type": "object",
+            "additionalProperties": false,
+            "required": [
+              "mode",
+              "spectral_energy",
+              "response_loss_bound",
+              "disposition"
+            ],
+            "properties": {
+              "mode": {
+                "type": "integer",
+                "minimum": 0
+              },
+              "spectral_energy": {
+                "type": "number",
+                "minimum": 0
+              },
+              "response_loss_bound": {
+                "type": "number",
+                "minimum": 0
+              },
+              "disposition": {
+                "enum": [
+                  "discarded_within_budget",
+                  "retained_budget_exceeded",
+                  "retained_unknown_response"
+                ]
+              }
+            }
+          }
+        }
+      }
+    },
+    "claim_boundary": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "status",
+        "no_physical_solver_run",
+        "synthetic_response_map_only"
+      ],
+      "properties": {
+        "status": {
+          "const": "synthetic_known_answer_only"
+        },
+        "no_physical_solver_run": {
+          "const": true
+        },
+        "synthetic_response_map_only": {
+          "const": true
+        }
+      }
+    }
+  }
+}
