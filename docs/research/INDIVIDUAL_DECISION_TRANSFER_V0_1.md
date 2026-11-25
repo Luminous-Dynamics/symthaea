@@ -37,7 +37,7 @@ Digest fields are identity references, not proof of artifact authenticity. The e
 
 ## 4. Output semantics
 
-The evaluator sorts action rows by action ID and returns deterministic output. On exact predicted-utility ties, the lexicographically smallest action ID is selected. It reports:
+The evaluator sorts action rows by action ID and returns deterministic output. The certificate echoes the complete frozen decision context, and each output action row retains its pairing-receipt and trajectory digests so the evidence references survive scoring. On exact predicted-utility ties, the lexicographically smallest action ID is selected. It reports:
 
 1. realized best utility and the complete realized epsilon-good action set;
 2. latent-readout and imagined-rollout selected action IDs;
@@ -66,7 +66,8 @@ The unit suite covers:
 - missing/extra action rows, duplicate action IDs and duplicate run IDs reject;
 - non-applied actions reject instead of receiving fabricated utility;
 - missing receipt references, negative epsilon and zero decision-point ID reject;
-- extreme signed utilities use wider checked arithmetic without wraparound.
+- extreme signed utilities use wider checked arithmetic without wraparound;
+- the certificate echoes the exact context and preserves action-specific receipt/trajectory references.
 
 ## 6. Research hypothesis and falsification
 
