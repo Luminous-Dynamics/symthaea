@@ -145,7 +145,7 @@
           "const": "inductive type plus all constructors"
         },
         "unresolved_policy": {
-          "const": "insert sorryAx sentinel and fail expected-axiom assertion"
+          "const": "preserve unresolved constant name in dependency set; exact expected-set assertion fails closed"
         }
       }
     },
