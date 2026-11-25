@@ -6707,6 +6707,9 @@ pub const WEIGHTED_FOURIER_MEASURE_FIXTURE: &str = include_str!(
 pub const WEIGHTED_MEASURE_TAIL_STABILITY_FIXTURE: &str = include_str!(
     "../../../../benchmarks/plasma/topology-lifting/fixtures/weighted-measure-tail-stability-v0.1.json"
 );
+pub const KIRR_PULSE_GRAPH_FIXTURE: &str = include_str!(
+    "../../../../benchmarks/plasma/kinetic-information-return/fixtures/kinetic-pulse-graph-known-answer-v0.1.json"
+);
 
 #[cfg(test)]
 mod tests {
@@ -11317,6 +11320,59 @@ mod tests {
             pulse.canonical_digest(&family).unwrap(),
             reversed.canonical_digest(&family).unwrap()
         );
+    }
+
+    #[test]
+    fn kinetic_pulse_sequence_fixture_builds_baseline_echo_and_cascade_paths() {
+        let fixture: serde_json::Value =
+            serde_json::from_str(KIRR_PULSE_GRAPH_FIXTURE).unwrap();
+        let family = contract();
+        let paths = fixture["paths"].as_array().unwrap();
+        assert_eq!(paths.len(), 3);
+
+        let expected = [
+            ("baseline-no-intervention", "baseline", 0_usize, 6.0_f64),
+            ("two-pulse-echo-anchor", "two_pulse_echo", 2, 8.0),
+            ("three-pulse-cascade", "multi_pulse_cascade", 3, 10.0),
+        ];
+        for (path, (expected_id, expected_kind, expected_count, expected_horizon)) in
+            paths.iter().zip(expected)
+        {
+            assert_eq!(path["path_id"].as_str().unwrap(), expected_id);
+            assert_eq!(path["path_kind"].as_str().unwrap(), expected_kind);
+            let horizon = path["observation_end_time"].as_f64().unwrap();
+            assert_eq!(horizon, expected_horizon);
+            let pulses = path["pulses"]
+                .as_array()
+                .unwrap()
+                .iter()
+                .map(|pulse| {
+                    candidate(
+                        pulse["spatial_mode"].as_u64().unwrap() as u32,
+                        pulse["phase_rad"].as_f64().unwrap(),
+                        pulse["kick_velocity_amplitude"].as_f64().unwrap(),
+                        pulse["application_time"].as_f64().unwrap(),
+                    )
+                })
+                .collect::<Vec<_>>();
+            assert_eq!(pulses.len(), expected_count);
+            let sequence = KineticPulseSequence::new(&family, &pulses, horizon).unwrap();
+            assert_eq!(sequence.pulses().len(), expected_count);
+            assert_eq!(sequence.observation_end_time(), expected_horizon);
+            assert_eq!(sequence.digest().len(), 64);
+            assert!(
+                sequence
+                    .pulses()
+                    .windows(2)
+                    .all(|window| window[0].application_time <= window[1].application_time)
+            );
+            assert!(
+                sequence
+                    .pulses()
+                    .iter()
+                    .all(|pulse| pulse.application_time < sequence.observation_end_time())
+            );
+        }
     }
 
     #[test]
