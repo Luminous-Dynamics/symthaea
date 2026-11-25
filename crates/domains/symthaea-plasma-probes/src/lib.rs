@@ -140,6 +140,8 @@ pub enum ContractError {
     IncomparableDiscriminationDesigns,
     #[error("kinetic discrimination portfolio contains duplicate intervention IDs")]
     DuplicateDiscriminationIntervention,
+    #[error("kinetic discrimination requires a stable, identified response branch for every hypothesis")]
+    InvalidDiscriminationResponseBranch,
     #[error("kinetic discrimination noise envelope must be finite, positive and ordered")]
     InvalidDiscriminationNoiseEnvelope,
     #[error("kinetic discrimination arithmetic produced an invalid information gain")]
@@ -1088,6 +1090,8 @@ pub struct KineticDiscriminationHypothesis {
     pub hypothesis_id: String,
     pub prior_probability: f64,
     pub predicted_response: ComplexResponse,
+    pub response_branch_id: String,
+    pub branch_association_stable: bool,
 }
 
 /// One candidate intervention evaluated for expected information gain.
@@ -1424,6 +1428,11 @@ pub fn evaluate_kinetic_discrimination_design(
             || !hypothesis.predicted_response.imag.is_finite()
         {
             return Err(ContractError::NonFiniteResponseValue);
+        }
+        if hypothesis.response_branch_id.trim().is_empty()
+            || !hypothesis.branch_association_stable
+        {
+            return Err(ContractError::InvalidDiscriminationResponseBranch);
         }
         maximum_prior = maximum_prior.max(hypothesis.prior_probability);
     }
@@ -7662,6 +7671,13 @@ mod tests {
                         hypothesis["predicted_response"]["imag"].as_f64().unwrap(),
                     )
                     .unwrap(),
+                    response_branch_id: hypothesis["response_branch_id"]
+                        .as_str()
+                        .unwrap()
+                        .to_owned(),
+                    branch_association_stable: hypothesis["branch_association_stable"]
+                        .as_bool()
+                        .unwrap(),
                 })
                 .collect();
             let design = KineticDiscriminationDesign {
@@ -7748,6 +7764,13 @@ mod tests {
                                     .unwrap(),
                             )
                             .unwrap(),
+                            response_branch_id: hypothesis["response_branch_id"]
+                                .as_str()
+                                .unwrap()
+                                .to_owned(),
+                            branch_association_stable: hypothesis["branch_association_stable"]
+                                .as_bool()
+                                .unwrap(),
                         })
                         .collect();
                     KineticDiscriminationDesign {
@@ -7805,6 +7828,8 @@ mod tests {
                     hypothesis_id: format!("state-{index}"),
                     prior_probability: *prior,
                     predicted_response: ComplexResponse::new(*real, *imag).unwrap(),
+                    response_branch_id: format!("branch-{index}"),
+                    branch_association_stable: true,
                 })
                 .collect(),
             noise_variance_per_quadrature: variance,
@@ -8012,6 +8037,27 @@ mod tests {
     }
 
     #[test]
+    fn kinetic_discrimination_rejects_unstable_or_unidentified_response_branches() {
+        let mut design = gaussian_discrimination_design(
+            &[(-1.0, 0.0), (1.0, 0.0)],
+            &[0.5, 0.5],
+            0.1,
+            1.0,
+        );
+        design.hypotheses[0].branch_association_stable = false;
+        assert_eq!(
+            evaluate_kinetic_discrimination_design(&design),
+            Err(ContractError::InvalidDiscriminationResponseBranch)
+        );
+        design.hypotheses[0].branch_association_stable = true;
+        design.hypotheses[0].response_branch_id.clear();
+        assert_eq!(
+            evaluate_kinetic_discrimination_design(&design),
+            Err(ContractError::InvalidDiscriminationResponseBranch)
+        );
+    }
+
+    #[test]
     fn kinetic_discrimination_normalizes_extreme_prior_magnitudes_safely() {
         let design = gaussian_discrimination_design(
             &[(-1.0, 0.0), (1.0, 0.0)],
@@ -8066,6 +8112,8 @@ mod tests {
                 hypothesis_id: format!("state-{index}"),
                 prior_probability: 1.0,
                 predicted_response: ComplexResponse::new(index as f64, 0.0).unwrap(),
+                response_branch_id: format!("branch-{index}"),
+                branch_association_stable: true,
             })
             .collect();
         assert_eq!(
