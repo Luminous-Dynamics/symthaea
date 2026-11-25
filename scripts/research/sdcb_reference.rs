@@ -561,6 +561,10 @@ mod tests {
             MatrixRank::Two
         );
         assert_eq!(
+            observability_rank_2x2(0.5, 0.0, 0.0, 0.2, 1.0, 1.0, 1e-12).unwrap(),
+            MatrixRank::Two
+        );
+        assert_eq!(
             observability_rank_2x2(0.5, 0.0, 0.0, 0.2, 0.0, 0.0, 1e-12).unwrap(),
             MatrixRank::Zero
         );
@@ -575,6 +579,11 @@ mod tests {
             observability_rank_2x2(0.5, 0.0, 0.0, 0.2, 1.0, 0.0, 1e-12).unwrap(),
             MatrixRank::One
         );
+        let first_with_hidden_sensor =
+            diagonal_observation_trace(0.5, 0.2, 1.0, 1.0, 0.0, 1.0, 8).unwrap();
+        let second_with_hidden_sensor =
+            diagonal_observation_trace(0.5, 0.9, 1.0, 1.0, 0.0, 1.0, 8).unwrap();
+        assert_ne!(first_with_hidden_sensor, second_with_hidden_sensor);
     }
 
     #[test]
