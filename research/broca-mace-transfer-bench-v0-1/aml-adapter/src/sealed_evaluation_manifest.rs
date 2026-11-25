@@ -1082,3 +1082,13 @@ mod tests {
     }
 
 }
+
+#[cfg(test)]
+pub(crate) fn test_verified_sealed_evaluation_fixture_v1(
+) -> (
+    SealedEvaluationManifestV1,
+    VerifiedSealedEvaluationManifestV1,
+    VerifiedEvaluationManifestCommitmentV1,
+) {
+    tests::verified_fixture_capabilities()
+}
