@@ -28,7 +28,7 @@ These profiles differ. Normalize the workload contract and compare only claims e
 
 ## Identity and admission sub-campaign
 
-For the WIMSE arm, test valid and revoked workload credentials, runtime-identity-to-logical-agent mapping, stale assurance status, wrong Evidence Service, token reuse across two calls, caller-reference replay at another serving party, caller-supplied call-digest substitution, host/gateway ambiguity, actor-chain disagreement and a mismatch between admission and subsequent linked verification. Serving-party admission must refuse when required identity/status checks cannot complete. Post-hoc linked audit must not be treated as the same thing as the pre-action authorization decision.
+For the WIMSE arm, test valid and revoked workload credentials, runtime-identity-to-logical-agent mapping, stale assurance status, wrong Evidence Service, token reuse across two calls, caller-reference replay at another serving party, caller-supplied call-digest substitution, host/gateway ambiguity, actor-chain disagreement and a mismatch between admission and subsequent linked verification. Inject evidence-service outage, unknown identity, stale status and failed proof-of-possession; the serving party must refuse before the external effect, while still retaining a refusal record. Verify that prior actor-chain entries cannot expand authority and that only token claims/current actor drive admission. Post-hoc linked audit must not be treated as the same thing as the pre-action authorization decision.
 
 ## Workload tiers
 
