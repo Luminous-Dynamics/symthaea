@@ -163,8 +163,10 @@ fn need_for_claim(
     for item in &evidence {
         let retrieval = get_str(item, "retrieval_state").unwrap_or("UNKNOWN");
         let integrity = get_str(item, "integrity_status").unwrap_or("UNKNOWN");
+        let correction = get_str(item, "correction_status").unwrap_or("UNKNOWN");
         if ["NOT_FOUND", "DIGEST_MISMATCH", "UNATTRIBUTED"].contains(&retrieval)
             || ["COMPROMISED", "MISSING"].contains(&integrity)
+            || ["RETRACTED", "SUPERSEDED"].contains(&correction)
         {
             let evidence_id = get_str(item, "evidence_id").map(str::to_owned);
             return Some(PolicyNeed {
@@ -176,7 +178,11 @@ fn need_for_claim(
                     ActionKind::RetrieveOrRecapture,
                     ActionKind::Escalate,
                 ],
-                reason_codes: vec!["ARTIFACT_INTEGRITY_OR_ATTRIBUTION_GAP".to_owned()],
+                reason_codes: vec![if ["RETRACTED", "SUPERSEDED"].contains(&correction) {
+                    "SOURCE_RETRACTED_OR_SUPERSEDED".to_owned()
+                } else {
+                    "ARTIFACT_INTEGRITY_OR_ATTRIBUTION_GAP".to_owned()
+                }],
             });
         }
     }
@@ -250,6 +256,21 @@ fn need_for_claim(
     let adjudication = claim.get("truth_adjudication");
     let adjudication_status = adjudication.and_then(|value| get_str(value, "status"));
     let adjudication_result = adjudication.and_then(|value| get_str(value, "result"));
+    if ["REFUTED", "MIXED", "UNDECIDABLE"].contains(&adjudication_result.unwrap_or("NOT_ADJUDICATED")) {
+        return Some(PolicyNeed {
+            priority: 4,
+            claim_id,
+            evidence_id: None,
+            action_kinds: vec![
+                ActionKind::RequestDiscriminatingExperiment,
+                ActionKind::SeekIndependentSource,
+                ActionKind::Replicate,
+                ActionKind::Escalate,
+            ],
+            reason_codes: vec!["INDEPENDENT_ADJUDICATION_NOT_DECISIVELY_SUPPORTIVE".to_owned()],
+        });
+    }
+
     if ["HIGH", "CRITICAL"].contains(&risk_class)
         && (adjudication_status != Some("ADJUDICATED")
             || adjudication_result != Some("SUPPORTED"))
@@ -263,20 +284,6 @@ fn need_for_claim(
                 ActionKind::Escalate,
             ],
             reason_codes: vec!["HIGH_RISK_REQUIRES_INDEPENDENT_SUPPORTED_ADJUDICATION".to_owned()],
-        });
-    }
-
-    if adjudication_result == Some("REFUTED") {
-        return Some(PolicyNeed {
-            priority: 5,
-            claim_id,
-            evidence_id: None,
-            action_kinds: vec![
-                ActionKind::RequestDiscriminatingExperiment,
-                ActionKind::SeekIndependentSource,
-                ActionKind::Escalate,
-            ],
-            reason_codes: vec!["INDEPENDENT_ADJUDICATION_REFUTES_CLAIM".to_owned()],
         });
     }
 
