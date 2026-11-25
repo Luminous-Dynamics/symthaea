@@ -68,7 +68,7 @@ The Rust implementation includes:
 6. explicit UNKNOWN on non-identifiable/confounded cases;
 7. canonical channel ordering for input/diagnosis digest order invariance.
 
-Eleven authored tests cover process-only, sensor-only, reference-only and context-only interventions; missing negative control; unqualified/future evidence; confounding; ambiguous paired patterns; channel order invariance; malformed source digests; false manifest labels; and two different causal worlds with the same available measurement signature, both of which must yield UNKNOWN.
+Twelve authored tests cover process-only, sensor-only, reference-only and context-only interventions; missing negative control; unqualified/future evidence; confounding; ambiguous paired patterns; channel order invariance; malformed source digests; false manifest labels; and two different causal worlds with the same available measurement signature, both of which must yield UNKNOWN.
 
 ## Benchmark tournament
 
