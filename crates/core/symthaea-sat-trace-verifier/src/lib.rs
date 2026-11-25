@@ -115,6 +115,7 @@ pub enum VerificationErrorCode {
     DuplicateAttemptId(String),
     DuplicateTerminalObservation(String),
     StaleAttemptObservation { key: String, expected_attempt_id: String, observed_attempt_id: String },
+    EffectCausalityMismatch(String),
     IdempotencyKeyRebound(String),
 }
 
@@ -197,6 +198,9 @@ impl fmt::Display for VerificationErrorCode {
             }
             Self::StaleAttemptObservation { key, expected_attempt_id, observed_attempt_id } => {
                 write!(f, "observation for idempotency key {key} names stale attempt {observed_attempt_id}; current attempt is {expected_attempt_id}")
+            }
+            Self::EffectCausalityMismatch(key) => {
+                write!(f, "observation for idempotency key {key} is not causally linked to the latest event for its attempt")
             }
             Self::IdempotencyKeyRebound(key) => {
                 write!(f, "idempotency key {key} was rebound to a different intent")
@@ -651,6 +655,8 @@ enum AttemptStatus {
 struct Attempt {
     binding_digest: String,
     attempt_id: String,
+    last_event_id: String,
+    correlation_id: String,
     status: AttemptStatus,
 }
 
@@ -1037,6 +1043,8 @@ pub fn verify_trace_with_options(
                     Attempt {
                         binding_digest: binding.binding_digest.clone(),
                         attempt_id: attempt_id.clone(),
+                        last_event_id: event.event_id.clone(),
+                        correlation_id: event.causality.correlation_id.clone(),
                         status: AttemptStatus::Pending,
                     },
                 );
@@ -1085,6 +1093,14 @@ pub fn verify_trace_with_options(
                         },
                     ));
                 }
+                if event.causality.correlation_id != attempt.correlation_id
+                    || !event.causality.parent_event_ids.contains(&attempt.last_event_id)
+                {
+                    return Err(TraceVerificationError::new(
+                        line_number,
+                        VerificationErrorCode::EffectCausalityMismatch(key.clone()),
+                    ));
+                }
                 if attempt.status != AttemptStatus::Pending {
                     return Err(TraceVerificationError::new(
                         line_number,
@@ -1102,6 +1118,7 @@ pub fn verify_trace_with_options(
                         terminal_observations += 1;
                     }
                 }
+                attempt.last_event_id = event.event_id.clone();
             }
             _ => {}
         }
