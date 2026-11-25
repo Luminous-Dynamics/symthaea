@@ -156,8 +156,9 @@ pub use ca_ocrc::{
     CA_OCRC_ROUND_INPUT_SCHEMA_V1, CA_OCRC_ROUND_RECEIPT_SCHEMA_V1,
     CaOcrcEngineV1, CaOcrcErrorV1, CaOcrcEvidenceDispositionV1,
     CaOcrcFeedbackArrivalV1, CaOcrcFeedbackDispositionV1, CaOcrcFeedbackReceiptV1,
-    CaOcrcPolicyV1, CaOcrcPredictionSetKindV1, CaOcrcRiskBoundV1,
-    CaOcrcRoundInputV1, CaOcrcRoundReceiptV1, CaOcrcTrackingTicketV1,
-    advance_ca_ocrc_round_v1, ca_ocrc_risk_bound_v1,
-    create_ca_ocrc_engine_v1, sample_ca_ocrc_proxy_delay_v1,
+    CaOcrcPolicyV1, CaOcrcPredictionSetKindV1, CaOcrcProxyOptimizationV1,
+    CaOcrcRiskBoundV1, CaOcrcRoundInputV1, CaOcrcRoundReceiptV1,
+    CaOcrcTrackingTicketV1, advance_ca_ocrc_round_v1, ca_ocrc_risk_bound_v1,
+    create_ca_ocrc_engine_v1, optimize_worst_case_ca_ocrc_proxy_v1,
+    sample_ca_ocrc_proxy_delay_v1,
 };
