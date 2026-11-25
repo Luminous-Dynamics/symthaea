@@ -79,8 +79,15 @@ This programme is a benchmark and integration layer. It does not create a second
 | Symthaea #13565 | Independent qualification exchange and fail-closed qualified projection | Reuse consumer-side qualification semantics |
 | Mycelix #5999 and #6089 | Human deliberation quality, information rights, evidence acquisition and contestability | Pluralistic governance and evidence-rights track |
 | Mycelix #6597 | Team capability and knowledge retention after AI withdrawal | Human capability-retention track |
+| Mycelix #6616 | Randomized AI-first, independent-first and evidence-first exposure-order experiment | Human anchoring / information-order treatment arms |
+| Mycelix #6069 and #4835 | Bitemporal institutional reconstruction and independent evaluator/oracle separation | Historical reconstruction, contestability and oracle integrity |
+| Symtropy #6498 | Mission/subgoal state machine, completion evidence and unknown-outcome hold | Reuse the owner-native M1 operational-control oracle; no duplicate mutation state machine |
+| Symtropy #6669 | Authority-linearized native mutation and final controller-boundary checks | Test exact ticket/currentness/fencing at the actual sink |
+| Symtropy #6698 | Proof-carrying non-interference for opt-in concurrent actions | Adaptive-control extension for safe concurrency; default remains serial |
+| Symtropy #6477 | Long-horizon robot execution benchmark with LADDER comparator | Physical/mission-level external benchmark adapter |
+| Mycelix #803 and #830 | Durable effect attempt and independent offline authority/evidence reconstruction | Reuse durable effect and offline audit contracts |
 
-The current default-branch swarm implementation and the draft corrective work must be kept distinct in evidence. The inspected main source still contains the legacy AuthorityDelegation semantics; PR #12825 is draft-only and is based on an older main SHA. The exact authority qualification remains owned by #4155. This programme does not claim that the swarm repair has been merged or qualified.
+The default-branch swarm source originally represented collective Phi as `AuthorityDelegation` and exposed `SwarmManager::effective_phi`. Current-main corrective draft [#13604](https://github.com/Luminous-Dynamics/symthaea/pull/13604) now renames this to `CollectiveCognitiveInfluence`, preserves the existing cognitive blend, and removes the authority-bearing accessor. It is still uncompiled and unqualified. The exact repository-wide no-Phi-to-authority qualification remains owned by #4155; this programme does not claim that the theorem is already proven.
 
 ## 4. Threat model
 
