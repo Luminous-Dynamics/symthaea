@@ -326,7 +326,7 @@ impl AuthorityLedger {
         grant_id: &GrantId,
         now: u64,
     ) -> Result<(), DenialReason> {
-        let mut cursor = grant_id;
+        let mut cursor = grant_id.clone();
         let mut depth = 0usize;
         let mut visited = BTreeSet::new();
 
@@ -336,10 +336,10 @@ impl AuthorityLedger {
             }
             let grant = self
                 .grants
-                .get(cursor)
+                .get(&cursor)
                 .ok_or(DenialReason::InvalidLineage)?;
 
-            if self.revoked.contains(cursor) {
+            if self.revoked.contains(&cursor) {
                 return Err(if depth == 0 {
                     DenialReason::GrantRevoked
                 } else {
@@ -361,7 +361,7 @@ impl AuthorityLedger {
                 });
             }
 
-            match &grant.parent_id {
+            match grant.parent_id.clone() {
                 Some(parent_id) => {
                     cursor = parent_id;
                     depth += 1;
