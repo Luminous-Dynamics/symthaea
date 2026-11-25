@@ -184,6 +184,10 @@ pub enum ContractError {
     NonFiniteSymplecticBasis,
     #[error("canonical symplectic pair defect exceeds the declared tolerance")]
     InvalidSymplecticBasis,
+    #[error("positivity projection inputs or target mass are invalid")]
+    InvalidPositivityProjectionInput,
+    #[error("positivity projection arithmetic overflowed")]
+    PositivityProjectionArithmeticOverflow,
     #[error("invalid coupled-mode authority contract: {0}")]
     InvalidCoupledModeAuthority(&'static str),
     #[error("invalid periodic derivative configuration: {0}")]
@@ -4876,6 +4880,141 @@ pub fn validate_canonical_symplectic_pair_2d(
     Ok(defect)
 }
 
+/// Result of a weighted least-squares projection onto non-negative states
+/// with an exactly declared discrete mass constraint.
+///
+/// The projection minimizes
+/// 0.5 * sum_i cell_volume[i] * (projected[i] - input[i])^2
+/// subject to projected[i] >= 0 and
+/// sum_i cell_volume[i] * projected[i] = target_mass.
+///
+/// This preserves one declared discrete mass only. It does not preserve
+/// momentum, energy, entropy, the Vlasov Casimir family, or future responses.
+#[derive(Clone, Debug, PartialEq, Serialize)]
+pub struct PositiveMassProjectionReport {
+    pub projected_values: Vec<f64>,
+    pub target_mass: f64,
+    pub achieved_mass: f64,
+    pub mass_residual: f64,
+    pub lagrange_multiplier: f64,
+    pub active_positive_cell_count: usize,
+    pub weighted_correction_norm: f64,
+    pub minimum_projected_value: f64,
+}
+
+/// Project onto the non-negative cone while preserving one weighted discrete mass.
+///
+/// The weights are positive cell volumes. This is the exact active-set solution
+/// for the weighted Euclidean projection with one equality constraint; it is
+/// not a general multi-moment quadratic-program solver.
+pub fn project_nonnegative_preserving_mass(
+    input_values: &[f64],
+    cell_volumes: &[f64],
+    target_mass: f64,
+) -> Result<PositiveMassProjectionReport, ContractError> {
+    if input_values.is_empty()
+        || input_values.len() != cell_volumes.len()
+        || !target_mass.is_finite()
+        || target_mass < 0.0
+        || input_values.iter().any(|value| !value.is_finite())
+        || cell_volumes
+            .iter()
+            .any(|volume| !volume.is_finite() || *volume <= 0.0)
+    {
+        return Err(ContractError::InvalidPositivityProjectionInput);
+    }
+
+    let mut ordered = input_values
+        .iter()
+        .copied()
+        .enumerate()
+        .map(|(index, value)| (value, cell_volumes[index], index))
+        .collect::<Vec<_>>();
+    ordered.sort_by(|left, right| right.0.total_cmp(&left.0));
+
+    let lagrange_multiplier = if target_mass == 0.0 {
+        ordered[0].0.max(0.0)
+    } else {
+        let mut active_volume = 0.0_f64;
+        let mut active_weighted_sum = 0.0_f64;
+        let mut selected = None;
+        for (position, (value, volume, _)) in ordered.iter().copied().enumerate() {
+            active_volume += volume;
+            active_weighted_sum = volume.mul_add(value, active_weighted_sum);
+            if !active_volume.is_finite() || !active_weighted_sum.is_finite() {
+                return Err(ContractError::PositivityProjectionArithmeticOverflow);
+            }
+            let candidate = (active_weighted_sum - target_mass) / active_volume;
+            let next_value = ordered.get(position + 1).map(|entry| entry.0);
+            let lower_condition = next_value.is_none_or(|next| candidate >= next);
+            let upper_condition = candidate <= value;
+            if candidate.is_finite() && lower_condition && upper_condition {
+                selected = Some(candidate);
+                break;
+            }
+        }
+        selected.ok_or(ContractError::PositivityProjectionArithmeticOverflow)?
+    };
+
+    if !lagrange_multiplier.is_finite() {
+        return Err(ContractError::PositivityProjectionArithmeticOverflow);
+    }
+
+    let projected_values = input_values
+        .iter()
+        .map(|value| (value - lagrange_multiplier).max(0.0))
+        .collect::<Vec<_>>();
+    if projected_values.iter().any(|value| !value.is_finite()) {
+        return Err(ContractError::PositivityProjectionArithmeticOverflow);
+    }
+
+    let mut achieved_mass = 0.0_f64;
+    let mut correction_squared = 0.0_f64;
+    let mut active_positive_cell_count = 0_usize;
+    let mut minimum_projected_value = f64::INFINITY;
+    for ((input, projected), volume) in input_values
+        .iter()
+        .zip(&projected_values)
+        .zip(cell_volumes)
+    {
+        achieved_mass = volume.mul_add(*projected, achieved_mass);
+        let correction = projected - input;
+        correction_squared = volume.mul_add(correction * correction, correction_squared);
+        if *projected > 0.0 {
+            active_positive_cell_count += 1;
+        }
+        minimum_projected_value = minimum_projected_value.min(*projected);
+        if !achieved_mass.is_finite() || !correction_squared.is_finite() {
+            return Err(ContractError::PositivityProjectionArithmeticOverflow);
+        }
+    }
+
+    let weighted_correction_norm = correction_squared.sqrt();
+    let mass_residual = achieved_mass - target_mass;
+    if !weighted_correction_norm.is_finite()
+        || !mass_residual.is_finite()
+        || minimum_projected_value < 0.0
+    {
+        return Err(ContractError::PositivityProjectionArithmeticOverflow);
+    }
+
+    let mass_tolerance = 1.0e-12_f64.max(target_mass.abs() * 1.0e-10);
+    if mass_residual.abs() > mass_tolerance {
+        return Err(ContractError::PositivityProjectionArithmeticOverflow);
+    }
+
+    Ok(PositiveMassProjectionReport {
+        projected_values,
+        target_mass,
+        achieved_mass,
+        mass_residual,
+        lagrange_multiplier,
+        active_positive_cell_count,
+        weighted_correction_norm,
+        minimum_projected_value,
+    })
+}
+
 /// Summary of a semantically checked KIRD checkpoint record.
 #[derive(Clone, Debug, PartialEq, Serialize)]
 pub struct KirdRecordSummary {
@@ -9336,6 +9475,73 @@ mod tests {
         assert_eq!(
             plan_response_weighted_refinement(&matrix, &coefficients, &bytes, &[1.0], f64::NAN),
             Err(ContractError::InvalidResponseRefinementInput)
+        );
+    }
+
+    #[test]
+    fn positivity_projection_removes_negative_overshoot_and_preserves_mass() {
+        let report =
+            project_nonnegative_preserving_mass(&[-0.1, 1.1], &[1.0, 1.0], 1.0).unwrap();
+        assert_eq!(report.projected_values, vec![0.0, 1.0]);
+        assert_eq!(report.target_mass, 1.0);
+        assert!((report.achieved_mass - 1.0).abs() < 1.0e-12);
+        assert!(report.mass_residual.abs() < 1.0e-12);
+        assert_eq!(report.active_positive_cell_count, 1);
+        assert_eq!(report.minimum_projected_value, 0.0);
+        assert!((report.lagrange_multiplier - 0.1).abs() < 1.0e-12);
+        assert!((report.weighted_correction_norm - 0.141_421_356_237_309_5).abs() < 1.0e-12);
+    }
+
+    #[test]
+    fn positivity_projection_respects_nonuniform_cell_volumes() {
+        let report =
+            project_nonnegative_preserving_mass(&[-1.0, 2.0], &[1.0, 2.0], 2.5).unwrap();
+        assert_eq!(report.projected_values[0], 0.0);
+        assert!((report.projected_values[1] - 1.25).abs() < 1.0e-12);
+        assert!((report.achieved_mass - 2.5).abs() < 1.0e-12);
+        assert_eq!(report.active_positive_cell_count, 1);
+    }
+
+    #[test]
+    fn positivity_projection_leaves_an_already_feasible_state_unchanged() {
+        let input = [0.2, 0.8];
+        let report = project_nonnegative_preserving_mass(&input, &[1.0, 1.0], 1.0).unwrap();
+        assert_eq!(report.projected_values, input);
+        assert!(report.weighted_correction_norm < 1.0e-12);
+        assert!(report.lagrange_multiplier.abs() < 1.0e-12);
+    }
+
+    #[test]
+    fn positivity_projection_handles_zero_target_mass() {
+        let report =
+            project_nonnegative_preserving_mass(&[-0.2, 1.2, 0.4], &[1.0, 2.0, 0.5], 0.0)
+                .unwrap();
+        assert_eq!(report.projected_values, vec![0.0, 0.0, 0.0]);
+        assert_eq!(report.achieved_mass, 0.0);
+        assert_eq!(report.active_positive_cell_count, 0);
+    }
+
+    #[test]
+    fn positivity_projection_rejects_invalid_shapes_volumes_and_target() {
+        assert_eq!(
+            project_nonnegative_preserving_mass(&[], &[], 0.0),
+            Err(ContractError::InvalidPositivityProjectionInput)
+        );
+        assert_eq!(
+            project_nonnegative_preserving_mass(&[1.0], &[1.0, 2.0], 1.0),
+            Err(ContractError::InvalidPositivityProjectionInput)
+        );
+        assert_eq!(
+            project_nonnegative_preserving_mass(&[1.0], &[0.0], 1.0),
+            Err(ContractError::InvalidPositivityProjectionInput)
+        );
+        assert_eq!(
+            project_nonnegative_preserving_mass(&[1.0], &[1.0], -1.0),
+            Err(ContractError::InvalidPositivityProjectionInput)
+        );
+        assert_eq!(
+            project_nonnegative_preserving_mass(&[f64::NAN], &[1.0], 1.0),
+            Err(ContractError::InvalidPositivityProjectionInput)
         );
     }
 
