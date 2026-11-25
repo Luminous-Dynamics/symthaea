@@ -14,10 +14,12 @@ pub mod raw_session;
 pub mod longmemeval_v2;
 pub mod longmemeval_v2_entity;
 pub mod candidate_evidence;
+pub mod qualified_candidate_evidence;
 pub mod longmemeval_v2_candidate_adapter;
 pub mod retrieval_policy_memory;
 pub mod retrieval_policy_store;
 pub mod evidence_qualification_gate;
+pub mod qualification_trust;
 pub mod acquisition_receipt_v2;
 
 use std::collections::BTreeMap;

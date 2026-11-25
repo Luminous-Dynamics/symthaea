@@ -9,3 +9,4 @@ description = "Provider-neutral Add/Search contract core for future Agent Memory
 [dependencies]
 serde_json = "1.0"
 sha2 = "0.10"
+ed25519-dalek = "=2.1.0"
