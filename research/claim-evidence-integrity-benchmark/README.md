@@ -26,8 +26,8 @@ The benchmark therefore treats a verification as a structured relation among a s
 |---|---|---|
 | Deep-research citation audits | *Cited but Not Verified* (2026): >94% link validity and >80% relevance, but 39–77% factual accuracy across tested models; one study found factual-check accuracy fell ~42% as tool calls increased from 2 to 150 | Link validity, topical relevance and fact support must be separate |
 | Dynamic response factuality | FactBench / VERIFY: 1,000 prompts, 150 topics, Supported / Unsupported / Undecidable labels | Real-world generated-content factuality and appropriate undecidability |
-| Temporal/numeric claims | TSVer: 287 real-world claims, 38 fact-checking organizations, 400 time series; Gemini-2.5-Pro 63.37 verdict accuracy and 48.63 justification score | Time ranges, numeric evidence and justifications |
-| Scientific claim-source retrieval | CheckThat! 2026 study: verification-based ranking reached MRR@5 0.758 | Finding the actual publication behind a paraphrased scientific claim |
+| Temporal/numeric claims | TSVer (EMNLP 2025 proceedings): 304 real-world claims, 41 fact-checking organizations, 400 time series; Gemini-2.5-Pro 63.57 verdict accuracy and 48.63 justification score; verdict agreement κ=0.77 | Time ranges, numeric evidence and justifications |
+| Scientific claim-source retrieval | CheckThat! 2026 Claim2Source: verification-based reranking reports MRR@5 0.7628 across English, German and French, first on the task leaderboard | Finding the actual publication that supports a paraphrased scientific claim |
 | Long-form RAG attribution | TREC 2025 RAG Track uses nugget coverage and sentence-support rate | Evidence coverage and sentence-level attribution |
 
 These scores use different datasets and constructs and must not be pooled into a single SOTA number.
@@ -111,7 +111,7 @@ Before reporting external superiority:
 ## Proposed targets (prospective only)
 
 After exact external dataset and scorer parity:
-- CheckThat!-style claim-source retrieval MRR@5 >= 0.80 against the published 0.758 reference;
+- CheckThat! 2026 Claim2Source-style claim-source retrieval MRR@5 >= 0.82 against the reported 0.7628 reference;
 - claim-support precision >= 0.95 at >= 0.80 coverage;
 - claim-refutation recall >= 0.90 on blinded contradiction cases;
 - false-support rate <= 0.01 on topical-only, source-conflict, duplicate-lineage and future-leakage controls;
