@@ -354,10 +354,13 @@ jobs:
               for event in ledger["events"]:
                   if event["operation_class"] == "physical_collision":
                       assert ledger["physical_model"] != "collisionless_vlasov"
+                      assert event["physical_entropy_sign_convention"] == "boltzmann_entropy_increase"
                       assert "physical_entropy_production" in event
                       assert "numerical_entropy_delta" not in event
+                      assert "discarded_effect_measure" not in event
                   else:
                       assert "physical_entropy_production" not in event
+                      assert "physical_entropy_sign_convention" not in event
                   if event["declared_reversible"]:
                       assert event.get("discarded_effect_measure", 0) == 0
           invalid_collisionless = json.loads(json.dumps(ledger_fixture))
@@ -367,8 +370,14 @@ jobs:
           assert not ledger_validator.is_valid(invalid_collisionless)
           invalid_numerical = json.loads(json.dumps(ledger_fixture))
           invalid_numerical["ledgers"][0]["events"][0]["physical_entropy_measure_id"] = "physical-entropy"
+          invalid_numerical["ledgers"][0]["events"][0]["physical_entropy_sign_convention"] = "boltzmann_entropy_increase"
           invalid_numerical["ledgers"][0]["events"][0]["physical_entropy_production"] = 0.02
           assert not ledger_validator.is_valid(invalid_numerical)
+          invalid_collisionless = json.loads(json.dumps(ledger_fixture))
+          invalid_collisionless["ledgers"][0]["events"].append(
+              json.loads(json.dumps(ledger_fixture["ledgers"][1]["events"][0]))
+          )
+          assert not ledger_validator.is_valid(invalid_collisionless)
           print("kinetic_operation_ledger_validation=PASS")
           PY
 
