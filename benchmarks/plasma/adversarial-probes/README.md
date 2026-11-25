@@ -173,7 +173,7 @@ The synthetic scorer can be run directly:
 
 `cargo run --bin response_weighted_refinement_audit -- benchmarks/plasma/adversarial-probes/fixtures/response-weighted-refinement-known-answer-v0.1.json`
 
-The CLI parses the complex response matrix, mode coefficients, encoded bytes and QoI weights, runs the planner, and emits a JSON decision receipt. It exits non-zero on malformed registries, missing/duplicate mode metadata, invalid weights, unmeasured matrix entries used as data, or arithmetic failures. Missing response entries are retained as UNKNOWN in the output, never coerced to zero sensitivity.
+The CLI parses the complex response matrix, mode coefficients, encoded bytes, QoI weights and expected mode decisions. It runs the planner, compares every disposition, spectral energy, response-loss bound, discarded-byte total and aggregate loss against the fixture, then emits a JSON decision receipt with known_answer_verified=true. It exits non-zero on malformed registries, missing/duplicate mode metadata, invalid weights, unmeasured matrix entries used as data, arithmetic failures or any expected-value mismatch. Missing response entries are retained as UNKNOWN in the output, never coerced to zero sensitivity.
 
 The focused Plasma Probe Contract workflow validates the Draft 2020-12 fixture schema, Rust-formats the CLI, runs it on the known-answer fixture, and tests the same scenario in the Rust unit suite.
 
