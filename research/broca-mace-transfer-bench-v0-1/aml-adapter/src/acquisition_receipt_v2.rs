@@ -145,7 +145,12 @@ pub fn verify_candidate_batch(
     receipt.validate()?;
     let recomputed = crate::candidate_evidence::encode_candidate_evidence_jsonl(&batch.evidence)
         .map_err(|_| ReceiptError::CandidateMismatch)?;
-    if recomputed.run_id != receipt.run_id
+    // CandidateEvidenceBatchV1 has public fields. Recompute from the records and
+    // compare the entire envelope, not only the fields copied into the receipt.
+    // Otherwise callers can mutate backend/scope/purpose metadata while retaining
+    // the same evidence vector and candidate-set digest.
+    if &recomputed != batch
+        || recomputed.run_id != receipt.run_id
         || recomputed.candidate_id != receipt.query_invocation_id
         || recomputed.query_sha256 != receipt.query_sha256
         || Some(&recomputed.candidate_set_sha256) != receipt.candidate_set_sha256.as_ref()
@@ -173,9 +178,17 @@ struct InvocationBinding {
 /// Durable authority still depends on the caller persisting this state in a
 /// separately protected store/checkpoint.
 #[derive(Default)]
+struct InvocationRegistryState {
+    bindings: BTreeMap<(String, String), InvocationBinding>,
+    revoked: BTreeSet<(String, String)>,
+}
+
+/// The binding and revocation sets share one lock so a revocation cannot race
+/// between the registration check and insertion. This is process-local state;
+/// durable authority still requires a separately protected persistent store.
+#[derive(Default)]
 pub struct InvocationRegistry {
-    bindings: Mutex<BTreeMap<(String, String), InvocationBinding>>,
-    revoked: Mutex<BTreeSet<(String, String)>>,
+    state: Mutex<InvocationRegistryState>,
 }
 
 impl InvocationRegistry {
@@ -195,60 +208,62 @@ impl InvocationRegistry {
             return Err(ReceiptError::Expired);
         }
         let key = (receipt.run_id.clone(), receipt.query_invocation_id.clone());
-        if self
-            .revoked
-            .lock()
-            .map_err(|_| ReceiptError::Io)?
-            .contains(&key)
-        {
+        let mut state = self.state.lock().map_err(|_| ReceiptError::Io)?;
+        if state.revoked.contains(&key) {
             return Err(ReceiptError::Revoked);
         }
-        let mut bindings = self.bindings.lock().map_err(|_| ReceiptError::Io)?;
         let value = InvocationBinding {
             receipt_sha256: receipt.receipt_sha256(),
             purpose: purpose.into(),
             scope: scope.into(),
             expires_at_unix,
         };
-        match bindings.get(&key) {
+        match state.bindings.get(&key) {
             Some(old) if old == &value => Ok(InvocationWrite::IdempotentReplay),
             Some(_) => Err(ReceiptError::InvocationConflict),
             None => {
-                bindings.insert(key, value);
+                state.bindings.insert(key, value);
                 Ok(InvocationWrite::Inserted)
             }
         }
     }
+
     pub fn revoke(&self, run_id: &str, invocation_id: &str) -> Result<(), ReceiptError> {
-        self.revoked
+        self.state
             .lock()
             .map_err(|_| ReceiptError::Io)?
+            .revoked
             .insert((run_id.into(), invocation_id.into()));
         Ok(())
     }
+
+    /// Check the exact registered receipt, rather than accepting only a matching
+    /// run/invocation key. Reusing an invocation identifier with altered receipt
+    /// content is a conflict even when purpose, scope and expiry still match.
     pub fn check(
         &self,
-        run_id: &str,
-        invocation_id: &str,
+        receipt: &AcquisitionReceiptV2,
         purpose: &str,
         scope: &str,
         now_unix: u64,
     ) -> Result<(), ReceiptError> {
-        let key = (run_id.into(), invocation_id.into());
-        if self
-            .revoked
-            .lock()
-            .map_err(|_| ReceiptError::Io)?
-            .contains(&key)
-        {
+        receipt.validate()?;
+        let key = (receipt.run_id.clone(), receipt.query_invocation_id.clone());
+        let state = self.state.lock().map_err(|_| ReceiptError::Io)?;
+        if state.revoked.contains(&key) {
             return Err(ReceiptError::Revoked);
         }
-        let bindings = self.bindings.lock().map_err(|_| ReceiptError::Io)?;
-        let b = bindings.get(&key).ok_or(ReceiptError::InvocationConflict)?;
-        if b.purpose != purpose || b.scope != scope {
+        let binding = state
+            .bindings
+            .get(&key)
+            .ok_or(ReceiptError::InvocationConflict)?;
+        if binding.receipt_sha256 != receipt.receipt_sha256()
+            || binding.purpose != purpose
+            || binding.scope != scope
+        {
             return Err(ReceiptError::InvocationConflict);
         }
-        if now_unix >= b.expires_at_unix {
+        if now_unix >= binding.expires_at_unix {
             return Err(ReceiptError::Expired);
         }
         Ok(())
@@ -752,7 +767,50 @@ mod tests {
     }
 
     #[test]
-    fn invocation_registry_is_idempotent_and_rejects_rebinding_expiry_and_revocation() {
+    fn candidate_envelope_metadata_cannot_diverge_from_committed_records() {
+        let mut r = receipt();
+        let batch = encode_candidate_evidence_jsonl(&[candidate()]).unwrap();
+        r.candidate_set_sha256 = Some(batch.candidate_set_sha256.clone());
+        verify_candidate_batch(&r, &batch).unwrap();
+
+        let mut changed_backend = batch.clone();
+        changed_backend.backend_id = "substituted-backend".into();
+        assert_eq!(
+            verify_candidate_batch(&r, &changed_backend),
+            Err(ReceiptError::CandidateMismatch)
+        );
+
+        let mut changed_revision = batch.clone();
+        changed_revision.backend_revision_sha256 = "d".repeat(64);
+        assert_eq!(
+            verify_candidate_batch(&r, &changed_revision),
+            Err(ReceiptError::CandidateMismatch)
+        );
+
+        let mut changed_scope = batch.clone();
+        changed_scope.query_scope = "other-scope".into();
+        assert_eq!(
+            verify_candidate_batch(&r, &changed_scope),
+            Err(ReceiptError::CandidateMismatch)
+        );
+
+        let mut changed_purpose = batch.clone();
+        changed_purpose.query_purpose = "other-purpose".into();
+        assert_eq!(
+            verify_candidate_batch(&r, &changed_purpose),
+            Err(ReceiptError::CandidateMismatch)
+        );
+
+        let mut changed_digest = batch;
+        changed_digest.candidate_set_sha256 = "e".repeat(64);
+        assert_eq!(
+            verify_candidate_batch(&r, &changed_digest),
+            Err(ReceiptError::CandidateMismatch)
+        );
+    }
+
+    #[test]
+    fn invocation_registry_is_idempotent_and_rejects_receipt_rebinding_expiry_and_revocation() {
         let registry = InvocationRegistry::default();
         let r = receipt();
         assert_eq!(
@@ -764,20 +822,35 @@ mod tests {
             Ok(InvocationWrite::IdempotentReplay)
         );
         assert_eq!(
+            registry.check(&r, "answer", "tenant-1", 10),
+            Ok(())
+        );
+
+        let mut rebound = r.clone();
+        rebound.elapsed_ns += 1;
+        assert_eq!(
+            registry.check(&rebound, "answer", "tenant-1", 10),
+            Err(ReceiptError::InvocationConflict)
+        );
+        assert_eq!(
             registry.record(&r, "different-purpose", "tenant-1", 100, 10),
             Err(ReceiptError::InvocationConflict)
         );
         assert_eq!(
-            registry.check("r", "i", "answer", "tenant-2", 10),
+            registry.check(&r, "answer", "tenant-2", 10),
             Err(ReceiptError::InvocationConflict)
         );
         assert_eq!(
-            registry.check("r", "i", "answer", "tenant-1", 100),
+            registry.check(&r, "answer", "tenant-1", 100),
             Err(ReceiptError::Expired)
         );
         registry.revoke("r", "i").unwrap();
         assert_eq!(
-            registry.check("r", "i", "answer", "tenant-1", 10),
+            registry.check(&r, "answer", "tenant-1", 10),
+            Err(ReceiptError::Revoked)
+        );
+        assert_eq!(
+            registry.record(&r, "answer", "tenant-1", 100, 10),
             Err(ReceiptError::Revoked)
         );
     }
