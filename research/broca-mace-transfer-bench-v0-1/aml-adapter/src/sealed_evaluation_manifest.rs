@@ -746,7 +746,7 @@ mod tests {
                     verifier_profile_sha256: digest('c'),
                     access_control_profile_sha256: digest('d'),
                     sealed_store_profile_sha256: digest('e'),
-                    committed_at_unix: 110,
+                    committed_at_unix: 90,
                     key_id: "mace-evaluator-key-1".to_owned(),
                 },
                 anti_leakage: SealedEvaluationAntiLeakageV1 {
