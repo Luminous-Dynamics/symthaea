@@ -16,6 +16,7 @@ use crate::temporal_grounding::{
     TemporalGroundTruthV1, TemporalGroundingPlanV1,
     TemporalGroundingPredictionV1, TemporalGroundingScoreV1,
     score_temporal_grounding, validate_temporal_ground_truth,
+    validate_temporal_grounding_plan,
 };
 
 const CORPUS_SCHEMA_V1: &str = "mel-temporal-annotation-reliability-corpus-v1";
@@ -154,7 +155,6 @@ pub fn audit_reliability_corpus(
     let mut global_counts = CategoryCounts::default();
     let mut total_ratings = 0_usize;
     let mut observed_disagreement_total = 0.0_f64;
-    let mut item_category_counts = Vec::with_capacity(corpus.units.len());
     let mut source_lineages = BTreeSet::new();
     let mut total_annotation_records = 0_usize;
     let mut unit_summaries = Vec::with_capacity(corpus.units.len());
@@ -182,7 +182,6 @@ pub fn audit_reliability_corpus(
         global_counts.absent += counts.absent;
         global_counts.ambiguous += counts.ambiguous;
         global_counts.not_estimable += counts.not_estimable;
-        item_category_counts.push(counts);
         unit_summaries.push(summarize_unit(unit, &corpus.plan, &corpus.interval_iou_thresholds)?);
     }
 
@@ -254,6 +253,10 @@ fn validate_corpus(corpus: &TemporalReliabilityCorpusV1) -> Result<(), String> {
     require_text(&corpus.annotation_policy_version, "annotation_policy_version")?;
     if corpus.minimum_annotations_per_unit < 2 {
         return Err("minimum_annotations_per_unit must be at least two".into());
+    }
+    let plan_issues = validate_temporal_grounding_plan(&corpus.plan);
+    if !plan_issues.is_empty() {
+        return Err(format!("invalid frozen temporal grounding plan: {plan_issues:?}"));
     }
     if corpus.units.len() < 2 {
         return Err("formal reliability requires at least two query-items".into());
