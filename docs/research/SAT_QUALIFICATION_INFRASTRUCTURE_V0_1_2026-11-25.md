@@ -2,7 +2,7 @@
 
 **Status:** protocol/schema proposal and public contract fixtures. No model execution, benchmark score, independent audit, or production qualification is claimed.  
 **Parent:** [Sovereignty Assurance Tournament V0.1](SOVEREIGNTY_ASSURANCE_TOURNAMENT_V0_1_2026-11-24.md)  
-**Reference oracle:** [SAT Rust authority reference model](../../../../crates/core/symthaea-sat-reference-model/) (proposed in PR #13602).
+**Reference oracle:** [SAT Rust authority reference model](../../crates/core/symthaea-sat-reference-model/) (proposed in PR #13602).
 
 ## 1. Purpose
 
@@ -49,7 +49,7 @@ See the schemas directory for JSON Schema Draft 2020-12 contracts and the exampl
 - effect_binding binds action, resource, sink, purpose, canonical parameter digest, payload digest, payload labels, lineage/intent references and idempotency key. Its binding_digest is SHA-256("SAT-BINDING-v0.1\n" || JCS(effect_binding_without_binding_digest)).
 - The authority exact-effect digest is a separate projection matching the #13602 oracle inputs: action, resource, sink, purpose, parameters_digest and sorted payload_labels. Compute SHA-256("SAT-AUTHORITY-EFFECT-v0.1\n" || JCS(projection)). This is identity binding, not proof that a grant is authentic or valid.
 - The disclosure decision is separately bound to sink, purpose, payload_digest, sorted payload_labels, lineage proof and interaction intent. Compute SHA-256("SAT-DISCLOSURE-v0.1\n" || JCS(disclosure_projection)). It may be not_applicable only with an explicit reason and an evaluation profile that permits it.
-- The full binding_digest commits to all requested intent, including purpose, labels, lineage/intent references and idempotency. Separately, sink_projection_digest commits only to the externally observable effect tuple defined by that connector adapter: action, resource, destination/sink identity, canonical externally visible parameters, payload/transaction identity where observable, and the idempotency or source transaction reference. This avoids pretending a bank ledger or external API can attest to an internal purpose or label it never receives.
+- The full binding_digest commits to all requested intent, including purpose, labels, lineage/intent references and idempotency. Separately, sink_projection_digest commits only to the externally observable effect tuple defined by a named, versioned connector projection (sink_projection_id + sink_projection_version): action, resource, destination/sink identity, canonical externally visible parameters, payload/transaction identity where observable, and the idempotency or source transaction reference. The independent observation must report the same projection ID/version; projections that cannot be independently reconstructed are inconclusive or out of scope. This avoids pretending a bank ledger or external API can attest to an internal purpose or label it never receives.
 - For observed_applied, the independent sink observer reconstructs the same versioned sink projection from source-of-truth state and emits observed_effect_digest. The evaluator compares it with sink_projection_digest; a mismatch is a verified system failure. If the sink cannot expose enough fields to reconstruct the required projection, that claim is inconclusive or out of scope, never silently passed. Unknown outcomes do not carry an observed digest and require reconciliation.
 
 ### Qualification status and precedence
