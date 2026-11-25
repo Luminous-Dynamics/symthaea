@@ -509,7 +509,7 @@ mod tests {
         json!({
             "schema_version":"1.0.0",
             "artifact_id":"LEAN-TRUST-CLOSURE-ASSURANCE-CAPSULE-001",
-            "disposition":"qualified_under_policy",
+            "disposition":"inconclusive",
             "policy":{
                 "policy_id":"TEST-POLICY",
                 "version":"1",
@@ -588,7 +588,7 @@ mod tests {
                 }
             },
             "checker_diversity":{
-                "status":"qualified_under_policy",
+                "status":"synthetic_fixture_only",
                 "profile_id":"SYNTHETIC-CHECKER-PROFILE",
                 "registry_sha256":digest,
                 "profile_sha256":digest
@@ -597,7 +597,7 @@ mod tests {
                 "statement_fidelity":{"status":"satisfied","rationale":"trusted challenge matched","evidence_digests":[digest]},
                 "logical_dependency_closure":{"status":"satisfied","rationale":"fresh closure complete","evidence_digests":[digest]},
                 "official_kernel_replay":{"status":"satisfied","rationale":"kernel accepted exact export","evidence_digests":[digest]},
-                "independent_checker_replay":{"status":"satisfied","rationale":"distinct checker accepted exact export","evidence_digests":[digest]},
+                "independent_checker_replay":{"status":"unknown","rationale":"only a synthetic checker profile exists; no observed full-bundle receipt","evidence_digests":[digest]},
                 "construction_containment":{"status":"satisfied","rationale":"build isolated","evidence_digests":[digest]},
                 "environment_reproducibility":{"status":"satisfied","rationale":"inputs pinned","evidence_digests":[digest]},
                 "computational_trust":{"status":"satisfied","rationale":"no native computation observed","evidence_digests":[digest]}
@@ -615,6 +615,7 @@ mod tests {
     #[test]
     fn rejects_qualification_with_unknown_axis() {
         let mut capsule = baseline();
+        capsule["disposition"] = json!("qualified_under_policy");
         capsule["assurance_axes"]["independent_checker_replay"]["status"] = json!("unknown");
         let errors = validate_capsule(&capsule);
         assert!(errors.iter().any(|error| error.contains("qualified_under_policy")));
@@ -623,6 +624,8 @@ mod tests {
     #[test]
     fn independent_replay_requires_a_qualified_checker_profile() {
         let mut capsule = baseline();
+        capsule["disposition"] = json!("qualified_under_policy");
+        capsule["assurance_axes"]["independent_checker_replay"]["status"] = json!("satisfied");
         capsule["checker_diversity"]["status"] = json!("synthetic_fixture_only");
         let errors = validate_capsule(&capsule);
         assert!(errors.iter().any(|error| error.contains("unqualified checker-diversity")));
@@ -631,6 +634,7 @@ mod tests {
     #[test]
     fn qualified_checker_profile_requires_replay_axis_satisfied() {
         let mut capsule = baseline();
+        capsule["checker_diversity"]["status"] = json!("qualified_under_policy");
         capsule["assurance_axes"]["independent_checker_replay"]["status"] = json!("unknown");
         capsule["disposition"] = json!("inconclusive");
         let errors = validate_capsule(&capsule);
@@ -648,6 +652,9 @@ mod tests {
     #[test]
     fn same_kernel_twice_is_not_independent_replay() {
         let mut capsule = baseline();
+        capsule["disposition"] = json!("qualified_under_policy");
+        capsule["checker_diversity"]["status"] = json!("qualified_under_policy");
+        capsule["assurance_axes"]["independent_checker_replay"]["status"] = json!("satisfied");
         capsule["replays"]["independent_checkers"][0]["checker"] = json!("lean-kernel");
         capsule["replays"]["independent_checkers"][0]["independent_from_official_kernel"] = json!(false);
         let errors = validate_capsule(&capsule);
@@ -657,6 +664,9 @@ mod tests {
     #[test]
     fn independent_checker_must_check_identical_export() {
         let mut capsule = baseline();
+        capsule["disposition"] = json!("qualified_under_policy");
+        capsule["checker_diversity"]["status"] = json!("qualified_under_policy");
+        capsule["assurance_axes"]["independent_checker_replay"]["status"] = json!("satisfied");
         capsule["replays"]["independent_checkers"][0]["export_sha256"] = json!("c".repeat(64));
         let errors = validate_capsule(&capsule);
         assert!(errors.iter().any(|error| error.contains("distinct implementation")));
