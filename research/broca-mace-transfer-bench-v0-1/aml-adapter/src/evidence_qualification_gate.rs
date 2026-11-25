@@ -1187,7 +1187,7 @@ mod tests {
         .expect("external qualification result is validly bound");
         assert!(verified.is_empty());
         assert!(verified
-            .admissible_evidence_ids_at(150)
+            .admissible_evidence_ids_for_use(&binding, &TestSignatureVerifier)
             .expect("fresh token")
             .is_empty());
         assert_eq!(policy_memory.note_count(), 0);
