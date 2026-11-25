@@ -1,0 +1,70 @@
+{
+  "schema_version": "individual-decision-transfer-v0.1",
+  "status": "semantic-fixture-only",
+  "utility_direction": "higher-is-better",
+  "tie_break": "lexicographically-smallest-action-id",
+  "epsilon_units": 10,
+  "action_set": ["action-a", "action-b", "action-c"],
+  "actions": [
+    {
+      "action_id": "action-a",
+      "realized_utility_units": 100,
+      "latent_predicted_utility_units": 90,
+      "rollout_predicted_utility_units": 10
+    },
+    {
+      "action_id": "action-b",
+      "realized_utility_units": 50,
+      "latent_predicted_utility_units": 10,
+      "rollout_predicted_utility_units": 95
+    },
+    {
+      "action_id": "action-c",
+      "realized_utility_units": 0,
+      "latent_predicted_utility_units": 5,
+      "rollout_predicted_utility_units": 0
+    }
+  ],
+  "expected": {
+    "realized_best_utility_units": 100,
+    "realized_epsilon_good_action_ids": ["action-a"],
+    "latent_selected_action_id": "action-a",
+    "latent_realized_regret_units": 0,
+    "latent_top1": true,
+    "latent_epsilon_good": true,
+    "latent_ranking": {
+      "concordant": 3,
+      "discordant": 0,
+      "realized_only_ties": 0,
+      "predicted_only_ties": 0,
+      "both_tied": 0
+    },
+    "rollout_selected_action_id": "action-b",
+    "rollout_realized_regret_units": 50,
+    "rollout_top1": false,
+    "rollout_epsilon_good": false,
+    "rollout_minus_latent_regret_units": 50,
+    "rollout_ranking": {
+      "concordant": 2,
+      "discordant": 1,
+      "realized_only_ties": 0,
+      "predicted_only_ties": 0,
+      "both_tied": 0
+    }
+  },
+  "negative_controls": [
+    "missing-action",
+    "unexpected-action",
+    "duplicate-action-id",
+    "duplicate-run-id",
+    "non-applied-action",
+    "changed-full-snapshot-digest",
+    "changed-exogenous-manifest-digest",
+    "empty-pairing-receipt-digest",
+    "negative-epsilon",
+    "common-mode-utility-translation",
+    "realized-and-predicted-ties",
+    "extreme-signed-i64-utilities"
+  ],
+  "claim_ceiling": "finite scorecard arithmetic only; not causal identification, model training, paper replication, decision advantage, physical safety, or SOTA"
+}
