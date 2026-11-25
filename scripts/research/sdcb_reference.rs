@@ -359,8 +359,8 @@ mod tests {
         let left = [1, 0, 1, 1, 0, 0, 1, 0];
         let right = [0, 1, 1, 0, 0, 1, 0, 1];
         let bound = xor_bind(&left, &right).unwrap();
-        assert_eq!(xor_unbind(&bound, &right).unwrap(), left);
-        assert_eq!(xor_unbind(&bound, &left).unwrap(), right);
+        assert_eq!(xor_unbind(&bound, &right).unwrap(), left.to_vec());
+        assert_eq!(xor_unbind(&bound, &left).unwrap(), right.to_vec());
         assert_eq!(xor_unbind(&bound, &right).unwrap(), left);
     }
 
