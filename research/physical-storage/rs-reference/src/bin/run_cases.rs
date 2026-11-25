@@ -1,4 +1,4 @@
-use physical_storage_rs_reference::{
+use physical_storage_mds_reference::{
     reference_payload, MediaImage, PhysicalLayout, STRIPE_COUNT, TILE_COUNT,
 };
 
@@ -22,7 +22,7 @@ fn main() {
         .expect("reference payload and physical layout are fixed");
 
     println!(
-        "{{\"fixture\":\"synthetic-rs6-4-v0.1\",\"payload_bytes\":{},\"physical_tiles\":{},\"stripes\":{}}}",
+        "{{\"fixture\":\"synthetic-mds6-4-v0.1\",\"payload_bytes\":{},\"physical_tiles\":{},\"stripes\":{}}}",
         payload.len(),
         TILE_COUNT,
         STRIPE_COUNT
