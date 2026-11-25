@@ -73,7 +73,7 @@ A randomized-audit candidate must provide:
 - a sampling-design digest;
 - an inclusion probability in (0, 1].
 
-If the requested randomized-audit floor cannot be met within cost/capacity constraints, the output is AUDIT_FLOOR_UNSATISFIED. Population estimation is only marked available when the selected portfolio meets a positive audit floor and the chosen audit candidates carry recorded inclusion probabilities. Selected-only measurements without valid audit inclusion probabilities cannot support production prevalence claims.
+If the requested randomized-audit floor cannot be met within cost/capacity constraints, the output is AUDIT_FLOOR_UNSATISFIED. Population estimation is only marked available when the selected portfolio meets a positive audit floor and the chosen audit candidates carry recorded inclusion probabilities. This means the plan has the required declared design metadata; it does not prove the audit was executed according to plan. The report always leaves population-prevalence claim authority false. Selected-only measurements without valid audit inclusion probabilities cannot support production prevalence claims.
 
 ## Deterministic exact search
 
