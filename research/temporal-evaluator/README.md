@@ -63,4 +63,4 @@ The evaluator-side module `src/randomized_decision_regret.rs` extends decision-o
 - The deterministic minimax-regret score is only a comparator. It is not the optimal randomized-policy floor.
 - The module does not sample actions, calibrate a probability model, optimize a mixed policy, authenticate candidate execution, or establish safety.
 
-Ten unit tests cover a balanced mixture that halves worst-case expected regret relative to the deterministic comparator, support-risk separation, deterministic degeneration, exact probability mass, canonical action ordering, inadmissible actions, candidate-view identity, duplicate worlds, digest requirements and conservative rounding.
+Fifteen unit tests cover a balanced mixture that halves worst-case expected regret relative to the deterministic comparator, support-risk separation, deterministic degeneration, exact probability mass, canonical action ordering, inadmissible actions, candidate-view identity, duplicate worlds, digest requirements and conservative rounding, empty/bounded inputs, action-set consistency, loss-range validation and asymmetric mixtures.
