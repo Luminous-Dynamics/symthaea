@@ -144,3 +144,22 @@ A signature stores complex response values and branch labels for each interventi
 **Do not union pairwise matches into an equivalence class.** Approximate compatibility is not transitive: for scalar response values 0, 0.75 and 1.5 with tolerance 1, A is compatible with B and B with C, but A is not compatible with C. A whole class needs an explicit diameter bound / certified quotient, not merely connected components of pairwise matches.
 
 This is the first measurement primitive for [#13503](https://github.com/Luminous-Dynamics/symthaea/issues/13503). It does not generate plasma trajectories or establish actual kinetic equivalence; signatures must be built from independent, physically qualified interventions and reference outputs.
+
+
+## Response-weighted spectral refinement (RWSR)
+
+A first scoring primitive for [#13628](https://github.com/Luminous-Dynamics/symthaea/issues/13628) is now available in the crate:
+
+`plan_response_weighted_refinement`
+
+For complex coefficient (a_k), phase-resolved response (G_{qk}), and non-negative QoI weights (w_q), its conservative per-mode first-order indicator is
+
+`b_k = |a_k| * sum_q w_q * |G_qk|`.
+
+It uses a triangle-inequality sum, not an unqualified RMS / orthogonality assumption. It ranks known modes by response-loss bound per encoded byte and greedily discards only those whose accumulated bound stays within the caller's response-loss budget. This greedy byte heuristic is deterministic but is **not** a globally optimal knapsack solver.
+
+Missing response entries are represented as `RetainedUnknownResponse`: they are never treated as zero sensitivity and are never discarded by the planner. The scoring contract validates exact mode registries, non-negative finite QoI weights, positive encoded byte counts and finite arithmetic.
+
+A manufactured test deliberately disagrees with energy-only ranking: mode 2 has much lower spectral energy than mode 1, but a much larger future response gain. The planner discards mode 1 within budget and retains mode 2. This is a scoring-primitive test only; response gains are synthetic and no adaptive Fourier solver or physical echo is executed.
+
+The intended tournament is tail-only adaptive zero-padding (Cho & Russo 2026), response-only, adjoint/QoI-only, hybrid response+tail+uncertainty, local time/energy-window ROM, adaptive Hermite and VlasovTT at matched storage and total cost.
