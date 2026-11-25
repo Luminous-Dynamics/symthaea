@@ -9558,6 +9558,61 @@ mod tests {
     }
 
     #[test]
+    fn positivity_projection_satisfies_active_set_kkt_conditions() {
+        let input = [-0.2, 0.4, 1.3];
+        let volumes = [0.5, 2.0, 1.0];
+        let report =
+            project_nonnegative_preserving_mass(&input, &volumes, 1.5).unwrap();
+        for ((input_value, projected), _) in input
+            .iter()
+            .zip(&report.projected_values)
+            .zip(&volumes)
+        {
+            if *projected > 0.0 {
+                assert!((*projected - (*input_value - report.lagrange_multiplier)).abs() < 1.0e-12);
+            } else {
+                assert!(*input_value <= report.lagrange_multiplier + 1.0e-12);
+            }
+        }
+        assert!((report.achieved_mass - 1.5).abs() < 1.0e-12);
+        assert_eq!(report.active_positive_cell_count, 2);
+    }
+
+    #[test]
+    fn positivity_projection_is_invariant_to_cell_permutation() {
+        let original = project_nonnegative_preserving_mass(
+            &[-0.2, 0.4, 1.3],
+            &[0.5, 2.0, 1.0],
+            1.5,
+        )
+        .unwrap();
+        let permuted = project_nonnegative_preserving_mass(
+            &[1.3, -0.2, 0.4],
+            &[1.0, 0.5, 2.0],
+            1.5,
+        )
+        .unwrap();
+        let reordered = [
+            permuted.projected_values[1],
+            permuted.projected_values[2],
+            permuted.projected_values[0],
+        ];
+        for (left, right) in original.projected_values.iter().zip(reordered) {
+            assert!((left - right).abs() < 1.0e-12);
+        }
+        assert!((original.lagrange_multiplier - permuted.lagrange_multiplier).abs() < 1.0e-12);
+        assert!((original.weighted_correction_norm - permuted.weighted_correction_norm).abs() < 1.0e-12);
+    }
+
+    #[test]
+    fn positivity_projection_fails_closed_on_weighted_arithmetic_overflow() {
+        assert_eq!(
+            project_nonnegative_preserving_mass(&[1.0e308], &[1.0e308], 1.0e308),
+            Err(ContractError::PositivityProjectionArithmeticOverflow)
+        );
+    }
+
+    #[test]
     fn positivity_projection_leaves_an_already_feasible_state_unchanged() {
         let input = [0.2, 0.8];
         let report = project_nonnegative_preserving_mass(&input, &[1.0, 1.0], 1.0).unwrap();
