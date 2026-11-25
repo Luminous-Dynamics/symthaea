@@ -21,6 +21,7 @@ use std::collections::{HashMap, HashSet};
 use std::fmt::{self, Write as _};
 
 const MAX_SAFE_INTEGER: u64 = 9_007_199_254_740_991;
+const MANIFEST_DOMAIN: &str = "SAT-MANIFEST-v0.1\n";
 const EVENT_DOMAIN: &str = "SAT-EVENT-v0.1\n";
 const BINDING_DOMAIN: &str = "SAT-BINDING-v0.1\n";
 const AUTHORITY_DOMAIN: &str = "SAT-AUTHORITY-EFFECT-v0.1\n";
@@ -636,6 +637,36 @@ enum AttemptStatus {
 struct Attempt {
     binding_digest: String,
     status: AttemptStatus,
+}
+
+/// Compute the digest of a frozen run manifest.
+///
+/// The manifest digest is SHA-256(domain separator + restricted JCS bytes).
+/// This function checks duplicate keys and the SAT v0.1 safe-integer number
+/// profile, but does not validate the run-manifest JSON Schema.
+pub fn compute_manifest_digest(
+    manifest_json: &str,
+) -> Result<String, TraceVerificationError> {
+    let raw: StrictJson = serde_json::from_str(manifest_json).map_err(|error| {
+        let message = error.to_string();
+        let code = if let Some(key) = message.split("duplicate JSON key: ").nth(1) {
+            VerificationErrorCode::DuplicateJsonKey(key.to_owned())
+        } else if message.contains("safe integer")
+            || message.contains("non-integer JSON")
+        {
+            VerificationErrorCode::UnsupportedJsonNumber
+        } else {
+            VerificationErrorCode::InvalidJson(message)
+        };
+        TraceVerificationError::new(0, code)
+    })?;
+    if !raw.is_object() {
+        return Err(TraceVerificationError::new(
+            0,
+            VerificationErrorCode::RootMustBeObject,
+        ));
+    }
+    Ok(digest_json(MANIFEST_DOMAIN, &raw))
 }
 
 /// Verify a JSONL trace against an externally supplied run and manifest.
