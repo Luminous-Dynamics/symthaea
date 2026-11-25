@@ -25,7 +25,7 @@ The two pinned commits are unsigned. The public data license is reported as CC B
 Exploration:
 - The pinned MARA controller forwards a generic agent-feedback reward field on every step. In the reference reward-free exploration environment, ordinary actions, explicit reset and the go-to-test phase-exit action return exactly zero. The field is therefore present but carries no task-reward signal. The adapter must verify every exploration reward is zero and fail closed on any nonzero value; do not describe the feedback field itself as absent.
 - Candidate sees only the configured observation/action interface and actual observations.
-- Reset is a first-class action and is charged to the interaction budget. The candidate-issued go-to-test phase-exit action is also charged as an exploration interaction before the terminal test-phase marker.
+- Reset is a first-class action and is charged to the interaction budget. The candidate-issued go-to-test phase-exit action is also charged as an exploration interaction before the terminal test-phase marker. Each action/reset record now carries the exact IEEE-754 reward bits; the MARA wrapper rejects nonzero, NaN and infinite reward values before evaluating the trace.
 - Predicted future observations are never promoted to acquired observations.
 
 Test:

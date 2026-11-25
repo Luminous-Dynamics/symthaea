@@ -1,9 +1,9 @@
-//! WorldTest adapter phase-exit gate.
+//! MARA-specific WorldTest exploration contract.
 //!
-//! The MARA reference environment exposes "go-to-test" as an actual candidate
-//! action. It is charged as an exploration interaction. BeginTest is adapter
-//! metadata, not a free agent action. This wrapper rejects traces that omit,
-//! duplicate, or move the phase-exit action.
+//! Every candidate-issued action and reset carries the exact IEEE-754 reward
+//! bits returned by the pinned MARA environment. The reference exploration
+//! phase transmits this field but returns constant zero. Nonzero and
+//! non-finite values fail closed before the generic trace diagnostic runs.
 
 use super::worldtest_exploration::{
     evaluate_worldtest_exploration, ExplorationEvent, ExplorationTrace,
@@ -12,11 +12,36 @@ use super::worldtest_exploration::{
 use std::fmt;
 
 #[derive(Clone, Debug, Eq, PartialEq)]
+pub enum MaraExplorationEvent {
+    Action {
+        action_id: String,
+        reward_bits: u64,
+    },
+    Reset {
+        reward_bits: u64,
+    },
+    BeginTest,
+}
+
+#[derive(Clone, Debug, Eq, PartialEq)]
+pub struct MaraExplorationTrace {
+    pub events: Vec<MaraExplorationEvent>,
+}
+
+#[derive(Clone, Debug, Eq, PartialEq)]
 pub enum WorldTestPhaseContractError {
     MissingBeginTestMarker,
     MissingGoToTestAction,
     GoToTestNotImmediatelyBeforeMarker,
     DuplicateGoToTestAction,
+    NonFiniteExplorationReward {
+        event_index: usize,
+        reward_bits: u64,
+    },
+    NonZeroExplorationReward {
+        event_index: usize,
+        reward_bits: u64,
+    },
     Trace(WorldTestExplorationError),
 }
 
@@ -27,6 +52,14 @@ impl fmt::Display for WorldTestPhaseContractError {
             Self::MissingGoToTestAction => write!(formatter, "WorldTest exploration must include the candidate-issued go-to-test action"),
             Self::GoToTestNotImmediatelyBeforeMarker => write!(formatter, "go-to-test must be the final charged exploration action immediately before BeginTest"),
             Self::DuplicateGoToTestAction => write!(formatter, "WorldTest trace contains more than one go-to-test action"),
+            Self::NonFiniteExplorationReward { event_index, reward_bits } => write!(
+                formatter,
+                "exploration event {event_index} returned a non-finite reward (IEEE-754 bits {reward_bits:#018x})"
+            ),
+            Self::NonZeroExplorationReward { event_index, reward_bits } => write!(
+                formatter,
+                "exploration event {event_index} returned a nonzero reward (IEEE-754 bits {reward_bits:#018x})"
+            ),
             Self::Trace(error) => write!(formatter, "invalid WorldTest exploration trace: {error}"),
         }
     }
@@ -34,58 +67,107 @@ impl fmt::Display for WorldTestPhaseContractError {
 
 impl std::error::Error for WorldTestPhaseContractError {}
 
-/// Evaluate an exploration trace only after checking the MARA phase-exit
-/// contract. The final charged action is Action("go-to-test"); the following
-/// BeginTest marker is appended by the trusted adapter when the phase changes.
+fn validate_zero_reward(
+    event_index: usize,
+    reward_bits: u64,
+) -> Result<(), WorldTestPhaseContractError> {
+    let reward = f64::from_bits(reward_bits);
+    if !reward.is_finite() {
+        return Err(WorldTestPhaseContractError::NonFiniteExplorationReward {
+            event_index,
+            reward_bits,
+        });
+    }
+    if reward != 0.0 {
+        return Err(WorldTestPhaseContractError::NonZeroExplorationReward {
+            event_index,
+            reward_bits,
+        });
+    }
+    Ok(())
+}
+
+/// Qualify a MARA exploration trace. Each Action and Reset event includes the
+/// exact reward bits observed at that environment step. Exactly one go-to-test
+/// action must be immediately followed by the trusted BeginTest marker. The
+/// go-to-test action is charged by the underlying generic evaluator.
 pub fn evaluate_mara_worldtest_exploration(
-    trace: &ExplorationTrace,
+    trace: &MaraExplorationTrace,
 ) -> Result<WorldTestExplorationCertificate, WorldTestPhaseContractError> {
     let Some(last) = trace.events.last() else {
         return Err(WorldTestPhaseContractError::MissingBeginTestMarker);
     };
-    if !matches!(last, ExplorationEvent::BeginTest) {
+    if !matches!(last, MaraExplorationEvent::BeginTest) {
         return Err(WorldTestPhaseContractError::MissingBeginTestMarker);
     }
 
-    let positions: Vec<usize> = trace
-        .events
-        .iter()
-        .enumerate()
-        .filter_map(|(index, event)| match event {
-            ExplorationEvent::Action(action_id) if action_id == "go-to-test" => Some(index),
-            _ => None,
-        })
-        .collect();
+    let mut generic_events = Vec::with_capacity(trace.events.len());
+    let mut go_to_test_positions = Vec::new();
 
-    if positions.is_empty() {
+    for (index, event) in trace.events.iter().enumerate() {
+        match event {
+            MaraExplorationEvent::Action {
+                action_id,
+                reward_bits,
+            } => {
+                validate_zero_reward(index, *reward_bits)?;
+                if action_id == "go-to-test" {
+                    go_to_test_positions.push(index);
+                }
+                generic_events.push(ExplorationEvent::Action(action_id.clone()));
+            }
+            MaraExplorationEvent::Reset { reward_bits } => {
+                validate_zero_reward(index, *reward_bits)?;
+                generic_events.push(ExplorationEvent::Reset);
+            }
+            MaraExplorationEvent::BeginTest => {
+                generic_events.push(ExplorationEvent::BeginTest);
+            }
+        }
+    }
+
+    if go_to_test_positions.is_empty() {
         return Err(WorldTestPhaseContractError::MissingGoToTestAction);
     }
-    if positions.len() != 1 {
+    if go_to_test_positions.len() != 1 {
         return Err(WorldTestPhaseContractError::DuplicateGoToTestAction);
     }
-    if positions[0] + 2 != trace.events.len() {
+    if go_to_test_positions[0] + 2 != trace.events.len() {
         return Err(WorldTestPhaseContractError::GoToTestNotImmediatelyBeforeMarker);
     }
 
-    evaluate_worldtest_exploration(trace).map_err(WorldTestPhaseContractError::Trace)
+    let generic_trace = ExplorationTrace {
+        events: generic_events,
+    };
+    evaluate_worldtest_exploration(&generic_trace)
+        .map_err(WorldTestPhaseContractError::Trace)
 }
 
 #[cfg(test)]
 mod tests {
     use super::*;
 
-    fn action(value: &str) -> ExplorationEvent {
-        ExplorationEvent::Action(value.to_owned())
+    fn action(value: &str) -> MaraExplorationEvent {
+        MaraExplorationEvent::Action {
+            action_id: value.to_owned(),
+            reward_bits: 0.0_f64.to_bits(),
+        }
     }
 
-    fn valid_trace() -> ExplorationTrace {
-        ExplorationTrace {
+    fn reset() -> MaraExplorationEvent {
+        MaraExplorationEvent::Reset {
+            reward_bits: 0.0_f64.to_bits(),
+        }
+    }
+
+    fn valid_trace() -> MaraExplorationTrace {
+        MaraExplorationTrace {
             events: vec![
                 action("left"),
-                ExplorationEvent::Reset,
+                reset(),
                 action("right"),
                 action("go-to-test"),
-                ExplorationEvent::BeginTest,
+                MaraExplorationEvent::BeginTest,
             ],
         }
     }
@@ -100,8 +182,8 @@ mod tests {
 
     #[test]
     fn missing_go_to_test_action_is_rejected() {
-        let trace = ExplorationTrace {
-            events: vec![action("left"), ExplorationEvent::BeginTest],
+        let trace = MaraExplorationTrace {
+            events: vec![action("left"), MaraExplorationEvent::BeginTest],
         };
         assert_eq!(
             evaluate_mara_worldtest_exploration(&trace),
@@ -111,11 +193,11 @@ mod tests {
 
     #[test]
     fn go_to_test_must_be_the_final_action_before_marker() {
-        let trace = ExplorationTrace {
+        let trace = MaraExplorationTrace {
             events: vec![
                 action("go-to-test"),
                 action("left"),
-                ExplorationEvent::BeginTest,
+                MaraExplorationEvent::BeginTest,
             ],
         };
         assert_eq!(
@@ -126,11 +208,11 @@ mod tests {
 
     #[test]
     fn duplicate_go_to_test_actions_are_rejected() {
-        let trace = ExplorationTrace {
+        let trace = MaraExplorationTrace {
             events: vec![
                 action("go-to-test"),
                 action("go-to-test"),
-                ExplorationEvent::BeginTest,
+                MaraExplorationEvent::BeginTest,
             ],
         };
         assert_eq!(
@@ -141,12 +223,75 @@ mod tests {
 
     #[test]
     fn missing_terminal_marker_is_rejected() {
-        let trace = ExplorationTrace {
+        let trace = MaraExplorationTrace {
             events: vec![action("go-to-test")],
         };
         assert_eq!(
             evaluate_mara_worldtest_exploration(&trace),
             Err(WorldTestPhaseContractError::MissingBeginTestMarker)
         );
+    }
+
+    #[test]
+    fn rejects_nonzero_reward_on_ordinary_action() {
+        let mut trace = valid_trace();
+        if let MaraExplorationEvent::Action { reward_bits, .. } = &mut trace.events[0] {
+            *reward_bits = 0.25_f64.to_bits();
+        }
+        assert_eq!(
+            evaluate_mara_worldtest_exploration(&trace),
+            Err(WorldTestPhaseContractError::NonZeroExplorationReward {
+                event_index: 0,
+                reward_bits: 0.25_f64.to_bits(),
+            })
+        );
+    }
+
+    #[test]
+    fn rejects_nonzero_reward_on_reset() {
+        let mut trace = valid_trace();
+        if let MaraExplorationEvent::Reset { reward_bits } = &mut trace.events[1] {
+            *reward_bits = 1.0_f64.to_bits();
+        }
+        assert_eq!(
+            evaluate_mara_worldtest_exploration(&trace),
+            Err(WorldTestPhaseContractError::NonZeroExplorationReward {
+                event_index: 1,
+                reward_bits: 1.0_f64.to_bits(),
+            })
+        );
+    }
+
+    #[test]
+    fn rejects_nan_and_infinite_rewards() {
+        for (index, reward_bits) in [
+            (0_usize, f64::NAN.to_bits()),
+            (2_usize, f64::INFINITY.to_bits()),
+        ] {
+            let mut trace = valid_trace();
+            if let MaraExplorationEvent::Action {
+                reward_bits: actual,
+                ..
+            } = &mut trace.events[index]
+            {
+                *actual = reward_bits;
+            }
+            assert!(matches!(
+                evaluate_mara_worldtest_exploration(&trace),
+                Err(WorldTestPhaseContractError::NonFiniteExplorationReward {
+                    event_index,
+                    ..
+                }) if event_index == index
+            ));
+        }
+    }
+
+    #[test]
+    fn negative_zero_is_numerically_zero_and_is_accepted() {
+        let mut trace = valid_trace();
+        if let MaraExplorationEvent::Action { reward_bits, .. } = &mut trace.events[0] {
+            *reward_bits = (-0.0_f64).to_bits();
+        }
+        assert!(evaluate_mara_worldtest_exploration(&trace).is_ok());
     }
 }

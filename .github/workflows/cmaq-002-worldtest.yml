@@ -115,6 +115,7 @@ jobs:
           events = custody["exploration"]["event_trace"]
           assert [event["event_index"] for event in events] == list(range(len(events)))
           assert all(event["event_type"] in {"action", "noop", "reset"} for event in events)
+          assert all(event["reward_feedback_value"] == 0 for event in events)
           assert events[-1]["event_type"] == "action"
           assert events[-1]["action_id"] == "go-to-test"
 
@@ -136,6 +137,18 @@ jobs:
           hostile = copy.deepcopy(custody)
           hostile["exploration"]["nonzero_reward_permitted"] = True
           reject_mutation(hostile, "nonzero reward permitted during exploration")
+
+          hostile = copy.deepcopy(custody)
+          hostile["exploration"]["event_trace"][0]["reward_feedback_value"] = 1
+          reject_mutation(hostile, "nonzero reward attached to an action")
+
+          reset_index = next(
+              i for i, event in enumerate(custody["exploration"]["event_trace"])
+              if event["event_type"] == "reset"
+          )
+          hostile = copy.deepcopy(custody)
+          hostile["exploration"]["event_trace"][reset_index]["reward_feedback_value"] = 1
+          reject_mutation(hostile, "nonzero reward attached to reset")
 
           hostile = copy.deepcopy(custody)
           hostile["exploration"]["reset_enabled"] = False
