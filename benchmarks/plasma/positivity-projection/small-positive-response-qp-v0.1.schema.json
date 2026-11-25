@@ -1,0 +1,175 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://github.com/Luminous-Dynamics/symthaea/blob/main/benchmarks/plasma/positivity-projection/small-positive-response-qp-v0.1.schema.json",
+  "title": "Small positivity and response-constrained QP known answer v0.1",
+  "type": "object",
+  "additionalProperties": false,
+  "required": [
+    "schema_version",
+    "case_id",
+    "input_values",
+    "cell_volumes",
+    "response_coefficients",
+    "target_mass",
+    "target_response",
+    "expected",
+    "claim_boundary"
+  ],
+  "properties": {
+    "schema_version": {
+      "const": "0.1"
+    },
+    "case_id": {
+      "type": "string",
+      "minLength": 1
+    },
+    "input_values": {
+      "type": "array",
+      "minItems": 2,
+      "maxItems": 16,
+      "items": {
+        "type": "number"
+      }
+    },
+    "cell_volumes": {
+      "type": "array",
+      "minItems": 2,
+      "maxItems": 16,
+      "items": {
+        "type": "number",
+        "exclusiveMinimum": 0
+      }
+    },
+    "response_coefficients": {
+      "type": "array",
+      "minItems": 2,
+      "maxItems": 16,
+      "items": {
+        "type": "number"
+      }
+    },
+    "target_mass": {
+      "type": "number",
+      "exclusiveMinimum": 0
+    },
+    "target_response": {
+      "type": "number"
+    },
+    "expected": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "projected_values",
+        "positive_cell_count",
+        "achieved_mass",
+        "mass_residual",
+        "achieved_response",
+        "response_residual",
+        "lagrange_multipliers",
+        "weighted_correction_norm",
+        "objective_value",
+        "maximum_primal_violation",
+        "maximum_dual_violation",
+        "maximum_stationarity_residual",
+        "maximum_complementarity_residual"
+      ],
+      "properties": {
+        "projected_values": {
+          "type": "array",
+          "items": {
+            "type": "number",
+            "minimum": 0
+          }
+        },
+        "positive_cell_count": {
+          "type": "integer",
+          "minimum": 0
+        },
+        "achieved_mass": {
+          "type": "number",
+          "minimum": 0
+        },
+        "mass_residual": {
+          "type": "number"
+        },
+        "achieved_response": {
+          "type": "number"
+        },
+        "response_residual": {
+          "type": "number"
+        },
+        "lagrange_multipliers": {
+          "type": "array",
+          "items": {
+            "type": "number"
+          },
+          "minItems": 2,
+          "maxItems": 2
+        },
+        "weighted_correction_norm": {
+          "type": "number",
+          "minimum": 0
+        },
+        "objective_value": {
+          "type": "number",
+          "minimum": 0
+        },
+        "maximum_primal_violation": {
+          "type": "number",
+          "minimum": 0
+        },
+        "maximum_dual_violation": {
+          "type": "number",
+          "minimum": 0
+        },
+        "maximum_stationarity_residual": {
+          "type": "number",
+          "minimum": 0
+        },
+        "maximum_complementarity_residual": {
+          "type": "number",
+          "minimum": 0
+        }
+      }
+    },
+    "claim_boundary": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "status",
+        "synthetic_qp_only",
+        "no_physical_solver_run",
+        "not_a_general_multi_constraint_solver"
+      ],
+      "properties": {
+        "status": {
+          "const": "synthetic_known_answer_only"
+        },
+        "synthetic_qp_only": {
+          "const": true
+        },
+        "no_physical_solver_run": {
+          "const": true
+        },
+        "not_a_general_multi_constraint_solver": {
+          "const": true
+        }
+      }
+    }
+  },
+  "allOf": [
+    {
+      "properties": {
+        "input_values": {
+          "minItems": 3
+        },
+        "cell_volumes": {
+          "minItems": 3
+        },
+        "response_coefficients": {
+          "minItems": 3
+        }
+      }
+    }
+  ]
+}
