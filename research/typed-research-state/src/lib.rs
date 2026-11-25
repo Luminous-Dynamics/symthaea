@@ -426,7 +426,7 @@ fn validate_relation(
                 issues,
             );
             if let Some(classifier) = classifier {
-                classified_authorities.insert(classifier);
+                context.classified_authorities.insert(classifier);
             }
             validate_quote_span(
                 map.get("quote_span").unwrap(),
