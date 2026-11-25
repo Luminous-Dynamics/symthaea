@@ -67,3 +67,16 @@ The second is the more realistic near-term differentiator. It does not excuse we
 - **Gate F — SOTA claim:** only after a matched head-to-head with identical split, data, compute, model access, tool permissions, prompts, sampling, and scoring.
 
 A missed gate stays visible. A skipped runner, a structural JSON parse, or a synthetic control is never a benchmark pass.
+
+
+## 8. Internal Symthaea cross-domain integration
+
+SDCB should reuse existing physics and formal-assurance work rather than building parallel physical solvers:
+
+- **#13629 — positivity-, invariant- and response-constrained kinetic representation transitions.** This provides a domain-specific contract for safe state reduction in collisionless and collisional kinetic systems.
+- **#13633 — structured response-constrained low-rank correction.** This explores matrix-free/low-rank KKT methods, feasibility, active sets and response constraints against published positivity-preserving dynamical low-rank baselines.
+- **#13415 / #13628 — phase-resolved response measurements and mode-level response-loss estimation.** These are relevant to SDCB's intervention-and-restoration methodology.
+- **#13485 — hard-memory refinement control.** This connects the memory/cost frontier to explicit resource refusal rather than silent degradation.
+- **#13672 — SDCB parent research programme.** Owns the cross-domain protocol, analytic reference controls, identifiability/abstention track, benchmark governance and external comparison ledger.
+
+The shared methodology is: exact state/source identity → declared observables → identifiability conditions → controlled intervention → independent response measurement → uncertainty/resource receipt. A successful physical invariant check does not validate a cognitive mechanism; a successful cognitive benchmark does not validate a physical solver. Reuse the evidence and measurement infrastructure, not domain-specific truth claims.
