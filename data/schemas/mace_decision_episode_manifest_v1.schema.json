@@ -1,0 +1,210 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://github.com/Luminous-Dynamics/symthaea/blob/main/data/schemas/mace_decision_episode_manifest_v1.schema.json",
+  "title": "MACE Frozen Decision Episode Manifest v1",
+  "type": "object",
+  "additionalProperties": false,
+  "required": [
+    "schema_version",
+    "episode_id",
+    "suite",
+    "task",
+    "decision",
+    "runtime",
+    "resources",
+    "randomization",
+    "frozen_at_unix"
+  ],
+  "properties": {
+    "schema_version": {
+      "const": "mace_decision_episode_manifest_v1"
+    },
+    "episode_id": {
+      "type": "string",
+      "minLength": 1,
+      "maxLength": 256
+    },
+    "suite": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "suite_id",
+        "suite_version",
+        "task_family",
+        "split",
+        "episode_index"
+      ],
+      "properties": {
+        "suite_id": {
+          "type": "string",
+          "minLength": 1,
+          "maxLength": 256
+        },
+        "suite_version": {
+          "type": "string",
+          "minLength": 1,
+          "maxLength": 256
+        },
+        "task_family": {
+          "type": "string",
+          "minLength": 1,
+          "maxLength": 256
+        },
+        "split": {
+          "enum": [
+            "development",
+            "validation",
+            "held_out"
+          ]
+        },
+        "episode_index": {
+          "type": "integer",
+          "minimum": 0,
+          "maximum": 1000000000
+        }
+      }
+    },
+    "task": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "task_input_sha256",
+        "source_snapshot_sha256",
+        "provenance_graph_sha256"
+      ],
+      "properties": {
+        "task_input_sha256": {
+          "type": "string",
+          "pattern": "^[0-9a-f]{64}$"
+        },
+        "source_snapshot_sha256": {
+          "type": "string",
+          "pattern": "^[0-9a-f]{64}$"
+        },
+        "provenance_graph_sha256": {
+          "type": "string",
+          "pattern": "^[0-9a-f]{64}$"
+        }
+      }
+    },
+    "decision": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "decision_invocation_id",
+        "decision_need_sha256",
+        "purpose_sha256",
+        "subject_scope_sha256",
+        "option_set_sha256",
+        "constraint_set_sha256",
+        "decision_policy_sha256"
+      ],
+      "properties": {
+        "decision_invocation_id": {
+          "type": "string",
+          "minLength": 1,
+          "maxLength": 256
+        },
+        "decision_need_sha256": {
+          "type": "string",
+          "pattern": "^[0-9a-f]{64}$"
+        },
+        "purpose_sha256": {
+          "type": "string",
+          "pattern": "^[0-9a-f]{64}$"
+        },
+        "subject_scope_sha256": {
+          "type": "string",
+          "pattern": "^[0-9a-f]{64}$"
+        },
+        "option_set_sha256": {
+          "type": "string",
+          "pattern": "^[0-9a-f]{64}$"
+        },
+        "constraint_set_sha256": {
+          "type": "string",
+          "pattern": "^[0-9a-f]{64}$"
+        },
+        "decision_policy_sha256": {
+          "type": "string",
+          "pattern": "^[0-9a-f]{64}$"
+        }
+      }
+    },
+    "runtime": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "environment_revision_sha256",
+        "reader_profile_sha256",
+        "tool_profile_sha256",
+        "retrieval_policy_profile_sha256",
+        "runner_profile_sha256"
+      ],
+      "properties": {
+        "environment_revision_sha256": {
+          "type": "string",
+          "pattern": "^[0-9a-f]{64}$"
+        },
+        "reader_profile_sha256": {
+          "type": "string",
+          "pattern": "^[0-9a-f]{64}$"
+        },
+        "tool_profile_sha256": {
+          "type": "string",
+          "pattern": "^[0-9a-f]{64}$"
+        },
+        "retrieval_policy_profile_sha256": {
+          "type": "string",
+          "pattern": "^[0-9a-f]{64}$"
+        },
+        "runner_profile_sha256": {
+          "type": "string",
+          "pattern": "^[0-9a-f]{64}$"
+        }
+      }
+    },
+    "resources": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "budget_profile_sha256"
+      ],
+      "properties": {
+        "budget_profile_sha256": {
+          "type": "string",
+          "pattern": "^[0-9a-f]{64}$"
+        }
+      }
+    },
+    "randomization": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "episode_seed_commitment_sha256",
+        "arm_assignment_commitment_sha256",
+        "sealed_evaluation_manifest_sha256"
+      ],
+      "properties": {
+        "episode_seed_commitment_sha256": {
+          "type": "string",
+          "pattern": "^[0-9a-f]{64}$"
+        },
+        "arm_assignment_commitment_sha256": {
+          "type": "string",
+          "pattern": "^[0-9a-f]{64}$"
+        },
+        "sealed_evaluation_manifest_sha256": {
+          "type": "string",
+          "pattern": "^[0-9a-f]{64}$"
+        }
+      },
+      "description": "Commits to evaluator-held seed and treatment assignment without exposing either to the candidate."
+    },
+    "frozen_at_unix": {
+      "type": "integer",
+      "minimum": 0,
+      "maximum": 253402300799
+    }
+  }
+}
