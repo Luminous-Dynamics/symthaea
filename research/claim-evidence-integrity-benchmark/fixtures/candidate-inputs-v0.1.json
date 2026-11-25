@@ -1,0 +1,452 @@
+{
+  "schema_version": "symthaea-claim-evidence-candidate-input-v0.1",
+  "status": "SYNTHETIC_CANDIDATE_INPUT_NOT_EXPERT_DATA",
+  "fixtures": [
+    {
+      "fixture_id": "CEI-01",
+      "claim": "Compound Q reduces fever duration by 20%.",
+      "claim_scope": {
+        "population": "people with acute fever",
+        "outcome_or_measure": "mean duration of fever",
+        "quantifier_or_effect": "reduction of 20 percent",
+        "domain_or_reference_boundary": "clinical trial populations",
+        "scope_note": "Compound Q and the stated comparator"
+      },
+      "claim_reference_time": "2025-01-01T00:00:00Z",
+      "verification_time": "2026-11-25T00:00:00Z",
+      "model_knowledge_cutoff": "2026-01-01T00:00:00Z",
+      "evidence": [
+        {
+          "evidence_id": "E01",
+          "source_id": "clinic-blog-a",
+          "canonical_url": "https://clinic-blog-a.example/E01",
+          "publication_time": "2025-02-01T00:00:00Z",
+          "retrieval_time": "2026-11-25T00:00:00Z",
+          "artifact_text": "The clinic blog discusses fever treatments and compares several compounds. The page contains no measured result for Compound Q.",
+          "artifact_sha256": "1d697766081a6c228a86df1158cdcebb4ba74b683eb108b9817d8a1a4ec348ce"
+        }
+      ]
+    },
+    {
+      "fixture_id": "CEI-02",
+      "claim": "Compound R reduced mean fever duration by 20% in the specified trial.",
+      "claim_scope": {
+        "population": "200 randomized trial participants",
+        "outcome_or_measure": "mean fever duration",
+        "quantifier_or_effect": "reduction of 20 percent",
+        "domain_or_reference_boundary": "trial population and protocol",
+        "scope_note": "Compound R versus placebo"
+      },
+      "claim_reference_time": "2025-01-01T00:00:00Z",
+      "verification_time": "2026-11-25T00:00:00Z",
+      "model_knowledge_cutoff": "2026-01-01T00:00:00Z",
+      "evidence": [
+        {
+          "evidence_id": "E02A",
+          "source_id": "journal-primary-a",
+          "canonical_url": "https://journal-primary-a.example/E02A",
+          "publication_time": "2025-03-01T00:00:00Z",
+          "retrieval_time": "2026-11-25T00:00:00Z",
+          "artifact_text": "In a randomized trial of 200 participants, Compound R reduced mean fever duration by 20 percent versus placebo.",
+          "artifact_sha256": "61898b5ab7efd0b3768af9f42cba03b2d23022b71a4ff56eef13d4e25a5784dc"
+        },
+        {
+          "evidence_id": "E02B",
+          "source_id": "registry-trial-a",
+          "canonical_url": "https://registry-trial-a.example/E02B",
+          "publication_time": "2025-02-15T00:00:00Z",
+          "retrieval_time": "2026-11-25T00:00:00Z",
+          "artifact_text": "The prespecified primary endpoint was mean fever duration. The registry result reports a 20 percent reduction for Compound R.",
+          "artifact_sha256": "a67b3ae8e450a9f64f633e918403714ddf53a2609b22f630bc0a6f3ab8f33ce1"
+        }
+      ]
+    },
+    {
+      "fixture_id": "CEI-03",
+      "claim": "Compound S met the trial's prespecified primary endpoint.",
+      "claim_scope": {
+        "population": "trial S participants",
+        "outcome_or_measure": "prespecified primary endpoint",
+        "quantifier_or_effect": "met versus not met",
+        "domain_or_reference_boundary": "the named trial",
+        "scope_note": "Compound S"
+      },
+      "claim_reference_time": "2025-01-01T00:00:00Z",
+      "verification_time": "2026-11-25T00:00:00Z",
+      "model_knowledge_cutoff": "2026-01-01T00:00:00Z",
+      "evidence": [
+        {
+          "evidence_id": "E03A",
+          "source_id": "trial-registry-s",
+          "canonical_url": "https://trial-registry-s.example/E03A",
+          "publication_time": "2025-04-01T00:00:00Z",
+          "retrieval_time": "2026-11-25T00:00:00Z",
+          "artifact_text": "The prespecified primary endpoint was not met. The confidence interval crossed the null threshold.",
+          "artifact_sha256": "ee5ca554610977053f61c33ff38b989d5444d0abe12e67a4f3c47e0d36190ddc"
+        },
+        {
+          "evidence_id": "E03B",
+          "source_id": "journal-primary-s",
+          "canonical_url": "https://journal-primary-s.example/E03B",
+          "publication_time": "2025-04-12T00:00:00Z",
+          "retrieval_time": "2026-11-25T00:00:00Z",
+          "artifact_text": "The authors report that Compound S did not meet the prespecified primary endpoint.",
+          "artifact_sha256": "632d2d307b966e63821c093eeb1f52c81132b3fb19be188a7e59ba144ec6fbe9"
+        }
+      ]
+    },
+    {
+      "fixture_id": "CEI-04",
+      "claim": "Intervention T reduces long-term relapse risk in the target population.",
+      "claim_scope": {
+        "population": "target population in intervention T studies",
+        "outcome_or_measure": "long-term relapse risk",
+        "quantifier_or_effect": "reduction in risk",
+        "domain_or_reference_boundary": "studied cohorts only",
+        "scope_note": "contradictory independent analyses"
+      },
+      "claim_reference_time": "2024-01-01T00:00:00Z",
+      "verification_time": "2026-11-25T00:00:00Z",
+      "model_knowledge_cutoff": "2026-01-01T00:00:00Z",
+      "evidence": [
+        {
+          "evidence_id": "E04A",
+          "source_id": "cohort-study-a",
+          "canonical_url": "https://cohort-study-a.example/E04A",
+          "publication_time": "2024-02-01T00:00:00Z",
+          "retrieval_time": "2026-11-25T00:00:00Z",
+          "artifact_text": "The cohort analysis found a lower adjusted relapse rate in the intervention group.",
+          "artifact_sha256": "36c3350616acc29cc506f0dd5ce953d0ba96be666518d0451587fdefa2fb4e0d"
+        },
+        {
+          "evidence_id": "E04B",
+          "source_id": "registry-analysis-b",
+          "canonical_url": "https://registry-analysis-b.example/E04B",
+          "publication_time": "2024-06-01T00:00:00Z",
+          "retrieval_time": "2026-11-25T00:00:00Z",
+          "artifact_text": "The preregistered analysis found no statistically significant reduction in relapse risk.",
+          "artifact_sha256": "cdf323056e263e8ffa9d7b6593fb6e14666a8f1994ff8da07a11e59d9b515bff"
+        },
+        {
+          "evidence_id": "E04C",
+          "source_id": "systematic-review-c",
+          "canonical_url": "https://systematic-review-c.example/E04C",
+          "publication_time": "2025-01-01T00:00:00Z",
+          "retrieval_time": "2026-11-25T00:00:00Z",
+          "artifact_text": "The review concludes that available studies are inconsistent and the effect remains uncertain.",
+          "artifact_sha256": "ca0be9a4c5b05f5d60196334173c0b29d50ef4bf7874b967cdeb33849ad229a8"
+        }
+      ]
+    },
+    {
+      "fixture_id": "CEI-05",
+      "claim": "Policy U changed the national incidence rate in 2025.",
+      "claim_scope": {
+        "population": "national population",
+        "outcome_or_measure": "incidence rate",
+        "quantifier_or_effect": "any measured change in 2025",
+        "domain_or_reference_boundary": "national scope",
+        "scope_note": "policy U"
+      },
+      "claim_reference_time": "2025-01-01T00:00:00Z",
+      "verification_time": "2026-11-25T00:00:00Z",
+      "model_knowledge_cutoff": "2026-01-01T00:00:00Z",
+      "evidence": [
+        {
+          "evidence_id": "E05A",
+          "source_id": "wire-original",
+          "canonical_url": "https://wire-original.example/E05A",
+          "publication_time": "2025-03-01T00:00:00Z",
+          "retrieval_time": "2026-11-25T00:00:00Z",
+          "artifact_text": "The wire report discusses a policy announcement but reports no measured change in national incidence.",
+          "artifact_sha256": "4593b758badf23181a770b7666eaa0ec425b1da164f7fe2b10e110309584ea43"
+        },
+        {
+          "evidence_id": "E05B",
+          "source_id": "news-mirror-1",
+          "canonical_url": "https://news-mirror-1.example/E05B",
+          "publication_time": "2025-03-02T00:00:00Z",
+          "retrieval_time": "2026-11-25T00:00:00Z",
+          "artifact_text": "The wire report discusses a policy announcement but reports no measured change in national incidence.",
+          "artifact_sha256": "4593b758badf23181a770b7666eaa0ec425b1da164f7fe2b10e110309584ea43"
+        },
+        {
+          "evidence_id": "E05C",
+          "source_id": "news-mirror-2",
+          "canonical_url": "https://news-mirror-2.example/E05C",
+          "publication_time": "2025-03-03T00:00:00Z",
+          "retrieval_time": "2026-11-25T00:00:00Z",
+          "artifact_text": "The wire report discusses a policy announcement but reports no measured change in national incidence.",
+          "artifact_sha256": "4593b758badf23181a770b7666eaa0ec425b1da164f7fe2b10e110309584ea43"
+        }
+      ]
+    },
+    {
+      "fixture_id": "CEI-06",
+      "claim": "A 2015 Microsoft study measured average human attention span as eight seconds.",
+      "claim_scope": {
+        "population": "human population referenced by the 2015 article",
+        "outcome_or_measure": "attention span measured in seconds",
+        "quantifier_or_effect": "an eight-second average",
+        "domain_or_reference_boundary": "United States / source study as alleged",
+        "scope_note": "retrospective review may use later corrections"
+      },
+      "claim_reference_time": "2015-12-31T00:00:00Z",
+      "verification_time": "2026-11-25T00:00:00Z",
+      "model_knowledge_cutoff": "2026-01-01T00:00:00Z",
+      "evidence": [
+        {
+          "evidence_id": "E06A",
+          "source_id": "newspaper-report-2015",
+          "canonical_url": "https://newspaper-report-2015.example/E06A",
+          "publication_time": "2015-06-01T00:00:00Z",
+          "retrieval_time": "2026-11-25T00:00:00Z",
+          "artifact_text": "A 2015 article repeats the claim that a Microsoft study measured an average attention span of eight seconds.",
+          "artifact_sha256": "895387796db0236d4c6217286dae7edc3d50e858bdba45e3277423e9f3c25b15"
+        },
+        {
+          "evidence_id": "E06B",
+          "source_id": "investigation-2017",
+          "canonical_url": "https://investigation-2017.example/E06B",
+          "publication_time": "2017-05-01T00:00:00Z",
+          "retrieval_time": "2026-11-25T00:00:00Z",
+          "artifact_text": "The underlying Microsoft report did not measure attention in seconds and did not mention goldfish.",
+          "artifact_sha256": "3cdf7b313927f3f216ecd57342700a234e83f8f97cb0c3e7f622bbbd4f275b1e"
+        }
+      ]
+    },
+    {
+      "fixture_id": "CEI-07",
+      "claim": "As of 2015, the Microsoft study had measured attention span in seconds.",
+      "claim_scope": {
+        "population": "human population referenced by the 2015 article",
+        "outcome_or_measure": "attention span measured in seconds",
+        "quantifier_or_effect": "measured as eight seconds",
+        "domain_or_reference_boundary": "as known by 2015-12-31",
+        "scope_note": "future corrections are excluded"
+      },
+      "claim_reference_time": "2015-12-31T00:00:00Z",
+      "verification_time": "2015-12-31T23:59:59Z",
+      "model_knowledge_cutoff": "2026-01-01T00:00:00Z",
+      "evidence": [
+        {
+          "evidence_id": "E07A",
+          "source_id": "newspaper-report-2015",
+          "canonical_url": "https://newspaper-report-2015.example/E07A",
+          "publication_time": "2015-06-01T00:00:00Z",
+          "retrieval_time": "2015-12-31T23:59:59Z",
+          "artifact_text": "A 2015 article repeats the claim that a Microsoft study measured an average attention span of eight seconds.",
+          "artifact_sha256": "895387796db0236d4c6217286dae7edc3d50e858bdba45e3277423e9f3c25b15"
+        }
+      ]
+    },
+    {
+      "fixture_id": "CEI-08",
+      "claim": "As of 2015, Study V had demonstrated that intervention V prevents condition W.",
+      "claim_scope": {
+        "population": "population implied by Study V",
+        "outcome_or_measure": "prevention of condition W",
+        "quantifier_or_effect": "prevents rather than reduces",
+        "domain_or_reference_boundary": "as of 2015-12-31",
+        "scope_note": "evidence published in 2019 is not available at claim reference time"
+      },
+      "claim_reference_time": "2015-12-31T00:00:00Z",
+      "verification_time": "2015-12-31T23:59:59Z",
+      "model_knowledge_cutoff": "2026-01-01T00:00:00Z",
+      "evidence": [
+        {
+          "evidence_id": "E08A",
+          "source_id": "paper-2019",
+          "canonical_url": "https://paper-2019.example/E08A",
+          "publication_time": "2019-08-01T00:00:00Z",
+          "retrieval_time": "2026-11-25T00:00:00Z",
+          "artifact_text": "A 2019 randomized study reports a reduction in condition W after intervention V.",
+          "artifact_sha256": "5156c34479ea10353bf3faf5fff2b01d61ca170fc149c88d90023ce753db8463"
+        }
+      ]
+    },
+    {
+      "fixture_id": "CEI-09",
+      "claim": "All participants improved after Treatment M.",
+      "claim_scope": {
+        "population": "all enrolled participants",
+        "outcome_or_measure": "primary symptom measure",
+        "quantifier_or_effect": "universal quantifier all",
+        "domain_or_reference_boundary": "trial M population",
+        "scope_note": "three of twenty is not all"
+      },
+      "claim_reference_time": "2025-01-01T00:00:00Z",
+      "verification_time": "2026-11-25T00:00:00Z",
+      "model_knowledge_cutoff": "2026-01-01T00:00:00Z",
+      "evidence": [
+        {
+          "evidence_id": "E09A",
+          "source_id": "trial-m-report",
+          "canonical_url": "https://trial-m-report.example/E09A",
+          "publication_time": "2025-03-01T00:00:00Z",
+          "retrieval_time": "2026-11-25T00:00:00Z",
+          "artifact_text": "Three of twenty participants improved on the primary symptom measure; the remaining seventeen did not improve.",
+          "artifact_sha256": "912ff4f39b293e0634fec8ee05ee917f71ba14909392d6ab9c61c937c2a16fea"
+        },
+        {
+          "evidence_id": "E09B",
+          "source_id": "trial-m-protocol",
+          "canonical_url": "https://trial-m-protocol.example/E09B",
+          "publication_time": "2025-02-01T00:00:00Z",
+          "retrieval_time": "2026-11-25T00:00:00Z",
+          "artifact_text": "The primary symptom measure was defined before enrollment and assessed in all twenty participants.",
+          "artifact_sha256": "d557fa5fdb2cc4bb98182c584b4c4c4cf770cb29b0967319ecb45c3247a7fc01"
+        }
+      ]
+    },
+    {
+      "fixture_id": "CEI-10",
+      "claim": "Treatment N is effective.",
+      "claim_scope": {
+        "population": "unspecified population",
+        "outcome_or_measure": "unspecified outcome and threshold",
+        "quantifier_or_effect": "unqualified adjective effective",
+        "domain_or_reference_boundary": "no domain boundary supplied",
+        "scope_note": "claim lacks endpoint and threshold"
+      },
+      "claim_reference_time": "2025-01-01T00:00:00Z",
+      "verification_time": "2026-11-25T00:00:00Z",
+      "model_knowledge_cutoff": "2026-01-01T00:00:00Z",
+      "evidence": [
+        {
+          "evidence_id": "E10A",
+          "source_id": "trial-n-report",
+          "canonical_url": "https://trial-n-report.example/E10A",
+          "publication_time": "2025-05-01T00:00:00Z",
+          "retrieval_time": "2026-11-25T00:00:00Z",
+          "artifact_text": "The trial observed a small change on a secondary symptom scale, but did not define a primary efficacy threshold.",
+          "artifact_sha256": "eca8b710442c4f7c113c60756a7faa3bee1b82ca8e849a43dbce9d5267270bde"
+        }
+      ]
+    },
+    {
+      "fixture_id": "CEI-11",
+      "claim": "The unemployment rate rose by five percentage points between January and December 2024.",
+      "claim_scope": {
+        "population": "national unemployment population",
+        "outcome_or_measure": "unemployment rate change",
+        "quantifier_or_effect": "five percentage points",
+        "domain_or_reference_boundary": "January through December 2024",
+        "scope_note": "compare interval endpoints in the same units"
+      },
+      "claim_reference_time": "2024-12-31T00:00:00Z",
+      "verification_time": "2026-11-25T00:00:00Z",
+      "model_knowledge_cutoff": "2026-01-01T00:00:00Z",
+      "evidence": [
+        {
+          "evidence_id": "E11A",
+          "source_id": "statistics-agency-series",
+          "canonical_url": "https://statistics-agency-series.example/E11A",
+          "publication_time": "2025-01-15T00:00:00Z",
+          "retrieval_time": "2026-11-25T00:00:00Z",
+          "artifact_text": "Monthly unemployment rate: January 2024 = 4.1 percent; December 2024 = 4.4 percent.",
+          "artifact_sha256": "b19cad4b2bac110606af785b73e73874ab80620aee1d4cf9fe74795ae4e89592"
+        }
+      ]
+    },
+    {
+      "fixture_id": "CEI-12",
+      "claim": "The cited paper demonstrated a statistically significant improvement in survival.",
+      "claim_scope": {
+        "population": "trial survival population",
+        "outcome_or_measure": "overall survival",
+        "quantifier_or_effect": "statistically significant improvement",
+        "domain_or_reference_boundary": "the cited paper and population",
+        "scope_note": "citation resolves but result is opposite"
+      },
+      "claim_reference_time": "2024-01-01T00:00:00Z",
+      "verification_time": "2026-11-25T00:00:00Z",
+      "model_knowledge_cutoff": "2026-01-01T00:00:00Z",
+      "evidence": [
+        {
+          "evidence_id": "E12A",
+          "source_id": "survival-paper",
+          "canonical_url": "https://survival-paper.example/E12A",
+          "publication_time": "2024-03-01T00:00:00Z",
+          "retrieval_time": "2026-11-25T00:00:00Z",
+          "artifact_text": "The paper reports no statistically significant difference in survival between treatment and control groups.",
+          "artifact_sha256": "23aed594ed48df5c3af9d0136e3c9aec0666c135864caad604030005624fe69d"
+        }
+      ]
+    },
+    {
+      "fixture_id": "CEI-13",
+      "claim": "No clinical trials of Compound Z have ever been conducted.",
+      "claim_scope": {
+        "population": "all possible clinical trial registries and sources",
+        "outcome_or_measure": "existence of any clinical trial",
+        "quantifier_or_effect": "universal negative ever",
+        "domain_or_reference_boundary": "unbounded temporal and registry scope",
+        "scope_note": "finite searched-no-match cannot prove absence"
+      },
+      "claim_reference_time": "2025-01-01T00:00:00Z",
+      "verification_time": "2026-11-25T00:00:00Z",
+      "model_knowledge_cutoff": "2026-01-01T00:00:00Z",
+      "evidence": []
+    },
+    {
+      "fixture_id": "CEI-14",
+      "claim": "The current official guideline doubles the recommended dose of Compound Y.",
+      "claim_scope": {
+        "population": "patients under current official guideline",
+        "outcome_or_measure": "recommended dose of Compound Y",
+        "quantifier_or_effect": "doubles versus remains unchanged",
+        "domain_or_reference_boundary": "guideline current as of 2026-01-10",
+        "scope_note": "source compromise is a separate admissibility/context signal"
+      },
+      "claim_reference_time": "2026-01-01T00:00:00Z",
+      "verification_time": "2026-11-25T00:00:00Z",
+      "model_knowledge_cutoff": "2026-01-01T00:00:00Z",
+      "evidence": [
+        {
+          "evidence_id": "E14A",
+          "source_id": "compromised-mirror",
+          "canonical_url": "https://compromised-mirror.example/E14A",
+          "publication_time": "2026-01-05T00:00:00Z",
+          "retrieval_time": "2026-11-25T00:00:00Z",
+          "artifact_text": "A compromised mirror page states that the official guideline doubled the recommended dose.",
+          "artifact_sha256": "21b766f3f2b561f8ea0f101e03ad33eef471458d37e36bedfb736727643a3b28"
+        },
+        {
+          "evidence_id": "E14B",
+          "source_id": "official-guideline",
+          "canonical_url": "https://official-guideline.example/E14B",
+          "publication_time": "2026-01-10T00:00:00Z",
+          "retrieval_time": "2026-11-25T00:00:00Z",
+          "artifact_text": "The official guideline retains the prior dose and states that no dose increase is recommended.",
+          "artifact_sha256": "b24828748edd62d6f30f61451522e469de677b58fba46af62de6497cbd044e2a"
+        }
+      ]
+    },
+    {
+      "fixture_id": "CEI-15",
+      "claim": "Study P provides reliable evidence that supplement P reduces mortality.",
+      "claim_scope": {
+        "population": "population enrolled in Study P",
+        "outcome_or_measure": "mortality reduction",
+        "quantifier_or_effect": "reliable evidence of reduced mortality",
+        "domain_or_reference_boundary": "current assessment, with historical study preserved",
+        "scope_note": "retracted result is not current admissible support"
+      },
+      "claim_reference_time": "2020-01-01T00:00:00Z",
+      "verification_time": "2026-11-25T00:00:00Z",
+      "model_knowledge_cutoff": "2026-01-01T00:00:00Z",
+      "evidence": [
+        {
+          "evidence_id": "E15A",
+          "source_id": "retracted-study-p",
+          "canonical_url": "https://retracted-study-p.example/E15A",
+          "publication_time": "2020-05-01T00:00:00Z",
+          "retrieval_time": "2026-11-25T00:00:00Z",
+          "artifact_text": "The study reported a reduction in mortality in the supplement P treatment group.",
+          "artifact_sha256": "cfbbf13aa2bc3dd2fa114bba088fdf64403a3da2f9c90d6fd22cb7fa572389fa"
+        }
+      ]
+    }
+  ]
+}
