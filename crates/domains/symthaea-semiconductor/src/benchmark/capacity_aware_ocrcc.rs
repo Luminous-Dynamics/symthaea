@@ -1628,6 +1628,10 @@ mod tests {
         assert!((proxy_tracking_load_v1(&bernoulli).unwrap() - 0.75).abs() < 1.0e-12);
         assert!(validate_policy(&policy(bernoulli, 1)).is_ok());
         assert!(validate_policy(&policy(pmf_always_delay(3), 2)).is_err());
+
+        let mut zero_tail = pmf_always_delay(3);
+        zero_tail.probability_mass = vec![1.0, 0.0, 0.0, 0.0, 0.0];
+        assert!(validate_policy(&policy(zero_tail, 1)).is_err());
     }
 
     #[test]
