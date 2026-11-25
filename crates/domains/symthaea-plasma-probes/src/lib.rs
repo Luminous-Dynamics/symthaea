@@ -190,6 +190,10 @@ pub enum ContractError {
     PositivityProjectionArithmeticOverflow,
     #[error("two-cell positivity/mass/response constraints are infeasible or singular")]
     InfeasibleTwoCellResponseProjection,
+    #[error("small positivity/mass/response QP exceeds its bounded active-set work budget")]
+    PositiveResponseQpWorkBudgetExceeded,
+    #[error("small positivity/mass/response QP is infeasible or numerically unresolved")]
+    InfeasiblePositiveResponseQp,
     #[error("invalid coupled-mode authority contract: {0}")]
     InvalidCoupledModeAuthority(&'static str),
     #[error("invalid periodic derivative configuration: {0}")]
@@ -4883,6 +4887,232 @@ pub fn validate_canonical_symplectic_pair_2d(
         return Err(ContractError::InvalidSymplecticBasis);
     }
     Ok(defect)
+}
+
+/// Maximum number of cells in the exhaustive small-system active-set oracle.
+pub const MAX_SMALL_POSITIVE_RESPONSE_QP_CELLS: usize = 16;
+
+/// Exact small-system reference solution for positivity, discrete mass and one
+/// linear response functional.
+#[derive(Clone, Debug, PartialEq, Serialize)]
+pub struct SmallPositiveResponseQpReport {
+    pub projected_values: Vec<f64>,
+    pub positive_cell_count: usize,
+    pub target_mass: f64,
+    pub achieved_mass: f64,
+    pub mass_residual: f64,
+    pub target_response: f64,
+    pub achieved_response: f64,
+    pub response_residual: f64,
+    pub lagrange_multipliers: [f64; 2],
+    pub weighted_correction_norm: f64,
+    pub objective_value: f64,
+    pub maximum_primal_violation: f64,
+    pub maximum_dual_violation: f64,
+    pub maximum_stationarity_residual: f64,
+    pub maximum_complementarity_residual: f64,
+}
+
+/// Exhaustive active-set reference QP for small positivity/mass/response systems.
+///
+/// It minimizes 0.5 * sum_i volume_i * (g_i - input_i)^2 subject to g_i >= 0,
+/// weighted discrete mass, and one linear response equality. It enumerates
+/// all non-empty free-cell sets (bounded to 16 cells), solves the corresponding
+/// 2x2 dual system, checks KKT conditions, and returns the feasible KKT solution
+/// with the smallest objective.
+///
+/// This is a small correctness oracle for fixtures, not a scalable solver.
+pub fn solve_small_positive_mass_response_qp(
+    input_values: &[f64],
+    cell_volumes: &[f64],
+    response_coefficients: &[f64],
+    target_mass: f64,
+    target_response: f64,
+) -> Result<SmallPositiveResponseQpReport, ContractError> {
+    let cell_count = input_values.len();
+    if cell_count < 2
+        || cell_count != cell_volumes.len()
+        || cell_count != response_coefficients.len()
+        || !target_mass.is_finite()
+        || target_mass <= 0.0
+        || !target_response.is_finite()
+        || input_values.iter().any(|value| !value.is_finite())
+        || cell_volumes
+            .iter()
+            .any(|volume| !volume.is_finite() || *volume <= 0.0)
+        || response_coefficients.iter().any(|value| !value.is_finite())
+    {
+        return Err(ContractError::InvalidPositivityProjectionInput);
+    }
+    if cell_count > MAX_SMALL_POSITIVE_RESPONSE_QP_CELLS {
+        return Err(ContractError::PositiveResponseQpWorkBudgetExceeded);
+    }
+
+    let total_subsets = 1_u32
+        .checked_shl(cell_count as u32)
+        .ok_or(ContractError::PositiveResponseQpWorkBudgetExceeded)?;
+    let mut best: Option<SmallPositiveResponseQpReport> = None;
+
+    for mask in 1_u32..total_subsets {
+        let mut gram_00 = 0.0_f64;
+        let mut gram_01 = 0.0_f64;
+        let mut gram_11 = 0.0_f64;
+        let mut rhs_0 = -target_mass;
+        let mut rhs_1 = -target_response;
+
+        for index in 0..cell_count {
+            if (mask & (1_u32 << index)) == 0 {
+                continue;
+            }
+            let volume = cell_volumes[index];
+            let response = response_coefficients[index];
+            gram_00 += volume;
+            gram_01 += response;
+            gram_11 += response * response / volume;
+            rhs_0 += volume * input_values[index];
+            rhs_1 += response * input_values[index];
+        }
+
+        if [gram_00, gram_01, gram_11, rhs_0, rhs_1]
+            .iter()
+            .any(|value| !value.is_finite())
+        {
+            return Err(ContractError::PositivityProjectionArithmeticOverflow);
+        }
+
+        let determinant_term_a = gram_00 * gram_11;
+        let determinant_term_b = gram_01 * gram_01;
+        if !determinant_term_a.is_finite() || !determinant_term_b.is_finite() {
+            return Err(ContractError::PositivityProjectionArithmeticOverflow);
+        }
+        let determinant = determinant_term_a - determinant_term_b;
+        let determinant_scale = determinant_term_a.abs().max(determinant_term_b.abs());
+        if !determinant.is_finite() {
+            return Err(ContractError::PositivityProjectionArithmeticOverflow);
+        }
+        if determinant_scale == 0.0 || determinant.abs() <= 1.0e-12 * determinant_scale {
+            continue;
+        }
+
+        let lambda_0_numerator = rhs_0.mul_add(gram_11, -(gram_01 * rhs_1));
+        let lambda_1_numerator = gram_00.mul_add(rhs_1, -(gram_01 * rhs_0));
+        if !lambda_0_numerator.is_finite() || !lambda_1_numerator.is_finite() {
+            return Err(ContractError::PositivityProjectionArithmeticOverflow);
+        }
+        let lambda_0 = lambda_0_numerator / determinant;
+        let lambda_1 = lambda_1_numerator / determinant;
+        if !lambda_0.is_finite() || !lambda_1.is_finite() {
+            return Err(ContractError::PositivityProjectionArithmeticOverflow);
+        }
+
+        let mut projected = vec![0.0_f64; cell_count];
+        let mut feasible = true;
+        let mut max_primal_violation = 0.0_f64;
+        let mut max_dual_violation = 0.0_f64;
+        let mut max_stationarity_residual = 0.0_f64;
+        let mut max_complementarity_residual = 0.0_f64;
+        let mut achieved_mass = 0.0_f64;
+        let mut achieved_response = 0.0_f64;
+        let mut correction_squared = 0.0_f64;
+        let mut objective_value = 0.0_f64;
+
+        for index in 0..cell_count {
+            let volume = cell_volumes[index];
+            let response = response_coefficients[index];
+            let is_in_candidate_free_set = (mask & (1_u32 << index)) != 0;
+            let unconstrained = input_values[index] - lambda_0 - lambda_1 * response / volume;
+            if !unconstrained.is_finite() {
+                return Err(ContractError::PositivityProjectionArithmeticOverflow);
+            }
+            if is_in_candidate_free_set && unconstrained < -1.0e-10 {
+                feasible = false;
+            }
+            let value = if is_in_candidate_free_set {
+                unconstrained.max(0.0)
+            } else {
+                0.0
+            };
+            projected[index] = value;
+            max_primal_violation = max_primal_violation.max((-value).max(0.0));
+
+            if value > 0.0 {
+                let stationarity = volume * (value - input_values[index])
+                    + lambda_0 * volume
+                    + lambda_1 * response;
+                max_stationarity_residual =
+                    max_stationarity_residual.max(stationarity.abs());
+            } else {
+                let dual_multiplier =
+                    volume * (lambda_0 - input_values[index]) + lambda_1 * response;
+                max_dual_violation =
+                    max_dual_violation.max((-dual_multiplier).max(0.0));
+                max_complementarity_residual =
+                    max_complementarity_residual.max((value * dual_multiplier).abs());
+                if dual_multiplier < -1.0e-10 {
+                    feasible = false;
+                }
+            }
+
+            achieved_mass = volume.mul_add(value, achieved_mass);
+            achieved_response = response.mul_add(value, achieved_response);
+            let correction = value - input_values[index];
+            correction_squared =
+                volume.mul_add(correction * correction, correction_squared);
+            objective_value += 0.5 * volume * correction * correction;
+            if [
+                achieved_mass,
+                achieved_response,
+                correction_squared,
+                objective_value,
+            ]
+            .iter()
+            .any(|entry| !entry.is_finite())
+            {
+                return Err(ContractError::PositivityProjectionArithmeticOverflow);
+            }
+        }
+
+        let mass_residual = achieved_mass - target_mass;
+        let response_residual = achieved_response - target_response;
+        let equality_tolerance_mass = 1.0e-10_f64.max(target_mass.abs() * 1.0e-9);
+        let equality_tolerance_response =
+            1.0e-10_f64.max(target_response.abs() * 1.0e-9);
+        if mass_residual.abs() > equality_tolerance_mass
+            || response_residual.abs() > equality_tolerance_response
+        {
+            feasible = false;
+        }
+        if !feasible {
+            continue;
+        }
+
+        let candidate = SmallPositiveResponseQpReport {
+            projected_values: projected,
+            positive_cell_count: projected.iter().filter(|value| **value > 0.0).count(),
+            target_mass,
+            achieved_mass,
+            mass_residual,
+            target_response,
+            achieved_response,
+            response_residual,
+            lagrange_multipliers: [lambda_0, lambda_1],
+            weighted_correction_norm: correction_squared.sqrt(),
+            objective_value,
+            maximum_primal_violation: max_primal_violation,
+            maximum_dual_violation: max_dual_violation,
+            maximum_stationarity_residual: max_stationarity_residual,
+            maximum_complementarity_residual: max_complementarity_residual,
+        };
+
+        if best
+            .as_ref()
+            .is_none_or(|current| candidate.objective_value < current.objective_value)
+        {
+            best = Some(candidate);
+        }
+    }
+
+    best.ok_or(ContractError::InfeasiblePositiveResponseQp)
 }
 
 /// Exact two-cell joint feasibility oracle for positivity, discrete mass
@@ -9734,6 +9964,78 @@ mod tests {
             fixture["claim_boundary"]["does_not_claim_momentum_or_energy"]
                 .as_bool()
                 .unwrap()
+        );
+    }
+
+    #[test]
+    fn small_positive_response_qp_matches_three_cell_kkt_known_answer() {
+        let report = solve_small_positive_mass_response_qp(
+            &[-0.1, 0.5, 0.6],
+            &[1.0, 1.0, 1.0],
+            &[1.0, 0.0, 0.0],
+            1.0,
+            0.1,
+        )
+        .unwrap();
+        for (actual, expected) in report.projected_values.iter().zip([0.1, 0.4, 0.5]) {
+            assert!((actual - expected).abs() < 1.0e-10);
+        }
+        assert_eq!(report.positive_cell_count, 3);
+        assert!(report.mass_residual.abs() < 1.0e-10);
+        assert!(report.response_residual.abs() < 1.0e-10);
+        assert!(report.maximum_primal_violation < 1.0e-10);
+        assert!(report.maximum_dual_violation < 1.0e-10);
+        assert!(report.maximum_stationarity_residual < 1.0e-10);
+        assert!(report.maximum_complementarity_residual < 1.0e-10);
+    }
+
+    #[test]
+    fn small_positive_response_qp_finds_active_positivity_set() {
+        let report = solve_small_positive_mass_response_qp(
+            &[-0.2, 0.4, 1.3],
+            &[1.0, 1.0, 1.0],
+            &[1.0, 0.0, 0.0],
+            1.5,
+            0.0,
+        )
+        .unwrap();
+        assert_eq!(report.projected_values[0], 0.0);
+        assert!(report.projected_values[1] > 0.0);
+        assert!(report.projected_values[2] > 0.0);
+        assert_eq!(report.positive_cell_count, 2);
+        assert!(report.maximum_dual_violation < 1.0e-10);
+        assert!(report.maximum_stationarity_residual < 1.0e-10);
+    }
+
+    #[test]
+    fn small_positive_response_qp_rejects_infeasible_targets() {
+        assert_eq!(
+            solve_small_positive_mass_response_qp(
+                &[-0.1, 0.5, 0.6],
+                &[1.0, 1.0, 1.0],
+                &[1.0, 0.0, 0.0],
+                1.0,
+                1.1,
+            ),
+            Err(ContractError::InfeasiblePositiveResponseQp)
+        );
+    }
+
+    #[test]
+    fn small_positive_response_qp_enforces_work_budget() {
+        let count = MAX_SMALL_POSITIVE_RESPONSE_QP_CELLS + 1;
+        let values = vec![0.5; count];
+        let volumes = vec![1.0; count];
+        let response = (0..count).map(|index| index as f64).collect::<Vec<_>>();
+        assert_eq!(
+            solve_small_positive_mass_response_qp(
+                &values,
+                &volumes,
+                &response,
+                count as f64 * 0.5,
+                0.0,
+            ),
+            Err(ContractError::PositiveResponseQpWorkBudgetExceeded)
         );
     }
 
