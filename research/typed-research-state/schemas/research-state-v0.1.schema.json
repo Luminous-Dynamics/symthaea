@@ -208,7 +208,8 @@
                       "output_digest",
                       "confidence",
                       "emitted_at",
-                      "evidence_prefix_sha256"
+                      "evidence_prefix_sha256",
+                      "claim_sha256"
                     ],
                     "properties": {
                       "classifier_id": {
@@ -233,6 +234,10 @@
                         "format": "date-time"
                       },
                       "evidence_prefix_sha256": {
+                        "type": "string",
+                        "pattern": "^[a-f0-9]{64}$"
+                      },
+                      "claim_sha256": {
                         "type": "string",
                         "pattern": "^[a-f0-9]{64}$"
                       }
