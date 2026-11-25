@@ -194,7 +194,8 @@ Report observations, interventions, wall time, CPU/GPU time, FLOPs if measured, 
 | Autonomous Science Bench 0.1 | Six pilot tasks, three trials per task; current board lists GPT-6 Astra + Codex at 72.2%, Opus 5.5 + Claude Code at 66.7% | Full model/agent/tool/harness laboratory-loop comparison. Small gaps are not decisive at this pilot sample. |
 | RoboDyna | 20 conceptual and 10 household tasks; 3,500 demonstrations; 5.4K evaluated episodes; all reported policies below 20% success | Async dynamic-world and latency-aware physical transfer adapter; sync/async parity is not optional. |
 | V-JEPA 2 | Pretrained on over one million hours of video; reports 77.3 top-1 on Something-Something v2 and 39.7 R@5 on EPIC-KITCHENS-100; zero-shot image-goal robot pick/place after under 62 hours of DROID post-training | Strong representation / physical-planning comparator, not a matched task-agnostic structural-library score. |
-| Dreamer 4 | Evaluated across 8 domains and over 150 tasks with fixed configuration; offline Minecraft diamond task requires over 20,000 action steps | Strong model-based control and scalable world-model comparator; evaluate downstream action quality, not visual reconstruction alone. |
+| Dreamer 3 | Evaluated across 8 domains and over 150 tasks with a fixed configuration | Strong broad model-based control comparator; test whether pre-task structural acquisition adds transfer value under matched task/hardware budgets. |
+| Dreamer 4 | Separate scalable-world-model work reports an offline Minecraft diamond task requiring over 20,000 action steps, learned from diverse offline video data | Strong long-horizon world-model / imagination comparator; do not conflate its Minecraft result with Dreamer 3's 150-task evaluation. |
 | AgentIdeaBench | 33 LLMs, 40 subfields, 5 disciplines; active exploration improved grounding/feasibility/clarity while measured originality did not improve | Distinguish better-grounded hypotheses from novel discovery; score independently reviewed originality separately. |
 | AutoSciBench | Adaptive benchmark recipes reduced average solver accuracy by 22.4 pp (computational biology) and 25.5 pp (materials) versus curated benchmarks | Motivates a sealed refresh lane; do not let adaptive task generation contaminate immutable longitudinal anchors. |
 | DS-CP / TCC / KMM-CP | 2026 work on domain-shift-aware or transported conformal calibration; TCC uses paired unlabeled source/target data, KMM-CP is selective under support overlap | Required calibration-transfer baselines. Do not transport calibration across invalid structural/mechanism maps or claim arbitrary-shift coverage. |
@@ -219,7 +220,8 @@ Any hypothesis may fail. A transparent negative result is a successful benchmark
 - Autonomous Science Bench: https://asb.open-ssi.org/about and https://asb.open-ssi.org/leaderboard
 - RoboDyna: https://arxiv.org/abs/2611.26969 and https://robodyna.github.io/robodyna/
 - V-JEPA 2: https://ai.meta.com/research/publications/v-jepa-2-self-supervised-video-models-enable-understanding-prediction-and-planning/
-- Dreamer 4 / world models: https://arxiv.org/abs/2509.24527
+- Dreamer 3 (Nature 2025): https://doi.org/10.1038/s41586-025-08744-2
+- Dreamer 4 (world-model preprint): https://arxiv.org/abs/2509.24527
 - AgentIdeaBench: https://arxiv.org/abs/2609.07611
 - AutoSciBench: https://arxiv.org/abs/2610.05140
 - DS-CP (ICML 2026): https://proceedings.mlr.press/v306/lin26t.html
