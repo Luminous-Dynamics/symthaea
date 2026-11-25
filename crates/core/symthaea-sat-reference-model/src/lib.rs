@@ -20,9 +20,11 @@
 //! parameter. Such signals may be evaluated by a separate caution policy, but
 //! they cannot create a grant or satisfy this model's authority predicate.
 //!
+//! Every grant binds a complete effect identity: action, resource and a digest
+//! of the canonical operation parameters. There are no wildcard scopes.
 //! Time windows are half-open: not_before <= now < expires_at.
-//! Delegated action/resource scopes and validity windows must be subsets of
-//! the parent's, and each delegation consumes one unit of remaining depth.
+//! Delegated effect scopes and validity windows must be subsets of the parent,
+//! and each delegation consumes one unit of remaining depth.
 //!
 //! Unknown effect outcomes block another mutation attempt until reconciliation
 //! proves either that no effect occurred or that the effect already occurred.
@@ -50,15 +52,40 @@ impl From<&str> for GrantId {
     }
 }
 
-/// A bounded capability grant. Scopes are exact-match sets; wildcards,
-/// path-prefix semantics and ambient permissions are unsupported here.
+/// Canonical identity of one protected operation.
+///
+/// parameters_digest must be computed by the caller from a canonical,
+/// versioned representation of the complete effect parameters. This crate
+/// treats it as opaque and does not implement canonicalization or hashing.
+#[derive(Debug, Clone, PartialEq, Eq, PartialOrd, Ord)]
+pub struct EffectBinding {
+    pub action: String,
+    pub resource: String,
+    pub parameters_digest: String,
+}
+
+impl EffectBinding {
+    pub fn new(
+        action: impl Into<String>,
+        resource: impl Into<String>,
+        parameters_digest: impl Into<String>,
+    ) -> Self {
+        Self {
+            action: action.into(),
+            resource: resource.into(),
+            parameters_digest: parameters_digest.into(),
+        }
+    }
+}
+
+/// A bounded capability grant. The scope is a set of exact effect bindings;
+/// wildcard, prefix and ambient permissions are intentionally unsupported.
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub struct CapabilityGrant {
     pub id: GrantId,
     pub issuer: PrincipalId,
     pub subject: PrincipalId,
-    pub action_scope: BTreeSet<String>,
-    pub resource_scope: BTreeSet<String>,
+    pub effect_scope: BTreeSet<EffectBinding>,
     pub not_before: u64,
     pub expires_at: u64,
     pub may_delegate: bool,
@@ -68,12 +95,11 @@ pub struct CapabilityGrant {
 
 impl CapabilityGrant {
     #[allow(clippy::too_many_arguments)]
-    pub fn new<I, A, R, S>(
+    pub fn new<I>(
         id: impl Into<GrantId>,
         issuer: impl Into<PrincipalId>,
         subject: impl Into<PrincipalId>,
-        actions: I,
-        resources: R,
+        effects: I,
         not_before: u64,
         expires_at: u64,
         may_delegate: bool,
@@ -81,17 +107,13 @@ impl CapabilityGrant {
         parent_id: Option<GrantId>,
     ) -> Self
     where
-        I: IntoIterator<Item = A>,
-        A: Into<String>,
-        R: IntoIterator<Item = S>,
-        S: Into<String>,
+        I: IntoIterator<Item = EffectBinding>,
     {
         Self {
             id: id.into(),
             issuer: issuer.into(),
             subject: subject.into(),
-            action_scope: actions.into_iter().map(Into::into).collect(),
-            resource_scope: resources.into_iter().map(Into::into).collect(),
+            effect_scope: effects.into_iter().collect(),
             not_before,
             expires_at,
             may_delegate,
@@ -120,7 +142,7 @@ impl fmt::Display for DenialReason {
     }
 }
 
-/// The result of checking one exact action against the ledger.
+/// The result of checking one exact operation against the ledger.
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub enum AuthorizationDecision {
     Allowed { grant_id: GrantId },
@@ -131,8 +153,7 @@ pub enum AuthorizationDecision {
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub enum AuthorityError {
     EmptyIdentifier,
-    EmptyActionScope,
-    EmptyResourceScope,
+    EmptyEffectScope,
     InvalidValidityWindow,
     DelegationFlagDepthMismatch,
     DuplicateGrant,
@@ -142,8 +163,7 @@ pub enum AuthorityError {
     ParentCannotDelegate,
     ChildParentMismatch,
     DelegatorIdentityMismatch,
-    ActionScopeExpansion,
-    ResourceScopeExpansion,
+    EffectScopeExpansion,
     ValidityWindowExpansion,
     DelegationDepthExpansion,
     GrantNotFound,
@@ -219,11 +239,8 @@ impl AuthorityLedger {
         }
         validate_grant_shape(&child)?;
 
-        if !child.action_scope.is_subset(&parent.action_scope) {
-            return Err(AuthorityError::ActionScopeExpansion);
-        }
-        if !child.resource_scope.is_subset(&parent.resource_scope) {
-            return Err(AuthorityError::ResourceScopeExpansion);
+        if !child.effect_scope.is_subset(&parent.effect_scope) {
+            return Err(AuthorityError::EffectScopeExpansion);
         }
         if child.not_before < parent.not_before || child.expires_at > parent.expires_at {
             return Err(AuthorityError::ValidityWindowExpansion);
@@ -247,24 +264,21 @@ impl AuthorityLedger {
         Ok(())
     }
 
-    /// Authorize one exact subject/action/resource request.
+    /// Authorize one exact subject/effect request.
     ///
     /// There is deliberately no cognitive-score parameter. Intelligence can
     /// inform a separate caution policy but cannot satisfy this authority check.
     pub fn authorize(
         &self,
         subject: &PrincipalId,
-        action: &str,
-        resource: &str,
+        effect: &EffectBinding,
         now: u64,
     ) -> AuthorizationDecision {
         let mut scope_match = false;
         let mut last_reason = DenialReason::NoMatchingGrant;
 
         for grant in self.grants.values().filter(|grant| {
-            &grant.subject == subject
-                && grant.action_scope.contains(action)
-                && grant.resource_scope.contains(resource)
+            &grant.subject == subject && grant.effect_scope.contains(effect)
         }) {
             scope_match = true;
             match self.lineage_status(&grant.id, now) {
@@ -286,7 +300,7 @@ impl AuthorityLedger {
         }
     }
 
-    /// Stable inventory view; this does not imply that returned grants are live.
+    /// Stable inventory view; this does not imply returned grants are live.
     pub fn grant_ids_for_subject(&self, subject: &PrincipalId) -> Vec<GrantId> {
         self.grants
             .values()
@@ -369,11 +383,8 @@ fn validate_grant_shape(grant: &CapabilityGrant) -> Result<(), AuthorityError> {
     {
         return Err(AuthorityError::EmptyIdentifier);
     }
-    if grant.action_scope.is_empty() {
-        return Err(AuthorityError::EmptyActionScope);
-    }
-    if grant.resource_scope.is_empty() {
-        return Err(AuthorityError::EmptyResourceScope);
+    if grant.effect_scope.is_empty() {
+        return Err(AuthorityError::EmptyEffectScope);
     }
     if grant.not_before >= grant.expires_at {
         return Err(AuthorityError::InvalidValidityWindow);
@@ -381,12 +392,11 @@ fn validate_grant_shape(grant: &CapabilityGrant) -> Result<(), AuthorityError> {
     if grant.may_delegate != (grant.remaining_delegation_depth > 0) {
         return Err(AuthorityError::DelegationFlagDepthMismatch);
     }
-    if grant
-        .action_scope
-        .iter()
-        .chain(grant.resource_scope.iter())
-        .any(|item| item.trim().is_empty())
-    {
+    if grant.effect_scope.iter().any(|effect| {
+        effect.action.trim().is_empty()
+            || effect.resource.trim().is_empty()
+            || effect.parameters_digest.trim().is_empty()
+    }) {
         return Err(AuthorityError::EmptyIdentifier);
     }
     Ok(())
@@ -526,12 +536,16 @@ mod tests {
 
     const NOW: u64 = 1_000;
 
+    fn effect(action: &str, resource: &str, digest: &str) -> EffectBinding {
+        EffectBinding::new(action, resource, digest)
+    }
+
+    #[allow(clippy::too_many_arguments)]
     fn grant(
         id: &str,
         issuer: &str,
         subject: &str,
-        actions: &[&str],
-        resources: &[&str],
+        effects: &[EffectBinding],
         not_before: u64,
         expires_at: u64,
         may_delegate: bool,
@@ -542,8 +556,7 @@ mod tests {
             id,
             issuer,
             subject,
-            actions.iter().copied(),
-            resources.iter().copied(),
+            effects.iter().cloned(),
             not_before,
             expires_at,
             may_delegate,
@@ -559,8 +572,12 @@ mod tests {
                 "root",
                 "owner",
                 "agent-a",
-                &["read", "write"],
-                &["project-1", "project-2"],
+                &[
+                    effect("read", "project-1", "read-p1-v1"),
+                    effect("write", "project-1", "write-p1-v1"),
+                    effect("read", "project-2", "read-p2-v1"),
+                    effect("write", "project-2", "write-p2-v1"),
+                ],
                 900,
                 1_500,
                 true,
@@ -575,7 +592,11 @@ mod tests {
     fn missing_capability_denies() {
         let ledger = AuthorityLedger::new();
         assert_eq!(
-            ledger.authorize(&PrincipalId::from("agent-a"), "write", "project-1", NOW),
+            ledger.authorize(
+                &PrincipalId::from("agent-a"),
+                &effect("write", "project-1", "write-p1-v1"),
+                NOW,
+            ),
             AuthorizationDecision::Denied {
                 reason: DenialReason::NoMatchingGrant
             }
@@ -583,20 +604,35 @@ mod tests {
     }
 
     #[test]
-    fn exact_root_scope_authorizes_and_unlisted_action_denies() {
+    fn exact_effect_binding_authorizes() {
         let ledger = root_ledger();
         assert_eq!(
-            ledger.authorize(&PrincipalId::from("agent-a"), "write", "project-1", NOW),
+            ledger.authorize(
+                &PrincipalId::from("agent-a"),
+                &effect("write", "project-1", "write-p1-v1"),
+                NOW,
+            ),
             AuthorizationDecision::Allowed {
                 grant_id: GrantId::from("root")
             }
         );
-        assert_eq!(
-            ledger.authorize(&PrincipalId::from("agent-a"), "admin", "project-1", NOW),
-            AuthorizationDecision::Denied {
-                reason: DenialReason::NoMatchingGrant
-            }
-        );
+    }
+
+    #[test]
+    fn action_resource_or_parameter_change_does_not_match() {
+        let ledger = root_ledger();
+        for attempted in [
+            effect("admin", "project-1", "write-p1-v1"),
+            effect("write", "project-3", "write-p1-v1"),
+            effect("write", "project-1", "write-p1-other-amount-v1"),
+        ] {
+            assert_eq!(
+                ledger.authorize(&PrincipalId::from("agent-a"), &attempted, NOW),
+                AuthorizationDecision::Denied {
+                    reason: DenialReason::NoMatchingGrant
+                }
+            );
+        }
     }
 
     #[test]
@@ -609,8 +645,7 @@ mod tests {
                     "child",
                     "agent-a",
                     "agent-b",
-                    &["read"],
-                    &["project-1"],
+                    &[effect("read", "project-1", "read-p1-v1")],
                     950,
                     1_400,
                     true,
@@ -621,46 +656,45 @@ mod tests {
             )
             .expect("narrow child grant is admissible");
         assert_eq!(
-            ledger.authorize(&PrincipalId::from("agent-b"), "read", "project-1", NOW),
+            ledger.authorize(
+                &PrincipalId::from("agent-b"),
+                &effect("read", "project-1", "read-p1-v1"),
+                NOW,
+            ),
             AuthorizationDecision::Allowed {
                 grant_id: GrantId::from("child")
             }
         );
         assert!(matches!(
-            ledger.authorize(&PrincipalId::from("agent-b"), "write", "project-1", NOW),
-            AuthorizationDecision::Denied { .. }
-        ));
-        assert!(matches!(
-            ledger.authorize(&PrincipalId::from("agent-b"), "read", "project-2", NOW),
+            ledger.authorize(
+                &PrincipalId::from("agent-b"),
+                &effect("write", "project-1", "write-p1-v1"),
+                NOW,
+            ),
             AuthorizationDecision::Denied { .. }
         ));
     }
 
     #[test]
-    fn child_cannot_expand_action_scope() {
+    fn child_cannot_expand_effect_scope() {
         let mut ledger = root_ledger();
         assert_eq!(
             ledger.delegate(
                 &GrantId::from("root"),
-                grant("child", "agent-a", "agent-b", &["admin"], &["project-1"],
-                    950, 1_400, false, 0, Some("root")),
-                NOW
+                grant(
+                    "child",
+                    "agent-a",
+                    "agent-b",
+                    &[effect("admin", "project-1", "admin-p1-v1")],
+                    950,
+                    1_400,
+                    false,
+                    0,
+                    Some("root"),
+                ),
+                NOW,
             ),
-            Err(AuthorityError::ActionScopeExpansion)
-        );
-    }
-
-    #[test]
-    fn child_cannot_expand_resource_scope() {
-        let mut ledger = root_ledger();
-        assert_eq!(
-            ledger.delegate(
-                &GrantId::from("root"),
-                grant("child", "agent-a", "agent-b", &["read"], &["project-3"],
-                    950, 1_400, false, 0, Some("root")),
-                NOW
-            ),
-            Err(AuthorityError::ResourceScopeExpansion)
+            Err(AuthorityError::EffectScopeExpansion)
         );
     }
 
@@ -670,9 +704,18 @@ mod tests {
         assert_eq!(
             ledger.delegate(
                 &GrantId::from("root"),
-                grant("child", "agent-a", "agent-b", &["read"], &["project-1"],
-                    950, 1_501, false, 0, Some("root")),
-                NOW
+                grant(
+                    "child",
+                    "agent-a",
+                    "agent-b",
+                    &[effect("read", "project-1", "read-p1-v1")],
+                    950,
+                    1_501,
+                    false,
+                    0,
+                    Some("root"),
+                ),
+                NOW,
             ),
             Err(AuthorityError::ValidityWindowExpansion)
         );
@@ -684,9 +727,18 @@ mod tests {
         assert_eq!(
             ledger.delegate(
                 &GrantId::from("root"),
-                grant("child", "agent-a", "agent-b", &["read"], &["project-1"],
-                    950, 1_400, true, 2, Some("root")),
-                NOW
+                grant(
+                    "child",
+                    "agent-a",
+                    "agent-b",
+                    &[effect("read", "project-1", "read-p1-v1")],
+                    950,
+                    1_400,
+                    true,
+                    2,
+                    Some("root"),
+                ),
+                NOW,
             ),
             Err(AuthorityError::DelegationDepthExpansion)
         );
@@ -698,28 +750,97 @@ mod tests {
         assert_eq!(
             ledger.delegate(
                 &GrantId::from("root"),
-                grant("child", "attacker", "agent-b", &["read"], &["project-1"],
-                    950, 1_400, false, 0, Some("root")),
-                NOW
+                grant(
+                    "child",
+                    "attacker",
+                    "agent-b",
+                    &[effect("read", "project-1", "read-p1-v1")],
+                    950,
+                    1_400,
+                    false,
+                    0,
+                    Some("root"),
+                ),
+                NOW,
             ),
             Err(AuthorityError::DelegatorIdentityMismatch)
         );
     }
 
     #[test]
-    fn revoking_parent_invalidates_existing_child() {
+    fn delegation_depth_is_consumed_across_multiple_levels() {
         let mut ledger = root_ledger();
         ledger
             .delegate(
                 &GrantId::from("root"),
-                grant("child", "agent-a", "agent-b", &["read"], &["project-1"],
-                    950, 1_400, false, 0, Some("root")),
+                grant(
+                    "child",
+                    "agent-a",
+                    "agent-b",
+                    &[effect("read", "project-1", "read-p1-v1")],
+                    950,
+                    1_400,
+                    true,
+                    1,
+                    Some("root"),
+                ),
+                NOW,
+            )
+            .expect("first delegation");
+        ledger
+            .delegate(
+                &GrantId::from("child"),
+                grant(
+                    "grandchild",
+                    "agent-b",
+                    "agent-c",
+                    &[effect("read", "project-1", "read-p1-v1")],
+                    975,
+                    1_300,
+                    false,
+                    0,
+                    Some("child"),
+                ),
+                NOW,
+            )
+            .expect("second delegation");
+        assert!(matches!(
+            ledger.authorize(
+                &PrincipalId::from("agent-c"),
+                &effect("read", "project-1", "read-p1-v1"),
+                NOW,
+            ),
+            AuthorizationDecision::Allowed { .. }
+        ));
+    }
+
+    #[test]
+    fn revoking_parent_invalidates_existing_descendants() {
+        let mut ledger = root_ledger();
+        ledger
+            .delegate(
+                &GrantId::from("root"),
+                grant(
+                    "child",
+                    "agent-a",
+                    "agent-b",
+                    &[effect("read", "project-1", "read-p1-v1")],
+                    950,
+                    1_400,
+                    false,
+                    0,
+                    Some("root"),
+                ),
                 NOW,
             )
             .expect("valid child");
         ledger.revoke(&GrantId::from("root")).expect("root exists");
         assert_eq!(
-            ledger.authorize(&PrincipalId::from("agent-b"), "read", "project-1", NOW),
+            ledger.authorize(
+                &PrincipalId::from("agent-b"),
+                &effect("read", "project-1", "read-p1-v1"),
+                NOW,
+            ),
             AuthorizationDecision::Denied {
                 reason: DenialReason::AncestorRevoked
             }
@@ -730,11 +851,19 @@ mod tests {
     fn validity_window_is_half_open() {
         let ledger = root_ledger();
         assert!(matches!(
-            ledger.authorize(&PrincipalId::from("agent-a"), "read", "project-1", 900),
+            ledger.authorize(
+                &PrincipalId::from("agent-a"),
+                &effect("read", "project-1", "read-p1-v1"),
+                900,
+            ),
             AuthorizationDecision::Allowed { .. }
         ));
         assert_eq!(
-            ledger.authorize(&PrincipalId::from("agent-a"), "read", "project-1", 1_500),
+            ledger.authorize(
+                &PrincipalId::from("agent-a"),
+                &effect("read", "project-1", "read-p1-v1"),
+                1_500,
+            ),
             AuthorizationDecision::Denied {
                 reason: DenialReason::GrantExpired
             }
@@ -788,8 +917,15 @@ mod tests {
         let mut ledger = AuthorityLedger::new();
         assert_eq!(
             ledger.insert_root_grant(grant(
-                "bad-root", "owner", "agent-a", &["read"], &["project-1"],
-                900, 1_500, true, 0, None
+                "bad-root",
+                "owner",
+                "agent-a",
+                &[effect("read", "project-1", "read-p1-v1")],
+                900,
+                1_500,
+                true,
+                0,
+                None,
             )),
             Err(AuthorityError::DelegationFlagDepthMismatch)
         );
