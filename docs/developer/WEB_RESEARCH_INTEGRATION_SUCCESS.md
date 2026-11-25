@@ -224,7 +224,7 @@ learner.record_adjudicated_outcome(adjudicated)?;
 
 A research claim's confidence, epistemic status, source count or local verifier result is **not** an independent correctness label. Ordinary `EpistemicConsciousness::research()` extracts, verifies and integrates claims but does not write meta-learning correctness outcomes automatically.
 
-The learner's public update API accepts only `AdjudicatedVerificationOutcome`, which requires an explicit adjudication kind, authority ID and evidence reference. These fields are retained with the learned outcome and are exposed through `EpistemicLearner::adjudicated_outcomes()`. They bind provenance for audit; they do not authenticate the authority or prove the evidence is valid. Callers must use the existing independently adjudicated / evidence-custody process. Synthetic test fixtures must never be represented as live calibration data.
+The learner's public update API accepts only `AdjudicatedVerificationOutcome`, which requires an explicit adjudication kind, authority ID and evidence reference. These fields are retained with the learned outcome and are exposed through `EpistemicLearner::adjudicated_outcomes()`. They bind provenance for audit; they do not authenticate the authority or prove the evidence is valid. Callers must use the existing independently adjudicated / evidence-custody process. Synthetic test fixtures must never be represented as live calibration data. Persisted learner state is versioned and contains the adjudicated outcome records; restoration rebuilds derived aggregates from those records. Unversioned legacy snapshots and malformed records are rejected with calibration state reset, rather than restoring old aggregate credibility or Meta-Φ values.
 
 ## 📊 Performance Characteristics
 
