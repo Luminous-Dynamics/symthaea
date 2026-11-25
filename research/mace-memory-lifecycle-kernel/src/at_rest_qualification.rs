@@ -60,6 +60,14 @@ pub enum AtRestEvidenceEventKindV1 {
     RestoreApplied,
     SutRestartedAfterRestore,
     OrdinaryReadCompleted,
+    C1SutStoppedForNoOpReload,
+    C1SutRestartedAfterNoOpReload,
+    C1SeededReadCompleted,
+    C1InventoryUnchanged,
+    C2SutRestartedBeforeWrite,
+    C2WriteRequested,
+    C2WriteAcknowledged,
+    C2ReadbackCompleted,
 }
 
 /// Provenance boundary expected to emit each event.
@@ -70,6 +78,7 @@ pub enum AtRestEvidenceEventSourceV1 {
     SutErasureApi,
     RestoreHarness,
     SutReadApi,
+    StoreInventoryObserver,
 }
 
 #[derive(Clone, Debug, Eq, PartialEq)]
@@ -89,7 +98,9 @@ pub struct AtRestEvidenceEventV1 {
 #[derive(Clone, Debug, Eq, PartialEq)]
 pub struct AtRestControlReceiptV1 {
     pub passed: bool,
+    pub case_run_id: String,
     pub evidence_sha256: String,
+    pub events: Vec<AtRestEvidenceEventV1>,
 }
 
 #[derive(Clone, Debug, Eq, PartialEq)]
@@ -248,6 +259,8 @@ pub enum AtRestRejectV1 {
     DuplicateEventId,
     EventTimeNotMonotonic,
     EventClockProfileMismatch,
+    ControlEventTraceInvalid,
+    ControlEvidenceDigestMismatch,
 }
 
 #[derive(Clone, Copy, Debug, Default, Eq, PartialEq)]
@@ -300,7 +313,7 @@ pub fn validate_and_score_at_rest_report_v1(
         AtRestControlIdV1::C2GenuineWriteAfterRestart,
     ] {
         let receipt = report.controls.get(&control_id).ok_or(AtRestRejectV1::MissingControl)?;
-        validate_sha256(&receipt.evidence_sha256)?;
+        validate_control_event_trace(control_id, receipt)?;
         if !receipt.passed {
             return Err(AtRestRejectV1::ControlFailed);
         }
@@ -539,10 +552,22 @@ fn validate_operation_event_trace(
         ],
     };
 
+    let trace_sha256 = validate_event_sequence(events, case_run_id, expected)?;
+    let acknowledgement = events.get(2).ok_or(AtRestRejectV1::EventTraceMismatch)?;
+    if acknowledgement.receipt_sha256 != operation_receipt_sha256 {
+        return Err(AtRestRejectV1::OperationReceiptInvalid);
+    }
+    Ok(trace_sha256)
+}
+
+fn validate_event_sequence(
+    events: &[AtRestEvidenceEventV1],
+    case_run_id: &str,
+    expected: &[(AtRestEvidenceEventKindV1, AtRestEvidenceEventSourceV1)],
+) -> Result<String, AtRestRejectV1> {
     if events.len() != expected.len() {
         return Err(AtRestRejectV1::EventTraceMismatch);
     }
-
     let mut seen_ids = BTreeSet::new();
     let mut prior_time: Option<u64> = None;
     let mut clock_profile: Option<&str> = None;
@@ -574,12 +599,34 @@ fn validate_operation_event_trace(
         }
         prior_time = Some(event.monotonic_elapsed_ns);
     }
-
-    let acknowledgement = events.get(2).ok_or(AtRestRejectV1::EventTraceMismatch)?;
-    if acknowledgement.receipt_sha256 != operation_receipt_sha256 {
-        return Err(AtRestRejectV1::OperationReceiptInvalid);
-    }
     event_trace_sha256_v1(events)
+}
+
+fn validate_control_event_trace(
+    control_id: AtRestControlIdV1,
+    receipt: &AtRestControlReceiptV1,
+) -> Result<(), AtRestRejectV1> {
+    validate_atom(&receipt.case_run_id).map_err(|_| AtRestRejectV1::ControlEventTraceInvalid)?;
+    let expected: &[(AtRestEvidenceEventKindV1, AtRestEvidenceEventSourceV1)] = match control_id {
+        AtRestControlIdV1::C1NoOpReload => &[
+            (AtRestEvidenceEventKindV1::C1SutStoppedForNoOpReload, AtRestEvidenceEventSourceV1::SutProcessObserver),
+            (AtRestEvidenceEventKindV1::C1SutRestartedAfterNoOpReload, AtRestEvidenceEventSourceV1::SutProcessObserver),
+            (AtRestEvidenceEventKindV1::C1SeededReadCompleted, AtRestEvidenceEventSourceV1::SutReadApi),
+            (AtRestEvidenceEventKindV1::C1InventoryUnchanged, AtRestEvidenceEventSourceV1::StoreInventoryObserver),
+        ],
+        AtRestControlIdV1::C2GenuineWriteAfterRestart => &[
+            (AtRestEvidenceEventKindV1::C2SutRestartedBeforeWrite, AtRestEvidenceEventSourceV1::SutProcessObserver),
+            (AtRestEvidenceEventKindV1::C2WriteRequested, AtRestEvidenceEventSourceV1::SutWriteApi),
+            (AtRestEvidenceEventKindV1::C2WriteAcknowledged, AtRestEvidenceEventSourceV1::SutWriteApi),
+            (AtRestEvidenceEventKindV1::C2ReadbackCompleted, AtRestEvidenceEventSourceV1::SutReadApi),
+        ],
+    };
+    let actual = validate_event_sequence(&receipt.events, &receipt.case_run_id, expected)
+        .map_err(|_| AtRestRejectV1::ControlEventTraceInvalid)?;
+    if actual != receipt.evidence_sha256 {
+        return Err(AtRestRejectV1::ControlEvidenceDigestMismatch);
+    }
+    Ok(())
 }
 
 fn event_trace_sha256_v1(
@@ -612,6 +659,14 @@ fn event_kind_tag(value: AtRestEvidenceEventKindV1) -> u8 {
         AtRestEvidenceEventKindV1::RestoreApplied => 7,
         AtRestEvidenceEventKindV1::SutRestartedAfterRestore => 8,
         AtRestEvidenceEventKindV1::OrdinaryReadCompleted => 9,
+        AtRestEvidenceEventKindV1::C1SutStoppedForNoOpReload => 10,
+        AtRestEvidenceEventKindV1::C1SutRestartedAfterNoOpReload => 11,
+        AtRestEvidenceEventKindV1::C1SeededReadCompleted => 12,
+        AtRestEvidenceEventKindV1::C1InventoryUnchanged => 13,
+        AtRestEvidenceEventKindV1::C2SutRestartedBeforeWrite => 14,
+        AtRestEvidenceEventKindV1::C2WriteRequested => 15,
+        AtRestEvidenceEventKindV1::C2WriteAcknowledged => 16,
+        AtRestEvidenceEventKindV1::C2ReadbackCompleted => 17,
     }
 }
 
@@ -622,6 +677,7 @@ fn event_source_tag(value: AtRestEvidenceEventSourceV1) -> u8 {
         AtRestEvidenceEventSourceV1::SutErasureApi => 3,
         AtRestEvidenceEventSourceV1::RestoreHarness => 4,
         AtRestEvidenceEventSourceV1::SutReadApi => 5,
+        AtRestEvidenceEventSourceV1::StoreInventoryObserver => 6,
     }
 }
 
@@ -874,6 +930,33 @@ mod tests {
         }
     }
 
+    fn control_event_trace(control_id: AtRestControlIdV1, case_run_id: &str) -> Vec<AtRestEvidenceEventV1> {
+        let expected: &[(AtRestEvidenceEventKindV1, AtRestEvidenceEventSourceV1)] = match control_id {
+            AtRestControlIdV1::C1NoOpReload => &[
+                (AtRestEvidenceEventKindV1::C1SutStoppedForNoOpReload, AtRestEvidenceEventSourceV1::SutProcessObserver),
+                (AtRestEvidenceEventKindV1::C1SutRestartedAfterNoOpReload, AtRestEvidenceEventSourceV1::SutProcessObserver),
+                (AtRestEvidenceEventKindV1::C1SeededReadCompleted, AtRestEvidenceEventSourceV1::SutReadApi),
+                (AtRestEvidenceEventKindV1::C1InventoryUnchanged, AtRestEvidenceEventSourceV1::StoreInventoryObserver),
+            ],
+            AtRestControlIdV1::C2GenuineWriteAfterRestart => &[
+                (AtRestEvidenceEventKindV1::C2SutRestartedBeforeWrite, AtRestEvidenceEventSourceV1::SutProcessObserver),
+                (AtRestEvidenceEventKindV1::C2WriteRequested, AtRestEvidenceEventSourceV1::SutWriteApi),
+                (AtRestEvidenceEventKindV1::C2WriteAcknowledged, AtRestEvidenceEventSourceV1::SutWriteApi),
+                (AtRestEvidenceEventKindV1::C2ReadbackCompleted, AtRestEvidenceEventSourceV1::SutReadApi),
+            ],
+        };
+        expected.iter().enumerate().map(|(index, (kind, source))| AtRestEvidenceEventV1 {
+            sequence: index as u64,
+            case_run_id: case_run_id.to_owned(),
+            event_id: format!("{case_run_id}-event-{index}"),
+            kind: *kind,
+            source: *source,
+            monotonic_elapsed_ns: ((index as u64) + 1) * 10,
+            clock_profile_sha256: digest('c'),
+            receipt_sha256: digest(char::from(b'a' + index as u8)),
+        }).collect()
+    }
+
     fn report(
         t9_observation: AtRestObservationV1,
         t10_observation: AtRestObservationV1,
@@ -886,11 +969,27 @@ mod tests {
             controls: BTreeMap::from([
                 (
                     AtRestControlIdV1::C1NoOpReload,
-                    AtRestControlReceiptV1 { passed: true, evidence_sha256: digest('d') },
+                    {
+                        let events = control_event_trace(AtRestControlIdV1::C1NoOpReload, "c1-run-1");
+                        AtRestControlReceiptV1 {
+                            passed: true,
+                            case_run_id: "c1-run-1".to_owned(),
+                            evidence_sha256: event_trace_sha256_v1(&events).unwrap(),
+                            events,
+                        }
+                    },
                 ),
                 (
                     AtRestControlIdV1::C2GenuineWriteAfterRestart,
-                    AtRestControlReceiptV1 { passed: true, evidence_sha256: digest('e') },
+                    {
+                        let events = control_event_trace(AtRestControlIdV1::C2GenuineWriteAfterRestart, "c2-run-1");
+                        AtRestControlReceiptV1 {
+                            passed: true,
+                            case_run_id: "c2-run-1".to_owned(),
+                            evidence_sha256: event_trace_sha256_v1(&events).unwrap(),
+                            events,
+                        }
+                    },
                 ),
             ]),
             cases: vec![
@@ -983,6 +1082,35 @@ mod tests {
         assert_eq!(
             validate_and_score_at_rest_report_v1(&value),
             Err(AtRestRejectV1::MissingControl)
+        );
+    }
+
+    #[test]
+    fn mandatory_controls_require_run_bound_ordered_source_events() {
+        let mut value = report(rejected_on_read(), rejected_on_read());
+        value.controls.get_mut(&AtRestControlIdV1::C1NoOpReload).unwrap().events.swap(0, 1);
+        assert_eq!(
+            validate_and_score_at_rest_report_v1(&value),
+            Err(AtRestRejectV1::ControlEventTraceInvalid)
+        );
+
+        let mut value = report(rejected_on_read(), rejected_on_read());
+        value.controls.get_mut(&AtRestControlIdV1::C2GenuineWriteAfterRestart).unwrap()
+            .events[2].case_run_id = "other-control-run".to_owned();
+        assert_eq!(
+            validate_and_score_at_rest_report_v1(&value),
+            Err(AtRestRejectV1::ControlEventTraceInvalid)
+        );
+    }
+
+    #[test]
+    fn control_evidence_digest_commits_to_the_complete_event_trace() {
+        let mut value = report(rejected_on_read(), rejected_on_read());
+        value.controls.get_mut(&AtRestControlIdV1::C2GenuineWriteAfterRestart).unwrap()
+            .events[3].receipt_sha256 = digest('9');
+        assert_eq!(
+            validate_and_score_at_rest_report_v1(&value),
+            Err(AtRestRejectV1::ControlEvidenceDigestMismatch)
         );
     }
 
