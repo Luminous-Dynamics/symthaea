@@ -1,0 +1,193 @@
+{
+  "schema_version": "1.1.0",
+  "candidate": {
+    "pair_id": "PAIR-SYNTHETIC-IMPLICATION-CONVERSE-001",
+    "task_class": "synthetic_control_not_model_evaluation",
+    "model_identity": {
+      "provider": "synthetic_fixture",
+      "model": "deterministic_stipulated_output",
+      "version": "1",
+      "decoding_config_sha256": "807969c24abf78b50e72a98e5bd719347724162aebf1db7048405d333fb3182c"
+    },
+    "local_stage": {
+      "scope_binding": {
+        "source_repository": "symthaea.synthetic",
+        "source_revision": "fixture-v1",
+        "source_path": "truth_tables/implication_converse.json",
+        "declaration": "synthetic.non_entailment.implication_converse",
+        "theorem_id": "SYNTHETIC-NON-ENTAILMENT-IMPLICATION-CONVERSE",
+        "root_goal_sha256": "e0fd61c424cba2e3444d7c8e433e19138f547975adba4254a41343ca8633f9ee",
+        "hypothesis_set_sha256": "056fde24724099f0fc73830cb5d2b1f3500104723e2178d374205c7c9ce5057f",
+        "premise_set_sha256": "d4ecae3e4bbacc2d820fa77b0d0320e8b0c6517d803908823b4af3a399adbeca",
+        "conclusion_sha256": "4d8ea47ef4580219b4f715e337508a1da28c81ac5a1af5fdb17992c16e8e53f1",
+        "warrant_id": "W-IMPLICATION-CONVERSE",
+        "warrant_sha256": "94dd994ac8b135cba74a010ae96a4980a014f367fe6f0be4f7e6800f52a662b9",
+        "root_goal_text": "(q → p)",
+        "hypotheses": [],
+        "premises": [
+          "(p → q)"
+        ],
+        "conclusion_text": "(q → p)",
+        "warrant_text": "From (p → q) infer (q → p).",
+        "finite_boolean_sequent": {
+          "hypotheses": [],
+          "premises": [
+            {
+              "op": "implies",
+              "left": {
+                "op": "atom",
+                "name": "p"
+              },
+              "right": {
+                "op": "atom",
+                "name": "q"
+              }
+            }
+          ],
+          "conclusion": {
+            "op": "implies",
+            "left": {
+              "op": "atom",
+              "name": "q"
+            },
+            "right": {
+              "op": "atom",
+              "name": "p"
+            }
+          }
+        },
+        "finite_boolean_sequent_sha256": "13399db2f18fdaff704b4e7adda4e7e4b4be0aedfd241a409b4799c3d31dcef1"
+      },
+      "execution": {
+        "prompt_sha256": "19ecd8ae491541d1451cd6bdf9fc9a173b3a55b834f0987d0df62d72ce7ba4fe",
+        "input_sha256": "b944c0910411ae8e28286bfc0ca7f69614ea97a308f22cfb658b48819233928d",
+        "output_sha256": "15efb6637688bc76f9609a7543abc6ad0e02a8b2c98400360f5ebaa5bd540a2a",
+        "output_artifact_ref": "synthetic://candidate/local-stage-output",
+        "token_budget": 500,
+        "tokens_used": 35,
+        "tool_call_budget": 0,
+        "tool_calls_used": 0,
+        "wall_clock_budget_ms": 2000,
+        "wall_clock_used_ms": 20
+      },
+      "verdict": "reject"
+    },
+    "global_stage": {
+      "scope_binding": {
+        "source_repository": "symthaea.synthetic",
+        "source_revision": "fixture-v1",
+        "source_path": "truth_tables/implication_converse.json",
+        "declaration": "synthetic.non_entailment.implication_converse",
+        "theorem_id": "SYNTHETIC-NON-ENTAILMENT-IMPLICATION-CONVERSE",
+        "root_goal_sha256": "e0fd61c424cba2e3444d7c8e433e19138f547975adba4254a41343ca8633f9ee",
+        "hypothesis_set_sha256": "056fde24724099f0fc73830cb5d2b1f3500104723e2178d374205c7c9ce5057f",
+        "premise_set_sha256": "d4ecae3e4bbacc2d820fa77b0d0320e8b0c6517d803908823b4af3a399adbeca",
+        "conclusion_sha256": "4d8ea47ef4580219b4f715e337508a1da28c81ac5a1af5fdb17992c16e8e53f1",
+        "warrant_id": "W-IMPLICATION-CONVERSE",
+        "warrant_sha256": "94dd994ac8b135cba74a010ae96a4980a014f367fe6f0be4f7e6800f52a662b9",
+        "root_goal_text": "(q → p)",
+        "hypotheses": [],
+        "premises": [
+          "(p → q)"
+        ],
+        "conclusion_text": "(q → p)",
+        "warrant_text": "From (p → q) infer (q → p).",
+        "finite_boolean_sequent": {
+          "hypotheses": [],
+          "premises": [
+            {
+              "op": "implies",
+              "left": {
+                "op": "atom",
+                "name": "p"
+              },
+              "right": {
+                "op": "atom",
+                "name": "q"
+              }
+            }
+          ],
+          "conclusion": {
+            "op": "implies",
+            "left": {
+              "op": "atom",
+              "name": "q"
+            },
+            "right": {
+              "op": "atom",
+              "name": "p"
+            }
+          }
+        },
+        "finite_boolean_sequent_sha256": "13399db2f18fdaff704b4e7adda4e7e4b4be0aedfd241a409b4799c3d31dcef1"
+      },
+      "execution": {
+        "prompt_sha256": "bbdf550fd6093eb04217ece68774b259e5bde9a92071bcb6ff9be5bec7c18c1f",
+        "input_sha256": "7824f1c72a12ba7bfdca33d4ed9e923d200e5ef75811b703f1ae8442ada86fbf",
+        "output_sha256": "48441a06a011f465ff4a6005d65e8b686f1c0743bd14780c6ca5d0e15214d5ba",
+        "output_artifact_ref": "synthetic://candidate/global-stage-output",
+        "token_budget": 1000,
+        "tokens_used": 120,
+        "tool_call_budget": 0,
+        "tool_calls_used": 0,
+        "wall_clock_budget_ms": 4000,
+        "wall_clock_used_ms": 40
+      },
+      "proof_plan_sha256": "e0331b52d0b36a3244e42edf190b4b073bb084c1dd915a7f87c17b55b109fb74",
+      "warrant_mentions": [
+        {
+          "mention_id": "MENTION-W-P-TO-Q-001",
+          "warrant_id": "W-IMPLICATION-CONVERSE",
+          "plan_node_id": "N1",
+          "relation": "uses_as_rule"
+        }
+      ]
+    }
+  },
+  "evaluator_only": {
+    "eligibility": "eligible",
+    "exclusion_reason": null,
+    "independently_assessed_warrant": "invalid",
+    "local_verdict_correct": true,
+    "global_disposition": "used_directly",
+    "adjudication_authority": "finite_boolean_countermodel",
+    "adjudication_refs": [
+      "FINITE-SEMANTICS:p-implies-q-does-not-entail-q-implies-p",
+      "LOCAL-GLOBAL-PAIR:SYNTHETIC-ONLY"
+    ],
+    "finite_boolean_countermodel": {
+      "valuation": [
+        {
+          "atom": "p",
+          "value": false
+        },
+        {
+          "atom": "q",
+          "value": true
+        }
+      ]
+    },
+    "global_use_adjudication": {
+      "disposition": "used_directly",
+      "reviewer_id": "SYNTHETIC-POSTHOC-REVIEWER-001",
+      "reviewer_authority": "synthetic_fixture_plan_trace_adjudication",
+      "reviewed_plan_sha256": "e0331b52d0b36a3244e42edf190b4b073bb084c1dd915a7f87c17b55b109fb74",
+      "target_warrant_id": "W-IMPLICATION-CONVERSE",
+      "reviewed_entire_plan": true,
+      "node_evidence": [
+        {
+          "plan_node_id": "N1",
+          "warrant_id": "W-IMPLICATION-CONVERSE",
+          "relation": "uses_as_rule",
+          "material_use": true,
+          "rationale_ref": "LOCAL-GLOBAL-PAIR:SYNTHETIC-ONLY",
+          "mention_id": "MENTION-W-P-TO-Q-001"
+        }
+      ],
+      "evidence_refs": [
+        "PLAN-ARTIFACT:sha256:e0331b52d0b36a3244e42edf190b4b073bb084c1dd915a7f87c17b55b109fb74",
+        "LOCAL-GLOBAL-PAIR:SYNTHETIC-ONLY"
+      ]
+    }
+  }
+}

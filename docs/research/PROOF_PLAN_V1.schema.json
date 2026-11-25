@@ -1,0 +1,805 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://github.com/Luminous-Dynamics/symthaea/blob/main/docs/research/PROOF_PLAN_V1.schema.json",
+  "title": "Symthaea ProofPlanV1",
+  "description": "A provenance-bound representation of a mathematical proof plan. Structural validity does not certify a proof, theorem, or human understanding.",
+  "type": "object",
+  "additionalProperties": false,
+  "required": [
+    "schema_version",
+    "plan_id",
+    "status",
+    "theorem",
+    "environment",
+    "root_goal_id",
+    "nodes",
+    "edges",
+    "evidence",
+    "alternatives",
+    "validation",
+    "reviewers",
+    "limitations"
+  ],
+  "properties": {
+    "schema_version": {
+      "const": "1.0.0"
+    },
+    "plan_id": {
+      "type": "string",
+      "minLength": 1
+    },
+    "status": {
+      "enum": [
+        "source_pinned_provisional",
+        "in_progress",
+        "reviewed",
+        "accepted",
+        "rejected",
+        "inconclusive"
+      ]
+    },
+    "theorem": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "declaration",
+        "statement",
+        "identity_status",
+        "source",
+        "elaborated_type_sha256"
+      ],
+      "properties": {
+        "declaration": {
+          "type": "string",
+          "minLength": 1
+        },
+        "statement": {
+          "type": "string",
+          "minLength": 1
+        },
+        "identity_status": {
+          "enum": [
+            "source_pinned_provisional",
+            "elaborated_type_bound",
+            "kernel_checked",
+            "unresolved"
+          ]
+        },
+        "source": {
+          "type": "object",
+          "additionalProperties": false,
+          "required": [
+            "repository",
+            "revision",
+            "path",
+            "blob_sha",
+            "line_start",
+            "line_end",
+            "url"
+          ],
+          "properties": {
+            "repository": {
+              "type": "string",
+              "minLength": 1
+            },
+            "revision": {
+              "type": "string",
+              "pattern": "^[a-f0-9]{40}$"
+            },
+            "path": {
+              "type": "string",
+              "minLength": 1
+            },
+            "blob_sha": {
+              "type": "string",
+              "pattern": "^[a-f0-9]{40}$"
+            },
+            "line_start": {
+              "type": "integer",
+              "minimum": 1
+            },
+            "line_end": {
+              "type": "integer",
+              "minimum": 1
+            },
+            "url": {
+              "type": "string",
+              "format": "uri"
+            }
+          }
+        },
+        "elaborated_type_sha256": {
+          "type": [
+            "string",
+            "null"
+          ],
+          "pattern": "^[a-f0-9]{64}$"
+        }
+      }
+    },
+    "environment": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "status",
+        "lean_version",
+        "mathlib_revision",
+        "lake_manifest_sha256"
+      ],
+      "properties": {
+        "status": {
+          "enum": [
+            "source_only",
+            "built",
+            "kernel_checked",
+            "unresolved"
+          ]
+        },
+        "lean_version": {
+          "type": [
+            "string",
+            "null"
+          ]
+        },
+        "mathlib_revision": {
+          "type": [
+            "string",
+            "null"
+          ]
+        },
+        "lake_manifest_sha256": {
+          "type": [
+            "string",
+            "null"
+          ],
+          "pattern": "^[a-f0-9]{64}$"
+        }
+      }
+    },
+    "root_goal_id": {
+      "type": "string",
+      "minLength": 1
+    },
+    "nodes": {
+      "type": "array",
+      "minItems": 1,
+      "items": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": [
+          "id",
+          "kind",
+          "label",
+          "epistemic_class",
+          "evidence_refs"
+        ],
+        "properties": {
+          "id": {
+            "type": "string",
+            "minLength": 1
+          },
+          "kind": {
+            "enum": [
+              "goal_state",
+              "plan_action",
+              "justification",
+              "side_condition",
+              "subgoal",
+              "witness_or_construction",
+              "invariant",
+              "terminal_claim",
+              "unresolved_step"
+            ]
+          },
+          "label": {
+            "type": "string",
+            "minLength": 1
+          },
+          "statement": {
+            "type": "string",
+            "minLength": 1
+          },
+          "epistemic_class": {
+            "enum": [
+              "formal_fact",
+              "mathematical_interpretation",
+              "analogy",
+              "unknown"
+            ]
+          },
+          "evidence_refs": {
+            "type": "array",
+            "uniqueItems": true,
+            "items": {
+              "type": "string",
+              "minLength": 1
+            }
+          },
+          "action_spec": {
+            "type": "object",
+            "additionalProperties": false,
+            "required": [
+              "operation",
+              "input_goal_ids",
+              "output_subgoal_ids",
+              "consumed_side_condition_ids",
+              "justification_node_ids",
+              "rationale",
+              "evidence_refs"
+            ],
+            "properties": {
+              "operation": {
+                "enum": [
+                  "split_iff",
+                  "introduce",
+                  "specialize",
+                  "apply_lemma",
+                  "rewrite",
+                  "cases",
+                  "induction",
+                  "construct_witness",
+                  "contradiction",
+                  "bound",
+                  "normalize",
+                  "transport",
+                  "reduce",
+                  "compose",
+                  "other"
+                ]
+              },
+              "input_goal_ids": {
+                "type": "array",
+                "minItems": 1,
+                "uniqueItems": true,
+                "items": {
+                  "type": "string",
+                  "minLength": 1
+                }
+              },
+              "output_subgoal_ids": {
+                "type": "array",
+                "uniqueItems": true,
+                "items": {
+                  "type": "string",
+                  "minLength": 1
+                }
+              },
+              "consumed_side_condition_ids": {
+                "type": "array",
+                "uniqueItems": true,
+                "items": {
+                  "type": "string",
+                  "minLength": 1
+                }
+              },
+              "justification_node_ids": {
+                "type": "array",
+                "minItems": 1,
+                "uniqueItems": true,
+                "items": {
+                  "type": "string",
+                  "minLength": 1
+                }
+              },
+              "rationale": {
+                "type": "string",
+                "minLength": 1
+              },
+              "evidence_refs": {
+                "type": "array",
+                "minItems": 1,
+                "uniqueItems": true,
+                "items": {
+                  "type": "string",
+                  "minLength": 1
+                }
+              }
+            }
+          },
+          "analogy_boundary": {
+            "type": "string",
+            "minLength": 1
+          },
+          "unresolved_reason": {
+            "type": "string",
+            "minLength": 1
+          }
+        },
+        "allOf": [
+          {
+            "if": {
+              "properties": {
+                "kind": {
+                  "const": "plan_action"
+                }
+              },
+              "required": [
+                "kind"
+              ]
+            },
+            "then": {
+              "required": [
+                "action_spec"
+              ]
+            },
+            "else": {
+              "not": {
+                "required": [
+                  "action_spec"
+                ]
+              }
+            }
+          },
+          {
+            "if": {
+              "properties": {
+                "epistemic_class": {
+                  "enum": [
+                    "formal_fact",
+                    "mathematical_interpretation"
+                  ]
+                }
+              },
+              "required": [
+                "epistemic_class"
+              ]
+            },
+            "then": {
+              "properties": {
+                "evidence_refs": {
+                  "minItems": 1
+                }
+              }
+            }
+          },
+          {
+            "if": {
+              "properties": {
+                "epistemic_class": {
+                  "const": "analogy"
+                }
+              },
+              "required": [
+                "epistemic_class"
+              ]
+            },
+            "then": {
+              "required": [
+                "analogy_boundary"
+              ]
+            }
+          },
+          {
+            "if": {
+              "properties": {
+                "epistemic_class": {
+                  "const": "unknown"
+                }
+              },
+              "required": [
+                "epistemic_class"
+              ]
+            },
+            "then": {
+              "required": [
+                "unresolved_reason"
+              ]
+            }
+          }
+        ]
+      }
+    },
+    "edges": {
+      "type": "array",
+      "items": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": [
+          "source_id",
+          "target_id",
+          "relation",
+          "evidence_refs"
+        ],
+        "properties": {
+          "source_id": {
+            "type": "string",
+            "minLength": 1
+          },
+          "target_id": {
+            "type": "string",
+            "minLength": 1
+          },
+          "relation": {
+            "enum": [
+              "transforms",
+              "justified_by",
+              "requires",
+              "creates_subgoal",
+              "preserves",
+              "discharges",
+              "constructs",
+              "alternative_to",
+              "evidenced_by",
+              "unknown_because"
+            ]
+          },
+          "evidence_refs": {
+            "type": "array",
+            "minItems": 1,
+            "uniqueItems": true,
+            "items": {
+              "type": "string",
+              "minLength": 1
+            }
+          }
+        }
+      }
+    },
+    "evidence": {
+      "type": "array",
+      "items": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": [
+          "id",
+          "kind",
+          "authority",
+          "status",
+          "description"
+        ],
+        "properties": {
+          "id": {
+            "type": "string",
+            "minLength": 1
+          },
+          "kind": {
+            "enum": [
+              "source_span",
+              "declaration_metadata",
+              "elaborated_type",
+              "elaborated_value",
+              "lean_kernel_check",
+              "independent_checker",
+              "finite_witness",
+              "human_review",
+              "external_graph",
+              "other"
+            ]
+          },
+          "authority": {
+            "enum": [
+              "repository_source_inspection",
+              "lean_environment_extractor",
+              "lean_kernel",
+              "independent_checker",
+              "finite_reference_oracle",
+              "mathematical_reviewer",
+              "external_dataset",
+              "other"
+            ]
+          },
+          "status": {
+            "enum": [
+              "observed",
+              "not_run",
+              "passed",
+              "rejected",
+              "inconclusive"
+            ]
+          },
+          "description": {
+            "type": "string",
+            "minLength": 1
+          },
+          "source": {
+            "type": "object",
+            "additionalProperties": false,
+            "required": [
+              "repository",
+              "revision",
+              "path",
+              "blob_sha",
+              "line_start",
+              "line_end",
+              "url"
+            ],
+            "properties": {
+              "repository": {
+                "type": "string",
+                "minLength": 1
+              },
+              "revision": {
+                "type": "string",
+                "pattern": "^[a-f0-9]{40}$"
+              },
+              "path": {
+                "type": "string",
+                "minLength": 1
+              },
+              "blob_sha": {
+                "type": "string",
+                "pattern": "^[a-f0-9]{40}$"
+              },
+              "line_start": {
+                "type": "integer",
+                "minimum": 1
+              },
+              "line_end": {
+                "type": "integer",
+                "minimum": 1
+              },
+              "url": {
+                "type": "string",
+                "format": "uri"
+              }
+            }
+          },
+          "sha256": {
+            "type": [
+              "string",
+              "null"
+            ],
+            "pattern": "^[a-f0-9]{64}$"
+          },
+          "checker": {
+            "type": "string",
+            "minLength": 1
+          },
+          "checker_version": {
+            "type": "string",
+            "minLength": 1
+          },
+          "verdict": {
+            "enum": [
+              "accepted",
+              "rejected",
+              "error",
+              "timeout",
+              "inconclusive"
+            ]
+          }
+        }
+      }
+    },
+    "alternatives": {
+      "type": "array",
+      "minItems": 1,
+      "items": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": [
+          "id",
+          "label",
+          "root_goal_id",
+          "node_ids",
+          "status"
+        ],
+        "properties": {
+          "id": {
+            "type": "string",
+            "minLength": 1
+          },
+          "label": {
+            "type": "string",
+            "minLength": 1
+          },
+          "root_goal_id": {
+            "type": "string",
+            "minLength": 1
+          },
+          "node_ids": {
+            "type": "array",
+            "minItems": 1,
+            "uniqueItems": true,
+            "items": {
+              "type": "string",
+              "minLength": 1
+            }
+          },
+          "status": {
+            "enum": [
+              "primary",
+              "candidate",
+              "rejected",
+              "unknown"
+            ]
+          }
+        }
+      }
+    },
+    "validation": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "graph_structure_status",
+        "lean_kernel_status",
+        "expert_review_status",
+        "human_comprehension_status"
+      ],
+      "properties": {
+        "graph_structure_status": {
+          "enum": [
+            "not_run",
+            "passed",
+            "failed",
+            "inconclusive"
+          ]
+        },
+        "lean_kernel_status": {
+          "enum": [
+            "not_run",
+            "accepted",
+            "rejected",
+            "error",
+            "timeout",
+            "inconclusive"
+          ]
+        },
+        "expert_review_status": {
+          "enum": [
+            "not_reviewed",
+            "accepted",
+            "rejected",
+            "disputed",
+            "inconclusive"
+          ]
+        },
+        "human_comprehension_status": {
+          "enum": [
+            "not_run",
+            "in_progress",
+            "complete",
+            "inconclusive"
+          ]
+        },
+        "validator_version": {
+          "type": [
+            "string",
+            "null"
+          ]
+        }
+      }
+    },
+    "reviewers": {
+      "type": "array",
+      "items": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": [
+          "reviewer_id",
+          "role",
+          "disposition"
+        ],
+        "properties": {
+          "reviewer_id": {
+            "type": "string",
+            "minLength": 1
+          },
+          "role": {
+            "type": "string",
+            "minLength": 1
+          },
+          "disposition": {
+            "enum": [
+              "not_reviewed",
+              "accepted",
+              "rejected",
+              "disputed",
+              "inconclusive"
+            ]
+          },
+          "rationale": {
+            "type": [
+              "string",
+              "null"
+            ]
+          }
+        }
+      }
+    },
+    "limitations": {
+      "type": "array",
+      "minItems": 1,
+      "items": {
+        "type": "string",
+        "minLength": 1
+      }
+    }
+  },
+  "allOf": [
+    {
+      "if": {
+        "properties": {
+          "status": {
+            "const": "accepted"
+          }
+        },
+        "required": [
+          "status"
+        ]
+      },
+      "then": {
+        "properties": {
+          "validation": {
+            "properties": {
+              "lean_kernel_status": {
+                "const": "accepted"
+              },
+              "expert_review_status": {
+                "const": "accepted"
+              },
+              "graph_structure_status": {
+                "const": "passed"
+              }
+            }
+          }
+        }
+      }
+    },
+    {
+      "if": {
+        "properties": {
+          "validation": {
+            "properties": {
+              "lean_kernel_status": {
+                "const": "accepted"
+              }
+            },
+            "required": [
+              "lean_kernel_status"
+            ]
+          }
+        },
+        "required": [
+          "validation"
+        ]
+      },
+      "then": {
+        "properties": {
+          "evidence": {
+            "contains": {
+              "properties": {
+                "kind": {
+                  "const": "lean_kernel_check"
+                },
+                "verdict": {
+                  "const": "accepted"
+                }
+              },
+              "required": [
+                "kind",
+                "verdict"
+              ]
+            }
+          }
+        }
+      }
+    },
+    {
+      "if": {
+        "properties": {
+          "validation": {
+            "properties": {
+              "expert_review_status": {
+                "const": "accepted"
+              }
+            },
+            "required": [
+              "expert_review_status"
+            ]
+          }
+        },
+        "required": [
+          "validation"
+        ]
+      },
+      "then": {
+        "properties": {
+          "reviewers": {
+            "minItems": 2
+          }
+        }
+      }
+    }
+  ]
+}

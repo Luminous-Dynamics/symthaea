@@ -1,0 +1,84 @@
+{
+  "schema_version": "1.0.0",
+  "artifact_id": "LEAN-AXIOM-AUDIT-IMPORTED-INDUCTIVE-001",
+  "status": "independent_audit_pending",
+  "lean_toolchain": "leanprover/lean4:v4.37.0-rc1",
+  "lean_core_revision": "0b77e12952ad39077d80d8bd6b66d601f225c321",
+  "mathlib_revision": "6ebcce37335bcb6bca64596e5d57bb3035648030",
+  "sources": {
+    "module_a": {
+      "path": "scripts/research/lean-proof-extractor/axiom-audit-imported-inductive/A.lean",
+      "sha256": "e70af7d30ac091e8a50f219a1c53a7c85be5c750f2eb3ff127fcedc3b99a3003"
+    },
+    "module_b": {
+      "path": "scripts/research/lean-proof-extractor/axiom-audit-imported-inductive/B.lean",
+      "sha256": "b3bc644eab2fd0c4036ff02a463637ad854d76a5fb7ddb6cbb761641b9da3b1a"
+    },
+    "module_proof": {
+      "path": "scripts/research/lean-proof-extractor/ProofActionCertificateAndComm.lean",
+      "sha256": "9d1096dc51b80c06b35ee6ac987ec6f2bb92be4f0a3267f1df4074ed4372dcc4"
+    }
+  },
+  "roots": [
+    {
+      "name": "S9",
+      "expected_fresh_axioms": [
+        "Classical.choice"
+      ]
+    },
+    {
+      "name": "S9.mk",
+      "expected_fresh_axioms": [
+        "Classical.choice"
+      ]
+    },
+    {
+      "name": "usesS9",
+      "expected_fresh_axioms": [
+        "Classical.choice"
+      ]
+    },
+    {
+      "name": "And.comm",
+      "expected_fresh_axioms": []
+    },
+    {
+      "name": "ProofPlanActionCertificatePilot.and_comm_split_iff",
+      "expected_fresh_axioms": []
+    },
+    {
+      "name": "ProofPlanActionCertificatePilot.and_comm_forward",
+      "expected_fresh_axioms": []
+    },
+    {
+      "name": "ProofPlanActionCertificatePilot.and_comm_reverse",
+      "expected_fresh_axioms": []
+    },
+    {
+      "name": "ProofPlanActionCertificatePilot.and_comm_plan_replay",
+      "expected_fresh_axioms": []
+    }
+  ],
+  "audit_algorithm": {
+    "lookup": "env.setExporting false then env.checked.get.find?",
+    "state": "fresh per-root DFS; visited set only; no partial dependency result cache",
+    "traversed_constant_kinds": [
+      "axiom",
+      "definition",
+      "theorem",
+      "opaque",
+      "quotient",
+      "constructor",
+      "recursor",
+      "inductive"
+    ],
+    "inductive_edges": "inductive type plus all constructors",
+    "unresolved_policy": "preserve unresolved constant name in dependency set; exact expected-set assertion fails closed"
+  },
+  "claim_ceiling": [
+    "The project-side fresh DFS detected Classical.choice through the imported S9 inductive/constructor cycle and theorem usesS9, and returned an empty axiom set for And.comm plus all four local proof-action declarations, in this exact Lean environment.",
+    "Native #print axioms output is captured as a diagnostic and is not the independent audit acceptance oracle.",
+    "This is a research prototype, not a verified replacement for Lean's kernel or a complete repository-wide trust audit.",
+    "The reproduction covers one imported inductive/constructor cycle and one downstream theorem; mutual/nested inductives, all declaration forms and complete repository-wide trust closure require more adversarial cases."
+  ]
+}

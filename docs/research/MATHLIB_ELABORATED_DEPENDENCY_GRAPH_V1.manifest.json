@@ -1,0 +1,81 @@
+{
+  "schema_version": "1.0.0",
+  "status": "source_pinned_extraction_job_passed_small_pilot",
+  "execution": {
+    "repository": "Luminous-Dynamics/symthaea",
+    "branch": "research/math-proof-comprehension-001",
+    "source_head": "66ae219108312c868da42ac77fe468b3f8a880b9",
+    "workflow_run_id": 45194165987,
+    "workflow_run_url": "https://github.com/Luminous-Dynamics/symthaea/actions/runs/45194165987",
+    "job_id": 137760049208,
+    "job_name": "Pinned Mathlib elaborated dependency extraction",
+    "job_conclusion": "success",
+    "artifact_name": "mathlib-elaborated-dependency-graphs",
+    "artifact_id": 14827790108,
+    "artifact_sha256": "ddb5abe6a73060c4a6ffd116e8660a84a7fd90dc1ad79fb9aa98212113287b9e",
+    "artifact_created_at": "2026-11-23T14:27:57Z",
+    "note": "Both focused jobs in this exact-head run succeeded: the finite-reference / ProofPlan contract lane and the pinned Mathlib elaborated dependency extraction lane. Broader CI, governance, benchmark, workflow syntax, and showroom workflows were skipped for the draft PR; they are not passes.",
+    "finite_reference_job_id": 137760048256,
+    "finite_reference_job_conclusion": "success"
+  },
+  "source": {
+    "repository": "leanprover-community/mathlib4",
+    "revision": "6ebcce37335bcb6bca64596e5d57bb3035648030",
+    "lean_toolchain": "leanprover/lean4:v4.37.0-rc1",
+    "lean_revision": "0b77e12952ad39077d80d8bd6b66d601f225c321"
+  },
+  "checks": {
+    "declarations_extracted": 4,
+    "theorem_declarations": 4,
+    "unresolved_dependency_names": 0,
+    "exact_type_plus_proof_value_closure_reconciliation": 4,
+    "external_graph_differential": "pending",
+    "expert_role_review": "pending",
+    "human_comprehension_study": "not_run"
+  },
+  "results": [
+    {
+      "declaration": "Nat.choose_pos",
+      "type_references": 8,
+      "proof_value_references": 10,
+      "constant_info_closure": 10,
+      "typed_edges": 18,
+      "unresolved": 0,
+      "sha256": "6f63f12939f019112c04323781966bdb4aa804c3484580959628f09d228b4396"
+    },
+    {
+      "declaration": "Set.countable_union",
+      "type_references": 6,
+      "proof_value_references": 32,
+      "constant_info_closure": 32,
+      "typed_edges": 38,
+      "unresolved": 0,
+      "sha256": "4629920c02d3f94da401e20eaac483a7284662e6963b308f5beef0bf10fb7e69"
+    },
+    {
+      "declaration": "Multiset.map_id",
+      "type_references": 4,
+      "proof_value_references": 12,
+      "constant_info_closure": 12,
+      "typed_edges": 16,
+      "unresolved": 0,
+      "sha256": "b79f6ace4bb34faccfdd4385ecfa7f5dddaca2221e8c38a9964647f6b2302381"
+    },
+    {
+      "declaration": "Finset.card_map",
+      "type_references": 6,
+      "proof_value_references": 6,
+      "constant_info_closure": 10,
+      "typed_edges": 12,
+      "unresolved": 0,
+      "sha256": "89d8e4e113ff17af1e26f8cec7b0a76feef79561cf959b6f9d5848ce1e2d6c6a"
+    }
+  ],
+  "aggregate": {
+    "type_references": 24,
+    "proof_value_references": 60,
+    "constant_info_closure": 64,
+    "typed_edges": 84,
+    "unresolved": 0
+  }
+}

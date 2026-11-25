@@ -330,3 +330,53 @@ Open an issue on GitHub for research discussions.
 ---
 
 *"The study of consciousness is the study of what makes us us."*
+
+
+## Mathematical Proof Comprehension
+
+The proof-to-concept reconstruction and human-transfer research programme is tracked in:
+
+- [MATH-COMPREHENSION-001 design](MATH_PROOF_COMPREHENSION_001_V0_1.md)
+- [Pilot seed and source annotations](MATH_PROOF_COMPREHENSION_PILOT_V1.md)
+- [2026 competitive landscape ledger](MATH_PROOF_COMPREHENSION_COMPETITIVE_LEDGER_V1.md) — separate benchmarks, baselines and prospective Symthaea targets.
+- [HumanLean / APE-Bench / LeanGraphSearch interoperation](MATH_PROOF_COMPREHENSION_INTEROP_V1.md) — consume faithful formalization contracts, reuse dual-verification task semantics, and compare against multi-hop dependency/PPR retrieval.
+- [Human comprehension / transfer preregistration](MATH_PROOF_COMPREHENSION_HUMAN_STUDY_PREREG_V1.md) — study arms, blinded scoring, outcomes, ethics and sample-size plan; no participants/data yet.
+- [Mathlib proof-comprehension pilot](MATHLIB_PROOF_COMPREHENSION_PILOT_V1.md) — four source-pinned Mathlib theorem examples spanning recursion, simplification, quotient induction and embeddings.
+- [RH proof-graph reference baseline](RH_PROOF_GRAPH_BASELINE_V1.md) and [machine-readable snapshot](RH_PROOF_GRAPH_BASELINE_V1.json) — pinned CC0 v0.2.1 external kernel dependency analysis; graph prioritization only, not a proof explanation.
+- [RH main inequality (M) source map](RH_MAIN_INEQUALITY_M_MAP_V1.md), [machine map](RH_MAIN_INEQUALITY_M_MAP_V1.json), and [schema](RH_MAIN_INEQUALITY_M_MAP_V1.schema.json) — pinned formal declarations for the ASK/MAIN → per-translate bound → gapA bridge, plus explicit non-used/quoted inputs.
+- [Mathlib pilot dataset](MATHLIB_PROOF_COMPREHENSION_PILOT_V1.json) and [schema](MATHLIB_PROOF_COMPREHENSION_PILOT_V1.schema.json) — machine-readable source pins, provisional mechanism annotations and counterfactual tasks.
+- [Finite pilot oracle](../../scripts/research/proof_comprehension_oracle.rs) — dependency-free Rust tests for the ETH unique-extension mutation and selected counterfactual examples.
+- [Pilot dataset](MATH_PROOF_COMPREHENSION_PILOT_V1.json)
+- [Pilot dataset schema](MATH_PROOF_COMPREHENSION_PILOT_V1.schema.json)
+- [Evidence receipt schema](MATH_PROOF_COMPREHENSION_RECEIPT_V1.schema.json)
+- [Lean-native dependency extraction contract](MATH_PROOF_COMPREHENSION_LEAN_EXTRACTION_V1.md) — source-grounded use of `Expr.getUsedConstants`, `ConstantInfo.getUsedConstantsAsSet` and `Lake.Check.runForUsedConsts`.
+- [ETH reduction comprehension pilot](ETH_REDUCTION_COMPREHENSION_TOY_V1.md) — finite witness showing decision-preserving Tseitin mutation can break unique-extension and #SAT count preservation.
+- [ETH reduction pilot fixture](ETH_REDUCTION_COMPREHENSION_TOY_V1.json) — machine-readable truth-table and guarantee receipt.
+
+The initial seed is source-pinned to Lean 4 core and is explicitly not expert-reviewed gold data or a Lean extraction result. The next stage is elaborated-environment extraction, independent annotation, and a Mathlib-scale dependency-rich pilot.
+
+- [Executable local/global receipt and CIRR contract](LOCAL_GLOBAL_PAIR_V1.schema.json) with a synthetic post-hoc fixture and Rust validator; see [protocol details](PROOF_PLAN_LOCAL_GLOBAL_CONSISTENCY_V1.md).
+
+- [Mathlib elaborated dependency extraction contract](MATHLIB_ELABORATED_DEPENDENCY_GRAPH_V1.schema.json) and [first pinned extraction results](MATHLIB_ELABORATED_DEPENDENCY_GRAPH_V1_RESULTS.md).
+
+- [Mathematical proof-comprehension benchmark matrix](MATH_PROOF_COMPREHENSION_BENCHMARK_MATRIX_V1.md) — current SOTA comparisons, paradigm-shift hypotheses, prospective metrics, controls and execution tiers.
+
+- [Theorem-sandwich finite control contract](MATH_PROOF_COMPREHENSION_THEOREM_SANDWICH_V1.md) with [schema](MATH_PROOF_COMPREHENSION_THEOREM_SANDWICH_V1.schema.json) and a hidden-evaluator synthetic fixture.
+
+- [Mathlib source-snapshot dependency differential](MATHLIB_SOURCE_SNAPSHOT_DIFFERENTIAL_V1.md) — direct dependency-set overlap across the pinned v4.29 and v4.37 Mathlib cohorts.
+
+- [HDC / CfC proof-comprehension ablation protocol](MATH_PROOF_COMPREHENSION_HDC_CFC_ABLATION_V1.md) — prospective only, with matched retrieval/symbolic baselines.
+
+- [Evaluator calibration protocol](MATH_PROOF_COMPREHENSION_EVALUATOR_CALIBRATION_V1.md) — compares expert review, formal/finite checkers, ProofGrader-style and evidence-constrained LLM judges; issue #13476.
+
+- [HardModeReceiptV1 protocol](MATH_HARDMODE_RECEIPT_V1.md), [schema](MATH_HARDMODE_RECEIPT_V1.schema.json) and [synthetic receipt](MATH_HARDMODE_SYNTHETIC_V1.json) — separately records answer discovery, formalization, countermodel quality and proof-checker outcome.
+
+- [Proof-scope equivalence protocol](MATH_SCOPE_EQUIVALENCE_V1.md) — retains exact-scope CIRR as primary; includes an executable Tier-1 hypothesis-set normalizer and five controls plus a Tier-2 Lean context/warrant-transport pilot whose six declarations passed exact-head replay in run [45496916375](https://github.com/Luminous-Dynamics/symthaea/actions/runs/45496916375); receipt artifacts are retained. Dependent-context transport remains future work; tracked by [#13537](https://github.com/Luminous-Dynamics/symthaea/issues/13537). [Tier-1 fixture/schema](MATH_SCOPE_EQUIVALENCE_TIER1_V1.json) · [Tier-2 manifest/schema](MATH_SCOPE_EQUIVALENCE_TIER2_AND_COMM_V1.json) · [Tier-2 Lean source](../../scripts/research/lean-proof-extractor/ScopeEquivalenceTier2AndComm.lean). Tier-1 exact-head Rust qualification is now recorded in run [45495298723](https://github.com/Luminous-Dynamics/symthaea/actions/runs/45495298723): 121 tests, scope CLI and mutation gate passed; Tier-2 Lean replay remains pending.
+
+- [Mathematical invariance and intervention-sensitivity benchmark](MATH_METAMORPHIC_V1.md) — paired metamorphic tests for harmless reformulations, semantics-changing mutations, proof-route-only changes and unknown cases; tracked by issue [#13547](https://github.com/Luminous-Dynamics/symthaea/issues/13547).
+
+- [Minimum sufficient mathematical explanation protocol](MATH_MIN_SUFFICIENT_EXPLANATION_V1.md) — optimizes explanation cost under hard theorem/assumption/side-condition fidelity and measured human transfer constraints; tracked by issue [#13548](https://github.com/Luminous-Dynamics/symthaea/issues/13548).
+
+- [Metamorphic pair schema](MATH_METAMORPHIC_PAIR_V1.schema.json) and [finite fixtures](MATH_METAMORPHIC_PAIR_V1.json) — exact typed sequent digests and finite truth-table controls for equivalent rewrites, changed hypotheses and proof-route-only changes; executable Rust validator and `math-metamorphic` CLI; issue [#13547](https://github.com/Luminous-Dynamics/symthaea/issues/13547).
+
+- [Proof-action local certificate protocol](MATH_PROOF_ACTION_CERTIFICATE_V1.md) — protocol plus a source-pinned Lean 4.37 `And.comm` pilot, candidate mapping manifest and exact-head replay workflow; structured goal-state/context receipts remain future work; tracked by [#13549](https://github.com/Luminous-Dynamics/symthaea/issues/13549). [Manifest](PROOF_ACTION_CERTIFICATE_AND_COMM_V1.json) · [schema](PROOF_ACTION_CERTIFICATE_AND_COMM_V1.schema.json) · [Lean source](../../scripts/research/lean-proof-extractor/ProofActionCertificateAndComm.lean). The workflow also checks manifest-to-plan node/goal bindings with a mutated-manifest rejection control, and pins a wrong-proposition Lean negative control that must fail with an explicit type error. It also requires exact split-subgoal consumption with an omitted-subgoal mutation rejection, and tests whether a deliberately injected Lean axiom appears in `#print axioms` output. A separate fresh DFS fixture now audits eight roots: three expected `Classical.choice` roots plus five expected-empty `And.comm`/action roots. Native `#print axioms` is diagnostic-only. See [independent audit protocol](LEAN_AXIOM_AUDIT_INDEPENDENCE_V1.md), [15-root manifest/schema](LEAN_AXIOM_AUDIT_IMPORTED_INDUCTIVE_V1.json), [A](../../scripts/research/lean-proof-extractor/axiom-audit-imported-inductive/A.lean), [B](../../scripts/research/lean-proof-extractor/axiom-audit-imported-inductive/B.lean), and [#13575](https://github.com/Luminous-Dynamics/symthaea/issues/13575).

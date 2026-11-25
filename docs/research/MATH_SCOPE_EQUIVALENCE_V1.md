@@ -1,0 +1,202 @@
+# Proof-scope equivalence and paired comparability — protocol v1
+
+**Issue:** [#13537 — MATH-SCOPE-EQUIVALENCE-001](https://github.com/Luminous-Dynamics/symthaea/issues/13537)  
+**Programme:** [#13293 — MATH-COMPREHENSION-001](https://github.com/Luminous-Dynamics/symthaea/issues/13293)  
+**Paired receipt:** [#13345 — MATH-LOCAL-GLOBAL-RECEIPT-001](https://github.com/Luminous-Dynamics/symthaea/issues/13345)  
+**Status:** protocol plus a bounded executable Tier-1 normalizer and a source-pinned Lean Tier-2 propositional context/warrant-transport pilot whose exact-head replay is pending. Quantified alpha-equivalence, dependent-context transport, model evaluation, and empirical scope-CIRR scores remain unimplemented.
+
+## 1. Research question
+
+Can local and global mathematical judgments be compared when their textual representations differ, without weakening the exact-scope guarantee that makes the local-to-global consistency experiment valid?
+
+The existing LocalGlobalPairV1 contract uses strict digest equality. That remains the primary, safest cohort. This protocol adds a separately reported secondary track for representationally different contexts whose equivalence is certified by deterministic typed normalization or Lean-kernel-checked transport proofs.
+
+The scientific object is not string similarity. It is a proof that the compared contexts and target propositions denote the same mathematical problem under a pinned formal environment.
+
+## 2. Why a second comparability tier is useful
+
+Strict byte/digest identity prevents accidental context drift, but it can exclude semantically harmless differences such as:
+- alpha-renaming of bound variables;
+- reordering independent hypotheses;
+- equivalent syntax or notation;
+- definitional unfolding and folding under the same environment.
+
+At the other extreme, embeddings, fuzzy matching and LLM judgments can make genuinely different scopes look similar. They must never establish comparability.
+
+The protocol therefore separates **identity** from **equivalence** and keeps their results apart.
+
+## 3. Comparability tiers
+
+### Tier 0 — exact identity (existing primary result)
+
+Require the current local/global source, theorem, goal, hypothesis, premise, conclusion and warrant digests to match exactly. Existing CIRR eligibility and results are not modified by this protocol.
+
+### Tier 1 — deterministic typed alpha/structural equivalence
+
+For the bounded propositional seed, normalize only typed AST structure:
+- assign bound variables canonical positional identities;
+- preserve free variable identities and types;
+- preserve connective and argument structure;
+- sort only collections explicitly declared unordered, such as a set of independent hypotheses;
+- preserve premise multiplicity and all domain/scope information;
+- version and hash the normalization implementation.
+
+Do not perform textual substitution on variable names. Do not sort or rewrite a sequence whose order has mathematical meaning. An alpha-normalized match establishes only the equivalence covered by the normalization definition.
+
+### Tier 2 — kernel-certified equivalence
+
+For supported non-dependent propositions in a frozen Lean environment, require proof artifacts for both directions:
+- local context entails global context;
+- global context entails local context;
+- local target is equivalent to the global target under the mapped binders;
+- each required premise/warrant correspondence is discharged or explicitly excluded from the matched claim.
+
+All proof terms must be checked by Lean's kernel against the exact source/toolchain/import closure. Record declaration identities, type digests, toolchain, Lake manifest, axiom/admission profile and checker output.
+
+The initial v1 implementation must not attempt arbitrary dependent-context transport. Dependent binders, local instances, typeclass parameters, universe changes or unsupported telescope transformations remain unknown/ineligible unless a later protocol defines and validates them.
+
+### Tier 3 — unknown / ineligible
+
+Missing proof direction, incomplete source identity, unsupported context shape, changed domain or unresolved translation means the pair remains ineligible. One-way entailment is not equivalence.
+
+## 4. Formal comparison object
+
+A proposed ScopeEquivalenceV1 receipt binds:
+
+- pair ID and protocol/schema/normalizer versions;
+- local and global source repository, commit, path and declaration IDs;
+- Lean/Mathlib toolchains, Lake manifest and import closure;
+- exact elaborated target and context type identities;
+- binder map, binder kinds/types, universe parameters and local-instance context;
+- ordered premises and explicitly unordered hypotheses;
+- original and normalized AST/type digests;
+- comparability tier and exclusion reason;
+- alpha/structural normalization evidence, where used;
+- forward and reverse Lean proof artifact references and digests, where used;
+- kernel replay receipt for every transport proof;
+- axiom/admission profile and unresolved obligations.
+
+The evaluator may use the receipt to decide whether the pair is comparable. The candidate model must not receive evaluator-only equivalence proofs if those proofs reveal the task's answer or gold disposition.
+
+## 5. Paired experiment invariants
+
+1. Tier 0 remains byte-for-byte unchanged.
+2. Tier 1 is restricted to transformations explicitly listed in the versioned normalizer.
+3. Tier 2 requires both directions of every equivalence obligation.
+4. Any premise, hypothesis, binder type, domain, universe or target change not covered by a checked transport proof is excluded from the equivalence cohort.
+5. No fuzzy similarity, model confidence, graph centrality or agreement vote can set comparability.
+6. Every local/global paired result retains the same frozen candidate task, warrant, model snapshot and manipulation condition.
+7. Global-context pressure may vary only in the presentation dimension defined by the paired experiment; it may not add a mathematically useful premise.
+8. Hidden evaluator labels, witnesses and equivalence receipts remain outside candidate-visible input.
+9. Unknown and unsupported cases remain visible in the exclusion ledger.
+10. A false comparability finding invalidates that affected cohort pending adjudication.
+
+## 6. Seed fixtures
+
+Positive:
+- exact-identity control;
+- alpha-renaming of bound propositional variables;
+- permutation of independent hypotheses;
+- equivalent implication/disjunction form, with a precise AST-level translation;
+- definitional rewrite under a pinned environment.
+
+Negative:
+- add a strengthening assumption;
+- remove a necessary assumption;
+- change a binder type or domain;
+- introduce free-variable capture during alpha-renaming;
+- collide fully qualified names while changing namespaces;
+- provide only one direction of entailment;
+- change the target while retaining a superficially similar expression.
+
+Unknown:
+- dependent binder/telescope transformation outside the v1 supported fragment;
+- unresolved local instance or typeclass context;
+- opaque definition whose required equivalence is not established;
+- incomplete source/environment identity.
+
+Every fixture must state whether it tests syntax, definitional equality, logical equivalence or scope mutation. Do not conflate these authorities.
+
+## 7. Metrics and analysis
+
+Report separate tables and separate denominators for:
+- exact-scope CIRR (Tier 0);
+- alpha/structural-scope CIRR (Tier 1);
+- kernel-certified-equivalence CIRR (Tier 2);
+- candidate-pair count, eligible count and exclusions by tier;
+- false-comparability rate on non-equivalent controls;
+- proof-transport replay rate and axiom/admission profile;
+- unknown/abstention rate by scope feature;
+- local rejection coverage and false-rejection rates;
+- global invalid-warrant reuse over all independently invalid warrants;
+- per-theorem-family results and cluster-aware uncertainty.
+
+Do not pool tiers into one headline. A larger denominator is not a quality improvement unless comparability remains correct. A model that rejects every warrant must not appear stable simply because it rarely creates eligible local-rejection cases.
+
+## 8. Relation to neighboring benchmarks
+
+- **ProofGrid:** use its fine-grained proof-checking and first-failure diagnostic ideas; the proposed CIRR remains a distinct paired local-to-global measure.
+- **FormalMATH:** use its semantically validated formal theorem tasks for matched prover-side evaluation, not as a proof of explanation quality.
+- **TheoremGraph / LeanGraph:** reuse formal dependencies and external graph provenance. Graph matches are retrieval candidates, not scope-equivalence authority.
+- **LeanGraphSearch:** retain its retrieval results as an upstream baseline. Better premise retrieval does not certify that the retrieved theorem statement is the same problem.
+- **Human transfer:** use a separately governed delayed-transfer study; scope equivalence does not establish learning.
+
+## 9. Execution sequence
+
+1. Freeze the Tier 0 regression fixture and digest outputs.
+2. Define the typed propositional alpha-normalizer with deterministic serialization.
+3. Add Tier 1 positive/negative metamorphic tests.
+4. Build a small Lean proposition-transport proof harness for Tier 2.
+5. Add a versioned receipt schema and validator tests without weakening LocalGlobalPairV1.
+6. Have two reviewers independently audit the fixture labels and transport obligations.
+7. Compare exact and equivalence-tier eligibility coverage on a held-out theorem-family split.
+8. Only then run local/global model trials and publish tier-specific CIRR with uncertainty.
+
+## 10. Prospective acceptance gates
+
+- 100% reproducible Tier 1 normalization outputs on frozen fixtures.
+- 100% rejection or unknown classification for seeded non-equivalent contexts.
+- Both kernel-checked directions for every Tier 2 equivalence claim.
+- Zero observed false comparability in the frozen negative controls.
+- Existing Tier 0 fixture digests and CIRR remain unchanged.
+- Every ineligible pair has a machine-readable reason.
+- Results include per-tier numerators, denominators, exclusions and family-aware intervals.
+
+These are prospective gates, not measured Symthaea performance.
+
+## 11. Claim ceiling
+
+- Alpha-equivalence is not arbitrary mathematical equivalence.
+- Definitional equality depends on the pinned Lean environment.
+- One-way entailment is not logical equivalence.
+- Finite propositional normalization does not solve dependent-context equivalence.
+- A valid scope-equivalence receipt does not certify the candidate's proof plan.
+- A small eligible cohort cannot support broad reliability claims.
+
+
+## 12. Bounded Tier-1 implementation (2026-11-24)
+
+A first executable Tier-1 subset is now implemented in `scripts/research/proof-plan-contract/src/scope_equivalence.rs`, with CLI `scope-equivalence` and frozen fixture/schema:
+
+- `MATH_SCOPE_EQUIVALENCE_TIER1_V1.json`
+- `MATH_SCOPE_EQUIVALENCE_TIER1_V1.schema.json`
+
+The v1 normalizer sorts only the explicitly unordered BooleanSequent `hypotheses` collection by canonical typed-JSON representation. It preserves hypothesis multiplicity, all atom names, the ordered `premises` array, and the conclusion AST. Raw and normalized digests are separately domain-separated and reported.
+
+The five synthetic controls are: exact identity; hypothesis permutation (raw digest changes, normalized digest is stable); premise order mutation; duplicate-hypothesis/multiplicity mutation; and conclusion mutation. Evaluator-only expected relations are checked against the derived digest relation, and candidate-only serialization excludes the evaluator labels.
+
+**Claim ceiling:** this is a narrow structural comparator for the current finite BooleanSequent type. It does not implement bound-variable alpha-renaming because the AST has no binders; it does not use finite truth-table entailment to upgrade structural comparability; and it does not perform Lean definitional equality or dependent-context transport. Exact-identity Tier 0 LocalGlobalPairV1/CIRR is unchanged, and Tier-1 results must remain separately reported.
+
+**Execution state:** The finite-reference job on exact head `aa4f08f676eb4b84d0a6d2bd93ced971d773a8c0` passed in run [45495298723](https://github.com/Luminous-Dynamics/symthaea/actions/runs/45495298723): formatting passed, **121 tests / 0 failures**, the 10-test differential utility passed, and the five-pair scope CLI plus metamorphic CLI and plan-binding mutation control passed. The five-pair CLI reports exact identity, hypothesis-permutation Tier 1 equivalence, and rejects premise-order, multiplicity and conclusion mutations. Lean extraction/replay jobs in that run were still in progress at last check. The preceding shell and rustfmt failures are retained in runs [45494166481](https://github.com/Luminous-Dynamics/symthaea/actions/runs/45494166481) and [45495006983](https://github.com/Luminous-Dynamics/symthaea/actions/runs/45495006983); both issues were repaired before the passing finite-reference result.
+
+## 13. Tier-2 Lean context and warrant-transport pilot (2026-11-24)
+
+A source-pinned Lean pilot is now committed at `scripts/research/lean-proof-extractor/ScopeEquivalenceTier2AndComm.lean`, with [manifest](MATH_SCOPE_EQUIVALENCE_TIER2_AND_COMM_V1.json) and [schema](MATH_SCOPE_EQUIVALENCE_TIER2_AND_COMM_V1.schema.json).
+
+The bounded pair has local context `p ∧ q`, global context `q ∧ p`, and unchanged target `r`. The source declares and checks six certificates: local-to-global context entailment, global-to-local context entailment, two-way context equivalence, local-to-global warrant transport, global-to-local warrant transport, and their bidirectional equivalence. The latter two prove that a warrant for the exact same target can be transported between these reordered contexts.
+
+The source pins Lean `4.37.0-rc1`, Mathlib revision `6ebcce37335bcb6bca64596e5d57bb3035648030`, and Lean core commit `0b77e12952ad39077d80d8bd6b66d601f225c321`. The focused workflow verifies the source digest, replays all six Lean declarations, hashes the source/manifest/toolchain/axiom log and emits a separate receipt artifact. The static manifest stays `kernel_replay_pending`; only an accepted exact-run receipt can record replay.
+
+**Claim ceiling:** this is a synthetic, non-dependent propositional context permutation with an unchanged target. It does not cover dependent binders, local instances, typeclass parameters, changed targets/premises, universe transformations or arbitrary telescope transport. The workflow captures `#print axioms` output but does not yet parse a structured dependency closure. This is not an empirical scope-CIRR result and does not establish general Tier-2 support.
+
+**Execution state:** source, manifest, schema and workflow integration are committed; exact-head execution is pending.

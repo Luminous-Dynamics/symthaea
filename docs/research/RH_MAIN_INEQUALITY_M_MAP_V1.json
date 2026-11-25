@@ -1,0 +1,465 @@
+{
+  "schema_version": "1.0.0",
+  "dataset_id": "ALPOGE-RH-MAIN-INEQUALITY-MAP-V1",
+  "status": "source_inspected_composition_map_not_complete_reconstruction",
+  "source_identity": {
+    "repository": "leanprover-community/riemann-hypothesis",
+    "revision": "40e56bab026552e089d7afcfeff08d2defb9c005",
+    "revision_date": "2026-11-20T14:36:09Z",
+    "provenance": "Public mirror commit message says it mirrors the published Alpöge archive without changes; original proof source has no license identified here and is not copied into Symthaea.",
+    "cited_exposition": "https://www.math.uwaterloo.ca/~mrubinst/alpoge_claude_grh/zeta-paper.pdf"
+  },
+  "formal_scope": {
+    "target": "Main inequality (M) in the zeta-specialized human exposition; a central arithmetic input to the chain from theta lifts / divisibility / size to a one-sided smoothed prime-sum bound",
+    "final_effect": "Together with character estimates B and C, (M) yields a bound for G(x) on long intervals [Y,Y^(3/2)], which excludes zeros to the right of 1/2+epsilon.",
+    "not_a_claim": "This fixture does not reconstruct all of (M), prove its quoted inputs, or claim Symthaea independently verified RH."
+  },
+  "main_inequality": {
+    "paper_identity": "Part II, §4, equation (M), PDF page 32",
+    "statement_lhs": "(1/n) * sum_{u in H} sum_{t in T} sum_{j=1}^m (P_{u,t,j} - M_{u,t,j})",
+    "statement_rhs": "≤ E",
+    "normalized_error": "E/B ≤ x^(C ε) * (x/m + x m/k + m + k/n^2)",
+    "normalization": "B = |T| m b δ / 2, with b=exp(x^ε), δ=|T2|/n",
+    "parameter_orders_from_the_exposition": {
+      "m": "x^(1/2+O(ε))",
+      "k": "x^(9/2+O(ε))",
+      "n": "x^(2+O(ε))"
+    },
+    "conceptual_role": "The average arithmetic divisibility sum is bounded by a size-derived main term plus a controlled error. The error terms balance with m about sqrt(x). The log-weight term is forced by centering each residue cell's smoothed prime sum: its universal μ y log y part plus its cell-specific linear constant combine to the exact M expression, leaving only residuals."
+  },
+  "quantities": [
+    {
+      "name": "P_{u,t,j}",
+      "meaning": "Smoothed weighted sum over odd prime powers, with coefficient (1 - χ_d(p^h)) log p and positive-part cutoff (a_t / p^h - w_{u,j}(v(p^h), t[p^h]))_+.",
+      "paper_equation": "(4.1)"
+    },
+    {
+      "name": "M_{u,t,j}",
+      "meaning": "Main term a_t (log a_t - 1 - γ + c_{χ_d} - average_cell(log w)).",
+      "paper_equation": "(4.2)"
+    },
+    {
+      "name": "E",
+      "meaning": "Aggregate error from comparison of integral divisibility against complex size; the source splits it into four scale terms after normalization.",
+      "paper_equations": [
+        "(II.15)",
+        "(II.16)"
+      ]
+    }
+  ],
+  "proof_bridge": [
+    {
+      "role": "prime-sum representation and main term",
+      "source_file": "src/Formalism/SizeWindowBrackets/FirstPrimeNeSecondPrime.lean",
+      "blob_sha": "18deb7cb85d6f650a69f01fda6e0c789b9f04d89",
+      "cited_pdf_reference": "[3]",
+      "source_lines": {
+        "ASK": [
+          84,
+          87
+        ],
+        "MAIN": [
+          89,
+          90
+        ],
+        "AskMainBalance": [
+          98,
+          101
+        ],
+        "AskExpansion": [
+          133,
+          139
+        ]
+      },
+      "declarations": [
+        "ASK",
+        "MAIN",
+        "AskMainBalance",
+        "AskExpansion"
+      ],
+      "observed_role": "Source inspection confirms these are the formal ASK and MAIN quantities and candidate identities that expand the smoothed prime sum / character expression. The paper lists weighted sums ASK and MAIN from [3] among the declarations used by the final proof.",
+      "extraction_status": "source-inspected; exact elaborated dependency edges still require local extraction or upstream edge lookup"
+    },
+    {
+      "role": "per-translate bound used by the final proof",
+      "source_file": "src/Formalism/SizeWindowBrackets/ChainSlopeWindows/LevelOfCongruence.lean",
+      "blob_sha": "e08edc360cdf8d5d95d82ef1b805a8ea1a6151ef",
+      "cited_pdf_reference": "[28]",
+      "source_lines": {
+        "each_unit_bound_statement": [
+          175,
+          197
+        ],
+        "weighted_mean_bound_statement": [
+          199,
+          235
+        ]
+      },
+      "declarations": [
+        "each_unit_bound_statement",
+        "weighted_mean_bound_statement"
+      ],
+      "observed_role": "The human exposition explicitly says the final theorem uses each_unit_bound_statement with hypotheses defined in [7]. It explicitly says the averaged MeanBoundSecondForm declaration in [7] is not the used statement. The Lean source signature proves a PointwiseBoundVariant per unit after consuming the listed hypotheses.",
+      "extraction_status": "source-inspected and explicitly identified as used by the exposition; edge closure still needs differential verification"
+    },
+    {
+      "role": "composition into a gap / error-bracket bound",
+      "source_file": "src/Development/AutomorphicArithmetic/DedekindLFunctions/LandauTheorems/ChTop.lean",
+      "blob_sha": "ce06a34a9e0b1b332e10d3b7efb04a06e9ab77f5",
+      "cited_pdf_reference": "[5]",
+      "source_lines": {
+        "ch_top_main_eq": [
+          11,
+          35
+        ],
+        "ch_top": [
+          37,
+          73
+        ]
+      },
+      "declarations": [
+        "Deduction.ch_top_main_eq",
+        "Deduction.ch_top"
+      ],
+      "observed_role": "Source inspection shows ch_top_main_eq rewrites the abstract Data.Main quantity as a sum over MAIN. ch_top then applies each_unit_bound_statement and combines size/error hypotheses to bound gapA. This is the strongest currently inspected bridge from the pointwise ASK−MAIN statement to the prime-sum estimate used in the RH argument.",
+      "extraction_status": "source-inspected; verify exact final-root closure using pinned kernel graph before promoting to formal-proof dependency"
+    },
+    {
+      "role": "hypothesis and averaged-bound definitions used as context",
+      "source_file": "src/Formalism/RankGapBounds/MeanBoundSecondForm.lean",
+      "blob_sha": "e4332fd8680d2b2f82e0a1e44a276453e03e2109",
+      "cited_pdf_reference": "[7]",
+      "source_lines": {
+        "MeanBoundSecondForm": [
+          187,
+          190
+        ]
+      },
+      "declarations": [
+        "MeanBoundSecondForm"
+      ],
+      "observed_role": "The exposition says hypotheses for each_unit_bound_statement are defined in [7], but the averaged MeanBoundSecondForm declaration itself is not used by the final theorem. Do not substitute it for the per-unit statement.",
+      "extraction_status": "source-inspected negative / nearby-formulation control"
+    },
+    {
+      "role": "theta-lift size / period arithmetic input",
+      "source_file": "src/Development/AutomorphicSpectrum/Proofs/GeometryProofs/ChowlaSelbergPeriodStatement.lean",
+      "blob_sha": "41529351e00c543d71d4b9406f0bd1e856772fee",
+      "cited_pdf_reference": "[16]",
+      "source_lines": {
+        "chowla_selberg_period": [
+          9,
+          11
+        ]
+      },
+      "declarations": [
+        "GlobalTheory.T.chowla_selberg_period"
+      ],
+      "observed_role": "The exposition names the Chowla–Selberg period statement among the formal inputs used by the final theorem. The theorem connects a CM curve period to the Euler-constant/log discriminant and L'/L expression.",
+      "extraction_status": "source-inspected; mathematical role still needs expert review"
+    },
+    {
+      "role": "height / lattice map estimates",
+      "source_file": "src/Formalism/HarderNarasimhan/StatementPl.lean",
+      "blob_sha": "0ef994d7e7998e4b46dfce96b8ccd24bebe4bda8",
+      "cited_pdf_reference": "[25]",
+      "source_lines": {
+        "htMap_definition": [
+          55,
+          62
+        ],
+        "SizeIneq": [
+          121,
+          132
+        ],
+        "SlopeIneqMean": [
+          148,
+          160
+        ]
+      },
+      "declarations": [
+        "htMap",
+        "SizeIneq",
+        "SlopeIneqMean"
+      ],
+      "observed_role": "The human exposition names the height of a map [25] among the final theorem's formal inputs. These declarations form a plausible source-level map for the lattice-height / slope component, but exact role matching must be reviewed before calling each declaration the central used statement.",
+      "extraction_status": "source-inspected candidate"
+    },
+    {
+      "role": "digit / valuation arithmetic",
+      "source_file": "src/Formalism/ThetaLogCoordinates/UniformThetaSubstitution/StatementAB.lean",
+      "blob_sha": "f29a92be06011e418e5d81a4b7e71b28a3440945",
+      "cited_pdf_reference": "[21]",
+      "source_lines": {
+        "StarArith": [
+          103,
+          114
+        ]
+      },
+      "declarations": [
+        "StarArith",
+        "FactorialLg",
+        "ChargeLemma",
+        "ExcessGainBound",
+        "BCore"
+      ],
+      "observed_role": "The exposition explicitly lists the digit inequality StarArith among the formal statements used. It belongs to the p-adic valuation / digit-loss accounting behind divisibility at inert primes.",
+      "extraction_status": "source-inspected candidate"
+    },
+    {
+      "role": "global arithmetic / trace / divisibility statement bundle",
+      "source_file": "src/Formalism/SharpRestriction/GlobalTheoremInputs.lean",
+      "blob_sha": "ba31f5120ed089d48968754ae577427912d467c5",
+      "cited_pdf_reference": "[19]",
+      "source_lines": {
+        "LinkS_at": [
+          145,
+          158
+        ],
+        "GlobalTheoremInputs": [
+          158,
+          162
+        ]
+      },
+      "declarations": [
+        "LinkS_at",
+        "LinkS",
+        "GlobalTheoremInputs",
+        "LinkGLOBAL",
+        "BesselId",
+        "LinkDIV"
+      ],
+      "observed_role": "The exposition names local comparisons, layer-cake, Bessel and related inputs from [19]. This file exposes several hypothesis bundles, but precise matching of each quoted item to a specific declaration requires targeted reviewer work.",
+      "extraction_status": "source-inspected candidate; not a complete declaration map"
+    }
+  ],
+  "explicit_non_used_or_ambiguous": [
+    {
+      "declaration": "MeanBoundSecondForm",
+      "file": "src/Formalism/RankGapBounds/MeanBoundSecondForm.lean",
+      "reason": "Human exposition says this averaged statement is not the statement used by the final proof; final proof uses each_unit_bound_statement in [28]."
+    },
+    {
+      "declaration": "GrowthBoundGivesRiemannHypothesis (as cited in [6])",
+      "file": "src/Formalism/SizeWindowBrackets/GrowthBoundGivesRiemannHypothesis.lean",
+      "reason": "The exposition says the cited form is a parallel/earlier formulation and is not among the declarations on which final theorem depends."
+    },
+    {
+      "declaration": "ChainInt / FrameLA / FrameLast / CountIdentity (specific cited forms)",
+      "reason": "The exposition identifies these cited forms as not among the final theorem's dependency closure; avoid accepting a source filename as proof that every statement in it is used."
+    }
+  ],
+  "remaining_obligations": [
+    "Locate and verify the exact Lean declarations for the integrality of theta kernels in height-two logarithm coordinates (hypothesis B) and the valuations built on it.",
+    "Map the exact quoted inner-product formula, local factors, covolumes and local index bounds used in the theta-lift size estimate.",
+    "Map the trace/rank/pairing statements that yield the dimension bound.",
+    "Map the Galois-cohomology bound and the denominator passage.",
+    "Verify exact dependency membership for each named declaration against the upstream kernel-export dependency graph, not merely against a source file or the human guide.",
+    "Reconstruct the assembly of maps and weights and the averaged M inequality, including the explicit constants/parameter constraints.",
+    "Obtain independent mathematical review of the role graph.",
+    "Reconstruct the source-to-Lean correspondence for the cell-centering identities in Part II §5.1, including the constant sum and the linear-in-a term.",
+    "Reconstruct the finite-group translation identity (II.22) and the derived distinguished-cell identity (5.4), then distinguish the exact combinatorial identity from the separate uniform error estimates (5.6), (II.26) and (5.7).",
+    "Map the fixed-modulus prime number theorem cell-density argument and the uniform Estimate C dependency separately; do not transfer fixed-modulus O_A bounds to varying moduli.",
+    "If executable oracle source changes, run the focused workflow at the new exact head and replace the finite-oracle CI receipt; do not transfer a prior result to changed source."
+  ],
+  "limitations": [
+    "The original Lean source mirror is an exact mirror of the published source but no license was established here; this Symthaea artifact stores only paths, declaration names, line spans, blob IDs and explanatory metadata, not source code.",
+    "This is a source-inspected map of the M proof bridge, not a full formal dependency closure or mathematical reconstruction.",
+    "The proof's main inequality is still not derived in Rubinstein's working guide; the guide explicitly quotes substantial inputs from Lean.",
+    "The Mathlib theorem extractor in #13295 has not been implemented or run.",
+    "No theorem or proof acceptance is claimed by Symthaea."
+  ],
+  "centering_bridge": {
+    "paper_section": "Part II §5.1, equations (5.1)–(5.3), PDF pp.33–34",
+    "source_formulas": {
+      "cell_smoothed_sum": "S_i(y) = sum_{r in cell i} c(r) (y/r - 1)_+",
+      "cell_counting_function": "Psi_i(z) = sum_{r in cell i, r <= z} c(r)",
+      "integral_identity": "S_i(y)/y = integral_1^y Psi_i(z) dz/z^2",
+      "cell_decomposition": "S_i(y) = μ y log y + C_i y + R_i(y)",
+      "cell_constant": "C_i = integral_1^infinity (Psi_i(z)-μz) dz/z^2",
+      "residual": "R_i(y) = -y integral_y^infinity (Psi_i(z)-μz) dz/z^2"
+    },
+    "density": {
+      "raw_prime_density_per_cell": "1/(4n): one half nonsquare mod d, one half specified sign mod q, and 1/n specified residue-pair column; CRT gives independence over invertible residue classes",
+      "weight_coefficient": "c(r) = (1-χ_d(r)) log p; coefficient is 2 log p on contributing ordinary primes, doubling the raw density",
+      "weighted_density": "μ = 1/(2n)",
+      "caveat": "The source explicitly says the fixed-modulus PNT error O_A(z/(log z)^A) absorbs higher prime powers and the one exceptional prime. Its constants may depend on q,d,N. Uniformity as these moduli vary with x is not supplied by this fixed-modulus argument; Estimate C handles uniform nondistinguished-cell control later."
+    },
+    "constants": {
+      "identity": "sum_i C_i = -1 - γ + c_{χ_d}",
+      "source_reason": "sum_i S_i(y) = S_1(y)-S_{χ_d}(y); the ordinary smoothed von Mangoldt sum has linear coefficient -1-γ, while the nonprincipal χ_d sum has linear coefficient -c_{χ_d}",
+      "cell_count": "There are 2n cells and μ=1/(2n)."
+    },
+    "weighted_recombination": {
+      "identity": "P_{u,t,j} = sum_i w_i S_i(a/w_i)",
+      "main_terms": "sum_i w_i [μ(a/w_i) log(a/w_i) + C_i(a/w_i)]",
+      "logarithmic_part": "μa sum_i log(a/w_i) = a log a - a <log w>, where <log w>=(1/(2n))sum_i log w_i",
+      "linear_constant_part": "a sum_i C_i = a(-1-γ+c_{χ_d})",
+      "conclusion": "P_{u,t,j} - M_{u,t,j} = sum_i w_i R_i(a/w_i)",
+      "precise_M": "M_{u,t,j}=a(log a - 1 - γ + c_{χ_d} - <log w>)"
+    },
+    "evidence_status": "Human-exposition derivation source-inspected; the local Lean declaration graph for these exact identities has not yet been extracted.",
+    "source_refs": [
+      "Rubinstein working guide Part II §5.1, equations (5.1)–(5.3), PDF pp.33–34"
+    ]
+  },
+  "translation_average": {
+    "paper_section": "Part II §5.3, equations (5.4)–(5.5), PDF pp.34–35",
+    "identity": "(1/n) sum_{u in H} 1_{v(r)=1, t[r] in u T2} = δ 1_{χ_q(r)=1} = δ/2 (1+χ_q(r))",
+    "reason": "For a fixed column s=t[r], each z in T2 determines exactly one translate u=s z^{-1}; therefore exactly |T2| translates select that column. The row condition v(r)=1 is equivalent to χ_q(r)=1.",
+    "weighted_consequence": "(1/n) sum_u sum_{i distinguished at u} b S_i(a/b) = (δ b/2) S_{q,d}(a/b)",
+    "residual_consequence": "By linearity of subtracting the common logarithmic and linear centering terms, the same identity holds for residuals R_i and R_{q,d}.",
+    "caveats": [
+      "This exact identity assumes the finite group H and the stated T2 subset construction.",
+      "The replacement of actual distinguished weights by b, the control of nondistinguished cells, and the change from a_t/b to x require separate error estimates; they are not consequences of translation counting alone.",
+      "Estimate C supplies a uniform bound as q,d,N vary; the fixed-modulus PNT does not supply that uniformity."
+    ],
+    "evidence_status": "Human-exposition identity source-inspected; not independently formalized by Symthaea.",
+    "source_refs": [
+      "Rubinstein working guide Part II §5.3, equations (5.4)–(5.5), PDF pp.34–35"
+    ]
+  },
+  "finite_translation_oracle": {
+    "method": "Exhaustive finite check of the translate-count identity in cyclic groups C_n",
+    "group_sizes": [
+      2,
+      3,
+      4,
+      5,
+      6
+    ],
+    "subsets": "Every nonempty subset T2 of each C_n",
+    "group_target_cases": 620,
+    "row_indicator_cases": 1240,
+    "checked_identity": "For every target s, exactly |T2| translates u satisfy s in u+T2. With chi_q in {-1,+1}, the row-filtered count satisfies 2*selected_count = |T2|*(1+chi_q).",
+    "test_function": "translation_average_selects_each_column_exactly_cardinality_t2_times",
+    "status": "passed_exact_head_ci",
+    "limitations": [
+      "Finite cyclic groups only; not a formal proof for the actual group H used in the RH construction.",
+      "Does not verify the theta-lift, cell-weight perturbations, prime density or any uniform analytic estimate.",
+      "The product-group oracle tests six finite abelian groups C_m × C_n; it is still not a Lean proof for the specific RH group H or a proof for all finite groups."
+    ],
+    "previous_ci_receipt": {
+      "tested_pr_head": "fa47d22d2dc72cf4281ec93605befe0e726d8f06",
+      "workflow_run_id": 45074621157,
+      "workflow_url": "https://github.com/Luminous-Dynamics/symthaea/actions/runs/45074621157",
+      "workflow_name": "Math Proof Comprehension Pilot",
+      "conclusion": "success",
+      "rust_toolchain": "1.96.0 (ac68faa20 2026-05-25)",
+      "rust_tests_passed": 10,
+      "rust_tests_failed": 0,
+      "rustfmt": "passed",
+      "json_fixture_assertions": "passed",
+      "scope": "Standalone finite oracle and research fixture parsing only; no Lean build, kernel proof, RH proof validation, or complete workspace CI."
+    },
+    "product_group_structures": [
+      {
+        "group": "C2 × C2",
+        "m": 2,
+        "n": 2,
+        "group_size": 4
+      },
+      {
+        "group": "C2 × C3",
+        "m": 2,
+        "n": 3,
+        "group_size": 6
+      },
+      {
+        "group": "C2 × C4",
+        "m": 2,
+        "n": 4,
+        "group_size": 8
+      },
+      {
+        "group": "C3 × C3",
+        "m": 3,
+        "n": 3,
+        "group_size": 9
+      },
+      {
+        "group": "C2 × C5",
+        "m": 2,
+        "n": 5,
+        "group_size": 10
+      },
+      {
+        "group": "C3 × C4",
+        "m": 3,
+        "n": 4,
+        "group_size": 12
+      }
+    ],
+    "product_group_target_cases": 66447,
+    "product_group_row_indicator_cases": 132894,
+    "total_group_target_cases": 67067,
+    "total_row_indicator_cases": 134134,
+    "test_functions": [
+      "translation_average_selects_each_column_exactly_cardinality_t2_times",
+      "translation_average_holds_for_small_product_cyclic_groups"
+    ],
+    "ci_receipt": {
+      "tested_pr_head": "861db995fc80aa52c3339233fd6ce0cec0168458",
+      "workflow_run_id": 45075362857,
+      "workflow_url": "https://github.com/Luminous-Dynamics/symthaea/actions/runs/45075362857",
+      "workflow_name": "Math Proof Comprehension Pilot",
+      "conclusion": "success",
+      "rust_toolchain": "1.96.0 (ac68faa20 2026-05-25)",
+      "rust_tests_passed": 11,
+      "rust_tests_failed": 0,
+      "rustfmt": "passed",
+      "compile_with_warnings_denied": "passed",
+      "json_fixture_assertions": "passed",
+      "cyclic_group_target_cases": 620,
+      "cyclic_group_row_indicator_cases": 1240,
+      "product_group_target_cases": 66447,
+      "product_group_row_indicator_cases": 132894,
+      "total_group_target_cases": 67067,
+      "total_row_indicator_cases": 134134,
+      "scope": "Standalone dependency-free finite oracle and research fixture checks only; no Lean extraction, Lean kernel replay, RH proof validation, human study, or full workspace CI."
+    },
+    "receipt_validation_run": {
+      "pr_head": "60216f9b3f9bad0fb8f532c21086c33c7ac3bf5b",
+      "workflow_run_id": 45075466842,
+      "workflow_url": "https://github.com/Luminous-Dynamics/symthaea/actions/runs/45075466842",
+      "workflow_name": "Math Proof Comprehension Pilot",
+      "conclusion": "success",
+      "validated": "The recorded code-test receipt, current JSON fixture, product-group counts, status and schema-compatible structure all passed the focused workflow."
+    }
+  },
+  "upstream_graph_crosschecks": [
+    {
+      "declaration": "Formalism.RankGapBounds.WeightedMeanData.Data.Tterm",
+      "source_file": "src/Formalism/RankGapBounds/MeanBoundSecondForm.lean",
+      "source_lines": [
+        97,
+        99
+      ],
+      "upstream_file": "data/aux-only-decls.tsv",
+      "upstream_blob_sha": "6d5ab51bcc7c517f9fdbff294155c7953130fab3",
+      "upstream_row": "Formalism.RankGapBounds.WeightedMeanData.Data.Tterm\\tdef\\tsrc/Formalism/RankGapBounds/MeanBoundSecondForm.lean\\t97\\t99\\t2",
+      "upstream_semantics": "The upstream method defines this class as a declaration whose own constant is not in the kernel proof closure but which generated shared auxiliary lemma(s) used elsewhere. n_shared_aux_in_cone=2; use of those helper constants does not make the generator declaration itself used.",
+      "interpretation": "Independent support for excluding MeanBoundSecondForm itself from the final theorem's kernel-proof declaration closure, while preserving the fact that two generated helper constants are used by the proof.",
+      "limit": "This does not imply the helper constants are mathematically irrelevant, nor does it replace the exposition's exact statement that each_unit_bound_statement is used."
+    }
+  ],
+  "uniform_error_bridges": {
+    "non_distinguished_cells": {
+      "paper_equation": "(5.6), (II.25)",
+      "bound": "For y >= exp(x^ε/3)/3, |G_χ(y)| <= y exp(-κ x^(ε/8)), where κ is independent of x,q,d.",
+      "consequence": "Each cell residual is a character combination with sum of absolute Fourier coefficients 2, so |w_i R_i(a/w_i)| <= 2aθ; after averaging and normalization the nondistinguished contribution is o(1).",
+      "status": "Source-inspected in working guide; exact Lean declaration(s) for Estimate C are not yet mapped."
+    },
+    "distinguished_weight_perturbation": {
+      "paper_equation": "(II.26)",
+      "bound": "w_i=b+Δ_i, 0<=Δ_i<<b/(n x^2); |w_i R_i(a/w_i)-bR_i(a/b)|<<xΔ_i.",
+      "consequence": "After normalization, aggregate distinguished-weight perturbation is O(1/x).",
+      "status": "Source-inspected; exact formal declaration and dependency path are not yet mapped."
+    },
+    "cutoff_argument_shift": {
+      "source_identity": "|a_t/b-x|<=1",
+      "consequence": "S_{q,d}(y), y log y, and the centering constants vary by O(1+log x); combining (5.3), (5.5), (II.25), (II.26) gives (5.7).",
+      "status": "Source-inspected; proof-dependency mapping remains open."
+    }
+  }
+}

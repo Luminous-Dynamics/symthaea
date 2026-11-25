@@ -1,0 +1,299 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://github.com/Luminous-Dynamics/symthaea/blob/main/docs/research/MATH_PROOF_COMPREHENSION_PILOT_V1.schema.json",
+  "title": "Symthaea Proof Comprehension Pilot Dataset v1",
+  "type": "object",
+  "additionalProperties": false,
+  "required": [
+    "schema_version",
+    "dataset_id",
+    "status",
+    "source_snapshot",
+    "task_count",
+    "tasks",
+    "hard_gates",
+    "limitations",
+    "next_stage"
+  ],
+  "properties": {
+    "schema_version": {
+      "const": "1.0.0"
+    },
+    "dataset_id": {
+      "type": "string",
+      "minLength": 1
+    },
+    "status": {
+      "enum": [
+        "source_pinned_seed_not_gold",
+        "expert_reviewed",
+        "frozen_benchmark",
+        "retired"
+      ]
+    },
+    "created_at": {
+      "type": "string",
+      "format": "date"
+    },
+    "description": {
+      "type": "string",
+      "minLength": 1
+    },
+    "source_snapshot": {
+      "type": "object",
+      "required": [
+        "repository",
+        "commit",
+        "source_kind",
+        "lean_core_files"
+      ],
+      "properties": {
+        "repository": {
+          "type": "string"
+        },
+        "commit": {
+          "type": "string",
+          "pattern": "^[a-f0-9]{40}$"
+        },
+        "commit_url": {
+          "type": "string",
+          "format": "uri"
+        },
+        "source_kind": {
+          "type": "string"
+        },
+        "lean_core_files": {
+          "type": "array",
+          "minItems": 1,
+          "items": {
+            "type": "object",
+            "required": [
+              "path",
+              "blob_sha",
+              "permalink"
+            ],
+            "properties": {
+              "path": {
+                "type": "string"
+              },
+              "blob_sha": {
+                "type": "string",
+                "pattern": "^[a-f0-9]{40}$"
+              },
+              "permalink": {
+                "type": "string",
+                "format": "uri"
+              }
+            }
+          }
+        }
+      }
+    },
+    "task_count": {
+      "type": "integer",
+      "minimum": 1
+    },
+    "tasks": {
+      "type": "array",
+      "minItems": 1,
+      "items": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": [
+          "id",
+          "declaration",
+          "source",
+          "statement",
+          "proof_term_source",
+          "concept",
+          "dependency_graph",
+          "explanation_questions",
+          "counterfactuals",
+          "annotation_status"
+        ],
+        "properties": {
+          "id": {
+            "type": "string"
+          },
+          "declaration": {
+            "type": "string"
+          },
+          "statement": {
+            "type": "string"
+          },
+          "proof_term_source": {
+            "type": "string"
+          },
+          "concept": {
+            "type": "string"
+          },
+          "source": {
+            "type": "object",
+            "required": [
+              "repository",
+              "commit",
+              "path",
+              "blob_sha",
+              "line_start",
+              "line_end"
+            ],
+            "properties": {
+              "repository": {
+                "type": "string"
+              },
+              "commit": {
+                "type": "string",
+                "pattern": "^[a-f0-9]{40}$"
+              },
+              "path": {
+                "type": "string"
+              },
+              "blob_sha": {
+                "type": "string",
+                "pattern": "^[a-f0-9]{40}$"
+              },
+              "line_start": {
+                "type": "integer",
+                "minimum": 1
+              },
+              "line_end": {
+                "type": "integer",
+                "minimum": 1
+              }
+            }
+          },
+          "dependency_graph": {
+            "type": "object",
+            "required": [
+              "nodes",
+              "edges",
+              "status"
+            ],
+            "properties": {
+              "nodes": {
+                "type": "array",
+                "items": {
+                  "type": "object",
+                  "required": [
+                    "id",
+                    "kind"
+                  ],
+                  "properties": {
+                    "id": {
+                      "type": "string"
+                    },
+                    "kind": {
+                      "type": "string"
+                    }
+                  }
+                }
+              },
+              "edges": {
+                "type": "array",
+                "items": {
+                  "type": "object",
+                  "required": [
+                    "source",
+                    "target",
+                    "relation",
+                    "evidence"
+                  ],
+                  "properties": {
+                    "source": {
+                      "type": "string"
+                    },
+                    "target": {
+                      "type": "string"
+                    },
+                    "relation": {
+                      "type": "string"
+                    },
+                    "evidence": {
+                      "type": "string"
+                    }
+                  }
+                }
+              },
+              "status": {
+                "enum": [
+                  "source_expression_edges_only",
+                  "lean_environment_extracted",
+                  "independently_reviewed"
+                ]
+              }
+            }
+          },
+          "explanation_questions": {
+            "type": "array",
+            "items": {
+              "type": "string"
+            },
+            "minItems": 1
+          },
+          "counterfactuals": {
+            "type": "array",
+            "items": {
+              "type": "object",
+              "required": [
+                "id",
+                "mutation",
+                "expected"
+              ],
+              "properties": {
+                "id": {
+                  "type": "string"
+                },
+                "mutation": {
+                  "type": "string"
+                },
+                "expected": {
+                  "type": "string"
+                }
+              }
+            }
+          },
+          "annotation_status": {
+            "type": "string"
+          }
+        }
+      }
+    },
+    "hard_gates": {
+      "type": "object",
+      "required": [
+        "wrong_statement_acceptance",
+        "unsupported_formal_fact_claims",
+        "assumption_removal_false_acceptance",
+        "unknown_allowed"
+      ],
+      "properties": {
+        "wrong_statement_acceptance": {
+          "const": 0
+        },
+        "unsupported_formal_fact_claims": {
+          "const": 0
+        },
+        "assumption_removal_false_acceptance": {
+          "const": 0
+        },
+        "unknown_allowed": {
+          "const": true
+        }
+      }
+    },
+    "limitations": {
+      "type": "array",
+      "minItems": 1,
+      "items": {
+        "type": "string"
+      }
+    },
+    "next_stage": {
+      "type": "array",
+      "minItems": 1,
+      "items": {
+        "type": "string"
+      }
+    }
+  }
+}

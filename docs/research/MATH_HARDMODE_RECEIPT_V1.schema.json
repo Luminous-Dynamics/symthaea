@@ -1,0 +1,98 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://github.com/Luminous-Dynamics/symthaea/blob/main/docs/research/MATH_HARDMODE_RECEIPT_V1.schema.json",
+  "title": "HardModeReceiptV1",
+  "description": "Separates answer discovery, formalization, finite semantics, Lean proof verification, and proof-plan artifacts. Evaluator-only adjudication is post-hoc and must never be sent to a candidate.",
+  "type": "object",
+  "additionalProperties": false,
+  "required": ["schema_version", "candidate", "evaluator_only"],
+  "properties": {
+    "schema_version": { "const": "1.0.0" },
+    "candidate": { "$ref": "#/$defs/candidate" },
+    "evaluator_only": { "oneOf": [{ "type": "null" }, { "$ref": "#/$defs/evaluator" }] }
+  },
+  "$defs": {
+    "sha256": { "type": "string", "pattern": "^[a-f0-9]{64}$" },
+    "nonEmpty": { "type": "string", "minLength": 1 },
+    "candidate": {
+      "type": "object", "additionalProperties": false,
+      "required": ["task", "model_identity", "answer_text", "answer_sha256", "answer_abstained", "formalization", "candidate_countermodel", "proof_submission", "proof_plan_submission"],
+      "properties": {
+        "task": { "$ref": "#/$defs/task" },
+        "model_identity": { "type": "object", "additionalProperties": false, "required": ["provider", "model", "version", "decoding_config_sha256"], "properties": { "provider": { "$ref": "#/$defs/nonEmpty" }, "model": { "$ref": "#/$defs/nonEmpty" }, "version": { "$ref": "#/$defs/nonEmpty" }, "decoding_config_sha256": { "$ref": "#/$defs/sha256" } } },
+        "answer_text": { "$ref": "#/$defs/nonEmpty" },
+        "answer_sha256": { "$ref": "#/$defs/sha256" },
+        "answer_abstained": { "type": "boolean" },
+        "formalization": { "oneOf": [{ "type": "null" }, { "$ref": "#/$defs/formalization" }] },
+        "candidate_countermodel": { "oneOf": [{ "type": "null" }, { "$ref": "#/$defs/countermodel" }] },
+        "proof_submission": { "oneOf": [{ "type": "null" }, { "$ref": "#/$defs/artifact" }] },
+        "proof_plan_submission": { "oneOf": [{ "type": "null" }, { "$ref": "#/$defs/artifact" }] }
+      }
+    },
+    "task": {
+      "type": "object", "additionalProperties": false,
+      "required": ["benchmark_id", "benchmark_revision", "task_id", "task_variant", "problem_text", "problem_sha256", "prompt_text", "prompt_sha256", "visible_answer", "formal_source_repository", "formal_source_revision", "formal_source_path", "formal_declaration"],
+      "properties": {
+        "benchmark_id": { "$ref": "#/$defs/nonEmpty" },
+        "benchmark_revision": { "$ref": "#/$defs/nonEmpty" },
+        "task_id": { "$ref": "#/$defs/nonEmpty" },
+        "task_variant": { "enum": ["answer_provided", "no_answer"] },
+        "problem_text": { "$ref": "#/$defs/nonEmpty" },
+        "problem_sha256": { "$ref": "#/$defs/sha256" },
+        "prompt_text": { "$ref": "#/$defs/nonEmpty" },
+        "prompt_sha256": { "$ref": "#/$defs/sha256" },
+        "visible_answer": { "type": ["string", "null"] },
+        "formal_source_repository": { "$ref": "#/$defs/nonEmpty" },
+        "formal_source_revision": { "$ref": "#/$defs/nonEmpty" },
+        "formal_source_path": { "$ref": "#/$defs/nonEmpty" },
+        "formal_declaration": { "$ref": "#/$defs/nonEmpty" }
+      }
+    },
+    "formula": {
+      "oneOf": [
+        { "type": "object", "additionalProperties": false, "required": ["op", "name"], "properties": { "op": { "const": "atom" }, "name": { "$ref": "#/$defs/nonEmpty" } } },
+        { "type": "object", "additionalProperties": false, "required": ["op", "arg"], "properties": { "op": { "const": "not" }, "arg": { "$ref": "#/$defs/formula" } } },
+        { "type": "object", "additionalProperties": false, "required": ["op", "left", "right"], "properties": { "op": { "enum": ["and", "or", "implies", "iff"] }, "left": { "$ref": "#/$defs/formula" }, "right": { "$ref": "#/$defs/formula" } } }
+      ]
+    },
+    "sequent": {
+      "type": "object", "additionalProperties": false, "required": ["hypotheses", "premises", "conclusion"],
+      "properties": { "hypotheses": { "type": "array", "items": { "$ref": "#/$defs/formula" } }, "premises": { "type": "array", "items": { "$ref": "#/$defs/formula" } }, "conclusion": { "$ref": "#/$defs/formula" } }
+    },
+    "assignment": {
+      "type": "object", "additionalProperties": false, "required": ["atom", "value"],
+      "properties": { "atom": { "$ref": "#/$defs/nonEmpty" }, "value": { "type": "boolean" } }
+    },
+    "countermodel": {
+      "type": "object", "additionalProperties": false, "required": ["valuation"],
+      "properties": { "valuation": { "type": "array", "items": { "$ref": "#/$defs/assignment" } } }
+    },
+    "formalization": {
+      "type": "object", "additionalProperties": false,
+      "required": ["statement_text", "statement_sha256", "finite_boolean_sequent", "finite_boolean_sequent_sha256"],
+      "properties": { "statement_text": { "$ref": "#/$defs/nonEmpty" }, "statement_sha256": { "$ref": "#/$defs/sha256" }, "finite_boolean_sequent": { "oneOf": [{ "type": "null" }, { "$ref": "#/$defs/sequent" }] }, "finite_boolean_sequent_sha256": { "type": ["string", "null"], "pattern": "^[a-f0-9]{64}$" } }
+    },
+    "artifact": {
+      "type": "object", "additionalProperties": false, "required": ["artifact_ref", "sha256"],
+      "properties": { "artifact_ref": { "$ref": "#/$defs/nonEmpty" }, "sha256": { "$ref": "#/$defs/sha256" } }
+    },
+    "proof_verification": {
+      "type": "object", "additionalProperties": false,
+      "required": ["checker", "checker_version", "toolchain", "environment_manifest_sha256", "verified_task_id", "verified_formal_source_revision", "verified_statement_sha256", "verified_proof_sha256", "result_artifact_ref", "evidence_refs"],
+      "properties": { "checker": { "$ref": "#/$defs/nonEmpty" }, "checker_version": { "$ref": "#/$defs/nonEmpty" }, "toolchain": { "$ref": "#/$defs/nonEmpty" }, "environment_manifest_sha256": { "$ref": "#/$defs/sha256" }, "verified_task_id": { "$ref": "#/$defs/nonEmpty" }, "verified_formal_source_revision": { "$ref": "#/$defs/nonEmpty" }, "verified_statement_sha256": { "$ref": "#/$defs/sha256" }, "verified_proof_sha256": { "$ref": "#/$defs/sha256" }, "result_artifact_ref": { "$ref": "#/$defs/nonEmpty" }, "evidence_refs": { "type": "array", "minItems": 1, "uniqueItems": true, "items": { "$ref": "#/$defs/nonEmpty" } } }
+    },
+    "evaluator": {
+      "type": "object", "additionalProperties": false,
+      "required": ["answer_correct", "answer_evidence_refs", "formalization_matches_target", "formalization_evidence_refs", "gold_countermodel", "proof_status", "proof_verification"],
+      "properties": {
+        "answer_correct": { "type": ["boolean", "null"] },
+        "answer_evidence_refs": { "type": "array", "items": { "type": "string" } },
+        "formalization_matches_target": { "type": ["boolean", "null"] },
+        "formalization_evidence_refs": { "type": "array", "items": { "type": "string" } },
+        "gold_countermodel": { "oneOf": [{ "type": "null" }, { "$ref": "#/$defs/countermodel" }] },
+        "proof_status": { "enum": ["not_run", "accepted", "rejected", "error", "timeout", "inconclusive"] },
+        "proof_verification": { "oneOf": [{ "type": "null" }, { "$ref": "#/$defs/proof_verification" }] }
+      }
+    }
+  }
+}

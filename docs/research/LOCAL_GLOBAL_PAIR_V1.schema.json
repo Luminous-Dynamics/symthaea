@@ -1,0 +1,682 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://github.com/Luminous-Dynamics/symthaea/blob/main/docs/research/LOCAL_GLOBAL_PAIR_V1.schema.json",
+  "title": "Symthaea LocalGlobalPairV1",
+  "description": "Paired, scope-bound local/global proof-consistency receipt. Candidate-visible payload and evaluator-only adjudication are explicitly separated. Structural validity does not certify a theorem or Lean proof.",
+  "type": "object",
+  "additionalProperties": false,
+  "required": [
+    "schema_version",
+    "candidate",
+    "evaluator_only"
+  ],
+  "properties": {
+    "schema_version": {
+      "const": "1.1.0"
+    },
+    "candidate": {
+      "$ref": "#/$defs/candidate"
+    },
+    "evaluator_only": {
+      "oneOf": [
+        {
+          "type": "null"
+        },
+        {
+          "$ref": "#/$defs/evaluator"
+        }
+      ]
+    }
+  },
+  "$defs": {
+    "nonEmpty": {
+      "type": "string",
+      "minLength": 1
+    },
+    "sha256": {
+      "type": "string",
+      "pattern": "^[a-f0-9]{64}$"
+    },
+    "candidate": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "pair_id",
+        "task_class",
+        "model_identity",
+        "local_stage",
+        "global_stage"
+      ],
+      "properties": {
+        "pair_id": {
+          "$ref": "#/$defs/nonEmpty"
+        },
+        "task_class": {
+          "$ref": "#/$defs/nonEmpty"
+        },
+        "model_identity": {
+          "$ref": "#/$defs/modelIdentity"
+        },
+        "local_stage": {
+          "$ref": "#/$defs/localStage"
+        },
+        "global_stage": {
+          "$ref": "#/$defs/globalStage"
+        }
+      }
+    },
+    "modelIdentity": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "provider",
+        "model",
+        "version",
+        "decoding_config_sha256"
+      ],
+      "properties": {
+        "provider": {
+          "$ref": "#/$defs/nonEmpty"
+        },
+        "model": {
+          "$ref": "#/$defs/nonEmpty"
+        },
+        "version": {
+          "$ref": "#/$defs/nonEmpty"
+        },
+        "decoding_config_sha256": {
+          "$ref": "#/$defs/sha256"
+        }
+      }
+    },
+    "scopeBinding": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "source_repository",
+        "source_revision",
+        "source_path",
+        "declaration",
+        "theorem_id",
+        "root_goal_text",
+        "hypotheses",
+        "premises",
+        "conclusion_text",
+        "warrant_text",
+        "root_goal_sha256",
+        "hypothesis_set_sha256",
+        "premise_set_sha256",
+        "conclusion_sha256",
+        "warrant_id",
+        "warrant_sha256",
+        "finite_boolean_sequent",
+        "finite_boolean_sequent_sha256"
+      ],
+      "properties": {
+        "source_repository": {
+          "$ref": "#/$defs/nonEmpty"
+        },
+        "source_revision": {
+          "$ref": "#/$defs/nonEmpty"
+        },
+        "source_path": {
+          "$ref": "#/$defs/nonEmpty"
+        },
+        "declaration": {
+          "$ref": "#/$defs/nonEmpty"
+        },
+        "theorem_id": {
+          "$ref": "#/$defs/nonEmpty"
+        },
+        "root_goal_sha256": {
+          "$ref": "#/$defs/sha256"
+        },
+        "hypothesis_set_sha256": {
+          "$ref": "#/$defs/sha256"
+        },
+        "premise_set_sha256": {
+          "$ref": "#/$defs/sha256"
+        },
+        "conclusion_sha256": {
+          "$ref": "#/$defs/sha256"
+        },
+        "warrant_id": {
+          "$ref": "#/$defs/nonEmpty"
+        },
+        "warrant_sha256": {
+          "$ref": "#/$defs/sha256"
+        },
+        "root_goal_text": {
+          "$ref": "#/$defs/nonEmpty"
+        },
+        "hypotheses": {
+          "type": "array",
+          "uniqueItems": true,
+          "items": {
+            "$ref": "#/$defs/nonEmpty"
+          }
+        },
+        "premises": {
+          "type": "array",
+          "uniqueItems": true,
+          "items": {
+            "$ref": "#/$defs/nonEmpty"
+          }
+        },
+        "conclusion_text": {
+          "$ref": "#/$defs/nonEmpty"
+        },
+        "warrant_text": {
+          "$ref": "#/$defs/nonEmpty"
+        },
+        "finite_boolean_sequent": {
+          "oneOf": [
+            {
+              "$ref": "#/$defs/booleanSequent"
+            },
+            {
+              "type": "null"
+            }
+          ]
+        },
+        "finite_boolean_sequent_sha256": {
+          "oneOf": [
+            {
+              "$ref": "#/$defs/sha256"
+            },
+            {
+              "type": "null"
+            }
+          ]
+        }
+      }
+    },
+    "execution": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "prompt_sha256",
+        "input_sha256",
+        "output_sha256",
+        "output_artifact_ref",
+        "token_budget",
+        "tokens_used",
+        "tool_call_budget",
+        "tool_calls_used",
+        "wall_clock_budget_ms",
+        "wall_clock_used_ms"
+      ],
+      "properties": {
+        "prompt_sha256": {
+          "$ref": "#/$defs/sha256"
+        },
+        "input_sha256": {
+          "$ref": "#/$defs/sha256"
+        },
+        "output_sha256": {
+          "$ref": "#/$defs/sha256"
+        },
+        "output_artifact_ref": {
+          "$ref": "#/$defs/nonEmpty"
+        },
+        "token_budget": {
+          "type": "integer",
+          "minimum": 0
+        },
+        "tokens_used": {
+          "type": "integer",
+          "minimum": 0
+        },
+        "tool_call_budget": {
+          "type": "integer",
+          "minimum": 0
+        },
+        "tool_calls_used": {
+          "type": "integer",
+          "minimum": 0
+        },
+        "wall_clock_budget_ms": {
+          "type": "integer",
+          "minimum": 0
+        },
+        "wall_clock_used_ms": {
+          "type": "integer",
+          "minimum": 0
+        }
+      }
+    },
+    "localStage": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "scope_binding",
+        "execution",
+        "verdict"
+      ],
+      "properties": {
+        "scope_binding": {
+          "$ref": "#/$defs/scopeBinding"
+        },
+        "execution": {
+          "$ref": "#/$defs/execution"
+        },
+        "verdict": {
+          "enum": [
+            "accept",
+            "reject",
+            "unknown",
+            "ill_formed"
+          ]
+        }
+      }
+    },
+    "warrantMention": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "mention_id",
+        "warrant_id",
+        "plan_node_id",
+        "relation"
+      ],
+      "properties": {
+        "mention_id": {
+          "$ref": "#/$defs/nonEmpty"
+        },
+        "warrant_id": {
+          "$ref": "#/$defs/nonEmpty"
+        },
+        "plan_node_id": {
+          "$ref": "#/$defs/nonEmpty"
+        },
+        "relation": {
+          "enum": [
+            "uses_as_rule",
+            "supports_inference",
+            "cites",
+            "rebuts",
+            "context_only",
+            "alternative"
+          ]
+        }
+      }
+    },
+    "globalStage": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "scope_binding",
+        "execution",
+        "proof_plan_sha256",
+        "warrant_mentions"
+      ],
+      "properties": {
+        "scope_binding": {
+          "$ref": "#/$defs/scopeBinding"
+        },
+        "execution": {
+          "$ref": "#/$defs/execution"
+        },
+        "proof_plan_sha256": {
+          "$ref": "#/$defs/sha256"
+        },
+        "warrant_mentions": {
+          "type": "array",
+          "items": {
+            "$ref": "#/$defs/warrantMention"
+          }
+        }
+      }
+    },
+    "evaluator": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "eligibility",
+        "exclusion_reason",
+        "independently_assessed_warrant",
+        "local_verdict_correct",
+        "global_disposition",
+        "adjudication_authority",
+        "adjudication_refs",
+        "finite_boolean_countermodel",
+        "global_use_adjudication"
+      ],
+      "properties": {
+        "eligibility": {
+          "enum": [
+            "eligible",
+            "excluded"
+          ]
+        },
+        "exclusion_reason": {
+          "type": [
+            "string",
+            "null"
+          ]
+        },
+        "independently_assessed_warrant": {
+          "enum": [
+            "valid",
+            "invalid",
+            "unknown"
+          ]
+        },
+        "local_verdict_correct": {
+          "type": [
+            "boolean",
+            "null"
+          ]
+        },
+        "global_disposition": {
+          "enum": [
+            "used_directly",
+            "used_implicitly",
+            "cited_rejected",
+            "omitted",
+            "unknown"
+          ]
+        },
+        "adjudication_authority": {
+          "$ref": "#/$defs/nonEmpty"
+        },
+        "adjudication_refs": {
+          "type": "array",
+          "minItems": 1,
+          "uniqueItems": true,
+          "items": {
+            "$ref": "#/$defs/nonEmpty"
+          }
+        },
+        "finite_boolean_countermodel": {
+          "oneOf": [
+            {
+              "$ref": "#/$defs/booleanCountermodel"
+            },
+            {
+              "type": "null"
+            }
+          ]
+        },
+        "global_use_adjudication": {
+          "oneOf": [
+            {
+              "$ref": "#/$defs/globalUseAdjudication"
+            },
+            {
+              "type": "null"
+            }
+          ]
+        }
+      }
+    },
+    "booleanAssignment": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "atom",
+        "value"
+      ],
+      "properties": {
+        "atom": {
+          "$ref": "#/$defs/nonEmpty"
+        },
+        "value": {
+          "type": "boolean"
+        }
+      }
+    },
+    "booleanFormula": {
+      "oneOf": [
+        {
+          "type": "object",
+          "additionalProperties": false,
+          "required": [
+            "op",
+            "name"
+          ],
+          "properties": {
+            "op": {
+              "const": "atom"
+            },
+            "name": {
+              "$ref": "#/$defs/nonEmpty"
+            }
+          }
+        },
+        {
+          "type": "object",
+          "additionalProperties": false,
+          "required": [
+            "op",
+            "arg"
+          ],
+          "properties": {
+            "op": {
+              "const": "not"
+            },
+            "arg": {
+              "$ref": "#/$defs/booleanFormula"
+            }
+          }
+        },
+        {
+          "type": "object",
+          "additionalProperties": false,
+          "required": [
+            "op",
+            "left",
+            "right"
+          ],
+          "properties": {
+            "op": {
+              "const": "and"
+            },
+            "left": {
+              "$ref": "#/$defs/booleanFormula"
+            },
+            "right": {
+              "$ref": "#/$defs/booleanFormula"
+            }
+          }
+        },
+        {
+          "type": "object",
+          "additionalProperties": false,
+          "required": [
+            "op",
+            "left",
+            "right"
+          ],
+          "properties": {
+            "op": {
+              "const": "or"
+            },
+            "left": {
+              "$ref": "#/$defs/booleanFormula"
+            },
+            "right": {
+              "$ref": "#/$defs/booleanFormula"
+            }
+          }
+        },
+        {
+          "type": "object",
+          "additionalProperties": false,
+          "required": [
+            "op",
+            "left",
+            "right"
+          ],
+          "properties": {
+            "op": {
+              "const": "implies"
+            },
+            "left": {
+              "$ref": "#/$defs/booleanFormula"
+            },
+            "right": {
+              "$ref": "#/$defs/booleanFormula"
+            }
+          }
+        },
+        {
+          "type": "object",
+          "additionalProperties": false,
+          "required": [
+            "op",
+            "left",
+            "right"
+          ],
+          "properties": {
+            "op": {
+              "const": "iff"
+            },
+            "left": {
+              "$ref": "#/$defs/booleanFormula"
+            },
+            "right": {
+              "$ref": "#/$defs/booleanFormula"
+            }
+          }
+        }
+      ]
+    },
+    "booleanCountermodel": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "valuation"
+      ],
+      "properties": {
+        "valuation": {
+          "type": "array",
+          "minItems": 1,
+          "items": {
+            "$ref": "#/$defs/booleanAssignment"
+          }
+        }
+      }
+    },
+    "booleanSequent": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "hypotheses",
+        "premises",
+        "conclusion"
+      ],
+      "properties": {
+        "premises": {
+          "type": "array",
+          "minItems": 1,
+          "items": {
+            "$ref": "#/$defs/booleanFormula"
+          }
+        },
+        "conclusion": {
+          "$ref": "#/$defs/booleanFormula"
+        },
+        "hypotheses": {
+          "type": "array",
+          "items": {
+            "$ref": "#/$defs/booleanFormula"
+          }
+        }
+      }
+    },
+    "globalUseAdjudication": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "disposition",
+        "reviewer_id",
+        "reviewer_authority",
+        "reviewed_plan_sha256",
+        "target_warrant_id",
+        "reviewed_entire_plan",
+        "node_evidence",
+        "evidence_refs"
+      ],
+      "properties": {
+        "disposition": {
+          "enum": [
+            "used_directly",
+            "used_implicitly",
+            "cited_rejected",
+            "omitted",
+            "unknown"
+          ]
+        },
+        "reviewer_id": {
+          "$ref": "#/$defs/nonEmpty"
+        },
+        "reviewer_authority": {
+          "$ref": "#/$defs/nonEmpty"
+        },
+        "reviewed_plan_sha256": {
+          "$ref": "#/$defs/sha256"
+        },
+        "target_warrant_id": {
+          "$ref": "#/$defs/nonEmpty"
+        },
+        "reviewed_entire_plan": {
+          "type": "boolean"
+        },
+        "node_evidence": {
+          "type": "array",
+          "items": {
+            "$ref": "#/$defs/globalUseNodeEvidence"
+          }
+        },
+        "evidence_refs": {
+          "type": "array",
+          "minItems": 1,
+          "uniqueItems": true,
+          "items": {
+            "$ref": "#/$defs/nonEmpty"
+          }
+        }
+      }
+    },
+    "globalUseNodeEvidence": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "mention_id",
+        "plan_node_id",
+        "warrant_id",
+        "relation",
+        "material_use",
+        "rationale_ref"
+      ],
+      "properties": {
+        "plan_node_id": {
+          "$ref": "#/$defs/nonEmpty"
+        },
+        "warrant_id": {
+          "$ref": "#/$defs/nonEmpty"
+        },
+        "relation": {
+          "enum": [
+            "uses_as_rule",
+            "supports_inference",
+            "cites",
+            "rebuts",
+            "context_only",
+            "alternative"
+          ]
+        },
+        "material_use": {
+          "type": "boolean"
+        },
+        "rationale_ref": {
+          "$ref": "#/$defs/nonEmpty"
+        },
+        "mention_id": {
+          "$ref": "#/$defs/nonEmpty"
+        }
+      }
+    }
+  }
+}

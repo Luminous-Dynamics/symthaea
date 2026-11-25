@@ -1,0 +1,315 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://luminousdynamics.io/schemas/LEAN_AXIOM_AUDIT_IMPORTED_INDUCTIVE_V1.schema.json",
+  "title": "LeanAxiomAuditImportedInductiveV1",
+  "type": "object",
+  "additionalProperties": false,
+  "required": [
+    "schema_version",
+    "artifact_id",
+    "status",
+    "lean_toolchain",
+    "lean_core_revision",
+    "mathlib_revision",
+    "sources",
+    "roots",
+    "audit_algorithm",
+    "claim_ceiling"
+  ],
+  "properties": {
+    "schema_version": {
+      "const": "1.0.0"
+    },
+    "artifact_id": {
+      "const": "LEAN-AXIOM-AUDIT-IMPORTED-INDUCTIVE-001"
+    },
+    "status": {
+      "const": "independent_audit_pending"
+    },
+    "lean_toolchain": {
+      "const": "leanprover/lean4:v4.37.0-rc1"
+    },
+    "lean_core_revision": {
+      "const": "0b77e12952ad39077d80d8bd6b66d601f225c321"
+    },
+    "mathlib_revision": {
+      "const": "6ebcce37335bcb6bca64596e5d57bb3035648030"
+    },
+    "sources": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "module_a",
+        "module_b",
+        "module_proof"
+      ],
+      "properties": {
+        "module_a": {
+          "type": "object",
+          "additionalProperties": false,
+          "required": [
+            "path",
+            "sha256"
+          ],
+          "properties": {
+            "path": {
+              "const": "scripts/research/lean-proof-extractor/axiom-audit-imported-inductive/A.lean"
+            },
+            "sha256": {
+              "type": "string",
+              "pattern": "^[a-f0-9]{64}$"
+            }
+          }
+        },
+        "module_b": {
+          "type": "object",
+          "additionalProperties": false,
+          "required": [
+            "path",
+            "sha256"
+          ],
+          "properties": {
+            "path": {
+              "const": "scripts/research/lean-proof-extractor/axiom-audit-imported-inductive/B.lean"
+            },
+            "sha256": {
+              "type": "string",
+              "pattern": "^[a-f0-9]{64}$"
+            }
+          }
+        },
+        "module_proof": {
+          "type": "object",
+          "additionalProperties": false,
+          "required": [
+            "path",
+            "sha256"
+          ],
+          "properties": {
+            "path": {
+              "const": "scripts/research/lean-proof-extractor/ProofActionCertificateAndComm.lean"
+            },
+            "sha256": {
+              "type": "string",
+              "pattern": "^[a-f0-9]{64}$"
+            }
+          }
+        }
+      }
+    },
+    "roots": {
+      "type": "array",
+      "minItems": 8,
+      "maxItems": 8,
+      "items": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": [
+          "name",
+          "expected_fresh_axioms"
+        ],
+        "properties": {
+          "name": {
+            "enum": [
+              "S9",
+              "S9.mk",
+              "usesS9"
+            ]
+          },
+          "expected_fresh_axioms": {
+            "const": [
+              "Classical.choice"
+            ]
+          }
+        },
+        "oneOf": [
+          {
+            "type": "object",
+            "additionalProperties": false,
+            "required": [
+              "name",
+              "expected_fresh_axioms"
+            ],
+            "properties": {
+              "name": {
+                "const": "S9"
+              },
+              "expected_fresh_axioms": {
+                "const": [
+                  "Classical.choice"
+                ]
+              }
+            }
+          },
+          {
+            "type": "object",
+            "additionalProperties": false,
+            "required": [
+              "name",
+              "expected_fresh_axioms"
+            ],
+            "properties": {
+              "name": {
+                "const": "S9.mk"
+              },
+              "expected_fresh_axioms": {
+                "const": [
+                  "Classical.choice"
+                ]
+              }
+            }
+          },
+          {
+            "type": "object",
+            "additionalProperties": false,
+            "required": [
+              "name",
+              "expected_fresh_axioms"
+            ],
+            "properties": {
+              "name": {
+                "const": "usesS9"
+              },
+              "expected_fresh_axioms": {
+                "const": [
+                  "Classical.choice"
+                ]
+              }
+            }
+          },
+          {
+            "type": "object",
+            "additionalProperties": false,
+            "required": [
+              "name",
+              "expected_fresh_axioms"
+            ],
+            "properties": {
+              "name": {
+                "const": "And.comm"
+              },
+              "expected_fresh_axioms": {
+                "const": []
+              }
+            }
+          },
+          {
+            "type": "object",
+            "additionalProperties": false,
+            "required": [
+              "name",
+              "expected_fresh_axioms"
+            ],
+            "properties": {
+              "name": {
+                "const": "ProofPlanActionCertificatePilot.and_comm_split_iff"
+              },
+              "expected_fresh_axioms": {
+                "const": []
+              }
+            }
+          },
+          {
+            "type": "object",
+            "additionalProperties": false,
+            "required": [
+              "name",
+              "expected_fresh_axioms"
+            ],
+            "properties": {
+              "name": {
+                "const": "ProofPlanActionCertificatePilot.and_comm_forward"
+              },
+              "expected_fresh_axioms": {
+                "const": []
+              }
+            }
+          },
+          {
+            "type": "object",
+            "additionalProperties": false,
+            "required": [
+              "name",
+              "expected_fresh_axioms"
+            ],
+            "properties": {
+              "name": {
+                "const": "ProofPlanActionCertificatePilot.and_comm_reverse"
+              },
+              "expected_fresh_axioms": {
+                "const": []
+              }
+            }
+          },
+          {
+            "type": "object",
+            "additionalProperties": false,
+            "required": [
+              "name",
+              "expected_fresh_axioms"
+            ],
+            "properties": {
+              "name": {
+                "const": "ProofPlanActionCertificatePilot.and_comm_plan_replay"
+              },
+              "expected_fresh_axioms": {
+                "const": []
+              }
+            }
+          }
+        ]
+      }
+    },
+    "audit_algorithm": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "lookup",
+        "state",
+        "traversed_constant_kinds",
+        "inductive_edges",
+        "unresolved_policy"
+      ],
+      "properties": {
+        "lookup": {
+          "const": "env.setExporting false then env.checked.get.find?"
+        },
+        "state": {
+          "const": "fresh per-root DFS; visited set only; no partial dependency result cache"
+        },
+        "traversed_constant_kinds": {
+          "type": "array",
+          "minItems": 8,
+          "maxItems": 8,
+          "uniqueItems": true,
+          "items": {
+            "enum": [
+              "axiom",
+              "definition",
+              "theorem",
+              "opaque",
+              "quotient",
+              "constructor",
+              "recursor",
+              "inductive"
+            ]
+          }
+        },
+        "inductive_edges": {
+          "const": "inductive type plus all constructors"
+        },
+        "unresolved_policy": {
+          "const": "preserve unresolved constant name in dependency set; exact expected-set assertion fails closed"
+        }
+      }
+    },
+    "claim_ceiling": {
+      "type": "array",
+      "minItems": 4,
+      "items": {
+        "type": "string",
+        "minLength": 1
+      }
+    }
+  }
+}

@@ -1,0 +1,167 @@
+{
+  "schema_version": "1.0.0",
+  "task_id": "ETH-REDUCTION-COMPREHENSION-TOY-001",
+  "status": "finite_reference_fixture",
+  "source_problem": {
+    "kind": "propositional_formula",
+    "formula": "F(p,q,r) = (p ∧ q) ∨ r",
+    "original_variables": [
+      "p",
+      "q",
+      "r"
+    ]
+  },
+  "correct_encoding": {
+    "auxiliary_variables": [
+      "u",
+      "s"
+    ],
+    "intended_definitions": [
+      "u ↔ (p ∧ q)",
+      "s ↔ (u ∨ r)"
+    ],
+    "cnf_clauses": [
+      "¬u ∨ p",
+      "¬u ∨ q",
+      "u ∨ ¬p ∨ ¬q",
+      "s ∨ ¬u",
+      "s ∨ ¬r",
+      "¬s ∨ u ∨ r",
+      "s"
+    ],
+    "guarantee_classes": [
+      "decision_preserving",
+      "unique_extension",
+      "parsimonious"
+    ],
+    "explanation": "u is uniquely forced to p ∧ q; s is uniquely forced to u ∨ r; asserting s makes the target satisfiable exactly when F is true."
+  },
+  "mutation": {
+    "id": "REMOVE-AND-GATE-REVERSE-CLAUSE",
+    "removed_clause": "u ∨ ¬p ∨ ¬q",
+    "resulting_relation": "u → (p ∧ q), but not the converse",
+    "guarantee_classes_retained": [
+      "decision_preserving"
+    ],
+    "guarantee_classes_lost": [
+      "unique_extension",
+      "parsimonious"
+    ],
+    "witness": {
+      "original_assignment": {
+        "p": true,
+        "q": true,
+        "r": true
+      },
+      "correct_auxiliary_extensions": [
+        {
+          "u": true,
+          "s": true
+        }
+      ],
+      "mutated_auxiliary_extensions": [
+        {
+          "u": false,
+          "s": true
+        },
+        {
+          "u": true,
+          "s": true
+        }
+      ]
+    },
+    "interpretation": "The target remains satisfiable exactly for source-satisfying assignments, but one source assignment has two target extensions. This is decision-preserving but not count-preserving."
+  },
+  "finite_oracle": {
+    "method": "Exhaustive enumeration of all 2^3 original assignments and 2^2 auxiliary assignments per original assignment",
+    "source_satisfying_assignments": 5,
+    "correct_encoded_satisfying_assignments": 5,
+    "mutated_encoded_satisfying_assignments": 6,
+    "decision_equivalence_correct": true,
+    "decision_equivalence_mutated": true,
+    "unique_extension_correct": true,
+    "unique_extension_mutated": false,
+    "rows": [
+      {
+        "p": false,
+        "q": false,
+        "r": false,
+        "formula": false,
+        "correct_extensions": 0,
+        "mutated_extensions": 0
+      },
+      {
+        "p": false,
+        "q": false,
+        "r": true,
+        "formula": true,
+        "correct_extensions": 1,
+        "mutated_extensions": 1
+      },
+      {
+        "p": false,
+        "q": true,
+        "r": false,
+        "formula": false,
+        "correct_extensions": 0,
+        "mutated_extensions": 0
+      },
+      {
+        "p": false,
+        "q": true,
+        "r": true,
+        "formula": true,
+        "correct_extensions": 1,
+        "mutated_extensions": 1
+      },
+      {
+        "p": true,
+        "q": false,
+        "r": false,
+        "formula": false,
+        "correct_extensions": 0,
+        "mutated_extensions": 0
+      },
+      {
+        "p": true,
+        "q": false,
+        "r": true,
+        "formula": true,
+        "correct_extensions": 1,
+        "mutated_extensions": 1
+      },
+      {
+        "p": true,
+        "q": true,
+        "r": false,
+        "formula": true,
+        "correct_extensions": 1,
+        "mutated_extensions": 1
+      },
+      {
+        "p": true,
+        "q": true,
+        "r": true,
+        "formula": true,
+        "correct_extensions": 1,
+        "mutated_extensions": 2
+      }
+    ]
+  },
+  "research_connections": {
+    "symthaea_issues": [
+      10811,
+      10835,
+      10809,
+      10810,
+      10803
+    ],
+    "purpose": "Proof-comprehension example for why SAT equivalence, parsimonious counting, unique extension and independent proof semantics must be represented as distinct guarantees."
+  },
+  "limitations": [
+    "Synthetic finite Boolean encoding only; it is not a Lean proof and does not validate PR #10809 source code.",
+    "No asymptotic complexity or solver performance claim.",
+    "The finite oracle checks this fixed formula only; the generic unique-extension property requires a proof for every connective and composition rule.",
+    "The result is a teaching and regression fixture, not an expert-reviewed benchmark task."
+  ]
+}

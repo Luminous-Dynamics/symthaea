@@ -1,0 +1,560 @@
+# Mathematical proof comprehension — competitive landscape and benchmark ledger v1
+
+**Parent:** [#13293 MATH-COMPREHENSION-001](https://github.com/Luminous-Dynamics/symthaea/issues/13293)  
+**Date:** 2026-11-22  
+**Status:** literature baseline, not Symthaea benchmark results.
+
+## Executive positioning
+
+Symthaea should not compete on a single blended theorem-proving score. The field's current benchmarks measure different capabilities:
+
+- formal completion on a supplied statement;
+- discovery of the theorem before proving it;
+- repository-scale proof obligations and dependency retrieval;
+- proof compression / restructuring;
+- formalization of implementations;
+- theorem-family transfer;
+- human comprehension and explanation fidelity.
+
+The last two, when linked to a formal evidence graph and a blind human study, are the proposed differentiation. We do not claim no one has studied explanation; we claim this exact joined evaluation—formal identity, proof-mechanism reconstruction, explanation support, counterfactual understanding and human transfer—needs to be benchmarked as a coherent capability.
+
+## 1. Benchmark ledger
+
+| Benchmark / work | Public reference | Published scale / headline result | Capability measured | Strategic implication |
+|---|---|---|---|---|
+| FormalMATH (EMNLP Findings 2026) | https://aclanthology.org/2026.findings-emnlp.579/ | 5,560 semantically validated Lean 4 statements; DeepSeek-Prover-V2 671B: 28.31% Pass@32 | Formal proof generation from formal statements | Use as a proving baseline, but measure theorem-family transfer, claim fidelity and explanation quality separately |
+| EasyProver / Aegis (Oct 28, 2026 preprint) | https://arxiv.org/abs/2610.38174 | 669/672 PutnamBench; all six IMO 2026 formalizations; 597/600 NTP4VC; 189/189 VERINA; Aegis has 2,045 Rust–Lean program pairs and 11,533 candidate specs; 1,054/2,000 sampled specs proved within 30 minutes | Multi-agent Lean proving and implementation-derived verification | Contest theorem accuracy alone is saturated; add implementation semantics, mutations and hidden specifications |
+| VeriSoftBench | https://utopia-group.github.io/VeriSoftBench/ | 500 tasks from 23 Lean repositories; 41% best with curated context, 35% full raw-repository context | Repository-context software verification | Dependency selection/context construction is a measurable bottleneck and useful baseline |
+| LeanLean (2026) | https://www.sri.inf.ethz.ch/publications/rognvaldsson2026leanlean | 64 repositories up to 174k LOC; Opus 5 reports 48.3% average proof-size compression within 12 hours | Repository-scale proof compression and restructuring | Add an explanation-compression frontier, but do not equate shorter code with better mathematical understanding |
+| TheoremBench (Jun 8, 2026) | https://arxiv.org/abs/2606.09450 | Nearly 100 classical theorems; plain and premised versions with subtheorem families | Main theorem and supporting-subtheorem coverage, token efficiency | Compare proof dependency coverage, not just final theorem pass/fail |
+| Formal Conjectures (May 13, 2026 paper snapshot) | https://arxiv.org/abs/2605.13171 | 2,615 statements in the paper snapshot; 1,029 open research conjectures and 836 solved tasks for autoformalization | Research conjectures and formalization | Use immutable time-stamped family holdouts and contamination controls |
+| Discover-and-Prove (ACL 2026) | https://aclanthology.org/2026.acl-long.3/ | Hard-Mode MiniF2F/FIMO; reports 36 PutnamBench theorems formally proved in Hard Mode | Discovery before proof generation | Use as discovery baseline; add conceptual and cross-family transfer |
+| Aegis implementation lane | https://arxiv.org/abs/2610.38174 | Real Rust-to-Lean program pairs and candidate specifications | Correctness, safety and semantics of code | Useful transfer target for formal explanation and human-readable specification reasoning |
+
+Scores and budgets are not directly comparable across rows. Cite the paper's own protocol. Do not create an aggregate rank across these tasks.
+
+## 2. Where Symthaea should compete
+
+### Track A — proof identity and formal trust
+
+Baselines: Lean kernel, theorem prover output, #11362's claim-to-Lean fidelity checks.
+
+Targets:
+- exact theorem/source/toolchain identity on every task;
+- zero false-positive theorem acceptance on changed/weakening/namespace-shadowing controls;
+- explicit axioms, admissions, unknown and timeout;
+- no HDC similarity or model confidence as proof evidence.
+
+This is a hard gate, not a score that can be averaged.
+
+### Track B — repository dependency comprehension
+
+Baselines:
+- raw repository context;
+- curated context (VeriSoftBench-style);
+- lexical/BM25 retrieval;
+- dense retrieval;
+- Lean dependency graph;
+- symbolic/type-directed retrieval;
+- hybrid graph + lexical + dense;
+- hybrid plus HDC.
+
+Targets:
+- ≥90% precision / ≥85% recall on expert-labelled material dependencies;
+- distinguish type dependency, proof dependency, imported infrastructure, inductive/recursor edges and mathematical role;
+- do not claim every syntactic dependency is mathematically essential.
+
+### Track C — proof mechanism reconstruction
+
+For each proof slice, require:
+- exact theorem claim and all assumptions;
+- each key lemma's role and the direction in which it is used;
+- a derivation skeleton in mathematical prose;
+- one worked example / counterexample if available;
+- a list of quoted or unresolved obligations;
+- per-sentence evidence links for formal facts.
+
+Target: ≥80% independent expert acceptance on whole held-out theorem families, with reviewer disagreement retained.
+
+### Track D — counterfactual understanding
+
+Mutate one binder, assumption, endpoint, definition or reduction guarantee.
+
+Require:
+- predict whether the changed statement is still true;
+- provide a concrete counterexample when false;
+- distinguish "proof no longer typechecks" from "the mathematical proposition is false";
+- detect theorem substitutions and weakened claims.
+
+Targets:
+- ≥90% correct disposition on held-out controlled mutations;
+- zero acceptance of altered statement as original;
+- abstention is preferred over fabrication.
+
+### Track E — human comprehension and transfer
+
+Compare raw Lean/source, generic LLM summary, dependency graph only, and source-linked concept explanation.
+
+Primary outcomes:
+- exact restatement of theorem and assumptions;
+- explanation of selected construction / lemma role;
+- near-transfer problem accuracy;
+- confidence calibration.
+
+Secondary:
+- time-to-correct-understanding;
+- ability to detect a deliberately planted missing assumption;
+- ability to write a formalizable paraphrase;
+- explanation length / token and reviewer cost.
+
+Targets:
+- ≥20 percentage-point improvement in comprehension or near-transfer over raw-source and source-only baselines;
+- ≥10 percentage-point improvement on unseen theorem families;
+- no increase in false-fact rate.
+
+### Track F — explanation compression (Minimum Sufficient Explanation)
+
+Treat explanation length as a constrained optimization objective, not as a standalone score.
+
+Find the Pareto frontier of:
+- token count;
+- dependency coverage;
+- formal-fact support coverage;
+- expert faithfulness;
+- human comprehension;
+- near-transfer.
+
+Target: ≥25% fewer explanation tokens at matched comprehension within a preregistered 5 percentage-point non-inferiority margin. The frontier must include full-source and dependency-only baselines. A shorter explanation that drops assumptions or hurts transfer is a failure.
+
+### Track G — mathematical mechanism transfer
+
+Hold out entire theorem families. Train/tune on separate families. Ask whether a mechanism learned in one proof—recursion, quotient induction, local-to-global composition, interpolation, valuation arguments, symmetry reduction, witness reconstruction—helps solve or explain an unseen instance in another family.
+
+Target: at least +10 percentage points over a source-only baseline without increased false-fact rate. Require a task-level explanation of the transferred mechanism.
+
+## 3. HDC / CfC competitive ablations
+
+Use identical corpus, model, prompt, context budget and compute:
+1. BM25;
+2. dense embeddings;
+3. dependency graph only;
+4. symbolic / type-directed retrieval;
+5. lexical + dense + graph hybrid;
+6. hybrid + HDC;
+7. hybrid + HDC + CfC.
+
+Report recall@k, MRR, material-edge precision/recall, statement fidelity, explanation support, transfer, wall-clock time, memory and tokens. Do not claim HDC/CfC advantage from one benchmark or a similarity score. If the improvement fails to reproduce on held-out theorem families, remove the component from this capability.
+
+## 4. Industry comparison strategy
+
+We do not have to beat EasyProver at PutnamBench to make a meaningful contribution. We should:
+- reproduce published proof-generation baselines under compatible budgets;
+- compare repository comprehension against VeriSoftBench-style context conditions;
+- compare proof simplification against LeanLean under matched resource ceilings;
+- compare subtheorem/coverage behavior against TheoremBench;
+- compare research discovery against Formal Conjectures / Discover-and-Prove;
+- introduce the proof comprehension + human-transfer suite as a separate track.
+
+The new capability should be evaluated with open data, pinned environments, raw per-task rows and independent human review. We should publish negative results and false-positive rates. The ambition is to become a strong complementary research system, not to misrepresent one result as beating all of industry.
+
+## 5. Claim policy
+
+A leaderboard improvement on a supplied theorem is proof-generation evidence.  
+A smaller file is proof-compression evidence.  
+A correct dependency graph is structural evidence.  
+A human-readable explanation is only explanation evidence when reviewed.  
+A human transfer improvement is a learning/utility result.
+
+Do not merge these into a single "mathematical intelligence score" until the component metrics are independently reliable, and even then keep the hard trust gates separate.
+## 6. Newly identified adjacent state of the art (2026-11-22)
+
+The first version of the ledger understated three directly relevant developments. They must become explicit baselines / interoperability targets.
+
+### HumanLean — faithful paper-to-Lean formalization
+
+**Paper:** Yuhao et al., *Faithful Lean Formalization for Human Proof Review*, under review (2026). Public paper PDF: https://files.sri.inf.ethz.ch/website/papers/yuhao2026humanlean.pdf
+
+HumanLean's key contribution is a structured formalization contract with staged source / definition / scaffold / proof review. It separates accepted goals, excluded goals, external dependencies and proof routes; external facts not formalized in Mathlib can be declared as axioms in the scaffold, with that boundary made explicit. It also constrains the Lean layout so one main theorem per goal and helper lemmas are isolated for review.
+
+On nine theoretical papers:
+- GPT-6-Astra baseline: 56/150 accepted goals, 56 formalized, 55 judged faithful; HumanLean: 60/150 accepted, 60 formalized, 60 judged faithful.
+- Aggregate faithfulness: 98.2% baseline vs 100% HumanLean for GPT-6-Astra.
+- Two independent human reviewers with Lean/math expertise confirmed the 100% faithfulness claim for HumanLean/GPT-6-Astra. They spent 5–20 minutes per goal, mostly recovering relevant paper context.
+- HumanLean reports reducing axiom exposure from 0.20 to 0.07 per formalization with GPT-6-Astra, and custom-definition verbosity from 11.80 to 1.13 per formalization.
+- Cost increased: $6.7 to $8.7 per formalized goal for GPT-6-Astra. This is a real quality/review-burden trade-off, not a free improvement.
+
+**Implication:** We should reuse HumanLean's claim/goal contract, source audit discipline and independent review protocol where possible. Do not build a competing paper-to-Lean formalization pipeline. Our work begins from already formalized artifacts and measures conceptual reconstruction, explanation faithfulness, counterfactual understanding and whether humans can use what they learned on a new problem. HumanLean's two-reviewer paper-faithfulness score is not a human-learning/transfer result.
+
+Important limitations: this is a paper-level result under review, with nine paper case studies; its faithfulness is bounded by the selected goals and explicit external-dependency policy. Axiomatized external facts must not be presented as internally proved. It does not establish that readers learn or transfer mathematical mechanisms after reading an explanation.
+
+### APE-Bench / APE-Harness — repository-scale proof engineering
+
+**Paper:** Xin et al., ICML 2026 / PMLR 306: https://proceedings.mlr.press/v306/xin26c.html  
+**Public implementation:** https://github.com/xinhjBrant/APE-Bench  
+**Code snapshot:** commit `20017343657a7ce77fc67467c3dc9e443c81c075`, MIT license.
+
+APE-Bench introduces dual verification: a task must satisfy both syntactic compilation and semantic requirement checks in a pinned library environment. The public implementation documents:
+- 100 proof-engineering tasks;
+- 64 semantic-judge validation tasks;
+- theorem proving, proof engineering, judgment, instruction synthesis and library-annotation task types;
+- multi-version execution and version-scoped retrieval;
+- task contracts, isolated runtimes, and reference scaffolds for APE-Agent, Claude Code and Codex.
+
+**Implication:** Adopt dual verification and the task-contract abstraction for our machine evaluation. Use APE-Bench proof-engineering and semantic-judgment tasks as external regression lanes where licensing/data conditions allow. Do not duplicate its execution harness or call our prose-only pilot an APE benchmark.
+
+### LeanGraphSearch — strong dependency-aware retrieval baseline
+
+**Paper:** Xu et al., *Lean Graph Search for Formal Theorem Proving* (Oct 15, 2026): https://arxiv.org/abs/2610.22339
+
+It builds a Mathlib declaration graph using jixia static analysis and performs query-personalized PageRank from semantically retrieved seeds. Its reported results include:
+- MathlibQR Recall@100: 94.7%, versus 82.7% for LeanSearch v2 on the 810-query fair subset;
+- MathlibMPR complete-route coverage: 42.8% vs 39.1% at @20, and 44.2% vs 41.3% at @50;
+- downstream proof pass-rate gains up to 40% over a vanilla prover and up to 10% over LeanSearch v2 across the paper's evaluated benchmarks and budgets.
+
+**Implication:** A generic "dependency graph retrieval" arm is not enough. Explicitly reproduce LeanGraphSearch's seed retrieval + PPR + reranking baseline, or use its pinned implementation / reported results with compatible caveats. Compare our Lean-native extracted graph, jixia-style static graph and upstream kernel-export graph; measure edge differences rather than assuming these methods produce identical graphs.
+
+### Updated competitive positioning
+
+| Layer | Strong existing comparator | What Symthaea must add |
+|---|---|---|
+| Paper ↔ Lean fidelity | HumanLean | Explanation of an existing formal proof and measured reader understanding / transfer |
+| Repository proof engineering | APE-Bench / APE-Harness | Conceptual dependency map and proof mechanism reconstruction |
+| Dependency retrieval | LeanGraphSearch / LeanSearch v2 | Role-aware explanations, counterfactuals and human transfer; HDC only if an ablation beats graph retrieval |
+| Proof compression | LeanLean | Minimum-sufficient explanation at matched comprehension, not just shorter proof code |
+| Formal theorem proving | FormalMATH / EasyProver / Discover-and-Prove | Separate held-out mechanism transfer and human outcomes; do not imply it replaces these systems |
+
+## 7. Revised interoperation and claim policy
+
+1. **HumanLean compatibility:** treat its source/definition/scaffold/proof contract as an upstream input. Our claim classes should align with its source-supported facts, formalized goals, excluded goals, and explicitly axiomatized external dependencies. Preserve external-axiom status; never convert an axiom into a proved lemma.
+2. **APE-Harness compatibility:** shape tasks and receipts so an APE-style harness can check source identity, task contract, build, semantic requirements and exact output. The human explanation and learning outcomes remain separate outputs.
+3. **LeanGraphSearch compatibility:** include graph-based retrieval with PPR and reranking as a required baseline. Our own HDC/CfC variant must beat this strong graph-aware baseline on held-out tasks before we claim retrieval advantage.
+4. **Human evaluation is a distinct outcome:** reviewers confirming that a formalization matches a paper is not the same as readers learning the proof, restating its assumptions, or solving a near-transfer task. We must measure these directly.
+5. **No novelty inflation:** do not describe claim-to-Lean fidelity, dependency graph search, proof engineering dual verification or proof compression as new inventions of Symthaea. Our proposed contribution is a reproducible bridge among formal proof structure, faithful conceptual explanation, counterfactual diagnosis and measured human transfer.
+
+## 8. Revised baseline arms
+
+The next frozen experiment should include:
+- raw Lean/source;
+- generic LLM explanation;
+- HumanLean-style source/definition/scaffold/proof contract and staged faithfulness review;
+- APE-style dual-verification / task-contract baseline;
+- lexical / dense premise retrieval;
+- LeanGraphSearch-style dependency graph + personalized PageRank + reranker;
+- source/type/value Lean-native dependency extraction;
+- graph-aware explanation and concept reconstruction;
+- graph-aware explanation plus HDC;
+- graph-aware explanation plus HDC/CfC.
+
+Match context budget, model, tools, token budget and compute. Compare outputs using proof identity, dependency precision/recall, explanation fact support, reviewer burden, reader comprehension and near-transfer. If HDC/CfC fails against LeanGraphSearch, remove it from this pathway.
+
+
+## 9. TheoremGraph / LeanGraph — formal and informal graph scale is now an external baseline (2026-11-23)
+
+**References:** [TheoremGraph paper](https://arxiv.org/abs/2606.25363), [TheoremSearch project](https://github.com/uw-math-ai/TheoremSearch), [Math-Graph dataset](https://huggingface.co/datasets/uw-math-ai/math-graph), [LeanGraph extractor](https://github.com/aurasoph/lean-graph), [API documentation](https://www.theoremsearch.com/docs).
+
+TheoremGraph reports 11.7M informal mathematical statement nodes, 18.3M candidate informal dependency edges, 388,105 Lean declaration nodes and 11.3M typed formal edges across 25 Lean projects. LeanGraph records distinct signature, proof and definition edges, plus structure inheritance, field-composition and documentation-reference relations. Signature metadata includes binder position/kind, function/argument role and projection use.
+
+### Match-quality caveat
+
+The 47,952 judge-affirmed cross-formality links must not be reported as 47,952 exact formalizations. The November 19, 2026 author rebuttal divides them into 4,765 exact and 43,187 inexact/related pairs. The latter include specializations, generalizations and one-way implications; they are potentially useful for retrieval, but are not proposition equivalence. The reported expert audit is small (20 pairs reviewed by one expert), while a separate 199-pair sample was judged by two LLMs. Judge agreement/κ is repeatability, not semantic truth. Treat all such labels as candidate annotations until independent human adjudication.
+
+### LeanGraph graph-mode caveat
+
+The TheoremSearch corpus records LeanGraph submodule commit `9823e3f8f45036b124905e541c7dc92c39620283`, using Lean 4.29.0. At that revision, the unified graph is filtered and expanded: signature edges are filtered / sometimes parent-redirected; proof and definition dependencies use transitive expansion; structure, field and docstring overlays are added. A later LeanGraph commit `3bf57c70f0326e45b9e84345c8fe7cf520919358` adds a raw graph before the readable-view pass. These are not interchangeable outputs.
+
+### Competitive consequence
+
+Symthaea should not claim novelty for large-scale dependency extraction, semantic theorem retrieval, or graph-based informal/formal linking. LeanGraph / TheoremGraph become mandatory external comparators. The candidate Symthaea contribution is the layer beyond graph construction:
+
+1. source-, toolchain-, universe-, value-availability- and axiom-bound evidence receipts;
+2. explicit distinction between direct kernel edges, filtered/expanded edges, structural overlays and external candidate links;
+3. relation-aware informal/formal matching with direction and exactness (not one generic match score);
+4. independently reviewed mathematical-role graphs;
+5. explanations whose formal facts have claim-level evidence links;
+6. counterfactual diagnosis that separates proof-route sensitivity from theorem truth;
+7. measured human comprehension, proof validation, immediate/delayed transfer and cross-family transfer.
+
+### Required benchmark arms
+
+For the first four Mathlib + six Lean-core pilot declarations, compare historical TheoremGraph graph output, current LeanGraph raw output where compatible, Symthaea's local typed extractor, and manually reviewed role annotations. For retrieval/explanation, include BM25, dense semantic search, LeanSearch v2, LeanGraphSearch-style semantic seeds + dependency PPR + reranking, symbolic/type-directed retrieval, and graph-aware explanation with and without HDC/CfC. Match context and compute budgets.
+
+Report edge precision/recall by edge class, exact-vs-inexact relation classification, theorem identity fidelity, axiom/opaque handling, proof-route-vs-truth disposition, explanation fact support, counterexample validity, human outcomes and resource cost separately. Do not combine them into one aggregate mathematical-intelligence score.
+
+The interoperability work is tracked in [#13325 — MATH-GRAPH-INTEROP-001](https://github.com/Luminous-Dynamics/symthaea/issues/13325). Its figures are external published/project figures, not Symthaea results. No local differential or performance improvement is claimed until executed on pinned artifacts.
+
+
+## 10. Proof-plan reconstruction and human-learning evidence (2026-11-23)
+
+A further distinction is now explicit in the benchmark design: a dependency graph, an explanation, a proof presentation, a proof plan and delayed transfer are not interchangeable measures.
+
+Hamami & Morris (2024) argue that understanding a proof involves rationally reconstructing its underlying plan ([DOI](https://doi.org/10.1111/nous.12489)). Gao & Evans' November 6, 2026 study of 143 undergraduates found that proof-presentation performance was only moderately associated with later proof construction on a delayed near-transfer task ([DOI](https://doi.org/10.1007/s40753-026-00319-4)). Thus Symthaea must measure at least four distinct reader capabilities: (1) statement/assumption comprehension, (2) proof validation, (3) proof-plan reconstruction or presentation, and (4) immediate and delayed transfer.
+
+### New benchmark lane: MATH-PROOF-PLAN-001
+
+[#13326](https://github.com/Luminous-Dynamics/symthaea/issues/13326) defines a typed plan graph of goal states, actions, justifications, side conditions, subgoals, witnesses, invariants and unresolved steps. It requires support per action and permits alternative valid plans. It adds plan perturbation and alternative-route recognition instead of scoring only whether a natural-language summary is fluent.
+
+Prospective targets include at least 80% expert acceptance of held-out proof-plan skeletons, 90% side-condition/subgoal coverage and a 10 percentage-point improvement in delayed or cross-family transfer over the strongest matched baseline. These are goals, not current results.
+
+The existing study preregistration is being extended to separate the treatment arms and outcomes. No participants have been recruited and no human study has been run. Expert annotation, ethics determination/review, consent, feasibility pilot and a power analysis remain prerequisites to confirmatory data collection.
+
+
+## 11. ProofGrid, generative verifiers and local-to-global epistemic stability (2026-11-23)
+
+Three additional baselines sharpen the evaluation beyond theorem pass rate and explanation quality.
+
+### ProofGrid — machine-checkable proof competence
+
+Arkoudas & Batzoglou, [*Stress-Testing the Reasoning Competence of LLMs With Proofs Under Minimal Formalism*](https://arxiv.org/abs/2605.12524), introduces 15 tasks spanning proof writing, proof checking, proof masking and proof gap-filling in compact natural-deduction notation. Its instrumented checker localizes the first substantive proof failure rather than collapsing everything into a binary pass/fail. The paper also introduces an Epistemic Stability Index and uses 2PL item-response analysis / task-discrimination measures.
+
+**Use in Symthaea:** ProofGrid is a baseline for local inference checking, proof gap detection and failure localization. It is not a human-transfer benchmark and does not replace Lean's kernel. Add a separate local-to-global consistency experiment: measure whether a model that rejects an invalid inference when isolated also avoids using it in a complete proof plan. Preserve the paper's ESI as its own metric; do not rename a different formula as ESI.
+
+### Scaling Generative Verifiers — evaluator calibration
+
+Mahdavi et al., [*Scaling Generative Verifiers For Natural Language Mathematical Proof Verification And Selection*](https://proceedings.mlr.press/v306/mahdavi26a.html), ICML 2026, reports that combining GenSelect and LLM-as-a-Judge improves proof verification/selection, while judge-prompt choice materially affects performance. It also reports that gains in proof-level metrics do not necessarily improve final-answer precision.
+
+**Use in Symthaea:** any LLM reviewer must be evaluated across prompt variants and calibrated against human labels. Report false acceptance, false rejection, abstention and calibration. Do not let a generative verifier become the authority for a formal fact.
+
+### FormalMATH — explanation can interfere with proving
+
+FormalMATH's 2026 paper reports that providing human-written natural-language solution references can measurably degrade proof generation in its evaluated settings ([paper](https://aclanthology.org/2026.findings-emnlp.579/)). This is a warning against assuming that more explanation is always better or that a teaching-oriented explanation is necessarily the best prover context.
+
+**Use in Symthaea:** test two different interventions: explanation delivered to a human learner, and structured plan context delivered to a proof-generating model. Report their effects separately. A proof plan may improve human transfer while having no benefit—or even a cost—for Lean proof synthesis.
+
+### New benchmark outcomes
+
+Add the following as separate results, not a combined score:
+- first-invalid-step localization accuracy and distance from the actual first invalid inference;
+- local-to-global inference consistency under matched adversarial corruptions;
+- judge prompt sensitivity, calibration and false-acceptance rate;
+- proof-plan structural/evidence quality;
+- reader plan reconstruction and delayed transfer;
+- proof-generation utility when the same plan is supplied as model context.
+
+Prospective target: at least 95% precision for any system-labelled invalid inference used to block acceptance; zero false acceptance of an altered theorem as the original; report local-to-global consistency with confidence intervals and per-mutation family results. These are goals, not measured Symthaea results.
+
+The executable schema and initial fixture are tracked in [#13338 — MATH-PROOF-PLAN-SCHEMA-001](https://github.com/Luminous-Dynamics/symthaea/issues/13338). The validator's structural result must remain distinct from Lean kernel, expert and human-study results.
+
+
+## 12. Paired local-to-global proof consistency experiment (2026-11-23)
+
+ProofGrid motivates a distinct local-to-global consistency question: a model may reject an invalid inference in isolation yet reuse the same inference in a complete proof. Symthaea's proposed metric is **Context-Induced Reuse Rate (CIRR)**, not ProofGrid's Epistemic Stability Index:
+
+`CIRR = locally rejected, independently invalid warrants reused in global plans / eligible locally rejected, independently invalid warrants`.
+
+The paired protocol binds both stages to the same theorem identity, exact hypothesis set, proposition identities and warrant. Global context may change order, distractors, narrative framing and plan length, but may not silently add assumptions that make the warrant valid. Scope-change cases are a separate control. CIRR is undefined for a zero denominator; report numerator, denominator, cluster-aware intervals, per-condition strata, local false acceptance, global invalid reuse, valid-warrant false rejection, and first-failure localization separately.
+
+The key intervention compares a structured immutable local verdict/evidence envelope supplied to the global planner against ordinary natural-language self-critique or no local-verdict handoff. This tests whether evidence-carrying reasoning state resists contextual regression better than conversational memory.
+
+The full protocol is [PROOF_PLAN_LOCAL_GLOBAL_CONSISTENCY_V1.md](PROOF_PLAN_LOCAL_GLOBAL_CONSISTENCY_V1.md), tracked under [#13326](https://github.com/Luminous-Dynamics/symthaea/issues/13326). No CIRR measurement has been executed; the metric and prospective thresholds are research targets only.
+
+## 13. Updated benchmark frontier — evidence and comprehension (2026-11-23)
+
+The 2026-11-23 literature check adds several baselines that materially sharpen the competitive strategy. The values below are external published/project figures and are not Symthaea results.
+
+| Work | Published scope / result | What it establishes | Symthaea response |
+|---|---|---|---|
+| [LeanGraphSearch](https://arxiv.org/abs/2610.22339) | MathlibQR: Recall@100 94.7% vs LeanSearch v2 82.7% on the paper's 810-query fair subset; MathlibMPR route coverage 44.2% vs 41.3% at @50 | A strong semantic-seed + dependency-PPR + reranking retrieval baseline | Treat it as a mandatory retrieval comparator; novelty must be evidence-backed role reconstruction and transfer, not graph expansion |
+| [TheoremGraph](https://arxiv.org/abs/2606.25363) | 11.7M informal statement nodes, 18.3M candidate informal dependency edges, 388,105 Lean declarations and 11.3M typed formal edges | Large-scale formal/informal graph infrastructure already exists | Interoperate; distinguish direct kernel dependencies, filtered/expanded graph views, relation types and candidate cross-formality links |
+| [FormalMATH](https://aclanthology.org/2026.findings-emnlp.579/) | 5,560 semantically validated Lean 4 statements; strongest reported model 28.31% Pass@32 | Formal proof generation remains difficult and domain-imbalanced; solution prose can hurt proving | Separate reader-facing explanation from prover-facing plan context and measure both |
+| [ProofBench / ProofGrader](https://proceedings.iclr.cc/paper_files/paper/2026/hash/764d4fc73ab69289b1e10f15089274f3-Abstract-Conference.html) | 145 competition problems, 435 model-generated solutions, expert scores; evaluator MAE 0.926 | Fine-grained natural-language proof-quality evaluation is measurable | Use expert ratings as one outcome, but add assumption comprehension, plan reconstruction and delayed transfer |
+| [LeanLean](https://www.sri.inf.ethz.ch/publications/rognvaldsson2026leanlean) | 64 real-world Lean repositories, up to 174k LOC; best reported average compression 48.3% under a 12-hour limit | Repository-scale proof restructuring/compression is a mature comparison axis | Compare minimum-sufficient explanations at matched human comprehension; do not equate shorter source with understanding |
+| [TheoremBench](https://arxiv.org/abs/2606.09450) | Nearly 100 classical theorems, plain/premised versions and supporting subtheorem families | Whole-theorem coverage and token efficiency reveal progress hidden by single pass/fail | Add subgoal coverage, proof-plan fidelity and token/compute cost |
+| [Formal benchmark audit](https://proceedings.mlr.press/v306/ammanamanchi26a.html) | Audit of five Lean benchmark families; 4,833 findings including 398 mechanically certified defects | Kernel checking alone does not guarantee task/specification fidelity or robust evaluation | Make source identity, semantic task audit, hidden controls and false-acceptance tests first-class release gates |
+| [ProofGrid](https://arxiv.org/abs/2605.12524) | 15 proof writing/checking/masking/gap-filling tasks with instrumented first-invalid-step feedback | Fine-grained proof competence and failure localization | Reuse its task dimensions and keep its Epistemic Stability Index distinct from CIRR |
+
+### Paradigm shifts that can create a genuine contribution
+
+1. **From proof answers to evidence-carrying proof state.** Every claim, assumption, warrant, action and plan node is identity-bound to a source, proposition, proof environment and artifact. Model confidence is not authority.
+2. **From static explanation to intervention-based understanding.** Ask what changes when a premise, binder, lemma direction or reduction guarantee is altered. Distinguish a failed proof route from a false proposition, and require a counterexample when a claim is false.
+3. **From local accuracy to cross-context consistency.** Pair isolated inference judgments with later global proof planning under the same immutable scope. Measure whether rejected invalid warrants reappear as global support.
+4. **From one verifier to partitioned authority.** Candidate generation, structural validation, formal kernel replay, independent mathematical adjudication and human-learning outcomes are separate authorities. No stage inherits authority from another.
+5. **From one score to a reliability/utility frontier.** Report theorem identity, false acceptance, proof-route fidelity, explanation support, reader transfer, abstention, latency, tokens and review burden separately. Use hard gates for soundness-sensitive outcomes.
+6. **From fixed explanations to minimum-sufficient explanations.** Optimize explanation length only subject to non-inferiority in comprehension and transfer. A shorter explanation that drops a hypothesis or weakens transfer is a failure.
+
+### Revised prospective targets and comparison protocol
+
+| Dimension | Prospective target | Guardrail / interpretation |
+|---|---:|---|
+| Source + theorem + assumption identity | 100% exact match | Hard gate; any mismatch is a separate task/control |
+| False formal-proof acceptance | 0 | Hard gate on all negative controls; report confidence bounds |
+| Material dependency precision / recall | ≥95% / ≥90% | Expert-labelled held-out theorem families; stratify edge class |
+| Proof-plan expert acceptance | ≥80% | Two independent expert reviewers; retain disagreement |
+| Side-condition and subgoal coverage | ≥90% | Missing a required condition is a critical miss |
+| Counterfactual disposition accuracy | ≥90% | Include theorem-false and route-only mutations |
+| CIRR | ≤5% | Only with a nonzero eligible denominator; publish numerator/denominator and unresolved bounds |
+| Delayed / cross-family human transfer | +10 percentage points | Strongest matched control, preregistered primary outcome |
+| Minimum-sufficient explanation | ≥25% fewer tokens | Matched comprehension within a 5-point non-inferiority margin |
+
+These are prospective targets, not current achievements. Benchmark comparisons must pin model version, decoding configuration, context, tool access, proof environment, token/latency budget and contamination window. Report per-task and per-family rows, paired confidence intervals, abstentions, invalid-task exclusions and all negative-control results. A claimed SOTA win requires a matched rerun or a clearly labelled non-comparable published reference—not a cross-paper score collage.
+
+### Research execution order
+
+1. Finish and exact-head validate LocalGlobalPairV1 and CIRR arithmetic; first fixture is synthetic and is not a model score.
+2. Add Lean-native elaborated type/value extraction and compare its edge set against pinned LeanGraph / TheoremGraph outputs.
+3. Obtain expert-reviewed gold plan annotations on a small theorem-family holdout before scaling the corpus.
+4. Run matched retrieval/explanation ablations: BM25, dense, LeanSearch v2, LeanGraphSearch/PPR, symbolic/type-directed, HDC, and HDC+CfC.
+5. Preregister and conduct a human comprehension / delayed-transfer study only after ethics and power-analysis prerequisites are met.
+
+The purpose is not to beat all theorem provers at their own task. It is to establish whether evidence-bound proof reconstruction and counterfactual consistency deliver measurable capabilities that existing retrieval, formal proving, proof grading and proof compression benchmarks do not yet directly measure.
+
+## 14. Statement semantics and elaborated proof structure — new comparison axis
+
+Two recent benchmarks show that proof generation and statement fidelity are separate engineering problems:
+
+- **LPBench** publishes 118 Lean 4 research-level problems: 32 open conjectures, 65 literature problems and 21 calibration tasks. Its theorem-sandwich evaluation asks a candidate formalization to support a stronger statement or lemma family and to imply selected corollaries, reducing reliance on a single reference proof. Use it to calibrate statement fidelity and research-level proving, while keeping hidden sandwich evidence evaluator-only. <https://github.com/lp-bench/lp-bench>
+- **T² (ACL Industry 2026)** uses dependent successor theorems as downstream semantic tests. Its dataset covers 2,206 tasks across five Lean 4 repositories with about 41 successor theorems per task on average; the paper reports 38.9% testing accuracy for its best model in the stated setting. Compilation alone is not a complete semantic equivalence test. <https://aclanthology.org/2026.acl-industry.150/>
+
+The current Mathlib extractor pilot supplies an executable lower-level data source for this programme: 4 pinned theorem declarations, 24 type references, 60 proof-value references, 64 unique merged closure references, 84 role-labelled edges and zero unresolved names. For each theorem, the union of type and proof-value references reconciles exactly with Lean's ConstantInfo closure. This is a small extraction result, not expert proof-plan agreement or external graph SOTA.
+
+**New research hypothesis:** theorem comprehension should be evaluated across three independent identities: (1) formal statement and hypotheses, (2) elaborated proof-plan/dependency roles, and (3) downstream semantic behavior. A candidate passes only the layers it actually satisfies. Theorem sandwiches test selected implication directions; successor-theorem regression tests downstream compatibility; proof-plan reconstruction tests whether the model recovered the reasoning structure. None alone proves complete informal/formal equivalence.
+
+Prospective semantic gate targets:
+- 100% exact source/declaration/assumption identity.
+- Zero acceptance of vacuous, admitted or deliberately unsound negative controls.
+- ≥95% precision and ≥90% recall for seeded statement-defect detection.
+- ≥90% classification accuracy for entailment direction and route-only versus theorem-truth mutations.
+- Report theorem-sandwich obligations and successor-test behavior separately, with false alarms and task-family confidence intervals.
+
+These targets remain prospective. LPBench and T² must be run in their own harnesses and source pins; cross-paper headline scores are not directly comparable.
+
+## 14. Updated differentiation and benchmark targets (2026-11-23)
+
+A current benchmark matrix now lives in MATH_PROOF_COMPREHENSION_BENCHMARK_MATRIX_V1.md. It integrates LPBench's 118 research-level tasks and hidden theorem sandwiches; T² successor tests; LeanGraphSearch's high-recall and complete-route retrieval; FormalMATH's semantically validated proving tasks; TheoremGraph/LeanGraph; LeanLean; ProofGrid; and expert-rated ProofBench.
+
+The competitive implication is sharper: do not attempt to out-TheoremGraph TheoremGraph on corpus-scale graph extraction, or to out-LeanGraphSearch LeanGraphSearch at retrieval without a matched benchmark. The novel hypothesis is that a typed formal graph plus an evidence-carrying proof plan, controlled semantic interventions, local/global receipt, and blind delayed human transfer can measure capabilities not captured by retrieval recall, proof completion, successor compilation or proof compression alone.
+
+The first Lean environment extraction has run on four source-pinned Mathlib declarations: 24 type references, 60 proof-value references, 64 unique merged dependencies, 84 role-labelled direct edges, and zero unresolved names. Exact type/value union reconciliation passed for all four declarations. This is a small pilot result, not an external graph comparison or expert-reviewed edge-quality score.
+
+Prospective targets: 100% identity match; ≥95% precision and ≥90% recall for expert-labelled dependencies; ≥80% expert plan acceptance; ≥90% counterfactual disposition accuracy; CIRR ≤5% with a nonzero denominator; +10 percentage points delayed human transfer; and ≥25% explanation compression at matched comprehension. These remain targets, not achievements.
+## 14. Cross-snapshot differential: direct dependencies are environment-bound
+
+The v4.29-compatible and v4.37-rc1 Mathlib extraction artifacts now give a first exact dependency-set comparison across four declarations. The same source declaration text was inspected at both snapshots, yet `Nat.choose_pos` retained all type references while its proof-value closure changed from 33 to 10 names, and `Set.countable_union` changed the elaborated set-operation references (`Union.union` / `Set.instUnion` versus `Max.max` / `Set.instMax`). `Finset.card_map` and `Multiset.map_id` remained identical in all three sets.
+
+This is a source-snapshot/toolchain comparison, not a controlled Lean compiler-only experiment: both the Lean and Mathlib revisions differ. A cache keyed only by declaration name is therefore insufficient. Persist exact Mathlib commit, Lean toolchain/revision, declaration type identity and dependency provenance with every graph. See [the source-snapshot differential report](MATHLIB_SOURCE_SNAPSHOT_DIFFERENTIAL_V1.md).
+
+## 15. Exact-head focused execution receipt — 2026-11-23
+
+The focused Math Proof Comprehension workflow completed successfully on exact PR head `61cc196132abc54de6eaba39a82f149783dd58e0`:
+
+- Workflow run: https://github.com/Luminous-Dynamics/symthaea/actions/runs/45260762718
+- Finite reference oracle: 11 passed / 0 failed.
+- Rust contract library: 64 passed / 0 failed.
+- Source-snapshot differential CLI: 7 passed / 0 failed, including helper-expanded stability positive and type-interface-drift negative controls.
+- Rust formatting, frozen JSON fixtures and Cargo lock export: passed.
+- Both Lean extraction cohorts: Mathlib v4.29.0 LeanGraph-compatible and Mathlib v4.37.0-rc1 passed exact source/toolchain checks and extraction.
+- Cross-snapshot differential: passed all workflow assertions, including the `Nat.choose_pos` helper-expansion signal and separate `Set.countable_union` interface-drift classification.
+- ProofPlanV1 CLI: `PROOF_PLAN_STRUCTURALLY_VALID plan_id=PROOFPLAN-AND-COMM-001`.
+- Local/global CLI: `LOCAL_GLOBAL_PAIR_STRUCTURALLY_VALID`; finite truth-table witness `p=false,q=true`; synthetic CIRR numerator/denominator 1/1; lower/upper/point all 1.0.
+- Theorem-sandwich CLI: `THEOREM_SANDWICH_RECEIPT_VALID task_id=SYNTHETIC-SANDWICH-IMPLICATION-001`.
+
+The 64 library tests include canonical preimage hashing, local/global scope and CIRR semantics, finite countermodel validation, context-indexed theorem-sandwich semantics, two-reviewer translation quorum/disagreement, and the context-aware adversarial controls. The 7 comparator tests include positive helper-expansion diagnosis and a negative guard against hiding type-interface drift.
+
+**Claim ceiling:** The local/global 1/1 score is synthetic arithmetic only. The two reviewer IDs in the fixture are stipulated records, not real independent mathematicians. No model-produced CIRR, Lean kernel replay of the And.comm plan, expert proof-plan gold set, participant recruitment, or human delayed-transfer result has been produced.
+
+The focused run's sibling workflows (general CI, PR Governance, Benchmark Suite, Workflow Syntax and Showroom Integrity) were skipped because the PR remains a draft; they are not claimed as passes. A subsequent documentation-only benchmark-target revision followed this tested code head; a final exact-head focused rerun is requested separately.
+
+## 16. Interactive comprehension and diagnostic reformulation baselines (2026-11-24)
+
+### Explorable Proofs: immediate comprehension is already studied
+
+Kambhamettu et al., *Making Written Theorems Explorable by Grounding Them in Formal Representations* (UIST 2026; [paper](https://arxiv.org/abs/2604.02598)), links a written proof with a generated Lean proof, extracts intermediate states, provides worked examples, supports custom examples/counterexamples and traces dependencies. Its n=16 lab study found better, more correct and more detailed proof descriptions than a chatbot baseline.
+
+This rules out any claim that formal-backed interactive proof exploration is itself new. The paper also states concrete limitations: generated Lean can diverge structurally from the written proof, LLM mistranslation can present incorrect worked mathematics with undue authority, the study used relatively short proofs and undergraduate CS students, and it did not measure retention, transfer or independent proof construction. Those gaps motivate Symthaea's stricter identity/translation receipts, hidden semantic controls, plan-role validation and delayed transfer—but these must be measured before any superiority claim.
+
+### MathAdv: reformulation robustness is a required baseline
+
+[MathAdv](https://arxiv.org/abs/2608.25449) spans 13 undergraduate and graduate mathematics domains and combines Lean proving with knowledge, informal-reasoning and expert-authored equivalent-reformulation tasks. Our transformation suite must reuse its lessons: equivalence-preserving statement rewrites are distinct from semantic changes, and aggregate proving accuracy hides formalization and domain bottlenecks.
+
+### ProofRank and ProofOptimizer: quality/compression are mature axes
+
+[ProofRank](https://arxiv.org/abs/2605.10379) evaluates conciseness, computational ease, cognitive simplicity, diversity and adaptivity over 382 competition tasks. [ProofOptimizer](https://proceedings.iclr.cc/paper_files/paper/2026/hash/60917970c4257e50aff60d1d7bde2edf-Abstract-Conference.html) reports substantial automated proof-size reductions on miniF2F, PutnamBench and IMO proof sets. We therefore should not position proof compression or a generic "quality score" as novelty. Our proposed Minimum Sufficient Explanation objective is compression constrained by theorem/assumption fidelity and human delayed-transfer non-inferiority.
+
+### Current Mathlib retrieval reference requires a second matched cohort
+
+The [Legendre leaderboard](https://www.legendre-leaderboard.com/) runs multiple search engines against a common set of 894 resolved MathlibQR queries (out of 946 possible query slots). It reports Lean Finder v2 at Recall@10 89.4%, Recall@100 97.3% and nDCG@10 0.725. The leaderboard also documents the 11 gold declarations absent at its pinned corpus revision; unresolved queries are not scored as misses. These 894 queries are not the 810-query fair subset used in the LeanGraphSearch paper, so the figures cannot be interchanged. Symthaea needs separate, same-query reruns against Lean Finder v2 and LeanGraphSearch.
+
+### Updated research differentiation
+
+The best opportunity is a *proof-comprehension reliability benchmark*, not another explorable interface:
+
+- formal statement identity with hidden theorem-sandwich and successor-test controls;
+- a proof-plan graph validated against typed source evidence and expert mathematical roles;
+- counterfactual predictions with checked witnesses, including minimum-support witnesses in the finite propositional tier;
+- local-to-global warrant consistency under immutable semantic scope;
+- source-linked explanations with formal fact / interpretation / analogy / unknown claim types;
+- a human study whose primary endpoint is delayed transfer and whose baselines include raw source, generic explanation and an interactive formally-backed explorable proof arm where reproducible.
+
+The study must separate immediate interface comprehension from durable learning. Existing n=16 evidence is a valuable pilot baseline, not a substitute for a powered replication on held-out theorem families.
+
+## 17. New external frontier: hard-mode proving, live research and benchmark saturation (2026-11-24)
+
+The current literature makes one competitive conclusion unavoidable: raw theorem-proving is already a crowded and rapidly advancing axis. Goedel-Prover-V2 reports 90.4% MiniF2F pass@32 with self-correction and 86 PutnamBench problems at pass@184; Goedel-Architect reports 99.2% MiniF2F pass@1 and 75.6% PutnamBench pass@1, with higher results when seeded by natural-language proofs; Discover and Prove reports 36 PutnamBench Hard formal proofs and a large answer-accuracy versus proof-success gap. IMO-Bench separates answer, natural-language proof, grading and Lean-proof tasks, while FormalProofBench and LemmaBench extend evaluation toward graduate and research-level mathematics. Formal Conjectures provides an evolving repository of open and solved research statements.
+
+The current PutnamBench leaderboard displays a featured Lean ranking with all 672 tasks solved, while also separating answer-placeholder and no-answer variants and warning that some new tasks have not been rerun across all methods. Its own notes make exact benchmark commit, no-answer status and compute budget mandatory reporting fields. This is a concrete example of why benchmark saturation and non-matched compute can make raw leaderboard claims misleading.
+
+**New strategic boundary:** Symthaea must not claim novelty for theorem decomposition, formal dependency graphs, proof search, generic proof quality or interactive proof interfaces. The defensible target is a proof-comprehension reliability layer that is formally bound to source and assumptions, validates explanation/plan claims, tests intervention consequences, tracks unknowns, and demonstrates delayed human transfer. Existing provers should be integration baselines and downstream consumers.
+
+The benchmark matrix was updated with the current public comparison points and revised targets. See [the current SOTA / benchmark matrix](MATH_PROOF_COMPREHENSION_BENCHMARK_MATRIX_V1.md), especially §12. The external figures are references from different task sets and inference budgets—not a directly comparable combined ranking.
+
+### Sources added to the competitive ledger
+
+- Goedel-Prover-V2 (ICLR 2026): https://proceedings.iclr.cc/paper_files/paper/2026/hash/13e8be77982beb73d7ed0bbf122f9f3c-Abstract-Conference.html
+- Goedel-Architect: https://arxiv.org/abs/2606.06468
+- Discover and Prove / DAP (ACL 2026): https://aclanthology.org/2026.acl-long.3/
+- IMO-Bench: https://imobench.github.io/
+- FormalProofBench: https://arxiv.org/abs/2603.26996
+- LemmaBench: https://arxiv.org/abs/2602.24173
+- Formal Conjectures: https://arxiv.org/abs/2605.13171
+- Lean Finder V2 / Legendre leaderboard: https://www.legendre-leaderboard.com/
+- LeanGraphSearch: https://arxiv.org/abs/2610.22339
+- PutnamBench leaderboard: https://trishullab.github.io/PutnamBench/leaderboard
+- Stanford AI Index 2026: https://hai.stanford.edu/assets/files/ai_index_report_2026_chapter_2_technical.pdf
+
+### Immediate new research increment
+
+Open a dedicated matched-baseline task for:
+1. PutnamBench no-answer versus answer-provided paired evaluation;
+2. DAP-style answer discovery versus formal proof closure;
+3. theorem-sandwich statement fidelity and downstream successor testing;
+4. live LemmaBench / Formal Conjectures temporal holdouts;
+5. proof-plan role correctness and human transfer after successful formal proving.
+
+The first four are machine/formal tasks; item five is a separate human-study authority. None may be collapsed into a single proof-comprehension score.
+
+## 18. PutnamBench saturation finding (2026-11-24)
+
+The live PutnamBench leaderboard now reports a 672/672 solve count in its featured Lean ranking and a separate 672/672 result in its Lean no-answer ranking (Midas Prover; displayed mean cost $6.17 and 31 minutes/problem). This is a saturation signal, not proof that every possible theorem or research problem is solved. It also means answer-provided and no-answer performance must remain separate rows.
+
+Goedel-Architect must likewise be described by run mode: the paper/project summary gives 99.2% MiniF2F-test and 75.6% PutnamBench pass@1; its optional natural-language proof-seeded project run reports 88.8% (597/672) at pass@4, with $985.67 API cost. Goedel-Prover-V2's ICLR abstract reports 86 PutnamBench problems at pass@184, while its project README now lists 86 at pass@192. We preserve paper and rolling project numbers separately rather than collapse them.
+
+Lean Finder v2's live Legendre table explicitly records 894 gold-resolved MathlibQR queries (of 946 source prompts; missing pinned gold declarations are unresolved, not misses): R@1 55.0%, R@10 89.4%, R@100 97.3%, nDCG@10 0.725. LeanGraphSearch's 810-query fair subset is distinct; no cross-cohort arithmetic is valid.
+
+Implication: public PutnamBench solving is no longer the principal claim target. A future Symthaea SOTA comparison needs same-budget, no-answer and answer-provided evaluation on fresh holdouts, but differentiation should concentrate on verified proof-plan reconstruction, semantic statement fidelity, counterfactual validity, local/global consistency and human transfer.
+
+Sources:
+- PutnamBench leaderboard: https://trishullab.github.io/PutnamBench/leaderboard
+- Goedel-Architect project results/cost: https://goedelarchitect.github.io/
+- Goedel-Architect paper: https://arxiv.org/abs/2606.06468
+- Goedel-Prover-V2 ICLR paper: https://proceedings.iclr.cc/paper_files/paper/2026/hash/13e8be77982beb73d7ed0bbf122f9f3c-Abstract-Conference.html
+- Goedel-Prover-V2 project README: https://github.com/Goedel-LM/Goedel-Prover-V2
+- Legendre live leaderboard: https://www.legendre-leaderboard.com/
+- DAP hard-mode paper: https://aclanthology.org/2026.acl-long.3/
+
+
+## 19. Cross-benchmark research check (2026-11-24)
+
+A fresh source check reinforces the programme's benchmark segmentation. These results measure different capabilities and must not be collapsed into a single ranking.
+
+- **FormalMATH (EMNLP 2026 Findings):** 5,560 semantically validated Lean 4 statements; the paper reports DeepSeek-Prover-V2 at 28.31% Pass@32. It also reports that natural-language solution references can degrade formal proof generation in some conditions. This supports keeping human-facing explanation and prover-facing context as separate experimental arms. https://aclanthology.org/2026.findings-emnlp.579/
+- **LeanGraphSearch:** on the 810-query shared MathlibQR subset, Recall@100 is 94.7%; on MathlibMPR, complete-route Covered@20 is 42.8%. These are mandatory retrieval baselines, not proof-comprehension scores. https://pluslabnlp.github.io/LeanGraphSearch/
+- **MathAdv:** a 13-domain diagnostic benchmark with expert-crafted equivalent transformations; its analysis finds that mathematically equivalent reformulations reveal robustness limits, and that language guidance can help general-purpose LLMs while hindering proof-specialized models. This closely motivates paired invariance/sensitivity testing. https://arxiv.org/abs/2608.25449
+- **ProofGrid:** 15 proof writing/checking/masking/gap-filling tasks with first-substantive-failure localization and a separate Epistemic Stability Index. CIRR must remain distinct: it tests paired reuse of a locally rejected warrant in a later global plan. https://arxiv.org/abs/2605.12524
+- **QEDBench (ICML 2026):** 7 judges × 5 solvers, over 1,000 hours of human evaluation, and up to +0.28 positive scoring bias for some judge configurations. This makes independent gold, formal receipts and calibration essential; LLM judge agreement is not proof authority. https://proceedings.mlr.press/v306/gonzalez26a.html
+- **TheoremGraph / LeanGraph:** 11.7M informal theorem-like statements, 18.3M candidate informal dependencies, 388,105 Lean declarations and 11.3M typed formal edges across 25 Lean projects. Symthaea should interoperate and add reviewed proof-plan roles, local warrant evidence, intervention receipts and transfer—not attempt to recreate the graph. https://arxiv.org/abs/2606.25363
+- **ProofRank (NeurIPS 2026):** 382 base competition problems and 445 adaptivity pairs, with proxies for conciseness, computational ease, cognitive simplicity, diversity and requested-method adaptivity. MSE should complement these proof-quality dimensions with hard plan/assumption fidelity and learner transfer. https://www.sri.inf.ethz.ch/publications/petrov2026proofrank
+- **Gao & Evans (published 2026-11-06):** a study of 143 undergraduates found proof-presentation performance only moderately associated with later near-transfer proof construction (from sqrt(6) irrationality to sqrt(10)). This argues against using explanation fluency as a proxy for learning and supports delayed transfer as a primary human endpoint. https://link.springer.com/article/10.1007/s40753-026-00319-4
+- **PutnamBench live leaderboard:** the featured Lean ranking and separate no-answer ranking show 672/672 solved. This is a saturation signal for this competition suite, not a claim that research mathematics is solved. Keep answer-provided and no-answer results separate and use PutnamBench as an integration smoke test rather than the primary discriminative benchmark. https://trishullab.github.io/PutnamBench/leaderboard
+
+### Strategic decision
+
+The defensible competitive position is a reliability-and-comprehension layer composed with existing proof engines and retrieval graphs. The flagship result must show, on a hidden theorem-family holdout, exact statement/context binding, faithful proof-plan reconstruction, checked local warrant evidence, correct response to semantic interventions, low local-to-global reuse of invalid warrants, calibrated abstention, and improved delayed human transfer. No single aggregate can compensate for false acceptance or false context equivalence.

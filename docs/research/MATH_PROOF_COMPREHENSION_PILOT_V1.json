@@ -1,0 +1,468 @@
+{
+  "schema_version": "1.0.0",
+  "dataset_id": "SYTH-MATH-COMP-CORE-PILOT-V1",
+  "status": "source_pinned_seed_not_gold",
+  "created_at": "2026-11-22",
+  "description": "Six small Lean core proposition theorems with source-expression graph annotations and truth-table counterfactuals. This is a schema/pipeline smoke-test set, not a Mathlib dependency benchmark, not an elaborated-environment graph, and not expert-reviewed gold data.",
+  "source_snapshot": {
+    "repository": "leanprover/lean4",
+    "commit": "a9b5b8a25c4b932be8029426c2abd34685b078f0",
+    "commit_url": "https://github.com/leanprover/lean4/commit/a9b5b8a25c4b932be8029426c2abd34685b078f0",
+    "source_kind": "Lean core, not Mathlib",
+    "lean_core_files": [
+      {
+        "path": "src/Init/Core.lean",
+        "blob_sha": "2a44fea5380ec12bd026a1d8d62a2acb3fa79736",
+        "permalink": "https://github.com/leanprover/lean4/blob/a9b5b8a25c4b932be8029426c2abd34685b078f0/src/Init/Core.lean"
+      },
+      {
+        "path": "src/Init/SimpLemmas.lean",
+        "blob_sha": "f713e6cea737f7ead410c99d349f41ecdf9feff6",
+        "permalink": "https://github.com/leanprover/lean4/blob/a9b5b8a25c4b932be8029426c2abd34685b078f0/src/Init/SimpLemmas.lean"
+      }
+    ]
+  },
+  "task_count": 6,
+  "tasks": [
+    {
+      "id": "CORE-AND-COMM-001",
+      "declaration": "And.comm",
+      "source": {
+        "repository": "leanprover/lean4",
+        "commit": "a9b5b8a25c4b932be8029426c2abd34685b078f0",
+        "path": "src/Init/Core.lean",
+        "blob_sha": "2a44fea5380ec12bd026a1d8d62a2acb3fa79736",
+        "line_start": 1060,
+        "line_end": 1060
+      },
+      "statement": "∀ {a b : Prop}, a ∧ b ↔ b ∧ a",
+      "proof_term_source": "Iff.intro And.symm And.symm",
+      "concept": "Conjunction is symmetric: evidence for both propositions can be reordered without losing either fact. An iff requires two directions; the proof supplies the same symmetry operation in each direction.",
+      "dependency_graph": {
+        "nodes": [
+          {
+            "id": "And.comm",
+            "kind": "theorem"
+          },
+          {
+            "id": "And.symm",
+            "kind": "theorem"
+          },
+          {
+            "id": "Iff.intro",
+            "kind": "constructor"
+          }
+        ],
+        "edges": [
+          {
+            "source": "And.comm",
+            "target": "And.symm",
+            "relation": "uses",
+            "evidence": "source proof expression, line 1060"
+          },
+          {
+            "source": "And.comm",
+            "target": "Iff.intro",
+            "relation": "uses",
+            "evidence": "source proof expression, line 1060"
+          }
+        ],
+        "status": "source_expression_edges_only"
+      },
+      "explanation_questions": [
+        "Why does the proof use And.symm twice?",
+        "Which direction of the iff does each argument prove?",
+        "Why is swapping the order of the two pieces of evidence valid?"
+      ],
+      "counterfactuals": [
+        {
+          "id": "AND-COMM-001-NC1",
+          "mutation": "Replace the iff goal with only a → b but retain the two-direction proof expression.",
+          "expected": "Type mismatch / unnecessary second direction; the target contract has changed. This is a type-level mutation, not a counterexample to conjunction symmetry."
+        },
+        {
+          "id": "AND-COMM-001-NC2",
+          "mutation": "Replace one And.symm argument with an unrelated proof of a → b.",
+          "expected": "Reject unless the replacement has the required reverse-direction type."
+        }
+      ],
+      "annotation_status": "assistant-authored reference annotation; not expert-reviewed; not a Lean extraction receipt"
+    },
+    {
+      "id": "CORE-OR-COMM-001",
+      "declaration": "Or.comm",
+      "source": {
+        "repository": "leanprover/lean4",
+        "commit": "a9b5b8a25c4b932be8029426c2abd34685b078f0",
+        "path": "src/Init/Core.lean",
+        "blob_sha": "2a44fea5380ec12bd026a1d8d62a2acb3fa79736",
+        "line_start": 1064,
+        "line_end": 1064
+      },
+      "statement": "∀ {a b : Prop}, a ∨ b ↔ b ∨ a",
+      "proof_term_source": "Iff.intro Or.symm Or.symm",
+      "concept": "A disjunction records which side has a witness. Reordering the alternatives maps a left witness to a right witness and a right witness to a left witness.",
+      "dependency_graph": {
+        "nodes": [
+          {
+            "id": "Or.comm",
+            "kind": "theorem"
+          },
+          {
+            "id": "Or.symm",
+            "kind": "theorem"
+          },
+          {
+            "id": "Iff.intro",
+            "kind": "constructor"
+          }
+        ],
+        "edges": [
+          {
+            "source": "Or.comm",
+            "target": "Or.symm",
+            "relation": "uses",
+            "evidence": "source proof expression, line 1064"
+          },
+          {
+            "source": "Or.comm",
+            "target": "Iff.intro",
+            "relation": "uses",
+            "evidence": "source proof expression, line 1064"
+          }
+        ],
+        "status": "source_expression_edges_only"
+      },
+      "explanation_questions": [
+        "How does Or.symm treat an inl witness?",
+        "How does it treat an inr witness?",
+        "Why are two maps needed for an iff?"
+      ],
+      "counterfactuals": [
+        {
+          "id": "OR-COMM-001-NC1",
+          "mutation": "Swap only the target disjunction but omit one direction.",
+          "expected": "A one-way implication is not the original iff contract; Lean must reject it as a proof of the unchanged theorem."
+        }
+      ],
+      "annotation_status": "assistant-authored reference annotation; not expert-reviewed; not a Lean extraction receipt"
+    },
+    {
+      "id": "CORE-AND-ASSOC-001",
+      "declaration": "and_assoc",
+      "source": {
+        "repository": "leanprover/lean4",
+        "commit": "a9b5b8a25c4b932be8029426c2abd34685b078f0",
+        "path": "src/Init/SimpLemmas.lean",
+        "blob_sha": "f713e6cea737f7ead410c99d349f41ecdf9feff6",
+        "line_start": 312,
+        "line_end": 314
+      },
+      "statement": "∀ {a b c : Prop}, (a ∧ b) ∧ c ↔ a ∧ (b ∧ c)",
+      "proof_term_source": "Iff.intro (fun ⟨⟨ha, hb⟩, hc⟩ => ⟨ha, hb, hc⟩) (fun ⟨ha, hb, hc⟩ => ⟨⟨ha, hb⟩, hc⟩)",
+      "concept": "Associativity changes only the grouping of conjunctive evidence. Both sides contain exactly the same three proofs; the maps change the nesting of the product-like evidence structure.",
+      "dependency_graph": {
+        "nodes": [
+          {
+            "id": "and_assoc",
+            "kind": "theorem"
+          },
+          {
+            "id": "Iff.intro",
+            "kind": "constructor"
+          },
+          {
+            "id": "And.intro",
+            "kind": "constructor"
+          },
+          {
+            "id": "And.left",
+            "kind": "projection"
+          },
+          {
+            "id": "And.right",
+            "kind": "projection"
+          }
+        ],
+        "edges": [
+          {
+            "source": "and_assoc",
+            "target": "Iff.intro",
+            "relation": "uses",
+            "evidence": "source proof expression, lines 312-314"
+          },
+          {
+            "source": "and_assoc",
+            "target": "And.intro",
+            "relation": "uses",
+            "evidence": "pair construction / pattern reconstruction, lines 313-314"
+          }
+        ],
+        "status": "source_expression_edges_only"
+      },
+      "explanation_questions": [
+        "What information is preserved when parentheses move?",
+        "Why is the map reversible?",
+        "How does the nesting of constructor patterns encode the grouping?"
+      ],
+      "counterfactuals": [
+        {
+          "id": "AND-ASSOC-001-NC1",
+          "mutation": "Drop c from one direction's reconstructed conjunction.",
+          "expected": "Type mismatch because the target requires all three propositions."
+        },
+        {
+          "id": "AND-ASSOC-001-NC2",
+          "mutation": "Change one nested pattern so b and c are interchanged.",
+          "expected": "The type checker should reject a reconstruction with a proposition in the wrong position unless a corresponding commutativity theorem is applied."
+        }
+      ],
+      "annotation_status": "assistant-authored reference annotation; not expert-reviewed; not a Lean extraction receipt"
+    },
+    {
+      "id": "CORE-AND-IMPLIES-001",
+      "declaration": "and_iff_left_of_imp",
+      "source": {
+        "repository": "leanprover/lean4",
+        "commit": "a9b5b8a25c4b932be8029426c2abd34685b078f0",
+        "path": "src/Init/SimpLemmas.lean",
+        "blob_sha": "f713e6cea737f7ead410c99d349f41ecdf9feff6",
+        "line_start": 325,
+        "line_end": 325
+      },
+      "statement": "∀ {a b : Prop}, (a → b) → ((a ∧ b) ↔ a)",
+      "proof_term_source": "Iff.intro And.left (fun ha => And.intro ha (h ha))",
+      "concept": "Under the implication a → b, asserting a already guarantees b. Therefore a ∧ b carries no more information than a. The forward map projects a; the reverse map reconstructs the missing b using h.",
+      "dependency_graph": {
+        "nodes": [
+          {
+            "id": "and_iff_left_of_imp",
+            "kind": "theorem"
+          },
+          {
+            "id": "And.left",
+            "kind": "projection"
+          },
+          {
+            "id": "And.intro",
+            "kind": "constructor"
+          },
+          {
+            "id": "h",
+            "kind": "hypothesis"
+          }
+        ],
+        "edges": [
+          {
+            "source": "and_iff_left_of_imp",
+            "target": "And.left",
+            "relation": "uses",
+            "evidence": "first argument to Iff.intro, line 325"
+          },
+          {
+            "source": "and_iff_left_of_imp",
+            "target": "And.intro",
+            "relation": "uses",
+            "evidence": "second argument to Iff.intro, line 325"
+          },
+          {
+            "source": "and_iff_left_of_imp",
+            "target": "h",
+            "relation": "requires_assumption",
+            "evidence": "h ha appears in reverse direction, line 325"
+          }
+        ],
+        "status": "source_expression_edges_only"
+      },
+      "explanation_questions": [
+        "Why is a → b exactly the condition needed to reconstruct the second half?",
+        "Which direction works without h?",
+        "What conceptual information is redundant once h is available?"
+      ],
+      "counterfactuals": [
+        {
+          "id": "AND-IMPLIES-001-NC1",
+          "mutation": "Remove the hypothesis a → b from the theorem.",
+          "expected": "False. Counterexample: a=True and b=False. Then (a ∧ b) is False while a is True, so the iff fails."
+        },
+        {
+          "id": "AND-IMPLIES-001-NC2",
+          "mutation": "Keep the hypothesis but replace h ha by an arbitrary proof of b.",
+          "expected": "The proof obligation requires b in the current context; an arbitrary value without a derivation is not accepted."
+        }
+      ],
+      "annotation_status": "assistant-authored reference annotation; counterexample is truth-table verified; not expert-reviewed; not a Lean extraction receipt"
+    },
+    {
+      "id": "CORE-AND-IMPLIES-RIGHT-001",
+      "declaration": "and_iff_right_of_imp",
+      "source": {
+        "repository": "leanprover/lean4",
+        "commit": "a9b5b8a25c4b932be8029426c2abd34685b078f0",
+        "path": "src/Init/SimpLemmas.lean",
+        "blob_sha": "f713e6cea737f7ead410c99d349f41ecdf9feff6",
+        "line_start": 326,
+        "line_end": 326
+      },
+      "statement": "∀ {a b : Prop}, (b → a) → ((a ∧ b) ↔ b)",
+      "proof_term_source": "Iff.trans And.comm (and_iff_left_of_imp h)",
+      "concept": "This is the mirror of the previous theorem. First reorder a ∧ b as b ∧ a, then use b → a to show the final a is redundant. The result illustrates conceptual reuse through a previously established equivalence.",
+      "dependency_graph": {
+        "nodes": [
+          {
+            "id": "and_iff_right_of_imp",
+            "kind": "theorem"
+          },
+          {
+            "id": "And.comm",
+            "kind": "theorem"
+          },
+          {
+            "id": "and_iff_left_of_imp",
+            "kind": "theorem"
+          },
+          {
+            "id": "Iff.trans",
+            "kind": "constructor"
+          }
+        ],
+        "edges": [
+          {
+            "source": "and_iff_right_of_imp",
+            "target": "And.comm",
+            "relation": "uses",
+            "evidence": "source expression, line 326"
+          },
+          {
+            "source": "and_iff_right_of_imp",
+            "target": "and_iff_left_of_imp",
+            "relation": "uses",
+            "evidence": "source expression, line 326"
+          },
+          {
+            "source": "and_iff_right_of_imp",
+            "target": "Iff.trans",
+            "relation": "uses",
+            "evidence": "source expression, line 326"
+          }
+        ],
+        "status": "source_expression_edges_only"
+      },
+      "explanation_questions": [
+        "Why does commutativity have to be applied before the left-implication theorem?",
+        "Which previous result is being reused?",
+        "What does this demonstrate about proof composition?"
+      ],
+      "counterfactuals": [
+        {
+          "id": "AND-IMPLIES-RIGHT-001-NC1",
+          "mutation": "Remove b → a.",
+          "expected": "False. Counterexample: b=True and a=False. Then a ∧ b is False while b is True."
+        },
+        {
+          "id": "AND-IMPLIES-RIGHT-001-NC2",
+          "mutation": "Apply and_iff_left_of_imp directly to a ∧ b without first swapping it.",
+          "expected": "The intermediate proposition does not match the helper theorem's a ∧ b orientation; the type mismatch should be diagnosed rather than hidden."
+        }
+      ],
+      "annotation_status": "assistant-authored reference annotation; counterexample is truth-table verified; not expert-reviewed; not a Lean extraction receipt"
+    },
+    {
+      "id": "CORE-OR-IMPLIES-001",
+      "declaration": "or_iff_right_of_imp",
+      "source": {
+        "repository": "leanprover/lean4",
+        "commit": "a9b5b8a25c4b932be8029426c2abd34685b078f0",
+        "path": "src/Init/SimpLemmas.lean",
+        "blob_sha": "f713e6cea737f7ead410c99d349f41ecdf9feff6",
+        "line_start": 348,
+        "line_end": 348
+      },
+      "statement": "∀ {a b : Prop}, (a → b) → ((a ∨ b) ↔ b)",
+      "proof_term_source": "Iff.intro (Or.rec ha id) .inr",
+      "concept": "If a implies b, then either branch of a ∨ b establishes b: the left branch is converted using ha, and the right branch is already b. Conversely, any b gives the disjunction's right injection.",
+      "dependency_graph": {
+        "nodes": [
+          {
+            "id": "or_iff_right_of_imp",
+            "kind": "theorem"
+          },
+          {
+            "id": "Or.rec",
+            "kind": "eliminator"
+          },
+          {
+            "id": "Or.inr",
+            "kind": "constructor"
+          },
+          {
+            "id": "ha",
+            "kind": "hypothesis"
+          },
+          {
+            "id": "Iff.intro",
+            "kind": "constructor"
+          }
+        ],
+        "edges": [
+          {
+            "source": "or_iff_right_of_imp",
+            "target": "Or.rec",
+            "relation": "uses",
+            "evidence": "first Iff direction, line 348"
+          },
+          {
+            "source": "or_iff_right_of_imp",
+            "target": "Or.inr",
+            "relation": "uses",
+            "evidence": "reverse direction, line 348"
+          },
+          {
+            "source": "or_iff_right_of_imp",
+            "target": "ha",
+            "relation": "requires_assumption",
+            "evidence": "left case, line 348"
+          }
+        ],
+        "status": "source_expression_edges_only"
+      },
+      "explanation_questions": [
+        "Why does the forward direction require case analysis?",
+        "What happens in each disjunction case?",
+        "Why is the reverse direction simply an injection?"
+      ],
+      "counterfactuals": [
+        {
+          "id": "OR-IMPLIES-001-NC1",
+          "mutation": "Remove a → b.",
+          "expected": "False. Counterexample: a=True and b=False. Then a ∨ b is True while b is False."
+        },
+        {
+          "id": "OR-IMPLIES-001-NC2",
+          "mutation": "In the left case, return the original proof of a where a proof of b is required.",
+          "expected": "Type mismatch; the hypothesis ha is what converts the left branch."
+        }
+      ],
+      "annotation_status": "assistant-authored reference annotation; counterexample is truth-table verified; not expert-reviewed; not a Lean extraction receipt"
+    }
+  ],
+  "hard_gates": {
+    "wrong_statement_acceptance": 0,
+    "unsupported_formal_fact_claims": 0,
+    "assumption_removal_false_acceptance": 0,
+    "unknown_allowed": true
+  },
+  "limitations": [
+    "The proof graph edges are manually derived from visible proof expressions and source spans. They are not a Lean environment dependency extraction.",
+    "The statement strings are normalized human renderings of the source theorem types, not captured elaborated-type hashes.",
+    "No Lean compilation, kernel acceptance or independent-kernel replay was run in this execution.",
+    "Annotations are assistant-authored and require independent expert review before use as a gold benchmark.",
+    "This seed is Lean core, not the Mathlib-specific dependency-rich set required for the next stage."
+  ],
+  "next_stage": [
+    "Run a Lean 4 extractor on these six declarations and compare elaborated dependencies with the provisional graph.",
+    "Have two independent reviewers annotate the explanation and counterfactual labels.",
+    "Add 3–5 Mathlib theorems with nontrivial algebraic or analytic dependencies and exact dependency closure pins.",
+    "Create held-out theorem-family split before any model tuning."
+  ]
+}

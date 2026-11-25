@@ -1,0 +1,68 @@
+{
+  "schema_version": "1.0.0",
+  "artifact_id": "MATH-SCOPE-EQUIVALENCE-TIER2-AND-COMM-001",
+  "status": "kernel_replay_pending",
+  "pair_id": "SCOPE-TIER2-AND-COMM-001",
+  "comparison_tier": "tier2_kernel_certified_transport",
+  "source_pair": {
+    "local_context": "p ∧ q",
+    "global_context": "q ∧ p",
+    "local_to_global_context_obligation": "p ∧ q → q ∧ p",
+    "global_to_local_context_obligation": "q ∧ p → p ∧ q",
+    "target": "r",
+    "local_warrant": "p ∧ q → r",
+    "global_warrant": "q ∧ p → r",
+    "binder_fragment": "non_dependent_propositional"
+  },
+  "environment": {
+    "lean_toolchain": "leanprover/lean4:v4.37.0-rc1",
+    "mathlib_repository": "leanprover-community/mathlib4",
+    "mathlib_revision": "6ebcce37335bcb6bca64596e5d57bb3035648030",
+    "lean_core_repository": "leanprover/lean4",
+    "lean_core_revision": "0b77e12952ad39077d80d8bd6b66d601f225c321"
+  },
+  "proof_source": {
+    "repository": "Luminous-Dynamics/symthaea",
+    "path": "scripts/research/lean-proof-extractor/ScopeEquivalenceTier2AndComm.lean",
+    "sha256": "9702bb4139fe9aa51c2f708d95857aead3018856dbc935585842a9b5151a7395"
+  },
+  "certificates": [
+    {
+      "role": "local_context_entails_global",
+      "declaration": "ScopeEquivalenceTier2AndComm.local_context_to_global",
+      "expected_statement": "p ∧ q → q ∧ p"
+    },
+    {
+      "role": "global_context_entails_local",
+      "declaration": "ScopeEquivalenceTier2AndComm.global_context_to_local",
+      "expected_statement": "q ∧ p → p ∧ q"
+    },
+    {
+      "role": "context_equivalence",
+      "declaration": "ScopeEquivalenceTier2AndComm.context_equivalence",
+      "expected_statement": "(p ∧ q) ↔ (q ∧ p)"
+    },
+    {
+      "role": "warrant_local_to_global",
+      "declaration": "ScopeEquivalenceTier2AndComm.warrant_local_to_global",
+      "expected_statement": "(p ∧ q → r) → (q ∧ p → r)"
+    },
+    {
+      "role": "warrant_global_to_local",
+      "declaration": "ScopeEquivalenceTier2AndComm.warrant_global_to_local",
+      "expected_statement": "(q ∧ p → r) → (p ∧ q → r)"
+    },
+    {
+      "role": "warrant_transport_equivalence",
+      "declaration": "ScopeEquivalenceTier2AndComm.warrant_transport_equivalence",
+      "expected_statement": "(p ∧ q → r) ↔ (q ∧ p → r)"
+    }
+  ],
+  "claim_ceiling": [
+    "A successful Lean replay checks both context-entailment directions and bidirectional warrant transport for a non-dependent propositional context under this exact Lean/Mathlib environment.",
+    "The target proposition r is unchanged; this pilot does not transport across changed targets, changed premises, dependent binders, local instances, typeclass parameters, universes or arbitrary telescopes.",
+    "The proof source and #print axioms output are hashed in an exact-run receipt, but the axiom dependency closure is not yet machine-parsed into structured fields.",
+    "This synthetic And-commutation control does not validate a real mathematical paper explanation or expert-reviewed plan annotations.",
+    "This is one Tier-2 transport seed, not general scope-equivalence support or an empirical scope-CIRR result."
+  ]
+}
