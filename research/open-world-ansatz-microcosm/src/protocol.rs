@@ -803,11 +803,7 @@ impl BlindEpisode {
                     }
                     _ => return Err(ProtocolError::ClaimFamilyMismatch),
                 };
-                numeric_truth_behaviorally_represented(
-                    truth,
-                    self.numeric_quadratic_term,
-                    access,
-                )?
+                numeric_truth_behaviorally_represented(truth, self.numeric_quadratic_term, access)?
             }
         };
 
@@ -1075,15 +1071,14 @@ fn numeric_truth_signature(
         let mut state = truth.initial_state;
         for input in inputs {
             let latent = match truth.mechanism {
-                numeric::Mechanism::DirectResponse => truth
-                    .gain
-                    .checked_mul(input)
-                    .and_then(|base| {
+                numeric::Mechanism::DirectResponse => {
+                    truth.gain.checked_mul(input).and_then(|base| {
                         input
                             .checked_mul(input)
                             .and_then(|square| quadratic_term.checked_mul(square))
                             .and_then(|term| base.checked_add(term))
-                    }),
+                    })
+                }
                 numeric::Mechanism::LeakyMemory => state,
             }
             .ok_or_else(|| {
@@ -1565,13 +1560,9 @@ mod tests {
             initial_state: None,
             sensor: numeric::SensorMap::Identity,
         };
-        let mut episode = BlindEpisode::new_numeric_structural_shift(
-            "f2-quadratic-term-001",
-            truth,
-            1,
-            6,
-        )
-        .unwrap();
+        let mut episode =
+            BlindEpisode::new_numeric_structural_shift("f2-quadratic-term-001", truth, 1, 6)
+                .unwrap();
 
         for input in [-1, 0, 1] {
             episode
