@@ -93,6 +93,8 @@ pub enum MaceEvaluationAnchorPayloadRejectV1 {
     TooManyEpisodes,
     CanonicalizationFailed,
     PayloadTooLarge,
+    InvalidJson,
+    PayloadDigestMismatch,
 }
 
 /// Private-field capability proving that the exact MACE anchor payload is
@@ -119,6 +121,31 @@ impl VerifiedMaceEvaluationAnchorPayloadV1 {
     pub fn payload_sha256(&self) -> &str {
         &self.payload_sha256
     }
+}
+
+/// Decode a MACE pre-anchor payload obtained from a MON-005 record and
+/// verify it against the MACE payload digest retained by the consumer.
+/// This verifies the MACE payload commitment only; the outer MON-005 record
+/// and its Merkle inclusion/consistency proofs must be verified separately.
+pub fn parse_and_verify_mace_evaluation_anchor_payload_v1(
+    wire: &[u8],
+    expected_payload_sha256: &str,
+) -> Result<VerifiedMaceEvaluationAnchorPayloadV1, MaceEvaluationAnchorPayloadRejectV1> {
+    if wire.len() > MAX_MACE_EVALUATION_ANCHOR_PAYLOAD_BYTES_V1 {
+        return Err(MaceEvaluationAnchorPayloadRejectV1::PayloadTooLarge);
+    }
+    validate_sha256(expected_payload_sha256)?;
+    let payload: MaceEvaluationAnchorPayloadV1 =
+        serde_json::from_slice(wire)
+            .map_err(|_| MaceEvaluationAnchorPayloadRejectV1::InvalidJson)?;
+    let payload_sha256 = mace_evaluation_anchor_payload_sha256_v1(&payload)?;
+    if payload_sha256 != expected_payload_sha256 {
+        return Err(MaceEvaluationAnchorPayloadRejectV1::PayloadDigestMismatch);
+    }
+    Ok(VerifiedMaceEvaluationAnchorPayloadV1 {
+        payload,
+        payload_sha256,
+    })
 }
 
 /// Build the pre-anchor MACE statement only from already verified capabilities
@@ -418,6 +445,68 @@ mod tests {
         assert_eq!(
             payload.payload_sha256(),
             "117579a8803ecedd6b5eee4efbc73c4fe66ce9088c7687a5b8785ac4815d1154"
+        );
+    }
+
+    #[test]
+    fn retrieved_payload_reverifies_against_the_pre_anchor_digest() {
+        let (manifest, verified, witness) = test_verified_sealed_evaluation_fixture_v1();
+        let payload = build_mace_evaluation_anchor_payload_v1(
+            &manifest,
+            &verified,
+            &witness,
+            &expected(),
+        ).unwrap();
+        let wire = serde_json::to_vec(payload.payload()).unwrap();
+        let reparsed = parse_and_verify_mace_evaluation_anchor_payload_v1(
+            &wire,
+            payload.payload_sha256(),
+        ).unwrap();
+        assert_eq!(reparsed.payload(), payload.payload());
+        assert_eq!(reparsed.payload_sha256(), payload.payload_sha256());
+    }
+
+    #[test]
+    fn retrieved_payload_rejects_tampering_unknown_and_duplicate_fields() {
+        let (manifest, verified, witness) = test_verified_sealed_evaluation_fixture_v1();
+        let payload = build_mace_evaluation_anchor_payload_v1(
+            &manifest,
+            &verified,
+            &witness,
+            &expected(),
+        ).unwrap();
+        let wire = serde_json::to_vec(payload.payload()).unwrap();
+        let mut altered = payload.payload().clone();
+        altered.suite_version = "attacker-version".to_owned();
+        let tampered = serde_json::to_vec(&altered).unwrap();
+        assert_eq!(
+            parse_and_verify_mace_evaluation_anchor_payload_v1(
+                &tampered,
+                payload.payload_sha256(),
+            ),
+            Err(MaceEvaluationAnchorPayloadRejectV1::PayloadDigestMismatch)
+        );
+        let unknown = String::from_utf8(wire.clone()).unwrap()
+            .replacen("{", "{\"unexpected\":1,", 1);
+        assert_eq!(
+            parse_and_verify_mace_evaluation_anchor_payload_v1(
+                unknown.as_bytes(),
+                payload.payload_sha256(),
+            ),
+            Err(MaceEvaluationAnchorPayloadRejectV1::InvalidJson)
+        );
+        let duplicate = String::from_utf8(wire).unwrap()
+            .replacen(
+                "{\"schema_version\":",
+                "{\"schema_version\":\"mace_evaluation_anchor_payload_v1\",\"schema_version\":",
+                1,
+            );
+        assert_eq!(
+            parse_and_verify_mace_evaluation_anchor_payload_v1(
+                duplicate.as_bytes(),
+                payload.payload_sha256(),
+            ),
+            Err(MaceEvaluationAnchorPayloadRejectV1::InvalidJson)
         );
     }
 
