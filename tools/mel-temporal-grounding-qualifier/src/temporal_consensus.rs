@@ -102,6 +102,12 @@ pub struct MultiAnnotatorGroundingSummaryV1 {
     pub start_boundary_p95_abs_error_frames: Option<f64>,
     pub end_boundary_mae_frames: Option<f64>,
     pub end_boundary_p95_abs_error_frames: Option<f64>,
+    pub pairwise_annotation_pairs: usize,
+    pub pairwise_disposition_agreement_rate: Option<f64>,
+    pub pairwise_present_present_pairs: usize,
+    pub pairwise_present_symmetric_event_f1: Option<f64>,
+    pub pairwise_present_mean_matched_iou: Option<f64>,
+    pub pairwise_present_exact_count_agreement: Option<f64>,
 }
 
 /// Distribution of independent annotated boundaries aligned to one model
@@ -122,6 +128,24 @@ pub struct EventReferenceBoundaryDistributionV1 {
     pub end_spread_frames: u64,
 }
 
+/// Descriptive pairwise agreement for one annotation pair. For Present/Present
+/// pairs, interval comparison is symmetric: each annotation is used as truth
+/// once and as prediction once through the canonical scorer.
+#[derive(Debug, Clone, PartialEq, Serialize)]
+pub struct PairwiseAnnotationConcordanceV1 {
+    pub left_annotator_id_sha256: String,
+    pub right_annotator_id_sha256: String,
+    pub left_state: GroundTruthStateV1,
+    pub right_state: GroundTruthStateV1,
+    pub disposition_agreement: bool,
+    pub present_interval_comparison_eligible: bool,
+    pub left_as_truth_right_as_prediction_f1: Option<f64>,
+    pub right_as_truth_left_as_prediction_f1: Option<f64>,
+    pub symmetric_present_event_f1: Option<f64>,
+    pub mean_matched_interval_iou: Option<f64>,
+    pub exact_occurrence_count_agreement: Option<bool>,
+}
+
 #[derive(Debug, Clone, PartialEq, Serialize)]
 pub struct MultiAnnotatorGroundingReportV1 {
     pub schema: &'static str,
@@ -137,6 +161,8 @@ pub struct MultiAnnotatorGroundingReportV1 {
     pub annotator_results: Vec<AnnotatorGroundingResultV1>,
     /// Per-prediction boundary distributions derived from existing scorer matches.
     pub event_reference_boundary_distributions: Vec<EventReferenceBoundaryDistributionV1>,
+    /// Per-pair descriptive state/event comparison, not chance-corrected IAA.
+    pub pairwise_annotation_concordance: Vec<PairwiseAnnotationConcordanceV1>,
     /// Prediction indices with no match in any eligible Present annotation.
     pub unmatched_prediction_indices: Vec<usize>,
     /// Digest-shaped references are not cryptographically authenticated here.
@@ -266,7 +292,12 @@ pub fn audit_multi_annotator_case(
         });
     }
 
-    let summary = summarize_results(&results, case.minimum_annotator_count);
+    let pairwise_annotation_concordance = pairwise_annotation_concordance(case)?;
+    let summary = summarize_results(
+        &results,
+        case.minimum_annotator_count,
+        &pairwise_annotation_concordance,
+    );
     let prediction_count = match &case.prediction.state {
         GroundingPredictionStateV1::Occurrences { intervals } => intervals.len(),
         _ => 0,
@@ -286,6 +317,7 @@ pub fn audit_multi_annotator_case(
         summary,
         annotator_results: results,
         event_reference_boundary_distributions,
+        pairwise_annotation_concordance,
         unmatched_prediction_indices,
         annotation_manifest_authenticated: false,
         annotator_receipts_authenticated: false,
@@ -294,6 +326,105 @@ pub fn audit_multi_annotator_case(
         synthetic_consensus_ground_truth_created: false,
         population_confidence_interval_computed: false,
     })
+}
+
+fn pairwise_annotation_concordance(
+    case: &MultiAnnotatorTemporalCaseV1,
+) -> Result<Vec<PairwiseAnnotationConcordanceV1>, String> {
+    let mut output = Vec::new();
+    for left_index in 0..case.annotations.len() {
+        for right_index in (left_index + 1)..case.annotations.len() {
+            let left = &case.annotations[left_index];
+            let right = &case.annotations[right_index];
+            let both_present = left.state == GroundTruthStateV1::Present
+                && right.state == GroundTruthStateV1::Present;
+
+            let (left_score, right_score) = if both_present {
+                let left_truth = annotation_to_truth(case, left);
+                let right_truth = annotation_to_truth(case, right);
+                let left_as_prediction = annotation_to_prediction(case, left);
+                let right_as_prediction = annotation_to_prediction(case, right);
+                let left_score = score_temporal_grounding(
+                    &left_truth,
+                    &right_as_prediction,
+                    &case.plan,
+                )
+                .map_err(|issues| format!("left-to-right annotation comparison failed: {issues:?}"))?;
+                let right_score = score_temporal_grounding(
+                    &right_truth,
+                    &left_as_prediction,
+                    &case.plan,
+                )
+                .map_err(|issues| format!("right-to-left annotation comparison failed: {issues:?}"))?;
+                (Some(left_score), Some(right_score))
+            } else {
+                (None, None)
+            };
+
+            let left_f1 = left_score.as_ref().and_then(|score| score.f1);
+            let right_f1 = right_score.as_ref().and_then(|score| score.f1);
+            let symmetric_f1 = left_f1
+                .zip(right_f1)
+                .map(|(left_value, right_value)| (left_value + right_value) / 2.0);
+            let left_iou = left_score
+                .as_ref()
+                .and_then(|score| score.matched_interval_iou_mean);
+            let right_iou = right_score
+                .as_ref()
+                .and_then(|score| score.matched_interval_iou_mean);
+            let mean_iou = left_iou
+                .zip(right_iou)
+                .map(|(left_value, right_value)| (left_value + right_value) / 2.0);
+
+            output.push(PairwiseAnnotationConcordanceV1 {
+                left_annotator_id_sha256: left.annotator_id_sha256.clone(),
+                right_annotator_id_sha256: right.annotator_id_sha256.clone(),
+                left_state: left.state,
+                right_state: right.state,
+                disposition_agreement: left.state == right.state,
+                present_interval_comparison_eligible: both_present,
+                left_as_truth_right_as_prediction_f1: left_f1,
+                right_as_truth_left_as_prediction_f1: right_f1,
+                symmetric_present_event_f1: symmetric_f1,
+                mean_matched_interval_iou: mean_iou,
+                exact_occurrence_count_agreement: both_present
+                    .then_some(left.intervals.len() == right.intervals.len()),
+            });
+        }
+    }
+    Ok(output)
+}
+
+fn annotation_to_truth(
+    case: &MultiAnnotatorTemporalCaseV1,
+    annotation: &IndependentTemporalAnnotationV1,
+) -> TemporalGroundTruthV1 {
+    TemporalGroundTruthV1 {
+        schema_version: TEMPORAL_GROUNDING_SCHEMA_V1.into(),
+        query_id: case.query_id.clone(),
+        query_text: case.query_text.clone(),
+        artifact: case.artifact.clone(),
+        annotation_policy_version: case.annotation_policy_version.clone(),
+        annotation_set_sha256: annotation.annotation_sha256.clone(),
+        annotator_count: 1,
+        state: annotation.state,
+        intervals: annotation.intervals.clone(),
+        status_reason: annotation.status_reason.clone(),
+    }
+}
+
+fn annotation_to_prediction(
+    case: &MultiAnnotatorTemporalCaseV1,
+    annotation: &IndependentTemporalAnnotationV1,
+) -> TemporalGroundingPredictionV1 {
+    TemporalGroundingPredictionV1 {
+        schema_version: TEMPORAL_GROUNDING_SCHEMA_V1.into(),
+        query_id: case.query_id.clone(),
+        artifact: case.artifact.clone(),
+        state: GroundingPredictionStateV1::Occurrences {
+            intervals: annotation.intervals.clone(),
+        },
+    }
 }
 
 fn event_reference_boundary_distributions(
@@ -372,6 +503,7 @@ fn event_reference_boundary_distributions(
 fn summarize_results(
     results: &[AnnotatorGroundingResultV1],
     minimum_annotator_count: u16,
+    pairwise: &[PairwiseAnnotationConcordanceV1],
 ) -> MultiAnnotatorGroundingSummaryV1 {
     let scored: Vec<_> = results.iter().filter(|item| item.score.scored).collect();
     let present: Vec<_> = scored
@@ -435,6 +567,28 @@ fn summarize_results(
                 .iter()
                 .map(|matched| matched.end_error_frames.unsigned_abs() as f64)
         })
+        .collect();
+
+    let pairwise_present: Vec<_> = pairwise
+        .iter()
+        .filter(|pair| pair.present_interval_comparison_eligible)
+        .collect();
+    let pairwise_disposition_agreement_count = pairwise
+        .iter()
+        .filter(|pair| pair.disposition_agreement)
+        .count();
+    let pairwise_f1: Vec<_> = pairwise_present
+        .iter()
+        .filter_map(|pair| pair.symmetric_present_event_f1)
+        .collect();
+    let pairwise_iou: Vec<_> = pairwise_present
+        .iter()
+        .filter_map(|pair| pair.mean_matched_interval_iou)
+        .collect();
+    let pairwise_count_agreement: Vec<_> = pairwise_present
+        .iter()
+        .filter_map(|pair| pair.exact_occurrence_count_agreement)
+        .map(|equal| if equal { 1.0 } else { 0.0 })
         .collect();
 
     let fully_correct_annotators = scored
@@ -504,6 +658,15 @@ fn summarize_results(
         start_boundary_p95_abs_error_frames: percentile(&start_errors, 0.95),
         end_boundary_mae_frames: mean(&end_errors),
         end_boundary_p95_abs_error_frames: percentile(&end_errors, 0.95),
+        pairwise_annotation_pairs: pairwise.len(),
+        pairwise_disposition_agreement_rate: rate(
+            pairwise_disposition_agreement_count,
+            pairwise.len(),
+        ),
+        pairwise_present_present_pairs: pairwise_present.len(),
+        pairwise_present_symmetric_event_f1: mean(&pairwise_f1),
+        pairwise_present_mean_matched_iou: mean(&pairwise_iou),
+        pairwise_present_exact_count_agreement: mean(&pairwise_count_agreement),
     }
 }
 
