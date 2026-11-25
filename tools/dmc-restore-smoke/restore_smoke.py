@@ -73,20 +73,37 @@ def digest_task_rng(state: tuple[str, np.ndarray, int, int, float]) -> str:
     return digest_bytes(payload)
 
 
-def make_environment():
+TASKS = (
+    "cartpole.swingup",
+    "cartpole.two_poles",
+    "cartpole.three_poles",
+    "walker.walk",
+)
+
+
+def make_environment(task_name: str):
+    if task_name not in TASKS:
+        raise ValueError(f"unsupported DMC smoke task: {task_name}")
+    domain_name, suite_task_name = task_name.split(".", maxsplit=1)
     random_state = np.random.RandomState(SEED)
+    environment_kwargs = {
+        "legacy_step": LEGACY_STEP,
+        "flat_observation": False,
+    }
+    # Cartpole tasks accept an explicit action-repeat override. walker.walk
+    # supplies its own control_timestep and rejects a simultaneous n_sub_steps
+    # override, so preserve the pinned task's native walker timing.
+    if domain_name == "cartpole":
+        environment_kwargs["n_sub_steps"] = N_SUB_STEPS
+
     env = suite.load(
-        domain_name="cartpole",
-        task_name="swingup",
+        domain_name=domain_name,
+        task_name=suite_task_name,
         task_kwargs={
             "random": random_state,
             "time_limit": TIME_LIMIT_SECONDS,
         },
-        environment_kwargs={
-            "n_sub_steps": N_SUB_STEPS,
-            "legacy_step": LEGACY_STEP,
-            "flat_observation": False,
-        },
+        environment_kwargs=environment_kwargs,
     )
     return env
 
@@ -156,8 +173,8 @@ def verify_physics_copy_is_independent(env) -> dict[str, Any]:
     return {"physics_copy_data_independent": True, "physics_copy_share_model": False}
 
 
-def export_checkpoint(path: Path) -> None:
-    env = make_environment()
+def export_checkpoint(path: Path, task_name: str) -> None:
+    env = make_environment(task_name)
     env.reset()
     action = midpoint_action(env)
 
@@ -206,6 +223,8 @@ def export_checkpoint(path: Path) -> None:
         return values
 
     payload = {
+        "task_id": np.asarray(task_name),
+        "compiled_model_sha256": np.asarray(digest_bytes(physics.model.to_bytes())),
         "integration_state": full_state,
         "integration_state_size": np.asarray(expected_state_size, dtype=np.int64),
         "prefix_state_sha256": np.asarray(digest_array(full_state)),
@@ -249,8 +268,9 @@ def export_checkpoint(path: Path) -> None:
         "prefix_observation_sha256": digest_observation(prefix_observation),
         "task_rng_sha256": digest_task_rng(task_rng),
         "snapshot_contains_plugin_state": physics.model.nplugin == 0 or hasattr(physics.data, "plugin_state"),
-        **verify_legacy_state_is_incomplete(make_environment()),
-        **verify_physics_copy_is_independent(make_environment()),
+        "task_id": task_name,
+        **verify_legacy_state_is_incomplete(make_environment(task_name)),
+        **verify_physics_copy_is_independent(make_environment(task_name)),
     }, sort_keys=True))
 
 
@@ -262,13 +282,35 @@ def load_observation(data: Any, prefix: str) -> dict[str, np.ndarray]:
     }
 
 
-def replay_checkpoint(path: Path) -> None:
+def replay_checkpoint(path: Path, task_name: str) -> None:
     with np.load(path, allow_pickle=False) as data:
         saved = {key: data[key].copy() for key in data.files}
 
-    env = make_environment()
+    saved_task = str(saved["task_id"].item())
+    if saved_task != task_name:
+        raise AssertionError(f"checkpoint task {saved_task} does not match requested task {task_name}")
+    env = make_environment(task_name)
     env.reset()
     signature = int(mujoco.mjtState.mjSTATE_INTEGRATION.value)
+    replay_model_digest = digest_bytes(env.physics.model.to_bytes())
+    if replay_model_digest != str(saved["compiled_model_sha256"].item()):
+        raise AssertionError("fresh-process compiled MuJoCo model digest differs")
+
+    expected_control_timestep = float(saved["control_timestep"])
+    actual_control_timestep = float(env.control_timestep())
+    if np.asarray([actual_control_timestep], dtype="<f8").tobytes() != np.asarray(
+        [expected_control_timestep], dtype="<f8"
+    ).tobytes():
+        raise AssertionError("fresh-process control timestep differs")
+
+    if int(env._n_sub_steps) != int(saved["wrapper_n_sub_steps"]):
+        raise AssertionError("fresh-process wrapper n_sub_steps differs")
+    if np.asarray([env._step_limit], dtype="<f8").tobytes() != np.asarray(
+        [float(saved["wrapper_step_limit"])], dtype="<f8"
+    ).tobytes():
+        raise AssertionError("fresh-process wrapper step limit differs")
+    if bool(env.physics.legacy_step) != bool(saved["wrapper_legacy_step"]):
+        raise AssertionError("fresh-process legacy_step differs")
     if signature != EXPECTED_INTEGRATION_MASK:
         raise AssertionError(f"wrong pinned integration mask: {signature}")
 
@@ -289,9 +331,6 @@ def replay_checkpoint(path: Path) -> None:
     env.task.random.set_state(task_rng_state)
     env._step_count = int(saved["wrapper_step_count"])
     env._reset_next_step = bool(saved["wrapper_reset_next_step"])
-    env._n_sub_steps = int(saved["wrapper_n_sub_steps"])
-    env._step_limit = float(saved["wrapper_step_limit"])
-    env.physics.legacy_step = bool(saved["wrapper_legacy_step"])
 
     # Recompute derived MuJoCo quantities before reading observations.
     env.physics.forward()
@@ -344,6 +383,7 @@ def main() -> None:
     parser = argparse.ArgumentParser()
     parser.add_argument("mode", choices=("export", "replay"))
     parser.add_argument("checkpoint", type=Path)
+    parser.add_argument("--task", choices=TASKS, default="cartpole.swingup")
     arguments = parser.parse_args()
 
     installed_dm_control = importlib.metadata.version("dm-control")
@@ -358,9 +398,9 @@ def main() -> None:
         raise RuntimeError("pinned MuJoCo integration-state mask differs")
 
     if arguments.mode == "export":
-        export_checkpoint(arguments.checkpoint)
+        export_checkpoint(arguments.checkpoint, arguments.task)
     else:
-        replay_checkpoint(arguments.checkpoint)
+        replay_checkpoint(arguments.checkpoint, arguments.task)
 
 
 if __name__ == "__main__":
