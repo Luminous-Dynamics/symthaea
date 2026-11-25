@@ -5635,6 +5635,10 @@ pub const KIRD_SYNTHETIC_CERTIFIED_FIXTURE: &str = include_str!(
 /// validator; this constant makes the exact source available to integration tests.
 pub const KIRD_POINT_SCHEMA: &str =
     include_str!("../../../../benchmarks/plasma/rate-distortion/kird-point-v0.1.schema.json");
+pub const RESPONSE_WEIGHTED_REFINEMENT_FIXTURE: &str = include_str!(
+    "../../../../benchmarks/plasma/adversarial-probes/fixtures/response-weighted-refinement-known-answer-v0.1.json"
+);
+
 pub const KINETIC_DISCRIMINATION_FIXTURE: &str = include_str!(
     "../../../../benchmarks/plasma/kinetic-discrimination/fixtures/complex-response-eig-known-answers-v0.1.json"
 );
@@ -9140,6 +9144,117 @@ mod tests {
             evaluate_coupled_two_mode_authority(contract),
             Err(ContractError::InvalidCoupledModeAuthority(_))
         ));
+    }
+
+    #[test]
+    fn response_weighted_refinement_matches_checked_in_known_answer_fixture() {
+        let fixture: serde_json::Value =
+            serde_json::from_str(RESPONSE_WEIGHTED_REFINEMENT_FIXTURE).unwrap();
+        let input_modes = fixture["input_modes"]
+            .as_array()
+            .unwrap()
+            .iter()
+            .map(|value| value.as_u64().unwrap() as u32)
+            .collect::<Vec<_>>();
+        let output_modes = fixture["output_modes"]
+            .as_array()
+            .unwrap()
+            .iter()
+            .map(|value| value.as_u64().unwrap() as u32)
+            .collect::<Vec<_>>();
+        let mut matrix = ModeResponseMatrix::new(input_modes, output_modes).unwrap();
+        for entry in fixture["response_entries"].as_array().unwrap() {
+            matrix
+                .set(
+                    entry["input_mode"].as_u64().unwrap() as u32,
+                    entry["output_mode"].as_u64().unwrap() as u32,
+                    ComplexResponse::new(
+                        entry["real"].as_f64().unwrap(),
+                        entry["imag"].as_f64().unwrap(),
+                    )
+                    .unwrap(),
+                )
+                .unwrap();
+        }
+        let coefficients = fixture["coefficients"]
+            .as_array()
+            .unwrap()
+            .iter()
+            .map(|entry| {
+                (
+                    entry["mode"].as_u64().unwrap() as u32,
+                    ComplexResponse::new(
+                        entry["real"].as_f64().unwrap(),
+                        entry["imag"].as_f64().unwrap(),
+                    )
+                    .unwrap(),
+                )
+            })
+            .collect::<Vec<_>>();
+        let encoded_bytes = fixture["encoded_bytes"]
+            .as_array()
+            .unwrap()
+            .iter()
+            .map(|entry| {
+                (
+                    entry["mode"].as_u64().unwrap() as u32,
+                    entry["bytes"].as_u64().unwrap(),
+                )
+            })
+            .collect::<Vec<_>>();
+        let output_weights = fixture["output_qoi_weights"]
+            .as_array()
+            .unwrap()
+            .iter()
+            .map(|weight| weight.as_f64().unwrap())
+            .collect::<Vec<_>>();
+        let plan = plan_response_weighted_refinement(
+            &matrix,
+            &coefficients,
+            &encoded_bytes,
+            &output_weights,
+            fixture["response_loss_budget"].as_f64().unwrap(),
+        )
+        .unwrap();
+        assert_eq!(
+            plan.discarded_state_bytes,
+            fixture["expected"]["discarded_state_bytes"].as_u64().unwrap()
+        );
+        assert!(
+            (plan.accumulated_discarded_response_bound
+                - fixture["expected"]["accumulated_discarded_response_bound"]
+                    .as_f64()
+                    .unwrap())
+            .abs()
+                < 1.0e-12
+        );
+        for expected in fixture["expected"]["decisions"].as_array().unwrap() {
+            let mode = expected["mode"].as_u64().unwrap() as u32;
+            let decision = plan
+                .decisions
+                .iter()
+                .find(|item| item.input_mode == mode)
+                .unwrap();
+            assert!(
+                (decision.spectral_energy - expected["spectral_energy"].as_f64().unwrap()).abs()
+                    < 1.0e-12
+            );
+            assert!(
+                (decision.response_loss_bound.unwrap()
+                    - expected["response_loss_bound"].as_f64().unwrap())
+                .abs()
+                    < 1.0e-12
+            );
+            let expected_disposition = expected["disposition"].as_str().unwrap();
+            let actual_disposition = match decision.disposition {
+                ModeRefinementDisposition::DiscardedWithinBudget => "discarded_within_budget",
+                ModeRefinementDisposition::RetainedBudgetExceeded => "retained_budget_exceeded",
+                ModeRefinementDisposition::RetainedUnknownResponse => {
+                    "retained_unknown_response"
+                }
+            };
+            assert_eq!(actual_disposition, expected_disposition);
+        }
     }
 
     #[test]
