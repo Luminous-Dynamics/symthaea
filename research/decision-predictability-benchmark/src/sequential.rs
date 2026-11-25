@@ -7,7 +7,7 @@
 //! worlds. Its exhaustive policy-tree enumerator is a separately written
 //! cross-check, not a production planner.
 
-use std::collections::{BTreeMap, BTreeSet};
+use std::collections::{BTreeMap, BTreeSet, VecDeque};
 use std::error::Error;
 use std::fmt::{self, Display, Formatter};
 
@@ -422,76 +422,56 @@ fn validate(problem: &SequentialRobustProblem) -> Result<(), SequentialOracleErr
 
     // Validate outcome exhaustiveness against the state support actually
     // reachable at each public protocol node. Branch-specific actions need
-    // not cover the original universe, only the states that can reach them.
+    // not cover the original universe, only states that can reach them.
+    // Each (protocol node, possible state) pair is processed at most once.
     let mut reachable: BTreeMap<String, BTreeSet<String>> = BTreeMap::new();
-    reachable.insert(
-        problem.initial_protocol_state_id.clone(),
-        states.iter().map(|state| (*state).to_owned()).collect(),
-    );
-    loop {
-        let snapshot: Vec<(String, Vec<String>, Vec<String>)> = problem
+    let mut worklist = VecDeque::new();
+    let initial_support = reachable
+        .entry(problem.initial_protocol_state_id.clone())
+        .or_default();
+    for state_id in &problem.state_ids {
+        if initial_support.insert(state_id.clone()) {
+            worklist.push_back((problem.initial_protocol_state_id.clone(), state_id.clone()));
+        }
+    }
+
+    while let Some((protocol_state_id, state_id)) = worklist.pop_front() {
+        let protocol_state = problem
             .protocol_states
             .iter()
-            .filter_map(|protocol_state| {
-                reachable.get(&protocol_state.protocol_state_id).map(|support| {
-                    (
-                        protocol_state.protocol_state_id.clone(),
-                        support.iter().cloned().collect(),
-                        protocol_state.legal_action_ids.clone(),
-                    )
-                })
-            })
-            .collect();
-        let mut changed = false;
+            .find(|state| state.protocol_state_id == protocol_state_id)
+            .ok_or_else(|| {
+                SequentialOracleError::UnknownProtocolState(protocol_state_id.clone())
+            })?;
 
-        for (_protocol_state_id, current_support, legal_actions) in snapshot {
-            if current_support.is_empty() {
-                continue;
-            }
-            for action_id in legal_actions {
-                let action = problem
-                    .actions
-                    .iter()
-                    .find(|candidate| candidate.action_id == action_id)
-                    .ok_or_else(|| SequentialOracleError::UnknownAction(action_id.clone()))?;
-                let current_ids: BTreeSet<&str> =
-                    current_support.iter().map(String::as_str).collect();
-                let mut covered = BTreeSet::new();
+        for action_id in &protocol_state.legal_action_ids {
+            let action = problem
+                .actions
+                .iter()
+                .find(|candidate| candidate.action_id == *action_id)
+                .ok_or_else(|| SequentialOracleError::UnknownAction(action_id.clone()))?;
+            let mut covered = false;
 
-                for outcome in &action.outcomes {
-                    let compatible: Vec<String> = outcome
-                        .possible_state_ids
-                        .iter()
-                        .filter(|state_id| current_ids.contains(state_id.as_str()))
-                        .cloned()
-                        .collect();
-                    if compatible.is_empty() {
-                        continue;
-                    }
-                    for state_id in &compatible {
-                        covered.insert(state_id.clone());
-                    }
-                    let next_support = reachable
-                        .entry(outcome.next_protocol_state_id.clone())
-                        .or_default();
-                    for state_id in compatible {
-                        changed |= next_support.insert(state_id);
-                    }
+            for outcome in &action.outcomes {
+                if !outcome.possible_state_ids.contains(&state_id) {
+                    continue;
                 }
-
-                for state_id in &current_support {
-                    if !covered.contains(state_id) {
-                        return Err(SequentialOracleError::UncoveredState {
-                            action_id: action.action_id.clone(),
-                            state_id: state_id.clone(),
-                        });
-                    }
+                covered = true;
+                let next_protocol_state_id = &outcome.next_protocol_state_id;
+                let next_support = reachable
+                    .entry(next_protocol_state_id.clone())
+                    .or_default();
+                if next_support.insert(state_id.clone()) {
+                    worklist.push_back((next_protocol_state_id.clone(), state_id.clone()));
                 }
             }
-        }
 
-        if !changed {
-            break;
+            if !covered {
+                return Err(SequentialOracleError::UncoveredState {
+                    action_id: action.action_id.clone(),
+                    state_id: state_id.clone(),
+                });
+            }
         }
     }
     Ok(())
