@@ -245,12 +245,22 @@ jobs:
               for item in fixture["expected_pairwise_comparisons"]
           }
           assert comparisons[("A", "B")]["normalized_rms_distance"] == 0.75
+          assert comparisons[("A", "B")]["maximum_normalized_entry_error"] == 0.75
           assert comparisons[("A", "B")]["pairwise_compatible"] is True
           assert comparisons[("B", "C")]["pairwise_compatible"] is True
           assert comparisons[("A", "C")]["normalized_rms_distance"] == 1.5
+          assert comparisons[("A", "C")]["maximum_normalized_entry_error"] == 1.5
           assert comparisons[("A", "C")]["pairwise_compatible"] is False
           assert all(len(state["signature"]["qoi_scales"]) == len(state["signature"]["qoi_ids"]) for state in fixture["states"])
+          audit = fixture["expected_finite_class_audit"]
+          assert audit["compared_pair_count"] == 3
+          assert audit["compatible_pair_count"] == 2
+          assert audit["incompatible_pair_count"] == 1
+          assert audit["complete_response_coverage"] is True
+          assert audit["stable_branch_association"] is True
+          assert audit["within_finite_class_diameter"] is False
           assert fixture["claim_boundary"]["approximate_pairwise_compatibility_is_not_transitive"] is True
+          assert fixture["claim_boundary"]["finite_cluster_requires_all_pairwise_comparisons"] is True
           print("intervention_equivalent_state_schema_validation=PASS")
           PY
 
