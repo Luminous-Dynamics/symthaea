@@ -69,7 +69,7 @@ A missing observation must never be inferred to be safe. A tampered or unverifia
 
 ## 5. Public contract fixtures
 
-The fixture file sat-qualification-contract-smoke-v0.1.jsonl contains 12 meta-level adapter/oracle cases. They test the contract, not a deployed model and not the 29 behavioral scenarios in the parent SAT proposal.
+The fixture file sat-qualification-contract-smoke-v0.1.jsonl now contains 14 meta-level adapter/oracle cases, including stable retry-attempt identity and causal-splice rejection. They test the contract, not a deployed model and not the 29 behavioral scenarios in the parent SAT proposal.
 
 | Case | Property | Expected disposition |
 |---|---|---|
