@@ -14,6 +14,7 @@ on:
       - "docs/research/MATH_METAMORPHIC_*"
       - "docs/research/MATH_SCOPE_EQUIVALENCE_TIER1_V1.*"
       - "docs/research/MATH_SCOPE_EQUIVALENCE_TIER2_AND_COMM_V1.*"
+      - "docs/research/LEAN_AXIOM_AUDIT_IMPORTED_INDUCTIVE_V1.*"
       - "docs/research/MATH_HARDMODE_*"
       - "docs/research/PROOF_ACTION_CERTIFICATE_AND_COMM_V1.*"
       - "docs/research/PROOF_PLAN_*.md"
@@ -708,6 +709,135 @@ jobs:
           path: |
             mathlib4/scope-equivalence-tier2-and-comm-replay-receipt.json
             mathlib4/scope-equivalence-tier2-and-comm.log
+          if-no-files-found: error
+
+      - name: Reproduce imported-inductive axiom audit and run fresh DFS
+        working-directory: mathlib4
+        shell: bash
+        run: |
+          set -euo pipefail
+          manifest="$GITHUB_WORKSPACE/docs/research/LEAN_AXIOM_AUDIT_IMPORTED_INDUCTIVE_V1.json"
+          module_a="$GITHUB_WORKSPACE/scripts/research/lean-proof-extractor/axiom-audit-imported-inductive/A.lean"
+          module_b="$GITHUB_WORKSPACE/scripts/research/lean-proof-extractor/axiom-audit-imported-inductive/B.lean"
+          jq -e '.schema_version == "1.0.0"
+            and .status == "independent_audit_pending"
+            and .lean_toolchain == "leanprover/lean4:v4.37.0-rc1"
+            and .lean_core_revision == "0b77e12952ad39077d80d8bd6b66d601f225c321"
+            and .sources.module_a.sha256 == "e70af7d30ac091e8a50f219a1c53a7c85be5c750f2eb3ff127fcedc3b99a3003"
+            and .sources.module_b.sha256 == "18ca5b91051479397d826fe37432bca2e35320e9bbb47adb115186e7dfee9e09"
+            and ([.roots[].name] == ["S9", "S9.mk", "usesS9"])' "$manifest" >/dev/null
+          jq -e '."$schema" == "https://json-schema.org/draft/2020-12/schema"
+            and .properties.status.const == "independent_audit_pending"
+            and .properties.roots.minItems == 3
+            and .properties.roots.maxItems == 3' \
+            "$GITHUB_WORKSPACE/docs/research/LEAN_AXIOM_AUDIT_IMPORTED_INDUCTIVE_V1.schema.json" >/dev/null
+
+          test "$(cat lean-toolchain)" = "leanprover/lean4:v4.37.0-rc1"
+          test "$(git rev-parse HEAD)" = "6ebcce37335bcb6bca64596e5d57bb3035648030"
+          test "$(sha256sum "$module_a" | cut -d' ' -f1)" = "$(jq -r '.sources.module_a.sha256' "$manifest")"
+          test "$(sha256sum "$module_b" | cut -d' ' -f1)" = "$(jq -r '.sources.module_b.sha256' "$manifest")"
+
+          repro_dir="$GITHUB_WORKSPACE/mathlib4/axiom-audit-imported-inductive-repro"
+          mkdir -p "$repro_dir"
+          cp "$module_a" "$repro_dir/A.lean"
+          cp "$module_b" "$repro_dir/B.lean"
+          pushd "$repro_dir"
+          lake env lean -o A.olean A.lean 2>&1 | tee module-a-build.log
+          lake env bash -c 'LEAN_PATH="$PWD:$LEAN_PATH" lean B.lean' 2>&1 | tee module-b-import-audit.log
+
+          for root in S9 S9.mk usesS9; do
+            grep -Fq "FRESH_AXIOM_AUDIT root=$root axioms=[Classical.choice]" module-b-import-audit.log
+          done
+          grep -Fq "'S9'" module-b-import-audit.log
+          grep -Fq "'S9.mk'" module-b-import-audit.log
+          grep -Fq "'usesS9'" module-b-import-audit.log
+          echo "LEAN_IMPORTED_INDUCTIVE_FRESH_DFS_PASS"
+
+          native_s9="$(grep -F "'S9'" module-b-import-audit.log | tail -n 1)"
+          native_ctor="$(grep -F "'S9.mk'" module-b-import-audit.log | tail -n 1)"
+          native_uses="$(grep -F "'usesS9'" module-b-import-audit.log | tail -n 1)"
+          if printf '%s\n' "$native_s9" "$native_ctor" "$native_uses" | grep -Fq "does not depend on any axioms"; then
+            native_underreported=true
+          else
+            native_underreported=false
+          fi
+
+          module_a_sha256="$(sha256sum A.lean | cut -d' ' -f1)"
+          module_b_sha256="$(sha256sum B.lean | cut -d' ' -f1)"
+          module_a_olean_sha256="$(sha256sum A.olean | cut -d' ' -f1)"
+          module_a_log_sha256="$(sha256sum module-a-build.log | cut -d' ' -f1)"
+          module_b_log_sha256="$(sha256sum module-b-import-audit.log | cut -d' ' -f1)"
+          manifest_sha256="$(sha256sum "$manifest" | cut -d' ' -f1)"
+          lean_version="$(lean --version)"
+          lake_manifest_sha256="$(sha256sum ../lake-manifest.json | cut -d' ' -f1)"
+          symthaea_revision="$(git -C "$GITHUB_WORKSPACE" rev-parse HEAD)"
+          receipt="lean-imported-inductive-axiom-audit-receipt.json"
+          jq -n \
+            --arg symthaea_revision "$symthaea_revision" \
+            --arg lean_version "$lean_version" \
+            --arg module_a_sha256 "$module_a_sha256" \
+            --arg module_b_sha256 "$module_b_sha256" \
+            --arg module_a_olean_sha256 "$module_a_olean_sha256" \
+            --arg module_a_log_sha256 "$module_a_log_sha256" \
+            --arg module_b_log_sha256 "$module_b_log_sha256" \
+            --arg manifest_sha256 "$manifest_sha256" \
+            --arg lake_manifest_sha256 "$lake_manifest_sha256" \
+            --arg native_s9 "$native_s9" \
+            --arg native_ctor "$native_ctor" \
+            --arg native_uses "$native_uses" \
+            --argjson native_underreported "$native_underreported" \
+            '{
+              schema_version: "1.0.0",
+              receipt_kind: "fresh_imported_inductive_axiom_audit",
+              status: "accepted",
+              repository: "Luminous-Dynamics/symthaea",
+              symthaea_revision: $symthaea_revision,
+              lean_version: $lean_version,
+              mathlib_revision: "6ebcce37335bcb6bca64596e5d57bb3035648030",
+              manifest_sha256: $manifest_sha256,
+              lake_manifest_sha256: $lake_manifest_sha256,
+              module_a: {source_sha256: $module_a_sha256, olean_sha256: $module_a_olean_sha256, build_log_sha256: $module_a_log_sha256},
+              module_b: {source_sha256: $module_b_sha256, import_audit_log_sha256: $module_b_log_sha256},
+              roots: [
+                {name: "S9", fresh_audit_axioms: ["Classical.choice"], accepted: true},
+                {name: "S9.mk", fresh_audit_axioms: ["Classical.choice"], accepted: true},
+                {name: "usesS9", fresh_audit_axioms: ["Classical.choice"], accepted: true}
+              ],
+              native_collect_axioms_diagnostic_only: {
+                s9: $native_s9,
+                constructor: $native_ctor,
+                theorem: $native_uses,
+                underreported_any_root: $native_underreported
+              },
+              algorithm: {
+                environment_exporting_disabled: true,
+                kernel_constant_environment_lookup: "env.checked.get.find?",
+                traversal: "fresh per-root DFS",
+                memoization: "visited names only; no partial axiom result cache",
+                inductive_edges: "inductive type plus constructors",
+                unresolved_policy: "sorryAx sentinel; expected dependency assertion fails closed"
+              },
+              claim_ceiling: [
+                "The project-side fresh DFS detected Classical.choice through the imported S9 inductive/constructor cycle and the theorem usesS9 in this exact Lean environment.",
+                "Native #print axioms output is captured as a diagnostic and is not the independent acceptance oracle.",
+                "This is a research prototype for this imported-inductive reproduction, not a verified replacement for Lean's kernel or repository-wide trust audit.",
+                "Mutual/nested inductives, all declaration forms and complete repository-wide trust closure require more adversarial cases."
+              ]
+            }' > "$receipt"
+          jq -e '.status == "accepted" and (.roots | length) == 3 and all(.roots[]; .accepted == true and .fresh_audit_axioms == ["Classical.choice"]) and .algorithm.memoization == "visited names only; no partial axiom result cache"' "$receipt" >/dev/null
+          cat "$receipt" >> "$GITHUB_STEP_SUMMARY"
+          popd
+          echo "LEAN_IMPORTED_INDUCTIVE_AXIOM_AUDIT_RECEIPT_PASS"
+
+      - name: Preserve independent imported-inductive audit receipt
+        if: success()
+        uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9
+        with:
+          name: lean-imported-inductive-fresh-axiom-audit
+          path: |
+            mathlib4/axiom-audit-imported-inductive-repro/lean-imported-inductive-axiom-audit-receipt.json
+            mathlib4/axiom-audit-imported-inductive-repro/module-a-build.log
+            mathlib4/axiom-audit-imported-inductive-repro/module-b-import-audit.log
           if-no-files-found: error
 
       - name: Preserve extracted graph artifacts
