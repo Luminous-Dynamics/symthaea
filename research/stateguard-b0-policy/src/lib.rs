@@ -334,10 +334,12 @@ fn fits_budget(cost: &BTreeMap<String, u64>, budget: &BTreeMap<String, u64>) -> 
 }
 
 fn offer_matches_need(offer: &ActionOffer, need: &PolicyNeed) -> bool {
-    need.action_kinds.contains(&offer.kind)
-        && offer.target_claim_id.as_deref() == need.claim_id.as_deref()
-        && (need.evidence_id.is_none()
-            || offer.target_evidence_id.as_deref() == need.evidence_id.as_deref())
+    let claim_matches = offer.target_claim_id.as_deref() == need.claim_id.as_deref()
+        || (offer.kind == ActionKind::Escalate && offer.target_claim_id.is_none());
+    let evidence_matches = need.evidence_id.is_none()
+        || offer.target_evidence_id.as_deref() == need.evidence_id.as_deref()
+        || offer.kind == ActionKind::Escalate;
+    need.action_kinds.contains(&offer.kind) && claim_matches && evidence_matches
 }
 
 fn abstain(
@@ -646,6 +648,66 @@ mod tests {
         let decision = decide(&input(sample_state(0), vec![])).unwrap();
         assert_eq!(decision.disposition, DecisionDisposition::Abstain);
         assert_eq!(decision.reason_codes, vec!["NO_FEASIBLE_PERMITTED_ACTION"]);
+    }
+
+    #[test]
+    fn retracted_source_is_refreshed_before_using_its_old_support_label() {
+        let mut state: Value = serde_json::from_str(&sample_state(1)).unwrap();
+        state["evidence"][0]["correction_status"] = Value::String("RETRACTED".to_owned());
+        let input = input(
+            state.to_string(),
+            vec![offer(
+                "refresh-retracted",
+                ActionKind::RetrieveOrRecapture,
+                Some("claim-b"),
+                Some("ev-b1"),
+                &[("query_units", 1), ("experiment_units", 0), ("review_minutes", 0)],
+            )],
+        );
+        let decision = decide(&input).unwrap();
+        assert_eq!(decision.selected_offer_id.as_deref(), Some("refresh-retracted"));
+        assert_eq!(decision.reason_codes, vec!["SOURCE_RETRACTED_OR_SUPERSEDED"]);
+    }
+
+    #[test]
+    fn refuted_adjudication_requests_discriminating_work_not_repeat_adjudication() {
+        let mut state: Value = serde_json::from_str(&sample_state(1)).unwrap();
+        state["decision_context"]["risk_class"] = Value::String("HIGH".to_owned());
+        state["claims"][0]["truth_adjudication"] = serde_json::json!({
+            "status": "ADJUDICATED",
+            "result": "REFUTED",
+            "authority_id": "independent-reviewer",
+            "evidence_reference": "urn:adjudication:refuted",
+            "adjudicated_at": "2026-11-25T10:10:00Z"
+        });
+        let input = input(
+            state.to_string(),
+            vec![offer(
+                "discriminate",
+                ActionKind::RequestDiscriminatingExperiment,
+                Some("claim-b"),
+                None,
+                &[("query_units", 0), ("experiment_units", 2), ("review_minutes", 0)],
+            )],
+        );
+        let decision = decide(&input).unwrap();
+        assert_eq!(decision.selected_action_kind, Some(ActionKind::RequestDiscriminatingExperiment));
+    }
+
+    #[test]
+    fn global_escalation_offer_is_usable_as_a_fail_safe_fallback() {
+        let input = input(
+            sample_state(0),
+            vec![offer(
+                "escalate-episode",
+                ActionKind::Escalate,
+                None,
+                None,
+                &[("query_units", 0), ("experiment_units", 0), ("review_minutes", 1)],
+            )],
+        );
+        let decision = decide(&input).unwrap();
+        assert_eq!(decision.selected_offer_id.as_deref(), Some("escalate-episode"));
     }
 
     #[test]
