@@ -140,6 +140,11 @@ pub struct SelectiveGroundingSummaryV1 {
     pub area_under_risk_coverage_curve: Option<f64>,
     pub risk_at_80_percent_coverage: Option<f64>,
     pub max_coverage_at_risk_le_5_percent: Option<f64>,
+    pub always_answer_coverage: f64,
+    pub always_answer_risk: f64,
+    /// Expected random-retention risk at the model's observed maximum coverage.
+    pub random_abstention_baseline_risk: Option<f64>,
+    pub random_abstention_baseline_aurc: Option<f64>,
     pub always_abstain_coverage: f64,
     pub always_abstain_risk: Option<f64>,
 }
@@ -445,6 +450,11 @@ fn summarize(results: &[SelectiveCaseResultV1]) -> SelectiveGroundingSummaryV1 {
         area_under_risk_coverage_curve,
         risk_at_80_percent_coverage,
         max_coverage_at_risk_le_5_percent,
+        always_answer_coverage: 1.0,
+        always_answer_risk: (selective_errors + cases - covered.len()) as f64 / cases as f64,
+        random_abstention_baseline_risk: rate(selective_errors, covered.len()),
+        random_abstention_baseline_aurc: rate(selective_errors, covered.len())
+            .map(|risk| risk * covered.len() as f64 / cases as f64),
         always_abstain_coverage: 0.0,
         always_abstain_risk: None,
     }
@@ -839,6 +849,38 @@ mod tests {
         assert_eq!(report.summary.coverage, 0.0);
         assert_eq!(report.summary.risk_coverage_curve.len(), 0);
         assert_eq!(report.summary.area_under_risk_coverage_curve, None);
+    }
+
+    #[test]
+    fn always_answer_and_random_abstention_baselines_are_reported() {
+        let right = case(
+            "baseline-right",
+            GroundTruthStateV1::Present,
+            vec![crate::temporal_grounding::FrameIntervalV1 { start_frame: 100, end_frame: 200 }],
+            None,
+            SelectiveDecisionV1::Answer,
+            GroundingPredictionStateV1::Occurrences {
+                intervals: vec![crate::temporal_grounding::FrameIntervalV1 { start_frame: 100, end_frame: 200 }],
+            },
+            0.9,
+        );
+        let abstain = case(
+            "baseline-abstain",
+            GroundTruthStateV1::Present,
+            vec![crate::temporal_grounding::FrameIntervalV1 { start_frame: 100, end_frame: 200 }],
+            None,
+            SelectiveDecisionV1::AbstainNotEstimable,
+            GroundingPredictionStateV1::NotEstimable { reason: "not answered".into() },
+            0.8,
+        );
+        let report = audit_selective_batch(&batch(vec![right, abstain])).unwrap();
+        assert_eq!(report.summary.coverage, 0.5);
+        assert_eq!(report.summary.always_answer_coverage, 1.0);
+        assert_eq!(report.summary.always_answer_risk, 0.5);
+        assert_eq!(report.summary.random_abstention_baseline_risk, Some(0.0));
+        assert_eq!(report.summary.random_abstention_baseline_aurc, Some(0.0));
+        assert_eq!(report.summary.always_abstain_coverage, 0.0);
+        assert_eq!(report.summary.always_abstain_risk, None);
     }
 
     #[test]
