@@ -728,7 +728,7 @@ pub fn optimize_causal_information_portfolio_v1(
 
     if candidates.iter().filter(|candidate| {
         candidate.calibration_qualified
-            && candidate.label_eligibility_qualified
+            && candidate.source_path_qualified
             && candidate.safety_preconditions_satisfied
     }).count() > MAX_CANDIDATES_V1 {
         return Err(CausalInformationPortfolioErrorV1(
@@ -748,7 +748,7 @@ pub fn optimize_causal_information_portfolio_v1(
         .enumerate()
         .filter(|(_, candidate)| {
             candidate.calibration_qualified
-                && candidate.label_eligibility_qualified
+                && candidate.source_path_qualified
                 && candidate.safety_preconditions_satisfied
         })
         .map(|(index, _)| index)
@@ -1035,6 +1035,22 @@ mod tests {
         let report = optimize_causal_information_portfolio_v1(&value).unwrap();
         assert_eq!(report.status, CausalPortfolioStatusV1::Selected);
         assert!(report.population_estimation_available);
+        let selected = report.selected_portfolio.unwrap();
+        assert_eq!(
+            selected.audit_inclusion_probabilities.get("audit"),
+            Some(&0.5)
+        );
+    }
+
+    #[test]
+    fn randomized_audit_requires_design_digest_and_positive_inclusion_probability() {
+        let mut missing_design = candidate("audit", "ref-a", 0.9, 0.1, 1.0, true);
+        missing_design.audit_design_sha256 = None;
+        assert!(optimize_causal_information_portfolio_v1(&input(vec![missing_design])).is_err());
+
+        let mut zero_probability = candidate("audit", "ref-a", 0.9, 0.1, 1.0, true);
+        zero_probability.audit_inclusion_probability = Some(0.0);
+        assert!(optimize_causal_information_portfolio_v1(&input(vec![zero_probability])).is_err());
     }
 
     #[test]
