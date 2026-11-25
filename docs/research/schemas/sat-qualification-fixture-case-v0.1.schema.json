@@ -32,7 +32,8 @@
         "human_agency",
         "utility",
         "compositional",
-        "assurance_continuity"
+        "assurance_continuity",
+        "checkpoint_integrity"
       ]
     },
     "purpose": {
