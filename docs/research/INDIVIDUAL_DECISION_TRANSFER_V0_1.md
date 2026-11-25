@@ -110,7 +110,22 @@ The constant/population baseline must be frozen on training individuals, then ev
 
 No cross-benchmark scalar leaderboard is proposed. Report matched head-to-heads and their exact task, data, action, planner, compute and hardware conditions.
 
-## 9. Prospective gates (targets, not results)
+## 9. Decision-world-model evidence ladder
+
+A June 2026 decision-making-centric position paper recommends reporting an L0–L7 profile rather than a single pooled world-model score. It explicitly warns that the levels span partly independent axes (observational/interventional, open-/closed-loop, fixed-policy/optimizer-induced), and that the ladder is not monotone in practice. [Yu et al. (2026)](https://arxiv.org/abs/2606.15032).
+
+This scorecard is a **bounded L4 / per-decision outcome slice**, not a complete L6 policy evaluation and not L7 policy optimization:
+
+- **L4 — action controllability / interventional fidelity:** the upstream branch protocol must prove matched histories, full branch-point restoration and shared exogenous correspondence. The scorecard requires those identities and compares action-specific predicted utilities with executed outcomes.
+- **L5 — reward/value/outcome fidelity:** this scorecard computes realized utility and regret for a supplied finite action set, but it does not yet establish full-horizon reward/value calibration or success-probability calibration.
+- **L6 — fixed-policy evaluation/ranking:** requires closed-loop execution of behavior, anchor and shifted policies in the trusted environment and model, with full-horizon return/ranking/occupancy agreement. #9094 owns the external comparison protocol; #9289 owns the causal advantage-of-prediction controls. The current per-decision ranking metric is only one component.
+- **L7 — policy optimization/planning utility:** requires optimizing inside the model under a fixed budget, executing the resulting policies in the trusted environment, and reporting policy lift, optimization regret, safe-improvement probability and optimizer-induced exploitability. #9094 owns the matched external benchmark bridge; #9396 owns adaptive-search/model-error exploitability (XGap). Do not infer L7 from a good fixed-policy score.
+
+### Why the L7 exploitability experiment is essential
+
+A fixed policy set can miss narrow optimism pockets that an adaptive planner discovers. #9396 already specifies matched-global-MSE structured error families and search ladders over candidate count, search rounds and rollout horizon. Keep the random-action prediction error, optimizer-selected prediction error and realized selected-policy regret separate. Use #13652's per-individual scorecard as an action/effect diagnostic feeding the chain; do not duplicate the XGap owner.
+
+## 10. Prospective gates (targets, not results)
 
 - positive held-out paired regret improvement with a 95% independent-cluster interval excluding zero;
 - stretch target of at least 10% relative regret reduction versus the strongest matched-cost baseline;
@@ -120,6 +135,6 @@ No cross-benchmark scalar leaderboard is proposed. Report matched head-to-heads 
 
 These are preregistration targets. They are not current benchmark results.
 
-## 10. Execution and claim ceiling
+## 11. Execution and claim ceiling
 
 This PR adds only a finite evaluator primitive, tests and a semantic fixture. It does not authenticate receipts, establish causal identification, train HDC/CfC, reproduce the DMC paper, demonstrate model advantage, provide physical safety evidence, or establish SOTA.
