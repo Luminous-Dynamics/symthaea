@@ -74,7 +74,7 @@ The input and output are digest-bound and canonicalized across candidate/target/
 
 ## Authored known-answer tests
 
-Ten tests cover:
+Ten unit tests and two independent-oracle integration tests cover:
 1. robust target-interval and side-constraint rejection;
 2. unsupported and unknown evidence never entering top-K;
 3. insufficient historical support returning UNKNOWN;
@@ -85,6 +85,8 @@ Ten tests cover:
 8. candidate/input order-invariant ranking receipt;
 9. partial top-K fill and human-review-only authority flags;
 10. disabling diversity permits a zero diversity-distance threshold without NaN ranking scores.
+
+The integration oracle uses a frozen six-candidate known-answer set and independently asserts the feasible/unknown/unsupported/infeasible partition, diverse top-K identities, human-review-only claim flags, and input-permutation-invariant receipt.
 
 Tests are authored; exact-head rustfmt, strict Clippy, crate tests and SEMI-BENCH-001 reference validation remain pending.
 
