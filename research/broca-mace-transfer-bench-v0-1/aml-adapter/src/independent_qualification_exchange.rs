@@ -1006,8 +1006,8 @@ mod tests {
         );
 
         let duplicate = wire.replacen(
-            "\\\"schema_version\\\":",
-            "\\\"schema_version\\\":\\\"mace_evidence_qualification_request_v1\\\",\\\"schema_version\\\":",
+            "\"schema_version\":",
+            "\"schema_version\":\"mace_evidence_qualification_request_v1\",\"schema_version\":",
             1,
         );
         assert_eq!(
