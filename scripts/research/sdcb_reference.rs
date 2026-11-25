@@ -272,29 +272,40 @@ pub fn observability_rank_2x2(
     d: f64,
     sensor_1: f64,
     sensor_2: f64,
-    tolerance: f64,
+    relative_tolerance: f64,
 ) -> Result<MatrixRank, &'static str> {
     if !finite(&[a, b, c, d, sensor_1, sensor_2]) {
         return Err("system and sensor entries must be finite");
     }
-    if !tolerance.is_finite() || tolerance < 0.0 {
-        return Err("tolerance must be finite and nonnegative");
+    if !relative_tolerance.is_finite() || !(0.0..1.0).contains(&relative_tolerance) {
+        return Err("relative tolerance must be finite and in [0, 1)");
     }
 
     let row_2_1 = sensor_1 * a + sensor_2 * c;
     let row_2_2 = sensor_1 * b + sensor_2 * d;
-    let determinant = sensor_1 * row_2_2 - sensor_2 * row_2_1;
     let entries = [sensor_1, sensor_2, row_2_1, row_2_2];
-    if !finite(&[row_2_1, row_2_2, determinant]) {
+    if !finite(&[row_2_1, row_2_2]) {
         return Err("observability calculation overflowed");
     }
+    let scale = entries
+        .iter()
+        .fold(0.0_f64, |maximum, entry| maximum.max(entry.abs()));
+    if scale == 0.0 {
+        return Ok(MatrixRank::Zero);
+    }
 
-    Ok(if determinant.abs() > tolerance {
+    // Normalize before the determinant so rank is invariant to unit scaling.
+    let normalized_determinant =
+        (sensor_1 / scale) * (row_2_2 / scale)
+            - (sensor_2 / scale) * (row_2_1 / scale);
+    if !normalized_determinant.is_finite() {
+        return Err("normalized observability calculation overflowed");
+    }
+
+    Ok(if normalized_determinant.abs() > relative_tolerance {
         MatrixRank::Two
-    } else if entries.iter().any(|entry| entry.abs() > tolerance) {
-        MatrixRank::One
     } else {
-        MatrixRank::Zero
+        MatrixRank::One
     })
 }
 
@@ -304,34 +315,53 @@ pub fn observability_rank_2x2(
 /// identifiability for arbitrary nonlinear or time-varying systems.
 pub fn input_regressor_rank_2d(
     samples: &[[f64; 2]],
-    tolerance: f64,
+    relative_tolerance: f64,
 ) -> Result<MatrixRank, &'static str> {
-    if !tolerance.is_finite() || tolerance < 0.0 {
-        return Err("tolerance must be finite and nonnegative");
+    if !relative_tolerance.is_finite() || !(0.0..1.0).contains(&relative_tolerance) {
+        return Err("relative tolerance must be finite and in [0, 1)");
     }
     if samples.iter().flatten().any(|value| !value.is_finite()) {
         return Err("input samples must be finite");
+    }
+
+    // Normalize input units before forming the Gram matrix to avoid scale
+    // changing the numerical rank decision (and to reduce overflow risk).
+    let input_scale = samples
+        .iter()
+        .flatten()
+        .fold(0.0_f64, |maximum, value| maximum.max(value.abs()));
+    if input_scale == 0.0 {
+        return Ok(MatrixRank::Zero);
     }
 
     let mut g_11 = 0.0;
     let mut g_12 = 0.0;
     let mut g_22 = 0.0;
     for sample in samples {
-        g_11 += sample[0] * sample[0];
-        g_12 += sample[0] * sample[1];
-        g_22 += sample[1] * sample[1];
+        let first = sample[0] / input_scale;
+        let second = sample[1] / input_scale;
+        g_11 += first * first;
+        g_12 += first * second;
+        g_22 += second * second;
     }
-    let determinant = g_11 * g_22 - g_12 * g_12;
-    if !finite(&[g_11, g_12, g_22, determinant]) {
+    let gram_scale = g_11.max(g_12.abs()).max(g_22);
+    if !gram_scale.is_finite() {
         return Err("input Gram matrix calculation overflowed");
     }
+    if gram_scale == 0.0 {
+        return Ok(MatrixRank::Zero);
+    }
+    let normalized_determinant =
+        (g_11 / gram_scale) * (g_22 / gram_scale)
+            - (g_12 / gram_scale) * (g_12 / gram_scale);
+    if !normalized_determinant.is_finite() {
+        return Err("normalized input Gram calculation overflowed");
+    }
 
-    Ok(if determinant > tolerance {
+    Ok(if normalized_determinant > relative_tolerance {
         MatrixRank::Two
-    } else if g_11.max(g_22) > tolerance {
-        MatrixRank::One
     } else {
-        MatrixRank::Zero
+        MatrixRank::One
     })
 }
 
@@ -558,6 +588,27 @@ mod tests {
             MatrixRank::Two
         );
         assert_eq!(input_regressor_rank_2d(&[], 1e-12).unwrap(), MatrixRank::Zero);
+    }
+
+
+    #[test]
+    fn observability_and_excitation_ranks_are_invariant_to_unit_scaling() {
+        assert_eq!(
+            observability_rank_2x2(0.0, 1.0, -1.0, 0.0, 1.0, 0.0, 1e-12).unwrap(),
+            MatrixRank::Two
+        );
+        assert_eq!(
+            observability_rank_2x2(0.0, 1.0, -1.0, 0.0, 1e-8, 0.0, 1e-12).unwrap(),
+            MatrixRank::Two
+        );
+        assert_eq!(
+            input_regressor_rank_2d(&[[1.0, 0.0], [0.0, 1.0]], 1e-12).unwrap(),
+            MatrixRank::Two
+        );
+        assert_eq!(
+            input_regressor_rank_2d(&[[1e-8, 0.0], [0.0, 1e-8]], 1e-12).unwrap(),
+            MatrixRank::Two
+        );
     }
 
     #[test]
