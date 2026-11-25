@@ -131,13 +131,14 @@ pub struct T9WholeStoreRollbackEvidenceV1 {
     pub expected_edit_delta_sha256: String,
     /// Digest of the normalized raw-store delta measured by the evaluator adapter.
     pub observed_edit_delta_sha256: String,
+    pub event_trace_sha256: String,
+    pub events: Vec<AtRestEvidenceEventV1>,
     pub before_inventory: StoreInventoryV1,
     pub after_genuine_write_inventory: StoreInventoryV1,
     pub restored_inventory: StoreInventoryV1,
     pub new_record_id: String,
     pub new_record_payload_sha256: String,
     pub operation_receipt_sha256: String,
-    pub events: Vec<AtRestEvidenceEventV1>,
     pub operation_performed_via_sut_write_path: bool,
     pub operation_after_restart: bool,
     pub operation_acknowledged: bool,
@@ -156,13 +157,14 @@ pub struct T10ErasureResurrectionEvidenceV1 {
     pub expected_edit_delta_sha256: String,
     /// Digest of the normalized raw-store delta measured by the evaluator adapter.
     pub observed_edit_delta_sha256: String,
+    pub event_trace_sha256: String,
+    pub events: Vec<AtRestEvidenceEventV1>,
     pub before_inventory: StoreInventoryV1,
     pub after_erasure_inventory: StoreInventoryV1,
     pub restored_inventory: StoreInventoryV1,
     pub erased_record_id: String,
     pub erased_record_payload_sha256: String,
     pub erasure_receipt_sha256: String,
-    pub events: Vec<AtRestEvidenceEventV1>,
     pub erasure_performed_via_sut_interface: bool,
     pub erasure_acknowledged: bool,
     pub sut_stopped_during_restore: bool,
@@ -273,7 +275,7 @@ impl AtRestFamilyCountsV1 {
     }
 
     pub fn zero_acceptance_gate(&self) -> bool {
-        self.applicable > 0 && self.failed == 0
+        self.applicable > 0 && self.failed == 0 && self.errors == 0
     }
 }
 
@@ -397,12 +399,15 @@ fn validate_t9_evidence(
         &value.restored_snapshot_sha256,
     )?;
     validate_edit_delta(&value.expected_edit_delta_sha256, &value.observed_edit_delta_sha256)?;
-    validate_operation_event_trace(
+    let event_trace_sha256 = validate_operation_event_trace(
         &value.events,
         case_run_id,
         &value.operation_receipt_sha256,
         AtRestCaseIdV1::T9WholeStoreRollback,
     )?;
+    if event_trace_sha256 != value.event_trace_sha256 {
+        return Err(AtRestRejectV1::EventTraceMismatch);
+    }
     value.before_inventory.validate().map_err(|_| AtRestRejectV1::InventoryInvalid)?;
     value.after_genuine_write_inventory.validate().map_err(|_| AtRestRejectV1::InventoryInvalid)?;
     value.restored_inventory.validate().map_err(|_| AtRestRejectV1::InventoryInvalid)?;
@@ -455,12 +460,15 @@ fn validate_t10_evidence(
         &value.restored_snapshot_sha256,
     )?;
     validate_edit_delta(&value.expected_edit_delta_sha256, &value.observed_edit_delta_sha256)?;
-    validate_operation_event_trace(
+    let event_trace_sha256 = validate_operation_event_trace(
         &value.events,
         case_run_id,
         &value.erasure_receipt_sha256,
         AtRestCaseIdV1::T10ErasureResurrection,
     )?;
+    if event_trace_sha256 != value.event_trace_sha256 {
+        return Err(AtRestRejectV1::EventTraceMismatch);
+    }
     value.before_inventory.validate().map_err(|_| AtRestRejectV1::InventoryInvalid)?;
     value.after_erasure_inventory.validate().map_err(|_| AtRestRejectV1::InventoryInvalid)?;
     value.restored_inventory.validate().map_err(|_| AtRestRejectV1::InventoryInvalid)?;
@@ -506,7 +514,7 @@ fn validate_operation_event_trace(
     case_run_id: &str,
     operation_receipt_sha256: &str,
     case_id: AtRestCaseIdV1,
-) -> Result<(), AtRestRejectV1> {
+) -> Result<String, AtRestRejectV1> {
     validate_sha256(operation_receipt_sha256)
         .map_err(|_| AtRestRejectV1::OperationReceiptInvalid)?;
 
@@ -571,7 +579,50 @@ fn validate_operation_event_trace(
     if acknowledgement.receipt_sha256 != operation_receipt_sha256 {
         return Err(AtRestRejectV1::OperationReceiptInvalid);
     }
-    Ok(())
+    event_trace_sha256_v1(events)
+}
+
+fn event_trace_sha256_v1(
+    events: &[AtRestEvidenceEventV1],
+) -> Result<String, AtRestRejectV1> {
+    let mut hasher = Sha256::new();
+    hasher.update(b"luminous:mace:at-rest-event-trace:v1\0");
+    hasher.update((events.len() as u64).to_be_bytes());
+    for event in events {
+        hasher.update(event.sequence.to_be_bytes());
+        hash_field(&mut hasher, &event.case_run_id);
+        hash_field(&mut hasher, &event.event_id);
+        hasher.update([event_kind_tag(event.kind)]);
+        hasher.update([event_source_tag(event.source)]);
+        hasher.update(event.monotonic_elapsed_ns.to_be_bytes());
+        hasher.update(decode_sha256(&event.clock_profile_sha256)?);
+        hasher.update(decode_sha256(&event.receipt_sha256)?);
+    }
+    Ok(hex_digest(&hasher.finalize()))
+}
+
+fn event_kind_tag(value: AtRestEvidenceEventKindV1) -> u8 {
+    match value {
+        AtRestEvidenceEventKindV1::SutRestartedBeforeOperation => 1,
+        AtRestEvidenceEventKindV1::WriteRequested => 2,
+        AtRestEvidenceEventKindV1::WriteAcknowledged => 3,
+        AtRestEvidenceEventKindV1::ErasureRequested => 4,
+        AtRestEvidenceEventKindV1::ErasureAcknowledged => 5,
+        AtRestEvidenceEventKindV1::SutStoppedForRestore => 6,
+        AtRestEvidenceEventKindV1::RestoreApplied => 7,
+        AtRestEvidenceEventKindV1::SutRestartedAfterRestore => 8,
+        AtRestEvidenceEventKindV1::OrdinaryReadCompleted => 9,
+    }
+}
+
+fn event_source_tag(value: AtRestEvidenceEventSourceV1) -> u8 {
+    match value {
+        AtRestEvidenceEventSourceV1::SutProcessObserver => 1,
+        AtRestEvidenceEventSourceV1::SutWriteApi => 2,
+        AtRestEvidenceEventSourceV1::SutErasureApi => 3,
+        AtRestEvidenceEventSourceV1::RestoreHarness => 4,
+        AtRestEvidenceEventSourceV1::SutReadApi => 5,
+    }
 }
 
 fn validate_edit_delta(expected: &str, observed: &str) -> Result<(), AtRestRejectV1> {
@@ -771,12 +822,16 @@ mod tests {
     fn t9_evidence(case_run_id: &str) -> T9WholeStoreRollbackEvidenceV1 {
         let before = inventory(&[("a", 'a'), ("b", 'b'), ("c", 'c')]);
         let after = inventory(&[("a", 'a'), ("b", 'b'), ("c", 'c'), ("d", 'd')]);
+        let events = event_trace(case_run_id, AtRestCaseIdV1::T9WholeStoreRollback, &digest('e'));
+        let event_trace_sha256 = event_trace_sha256_v1(&events).unwrap();
         T9WholeStoreRollbackEvidenceV1 {
             before_snapshot_sha256: digest('1'),
             after_genuine_write_snapshot_sha256: digest('2'),
             restored_snapshot_sha256: digest('1'),
             expected_edit_delta_sha256: digest('7'),
             observed_edit_delta_sha256: digest('7'),
+            event_trace_sha256,
+            events,
             before_inventory: before.clone(),
             after_genuine_write_inventory: after,
             restored_inventory: before,
@@ -796,12 +851,16 @@ mod tests {
     fn t10_evidence(case_run_id: &str) -> T10ErasureResurrectionEvidenceV1 {
         let before = inventory(&[("a", 'a'), ("b", 'b'), ("c", 'c')]);
         let after = inventory(&[("a", 'a'), ("c", 'c')]);
+        let events = event_trace(case_run_id, AtRestCaseIdV1::T10ErasureResurrection, &digest('f'));
+        let event_trace_sha256 = event_trace_sha256_v1(&events).unwrap();
         T10ErasureResurrectionEvidenceV1 {
             before_snapshot_sha256: digest('1'),
             after_erasure_snapshot_sha256: digest('3'),
             restored_snapshot_sha256: digest('1'),
             expected_edit_delta_sha256: digest('8'),
             observed_edit_delta_sha256: digest('8'),
+            event_trace_sha256,
+            events,
             before_inventory: before.clone(),
             after_erasure_inventory: after,
             restored_inventory: before,
@@ -926,6 +985,21 @@ mod tests {
         assert_eq!(
             validate_and_score_at_rest_report_v1(&value),
             Err(AtRestRejectV1::MissingControl)
+        );
+    }
+
+    #[test]
+    fn event_trace_digest_binds_every_event_field() {
+        let mut value = report(rejected_on_read(), rejected_on_read());
+        if let AtRestCaseDispositionV1::Observed {
+            evidence: AtRestCaseEvidenceV1::T9(evidence),
+            ..
+        } = &mut value.cases[0].disposition {
+            evidence.events[0].receipt_sha256 = digest('9');
+        }
+        assert_eq!(
+            validate_and_score_at_rest_report_v1(&value),
+            Err(AtRestRejectV1::EventTraceMismatch)
         );
     }
 
@@ -1094,6 +1168,7 @@ mod tests {
         let score = validate_and_score_at_rest_report_v1(&value).unwrap();
         assert_eq!(score.t10.errors, 1);
         assert_eq!(score.t10.applicable, 0);
+        assert!(!score.t10.zero_acceptance_gate());
     }
 
     #[test]
