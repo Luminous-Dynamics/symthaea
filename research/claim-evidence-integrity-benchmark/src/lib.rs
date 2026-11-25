@@ -109,10 +109,62 @@ fn validate_exact_keys(
 }
 
 fn valid_time(value: &str) -> bool {
-    value.contains('T')
-        && (value.ends_with('Z')
-            || value.as_bytes().get(value.len().saturating_sub(6)) == Some(&b'+')
-            || value.as_bytes().get(value.len().saturating_sub(6)) == Some(&b'-'))
+    let bytes = value.as_bytes();
+    if bytes.len() != 20 && bytes.len() != 25 {
+        return false;
+    }
+    if bytes[4] != b'-'
+        || bytes[7] != b'-'
+        || bytes[10] != b'T'
+        || bytes[13] != b':'
+        || bytes[16] != b':'
+    {
+        return false;
+    }
+    let number = |range: std::ops::Range<usize>| -> Option<u32> {
+        let slice = bytes.get(range)?;
+        if !slice.iter().all(u8::is_ascii_digit) {
+            return None;
+        }
+        std::str::from_utf8(slice).ok()?.parse().ok()
+    };
+    let (Some(year), Some(month), Some(day), Some(hour), Some(minute), Some(second)) = (
+        number(0..4),
+        number(5..7),
+        number(8..10),
+        number(11..13),
+        number(14..16),
+        number(17..19),
+    ) else {
+        return false;
+    };
+    if year == 0 || !(1..=12).contains(&month) || !(0..=23).contains(&hour)
+        || !(0..=59).contains(&minute) || !(0..=59).contains(&second)
+    {
+        return false;
+    }
+    let leap_year = year % 4 == 0 && (year % 100 != 0 || year % 400 == 0);
+    let days_in_month = match month {
+        1 | 3 | 5 | 7 | 8 | 10 | 12 => 31,
+        4 | 6 | 9 | 11 => 30,
+        2 if leap_year => 29,
+        2 => 28,
+        _ => return false,
+    };
+    if day == 0 || day > days_in_month {
+        return false;
+    }
+
+    if bytes.len() == 20 {
+        return bytes[19] == b'Z';
+    }
+    if bytes[19] != b'+' && bytes[19] != b'-' || bytes[22] != b':' {
+        return false;
+    }
+    let (Some(offset_hour), Some(offset_minute)) = (number(20..22), number(23..25)) else {
+        return false;
+    };
+    offset_hour <= 23 && offset_minute <= 59
 }
 
 fn sha256_hex(text: &str) -> String {
@@ -146,7 +198,7 @@ fn validate_evidence(
     ];
     validate_exact_keys(map, KEYS, path, issues);
 
-    let evidence_id = required_string(map, "evidence_id", path, issues);
+    required_string(map, "evidence_id", path, issues);
     required_string(map, "source_id", path, issues);
     required_string(map, "source_family_id", path, issues);
     let source_role = required_string(map, "source_role", path, issues);
@@ -247,7 +299,6 @@ fn validate_evidence(
         issue(issues, format!("{path}.quote_span"), "required quote span is missing");
     }
 
-    let _ = evidence_id;
     digest_ok
 }
 
@@ -612,6 +663,17 @@ pub fn self_test() -> Result<ValidationReport, String> {
 #[cfg(test)]
 mod tests {
     use super::*;
+
+    #[test]
+    fn timestamps_require_valid_calendar_and_timezone_fields() {
+        assert!(valid_time("2024-02-29T12:30:45Z"));
+        assert!(valid_time("2026-11-25T13:07:00+02:00"));
+        assert!(!valid_time("2025-02-29T12:30:45Z"));
+        assert!(!valid_time("2026-13-01T12:30:45Z"));
+        assert!(!valid_time("2026-11-25T25:30:45Z"));
+        assert!(!valid_time("not-a-dateTyesZ"));
+        assert!(!valid_time("2026-11-25T13:07:00"));
+    }
 
     #[test]
     fn checked_in_pack_passes_digest_and_span_validation() {
