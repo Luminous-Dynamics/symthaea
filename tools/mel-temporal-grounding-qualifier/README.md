@@ -30,3 +30,35 @@ Research protocol: `docs/research/MEL-GROUND-006-MULTI-ANNOTATOR-TEMPORAL-GROUND
 
 
 For each predicted occurrence, the report also derives a **per-event reference-boundary distribution** from the production scorer's existing prediction↔annotation match records. It reports the number and fraction of eligible Present annotators who match that event, plus min/median/max start and end frames and boundary spread. Events that match no eligible Present annotation appear in `unmatched_prediction_indices`. This is not an interval consensus: original annotation records remain intact, and the support denominator is visible.
+
+
+## Selective temporal grounding and reason-specific abstention
+
+The temporal_selective module accepts a frozen adjudicated ground-truth case, raw prediction, typed decision, model-declared decision confidence and shared model/runtime/decoding identity. It scores each answer through the production temporal-grounding scorer. Decision dispositions are distinct: Answer, ClaimAbsent, AbstainAmbiguous and AbstainNotEstimable.
+
+The report separates coverage, selective risk/accuracy, answer-only F1/recall/count-gated F1, false absence claims, ambiguity/not-estimable reason precision and recall, calibration bins/Brier/ECE, evidence-stratum summaries and a confidence-ranked risk-coverage curve/AURC. It includes always-answer, random-abstention and always-abstain baselines; always-abstain has zero coverage and is never treated as successful product behaviour.
+
+Run the synthetic selective-control panel:
+
+    cargo +1.96.0 run --locked --manifest-path tools/mel-temporal-grounding-qualifier/Cargo.toml --bin mel-selective-grounding-audit -- tools/mel-temporal-grounding-qualifier/fixtures/mel-selective-temporal.synthetic.json
+
+Decision confidence is self-reported. Runtime identity and evidence receipts are not authenticated by this evaluator, and it does not inspect hidden reasoning. Calibration thresholds must be selected on source-lineage-disjoint calibration data, not the held-out test. Do not compare a risk-coverage/AURC result to a multiple-choice abstention result without reproducing the same task, units and coverage protocol.
+
+
+### Identifiability basis is separate from the abstention action
+
+Every case carries one adjudicated basis: ClearPositive, ClearAbsence, AnnotatorDisagreement, TaskAmbiguity, SignalInsufficient or UnsupportedQuery. The evaluator checks the basis against the adjudicated truth state and reports reason correctness by basis. Annotator disagreement is not silently treated as sensor/signal insufficiency, and a not-estimable case cannot be relabelled as mere annotator disagreement.
+
+The basis is an adjudication label backed by a frozen policy digest; it is not independently authenticated by this adapter. Use #13560 to retain the underlying per-annotator evidence.
+
+
+### Counterfactual always-answer baseline
+
+Each case retains both the selected prediction and the unconditional pre-abstention candidate. Covered Answer/ClaimAbsent decisions must use the same prediction as this candidate; abstained cases can retain the candidate that the selective policy suppressed. The evaluator scores the unconditional candidate against the same truth to calculate a paired always-answer baseline. Random-abstention risk is the expected error rate when retaining those candidates independently of confidence. The output includes both predictions and both scorer records per case.
+
+The 10-case synthetic fixture has 2 correct unconditional candidates and 8 incorrect ones, so its always-answer and random-retention risk are 0.8. This is a deliberately adversarial evaluator control, not a performance result for Melothaea.
+
+
+### Selective inference cost
+
+Each case contains matched selective-path wall time, one-pass baseline wall time and model forward-pass count for the same query/audio/runtime. The report emits mean/p95 forward passes, selective latency and latency multiplier. Batch-level hardware identity is required, but runtime, hardware and inference-cost receipts remain unauthenticated unless joined to an independent execution attestation. Synthetic cost values prove report plumbing only; they are not device performance measurements.
