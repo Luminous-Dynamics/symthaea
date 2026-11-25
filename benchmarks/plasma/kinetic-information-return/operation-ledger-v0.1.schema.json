@@ -80,7 +80,36 @@
             "$ref": "#/$defs/event"
           }
         }
-      }
+      },
+      "allOf": [
+        {
+          "if": {
+            "properties": {
+              "physical_model": {
+                "const": "collisionless_vlasov"
+              }
+            },
+            "required": [
+              "physical_model"
+            ]
+          },
+          "then": {
+            "properties": {
+              "events": {
+                "items": {
+                  "properties": {
+                    "operation_class": {
+                      "not": {
+                        "const": "physical_collision"
+                      }
+                    }
+                  }
+                }
+              }
+            }
+          }
+        }
+      ]
     },
     "event": {
       "type": "object",
@@ -180,9 +209,17 @@
               "physical_entropy_production"
             ],
             "not": {
-              "required": [
-                "numerical_entropy_measure_id",
-                "numerical_entropy_delta"
+              "anyOf": [
+                {
+                  "required": [
+                    "numerical_entropy_measure_id"
+                  ]
+                },
+                {
+                  "required": [
+                    "numerical_entropy_delta"
+                  ]
+                }
               ]
             }
           }
@@ -210,9 +247,17 @@
               "discarded_effect_measure"
             ],
             "not": {
-              "required": [
-                "physical_entropy_measure_id",
-                "physical_entropy_production"
+              "anyOf": [
+                {
+                  "required": [
+                    "physical_entropy_measure_id"
+                  ]
+                },
+                {
+                  "required": [
+                    "physical_entropy_production"
+                  ]
+                }
               ]
             }
           }
