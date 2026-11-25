@@ -606,6 +606,7 @@ mod tests {
         RetrievalOperationOutcomeV1,
         RetrievalOperationV1,
         RetrievalPolicyMemoryV1,
+        RetrievalPolicyRejectV1,
         RetrievalStopReasonV1,
         RetrievalTraceReceiptV1,
         RetrievalTraceRefV1,
