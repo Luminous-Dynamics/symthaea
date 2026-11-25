@@ -521,10 +521,42 @@ mod tests {
         receipt: EvaluationManifestCommitmentReceiptV1,
         verifier: PinnedEd25519QualificationVerifierV1,
         signer: SigningKey,
-        expected: EvaluationManifestCommitmentExpectedBindingV1<'static>,
+        suite_id: String,
+        suite_version: String,
+        episode_manifest_root_sha256: String,
+        sealed_evaluation_manifest_sha256: String,
+        arm_assignment_root_sha256: String,
+        pre_registration_root_sha256: String,
+        sealed_artifacts_root_sha256: String,
+        candidate_access_profile_sha256: String,
+        reveal_protocol_sha256: String,
+        anchor_log_id: String,
+        anchor_entry_id: String,
+        witness_profile_sha256: String,
+        verifier_profile_sha256: String,
     }
 
     impl Fixture {
+        fn expected(&self) -> EvaluationManifestCommitmentExpectedBindingV1<'_> {
+            EvaluationManifestCommitmentExpectedBindingV1 {
+                suite_id: &self.suite_id,
+                suite_version: &self.suite_version,
+                episode_manifest_root_sha256: &self.episode_manifest_root_sha256,
+                sealed_evaluation_manifest_sha256: &self.sealed_evaluation_manifest_sha256,
+                arm_assignment_root_sha256: &self.arm_assignment_root_sha256,
+                pre_registration_root_sha256: &self.pre_registration_root_sha256,
+                sealed_artifacts_root_sha256: &self.sealed_artifacts_root_sha256,
+                candidate_access_profile_sha256: &self.candidate_access_profile_sha256,
+                reveal_protocol_sha256: &self.reveal_protocol_sha256,
+                anchor_log_id: &self.anchor_log_id,
+                anchor_entry_id: &self.anchor_entry_id,
+                witness_profile_sha256: &self.witness_profile_sha256,
+                verifier_profile_sha256: &self.verifier_profile_sha256,
+                first_episode_started_unix: 200,
+                candidate_access_started_unix: 150,
+            }
+        }
+
         fn resign(&mut self) {
             let payload_sha256 =
                 evaluation_manifest_commitment_payload_sha256_v1(&self.receipt.payload).unwrap();
@@ -579,21 +611,33 @@ mod tests {
         )
         .unwrap();
 
+        let suite_id = "mace-test".to_owned();
+        let suite_version = "v1".to_owned();
+        let episode_manifest_root_sha256 = digest('b');
+        let sealed_evaluation_manifest_sha256 = digest('c');
+        let arm_assignment_root_sha256 = digest('d');
+        let pre_registration_root_sha256 = digest('e');
+        let sealed_artifacts_root_sha256 = digest('f');
+        let candidate_access_profile_sha256 = digest('1');
+        let reveal_protocol_sha256 = digest('2');
+        let anchor_log_id = "test-log".to_owned();
+        let anchor_entry_id = "entry-17".to_owned();
         let witness_profile_sha256 = digest('a');
+        let verifier_profile_sha256 = verifier_profile_sha256.clone();
         let payload = EvaluationManifestCommitmentPayloadV1 {
             schema_version: EVALUATION_MANIFEST_COMMITMENT_PAYLOAD_SCHEMA_V1.to_owned(),
-            suite_id: "mace-test".to_owned(),
-            suite_version: "v1".to_owned(),
-            episode_manifest_root_sha256: digest('b'),
-            sealed_evaluation_manifest_sha256: digest('c'),
-            arm_assignment_root_sha256: digest('d'),
-            pre_registration_root_sha256: digest('e'),
-            sealed_artifacts_root_sha256: digest('f'),
+            suite_id: suite_id.clone(),
+            suite_version: suite_version.clone(),
+            episode_manifest_root_sha256: episode_manifest_root_sha256.clone(),
+            sealed_evaluation_manifest_sha256: sealed_evaluation_manifest_sha256.clone(),
+            arm_assignment_root_sha256: arm_assignment_root_sha256.clone(),
+            pre_registration_root_sha256: pre_registration_root_sha256.clone(),
+            sealed_artifacts_root_sha256: sealed_artifacts_root_sha256.clone(),
             committed_at_unix: 100,
-            candidate_access_profile_sha256: digest('1'),
-            reveal_protocol_sha256: digest('2'),
-            anchor_log_id: "test-log".to_owned(),
-            anchor_entry_id: "entry-17".to_owned(),
+            candidate_access_profile_sha256: candidate_access_profile_sha256.clone(),
+            reveal_protocol_sha256: reveal_protocol_sha256.clone(),
+            anchor_log_id: anchor_log_id.clone(),
+            anchor_entry_id: anchor_entry_id.clone(),
         };
         let mut fixture = Fixture {
             receipt: EvaluationManifestCommitmentReceiptV1 {
@@ -611,23 +655,19 @@ mod tests {
             },
             verifier,
             signer,
-            expected: EvaluationManifestCommitmentExpectedBindingV1 {
-                suite_id: "mace-test",
-                suite_version: "v1",
-                episode_manifest_root_sha256: Box::leak(digest('b').into_boxed_str()),
-                sealed_evaluation_manifest_sha256: Box::leak(digest('c').into_boxed_str()),
-                arm_assignment_root_sha256: Box::leak(digest('d').into_boxed_str()),
-                pre_registration_root_sha256: Box::leak(digest('e').into_boxed_str()),
-                sealed_artifacts_root_sha256: Box::leak(digest('f').into_boxed_str()),
-                candidate_access_profile_sha256: Box::leak(digest('1').into_boxed_str()),
-                reveal_protocol_sha256: Box::leak(digest('2').into_boxed_str()),
-                anchor_log_id: "test-log",
-                anchor_entry_id: "entry-17",
-                witness_profile_sha256: Box::leak(witness_profile_sha256.into_boxed_str()),
-                verifier_profile_sha256: Box::leak(verifier_profile_sha256.into_boxed_str()),
-                first_episode_started_unix: 200,
-                candidate_access_started_unix: 150,
-            },
+            suite_id,
+            suite_version,
+            episode_manifest_root_sha256,
+            sealed_evaluation_manifest_sha256,
+            arm_assignment_root_sha256,
+            pre_registration_root_sha256,
+            sealed_artifacts_root_sha256,
+            candidate_access_profile_sha256,
+            reveal_protocol_sha256,
+            anchor_log_id,
+            anchor_entry_id,
+            witness_profile_sha256,
+            verifier_profile_sha256,
         };
         fixture.resign();
         fixture
@@ -636,7 +676,8 @@ mod tests {
     #[test]
     fn valid_witness_requires_signature_and_log_inclusion() {
         let fixture = fixture();
-        let verified = fixture.verify(250, &fixture.expected, &AcceptLog).unwrap();
+        let expected = fixture.expected();
+        let verified = fixture.verify(250, &expected, &AcceptLog).unwrap();
         assert_eq!(verified.committed_at_unix(), 100);
         assert_eq!(verified.suite_id(), "mace-test");
         assert_eq!(verified.sealed_evaluation_manifest_sha256(), digest('c'));
@@ -646,10 +687,8 @@ mod tests {
     #[test]
     fn commit_after_candidate_access_is_rejected() {
         let fixture = fixture();
-        let mut expected = EvaluationManifestCommitmentExpectedBindingV1 {
-            candidate_access_started_unix: 100,
-            ..fixture.expected
-        };
+        let mut expected = fixture.expected();
+        expected.candidate_access_started_unix = 100;
         // Keep the test binding independent of the receipt's committed time.
         assert_eq!(
             fixture.verify(250, &expected, &AcceptLog),
@@ -661,10 +700,8 @@ mod tests {
     #[test]
     fn commit_after_episode_start_is_rejected() {
         let fixture = fixture();
-        let expected = EvaluationManifestCommitmentExpectedBindingV1 {
-            first_episode_started_unix: 100,
-            ..fixture.expected
-        };
+        let mut expected = fixture.expected();
+        expected.first_episode_started_unix = 100;
         assert_eq!(
             fixture.verify(250, &expected, &AcceptLog),
             Err(EvaluationManifestCommitmentReceiptRejectV1::WitnessCommitmentAfterEpisodeStart)
@@ -685,9 +722,9 @@ mod tests {
     #[test]
     fn commitment_metadata_cannot_be_rebound_without_resigning() {
         let mut fixture = fixture();
-        fixture.receipt.payload.committed_at_unix = 99;
+        fixture.receipt.attestation.issued_at_unix = 111;
         assert_eq!(
-            fixture.verify(250, &fixture.expected, &AcceptLog),
+            fixture.verify(250, &fixture.expected(), &AcceptLog),
             Err(EvaluationManifestCommitmentReceiptRejectV1::AttestationDigestMismatch)
         );
     }
@@ -696,10 +733,8 @@ mod tests {
     fn wrong_manifest_root_is_rejected() {
         let fixture = fixture();
         let wrong_root = digest('8');
-        let expected = EvaluationManifestCommitmentExpectedBindingV1 {
-            episode_manifest_root_sha256: &wrong_root,
-            ..fixture.expected
-        };
+        let mut expected = fixture.expected();
+        expected.episode_manifest_root_sha256 = &wrong_root;
         assert_eq!(
             fixture.verify(250, &expected, &AcceptLog),
             Err(EvaluationManifestCommitmentReceiptRejectV1::BindingMismatch)
@@ -730,7 +765,7 @@ mod tests {
         assert_eq!(
             parse_and_verify_evaluation_manifest_commitment_receipt_v1(
                 duplicated.as_bytes(),
-                &fixture.expected,
+                &fixture.expected(),
                 250,
                 &fixture.verifier,
                 &AcceptLog,
