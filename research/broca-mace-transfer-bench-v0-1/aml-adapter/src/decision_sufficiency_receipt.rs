@@ -13,6 +13,7 @@ use std::collections::BTreeSet;
 
 use base64::{engine::general_purpose::STANDARD, Engine as _};
 use serde::{Deserialize, Serialize};
+use serde_json::json;
 use sha2::{Digest, Sha256};
 
 use crate::evidence_qualification_gate::{
@@ -95,6 +96,7 @@ pub struct DecisionSufficiencyAttestationV1 {
     pub issued_at_unix: u64,
     pub expires_at_unix: u64,
     pub payload_sha256: String,
+    pub attestation_sha256: String,
     pub signature_base64: String,
 }
 
@@ -128,6 +130,7 @@ pub enum DecisionSufficiencyReceiptRejectV1 {
     ReceiptExpired,
     InvalidSignatureEncoding,
     PayloadDigestMismatch,
+    AttestationDigestMismatch,
     CanonicalizationFailed,
     SignatureRejected(EvidenceQualificationRejectV1),
 }
@@ -235,6 +238,7 @@ pub fn validate_decision_sufficiency_receipt_v1(
     }
     validate_atom(&receipt.attestation.key_id)?;
     validate_hash(&receipt.attestation.payload_sha256)?;
+    validate_hash(&receipt.attestation.attestation_sha256)?;
 
     validate_sorted_ids(expected.qualified_evidence_ids)?;
     validate_assessment(
@@ -268,6 +272,14 @@ pub fn validate_decision_sufficiency_receipt_v1(
         return Err(DecisionSufficiencyReceiptRejectV1::PayloadDigestMismatch);
     }
 
+    let calculated_attestation_sha256 = decision_sufficiency_attestation_sha256_v1(
+        &calculated_payload_sha256,
+        &receipt.attestation,
+    )?;
+    if calculated_attestation_sha256 != receipt.attestation.attestation_sha256 {
+        return Err(DecisionSufficiencyReceiptRejectV1::AttestationDigestMismatch);
+    }
+
     if receipt.attestation.signature_base64.len() != 88 {
         return Err(DecisionSufficiencyReceiptRejectV1::InvalidSignatureEncoding);
     }
@@ -285,7 +297,7 @@ pub fn validate_decision_sufficiency_receipt_v1(
         .verify_signature(
             &receipt.attestation.verifier_profile_sha256,
             &receipt.attestation.key_id,
-            &calculated_payload_sha256,
+            &calculated_attestation_sha256,
             &signature,
             receipt.attestation.issued_at_unix,
             trusted_now_unix,
@@ -319,6 +331,32 @@ pub fn decision_sufficiency_payload_sha256_v1(
         .map_err(|_| DecisionSufficiencyReceiptRejectV1::CanonicalizationFailed)?;
     let mut hasher = Sha256::new();
     hasher.update(b"luminous:mace:decision-sufficiency-payload:v1\0");
+    hasher.update(&canonical);
+    Ok(hex_digest(&hasher.finalize()))
+}
+
+
+/// Hash the payload digest together with every validity/signer field that is
+/// otherwise outside the payload. The signature covers this digest, preventing
+/// an intermediary from extending expiry or rebinding the signer metadata.
+pub fn decision_sufficiency_attestation_sha256_v1(
+    payload_sha256: &str,
+    attestation: &DecisionSufficiencyAttestationV1,
+) -> Result<String, DecisionSufficiencyReceiptRejectV1> {
+    validate_hash(payload_sha256)?;
+    let preimage = json!({
+        "schema_version": "mace_decision_sufficiency_attestation_preimage_v1",
+        "payload_sha256": payload_sha256,
+        "assessor_profile_sha256": attestation.assessor_profile_sha256,
+        "verifier_profile_sha256": attestation.verifier_profile_sha256,
+        "key_id": attestation.key_id,
+        "issued_at_unix": attestation.issued_at_unix,
+        "expires_at_unix": attestation.expires_at_unix
+    });
+    let canonical = serde_json_canonicalizer::to_vec(&preimage)
+        .map_err(|_| DecisionSufficiencyReceiptRejectV1::CanonicalizationFailed)?;
+    let mut hasher = Sha256::new();
+    hasher.update(b"luminous:mace:decision-sufficiency-attestation:v1\\0");
     hasher.update(&canonical);
     Ok(hex_digest(&hasher.finalize()))
 }
@@ -539,19 +577,25 @@ mod tests {
             },
         };
         let payload_sha256 = decision_sufficiency_payload_sha256_v1(&payload).unwrap();
-        let signature = signer.sign(payload_sha256.as_bytes()).to_bytes();
+        let mut attestation = DecisionSufficiencyAttestationV1 {
+            assessor_profile_sha256: assessor_profile_sha256.clone(),
+            verifier_profile_sha256: verifier_profile_sha256.clone(),
+            key_id,
+            issued_at_unix: 100,
+            expires_at_unix: 300,
+            payload_sha256,
+            attestation_sha256: String::new(),
+            signature_base64: String::new(),
+        };
+        let attestation_sha256 =
+            decision_sufficiency_attestation_sha256_v1(&attestation.payload_sha256, &attestation)
+                .unwrap();
+        attestation.attestation_sha256 = attestation_sha256.clone();
+        attestation.signature_base64 = STANDARD.encode(signer.sign(attestation_sha256.as_bytes()).to_bytes());
         let receipt = DecisionSufficiencyReceiptV1 {
             schema_version: DECISION_SUFFICIENCY_RECEIPT_SCHEMA_V1.to_owned(),
             payload,
-            attestation: DecisionSufficiencyAttestationV1 {
-                assessor_profile_sha256: assessor_profile_sha256.clone(),
-                verifier_profile_sha256: verifier_profile_sha256.clone(),
-                key_id,
-                issued_at_unix: 100,
-                expires_at_unix: 300,
-                payload_sha256,
-                signature_base64: STANDARD.encode(signature),
-            },
+            attestation,
         };
         (
             receipt,
@@ -601,6 +645,18 @@ mod tests {
         let expected = expected(&binding, &qualified, &assessor, &verifier_profile);
         let result = validate_decision_sufficiency_receipt_v1(&receipt, &expected, 200, &verifier);
         assert_eq!(result, Err(DecisionSufficiencyReceiptRejectV1::ReceiptExpired));
+    }
+
+    #[test]
+    fn expiry_metadata_cannot_be_rebound_without_resigning() {
+        let (mut receipt, binding, qualified, assessor, verifier_profile, verifier) = fixture();
+        receipt.attestation.expires_at_unix = 301;
+        let expected = expected(&binding, &qualified, &assessor, &verifier_profile);
+        let result = validate_decision_sufficiency_receipt_v1(&receipt, &expected, 200, &verifier);
+        assert_eq!(
+            result,
+            Err(DecisionSufficiencyReceiptRejectV1::AttestationDigestMismatch)
+        );
     }
 
     #[test]
