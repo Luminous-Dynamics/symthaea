@@ -163,6 +163,10 @@
               "base64url",
               "provider-defined"
             ]
+          },
+          "previous_checkpoint_ref": {
+            "type": "string",
+            "minLength": 1
           }
         }
       }
@@ -295,5 +299,45 @@
       "pattern": "^sha256:[0-9a-f]{64}$"
     }
   },
-  "allOf": []
+  "allOf": [
+    {
+      "if": {
+        "properties": {
+          "transparency_entries": {
+            "contains": {
+              "properties": {
+                "previous_checkpoint_ref": {
+                  "type": "string"
+                }
+              },
+              "required": [
+                "previous_checkpoint_ref"
+              ]
+            }
+          }
+        },
+        "required": [
+          "transparency_entries"
+        ]
+      },
+      "then": {
+        "properties": {
+          "transparency_entries": {
+            "items": {
+              "if": {
+                "required": [
+                  "previous_checkpoint_ref"
+                ]
+              },
+              "then": {
+                "required": [
+                  "consistency_proof_ref"
+                ]
+              }
+            }
+          }
+        }
+      }
+    }
+  ]
 }
