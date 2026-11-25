@@ -972,6 +972,11 @@ mod tests {
         pack["examples"][0]["state"].clone()
     }
 
+    fn second_state() -> Value {
+        let pack: Value = serde_json::from_str(EXAMPLES).unwrap();
+        pack["examples"][1]["state"].clone()
+    }
+
     fn third_state() -> Value {
         let pack: Value = serde_json::from_str(EXAMPLES).unwrap();
         pack["examples"][2]["state"].clone()
@@ -1041,6 +1046,14 @@ mod tests {
             "emitted_at": "2026-11-25T10:00:00Z",
             "evidence_prefix_sha256": prefix_sha256
         });
+        assert!(validate_state(&state.to_string()).is_err());
+    }
+
+    #[test]
+    fn classifier_output_is_bound_to_exact_claim_text_and_scope() {
+        let mut state = second_state();
+        state["claims"][0]["statement"] =
+            Value::String("A materially changed claim with the same claim ID".to_owned());
         assert!(validate_state(&state.to_string()).is_err());
     }
 
@@ -1135,7 +1148,7 @@ mod tests {
 
     #[test]
     fn high_risk_sufficiency_requires_independent_supported_adjudication() {
-        let mut state = first_state();
+        let mut state = second_state();
         state["decision_context"]["risk_class"] = Value::String("HIGH".to_owned());
         state["claims"][0]["decision_usability"]["status"] = Value::String("SUFFICIENT".to_owned());
         assert!(validate_state(&state.to_string()).is_err());
