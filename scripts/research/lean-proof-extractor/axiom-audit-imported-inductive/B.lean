@@ -55,16 +55,17 @@ def freshAxiomDependenciesText (dependencies : NameSet) : String :=
   let ordered := dependencies.toList.mergeSort Name.quickLt
   String.intercalate ", " (ordered.map toString)
 
-syntax (name := auditFreshAxioms) "#audit_fresh_axioms " ident : command
+syntax (name := auditFreshAxioms) "#audit_fresh_axioms " ident " => " ident : command
 syntax (name := auditFreshNoAxioms) "#audit_fresh_no_axioms " ident : command
 
 elab_rules : command
-  | `(#audit_fresh_axioms $declaration:ident) => do
+  | `(#audit_fresh_axioms $declaration:ident => $expected:ident) => do
       let root := declaration.getId
+      let expectedAxiom := expected.getId
       let dependencies := freshAxiomDependenciesFor (← getEnv) root
       let rendered := freshAxiomDependenciesText dependencies
       logInfo m!"FRESH_AXIOM_AUDIT root={root} axioms=[{rendered}]"
-      unless dependencies.toList == [`Classical.choice] do
+      unless dependencies.toList == [expectedAxiom] do
         throwError m!"fresh audit did not produce the exact expected axiom set for {root}: {rendered}"
   | `(#audit_fresh_no_axioms $declaration:ident) => do
       let root := declaration.getId
@@ -76,22 +77,54 @@ elab_rules : command
 
 theorem usesS9 (_ : S9) : True := trivial
 
--- Native output is diagnostic only; the fresh per-root walk above is the
+theorem usesTransitiveAxiom : True := False.elim auditTransitiveAxiom
+
+-- Native output is diagnostic only; the fresh per-root walk below is the
 -- acceptance oracle for this reproduction and the proof-certificate roots.
 #print axioms S9
 #print axioms S9.mk
 #print axioms usesS9
+#print axioms auditDirectAxiom
+#print axioms auditTransitiveAxiom
+#print axioms usesTransitiveAxiom
+#print axioms Even
+#print axioms Odd
 #print axioms And.comm
 #print axioms ProofPlanActionCertificatePilot.and_comm_split_iff
 #print axioms ProofPlanActionCertificatePilot.and_comm_forward
 #print axioms ProofPlanActionCertificatePilot.and_comm_reverse
 #print axioms ProofPlanActionCertificatePilot.and_comm_plan_replay
 
-#audit_fresh_axioms S9
-#audit_fresh_axioms S9.mk
-#audit_fresh_axioms usesS9
+#audit_fresh_axioms S9 => Classical.choice
+#audit_fresh_axioms S9.mk => Classical.choice
+#audit_fresh_axioms usesS9 => Classical.choice
+#audit_fresh_axioms auditDirectAxiom => auditDirectAxiom
+#audit_fresh_axioms auditTransitiveAxiom => auditDirectAxiom
+#audit_fresh_axioms usesTransitiveAxiom => auditDirectAxiom
+#audit_fresh_no_axioms Even
+#audit_fresh_no_axioms Odd
+#audit_fresh_no_axioms Even.succ
+#audit_fresh_no_axioms Odd.succ
 #audit_fresh_no_axioms And.comm
 #audit_fresh_no_axioms ProofPlanActionCertificatePilot.and_comm_split_iff
 #audit_fresh_no_axioms ProofPlanActionCertificatePilot.and_comm_forward
 #audit_fresh_no_axioms ProofPlanActionCertificatePilot.and_comm_reverse
 #audit_fresh_no_axioms ProofPlanActionCertificatePilot.and_comm_plan_replay
+
+-- Reverse-order rerun: every root receives a new DFS, so earlier roots cannot
+-- contaminate later results through cached partial dependency sets.
+#audit_fresh_no_axioms ProofPlanActionCertificatePilot.and_comm_plan_replay
+#audit_fresh_no_axioms ProofPlanActionCertificatePilot.and_comm_reverse
+#audit_fresh_no_axioms ProofPlanActionCertificatePilot.and_comm_forward
+#audit_fresh_no_axioms ProofPlanActionCertificatePilot.and_comm_split_iff
+#audit_fresh_no_axioms And.comm
+#audit_fresh_no_axioms Odd.succ
+#audit_fresh_no_axioms Even.succ
+#audit_fresh_no_axioms Odd
+#audit_fresh_no_axioms Even
+#audit_fresh_axioms usesTransitiveAxiom => auditDirectAxiom
+#audit_fresh_axioms auditTransitiveAxiom => auditDirectAxiom
+#audit_fresh_axioms auditDirectAxiom => auditDirectAxiom
+#audit_fresh_axioms usesS9 => Classical.choice
+#audit_fresh_axioms S9.mk => Classical.choice
+#audit_fresh_axioms S9 => Classical.choice
