@@ -1,12 +1,3 @@
-pub mod submission;
-pub mod raw_session;
-pub mod longmemeval_v2;
-pub mod longmemeval_v2_entity;
-pub mod candidate_evidence;
-pub mod longmemeval_v2_candidate_adapter;
-pub mod retrieval_policy_memory;
-pub mod retrieval_policy_store;
-pub mod evidence_qualification_gate;
 
 // Copyright (C) 2026 Luminous Dynamics
 // SPDX-License-Identifier: AGPL-3.0-or-later
@@ -17,6 +8,17 @@ pub mod evidence_qualification_gate;
 //! chunking. It is not an HTTP server, memory database, embedding service or
 //! AML submission. A hosted service must acknowledge Add only after durable
 //! persistence and immediate Search visibility.
+
+pub mod submission;
+pub mod raw_session;
+pub mod longmemeval_v2;
+pub mod longmemeval_v2_entity;
+pub mod candidate_evidence;
+pub mod longmemeval_v2_candidate_adapter;
+pub mod retrieval_policy_memory;
+pub mod retrieval_policy_store;
+pub mod evidence_qualification_gate;
+pub mod acquisition_receipt_v2;
 
 use std::collections::BTreeMap;
 
@@ -759,6 +761,7 @@ impl AddIdempotencyLedger {
             Some((stored, _)) if stored != &digest => {
                 Err(AmlReject::RequestIdPayloadConflict)
             }
+            Some((_, None)) => Err(AmlReject::RequestIdPayloadConflict),
             Some((_, Some(_))) => Err(AmlReject::AddAlreadyCompleted),
             None => Err(AmlReject::UnknownRequestId),
         }

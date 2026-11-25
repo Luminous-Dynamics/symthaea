@@ -18,7 +18,7 @@ use crate::candidate_evidence::{
     EvidenceModalityV1, encode_candidate_evidence_jsonl,
 };
 use crate::longmemeval_v2::{
-    LongMemEvalV2HitV1, LongMemEvalV2SearchResultV1,
+    LongMemEvalV2HitV1, LongMemEvalV2SearchResultV1, LongMemEvalV2StateV1,
 };
 
 #[derive(Clone, Debug, Eq, PartialEq)]

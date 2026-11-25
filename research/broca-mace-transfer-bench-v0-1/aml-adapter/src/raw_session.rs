@@ -14,7 +14,7 @@ use sha2::{Digest, Sha256};
 
 use super::{
     add_payload_digest, chunk_textual_messages, AddRequest, FrozenAdapterWordCounter, Message,
-    MessageContent, Role, TextualChunkPlan, Track,
+    is_lower_sha256, MessageContent, Role, TextualChunkPlan, Track, FORMAL_TOP_K,
 };
 
 const RAW_SESSION_SCHEMA_VERSION: u64 = 1;
