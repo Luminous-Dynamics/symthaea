@@ -161,6 +161,10 @@ pub struct DecisionSufficiencyUseBindingV1<'a> {
     pub lifecycle_snapshot_sha256: &'a str,
     pub sufficiency_policy_sha256: &'a str,
     pub calibration_profile_sha256: &'a str,
+    pub calibration_receipt_sha256: &'a str,
+    pub required_requirement_ids: &'a [String],
+    pub risk_limit_ppm: u32,
+    pub minimum_confidence_level_ppm: u32,
     pub issuer_profile_sha256: &'a str,
     pub now_unix: u64,
 }
@@ -723,6 +727,36 @@ fn validate_receipt_binding(
     receipt: &DecisionSufficiencyReceiptV1,
     binding: &DecisionSufficiencyUseBindingV1<'_>,
 ) -> Result<(), DecisionSufficiencyRejectV1> {
+    if binding.required_requirement_ids.is_empty()
+        || binding.required_requirement_ids.windows(2).any(|pair| pair[0] >= pair[1])
+        || receipt.requirements.iter().map(|item| item.requirement_id.as_str())
+            .ne(binding.required_requirement_ids.iter().map(String::as_str))
+    {
+        return Err(DecisionSufficiencyRejectV1::BindingMismatch);
+    }
+    if binding.risk_limit_ppm > 1_000_000
+        || !(500_000..=999_999).contains(&binding.minimum_confidence_level_ppm)
+        || !valid_sha256(binding.calibration_receipt_sha256)
+    {
+        return Err(DecisionSufficiencyRejectV1::InvalidReceipt);
+    }
+    if receipt.risk_limit_ppm.is_some_and(|risk| risk != binding.risk_limit_ppm)
+        || receipt.confidence_level_ppm.is_some_and(|confidence| confidence < binding.minimum_confidence_level_ppm)
+        || receipt.calibration_receipt_sha256.as_deref()
+            .is_some_and(|digest| digest != binding.calibration_receipt_sha256)
+    {
+        return Err(DecisionSufficiencyRejectV1::BindingMismatch);
+    }
+    if receipt.status == DecisionSufficiencyStatusV1::Sufficient
+        && (receipt.risk_limit_ppm != Some(binding.risk_limit_ppm)
+            || receipt.confidence_level_ppm
+                .is_none_or(|confidence| confidence < binding.minimum_confidence_level_ppm)
+            || receipt.calibration_receipt_sha256.as_deref()
+                != Some(binding.calibration_receipt_sha256))
+    {
+        return Err(DecisionSufficiencyRejectV1::SufficientRiskBoundInvalid);
+    }
+
     for (actual, expected) in [
         (receipt.run_id.as_str(), binding.run_id),
         (receipt.query_invocation_id.as_str(), binding.query_invocation_id),
@@ -829,6 +863,7 @@ mod tests {
     const QUAL_PROFILE: &str = "19";
     const SUFF_POLICY: &str = "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa";
     const CALIBRATION: &str = "bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb";
+    const CALIBRATION_RECEIPT: &str = "dddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddd";
 
     struct TestQualificationVerifier;
     struct RevokedQualificationVerifier;
@@ -1054,6 +1089,12 @@ mod tests {
             lifecycle_snapshot_sha256: qualified.lifecycle_snapshot_sha256(),
             sufficiency_policy_sha256: SUFF_POLICY,
             calibration_profile_sha256: CALIBRATION,
+            calibration_receipt_sha256: CALIBRATION_RECEIPT,
+            required_requirement_ids: Box::leak(vec![
+                "minimum-independent-evidence".to_owned()
+            ].into_boxed_slice()),
+            risk_limit_ppm: 5000,
+            minimum_confidence_level_ppm: 900_000,
             issuer_profile_sha256,
             now_unix,
         }
@@ -1093,7 +1134,7 @@ mod tests {
             risk_limit_ppm: risk_limit,
             confidence_level_ppm: (status == DecisionSufficiencyStatusV1::Sufficient).then_some(950_000),
             calibration_receipt_sha256: (status == DecisionSufficiencyStatusV1::Sufficient)
-                .then(|| repeat('d')),
+                .then(|| CALIBRATION_RECEIPT.to_owned()),
             issued_at_unix: 150,
             expires_at_unix: 200,
             issuer_profile_sha256: binding.issuer_profile_sha256.into(),
