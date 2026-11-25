@@ -1,0 +1,128 @@
+# MACE V2 — Qualification Runtime Integration Contract v0.1
+
+**Status:** Draft integration contract. The V2 acquisition receipt, pinned Ed25519 verifier, and fail-closed qualified-candidate projection are composable library components on the current draft branch. The LongMemEval-V2 sidecar is **not yet wired to consume a qualification receipt**, and no independent qualification service is implemented by this change.
+
+## 1. The trust-boundary rule
+
+The candidate backend is an untrusted evidence producer. It can report what it searched and which candidate records it materialized. Its receipt is an unsigned observation, not an assertion that the candidates are authentic, authorized, true, admissible, or sufficient.
+
+The required chain is:
+
+`Acquisition observation → independent qualification → exact-batch projection → decision sufficiency → live action authorization → observed outcome`
+
+Each arrow is a separate contract. No stage may silently grant the next stage's authority.
+
+### Acquisition observation
+
+The V2 receipt binds a run, invocation, query, tool profile, operations, observed IDs, status, and candidate-set commitment. It can establish consistency of the candidate backend's own report. It cannot establish source authenticity, source authority, rights, or semantic correctness.
+
+The sidecar-specific binding check additionally requires:
+- candidate backend revision to match the receipt's tool-profile revision;
+- candidate scope and purpose to match the LMEv2 domain contract;
+- every direct hit and neighbor expansion to occur in an acquisition operation's observed-ID set;
+- every source-state record to be referenced by a returned record;
+- every screenshot record to have exactly one source-state parent.
+
+These invariants establish internal lineage consistency. A well-formed lineage can still originate from false, unauthorized, or stale source material.
+
+### Independent qualification
+
+A separately operated qualifier must recompute the exact candidate batch and independently inspect source-observation receipts, issuer authority, rights/purpose, provenance ancestry, and current lifecycle status. It issues a signed `EvidenceQualificationReceiptV1` only for the exact candidate set and use context.
+
+The candidate backend must not hold the qualifier's private key, choose its own trust profile, self-assert its own admissibility, or transform its acquisition trace into a qualification receipt.
+
+The qualification receipt binds:
+- run, invocation, domain, subject-scope commitment;
+- environment and tool-profile revisions;
+- query and complete candidate-set commitments;
+- the canonical candidate evidence-ID set;
+- DecisionNeed, purpose, qualification policy and lifecycle snapshot;
+- verifier profile, signer key ID, issuance and expiry;
+- one ordered disposition and basis-receipt digest per candidate.
+
+A valid signature authenticates the qualifier's statement. It does not prove the source statement is true; the qualifier must have an independently defensible basis for its disposition.
+
+### Pinned verifier and projection
+
+The current library implementation provides:
+- a pinned Ed25519 leaf-key profile with an out-of-band expected profile digest and minimum profile version;
+- strict signature verification, key-ID derivation, validity-window checks and rejection of unknown/revoked keys;
+- a verified capability that retains the complete signed binding;
+- a use-time method that requires the caller to re-present the full binding and trusted current time;
+- a pure projection that rebuilds the candidate batch, checks exact identity and candidate-ID-set equality, removes rejected/indeterminate evidence, closes over required parents, rejects cycles, and returns an explicit abstention when nothing remains admissible.
+
+The profile digest and minimum profile version must come from a trust channel outside the candidate backend and the memory-store rollback domain. Reading a profile and its purported pin from the same mutable store is not an independent trust bootstrap.
+
+### Decision sufficiency is a different question
+
+Admissibility answers: "May this evidence be considered under this policy and use context?"
+
+Decision sufficiency answers: "Is the admissible evidence enough to support this particular decision within its risk/regret tolerance?"
+
+The qualified projection does not answer the second question. A non-empty qualified batch is not a sufficient-evidence verdict. The next consumer must be the separate DecisionNeed sufficiency evaluator; it must be able to return insufficient, indeterminate, acquire-more, defer, or abstain.
+
+### Action authorization and outcomes remain separate
+
+Even a sufficient evidence set is not an action permit. At consequential use, the executor must re-check live subject authorization, rights, revocation, lifecycle currentness and policy. Any approval/consent that needs at-most-once use requires its own consume-once state and durable witness.
+
+An outcome receipt must bind the chosen action, exact evidence projection, pre-action prediction, observed result and any counterfactual comparison. Strategy promotion must depend on independently observed, paired, held-out results—not on a candidate's self-reported success.
+
+## 2. Compatibility boundary
+
+The acquisition V2 branch and the earlier qualification prototype had diverged at the signature-verifier interface. The integrated contract now supplies both `issued_at_unix` and trusted `now_unix` to the verifier. The verified token also retains the complete binding and requires it again at use.
+
+The existing candidate-evidence representation is byte-identical across the two implementation lines; the integration preserves the V2 branch's additional modules and acquisition-receipt code rather than replacing its library root with the older branch's version.
+
+## 3. What this increment does not claim
+
+Not implemented by this integration:
+- a separately operated qualification service or private-key custody;
+- independent source-observation ingestion, source-authority registry, rights engine, or tenant-isolation service;
+- remote trust-profile rotation/revocation distribution or a monotonic trust-profile witness;
+- a standard DSSE/in-toto or COSE signature envelope (the current profile signs the versioned MACE domain-separated payload digest);
+- V2 sidecar request/response integration that consumes an external signed qualification and withholds unqualified context;
+- a DecisionNeed sufficiency decision, executor authorization, consume-once action ledger, or outcome/promotion integration;
+- authenticated journal checkpoints or T9/T10 rollback/erasure-resurrection protection.
+
+Accordingly, the LongMemEval-V2 sidecar's current query result remains **unqualified benchmark evidence**. The presence of a V2 acquisition receipt or a locally verifiable signature must never be presented as production permission to use the evidence for a consequential action.
+
+## 4. Integration acceptance criteria
+
+A later end-to-end sidecar/runtime change is acceptable only when all of the following are true:
+
+1. An external qualifier receives the canonical candidate batch and independently verifies source receipts, issuer authority, scope, rights, provenance closure and lifecycle state.
+2. The qualifier issues a signed receipt bound to the exact candidate set, exact DecisionNeed and exact purpose/policy/lifecycle snapshot.
+3. The consumer obtains the verifier profile pin and monotonic minimum version independently of the candidate store.
+4. The consumer validates the signature at issuance and use time using a trusted clock, then re-presents the complete binding at every consumption.
+5. The projection returns only independently admissible records, removes descendants whose required parents are not admissible, and abstains on empty or inconsistent results.
+6. The sufficiency evaluator separately decides whether the projected evidence is enough for the named decision; otherwise it requests more evidence or abstains.
+7. The executor rechecks live authority and lifecycle and uses separate consume-once authorization state where required.
+8. Tests include wrong signer, unknown/revoked/expired key, profile rollback, stale lifecycle, purpose/tenant/DecisionNeed/candidate rebinding, missing or rejected parents, cycle, empty qualification, sidecar restart, and concurrent consumption.
+
+## 5. Evaluation programme
+
+Keep external benchmark protocols separate. MACE should report, at minimum:
+
+| Evaluation lane | Primary question | Required measurements |
+|---|---|---|
+| Official AML Cycle 2 | Does the Add/Search system compete with the strongest reproduced adapters? | Per-track score, exact frozen API/config, ingest/search latency, memory and token budgets |
+| LongMemEval-V2 | Can memory retrieve and answer long-horizon questions accurately and efficiently? | Per-ability accuracy, query latency, context budget, online/offline protocol |
+| AMA-Bench / WorldMemArena | Does memory improve long-horizon agent decisions and interaction with the world? | Paired task success, tool/action errors, cost, latency, trajectory-level outcomes |
+| FAMA / TimlMemBench | Does memory respect corrections, expiration, scope, consent and activation rules? | Stale-memory use, scope violations, correction latency, clean-task preservation |
+| Memory security lifecycle | Can poisoned, revoked, rolled-back or erased memory influence later behavior? | Persistence, propagation, retrieval exposure, causal action influence, repair precision, T9/T10 resurrection |
+| MACE Decision Memory Benchmark | Does the system acquire the least costly evidence that keeps decision regret within a declared tolerance? | Regret, sufficiency calibration, abstention, EVSI, evidence independence, verification cost, p50/p95/p99 latency |
+
+The external AML open-method targets recorded in issue #13284 are **targets, not results**: +5 points over the matched Cycle 2 open-method leaders in each separate track (textual 66.22/100, multimodal 48.26/100, coding 68.33% resolved). Do not pool those track scores.
+
+For the internal decision benchmark, compare the Pareto frontier of decision regret against all-in cost. Include no-memory, full-context, exact-scope scan, recency, BM25, dense, hybrid, entity/date/literal, neighbor expansion, state-first, causal-graph, hierarchical compression, typed HDC, event-ID HDC, and EVSI-guided acquisition. Use random, uncertainty-first, missing-dependency-first and fixed top-k query policies as controls; keep an evaluator-only oracle as an upper bound, never as a candidate input.
+
+Pre-register primary endpoints, task families, budgets, evaluation splits and stopping rules. Report paired intervals and worst-family regressions. A retrieval-score win is not a decision-quality win; a decision-quality win is not proof of safe authorization.
+
+## 6. Relevant standards and research context
+
+- [RFC 9334 — Remote ATtestation procedureS (RATS) Architecture](https://www.rfc-editor.org/rfc/rfc9334) is a useful separation analogy: an Attester produces evidence, a Verifier appraises it, and a Relying Party consumes an attestation result. It does not provide MACE's source-authority or decision-sufficiency semantics.
+- [MACE issue #13455](https://github.com/Luminous-Dynamics/symthaea/issues/13455) owns the independent qualification integration.
+- [MACE issue #13264](https://github.com/Luminous-Dynamics/symthaea/issues/13264) owns verified transitive evidence dependencies and lifecycle closure.
+- [MACE issue #13284](https://github.com/Luminous-Dynamics/symthaea/issues/13284) owns decision-sufficiency frontiers and EVSI-guided evidence acquisition.
+- [MACE issue #13319](https://github.com/Luminous-Dynamics/symthaea/issues/13319) owns adversarial memory-lifecycle and erasure-resurrection evaluation.
+- The [Agent Memory Integrity Internet-Draft](https://datatracker.ietf.org/doc/draft-khandelwal-bpm-agent-memory-integrity/) is work in progress, not an IETF standard; its stale-backup erasure-resurrection case is a useful threat-model input, not an endorsement or compliance claim.
