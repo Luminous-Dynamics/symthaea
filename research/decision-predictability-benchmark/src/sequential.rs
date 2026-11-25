@@ -101,9 +101,18 @@ pub enum SequentialPolicyNode {
 /// episode. This value is a reference for scoring, not an agent action.
 #[derive(Clone, Debug, PartialEq)]
 pub struct SequentialPolicyValue {
+    /// Best terminal decision loss available immediately, without another action.
+    pub current_minimax_loss: f64,
+    /// Whether the current information set admits a declared terminal decision.
+    pub current_risk_gate_passed: bool,
+    /// Worst-case terminal decision loss under the selected complete policy.
     pub worst_case_terminal_loss: f64,
-    pub root_risk_gate_passed: bool,
+    /// Whether every terminal branch of the selected policy meets the risk limit.
+    /// This does not imply that a decision is admissible before the policy runs.
+    pub policy_terminal_risk_gate_passed: bool,
+    /// Bounded search work; DP-node and exhaustive-enumerator counts are distinct.
     pub explored_nodes: usize,
+    /// Evaluator-only policy tree. Never expose state supports to a candidate.
     pub policy: SequentialPolicyNode,
 }
 
@@ -598,6 +607,7 @@ pub fn evaluate_sequential_robust(
     validate(problem)?;
     let mut possible_states = problem.state_ids.clone();
     possible_states.sort();
+    let current_minimax_loss = terminal_minimax(problem, &possible_states)?.0;
     let mut nodes = 0;
     let solved = solve_node(
         problem,
@@ -609,8 +619,12 @@ pub fn evaluate_sequential_robust(
         &mut nodes,
     )?;
     Ok(SequentialPolicyValue {
+        current_minimax_loss,
+        current_risk_gate_passed: current_minimax_loss
+            <= problem.maximum_worst_case_loss + VALUE_TOLERANCE,
         worst_case_terminal_loss: solved.loss,
-        root_risk_gate_passed: solved.loss <= problem.maximum_worst_case_loss + VALUE_TOLERANCE,
+        policy_terminal_risk_gate_passed: solved.loss
+            <= problem.maximum_worst_case_loss + VALUE_TOLERANCE,
         explored_nodes: nodes,
         policy: solved.policy,
     })
@@ -846,6 +860,28 @@ pub fn enumerate_sequential_robust(
     validate(problem)?;
     let mut possible_states = problem.state_ids.clone();
     possible_states.sort();
+    let current_minimax_loss = {
+        let mut best = f64::INFINITY;
+        for decision_id in &problem.decision_ids {
+            let mut worst = 0.0_f64;
+            for state_id in &possible_states {
+                let loss = problem
+                    .decision_loss
+                    .get(decision_id)
+                    .and_then(|by_state| by_state.get(state_id))
+                    .copied()
+                    .ok_or_else(|| SequentialOracleError::MissingDecisionLoss {
+                        decision_id: decision_id.clone(),
+                        state_id: state_id.clone(),
+                    })?;
+                worst = if loss > worst { loss } else { worst };
+            }
+            if worst < best {
+                best = worst;
+            }
+        }
+        best
+    };
     let mut work = 0;
     let policies = enumerate_node(
         problem,
@@ -868,8 +904,12 @@ pub fn enumerate_sequential_robust(
     }
     let best = best.ok_or(SequentialOracleError::NoPolicy)?;
     Ok(SequentialPolicyValue {
+        current_minimax_loss,
+        current_risk_gate_passed: current_minimax_loss
+            <= problem.maximum_worst_case_loss + VALUE_TOLERANCE,
         worst_case_terminal_loss: best.loss,
-        root_risk_gate_passed: best.loss <= problem.maximum_worst_case_loss + VALUE_TOLERANCE,
+        policy_terminal_risk_gate_passed: best.loss
+            <= problem.maximum_worst_case_loss + VALUE_TOLERANCE,
         explored_nodes: work,
         policy: best.policy,
     })
@@ -1013,7 +1053,9 @@ mod tests {
         let problem = branch_unlock_world();
         let value = evaluate_sequential_robust(&problem).unwrap();
         assert_eq!(value.worst_case_terminal_loss, 0.0);
-        assert!(value.root_risk_gate_passed);
+        assert!((value.current_minimax_loss - 1.0).abs() < VALUE_TOLERANCE);
+        assert!(!value.current_risk_gate_passed);
+        assert!(value.policy_terminal_risk_gate_passed);
         assert_eq!(root_action(&value.policy), Some("B"));
 
         let SequentialPolicyNode::Probe { branches, .. } = value.policy else {
@@ -1032,9 +1074,20 @@ mod tests {
         let dynamic = evaluate_sequential_robust(&problem).unwrap();
         let exhaustive = enumerate_sequential_robust(&problem).unwrap();
         assert_eq!(
+            dynamic.current_minimax_loss,
+            exhaustive.current_minimax_loss
+        );
+        assert_eq!(
+            dynamic.current_risk_gate_passed,
+            exhaustive.current_risk_gate_passed
+        );
+        assert_eq!(
             dynamic.worst_case_terminal_loss,
             exhaustive.worst_case_terminal_loss
         );
+        assert!(!dynamic.current_risk_gate_passed);
+        assert!(dynamic.policy_terminal_risk_gate_passed);
+        assert!(exhaustive.policy_terminal_risk_gate_passed);
         assert_eq!(dynamic.worst_case_terminal_loss, 0.0);
         assert_eq!(root_action(&dynamic.policy), Some("B"));
         assert_eq!(root_action(&exhaustive.policy), Some("B"));
@@ -1145,7 +1198,8 @@ mod tests {
         let value = evaluate_sequential_robust(&problem).unwrap();
         assert_eq!(value.worst_case_terminal_loss, 1.0);
         assert!(matches!(value.policy, SequentialPolicyNode::Stop { .. }));
-        assert!(!value.root_risk_gate_passed);
+        assert!(!value.current_risk_gate_passed);
+        assert!(!value.policy_terminal_risk_gate_passed);
         let exhaustive = enumerate_sequential_robust(&problem).unwrap();
         assert_eq!(exhaustive.worst_case_terminal_loss, 1.0);
     }
