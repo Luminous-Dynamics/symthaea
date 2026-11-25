@@ -1,0 +1,63 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://luminousdynamics.io/schemas/mace_mon005_outer_record_v1.schema.json",
+  "title": "MACE MON-005 outer evidence record v1",
+  "type": "object",
+  "additionalProperties": false,
+  "required": [
+    "schema",
+    "tenantId",
+    "sequence",
+    "previousRecordHash",
+    "payload",
+    "recordHash"
+  ],
+  "properties": {
+    "schema": {
+      "const": "sfeb-evidence-record-v1"
+    },
+    "tenantId": {
+      "type": "string",
+      "minLength": 1,
+      "maxLength": 256
+    },
+    "sequence": {
+      "type": "integer",
+      "minimum": 1,
+      "maximum": 9007199254740991
+    },
+    "previousRecordHash": {
+      "type": "string",
+      "pattern": "^[0-9a-f]{64}$"
+    },
+    "recordHash": {
+      "type": "string",
+      "pattern": "^[0-9a-f]{64}$"
+    },
+    "payload": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "kind",
+        "schema",
+        "macePayload",
+        "macePayloadSha256"
+      ],
+      "properties": {
+        "kind": {
+          "const": "mace-evaluation-anchor"
+        },
+        "schema": {
+          "const": "mace-mon005-evaluation-anchor-v1"
+        },
+        "macePayloadSha256": {
+          "type": "string",
+          "pattern": "^[0-9a-f]{64}$"
+        },
+        "macePayload": {
+          "$ref": "https://github.com/Luminous-Dynamics/symthaea/blob/main/data/schemas/mace_evaluation_anchor_payload_v1.schema.json"
+        }
+      }
+    }
+  }
+}
