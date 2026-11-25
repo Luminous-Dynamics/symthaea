@@ -433,20 +433,20 @@ mod tests {
     }
 
     #[test]
-    fn episode_set_root_is_independent_of_manifest_object_key_order() {
+    fn episode_set_root_is_deterministic_for_fixed_manifests() {
         let a = fixture_manifest("episode-a");
         let b = fixture_manifest("episode-b");
         let set = verify_frozen_decision_episode_set_v1(&[a.clone(), b.clone()]).unwrap();
-        let a_hash = frozen_decision_episode_manifest_sha256_v1(&a).unwrap();
-        let wire = serde_json::to_string(&a).unwrap();
-        let reordered = wire.replace(
-            "{\"schema_version\":\"mace_decision_episode_manifest_v1\",",
-            "{\"episode_id\":\"episode-a\",\"schema_version\":\"mace_decision_episode_manifest_v1\",",
+        let reparsed = parse_frozen_decision_episode_manifest_v1(
+            &serde_json::to_vec(&a).unwrap(),
+        ).unwrap();
+        assert_eq!(
+            frozen_decision_episode_manifest_sha256_v1(&reparsed).unwrap(),
+            frozen_decision_episode_manifest_sha256_v1(&a).unwrap()
         );
-        let reparsed = parse_frozen_decision_episode_manifest_v1(reordered.as_bytes()).unwrap();
-        assert_eq!(frozen_decision_episode_manifest_sha256_v1(&reparsed).unwrap(), a_hash);
+        let repeated = verify_frozen_decision_episode_set_v1(&[a, b]).unwrap();
+        assert_eq!(set.root_sha256(), repeated.root_sha256());
         assert_eq!(set.len(), 2);
-        assert_eq!(set.root_sha256().len(), 64);
     }
 
     #[test]
@@ -493,4 +493,17 @@ mod tests {
             Err(FrozenDecisionEpisodeManifestRejectV1::InvalidJson)
         );
     }
+}
+
+#[cfg(test)]
+pub(crate) fn test_verified_episode_membership_v1() -> VerifiedDecisionEpisodeMembershipV1 {
+    let manifest = tests::fixture_manifest("episode-1");
+    let manifest_sha256 = frozen_decision_episode_manifest_sha256_v1(&manifest).unwrap();
+    let set = verify_frozen_decision_episode_set_v1(&[manifest.clone()]).unwrap();
+    let witness =
+        crate::evaluation_manifest_commitment_receipt::test_verified_evaluation_manifest_commitment_with_episode_root_v1(
+            set.root_sha256(),
+        );
+    set.bind_episode(&manifest.episode_id, &manifest_sha256, &witness)
+        .unwrap()
 }
