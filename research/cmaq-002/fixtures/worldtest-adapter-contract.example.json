@@ -10,7 +10,6 @@
     "related_family_id": "fixture-family-alpha"
   },
   "exploration": {
-    "reward_visible": false,
     "reset_enabled": true,
     "event_trace": [
       {
@@ -41,8 +40,17 @@
         "event_index": 5,
         "event_type": "noop",
         "action_id": "noop"
+      },
+      {
+        "event_index": 6,
+        "event_type": "action",
+        "action_id": "go-to-test"
       }
-    ]
+    ],
+    "reward_feedback_policy": "constant_zero",
+    "reward_feedback_value": 0,
+    "nonzero_reward_permitted": false,
+    "phase_exit_action": "go-to-test"
   },
   "test": {
     "query_family": "change_detection",

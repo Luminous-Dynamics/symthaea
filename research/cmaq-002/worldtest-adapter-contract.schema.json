@@ -65,14 +65,14 @@
       "type": "object",
       "additionalProperties": false,
       "required": [
-        "reward_visible",
         "reset_enabled",
-        "event_trace"
+        "event_trace",
+        "reward_feedback_policy",
+        "reward_feedback_value",
+        "nonzero_reward_permitted",
+        "phase_exit_action"
       ],
       "properties": {
-        "reward_visible": {
-          "const": false
-        },
         "reset_enabled": {
           "const": true
         },
@@ -127,6 +127,18 @@
               }
             ]
           }
+        },
+        "reward_feedback_policy": {
+          "const": "constant_zero"
+        },
+        "reward_feedback_value": {
+          "const": 0
+        },
+        "nonzero_reward_permitted": {
+          "const": false
+        },
+        "phase_exit_action": {
+          "const": "go-to-test"
         }
       }
     },

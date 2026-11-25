@@ -23,9 +23,9 @@ The two pinned commits are unsigned. The public data license is reported as CC B
 ## Protocol custody
 
 Exploration:
-- Reward is absent.
+- The pinned MARA controller forwards a generic agent-feedback reward field on every step. In the reference reward-free exploration environment, ordinary actions, explicit reset and the go-to-test phase-exit action return exactly zero. The field is therefore present but carries no task-reward signal. The adapter must verify every exploration reward is zero and fail closed on any nonzero value; do not describe the feedback field itself as absent.
 - Candidate sees only the configured observation/action interface and actual observations.
-- Reset is a first-class action and is charged to the interaction budget.
+- Reset is a first-class action and is charged to the interaction budget. The candidate-issued go-to-test phase-exit action is also charged as an exploration interaction before the terminal test-phase marker.
 - Predicted future observations are never promoted to acquired observations.
 
 Test:
@@ -36,9 +36,24 @@ Test:
 
 The JSON Schema fixture validates this metadata/custody contract only. It does not establish actual dataset integrity or a successful simulator adapter.
 
+## Pinned MARA runner reward and phase audit
+
+The pinned reference controller calls the agent Feedback RPC after every environment step and forwards StepResponse.reward into FeedbackRequest.reward. The interactive exploration implementation returns exactly zero for ordinary actions, explicit reset and go-to-test. This is reward-free by **constant-zero signal semantics**, not by omitting the feedback field. A qualified adapter must check the returned reward at every exploration step and reject nonzero values before forwarding feedback.
+
+The transition action go-to-test is issued by the candidate and is a charged exploration interaction. The trusted adapter appends the non-interaction BeginTest marker only after the environment has accepted the phase transition. The qualified Rust entry point is evaluate_mara_worldtest_exploration in src/worldtest_phase_contract.rs; it requires exactly one go-to-test action immediately before BeginTest.
+
+Pinned source identities at MARAProtocol commit d0d4e9251151778415cc5195c5dfb8296a5ded24:
+- mara_agent.proto: 70ae75dad22be364af45417fb24007ddbfbe61a3 (reward field in FeedbackRequest)
+- mara_environment_service.proto: 58069aa74cb1bf084155c115111dc2a2aa6b58c6 (StepResponse reward)
+- evaluation_controller.py: 8650b314b3f0e5f9301340dce89aed5aa4de0ae8 (reward forwarded on each Feedback call)
+- environment_interfaces.py: 7048358744b74f042db4c43f734d9271468f727b (interactive-to-test transition)
+- concrete_envs.py: 961858e7f47ad1e572bc20936d27ae0b4fee000b (interactive action/reset/go-to-test returns zero)
+
+The source lock and machine-readable audit are in worldtest-runner-audit.lock.json and worldtest-runner-audit.schema.json. This is a pinned source audit only; no MARA process or Autumn interpreter was run.
+
 ## Rust reset/replay diagnostic
 
-The new module src/worldtest_exploration.rs audits a bounded exploration trace and requires a terminal test-phase transition. It reports:
+The bounded module src/worldtest_exploration.rs audits resets and replay; the phase wrapper src/worldtest_phase_contract.rs additionally requires the charged go-to-test action followed immediately by a terminal BeginTest marker. Use evaluate_mara_worldtest_exploration as the qualified entry point. It reports:
 - action count, reset count and reset share of all action-plus-reset interactions;
 - nonempty exploration segments separated by resets;
 - adjacent segment pairs and their longest-common-subsequence (LCS) ratio;

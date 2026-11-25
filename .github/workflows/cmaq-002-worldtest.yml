@@ -6,6 +6,7 @@ on:
       - research/cmaq-002-worldtest-exploration-v0-1-20261125
     paths:
       - "research/cmaq-002/src/worldtest_exploration.rs"
+      - "research/cmaq-002/src/worldtest_phase_contract.rs"
       - "research/cmaq-002/worldtest-*"
       - "research/cmaq-002/fixtures/worldtest-*"
       - "research/cmaq-002/WORLDTEST_ADAPTER_V0_1.md"
@@ -38,7 +39,7 @@ jobs:
           components: rustfmt, clippy
 
       - name: Check formatting of the new Rust module
-        run: rustfmt --check --edition 2024 research/cmaq-002/src/worldtest_exploration.rs
+        run: rustfmt --check --edition 2024 research/cmaq-002/src/worldtest_exploration.rs research/cmaq-002/src/worldtest_phase_contract.rs
 
       - name: Run CMAQ-002 evaluator tests
         working-directory: research/cmaq-002
@@ -98,7 +99,10 @@ jobs:
           validate_phase_record(custody)
 
           assert custody["status"] == "metadata_only"
-          assert custody["exploration"]["reward_visible"] is False
+          assert custody["exploration"]["reward_feedback_policy"] == "constant_zero"
+          assert custody["exploration"]["reward_feedback_value"] == 0
+          assert custody["exploration"]["nonzero_reward_permitted"] is False
+          assert custody["exploration"]["phase_exit_action"] == "go-to-test"
           assert custody["exploration"]["reset_enabled"] is True
           assert custody["test"]["answer_key_candidate_visible"] is False
           assert custody["evaluator_only"]["candidate_visible"] is False
@@ -109,6 +113,8 @@ jobs:
           events = custody["exploration"]["event_trace"]
           assert [event["event_index"] for event in events] == list(range(len(events)))
           assert all(event["event_type"] in {"action", "noop", "reset"} for event in events)
+          assert events[-1]["event_type"] == "action"
+          assert events[-1]["action_id"] == "go-to-test"
 
           def reject_mutation(mutated, label):
               try:
@@ -118,8 +124,16 @@ jobs:
               raise AssertionError(f"WorldTest custody admitted hostile mutation: {label}")
 
           hostile = copy.deepcopy(custody)
-          hostile["exploration"]["reward_visible"] = True
-          reject_mutation(hostile, "reward visible during reward-free exploration")
+          hostile["exploration"]["reward_feedback_policy"] = "pass_through"
+          reject_mutation(hostile, "nonzero/pass-through reward during exploration")
+
+          hostile = copy.deepcopy(custody)
+          hostile["exploration"]["reward_feedback_value"] = 1
+          reject_mutation(hostile, "nonzero exploration reward")
+
+          hostile = copy.deepcopy(custody)
+          hostile["exploration"]["nonzero_reward_permitted"] = True
+          reject_mutation(hostile, "nonzero reward permitted during exploration")
 
           hostile = copy.deepcopy(custody)
           hostile["exploration"]["reset_enabled"] = False
@@ -157,7 +171,31 @@ jobs:
               raise AssertionError("WorldTest custody admitted same exploration/test program")
 
           print(
-              "WorldTest baseline lock, phase custody, public-subset boundary, "
-              "and six hostile controls validated"
+              "WorldTest baseline lock, constant-zero reward custody, go-to-test "
+              "phase exit, public-subset boundary and hostile controls validated"
           )
+          PY
+
+      - name: Validate pinned MARA runner reward and phase audit
+        working-directory: research/cmaq-002
+        run: |
+          python3 - <<'PY'
+          import copy
+          import json
+          from pathlib import Path
+          from jsonschema import Draft202012Validator, ValidationError, validate
+
+          schema = json.loads(Path("worldtest-runner-audit.schema.json").read_text())
+          Draft202012Validator.check_schema(schema)
+          audit = json.loads(Path("worldtest-runner-audit.lock.json").read_text())
+          validate(instance=audit, schema=schema)
+          observed = audit["observed_reference_behavior"]
+          assert observed["feedback_request_contains_reward_field"] is True
+          assert observed["evaluation_controller_forwards_step_reward_on_each_feedback"] is True
+          assert observed["exploration_ordinary_action_reward"] == 0
+          assert observed["explicit_reset_reward"] == 0
+          assert observed["go_to_test_action"] == "go-to-test"
+          assert observed["go_to_test_action_reward"] == 0
+          assert audit["adapter_requirements"]["reject_nonzero_exploration_reward"] is True
+          print("MARA constant-zero exploration reward and charged phase exit source audit validated")
           PY

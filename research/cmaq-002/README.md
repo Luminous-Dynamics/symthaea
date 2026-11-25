@@ -161,3 +161,8 @@ A separate metadata-only extension now tracks [WorldTest / AutumnBench](https://
 - This is not the DEEP/ActiveArena camera-perception adapter in #8156, and it is not a completed AutumnBench run.
 
 Protocol: [WORLDTEST_ADAPTER_V0_1.md](WORLDTEST_ADAPTER_V0_1.md). Baseline lock: [worldtest-baseline.lock.json](worldtest-baseline.lock.json). Phase custody contract: [worldtest-adapter-contract.schema.json](worldtest-adapter-contract.schema.json).
+
+
+### MARA reward and phase-exit custody
+
+The MARA reference runner forwards a reward field during exploration, but the pinned interactive environment returns constant zero for normal exploration actions, reset and go-to-test. The field is present but carries no task reward signal. Any adapter must reject a nonzero exploration reward. The go-to-test action is a charged exploration interaction; the terminal BeginTest marker is added only by the trusted adapter after transition acceptance. See [WORLDTEST_MARA_RUNNER_AUDIT_V0_1.md](WORLDTEST_MARA_RUNNER_AUDIT_V0_1.md).
