@@ -511,6 +511,34 @@ mod tests {
     }
 
     #[test]
+    fn payload_shape_rejects_leakage_and_early_reveal_mutations() {
+        let (manifest, verified, witness) = test_verified_sealed_evaluation_fixture_v1();
+        let mut payload = build_mace_evaluation_anchor_payload_v1(
+            &manifest,
+            &verified,
+            &witness,
+            &expected(),
+        ).unwrap().payload().clone();
+        payload.candidate_readable_before_trace_seal = true;
+        assert_eq!(
+            mace_evaluation_anchor_payload_sha256_v1(&payload),
+            Err(MaceEvaluationAnchorPayloadRejectV1::CandidateReadableBeforeTraceSeal)
+        );
+
+        let mut payload = build_mace_evaluation_anchor_payload_v1(
+            &manifest,
+            &verified,
+            &witness,
+            &expected(),
+        ).unwrap().payload().clone();
+        payload.reveal_condition = "candidate_access_before_trace_seal".to_owned();
+        assert_eq!(
+            mace_evaluation_anchor_payload_sha256_v1(&payload),
+            Err(MaceEvaluationAnchorPayloadRejectV1::InvalidRevealCondition)
+        );
+    }
+
+    #[test]
     fn altered_manifest_cannot_be_bound_to_verified_capability() {
         let (manifest, verified, witness) = test_verified_sealed_evaluation_fixture_v1();
         let mut altered = manifest.clone();
