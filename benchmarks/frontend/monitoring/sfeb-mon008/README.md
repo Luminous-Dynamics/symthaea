@@ -46,3 +46,8 @@ The benchmark matches PostgreSQL outbox, DBOS, Temporal, SCITT/RFC 9942+9943, Re
 MON-008 is deliberately not positioned as a new agent receipt format. See `INTEROPERABILITY-AND-NOVELTY-MAP-v1.md` for the current RFC 9942/9943, AEE, Vaara Receipt and Sigstore comparison. The AEE draft already defines caller/serving-party paired evidence and offline bundles; the next differentiator is to qualify the real destination-side state change, independent readback and declared observation completeness.
 
 `ASSURANCE-GAP-BENCHMARK-v2.md` adds AEE, the SCITT AI Agent Execution profile and Vaara Receipt as comparison arms, and adds omission/coverage adversarial tests. It forbids treating missing receipt evidence as proof that an action did not occur outside an independently qualified observation boundary.
+
+
+## Industry baseline facts
+
+`CURRENT-INDUSTRY-BASELINES-v1.md` records the dated DBOS, Temporal, Rekor and RFC 9942/9943 reference points, and explains why W0 no-op throughput cannot be ranked against external-effect qualification. The benchmark's main target is offline-audited external effects/s at a matched assurance tier, with false accepts, duplicates, indeterminate outcomes, coverage and cost reported alongside throughput.
