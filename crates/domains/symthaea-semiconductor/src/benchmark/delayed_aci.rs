@@ -385,7 +385,7 @@ fn validate_policy(policy: &DelayedAciPolicyV1) -> Result<(), DelayedAciErrorV1>
     }
     require_text(&policy.policy_id, "policy.policy_id")?;
     if !policy.target_miscoverage.is_finite()
-        || !(0.0..=1.0).contains(&policy.target_miscoverage)
+        || !(0.0..1.0).contains(&policy.target_miscoverage)
         || !policy.learning_rate.is_finite()
         || policy.learning_rate <= 0.0
         || policy.delay_rounds == 0
@@ -464,6 +464,9 @@ pub fn begin_delayed_aci_round_v1(
         return Err(DelayedAciErrorV1(
             "ACI rounds must begin at zero and advance sequentially".into(),
         ));
+    }
+    if engine.current_round.is_some() && !engine.prediction_issued_this_round {
+        engine.guarantee_state = AciGuaranteeStateV1::UncertifiedMissingOrInvalidFeedback;
     }
     let overdue: Vec<u64> = engine
         .pending_predictions
@@ -1622,6 +1625,32 @@ mod tests {
         );
         assert!(engine.pending_predictions.is_empty());
         begin_and_issue(&mut engine, 1, AciPredictionIntervalV1::bounded(9.0, 11.0));
+    }
+
+    #[test]
+    fn skipped_prediction_round_revokes_fixed_complete_round_claim() {
+        let mut engine = engine(2);
+        begin_and_issue(&mut engine, 0, AciPredictionIntervalV1::bounded(9.0, 11.0));
+        begin_delayed_aci_round_v1(&mut engine, 1).unwrap();
+        // No prediction is issued in round 1.
+        begin_delayed_aci_round_v1(&mut engine, 2).unwrap();
+        assert_eq!(
+            engine.guarantee_state,
+            AciGuaranteeStateV1::UncertifiedMissingOrInvalidFeedback
+        );
+        // Round 0's due feedback must still be resolved or explicitly forfeited.
+        assert!(
+            issue_delayed_aci_prediction_v1(
+                &mut engine,
+                &prediction_input(
+                    "sample-2",
+                    "event-2",
+                    2,
+                    AciPredictionIntervalV1::bounded(9.0, 11.0),
+                )
+            )
+            .is_err()
+        );
     }
 
     #[test]
