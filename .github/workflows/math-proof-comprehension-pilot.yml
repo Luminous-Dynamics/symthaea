@@ -79,6 +79,8 @@ jobs:
             docs/research/MATH_PROOF_COMPREHENSION_PILOT_V1.schema.json
             docs/research/PROOF_PLAN_V1.schema.json
             docs/research/PROOF_PLAN_AND_COMM_V1.json
+            docs/research/PROOF_PLAN_GLOBAL_OBLIGATION_MUTATIONS_V1.schema.json
+            docs/research/PROOF_PLAN_GLOBAL_OBLIGATION_MUTATIONS_V1.json
             docs/research/PROOF_PLAN_MUTATION_FIXTURES_V1.schema.json
             docs/research/PROOF_PLAN_MUTATION_FIXTURES_V1.json
             docs/research/LOCAL_GLOBAL_PAIR_V1.schema.json
@@ -189,6 +191,24 @@ jobs:
             and ([.cases[] | select(.id == "MUT-LOCAL-GLOBAL-CONTEXT" and .mathematical_disposition == "unknown" and .oracle_status == "not_run")] | length) == 1' \
             docs/research/PROOF_PLAN_MUTATION_FIXTURES_V1.json >/dev/null
           echo "PROOF_PLAN_MUTATION_FIXTURE_PASS"
+
+          jq -e '.schema_version == "1.0.0"
+            and .artifact_id == "PROOF-PLAN-GLOBAL-OBLIGATION-MUTATIONS-001"
+            and .status == "frozen_expected_behavior_specification_not_execution"
+            and (.cases | length) == 11
+            and ([.cases[] | .id] | unique | length) == 11
+            and ([.cases[] | select(.id == "OBL-001-and-comm-complete" and .expected == "complete")] | length) == 1
+            and ([.cases[] | select(.id == "OBL-002-missing-discharge-provisional" and .expected == "incomplete" and .expected_counts.unresolved_goals == 1)] | length) == 1
+            and ([.cases[] | select(.id == "OBL-008-accepted-with-unresolved-leaf" and .expected == "reject")] | length) == 1
+            and ([.cases[] | select(.id == "OBL-009-primary-route-cycle" and .expected_counts.cycle_nodes > 0)] | length) == 1
+            and ([.cases[] | select(.id == "OBL-010-candidate-route-not-primary" and .expected == "primary_complete_candidate_incomplete")] | length) == 1
+            and ([.cases[] | select(.id == "OBL-011-multiple-primary-alternatives" and .expected == "reject")] | length) == 1' \
+            docs/research/PROOF_PLAN_GLOBAL_OBLIGATION_MUTATIONS_V1.json >/dev/null
+          jq -e '."$schema" == "https://json-schema.org/draft/2020-12/schema"
+            and .properties.cases.minItems == 11
+            and .properties.cases.maxItems == 11' \
+            docs/research/PROOF_PLAN_GLOBAL_OBLIGATION_MUTATIONS_V1.schema.json >/dev/null
+          echo "GLOBAL_OBLIGATION_MUTATION_FIXTURES_PASS"
 
           jq -e '.schema_version == "1.1.0"
             and .candidate.task_class == "synthetic_control_not_model_evaluation"
@@ -360,7 +380,10 @@ jobs:
           export CARGO_TARGET_DIR="$RUNNER_TEMP/proof-plan-target"
           cargo test --locked --manifest-path scripts/research/proof-plan-contract/Cargo.toml
           cargo run --locked --manifest-path scripts/research/proof-plan-contract/Cargo.toml --bin proof-plan-contract -- \
-            docs/research/PROOF_PLAN_AND_COMM_V1.json
+            docs/research/PROOF_PLAN_AND_COMM_V1.json | tee proof-plan-cli.out
+          grep -Fq "PRIMARY_ROUTE_ACCOUNTING=complete" proof-plan-cli.out
+          grep -Fq "primary_route_unresolved_goals=0" proof-plan-cli.out
+          grep -Fq "primary_route_terminal_goals=2" proof-plan-cli.out
           cargo run --locked --manifest-path scripts/research/proof-plan-contract/Cargo.toml --bin local-global -- \
             docs/research/LOCAL_GLOBAL_PAIR_SYNTHETIC_V1.json | tee local-global-cli.out
           grep -Eq '^candidate_payload_sha256=[a-f0-9]{64}$' local-global-cli.out
