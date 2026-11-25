@@ -1451,7 +1451,19 @@ mod tests {
 
     #[test]
     fn terminal_resource_paths_report_exact_branch_costs() {
-        let problem = branch_unlock_world();
+        let mut problem = branch_unlock_world();
+        problem.resource_budget.insert("compute_units".to_owned(), 1);
+        for action in &mut problem.actions {
+            action.resource_costs.insert("compute_units".to_owned(), 0);
+        }
+        problem
+            .actions
+            .iter_mut()
+            .find(|action| action.action_id == "C1")
+            .unwrap()
+            .resource_costs
+            .insert("compute_units".to_owned(), 1);
+
         let dynamic = evaluate_sequential_robust(&problem).unwrap();
         let exhaustive = enumerate_sequential_robust(&problem).unwrap();
 
@@ -1465,6 +1477,8 @@ mod tests {
             assert_eq!(path.steps[0].action_id, "B");
             assert!(path.steps[1].action_id == "C0" || path.steps[1].action_id == "C1");
             assert_eq!(path.resource_usage["experiment_units"], 2);
+            let expected_compute = if path.steps[1].action_id == "C0" { 0 } else { 1 };
+            assert_eq!(path.resource_usage["compute_units"], expected_compute);
         }
     }
 
