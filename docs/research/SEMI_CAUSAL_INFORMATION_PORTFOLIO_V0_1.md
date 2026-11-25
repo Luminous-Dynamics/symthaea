@@ -24,6 +24,7 @@ The input declares:
 - outcome likelihoods P(outcome | hypothesis);
 - cost, queue delay, capacity units and randomized-audit status;
 - calibration/source-path/safety eligibility;
+- randomized-audit design digest and declared inclusion probability when the candidate is an audit;
 - predictive-risk reduction as a separate model-supplied term;
 - dependence-group identity;
 - objective weights and hard resource limits.
@@ -66,13 +67,13 @@ A candidate receives no information credit unless:
 - safety preconditions are satisfied;
 - the likelihood model and outcome schema digests are valid.
 
-This is a pre-measurement plan. A future physical outcome is **not** pre-qualified by the plan: the report always records that it must pass the downstream K1 numeric-label qualification before model or conformal updates.
+This is a pre-measurement plan. A future physical outcome is **not** pre-qualified by the plan: the report always records that it must pass the downstream K1 numeric-label qualification before model or conformal updates. The declared source path must be qualified before the candidate receives information credit.
 
 A randomized-audit candidate must provide:
 - a sampling-design digest;
 - an inclusion probability in (0, 1].
 
-If the requested randomized-audit floor cannot be met within cost/capacity constraints, the output is AUDIT_FLOOR_UNSATISFIED. Population estimation is only marked available when the selected portfolio meets a positive audit floor. Selected-only measurements without valid audit inclusion probabilities cannot support production prevalence claims.
+If the requested randomized-audit floor cannot be met within cost/capacity constraints, the output is AUDIT_FLOOR_UNSATISFIED. Population estimation is only marked available when the selected portfolio meets a positive audit floor and the chosen audit candidates carry recorded inclusion probabilities. Selected-only measurements without valid audit inclusion probabilities cannot support production prevalence claims.
 
 ## Deterministic exact search
 
@@ -90,7 +91,7 @@ The integration reference tests independently enumerate a two-candidate joint-ou
 
 ## Authored adversarial coverage
 
-The source currently includes 12 Rust unit tests plus 2 integration reference tests covering:
+The source currently includes 14 Rust unit tests plus 2 integration reference tests covering:
 1. known binary-test information gain;
 2. hard cost and capacity;
 3. same dependency-group exclusion;
