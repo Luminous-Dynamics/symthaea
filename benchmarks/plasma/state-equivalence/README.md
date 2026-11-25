@@ -19,3 +19,16 @@ See [#13503](https://github.com/Luminous-Dynamics/symthaea/issues/13503).
 The response-signature schema includes a positive, finite scale for each registered QoI. The comparison divides each complex residual by the scale of its QoI before taking the RMS across the fixed intervention/QoI/time grid. Signatures with different scale vectors cannot be compared. This prevents unit mismatches (for example field amplitude versus energy) and prevents a caller from changing the comparison normalization after signatures are created.
 
 The Rust tests include a two-QoI known-answer case with scales [1, 10] and a negative control rejecting a pair whose scale vectors differ.
+
+
+## Finite-class diameter audit
+
+Pairwise approximate compatibility remains useful as a diagnostic, but it is not transitive. The Rust API now reports both:
+- normalized RMS distance across the registered response grid (useful as a summary);
+- maximum normalized complex-response error at any individual intervention/QoI/time entry (the admission criterion).
+
+`pairwise_compatible` uses the maximum per-entry error, not RMS, so a single large future-response miss cannot be diluted by many small entries.
+
+`audit_response_signature_cluster` checks every pair in a proposed finite class. It reports the number of compatible/incompatible pairs, maximum RMS and per-entry errors, completeness, branch stability and structure-class compatibility. A class is admitted only when every pair satisfies the frozen tolerance and all identity / observation gates pass. The audit has bounded member and comparison-work budgets.
+
+For A/B/C, A–B and B–C pass at tolerance 1, but A–C fails at 1.5. The complete three-member class is therefore rejected even though connected-component union-find would merge all three. This is a finite empirical diameter check, not a proof of equivalence for untested kinetic states or interventions.
