@@ -2931,6 +2931,10 @@ impl WeightedEmpiricalMeasure1D {
 pub const PARTICLE_MEASURE_W1_FIXTURE: &str = include_str!(
     "../../../../benchmarks/plasma/measure-stability/fixtures/particle-measure-w1-known-answer-v0.1.json"
 );
+/// Periodic one-dimensional particle-measure W1 known-answer fixture.
+pub const PARTICLE_MEASURE_TORUS_W1_FIXTURE: &str = include_str!(
+    "../../../../benchmarks/plasma/measure-stability/fixtures/particle-measure-torus-w1-known-answer-v0.1.json"
+);
 
 /// Low-order Fourier moments of a weighted empirical particle measure on a torus.
 ///
@@ -7674,6 +7678,71 @@ mod tests {
         .unwrap();
         assert_eq!(coarse.atoms(), fine.atoms());
         assert_eq!(coarse.wasserstein1(&fine), Ok(0.0));
+    }
+
+    #[test]
+    fn periodic_wasserstein_fixture_matches_all_declared_known_answers() {
+        let fixture: serde_json::Value =
+            serde_json::from_str(PARTICLE_MEASURE_TORUS_W1_FIXTURE).unwrap();
+        let default_minimum = fixture["domain"]["minimum"].as_f64().unwrap();
+        let default_maximum = fixture["domain"]["maximum"].as_f64().unwrap();
+        let cases = fixture["cases"].as_array().unwrap();
+        assert_eq!(cases.len(), 4);
+
+        for case in cases {
+            let minimum = case
+                .get("domain_override")
+                .and_then(|domain| domain["minimum"].as_f64())
+                .unwrap_or(default_minimum);
+            let maximum = case
+                .get("domain_override")
+                .and_then(|domain| domain["maximum"].as_f64())
+                .unwrap_or(default_maximum);
+            let parse_measure = |value: &serde_json::Value| {
+                let positions = value["positions"]
+                    .as_array()
+                    .unwrap()
+                    .iter()
+                    .map(|item| item.as_f64().unwrap())
+                    .collect::<Vec<_>>();
+                let weights = value["weights"]
+                    .as_array()
+                    .unwrap()
+                    .iter()
+                    .map(|item| item.as_f64().unwrap())
+                    .collect::<Vec<_>>();
+                WeightedEmpiricalMeasure1D::new(
+                    &positions,
+                    &weights,
+                    minimum,
+                    maximum,
+                )
+                .unwrap()
+            };
+            let left = parse_measure(&case["left"]);
+            let right = parse_measure(&case["right"]);
+            let expected = case["expected_w1"].as_f64().unwrap();
+            assert!(
+                (left.wasserstein1_periodic(&right).unwrap() - expected).abs() < 1.0e-13,
+                "known-answer case {}",
+                case["case_id"].as_str().unwrap()
+            );
+
+            if let (Some(translated_left), Some(translated_right), Some(translated_expected)) = (
+                case.get("translated_left"),
+                case.get("translated_right"),
+                case.get("translated_expected_w1").and_then(serde_json::Value::as_f64),
+            ) {
+                let translated_left = parse_measure(translated_left);
+                let translated_right = parse_measure(translated_right);
+                assert!(
+                    (translated_left.wasserstein1_periodic(&translated_right).unwrap()
+                        - translated_expected)
+                        .abs()
+                        < 1.0e-13
+                );
+            }
+        }
     }
 
     #[test]
