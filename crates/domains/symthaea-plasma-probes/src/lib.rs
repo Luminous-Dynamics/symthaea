@@ -11576,7 +11576,7 @@ mod tests {
         )
         .unwrap();
         let comparison = first.compare(&same_path_candidate).unwrap();
-        assert!(comparison.structure_class_compatible == false);
+        assert!(!comparison.structure_class_compatible);
         assert_eq!(
             first.compare(&other_path),
             Err(ContractError::InvalidKineticPathResponseSignature(
