@@ -5026,6 +5026,7 @@ fn validate_kird_global_coverage(
     }
 
     let covering_radius = kird_number(root, "response_scope.covering_radius")?;
+    validate_kird_interval_cover(root, covering_radius, registered_probe_count)?;
     let lipschitz_constant = kird_number(root, "response_scope.verified_lipschitz_constant")?;
     let reference_uncertainty = kird_number(root, "response_scope.reference_uncertainty")?;
     let candidate_uncertainty = kird_number(root, "response_scope.candidate_uncertainty")?;
@@ -5110,6 +5111,106 @@ fn validate_kird_global_coverage(
         ));
     }
 
+    Ok(())
+}
+
+/// Verify a one-dimensional compact interval r-net using exact integer ticks.
+///
+/// This verifies the cover geometry in the declared normalized interval metric.
+/// It does not prove the response Lipschitz constant; that remains a separate
+/// proof artifact checked by an independent certificate process.
+fn validate_kird_interval_cover(
+    root: &serde_json::Value,
+    declared_radius: f64,
+    registered_probe_count: u64,
+) -> Result<(), ContractError> {
+    let metric_type = kird_string(root, "response_scope.coverage_domain.metric_type")?;
+    if metric_type != "normalized_interval_abs" {
+        return Err(kird_error(
+            "response_scope.coverage_domain.metric_type",
+            "this verifier currently supports only one-dimensional normalized interval absolute distance",
+        ));
+    }
+    let coordinate_id = kird_string(root, "response_scope.coverage_domain.coordinate_id")?;
+    if coordinate_id.trim().is_empty() {
+        return Err(kird_error(
+            "response_scope.coverage_domain.coordinate_id",
+            "must identify the normalized intervention coordinate",
+        ));
+    }
+
+    let minimum_tick = kird_u64(root, "response_scope.coverage_domain.minimum_tick")?;
+    let maximum_tick = kird_u64(root, "response_scope.coverage_domain.maximum_tick")?;
+    let tick_scale = kird_u64(root, "response_scope.coverage_domain.tick_scale")?;
+    let radius_ticks = kird_u64(root, "response_scope.coverage_domain.radius_ticks")?;
+    if tick_scale == 0 || minimum_tick >= maximum_tick || maximum_tick > tick_scale {
+        return Err(kird_error(
+            "response_scope.coverage_domain",
+            "normalized interval ticks require 0 <= minimum < maximum <= tick_scale",
+        ));
+    }
+
+    let centers = kird_array(root, "response_scope.coverage_domain.probe_centers_ticks")?;
+    if centers.len() as u64 != registered_probe_count {
+        return Err(kird_error(
+            "response_scope.coverage_domain.probe_centers_ticks",
+            "the geometric cover must contain exactly one center per registered intervention probe",
+        ));
+    }
+    let mut intervals = Vec::with_capacity(centers.len());
+    let mut sorted_centers = Vec::with_capacity(centers.len());
+    for center_value in centers {
+        let center = center_value.as_u64().ok_or_else(|| {
+            kird_error(
+                "response_scope.coverage_domain.probe_centers_ticks",
+                "each center must be a non-negative integer tick",
+            )
+        })?;
+        if center < minimum_tick || center > maximum_tick {
+            return Err(kird_error(
+                "response_scope.coverage_domain.probe_centers_ticks",
+                "probe center lies outside the declared compact intervention interval",
+            ));
+        }
+        sorted_centers.push(center);
+        let left = center.saturating_sub(radius_ticks).max(minimum_tick);
+        let right = center.saturating_add(radius_ticks).min(maximum_tick);
+        intervals.push((left, right));
+    }
+    sorted_centers.sort_unstable();
+    if sorted_centers.windows(2).any(|pair| pair[0] == pair[1]) {
+        return Err(kird_error(
+            "response_scope.coverage_domain.probe_centers_ticks",
+            "duplicate probe centers do not increase cover coverage",
+        ));
+    }
+
+    intervals.sort_unstable_by_key(|interval| interval.0);
+    let mut covered_until = minimum_tick;
+    for (left, right) in intervals {
+        if left > covered_until {
+            return Err(kird_error(
+                "response_scope.coverage_domain",
+                "probe balls leave a gap in the declared compact interval",
+            ));
+        }
+        covered_until = covered_until.max(right);
+    }
+    if covered_until < maximum_tick {
+        return Err(kird_error(
+            "response_scope.coverage_domain",
+            "probe balls do not cover the upper end of the declared compact interval",
+        ));
+    }
+
+    let geometric_radius = radius_ticks as f64 / tick_scale as f64;
+    let allowance = 1.0e-12_f64.max(geometric_radius.abs() * 1.0e-10);
+    if !declared_radius.is_finite() || (declared_radius - geometric_radius).abs() > allowance {
+        return Err(kird_error(
+            "response_scope.covering_radius",
+            "declared covering radius must equal radius_ticks / tick_scale",
+        ));
+    }
     Ok(())
 }
 
@@ -5895,6 +5996,69 @@ mod tests {
             validate_kird_record_value(&value),
             Err(ContractError::InvalidKirdField {
                 field: "response_scope.cover_radius_evidence_sha256",
+                ..
+            })
+        ));
+    }
+
+    #[test]
+    fn kird_audit_verifies_interval_probe_balls_cover_the_entire_domain() {
+        let value = certified_kird_value();
+        let report = validate_kird_record_value(&value).unwrap();
+        assert_eq!(report.response_coverage_kind, "certified_global");
+        assert_eq!(report.covering_radius, Some(0.1));
+    }
+
+    #[test]
+    fn kird_audit_rejects_a_gap_in_the_certified_interval_cover() {
+        let mut value = certified_kird_value();
+        value["response_scope"]["coverage_domain"]["radius_ticks"] = serde_json::json!(4);
+        value["response_scope"]["covering_radius"] = serde_json::json!(0.04);
+        assert!(matches!(
+            validate_kird_record_value(&value),
+            Err(ContractError::InvalidKirdField {
+                field: "response_scope.coverage_domain",
+                ..
+            })
+        ));
+    }
+
+    #[test]
+    fn kird_audit_rejects_interval_cover_probe_count_mismatch() {
+        let mut value = certified_kird_value();
+        value["response_scope"]["coverage_domain"]["probe_centers_ticks"] =
+            serde_json::json!([0, 10]);
+        assert!(matches!(
+            validate_kird_record_value(&value),
+            Err(ContractError::InvalidKirdField {
+                field: "response_scope.coverage_domain.probe_centers_ticks",
+                ..
+            })
+        ));
+    }
+
+    #[test]
+    fn kird_audit_rejects_probe_centers_outside_the_compact_domain() {
+        let mut value = certified_kird_value();
+        value["response_scope"]["coverage_domain"]["probe_centers_ticks"] =
+            serde_json::json!([11]);
+        assert!(matches!(
+            validate_kird_record_value(&value),
+            Err(ContractError::InvalidKirdField {
+                field: "response_scope.coverage_domain.probe_centers_ticks",
+                ..
+            })
+        ));
+    }
+
+    #[test]
+    fn kird_audit_rejects_covering_radius_inconsistent_with_integer_geometry() {
+        let mut value = certified_kird_value();
+        value["response_scope"]["covering_radius"] = serde_json::json!(0.09);
+        assert!(matches!(
+            validate_kird_record_value(&value),
+            Err(ContractError::InvalidKirdField {
+                field: "response_scope.covering_radius",
                 ..
             })
         ));
