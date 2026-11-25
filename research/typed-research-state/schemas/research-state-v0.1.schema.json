@@ -18,7 +18,10 @@
       "const": "symthaea-public-research-state-v0.1"
     },
     "status": {
-      "const": "SYNTHETIC_CONFORMANCE_EXAMPLE_NOT_PRODUCTION_STATE"
+      "enum": [
+        "SYNTHETIC_CONFORMANCE_EXAMPLE_NOT_PRODUCTION_STATE",
+        "PRODUCTION_PUBLIC_STATE"
+      ]
     },
     "research_episode_id": {
       "type": "string",
