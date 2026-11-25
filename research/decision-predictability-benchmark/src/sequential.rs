@@ -369,7 +369,6 @@ fn validate(problem: &SequentialRobustProblem) -> Result<(), SequentialOracleErr
             });
         }
         let mut outcome_seen = BTreeSet::new();
-        let mut action_covered_states = BTreeSet::new();
         for outcome in &action.outcomes {
             if outcome.outcome_id.trim().is_empty() {
                 return Err(SequentialOracleError::EmptyIdentifier("outcome"));
@@ -401,15 +400,6 @@ fn validate(problem: &SequentialRobustProblem) -> Result<(), SequentialOracleErr
                         id: state_id.clone(),
                     });
                 }
-                action_covered_states.insert(state_id.as_str());
-            }
-        }
-        for state_id in &problem.state_ids {
-            if !action_covered_states.contains(state_id.as_str()) {
-                return Err(SequentialOracleError::UncoveredState {
-                    action_id: action.action_id.clone(),
-                    state_id: state_id.clone(),
-                });
             }
         }
     }
@@ -427,6 +417,81 @@ fn validate(problem: &SequentialRobustProblem) -> Result<(), SequentialOracleErr
                     id: action_id.clone(),
                 });
             }
+        }
+    }
+
+    // Validate outcome exhaustiveness against the state support actually
+    // reachable at each public protocol node. Branch-specific actions need
+    // not cover the original universe, only the states that can reach them.
+    let mut reachable: BTreeMap<String, BTreeSet<String>> = BTreeMap::new();
+    reachable.insert(
+        problem.initial_protocol_state_id.clone(),
+        states.iter().map(|state| (*state).to_owned()).collect(),
+    );
+    loop {
+        let snapshot: Vec<(String, Vec<String>, Vec<String>)> = problem
+            .protocol_states
+            .iter()
+            .filter_map(|protocol_state| {
+                reachable.get(&protocol_state.protocol_state_id).map(|support| {
+                    (
+                        protocol_state.protocol_state_id.clone(),
+                        support.iter().cloned().collect(),
+                        protocol_state.legal_action_ids.clone(),
+                    )
+                })
+            })
+            .collect();
+        let mut changed = false;
+
+        for (_protocol_state_id, current_support, legal_actions) in snapshot {
+            if current_support.is_empty() {
+                continue;
+            }
+            for action_id in legal_actions {
+                let action = problem
+                    .actions
+                    .iter()
+                    .find(|candidate| candidate.action_id == action_id)
+                    .ok_or_else(|| SequentialOracleError::UnknownAction(action_id.clone()))?;
+                let current_ids: BTreeSet<&str> =
+                    current_support.iter().map(String::as_str).collect();
+                let mut covered = BTreeSet::new();
+
+                for outcome in &action.outcomes {
+                    let compatible: Vec<String> = outcome
+                        .possible_state_ids
+                        .iter()
+                        .filter(|state_id| current_ids.contains(state_id.as_str()))
+                        .cloned()
+                        .collect();
+                    if compatible.is_empty() {
+                        continue;
+                    }
+                    for state_id in &compatible {
+                        covered.insert(state_id.clone());
+                    }
+                    let next_support = reachable
+                        .entry(outcome.next_protocol_state_id.clone())
+                        .or_default();
+                    for state_id in compatible {
+                        changed |= next_support.insert(state_id);
+                    }
+                }
+
+                for state_id in &current_support {
+                    if !covered.contains(state_id) {
+                        return Err(SequentialOracleError::UncoveredState {
+                            action_id: action.action_id.clone(),
+                            state_id: state_id.clone(),
+                        });
+                    }
+                }
+            }
+        }
+
+        if !changed {
+            break;
         }
     }
     Ok(())
