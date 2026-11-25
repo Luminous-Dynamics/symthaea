@@ -118,6 +118,8 @@ jobs:
             and .selection_receipt_is_authentication == false
             and (.selection_receipt_sha256 | test("^[0-9a-f]{64}$"))
             and ([.probability_audit[].item_inclusion_probability | select(.numerator == 2 and .denominator == 3)] | length) == 4
+            and (.probability_audit_design | length) == 2
+            and all(.probability_audit_design[]; .eligible_source_works == 3 and .selected_source_works == 2 and .eligible_query_items == 3 and .selected_query_items == 2 and .items_per_source_work_cap == 2)
             and ([.active_refinement[].item_inclusion_probability | select(. != null)] | length) == 0
           ' "$RUNNER_TEMP/annotation-acquisition-report.json" > /dev/null
 
