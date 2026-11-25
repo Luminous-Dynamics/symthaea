@@ -42,6 +42,7 @@ A file-disjoint split reduces one source of leakage. It does not establish host-
 The `agent_behavior` module adds a deterministic, tenant/task-scoped feature baseline for autonomous-agent telemetry. It correlates normalized worker creation, destination expansion, API-read volume, privilege changes, model-endpoint drift, secret-access attempts, egress/scope enforcement, artifact provenance, and recovery-control events.
 
 - Findings carry event IDs, source collector IDs, and opaque verified-receipt references.
+- Every trace event is bound to the Nixward task-contract digest and exact workload digest; a task window rejects mixed tenant/task/contract/workload/principal scopes.
 - Event fields and receipt references are immutable outside the module; events cannot be constructed with public struct literals or deserialized directly.
 - Semantic event kinds are bound to their expected telemetry plane (for example, network egress events require network evidence, model endpoint drift requires model-gateway evidence, and recovery claims require recovery/service-observer evidence).
 - Mixed-tenant or mixed-task windows, duplicate event IDs, mismatched source planes, and missing source receipts are rejected.
