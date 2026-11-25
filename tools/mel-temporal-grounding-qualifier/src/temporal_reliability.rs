@@ -17,9 +17,9 @@ use crate::temporal_consensus::{
     MultiAnnotatorTemporalCaseV1,
 };
 use crate::temporal_grounding::{
-    score_temporal_grounding, GroundTruthStateV1, GroundingPredictionStateV1,
-    TemporalGroundTruthV1, TemporalGroundingPredictionV1, TemporalGroundingScoreV1,
-    TEMPORAL_GROUNDING_SCHEMA_V1,
+    score_temporal_grounding, AudioArtifactClockV1, GroundTruthStateV1,
+    GroundingPredictionStateV1, TemporalGroundTruthV1, TemporalGroundingPlanV1,
+    TemporalGroundingPredictionV1, TemporalGroundingScoreV1, TEMPORAL_GROUNDING_SCHEMA_V1,
 };
 
 const DATASET_SCHEMA_V1: &str = "mel-multi-annotator-reliability-dataset-v1";
@@ -169,7 +169,13 @@ pub struct MultiAnnotatorReliabilityBootstrapV1 {
 pub struct ModelGroundingItemReliabilityV1 {
     pub item_id: String,
     pub query_id: String,
+    pub query_text: String,
     pub source_work_id_sha256: String,
+    pub annotation_manifest_sha256: String,
+    pub artifact: AudioArtifactClockV1,
+    pub plan: TemporalGroundingPlanV1,
+    pub prediction: TemporalGroundingPredictionV1,
+    pub annotations: Vec<IndependentTemporalAnnotationV1>,
     pub summary: MultiAnnotatorGroundingSummaryV1,
     pub annotator_results: Vec<AnnotatorGroundingResultV1>,
 }
@@ -238,7 +244,13 @@ pub fn audit_multi_annotator_dataset(
         model_grounding_by_item.push(ModelGroundingItemReliabilityV1 {
             item_id: item.item_id.clone(),
             query_id: item.case.query_id.clone(),
+            query_text: item.case.query_text.clone(),
             source_work_id_sha256: item.source_work_id_sha256.clone(),
+            annotation_manifest_sha256: item.case.annotation_manifest_sha256.clone(),
+            artifact: item.case.artifact.clone(),
+            plan: item.case.plan.clone(),
+            prediction: item.case.prediction.clone(),
+            annotations: item.case.annotations.clone(),
             summary: model_report.summary,
             annotator_results: model_report.annotator_results,
         });
