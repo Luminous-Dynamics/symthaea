@@ -7,7 +7,7 @@
 
 use super::worldtest_exploration::{
     evaluate_worldtest_exploration, ExplorationEvent, ExplorationTrace,
-    WorldTestExplorationCertificate, WorldTestExplorationError,
+    WorldTestExplorationCertificate, WorldTestExplorationError, WORLDTEST_RATIO_PPM,
 };
 use std::fmt;
 
@@ -113,8 +113,12 @@ pub fn evaluate_mara_worldtest_exploration(
                 validate_zero_reward(index, *reward_bits)?;
                 if action_id == "go-to-test" {
                     go_to_test_positions.push(index);
+                    // This is a charged protocol transition, not a repeated
+                    // environment action. Count it below, but exclude it from
+                    // reset-replay sequence similarity.
+                } else {
+                    generic_events.push(ExplorationEvent::Action(action_id.clone()));
                 }
-                generic_events.push(ExplorationEvent::Action(action_id.clone()));
             }
             MaraExplorationEvent::Reset { reward_bits } => {
                 validate_zero_reward(index, *reward_bits)?;
@@ -139,8 +143,35 @@ pub fn evaluate_mara_worldtest_exploration(
     let generic_trace = ExplorationTrace {
         events: generic_events,
     };
-    evaluate_worldtest_exploration(&generic_trace)
-        .map_err(WorldTestPhaseContractError::Trace)
+    let mut certificate = evaluate_worldtest_exploration(&generic_trace)
+        .map_err(WorldTestPhaseContractError::Trace)?;
+
+    // go-to-test consumes one candidate interaction but is not part of the
+    // environment-action sequence used to calculate reset-replay LCS.
+    certificate.exploration_action_count = certificate
+        .exploration_action_count
+        .checked_add(1)
+        .ok_or(WorldTestPhaseContractError::Trace(
+            WorldTestExplorationError::ArithmeticOverflow,
+        ))?;
+    let total_interactions = u128::from(certificate.exploration_action_count)
+        .checked_add(u128::from(certificate.reset_count))
+        .ok_or(WorldTestPhaseContractError::Trace(
+            WorldTestExplorationError::ArithmeticOverflow,
+        ))?;
+    let reset_numerator = u128::from(certificate.reset_count)
+        .checked_mul(u128::from(WORLDTEST_RATIO_PPM))
+        .ok_or(WorldTestPhaseContractError::Trace(
+            WorldTestExplorationError::ArithmeticOverflow,
+        ))?;
+    certificate.reset_share_ppm = u32::try_from(
+        reset_numerator / total_interactions,
+    )
+    .map_err(|_| WorldTestPhaseContractError::Trace(
+        WorldTestExplorationError::ArithmeticOverflow,
+    ))?;
+
+    Ok(certificate)
 }
 
 #[cfg(test)]
@@ -178,6 +209,7 @@ mod tests {
         assert_eq!(certificate.exploration_action_count, 3);
         assert_eq!(certificate.reset_count, 1);
         assert_eq!(certificate.reset_share_ppm, 250_000);
+        assert_eq!(certificate.reset_replay_pairs[0].after_action_count, 1);
     }
 
     #[test]
