@@ -351,7 +351,16 @@ fn decode_dsse_base64(value: &str) -> Result<Vec<u8>, EvidenceQualificationRejec
 }
 
 fn parse_strict_json(bytes: &[u8]) -> Result<Value, EvidenceQualificationRejectV1> {
-    if bytes.len() > MAX_DSSE_PAYLOAD_BYTES_V1 {
+    parse_strict_json_bounded(bytes, MAX_DSSE_PAYLOAD_BYTES_V1)
+}
+
+/// Shared strict JSON parser for other MACE wire formats. Duplicate object
+/// keys are rejected before conversion to serde_json::Value.
+pub(crate) fn parse_strict_json_bounded(
+    bytes: &[u8],
+    maximum_bytes: usize,
+) -> Result<Value, EvidenceQualificationRejectV1> {
+    if bytes.len() > maximum_bytes {
         return Err(EvidenceQualificationRejectV1::DssePayloadTooLarge);
     }
     let parsed: StrictJsonValue = serde_json::from_slice(bytes)

@@ -74,3 +74,14 @@ Resource receipts report local measured index-build and query latency, source/st
 The sidecar's retrieval arms are fixed benchmark ablations, not learned strategy selection. The selected mode, active channel list, backend identity, entity-literal field weights (when used), extraction rule, backend binary digest and RRF configuration (when hybrid) are included in the Python bridge's backend profile commitment. Each executed action is independently recorded even when it returns no candidates.
 
 No V2 run or score is claimed.
+
+
+## DSSE-backed independent qualification exchange
+
+The `independent_qualification_exchange` module packages the exact canonical candidate JSONL and consumer-owned use binding for an injected issuer transport. The issuer returns a DSSE v1.0.2 JSON envelope containing an in-toto Statement v1 with the MACE qualification predicate. The consumer verifies the exact PAE, signed candidate-set subject, complete DecisionNeed/use binding and pinned Ed25519 signer, then returns only a dependency-closed qualified projection or explicit abstention. The original unqualified batch is never a fallback.
+
+The exchange samples protected consumer time after the issuer response; the request has no caller-controlled timestamp. The result retains the exact signed envelope and can reconstruct a fresh verifier from the current pinned trust profile before each subsequent use.
+
+This is still a consumer-side library contract, not an independent qualifier or production transport. The production issuer must run under separate credentials and trust roots, independently resolve payload/source material, recompute provenance, and check rights, purpose, scope, correction/revocation and erasure state. The public test-signing key is deterministic and must never be used in production.
+
+Protocol: [MACE independent qualification exchange v1](../../../docs/research/MACE_INDEPENDENT_QUALIFICATION_EXCHANGE_V1.md). Request schema: [mace_evidence_qualification_request_v1.schema.json](../../../data/schemas/mace_evidence_qualification_request_v1.schema.json).
