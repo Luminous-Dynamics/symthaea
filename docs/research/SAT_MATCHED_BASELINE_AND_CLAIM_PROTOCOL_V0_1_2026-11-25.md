@@ -153,7 +153,13 @@ A SAT claim must state its evidence level:
 | L4 | Blind independent evaluator, sealed holdout and independent regrade | Independently evaluated qualification for a frozen configuration/profile |
 | L5 | Field/production evidence, drift monitoring, incident response and change-triggered requalification | Time-bounded deployment assurance under stated operating constraints |
 
-A higher level requires every lower-level prerequisite. Source-authored tests are not L1 until executed. A valid event chain is not L3. A report issued by the system owner alone is not L4. An L4 result is not a general alignment or civilizational-safety proof.
+A higher level requires every lower-level prerequisite. Source-authored tests are not L1 until executed. An internally consistent unkeyed event chain is not an external tamper-resistance claim; L3/L4 evidence that requires trace custody also needs an authenticated checkpoint or separately qualified witness. A report issued by the system owner alone is not L4. An L4 result is not a general alignment or civilizational-safety proof.
+
+## 10.1 Evidence custody and transparency checkpoint requirements
+
+For evidence-integrity and independent regrade claims, include a trace-head checkpoint package where the threat model requires protection against complete-history rewrite. Use the [SAT External Trace Checkpoint Profile V0.1](SAT_TRACE_CHECKPOINT_PROFILE_V0_1_2026-11-25.md), based on existing [SCITT RFC 9943](https://www.rfc-editor.org/rfc/rfc9943.html) or a compatible transparency service such as [Sigstore Rekor](https://docs.sigstore.dev/logging/overview/).
+
+The evaluator must verify the signed statement, key policy/revocation, inclusion proof, consistency from a previously pinned checkpoint and independent witness threshold. A checkpoint inside the candidate's own report, without external trust/custody, is not an anchor. If only the unkeyed trace is available, the claim level must say "internally consistent, unanchored"; it must not claim tamper resistance against full rewrite.
 
 ## 11. Publication and SOTA claim rules
 
