@@ -399,7 +399,7 @@ pub fn analyze_global_obligations(plan: &ProofPlan) -> GlobalObligationReport {
 #[cfg(test)]
 mod tests {
     use super::*;
-    use crate::{parse_plan, PlanStatus};
+    use crate::parse_plan;
     use serde_json::Value;
 
     const FIXTURE: &str =
@@ -532,12 +532,12 @@ mod tests {
 
     #[test]
     fn multiple_primary_alternatives_block_acceptance() {
-        let mut plan = fixture();
-        let mut second = plan.alternatives[0].clone();
-        second.id = "ALT_PRIMARY_2".to_owned();
-        plan.alternatives.push(second);
-        plan.status = PlanStatus::Accepted;
-        let report = analyze_global_obligations(&plan);
+        let mut value = plan_value();
+        let mut second = value["alternatives"][0].clone();
+        second["id"] = Value::String("ALT_PRIMARY_2".to_owned());
+        value["alternatives"].as_array_mut().unwrap().push(second);
+        value["status"] = Value::String("accepted".to_owned());
+        let report = analyzed(&value);
         assert!(report.errors.iter().any(|error| error.contains("exactly one primary alternative")));
     }
 
