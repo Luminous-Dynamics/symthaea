@@ -11,7 +11,8 @@
     "pairwise_tolerance",
     "states",
     "expected_pairwise_comparisons",
-    "claim_boundary"
+    "claim_boundary",
+    "expected_finite_class_audit"
   ],
   "properties": {
     "schema_version": {
@@ -47,7 +48,8 @@
           "left",
           "right",
           "normalized_rms_distance",
-          "pairwise_compatible"
+          "pairwise_compatible",
+          "maximum_normalized_entry_error"
         ],
         "properties": {
           "left": {
@@ -64,6 +66,10 @@
           },
           "pairwise_compatible": {
             "type": "boolean"
+          },
+          "maximum_normalized_entry_error": {
+            "type": "number",
+            "minimum": 0
           }
         }
       }
@@ -74,7 +80,8 @@
       "required": [
         "approximate_pairwise_compatibility_is_not_transitive",
         "no_kinetic_state_pair_evaluated",
-        "no_physical_plasma_run"
+        "no_physical_plasma_run",
+        "finite_cluster_requires_all_pairwise_comparisons"
       ],
       "properties": {
         "approximate_pairwise_compatibility_is_not_transitive": {
@@ -85,6 +92,63 @@
         },
         "no_physical_plasma_run": {
           "const": true
+        },
+        "finite_cluster_requires_all_pairwise_comparisons": {
+          "const": true
+        }
+      }
+    },
+    "expected_finite_class_audit": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "member_count",
+        "compared_pair_count",
+        "compatible_pair_count",
+        "incompatible_pair_count",
+        "maximum_pairwise_normalized_rms_distance",
+        "maximum_pairwise_normalized_entry_error",
+        "complete_response_coverage",
+        "stable_branch_association",
+        "compatible_structure_class",
+        "within_finite_class_diameter"
+      ],
+      "properties": {
+        "member_count": {
+          "type": "integer",
+          "minimum": 1
+        },
+        "compared_pair_count": {
+          "type": "integer",
+          "minimum": 0
+        },
+        "compatible_pair_count": {
+          "type": "integer",
+          "minimum": 0
+        },
+        "incompatible_pair_count": {
+          "type": "integer",
+          "minimum": 0
+        },
+        "maximum_pairwise_normalized_rms_distance": {
+          "type": "number",
+          "minimum": 0
+        },
+        "maximum_pairwise_normalized_entry_error": {
+          "type": "number",
+          "minimum": 0
+        },
+        "complete_response_coverage": {
+          "type": "boolean"
+        },
+        "stable_branch_association": {
+          "type": "boolean"
+        },
+        "compatible_structure_class": {
+          "type": "boolean"
+        },
+        "within_finite_class_diameter": {
+          "type": "boolean"
         }
       }
     }
