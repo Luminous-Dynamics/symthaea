@@ -6,13 +6,11 @@
 //! first- and second-order ultimate-item inclusion probabilities; strata with
 //! zero pairwise inclusion support report variance unavailable.
 
-use std::collections::{BTreeMap, BTreeSet};
-
 use serde::{Deserialize, Serialize};
 
 use crate::temporal_acquisition::{
     plan_annotation_acquisition, AnnotationAcquisitionDatasetV1,
-    AnnotationAcquisitionReportV1, AnnotationSelectionRecordV1,
+    AnnotationSelectionRecordV1,
     ProbabilityAuditStratumDesignV1, SelectionStreamV1,
 };
 
@@ -328,10 +326,6 @@ fn estimate_stratum_variance(
     if design.selected_source_works < 2 && design.eligible_source_works > 1 {
         return Err(VarianceUnavailableReasonV1::FewerThanTwoSelectedSourceWorks);
     }
-    let selected: BTreeMap<&str, &SampledItemV1<'_>> = sample
-        .iter()
-        .map(|item| (item.selection.item_id.as_str(), item))
-        .collect();
     let mut variance = 0.0;
 
     for left in sample {
@@ -354,7 +348,6 @@ fn estimate_stratum_variance(
                 * (right.outcome / pi_right);
         }
     }
-    let _selected_lookup_size = selected.len();
     Ok(variance)
 }
 
