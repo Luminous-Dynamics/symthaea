@@ -9,6 +9,7 @@
 //! it does not authenticate issuers or establish semantic truth.
 
 pub mod file_witness;
+pub mod at_rest_qualification;
 
 use std::collections::{BTreeMap, BTreeSet};
 use std::fmt;
