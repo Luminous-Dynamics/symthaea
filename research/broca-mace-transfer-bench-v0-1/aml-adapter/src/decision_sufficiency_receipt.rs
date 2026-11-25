@@ -179,6 +179,8 @@ impl VerifiedDecisionSufficiencyReceiptV1 {
     }
 }
 
+/// Call for each consequential use with fresh trusted time and freshly sampled
+/// consumer bindings; do not treat the returned capability as a permanent grant.
 pub fn parse_and_verify_decision_sufficiency_receipt_v1(
     wire: &[u8],
     expected: &DecisionSufficiencyExpectedBindingV1<'_>,
@@ -726,7 +728,7 @@ mod tests {
         let value = serde_json::json!({"z": 0, "a": 1});
         assert_eq!(
             serde_json_canonicalizer::to_vec(&value).unwrap(),
-            br#"{"a":1,"z":0}"#
+            br#"{"a":1,"z":0}"#.to_vec()
         );
     }
 
