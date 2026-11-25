@@ -1,0 +1,46 @@
+name: Randomized decision regret evaluator
+
+on:
+  push:
+    branches:
+      - research/randomized-decision-regret-v0-1-20261125
+    paths:
+      - research/temporal-evaluator/**
+      - docs/research/RANDOMIZED_DECISION_REGRET_V0_1.md
+      - docs/research/fixtures/randomized_decision_regret_v0.1.json
+      - .github/workflows/randomized-decision-regret.yml
+  pull_request:
+    types: [opened, synchronize, reopened, ready_for_review]
+    branches:
+      - research/dmc-restore-contract-v0-1-20261124
+    paths:
+      - research/temporal-evaluator/**
+      - docs/research/RANDOMIZED_DECISION_REGRET_V0_1.md
+      - docs/research/fixtures/randomized_decision_regret_v0.1.json
+      - .github/workflows/randomized-decision-regret.yml
+
+permissions:
+  contents: read
+
+jobs:
+  rust-evaluator:
+    name: Rust 1.96 evaluator format / test / clippy
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    steps:
+      - uses: actions/checkout@v4
+      - name: Install pinned Rust toolchain
+        uses: dtolnay/rust-toolchain@1.96.0
+        with:
+          components: rustfmt, clippy
+      - name: Check formatting of the new evaluator module only
+        run: rustfmt --check --edition 2024 research/temporal-evaluator/src/randomized_decision_regret.rs
+      - name: Establish standalone lockfile when absent
+        run: |
+          if [ ! -f research/temporal-evaluator/Cargo.lock ]; then
+            cargo generate-lockfile --manifest-path research/temporal-evaluator/Cargo.toml
+          fi
+      - name: Run evaluator tests
+        run: cargo test --manifest-path research/temporal-evaluator/Cargo.toml --locked --all-targets
+      - name: Run strict Clippy
+        run: cargo clippy --manifest-path research/temporal-evaluator/Cargo.toml --locked --all-targets -- -D warnings
