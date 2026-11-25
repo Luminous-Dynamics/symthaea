@@ -5123,15 +5123,25 @@ pub fn solve_small_positive_mass_response_qp(
                 let stationarity = volume * (value - input_values[index])
                     + lambda_0 * volume
                     + lambda_1 * response;
+                if !stationarity.is_finite() {
+                    return Err(ContractError::PositivityProjectionArithmeticOverflow);
+                }
                 max_stationarity_residual =
                     max_stationarity_residual.max(stationarity.abs());
             } else {
                 let dual_multiplier =
                     volume * (lambda_0 - input_values[index]) + lambda_1 * response;
+                if !dual_multiplier.is_finite() {
+                    return Err(ContractError::PositivityProjectionArithmeticOverflow);
+                }
+                let complementarity = value * dual_multiplier;
+                if !complementarity.is_finite() {
+                    return Err(ContractError::PositivityProjectionArithmeticOverflow);
+                }
                 max_dual_violation =
                     max_dual_violation.max((-dual_multiplier).max(0.0));
                 max_complementarity_residual =
-                    max_complementarity_residual.max((value * dual_multiplier).abs());
+                    max_complementarity_residual.max(complementarity.abs());
                 if dual_multiplier < -1.0e-10 {
                     feasible = false;
                 }
@@ -10121,6 +10131,20 @@ mod tests {
                 1.1,
             ),
             Err(ContractError::InfeasiblePositiveResponseQp)
+        );
+    }
+
+    #[test]
+    fn small_positive_response_qp_fails_closed_on_kkt_multiplier_overflow() {
+        assert_eq!(
+            solve_small_positive_mass_response_qp(
+                &[1.0e308, 1.0e308],
+                &[1.0, 1.0],
+                &[1.0, -1.0],
+                1.0,
+                0.0,
+            ),
+            Err(ContractError::PositivityProjectionArithmeticOverflow)
         );
     }
 
