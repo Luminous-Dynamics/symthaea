@@ -570,8 +570,14 @@ mod tests {
                 .record_adjudicated_outcome(make_outcome("programming", "rust-lang.org", true))
                 .unwrap();
         }
-        let mut legacy_state = seeded.export_state();
-        legacy_state.adjudication_schema_version = 0;
+        let legacy_json = r#"{
+            "source_credibility": {},
+            "strategies": [],
+            "meta_phi": {},
+            "domain_expertise": {}
+        }"#;
+        let legacy_state: LearnerState = serde_json::from_str(legacy_json).unwrap();
+        assert_eq!(legacy_state.adjudication_schema_version, 0);
 
         let mut restored = EpistemicLearner::new();
         restored
