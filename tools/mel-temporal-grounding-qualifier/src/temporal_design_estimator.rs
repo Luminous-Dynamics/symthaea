@@ -91,6 +91,9 @@ pub struct DesignEstimatorReportV1 {
     pub estimator_version: &'static str,
     pub dataset_id: String,
     pub metric_id: String,
+    pub model_identity_sha256: String,
+    pub evaluator_version: String,
+    pub scoring_plan_sha256: String,
     pub selection_receipt_sha256: String,
     pub candidate_manifest_sha256: String,
     pub normalized_config_sha256: String,
@@ -199,7 +202,7 @@ pub fn estimate_design_based_metric(
                 outcome.item_id
             ));
         }
-        if outcomes.insert(outcome.item_id.as_str(), outcome.value_ppm).is_some() {
+        if outcomes.insert(outcome.item_id.as_str(), outcome).is_some() {
             return Err(format!("duplicate observed audit outcome for {}", outcome.item_id));
         }
     }
@@ -267,10 +270,9 @@ pub fn estimate_design_based_metric(
             .iter()
             .filter(|selection| selection.source_stratum_id == design.source_stratum_id)
             .map(|selection| {
-                let observed = input
-                    .observed_audit_outcomes
-                    .iter()
-                    .find(|outcome| outcome.item_id == selection.item_id)
+                let observed = outcomes
+                    .get(selection.item_id.as_str())
+                    .copied()
                     .ok_or_else(|| format!("missing selected outcome for {}", selection.item_id))?;
                 if observed.source_work_id_sha256 != selection.source_work_id_sha256 {
                     return Err(format!(
@@ -278,10 +280,7 @@ pub fn estimate_design_based_metric(
                         selection.item_id
                     ));
                 }
-                let value = outcomes
-                    .get(selection.item_id.as_str())
-                    .copied()
-                    .ok_or_else(|| format!("missing selected outcome for {}", selection.item_id))?;
+                let value = observed.value_ppm;
                 let source_work_size = selection
                     .eligible_items_in_source_work
                     .filter(|count| *count > 0)
@@ -430,6 +429,9 @@ pub fn estimate_design_based_metric(
         estimator_version: ESTIMATOR_VERSION_V1,
         dataset_id: input.dataset.dataset_id.clone(),
         metric_id: input.metric_id.clone(),
+        model_identity_sha256: input.model_identity_sha256.clone(),
+        evaluator_version: input.evaluator_version.clone(),
+        scoring_plan_sha256: input.scoring_plan_sha256.clone(),
         selection_receipt_sha256: planned.selection_receipt_sha256,
         candidate_manifest_sha256: planned.candidate_manifest_sha256,
         normalized_config_sha256: planned.normalized_config_sha256,
