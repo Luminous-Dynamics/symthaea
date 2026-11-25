@@ -627,10 +627,17 @@ mod tests {
         );
         let payload = in_toto_qualification_payload_v1(&receipt).unwrap();
         assert_eq!(payload.len(), fixture["payload_bytes"].as_u64().unwrap() as usize);
-        assert_eq!(STANDARD.encode(&payload), fixture["payload_base64"].as_str().unwrap());
+        assert_eq!(
+            format!("{:x}", Sha256::digest(&payload)),
+            fixture["payload_sha256"].as_str().unwrap()
+        );
 
         let pae = dsse_pae_v1(DSSE_PAYLOAD_TYPE_V1, &payload);
         assert_eq!(pae.len(), fixture["pae_bytes"].as_u64().unwrap() as usize);
+        assert_eq!(
+            format!("{:x}", Sha256::digest(&pae)),
+            fixture["pae_sha256"].as_str().unwrap()
+        );
         let signature = key.sign(&pae).to_bytes();
         assert_eq!(
             STANDARD.encode(signature),
@@ -640,7 +647,7 @@ mod tests {
         let envelope = encode_dsse_envelope_v1(&payload, &key_id, &signature).unwrap();
         let envelope_value: Value = serde_json::from_str(&envelope).unwrap();
         assert_eq!(envelope_value["payloadType"], fixture["payload_type"]);
-        assert_eq!(envelope_value["payload"], fixture["payload_base64"]);
+        assert_eq!(envelope_value["payload"], STANDARD.encode(&payload));
         assert_eq!(
             envelope_value["signatures"][0]["sig"],
             fixture["signature_base64"]
