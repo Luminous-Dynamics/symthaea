@@ -11,9 +11,9 @@ From the Symthaea workspace, run:
     cargo test -p symthaea-sat-trace-verifier
     cargo clippy -p symthaea-sat-trace-verifier --all-targets -- -D warnings
     cargo fmt --all -- --check
-    cargo run -p symthaea-sat-trace-verifier --bin sat-trace-verify -- <run-uuid> <sha256:manifest-digest> <events.jsonl>
+    cargo run -p symthaea-sat-trace-verifier --bin sat-trace-verify -- <run-uuid> <manifest.json> <events.jsonl>
 
-Pass "-" as the final argument to read JSONL from stdin.
+Pass "-" as the final argument to read JSONL from stdin. The CLI computes the manifest digest from the frozen manifest file using the SAT v0.1 domain-separated JCS profile.
 
 ## What it verifies
 
