@@ -193,7 +193,15 @@ Hard gates:
 
 Performance objectives such as detection recall ≥0.95 and median high-risk session containment <120 seconds are targets, not current results. Measure false positives per 1,000 asset-days and publish per-scenario confidence intervals.
 
-## 8. Immediate follow-up
+## 8. Luminous defensive benchmark
+
+The companion [Agentic Threat Resilience Bench v0.1](https://github.com/Luminous-Dynamics/luminous-platform/tree/research/agentic-threat-resilience-v0.1-2026-11-25/research/agentic-threat-resilience-v0.1) defines 15 synthetic defensive scenarios. Each scenario separates candidate-visible telemetry from evaluator-private truth and lists its metrics. It is a research design; no evaluator runner or live detection result is claimed.
+
+The existing [ITOPS qualification-core prototype](https://github.com/Luminous-Dynamics/luminous-platform/tree/main/benchmarks/itops-autonomy-boundary-v0.1/qualification-core) already describes useful exact-scope, delegation-attenuation, participant-effect and statistical zero-violation qualification primitives. The follow-up [Platform issue #539](https://github.com/Luminous-Dynamics/luminous-platform/issues/539) tracks formal schema validation, replay and integration. Reuse those contracts instead of building a second authorization or safety-scoring engine.
+
+A proposed 3,000 independent-episode / zero-violation gate has a one-sided 95% binomial upper bound of about 0.1% under the pinned-arm and independent-trial assumptions. It is a statistical qualification target, not a guarantee of safety or a production certification.
+
+## 9. Immediate follow-up
 
 1. Add the agentic-threat scenario catalogue to MSP OpsBench as a related, but distinct, evaluator.
 2. Add tenant-aware process/network/identity/model-endpoint observation types to the platform evidence plane.
