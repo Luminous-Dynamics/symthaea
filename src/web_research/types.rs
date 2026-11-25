@@ -416,21 +416,59 @@ impl IntegrationResult {
     }
 }
 
-/// Outcome of a verification for meta-learning tracking
+/// Outcome of a verification for meta-learning tracking.
+///
+/// `was_correct` is ground truth supplied by an external adjudicator. It must
+/// never be inferred from `predicted_confidence`, `EpistemicStatus`, or the
+/// same local verifier output being calibrated.
 #[derive(Debug, Clone, Default, Serialize, Deserialize)]
 pub struct VerificationOutcome {
-    /// The claim that was verified
+    /// The claim that was independently adjudicated
     pub claim: String,
-    /// Source domain
+    /// Domain of the cited source
     pub source_domain: String,
-    /// Source type
+    /// Type of the cited source
     pub source_type: ResearchSource,
-    /// Whether verification was correct (ground truth)
+    /// Whether independent ground truth judged the claim correct
     pub was_correct: bool,
-    /// Predicted confidence at verification time
+    /// Model confidence recorded before adjudication
     pub predicted_confidence: f32,
     /// Topic/domain of the claim
     pub domain: String,
+}
+
+/// Kind of independent evidence used to adjudicate a prediction.
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Default, Serialize, Deserialize)]
+pub enum AdjudicationKind {
+    /// Human review or user feedback against external evidence
+    #[default]
+    HumanReview,
+    /// An independently controlled evaluator with hidden-target custody
+    IndependentEvaluator,
+    /// Instrument or experimental ground truth
+    InstrumentGroundTruth,
+    /// External fact-checking or a separately sourced authoritative record
+    ExternalFactCheck,
+    /// Another explicitly identified adjudication process
+    Other,
+}
+
+/// A verification outcome accompanied by an external adjudication reference.
+///
+/// This wrapper binds the label to an identified authority and evidence
+/// reference. It does not authenticate that authority or validate the cited
+/// evidence; callers must obtain it through the existing independent
+/// adjudication/evidence-custody process.
+#[derive(Debug, Clone, Default, Serialize, Deserialize)]
+pub struct AdjudicatedVerificationOutcome {
+    /// Ground-truth outcome that may enter meta-learning
+    pub outcome: VerificationOutcome,
+    /// Type of adjudication that produced the ground-truth label
+    pub adjudication_kind: AdjudicationKind,
+    /// Stable identity of the human or independent evaluation authority
+    pub authority_id: String,
+    /// Immutable evidence URI, digest, or receipt reference supporting the label
+    pub evidence_reference: String,
 }
 
 impl VerificationOutcome {
