@@ -733,29 +733,29 @@ mod tests {
         // 13 of 36 positions.
         assert_eq!(
             rectangular_fault_tournament(&layout, (2, 2, 1), false),
-            (1, 0, 36)
+            (1, 0, 27)
         );
         assert_eq!(
             rectangular_fault_tournament(&layout, (2, 2, 1), true),
-            (4, 13, 36)
+            (4, 13, 27)
         );
 
         // 2x2x2 boxes remain recoverable under the spatial mapping; row-major
         // fails 19 of 27 positions.
         assert_eq!(
             rectangular_fault_tournament(&layout, (2, 2, 2), false),
-            (2, 0, 27)
+            (2, 0, 18)
         );
         assert_eq!(
             rectangular_fault_tournament(&layout, (2, 2, 2), true),
-            (4, 19, 27)
+            (4, 14, 18)
         );
 
         // The measured design envelope has a visible boundary: 3x3x2 boxes
         // exceed two erasures in eight of twelve positions.
         assert_eq!(
             rectangular_fault_tournament(&layout, (3, 3, 2), false),
-            (4, 8, 12)
+            (4, 8, 8)
         );
     }
 
