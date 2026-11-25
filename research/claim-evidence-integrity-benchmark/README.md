@@ -18,7 +18,7 @@ The central contract is: **no claim receives support merely because a page is to
 
 The NeurIPS 2026 position paper *From Claims to Context* argues that factuality alone is insufficient without temporal, source-attribution, source-network, conflict and nuance signals. It separates claim reference time, evidence publication time, retrieval time and model knowledge cutoff. See https://ekmpa.github.io/context/
 
-The benchmark therefore treats a verification as a structured relation among claim, source artifact, quoted span, source-family lineage, temporal context and adjudication status. It does not emit a single unqualified confidence score.
+The benchmark therefore treats a verification as a structured relation among a scoped claim, source artifact, exact quoted span, source-family lineage, temporal context and label provenance. Each claim carries population, outcome/measure, quantifier/effect and domain/time boundary fields. Expected synthetic labels have explicit evaluator-only provenance and are never live calibration labels. It does not emit a single unqualified confidence score.
 
 ## External comparison points
 
@@ -76,7 +76,7 @@ A source family identifies common origin, syndication or copied lineage. Three m
 - `Cargo.lock`: pinned standalone dependency resolution.
 - `.github/workflows/claim-evidence-integrity-benchmark.yml`: exact Rust 1.96 format/test/self-test/Clippy workflow.
 
-Every synthetic evidence artifact includes an SHA-256 digest of its exact text and a byte span for the quoted passage.
+Every synthetic evidence artifact includes an SHA-256 digest of its exact text and a byte span for the quoted passage. Each expected fixture label is tagged as synthetic, evaluator-only known-answer data, never ground truth for production meta-learning.
 
 ## Local execution
 
@@ -89,7 +89,7 @@ cargo run --manifest-path research/claim-evidence-integrity-benchmark/Cargo.toml
 cargo clippy --manifest-path research/claim-evidence-integrity-benchmark/Cargo.toml --locked --all-targets -- -D warnings
 ```
 
-The self-test runs negative controls for modified artifact bytes, altered quote spans and duplicate fixture IDs. The validator proves pack integrity and contract shape only; it does not decide whether natural-language evidence entails a claim.
+The self-test runs negative controls for modified artifact bytes, altered quote spans and duplicate fixture IDs. Unit tests also reject missing claim scope, unsupported relation enums, missing temporal axes, duplicate evidence IDs and candidate-visible synthetic labels. The validator proves pack integrity and contract shape only; it does not decide whether natural-language evidence entails a claim.
 
 ## Synthetic fixture families
 
