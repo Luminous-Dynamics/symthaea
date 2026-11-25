@@ -109,6 +109,32 @@
           "expected_w1": {
             "type": "number",
             "minimum": 0
+          },
+          "domain_override": {
+            "type": "object",
+            "additionalProperties": false,
+            "required": [
+              "minimum",
+              "maximum"
+            ],
+            "properties": {
+              "minimum": {
+                "type": "number"
+              },
+              "maximum": {
+                "type": "number"
+              }
+            }
+          },
+          "translated_left": {
+            "$ref": "#/$defs/measure"
+          },
+          "translated_right": {
+            "$ref": "#/$defs/measure"
+          },
+          "translated_expected_w1": {
+            "type": "number",
+            "minimum": 0
           }
         }
       }
