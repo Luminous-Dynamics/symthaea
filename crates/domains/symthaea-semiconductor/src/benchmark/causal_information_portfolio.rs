@@ -45,6 +45,7 @@ pub struct CandidateLikelihoodStressV1 {
 #[derive(Clone, Debug, PartialEq, Serialize, Deserialize)]
 pub struct PortfolioLikelihoodStressScenarioV1 {
     pub scenario_id: String,
+    pub scenario_protocol_sha256: String,
     /// Complete alternative likelihood set, one entry per candidate.
     pub candidate_likelihoods: Vec<CandidateLikelihoodStressV1>,
 }
@@ -252,6 +253,7 @@ fn validate_input(
         BTreeMap<String, f64>,
         BTreeMap<String, Vec<f64>>,
         Vec<CausalCandidateEligibilityV1>,
+        Vec<(String, BTreeMap<String, Vec<Vec<f64>>>)>,
     ),
     CausalInformationPortfolioErrorV1,
 > {
@@ -496,6 +498,12 @@ fn validate_input(
     let mut stress_likelihoods = Vec::new();
     for scenario in &input.likelihood_stress_scenarios {
         require_text(&scenario.scenario_id, "likelihood_stress_scenario.scenario_id")?;
+        if !valid_sha256(&scenario.scenario_protocol_sha256) {
+            return Err(CausalInformationPortfolioErrorV1(format!(
+                "stress scenario {} has a malformed protocol digest",
+                scenario.scenario_id
+            )));
+        }
         if !stress_scenario_ids.insert(scenario.scenario_id.as_str()) {
             return Err(CausalInformationPortfolioErrorV1(
                 "duplicate likelihood stress scenario ID".into(),
@@ -797,8 +805,13 @@ fn make_portfolio(
         .iter()
         .copied()
         .fold(information_gain, f64::max);
+    let robust_information_gain_term = if stress_information_gains.is_empty() {
+        0.0
+    } else {
+        minimum_stress_information_gain_bits
+    };
     let objective_score = objective_weights.information_gain_weight * information_gain
-        + objective_weights.robust_information_gain_weight * minimum_stress_information_gain_bits
+        + objective_weights.robust_information_gain_weight * robust_information_gain_term
         + objective_weights.decision_loss_reduction_weight * decision_gain
         + objective_weights.predictive_risk_reduction_weight
             * expected_predictive_risk_reduction
@@ -1110,6 +1123,7 @@ mod tests {
             ],
             decision_actions: Vec::new(),
             candidates,
+            likelihood_stress_scenarios: Vec::new(),
             physical_cost_budget: 1.0,
             maximum_capacity_units: 1,
             minimum_randomized_audit_count: 0,
@@ -1117,6 +1131,7 @@ mod tests {
             conditional_independence_assumption_sha256: None,
             objective_weights: CausalPortfolioObjectiveWeightsV1 {
                 information_gain_weight: 1.0,
+                robust_information_gain_weight: 0.0,
                 decision_loss_reduction_weight: 0.0,
                 predictive_risk_reduction_weight: 0.0,
                 physical_cost_weight: 0.0,
