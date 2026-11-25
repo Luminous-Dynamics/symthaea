@@ -1,0 +1,57 @@
+{
+  "schema_version": "0.1.0",
+  "artifact_kind": "bh_egb_open_world_model_adequacy_verification_receipt",
+  "checked_utc": "2026-11-24",
+  "result": "pass_exact_synthetic_open_world_control_and_negative_controls",
+  "repository_context": {
+    "repository": "Luminous-Dynamics/symthaea",
+    "branch": "research/bh-egb-symthaea-campaign-2026-11-23",
+    "fixture_commit": "514a5b37a6c488c1e54a72278061e63dcaf6507e",
+    "verifier_commit": "51efb803408168ef300a87632678fa382197a20d",
+    "campaign_head_at_check": "51efb803408168ef300a87632678fa382197a20d"
+  },
+  "inputs": {
+    "fixture_path": "docs/research/BH_EGB_OPEN_WORLD_MODEL_ADEQUACY_CONTROL_V0_1.json",
+    "fixture_git_blob_sha1": "a19cc81b48910fbb90ce3a766bd1b820786a5c47",
+    "verifier_path": "docs/research/verify_bh_egb_open_world_model_adequacy.py",
+    "verifier_git_blob_sha1": "23c43cf03903446d9721b5d6981fbcdf1df43956",
+    "method": "exact rational quadratic forms over a frozen held-out observation and covariance"
+  },
+  "execution": {
+    "command": "python3 docs/research/verify_bh_egb_open_world_model_adequacy.py docs/research/BH_EGB_OPEN_WORLD_MODEL_ADEQUACY_CONTROL_V0_1.json",
+    "runtime": "Python 3.13.5",
+    "dependencies": "Python standard library only",
+    "arithmetic": "exact fractions.Fraction",
+    "fixture_bytes": "local Git blob SHA-1 exactly matches fetched public fixture blob",
+    "verifier_bytes": "local Git blob SHA-1 exactly matches fetched public verifier blob",
+    "exit_code": 0
+  },
+  "checks": {
+    "pairwise_candidate_separation_squared": "2",
+    "H0_held_out_residual_squared": "1",
+    "H1_held_out_residual_squared": "1",
+    "maximum_admissible_squared_residual": "1/2",
+    "initial_family_disposition": "ABSTAIN_AND_EXPAND_MODEL_CLASS",
+    "all_initial_candidates_rejected": true,
+    "outside_family_H2_residual_squared": "0",
+    "outside_family_H2_disposition": "H2_ADMISSIBLE",
+    "negative_controls_expected_to_reject": 4,
+    "negative_controls_rejected": [
+      "post_hoc_gate_relaxation",
+      "held_out_observation_mutation",
+      "candidate_prediction_mutation",
+      "outside_family_witness_mutation"
+    ]
+  },
+  "claim_ceiling": "The verifier passes one deterministic, exact synthetic open-world model-adequacy control and its four hostile mutations. It demonstrates that pairwise separation among candidate models does not establish adequacy. It does not establish a calibrated statistical test, a physical EGB model, experiment-design superiority, Symthaea policy performance, or benchmark leadership.",
+  "not_run_or_not_claimed": [
+    "Rust build or package tests",
+    "hosted CI pass",
+    "runtime Symthaea policy execution",
+    "PR #8034 qualification",
+    "finite-positive-coupling EGB BVP",
+    "interval theorem or branch completeness",
+    "physical hyperbolicity",
+    "external benchmark superiority"
+  ]
+}

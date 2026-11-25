@@ -1,0 +1,402 @@
+{
+  "schema_version": "0.1.0",
+  "artifact_kind": "bh_egb_campaign_manifest_structural_replay",
+  "checked_utc": "2026-11-24",
+  "result": "pass_structural_source_pin_replay_only",
+  "repository_context": {
+    "symthaea_repository": "Luminous-Dynamics/symthaea",
+    "symthaea_branch": "research/bh-egb-symthaea-campaign-2026-11-23",
+    "symthaea_campaign_protocol_commit": "c98881471ddd929dfe97e9bb5c5d0e3ff71a790f",
+    "symtropy_repository": "Luminous-Dynamics/symtropy",
+    "symtropy_branch": "research/spin2-regularized-pivot-2026-11-21",
+    "symtropy_branch_head": "ef5a006023300086e134ba6d39ca4fc3e859872f"
+  },
+  "inputs": {
+    "manifest_path": "docs/research/BH_EGB_CAMPAIGN_EPISODES_V0_1.json",
+    "manifest_git_blob_sha1": "06cf0394686533b320a72e49a96bfdd7208337d6",
+    "schema_path": "docs/research/BH_EGB_CAMPAIGN_EPISODES_V0_1.schema.json",
+    "schema_git_blob_sha1": "77dd2e9e33f94e33bbe2b930286580f4d43ebf6f",
+    "covariance_redundancy_fixture": {
+      "path": "docs/research/BH_EGB_COVARIANCE_REDUNDANCY_CONTROL_V0_1.json",
+      "git_blob_sha1": "8f9ed0654b88376deeee2c7d466682dc37dbc8fd"
+    },
+    "decision_value_control": {
+      "fixture_path": "docs/research/BH_EGB_DECISION_VALUE_CONTROL_V0_1.json",
+      "fixture_git_blob_sha1": "46cd9fac730f7375eaa15b5c84541fb113324ecd",
+      "verifier_path": "docs/research/verify_bh_egb_decision_value.py",
+      "verifier_git_blob_sha1": "2b0fc3511b13ec4bb545a8e7873f7c6292c51e0e",
+      "receipt_path": "docs/research/BH_EGB_DECISION_VALUE_VERIFICATION_RECEIPT_V0_1.json",
+      "receipt_git_blob_sha1": "23165b2f5093b9a0015f5f4f09541615b00b70b4"
+    }
+  },
+  "checks": {
+    "manifest_json_parse": true,
+    "schema_json_parse": true,
+    "top_level_required_property_presence": true,
+    "unique_episode_ids": true,
+    "unique_action_ids": true,
+    "all_episode_action_references_resolve": true,
+    "all_declared_source_git_blob_ids_match_live_fetch": "manually_replayed_33_of_33_exact_public_git_blob_ids",
+    "policy_arm_count": 11,
+    "episode_count": 8,
+    "action_count": 10,
+    "frozen_negative_control_count": 14,
+    "source_pin_count": 33,
+    "source_pin_matches": 33,
+    "source_pin_mismatches": 0,
+    "acquisition_stage_count": 2,
+    "covariance_redundancy_control_pinned": true,
+    "confirmatory_preconditions_all_unset": true,
+    "decision_value_control_pinned": true,
+    "open_world_adequacy_control_pinned": true
+  },
+  "source_pin_replay": [
+    {
+      "repository": "Luminous-Dynamics/symthaea",
+      "ref": "main",
+      "path": "crates/core/symthaea-core/src/physics/general_relativity.rs",
+      "git_blob_sha1": "cae917e114407316bf263065d13a59dda9794e49",
+      "role": "symthaea_source_audit"
+    },
+    {
+      "repository": "Luminous-Dynamics/symthaea",
+      "ref": "main",
+      "path": "crates/bridges/symthaea-physics-bridge/src/integrated_discovery.rs",
+      "git_blob_sha1": "e840a4e316b8770dd0293154e9e116f30c049b9b",
+      "role": "symthaea_source_audit"
+    },
+    {
+      "repository": "Luminous-Dynamics/symthaea",
+      "ref": "main",
+      "path": "src/language/research_plugin.rs",
+      "git_blob_sha1": "9aa62780576f9937ce6310c9c0176fbfa51bb9d5",
+      "role": "symthaea_source_audit"
+    },
+    {
+      "repository": "Luminous-Dynamics/symthaea",
+      "ref": "main",
+      "path": "src/z3_bridge.rs",
+      "git_blob_sha1": "28b802030718c299105f6e337be3a94db699f1f7",
+      "role": "symthaea_source_audit"
+    },
+    {
+      "repository": "Luminous-Dynamics/symthaea",
+      "ref": "research/bh-egb-symthaea-campaign-2026-11-23",
+      "path": "docs/research/BH_EGB_SYMTHAEA_CAMPAIGN_V0_1.md",
+      "git_blob_sha1": "8d3a9dbec24663a9eaad1132f16a4ee78ccc6689",
+      "role": "symthaea_campaign_protocol"
+    },
+    {
+      "repository": "Luminous-Dynamics/symtropy",
+      "ref": "research/spin2-regularized-pivot-2026-11-21",
+      "path": "crates/domains/symtropy-lovelock5d/benchmarks/spin2_boundary_response_operator_protocol_v1.md",
+      "git_blob_sha1": "435e86f3d6852b5e4df16d4a2068c62df8d50eda",
+      "role": "symtropy_response_operator"
+    },
+    {
+      "repository": "Luminous-Dynamics/symtropy",
+      "ref": "research/spin2-regularized-pivot-2026-11-21",
+      "path": "crates/domains/symtropy-lovelock5d/benchmarks/verify_spin2_response_basis_covariance.py",
+      "git_blob_sha1": "5c5a973f06da5f18a6c6b8e0e75611746bcb2161",
+      "role": "symtropy_response_operator"
+    },
+    {
+      "repository": "Luminous-Dynamics/symtropy",
+      "ref": "research/spin2-regularized-pivot-2026-11-21",
+      "path": "crates/domains/symtropy-lovelock5d/benchmarks/spin2_response_basis_covariance_v1.json",
+      "git_blob_sha1": "1063012ae7480858f9283671ac05843c89d5791a",
+      "role": "symtropy_response_operator"
+    },
+    {
+      "repository": "Luminous-Dynamics/symtropy",
+      "ref": "research/spin2-regularized-pivot-2026-11-21",
+      "path": "crates/domains/symtropy-lovelock5d/benchmarks/spin2_coupling_sensitivity_continuation_contract_v1.md",
+      "git_blob_sha1": "f89fdb2fe19cafd13327ae44231485bc9874accf",
+      "role": "symtropy_response_operator"
+    },
+    {
+      "repository": "Luminous-Dynamics/symtropy",
+      "ref": "research/spin2-regularized-pivot-2026-11-21",
+      "path": "crates/domains/symtropy-lovelock5d/benchmarks/akribiea_5d_mp_exact_fixture_v1.json",
+      "git_blob_sha1": "2cf5847556925aea7a376dadd6d4b4861d6d8bb8",
+      "role": "akribiea_einstein_limit_comparator"
+    },
+    {
+      "repository": "Luminous-Dynamics/symtropy",
+      "ref": "research/spin2-regularized-pivot-2026-11-21",
+      "path": "crates/domains/symtropy-lovelock5d/benchmarks/akribiea_5d_mp_exact_reference.py",
+      "git_blob_sha1": "fc461ceb18d219ac7a0a97beee488bc1fb094ce7",
+      "role": "akribiea_einstein_limit_comparator"
+    },
+    {
+      "repository": "Luminous-Dynamics/symtropy",
+      "ref": "research/spin2-regularized-pivot-2026-11-21",
+      "path": "crates/domains/symtropy-lovelock5d/benchmarks/derive_ma_lu_equal_spin_parameter_map.py",
+      "git_blob_sha1": "30616c178a051f0a2fd120aba8a9d03dfc8c865e",
+      "role": "ma_lu_parameter_map"
+    },
+    {
+      "repository": "Luminous-Dynamics/symtropy",
+      "ref": "research/spin2-regularized-pivot-2026-11-21",
+      "path": "crates/domains/symtropy-lovelock5d/benchmarks/derive_ma_lu_equal_spin_symtropy_gauge.py",
+      "git_blob_sha1": "538003f2936e645ef8c7c62f4ffd1f4db00153ae",
+      "role": "ma_lu_parameter_map"
+    },
+    {
+      "repository": "Luminous-Dynamics/symthaea",
+      "ref": "research/bh-egb-symthaea-campaign-2026-11-23",
+      "path": "docs/research/BH_EGB_AGENT_BENCHMARK_LANDSCAPE_2026_11_23.md",
+      "git_blob_sha1": "baebd719f5a2b71e92c6d7a4f5466ba11e928aa7",
+      "role": "research_benchmark_landscape"
+    },
+    {
+      "repository": "Luminous-Dynamics/symthaea",
+      "ref": "main",
+      "path": "crates/core/symthaea-core/src/hdc/conjecture_engine/experiment_selection.rs",
+      "git_blob_sha1": "06a033939ba922f1933680d8bd15ab4d9222d296",
+      "role": "symthaea_simple_variance_experiment_selector"
+    },
+    {
+      "repository": "Luminous-Dynamics/symthaea",
+      "ref": "main",
+      "path": "crates/core/symthaea-core/src/hdc/conjecture_engine/cfc_smoothing.rs",
+      "git_blob_sha1": "70424f79db300cf97a40271d128326aabc5cb017",
+      "role": "symthaea_simple_variance_experiment_selector"
+    },
+    {
+      "repository": "Luminous-Dynamics/symthaea",
+      "ref": "feat/physics-experiment-design-v0-1-2026-10-18",
+      "path": "crates/domains/symthaea-experiment-design/src/lib.rs",
+      "git_blob_sha1": "f5ea0c9d226948344b8eba497aeca2300056e9aa",
+      "role": "symthaea_robust_maximin_selector_candidate"
+    },
+    {
+      "repository": "Luminous-Dynamics/symthaea",
+      "ref": "feat/physics-experiment-design-v0-1-2026-10-18",
+      "path": "crates/domains/symthaea-experiment-design/Cargo.toml",
+      "git_blob_sha1": "b22aaec604c9d9a72b69cdaf8aa23935e08007f1",
+      "role": "symthaea_robust_maximin_selector_candidate"
+    },
+    {
+      "repository": "Luminous-Dynamics/symthaea",
+      "ref": "feat/physics-experiment-design-v0-1-2026-10-18",
+      "path": "crates/domains/symthaea-experiment-design/src/main.rs",
+      "git_blob_sha1": "accede6ad3bb715825b54d7db15ef72a34db6769",
+      "role": "symthaea_robust_maximin_selector_candidate"
+    },
+    {
+      "repository": "Luminous-Dynamics/symthaea",
+      "ref": "feat/physics-experiment-design-v0-1-2026-10-18",
+      "path": "crates/domains/symthaea-experiment-design/fixtures/galileo-discrimination-v0.1.json",
+      "git_blob_sha1": "0548cf58562517e69c93e5f810bfee822acee1a2",
+      "role": "symthaea_robust_maximin_selector_candidate"
+    },
+    {
+      "repository": "Luminous-Dynamics/symthaea",
+      "ref": "feat/physics-experiment-design-v0-1-2026-10-18",
+      "path": ".github/workflows/physics-experiment-design.yml",
+      "git_blob_sha1": "72550e109662ef3c83578e5fb79345b8b45a941a",
+      "role": "symthaea_robust_maximin_selector_candidate"
+    },
+    {
+      "repository": "Luminous-Dynamics/symthaea",
+      "ref": "fix/workspace-exclude-empty-core-symthaea-2026-11-21",
+      "path": "Cargo.toml",
+      "git_blob_sha1": "6b0b90b7b02912d392cd15ba658828ad09687bf6",
+      "role": "symthaea_workspace_glob_repair_candidate"
+    },
+    {
+      "repository": "Luminous-Dynamics/symthaea",
+      "ref": "fix/workspace-exclude-empty-core-symthaea-2026-11-21",
+      "path": "scripts/check-workspace-targets.sh",
+      "git_blob_sha1": "63264e93c7f9dea6252f288af45565e34f17f972",
+      "role": "symthaea_workspace_glob_repair_candidate"
+    },
+    {
+      "repository": "Luminous-Dynamics/symthaea",
+      "ref": "fix/workspace-exclude-empty-core-symthaea-2026-11-21",
+      "path": ".github/workflows/workspace-manifest-smoke.yml",
+      "git_blob_sha1": "2aa01568f62f3cd081bd58214b7dc70464dd09fb",
+      "role": "symthaea_workspace_glob_repair_candidate"
+    },
+    {
+      "repository": "Luminous-Dynamics/symthaea",
+      "ref": "research/bh-egb-symthaea-campaign-2026-11-23",
+      "path": "docs/research/BH_EGB_COVARIANCE_REDUNDANCY_CONTROL_V0_1.json",
+      "git_blob_sha1": "8f9ed0654b88376deeee2c7d466682dc37dbc8fd",
+      "role": "symthaea_covariance_redundancy_synthetic_control"
+    },
+    {
+      "repository": "Luminous-Dynamics/symthaea",
+      "ref": "research/bh-egb-symthaea-campaign-2026-11-23",
+      "path": "docs/research/BH_EGB_DECISION_VALUE_CONTROL_V0_1.json",
+      "git_blob_sha1": "46cd9fac730f7375eaa15b5c84541fb113324ecd",
+      "role": "symthaea_decision_value_vs_information_gain_synthetic_control"
+    },
+    {
+      "repository": "Luminous-Dynamics/symthaea",
+      "ref": "research/bh-egb-symthaea-campaign-2026-11-23",
+      "path": "docs/research/verify_bh_egb_decision_value.py",
+      "git_blob_sha1": "2b0fc3511b13ec4bb545a8e7873f7c6292c51e0e",
+      "role": "symthaea_decision_value_vs_information_gain_synthetic_control"
+    },
+    {
+      "repository": "Luminous-Dynamics/symthaea",
+      "ref": "research/bh-egb-symthaea-campaign-2026-11-23",
+      "path": "docs/research/BH_EGB_DECISION_VALUE_VERIFICATION_RECEIPT_V0_1.json",
+      "git_blob_sha1": "23165b2f5093b9a0015f5f4f09541615b00b70b4",
+      "role": "symthaea_decision_value_vs_information_gain_synthetic_control"
+    },
+    {
+      "repository": "Luminous-Dynamics/symthaea",
+      "ref": "research/bh-egb-symthaea-campaign-2026-11-23",
+      "path": "docs/research/verify_bh_egb_covariance_fixture.py",
+      "git_blob_sha1": "8e3fd3ced8efb605385e292cd0281f4e3c0a7255",
+      "role": "symthaea_covariance_redundancy_synthetic_control"
+    },
+    {
+      "repository": "Luminous-Dynamics/symthaea",
+      "ref": "research/bh-egb-symthaea-campaign-2026-11-23",
+      "path": "docs/research/BH_EGB_COVARIANCE_VERIFICATION_RECEIPT_V0_1.json",
+      "git_blob_sha1": "d0f1a7e154cb927c15d0def3cf44f35dd161f970",
+      "role": "symthaea_covariance_redundancy_synthetic_control"
+    },
+    {
+      "repository": "Luminous-Dynamics/symthaea",
+      "ref": "research/bh-egb-symthaea-campaign-2026-11-23",
+      "path": "docs/research/BH_EGB_OPEN_WORLD_MODEL_ADEQUACY_CONTROL_V0_1.json",
+      "git_blob_sha1": "a19cc81b48910fbb90ce3a766bd1b820786a5c47",
+      "role": "symthaea_open_world_model_adequacy_synthetic_control"
+    },
+    {
+      "repository": "Luminous-Dynamics/symthaea",
+      "ref": "research/bh-egb-symthaea-campaign-2026-11-23",
+      "path": "docs/research/verify_bh_egb_open_world_model_adequacy.py",
+      "git_blob_sha1": "23c43cf03903446d9721b5d6981fbcdf1df43956",
+      "role": "symthaea_open_world_model_adequacy_synthetic_control"
+    },
+    {
+      "repository": "Luminous-Dynamics/symthaea",
+      "ref": "research/bh-egb-symthaea-campaign-2026-11-23",
+      "path": "docs/research/BH_EGB_OPEN_WORLD_MODEL_ADEQUACY_RECEIPT_V0_1.json",
+      "git_blob_sha1": "cfaabadb6ac1a590770addcf6c7751cb1601351f",
+      "role": "symthaea_open_world_model_adequacy_synthetic_control"
+    }
+  ],
+  "exclusions": [
+    "not a formal JSON Schema implementation run",
+    "not a Rust build/test/Clippy run of the Symthaea EGB campaign",
+    "not a Symthaea research-policy execution",
+    "not a validated active experiment selector result; PR #8034 remains a draft and its focused workflow failed before package tests",
+    "not an EGB finite-positive-coupling BVP",
+    "not an interval existence/uniqueness theorem",
+    "not a branch-completeness or hyperbolicity result",
+    "not a SOTA comparison result"
+  ],
+  "claim_ceiling": "The check establishes that the manifest parses, its required top-level structure and cross-references pass local checks, and all 25 declared source blob identities were manually fetched from their declared public repository refs and matched. It does not validate the physics, qualify the experiment-design selector, execute Symthaea, or establish superiority.",
+  "acquisition_policy_audit": {
+    "issue": "https://github.com/Luminous-Dynamics/symthaea/issues/13418",
+    "stages": [
+      "research_action_allocation_using_existing_VoC_owners",
+      "numerical_design_selection_using_model_separation"
+    ],
+    "selector_pr": {
+      "url": "https://github.com/Luminous-Dynamics/symthaea/pull/8034",
+      "head": "5065b7c5392160e59da5eadc783b8abcdcd2d406",
+      "run_id": 39132979516,
+      "job_id": 117691747141,
+      "conclusion": "failure_before_package_checks",
+      "root_cause": "Cargo workspace glob admitted crates/core/symthaea-observation-attestation without Cargo.toml; failure occurred in cargo fmt metadata resolution before tests, Clippy, demo or JSON IO"
+    },
+    "workspace_repair_pr": {
+      "url": "https://github.com/Luminous-Dynamics/symthaea/pull/13080",
+      "head": "6a0f432c8b647704c8a6101e78bd661722ad105c",
+      "workflow_run_id": 44919597959,
+      "dedicated_workspace_smoke": "success",
+      "passed_steps": [
+        "unmanifested workspace glob guard",
+        "cargo metadata --no-deps",
+        "root package rustfmt"
+      ],
+      "separate_unrelated_workflow_failure": "Beverage Benchmark Contract",
+      "status": "draft_not_merged"
+    },
+    "covariance_control": {
+      "status": "exact_verifier_passed_synthetic_only",
+      "base_covariance": [
+        [
+          "1",
+          "1/2"
+        ],
+        [
+          "1/2",
+          "1"
+        ]
+      ],
+      "mean_difference": [
+        "1",
+        "2"
+      ],
+      "covariance_aware_mahalanobis_squared": "4",
+      "redundant_observable": "x3=x1+x2",
+      "augmented_covariance": [
+        [
+          "1",
+          "1/2",
+          "3/2"
+        ],
+        [
+          "1/2",
+          "1",
+          "3/2"
+        ],
+        [
+          "3/2",
+          "3/2",
+          "3"
+        ]
+      ],
+      "covariance_aware_augmented_mahalanobis_squared": "4",
+      "naive_diagonal_score_before": "5",
+      "naive_diagonal_score_after_duplicate": "8",
+      "fixture_git_blob_sha1": "8f9ed0654b88376deeee2c7d466682dc37dbc8fd",
+      "verifier_path": "docs/research/verify_bh_egb_covariance_fixture.py",
+      "verifier_git_blob_sha1": "8e3fd3ced8efb605385e292cd0281f4e3c0a7255",
+      "verifier_commit": "25bf634e70bc096101a522f02674aa6b4412af7c",
+      "exact_rational_replay": {
+        "base_mahalanobis_squared": "4",
+        "augmented_pseudoinverse_mahalanobis_squared": "4",
+        "naive_diagonal_score_before": "5",
+        "naive_diagonal_score_after": "8",
+        "redundancy_invariance": true,
+        "basis_metamorphic_invariance": true,
+        "unit_rescaling_invariance": true,
+        "negative_controls_rejected": 4
+      },
+      "claim_ceiling": "One exact synthetic rational linear-algebra fixture only; not EGB physics, calibration, selector qualification, or policy performance."
+    },
+    "decision_value_control": {
+      "status": "exact_finite_state_oracle_control_passed",
+      "fixture_git_blob_sha1": "46cd9fac730f7375eaa15b5c84541fb113324ecd",
+      "verifier_git_blob_sha1": "2b0fc3511b13ec4bb545a8e7873f7c6292c51e0e",
+      "equal_information_gain_bits": "1",
+      "entropy_only_action_net_value": "-1/10",
+      "decision_relevant_action_net_value": "2/5",
+      "selected_action": "B_decision_relevant",
+      "negative_controls_rejected": 4,
+      "claim_ceiling": "Synthetic finite oracle only; not the live Symthaea VoC policy."
+    },
+    "open_world_model_adequacy_control": {
+      "status": "exact_synthetic_open_world_control_passed",
+      "fixture_git_blob_sha1": "a19cc81b48910fbb90ce3a766bd1b820786a5c47",
+      "verifier_git_blob_sha1": "23c43cf03903446d9721b5d6981fbcdf1df43956",
+      "pairwise_candidate_separation_squared": "2",
+      "each_initial_candidate_held_out_residual_squared": "1",
+      "maximum_admissible_squared_residual": "1/2",
+      "initial_family_disposition": "ABSTAIN_AND_EXPAND_MODEL_CLASS",
+      "outside_family_witness_residual_squared": "0",
+      "negative_controls_rejected": 4,
+      "claim_ceiling": "Synthetic deterministic control only; no calibrated statistics, real EGB adequacy, or policy-performance claim."
+    }
+  }
+}

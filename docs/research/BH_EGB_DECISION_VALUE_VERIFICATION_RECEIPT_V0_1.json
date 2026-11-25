@@ -1,0 +1,57 @@
+{
+  "schema_version": "0.1.0",
+  "artifact_kind": "bh_egb_decision_value_vs_information_gain_verification_receipt",
+  "checked_utc": "2026-11-24",
+  "result": "pass_exact_finite_decision_value_oracle_and_negative_controls",
+  "repository_context": {
+    "repository": "Luminous-Dynamics/symthaea",
+    "branch": "research/bh-egb-symthaea-campaign-2026-11-23",
+    "fixture_commit": "2ef3625e71982db38e96b56631cde472a117c1be",
+    "verifier_commit": "048809bd9c7607698102cb55f938dd848586cf11"
+  },
+  "inputs": {
+    "fixture_path": "docs/research/BH_EGB_DECISION_VALUE_CONTROL_V0_1.json",
+    "fixture_git_blob_sha1": "46cd9fac730f7375eaa15b5c84541fb113324ecd",
+    "verifier_path": "docs/research/verify_bh_egb_decision_value.py",
+    "verifier_git_blob_sha1": "2b0fc3511b13ec4bb545a8e7873f7c6292c51e0e"
+  },
+  "execution": {
+    "command": "python3 docs/research/verify_bh_egb_decision_value.py docs/research/BH_EGB_DECISION_VALUE_CONTROL_V0_1.json",
+    "runtime": "Python 3.13.5",
+    "dependencies": "Python standard library only",
+    "arithmetic": "exact fractions.Fraction",
+    "fixture_bytes": "local Git blob SHA-1 exactly matches fetched public fixture blob",
+    "verifier_bytes": "local Git blob SHA-1 exactly matches fetched public verifier blob",
+    "exit_code": 0
+  },
+  "checks": {
+    "pre_action_bayes_risk": "1/2",
+    "action_A_information_gain_bits": "1",
+    "action_B_information_gain_bits": "1",
+    "action_A_expected_posterior_bayes_risk": "1/2",
+    "action_A_gross_decision_value": "0",
+    "action_A_net_value_of_computation": "-1/10",
+    "action_B_expected_posterior_bayes_risk": "0",
+    "action_B_gross_decision_value": "1/2",
+    "action_B_net_value_of_computation": "2/5",
+    "selected_action": "B_decision_relevant",
+    "decision_value_gap": "1/2",
+    "negative_controls_expected_to_reject": 4,
+    "negative_controls_rejected": [
+      "action_cost_mutation",
+      "prior_mutation",
+      "decision_class_mutation",
+      "outcome_mapping_mutation"
+    ]
+  },
+  "claim_ceiling": "The verifier passes one exact finite synthetic decision oracle and its four hostile mutations. It demonstrates that equal information gain need not imply equal decision value. It does not validate the real Symthaea VoC policy, EGB physics, utility assumptions for any real-world application, or performance superiority.",
+  "not_run_or_not_claimed": [
+    "runtime Symthaea Stage-A VoC policy execution",
+    "real EGB action utility or cost calibration",
+    "calibrated Bayesian posterior for physical EGB models",
+    "Rust build or package tests",
+    "hosted CI pass",
+    "PR #8034 qualification",
+    "SOTA performance"
+  ]
+}

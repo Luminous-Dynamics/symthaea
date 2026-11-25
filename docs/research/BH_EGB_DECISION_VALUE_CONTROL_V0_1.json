@@ -1,0 +1,59 @@
+{
+  "schema_version": "bh-egb-decision-value-control-v0.1",
+  "artifact_kind": "synthetic_decision_value_vs_information_gain_regression",
+  "campaign_issue": "https://github.com/Luminous-Dynamics/symthaea/issues/13418",
+  "scope": "Exact finite synthetic decision problem only. The state prior and observation outcomes are fully enumerated; this is an oracle control, not a physical EGB model or a learned policy result.",
+  "states": [
+    {"state_id": "A0", "probability": "1/4", "decision_class": "A"},
+    {"state_id": "A1", "probability": "1/4", "decision_class": "A"},
+    {"state_id": "B0", "probability": "1/4", "decision_class": "B"},
+    {"state_id": "B1", "probability": "1/4", "decision_class": "B"}
+  ],
+  "loss": {
+    "kind": "zero_one_decision_classification",
+    "loss_for_wrong_decision": "1",
+    "loss_for_correct_decision": "0"
+  },
+  "actions": [
+    {
+      "action_id": "A_entropy_only",
+      "description": "Reveal the within-class subtype bit, which is independent of the decision class.",
+      "cost": "1/10",
+      "outcome_by_state": {"A0": "0", "A1": "1", "B0": "0", "B1": "1"},
+      "expected": {
+        "information_gain_bits": "1",
+        "expected_posterior_bayes_risk": "1/2",
+        "gross_decision_value": "0",
+        "net_value_of_computation": "-1/10"
+      }
+    },
+    {
+      "action_id": "B_decision_relevant",
+      "description": "Reveal the decision class, which directly changes the optimal decision.",
+      "cost": "1/10",
+      "outcome_by_state": {"A0": "A", "A1": "A", "B0": "B", "B1": "B"},
+      "expected": {
+        "information_gain_bits": "1",
+        "expected_posterior_bayes_risk": "0",
+        "gross_decision_value": "1/2",
+        "net_value_of_computation": "2/5"
+      }
+    }
+  ],
+  "expected": {
+    "pre_action_bayes_risk": "1/2",
+    "equal_information_gain_bits": "1",
+    "best_action": "B_decision_relevant",
+    "best_net_value_of_computation": "2/5",
+    "decision_value_gap_between_actions": "1/2",
+    "selection_rule": "maximize expected reduction in Bayes decision risk minus action cost; information gain is reported separately and is not the objective"
+  },
+  "assertions": [
+    "Both actions have exactly one bit of Shannon information gain under the enumerated uniform prior.",
+    "The entropy-only action leaves the posterior decision risk unchanged and has negative net value after cost.",
+    "The decision-relevant action reduces Bayes risk from 1/2 to 0 and has positive net value after the same cost.",
+    "The selected action must be B_decision_relevant even though both actions have equal information gain and equal cost.",
+    "Changing the frozen prior, decision classes, outcomes or costs without changing expected values must fail closed."
+  ],
+  "claim_ceiling": "This exact finite oracle control demonstrates the difference between information gain and decision value. It does not validate a real-world utility model, EGB computation, prospective Symthaea VoC, or policy performance."
+}
