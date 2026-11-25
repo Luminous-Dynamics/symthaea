@@ -47,7 +47,7 @@ The evaluator is deterministic and does not simulate probe execution. It compute
 The new `src/sequential.rs` module adds a finite-horizon, prior-free policy-tree reference with:
 
 - Set-valued observation supports, including overlapping outcomes.
-- Branch-specific continuations driven by public protocol state.
+- Branch-specific continuations driven by public protocol state; action outcome supports are validated as exhaustive over the states reachable at that protocol node, not over unrelated branches of the global state universe.
 - Component-wise integer resource budgets and explicit result deadlines.
 - A bounded backward dynamic programme and a separately written exhaustive policy-tree enumerator.
 - Explicit terminal decisions; separate current-state minimax/risk-gate fields from the selected policy's terminal loss/risk-gate fields; evaluator-only per-terminal receipts bind action/outcome supports, terminal decision/loss and branch-specific resource vectors; no implicit abstain action or execution authorization.
