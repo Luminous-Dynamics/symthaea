@@ -604,6 +604,15 @@ mod tests {
         assert!(!restored.import_state(invalid_confidence_state));
         assert_eq!(restored.stats().total_outcomes, 0);
         assert_eq!(restored.stats().source_count, 0);
+
+        let mut oversized_state = seeded.export_state();
+        let duplicate = oversized_state.adjudicated_outcomes[0].clone();
+        oversized_state
+            .adjudicated_outcomes
+            .extend(std::iter::repeat_n(duplicate, MAX_PERSISTED_ADJUDICATED_OUTCOMES + 1));
+        assert!(!restored.import_state(oversized_state));
+        assert_eq!(restored.stats().total_outcomes, 0);
+        assert_eq!(restored.stats().source_count, 0);
     }
 
     #[test]
