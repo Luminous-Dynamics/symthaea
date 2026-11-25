@@ -943,6 +943,169 @@ mod tests {
         })
     }
 
+    fn operation_binding_fixture() -> (
+        AcquisitionReceiptV2,
+        broca_aml_adapter::candidate_evidence::CandidateEvidenceBatchV1,
+    ) {
+        use broca_aml_adapter::candidate_evidence::{
+            CandidateEvidenceV1, EvidenceModalityV1, encode_candidate_evidence_jsonl,
+        };
+
+        let revision = "11".repeat(32);
+        let state_digest = "22".repeat(32);
+        let source_digest = "33".repeat(32);
+        let chunk_digest = "44".repeat(32);
+        let image_digest = "55".repeat(32);
+        let query_digest = sha256_hex(b"fixture query");
+        let state_id = format!("lmev2:state:trajectory-1:0:{state_digest}");
+        let text_id = format!("lmev2:text:trajectory-1:{chunk_digest}");
+        let image_id = format!("lmev2:image:trajectory-1:0:{image_digest}");
+
+        let common = |evidence_id: String,
+                      modality: EvidenceModalityV1,
+                      retrieval_channel: &str,
+                      retrieval_rank: u32,
+                      parents: Vec<String>,
+                      derivation_receipt_sha256: Option<String>,
+                      payload_sha256: String,
+                      payload_ref: String,
+                      retrieval_score: Option<f64>| CandidateEvidenceV1 {
+            run_id: "fixture-run".into(),
+            candidate_id: "fixture-invocation".into(),
+            backend_id: "mace_lmev2_bm25_only".into(),
+            backend_revision_sha256: revision.clone(),
+            query_scope: "longmemeval-v2:domain:web".into(),
+            query_purpose: "benchmark:memory-context".into(),
+            query_sha256: query_digest.clone(),
+            evidence_id,
+            source_id: "trajectory-1".into(),
+            source_sha256: source_digest.clone(),
+            payload_sha256,
+            payload_ref,
+            modality,
+            retrieval_channel: retrieval_channel.into(),
+            retrieval_rank,
+            retrieval_score,
+            parent_evidence_ids: parents,
+            derivation_receipt_sha256,
+        };
+
+        let records = vec![
+            common(
+                state_id.clone(),
+                EvidenceModalityV1::Structured,
+                "source_state_lineage",
+                1,
+                Vec::new(),
+                None,
+                state_digest.clone(),
+                "lmev2://web/trajectories/trajectory-1/states/0/raw-json".into(),
+                None,
+            ),
+            common(
+                text_id.clone(),
+                EvidenceModalityV1::Text,
+                "trajectory_bm25_text",
+                1,
+                vec![state_id.clone()],
+                Some(chunk_digest.clone()),
+                chunk_digest.clone(),
+                format!("lmev2://web/trajectories/trajectory-1/chunks/{chunk_digest}"),
+                Some(1.0),
+            ),
+            common(
+                image_id,
+                EvidenceModalityV1::Image,
+                "attached_image_evidence",
+                1,
+                vec![state_id],
+                Some(sha256_hex(b"screenshot binding")),
+                image_digest.clone(),
+                format!("lmev2://web/trajectories/trajectory-1/states/0/screenshots/{image_digest}"),
+                None,
+            ),
+        ];
+        let batch = encode_candidate_evidence_jsonl(&records).expect("canonical candidate batch");
+        let receipt = AcquisitionReceiptV2 {
+            run_id: "fixture-run".into(),
+            query_invocation_id: "fixture-invocation".into(),
+            domain_id: "web".into(),
+            environment_revision_sha256: "66".repeat(32),
+            tool_profile_sha256: revision.clone(),
+            query_sha256: query_digest,
+            candidate_set_sha256: Some(batch.candidate_set_sha256.clone()),
+            operations: vec![AcquisitionOperationV2 {
+                tool_id: "trajectory.bm25.search".into(),
+                tool_revision_sha256: revision,
+                action_template_sha256: "77".repeat(32),
+                observed_evidence_ids: vec![text_id],
+                outcome: OperationOutcomeV2::EvidenceObserved,
+                elapsed_ns: 10,
+                inspected_bytes: 0,
+                inspected_bytes_measured: false,
+            }],
+            acquisition_status: AcquisitionStatusV2::CandidatesReturned,
+            tool_call_budget: 1,
+            tool_calls_used: 1,
+            elapsed_ns: 10,
+            inspected_bytes: 0,
+            inspected_bytes_complete: false,
+            created_at_unix: 100,
+        };
+        (receipt, batch)
+    }
+
+    #[test]
+    fn candidate_projection_is_bound_to_acquisition_operations_and_source_parents() {
+        let (receipt, batch) = operation_binding_fixture();
+        verify_candidate_batch(&receipt, &batch).expect("receipt candidate digest");
+        verify_lmev2_candidate_operation_binding(&receipt, &batch)
+            .expect("operation and parent binding");
+
+        let mut missing_observation = receipt.clone();
+        missing_observation.operations[0].observed_evidence_ids.clear();
+        assert!(
+            verify_lmev2_candidate_operation_binding(&missing_observation, &batch).is_err()
+        );
+
+        let mut wrong_revision = receipt;
+        wrong_revision.tool_profile_sha256 = "88".repeat(32);
+        assert!(
+            verify_lmev2_candidate_operation_binding(&wrong_revision, &batch).is_err()
+        );
+    }
+
+    #[test]
+    fn neighbor_evidence_is_included_in_the_search_operation_observation_set() {
+        use broca_aml_adapter::longmemeval_v2::{
+            LongMemEvalV2EvidenceChunkV1, LongMemEvalV2NeighborV1,
+        };
+
+        let neighbor = LongMemEvalV2NeighborV1 {
+            chunk: LongMemEvalV2EvidenceChunkV1 {
+                chunk_id: "chunk-id".into(),
+                trajectory_id: "trajectory-1".into(),
+                domain: "web".into(),
+                goal: "goal".into(),
+                start_url: "https://example.test".into(),
+                center_state_ordinal: 1,
+                window_start_ordinal: 0,
+                window_end_ordinal_exclusive: 2,
+                source_trajectory_sha256: "11".repeat(32),
+                state_window: Vec::new(),
+                screenshot_references: Vec::new(),
+                chunk_sha256: "22".repeat(32),
+                evidence_text: "neighbor context".into(),
+            },
+            expanded_from_hit_rank: 1,
+            relative_state_offset: -1,
+        };
+        assert_eq!(
+            trace_evidence_ids(&[], &[neighbor]),
+            vec!["lmev2:neighbor:trajectory-1:".to_owned() + &"22".repeat(32)]
+        );
+    }
+
     #[test]
     fn reciprocal_rank_fusion_deduplicates_cross_channel_hits() {
         let root = fixture_root("rrf-dedup");
