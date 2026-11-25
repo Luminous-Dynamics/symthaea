@@ -100,6 +100,24 @@ pub struct MultiAnnotatorGroundingSummaryV1 {
     pub end_boundary_p95_abs_error_frames: Option<f64>,
 }
 
+/// Distribution of independent annotated boundaries aligned to one model
+/// prediction index through the production scorer's existing match records.
+#[derive(Debug, Clone, PartialEq, Serialize)]
+pub struct EventReferenceBoundaryDistributionV1 {
+    pub prediction_index: usize,
+    pub present_annotators: usize,
+    pub matching_annotators: usize,
+    pub support_rate: Option<f64>,
+    pub annotated_start_frame_min: u64,
+    pub annotated_start_frame_median: f64,
+    pub annotated_start_frame_max: u64,
+    pub annotated_end_frame_min: u64,
+    pub annotated_end_frame_median: f64,
+    pub annotated_end_frame_max: u64,
+    pub start_spread_frames: u64,
+    pub end_spread_frames: u64,
+}
+
 #[derive(Debug, Clone, PartialEq, Serialize)]
 pub struct MultiAnnotatorGroundingReportV1 {
     pub schema: &'static str,
@@ -113,6 +131,10 @@ pub struct MultiAnnotatorGroundingReportV1 {
     pub summary: MultiAnnotatorGroundingSummaryV1,
     /// Scores retain every per-annotator result; exclusions are not discarded.
     pub annotator_results: Vec<AnnotatorGroundingResultV1>,
+    /// Per-prediction boundary distributions derived from existing scorer matches.
+    pub event_reference_boundary_distributions: Vec<EventReferenceBoundaryDistributionV1>,
+    /// Prediction indices with no match in any eligible Present annotation.
+    pub unmatched_prediction_indices: Vec<usize>,
     /// Digest-shaped references are not cryptographically authenticated here.
     pub annotation_manifest_authenticated: bool,
     pub annotator_receipts_authenticated: bool,
@@ -231,6 +253,12 @@ pub fn audit_multi_annotator_case(
     }
 
     let summary = summarize_results(&results, case.minimum_annotator_count);
+    let prediction_count = match &case.prediction.state {
+        GroundingPredictionStateV1::Occurrences { intervals } => intervals.len(),
+        _ => 0,
+    };
+    let (event_reference_boundary_distributions, unmatched_prediction_indices) =
+        event_reference_boundary_distributions(&results, prediction_count);
 
     Ok(MultiAnnotatorGroundingReportV1 {
         schema: "mel-multi-annotator-grounding-report-v1",
@@ -243,6 +271,8 @@ pub fn audit_multi_annotator_case(
         prediction: case.prediction.clone(),
         summary,
         annotator_results: results,
+        event_reference_boundary_distributions,
+        unmatched_prediction_indices,
         annotation_manifest_authenticated: false,
         annotator_receipts_authenticated: false,
         pairwise_inter_annotator_agreement_computed: false,
@@ -250,6 +280,81 @@ pub fn audit_multi_annotator_case(
         synthetic_consensus_ground_truth_created: false,
         population_confidence_interval_computed: false,
     })
+}
+
+fn event_reference_boundary_distributions(
+    results: &[AnnotatorGroundingResultV1],
+    prediction_count: usize,
+) -> (Vec<EventReferenceBoundaryDistributionV1>, Vec<usize>) {
+    let present_annotators = results
+        .iter()
+        .filter(|item| item.state == GroundTruthStateV1::Present && item.score.scored)
+        .count();
+    let mut by_prediction: std::collections::BTreeMap<usize, Vec<(usize, u64, u64)>> =
+        std::collections::BTreeMap::new();
+
+    for (annotator_index, result) in results.iter().enumerate() {
+        if result.state != GroundTruthStateV1::Present || !result.score.scored {
+            continue;
+        }
+        for matched in &result.score.matches {
+            let Some(interval) = result.intervals.get(matched.annotation_index) else {
+                continue;
+            };
+            by_prediction
+                .entry(matched.prediction_index)
+                .or_default()
+                .push((
+                    annotator_index,
+                    interval.start_frame,
+                    interval.end_frame,
+                ));
+        }
+    }
+
+    let mut distributions = Vec::with_capacity(by_prediction.len());
+    for (prediction_index, observations) in by_prediction {
+        let mut starts: Vec<_> = observations.iter().map(|item| item.1).collect();
+        let mut ends: Vec<_> = observations.iter().map(|item| item.2).collect();
+        starts.sort_unstable();
+        ends.sort_unstable();
+        let matching_annotators = observations
+            .iter()
+            .map(|item| item.0)
+            .collect::<BTreeSet<_>>()
+            .len();
+        let start_min = starts[0];
+        let start_max = *starts.last().unwrap_or(&start_min);
+        let end_min = ends[0];
+        let end_max = *ends.last().unwrap_or(&end_min);
+        distributions.push(EventReferenceBoundaryDistributionV1 {
+            prediction_index,
+            present_annotators,
+            matching_annotators,
+            support_rate: rate(matching_annotators, present_annotators),
+            annotated_start_frame_min: start_min,
+            annotated_start_frame_median: median_u64(
+                &starts.iter().map(|value| *value as usize).collect::<Vec<_>>(),
+            )
+            .unwrap_or(start_min as f64),
+            annotated_start_frame_max: start_max,
+            annotated_end_frame_min: end_min,
+            annotated_end_frame_median: median_u64(
+                &ends.iter().map(|value| *value as usize).collect::<Vec<_>>(),
+            )
+            .unwrap_or(end_min as f64),
+            annotated_end_frame_max: end_max,
+            start_spread_frames: start_max - start_min,
+            end_spread_frames: end_max - end_min,
+        });
+    }
+
+    let matched_prediction_indices: BTreeSet<_> =
+        distributions.iter().map(|item| item.prediction_index).collect();
+    let unmatched = (0..prediction_count)
+        .filter(|index| !matched_prediction_indices.contains(index))
+        .collect();
+    (distributions, unmatched)
 }
 
 fn summarize_results(
