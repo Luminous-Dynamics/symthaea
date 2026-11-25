@@ -280,6 +280,9 @@ fn input_digest(
     canonical.hypotheses.sort_by(|left, right| left.hypothesis_id.cmp(&right.hypothesis_id));
     for hypothesis in &mut canonical.hypotheses {
         hypothesis.evidence.sort_by(|left, right| left.evidence_id.cmp(&right.evidence_id));
+        if let Some(contrast) = &mut hypothesis.clustered_matched_contrast {
+            contrast.clusters.sort_by(|left, right| left.cluster_id.cmp(&right.cluster_id));
+        }
         hypothesis.negative_controls.sort_by(|left, right| left.control_id.cmp(&right.control_id));
         hypothesis.measured_confounders.sort();
         hypothesis.unmeasured_confounders.sort();
