@@ -887,6 +887,33 @@ mod tests {
     }
 
     #[test]
+    fn outcome_cannot_rebind_episode_digest_after_witnessed_membership() {
+        let mut fixture = fixture();
+        fixture.receipt.payload.episode_manifest_sha256 = digest('0');
+        fixture.resign();
+        assert_eq!(
+            fixture.verify(250),
+            Err(DecisionOutcomeReceiptRejectV1::BindingMismatch)
+        );
+    }
+
+    #[test]
+    fn held_out_outcome_rejects_development_membership() {
+        let fixture = fixture();
+        let mut expected = fixture.expected();
+        expected.required_split = DecisionEpisodeSplitV1::Development;
+        assert_eq!(
+            validate_decision_outcome_receipt_v1(
+                &fixture.receipt,
+                &expected,
+                250,
+                &fixture.verifier,
+            ),
+            Err(DecisionOutcomeReceiptRejectV1::BindingMismatch)
+        );
+    }
+
+    #[test]
     fn utility_delta_must_match_treatment_minus_baseline() {
         let mut fixture = fixture();
         fixture.receipt.payload.outcome.utility_delta_microunits = 6;
