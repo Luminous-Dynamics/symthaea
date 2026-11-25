@@ -480,7 +480,10 @@ pub fn advance_ca_ocrc_round_v1(
         }
 
         let Some(ticket) = next.tracking_set.get(&arrival.origin_round_id).cloned() else {
-            if arrival.loss.is_some() || arrival.evidence_disposition.is_some() {
+            if arrival.loss.is_some()
+                || arrival.evidence_disposition.is_some()
+                || arrival.evidence_receipt_sha256.is_some()
+            {
                 return Err(CaOcrcErrorV1(
                     "loss/evidence must not be exposed for a round that was not tracked".into()
                 ));
@@ -684,6 +687,40 @@ mod tests {
             &input(3, CaOcrcPredictionSetKindV1::NonTrivial, Some(0.9),
                 vec![feedback(1, 3, Some(CaOcrcEvidenceDispositionV1::Qualified), Some(1.0))])).unwrap();
         assert_eq!(r3.feedback[0].disposition, CaOcrcFeedbackDispositionV1::Applied);
+    }
+
+    #[test]
+    fn capacity_at_least_dmax_plus_one_reproduces_unlimited_delayed_ocrc() {
+        let mut e = engine(3, vec![1.0, 1.0, 1.0], 0.5);
+        let one = advance_ca_ocrc_round_v1(
+            &mut e,
+            &input(1, CaOcrcPredictionSetKindV1::NonTrivial, Some(0.9), vec![]),
+        )
+        .unwrap();
+        assert!(one.admitted_current_round);
+        let two = advance_ca_ocrc_round_v1(
+            &mut e,
+            &input(2, CaOcrcPredictionSetKindV1::NonTrivial, Some(0.9), vec![]),
+        )
+        .unwrap();
+        assert!(two.admitted_current_round);
+        let three = advance_ca_ocrc_round_v1(
+            &mut e,
+            &input(
+                3,
+                CaOcrcPredictionSetKindV1::NonTrivial,
+                Some(0.9),
+                vec![
+                    feedback(1, 3, Some(CaOcrcEvidenceDispositionV1::Qualified), Some(1.0)),
+                    feedback(2, 3, Some(CaOcrcEvidenceDispositionV1::Qualified), Some(0.0)),
+                ],
+            ),
+        )
+        .unwrap();
+        assert!(three.admitted_current_round);
+        assert!((three.feedback_threshold_contribution - 0.04).abs() < 1.0e-12);
+        assert!((three.threshold_after - 0.54).abs() < 1.0e-12);
+        assert_eq!(three.capacity_occupancy_after, 1);
     }
 
     #[test]
