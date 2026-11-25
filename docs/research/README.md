@@ -380,3 +380,18 @@ The initial seed is source-pinned to Lean 4 core and is explicitly not expert-re
 - [Metamorphic pair schema](MATH_METAMORPHIC_PAIR_V1.schema.json) and [finite fixtures](MATH_METAMORPHIC_PAIR_V1.json) — exact typed sequent digests and finite truth-table controls for equivalent rewrites, changed hypotheses and proof-route-only changes; executable Rust validator and `math-metamorphic` CLI; issue [#13547](https://github.com/Luminous-Dynamics/symthaea/issues/13547).
 
 - [Proof-action local certificate protocol](MATH_PROOF_ACTION_CERTIFICATE_V1.md) — protocol plus a source-pinned Lean 4.37 `And.comm` pilot, candidate mapping manifest and exact-head replay workflow; structured goal-state/context receipts remain future work; tracked by [#13549](https://github.com/Luminous-Dynamics/symthaea/issues/13549). [Manifest](PROOF_ACTION_CERTIFICATE_AND_COMM_V1.json) · [schema](PROOF_ACTION_CERTIFICATE_AND_COMM_V1.schema.json) · [Lean source](../../scripts/research/lean-proof-extractor/ProofActionCertificateAndComm.lean). The workflow also checks manifest-to-plan node/goal bindings with a mutated-manifest rejection control, and pins a wrong-proposition Lean negative control that must fail with an explicit type error. It also requires exact split-subgoal consumption with an omitted-subgoal mutation rejection, and tests whether a deliberately injected Lean axiom appears in `#print axioms` output. A separate fresh DFS fixture now audits eight roots: three expected `Classical.choice` roots plus five expected-empty `And.comm`/action roots. Native `#print axioms` is diagnostic-only. See [independent audit protocol](LEAN_AXIOM_AUDIT_INDEPENDENCE_V1.md), [15-root manifest/schema](LEAN_AXIOM_AUDIT_IMPORTED_INDUCTIVE_V1.json), [A](../../scripts/research/lean-proof-extractor/axiom-audit-imported-inductive/A.lean), [B](../../scripts/research/lean-proof-extractor/axiom-audit-imported-inductive/B.lean), and [#13575](https://github.com/Luminous-Dynamics/symthaea/issues/13575).
+
+
+## Spectral–Dynamical Cognition Bridge (SDCB v1)
+
+A falsifiable programme for spectral statistics, RH/prime-structure controls, neural-weight spectra, criticality, Koopman dynamics, observability, memory, and proof/search.
+
+- [Research protocol](SPECTRAL_DYNAMICAL_COGNITION_BRIDGE_V1.md)
+- [Industry and research benchmark landscape (2026-11-25)](SDCB_INDUSTRY_BENCHMARK_LANDSCAPE_2026_11_25.md)
+- [Hidden evaluation and reproducibility protocol](SDCB_HIDDEN_EVALUATION_AND_REPRODUCIBILITY_V1.md)
+- [28-task exploratory pilot manifest](SPECTRAL_DYNAMICAL_PILOT_V1.json)
+- [Benchmark manifest schema](SPECTRAL_DYNAMICAL_BENCHMARK_MANIFEST_V1.schema.json)
+- [Dependency-free Rust analytic reference harness](../../scripts/research/sdcb_reference.rs)
+- [Reference harness run instructions and limits](../../scripts/research/SDCB_REFERENCE_HARNESS_README.md)
+
+**Evidence boundary:** artifacts are research specifications and authored reference tests. Rust compilation/tests, model inference, generated trajectory experiments, hidden-set creation, external baseline reproduction, and scientific results remain pending.
