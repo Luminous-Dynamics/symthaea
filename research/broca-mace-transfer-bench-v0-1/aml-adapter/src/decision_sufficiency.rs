@@ -808,8 +808,8 @@ mod tests {
     const QUAL_POLICY: &str = "17";
     const LIFECYCLE: &str = "18";
     const QUAL_PROFILE: &str = "19";
-    const SUFF_POLICY: &str = "1a";
-    const CALIBRATION: &str = "1b";
+    const SUFF_POLICY: &str = "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa";
+    const CALIBRATION: &str = "bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb";
 
     struct TestQualificationVerifier;
 
