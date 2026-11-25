@@ -9,6 +9,9 @@
     "dataset",
     "expected_selection_receipt_sha256",
     "metric_id",
+    "model_identity_sha256",
+    "evaluator_version",
+    "scoring_plan_sha256",
     "observed_audit_outcomes"
   ],
   "properties": {
@@ -41,6 +44,11 @@
         "additionalProperties": false,
         "required": [
           "item_id",
+          "source_work_id_sha256",
+          "scoring_report_sha256",
+          "model_identity_sha256",
+          "evaluator_version",
+          "scoring_plan_sha256",
           "metric_id",
           "value_ppm"
         ],
@@ -57,9 +65,41 @@
             "type": "integer",
             "minimum": 0,
             "maximum": 1000000
+          },
+          "source_work_id_sha256": {
+            "type": "string",
+            "pattern": "^[0-9a-f]{64}$"
+          },
+          "scoring_report_sha256": {
+            "type": "string",
+            "pattern": "^[0-9a-f]{64}$"
+          },
+          "model_identity_sha256": {
+            "type": "string",
+            "pattern": "^[0-9a-f]{64}$"
+          },
+          "evaluator_version": {
+            "type": "string",
+            "minLength": 1
+          },
+          "scoring_plan_sha256": {
+            "type": "string",
+            "pattern": "^[0-9a-f]{64}$"
           }
         }
       }
+    },
+    "model_identity_sha256": {
+      "type": "string",
+      "pattern": "^[0-9a-f]{64}$"
+    },
+    "evaluator_version": {
+      "type": "string",
+      "minLength": 1
+    },
+    "scoring_plan_sha256": {
+      "type": "string",
+      "pattern": "^[0-9a-f]{64}$"
     }
   }
 }
