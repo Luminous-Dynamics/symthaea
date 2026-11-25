@@ -1,0 +1,205 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://github.com/Luminous-Dynamics/symthaea/blob/main/benchmarks/plasma/kinetic-information-return/path-response-signature-v0.1.schema.json",
+  "title": "KIRR path-conditioned complex response signature v0.1",
+  "description": "A candidate/reference complex response signature bound at runtime to an immutable kinetic pulse path. This schema defines wire shape and expected dispositions only.",
+  "type": "object",
+  "additionalProperties": false,
+  "required": [
+    "schema_version",
+    "record_status",
+    "fixture_id",
+    "cases",
+    "claim_boundary"
+  ],
+  "properties": {
+    "schema_version": {
+      "const": "0.1"
+    },
+    "record_status": {
+      "const": "synthetic_path_response_disposition_fixture"
+    },
+    "fixture_id": {
+      "type": "string",
+      "minLength": 1
+    },
+    "cases": {
+      "type": "array",
+      "minItems": 1,
+      "maxItems": 128,
+      "items": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": [
+          "case_id",
+          "sequence_path_id",
+          "observation_end_time",
+          "empirical_tolerance",
+          "reference_signature",
+          "candidate_signature",
+          "expected_disposition"
+        ],
+        "properties": {
+          "case_id": {
+            "type": "string",
+            "minLength": 1
+          },
+          "sequence_path_id": {
+            "enum": [
+              "two-pulse-echo-anchor",
+              "three-pulse-cascade"
+            ]
+          },
+          "observation_end_time": {
+            "type": "number",
+            "exclusiveMinimum": 0
+          },
+          "empirical_tolerance": {
+            "type": "number",
+            "minimum": 0
+          },
+          "reference_signature": {
+            "$ref": "#/$defs/signature"
+          },
+          "candidate_signature": {
+            "$ref": "#/$defs/signature"
+          },
+          "expected_disposition": {
+            "enum": [
+              "PASS",
+              "FAIL",
+              "UNKNOWN",
+              "UNSUPPORTED"
+            ]
+          },
+          "expected_missing_response_count": {
+            "type": "integer",
+            "minimum": 0
+          },
+          "expected_branch_mismatch_count": {
+            "type": "integer",
+            "minimum": 0
+          },
+          "expected_unresolved_branch_count": {
+            "type": "integer",
+            "minimum": 0
+          },
+          "expected_maximum_normalized_error": {
+            "type": "number",
+            "minimum": 0
+          }
+        }
+      }
+    },
+    "claim_boundary": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "no_solver_run",
+        "no_echo_measured",
+        "no_global_guarantee"
+      ],
+      "properties": {
+        "no_solver_run": {
+          "const": true
+        },
+        "no_echo_measured": {
+          "const": true
+        },
+        "no_global_guarantee": {
+          "const": true
+        }
+      }
+    }
+  },
+  "$defs": {
+    "signature": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "contract_id",
+        "structure_class_id",
+        "qoi_ids",
+        "qoi_scales",
+        "time_samples",
+        "responses",
+        "branch_ids"
+      ],
+      "properties": {
+        "contract_id": {
+          "type": "string",
+          "minLength": 1
+        },
+        "structure_class_id": {
+          "type": "string",
+          "minLength": 1
+        },
+        "qoi_ids": {
+          "type": "array",
+          "minItems": 1,
+          "items": {
+            "type": "string",
+            "minLength": 1
+          }
+        },
+        "qoi_scales": {
+          "type": "array",
+          "minItems": 1,
+          "items": {
+            "type": "number",
+            "exclusiveMinimum": 0
+          }
+        },
+        "time_samples": {
+          "type": "array",
+          "minItems": 1,
+          "items": {
+            "type": "number"
+          }
+        },
+        "responses": {
+          "type": "array",
+          "minItems": 1,
+          "items": {
+            "oneOf": [
+              {
+                "type": "null"
+              },
+              {
+                "type": "object",
+                "additionalProperties": false,
+                "required": [
+                  "real",
+                  "imag"
+                ],
+                "properties": {
+                  "real": {
+                    "type": "number"
+                  },
+                  "imag": {
+                    "type": "number"
+                  }
+                }
+              }
+            ]
+          }
+        },
+        "branch_ids": {
+          "type": "array",
+          "minItems": 1,
+          "items": {
+            "oneOf": [
+              {
+                "type": "null"
+              },
+              {
+                "type": "string",
+                "minLength": 1
+              }
+            ]
+          }
+        }
+      }
+    }
+  }
+}
