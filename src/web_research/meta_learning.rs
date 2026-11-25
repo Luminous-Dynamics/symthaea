@@ -460,6 +460,7 @@ mod tests {
             was_correct: correct,
             predicted_confidence: 0.8,
             domain: domain.to_string(),
+            adjudication_provenance: None,
         }
     }
 
