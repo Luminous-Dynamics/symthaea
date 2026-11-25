@@ -210,7 +210,6 @@ impl VerifiedEvaluationManifestCommitmentV1 {
     pub fn witness_profile_sha256(&self) -> &str {
         &self.witness_profile_sha256
     }
-}
 
     /// Candidate-access profile committed by the witness and checked against
     /// the consumer-owned runner/custody profile.
@@ -222,6 +221,7 @@ impl VerifiedEvaluationManifestCommitmentV1 {
     pub fn reveal_protocol_sha256(&self) -> &str {
         &self.reveal_protocol_sha256
     }
+}
 
 pub fn parse_and_verify_evaluation_manifest_commitment_receipt_v1(
     wire: &[u8],
