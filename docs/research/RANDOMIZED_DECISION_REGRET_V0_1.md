@@ -136,6 +136,20 @@ A next-generation system should:
 
 This is a decision-sufficient, evidence-carrying world model—not a claim that one model architecture dominates every task.
 
+
+### Counterfactual calibration and training-selection price
+
+The published individual-effect calibration certificate is a joint tuple `(β, τ, ρ; m)`, not a single score: `β` is the calibration slope (realised centred effect regressed on predicted centred effect), `τ` is within-individual intervention-rank correlation, `ρ` is prediction error relative to the zero-effect predictor, and `m` is the count of counterfactual pairs consumed by fitting the predictor. These can disagree: affine recalibration can repair slope without repairing ordering; a predictor that collapses toward zero can look competitive on a single normalised error while carrying almost no useful rank signal.
+
+The paired contrast objective in the source paper is:
+
+`L_cf = Σ_k ||ŷ_k − y_k||² + w Σ_(k≠k') ||(ŷ_k − ŷ_k') − (y_k − y_k')||²`.
+
+The first term supervises branch outcomes. The second term directly supervises the individual-specific difference between sibling interventions sharing the same individual and factual/exogenous history. The paper uses `w=100`; do not copy that scalar blindly across a different output scale. Our experiment must report the chosen normalisation and a preregistered `w` sensitivity. It must also state whether ordered or unordered pairs are used, since pair duplication changes loss scale and compute.
+
+Checkpoint selection is itself a consumer of counterfactual pairs. Report distinct pair budgets for training loss, held-out contrast-based checkpoint selection, readout fitting, and final evaluation. Hold out individuals for selection and reserve a disjoint confirmatory cohort. Report reconstruction-selected, contrast-selected and final checkpoints side by side; never expose the confirmatory labels to checkpoint selection.
+
+Source: Okita (2026), Equations 30–32 and Sections 9.1, 9.5–9.7: https://www.mdpi.com/2504-4990/8/11/363.
 ## 7A. Existing randomized-mixture work: do not duplicate the optimizer
 
 The repository already has a randomized minimax policy-frontier programme in #8646 (with the benchmark work in #8493). Its recorded horizon-two experiment found only a negligible average randomized-mixture gain on the tested grid (0.000064 bits). Its column-generation path was approximately 2.56× slower than exhaustive-frontier plus LP over the reported 36-case aggregate. Epsilon-frontier pruning reduced the largest horizon-two kernel frontier from 450 to 131 at epsilon 0.01, with no observed regret on that tested grid; the issue explicitly does not claim a general regret theorem.
