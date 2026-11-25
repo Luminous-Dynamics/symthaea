@@ -349,7 +349,12 @@ pub fn inspect_checkpoint_receipt(
                 entry.log_id.clone(),
             ));
         }
-        if entry.previous_checkpoint_ref.as_deref().is_some_and(|v| !v.trim().is_empty())
+        if entry.previous_checkpoint_ref.as_deref().is_some_and(|v| v.trim().is_empty()) {
+            return Err(CheckpointVerificationError::InvalidShape(
+                "previous_checkpoint_ref must be non-empty when present".to_owned(),
+            ));
+        }
+        if entry.previous_checkpoint_ref.is_some()
             && entry.consistency_proof_ref.as_deref().is_none_or(|v| v.trim().is_empty())
         {
             return Err(CheckpointVerificationError::MissingConsistencyProof(
@@ -467,11 +472,15 @@ pub fn inspect_checkpoint_receipt(
             && !entry.inclusion_proof_ref.trim().is_empty()
             && !entry.signed_statement_ref.trim().is_empty()
             && !entry.verification_policy_ref.trim().is_empty()
+            && entry.previous_checkpoint_ref.as_deref().is_none_or(|v| !v.trim().is_empty())
+            && entry.consistency_proof_ref.as_deref().is_none_or(|v| !v.trim().is_empty())
     }) && receipt.witness_attestations.iter().all(|witness| {
         !witness.signature_ref.trim().is_empty()
             && !witness.key_id.trim().is_empty()
             && !witness.independence_basis_ref.trim().is_empty()
-    });
+    }) && !receipt.trust_policy.key_status_evidence_ref.trim().is_empty()
+        && !receipt.trust_policy.revocation_snapshot_ref.trim().is_empty()
+        && !receipt.trust_policy.governance_policy_ref.trim().is_empty();
 
     // Read otherwise informational fields so future schema changes are visible.
     let _ = (&receipt.artifact_refs, &receipt.limitations);
