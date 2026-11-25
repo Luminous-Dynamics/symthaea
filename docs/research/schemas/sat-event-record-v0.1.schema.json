@@ -123,7 +123,8 @@
         "parameters_digest",
         "payload_digest",
         "payload_labels",
-        "binding_digest"
+        "binding_digest",
+        "sink_projection_digest"
       ],
       "properties": {
         "action": {
@@ -165,6 +166,9 @@
           "type": "string"
         },
         "binding_digest": {
+          "$ref": "#/$defs/digest"
+        },
+        "sink_projection_digest": {
           "$ref": "#/$defs/digest"
         }
       }
