@@ -37,7 +37,7 @@ This harness does not:
 - prove a theorem or verify a proof plan;
 - establish consciousness, intelligence, or biological correspondence.
 
-The Rust source currently authors 24 unit tests, including observability, excitation, and selective-abstention controls. A passing run would validate these small reference functions only. It would not count as an SDCB model result or a SOTA comparison.
+The Rust source currently authors 27 unit tests, including observability, excitation, and selective-abstention controls. A passing run would validate these small reference functions only. It would not count as an SDCB model result or a SOTA comparison.
 
 
 ## Machine-readable reference receipt
