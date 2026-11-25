@@ -333,14 +333,14 @@ fn event_reference_boundary_distributions(
             matching_annotators,
             support_rate: rate(matching_annotators, present_annotators),
             annotated_start_frame_min: start_min,
-            annotated_start_frame_median: median_u64(
-                &starts.iter().map(|value| *value as usize).collect::<Vec<_>>(),
+            annotated_start_frame_median: median(
+                &starts.iter().map(|value| *value as f64).collect::<Vec<_>>(),
             )
             .unwrap_or(start_min as f64),
             annotated_start_frame_max: start_max,
             annotated_end_frame_min: end_min,
-            annotated_end_frame_median: median_u64(
-                &ends.iter().map(|value| *value as usize).collect::<Vec<_>>(),
+            annotated_end_frame_median: median(
+                &ends.iter().map(|value| *value as f64).collect::<Vec<_>>(),
             )
             .unwrap_or(end_min as f64),
             annotated_end_frame_max: end_max,
@@ -825,6 +825,99 @@ mod tests {
                 .reduce(f64::max)
         );
         assert!(report.summary.start_boundary_mae_frames.unwrap() > 0.0);
+    }
+
+    #[test]
+    fn per_event_boundary_distribution_exposes_listener_spread_without_consensus() {
+        let input = case(
+            vec![
+                annotation(
+                    '1',
+                    'a',
+                    GroundTruthStateV1::Present,
+                    vec![FrameIntervalV1 {
+                        start_frame: 100,
+                        end_frame: 200,
+                    }],
+                    None,
+                ),
+                annotation(
+                    '2',
+                    'b',
+                    GroundTruthStateV1::Present,
+                    vec![FrameIntervalV1 {
+                        start_frame: 120,
+                        end_frame: 220,
+                    }],
+                    None,
+                ),
+            ],
+            prediction(vec![FrameIntervalV1 {
+                start_frame: 100,
+                end_frame: 200,
+            }]),
+        );
+        let report = audit_multi_annotator_case(&input).unwrap();
+        assert_eq!(report.event_reference_boundary_distributions.len(), 1);
+        let distribution = &report.event_reference_boundary_distributions[0];
+        assert_eq!(distribution.prediction_index, 0);
+        assert_eq!(distribution.present_annotators, 2);
+        assert_eq!(distribution.matching_annotators, 2);
+        assert_eq!(distribution.support_rate, Some(1.0));
+        assert_eq!(distribution.annotated_start_frame_min, 100);
+        assert_eq!(distribution.annotated_start_frame_median, 110.0);
+        assert_eq!(distribution.annotated_start_frame_max, 120);
+        assert_eq!(distribution.annotated_end_frame_min, 200);
+        assert_eq!(distribution.annotated_end_frame_median, 210.0);
+        assert_eq!(distribution.annotated_end_frame_max, 220);
+        assert_eq!(distribution.start_spread_frames, 20);
+        assert_eq!(distribution.end_spread_frames, 20);
+        assert!(report.unmatched_prediction_indices.is_empty());
+        assert!(!report.synthetic_consensus_ground_truth_created);
+    }
+
+    #[test]
+    fn per_event_support_rate_exposes_occurrence_not_shared_by_all_annotators() {
+        let input = case(
+            vec![
+                annotation(
+                    '1',
+                    'a',
+                    GroundTruthStateV1::Present,
+                    vec![
+                        FrameIntervalV1 { start_frame: 100, end_frame: 200 },
+                        FrameIntervalV1 { start_frame: 500, end_frame: 600 },
+                    ],
+                    None,
+                ),
+                annotation(
+                    '2',
+                    'b',
+                    GroundTruthStateV1::Present,
+                    vec![FrameIntervalV1 { start_frame: 100, end_frame: 200 }],
+                    None,
+                ),
+            ],
+            prediction(vec![
+                FrameIntervalV1 { start_frame: 100, end_frame: 200 },
+                FrameIntervalV1 { start_frame: 500, end_frame: 600 },
+            ]),
+        );
+        let report = audit_multi_annotator_case(&input).unwrap();
+        assert_eq!(report.event_reference_boundary_distributions.len(), 2);
+        assert_eq!(
+            report.event_reference_boundary_distributions[0].matching_annotators,
+            2
+        );
+        assert_eq!(
+            report.event_reference_boundary_distributions[1].matching_annotators,
+            1
+        );
+        assert_eq!(
+            report.event_reference_boundary_distributions[1].support_rate,
+            Some(0.5)
+        );
+        assert!(report.unmatched_prediction_indices.is_empty());
     }
 
     #[test]
