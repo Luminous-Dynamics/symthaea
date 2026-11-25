@@ -1,0 +1,344 @@
+{
+  "schema_version": "0.1",
+  "record_status": "synthetic_path_response_disposition_fixture",
+  "fixture_id": "KIRR-PATH-RESPONSE-DISPOSITIONS-001",
+  "cases": [
+    {
+      "case_id": "complete-matching-path-response-passes",
+      "sequence_path_id": "two-pulse-echo-anchor",
+      "observation_end_time": 8,
+      "empirical_tolerance": 0.001,
+      "reference_signature": {
+        "contract_id": "kirr-path-response-fixture-v0.1",
+        "structure_class_id": "full-order-reference",
+        "qoi_ids": [
+          "electric-field-mode-2"
+        ],
+        "qoi_scales": [
+          1
+        ],
+        "time_samples": [
+          3.5,
+          4.5
+        ],
+        "responses": [
+          {
+            "real": 0.1,
+            "imag": 0
+          },
+          {
+            "real": 0.2,
+            "imag": 0.1
+          }
+        ],
+        "branch_ids": [
+          "echo-branch-a",
+          "echo-branch-a"
+        ]
+      },
+      "candidate_signature": {
+        "contract_id": "kirr-path-response-fixture-v0.1",
+        "structure_class_id": "full-order-reference",
+        "qoi_ids": [
+          "electric-field-mode-2"
+        ],
+        "qoi_scales": [
+          1
+        ],
+        "time_samples": [
+          3.5,
+          4.5
+        ],
+        "responses": [
+          {
+            "real": 0.1002,
+            "imag": 0
+          },
+          {
+            "real": 0.2002,
+            "imag": 0.1
+          }
+        ],
+        "branch_ids": [
+          "echo-branch-a",
+          "echo-branch-a"
+        ]
+      },
+      "expected_disposition": "PASS",
+      "expected_missing_response_count": 0,
+      "expected_branch_mismatch_count": 0,
+      "expected_unresolved_branch_count": 0,
+      "expected_maximum_normalized_error": 0.0002
+    },
+    {
+      "case_id": "measured-branch-mismatch-fails",
+      "sequence_path_id": "two-pulse-echo-anchor",
+      "observation_end_time": 8,
+      "empirical_tolerance": 0.001,
+      "reference_signature": {
+        "contract_id": "kirr-path-response-fixture-v0.1",
+        "structure_class_id": "full-order-reference",
+        "qoi_ids": [
+          "electric-field-mode-2"
+        ],
+        "qoi_scales": [
+          1
+        ],
+        "time_samples": [
+          3.5,
+          4.5
+        ],
+        "responses": [
+          {
+            "real": 0.1,
+            "imag": 0
+          },
+          {
+            "real": 0.2,
+            "imag": 0.1
+          }
+        ],
+        "branch_ids": [
+          "echo-branch-a",
+          "echo-branch-a"
+        ]
+      },
+      "candidate_signature": {
+        "contract_id": "kirr-path-response-fixture-v0.1",
+        "structure_class_id": "full-order-reference",
+        "qoi_ids": [
+          "electric-field-mode-2"
+        ],
+        "qoi_scales": [
+          1
+        ],
+        "time_samples": [
+          3.5,
+          4.5
+        ],
+        "responses": [
+          {
+            "real": 0.1,
+            "imag": 0
+          },
+          {
+            "real": 0.2,
+            "imag": 0.1
+          }
+        ],
+        "branch_ids": [
+          "echo-branch-a",
+          "echo-branch-b"
+        ]
+      },
+      "expected_disposition": "FAIL",
+      "expected_missing_response_count": 0,
+      "expected_branch_mismatch_count": 1,
+      "expected_unresolved_branch_count": 0,
+      "expected_maximum_normalized_error": 0
+    },
+    {
+      "case_id": "confirmed-response-error-fails",
+      "sequence_path_id": "two-pulse-echo-anchor",
+      "observation_end_time": 8,
+      "empirical_tolerance": 0.01,
+      "reference_signature": {
+        "contract_id": "kirr-path-response-fixture-v0.1",
+        "structure_class_id": "full-order-reference",
+        "qoi_ids": [
+          "electric-field-mode-2"
+        ],
+        "qoi_scales": [
+          1
+        ],
+        "time_samples": [
+          3.5,
+          4.5
+        ],
+        "responses": [
+          {
+            "real": 0.1,
+            "imag": 0
+          },
+          {
+            "real": 0.2,
+            "imag": 0.1
+          }
+        ],
+        "branch_ids": [
+          "echo-branch-a",
+          "echo-branch-a"
+        ]
+      },
+      "candidate_signature": {
+        "contract_id": "kirr-path-response-fixture-v0.1",
+        "structure_class_id": "full-order-reference",
+        "qoi_ids": [
+          "electric-field-mode-2"
+        ],
+        "qoi_scales": [
+          1
+        ],
+        "time_samples": [
+          3.5,
+          4.5
+        ],
+        "responses": [
+          {
+            "real": 0.1,
+            "imag": 0
+          },
+          {
+            "real": 0.4,
+            "imag": 0.1
+          }
+        ],
+        "branch_ids": [
+          "echo-branch-a",
+          "echo-branch-a"
+        ]
+      },
+      "expected_disposition": "FAIL",
+      "expected_missing_response_count": 0,
+      "expected_branch_mismatch_count": 0,
+      "expected_unresolved_branch_count": 0,
+      "expected_maximum_normalized_error": 0.2
+    },
+    {
+      "case_id": "missing-response-and-branch-remain-unknown",
+      "sequence_path_id": "two-pulse-echo-anchor",
+      "observation_end_time": 8,
+      "empirical_tolerance": 1,
+      "reference_signature": {
+        "contract_id": "kirr-path-response-fixture-v0.1",
+        "structure_class_id": "full-order-reference",
+        "qoi_ids": [
+          "electric-field-mode-2"
+        ],
+        "qoi_scales": [
+          1
+        ],
+        "time_samples": [
+          3.5,
+          4.5
+        ],
+        "responses": [
+          {
+            "real": 0.1,
+            "imag": 0
+          },
+          {
+            "real": 0.2,
+            "imag": 0.1
+          }
+        ],
+        "branch_ids": [
+          "echo-branch-a",
+          "echo-branch-a"
+        ]
+      },
+      "candidate_signature": {
+        "contract_id": "kirr-path-response-fixture-v0.1",
+        "structure_class_id": "full-order-reference",
+        "qoi_ids": [
+          "electric-field-mode-2"
+        ],
+        "qoi_scales": [
+          1
+        ],
+        "time_samples": [
+          3.5,
+          4.5
+        ],
+        "responses": [
+          {
+            "real": 0.1,
+            "imag": 0
+          },
+          null
+        ],
+        "branch_ids": [
+          "echo-branch-a",
+          null
+        ]
+      },
+      "expected_disposition": "UNKNOWN",
+      "expected_missing_response_count": 1,
+      "expected_branch_mismatch_count": 0,
+      "expected_unresolved_branch_count": 1,
+      "expected_maximum_normalized_error": 0
+    },
+    {
+      "case_id": "incompatible-structure-class-is-unsupported",
+      "sequence_path_id": "two-pulse-echo-anchor",
+      "observation_end_time": 8,
+      "empirical_tolerance": 1,
+      "reference_signature": {
+        "contract_id": "kirr-path-response-fixture-v0.1",
+        "structure_class_id": "full-order-reference",
+        "qoi_ids": [
+          "electric-field-mode-2"
+        ],
+        "qoi_scales": [
+          1
+        ],
+        "time_samples": [
+          3.5,
+          4.5
+        ],
+        "responses": [
+          {
+            "real": 0.1,
+            "imag": 0
+          },
+          {
+            "real": 0.2,
+            "imag": 0.1
+          }
+        ],
+        "branch_ids": [
+          "echo-branch-a",
+          "echo-branch-a"
+        ]
+      },
+      "candidate_signature": {
+        "contract_id": "kirr-path-response-fixture-v0.1",
+        "structure_class_id": "reduced-structure-unqualified",
+        "qoi_ids": [
+          "electric-field-mode-2"
+        ],
+        "qoi_scales": [
+          1
+        ],
+        "time_samples": [
+          3.5,
+          4.5
+        ],
+        "responses": [
+          {
+            "real": 0.1,
+            "imag": 0
+          },
+          {
+            "real": 0.2,
+            "imag": 0.1
+          }
+        ],
+        "branch_ids": [
+          "echo-branch-a",
+          "echo-branch-a"
+        ]
+      },
+      "expected_disposition": "UNSUPPORTED",
+      "expected_missing_response_count": 0,
+      "expected_branch_mismatch_count": 0,
+      "expected_unresolved_branch_count": 0,
+      "expected_maximum_normalized_error": 0
+    }
+  ],
+  "claim_boundary": {
+    "no_solver_run": true,
+    "no_echo_measured": true,
+    "no_global_guarantee": true
+  }
+}
