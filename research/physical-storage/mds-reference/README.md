@@ -10,7 +10,7 @@ This standalone crate is a deterministic byte-level research fixture. It is not 
 - 42 active tiles arranged as seven interleaved stripes.
 - Each stripe has four 8-byte data shards and two 8-byte parity shards.
 - A systematic linear [6,4,3] MDS array code over GF(256) recovers any two known shard erasures in each stripe.
-- SHA-256 verifies the final payload; unknown substitutions are detected but not corrected.
+- SHA-256 verifies the final payload against an out-of-band expected digest captured when the payload is written; unknown substitutions are detected but not corrected. The digest is an integrity reference, not a signature or source-authentication proof.
 
 The six generator rows are the four identity rows, [1,1,1,1] and [1,2,3,4]. Every choice of four rows is nonsingular under the implemented GF(256) arithmetic. The code is therefore described as a linear MDS code, not labelled Reed–Solomon without an explicit GRS equivalence proof. A standards-conformant RS baseline remains part of the future comparator tournament.
 
