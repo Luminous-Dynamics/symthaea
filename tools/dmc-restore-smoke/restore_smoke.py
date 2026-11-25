@@ -86,6 +86,16 @@ def make_environment(task_name: str):
         raise ValueError(f"unsupported DMC smoke task: {task_name}")
     domain_name, suite_task_name = task_name.split(".", maxsplit=1)
     random_state = np.random.RandomState(SEED)
+    environment_kwargs = {
+        "legacy_step": LEGACY_STEP,
+        "flat_observation": False,
+    }
+    # Cartpole tasks accept an explicit action-repeat override. walker.walk
+    # supplies its own control_timestep and rejects a simultaneous n_sub_steps
+    # override, so preserve the pinned task's native walker timing.
+    if domain_name == "cartpole":
+        environment_kwargs["n_sub_steps"] = N_SUB_STEPS
+
     env = suite.load(
         domain_name=domain_name,
         task_name=suite_task_name,
@@ -93,11 +103,7 @@ def make_environment(task_name: str):
             "random": random_state,
             "time_limit": TIME_LIMIT_SECONDS,
         },
-        environment_kwargs={
-            "n_sub_steps": N_SUB_STEPS,
-            "legacy_step": LEGACY_STEP,
-            "flat_observation": False,
-        },
+        environment_kwargs=environment_kwargs,
     )
     return env
 
