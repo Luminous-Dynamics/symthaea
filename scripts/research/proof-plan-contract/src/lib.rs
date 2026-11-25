@@ -558,9 +558,10 @@ pub fn validate_plan(plan: &ProofPlan) -> Vec<String> {
             }
             if !edge_exists(&node.id, goal_id, EdgeRelation::Discharges)
                 && !edge_exists(&node.id, goal_id, EdgeRelation::Transforms)
+                && plan.status == PlanStatus::Accepted
             {
                 errors.push(format!(
-                    "action {} input {} lacks a discharges/transforms edge",
+                    "accepted action {} input {} lacks a discharges/transforms edge",
                     node.id, goal_id
                 ));
             }
@@ -810,6 +811,25 @@ mod tests {
                 .iter()
                 .any(|e| e.contains("lacks creates_subgoal edge"))
         );
+    }
+
+    #[test]
+    fn unresolved_action_input_is_not_mistaken_for_a_completed_provisional_plan() {
+        let mut value = fixture_value();
+        value["edges"].as_array_mut().unwrap().retain(|edge| {
+            !(edge["source_id"] == "A_REVERSE"
+                && edge["target_id"] == "G_REVERSE"
+                && edge["relation"] == "discharges")
+        });
+        let input = serde_json::to_string(&value).unwrap();
+        let plan = parse_plan(&input).expect("provisional plan remains parseable");
+        assert!(validate_plan(&plan).is_empty());
+        let report = crate::global_obligations::analyze_global_obligations(&plan);
+        assert!(report.errors.is_empty());
+        assert!(report.alternatives[0]
+            .unresolved_goals
+            .iter()
+            .any(|goal| goal == "G_REVERSE"));
     }
 
     #[test]
