@@ -1151,6 +1151,32 @@ mod tests {
     }
 
     #[test]
+    fn cumulative_sequence_cost_is_enforced_across_branches() {
+        let mut problem = branch_unlock_world();
+        // The first branch probe fits, but its required follow-up does not.
+        problem.resource_budget = cost(1);
+        let dynamic = evaluate_sequential_robust(&problem).unwrap();
+        let exhaustive = enumerate_sequential_robust(&problem).unwrap();
+        assert_eq!(dynamic.worst_case_terminal_loss, 1.0);
+        assert_eq!(exhaustive.worst_case_terminal_loss, 1.0);
+        assert!(matches!(dynamic.policy, SequentialPolicyNode::Stop { .. }));
+        assert!(matches!(exhaustive.policy, SequentialPolicyNode::Stop { .. }));
+    }
+
+    #[test]
+    fn follow_up_that_arrives_after_deadline_is_not_selected() {
+        let mut problem = branch_unlock_world();
+        // B arrives at step 1. Its C follow-up would arrive at step 2.
+        problem.decision_deadline_step = 1;
+        let dynamic = evaluate_sequential_robust(&problem).unwrap();
+        let exhaustive = enumerate_sequential_robust(&problem).unwrap();
+        assert_eq!(dynamic.worst_case_terminal_loss, 1.0);
+        assert_eq!(exhaustive.worst_case_terminal_loss, 1.0);
+        assert!(matches!(dynamic.policy, SequentialPolicyNode::Stop { .. }));
+        assert!(matches!(exhaustive.policy, SequentialPolicyNode::Stop { .. }));
+    }
+
+    #[test]
     fn every_resource_dimension_is_enforced_component_wise() {
         let mut problem = branch_unlock_world();
         problem.resource_budget.insert("compute_units".to_owned(), 1);
