@@ -2797,9 +2797,7 @@ pub fn estimate_periodic_derivative(
             "Tikhonov strength must be finite and non-negative",
         ));
     }
-    if !config.measurement_noise_variance.is_finite()
-        || config.measurement_noise_variance < 0.0
-    {
+    if !config.measurement_noise_variance.is_finite() || config.measurement_noise_variance < 0.0 {
         return Err(ContractError::InvalidPeriodicDerivativeConfig(
             "white measurement-noise variance must be finite and non-negative",
         ));
@@ -2835,7 +2833,11 @@ pub fn estimate_periodic_derivative(
 
         for (sample_index, sample) in samples.iter().enumerate() {
             let phase = TAU * harmonic as f64 * sample_index as f64 / sample_count as f64;
-            kahan_add(*sample * phase.cos(), &mut cosine_sum, &mut cosine_compensation);
+            kahan_add(
+                *sample * phase.cos(),
+                &mut cosine_sum,
+                &mut cosine_compensation,
+            );
             kahan_add(*sample * phase.sin(), &mut sine_sum, &mut sine_compensation);
         }
 
@@ -2851,17 +2853,18 @@ pub fn estimate_periodic_derivative(
         filter_weights.push(weight);
 
         let angular_frequency = TAU * harmonic as f64 / config.domain_length;
-        let gain_term = (2.0 / sample_count as f64)
-            * angular_frequency
-            * angular_frequency
-            * weight
-            * weight;
+        let gain_term =
+            (2.0 / sample_count as f64) * angular_frequency * angular_frequency * weight * weight;
         if !gain_term.is_finite() {
             return Err(ContractError::InvalidPeriodicDerivativeConfig(
                 "white-noise gain arithmetic produced a non-finite value",
             ));
         }
-        kahan_add(gain_term, &mut white_noise_variance_gain, &mut gain_compensation);
+        kahan_add(
+            gain_term,
+            &mut white_noise_variance_gain,
+            &mut gain_compensation,
+        );
     }
 
     let mut derivative = Vec::with_capacity(sample_count);
@@ -6924,18 +6927,18 @@ mod tests {
     fn kinetic_response_signature_requires_valid_axes_times_and_scale() {
         assert_eq!(
             KineticResponseSignature::new(KineticResponseSignatureInput {
-            contract_id: "contract".to_owned(),
-            structure_class_id: "class".to_owned(),
-            intervention_ids: vec!["pulse".to_owned()],
-            qoi_ids: vec!["qoi".to_owned()],
-            qoi_scales: vec![1.0],
-            time_samples: vec![0.0, 0.0],
-            responses: vec![
+                contract_id: "contract".to_owned(),
+                structure_class_id: "class".to_owned(),
+                intervention_ids: vec!["pulse".to_owned()],
+                qoi_ids: vec!["qoi".to_owned()],
+                qoi_scales: vec![1.0],
+                time_samples: vec![0.0, 0.0],
+                responses: vec![
                     Some(ComplexResponse::new(1.0, 0.0).unwrap()),
                     Some(ComplexResponse::new(1.0, 0.0).unwrap())
                 ],
-            branch_ids: vec![Some("branch".to_owned()), Some("branch".to_owned())],
-        })
+                branch_ids: vec![Some("branch".to_owned()), Some("branch".to_owned())],
+            })
             .unwrap_err(),
             ContractError::InvalidResponseSignatureTimes
         );
@@ -7063,7 +7066,12 @@ mod tests {
                 .abs()
                 < 1.0e-12
         );
-        assert!(estimate.derivative.iter().all(|value| value.abs() < 1.0e-12));
+        assert!(
+            estimate
+                .derivative
+                .iter()
+                .all(|value| value.abs() < 1.0e-12)
+        );
     }
 
     #[test]
@@ -7074,23 +7082,21 @@ mod tests {
                 (9.0 * phase).sin() + 0.1 * (2.0 * phase).cos()
             })
             .collect::<Vec<_>>();
-        let raw = estimate_periodic_derivative(
-            &samples,
-            periodic_derivative_config(33, 12, 0.0, 0.2),
-        )
-        .unwrap();
-        let regularized = estimate_periodic_derivative(
-            &samples,
-            periodic_derivative_config(33, 12, 0.5, 0.2),
-        )
-        .unwrap();
+        let raw =
+            estimate_periodic_derivative(&samples, periodic_derivative_config(33, 12, 0.0, 0.2))
+                .unwrap();
+        let regularized =
+            estimate_periodic_derivative(&samples, periodic_derivative_config(33, 12, 0.5, 0.2))
+                .unwrap();
         assert!(regularized.white_noise_variance_gain < raw.white_noise_variance_gain);
         assert!(regularized.predicted_white_noise_variance < raw.predicted_white_noise_variance);
-        assert!(regularized
-            .filter_weights
-            .iter()
-            .zip(&raw.filter_weights)
-            .all(|(filtered, unfiltered)| filtered <= unfiltered));
+        assert!(
+            regularized
+                .filter_weights
+                .iter()
+                .zip(&raw.filter_weights)
+                .all(|(filtered, unfiltered)| filtered <= unfiltered)
+        );
     }
 
     #[test]
@@ -7115,8 +7121,7 @@ mod tests {
         for index in 0..sample_count {
             let translated_index = (index + sample_count - 7) % sample_count;
             assert!(
-                (base.derivative[index] - translated.derivative[translated_index]).abs()
-                    < 1.0e-10
+                (base.derivative[index] - translated.derivative[translated_index]).abs() < 1.0e-10
             );
         }
     }
@@ -7137,33 +7142,21 @@ mod tests {
             Err(ContractError::InvalidPeriodicDerivativeConfig(_))
         ));
         assert!(matches!(
-            estimate_periodic_derivative(
-                &samples,
-                periodic_derivative_config(8, 4, 0.0, 0.0)
-            ),
+            estimate_periodic_derivative(&samples, periodic_derivative_config(8, 4, 0.0, 0.0)),
             Err(ContractError::InvalidPeriodicDerivativeConfig(_))
         ));
         assert!(matches!(
-            estimate_periodic_derivative(
-                &samples,
-                periodic_derivative_config(8, 1, -0.1, 0.0)
-            ),
+            estimate_periodic_derivative(&samples, periodic_derivative_config(8, 1, -0.1, 0.0)),
             Err(ContractError::InvalidPeriodicDerivativeConfig(_))
         ));
         assert!(matches!(
-            estimate_periodic_derivative(
-                &samples,
-                periodic_derivative_config(8, 1, 0.0, f64::NAN)
-            ),
+            estimate_periodic_derivative(&samples, periodic_derivative_config(8, 1, 0.0, f64::NAN)),
             Err(ContractError::InvalidPeriodicDerivativeConfig(_))
         ));
         let mut non_finite = samples.clone();
         non_finite[2] = f64::INFINITY;
         assert!(matches!(
-            estimate_periodic_derivative(
-                &non_finite,
-                periodic_derivative_config(8, 1, 0.0, 0.0)
-            ),
+            estimate_periodic_derivative(&non_finite, periodic_derivative_config(8, 1, 0.0, 0.0)),
             Err(ContractError::InvalidPeriodicDerivativeConfig(_))
         ));
         let maximum_samples = MAX_PERIODIC_DERIVATIVE_SAMPLES;
@@ -7171,12 +7164,7 @@ mod tests {
         assert_eq!(
             estimate_periodic_derivative(
                 &excessive,
-                periodic_derivative_config(
-                    maximum_samples,
-                    (maximum_samples - 1) / 2,
-                    0.0,
-                    0.0
-                )
+                periodic_derivative_config(maximum_samples, (maximum_samples - 1) / 2, 0.0, 0.0)
             ),
             Err(ContractError::PeriodicDerivativeWorkBudgetExceeded)
         );
