@@ -304,11 +304,7 @@ fn event_reference_boundary_distributions(
             by_prediction
                 .entry(matched.prediction_index)
                 .or_default()
-                .push((
-                    annotator_index,
-                    interval.start_frame,
-                    interval.end_frame,
-                ));
+                .push((annotator_index, interval.start_frame, interval.end_frame));
         }
     }
 
@@ -349,8 +345,10 @@ fn event_reference_boundary_distributions(
         });
     }
 
-    let matched_prediction_indices: BTreeSet<_> =
-        distributions.iter().map(|item| item.prediction_index).collect();
+    let matched_prediction_indices: BTreeSet<_> = distributions
+        .iter()
+        .map(|item| item.prediction_index)
+        .collect();
     let unmatched = (0..prediction_count)
         .filter(|index| !matched_prediction_indices.contains(index))
         .collect();
@@ -885,8 +883,14 @@ mod tests {
                     'a',
                     GroundTruthStateV1::Present,
                     vec![
-                        FrameIntervalV1 { start_frame: 100, end_frame: 200 },
-                        FrameIntervalV1 { start_frame: 500, end_frame: 600 },
+                        FrameIntervalV1 {
+                            start_frame: 100,
+                            end_frame: 200,
+                        },
+                        FrameIntervalV1 {
+                            start_frame: 500,
+                            end_frame: 600,
+                        },
                     ],
                     None,
                 ),
@@ -894,13 +898,22 @@ mod tests {
                     '2',
                     'b',
                     GroundTruthStateV1::Present,
-                    vec![FrameIntervalV1 { start_frame: 100, end_frame: 200 }],
+                    vec![FrameIntervalV1 {
+                        start_frame: 100,
+                        end_frame: 200,
+                    }],
                     None,
                 ),
             ],
             prediction(vec![
-                FrameIntervalV1 { start_frame: 100, end_frame: 200 },
-                FrameIntervalV1 { start_frame: 500, end_frame: 600 },
+                FrameIntervalV1 {
+                    start_frame: 100,
+                    end_frame: 200,
+                },
+                FrameIntervalV1 {
+                    start_frame: 500,
+                    end_frame: 600,
+                },
             ]),
         );
         let report = audit_multi_annotator_case(&input).unwrap();
