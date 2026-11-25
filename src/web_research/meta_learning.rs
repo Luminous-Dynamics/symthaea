@@ -14,6 +14,7 @@ use std::collections::{HashMap, VecDeque};
 use super::types::{AdjudicatedVerificationOutcome, ResearchSource, VerificationOutcome};
 
 const ADJUDICATED_LEARNER_STATE_VERSION: u16 = 1;
+const MAX_PERSISTED_ADJUDICATED_OUTCOMES: usize = 1_000;
 #[cfg(test)]
 use super::types::AdjudicationKind;
 
@@ -457,6 +458,7 @@ impl EpistemicLearner {
     pub fn import_state(&mut self, state: LearnerState) -> bool {
         self.reset_calibration_state();
         if state.adjudication_schema_version != ADJUDICATED_LEARNER_STATE_VERSION
+            || state.adjudicated_outcomes.len() > MAX_PERSISTED_ADJUDICATED_OUTCOMES
             || state
                 .adjudicated_outcomes
                 .iter()
