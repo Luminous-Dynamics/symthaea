@@ -1,7 +1,13 @@
 #!/usr/bin/env bash
 set -euo pipefail
 
-ROOT="$(git rev-parse --show-toplevel)"
+SCRIPT_DIR="$(cd -- "$(dirname -- "${BASH_SOURCE[0]}")" && pwd)"
+if ROOT="$(git -C "$SCRIPT_DIR" rev-parse --show-toplevel 2>/dev/null)"; then
+  :
+else
+  ROOT="$(cd "$SCRIPT_DIR/../../../../.." && pwd)"
+fi
+
 MON007="$ROOT/benchmarks/frontend/monitoring/sfeb-mon007"
 MON008="$ROOT/benchmarks/frontend/monitoring/sfeb-mon008"
 

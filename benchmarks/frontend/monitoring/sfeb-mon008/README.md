@@ -6,13 +6,13 @@ MON-008 extends MON-007's independent RFC 9162 proof checks with authenticated, 
 
 ## Reproduce
 
-From a clean checkout of this branch, run:
+From a clean checkout **or from the extracted self-contained bundle**, run:
 
 ```sh
 bash benchmarks/frontend/monitoring/sfeb-mon008/scripts/reproduce.sh
 ```
 
-The script expands the committed gzip source/fixture files into their sibling working-tree paths, including the MON-007 Go module used by MON-008, then runs the semantic, Merkle and checkpoint suites, race detector, vet and coverage. The expanded files are local build inputs and need not be committed. Set `RUN_BENCHMARKS=1` to run the verifier-only MON-008 benchmark after tests.
+The runner expands committed gzip source and fixture files into sibling working-tree paths, including the MON-007 Go module used by MON-008. It then runs the semantic, Merkle and checkpoint suites, race detector, vet and coverage. Expanded source files are local build inputs and need not be committed. Set `RUN_BENCHMARKS=1` to run the verifier-only MON-008 benchmark after tests.
 
 ## Local preflight results (2026-11-25; not CI)
 
