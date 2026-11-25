@@ -165,7 +165,10 @@
         "occurrence_count_disagreement_ppm",
         "prediction_coverage_ppm",
         "boundary_dispersion_ms",
-        "hidden_repeat_control"
+        "hidden_repeat_control",
+        "model_grounding_report_sha256",
+        "inter_annotator_reliability_report_sha256",
+        "cohort_assignment_manifest_sha256"
       ],
       "properties": {
         "item_id": {
@@ -258,6 +261,15 @@
         },
         "hidden_repeat_control": {
           "type": "boolean"
+        },
+        "model_grounding_report_sha256": {
+          "$ref": "#/$defs/digest"
+        },
+        "inter_annotator_reliability_report_sha256": {
+          "$ref": "#/$defs/digest"
+        },
+        "cohort_assignment_manifest_sha256": {
+          "$ref": "#/$defs/digest"
         }
       }
     }
