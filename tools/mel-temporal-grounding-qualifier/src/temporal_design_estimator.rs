@@ -6,6 +6,8 @@
 //! first- and second-order ultimate-item inclusion probabilities; strata with
 //! zero pairwise inclusion support report variance unavailable.
 
+use std::collections::BTreeMap;
+
 use serde::{Deserialize, Serialize};
 
 use crate::temporal_acquisition::{
