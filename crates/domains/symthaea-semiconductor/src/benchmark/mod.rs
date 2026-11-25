@@ -165,9 +165,10 @@ pub use causal_drift_diagnosis::{
 
 pub use causal_information_portfolio::{
     CAUSAL_PORTFOLIO_INPUT_SCHEMA_V1, CAUSAL_PORTFOLIO_REPORT_SCHEMA_V1,
-    CandidateOutcomeLikelihoodV1, CausalCandidateEligibilityV1,
+    CandidateLikelihoodStressV1, CandidateOutcomeLikelihoodV1, CausalCandidateEligibilityV1,
     CausalInformationPortfolioErrorV1, CausalInformationPortfolioInputV1,
     CausalInformationPortfolioReportV1, CausalMeasurementCandidateV1,
     CausalPortfolioMetricsV1, CausalPortfolioObjectiveWeightsV1, CausalPortfolioStatusV1,
+    PortfolioLikelihoodStressScenarioV1,
     DecisionActionLossV1, HypothesisPriorV1, optimize_causal_information_portfolio_v1,
 };
