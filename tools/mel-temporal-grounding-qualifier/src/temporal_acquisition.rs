@@ -353,8 +353,13 @@ pub fn plan_annotation_acquisition(
     }
 
     let mut random_state = config.seed;
-    let (probability_audit, audit_unmet, audit_spent, audit_source_works) =
-        select_probability_audit(&candidates, &eligible_audit, &config, &mut random_state)?;
+    let (
+        probability_audit,
+        audit_unmet,
+        audit_spent,
+        audit_source_works,
+        audit_design,
+    ) = select_probability_audit(&candidates, &eligible_audit, &config, &mut random_state)?;
 
     let audit_source_set: BTreeSet<_> = probability_audit
         .iter()
@@ -448,6 +453,7 @@ pub fn plan_annotation_acquisition(
         normalized_config_sha256: &normalized_config_sha256,
         active_refinement: &active_refinement,
         probability_audit: &probability_audit,
+        probability_audit_design: &audit_design,
         rejected_candidates: &rejected_candidates,
         eligible_but_unselected: &eligible_but_unselected,
         unmet_quotas: &unmet_quotas,
@@ -466,6 +472,7 @@ pub fn plan_annotation_acquisition(
         normalized_config_sha256,
         active_refinement,
         probability_audit,
+        probability_audit_design: audit_design,
         rejected_candidates,
         eligible_but_unselected,
         unmet_quotas,
@@ -1252,6 +1259,7 @@ mod tests {
             seed: 0x13624,
             minimum_panel_count: 3,
             maximum_active_items_per_source_work: 1,
+            audit_items_per_source_work: 2,
             total_budget_units: 100,
             active_budget_units: 60,
             probability_audit_budget_units: 40,
