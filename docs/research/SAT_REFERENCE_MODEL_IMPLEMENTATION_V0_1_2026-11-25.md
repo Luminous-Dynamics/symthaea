@@ -30,7 +30,7 @@ independent evidence infrastructure.
 The initial unit-test set covers:
 - no matching grant;
 - exact effect authorization;
-- changed action/resource/parameter digest;
+- changed action/resource/sink/purpose/parameter digest;
 - delegated subset use;
 - effect-scope expansion;
 - lifetime expansion;
@@ -39,7 +39,9 @@ The initial unit-test set covers:
 - multi-level delegation depth consumption;
 - parent revocation invalidating descendants;
 - half-open expiry;
-- invalid delegation flag/depth combinations.
+- invalid delegation flag/depth combinations;
+- non-delegable parent rejection;
+- future grant rejection.
 
 The 14 tests exercise a small reference-model subset. They do not reproduce
 DelegateGuard's full dataset, tool adapters, adaptive attack campaign or
@@ -104,8 +106,8 @@ remain owner-native to Symtropy and Mycelix.
 
 ## No-runner validation record
 
-The current environment has no Rust compiler or Cargo executable. The files
-were written to the public branch and read-back is required before PR creation.
-No compile, unit-test, Clippy, rustfmt or CI pass is claimed. Next validation
+The current environment has no Rust compiler or Cargo executable. The manifest,
+source and documentation were fetched back from the public branch and are linked
+in draft PR #13602. No compile, unit-test, Clippy, rustfmt or CI pass is claimed. Next validation
 must run on the exact PR head and record the Rust toolchain, command results
 and artifact digests. If CI is queued or skipped, status remains pending.
