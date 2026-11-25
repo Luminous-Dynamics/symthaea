@@ -135,6 +135,40 @@ A promising theoretical line for the probabilistic arm is the September 2026 pap
 
 - **AstaBench:** secondary breadth/cost target: at least 0.60 mean score at no more than $3.40 per problem under the same official task set and scoring version. Report the domain and workflow-stage vector, not only the aggregate.
 
+### Typed research decisions, whole-paper improvement and world-model adequacy
+
+These benchmarks close three gaps between local action selection and a complete scientific researcher.
+
+**Decision-Centric Research / RD-Bench**
+
+The paper defines 24 decision types and instantiates ten in 2,000 rule-generated cases, with a held-out research-domain split. Its 0.6B state-aware DCRM reports 89.4% Top-1 across ten types versus 27.8% for the matched question-only model and 36.4% for DeepSeek-V4.1-Flash. The next-action type is materially harder (72.0% state-aware Top-1); stopping-condition is 100% on this closed candidate set. Calibrated prediction sets report 97.1% empirical label coverage at a mean size of 1.515. This is a strong typed-decision baseline, not evidence of open-ended scientific execution: labels are programmatic, action candidates are supplied, and each task is a bounded choice.
+
+Symthaea target, after exact adapter/scorer parity:
+- ≥92% pooled Top-1 across the ten official types;
+- ≥85% Top-1 for next-action choice, reporting all ten type rows rather than allowing easy stopping/routing cases to hide weakness;
+- ≥95% empirical label coverage on held-out domains with mean prediction-set size ≤1.5, plus reliability curves and risk–coverage;
+- zero false-safe outputs on frozen evidence-insufficiency and missing-state controls.
+
+Use a state-aware model, question-only model, and frontier baseline on identical case inputs. Publish paired task-level results, seed variation, type/domain strata, candidate-set size and every refusal/invalid case. Never conflate RD-Bench Top-1 with experiment-resolution rate. Compose its Research State / typed decision interface with [#11171](https://github.com/Luminous-Dynamics/symthaea/issues/11171), its policy regret evaluation with [#13567](https://github.com/Luminous-Dynamics/symthaea/issues/13567), and its prospective traces with [#11015](https://github.com/Luminous-Dynamics/symthaea/pull/11015).
+
+**FrontierPhysics — end-to-end physics research**
+
+The paper's initial evaluation covers 56 expert-authored tasks across nine physics domains, with three rollouts per task (168 per configuration). A pass requires all deterministic verifier checks and all blocking expert-rubric items; the paper reports no configuration above 46/168 (27.4%). A third-party leaderboard snapshot dated Nov 24, 2026 reports Fable 5.2 at 33.3%, Opus/Sonnet 5.5 at 27.4%, and GPT-6.2 Astra at 26.8%. Keep the paper snapshot and later third-party snapshot distinct until harness/configuration parity is confirmed.
+
+Symthaea target: ≥40% full-task Pass@1 on the exact 56-task / 168-rollout protocol, with all 168 rollout attempts accounted for, no result selected from a best-of-three policy, and no blocking rubric or verifier regression. Require a held-out or rotated task family and report each domain, failure class, compute, wall-clock, tool and human-review cost. Treat this as a physics research milestone, not a universal science score. Use #11171 for the candidate policy, #11042/#11060 for structure-first discovery controls, and #9332/#10756 for hidden evaluator custody and rubric integrity.
+
+**Scientist World — improvement over executable paper baselines**
+
+Scientist World releases 1,000 paper-derived executable environments. Its construction protocol reports 99% reproduced-source-method fidelity within margin, 82% beating paper baselines across the environment set, 100% final independent verification, and later cross-checks reverted 37% of iterations. Its FNI metric measures weighted, frontier-normalized improvement over the reproduced source method across paper metrics. The headline 74% refers to AI-scientist attempts surpassing source-paper researcher performance in this curated environment set; it is not peer review or general scientific success.
+
+Symthaea target: on matched tasks and constraints, positive FNI on ≥80% of confirmatory environments, while preserving the original question, source metrics, data/model scale and compute constraints. Every counted task must pass the independent verifier; require 100% independent verification of scored outputs, and report protected-metric regressions, rollbacks, failed iterations and full inclusive costs. Use the visible split for development and preserve the environment-held-out slice for confirmation. No direct scale increase may count as a research-method improvement.
+
+**WorldTest / AutumnBench — generality of the learned world model**
+
+WorldTest asks whether a model supports queries about environment-level structure and counterfactual consequences, not only properties visible in a particular rollout. AutumnBench contains 43 interactive grid-world environments and 129 tasks across masked-frame prediction, change detection and planning; in the published comparison, 517 humans substantially outperformed five frontier models.
+
+Use this as a secondary test of open-world reasoning and intervention understanding. Target ≥90% of the human-median performance on each query family on the published task split, with separate ID/OOD reporting, and zero false-correct claims on frozen impossible-reachability or intervention-under-identifiability controls. Report actual exploration/query cost and uncertainty. It is not a scientific-paper benchmark; it tests whether the agent's internal world model supports counterfactual queries beyond its observed trajectories.
+
 ### Research taste: problem, approach, experiment and interpretation
 
 A closed-loop research system needs more than experimental selection. Compose with [#10877 — research direction, concrete ideas, experimental taste and interpretation](https://github.com/Luminous-Dynamics/symthaea/issues/10877), and keep the components separate.
