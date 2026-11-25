@@ -1046,15 +1046,15 @@ fn validate_binding_against_qualified(
 ) -> Result<(), DecisionSufficiencyRejectV1> {
     let need = binding.decision_need;
     let need_digest = need.digest()?;
-    if qualified.decision_need_sha256() != need_digest
-        || qualified.domain_id() != need.domain_id
-        || qualified.subject_scope_sha256() != need.subject_scope_sha256
-        || qualified.purpose_sha256() != need.purpose_sha256
-        || binding.decision_need_sha256 != need_digest
-        || binding.purpose_sha256 != need.purpose_sha256
-        || binding.sufficiency_policy_sha256 != need.sufficiency_policy_sha256
-        || binding.calibration_profile_sha256 != need.calibration_profile_sha256
-        || binding.calibration_receipt_sha256 != need.calibration_receipt_sha256
+    if qualified.decision_need_sha256() != need_digest.as_str()
+        || qualified.domain_id() != need.domain_id.as_str()
+        || qualified.subject_scope_sha256() != need.subject_scope_sha256.as_str()
+        || qualified.purpose_sha256() != need.purpose_sha256.as_str()
+        || binding.decision_need_sha256 != need_digest.as_str()
+        || binding.purpose_sha256 != need.purpose_sha256.as_str()
+        || binding.sufficiency_policy_sha256 != need.sufficiency_policy_sha256.as_str()
+        || binding.calibration_profile_sha256 != need.calibration_profile_sha256.as_str()
+        || binding.calibration_receipt_sha256 != need.calibration_receipt_sha256.as_str()
         || binding.risk_limit_ppm != need.risk_limit_ppm
         || binding.minimum_confidence_level_ppm != need.minimum_confidence_level_ppm
         || binding.required_requirement_ids.iter().map(String::as_str)
