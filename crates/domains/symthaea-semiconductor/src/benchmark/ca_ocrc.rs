@@ -289,6 +289,29 @@ pub fn create_ca_ocrc_engine_v1(
     })
 }
 
+fn validate_engine_state(engine: &CaOcrcEngineV1) -> Result<(), CaOcrcErrorV1> {
+    if !engine.threshold.is_finite() {
+        return Err(CaOcrcErrorV1("engine threshold is non-finite".into()));
+    }
+    if engine.tracking_set.len() > engine.policy.capacity {
+        return Err(CaOcrcErrorV1("tracking set exceeds configured capacity".into()));
+    }
+    for (round_id, ticket) in &engine.tracking_set {
+        if *round_id != ticket.round_id
+            || ticket.round_id == 0
+            || ticket.round_id > engine.round_index
+            || ticket.proxy_delay > engine.policy.maximum_feedback_delay
+            || ticket.policy_sha256 != engine.policy_sha256
+            || engine.policy.proxy_delay_survival[ticket.proxy_delay as usize] <= 0.0
+            || !valid_sha256(&ticket.model_artifact_sha256)
+            || !valid_sha256(&ticket.score_policy_sha256)
+        {
+            return Err(CaOcrcErrorV1("tracking ticket violates engine invariants".into()));
+        }
+    }
+    Ok(())
+}
+
 fn set_kind_for_threshold(threshold: f64, bound: f64) -> CaOcrcPredictionSetKindV1 {
     if threshold < 0.0 { CaOcrcPredictionSetKindV1::Empty }
     else if threshold >= bound { CaOcrcPredictionSetKindV1::Full }
@@ -327,8 +350,11 @@ fn make_receipt(
         trivial_loss_threshold_contribution: trivial_term,
         feedback_threshold_contribution: feedback_term,
         tracking_load: tracking_load(&engine.policy),
-        theoretical_risk_bound: ca_ocrc_risk_bound_v1(&engine.policy, input.round_id)?
-            .map(|bound| bound.total),
+        theoretical_risk_bound: if engine.theorem_assumptions_intact {
+            ca_ocrc_risk_bound_v1(&engine.policy, input.round_id)?.map(|bound| bound.total)
+        } else {
+            None
+        },
         theorem_assumptions_intact: engine.theorem_assumptions_intact,
         input_sha256,
         receipt_sha256: String::new(),
@@ -349,6 +375,7 @@ pub fn advance_ca_ocrc_round_v1(
         return Err(CaOcrcErrorV1("engine or policy digest is invalid".into()));
     }
     validate_policy(&engine.policy)?;
+    validate_engine_state(engine)?;
     if input.schema != CA_OCRC_ROUND_INPUT_SCHEMA_V1 {
         return Err(CaOcrcErrorV1("round input schema is unsupported".into()));
     }
@@ -482,6 +509,12 @@ pub fn advance_ca_ocrc_round_v1(
         let evidence = arrival.evidence_disposition.ok_or_else(|| CaOcrcErrorV1(
             "tracked feedback requires an explicit evidence disposition".into()
         ))?;
+        let evidence_digest = arrival.evidence_receipt_sha256.as_ref().ok_or_else(|| {
+            CaOcrcErrorV1("tracked feedback requires a K1 evidence receipt digest".into())
+        })?;
+        if !valid_sha256(evidence_digest) {
+            return Err(CaOcrcErrorV1("tracked K1 evidence receipt digest is malformed".into()));
+        }
         let (disposition, observed_loss, inverse_weight, contribution) = match evidence {
             CaOcrcEvidenceDispositionV1::Qualified => {
                 let loss = arrival.loss.ok_or_else(|| CaOcrcErrorV1(
@@ -493,11 +526,6 @@ pub fn advance_ca_ocrc_round_v1(
                 let survival = next.policy.proxy_delay_survival[arrival.actual_delay as usize];
                 if survival <= 0.0 {
                     return Err(CaOcrcErrorV1("F(actual_delay) must be positive for tracked feedback".into()));
-                }
-                let evidence_digest = arrival.evidence_receipt_sha256.as_ref()
-                    .ok_or_else(|| CaOcrcErrorV1("qualified feedback requires an evidence receipt digest".into()))?;
-                if !valid_sha256(evidence_digest) {
-                    return Err(CaOcrcErrorV1("qualified evidence receipt digest is malformed".into()));
                 }
                 let weight = 1.0 / survival;
                 let contribution = next.policy.learning_rate
