@@ -214,7 +214,48 @@ These figures are reported by their respective papers or benchmark maintainers, 
 
 Any hypothesis may fail. A transparent negative result is a successful benchmark outcome.
 
-## 12. References (snapshot 2026-11-25)
+## 12. Library intervention and causal-attribution controls
+
+The primary transfer claim is not merely that a learner with a library performs better. It is that the *structural content actually acquired before task disclosure* causes measurable downstream improvement. Cold-start/no-transfer controls are necessary but do not fully rule out extra memory capacity, prompt/context, parameter count or retrieval compute as the source of a gain.
+
+Run a preregistered, paired library-intervention tournament. Freeze the learner, acquisition trace, source observations, library serialization, target tasks and total resource budgets before task disclosure. Randomize the library treatment within matched target-world/seed blocks; use fresh process state for each arm so one treatment cannot contaminate another.
+
+### Treatment arms
+
+1. **Intact acquired library:** the exact pre-task frozen entries, alternatives, transformations, counterexamples and provenance produced by the acquisition policy.
+2. **Empty / masked library:** same interface, number of slots and retrieval path, but no usable structural information.
+3. **Capacity-matched randomized library:** preserve entry count, type frequencies, relation arity, approximate degree/frequency profiles and serialization size, but randomize the actual structural incidence.
+4. **Structure-destroyed ablation:** preserve units, relation count, local marginals and relation-kind frequencies while permuting endpoints so higher-order motifs and cross-context relations are broken.
+5. **Context-shuffled library:** preserve individually valid entries and their marginal frequency, but permute which source context / evidence prefix each entry is bound to.
+6. **Retrieval-disabled arm:** retain the acquired library and identical model parameters, but prevent target-time retrieval. This checks that the proposed transfer path actually consumes the library.
+7. **Cold-start target learner:** no source-acquired content; same target data and total downstream budget.
+8. **Oracle-library ceiling:** evaluator-generated correct structure, never exposed to the candidate. This estimates headroom and verifies the target task is solvable.
+9. **Post-disclosure library sentinel:** a library built with target-task information after disclosure. This is a leakage/ceiling control, not a task-agnostic treatment and never counts as a win.
+
+Arms 1–6 must hold constant model weights, parameter count, retrieval calls, context/token budget, memory allocation, target observations, allowed actions, wall-clock/compute budget and tuning opportunity. For arms that remove or randomize content, pad to the same declared capacity and serialization length. Do not give the intact arm a larger effective context or more inference work.
+
+### Primary estimands
+
+- **Library content effect:** paired difference in target terminal loss / utility between the intact library and the strongest capacity- and marginal-matched content-destroying control.
+- **Transfer sample efficiency:** target observations or interventions needed to reach a preregistered quality threshold, with all acquisition and adaptation costs reported separately and jointly.
+- **Transfer frontier:** target quality versus source acquisition observations, target observations, compute, memory, latency and energy; compare Pareto frontiers rather than one unqualified efficiency ratio.
+- **Retrieval-mediated effect:** paired difference between intact and retrieval-disabled arms, with exact retrieved entry IDs/revisions logged.
+- **Negative-transfer cost:** excess target loss, action regret and high-confidence false-transfer rate when the source library is misleading or out of support.
+
+### Integrity and analysis
+
+- Bind every retrieved entry to the frozen source evidence prefix and exact library revision; log retrieval, rejection, counterexample and supersession events.
+- The candidate never sees the intervention assignment, evaluator task family, hidden labels, randomization seed or expected arm outcome.
+- Preserve a fixed primary comparison and multiplicity plan. Use paired analysis at the generator/world seed level and cluster-aware intervals when recipes share latent structure; do not treat frames or events from one world as independent trials.
+- Report each family and shift separately, including failed retrieval, no retrieval, abstention, timeout and invalid action denominators.
+- The randomized capacity-matched and structure-destroyed arms are mandatory before attributing a gain to structural acquisition. If the intact library does not beat the strongest compatible controls, report that reusable content has not been demonstrated even if a larger memory or model performs well.
+- The oracle-library arm is evaluator-only. The post-disclosure sentinel is not a valid task-agnostic treatment and must never be included in the primary leaderboard.
+
+### Gate 1A — attributable pre-task library value
+
+Advance only when the intact frozen library improves a preregistered downstream estimand over the strongest capacity/marginal-matched control on sealed target worlds, with a paired lower confidence bound above zero (or above a predeclared practically meaningful margin), while preserving the false-unification, false-causal-transfer, calibration and resource guardrails. Otherwise retain the result as a negative or inconclusive finding and revise the acquisition hypothesis rather than relaxing the controls.
+
+## 13. References (snapshot 2026-11-25)
 
 - Unsatz: https://arxiv.org/abs/2611.03713
 - Autonomous Science Bench: https://asb.open-ssi.org/about and https://asb.open-ssi.org/leaderboard
