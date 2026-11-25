@@ -938,6 +938,9 @@ mod tests {
     #[test]
     fn unknown_source_lineage_does_not_hide_a_claim_conflict() {
         let mut state = first_state();
+        let updated_prefix = "9".repeat(64);
+        state["evidence_prefix"]["prefix_sha256"] = Value::String(updated_prefix.clone());
+
         let second = serde_json::json!({
             "evidence_id": "ev-a2",
             "artifact_ref": "urn:synthetic:artifact:rs-unknown-second",
@@ -946,11 +949,28 @@ mod tests {
             "published_at": "2026-01-10T00:00:00Z",
             "captured_at": "2026-11-25T10:00:00Z",
             "source_lineage": { "status": "UNKNOWN" },
+            "source_role": "UNKNOWN",
             "integrity_status": "CLEAN",
             "correction_status": "NONE",
             "retrieval_state": "CAPTURED"
         });
         state["evidence"].as_array_mut().unwrap().push(second);
+
+        let first_relation = &mut state["claims"][0]["evidence_relations"][0];
+        first_relation["relation"] = Value::String("SUPPORTS".to_owned());
+        first_relation["classifier_provenance"] = serde_json::json!({
+            "classifier_id": "synthetic-classifier",
+            "version": "0.1",
+            "output_digest": "e".repeat(64),
+            "confidence": 0.9,
+            "emitted_at": "2026-11-25T10:00:00Z",
+            "evidence_prefix_sha256": updated_prefix
+        });
+        first_relation["quote_span"] = serde_json::json!({
+            "byte_start": 0,
+            "byte_end": 5,
+            "quote_sha256": "f".repeat(64)
+        });
         let second_relation = serde_json::json!({
             "claim_id": "claim-a",
             "evidence_id": "ev-a2",
@@ -961,7 +981,7 @@ mod tests {
                 "output_digest": "c".repeat(64),
                 "confidence": 0.9,
                 "emitted_at": "2026-11-25T10:00:00Z",
-                "evidence_prefix_sha256": state["evidence_prefix"]["prefix_sha256"]
+                "evidence_prefix_sha256": updated_prefix
             },
             "quote_span": {
                 "byte_start": 0,
@@ -969,28 +989,13 @@ mod tests {
                 "quote_sha256": "d".repeat(64)
             }
         });
-        // The relation needs a classifier output bound to the existing prefix.
-        state["claims"][0]["evidence_relations"][0]["relation"] = Value::String("SUPPORTS".to_owned());
-        state["claims"][0]["evidence_relations"][0]["classifier_provenance"] = serde_json::json!({
-            "classifier_id": "synthetic-classifier",
-            "version": "0.1",
-            "output_digest": "e".repeat(64),
-            "confidence": 0.9,
-            "emitted_at": "2026-11-25T10:00:00Z",
-            "evidence_prefix_sha256": state["evidence_prefix"]["prefix_sha256"]
-        });
-        state["claims"][0]["evidence_relations"][0]["quote_span"] = serde_json::json!({
-            "byte_start": 0, "byte_end": 5, "quote_sha256": "f".repeat(64)
-        });
-        state["claims"][0]["evidence_relations"].as_array_mut().unwrap().push(second_relation);
-        state["claims"][0]["decision_usability"]["status"] = Value::String("SUFFICIENT".to_owned());
-        state["claims"][0]["truth_adjudication"] = serde_json::json!({
-            "status": "NOT_ADJUDICATED",
-            "result": null,
-            "authority_id": null,
-            "evidence_reference": null,
-            "adjudicated_at": null
-        });
+        state["claims"][0]["evidence_relations"]
+            .as_array_mut()
+            .unwrap()
+            .push(second_relation);
+        state["claims"][0]["decision_usability"]["status"] =
+            Value::String("SUFFICIENT".to_owned());
+
         assert!(validate_state(&state.to_string()).is_err());
     }
 
@@ -1004,6 +1009,7 @@ mod tests {
     #[test]
     fn high_risk_sufficiency_requires_independent_supported_adjudication() {
         let mut state = first_state();
+        state["decision_context"]["risk_class"] = Value::String("HIGH".to_owned());
         state["claims"][0]["decision_usability"]["status"] = Value::String("SUFFICIENT".to_owned());
         assert!(validate_state(&state.to_string()).is_err());
     }
