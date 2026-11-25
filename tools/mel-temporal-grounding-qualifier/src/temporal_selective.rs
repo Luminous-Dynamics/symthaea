@@ -1125,6 +1125,37 @@ mod tests {
     }
 
     #[test]
+    fn strict_batch_json_round_trips_and_rejects_unknown_fields() {
+        let valid = batch(vec![case(
+            "schema-roundtrip",
+            GroundTruthStateV1::Present,
+            vec![crate::temporal_grounding::FrameIntervalV1 {
+                start_frame: 100,
+                end_frame: 200,
+            }],
+            None,
+            SelectiveDecisionV1::Answer,
+            GroundingPredictionStateV1::Occurrences {
+                intervals: vec![crate::temporal_grounding::FrameIntervalV1 {
+                    start_frame: 100,
+                    end_frame: 200,
+                }],
+            },
+            0.9,
+        )]);
+        let encoded = serde_json::to_string(&valid).unwrap();
+        assert!(audit_selective_batch_json(&encoded).is_ok());
+
+        let mut value: serde_json::Value = serde_json::from_str(&encoded).unwrap();
+        value["unknown_batch_field"] = serde_json::json!(true);
+        assert!(audit_selective_batch_json(&value.to_string()).is_err());
+
+        let mut value: serde_json::Value = serde_json::from_str(&encoded).unwrap();
+        value["cases"][0]["unknown_case_field"] = serde_json::json!(true);
+        assert!(audit_selective_batch_json(&value.to_string()).is_err());
+    }
+
+    #[test]
     fn confidence_and_case_metadata_are_validated() {
         let mut invalid = batch(vec![case(
             "bad-confidence",
