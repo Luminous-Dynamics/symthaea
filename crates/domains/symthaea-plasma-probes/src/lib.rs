@@ -858,7 +858,7 @@ fn dot(left: &[f64], right: &[f64]) -> Result<f64, ContractError> {
 /// The convention is y = real + i * imag for the registered output-mode
 /// quadrature. Missing measurements are represented by None in the matrix,
 /// never by an implicit zero.
-#[derive(Clone, Copy, Debug, Default, PartialEq, Serialize)]
+#[derive(Clone, Copy, Debug, Default, PartialEq, Serialize, Deserialize)]
 pub struct ComplexResponse {
     pub real: f64,
     pub imag: f64,
