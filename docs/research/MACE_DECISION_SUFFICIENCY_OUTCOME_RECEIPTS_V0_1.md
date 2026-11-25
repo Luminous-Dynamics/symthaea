@@ -87,7 +87,7 @@ A `sufficient` assessment MUST have no missing requirements and no unresolved co
 6. the assessor and signing key are trusted by an out-of-band pinned profile, not by a profile copied from the request or payload;
 7. the Ed25519 signature and payload digest validate exactly.
 
-A `sufficient` receipt says only that the declared evidence-coverage procedure passed for the declared decision. It does not prove truth, eliminate model error, or authorize execution. An independent assessor must have a distinct principal, signing key, data access boundary and policy from the retrieval backend and decision reader. A separate binary under the same user account and credential store is not sufficient independence against a hostile-host threat model.
+A `sufficient` receipt says only that the declared evidence-coverage procedure passed for the declared decision. It does not prove truth, eliminate model error, or authorize execution. A sufficient assessment must have at least one applicable requirement; an insufficient assessment must expose at least one missing requirement or unresolved contradiction. An independent assessor must have a distinct principal, signing key, data access boundary and policy from the retrieval backend and decision reader. The pinned verifier profile used for a decision assessor should be scoped to that assessor's signer set; a broad shared key ring does not establish assessor identity or operational independence. A separate binary under the same user account and credential store is not sufficient independence against a hostile-host threat model.
 
 ## 5. Decision Outcome Receipt v1
 
@@ -229,9 +229,19 @@ Hard constraints are gates. Utility is optimized only among configurations that 
 6. Add adapters for AML, LongMemEval-V2, MemoryArena, WorldMemArena, TimlMemBench, FAMA, MemForm, MemSecBench, MemoryDojo and all ten Agent Memory Integrity cases.
 7. Publish matched baseline results and Pareto frontiers. Promote strategy memory only after a held-out causal improvement without hard-constraint regression.
 
-## 11. Claim boundary and acceptance gates
+## 11. Rust consumer-side verifier increment
 
-This PR adds schemas and protocol semantics only. It does not implement the Rust validator, decision assessor, action authorizer, execution receipt, outcome evaluator, benchmark harness, independent service deployment, cryptographic provisioning, or a measured benchmark result. The JSON Schemas enforce structure and selected conditional constraints; they cannot enforce digest recomputation, set inclusion, arithmetic consistency, live lifecycle, authority, signature validity, source truth, causal identification or independence.
+The AML adapter module `decision_sufficiency_receipt.rs` implements the consumer-side v1 receipt verifier. It uses strict typed Serde decoding with unknown-field rejection (including duplicate known fields), RFC 8785 canonicalization through the pinned `serde_json_canonicalizer = 0.3.2` dependency, the MACE v1 lowercase-hex digest signing convention, canonical Base64 decoding, and the existing `EvidenceQualificationSignatureVerifierV1` / pinned Ed25519 trust-profile verifier.
+
+The Rust verifier checks the consumer-owned episode/invocation and twelve-field decision binding, assessor/verifier profile pins, the exact qualified-evidence ID set supplied by the already verified qualification stage, sorted unique IDs, evidence-set subset relations, a complete disjoint partition of applicable requirements, sufficient/insufficient disposition consistency, the 900-second TTL and use-time validity, canonical digest, signature and full-receipt commitment. It returns a capability type whose fields cannot be constructed directly from unverified JSON.
+
+The verifier's expected binding and profile pins must come from consumer-controlled configuration/current state. The signer trust profile should be provisioned specifically for the assessor identity; this module does not create or deploy the assessor and cannot establish process, credential, data-access or evaluator independence by itself.
+
+The schema validator and Rust verifier intentionally complement each other. JSON Schema checks the wire structure; the Rust verifier checks cross-field relations and cryptographic/current-use properties. The outcome-receipt validator is still a separate implementation task.
+
+## 12. Claim boundary and acceptance gates
+
+This PR stack adds strict schemas, protocol semantics and a consumer-side Rust sufficiency-receipt verifier. It does not implement or deploy the independent decision assessor, action authorizer, execution receipt, outcome-receipt verifier/evaluator, benchmark harness, independent service deployment, production cryptographic provisioning, or a measured benchmark result. The JSON Schemas enforce structure and selected conditional constraints; they cannot enforce digest recomputation, set inclusion, arithmetic consistency, live lifecycle, authority, signature validity, source truth, causal identification or independence.
 
 Required before production claims:
 
