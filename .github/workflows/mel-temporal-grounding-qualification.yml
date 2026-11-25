@@ -112,7 +112,7 @@ jobs:
             and .summary.present_exact_count_accuracy < 0.67
             and .summary.annotated_occurrence_count_min == 1
             and .summary.annotated_occurrence_count_max == 2
-            and .summary.one_to_many_annotators == 1
+            and .summary.one_to_many_annotators == 2
             and .summary.one_to_many_mean_count_gated_f1 == 1.0
             and .summary.unanimous_correct_across_scored_annotators == false
             and (.annotator_results | length) == 6
