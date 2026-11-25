@@ -650,14 +650,6 @@ fn summarize_dataset(
         .iter()
         .filter(|pair| pair.state_agreement.is_none())
         .count();
-    let start_errors: Vec<_> = present_pairs
-        .iter()
-        .flat_map(|pair| pair.start_boundary_abs_errors_ms.iter().copied())
-        .collect();
-    let end_errors: Vec<_> = present_pairs
-        .iter()
-        .flat_map(|pair| pair.end_boundary_abs_errors_ms.iter().copied())
-        .collect();
     let boundary_tolerance_agreement = tolerances
         .iter()
         .map(|tolerance| boundary_tolerance_summary(pairwise, *tolerance))
