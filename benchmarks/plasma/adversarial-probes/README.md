@@ -160,7 +160,7 @@ It uses a triangle-inequality sum, not an unqualified RMS / orthogonality assump
 
 This is a first-order empirical indicator conditional on the supplied response matrix. It is not a certified nonlinear truncation bound; mode coupling, amplitude dependence, evolving branch identity and sensitivity remainder require separate validation or a certified error envelope.
 
-Missing response entries are represented as `RetainedUnknownResponse`: they are never treated as zero sensitivity and are never discarded by the planner. The scoring contract validates exact mode registries, non-negative finite QoI weights, positive encoded byte counts and finite arithmetic.
+Missing response entries are represented as `RetainedUnknownResponse`: they are never treated as zero sensitivity and are never discarded by the planner. The exception is an output QoI whose declared normalized weight is exactly zero: it is outside the task's active error metric, so an unmeasured entry for that zero-weight output does not block the decision. At least one output weight must be strictly positive, and every positively weighted output must have a measured response entry. The scoring contract validates exact mode registries, non-negative finite QoI weights, positive encoded byte counts and finite arithmetic.
 
 A manufactured test deliberately disagrees with energy-only ranking: mode 2 has much lower spectral energy than mode 1, but a much larger future response gain. The planner discards mode 1 within budget and retains mode 2. This is a scoring-primitive test only; response gains are synthetic and no adaptive Fourier solver or physical echo is executed.
 
