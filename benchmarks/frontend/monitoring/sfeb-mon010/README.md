@@ -11,3 +11,12 @@ Its central design shift is bitemporal append-only claim lineage. Historical evi
 See [SOURCE-CLAIM-PROVENANCE-v1.md](SOURCE-CLAIM-PROVENANCE-v1.md) for the graph model, source/claim/decision semantics, correction rules, adversarial corpus and Claim Provenance and Drift Challenge (CPDC) benchmarks.
 
 MON-010 reuses active SCITT profiles and RFC 9942/9943. It does not invent another receipt format or claim that a source signature proves factual truth.
+
+
+## Executable bitemporal claimgraph preflight
+
+The initial standard-library Go prototype is in [claimgraph/](claimgraph/). It records source publication, supersession, retraction, independent dispute and availability events in an append-only hash-chained history; evaluates historical status as-of recorded time separately from current source status; and computes transitive impact closure while preserving executed-action records.
+
+Run `claimgraph/reproduce.sh` for five race-enabled test runs, `go vet` and coverage. The source/test snapshots are committed as gzip files and expanded into a temporary directory by the runner.
+
+Local preflight on Go 1.23.2/linux-amd64: 14 named tests, five race-enabled runs passed, vet passed, 81.4% statement coverage. This is an executable reference model, not publisher-signature verification, a SCITT adapter, source truth oracle or production authorization mechanism.
