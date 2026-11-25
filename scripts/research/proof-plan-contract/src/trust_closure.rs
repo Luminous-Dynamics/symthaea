@@ -33,7 +33,7 @@ fn array_at<'a>(value: &'a Value, path: &[&str]) -> Option<&'a Vec<Value>> {
 }
 
 fn is_hex(value: &str, length: usize) -> bool {
-    value.len() == length && value.bytes().all(|b| b.is_ascii_hexdigit())
+    value.len() == length && value.bytes().all(|b| b.is_ascii_digit() || (b'a'..=b'f').contains(&b))
 }
 
 fn axis_status<'a>(value: &'a Value, axis: &str) -> Option<&'a str> {
@@ -65,6 +65,12 @@ fn check_subject_and_environment(value: &Value, errors: &mut Vec<String>) {
         _ => push_missing(errors, "subject.commit"),
     }
     check_digest(value, &["subject", "source", "sha256"], "subject.source.sha256", errors);
+    check_digest(
+        value,
+        &["subject", "root_declaration", "type_sha256"],
+        "subject.root_declaration.type_sha256",
+        errors,
+    );
     check_digest(
         value,
         &["subject", "challenge", "artifact", "sha256"],
@@ -158,6 +164,9 @@ fn check_logical_closure(value: &Value, errors: &mut Vec<String>) {
         }
 
         if let Some(nodes) = array_at(value, &["logical_dependency_audit", "nodes"]) {
+            if nodes.is_empty() {
+                errors.push("logical closure requires at least one observed dependency node".to_owned());
+            }
             for (index, node) in nodes.iter().enumerate() {
                 if string_at(node, &["kind"]) == Some("unknown")
                     || string_at(node, &["value_availability"]) == Some("unavailable")
@@ -225,7 +234,8 @@ fn check_statement_fidelity(value: &Value, errors: &mut Vec<String>) {
     let challenge_replay = string_at(value, &["replays", "statement_comparison", "challenge_target_sha256"]);
     let solution_replay = string_at(value, &["replays", "statement_comparison", "solution_target_sha256"]);
 
-    if comparison != Some("match")
+    if string_at(value, &["replays", "statement_comparison", "status"]) != Some("recorded")
+        || comparison != Some("match")
         || challenge_digest.is_none()
         || challenge_digest != root_digest
         || challenge_digest != challenge_replay
@@ -297,7 +307,13 @@ fn check_construction(value: &Value, errors: &mut Vec<String>) {
     );
 
     if let Some(components) = array_at(value, &["construction_provenance", "components"]) {
+        if components.is_empty() {
+            errors.push("construction containment requires an explicit component inventory".to_owned());
+        }
         for (index, component) in components.iter().enumerate() {
+            if string_at(component, &["kind"]) == Some("unknown") {
+                errors.push(format!("construction component {index} has unknown kind"));
+            }
             let stage = string_at(component, &["execution_stage"]);
             if matches!(stage, Some("elaboration" | "build" | "export"))
                 && bool_at(component, &["sandboxed"]) != Some(true)
