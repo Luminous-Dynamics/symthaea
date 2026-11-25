@@ -5,7 +5,7 @@
 //! sufficiency answers whether the qualified set supports one exact decision.
 //! Neither receipt authorizes an action.
 
-use serde_json::{Map, Value, json};
+use serde_json::{Value, json};
 use sha2::{Digest, Sha256};
 
 use crate::qualification_dsse::{
@@ -831,6 +831,21 @@ mod tests {
     const CALIBRATION: &str = "bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb";
 
     struct TestQualificationVerifier;
+    struct RevokedQualificationVerifier;
+
+    impl EvidenceQualificationSignatureVerifierV1 for RevokedQualificationVerifier {
+        fn verify_signature(
+            &self,
+            _profile: &str,
+            _key_id: &str,
+            _payload_sha256: &str,
+            _signature: &[u8],
+            _issued_at_unix: u64,
+            _now_unix: u64,
+        ) -> Result<(), crate::evidence_qualification_gate::EvidenceQualificationRejectV1> {
+            Err(crate::evidence_qualification_gate::EvidenceQualificationRejectV1::RevokedKey)
+        }
+    }
 
     impl EvidenceQualificationSignatureVerifierV1 for TestQualificationVerifier {
         fn verify_signature(
@@ -1267,6 +1282,63 @@ mod tests {
                 &profile,
             ),
             Err(DecisionSufficiencyRejectV1::SharedQualificationAuthority)
+        );
+    }
+
+    #[test]
+    fn sufficiency_cannot_outlive_original_qualification_expiry() {
+        let qualified = qualified_batch(&repeat('f'));
+        let (binding, profile, envelope) = build_valid_assessment(
+            &qualified,
+            DecisionSufficiencyStatusV1::Sufficient,
+            DecisionRequirementStatusV1::Met,
+            Some(1000),
+            Some(5000),
+        );
+        let candidate_ids = vec!["evidence-1".to_owned()];
+        let mut qualification_binding = qualification_binding(&qualified, &candidate_ids, 250);
+        let mut later_binding = binding.clone();
+        later_binding.now_unix = 250;
+        assert_eq!(
+            verify_decision_sufficiency_v1(
+                &qualified,
+                &qualification_binding,
+                &TestQualificationVerifier,
+                &later_binding,
+                &envelope,
+                &profile,
+            ),
+            Err(DecisionSufficiencyRejectV1::Qualification(
+                EvidenceQualificationRejectV1::ReceiptExpired
+            ))
+        );
+        qualification_binding.now_unix = 250;
+    }
+
+    #[test]
+    fn sufficiency_rechecks_original_qualification_signer_at_use() {
+        let qualified = qualified_batch(&repeat('f'));
+        let (binding, profile, envelope) = build_valid_assessment(
+            &qualified,
+            DecisionSufficiencyStatusV1::Sufficient,
+            DecisionRequirementStatusV1::Met,
+            Some(1000),
+            Some(5000),
+        );
+        let candidate_ids = vec!["evidence-1".to_owned()];
+        let qualification_binding = qualification_binding(&qualified, &candidate_ids, 160);
+        assert_eq!(
+            verify_decision_sufficiency_v1(
+                &qualified,
+                &qualification_binding,
+                &RevokedQualificationVerifier,
+                &binding,
+                &envelope,
+                &profile,
+            ),
+            Err(DecisionSufficiencyRejectV1::Qualification(
+                EvidenceQualificationRejectV1::RevokedKey
+            ))
         );
     }
 
