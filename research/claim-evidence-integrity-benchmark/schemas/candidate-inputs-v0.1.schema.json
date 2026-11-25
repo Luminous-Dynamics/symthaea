@@ -1,0 +1,138 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://github.com/Luminous-Dynamics/symthaea/research/claim-evidence-integrity-benchmark/schemas/candidate-inputs-v0.1.schema.json",
+  "title": "Candidate-visible Claim-Evidence Integrity Inputs v0.1",
+  "type": "object",
+  "additionalProperties": false,
+  "required": [
+    "schema_version",
+    "status",
+    "fixtures"
+  ],
+  "properties": {
+    "schema_version": {
+      "const": "symthaea-claim-evidence-candidate-input-v0.1"
+    },
+    "status": {
+      "const": "SYNTHETIC_CANDIDATE_INPUT_NOT_EXPERT_DATA"
+    },
+    "fixtures": {
+      "type": "array",
+      "minItems": 12,
+      "items": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": [
+          "fixture_id",
+          "claim",
+          "claim_scope",
+          "claim_reference_time",
+          "verification_time",
+          "model_knowledge_cutoff",
+          "evidence"
+        ],
+        "properties": {
+          "fixture_id": {
+            "type": "string",
+            "minLength": 1
+          },
+          "claim": {
+            "type": "string",
+            "minLength": 1
+          },
+          "claim_scope": {
+            "type": "object",
+            "additionalProperties": false,
+            "required": [
+              "population",
+              "outcome_or_measure",
+              "quantifier_or_effect",
+              "domain_or_reference_boundary",
+              "scope_note"
+            ],
+            "properties": {
+              "population": {
+                "type": "string",
+                "minLength": 1
+              },
+              "outcome_or_measure": {
+                "type": "string",
+                "minLength": 1
+              },
+              "quantifier_or_effect": {
+                "type": "string",
+                "minLength": 1
+              },
+              "domain_or_reference_boundary": {
+                "type": "string",
+                "minLength": 1
+              },
+              "scope_note": {
+                "type": "string",
+                "minLength": 1
+              }
+            }
+          },
+          "claim_reference_time": {
+            "type": "string",
+            "format": "date-time"
+          },
+          "verification_time": {
+            "type": "string",
+            "format": "date-time"
+          },
+          "model_knowledge_cutoff": {
+            "type": "string",
+            "format": "date-time"
+          },
+          "evidence": {
+            "type": "array",
+            "items": {
+              "type": "object",
+              "additionalProperties": false,
+              "required": [
+                "evidence_id",
+                "source_id",
+                "canonical_url",
+                "publication_time",
+                "retrieval_time",
+                "artifact_text",
+                "artifact_sha256"
+              ],
+              "properties": {
+                "evidence_id": {
+                  "type": "string",
+                  "minLength": 1
+                },
+                "source_id": {
+                  "type": "string",
+                  "minLength": 1
+                },
+                "canonical_url": {
+                  "type": "string",
+                  "format": "uri"
+                },
+                "publication_time": {
+                  "type": "string",
+                  "format": "date-time"
+                },
+                "retrieval_time": {
+                  "type": "string",
+                  "format": "date-time"
+                },
+                "artifact_text": {
+                  "type": "string",
+                  "minLength": 1
+                },
+                "artifact_sha256": {
+                  "type": "string",
+                  "pattern": "^[a-f0-9]{64}$"
+                }
+              }
+            }
+          }
+        }
+      }
+    }
+  }
+}
