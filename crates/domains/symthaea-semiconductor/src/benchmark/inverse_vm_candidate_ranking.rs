@@ -381,9 +381,9 @@ fn evaluate_candidate(
         reasons.push(reason);
         let rank = |value| match value {
             CandidateDispositionV1::Eligible => 0,
-            CandidateDispositionV1::Unknown => 1,
+            CandidateDispositionV1::Infeasible => 1,
             CandidateDispositionV1::Unsupported => 2,
-            CandidateDispositionV1::Infeasible => 3,
+            CandidateDispositionV1::Unknown => 3,
             CandidateDispositionV1::Rejected => 4,
         };
         if rank(next) > rank(disposition) {
