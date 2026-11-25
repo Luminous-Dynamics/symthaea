@@ -206,6 +206,7 @@ fn validate_evidence(
         "published_at",
         "captured_at",
         "source_lineage",
+        "source_role",
         "integrity_status",
         "correction_status",
         "retrieval_state",
@@ -256,6 +257,11 @@ fn validate_evidence(
         issue(issues, format!("{path}.source_lineage"), "missing source lineage state");
     }
 
+    if let Some(role) = string(map, "source_role", &path, issues) {
+        if !["UNKNOWN", "PRIMARY", "SECONDARY", "REGISTRY", "SYNDICATED"].contains(&role) {
+            issue(issues, format!("{path}.source_role"), "unknown source role");
+        }
+    }
     if let Some(state) = string(map, "integrity_status", &path, issues) {
         if !["UNKNOWN", "CLEAN", "COMPROMISED", "MISSING"].contains(&state) {
             issue(issues, format!("{path}.integrity_status"), "unknown integrity state");
@@ -381,10 +387,11 @@ fn validate_relation(
         // Known lineage uses the authoritative source-family reference.
         // Unknown lineage still remains a distinct observed source for conflict
         // detection, but its synthetic key is never evidence of independence.
-        let origin = family
-            .as_ref()
-            .and_then(Option::as_ref)
-            .cloned()
+        let known_family = match family.as_ref() {
+            Some(Some(value)) => Some(value.clone()),
+            _ => None,
+        };
+        let origin = known_family
             .or_else(|| evidence_id.as_ref().map(|id| format!("unknown-origin:{id}")));
         if relation == "SUPPORTS" {
             if let Some(origin) = origin.as_ref() {
