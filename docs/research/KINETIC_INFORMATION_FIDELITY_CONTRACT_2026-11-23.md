@@ -787,6 +787,14 @@ Mandatory prior art:
 - Pagliantini, Delzanno & Markidis (2023), [Physics-based adaptive AW Hermite VP](https://doi.org/10.1016/j.jcp.2023.112252): conservative maps across velocity shift/scale changes.
 - Cho & Russo (2026), [Adaptive Fourier spectral VP](https://arxiv.org/abs/2607.12368): mandatory zero-padding / spectral-tail baseline.
 
+The 2026 Kormann–Nazarov–Wen method is now the key algorithmic QP comparator, not merely a positivity baseline:
+- PP-KL corrects K or L and exploits row-separable positivity constraints: N_x independent QPs with r variables, an active set of at most r, and O(r^3) per-row solve cost (O(N_x r^3) total).
+- MMC-PP-S corrects the low-rank core S to add global mass and momentum constraints. This breaks row separability and gives O(r^6) QP complexity.
+- In the paper's 1D1V two-stream experiment (N_x=N_v=128, r_max=20), reported total times are 90.28 s without correction, 122.91 s for PP-KL and 1,861.30 s for MMC-PP-S. The authors attribute the large difference to the global constraints and report roughly 50× correction-cost overhead for MMC-PP-S relative to PP-KL in that case.
+- The exact source is [arXiv:2606.31662](https://arxiv.org/abs/2606.31662), §§3–5. These are reported timings on the authors' CPU/MATLAB setup, not hardware-independent scaling laws.
+
+This creates a concrete paradigm target for [#13633 — structured response-constrained low-rank correction](https://github.com/Luminous-Dynamics/symthaea/issues/13633): retain the row-separable solve where possible; handle the small number of global moment and response constraints through matrix-free KKT products, a low-rank Schur complement, response-block decomposition and warm-started active sets. Compare against PP-KL and MMC-PP-S with identical physics and quantify the cost per added constraint.
+
 The full programme makes each transition jointly accountable for positivity, only those invariants actually conserved by the selected discrete reference, the correct entropy-production / energy-exchange law for collisional systems, and independently qualified future-response distortion. Collisionless VP and collisional high-field VPFP/VPL remain separate cohorts. Do not claim preservation of the infinite Vlasov Casimir family from a finite set of moments.
 
 The first implementation in [PR #13405](https://github.com/Luminous-Dynamics/symthaea/pull/13405) is deliberately narrow: \`project_nonnegative_preserving_mass\` solves the exact weighted one-equality projection
