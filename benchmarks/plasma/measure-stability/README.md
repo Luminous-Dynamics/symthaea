@@ -17,3 +17,18 @@ The known-answer cases cover:
 This metric is **not** the periodic-torus W1 metric and is not a multidimensional transport solver. The current schema and fixture do not measure a field-operator error or establish a field stability constant. They provide a precise input-measure distance for future output-error-vs-W1 experiments.
 
 The associated implementation is in the Rust crate `WeightedEmpiricalMeasure1D`; its constructor validates fixed interval membership, normalizes weights using max-scaled sums, and aggregates co-located atoms. Unit tests exercise these four cases plus malformed domains / weights and large finite weight scales.
+
+
+## Executable Rust primitive
+
+The public Rust type `WeightedEmpiricalMeasure1D`:
+- requires a caller-supplied finite, strictly increasing physical interval;
+- rejects particles outside that interval and invalid / all-zero weights;
+- normalizes non-negative weights using a max-scaled sum to avoid overflow;
+- drops zero-mass atoms and aggregates co-located atoms;
+- stores atoms in sorted physical-coordinate order;
+- evaluates W1 by a two-pointer cumulative-distribution sweep in O(n+m), with compensated accumulation.
+
+The focused Rust unit suite consumes the checked-in fixture directly and verifies every declared W1 known answer. Further tests cover weight renormalization, zero-mass atoms, large finite weights, symmetry and a triangle-inequality control.
+
+The implementation deliberately refuses to use particle-cloud extrema as a coordinate transform. The domain and units are explicit inputs. It does not yet implement torus W1, multidimensional optimal transport, or a W1-to-Coulomb-field theorem.
