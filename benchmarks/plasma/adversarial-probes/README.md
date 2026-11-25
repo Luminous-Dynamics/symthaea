@@ -163,3 +163,14 @@ Missing response entries are represented as `RetainedUnknownResponse`: they are 
 A manufactured test deliberately disagrees with energy-only ranking: mode 2 has much lower spectral energy than mode 1, but a much larger future response gain. The planner discards mode 1 within budget and retains mode 2. This is a scoring-primitive test only; response gains are synthetic and no adaptive Fourier solver or physical echo is executed.
 
 The intended tournament is tail-only adaptive zero-padding (Cho & Russo 2026), response-only, adjoint/QoI-only, hybrid response+tail+uncertainty, local time/energy-window ROM, adaptive Hermite and VlasovTT at matched storage and total cost.
+
+
+### Replaying the mode-level decision
+
+The synthetic scorer can be run directly:
+
+`cargo run --bin response_weighted_refinement_audit -- benchmarks/plasma/adversarial-probes/fixtures/response-weighted-refinement-known-answer-v0.1.json`
+
+The CLI parses the complex response matrix, mode coefficients, encoded bytes and QoI weights, runs the planner, and emits a JSON decision receipt. It exits non-zero on malformed registries, missing/duplicate mode metadata, invalid weights, unmeasured matrix entries used as data, or arithmetic failures. Missing response entries are retained as UNKNOWN in the output, never coerced to zero sensitivity.
+
+The focused Plasma Probe Contract workflow validates the Draft 2020-12 fixture schema, Rust-formats the CLI, runs it on the known-answer fixture, and tests the same scenario in the Rust unit suite.
