@@ -149,8 +149,12 @@ impl AgentTraceEvent {
         if event_id.trim().is_empty() {
             return Err(BehaviorError::MissingEventId);
         }
-        validate_digest(&agent_task_contract_blake3)?;
-        validate_digest(&workload_blake3)?;
+        if !is_valid_digest(&agent_task_contract_blake3) {
+            return Err(BehaviorError::InvalidTaskContractDigest);
+        }
+        if !is_valid_digest(&workload_blake3) {
+            return Err(BehaviorError::InvalidWorkloadDigest);
+        }
         if !source_matches_kind(source, kind) {
             return Err(BehaviorError::SourceKindMismatch { source, kind });
         }
@@ -349,6 +353,8 @@ pub enum BehaviorError {
     MixedTaskContract,
     #[error("task window mixes workload identity digests")]
     MixedWorkload,
+    #[error("task window mixes principal identities")]
+    MixedPrincipal,
     #[error("source receipt is missing or invalid")]
     MissingSourceReceipt,
     #[error("task window contains more than one tenant")]
@@ -395,18 +401,11 @@ fn source_matches_kind(source: TelemetrySource, kind: AgentEventKind) -> bool {
     }
 }
 
-fn validate_digest(value: &str) -> Result<(), BehaviorError> {
-    if value.len() == 64
+fn is_valid_digest(value: &str) -> bool {
+    value.len() == 64
         && value
             .bytes()
             .all(|byte| byte.is_ascii_digit() || (b'a'..=b'f').contains(&byte))
-    {
-        Ok(())
-    } else if value.trim().is_empty() {
-        Err(BehaviorError::InvalidTaskContractDigest)
-    } else {
-        Err(BehaviorError::InvalidWorkloadDigest)
-    }
 }
 
 /// Analyze one task's normalized, source-verified event stream.
@@ -452,10 +451,14 @@ pub fn analyze_task_window(
             return Err(BehaviorError::MixedWorkload);
         }
         if event.principal_id != principal_id {
-            return Err(BehaviorError::MissingPrincipal);
+            return Err(BehaviorError::MixedPrincipal);
         }
-        validate_digest(&event.agent_task_contract_blake3)?;
-        validate_digest(&event.workload_blake3)?;
+        if !is_valid_digest(&event.agent_task_contract_blake3) {
+            return Err(BehaviorError::InvalidTaskContractDigest);
+        }
+        if !is_valid_digest(&event.workload_blake3) {
+            return Err(BehaviorError::InvalidWorkloadDigest);
+        }
         if event.tenant_id.trim().is_empty() {
             return Err(BehaviorError::MissingTenant);
         }
