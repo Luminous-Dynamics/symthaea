@@ -652,7 +652,8 @@ pub fn self_test() -> Result<ValidationReport, String> {
 
     let mut duplicate: Value =
         serde_json::from_str(FIXTURE_PACK).map_err(|error| error.to_string())?;
-    duplicate["fixtures"][1]["fixture_id"] = duplicate["fixtures"][0]["fixture_id"].clone();
+    let duplicate_id = duplicate["fixtures"][0]["fixture_id"].clone();
+    duplicate["fixtures"][1]["fixture_id"] = duplicate_id;
     if validate_value(&duplicate).is_ok() {
         return Err("duplicate fixture ID unexpectedly passed validation".to_owned());
     }
@@ -701,7 +702,8 @@ mod tests {
     #[test]
     fn duplicate_fixture_ids_fail_closed() {
         let mut value: Value = serde_json::from_str(FIXTURE_PACK).unwrap();
-        value["fixtures"][1]["fixture_id"] = value["fixtures"][0]["fixture_id"].clone();
+        let duplicate_id = value["fixtures"][0]["fixture_id"].clone();
+        value["fixtures"][1]["fixture_id"] = duplicate_id;
         assert!(validate_value(&value).is_err());
     }
 
