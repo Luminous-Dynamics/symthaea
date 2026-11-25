@@ -21,6 +21,7 @@
         "decision_episode_id",
         "episode_manifest_sha256",
         "evaluation_manifest_sha256",
+        "evaluation_manifest_commitment_receipt_sha256",
         "qualification_receipt_sha256",
         "decision_sufficiency_receipt_sha256",
         "decision_record_sha256",
@@ -403,6 +404,9 @@
               }
             }
           ]
+        },
+        "evaluation_manifest_commitment_receipt_sha256": {
+          "$ref": "#/$defs/sha256"
         }
       }
     },
