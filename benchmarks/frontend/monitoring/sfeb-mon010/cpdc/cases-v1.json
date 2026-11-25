@@ -1,5 +1,5 @@
 {
-  "version": "CPDC-SYNTHETIC-1.0",
+  "version": "CPDC-SYNTHETIC-1.1",
   "cases": [
     {"id":"C01","name":"publisher correction reaches pending action","current_state":"superseded","source_authenticated":true,"semantic_match":true,"affects_action":true,"action_state":"pending","approval_bytes_match":true,"decision_authorized":true,"measurement_authority":"NONE"},
     {"id":"C02","name":"publisher retraction reaches pending action","current_state":"retracted","source_authenticated":true,"semantic_match":true,"affects_action":true,"action_state":"pending","approval_bytes_match":true,"decision_authorized":true,"measurement_authority":"NONE"},
@@ -14,7 +14,8 @@
     {"id":"C11","name":"approval bytes differ from executed action request","current_state":"current","source_authenticated":true,"semantic_match":true,"affects_action":false,"action_state":"pending","approval_bytes_match":false,"decision_authorized":true,"measurement_authority":"NONE"},
     {"id":"C12","name":"authority-free measurement capsule cannot authorize","current_state":"current","source_authenticated":true,"semantic_match":true,"affects_action":false,"action_state":"pending","approval_bytes_match":true,"decision_authorized":false,"measurement_authority":"NONE"},
     {"id":"C13","name":"measurement claim with authority-like label still cannot authorize","current_state":"current","source_authenticated":true,"semantic_match":true,"affects_action":false,"action_state":"pending","approval_bytes_match":true,"decision_authorized":false,"measurement_authority":"APPROVED"},
-    {"id":"C14","name":"publisher authentication failed","current_state":"current","source_authenticated":false,"semantic_match":true,"affects_action":false,"action_state":"pending","approval_bytes_match":true,"decision_authorized":true,"measurement_authority":"NONE"}
+    {"id":"C14","name":"publisher authentication failed","current_state":"current","source_authenticated":false,"semantic_match":true,"affects_action":false,"action_state":"pending","approval_bytes_match":true,"decision_authorized":true,"measurement_authority":"NONE"},
+    {"id":"C15","name":"historical pending action is not retroactively reauthorized by a later correction","current_state":"superseded","historical_query":true,"historical_state":"current","source_authenticated":true,"semantic_match":true,"affects_action":true,"action_state":"pending","approval_bytes_match":true,"decision_authorized":true,"measurement_authority":"NONE"}
   ],
   "expected": {
     "C01":{"source_usable":false,"reauthorize":true,"action_allowed":false,"preserve_execution":false,"current_risk_review":false},
@@ -30,6 +31,7 @@
     "C11":{"source_usable":true,"reauthorize":false,"action_allowed":false,"preserve_execution":false,"current_risk_review":false},
     "C12":{"source_usable":true,"reauthorize":false,"action_allowed":false,"preserve_execution":false,"current_risk_review":false},
     "C13":{"source_usable":true,"reauthorize":false,"action_allowed":false,"preserve_execution":false,"current_risk_review":false},
-    "C14":{"source_usable":false,"reauthorize":false,"action_allowed":false,"preserve_execution":false,"current_risk_review":false}
+    "C14":{"source_usable":false,"reauthorize":false,"action_allowed":false,"preserve_execution":false,"current_risk_review":false},
+    "C15":{"source_usable":true,"reauthorize":false,"action_allowed":true,"preserve_execution":false,"current_risk_review":false}
   }
 }
