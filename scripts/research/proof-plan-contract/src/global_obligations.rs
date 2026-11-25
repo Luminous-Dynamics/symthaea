@@ -49,20 +49,11 @@ fn report_for_alternative(
         {
             continue;
         }
-        match edge.relation {
-            EdgeRelation::CreatesSubgoal => {
-                creators
-                    .entry(edge.target_id.clone())
-                    .or_default()
-                    .push(edge.source_id.clone());
-            }
-            EdgeRelation::Discharges | EdgeRelation::Transforms => {
-                consumers
-                    .entry(edge.target_id.clone())
-                    .or_default()
-                    .push((edge.source_id.clone(), edge.relation));
-            }
-            _ => {}
+        if edge.relation == EdgeRelation::CreatesSubgoal {
+            creators
+                .entry(edge.target_id.clone())
+                .or_default()
+                .push(edge.source_id.clone());
         }
     }
 
@@ -300,7 +291,7 @@ pub fn analyze_global_obligations(plan: &ProofPlan) -> GlobalObligationReport {
     let primary_alternatives: Vec<&PlanAlternative> = plan
         .alternatives
         .iter()
-        .filter(|alternative| alternative.status == AlternativeStatus::Primary)
+        .filter(|alternative| matches!(alternative.status, AlternativeStatus::Primary))
         .collect();
     let primary_alternative_count = primary_alternatives.len();
 
