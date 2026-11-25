@@ -35,7 +35,9 @@ pub struct DesignEstimatorInputV1 {
     pub schema: String,
     pub dataset: AnnotationAcquisitionDatasetV1,
     /// Must match the deterministic planner output exactly.
-    pub expected_selection_receipt_sha256: String,
+    /// Required for reviewed/audited runs. Null is permitted only for a
+    /// fresh deterministic demonstration and is explicitly marked unverified.
+    pub expected_selection_receipt_sha256: Option<String>,
     pub metric_id: String,
     /// Exactly one observed outcome per selected probability-audit item.
     pub observed_audit_outcomes: Vec<ObservedAuditOutcomeV1>,
@@ -87,6 +89,8 @@ pub struct DesignEstimatorReportV1 {
     pub stratum_estimates: Vec<StratumDesignEstimateV1>,
     pub adaptive_active_stream_used: bool,
     pub exact_selection_receipt_replayed: bool,
+    pub expected_selection_receipt_supplied: bool,
+    pub selection_receipt_match_verified: bool,
     pub observed_outcomes_authenticated: bool,
     pub population_confidence_claim_permitted: bool,
 }
@@ -111,15 +115,19 @@ pub fn estimate_design_based_metric(
         return Err(format!("unsupported estimator input schema: {}", input.schema));
     }
     require_text(&input.metric_id, "metric_id")?;
-    validate_digest(
-        &input.expected_selection_receipt_sha256,
-        "expected_selection_receipt_sha256",
-    )?;
+    if let Some(expected) = input.expected_selection_receipt_sha256.as_deref() {
+        validate_digest(expected, "expected_selection_receipt_sha256")?;
+    }
 
     let planned = plan_annotation_acquisition(&input.dataset)?;
-    if planned.selection_receipt_sha256 != input.expected_selection_receipt_sha256 {
+    if input
+        .expected_selection_receipt_sha256
+        .as_deref()
+        .is_some_and(|expected| planned.selection_receipt_sha256 != expected)
+    {
         return Err("selection receipt digest does not match deterministic planner replay".into());
     }
+    let selection_receipt_match_verified = input.expected_selection_receipt_sha256.is_some();
     if planned.probability_audit_is_adaptive || !planned.source_work_sets_are_disjoint {
         return Err("planner report does not satisfy frozen independent audit-stream invariants".into());
     }
@@ -314,6 +322,8 @@ pub fn estimate_design_based_metric(
         stratum_estimates,
         adaptive_active_stream_used: false,
         exact_selection_receipt_replayed: true,
+        expected_selection_receipt_supplied: input.expected_selection_receipt_sha256.is_some(),
+        selection_receipt_match_verified,
         observed_outcomes_authenticated: false,
         population_confidence_claim_permitted: false,
     })
@@ -538,7 +548,7 @@ mod tests {
         DesignEstimatorInputV1 {
             schema: ESTIMATOR_SCHEMA_V1.into(),
             dataset,
-            expected_selection_receipt_sha256: planned.selection_receipt_sha256,
+            expected_selection_receipt_sha256: Some(planned.selection_receipt_sha256),
             metric_id: "grounded-correct".into(),
             observed_audit_outcomes,
         }
