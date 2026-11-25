@@ -7737,7 +7737,7 @@ mod tests {
         let left =
             WeightedEmpiricalMeasure1D::new(&[0.95], &[1.0], -2.0, 3.0).unwrap();
         let right =
-            WeightedEmpiricalMeasure1D::new(&[-1.75], &[1.0], -2.0, 3.0).unwrap();
+            WeightedEmpiricalMeasure1D::new(&[2.45], &[1.0], -2.0, 3.0).unwrap();
         assert!((left.wasserstein1_periodic(&right).unwrap() - 1.5).abs() < 1.0e-14);
     }
 
