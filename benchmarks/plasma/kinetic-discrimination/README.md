@@ -41,3 +41,8 @@ A synthetic Rust regression fixture includes:
 - a strong low-cost pulse that dominates the high-cost version.
 
 This selector does not execute a Vlasov solver or choose from physical pulse families. Real acquisition still requires calibrated noise/reference uncertainty, boundary and amplitude admissibility, branch controls, independent replay and confirmation on whole held-out trajectories.
+
+
+The fixture also contains a matched four-candidate portfolio. All candidates share identical state hypotheses, prior probabilities and noise variance. The expected Pareto frontier contains the weak/low-cost and strong/low-cost interventions; the strong/high-cost design is dominated by the equal-information strong/low-cost design, and the weak/expensive design is dominated by the weak/low-cost design. The best EIG-per-cost selector is the strong/low-cost option.
+
+The selector rejects portfolios that change hypothesis ordering, normalized priors or the observation-noise model between candidate interventions. It returns the Pareto indices and scalar EIG/cost choice separately, so the scalar decision does not erase the frontier.
