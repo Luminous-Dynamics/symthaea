@@ -740,6 +740,58 @@ mod tests {
     }
 
     #[test]
+    fn unequal_work_sizes_use_distinct_within_work_inclusion_probabilities() {
+        let mut data = dataset(101, 2);
+        data.candidates = vec![
+            candidate("a-1", 'a'),
+            candidate("b-1", 'b'),
+            candidate("b-2", 'b'),
+            candidate("c-1", 'c'),
+            candidate("c-2", 'c'),
+            candidate("c-3", 'c'),
+        ];
+        let mut observed_same_work = false;
+        let mut observed_different_size_works = false;
+
+        for seed in 1_u64..=512 {
+            data.config.seed = seed;
+            let plan = plan_annotation_acquisition(&data).unwrap();
+            for left_index in 0..plan.probability_audit.len() {
+                for right_index in (left_index + 1)..plan.probability_audit.len() {
+                    let left = &plan.probability_audit[left_index];
+                    let right = &plan.probability_audit[right_index];
+                    let joint = second_order_inclusion_probability(left, right).unwrap();
+                    let works = left.eligible_source_works_in_stratum.unwrap() as f64;
+                    let selected_works = left.selected_source_works_in_stratum.unwrap() as f64;
+                    let left_n = left.eligible_items_in_source_work.unwrap() as f64;
+                    let right_n = right.eligible_items_in_source_work.unwrap() as f64;
+                    let left_m = left.selected_items_in_source_work.unwrap() as f64;
+                    let right_m = right.selected_items_in_source_work.unwrap() as f64;
+
+                    let expected = if left.source_work_id_sha256 == right.source_work_id_sha256 {
+                        observed_same_work = true;
+                        (selected_works / works)
+                            * (left_m * (left_m - 1.0) / (left_n * (left_n - 1.0)))
+                    } else {
+                        if (left_n - right_n).abs() > f64::EPSILON {
+                            observed_different_size_works = true;
+                        }
+                        (selected_works * (selected_works - 1.0) / (works * (works - 1.0)))
+                            * (left_m / left_n)
+                            * (right_m / right_n)
+                    };
+                    assert!((joint - expected).abs() < 1e-12);
+                }
+            }
+            if observed_same_work && observed_different_size_works {
+                break;
+            }
+        }
+        assert!(observed_same_work);
+        assert!(observed_different_size_works);
+    }
+
+    #[test]
     fn source_work_weighted_estimator_recovers_equal_work_target_and_variance() {
         let mut means = Vec::new();
         let mut variances = Vec::new();
