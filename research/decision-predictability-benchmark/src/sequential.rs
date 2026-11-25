@@ -732,7 +732,9 @@ fn enumerate_node(
 
     let mut stop_value = f64::INFINITY;
     let mut stop_decision: Option<String> = None;
-    for decision_id in &problem.decision_ids {
+    let mut ordered_decisions = problem.decision_ids.clone();
+    ordered_decisions.sort();
+    for decision_id in &ordered_decisions {
         let mut worst = 0.0_f64;
         for state_id in possible_states {
             let loss = problem
@@ -1308,6 +1310,39 @@ mod tests {
                 "policy-terminal risk-gate mismatch on generated case {case_index}"
             );
         }
+    }
+
+    #[test]
+    fn dynamic_and_exhaustive_oracles_use_same_lexicographic_decision_tie_break() {
+        let problem = SequentialRobustProblem {
+            state_ids: vec!["s0".to_owned()],
+            // Deliberately reverse the lexical order.
+            decision_ids: vec!["z_last".to_owned(), "a_first".to_owned()],
+            decision_loss: BTreeMap::from([
+                ("z_last".to_owned(), BTreeMap::from([("s0".to_owned(), 0.25)])),
+                ("a_first".to_owned(), BTreeMap::from([("s0".to_owned(), 0.25)])),
+            ]),
+            maximum_worst_case_loss: 0.5,
+            initial_protocol_state_id: "root".to_owned(),
+            protocol_states: vec![SequentialProtocolState {
+                protocol_state_id: "root".to_owned(),
+                legal_action_ids: Vec::new(),
+            }],
+            actions: Vec::new(),
+            resource_budget: cost(0),
+            current_step: 0,
+            decision_deadline_step: 0,
+            maximum_actions: 0,
+        };
+        let dynamic = evaluate_sequential_robust(&problem).unwrap();
+        let exhaustive = enumerate_sequential_robust(&problem).unwrap();
+
+        let selected = |policy: &SequentialPolicyNode| match policy {
+            SequentialPolicyNode::Stop { decision_id, .. } => decision_id.as_str(),
+            SequentialPolicyNode::Probe { .. } => panic!("unexpected probe"),
+        };
+        assert_eq!(selected(&dynamic.policy), "a_first");
+        assert_eq!(selected(&exhaustive.policy), "a_first");
     }
 
     #[test]
