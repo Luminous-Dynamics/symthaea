@@ -588,7 +588,8 @@ jobs:
               axiom_report: {
                 captured: true,
                 parsed: false,
-                positive_certificates_depend_on_no_axioms: true,
+                native_reported_no_axioms: true,
+                independent_audit_required_for_trust_claim: true,
                 log_sha256: $axiom_log_sha256
               },
               negative_control: {
@@ -611,7 +612,7 @@ jobs:
                 "The action-to-plan mapping remains provisional and has not received independent expert review."
               ]
             }' > "$receipt"
-          jq -e '.status == "accepted" and (.action_certificates | length) == 3 and .root_declaration == "ProofPlanActionCertificatePilot.and_comm_plan_replay" and .axiom_report.captured == true and .axiom_report.parsed == false and .axiom_report.positive_certificates_depend_on_no_axioms == true and .negative_control.expected_result == "lean_type_error" and .negative_control.rejected_as_expected == true and (.negative_control.source_sha256 | test("^[a-f0-9]{64}$")) and (.negative_control.log_sha256 | test("^[a-f0-9]{64}$")) and .axiom_negative_control.expected_result == "axiom_dependency_reported" and .axiom_negative_control.observed_as_expected == true and .axiom_negative_control.expected_axiom == "ProofActionCertificateAxiomControl.injected_premise" and (.axiom_negative_control.source_sha256 | test("^[a-f0-9]{64}$")) and (.axiom_negative_control.log_sha256 | test("^[a-f0-9]{64}$"))' "$receipt" >/dev/null
+          jq -e '.status == "accepted" and (.action_certificates | length) == 3 and .root_declaration == "ProofPlanActionCertificatePilot.and_comm_plan_replay" and .axiom_report.captured == true and .axiom_report.parsed == false and .axiom_report.native_reported_no_axioms == true and .axiom_report.independent_audit_required_for_trust_claim == true and .negative_control.expected_result == "lean_type_error" and .negative_control.rejected_as_expected == true and (.negative_control.source_sha256 | test("^[a-f0-9]{64}$")) and (.negative_control.log_sha256 | test("^[a-f0-9]{64}$")) and .axiom_negative_control.expected_result == "axiom_dependency_reported" and .axiom_negative_control.observed_as_expected == true and .axiom_negative_control.expected_axiom == "ProofActionCertificateAxiomControl.injected_premise" and (.axiom_negative_control.source_sha256 | test("^[a-f0-9]{64}$")) and (.axiom_negative_control.log_sha256 | test("^[a-f0-9]{64}$"))' "$receipt" >/dev/null
           cat "$receipt" >> "$GITHUB_STEP_SUMMARY"
           echo "PROOF_ACTION_CERTIFICATE_AND_COMM_LEAN_REPLAY_PASS"
 
