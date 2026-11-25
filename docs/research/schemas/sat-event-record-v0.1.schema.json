@@ -126,7 +126,8 @@
         "binding_digest",
         "sink_projection_digest",
         "sink_projection_id",
-        "sink_projection_version"
+        "sink_projection_version",
+        "sink_projection"
       ],
       "properties": {
         "action": {
@@ -180,6 +181,11 @@
         "sink_projection_version": {
           "type": "string",
           "minLength": 1
+        },
+        "sink_projection": {
+          "type": "object",
+          "description": "Connector-versioned projection fields independently observable at the actual sink.",
+          "additionalProperties": true
         }
       }
     },
@@ -230,7 +236,8 @@
         "observed_at",
         "idempotency_key",
         "sink_projection_id",
-        "sink_projection_version"
+        "sink_projection_version",
+        "observed_projection"
       ],
       "properties": {
         "outcome": {
@@ -269,6 +276,11 @@
         "sink_projection_version": {
           "type": "string",
           "minLength": 1
+        },
+        "observed_projection": {
+          "type": "object",
+          "description": "Fields reconstructed from the authoritative sink readback under the same projection adapter.",
+          "additionalProperties": true
         }
       }
     },
@@ -639,7 +651,8 @@
         "properties": {
           "effect_observation": {
             "required": [
-              "observed_effect_digest"
+              "observed_effect_digest",
+              "observed_projection"
             ]
           }
         }
