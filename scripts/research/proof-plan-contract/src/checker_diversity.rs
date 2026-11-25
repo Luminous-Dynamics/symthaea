@@ -739,6 +739,50 @@ mod tests {
     }
 
     #[test]
+    fn paranoid_mode_requires_the_complete_registered_bundle() {
+        let (registry, mut profile) = values();
+        profile["orchestrator"]["paranoid_mode"] = json!(true);
+        profile["requested_checker_ids"]
+            .as_array_mut()
+            .unwrap()
+            .retain(|id| id != "leanchecker_paranoid");
+        profile["checker_runs"]
+            .as_array_mut()
+            .unwrap()
+            .retain(|run| run["checker_id"] != "leanchecker_paranoid");
+        profile["diversity_summary"]["requested_count"] = json!(5);
+        profile["diversity_summary"]["executed_count"] = json!(5);
+        profile["diversity_summary"]["distinct_implementation_families"] = json!(5);
+        let errors = validate_profile(&registry, &profile, REGISTRY.as_bytes());
+        assert!(errors.iter().any(|error| error.contains("full comparator bundle")));
+    }
+
+    #[test]
+    fn not_run_checker_is_inconclusive_not_a_rejection() {
+        let (registry, mut profile) = values();
+        profile["profile_status"] = json!("observed_exact_export_run");
+        profile["profile_disposition"] = json!("inconclusive");
+        profile["orchestrator"]["exit_status"] = json!("failure");
+        profile["checker_runs"][5]["result"] = json!("not_run");
+        for key in [
+            "checker_version",
+            "implementation_revision",
+            "binary_sha256",
+            "input_export_sha256",
+            "raw_receipt_sha256",
+            "raw_stdout_sha256",
+            "raw_stderr_sha256"
+        ] {
+            profile["checker_runs"][5].as_object_mut().unwrap().remove(key);
+        }
+        profile["diversity_summary"]["executed_count"] = json!(5);
+        profile["diversity_summary"]["accepted_count"] = json!(5);
+        profile["diversity_summary"]["distinct_implementation_families"] = json!(5);
+        let errors = validate_profile(&registry, &profile, REGISTRY.as_bytes());
+        assert!(errors.is_empty(), "{errors:?}");
+    }
+
+    #[test]
     fn computes_three_algorithm_lineages_not_six() {
         let result = validate_json_inputs(REGISTRY, SYNTHETIC_PROFILE).expect("valid fixture");
         assert_eq!(result.requested_count, 6);
