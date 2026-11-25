@@ -99,6 +99,21 @@ pub enum SequentialPolicyNode {
 /// Evaluator-only oracle output. Neither the policy tree nor its
 /// possible-state support sets may be disclosed to a candidate during a blind
 /// episode. This value is a reference for scoring, not an agent action.
+#[derive(Clone, Debug, PartialEq, Eq)]
+pub struct SequentialResourceStep {
+    pub action_id: String,
+    pub outcome_id: String,
+}
+
+/// Exact component-wise cost on one terminal branch of the selected policy.
+#[derive(Clone, Debug, PartialEq, Eq)]
+pub struct SequentialTerminalResourcePath {
+    /// Action/outcome sequence from the root to this terminal node.
+    pub steps: Vec<SequentialResourceStep>,
+    /// Total resource units along this path, kept separate by dimension.
+    pub resource_usage: BTreeMap<String, u64>,
+}
+
 #[derive(Clone, Debug, PartialEq)]
 pub struct SequentialPolicyValue {
     /// Best terminal decision loss available immediately, without another action.
@@ -110,6 +125,8 @@ pub struct SequentialPolicyValue {
     /// Whether every terminal branch of the selected policy meets the risk limit.
     /// This does not imply that a decision is admissible before the policy runs.
     pub policy_terminal_risk_gate_passed: bool,
+    /// Exact resource vector for every terminal branch of the selected policy.
+    pub terminal_resource_paths: Vec<SequentialTerminalResourcePath>,
     /// Bounded search work; DP-node and exhaustive-enumerator counts are distinct.
     pub explored_nodes: usize,
     /// Evaluator-only policy tree. Never expose state supports to a candidate.
@@ -159,6 +176,11 @@ pub enum SequentialOracleError {
     },
     InvalidDeadline,
     TimeOverflow,
+    ResourceOverflow {
+        action_id: String,
+        dimension: String,
+    },
+    TooManyTerminalResourcePaths(usize),
     SearchLimitExceeded(usize),
     EnumerationLimitExceeded(usize),
     NoPolicy,
@@ -618,6 +640,7 @@ pub fn evaluate_sequential_robust(
         problem.maximum_actions,
         &mut nodes,
     )?;
+    let terminal_resource_paths = terminal_resource_paths(problem, &solved.policy)?;
     Ok(SequentialPolicyValue {
         current_minimax_loss,
         current_risk_gate_passed: current_minimax_loss
@@ -625,9 +648,68 @@ pub fn evaluate_sequential_robust(
         worst_case_terminal_loss: solved.loss,
         policy_terminal_risk_gate_passed: solved.loss
             <= problem.maximum_worst_case_loss + VALUE_TOLERANCE,
+        terminal_resource_paths,
         explored_nodes: nodes,
         policy: solved.policy,
     })
+}
+
+fn terminal_resource_paths(
+    problem: &SequentialRobustProblem,
+    policy: &SequentialPolicyNode,
+) -> Result<Vec<SequentialTerminalResourcePath>, SequentialOracleError> {
+    match policy {
+        SequentialPolicyNode::Stop { .. } => Ok(vec![SequentialTerminalResourcePath {
+            steps: Vec::new(),
+            resource_usage: problem
+                .resource_budget
+                .keys()
+                .map(|dimension| (dimension.clone(), 0))
+                .collect(),
+        }]),
+        SequentialPolicyNode::Probe {
+            action_id,
+            branches,
+        } => {
+            let action = problem
+                .actions
+                .iter()
+                .find(|candidate| candidate.action_id == *action_id)
+                .ok_or_else(|| SequentialOracleError::UnknownAction(action_id.clone()))?;
+            let mut paths = Vec::new();
+
+            for branch in branches {
+                let child_paths = terminal_resource_paths(problem, &branch.continuation)?;
+                for mut child in child_paths {
+                    let mut steps = Vec::with_capacity(child.steps.len() + 1);
+                    steps.push(SequentialResourceStep {
+                        action_id: action_id.clone(),
+                        outcome_id: branch.outcome_id.clone(),
+                    });
+                    steps.append(&mut child.steps);
+                    child.steps = steps;
+
+                    for (dimension, cost) in &action.resource_costs {
+                        let used = child.resource_usage.get(dimension).copied().unwrap_or(0);
+                        let total = used.checked_add(*cost).ok_or_else(|| {
+                            SequentialOracleError::ResourceOverflow {
+                                action_id: action_id.clone(),
+                                dimension: dimension.clone(),
+                            }
+                        })?;
+                        child.resource_usage.insert(dimension.clone(), total);
+                    }
+                    paths.push(child);
+                    if paths.len() > MAX_SEARCH_NODES {
+                        return Err(SequentialOracleError::TooManyTerminalResourcePaths(
+                            paths.len(),
+                        ));
+                    }
+                }
+            }
+            Ok(paths)
+        }
+    }
 }
 
 #[derive(Clone)]
@@ -905,6 +987,7 @@ pub fn enumerate_sequential_robust(
         }
     }
     let best = best.ok_or(SequentialOracleError::NoPolicy)?;
+    let terminal_resource_paths = terminal_resource_paths(problem, &best.policy)?;
     Ok(SequentialPolicyValue {
         current_minimax_loss,
         current_risk_gate_passed: current_minimax_loss
@@ -912,6 +995,7 @@ pub fn enumerate_sequential_robust(
         worst_case_terminal_loss: best.loss,
         policy_terminal_risk_gate_passed: best.loss
             <= problem.maximum_worst_case_loss + VALUE_TOLERANCE,
+        terminal_resource_paths,
         explored_nodes: work,
         policy: best.policy,
     })
@@ -1362,6 +1446,25 @@ mod tests {
         for branch in branches {
             let expected = if branch.outcome_id == "z0" { "C0" } else { "C1" };
             assert_eq!(root_action(&branch.continuation), Some(expected));
+        }
+    }
+
+    #[test]
+    fn terminal_resource_paths_report_exact_branch_costs() {
+        let problem = branch_unlock_world();
+        let dynamic = evaluate_sequential_robust(&problem).unwrap();
+        let exhaustive = enumerate_sequential_robust(&problem).unwrap();
+
+        assert_eq!(dynamic.terminal_resource_paths.len(), 2);
+        assert_eq!(
+            dynamic.terminal_resource_paths,
+            exhaustive.terminal_resource_paths
+        );
+        for path in &dynamic.terminal_resource_paths {
+            assert_eq!(path.steps.len(), 2);
+            assert_eq!(path.steps[0].action_id, "B");
+            assert!(path.steps[1].action_id == "C0" || path.steps[1].action_id == "C1");
+            assert_eq!(path.resource_usage["experiment_units"], 2);
         }
     }
 
