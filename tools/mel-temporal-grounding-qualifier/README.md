@@ -45,7 +45,7 @@ The temporal_reliability module consumes multiple query-items, each with two or 
 
 Temporal event-set agreement is reported separately. The corpus pins a strictly increasing IoU threshold sweep; each Present/Present annotator pair is scored in both directions through the production one-to-one scorer. The output reports symmetric event F1, matched interval IoU, exact occurrence-count agreement and onset/offset error distributions at each threshold. No second interval matcher is introduced.
 
-The evaluator requires at least two query-items and at least two annotators per item, supports variable annotator membership across items, and binds each item to a source-work lineage digest. It does not calculate population confidence intervals or source-work bootstrap in V1; source lineage and per-unit summaries are retained for a later preregistered bootstrap. It does not create consensus references or score model performance.
+The evaluator requires at least two query-items and at least two annotators per item, supports variable annotator membership across items, caps each item at 256 annotations to bound pairwise scoring, and binds each item to a source-work lineage digest. Alpha coincidence totals and denominators use checked integer arithmetic and fail closed on overflow. It does not calculate population confidence intervals or source-work bootstrap in V1; source lineage and per-unit summaries are retained for a later preregistered bootstrap. It does not create consensus references or score model performance.
 
 Run the synthetic corpus fixture with:
 
