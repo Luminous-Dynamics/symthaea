@@ -100,8 +100,9 @@ jobs:
             and .summary.answer_present_mean_count_gated_f1 < .summary.answer_present_mean_f1
             and ((.summary.risk_coverage_curve | length) >= 2)
             and .summary.always_answer_coverage == 1.0
-            and .summary.always_answer_risk > .39
-            and .summary.random_abstention_baseline_risk != null
+            and .summary.always_answer_risk > .79
+            and .summary.random_abstention_baseline_risk == 0.8
+            and .summary.random_abstention_baseline_aurc == 0.8
             and .summary.always_abstain_coverage == 0.0
             and .runtime_identity_authenticated == false
             and .evidence_receipts_authenticated == false
