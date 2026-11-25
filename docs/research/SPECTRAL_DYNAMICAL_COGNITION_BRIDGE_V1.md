@@ -198,7 +198,7 @@ The 15-root axiom-audit prototype in this repository is a small, separate fixtur
 6. Execute the exploratory pilot and publish raw per-seed results, then preregister hidden/confirmatory runs.
 7. Seek independent reproduction on a second machine and independent review of the statistical analysis.
 
-**Current evidence state:** protocol, 28-task design manifest, and a dependency-free Rust analytic reference harness with 24 authored unit tests are present. The Rust source has not been compiled or executed. No dataset generation, HDC/CfC or transformer model run, EEG analysis, RH proof verification, SOTA reproduction, or performance result is claimed by this artifact.
+**Current evidence state:** protocol, 30-task design manifest, and a dependency-free Rust analytic reference harness with 24 authored unit tests are present. The Rust source has not been compiled or executed. No dataset generation, HDC/CfC or transformer model run, EEG analysis, RH proof verification, SOTA reproduction, or performance result is claimed by this artifact.
 
 
 ## 11. References and evidence boundaries
