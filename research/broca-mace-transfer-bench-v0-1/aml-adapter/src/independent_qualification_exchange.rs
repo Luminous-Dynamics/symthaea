@@ -608,9 +608,6 @@ mod tests {
     use crate::evidence_qualification_gate::{
         EvidenceDispositionV1, EvidenceQualificationEntryV1, EvidenceQualificationReceiptV1,
     };
-    use crate::qualification_dsse::{
-        DSSE_PAYLOAD_TYPE_V1,
-    };
     use crate::qualification_trust::{
         PinnedEd25519QualificationVerifierV1, QualificationKeyStatusV1,
         QualificationTrustKeyV1, QualificationTrustProfileV1, qualification_key_id_v1,
@@ -788,12 +785,9 @@ mod tests {
     fn use_binding<'a>(
         batch: &'a CandidateEvidenceBatchV1,
         context: &'a QualificationUseContextV1,
+        candidate_ids: &'a [String],
         now_unix: u64,
     ) -> EvidenceQualificationBindingV1<'a> {
-        let mut ids = batch.evidence.iter()
-            .map(|item| item.evidence_id.clone())
-            .collect::<Vec<_>>();
-        ids.sort();
         EvidenceQualificationBindingV1 {
             run_id: &batch.run_id,
             query_invocation_id: &context.query_invocation_id,
@@ -803,7 +797,7 @@ mod tests {
             tool_profile_sha256: &context.tool_profile_sha256,
             query_sha256: &batch.query_sha256,
             candidate_set_sha256: &batch.candidate_set_sha256,
-            candidate_evidence_ids: Box::leak(ids.into_boxed_slice()),
+            candidate_evidence_ids: candidate_ids,
             decision_need_sha256: &context.decision_need_sha256,
             purpose_sha256: &context.purpose_sha256,
             qualification_policy_sha256: &context.qualification_policy_sha256,
@@ -855,7 +849,11 @@ mod tests {
                 assert_eq!(qualified.evidence().len(), 1);
                 assert_eq!(qualified.source_candidate_set_sha256(), batch.candidate_set_sha256);
                 assert_eq!(qualified.decision_need_sha256(), context.decision_need_sha256);
-                let binding = use_binding(&batch, &context, 101);
+                let mut candidate_ids = batch.evidence.iter()
+                    .map(|item| item.evidence_id.clone())
+                    .collect::<Vec<_>>();
+                candidate_ids.sort();
+                let binding = use_binding(&batch, &context, &candidate_ids, 101);
                 let verifier = result.verifier_for_use(&pinned_profile).expect("fresh DSSE verifier");
                 qualified.validate_at_use(&binding, &verifier).expect("same context remains valid");
             }
@@ -994,6 +992,29 @@ mod tests {
         ).expect("issuer-side strict decode");
         assert_eq!(decoded, request);
         let _ = (issuer, verifier);
+    }
+
+    #[test]
+    fn issuer_request_string_decoder_rejects_duplicate_json_keys() {
+        let batch = batch();
+        let (issuer, _pinned, context) = setup(EvidenceDispositionV1::Admissible, false);
+        let request = build_request(&batch, &context, &expected(&batch)).expect("request");
+        let wire = serde_json::to_string(&request.to_json_value()).unwrap();
+        assert_eq!(
+            EvidenceQualificationRequestV1::from_json_str(&wire),
+            Ok(request.clone())
+        );
+
+        let duplicate = wire.replacen(
+            "\\\"schema_version\\\":",
+            "\\\"schema_version\\\":\\\"mace_evidence_qualification_request_v1\\\",\\\"schema_version\\\":",
+            1,
+        );
+        assert_eq!(
+            EvidenceQualificationRequestV1::from_json_str(&duplicate),
+            Err(IndependentQualificationExchangeRejectV1::InvalidRequestJson)
+        );
+        let _ = issuer;
     }
 
     #[test]
