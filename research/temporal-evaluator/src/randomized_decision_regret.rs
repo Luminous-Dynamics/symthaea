@@ -439,7 +439,7 @@ pub fn evaluate_randomized_decision_regret(
         deterministic_minimax_regret_comparator_ppm: deterministic
             .unavoidable_worst_case_regret_ppm,
         deterministic_minimax_action_id: deterministic.minimax_regret_action_id,
-        worst_case_expected_regret_numerator,
+        worst_case_expected_regret_numerator: worst_expected_regret_numerator,
         worst_case_expected_regret_ppm_ceil,
         total_expected_regret_numerator,
         mean_expected_regret_ppm_ceil,
