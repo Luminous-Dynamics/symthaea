@@ -55,6 +55,20 @@ The profile digest and minimum profile version must come from a trust channel ou
 
 The verified capability also retains the signer key ID, signed payload digest, and signature. At every consumption, the caller must supply a freshly provisioned verifier, and the capability re-checks the signature against that verifier at the supplied trusted current time. A newly revoked key or a changed trust-profile pin therefore fails closed; a rotation to a new profile invalidates receipts that bind the old profile and requires re-qualification/re-issuance under the new profile. Passing a cached old verifier defeats this property, so freshness and monotonicity of the verifier-profile source remain an external relying-party obligation.
 
+### Standard DSSE / in-toto transport (library support on the follow-up branch)
+
+The DSSE follow-up adds a transport adapter for the existing typed qualification predicate:
+
+- DSSE protocol v1.0.2 PAE signs the exact serialized in-toto Statement bytes and the payload type; the test vector fixes the byte lengths, payload digest, PAE digest and Ed25519 signature.
+- The payload uses the in-toto Statement v1 type URI and a versioned MACE Evidence Qualification predicate type. The single Statement subject binds the candidate-set SHA-256; the predicate carries the full MACE request binding and per-evidence disposition.
+- The parser rejects duplicate JSON object keys, malformed/non-canonical Base64, wrong payload type, multiple signatures under the current MACE v1 profile, a mismatched subject, and predicate/receipt mismatch.
+- It accepts standard and URL-safe Base64, padded and unpadded; outer DSSE keyid is optional and is only a key-selection hint. The authenticated MACE predicate carries the actual key ID and the pinned verifier checks it against the trust profile.
+- Unrecognized DSSE envelope, signature-object and in-toto Statement extension fields are ignored; the MACE v1 predicate itself remains closed and exact.
+
+**Profile limit:** DSSE allows multiple signatures and application-specific threshold policies. MACE v1 currently requires exactly one Ed25519 signature; a future multi-party qualifier policy must define distinct signer roles, threshold, independence/common-cause rules, and rotation semantics before relaxing that restriction.
+
+The signed bytes are not canonicalized and are never reconstructed for verification: the verifier signs/verifies DSSE PAE over the exact payload bytes received, then passes the same parsed statement/predicate object to the typed MACE binding gate. The receiver must not re-read or reparse a different payload after verification.
+
 ### Decision sufficiency is a different question
 
 Admissibility answers: "May this evidence be considered under this policy and use context?"
@@ -81,7 +95,7 @@ Not implemented by this integration:
 - a separately operated qualification service or private-key custody;
 - independent source-observation ingestion, source-authority registry, rights engine, or tenant-isolation service;
 - remote trust-profile rotation/revocation distribution or a monotonic trust-profile witness;
-- a standard DSSE/in-toto or COSE signature envelope (the current profile signs the versioned MACE domain-separated payload digest);
+- an independently operated qualifier service that produces the DSSE/in-toto envelope, or sidecar request/response consumption of that envelope; the follow-up branch adds only the library-level DSSE/in-toto verifier and schemas;
 - V2 sidecar request/response integration that consumes an external signed qualification and withholds unqualified context;
 - a DecisionNeed sufficiency decision, executor authorization, consume-once action ledger, or outcome/promotion integration;
 - authenticated journal checkpoints or T9/T10 rollback/erasure-resurrection protection.
@@ -121,6 +135,13 @@ For the internal decision benchmark, compare the Pareto frontier of decision reg
 Pre-register primary endpoints, task families, budgets, evaluation splits and stopping rules. Report paired intervals and worst-family regressions. A retrieval-score win is not a decision-quality win; a decision-quality win is not proof of safe authorization.
 
 ## 6. Relevant standards and research context
+
+- [DSSE Protocol v1.0.2](https://github.com/dsse-lf/dsse/blob/master/protocol.md): signature is over PAE(UTF8(PAYLOAD_TYPE), SERIALIZED_BODY); payload type is authenticated, keyid is an optional unauthenticated hint, and verifiers must accept standard or URL-safe Base64.
+- [DSSE JSON Envelope v1.0.2](https://github.com/dsse-lf/dsse/blob/master/envelope.md): payload, payloadType and signatures; unknown envelope extensions must be ignored; the same payload bytes that are verified must be the bytes delivered to the application.
+- [in-toto Attestation Framework v1.2](https://github.com/in-toto/attestation/tree/main/spec/v1): Statement binds the subject and predicate type; the Statement _type remains https://in-toto.io/Statement/v1. MACE uses a private, versioned predicate type rather than claiming to be a standard in-toto predicate.
+- [DSSE test and reference implementation](https://github.com/dsse-lf/dsse/tree/master/implementation): independent interoperability reference. The Rust fixture is authored but still needs execution against an independent DSSE implementation; the Python-generated Ed25519 vector is a deterministic golden fixture, not cross-implementation conformance evidence.
+
+
 
 - [RFC 9334 — Remote ATtestation procedureS (RATS) Architecture](https://www.rfc-editor.org/rfc/rfc9334) is a useful separation analogy: an Attester produces evidence, a Verifier appraises it, and a Relying Party consumes an attestation result. It does not provide MACE's source-authority or decision-sufficiency semantics.
 - [MACE issue #13455](https://github.com/Luminous-Dynamics/symthaea/issues/13455) owns the independent qualification integration.
