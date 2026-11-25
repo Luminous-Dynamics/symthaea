@@ -558,7 +558,7 @@ fn handle_request(
                         tool_id: "trajectory.entity_literal.search".to_owned(),
                         tool_revision_sha256: config.backend_revision_sha256.clone(),
                         action_template_sha256: entity_literal_action_template_sha256(config),
-                        observed_evidence_ids: trace_evidence_ids(&retrieved.hits, &retrieved.neighbor_context),
+                        observed_evidence_ids: trace_evidence_ids(&retrieved.hits, &[]),
                         outcome: if retrieved.hits.is_empty() {
                             RetrievalOperationOutcomeV1::NoEvidence
                         } else {
