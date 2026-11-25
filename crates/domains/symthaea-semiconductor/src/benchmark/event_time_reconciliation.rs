@@ -183,8 +183,8 @@ fn report_digest(
     json_sha256(&canonical)
 }
 
-fn label_key(label_id: &str, revision: u64) -> String {
-    format!("{label_id}:{revision}")
+fn label_key(label_id: &str, revision: u64, measurement_event_id: &str) -> String {
+    format!("{label_id}:{revision}:{measurement_event_id}")
 }
 
 fn validate_payload_time(
@@ -411,7 +411,11 @@ pub fn reconstruct_streaming_adapter_event_time_v1(
                 )
             }
             StreamingReconstructionPayloadV1::LabelDelivery { delivery } => {
-                let key = label_key(&delivery.label_id, delivery.label_revision);
+                let key = label_key(
+                    &delivery.label_id,
+                    delivery.label_revision,
+                    &delivery.measurement_event_id,
+                );
                 let mut replay_delivery = delivery.clone();
                 if let Some((corrected, effective_at, report_available_at)) =
                     latest_corrections.get(&key)
@@ -460,7 +464,7 @@ pub fn reconstruct_streaming_adapter_event_time_v1(
                 report,
                 ..
             } => {
-                let key = label_key(label_id, *label_revision);
+                let key = label_key(label_id, *label_revision, measurement_event_id);
                 if correction_report_digest(report)? != report.report_sha256 {
                     return Err(EventTimeReconstructionErrorV1(
                         "eligibility correction report digest mismatch".into(),
