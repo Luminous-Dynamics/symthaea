@@ -427,6 +427,28 @@ For ECPCB this is a **stress and comprehension challenge**, not a gold set by de
 
 A 17-million-line formal proof can pass extensive machine checks while remaining difficult for humans to understand. That gap is central to ECPCB's research purpose, not a reason to diminish the machine-verification evidence.
 
+## 10.2 Lean Kernel Arena — broader checker differential lane
+
+The current Lean Kernel Arena homepage captured on 25 November 2026 lists 37 checker entrants across 15 reported implementation languages. This is broader than the six execution paths in Lake's standard `--paranoid` comparator bundle. Keep the two datasets separate:
+- **Production assurance:** use the six-path same-export comparator bundle and the checker-lineage profile in [CHECKER-DIVERSITY-001](https://github.com/Luminous-Dynamics/symthaea/issues/13637).
+- **Research differential testing:** use the wider Arena population to discover implementation-specific false acceptances, false rejections, feature gaps, declines and resource trade-offs.
+
+The homepage's downloadable suite lists 138 good and 92 bad tests (excluding individual files larger than 10 MB), plus 30 corner cases per checker. It distinguishes invalid-proof rejection, valid-proof acceptance and corner cases; declines include unsupported features, crashes and timeouts. Mathlib virtual CPU time is instruction-derived at a fixed 6.0-Ginstr/s rate, not wall-clock or parallel throughput. Some entrants have no published Mathlib timing or memory number.
+
+The current homepage is a **mutable in-progress round**, not an immutable test corpus. The Arena explicitly warns that checkers/tests are continually updated and performance is comparable only within the same round. The Symthaea capture in [ARENA-DIFFERENTIAL-001](https://github.com/Luminous-Dynamics/symthaea/issues/13643) records the homepage rows but could not retrieve the underlying 9.4 MB raw `results.json`; therefore it is a landscape snapshot, not a round archive or reproducible benchmark receipt. Before a head-to-head Arena claim, freeze a round-specific test tarball, exact checker commits/binaries, Lean/export version, result manifest and raw receipts.
+
+ECPCB should report the Arena lane separately:
+- false acceptance on invalid proof exports;
+- false rejection on supported valid exports;
+- decline, timeout, crash/error and resource exhaustion;
+- supported feature coverage and parser behavior;
+- checker algorithm lineage and known common-mode relations;
+- exact same-export binding and per-checker receipts;
+- median/p95 instruction count, wall time and peak RSS by test family;
+- disagreement minimization and reproducibility.
+
+A fast or language-diverse checker is not automatically more trustworthy. The benchmark should identify where it adds an independent failure domain, where it merely ports the same algorithm, and where lineage remains unknown. No cross-round rank or soundness claim should be inferred from the live-page snapshot.
+
 ## 11. Strategy to exceed the state of the art
 
 Do not try to beat the strongest prover on every theorem benchmark at once. Pursue a sequence of credible wins:
