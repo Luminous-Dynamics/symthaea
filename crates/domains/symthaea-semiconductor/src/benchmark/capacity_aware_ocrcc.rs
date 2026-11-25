@@ -1324,7 +1324,7 @@ mod tests {
             label_value: value,
             label_available_at_unix_seconds: available,
             eligibility_report_available_at_unix_seconds: available,
-            delivered_at_unix_seconds: available + 1,
+            delivered_at_unix_seconds: available + 2,
             delivered_round,
             clock_domain_id: "fab-clock".into(),
             idempotency_key: format!("{label}:{revision}"),
@@ -1520,6 +1520,41 @@ mod tests {
     }
 
     #[test]
+    fn blocked_qualified_feedback_releases_capacity_after_end_of_round() {
+        let mut engine = engine(pmf_always_delay(2), 1, 3);
+        let first =
+            process_ca_ocrc_round_v1(&mut engine, &round(0, "s0", "e0", 10.0), &[]).unwrap();
+        assert_eq!(first.admission, CaOcrcAdmissionV1::Admitted);
+        assert_eq!(first.tracking_count_after, 1);
+
+        let blocked = delivery(
+            "s0",
+            "l0",
+            1,
+            "e0",
+            12.0,
+            0,
+            1,
+            LabelConsumptionEligibilityV1::Blocked,
+        );
+        let second =
+            process_ca_ocrc_round_v1(&mut engine, &round(1, "s1", "e1", 10.0), &[blocked]).unwrap();
+        // Paper ordering is admission before end-of-round reception: this
+        // round remains saturated, then the BLOCKED loss releases its slot.
+        assert_eq!(second.admission, CaOcrcAdmissionV1::CapacitySaturated);
+        assert_eq!(second.tracking_count_after, 0);
+        assert_eq!(
+            second.feedback[0].disposition,
+            CaOcrcFeedbackDispositionV1::Blocked
+        );
+
+        let third =
+            process_ca_ocrc_round_v1(&mut engine, &round(2, "s2", "e2", 10.0), &[]).unwrap();
+        assert_eq!(third.admission, CaOcrcAdmissionV1::Admitted);
+        assert_eq!(third.tracking_count_after, 1);
+    }
+
+    #[test]
     fn expired_or_not_admitted_feedback_is_untracked_and_does_not_update() {
         let mut engine = engine(pmf_always_delay(1), 1, 7);
         process_ca_ocrc_round_v1(&mut engine, &round(0, "s0", "e0", 10.0), &[]).unwrap();
@@ -1620,10 +1655,152 @@ mod tests {
         let distribution = bernoulli_proxy_distribution_v1("p", 2, 0.5).unwrap();
         let bound =
             arbitrary_delay_ca_ocrc_risk_bound_v1(10.0, 0.0, 0.2, 100, 2, &distribution).unwrap();
+        assert!(
+            arbitrary_delay_ca_ocrc_risk_bound_v1(10.0, -0.1, 0.2, 100, 2, &distribution)
+                .is_err()
+        );
+        assert!(
+            arbitrary_delay_ca_ocrc_risk_bound_v1(10.0, 10.1, 0.2, 100, 2, &distribution)
+                .is_err()
+        );
         let load = 1.0;
         let h = load / 2.0 - 1.0 - (load / 2.0_f64).ln();
         let expected = 10.0 / (0.2 * 100.0) + 3.0 / (0.5 * 100.0) + (-2.0 * h).exp();
         assert!((bound - expected).abs() < 1.0e-12);
+    }
+
+    #[test]
+    fn deterministic_tracking_and_threshold_match_independent_slow_oracle() {
+        let capacity = 2_usize;
+        let maximum_delay = 2_u64;
+        let target_risk = 0.10_f64;
+        let learning_rate = 0.10_f64;
+        let score_bound = 10.0_f64;
+        let mut engine = engine(pmf_always_delay(maximum_delay), capacity, 0x77);
+        let mut oracle_tracking: BTreeMap<u64, (u64, f64)> = BTreeMap::new();
+        let mut oracle_threshold = 1.0_f64;
+
+        for current_round in 0..12_u64 {
+            let expired: Vec<u64> = oracle_tracking
+                .iter()
+                .filter_map(|(issue_round, (proxy_delay, _))| {
+                    (issue_round + proxy_delay < current_round).then_some(*issue_round)
+                })
+                .collect();
+            for issue_round in &expired {
+                oracle_tracking.remove(issue_round);
+            }
+
+            let set_is_trivial =
+                oracle_threshold < 0.0 || oracle_threshold >= score_bound;
+            let oracle_admission = if set_is_trivial {
+                CaOcrcAdmissionV1::TrivialSetNoTracking
+            } else if oracle_tracking.len() >= capacity {
+                CaOcrcAdmissionV1::CapacitySaturated
+            } else {
+                oracle_tracking.insert(current_round, (maximum_delay, oracle_threshold));
+                CaOcrcAdmissionV1::Admitted
+            };
+
+            let mut due = Vec::new();
+            let due_rounds: Vec<u64> = oracle_tracking
+                .keys()
+                .copied()
+                .filter(|issue_round| issue_round + 1 == current_round)
+                .collect();
+            let mut oracle_update = 0.0_f64;
+            for issue_round in due_rounds {
+                let (_, frozen_threshold) = oracle_tracking[&issue_round];
+                let label_value = 12.5_f64;
+                let lower = 10.0 - frozen_threshold;
+                let upper = 10.0 + frozen_threshold;
+                let loss = if label_value < lower || label_value > upper {
+                    1.0
+                } else {
+                    0.0
+                };
+                let survival = 1.0_f64; // F(1) for the deterministic proxy delay dbar=2.
+                let update = learning_rate * (loss - target_risk) / survival;
+                oracle_update += update;
+                due.push(delivery(
+                    &format!("s{issue_round}"),
+                    &format!("l{issue_round}"),
+                    1,
+                    &format!("e{issue_round}"),
+                    label_value,
+                    issue_round,
+                    current_round,
+                    LabelConsumptionEligibilityV1::EligibleUnderDeclaredPolicy,
+                ));
+                oracle_tracking.remove(&issue_round);
+            }
+            let oracle_before = oracle_threshold;
+            oracle_threshold += oracle_update;
+
+            let receipt = process_ca_ocrc_round_v1(
+                &mut engine,
+                &round(
+                    current_round,
+                    &format!("s{current_round}"),
+                    &format!("e{current_round}"),
+                    10.0,
+                ),
+                &due,
+            )
+            .unwrap();
+
+            assert_eq!(receipt.evicted_rounds, expired);
+            assert_eq!(receipt.admission, oracle_admission);
+            assert!((receipt.threshold_before - oracle_before).abs() < 1.0e-12);
+            assert!((receipt.feedback_update_sum - oracle_update).abs() < 1.0e-12);
+            assert!((receipt.threshold_after - oracle_threshold).abs() < 1.0e-12);
+            assert_eq!(receipt.tracking_count_after, oracle_tracking.len());
+            assert_eq!(engine.tracking_set.len(), oracle_tracking.len());
+            for issue_round in oracle_tracking.keys() {
+                assert!(engine.tracking_set.contains_key(issue_round));
+            }
+            assert!(receipt.tracking_count_after <= capacity);
+        }
+    }
+
+    #[test]
+    fn feedback_input_order_is_canonical_and_receipt_is_order_invariant() {
+        fn run(reverse: bool) -> String {
+            let mut engine = engine(pmf_always_delay(2), 2, 0x123);
+            process_ca_ocrc_round_v1(&mut engine, &round(0, "s0", "e0", 10.0), &[]).unwrap();
+            process_ca_ocrc_round_v1(&mut engine, &round(1, "s1", "e1", 10.0), &[]).unwrap();
+
+            let first = delivery(
+                "s0",
+                "l0",
+                1,
+                "e0",
+                12.0,
+                0,
+                2,
+                LabelConsumptionEligibilityV1::EligibleUnderDeclaredPolicy,
+            );
+            let second = delivery(
+                "s1",
+                "l1",
+                1,
+                "e1",
+                12.0,
+                1,
+                2,
+                LabelConsumptionEligibilityV1::EligibleUnderDeclaredPolicy,
+            );
+            let deliveries = if reverse {
+                vec![second, first]
+            } else {
+                vec![first, second]
+            };
+            let receipt =
+                process_ca_ocrc_round_v1(&mut engine, &round(2, "s2", "e2", 10.0), &deliveries)
+                    .unwrap();
+            receipt.receipt_sha256
+        }
+        assert_eq!(run(false), run(true));
     }
 
     #[test]
