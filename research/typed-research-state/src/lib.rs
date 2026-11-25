@@ -560,7 +560,27 @@ fn validate_usability(
     }
 }
 
-pub fn validate_state(input: &str) -> Result<ValidationReport, Vec<ValidationIssue>> {
+pub fn evidence_prefix_sha256(
+    research_episode_id: &str,
+    sequence_number: u64,
+    evidence: &[Value],
+) -> String {
+    // serde_json preserve_order is enabled in this standalone crate. This
+    // manifest field order is canonical and is shared with the fixture writer.
+    let manifest = serde_json::json!({
+        "research_episode_id": research_episode_id,
+        "sequence_number": sequence_number,
+        "evidence": evidence,
+    });
+    let bytes = serde_json::to_vec(&manifest)
+        .expect("serializing a serde_json::Value to JSON bytes is infallible");
+    Sha256::digest(bytes)
+        .iter()
+        .map(|byte| format!("{byte:02x}"))
+        .collect()
+}
+
+fn validate_state(input: &str) -> Result<ValidationReport, Vec<ValidationIssue>> {
     let value: Value = serde_json::from_str(input).map_err(|error| {
         vec![ValidationIssue {
             path: "$".to_owned(),
@@ -616,7 +636,8 @@ pub fn validate_state(input: &str) -> Result<ValidationReport, Vec<ValidationIss
     let prefix_sha256 = digest_string(prefix, "prefix_sha256", "$.evidence_prefix", &mut issues)
         .unwrap_or_default();
     string(prefix, "lineage_snapshot_ref", "$.evidence_prefix", &mut issues);
-    if prefix.get("sequence_number").and_then(Value::as_u64).is_none() {
+    let sequence_number = prefix.get("sequence_number").and_then(Value::as_u64);
+    if sequence_number.is_none() {
         issue(&mut issues, "$.evidence_prefix.sequence_number", "expected non-negative sequence number");
     }
 
@@ -652,6 +673,16 @@ pub fn validate_state(input: &str) -> Result<ValidationReport, Vec<ValidationIss
     let Some(evidence) = array(root, "evidence", "$", &mut issues) else {
         return Err(issues);
     };
+    if let Some(sequence_number) = sequence_number {
+        let expected = evidence_prefix_sha256(&episode, sequence_number, evidence);
+        if prefix_sha256 != expected {
+            issue(
+                &mut issues,
+                "$.evidence_prefix.prefix_sha256",
+                "prefix digest does not match the exact public evidence manifest",
+            );
+        }
+    }
     let mut evidence_ids: HashMap<String, Option<String>> = HashMap::new();
     for (index, item) in evidence.iter().enumerate() {
         validate_evidence(item, index, &mut evidence_ids, &mut issues);
@@ -915,6 +946,14 @@ mod tests {
                 .map(|byte| format!("{byte:02x}"))
                 .collect::<String>()
         );
+    }
+
+    #[test]
+    fn evidence_prefix_digest_rejects_modified_manifest() {
+        let mut state = first_state();
+        state["evidence"][0]["artifact_ref"] =
+            Value::String("urn:synthetic:artifact:tampered".to_owned());
+        assert!(validate_state(&state.to_string()).is_err());
     }
 
     #[test]
