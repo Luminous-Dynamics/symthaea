@@ -154,8 +154,9 @@ pub use delayed_aci::{
 };
 
 pub use capacity_aware_ocrcc::{
-    CA_OCRC_DELIVERY_SCHEMA_V1, CA_OCRC_POLICY_SCHEMA_V1, CA_OCRC_ROUND_INPUT_SCHEMA_V1,
-    CA_OCRC_ROUND_RECEIPT_SCHEMA_V1, CA_OCRC_SCHEMA_V1, CaOcrcAdmissionV1, CaOcrcEngineV1,
+    CA_OCRC_DELIVERY_SCHEMA_V1, CA_OCRC_POLICY_SCHEMA_V1, CA_OCRC_PRNG_ALGORITHM_V1,
+    CA_OCRC_ROUND_INPUT_SCHEMA_V1, CA_OCRC_ROUND_RECEIPT_SCHEMA_V1, CA_OCRC_SCHEMA_V1,
+    CA_OCRC_SCORE_CONTRACT_V1, CaOcrcAdmissionV1, CaOcrcEngineV1,
     CaOcrcErrorV1, CaOcrcFeedbackDispositionV1, CaOcrcFeedbackReasonV1, CaOcrcGuaranteeStateV1,
     CaOcrcLabelDeliveryV1, CaOcrcPolicyV1, CaOcrcPredictionReceiptV1,
     CaOcrcProxyDelayDistributionV1, CaOcrcRoundInputV1, CaOcrcRoundReceiptV1, CaOcrcSetKindV1,
