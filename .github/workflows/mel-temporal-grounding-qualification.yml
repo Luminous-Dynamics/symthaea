@@ -4,8 +4,10 @@ on:
   push:
     branches:
       - research/mel-temporal-grounding-count-gated-f1-v1-20261124
+      - research/mel-multi-annotator-grounding-v1-20261124
       - research/mel-temporal-revision-audit-v1-20261124
       - research/mel-multi-annotator-grounding-v1-20261124
+      - research/mel-selective-grounding-v1-20261125
     paths:
       - "crates/domains/symthaea-muse/src/temporal_grounding.rs"
       - "crates/domains/symthaea-muse/src/evidence_digest.rs"
@@ -74,6 +76,30 @@ jobs:
 
       - name: Warnings-denied Clippy on exact production source
         run: cargo +1.96.0 clippy --locked --manifest-path tools/mel-temporal-grounding-qualifier/Cargo.toml --all-targets -- -D warnings
+
+      - name: Replay selective grounding and abstention controls when module is present
+        if: hashFiles('tools/mel-temporal-grounding-qualifier/src/temporal_selective.rs') != ''
+        shell: bash
+        run: |
+          set -euo pipefail
+          cargo +1.96.0 run --locked --manifest-path tools/mel-temporal-grounding-qualifier/Cargo.toml --bin mel-selective-grounding-audit -- tools/mel-temporal-grounding-qualifier/fixtures/mel-selective-temporal.synthetic.json > "$RUNNER_TEMP/selective-grounding-report.json"
+          jq -e '
+            .schema == "mel-selective-temporal-report-v1"
+            and .summary.cases == 10
+            and .summary.covered_cases == 6
+            and .summary.coverage == 0.6
+            and .summary.selective_errors == 4
+            and .summary.selective_risk > 0.66
+            and .summary.false_absence_claims == 1
+            and .summary.ambiguous_reason_recall == 0.5
+            and .summary.not_estimable_reason_recall == 0.5
+            and .summary.answer_present_cases == 3
+            and .summary.answer_present_mean_count_gated_f1 < .summary.answer_present_mean_f1
+            and .summary.risk_coverage_curve | length >= 2
+            and .runtime_identity_authenticated == false
+            and .evidence_receipts_authenticated == false
+            and .always_abstain_is_a_product_baseline == false
+          ' "$RUNNER_TEMP/selective-grounding-report.json" > /dev/null
 
       - name: Replay multi-annotator temporal-grounding panel when module is present
         if: hashFiles('tools/mel-temporal-grounding-qualifier/src/temporal_consensus.rs') != ''
