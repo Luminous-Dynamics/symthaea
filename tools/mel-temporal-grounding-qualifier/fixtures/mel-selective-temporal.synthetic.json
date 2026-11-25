@@ -58,7 +58,8 @@
         }
       },
       "decision": "Answer",
-      "decision_confidence": 0.95
+      "decision_confidence": 0.95,
+      "identifiability_basis": "ClearPositive"
     },
     {
       "schema": "mel-selective-temporal-case-v1",
@@ -109,7 +110,8 @@
         }
       },
       "decision": "Answer",
-      "decision_confidence": 0.99
+      "decision_confidence": 0.99,
+      "identifiability_basis": "ClearPositive"
     },
     {
       "schema": "mel-selective-temporal-case-v1",
@@ -146,7 +148,8 @@
         "state": "QueryAbsent"
       },
       "decision": "ClaimAbsent",
-      "decision_confidence": 0.9
+      "decision_confidence": 0.9,
+      "identifiability_basis": "ClearAbsence"
     },
     {
       "schema": "mel-selective-temporal-case-v1",
@@ -192,7 +195,8 @@
         }
       },
       "decision": "Answer",
-      "decision_confidence": 0.97
+      "decision_confidence": 0.97,
+      "identifiability_basis": "ClearAbsence"
     },
     {
       "schema": "mel-selective-temporal-case-v1",
@@ -239,7 +243,8 @@
         }
       },
       "decision": "AbstainAmbiguous",
-      "decision_confidence": 0.8
+      "decision_confidence": 0.8,
+      "identifiability_basis": "TaskAmbiguity"
     },
     {
       "schema": "mel-selective-temporal-case-v1",
@@ -280,7 +285,8 @@
         }
       },
       "decision": "AbstainNotEstimable",
-      "decision_confidence": 0.85
+      "decision_confidence": 0.85,
+      "identifiability_basis": "AnnotatorDisagreement"
     },
     {
       "schema": "mel-selective-temporal-case-v1",
@@ -321,7 +327,8 @@
         }
       },
       "decision": "AbstainNotEstimable",
-      "decision_confidence": 0.88
+      "decision_confidence": 0.88,
+      "identifiability_basis": "SignalInsufficient"
     },
     {
       "schema": "mel-selective-temporal-case-v1",
@@ -358,7 +365,8 @@
         "state": "QueryAbsent"
       },
       "decision": "ClaimAbsent",
-      "decision_confidence": 0.99
+      "decision_confidence": 0.99,
+      "identifiability_basis": "UnsupportedQuery"
     },
     {
       "schema": "mel-selective-temporal-case-v1",
@@ -404,7 +412,8 @@
         }
       },
       "decision": "AbstainNotEstimable",
-      "decision_confidence": 0.9
+      "decision_confidence": 0.9,
+      "identifiability_basis": "ClearPositive"
     },
     {
       "schema": "mel-selective-temporal-case-v1",
@@ -459,7 +468,8 @@
         }
       },
       "decision": "Answer",
-      "decision_confidence": 0.5
+      "decision_confidence": 0.5,
+      "identifiability_basis": "ClearPositive"
     }
   ]
 }
