@@ -47,7 +47,7 @@ Only these predeclared single-cause signatures can be identified in v0.1:
 - **Metrology/reference drift:** physical metrology and check standard move together; both process sensor streams remain stable.
 - **Context-only shift:** the context key changes but all measurement channels remain stable. This is classified as a context transition, not a physical process fault.
 
-Any missing required channel, insufficient support, unqualified evidence, future/unavailable evidence, malformed source/transform/qualification digest or non-finite observation prevents a causal claim. Multiple concurrent shifts or a pattern outside the declared signatures returns UNKNOWN rather than guessing.
+Missing required channels, insufficient support, non-independent sensor channels or evidence not yet available at the declared knowledge frontier return UNKNOWN_NOT_IDENTIFIABLE. Unqualified evidence, malformed source/transform/qualification digests, duplicate channel roles or non-finite observations return REJECTED_INVALID_EVIDENCE. Multiple concurrent shifts or a pattern outside the declared signatures returns UNKNOWN rather than guessing.
 
 The output explicitly sets:
 - `source_authenticity_proven = false`;
@@ -68,7 +68,7 @@ The Rust implementation includes:
 6. explicit UNKNOWN on non-identifiable/confounded cases;
 7. canonical channel ordering for input/diagnosis digest order invariance.
 
-Ten authored tests cover process-only, sensor-only, reference-only and context-only interventions; missing negative control; unqualified/future evidence; confounding; ambiguous paired patterns; channel order invariance; malformed source digests; and false manifest labels.
+Eleven authored tests cover process-only, sensor-only, reference-only and context-only interventions; missing negative control; unqualified/future evidence; confounding; ambiguous paired patterns; channel order invariance; malformed source digests; false manifest labels; and two different causal worlds with the same available measurement signature, both of which must yield UNKNOWN.
 
 ## Benchmark tournament
 
