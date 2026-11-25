@@ -2,10 +2,14 @@
   "$schema": "https://json-schema.org/draft/2020-12/schema",
   "$id": "https://luminousdynamics.io/schemas/mace_evidence_qualification_dsse_envelope_v1.schema.json",
   "title": "MACE Evidence Qualification DSSE Envelope V1",
-  "description": "Closed single-signature MACE profile over a DSSE v1 in-toto Statement. DSSE itself supports multiple signatures; this profile deliberately requires exactly one Ed25519 signer until a threshold and role policy is specified.",
+  "description": "DSSE v1.0.2 JSON envelope with the MACE single-Ed25519-signature profile. Standard and URL-safe Base64 encodings are accepted; outer keyid is optional and unauthenticated; unknown envelope fields are ignored.",
   "type": "object",
-  "additionalProperties": false,
-  "required": ["payloadType", "payload", "signatures"],
+  "additionalProperties": true,
+  "required": [
+    "payloadType",
+    "payload",
+    "signatures"
+  ],
   "properties": {
     "payloadType": {
       "const": "application/vnd.in-toto+json"
@@ -14,7 +18,7 @@
       "type": "string",
       "minLength": 4,
       "maxLength": 11184812,
-      "pattern": "^(?:[A-Za-z0-9+/]{4})*(?:[A-Za-z0-9+/]{2}==|[A-Za-z0-9+/]{3}=)?$"
+      "pattern": "^[A-Za-z0-9+/_-]+={0,2}$"
     },
     "signatures": {
       "type": "array",
@@ -22,18 +26,20 @@
       "maxItems": 1,
       "items": {
         "type": "object",
-        "additionalProperties": false,
-        "required": ["keyid", "sig"],
+        "additionalProperties": true,
+        "required": [
+          "sig"
+        ],
         "properties": {
           "keyid": {
             "type": "string",
-            "pattern": "^[0-9a-f]{64}$"
+            "maxLength": 256
           },
           "sig": {
             "type": "string",
-            "minLength": 88,
+            "minLength": 86,
             "maxLength": 88,
-            "pattern": "^[A-Za-z0-9+/]{86}==$"
+            "pattern": "^[A-Za-z0-9+/_-]{86}(?:==)?$"
           }
         }
       }
