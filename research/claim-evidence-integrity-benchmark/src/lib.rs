@@ -660,6 +660,21 @@ mod tests {
     }
 
     #[test]
+    fn missing_claim_scope_fails_closed() {
+        let mut value: Value = serde_json::from_str(FIXTURE_PACK).unwrap();
+        value["fixtures"][0].as_object_mut().unwrap().remove("claim_scope");
+        assert!(validate_value(&value).is_err());
+    }
+
+    #[test]
+    fn candidate_visible_synthetic_label_provenance_fails_closed() {
+        let mut value: Value = serde_json::from_str(FIXTURE_PACK).unwrap();
+        value["fixtures"][0]["label_provenance"]["independent_of_candidate"] =
+            Value::Bool(false);
+        assert!(validate_value(&value).is_err());
+    }
+
+    #[test]
     fn duplicate_evidence_ids_fail_closed() {
         let mut value: Value = serde_json::from_str(FIXTURE_PACK).unwrap();
         let duplicate = value["fixtures"][0]["evidence"][0].clone();
