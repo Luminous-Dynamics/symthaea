@@ -1303,7 +1303,9 @@ mod tests {
 
     #[test]
     fn source_work_bootstrap_is_deterministic_and_clustered() {
-        let data = balanced_agreement_dataset();
+        let mut data = balanced_agreement_dataset();
+        data.items[0].case.annotations[1].intervals[0].start_frame += 1_440;
+        data.items[0].case.annotations[1].intervals[0].end_frame += 1_440;
         let report_a = audit_multi_annotator_dataset(&data).unwrap();
         let report_b = audit_multi_annotator_dataset(&data).unwrap();
         assert_eq!(report_a.bootstrap, report_b.bootstrap);
@@ -1315,6 +1317,23 @@ mod tests {
         assert!(!report_a.proposed_confirmatory_cluster_floor_met);
         assert_eq!(report_a.summary.dataset_items, 6);
         assert_eq!(report_a.summary.source_work_clusters, 3);
+        assert_eq!(bootstrap.boundary_tolerance_agreement.len(), 3);
+        assert!(
+            bootstrap.boundary_tolerance_agreement[0]
+                .both_boundaries_within_tolerance_rate
+                .as_ref()
+                .unwrap()
+                .estimate
+                < 1.0
+        );
+        assert_eq!(
+            bootstrap.boundary_tolerance_agreement[1]
+                .both_boundaries_within_tolerance_rate
+                .as_ref()
+                .unwrap()
+                .estimate,
+            1.0
+        );
     }
 
     #[test]
