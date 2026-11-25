@@ -43,7 +43,7 @@ The Rust source currently authors 32 unit tests, including observability, excita
 
 ## Machine-readable reference receipt
 
-A standalone runner emits one JSON receipt for the analytic reference controls:
+A standalone runner emits one JSON receipt for 29 analytic reference-control cases, including spectral/stability checks, HDC primitives, identifiability/active sensing, and Beta–Bernoulli/UCB sequential-design controls:
 
 ```bash
 rustc --edition=2024 scripts/research/sdcb_reference_receipt.rs -o /tmp/sdcb-reference-receipt
