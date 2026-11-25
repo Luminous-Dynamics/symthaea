@@ -44,6 +44,8 @@ pub struct MultiAnnotatorReliabilityDatasetV1 {
     pub dataset_id: String,
     pub annotation_policy_version: String,
     pub minimum_raters_per_item: u16,
+    /// One frozen scoring plan is shared by every item in this dataset.
+    pub scoring_plan: crate::temporal_grounding::TemporalGroundingPlanV1,
     pub bootstrap_replicates: usize,
     pub bootstrap_seed: u64,
     /// Task-specific tolerances must be preregistered, ascending, and > 0.
@@ -82,6 +84,8 @@ pub struct KrippendorffAlphaNominalV1 {
     pub eligible_items: usize,
     pub items_without_two_eligible_raters: usize,
     pub eligible_ratings: usize,
+    /// Ordered coincidence count actually used in nominal alpha.
+    pub ratings_in_alpha: usize,
     pub present_ratings: usize,
     pub absent_ratings: usize,
     pub ambiguous_exclusions: usize,
@@ -165,6 +169,7 @@ pub struct MultiAnnotatorReliabilityReportV1 {
     pub pairwise_state_agreement_computed: bool,
     pub pairwise_interval_agreement_computed: bool,
     pub population_confidence_claim_permitted: bool,
+    pub proposed_confirmatory_cluster_floor_met: bool,
 }
 
 pub fn audit_multi_annotator_dataset_json(
@@ -226,7 +231,8 @@ pub fn audit_multi_annotator_dataset(
         annotation_receipts_authenticated: false,
         pairwise_state_agreement_computed: true,
         pairwise_interval_agreement_computed: true,
-        population_confidence_claim_permitted: source_cluster_count
+        population_confidence_claim_permitted: false,
+        proposed_confirmatory_cluster_floor_met: source_cluster_count
             >= CONFIRMATORY_SOURCE_CLUSTER_FLOOR,
     })
 }
@@ -260,11 +266,36 @@ fn validate_dataset(dataset: &MultiAnnotatorReliabilityDatasetV1) -> Result<(), 
     }
 
     let mut item_ids = BTreeSet::new();
+    let mut query_ids = BTreeSet::new();
+    let mut annotation_digests = BTreeSet::new();
     for item in &dataset.items {
         require_text(&item.item_id, "item_id")?;
         validate_digest(&item.source_work_id_sha256, "source_work_id_sha256")?;
         if !item_ids.insert(item.item_id.as_str()) {
             return Err(format!("duplicate reliability item_id: {}", item.item_id));
+        }
+        if !query_ids.insert(item.case.query_id.as_str()) {
+            return Err(format!("duplicate reliability query_id: {}", item.case.query_id));
+        }
+        if item.case.minimum_annotator_count != dataset.minimum_raters_per_item {
+            return Err(format!(
+                "item {} panel minimum differs from dataset-level minimum",
+                item.item_id
+            ));
+        }
+        if item.case.plan != dataset.scoring_plan {
+            return Err(format!(
+                "item {} does not use the frozen dataset scoring plan",
+                item.item_id
+            ));
+        }
+        for annotation in &item.case.annotations {
+            if !annotation_digests.insert(annotation.annotation_sha256.as_str()) {
+                return Err(format!(
+                    "duplicate annotation-record digest in dataset: {}",
+                    annotation.annotation_sha256
+                ));
+            }
         }
         if item.case.annotation_policy_version != dataset.annotation_policy_version {
             return Err(format!(
@@ -482,6 +513,7 @@ fn nominal_alpha(items: &[MultiAnnotatorReliabilityItemV1]) -> KrippendorffAlpha
         eligible_items,
         items_without_two_eligible_raters,
         eligible_ratings,
+        ratings_in_alpha: ordered_coincidences as usize,
         present_ratings,
         absent_ratings,
         ambiguous_exclusions,
