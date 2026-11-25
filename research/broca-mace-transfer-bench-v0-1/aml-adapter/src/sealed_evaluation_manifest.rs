@@ -806,6 +806,42 @@ mod tests {
     }
 
     #[test]
+    fn fixed_roots_match_independent_jcs_reference_vectors() {
+        let fixture = Fixture::new();
+        let episode_set = verify_frozen_decision_episode_set_v1(&fixture.episodes).unwrap();
+        assert_eq!(
+            episode_set.root_sha256(),
+            "75f59e31152587332c9784865a9fb6323c24bbdba52d57f08de1ca4cc0a5151a"
+        );
+        assert_eq!(
+            arm_assignment_commitment_sha256_v1(&fixture.manifest.assignments[0]).unwrap(),
+            "de44441d6cc243bdfa87720795f0b0cccd339aa18fe81042048a895b68fd56d1"
+        );
+        assert_eq!(
+            arm_assignment_commitment_sha256_v1(&fixture.manifest.assignments[1]).unwrap(),
+            "b31cad1a1fd6472b2cfffd49267e68ecaf4d6f6184c74c8f78978e27178bb181"
+        );
+        assert_eq!(
+            arm_assignment_set_root_sha256_v1(
+                &fixture.manifest.assignments, &fixture.episodes
+            ).unwrap(),
+            "f58f876336a886a0e6665fc0db926cb3ab46dc3a42339b4971491ec426dbaaed"
+        );
+        assert_eq!(
+            pre_registration_root_sha256_v1(&fixture.manifest.pre_registration).unwrap(),
+            "53f3c926d3f4e74c5c8d52e8073288610f9a84aebf0ea257dca7b6d66b8a3ae7"
+        );
+        assert_eq!(
+            sealed_artifacts_root_sha256_v1(&fixture.manifest.sealed_artifacts).unwrap(),
+            "12178fbd2e8f05f809fe97877ee888810674dc843572198f10f0ac5eba1906c9"
+        );
+        assert_eq!(
+            sealed_evaluation_manifest_sha256_v1(&fixture.manifest).unwrap(),
+            "74f920a119a64f326b1d6b7b6379138c66c55b451967cbe9deb39acf8bbc9f97"
+        );
+    }
+
+    #[test]
     fn exact_assignment_artifact_and_witness_bindings_verify() {
         let fixture = Fixture::new();
         let verified = fixture.verify().unwrap();
