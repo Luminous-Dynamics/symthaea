@@ -26,8 +26,10 @@ Pass "-" as the final argument to read JSONL from stdin. The CLI computes the ma
 - Full intent, authority exact-effect, disclosure and versioned sink-projection
   commitments.
 - Independent sink-observer role/identity and observed projection equality.
-- Effect-submission/observation correlation and hold-before-new-mutation
-  semantics for unknown external outcomes.
+- Effect-submission/observation correlation by both idempotency_key and unique
+  attempt_id; delayed observations for an earlier attempt cannot settle a retry.
+- Hold-before-new-mutation semantics for unknown external outcomes; terminal
+  observations cannot be silently overwritten.
 
 ## Deliberate limits
 
