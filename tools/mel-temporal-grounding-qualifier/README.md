@@ -37,3 +37,18 @@ For each predicted occurrence, the report also derives a **per-event reference-b
 Every annotator pair is compared. The report first measures exact disposition agreement across Present, Absent, Ambiguous and NotEstimable states. For Present/Present pairs only, it applies the production one-to-one interval matcher in both directions and reports symmetric event F1, mean matched interval IoU and exact occurrence-count agreement.
 
 Pairs with different dispositions, including Present/Absent, do not receive fabricated interval scores. Ambiguous and NotEstimable states remain categorical. These pairwise metrics are descriptive for the current query panel and are not Cohen's kappa, Fleiss' kappa or Krippendorff's alpha. A defensible chance-corrected reliability estimate requires a multi-query corpus with preregistered item/rater structure, missingness policy and chance model. The report continues to set `pairwise_inter_annotator_agreement_computed = false`.
+
+
+## Corpus-level temporal annotation reliability
+
+The temporal_reliability module consumes multiple query-items, each with two or more independent annotation records. It computes **nominal Krippendorff's alpha** for the four disposition states (Present, Absent, Ambiguous, NotEstimable) using a coincidence matrix that supports a variable number of annotations per item. It returns the observed disagreement, expected disagreement, pooled category counts and alpha value. If expected disagreement is zero, alpha is null with an explicit status reason rather than an invented value.
+
+Temporal event-set agreement is reported separately. The corpus pins a strictly increasing IoU threshold sweep; each Present/Present annotator pair is scored in both directions through the production one-to-one scorer. The output reports symmetric event F1, matched interval IoU, exact occurrence-count agreement and onset/offset error distributions at each threshold. No second interval matcher is introduced.
+
+The evaluator requires at least two query-items and at least two annotators per item, supports variable annotator membership across items, and binds each item to a source-work lineage digest. It does not calculate population confidence intervals or source-work bootstrap in V1; source lineage and per-unit summaries are retained for a later preregistered bootstrap. It does not create consensus references or score model performance.
+
+Run the synthetic corpus fixture with:
+
+    cargo +1.96.0 run --locked --manifest-path tools/mel-temporal-grounding-qualifier/Cargo.toml --bin mel-temporal-reliability-audit -- tools/mel-temporal-grounding-qualifier/fixtures/mel-temporal-reliability-corpus.synthetic.json
+
+The strict input envelope is defined in schemas/mel-temporal-annotation-reliability-corpus-v1.schema.json. Structural cross-record checks and the actual alpha/temporal scoring rules are enforced by Rust.
