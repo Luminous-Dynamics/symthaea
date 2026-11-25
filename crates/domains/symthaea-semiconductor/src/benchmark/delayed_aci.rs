@@ -1624,7 +1624,16 @@ mod tests {
             AciGuaranteeStateV1::UncertifiedMissingOrInvalidFeedback
         );
         assert!(engine.pending_predictions.is_empty());
-        begin_and_issue(&mut engine, 1, AciPredictionIntervalV1::bounded(9.0, 11.0));
+        issue_delayed_aci_prediction_v1(
+            &mut engine,
+            &prediction_input(
+                "sample-1",
+                "event-1",
+                1,
+                AciPredictionIntervalV1::bounded(9.0, 11.0),
+            ),
+        )
+        .unwrap();
     }
 
     #[test]
