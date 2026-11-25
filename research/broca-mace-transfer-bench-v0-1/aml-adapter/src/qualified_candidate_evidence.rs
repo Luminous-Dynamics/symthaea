@@ -12,7 +12,7 @@ use crate::candidate_evidence::{
 };
 use crate::evidence_qualification_gate::{
     EvidenceQualificationBindingV1, EvidenceQualificationRejectV1,
-    VerifiedEvidenceQualificationV1,
+    EvidenceQualificationSignatureVerifierV1, VerifiedEvidenceQualificationV1,
 };
 
 /// Independently expected batch identity, supplied by the query/runner context.
@@ -129,6 +129,7 @@ pub struct QualifiedCandidateEvidenceBatchV1 {
     batch: CandidateEvidenceBatchV1,
     source_candidate_set_sha256: String,
     qualification_receipt_sha256: String,
+    qualification: VerifiedEvidenceQualificationV1,
     use_snapshot: QualificationUseSnapshotV1,
 }
 
@@ -139,8 +140,12 @@ impl QualifiedCandidateEvidenceBatchV1 {
     pub fn validate_at_use(
         &self,
         binding: &EvidenceQualificationBindingV1<'_>,
+        verifier: &impl EvidenceQualificationSignatureVerifierV1,
     ) -> Result<(), EvidenceQualificationRejectV1> {
-        self.use_snapshot.validate_at_use(binding)
+        self.use_snapshot.validate_at_use(binding)?;
+        self.qualification
+            .admissible_evidence_ids_for_use(binding, verifier)
+            .map(|_| ())
     }
 
     pub fn batch(&self) -> &CandidateEvidenceBatchV1 { &self.batch }
@@ -189,6 +194,7 @@ pub fn project_qualified_candidate_evidence_v1(
     qualification: &VerifiedEvidenceQualificationV1,
     binding: &EvidenceQualificationBindingV1<'_>,
     expected: &CandidateEvidenceBatchExpectationV1<'_>,
+    verifier: &impl EvidenceQualificationSignatureVerifierV1,
 ) -> Result<CandidateEvidenceProjectionV1, CandidateEvidenceProjectionRejectV1> {
     let rebuilt = encode_candidate_evidence_jsonl(&batch.evidence)
         .map_err(CandidateEvidenceProjectionRejectV1::Candidate)?;
@@ -216,7 +222,7 @@ pub fn project_qualified_candidate_evidence_v1(
             EvidenceQualificationRejectV1::BindingMismatch));
     }
 
-    let admissible = qualification.admissible_evidence_ids_for_use(binding)
+    let admissible = qualification.admissible_evidence_ids_for_use(binding, verifier)
         .map_err(CandidateEvidenceProjectionRejectV1::Qualification)?;
     let independently_admissible_count = admissible.len();
     let mut keep = admissible.iter().cloned().collect::<BTreeSet<_>>();
@@ -268,6 +274,7 @@ pub fn project_qualified_candidate_evidence_v1(
         batch: qualified_batch,
         source_candidate_set_sha256: batch.candidate_set_sha256.clone(),
         qualification_receipt_sha256: qualification.receipt_sha256().to_owned(),
+        qualification: qualification.clone(),
         use_snapshot: QualificationUseSnapshotV1::from_binding(
             binding,
             qualification.expires_at_unix(),
@@ -339,6 +346,22 @@ mod tests {
     const F: &str = "ffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffff";
 
     struct TestVerifier;
+    struct RevokedAtUseVerifier;
+
+    impl EvidenceQualificationSignatureVerifierV1 for RevokedAtUseVerifier {
+        fn verify_signature(
+            &self,
+            _profile: &str,
+            _key: &str,
+            _payload: &str,
+            _signature: &[u8],
+            _issued: u64,
+            _now: u64,
+        ) -> Result<(), EvidenceQualificationRejectV1> {
+            Err(EvidenceQualificationRejectV1::RevokedKey)
+        }
+    }
+
     impl EvidenceQualificationSignatureVerifierV1 for TestVerifier {
         fn verify_signature(&self, profile: &str, key: &str, payload: &str,
             signature: &[u8], _issued: u64, _now: u64)
@@ -438,7 +461,7 @@ mod tests {
         let ids = ids(&batch); let binding = binding(&batch, &ids);
         let token = token(&binding, &[EvidenceDispositionV1::Admissible,
             EvidenceDispositionV1::Rejected, EvidenceDispositionV1::Indeterminate]);
-        let result = project_qualified_candidate_evidence_v1(&batch, &token, &binding, &expectation(&batch)).unwrap();
+        let result = project_qualified_candidate_evidence_v1(&batch, &token, &binding, &expectation(&batch), &TestVerifier).unwrap();
         let CandidateEvidenceProjectionV1::Qualified(projected) = result else { panic!("expected qualified subset"); };
         assert_eq!(projected.evidence().len(), 1);
         assert_eq!(projected.evidence()[0].evidence_id, "a");
@@ -451,8 +474,9 @@ mod tests {
         let ids = ids(&batch); let binding = binding(&batch, &ids);
         let token = token(&binding, &[EvidenceDispositionV1::Admissible]);
         let mut expected = expectation(&batch); expected.query_scope = "tenant:other";
-        assert_eq!(project_qualified_candidate_evidence_v1(&batch, &token, &binding, &expected),
-            Err(CandidateEvidenceProjectionRejectV1::BatchIdentityMismatch));
+        assert_eq!(project_qualified_candidate_evidence_v1(
+            &batch, &token, &binding, &expected, &TestVerifier,
+        ), Err(CandidateEvidenceProjectionRejectV1::BatchIdentityMismatch));
     }
 
     #[test]
@@ -461,7 +485,7 @@ mod tests {
         batch.query_purpose = "answer:other".into();
         let ids = ids(&batch); let binding = binding(&batch, &ids);
         let token = token(&binding, &[EvidenceDispositionV1::Admissible]);
-        assert_eq!(project_qualified_candidate_evidence_v1(&batch, &token, &binding, &expectation(&batch)),
+        assert_eq!(project_qualified_candidate_evidence_v1(&batch, &token, &binding, &expectation(&batch), &TestVerifier),
             Err(CandidateEvidenceProjectionRejectV1::BatchNotCanonical));
     }
 
@@ -470,7 +494,7 @@ mod tests {
         let batch = make_batch(&[record("a", 1, vec![])]);
         let wrong_ids = vec!["other".to_owned()]; let binding = binding(&batch, &wrong_ids);
         let token = token(&binding, &[EvidenceDispositionV1::Admissible]);
-        assert_eq!(project_qualified_candidate_evidence_v1(&batch, &token, &binding, &expectation(&batch)),
+        assert_eq!(project_qualified_candidate_evidence_v1(&batch, &token, &binding, &expectation(&batch), &TestVerifier),
             Err(CandidateEvidenceProjectionRejectV1::Qualification(EvidenceQualificationRejectV1::BindingMismatch)));
     }
 
@@ -482,7 +506,7 @@ mod tests {
         let ids = ids(&batch); let binding = binding(&batch, &ids);
         let token = token(&binding, &[EvidenceDispositionV1::Admissible,
             EvidenceDispositionV1::Rejected, EvidenceDispositionV1::Admissible]);
-        let result = project_qualified_candidate_evidence_v1(&batch, &token, &binding, &expectation(&batch)).unwrap();
+        let result = project_qualified_candidate_evidence_v1(&batch, &token, &binding, &expectation(&batch), &TestVerifier).unwrap();
         let CandidateEvidenceProjectionV1::Qualified(projected) = result else { panic!("root should remain"); };
         assert_eq!(projected.evidence().iter().map(|item| item.evidence_id.as_str()).collect::<Vec<_>>(), vec!["root"]);
     }
@@ -492,7 +516,7 @@ mod tests {
         let batch = make_batch(&[record("derived", 1, vec!["missing".into()])]);
         let ids = ids(&batch); let binding = binding(&batch, &ids);
         let token = token(&binding, &[EvidenceDispositionV1::Admissible]);
-        let result = project_qualified_candidate_evidence_v1(&batch, &token, &binding, &expectation(&batch)).unwrap();
+        let result = project_qualified_candidate_evidence_v1(&batch, &token, &binding, &expectation(&batch), &TestVerifier).unwrap();
         let CandidateEvidenceProjectionV1::Abstained(abstention) = result else { panic!("must abstain"); };
         assert_eq!(abstention.reason(), CandidateEvidenceAbstentionReasonV1::DependencyClosureRemovedAllEvidence);
     }
@@ -502,8 +526,32 @@ mod tests {
         let batch = make_batch(&[record("a", 1, vec!["b".into()]), record("b", 2, vec!["a".into()])]);
         let ids = ids(&batch); let binding = binding(&batch, &ids);
         let token = token(&binding, &[EvidenceDispositionV1::Admissible, EvidenceDispositionV1::Admissible]);
-        assert_eq!(project_qualified_candidate_evidence_v1(&batch, &token, &binding, &expectation(&batch)),
+        assert_eq!(project_qualified_candidate_evidence_v1(&batch, &token, &binding, &expectation(&batch), &TestVerifier),
             Err(CandidateEvidenceProjectionRejectV1::DependencyCycle));
+    }
+
+    #[test]
+    fn qualified_projection_rechecks_signer_status_at_each_use() {
+        let batch = make_batch(&[record("a", 1, vec![])]);
+        let ids = ids(&batch);
+        let initial_binding = binding(&batch, &ids);
+        let token = token(&initial_binding, &[EvidenceDispositionV1::Admissible]);
+        let result = project_qualified_candidate_evidence_v1(
+            &batch,
+            &token,
+            &initial_binding,
+            &expectation(&batch),
+            &TestVerifier,
+        )
+        .expect("initial qualification");
+        let CandidateEvidenceProjectionV1::Qualified(projected) = result else {
+            panic!("expected qualified projection");
+        };
+
+        assert_eq!(
+            projected.validate_at_use(&initial_binding, &RevokedAtUseVerifier),
+            Err(EvidenceQualificationRejectV1::RevokedKey)
+        );
     }
 
     #[test]
@@ -514,6 +562,7 @@ mod tests {
         let token = token(&initial_binding, &[EvidenceDispositionV1::Admissible]);
         let result = project_qualified_candidate_evidence_v1(
             &batch, &token, &initial_binding, &expectation(&batch),
+            &TestVerifier,
         ).unwrap();
         let CandidateEvidenceProjectionV1::Qualified(projected) = result else {
             panic!("expected qualified projection");
@@ -521,7 +570,7 @@ mod tests {
         let mut expired_binding = binding(&batch, &ids);
         expired_binding.now_unix = 200;
         assert_eq!(
-            projected.validate_at_use(&expired_binding),
+            projected.validate_at_use(&expired_binding, &TestVerifier),
             Err(EvidenceQualificationRejectV1::ReceiptExpired)
         );
     }
@@ -534,6 +583,7 @@ mod tests {
         let token = token(&initial_binding, &[EvidenceDispositionV1::Admissible]);
         let result = project_qualified_candidate_evidence_v1(
             &batch, &token, &initial_binding, &expectation(&batch),
+            &TestVerifier,
         ).unwrap();
         let CandidateEvidenceProjectionV1::Qualified(projected) = result else {
             panic!("expected qualified projection");
@@ -541,7 +591,7 @@ mod tests {
         let mut changed_binding = binding(&batch, &ids);
         changed_binding.purpose_sha256 = A;
         assert_eq!(
-            projected.validate_at_use(&changed_binding),
+            projected.validate_at_use(&changed_binding, &TestVerifier),
             Err(EvidenceQualificationRejectV1::BindingMismatch)
         );
     }
@@ -554,6 +604,7 @@ mod tests {
         let token = token(&initial_binding, &[EvidenceDispositionV1::Admissible]);
         let result = project_qualified_candidate_evidence_v1(
             &batch, &token, &initial_binding, &expectation(&batch),
+            &TestVerifier,
         ).unwrap();
         let CandidateEvidenceProjectionV1::Qualified(projected) = result else {
             panic!("expected qualified projection");
@@ -561,7 +612,7 @@ mod tests {
         let mut rolled_back_binding = binding(&batch, &ids);
         rolled_back_binding.now_unix = 99;
         assert_eq!(
-            projected.validate_at_use(&rolled_back_binding),
+            projected.validate_at_use(&rolled_back_binding, &TestVerifier),
             Err(EvidenceQualificationRejectV1::ReceiptNotYetValid)
         );
     }
@@ -574,6 +625,7 @@ mod tests {
         let token = token(&initial_binding, &[EvidenceDispositionV1::Admissible]);
         let result = project_qualified_candidate_evidence_v1(
             &batch, &token, &initial_binding, &expectation(&batch),
+            &TestVerifier,
         ).unwrap();
         let CandidateEvidenceProjectionV1::Qualified(projected) = result else {
             panic!("expected qualified projection");
@@ -582,14 +634,14 @@ mod tests {
         let mut changed_subject = binding(&batch, &ids);
         changed_subject.subject_scope_sha256 = A;
         assert_eq!(
-            projected.validate_at_use(&changed_subject),
+            projected.validate_at_use(&changed_subject, &TestVerifier),
             Err(EvidenceQualificationRejectV1::BindingMismatch)
         );
 
         let mut changed_lifecycle = binding(&batch, &ids);
         changed_lifecycle.lifecycle_snapshot_sha256 = A;
         assert_eq!(
-            projected.validate_at_use(&changed_lifecycle),
+            projected.validate_at_use(&changed_lifecycle, &TestVerifier),
             Err(EvidenceQualificationRejectV1::BindingMismatch)
         );
 
@@ -597,7 +649,7 @@ mod tests {
         let mut changed_candidates = binding(&batch, &ids);
         changed_candidates.candidate_evidence_ids = &substituted_ids;
         assert_eq!(
-            projected.validate_at_use(&changed_candidates),
+            projected.validate_at_use(&changed_candidates, &TestVerifier),
             Err(EvidenceQualificationRejectV1::BindingMismatch)
         );
     }
@@ -607,7 +659,7 @@ mod tests {
         let batch = make_batch(&[record("a", 1, vec![]), record("b", 2, vec![])]);
         let ids = ids(&batch); let binding = binding(&batch, &ids);
         let token = token(&binding, &[EvidenceDispositionV1::Rejected, EvidenceDispositionV1::Indeterminate]);
-        let result = project_qualified_candidate_evidence_v1(&batch, &token, &binding, &expectation(&batch)).unwrap();
+        let result = project_qualified_candidate_evidence_v1(&batch, &token, &binding, &expectation(&batch), &TestVerifier).unwrap();
         let CandidateEvidenceProjectionV1::Abstained(abstention) = result else { panic!("must abstain"); };
         assert_eq!(abstention.reason(), CandidateEvidenceAbstentionReasonV1::NoIndependentlyAdmissibleEvidence);
         assert_eq!(abstention.source_evidence_count(), 2);

@@ -158,6 +158,9 @@ pub struct VerifiedEvidenceQualificationV1 {
     qualification_policy_sha256: String,
     lifecycle_snapshot_sha256: String,
     verifier_profile_sha256: String,
+    key_id: String,
+    signing_payload_sha256: String,
+    signature: Vec<u8>,
     issued_at_unix: u64,
     admissible_evidence_ids: Vec<String>,
     rejected_evidence_ids: Vec<String>,
@@ -261,6 +264,9 @@ impl VerifiedEvidenceQualificationV1 {
             qualification_policy_sha256: receipt.qualification_policy_sha256.clone(),
             lifecycle_snapshot_sha256: receipt.lifecycle_snapshot_sha256.clone(),
             verifier_profile_sha256: receipt.verifier_profile_sha256.clone(),
+            key_id: receipt.key_id.clone(),
+            signing_payload_sha256: payload_sha256,
+            signature: receipt.signature.clone(),
             issued_at_unix: receipt.issued_at_unix,
             admissible_evidence_ids: admissible,
             rejected_evidence_ids: rejected,
@@ -271,11 +277,14 @@ impl VerifiedEvidenceQualificationV1 {
 
     /// Re-bind the verified capability to the exact query, subject/tenant scope,
     /// DecisionNeed, purpose, candidate set, policy and lifecycle snapshot at
-    /// consumption time. Live authorization and lifecycle checks remain
-    /// mandatory at consequential use.
+    /// consumption time, then re-verify its signature against the caller's
+    /// current pinned verifier. The verifier source itself must be fresh and
+    /// outside the candidate-store rollback domain. Live authorization and
+    /// lifecycle checks remain mandatory at consequential use.
     pub fn admissible_evidence_ids_for_use(
         &self,
         binding: &EvidenceQualificationBindingV1<'_>,
+        verifier: &impl EvidenceQualificationSignatureVerifierV1,
     ) -> Result<&[String], EvidenceQualificationRejectV1> {
         validate_binding(binding)?;
         for (actual, expected) in [
@@ -306,6 +315,18 @@ impl VerifiedEvidenceQualificationV1 {
         if binding.now_unix >= self.expires_at_unix {
             return Err(EvidenceQualificationRejectV1::ReceiptExpired);
         }
+        // Re-check the signature against the currently provisioned trust
+        // profile on every consumption. Profile/key revocation or rotation
+        // therefore fails closed instead of leaving a previously verified
+        // in-memory capability usable until receipt expiry.
+        verifier.verify_signature(
+            &self.verifier_profile_sha256,
+            &self.key_id,
+            &self.signing_payload_sha256,
+            &self.signature,
+            self.issued_at_unix,
+            binding.now_unix,
+        )?;
         Ok(&self.admissible_evidence_ids)
     }
     pub fn rejected_evidence_ids(&self) -> &[String] { &self.rejected_evidence_ids }
@@ -622,6 +643,22 @@ mod tests {
 
     struct TestSignatureVerifier;
 
+    struct RevokedAtUseVerifier;
+
+    impl EvidenceQualificationSignatureVerifierV1 for RevokedAtUseVerifier {
+        fn verify_signature(
+            &self,
+            _profile: &str,
+            _key_id: &str,
+            _payload: &str,
+            _signature: &[u8],
+            _issued_at_unix: u64,
+            _now_unix: u64,
+        ) -> Result<(), EvidenceQualificationRejectV1> {
+            Err(EvidenceQualificationRejectV1::RevokedKey)
+        }
+    }
+
     impl EvidenceQualificationSignatureVerifierV1 for TestSignatureVerifier {
         fn verify_signature(
             &self, profile: &str, key_id: &str, payload: &str, signature: &[u8],
@@ -798,7 +835,7 @@ mod tests {
             &binding,
             &verifier,
         ).expect("real Ed25519 signature over exact receipt digest");
-        assert_eq!(verified.admissible_evidence_ids_for_use(&binding).expect("fresh"), &["evidence-a".to_owned()]);
+        assert_eq!(verified.admissible_evidence_ids_for_use(&binding, &TestSignatureVerifier).expect("fresh"), &["evidence-a".to_owned()]);
     }
 
     #[test]
@@ -845,6 +882,24 @@ mod tests {
     }
 
     #[test]
+    fn previously_verified_capability_rechecks_signer_revocation_at_use() {
+        let receipt = signed_receipt();
+        let ids = candidate_ids();
+        let binding = binding(&receipt, &ids, 150);
+        let verified = VerifiedEvidenceQualificationV1::verify_and_bind(
+            &receipt,
+            &binding,
+            &TestSignatureVerifier,
+        )
+        .expect("initial signature verification succeeds");
+
+        assert_eq!(
+            verified.admissible_evidence_ids_for_use(&binding, &RevokedAtUseVerifier),
+            Err(EvidenceQualificationRejectV1::RevokedKey)
+        );
+    }
+
+    #[test]
     fn only_independently_admissible_ids_cross_the_gate() {
         let receipt = signed_receipt();
         let ids = candidate_ids();
@@ -852,7 +907,7 @@ mod tests {
         let verified = VerifiedEvidenceQualificationV1::verify_and_bind(
             &receipt, &binding, &TestSignatureVerifier,
         ).expect("valid scoped receipt");
-        assert_eq!(verified.admissible_evidence_ids_for_use(&binding).expect("still valid"), &["evidence-a".to_owned()]);
+        assert_eq!(verified.admissible_evidence_ids_for_use(&binding, &TestSignatureVerifier).expect("still valid"), &["evidence-a".to_owned()]);
         assert_eq!(verified.rejected_evidence_ids(), &["evidence-b".to_owned()]);
         assert_eq!(verified.indeterminate_evidence_ids(), &["evidence-c".to_owned()]);
         assert_eq!(verified.expires_at_unix(), 200);
@@ -999,7 +1054,7 @@ mod tests {
         let mut expired_binding = binding;
         expired_binding.now_unix = 200;
         assert_eq!(
-            verified.admissible_evidence_ids_for_use(&expired_binding),
+            verified.admissible_evidence_ids_for_use(&expired_binding, &TestSignatureVerifier),
             Err(EvidenceQualificationRejectV1::ReceiptExpired)
         );
     }
@@ -1017,7 +1072,7 @@ mod tests {
         let mut wrong_purpose = binding_for_test(&receipt, &ids, 150);
         wrong_purpose.purpose_sha256 = &changed_purpose;
         assert_eq!(
-            verified.admissible_evidence_ids_for_use(&wrong_purpose),
+            verified.admissible_evidence_ids_for_use(&wrong_purpose, &TestSignatureVerifier),
             Err(EvidenceQualificationRejectV1::BindingMismatch)
         );
 
@@ -1025,7 +1080,7 @@ mod tests {
         let mut wrong_subject = binding_for_test(&receipt, &ids, 150);
         wrong_subject.subject_scope_sha256 = &changed_subject;
         assert_eq!(
-            verified.admissible_evidence_ids_for_use(&wrong_subject),
+            verified.admissible_evidence_ids_for_use(&wrong_subject, &TestSignatureVerifier),
             Err(EvidenceQualificationRejectV1::BindingMismatch)
         );
     }
@@ -1042,7 +1097,7 @@ mod tests {
         let changed_ids = vec!["evidence-a".to_owned(), "evidence-b".to_owned()];
         let wrong_candidates = binding_for_test(&receipt, &changed_ids, 150);
         assert_eq!(
-            verified.admissible_evidence_ids_for_use(&wrong_candidates),
+            verified.admissible_evidence_ids_for_use(&wrong_candidates, &TestSignatureVerifier),
             Err(EvidenceQualificationRejectV1::BindingMismatch)
         );
     }
@@ -1058,7 +1113,7 @@ mod tests {
 
         let before_issue = binding_for_test(&receipt, &ids, 99);
         assert_eq!(
-            verified.admissible_evidence_ids_for_use(&before_issue),
+            verified.admissible_evidence_ids_for_use(&before_issue, &TestSignatureVerifier),
             Err(EvidenceQualificationRejectV1::ReceiptNotYetValid)
         );
     }
@@ -1134,7 +1189,7 @@ mod tests {
         .expect("external qualification result is validly bound");
         assert!(verified.is_empty());
         assert!(verified
-            .admissible_evidence_ids_for_use(&binding)
+            .admissible_evidence_ids_for_use(&binding, &TestSignatureVerifier)
             .expect("fresh token")
             .is_empty());
         assert_eq!(policy_memory.note_count(), 0);
@@ -1151,6 +1206,6 @@ mod tests {
             &receipt, &binding, &TestSignatureVerifier,
         ).expect("valid receipt can qualify zero candidates");
         assert!(verified.is_empty());
-        assert!(verified.admissible_evidence_ids_for_use(&binding).expect("still valid").is_empty());
+        assert!(verified.admissible_evidence_ids_for_use(&binding, &TestSignatureVerifier).expect("still valid").is_empty());
     }
 }

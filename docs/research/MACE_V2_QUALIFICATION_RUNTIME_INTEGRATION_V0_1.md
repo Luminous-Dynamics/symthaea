@@ -53,6 +53,8 @@ The current library implementation provides:
 
 The profile digest and minimum profile version must come from a trust channel outside the candidate backend and the memory-store rollback domain. Reading a profile and its purported pin from the same mutable store is not an independent trust bootstrap.
 
+The verified capability also retains the signer key ID, signed payload digest, and signature. At every consumption, the caller must supply a freshly provisioned verifier, and the capability re-checks the signature against that verifier at the supplied trusted current time. A newly revoked key or a changed trust-profile pin therefore fails closed; a rotation to a new profile invalidates receipts that bind the old profile and requires re-qualification/re-issuance under the new profile. Passing a cached old verifier defeats this property, so freshness and monotonicity of the verifier-profile source remain an external relying-party obligation.
+
 ### Decision sufficiency is a different question
 
 Admissibility answers: "May this evidence be considered under this policy and use context?"
@@ -93,7 +95,7 @@ A later end-to-end sidecar/runtime change is acceptable only when all of the fol
 1. An external qualifier receives the canonical candidate batch and independently verifies source receipts, issuer authority, scope, rights, provenance closure and lifecycle state.
 2. The qualifier issues a signed receipt bound to the exact candidate set, exact DecisionNeed and exact purpose/policy/lifecycle snapshot.
 3. The consumer obtains the verifier profile pin and monotonic minimum version independently of the candidate store.
-4. The consumer validates the signature at issuance and use time using a trusted clock, then re-presents the complete binding at every consumption.
+4. The consumer validates the signature at issuance and at every use using a trusted clock and a freshly provisioned verifier/trust-profile pin, then re-presents the complete binding at every consumption. Cached verifiers or trust-profile state inside the candidate-store rollback domain do not satisfy this requirement.
 5. The projection returns only independently admissible records, removes descendants whose required parents are not admissible, and abstains on empty or inconsistent results.
 6. The sufficiency evaluator separately decides whether the projected evidence is enough for the named decision; otherwise it requests more evidence or abstains.
 7. The executor rechecks live authority and lifecycle and uses separate consume-once authorization state where required.
