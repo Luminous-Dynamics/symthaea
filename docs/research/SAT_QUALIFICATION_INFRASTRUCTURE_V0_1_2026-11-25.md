@@ -46,7 +46,10 @@ See the schemas directory for JSON Schema Draft 2020-12 contracts and the exampl
 - Canonicalize using [RFC 8785 JCS](https://www.rfc-editor.org/rfc/rfc8785). Reject duplicate JSON object keys before canonicalization.
 - Compute SHA-256("SAT-EVENT-v0.1\\n" || canonical_event_bytes), omitting only integrity.event_digest from the canonical event. Encode as sha256:<64 lowercase hex>.
 - A gap, fork, replay, duplicate sequence, unexpected run ID or digest mismatch invalidates the stream. The chain is tamper-evident, not proof of a truthful observation.
-- effect_binding binds action, resource, sink, purpose, canonical parameter digest, payload digest and payload labels. The corresponding authority decision must use the same exact-effect digest. The independent sink observation must match the authorized tuple.
+- effect_binding binds action, resource, sink, purpose, canonical parameter digest, payload digest, payload labels, lineage/intent references and idempotency key. Its binding_digest is SHA-256("SAT-BINDING-v0.1\n" || JCS(effect_binding_without_binding_digest)).
+- The authority exact-effect digest is a separate projection matching the #13602 oracle inputs: action, resource, sink, purpose, parameters_digest and sorted payload_labels. Compute SHA-256("SAT-AUTHORITY-EFFECT-v0.1\n" || JCS(projection)). This is identity binding, not proof that a grant is authentic or valid.
+- The disclosure decision is separately bound to sink, purpose, payload_digest, sorted payload_labels, lineage proof and interaction intent. Compute SHA-256("SAT-DISCLOSURE-v0.1\n" || JCS(disclosure_projection)). It may be not_applicable only with an explicit reason and an evaluation profile that permits it.
+- For observed_applied, the sink observer supplies observed_effect_digest using the same binding projection and domain separator as binding_digest. A mismatch is a verified system failure; the digest and observer source must still be independently qualified. Unknown outcomes do not carry an observed digest and require reconciliation.
 
 ### Qualification status and precedence
 
