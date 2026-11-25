@@ -774,6 +774,38 @@ Prior art is explicit:
 
 The present implementation is deliberately narrow: one complex output coefficient, finite categorical hypotheses and homoscedastic independent Gaussian quadrature noise. Correlated QoIs, full waveforms, heteroscedastic noise, uncertain predictions, nonlinear branch switching and multi-fidelity reference discrepancy need explicit extension and independent calibration. An EIG-ranked intervention is a proposal, not a counterexample, physical certificate or global state-equivalence proof.
 
+## Invariant- and Response-Constrained Kinetic Projection (IRCKP)
+
+New programme: [#13629 — qualify positivity- and response-constrained kinetic representation transitions](https://github.com/Luminous-Dynamics/symthaea/issues/13629).
+
+The adaptive Fourier VP solver demonstrates that preserving mass and \(L^2\) under zero-padding does not guarantee positivity, \(L^1\) or entropy quality. IRCKP treats a basis change, truncation, interpolation, low-rank reconstruction or grid transfer as a physical operation that must pass its own transition contract.
+
+Mandatory prior art:
+- Kormann, Nazarov & Wen (2026), [Positivity-preserving dynamical low-rank methods for the Vlasov equation](https://arxiv.org/abs/2606.31662): a positivity constraint with a minimal quadratic-program correction; one scheme also preserves mass and momentum.
+- Issan et al. (2024), [Anti-symmetric and positivity preserving spectral VP](https://arxiv.org/abs/2312.05439): a square-root transformed distribution and derived mass/momentum/energy conservation properties.
+- Kiechle, Chudzik & Helzel (2025), [Positivity-preserving Active Flux VP](https://doi.org/10.1016/j.jcp.2024.113693): third-order Active Flux with a positivity limiter.
+- Pagliantini, Delzanno & Markidis (2023), [Physics-based adaptive AW Hermite VP](https://doi.org/10.1016/j.jcp.2023.112252): conservative maps across velocity shift/scale changes.
+- Cho & Russo (2026), [Adaptive Fourier spectral VP](https://arxiv.org/abs/2607.12368): mandatory zero-padding / spectral-tail baseline.
+
+The intended general transition is a minimum-correction projection subject to:
+1. non-negativity of the reconstructed distribution;
+2. only those moments/invariants actually preserved by the selected discrete reference;
+3. the correct entropy-production / energy-exchange law for collisional systems;
+4. an independently qualified future-response distortion envelope.
+
+Collisionless VP and collisional high-field VPFP/VPL must remain separate. Do not impose a conservative symplectic law on a dissipative collision operator, and do not claim preservation of the infinite Vlasov Casimir family from a finite set of discrete moments.
+
+A first narrow implementation is in [PR #13405](https://github.com/Luminous-Dynamics/symthaea/pull/13405): \`project_nonnegative_preserving_mass\` solves the exact weighted one-equality projection
+
+\[
+\min_g \frac12\sum_i v_i(g_i-\tilde f_i)^2
+\quad\text{s.t.}\quad g_i\geq0,\quad\sum_i v_i g_i=M_{\rm target}.
+\]
+
+It uses the active-set form \(g_i=\max(0,\tilde f_i-\lambda)\) and reports the multiplier, positive-cell count, achieved mass, residual, minimum value and weighted correction norm. A negative spectral-overshoot fixture \([-0.1,1.1]\mapsto[0,1]\) is schema-checked and replayed through a small CLI.
+
+**Scope boundary:** this first primitive preserves positivity and one discrete mass only. It does not preserve momentum, energy, \(L^1\), \(L^2\), entropy, the full Casimir family, Poisson residual or future response. The next stages require multi-constraint feasibility/KKT evidence and post-transition response validation; infeasible low-rank transitions must be refused or trigger rank increase rather than silently clipping away the error.
+
 ## Response-Weighted Spectral Refinement (RWSR)
 
 New companion programme: [#13628 — refine kinetic spectral resolution by future response sensitivity](https://github.com/Luminous-Dynamics/symthaea/issues/13628).
