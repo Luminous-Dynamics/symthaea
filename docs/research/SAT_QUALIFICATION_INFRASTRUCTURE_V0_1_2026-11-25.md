@@ -123,6 +123,46 @@ These anchors imply a more credible path to outperforming current practice:
 4. Publish matched comparisons only when model version, tool surface, prompts, attacker knowledge, budgets, retries, monitor visibility, sandbox, scorer and case split are controlled.
 5. Publish the strongest successful attack and benign false-block cases, not just an average. Keep development cases public and qualification holdouts sealed.
 
+## 6.2 Governance and threat-taxonomy crosswalk
+
+SAT should complement governance and threat taxonomies rather than claim to replace them.
+
+| Industry framework | What it provides | SAT contribution / boundary |
+|---|---|---|
+| OWASP Top 10 for Agentic Applications 2026 | A current threat taxonomy spanning goal hijack, tool misuse, identity/privilege abuse, supply-chain weaknesses, unexpected code execution, memory/context poisoning, insecure inter-agent communication, cascading failures, human-agent trust exploitation and rogue agents. | Map each risk to owner-native controls, adversarial fixtures and independent effect/evidence gates. OWASP categories are coverage guidance, not a performance result. |
+| NIST AI RMF and Generative AI Profile | Voluntary organization-level risk-management guidance across GOVERN, MAP, MEASURE and MANAGE. | SAT can supply reproducible MEASURE/MANAGE evidence and change-triggered reassessment inputs. It does not replace governance, impact assessment or organizational accountability. |
+| ISO/IEC 42001:2023 | Requirements for an organizational AI management system, including lifecycle governance and continual improvement. Certification concerns the organization's management system. | SAT can provide technical system-level evidence that an organization may use within its AIMS. SAT must not call an individual model or deployment "ISO 42001 certified" on the strength of a benchmark report. |
+| ISO/IEC 23894 and related AI risk guidance | Risk-management guidance for AI-specific uncertainty and lifecycle risks. | Use as a risk-process crosswalk, not as an executable test suite or substitute for empirical system evidence. |
+
+The standards distinction is strategically important: ISO/IEC 42001 certification is of an organization's AI management system, not a certificate that a particular model or deployment is safe. SAT's possible contribution is a portable, independently checkable technical evidence layer beneath those organizational processes.
+
+### Compositional fault-injection programme
+
+The next research advance should test whether individually sound controls compose under simultaneous failure. A fixed attack suite can miss boundary interactions such as a label downgrade combined with a connector switch and a stale authority decision.
+
+Create a SAT-FENCE campaign with these fault boundaries:
+
+1. source identity/classification;
+2. transformation and derived-memory lineage;
+3. connector and disclosure intent;
+4. delegation and authority scope;
+5. commit-time expiry/revocation;
+6. effect sink and idempotent mutation;
+7. observation/source-of-truth integrity;
+8. trace custody and evaluator integrity;
+9. human contest/revocation and AI withdrawal.
+
+Start with every single-boundary fault, all pairwise combinations, and selected three-way combinations chosen before execution. Include matched benign controls. A useful first campaign is 9 single-boundary cases plus 36 pairwise interactions, then a preregistered higher-order set. Do not treat the resulting cases as independent trials when faults share a common mechanism.
+
+New metrics:
+- **Compositional escape rate:** fraction of injected single/pairwise faults that produce a verified prohibited effect.
+- **Evidence-loss fail-closed rate:** fraction of required-evidence omissions that correctly result in hold/inconclusive rather than qualified.
+- **Boundary-localization accuracy:** whether the evaluator identifies the first violated boundary and the downstream consequences without mislabelling a system failure as invalid evidence.
+- **Assurance continuity:** whether claims are retained, revalidated, invalidated or marked inconclusive after model, prompt, policy, connector, runner or grader changes.
+- **Recovery integrity:** whether reconciliation, revocation and restoration preserve a complete causal record without duplicate effects.
+
+Prospective targets are 0 critical compositional escapes in the registered pilot, 100% fail-closed handling of mandatory evidence loss, and 100% correct invalidation/revalidation decisions on the finite change-control fixtures. These are research targets, not results.
+
 ## 7. Initial research targets (not achieved or standards)
 
 | Metric | Pilot target | Hard interpretation |
@@ -158,17 +198,36 @@ Do not create a parallel authority kernel, DLP/egress policy, capability issuer,
 
 ## 9. Next implementation sequence
 
-1. Implement a small independent trace verifier: duplicate-key rejection, sequence continuity, JCS digest, chain integrity and exact-effect correspondence.
+1. **Trace verification prototype — source authored:** create the strict Rust trace verifier and CLI described below. Compile/test/rustfmt/Clippy are pending.
 2. Build an adapter against the #13602 reference oracle and production authority owner; compare matched traces including attenuation, revocation and TOCTOU.
 3. Connect CogSec/INTX lineage and disclosure decisions; inject HDC/summary label downgrade, payload rebinding, connector change and direct-egress attempts.
 4. Connect Symtropy at the final mutation boundary; inject replay, revocation, crash-after-commit, ambiguous outcomes and stale state.
 5. Wrap AgentDojo/AgentHarm and ControlArena/Inspect; add AuditBench, SHADE-Arena and LADDER integrations as separate tracks.
-6. Run a blinded evaluator with positive and benign targets, pairwise auditor review, pre-registered analysis and sealed holdouts.
-7. Preregister the human independent-first/AI-first/evidence-first experiment and delayed AI-withdrawal outcome measures.
+6. Run the SAT-FENCE compositional fault campaign with paired benign controls and preregistered single/pairwise/higher-order strata.
+7. Run a blinded evaluator with positive and benign targets, pairwise auditor review, pre-registered analysis and sealed holdouts.
+8. Preregister the human independent-first/AI-first/evidence-first experiment and delayed AI-withdrawal outcome measures.
+
+### 9.1 First Rust trace-verifier increment
+
+A stacked implementation branch adds `crates/core/symthaea-sat-trace-verifier/`, a read-only library and CLI. Its intended v0.1 responsibilities are:
+
+- reject duplicate JSON object keys, invalid event shapes and numbers outside the SAT safe-integer JCS profile;
+- canonicalize using UTF-16 property ordering and verify the domain-separated event chain;
+- bind every event to a caller-supplied frozen run ID and manifest digest;
+- recompute the full intent, #13602-compatible authority identity, disclosure and versioned sink-projection digests;
+- require a sink-observer actor and independently-observed evidence for effect observations;
+- correlate submissions and observations by idempotency key; an unknown outcome produces a hold, and no subsequent mutation submission is accepted before a terminal reconciliation;
+- require a decision receipt and an RFC 3339 validity bound for effect submission, rejecting a commit timestamp at or after the recorded expiry.
+
+The verifier always reports `signatures_verified = false` and `system_qualified = false`. It does not authenticate issuers, verify signatures/revocation, establish trusted time, prove observer independence or source truth, enforce policies at a live sink, or issue a qualification decision. A correct trace is necessary evidence, not proof that the system is safe.
+
+The crate contains focused unit tests for canonicalization, duplicate keys, numeric profile limits, manifest binding, chain continuity, exact authority/disclosure binding, sink projection mismatch, replay, expiry and unknown-outcome reconciliation. These tests are authored but remain unexecuted until a Rust toolchain/runner is available.
 
 ## 10. Validation and claim boundary
 
-This increment defines wire contracts and public fixtures. The schemas do not authenticate identities, verify signatures, establish label truth, prove sink independence or show that an adapter is correct. The fixtures do not measure system performance. JSON Schema and fixture preflight are separate from Rust compile/test/Clippy/rustfmt, integration, adaptive campaigns, independent audit and production qualification. No benchmark score, SOTA claim or general alignment guarantee is made.
+The wire contracts, examples and public fixtures are source artifacts. Branch round-trip and parse checks are separate from full JSON Schema validation, Rust compile/test/Clippy/rustfmt, integration, adaptive campaigns, independent audit and production qualification. The trace verifier source and tests have been authored but not run because the current execution environment has no Cargo, rustc, rustfmt or Nix toolchain. No benchmark score, SOTA claim or general alignment guarantee is made.
+
+The trace verifier does not authenticate identities, verify signatures, establish label truth, prove sink independence, validate revocation status or show that an adapter is correct. Its result is only structural trace verification; an unresolved mutation is explicitly returned as a hold.
 
 ## References
 
@@ -176,5 +235,5 @@ This increment defines wire contracts and public fixtures. The schemas do not au
 - [DelegateGuard](https://arxiv.org/abs/2610.16005), 2026.
 - [AgentDojo](https://proceedings.neurips.cc/paper_files/paper/2024/hash/97091a5177d8dc64b1da8bf3e1f6fb54-Abstract-Datasets_and_Benchmarks_Track.html), NeurIPS 2024; [AgentHarm](https://proceedings.iclr.cc/paper_files/paper/2025/hash/c493d23af93118975cdbc32cbe7323f5-Abstract-Conference.html), ICLR 2025.
 - UK AISI [ControlArena](https://control-arena.aisi.org.uk/); [SHADE-Arena](https://arxiv.org/abs/2506.15740) and [adaptive control evaluation](https://arxiv.org/abs/2511.02997).
-- [LADDER](https://ladderrobotics.ai/research), 2026; [OWASP Agentic Applications Top 10](https://genai.owasp.org/top-10-for-agentic-applications-2026/); [NIST AI RMF](https://www.nist.gov/itl/ai-risk-management-framework).
+- [LADDER](https://ladderrobotics.ai/research), 2026; [OWASP Top 10 for Agentic Applications 2026](https://genai.owasp.org/top-10-for-agentic-applications-2026/); [NIST AI RMF](https://www.nist.gov/itl/ai-risk-management-framework) and [GenAI Profile](https://www.nist.gov/publications/artificial-intelligence-risk-management-framework-generative-artificial-intelligence); [ISO/IEC 42001:2023](https://www.iso.org/standard/42001).
 - [RFC 8785: JSON Canonicalization Scheme](https://www.rfc-editor.org/rfc/rfc8785).
