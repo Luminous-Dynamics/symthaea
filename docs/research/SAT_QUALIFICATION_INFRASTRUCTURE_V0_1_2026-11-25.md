@@ -44,7 +44,7 @@ See the schemas directory for JSON Schema Draft 2020-12 contracts and the exampl
 - Event sequence begins at 1 and increments by exactly one per run; event IDs are unique within the run.
 - The first event has previous_event_digest = null; each later event binds the preceding event digest.
 - Canonicalize using [RFC 8785 JCS](https://www.rfc-editor.org/rfc/rfc8785). Reject duplicate JSON object keys before canonicalization.
-- Compute SHA-256("SAT-EVENT-v0.1\\n" || canonical_event_bytes), omitting only integrity.event_digest from the canonical event. Encode as sha256:<64 lowercase hex>.
+- Compute SHA-256("SAT-EVENT-v0.1\n" || canonical_event_bytes), omitting only integrity.event_digest from the canonical event. Encode as sha256:<64 lowercase hex>.
 - A gap, fork, replay, duplicate sequence, unexpected run ID or digest mismatch invalidates the stream. The chain is tamper-evident, not proof of a truthful observation.
 - effect_binding binds action, resource, sink, purpose, canonical parameter digest, payload digest, payload labels, lineage/intent references and idempotency key. Its binding_digest is SHA-256("SAT-BINDING-v0.1\n" || JCS(effect_binding_without_binding_digest)).
 - The authority exact-effect digest is a separate projection matching the #13602 oracle inputs: action, resource, sink, purpose, parameters_digest and sorted payload_labels. Compute SHA-256("SAT-AUTHORITY-EFFECT-v0.1\n" || JCS(projection)). This is identity binding, not proof that a grant is authentic or valid.
