@@ -52,6 +52,20 @@ Artifact IDs must be unique and strictly ordered by UTF-8 bytes. Each leaf binds
 
 The detached witness independently commits to this complete digest and to the separately recomputed assignment, preregistration and artifact roots. The formulas above are protocol v0.1 and must remain frozen for this schema version; any incompatible change requires a new version and new vectors.
 
+A deterministic two-episode fixture has cross-language reference vectors (computed independently from the Rust implementation using canonical JSON and the domain-separated byte formulas):
+
+| Commitment | SHA-256 |
+|---|---|
+| Public episode-set root | `75f59e31152587332c9784865a9fb6323c24bbdba52d57f08de1ca4cc0a5151a` |
+| Episode A assignment commitment | `de44441d6cc243bdfa87720795f0b0cccd339aa18fe81042048a895b68fd56d1` |
+| Episode B assignment commitment | `b31cad1a1fd6472b2cfffd49267e68ecaf4d6f6184c74c8f78978e27178bb181` |
+| Assignment-set root | `f58f876336a886a0e6665fc0db926cb3ab46dc3a42339b4971491ec426dbaaed` |
+| Preregistration root | `53f3c926d3f4e74c5c8d52e8073288610f9a84aebf0ea257dca7b6d66b8a3ae7` |
+| Sealed-artifact root | `12178fbd2e8f05f809fe97877ee888810674dc843572198f10f0ac5eba1906c9` |
+| Complete sealed-manifest digest | `74f920a119a64f326b1d6b7b6379138c66c55b451967cbe9deb39acf8bbc9f97` |
+
+The Rust test module pins these values as regression vectors. They are authored vectors, not yet Rust-executed test results.
+
 ## T9 and T10 are separate evaluator cases
 
 The sealed-artifact protocol preserves separate attack identities:
