@@ -158,6 +158,10 @@ jobs:
             "${tmp_root}/benchmarks/plasma/measure-stability/"
           cp benchmarks/plasma/measure-stability/fixtures/particle-measure-w1-known-answer-v0.1.json \
             "${tmp_root}/benchmarks/plasma/measure-stability/fixtures/"
+          cp benchmarks/plasma/measure-stability/particle-measure-torus-w1-v0.1.schema.json \
+            "${tmp_root}/benchmarks/plasma/measure-stability/"
+          cp benchmarks/plasma/measure-stability/fixtures/particle-measure-torus-w1-known-answer-v0.1.json \
+            "${tmp_root}/benchmarks/plasma/measure-stability/fixtures/"
           cat > "${crate_dir}/Cargo.toml" <<'EOF'
           [package]
           name = "symthaea-plasma-probes"
@@ -292,6 +296,20 @@ jobs:
               assert abs(sum(case["right"]["weights"]) - 1.0) < 1e-12
           assert fixture["claim_boundary"]["not_a_global_stability_certificate"] is True
           print("particle_measure_w1_schema_validation=PASS")
+
+          torus_schema = json.loads((root / "particle-measure-torus-w1-v0.1.schema.json").read_text())
+          torus_fixture = json.loads((root / "fixtures/particle-measure-torus-w1-known-answer-v0.1.json").read_text())
+          Draft202012Validator.check_schema(torus_schema)
+          Draft202012Validator(torus_schema).validate(torus_fixture)
+          assert torus_fixture["domain"]["topology"] == "torus"
+          assert torus_fixture["metric"]["id"] == "wasserstein_1_circle_1d"
+          torus_cases = {case["case_id"]: case for case in torus_fixture["cases"]}
+          assert torus_cases["periodic-endpoints-are-identified"]["expected_w1"] == 0.0
+          assert abs(torus_cases["shortest-geodesic-crosses-coordinate-seam"]["expected_w1"] - 0.1) < 1e-15
+          assert abs(torus_cases["common-periodic-translation-preserves-distance"]["expected_w1"] - 0.1) < 1e-15
+          assert abs(torus_cases["geodesic-distance-scales-with-physical-period"]["expected_w1"] - 1.5) < 1e-15
+          assert torus_fixture["claim_boundary"]["not_a_global_field_stability_certificate"] is True
+          print("particle_measure_torus_w1_schema_validation=PASS")
           PY
 
       - name: Validate intervention-equivalent kinetic state fixture
