@@ -187,7 +187,8 @@
           "trust_policy_digest",
           "root_hash",
           "root_hash_algorithm",
-          "root_hash_encoding"
+          "root_hash_encoding",
+          "log_id"
         ],
         "properties": {
           "witness_id": {
@@ -235,6 +236,10 @@
               "base64url",
               "provider-defined"
             ]
+          },
+          "log_id": {
+            "type": "string",
+            "minLength": 1
           }
         }
       }
