@@ -4,50 +4,151 @@
   "title": "MACE Decision Outcome Receipt v1",
   "type": "object",
   "additionalProperties": false,
-  "required": ["schema_version", "payload", "attestation"],
+  "required": [
+    "schema_version",
+    "payload",
+    "attestation"
+  ],
   "properties": {
-    "schema_version": { "const": "mace_decision_outcome_receipt_v1" },
+    "schema_version": {
+      "const": "mace_decision_outcome_receipt_v1"
+    },
     "payload": {
       "type": "object",
       "additionalProperties": false,
       "required": [
-        "schema_version", "decision_episode_id", "episode_manifest_sha256",
-        "evaluation_manifest_sha256", "qualification_receipt_sha256",
-        "decision_sufficiency_receipt_sha256", "decision_record_sha256",
-        "execution", "outcome", "hard_constraints", "causal"
+        "schema_version",
+        "decision_episode_id",
+        "episode_manifest_sha256",
+        "evaluation_manifest_sha256",
+        "qualification_receipt_sha256",
+        "decision_sufficiency_receipt_sha256",
+        "decision_record_sha256",
+        "execution",
+        "outcome",
+        "hard_constraints",
+        "causal"
       ],
       "properties": {
-        "schema_version": { "const": "mace_decision_outcome_payload_v1" },
-        "decision_episode_id": { "type": "string", "minLength": 1, "maxLength": 256 },
-        "episode_manifest_sha256": { "$ref": "#/$defs/sha256" },
-        "evaluation_manifest_sha256": { "$ref": "#/$defs/sha256" },
-        "qualification_receipt_sha256": { "oneOf": [{ "$ref": "#/$defs/sha256" }, { "type": "null" }] },
-        "decision_sufficiency_receipt_sha256": { "oneOf": [{ "$ref": "#/$defs/sha256" }, { "type": "null" }] },
-        "decision_record_sha256": { "$ref": "#/$defs/sha256" },
+        "schema_version": {
+          "const": "mace_decision_outcome_payload_v1"
+        },
+        "decision_episode_id": {
+          "type": "string",
+          "minLength": 1,
+          "maxLength": 256
+        },
+        "episode_manifest_sha256": {
+          "$ref": "#/$defs/sha256"
+        },
+        "evaluation_manifest_sha256": {
+          "$ref": "#/$defs/sha256"
+        },
+        "qualification_receipt_sha256": {
+          "oneOf": [
+            {
+              "$ref": "#/$defs/sha256"
+            },
+            {
+              "type": "null"
+            }
+          ]
+        },
+        "decision_sufficiency_receipt_sha256": {
+          "oneOf": [
+            {
+              "$ref": "#/$defs/sha256"
+            },
+            {
+              "type": "null"
+            }
+          ]
+        },
+        "decision_record_sha256": {
+          "$ref": "#/$defs/sha256"
+        },
         "execution": {
           "type": "object",
           "additionalProperties": false,
-          "required": ["status", "action_sha256", "authorization_receipt_sha256", "execution_receipt_sha256"],
+          "required": [
+            "status",
+            "action_sha256",
+            "authorization_receipt_sha256",
+            "execution_receipt_sha256"
+          ],
           "properties": {
-            "status": { "enum": ["executed", "blocked", "abstained", "not_attempted"] },
-            "action_sha256": { "oneOf": [{ "$ref": "#/$defs/sha256" }, { "type": "null" }] },
-            "authorization_receipt_sha256": { "oneOf": [{ "$ref": "#/$defs/sha256" }, { "type": "null" }] },
-            "execution_receipt_sha256": { "oneOf": [{ "$ref": "#/$defs/sha256" }, { "type": "null" }] }
+            "status": {
+              "enum": [
+                "executed",
+                "blocked",
+                "abstained",
+                "not_attempted"
+              ]
+            },
+            "action_sha256": {
+              "oneOf": [
+                {
+                  "$ref": "#/$defs/sha256"
+                },
+                {
+                  "type": "null"
+                }
+              ]
+            },
+            "authorization_receipt_sha256": {
+              "oneOf": [
+                {
+                  "$ref": "#/$defs/sha256"
+                },
+                {
+                  "type": "null"
+                }
+              ]
+            },
+            "execution_receipt_sha256": {
+              "oneOf": [
+                {
+                  "$ref": "#/$defs/sha256"
+                },
+                {
+                  "type": "null"
+                }
+              ]
+            }
           },
           "allOf": [
             {
-              "if": { "properties": { "status": { "const": "executed" } }, "required": ["status"] },
+              "if": {
+                "properties": {
+                  "status": {
+                    "const": "executed"
+                  }
+                },
+                "required": [
+                  "status"
+                ]
+              },
               "then": {
                 "properties": {
-                  "action_sha256": { "$ref": "#/$defs/sha256" },
-                  "authorization_receipt_sha256": { "$ref": "#/$defs/sha256" },
-                  "execution_receipt_sha256": { "$ref": "#/$defs/sha256" }
+                  "action_sha256": {
+                    "$ref": "#/$defs/sha256"
+                  },
+                  "authorization_receipt_sha256": {
+                    "$ref": "#/$defs/sha256"
+                  },
+                  "execution_receipt_sha256": {
+                    "$ref": "#/$defs/sha256"
+                  }
                 }
               },
               "else": {
                 "properties": {
-                  "action_sha256": { "type": "null" },
-                  "execution_receipt_sha256": { "type": "null" }
+                  "action_sha256": {
+                    "type": "null"
+                  },
+                  "execution_receipt_sha256": {
+                    "type": "null"
+                  }
                 }
               }
             }
@@ -57,54 +158,147 @@
           "type": "object",
           "additionalProperties": false,
           "required": [
-            "observation_window_start_unix", "observation_window_end_unix",
-            "outcome_observation_sha256", "utility_scale_sha256",
-            "baseline_utility_microunits", "treatment_utility_microunits",
-            "utility_delta_microunits", "resource_cost_report_sha256"
+            "observation_window_start_unix",
+            "observation_window_end_unix",
+            "outcome_observation_sha256",
+            "utility_scale_sha256",
+            "baseline_utility_microunits",
+            "treatment_utility_microunits",
+            "utility_delta_microunits",
+            "resource_cost_report_sha256"
           ],
           "properties": {
-            "observation_window_start_unix": { "type": "integer", "minimum": 0, "maximum": 253402300799 },
-            "observation_window_end_unix": { "type": "integer", "minimum": 0, "maximum": 253402300799 },
-            "outcome_observation_sha256": { "$ref": "#/$defs/sha256" },
-            "utility_scale_sha256": { "$ref": "#/$defs/sha256" },
-            "baseline_utility_microunits": { "$ref": "#/$defs/signedMicrounits" },
-            "treatment_utility_microunits": { "$ref": "#/$defs/signedMicrounits" },
-            "utility_delta_microunits": { "$ref": "#/$defs/signedMicrounits" },
-            "resource_cost_report_sha256": { "$ref": "#/$defs/sha256" }
+            "observation_window_start_unix": {
+              "type": "integer",
+              "minimum": 0,
+              "maximum": 253402300799
+            },
+            "observation_window_end_unix": {
+              "type": "integer",
+              "minimum": 0,
+              "maximum": 253402300799
+            },
+            "outcome_observation_sha256": {
+              "$ref": "#/$defs/sha256"
+            },
+            "utility_scale_sha256": {
+              "$ref": "#/$defs/sha256"
+            },
+            "baseline_utility_microunits": {
+              "$ref": "#/$defs/signedMicrounits"
+            },
+            "treatment_utility_microunits": {
+              "$ref": "#/$defs/signedMicrounits"
+            },
+            "utility_delta_microunits": {
+              "$ref": "#/$defs/signedMicrounits"
+            },
+            "resource_cost_report_sha256": {
+              "$ref": "#/$defs/sha256"
+            }
           }
         },
         "hard_constraints": {
           "type": "object",
           "additionalProperties": false,
-          "required": ["verdict", "violation_count", "violation_report_sha256"],
+          "required": [
+            "verdict",
+            "violation_count",
+            "violation_report_sha256"
+          ],
           "properties": {
-            "verdict": { "enum": ["satisfied", "violated", "not_evaluable"] },
-            "violation_count": { "oneOf": [{ "type": "integer", "minimum": 0 }, { "type": "null" }] },
-            "violation_report_sha256": { "oneOf": [{ "$ref": "#/$defs/sha256" }, { "type": "null" }] }
+            "verdict": {
+              "enum": [
+                "satisfied",
+                "violated",
+                "not_evaluable"
+              ]
+            },
+            "violation_count": {
+              "oneOf": [
+                {
+                  "type": "integer",
+                  "minimum": 0
+                },
+                {
+                  "type": "null"
+                }
+              ]
+            },
+            "violation_report_sha256": {
+              "oneOf": [
+                {
+                  "$ref": "#/$defs/sha256"
+                },
+                {
+                  "type": "null"
+                }
+              ]
+            }
           },
           "allOf": [
             {
-              "if": { "properties": { "verdict": { "const": "satisfied" } }, "required": ["verdict"] },
+              "if": {
+                "properties": {
+                  "verdict": {
+                    "const": "satisfied"
+                  }
+                },
+                "required": [
+                  "verdict"
+                ]
+              },
               "then": {
                 "properties": {
-                  "violation_count": { "const": 0 },
-                  "violation_report_sha256": { "type": "null" }
+                  "violation_count": {
+                    "const": 0
+                  },
+                  "violation_report_sha256": {
+                    "type": "null"
+                  }
                 }
               }
             },
             {
-              "if": { "properties": { "verdict": { "const": "violated" } }, "required": ["verdict"] },
+              "if": {
+                "properties": {
+                  "verdict": {
+                    "const": "violated"
+                  }
+                },
+                "required": [
+                  "verdict"
+                ]
+              },
               "then": {
                 "properties": {
-                  "violation_count": { "type": "integer", "minimum": 1 },
-                  "violation_report_sha256": { "$ref": "#/$defs/sha256" }
+                  "violation_count": {
+                    "type": "integer",
+                    "minimum": 1
+                  },
+                  "violation_report_sha256": {
+                    "$ref": "#/$defs/sha256"
+                  }
                 }
               }
             },
             {
-              "if": { "properties": { "verdict": { "const": "not_evaluable" } }, "required": ["verdict"] },
+              "if": {
+                "properties": {
+                  "verdict": {
+                    "const": "not_evaluable"
+                  }
+                },
+                "required": [
+                  "verdict"
+                ]
+              },
               "then": {
-                "properties": { "violation_count": { "type": "null" } }
+                "properties": {
+                  "violation_count": {
+                    "type": "null"
+                  }
+                }
               }
             }
           ]
@@ -113,39 +307,98 @@
           "type": "object",
           "additionalProperties": false,
           "required": [
-            "design", "attribution", "paired_episode_manifest_sha256",
-            "analysis_plan_sha256", "independent_episode_count",
+            "design",
+            "attribution",
+            "paired_episode_manifest_sha256",
+            "analysis_plan_sha256",
+            "independent_episode_count",
             "confidence_interval_report_sha256"
           ],
           "properties": {
-            "design": { "enum": ["randomized_paired", "matched_paired", "structural_counterfactual", "descriptive_only"] },
-            "attribution": { "enum": ["identified_positive", "identified_no_effect", "identified_negative", "unidentifiable"] },
-            "paired_episode_manifest_sha256": { "$ref": "#/$defs/sha256" },
-            "analysis_plan_sha256": { "$ref": "#/$defs/sha256" },
-            "independent_episode_count": { "type": "integer", "minimum": 0, "maximum": 1000000000 },
-            "confidence_interval_report_sha256": { "oneOf": [{ "$ref": "#/$defs/sha256" }, { "type": "null" }] }
+            "design": {
+              "enum": [
+                "randomized_paired",
+                "matched_paired",
+                "structural_counterfactual",
+                "descriptive_only"
+              ]
+            },
+            "attribution": {
+              "enum": [
+                "identified_positive",
+                "identified_no_effect",
+                "identified_negative",
+                "unidentifiable"
+              ]
+            },
+            "paired_episode_manifest_sha256": {
+              "$ref": "#/$defs/sha256"
+            },
+            "analysis_plan_sha256": {
+              "$ref": "#/$defs/sha256"
+            },
+            "independent_episode_count": {
+              "type": "integer",
+              "minimum": 0,
+              "maximum": 1000000000
+            },
+            "confidence_interval_report_sha256": {
+              "oneOf": [
+                {
+                  "$ref": "#/$defs/sha256"
+                },
+                {
+                  "type": "null"
+                }
+              ]
+            }
           },
           "allOf": [
             {
-              "if": { "properties": { "design": { "const": "descriptive_only" } }, "required": ["design"] },
+              "if": {
+                "properties": {
+                  "design": {
+                    "const": "descriptive_only"
+                  }
+                },
+                "required": [
+                  "design"
+                ]
+              },
               "then": {
                 "properties": {
-                  "attribution": { "const": "unidentifiable" },
-                  "confidence_interval_report_sha256": { "type": "null" }
+                  "attribution": {
+                    "const": "unidentifiable"
+                  },
+                  "confidence_interval_report_sha256": {
+                    "type": "null"
+                  }
                 }
               }
             },
             {
               "if": {
                 "properties": {
-                  "attribution": { "enum": ["identified_positive", "identified_no_effect", "identified_negative"] }
+                  "attribution": {
+                    "enum": [
+                      "identified_positive",
+                      "identified_no_effect",
+                      "identified_negative"
+                    ]
+                  }
                 },
-                "required": ["attribution"]
+                "required": [
+                  "attribution"
+                ]
               },
               "then": {
                 "properties": {
-                  "independent_episode_count": { "minimum": 1 },
-                  "confidence_interval_report_sha256": { "$ref": "#/$defs/sha256" }
+                  "independent_episode_count": {
+                    "minimum": 1
+                  },
+                  "confidence_interval_report_sha256": {
+                    "$ref": "#/$defs/sha256"
+                  }
                 }
               }
             }
@@ -157,15 +410,34 @@
       "type": "object",
       "additionalProperties": false,
       "required": [
-        "evaluator_profile_sha256", "verifier_profile_sha256", "key_id",
-        "issued_at_unix", "payload_sha256", "signature_base64"
+        "evaluator_profile_sha256",
+        "verifier_profile_sha256",
+        "key_id",
+        "issued_at_unix",
+        "payload_sha256",
+        "attestation_sha256",
+        "signature_base64"
       ],
       "properties": {
-        "evaluator_profile_sha256": { "$ref": "#/$defs/sha256" },
-        "verifier_profile_sha256": { "$ref": "#/$defs/sha256" },
-        "key_id": { "type": "string", "minLength": 1, "maxLength": 256 },
-        "issued_at_unix": { "type": "integer", "minimum": 0, "maximum": 253402300799 },
-        "payload_sha256": { "$ref": "#/$defs/sha256" },
+        "evaluator_profile_sha256": {
+          "$ref": "#/$defs/sha256"
+        },
+        "verifier_profile_sha256": {
+          "$ref": "#/$defs/sha256"
+        },
+        "key_id": {
+          "type": "string",
+          "minLength": 1,
+          "maxLength": 256
+        },
+        "issued_at_unix": {
+          "type": "integer",
+          "minimum": 0,
+          "maximum": 253402300799
+        },
+        "payload_sha256": {
+          "$ref": "#/$defs/sha256"
+        },
         "signature_base64": {
           "type": "string",
           "minLength": 88,
@@ -173,12 +445,22 @@
           "pattern": "^[A-Za-z0-9+/]{86}==$",
           "contentEncoding": "base64",
           "description": "Canonical padded Base64 encoding of a 64-byte Ed25519 signature."
+        },
+        "attestation_sha256": {
+          "$ref": "#/$defs/sha256"
         }
       }
     }
   },
   "$defs": {
-    "sha256": { "type": "string", "pattern": "^[0-9a-f]{64}$" },
-    "signedMicrounits": { "type": "integer", "minimum": -9000000000000000, "maximum": 9000000000000000 }
+    "sha256": {
+      "type": "string",
+      "pattern": "^[0-9a-f]{64}$"
+    },
+    "signedMicrounits": {
+      "type": "integer",
+      "minimum": -9000000000000000,
+      "maximum": 9000000000000000
+    }
   }
 }
