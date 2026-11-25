@@ -25,6 +25,11 @@ const PPM_SCALE: u32 = 1_000_000;
 #[serde(deny_unknown_fields)]
 pub struct ObservedAuditOutcomeV1 {
     pub item_id: String,
+    pub source_work_id_sha256: String,
+    pub scoring_report_sha256: String,
+    pub model_identity_sha256: String,
+    pub evaluator_version: String,
+    pub scoring_plan_sha256: String,
     /// The same metric ID must be used for every sampled item.
     pub metric_id: String,
     /// Fixed-point outcome in [0, 1], scaled by 1,000,000.
@@ -41,6 +46,9 @@ pub struct DesignEstimatorInputV1 {
     /// fresh deterministic demonstration and is explicitly marked unverified.
     pub expected_selection_receipt_sha256: Option<String>,
     pub metric_id: String,
+    pub model_identity_sha256: String,
+    pub evaluator_version: String,
+    pub scoring_plan_sha256: String,
     /// Exactly one observed outcome per selected probability-audit item.
     pub observed_audit_outcomes: Vec<ObservedAuditOutcomeV1>,
 }
@@ -67,6 +75,12 @@ pub struct StratumDesignEstimateV1 {
     pub estimated_total_standard_error: Option<f64>,
     pub estimated_mean_variance: Option<f64>,
     pub variance_unavailable_reason: Option<VarianceUnavailableReasonV1>,
+    pub estimated_source_work_total: f64,
+    pub estimated_source_work_mean: f64,
+    pub estimated_source_work_total_variance: Option<f64>,
+    pub estimated_source_work_total_standard_error: Option<f64>,
+    pub estimated_source_work_mean_variance: Option<f64>,
+    pub source_work_variance_unavailable_reason: Option<VarianceUnavailableReasonV1>,
     pub source_work_fpc: Option<f64>,
     pub selected_source_work_ids: Vec<String>,
 }
@@ -88,6 +102,12 @@ pub struct DesignEstimatorReportV1 {
     pub estimated_population_total_standard_error: Option<f64>,
     pub estimated_population_mean_variance: Option<f64>,
     pub variance_unavailable_reasons: Vec<(String, VarianceUnavailableReasonV1)>,
+    pub estimated_source_work_population_total: Option<f64>,
+    pub estimated_source_work_population_mean: Option<f64>,
+    pub estimated_source_work_population_total_variance: Option<f64>,
+    pub estimated_source_work_population_total_standard_error: Option<f64>,
+    pub estimated_source_work_population_mean_variance: Option<f64>,
+    pub source_work_variance_unavailable_reasons: Vec<(String, VarianceUnavailableReasonV1)>,
     pub stratum_estimates: Vec<StratumDesignEstimateV1>,
     pub adaptive_active_stream_used: bool,
     pub exact_selection_receipt_replayed: bool,
@@ -101,7 +121,14 @@ pub struct DesignEstimatorReportV1 {
 struct SampledItemV1<'a> {
     selection: &'a AnnotationSelectionRecordV1,
     outcome: f64,
+    source_work_size: usize,
     first_order_probability: f64,
+}
+
+#[derive(Debug, Clone, Copy)]
+enum EstimatorTargetV1 {
+    QueryItem,
+    SourceWorkMean,
 }
 
 pub fn estimate_design_based_metric_json(input: &str) -> Result<DesignEstimatorReportV1, String> {
@@ -117,6 +144,9 @@ pub fn estimate_design_based_metric(
         return Err(format!("unsupported estimator input schema: {}", input.schema));
     }
     require_text(&input.metric_id, "metric_id")?;
+    require_text(&input.evaluator_version, "evaluator_version")?;
+    validate_digest(&input.model_identity_sha256, "model_identity_sha256")?;
+    validate_digest(&input.scoring_plan_sha256, "scoring_plan_sha256")?;
     if let Some(expected) = input.expected_selection_receipt_sha256.as_deref() {
         validate_digest(expected, "expected_selection_receipt_sha256")?;
     }
@@ -140,6 +170,19 @@ pub fn estimate_design_based_metric(
     let mut outcomes = BTreeMap::new();
     for outcome in &input.observed_audit_outcomes {
         require_text(&outcome.item_id, "observed_audit_outcomes.item_id")?;
+        validate_digest(&outcome.source_work_id_sha256, "outcome.source_work_id_sha256")?;
+        validate_digest(&outcome.scoring_report_sha256, "outcome.scoring_report_sha256")?;
+        validate_digest(&outcome.model_identity_sha256, "outcome.model_identity_sha256")?;
+        validate_digest(&outcome.scoring_plan_sha256, "outcome.scoring_plan_sha256")?;
+        if outcome.model_identity_sha256 != input.model_identity_sha256
+            || outcome.evaluator_version != input.evaluator_version
+            || outcome.scoring_plan_sha256 != input.scoring_plan_sha256
+        {
+            return Err(format!(
+                "item {} has a model/evaluator/scoring-plan identity mismatch",
+                outcome.item_id
+            ));
+        }
         if outcome.metric_id != input.metric_id {
             return Err(format!(
                 "item {} has metric ID {}, expected {}",
@@ -191,12 +234,19 @@ pub fn estimate_design_based_metric(
     let mut total_estimate = 0.0;
     let mut total_variance = 0.0;
     let mut total_variance_available = true;
+    let mut source_work_total_estimate = 0.0;
+    let mut source_work_total_variance = 0.0;
+    let mut source_work_variance_available = true;
     let mut population_item_count = 0_u64;
-    let eligible_probability_audit_items: usize = planned
-        .probability_audit_design
-        .iter()
-        .map(|design| design.eligible_query_items)
-        .sum();
+    let mut population_source_work_count = 0_u64;
+    let mut eligible_probability_audit_items = 0_usize;
+    for design in &planned.probability_audit_design {
+        eligible_probability_audit_items = eligible_probability_audit_items
+            .checked_add(design.eligible_query_items)
+            .ok_or_else(|| "eligible probability-audit item count overflow".to_string())?;
+    }
+    let mut variance_unavailable_reasons = Vec::new();
+    let mut source_work_variance_unavailable_reasons = Vec::new();
 
     for design in &planned.probability_audit_design {
         if design.eligible_query_items == 0 {
@@ -213,10 +263,25 @@ pub fn estimate_design_based_metric(
             .iter()
             .filter(|selection| selection.source_stratum_id == design.source_stratum_id)
             .map(|selection| {
+                let observed = input
+                    .observed_audit_outcomes
+                    .iter()
+                    .find(|outcome| outcome.item_id == selection.item_id)
+                    .ok_or_else(|| format!("missing selected outcome for {}", selection.item_id))?;
+                if observed.source_work_id_sha256 != selection.source_work_id_sha256 {
+                    return Err(format!(
+                        "observed outcome {} is bound to a different source work than its planner selection",
+                        selection.item_id
+                    ));
+                }
                 let value = outcomes
                     .get(selection.item_id.as_str())
                     .copied()
                     .ok_or_else(|| format!("missing selected outcome for {}", selection.item_id))?;
+                let source_work_size = selection
+                    .eligible_items_in_source_work
+                    .filter(|count| *count > 0)
+                    .ok_or_else(|| format!("selected item {} lacks a valid source-work size", selection.item_id))?;
                 let pi = probability_to_f64(
                     selection.item_inclusion_probability.ok_or_else(|| {
                         format!("selected item {} lacks first-order inclusion probability", selection.item_id)
@@ -228,6 +293,7 @@ pub fn estimate_design_based_metric(
                 Ok(SampledItemV1 {
                     selection,
                     outcome: value as f64 / PPM_SCALE as f64,
+                    source_work_size,
                     first_order_probability: pi,
                 })
             })
@@ -239,7 +305,7 @@ pub fn estimate_design_based_metric(
             .map(|item| item.outcome / item.first_order_probability)
             .sum();
         let mean_estimate = estimate / design.eligible_query_items as f64;
-        let variance = estimate_stratum_variance(design, &selected);
+        let variance = estimate_stratum_variance(design, &selected, EstimatorTargetV1::QueryItem);
         let (variance_value, reason) = match variance {
             Ok(value) if value.is_finite() && value >= 0.0 => (Some(value), None),
             Ok(value) if !value.is_finite() => (
@@ -258,11 +324,49 @@ pub fn estimate_design_based_metric(
             total_variance_available = false;
             variance_unavailable_reasons.push((design.source_stratum_id.clone(), reason.unwrap()));
         }
+        let source_work_estimate: f64 = selected
+            .iter()
+            .map(|item| (item.outcome / item.source_work_size as f64) / item.first_order_probability)
+            .sum();
+        let source_work_mean_estimate =
+            source_work_estimate / design.eligible_source_works as f64;
+        let source_work_variance = estimate_stratum_variance(
+            design,
+            &selected,
+            EstimatorTargetV1::SourceWorkMean,
+        );
+        let (source_work_variance_value, source_work_variance_reason) = match source_work_variance {
+            Ok(value) if value.is_finite() && value >= 0.0 => (Some(value), None),
+            Ok(value) if !value.is_finite() => (
+                None,
+                Some(VarianceUnavailableReasonV1::NonFiniteVarianceEstimate),
+            ),
+            Ok(_) => (
+                None,
+                Some(VarianceUnavailableReasonV1::NegativeVarianceEstimate),
+            ),
+            Err(reason) => (None, Some(reason)),
+        };
+        if let Some(value) = source_work_variance_value {
+            source_work_total_variance += value;
+        } else {
+            source_work_variance_available = false;
+            source_work_variance_unavailable_reasons
+                .push((design.source_stratum_id.clone(), source_work_variance_reason.unwrap()));
+        }
+
         total_estimate += estimate;
+        source_work_total_estimate += source_work_estimate;
         population_item_count = population_item_count
             .checked_add(design.eligible_query_items as u64)
             .ok_or_else(|| "population query-item count overflow".to_string())?;
+        population_source_work_count = population_source_work_count
+            .checked_add(design.eligible_source_works as u64)
+            .ok_or_else(|| "population source-work count overflow".to_string())?;
         let variance_standard_error = variance_value.map(f64::sqrt);
+        let source_work_variance_standard_error = source_work_variance_value.map(f64::sqrt);
+        let source_work_mean_variance = source_work_variance_value
+            .map(|value| value / (design.eligible_source_works as f64).powi(2));
         let mean_variance = variance_value.map(|value| {
             value / (design.eligible_query_items as f64).powi(2)
         });
@@ -287,6 +391,12 @@ pub fn estimate_design_based_metric(
             estimated_total_standard_error: variance_standard_error,
             estimated_mean_variance: mean_variance,
             variance_unavailable_reason: reason,
+            estimated_source_work_total: source_work_estimate,
+            estimated_source_work_mean: source_work_mean_estimate,
+            estimated_source_work_total_variance: source_work_variance_value,
+            estimated_source_work_total_standard_error: source_work_variance_standard_error,
+            estimated_source_work_mean_variance: source_work_mean_variance,
+            source_work_variance_unavailable_reason: source_work_variance_reason,
             source_work_fpc,
             selected_source_work_ids: selected
                 .iter()
@@ -304,6 +414,12 @@ pub fn estimate_design_based_metric(
     let population_variance = total_variance_available.then_some(total_variance);
     let population_mean_variance =
         population_variance.map(|value| value / (population_item_count as f64).powi(2));
+    let source_work_population_mean =
+        source_work_total_estimate / population_source_work_count as f64;
+    let source_work_population_variance =
+        source_work_variance_available.then_some(source_work_total_variance);
+    let source_work_population_mean_variance = source_work_population_variance
+        .map(|value| value / (population_source_work_count as f64).powi(2));
 
     Ok(DesignEstimatorReportV1 {
         schema: ESTIMATOR_REPORT_SCHEMA_V1,
@@ -321,6 +437,13 @@ pub fn estimate_design_based_metric(
         estimated_population_total_standard_error: population_variance.map(f64::sqrt),
         estimated_population_mean_variance: population_mean_variance,
         variance_unavailable_reasons,
+        estimated_source_work_population_total: Some(source_work_total_estimate),
+        estimated_source_work_population_mean: Some(source_work_population_mean),
+        estimated_source_work_population_total_variance: source_work_population_variance,
+        estimated_source_work_population_total_standard_error: source_work_population_variance
+            .map(f64::sqrt),
+        estimated_source_work_population_mean_variance: source_work_population_mean_variance,
+        source_work_variance_unavailable_reasons,
         stratum_estimates,
         adaptive_active_stream_used: false,
         exact_selection_receipt_replayed: true,
@@ -334,6 +457,7 @@ pub fn estimate_design_based_metric(
 fn estimate_stratum_variance(
     design: &ProbabilityAuditStratumDesignV1,
     sample: &[SampledItemV1<'_>],
+    target: EstimatorTargetV1,
 ) -> Result<f64, VarianceUnavailableReasonV1> {
     if design.selected_source_works < 2 && design.eligible_source_works > 1 {
         return Err(VarianceUnavailableReasonV1::FewerThanTwoSelectedSourceWorks);
@@ -355,9 +479,17 @@ fn estimate_stratum_variance(
                 return Err(VarianceUnavailableReasonV1::ZeroJointInclusionProbability);
             }
             let covariance_factor = (pi_joint - pi_left * pi_right) / pi_joint;
+            let left_value = match target {
+                EstimatorTargetV1::QueryItem => left.outcome,
+                EstimatorTargetV1::SourceWorkMean => left.outcome / left.source_work_size as f64,
+            };
+            let right_value = match target {
+                EstimatorTargetV1::QueryItem => right.outcome,
+                EstimatorTargetV1::SourceWorkMean => right.outcome / right.source_work_size as f64,
+            };
             variance += covariance_factor
-                * (left.outcome / pi_left)
-                * (right.outcome / pi_right);
+                * (left_value / pi_left)
+                * (right_value / pi_right);
         }
     }
     Ok(variance)
@@ -543,6 +675,11 @@ mod tests {
             .iter()
             .map(|selection| ObservedAuditOutcomeV1 {
                 item_id: selection.item_id.clone(),
+                source_work_id_sha256: selection.source_work_id_sha256.clone(),
+                scoring_report_sha256: digest('3'),
+                model_identity_sha256: digest('1'),
+                evaluator_version: "mel-grounding-model-eval-v1".into(),
+                scoring_plan_sha256: digest('2'),
                 metric_id: "grounded-correct".into(),
                 value_ppm: value_for_item(&selection.item_id),
             })
@@ -552,6 +689,9 @@ mod tests {
             dataset,
             expected_selection_receipt_sha256: Some(planned.selection_receipt_sha256),
             metric_id: "grounded-correct".into(),
+            model_identity_sha256: digest('1'),
+            evaluator_version: "mel-grounding-model-eval-v1".into(),
+            scoring_plan_sha256: digest('2'),
             observed_audit_outcomes,
         }
     }
@@ -594,6 +734,50 @@ mod tests {
     }
 
     #[test]
+    fn source_work_weighted_estimator_recovers_equal_work_target_and_variance() {
+        let mut means = Vec::new();
+        let mut variances = Vec::new();
+        let mut selected_sets = BTreeSet::new();
+
+        // Source-work means are [0.5, 1.0, 0.0]. Across every possible
+        // two-of-three work sample, the HT source-work total is unbiased.
+        for seed in 1_u64..=256 {
+            let report = estimate_design_based_metric(&estimator_input(dataset(seed, 2))).unwrap();
+            let selected: BTreeSet<_> = report.stratum_estimates[0]
+                .selected_source_work_ids
+                .iter()
+                .cloned()
+                .collect();
+            if selected_sets.insert(selected) {
+                means.push(report.estimated_source_work_population_mean.unwrap());
+                variances.push(
+                    report.estimated_source_work_population_total_variance
+                        .expect("two selected source works support between-work variance"),
+                );
+            }
+        }
+        assert_eq!(selected_sets.len(), 3);
+        assert!((mean(&means) - 0.5).abs() < 1e-10);
+        // Exact HT total variance for PSU means [0.5, 1.0, 0.0], W=3,K=2.
+        assert!((mean(&variances) - 0.375).abs() < 1e-10);
+    }
+
+    #[test]
+    fn observed_source_work_and_scoring_identities_must_match_selected_sample() {
+        let mut input = estimator_input(dataset(19, 2));
+        input.observed_audit_outcomes[0].source_work_id_sha256 = digest('z');
+        assert!(estimate_design_based_metric(&input).is_err());
+
+        let mut input = estimator_input(dataset(19, 2));
+        input.observed_audit_outcomes[0].model_identity_sha256 = digest('z');
+        assert!(estimate_design_based_metric(&input).is_err());
+
+        let mut input = estimator_input(dataset(19, 2));
+        input.observed_audit_outcomes[0].scoring_plan_sha256 = digest('z');
+        assert!(estimate_design_based_metric(&input).is_err());
+    }
+
+    #[test]
     fn one_selected_work_returns_point_estimate_but_withholds_between_work_variance() {
         let input = estimator_input(dataset(71, 1));
         let report = estimate_design_based_metric(&input).unwrap();
@@ -620,6 +804,11 @@ mod tests {
         let mut input = estimator_input(dataset(19, 2));
         input.observed_audit_outcomes.push(ObservedAuditOutcomeV1 {
             item_id: "not-selected-active-item".into(),
+            source_work_id_sha256: digest('a'),
+            scoring_report_sha256: digest('3'),
+            model_identity_sha256: digest('1'),
+            evaluator_version: "mel-grounding-model-eval-v1".into(),
+            scoring_plan_sha256: digest('2'),
             metric_id: "grounded-correct".into(),
             value_ppm: PPM_SCALE,
         });
