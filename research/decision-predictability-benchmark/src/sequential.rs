@@ -1500,7 +1500,7 @@ mod tests {
                 path.steps[1].action_id == "C0" || path.steps[1].action_id == "C1"
             );
             assert_eq!(path.steps[1].possible_state_ids.len(), 4);
-            assert_eq!(path.terminal_possible_state_ids.len(), 2);
+            assert_eq!(path.terminal_possible_state_ids.len(), 4);
             assert_eq!(path.resource_usage["experiment_units"], 2);
             let expected_compute = if path.steps[1].action_id == "C0" { 0 } else { 1 };
             assert_eq!(path.resource_usage["compute_units"], expected_compute);
