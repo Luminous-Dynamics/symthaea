@@ -27,6 +27,7 @@ pub const MAX_DECISION_SUFFICIENCY_RECEIPT_BYTES_V1: usize = 1_048_576;
 pub const MAX_DECISION_SUFFICIENCY_RECEIPT_TTL_SECONDS_V1: u64 = 900;
 pub const MAX_DECISION_SUFFICIENCY_IDS_V1: usize = 10_000;
 pub const MAX_DECISION_SUFFICIENCY_IDENTIFIER_BYTES_V1: usize = 256;
+pub const MAX_DECISION_SUFFICIENCY_UNIX_SECONDS_V1: u64 = 253_402_300_799;
 
 #[derive(Clone, Debug, Eq, PartialEq, Serialize, Deserialize)]
 #[serde(deny_unknown_fields)]
@@ -241,6 +242,12 @@ pub fn validate_decision_sufficiency_receipt_v1(
         expected.qualified_evidence_ids,
     )?;
 
+    if receipt.attestation.issued_at_unix > MAX_DECISION_SUFFICIENCY_UNIX_SECONDS_V1
+        || receipt.attestation.expires_at_unix > MAX_DECISION_SUFFICIENCY_UNIX_SECONDS_V1
+    {
+        return Err(DecisionSufficiencyReceiptRejectV1::InvalidReceiptTtl);
+    }
+
     let lifetime = receipt
         .attestation
         .expires_at_unix
@@ -261,6 +268,9 @@ pub fn validate_decision_sufficiency_receipt_v1(
         return Err(DecisionSufficiencyReceiptRejectV1::PayloadDigestMismatch);
     }
 
+    if receipt.attestation.signature_base64.len() != 88 {
+        return Err(DecisionSufficiencyReceiptRejectV1::InvalidSignatureEncoding);
+    }
     let signature = STANDARD
         .decode(&receipt.attestation.signature_base64)
         .map_err(|_| DecisionSufficiencyReceiptRejectV1::InvalidSignatureEncoding)?;
@@ -652,6 +662,15 @@ mod tests {
             Err(DecisionSufficiencyReceiptRejectV1::SignatureRejected(
                 EvidenceQualificationRejectV1::SignatureRejected
             ))
+        );
+    }
+
+    #[test]
+    fn jcs_canonicalization_uses_sorted_object_keys() {
+        let value = serde_json::json!({"z": 0, "a": 1});
+        assert_eq!(
+            serde_json_canonicalizer::to_vec(&value).unwrap(),
+            br#"{"a":1,"z":0}"#
         );
     }
 
