@@ -436,6 +436,8 @@ fn require_text(value: &str, label: &str) -> Result<(), String> {
 #[cfg(test)]
 mod tests {
     use super::*;
+    use std::collections::BTreeSet;
+
     use crate::temporal_acquisition::{
         AnnotationAcquisitionCandidateV1, AnnotationCohortRoleV1,
         AnnotationStratumQuotaV1, AuthorizationStateV1,
@@ -443,6 +445,10 @@ mod tests {
 
     fn digest(byte: char) -> String {
         byte.to_string().repeat(64)
+    }
+
+    fn mean(values: &[f64]) -> f64 {
+        values.iter().sum::<f64>() / values.len() as f64
     }
 
     fn candidate(item: &str, work: char) -> AnnotationAcquisitionCandidateV1 {
