@@ -1,0 +1,46 @@
+{
+  "schema_version": "sat-event-record/v0.1",
+  "run_id": "00000000-0000-4000-8000-000000000001",
+  "event_id": "event-0002",
+  "sequence": 2,
+  "occurred_at": "2026-11-25T10:01:02Z",
+  "event_type": "effect_observed",
+  "actor": {"principal_id": "observer-01", "role": "sink_observer", "component_id": "bank-ledger-readback"},
+  "causality": {"correlation_id": "transfer-01", "parent_event_ids": ["event-0001"]},
+  "effect_binding": {
+    "action": "transfer",
+    "resource": "account-source-01",
+    "sink": "bank-ledger",
+    "purpose": "approved-invoice-payment",
+    "parameters_digest": "sha256:3333333333333333333333333333333333333333333333333333333333333333",
+    "payload_digest": "sha256:4444444444444444444444444444444444444444444444444444444444444444",
+    "payload_labels": ["financial.transaction"],
+    "idempotency_key": "payment-run-01"
+  },
+  "authority_decision": {
+    "decision": "allow",
+    "policy_digest": "sha256:5555555555555555555555555555555555555555555555555555555555555555",
+    "exact_effect_digest": "sha256:6666666666666666666666666666666666666666666666666666666666666666",
+    "grant_refs": ["grant-001"],
+    "decision_receipt_ref": "decision-receipt-001"
+  },
+  "effect_observation": {
+    "outcome": "observed_applied",
+    "observer_id": "observer-01",
+    "source_of_truth": "bank-ledger-readback",
+    "observed_at": "2026-11-25T10:01:02Z",
+    "state_version": "ledger-version-918"
+  },
+  "evidence_refs": [{
+    "artifact_id": "ledger-readback-001",
+    "digest": "sha256:7777777777777777777777777777777777777777777777777777777777777777",
+    "source_id": "bank-ledger-read-api",
+    "capture_method": "independent_api_read",
+    "independently_observed": true
+  }],
+  "integrity": {
+    "hash_algorithm": "sha256-jcs-v1",
+    "previous_event_digest": "sha256:8888888888888888888888888888888888888888888888888888888888888888",
+    "event_digest": "sha256:9999999999999999999999999999999999999999999999999999999999999999"
+  }
+}
