@@ -1,4 +1,4 @@
-# SAT Rust Reference Model V0.1 — 25 November 2026
+# SAT Rust Authority Reference Model V0.1 — 25 November 2026
 
 **Status:** source implementation added; compile/test/CI status pending.  
 **Parent research programme:** [SAT V0.1, PR #13574](https://github.com/Luminous-Dynamics/symthaea/pull/13574).  
@@ -7,7 +7,7 @@
 ## Purpose
 
 Provide a small, independently authored, dependency-free Rust oracle for
-bounded authority and ambiguous-outcome fixtures. The oracle is intended to
+bounded authority fixtures. The oracle is intended to
 challenge production implementations and adapters. It is not a second
 production authority kernel and does not replace the fabrication-specific
 delegation protocol, #4155 qualification, MACE receipt verification, or
@@ -22,8 +22,6 @@ independent evidence infrastructure.
   effect-scope subset, validity-window subset and decreasing delegation depth.
 - Full-lineage authorization checks and ancestor revocation.
 - Half-open validity windows: not-before inclusive, expiry exclusive.
-- Per-operation mutation state: unknown outcomes block retries; confirmed
-  no-effect permits a retry; confirmed effect blocks duplicate mutation.
 
 ## Reference tests
 
@@ -39,8 +37,6 @@ The initial unit-test set covers:
 - multi-level delegation depth consumption;
 - parent revocation invalidating descendants;
 - half-open expiry;
-- unknown-outcome reconciliation;
-- confirmed-effect duplicate blocking;
 - invalid delegation flag/depth combinations.
 
 These are reference-model tests, not execution of the complete public SAT
@@ -59,6 +55,9 @@ contract; this crate does not silently invent one.
 
 ## Composition with current work
 
+- Symtropy [MISSION-SUPERVISOR-001 #6498](https://github.com/Luminous-Dynamics/symtropy/issues/6498) owns the mission/subgoal mutation state machine and ambiguity hold. Symtropy [MOBILITY-MUTATION-BOUNDARY-001 #6669](https://github.com/Luminous-Dynamics/symtropy/issues/6669) owns the authority-linearized native mutation boundary. The SAT reference crate deliberately does not duplicate these mutation semantics; SAT consumes them in its operational-control track.
+- Mycelix [AGENT-009 #803](https://github.com/Luminous-Dynamics/mycelix/issues/803) and [AGENT-010 #830](https://github.com/Luminous-Dynamics/mycelix/issues/830) own durable effect-attempt and offline authority/evidence reconstruction semantics. Compose those contracts where the Mycelix agent runtime is evaluated.
+
 - [#4143](https://github.com/Luminous-Dynamics/symthaea/issues/4143) and
   [#4155](https://github.com/Luminous-Dynamics/symthaea/issues/4155): no
   authority from individual or collective intelligence.
@@ -76,7 +75,9 @@ contract; this crate does not silently invent one.
   frozen decision episodes and sealed evaluator manifests.
 
 The reference model does not replace these mechanisms. It supplies a separate
-behavioral oracle for a subset of authority and retry invariants.
+behavioral oracle for bounded capability and delegation invariants. Mutation
+reconciliation, sink linearization, and persistent effect-attempt evidence
+remain owner-native to Symtropy and Mycelix.
 
 ## No-runner validation record
 
