@@ -135,7 +135,9 @@
       "required": [
         "hypothesis_id",
         "prior_probability",
-        "predicted_response"
+        "predicted_response",
+        "response_branch_id",
+        "branch_association_stable"
       ],
       "properties": {
         "hypothesis_id": {
@@ -161,6 +163,13 @@
               "type": "number"
             }
           }
+        },
+        "response_branch_id": {
+          "type": "string",
+          "minLength": 1
+        },
+        "branch_association_stable": {
+          "const": true
         }
       }
     },
