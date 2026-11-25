@@ -443,7 +443,7 @@ mod tests {
             .unwrap();
         assert_eq!(primary.produced_subgoals.len(), 2);
         assert_eq!(primary.discharged_goals.len(), 2);
-        assert!(primary.transformed_goals.is_empty());
+        assert_eq!(primary.transformed_goals, vec!["G_MAIN".to_owned()]);
         assert!(primary.unresolved_goals.is_empty());
         assert_eq!(primary.terminal_goals.len(), 2);
     }
