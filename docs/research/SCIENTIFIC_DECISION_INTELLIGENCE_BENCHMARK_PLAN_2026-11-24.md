@@ -1,6 +1,6 @@
 # Scientific Decision Intelligence: Research and Benchmark Plan
 
-**Snapshot:** 2026-11-24  
+**Snapshot:** 2026-11-25  
 **Scope:** Symthaea experiment design, active evidence acquisition, decision-focused sensing, numerical qualification and end-to-end scientific workflow execution.  
 **Claim status:** Research plan and engineering status only. No external leaderboard result or physical validation is claimed.
 
@@ -82,6 +82,8 @@ AutoSciBench (arXiv:2610.05140) is a relevant methodological comparator for adap
 ## Current external benchmark landscape
 
 The figures below are public reference points, not results from Luminous Dynamics. Benchmarks are different tasks and must not be combined into one league table.
+
+**Verification note (2026-11-25):** Primary benchmark pages/papers were rechecked. The AS-Bench paper reports six campaigns, three runs per campaign per configuration (18 trials/configuration), 180 total trials across ten configurations, and 72% for the strongest configuration. The public leaderboard rounds this to 72.2%. The internal 83.3% target therefore means 15/18 per configuration, not 150/180.
 
 | Benchmark | Public reference point | Why it matters | Comparability warning |
 |---|---:|---|---|
