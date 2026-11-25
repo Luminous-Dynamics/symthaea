@@ -125,7 +125,10 @@ pub struct CausalInformationPortfolioReportV1 {
     pub candidate_eligibility: Vec<CausalCandidateEligibilityV1>,
     pub feasible_portfolio_count: usize,
     pub feasible_without_audit_floor_count: usize,
+    /// True only when the selected plan includes the required randomized-audit
+    /// design and declared inclusion probabilities; actual execution is unverified.
     pub population_estimation_available: bool,
+    pub population_prevalence_claim_authorized: bool,
     pub future_outcomes_require_k1_before_consumption: bool,
     pub conditional_independence_assumption_used: bool,
     pub source_likelihood_authenticity_proven: bool,
@@ -857,6 +860,7 @@ pub fn optimize_causal_information_portfolio_v1(
         feasible_portfolio_count: feasible.len(),
         feasible_without_audit_floor_count,
         population_estimation_available,
+        population_prevalence_claim_authorized: false,
         future_outcomes_require_k1_before_consumption: true,
         conditional_independence_assumption_used: input
             .conditional_independence_assumption_declared
@@ -1053,6 +1057,8 @@ mod tests {
         let report = optimize_causal_information_portfolio_v1(&value).unwrap();
         assert_eq!(report.status, CausalPortfolioStatusV1::Selected);
         assert!(report.population_estimation_available);
+        assert!(!report.population_prevalence_claim_authorized);
+        assert!(report.future_outcomes_require_k1_before_consumption);
         let selected = report.selected_portfolio.unwrap();
         assert_eq!(
             selected.audit_inclusion_probabilities.get("audit"),
