@@ -107,14 +107,23 @@ pub enum RandomizedDecisionError {
     TooManyPolicyActions,
     EmptyActionId,
     UnsortedOrDuplicatePolicyAction,
-    ZeroProbability { action_id: String },
+    ZeroProbability {
+        action_id: String,
+    },
     ProbabilityOutOfRange {
         action_id: String,
         probability_ppm: u32,
     },
-    ProbabilityMassMismatch { actual_ppm: u64 },
-    EmptyHiddenWorldDigest { world_id: u64 },
-    PolicyActionUnknown { world_id: u64, action_id: String },
+    ProbabilityMassMismatch {
+        actual_ppm: u64,
+    },
+    EmptyHiddenWorldDigest {
+        world_id: u64,
+    },
+    PolicyActionUnknown {
+        world_id: u64,
+        action_id: String,
+    },
     ArithmeticOverflow,
     DecisionObservability(DecisionObservabilityError),
 }
@@ -135,7 +144,10 @@ impl fmt::Display for RandomizedDecisionError {
                 write!(formatter, "candidate action distribution must not be empty")
             }
             Self::TooManyPolicyActions => {
-                write!(formatter, "candidate action distribution exceeds the action limit")
+                write!(
+                    formatter,
+                    "candidate action distribution exceeds the action limit"
+                )
             }
             Self::EmptyActionId => write!(formatter, "candidate action ID must not be empty"),
             Self::UnsortedOrDuplicatePolicyAction => write!(
@@ -158,14 +170,23 @@ impl fmt::Display for RandomizedDecisionError {
                 "candidate action probabilities sum to {actual_ppm} PPM, expected {RANDOMIZED_POLICY_MASS_PPM}"
             ),
             Self::EmptyHiddenWorldDigest { world_id } => {
-                write!(formatter, "hidden world {world_id} has an empty identity digest")
+                write!(
+                    formatter,
+                    "hidden world {world_id} has an empty identity digest"
+                )
             }
-            Self::PolicyActionUnknown { world_id, action_id } => write!(
+            Self::PolicyActionUnknown {
+                world_id,
+                action_id,
+            } => write!(
                 formatter,
                 "candidate policy assigns positive probability to inadmissible action {action_id} in world {world_id}"
             ),
             Self::ArithmeticOverflow => {
-                write!(formatter, "randomized decision-regret arithmetic overflowed")
+                write!(
+                    formatter,
+                    "randomized decision-regret arithmetic overflowed"
+                )
             }
             Self::DecisionObservability(error) => write!(
                 formatter,
@@ -241,9 +262,7 @@ fn validate_policy_distribution(
         previous_action = Some(probability.action_id.as_str());
     }
     if mass != u64::from(RANDOMIZED_POLICY_MASS_PPM) {
-        return Err(RandomizedDecisionError::ProbabilityMassMismatch {
-            actual_ppm: mass,
-        });
+        return Err(RandomizedDecisionError::ProbabilityMassMismatch { actual_ppm: mass });
     }
     Ok(())
 }
@@ -365,8 +384,7 @@ pub fn evaluate_randomized_decision_regret(
             expected_regret_numerator = expected_regret_numerator
                 .checked_add(weighted_regret)
                 .ok_or(RandomizedDecisionError::ArithmeticOverflow)?;
-            world_worst_supported_regret_ppm =
-                world_worst_supported_regret_ppm.max(regret_ppm);
+            world_worst_supported_regret_ppm = world_worst_supported_regret_ppm.max(regret_ppm);
         }
 
         let expected_loss_ppm_ceil = to_u32(ceil_div(
@@ -406,10 +424,8 @@ pub fn evaluate_randomized_decision_regret(
         worst_expected_regret_numerator,
         u128::from(RANDOMIZED_POLICY_MASS_PPM),
     )?)?;
-    let mean_expected_regret_ppm_ceil = to_u32(ceil_div(
-        total_expected_regret_numerator,
-        mean_denominator,
-    )?)?;
+    let mean_expected_regret_ppm_ceil =
+        to_u32(ceil_div(total_expected_regret_numerator, mean_denominator)?)?;
 
     Ok(RandomizedDecisionRegretCertificate {
         equivalence_class_id: class.equivalence_class_id,
@@ -448,11 +464,7 @@ mod tests {
         }
     }
 
-    fn world(
-        world_id: u64,
-        left_loss: u32,
-        right_loss: u32,
-    ) -> RandomizedPolicyWorld {
+    fn world(world_id: u64, left_loss: u32, right_loss: u32) -> RandomizedPolicyWorld {
         RandomizedPolicyWorld {
             evaluator_world_id: world_id,
             hidden_world_sha256: digest(if world_id == 1 { 11 } else { 12 }),
@@ -475,10 +487,7 @@ mod tests {
             equivalence_class_id: 77,
             candidate_policy_sha256: digest(9),
             action_probabilities: probabilities,
-            alternatives: vec![
-                world(1, 0, 1_000_000),
-                world(2, 1_000_000, 0),
-            ],
+            alternatives: vec![world(1, 0, 1_000_000), world(2, 1_000_000, 0)],
         }
     }
 
@@ -500,7 +509,10 @@ mod tests {
         let result = evaluate_randomized_decision_regret(&class(mixture())).unwrap();
         assert_eq!(result.worst_case_expected_regret_ppm_ceil, 500_000);
         assert_eq!(result.mean_expected_regret_ppm_ceil, 500_000);
-        assert_eq!(result.deterministic_minimax_regret_comparator_ppm, 1_000_000);
+        assert_eq!(
+            result.deterministic_minimax_regret_comparator_ppm,
+            1_000_000
+        );
         assert_eq!(result.deterministic_minimax_action_id, "left");
         assert_eq!(result.policy_probability_mass_ppm, 1_000_000);
         assert_eq!(result.policy_support_action_count, 2);
@@ -512,8 +524,9 @@ mod tests {
         let result = evaluate_randomized_decision_regret(&class(mixture())).unwrap();
         assert_eq!(result.worst_case_expected_regret_ppm_ceil, 500_000);
         assert_eq!(result.worst_supported_action_regret_ppm, 1_000_000);
-        assert!(result.worst_supported_action_regret_ppm
-            > result.worst_case_expected_regret_ppm_ceil);
+        assert!(
+            result.worst_supported_action_regret_ppm > result.worst_case_expected_regret_ppm_ceil
+        );
     }
 
     #[test]
@@ -601,7 +614,9 @@ mod tests {
     #[test]
     fn same_hidden_worlds_must_have_identical_candidate_views() {
         let mut invalid = class(mixture());
-        invalid.alternatives[1].candidate_view.recurrent_state_sha256 = digest(88);
+        invalid.alternatives[1]
+            .candidate_view
+            .recurrent_state_sha256 = digest(88);
         assert_eq!(
             evaluate_randomized_decision_regret(&invalid),
             Err(RandomizedDecisionError::DecisionObservability(
