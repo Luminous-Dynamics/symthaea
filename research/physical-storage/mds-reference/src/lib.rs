@@ -773,11 +773,15 @@ mod tests {
             (4, 14, 18)
         );
 
-        // The measured design envelope has a visible boundary: 3x3x2 boxes
+        // The synthetic design envelope has a visible boundary: 3x3x2 boxes
         // exceed two erasures in all eight positions.
         assert_eq!(
             rectangular_fault_tournament(&layout, (3, 3, 2), false),
             (4, 8, 8)
+        );
+        assert_eq!(
+            rectangular_fault_tournament(&layout, (3, 3, 2), true),
+            (5, 8, 8)
         );
     }
 
