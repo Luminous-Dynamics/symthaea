@@ -1,36 +1,36 @@
 {
-  "version": "CPDC-SYNTHETIC-1.0",
+  "version": "CPDC-SYNTHETIC-1.1",
   "semantics": "synthetic semantic qualification; lower is better except exact_expected_decisions",
   "strategies": {
     "citation-only": {
-      "cases": 14,
+      "cases": 15,
       "false_current": 8,
       "false_stale": 0,
       "missed_reauthorizations": 4,
       "unauthorized_allows": 11,
       "missed_current_risk_reviews": 1,
       "historical_as_of_errors": 0,
-      "exact_expected_decisions": 3
+      "exact_expected_decisions": 4
     },
     "lineage-aware": {
-      "cases": 14,
+      "cases": 15,
       "false_current": 0,
       "false_stale": 0,
       "missed_reauthorizations": 0,
       "unauthorized_allows": 0,
       "missed_current_risk_reviews": 0,
       "historical_as_of_errors": 0,
-      "exact_expected_decisions": 14
+      "exact_expected_decisions": 15
     },
     "snapshot-only": {
-      "cases": 14,
+      "cases": 15,
       "false_current": 0,
       "false_stale": 0,
       "missed_reauthorizations": 4,
       "unauthorized_allows": 0,
       "missed_current_risk_reviews": 1,
       "historical_as_of_errors": 0,
-      "exact_expected_decisions": 9
+      "exact_expected_decisions": 10
     }
   },
   "disclaimer": "These fixtures compare explicit policy baselines only. They are not measurements of DBOS, Temporal, Rekor, SCITT, or any external product, and are not a production qualification result."
