@@ -37,7 +37,7 @@
   "witness_attestations": [
     {
       "witness_id": "witness-alpha",
-      "service_id": "https://witness-a.example.invalid",
+      "service_id": "https://transparency.example.invalid",
       "tree_size": 100,
       "root_hash": "sha256:bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb",
       "observed_at": "2026-11-25T13:00:01Z",
@@ -51,7 +51,7 @@
     },
     {
       "witness_id": "witness-beta",
-      "service_id": "https://witness-b.example.invalid",
+      "service_id": "https://transparency.example.invalid",
       "tree_size": 100,
       "root_hash": "sha256:bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb",
       "root_hash_algorithm": "sha-256",
