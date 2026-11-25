@@ -608,7 +608,7 @@ mod tests {
     #[test]
     fn exact_receipt_and_exact_selected_outcome_set_are_required() {
         let mut input = estimator_input(dataset(19, 2));
-        input.expected_selection_receipt_sha256 = digest('f');
+        input.expected_selection_receipt_sha256 = Some(digest('f'));
         assert!(estimate_design_based_metric(&input).is_err());
 
         let mut input = estimator_input(dataset(19, 2));
@@ -640,6 +640,8 @@ mod tests {
         let input = estimator_input(dataset(31, 2));
         let report = estimate_design_based_metric(&input).unwrap();
         assert!(report.exact_selection_receipt_replayed);
+        assert!(report.expected_selection_receipt_supplied);
+        assert!(report.selection_receipt_match_verified);
         assert!(!report.adaptive_active_stream_used);
         assert!(!report.observed_outcomes_authenticated);
         assert!(!report.population_confidence_claim_permitted);
