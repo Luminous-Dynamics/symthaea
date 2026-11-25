@@ -59,11 +59,11 @@
     "expected_statement": "a ∧ b ↔ b ∧ a"
   },
   "claim_ceiling": [
-    "A successful Lean replay checks the declared local propositions and the composed root theorem under the pinned Lean/Mathlib environment.",
-    "The split certificate establishes obligation equivalence for the two implication subgoals; the forward and reverse declarations certify those exact implications.",
-    "This pilot does not yet emit elaborated pre-goal binder identities, local-instance context digests, generated subgoal-state receipts, or a parsed axiom/admission dependency closure.",
-    "The ProofPlan action-to-declaration mapping and natural-language mathematical-role labels remain provisional and are not expert-reviewed gold annotations.",
-    "This is not a general ProofActionCertificateV1 validator or a benchmark result."
+    "A successful Lean replay checks the declared local propositions and composed root theorem under this exact pinned Lean/Mathlib environment.",
+    "The raw #print axioms output and native no-axioms declarations are diagnostic only; Lean issue #15226 documents under-reporting via shared imported-axiom cache in affected toolchains.",
+    "Do not treat native #print axioms as a complete trust-closure proof; use the separately recorded fresh-Dfs reproduction and extend its coverage before making repository-wide trust claims.",
+    "The pilot does not emit elaborated pre/post goal-state snapshots, binder identity or local-instance context digests, or a general machine-checked ProofActionCertificateV1 graph validator.",
+    "The ProofPlan action-to-declaration mapping and mathematical-role labels remain provisional and are not independently expert-reviewed."
   ],
   "negative_control": {
     "path": "scripts/research/lean-proof-extractor/ProofActionCertificateAndCommNegative.lean",
