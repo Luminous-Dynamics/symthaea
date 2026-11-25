@@ -3,9 +3,9 @@
 // Commercial licensing: see COMMERCIAL_LICENSE.md at repository root
 //! Web Research Orchestrator
 //!
-//! Coordinates the research pipeline: query planning, fetching,
-//! extraction, verification, and integration. This is the main
-//! entry point for autonomous web research.
+//! Coordinates query planning, retrieval, extraction, epistemic assessment,
+//! and knowledge integration. Retrieved pages are evidence candidates; they are
+//! not claim support until an upstream claim-specific classifier labels them.
 
 use anyhow::{Context, Result};
 use serde_json::Value;
