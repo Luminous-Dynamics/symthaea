@@ -21,6 +21,8 @@ The file uses only the Rust standard library and can be compiled without resolvi
 - The exact trace/determinant Hurwitz criterion for a real 2x2 continuous-time linear system.
 - Adjacent spectral gap ratios and positive-affine invariance.
 - A deterministic prime sieve for small analytic reference cases.
+- 2x2 linear-system observability rank and 2-feature input-excitation rank.
+- An exact hidden-mode non-identifiability fixture: two different systems generate identical measured traces.
 - XOR binding/unbinding, majority bundling, Hamming distance, and reproducible synthetic binary codewords.
 
 The tests include malformed-input and boundary controls. The deterministic codeword generator is **not cryptographic** and is only for reproducible test fixtures.
@@ -35,4 +37,4 @@ This harness does not:
 - prove a theorem or verify a proof plan;
 - establish consciousness, intelligence, or biological correspondence.
 
-A passing run would validate these small reference functions only. It would not count as an SDCB model result or a SOTA comparison.
+The Rust source currently authors 23 unit tests, including observability, excitation, and selective-abstention controls. A passing run would validate these small reference functions only. It would not count as an SDCB model result or a SOTA comparison.
