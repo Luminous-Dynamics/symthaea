@@ -52,6 +52,7 @@ The storage adapter must define and independently calculate the normalized edit-
 ## Ordered experiment evidence
 
 Each applicable T9/T10 episode now carries a run-bound event trace with a contiguous sequence number, unique event ID, monotonic elapsed time, one pinned clock-profile digest, typed event kind/source, and digest of the original receipt bytes.
+C1 and C2 control receipts use the same event-trace mechanism. C1 records SUT stop/restart, seeded read and unchanged inventory observation. C2 records post-restart write request/acknowledgement and successful readback. The control evidence digest must equal the recomputed event-trace root; a passed flag alone is not sufficient.
 
 The required event sequence is explicit:
 
