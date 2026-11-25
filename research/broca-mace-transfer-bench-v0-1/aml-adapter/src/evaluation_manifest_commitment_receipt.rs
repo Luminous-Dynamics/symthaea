@@ -588,6 +588,10 @@ mod tests {
     }
 
     fn fixture() -> Fixture {
+        fixture_with_episode_root(digest('b'))
+    }
+
+    fn fixture_with_episode_root(episode_manifest_root_sha256: String) -> Fixture {
         let signer = SigningKey::from_bytes(&[9; 32]);
         let public_key = signer.verifying_key().to_bytes();
         let key_id = qualification_key_id_v1(&public_key);
@@ -613,7 +617,6 @@ mod tests {
 
         let suite_id = "mace-test".to_owned();
         let suite_version = "v1".to_owned();
-        let episode_manifest_root_sha256 = digest('b');
         let sealed_evaluation_manifest_sha256 = digest('c');
         let arm_assignment_root_sha256 = digest('d');
         let pre_registration_root_sha256 = digest('e');
@@ -674,7 +677,13 @@ mod tests {
     }
 
     pub(super) fn verified_fixture_capability() -> VerifiedEvaluationManifestCommitmentV1 {
-        let fixture = fixture();
+        verified_fixture_capability_with_episode_root(&digest('b'))
+    }
+
+    pub(super) fn verified_fixture_capability_with_episode_root(
+        root: &str,
+    ) -> VerifiedEvaluationManifestCommitmentV1 {
+        let fixture = fixture_with_episode_root(root.to_owned());
         let expected = fixture.expected();
         fixture.verify(250, &expected, &AcceptLog).unwrap()
     }
@@ -785,4 +794,11 @@ mod tests {
 pub(crate) fn test_verified_evaluation_manifest_commitment_v1(
 ) -> VerifiedEvaluationManifestCommitmentV1 {
     tests::verified_fixture_capability()
+}
+
+#[cfg(test)]
+pub(crate) fn test_verified_evaluation_manifest_commitment_with_episode_root_v1(
+    root: &str,
+) -> VerifiedEvaluationManifestCommitmentV1 {
+    tests::verified_fixture_capability_with_episode_root(root)
 }
