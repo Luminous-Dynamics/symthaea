@@ -2079,6 +2079,30 @@ mod tests {
     }
 
     #[test]
+    fn exact_intent_digest_remains_stable_across_new_attempt_ids() {
+        let first = sample_event(1, "event-1", "effect_submitted", None, None, vec![]);
+        let second = with_attempt_id(
+            sample_event(
+                2,
+                "event-2",
+                "effect_submitted",
+                Some(&event_digest(&first)),
+                None,
+                vec!["event-1"],
+            ),
+            "attempt-0002",
+        );
+        assert_eq!(
+            first["effect_binding"]["binding_digest"],
+            second["effect_binding"]["binding_digest"]
+        );
+        assert_ne!(
+            first["effect_binding"]["attempt_id"],
+            second["effect_binding"]["attempt_id"]
+        );
+    }
+
+    #[test]
     fn late_observation_for_previous_attempt_cannot_settle_retry() {
         let first_submission = sample_event(1, "event-1", "effect_submitted", None, None, vec![]);
         let first_digest = event_digest(&first_submission);
