@@ -49,7 +49,7 @@ A candidate with current but out-of-domain support is **UNSUPPORTED**. Insuffici
 
 ## Ranking
 
-Only candidates that pass all hard gates are ranked. The base score combines mean robust target-risk ratio and historical-support ratio. A deterministic greedy selection then applies a capped diversity bonus based on normalized Euclidean distance in recipe-control space. The report preserves:
+Only candidates that pass all hard gates are ranked. The base score combines mean robust target-risk ratio, historical-support ratio and a side-constraint margin penalty. A deterministic greedy selection then applies a capped diversity bonus based on normalized Euclidean distance in recipe-control space. The report preserves:
 - robust target risk;
 - support-distance ratio;
 - minimum normalized side-constraint margin;
@@ -74,7 +74,7 @@ The input and output are digest-bound and canonicalized across candidate/target/
 
 ## Authored known-answer tests
 
-Nine tests cover:
+Ten tests cover:
 1. robust target-interval and side-constraint rejection;
 2. unsupported and unknown evidence never entering top-K;
 3. insufficient historical support returning UNKNOWN;
@@ -83,7 +83,8 @@ Nine tests cover:
 6. candidate payload tampering returning REJECTED;
 7. diversity changing top-K without changing feasibility;
 8. candidate/input order-invariant ranking receipt;
-9. partial top-K fill and human-review-only authority flags.
+9. partial top-K fill and human-review-only authority flags;
+10. disabling diversity permits a zero diversity-distance threshold without NaN ranking scores.
 
 Tests are authored; exact-head rustfmt, strict Clippy, crate tests and SEMI-BENCH-001 reference validation remain pending.
 
