@@ -2,6 +2,7 @@
 
 pub mod binary_metrics;
 pub mod calibration_requalification;
+pub mod causal_drift_interventions;
 pub mod dtco_manifest;
 pub mod gated_streaming_adapter;
 pub mod label_consumption_guard;
@@ -148,4 +149,14 @@ pub use gated_streaming_adapter::{
     StreamingPredictionReceiptV1, StreamingUpdateDispositionV1, StreamingUpdateReasonV1,
     StreamingUpdateReceiptV1, create_gated_streaming_adapter_engine_v1,
     deliver_qualified_stream_label_v1, predict_and_register_stream_sample_v1,
+};
+
+pub use causal_drift_interventions::{
+    CAUSAL_DRIFT_FIXTURE_SCHEMA_V1, CAUSAL_DRIFT_REPORT_SCHEMA_V1, CAUSAL_DRIFT_SCHEMA_V1,
+    CausalDriftCauseV1, CausalDriftChannelDeltaV1, CausalDriftChannelEvidenceV1,
+    CausalDriftChannelV1, CausalDriftDiagnosisV1, CausalDriftErrorV1,
+    CausalDriftInputV1, CausalDriftInterventionManifestV1,
+    CausalDriftReasonV1, CausalDriftSyntheticFixtureV1,
+    CausalIdentificationStatusV1, diagnose_causal_drift_v1,
+    generate_causal_drift_fixture_v1,
 };
