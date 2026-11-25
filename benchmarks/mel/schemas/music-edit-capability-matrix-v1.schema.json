@@ -1,0 +1,80 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://luminousdynamics.io/schemas/mel/music-edit-capability-matrix-v1.schema.json",
+  "title": "Melothaea music-edit operation qualification matrix v1",
+  "type": "object",
+  "additionalProperties": false,
+  "required": [
+    "schema_version",
+    "capabilities"
+  ],
+  "properties": {
+    "schema_version": {
+      "const": "mel-music-edit-capability-matrix-v1"
+    },
+    "capabilities": {
+      "type": "array",
+      "minItems": 12,
+      "maxItems": 12,
+      "items": {
+        "$ref": "#/$defs/capability"
+      }
+    }
+  },
+  "$defs": {
+    "sha256": {
+      "type": "string",
+      "pattern": "^[0-9a-f]{64}$"
+    },
+    "capability": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "operation",
+        "qualification",
+        "qualification_evidence_sha256",
+        "boundary"
+      ],
+      "properties": {
+        "operation": {
+          "enum": [
+            "remove_instrument",
+            "replace_instrument",
+            "extract_instrument",
+            "double_instrument",
+            "remove_drums",
+            "replace_drums",
+            "extract_drums",
+            "staccato",
+            "legato",
+            "crescendo",
+            "decrescendo",
+            "tuning_correction440"
+          ]
+        },
+        "qualification": {
+          "enum": [
+            "qualified",
+            "not_yet_qualified",
+            "unsupported",
+            "abstain_only"
+          ]
+        },
+        "qualification_evidence_sha256": {
+          "oneOf": [
+            {
+              "$ref": "#/$defs/sha256"
+            },
+            {
+              "type": "null"
+            }
+          ]
+        },
+        "boundary": {
+          "type": "string",
+          "minLength": 1
+        }
+      }
+    }
+  }
+}

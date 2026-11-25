@@ -1,0 +1,49 @@
+{
+  "schema_version": "mel-music-edit-dataset-manifest-v1",
+  "dataset_id": "mel-music-edit-adapter-synthetic-contract",
+  "dataset_version": "synthetic-contract-v1",
+  "benchmark_track_id": "synthetic-music-edit-dev",
+  "protocol_sha256": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+  "scorer_sha256": "bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb",
+  "access_tier": "public",
+  "access_evidence_sha256": null,
+  "intended_use": "evaluation_only",
+  "rights": {
+    "state": "cleared",
+    "rights_reference": "generated synthetic metadata only; no external recordings or benchmark assets",
+    "rights_evidence_sha256": "cccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccc",
+    "permitted_uses": [
+      "evaluation_only"
+    ]
+  },
+  "rows": [
+    {
+      "sample_id": "synthetic-001",
+      "source_lineage_sha256": "dddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddd",
+      "split": "development",
+      "stratum": "midi_synthesized",
+      "operation": "remove_instrument",
+      "target_scope": "instrument",
+      "source_audio_sha256": "1111111111111111111111111111111111111111111111111111111111111111",
+      "instruction_sha256": "2222222222222222222222222222222222222222222222222222222222222222",
+      "target_audio_sha256": "3333333333333333333333333333333333333333333333333333333333333333",
+      "source_symbolic_sha256": "4444444444444444444444444444444444444444444444444444444444444444",
+      "target_selector_sha256": "5555555555555555555555555555555555555555555555555555555555555555",
+      "metadata_sha256": "6666666666666666666666666666666666666666666666666666666666666666"
+    },
+    {
+      "sample_id": "synthetic-002",
+      "source_lineage_sha256": "dddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddd",
+      "split": "development",
+      "stratum": "midi_synthesized",
+      "operation": "staccato",
+      "target_scope": "instrument",
+      "source_audio_sha256": "7777777777777777777777777777777777777777777777777777777777777777",
+      "instruction_sha256": "8888888888888888888888888888888888888888888888888888888888888888",
+      "target_audio_sha256": "9999999999999999999999999999999999999999999999999999999999999999",
+      "source_symbolic_sha256": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+      "target_selector_sha256": "bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb",
+      "metadata_sha256": "cccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccc"
+    }
+  ]
+}
