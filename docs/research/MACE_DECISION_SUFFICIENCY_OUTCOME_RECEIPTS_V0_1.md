@@ -95,7 +95,7 @@ Schema: `data/schemas/mace_decision_outcome_receipt_v1.schema.json`
 
 The outcome receipt binds:
 
-- the public decision-episode manifest and sealed evaluator-manifest commitment;
+- the public decision-episode manifest and sealed evaluator-manifest digest, plus the digest of a separately verified, pre-run commitment-witness receipt;
 - the qualification and sufficiency receipt digests (explicit null is allowed for no-memory control arms only);
 - the exact decision record;
 - execution status and, when executed, the action, authorization and execution receipt digests;
@@ -119,7 +119,7 @@ Causal attribution is separate from outcome measurement:
 
 Only `identified_positive`, `identified_no_effect`, or `identified_negative` outcomes with a disclosed independent episode count and confidence-interval report may contribute to causal-uplift claims. Report estimates, uncertainty, per-family results and preregistered exclusions. Do not convert a descriptive correlation into uplift.
 
-The outcome receipt is an archival measurement, not an authorization credential. It has no expiry field; trust validation still checks the evaluator profile, key status and signature. Key revocation can invalidate confidence in an attestation without rewriting the historical event.
+The outcome receipt is an archival measurement, not an authorization credential. It has no expiry field; trust validation still checks the evaluator profile, key status and signature. Key revocation can invalidate confidence in an attestation without rewriting the historical event. The consumer MUST independently verify the detached evaluation-manifest commitment witness before constructing the expected outcome binding. The Rust outcome verifier requires a private-field `VerifiedEvaluationManifestCommitmentV1` capability produced only after the detached-witness signature, exact root/binding, commit-before-access/start checks and injected append-only-log verification pass; it does not accept an arbitrary witness digest string. It also requires a private `VerifiedDecisionEpisodeMembershipV1` capability proving that the exact episode digest/ID belongs to the full public episode-set root bound by that witness. The public episode-set root and membership validator are implemented; the sealed assignment/artifact root validator and concrete production log client/checkpoint trust remain outstanding.
 
 ## 6. Canonicalization and signature profile
 
@@ -228,11 +228,12 @@ Hard constraints are gates. Utility is optimized only among configurations that 
 1. **Protocol contracts (#13594):** versioned strict schemas and normative semantics for sufficiency and outcome attestations.
 2. **Consumer-side sufficiency verification (this increment):** strict typed parsing, JCS canonicalization, current binding, requirement/evidence-set consistency, pinned Ed25519 verification and negative tests.
 3. **Outcome receipt verification (this increment):** strict decoding, arithmetic/cross-field consistency, execution-chain completeness, preregistered-design binding, evaluator-profile pinning and signed outcome verification.
-4. Build the independent decision assessor with separate OS principal, credentials, source resolver, policy and private key. Recompute evidence qualification and the coverage/uncertainty/contradiction reports independently.
-5. Build a separate action-authority service that issues short-lived, consume-once authorization receipts. It must re-check live rights, purpose, scope, lifecycle, resource and human-approval conditions at use.
-6. Build an outcome evaluator that owns sealed manifests, independently observes execution/outcome, runs paired counterfactual arms and signs outcome receipts. The candidate must not possess evaluator labels or signing credentials.
-7. Add adapters for AML, LongMemEval-V2, MemoryArena, WorldMemArena, TimlMemBench, FAMA, MemForm, MemSecBench, MemoryDojo and all ten Agent Memory Integrity cases.
-8. Publish matched baseline results and Pareto frontiers. Promote strategy memory only after a held-out causal improvement without hard-constraint regression.
+4. **Frozen manifests and detached evaluator witness (#13600):** canonical public episode manifests and witnessed exact episode membership; sealed assignments/oracles, detached pre-run commitment receipt, separate witness trust, concrete append-only log and delayed reveal remain in progress.
+5. Build the independent decision assessor with separate OS principal, credentials, source resolver, policy and private key. Recompute evidence qualification and the coverage/uncertainty/contradiction reports independently.
+6. Build a separate action-authority service that issues short-lived, consume-once authorization receipts. It must re-check live rights, purpose, scope, lifecycle, resource and human-approval conditions at use.
+7. Build an outcome evaluator that owns sealed manifests, independently observes execution/outcome, runs paired counterfactual arms and signs outcome receipts. The candidate must not possess evaluator labels or signing credentials.
+8. Add adapters for AML, LongMemEval-V2, MemoryArena, WorldMemArena, TimlMemBench, FAMA, MemForm, MemSecBench, MemoryDojo and all ten Agent Memory Integrity cases.
+9. Publish matched baseline results and Pareto frontiers. Promote strategy memory only after a held-out causal improvement without hard-constraint regression.
 
 ## 11. Rust consumer-side verifier increment
 
@@ -275,3 +276,4 @@ Until those gates pass, describe this as a protocol/schema contribution, not a d
 - Agent Memory Integrity Internet-Draft, revision -00 (published 2026-11-01; work in progress, not an IETF standard): https://datatracker.ietf.org/doc/draft-khandelwal-bpm-agent-memory-integrity/
 - MACE independent qualification exchange v1: `MACE_INDEPENDENT_QUALIFICATION_EXCHANGE_V1.md`
 - Related MACE decision-influence and selective-repair specification: https://github.com/Luminous-Dynamics/symthaea/pull/13397
+- Frozen episode, sealed evaluator and detached commitment witness contracts: `MACE_FROZEN_DECISION_EVALUATION_MANIFESTS_V0_1.md` (stacked PR #13600)

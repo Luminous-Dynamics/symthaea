@@ -17,6 +17,10 @@ use sha2::{Digest, Sha256};
 use crate::evidence_qualification_gate::{
     EvidenceQualificationRejectV1, EvidenceQualificationSignatureVerifierV1,
 };
+use crate::evaluation_manifest_commitment_receipt::VerifiedEvaluationManifestCommitmentV1;
+use crate::frozen_decision_episode_manifest::{
+    DecisionEpisodeSplitV1, VerifiedDecisionEpisodeMembershipV1,
+};
 
 pub const DECISION_OUTCOME_RECEIPT_SCHEMA_V1: &str = "mace_decision_outcome_receipt_v1";
 pub const DECISION_OUTCOME_PAYLOAD_SCHEMA_V1: &str = "mace_decision_outcome_payload_v1";
@@ -41,6 +45,7 @@ pub struct DecisionOutcomePayloadV1 {
     pub decision_episode_id: String,
     pub episode_manifest_sha256: String,
     pub evaluation_manifest_sha256: String,
+    pub evaluation_manifest_commitment_receipt_sha256: String,
     pub qualification_receipt_sha256: Option<String>,
     pub decision_sufficiency_receipt_sha256: Option<String>,
     pub decision_record_sha256: String,
@@ -142,8 +147,14 @@ pub struct DecisionOutcomeAttestationV1 {
 /// preregistered causal design, and separately pinned evaluator/verifier.
 pub struct DecisionOutcomeExpectedBindingV1<'a> {
     pub decision_episode_id: &'a str,
-    pub episode_manifest_sha256: &'a str,
-    pub evaluation_manifest_sha256: &'a str,
+    /// Capability returned only after the canonical episode-set root and exact
+    /// episode digest have been bound to the verified detached witness.
+    pub episode_membership: &'a VerifiedDecisionEpisodeMembershipV1,
+    /// Split required by the consumer's sealed evaluation protocol.
+    pub required_split: DecisionEpisodeSplitV1,
+    /// Capability returned only after the detached witness signature, bindings,
+    /// pre-run time and append-only log proof have been verified.
+    pub evaluation_manifest_commitment: &'a VerifiedEvaluationManifestCommitmentV1,
     pub qualification_receipt_sha256: Option<&'a str>,
     pub decision_sufficiency_receipt_sha256: Option<&'a str>,
     pub decision_record_sha256: &'a str,
@@ -274,16 +285,27 @@ pub fn validate_decision_outcome_receipt_v1(
     validate_atom(&receipt.payload.decision_episode_id)?;
     validate_atom(expected.decision_episode_id)?;
     if receipt.payload.decision_episode_id != expected.decision_episode_id
-        || receipt.payload.episode_manifest_sha256 != expected.episode_manifest_sha256
-        || receipt.payload.evaluation_manifest_sha256 != expected.evaluation_manifest_sha256
+        || receipt.payload.decision_episode_id != expected.episode_membership.episode_id()
+        || receipt.payload.episode_manifest_sha256 != expected.episode_membership.manifest_sha256()
+        || expected.episode_membership.episode_set_root_sha256()
+            != expected.evaluation_manifest_commitment.episode_manifest_root_sha256()
+        || expected.episode_membership.suite_id() != expected.evaluation_manifest_commitment.suite_id()
+        || expected.episode_membership.suite_version()
+            != expected.evaluation_manifest_commitment.suite_version()
+        || expected.episode_membership.split() != expected.required_split
+        || receipt.payload.evaluation_manifest_sha256
+            != expected.evaluation_manifest_commitment.sealed_evaluation_manifest_sha256()
+        || receipt.payload.evaluation_manifest_commitment_receipt_sha256
+            != expected.evaluation_manifest_commitment.receipt_sha256()
         || receipt.payload.decision_record_sha256 != expected.decision_record_sha256
     {
         return Err(DecisionOutcomeReceiptRejectV1::BindingMismatch);
     }
 
     for digest in [
-        expected.episode_manifest_sha256,
-        expected.evaluation_manifest_sha256,
+        expected.episode_membership.manifest_sha256(),
+        expected.evaluation_manifest_commitment.sealed_evaluation_manifest_sha256(),
+        expected.evaluation_manifest_commitment.receipt_sha256(),
         expected.decision_record_sha256,
         expected.evaluator_profile_sha256,
         expected.verifier_profile_sha256,
@@ -660,8 +682,8 @@ mod tests {
         receipt: DecisionOutcomeReceiptV1,
         verifier: PinnedEd25519QualificationVerifierV1,
         signer: SigningKey,
-        episode_manifest_sha256: String,
-        evaluation_manifest_sha256: String,
+        episode_membership: VerifiedDecisionEpisodeMembershipV1,
+        evaluation_manifest_commitment: VerifiedEvaluationManifestCommitmentV1,
         qualification_receipt_sha256: Option<String>,
         decision_sufficiency_receipt_sha256: Option<String>,
         decision_record_sha256: String,
@@ -676,8 +698,9 @@ mod tests {
         fn expected(&self) -> DecisionOutcomeExpectedBindingV1<'_> {
             DecisionOutcomeExpectedBindingV1 {
                 decision_episode_id: "episode-1",
-                episode_manifest_sha256: &self.episode_manifest_sha256,
-                evaluation_manifest_sha256: &self.evaluation_manifest_sha256,
+                episode_membership: &self.episode_membership,
+                required_split: DecisionEpisodeSplitV1::HeldOut,
+                evaluation_manifest_commitment: &self.evaluation_manifest_commitment,
                 qualification_receipt_sha256: self.qualification_receipt_sha256.as_deref(),
                 decision_sufficiency_receipt_sha256: self
                     .decision_sufficiency_receipt_sha256
@@ -739,8 +762,17 @@ mod tests {
         )
         .unwrap();
 
-        let episode_manifest_sha256 = digest('a');
-        let evaluation_manifest_sha256 = digest('b');
+        let episode_membership =
+            crate::frozen_decision_episode_manifest::test_verified_episode_membership_v1();
+        let episode_manifest_sha256 = episode_membership.manifest_sha256().to_owned();
+        let evaluation_manifest_commitment =
+            crate::evaluation_manifest_commitment_receipt::test_verified_evaluation_manifest_commitment_with_episode_root_v1(
+                episode_membership.episode_set_root_sha256(),
+            );
+        let evaluation_manifest_sha256 =
+            evaluation_manifest_commitment.sealed_evaluation_manifest_sha256().to_owned();
+        let evaluation_manifest_commitment_receipt_sha256 =
+            evaluation_manifest_commitment.receipt_sha256().to_owned();
         let qualification_receipt_sha256 = Some(digest('c'));
         let decision_sufficiency_receipt_sha256 = Some(digest('d'));
         let decision_record_sha256 = digest('e');
@@ -762,6 +794,7 @@ mod tests {
                     decision_episode_id: "episode-1".to_owned(),
                     episode_manifest_sha256: episode_manifest_sha256.clone(),
                     evaluation_manifest_sha256: evaluation_manifest_sha256.clone(),
+                    evaluation_manifest_commitment_receipt_sha256: evaluation_manifest_commitment_receipt_sha256.clone(),
                     qualification_receipt_sha256: qualification_receipt_sha256.clone(),
                     decision_sufficiency_receipt_sha256: decision_sufficiency_receipt_sha256.clone(),
                     decision_record_sha256: decision_record_sha256.clone(),
@@ -802,8 +835,8 @@ mod tests {
             },
             verifier,
             signer,
-            episode_manifest_sha256,
-            evaluation_manifest_sha256,
+            episode_membership,
+            evaluation_manifest_commitment,
             qualification_receipt_sha256,
             decision_sufficiency_receipt_sha256,
             decision_record_sha256,
@@ -834,6 +867,50 @@ mod tests {
         );
         assert_eq!(verified.independent_episode_count(), 20);
         assert_eq!(verified.receipt_sha256().len(), 64);
+    }
+
+    #[test]
+    fn outcome_cannot_rebind_pre_run_manifest_witness() {
+        let mut fixture = fixture();
+        fixture.receipt.payload.evaluation_manifest_commitment_receipt_sha256 = digest('0');
+        fixture.resign();
+        let expected = fixture.expected();
+        assert_eq!(
+            validate_decision_outcome_receipt_v1(
+                &fixture.receipt,
+                &expected,
+                250,
+                &fixture.verifier,
+            ),
+            Err(DecisionOutcomeReceiptRejectV1::BindingMismatch)
+        );
+    }
+
+    #[test]
+    fn outcome_cannot_rebind_episode_digest_after_witnessed_membership() {
+        let mut fixture = fixture();
+        fixture.receipt.payload.episode_manifest_sha256 = digest('0');
+        fixture.resign();
+        assert_eq!(
+            fixture.verify(250),
+            Err(DecisionOutcomeReceiptRejectV1::BindingMismatch)
+        );
+    }
+
+    #[test]
+    fn held_out_outcome_rejects_development_membership() {
+        let fixture = fixture();
+        let mut expected = fixture.expected();
+        expected.required_split = DecisionEpisodeSplitV1::Development;
+        assert_eq!(
+            validate_decision_outcome_receipt_v1(
+                &fixture.receipt,
+                &expected,
+                250,
+                &fixture.verifier,
+            ),
+            Err(DecisionOutcomeReceiptRejectV1::BindingMismatch)
+        );
     }
 
     #[test]

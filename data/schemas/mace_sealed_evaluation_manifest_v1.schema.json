@@ -1,0 +1,263 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://github.com/Luminous-Dynamics/symthaea/blob/main/data/schemas/mace_sealed_evaluation_manifest_v1.schema.json",
+  "title": "MACE Sealed Evaluation Manifest v1",
+  "type": "object",
+  "additionalProperties": false,
+  "required": [
+    "schema_version",
+    "suite",
+    "episode_set",
+    "assignments",
+    "pre_registration",
+    "sealed_artifacts",
+    "custody",
+    "anti_leakage"
+  ],
+  "properties": {
+    "schema_version": {
+      "const": "mace_sealed_evaluation_manifest_v1"
+    },
+    "suite": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "suite_id",
+        "suite_version",
+        "evaluation_protocol_sha256"
+      ],
+      "properties": {
+        "suite_id": {
+          "type": "string",
+          "minLength": 1,
+          "maxLength": 256
+        },
+        "suite_version": {
+          "type": "string",
+          "minLength": 1,
+          "maxLength": 256
+        },
+        "evaluation_protocol_sha256": {
+          "type": "string",
+          "pattern": "^[0-9a-f]{64}$"
+        }
+      }
+    },
+    "episode_set": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "episode_manifest_root_sha256",
+        "episode_count",
+        "split"
+      ],
+      "properties": {
+        "episode_manifest_root_sha256": {
+          "type": "string",
+          "pattern": "^[0-9a-f]{64}$"
+        },
+        "episode_count": {
+          "type": "integer",
+          "minimum": 1,
+          "maximum": 10000
+        },
+        "split": {
+          "enum": [
+            "development",
+            "validation",
+            "held_out"
+          ]
+        }
+      }
+    },
+    "assignments": {
+      "type": "array",
+      "minItems": 1,
+      "maxItems": 10000,
+      "items": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": [
+          "episode_id",
+          "arm_id",
+          "seed_commitment_sha256",
+          "treatment_configuration_sha256"
+        ],
+        "properties": {
+          "episode_id": {
+            "type": "string",
+            "minLength": 1,
+            "maxLength": 256
+          },
+          "arm_id": {
+            "enum": [
+              "A",
+              "B",
+              "C",
+              "D",
+              "E",
+              "F",
+              "G",
+              "H",
+              "I",
+              "J",
+              "K"
+            ]
+          },
+          "seed_commitment_sha256": {
+            "type": "string",
+            "pattern": "^[0-9a-f]{64}$"
+          },
+          "treatment_configuration_sha256": {
+            "type": "string",
+            "pattern": "^[0-9a-f]{64}$"
+          }
+        }
+      },
+      "description": "Runtime validators MUST enforce one assignment per episode and strict ascending UTF-8 episode_id order. Arm IDs remain sealed until trace sealing."
+    },
+    "pre_registration": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "analysis_plan_sha256",
+        "utility_scale_sha256",
+        "hard_constraint_oracle_sha256",
+        "metric_definitions_sha256",
+        "exclusion_policy_sha256",
+        "stopping_rule_sha256"
+      ],
+      "properties": {
+        "analysis_plan_sha256": {
+          "type": "string",
+          "pattern": "^[0-9a-f]{64}$"
+        },
+        "utility_scale_sha256": {
+          "type": "string",
+          "pattern": "^[0-9a-f]{64}$"
+        },
+        "hard_constraint_oracle_sha256": {
+          "type": "string",
+          "pattern": "^[0-9a-f]{64}$"
+        },
+        "metric_definitions_sha256": {
+          "type": "string",
+          "pattern": "^[0-9a-f]{64}$"
+        },
+        "exclusion_policy_sha256": {
+          "type": "string",
+          "pattern": "^[0-9a-f]{64}$"
+        },
+        "stopping_rule_sha256": {
+          "type": "string",
+          "pattern": "^[0-9a-f]{64}$"
+        }
+      }
+    },
+    "sealed_artifacts": {
+      "type": "array",
+      "minItems": 1,
+      "maxItems": 100000,
+      "items": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": [
+          "artifact_id",
+          "role",
+          "content_sha256",
+          "sealed_object_commitment_sha256"
+        ],
+        "properties": {
+          "artifact_id": {
+            "type": "string",
+            "minLength": 1,
+            "maxLength": 256
+          },
+          "role": {
+            "enum": [
+              "hidden_ground_truth",
+              "attack_label",
+              "expected_decision",
+              "outcome_oracle",
+              "repair_oracle",
+              "constraint_oracle",
+              "metric_parameters",
+              "adjudication_evidence",
+              "exclusion_details"
+            ]
+          },
+          "content_sha256": {
+            "type": "string",
+            "pattern": "^[0-9a-f]{64}$"
+          },
+          "sealed_object_commitment_sha256": {
+            "type": "string",
+            "pattern": "^[0-9a-f]{64}$"
+          }
+        }
+      },
+      "description": "Hashes only; content is held in an evaluator-controlled store and is not available to the candidate before trace sealing."
+    },
+    "custody": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "evaluator_profile_sha256",
+        "verifier_profile_sha256",
+        "access_control_profile_sha256",
+        "sealed_store_profile_sha256",
+        "committed_at_unix",
+        "key_id"
+      ],
+      "properties": {
+        "evaluator_profile_sha256": {
+          "type": "string",
+          "pattern": "^[0-9a-f]{64}$"
+        },
+        "verifier_profile_sha256": {
+          "type": "string",
+          "pattern": "^[0-9a-f]{64}$"
+        },
+        "access_control_profile_sha256": {
+          "type": "string",
+          "pattern": "^[0-9a-f]{64}$"
+        },
+        "sealed_store_profile_sha256": {
+          "type": "string",
+          "pattern": "^[0-9a-f]{64}$"
+        },
+        "committed_at_unix": {
+          "type": "integer",
+          "minimum": 0,
+          "maximum": 253402300799
+        },
+        "key_id": {
+          "type": "string",
+          "minLength": 1,
+          "maxLength": 256
+        }
+      }
+    },
+    "anti_leakage": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "candidate_readable_before_trace_seal",
+        "trace_seal_protocol_sha256",
+        "reveal_condition"
+      ],
+      "properties": {
+        "candidate_readable_before_trace_seal": {
+          "const": false
+        },
+        "trace_seal_protocol_sha256": {
+          "type": "string",
+          "pattern": "^[0-9a-f]{64}$"
+        },
+        "reveal_condition": {
+          "const": "all_candidate_traces_sealed"
+        }
+      }
+    }
+  }
+}

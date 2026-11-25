@@ -1,0 +1,149 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://github.com/Luminous-Dynamics/symthaea/blob/main/data/schemas/mace_evaluation_manifest_commitment_receipt_v1.schema.json",
+  "title": "MACE Evaluation Manifest Commitment Receipt v1",
+  "type": "object",
+  "additionalProperties": false,
+  "required": [
+    "schema_version",
+    "payload",
+    "attestation"
+  ],
+  "properties": {
+    "schema_version": {
+      "const": "mace_evaluation_manifest_commitment_receipt_v1"
+    },
+    "payload": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "schema_version",
+        "suite_id",
+        "suite_version",
+        "episode_manifest_root_sha256",
+        "sealed_evaluation_manifest_sha256",
+        "arm_assignment_root_sha256",
+        "pre_registration_root_sha256",
+        "sealed_artifacts_root_sha256",
+        "committed_at_unix",
+        "candidate_access_profile_sha256",
+        "reveal_protocol_sha256",
+        "anchor_log_id",
+        "anchor_entry_id"
+      ],
+      "properties": {
+        "schema_version": {
+          "const": "mace_evaluation_manifest_commitment_payload_v1"
+        },
+        "suite_id": {
+          "type": "string",
+          "minLength": 1,
+          "maxLength": 256
+        },
+        "suite_version": {
+          "type": "string",
+          "minLength": 1,
+          "maxLength": 256
+        },
+        "episode_manifest_root_sha256": {
+          "type": "string",
+          "pattern": "^[0-9a-f]{64}$"
+        },
+        "sealed_evaluation_manifest_sha256": {
+          "type": "string",
+          "pattern": "^[0-9a-f]{64}$"
+        },
+        "arm_assignment_root_sha256": {
+          "type": "string",
+          "pattern": "^[0-9a-f]{64}$"
+        },
+        "pre_registration_root_sha256": {
+          "type": "string",
+          "pattern": "^[0-9a-f]{64}$"
+        },
+        "sealed_artifacts_root_sha256": {
+          "type": "string",
+          "pattern": "^[0-9a-f]{64}$"
+        },
+        "committed_at_unix": {
+          "type": "integer",
+          "minimum": 0,
+          "maximum": 253402300799
+        },
+        "candidate_access_profile_sha256": {
+          "type": "string",
+          "pattern": "^[0-9a-f]{64}$"
+        },
+        "reveal_protocol_sha256": {
+          "type": "string",
+          "pattern": "^[0-9a-f]{64}$"
+        },
+        "anchor_log_id": {
+          "type": "string",
+          "minLength": 1,
+          "maxLength": 256
+        },
+        "anchor_entry_id": {
+          "type": "string",
+          "minLength": 1,
+          "maxLength": 256
+        }
+      }
+    },
+    "attestation": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "witness_profile_sha256",
+        "verifier_profile_sha256",
+        "key_id",
+        "issued_at_unix",
+        "payload_sha256",
+        "attestation_sha256",
+        "signature_base64"
+      ],
+      "properties": {
+        "witness_profile_sha256": {
+          "type": "string",
+          "pattern": "^[0-9a-f]{64}$"
+        },
+        "verifier_profile_sha256": {
+          "type": "string",
+          "pattern": "^[0-9a-f]{64}$"
+        },
+        "key_id": {
+          "type": "string",
+          "minLength": 1,
+          "maxLength": 256
+        },
+        "issued_at_unix": {
+          "type": "integer",
+          "minimum": 0,
+          "maximum": 253402300799
+        },
+        "payload_sha256": {
+          "type": "string",
+          "pattern": "^[0-9a-f]{64}$"
+        },
+        "attestation_sha256": {
+          "type": "string",
+          "pattern": "^[0-9a-f]{64}$"
+        },
+        "signature_base64": {
+          "type": "string",
+          "minLength": 88,
+          "maxLength": 88,
+          "pattern": "^[A-Za-z0-9+/]{86}==$",
+          "contentEncoding": "base64",
+          "description": "Canonical padded Base64 encoding of a 64-byte Ed25519 signature."
+        }
+      }
+    }
+  },
+  "$defs": {
+    "sha256": {
+      "type": "string",
+      "pattern": "^[0-9a-f]{64}$"
+    }
+  }
+}
