@@ -90,9 +90,11 @@ impl RetrievalPolicyTraceFileStoreV1 {
                 "retrieval trace persistence outcome may be unknown; reopen and reconcile before retry: {error}"
             )
         })?;
-        memory
-            .restore_trace_json_value(&value)
-            .map_err(|error| format!("bind persisted retrieval trace: {error:?}"))
+        memory.restore_trace_json_value(&value).map_err(|error| {
+            format!(
+                "retrieval trace was durably published but in-memory binding failed; reopen and reconcile before retry: {error:?}"
+            )
+        })
     }
 
     /// Replay every persisted receipt into a fresh in-memory policy store.
@@ -363,7 +365,8 @@ mod tests {
         let persisted = trace("invocation-bind-conflict");
         let error = store.record_trace(&mut memory, &persisted)
             .expect_err("same invocation cannot rebind the live memory map");
-        assert!(error.contains("outcome may be unknown"));
+        assert!(error.contains("durably published but in-memory binding failed"));
+        assert!(error.contains("reopen and reconcile before retry"));
         assert_eq!(fs::read_dir(&root).expect("trace directory").count(), 1);
 
         let mut reconciled = RetrievalPolicyMemoryV1::default();

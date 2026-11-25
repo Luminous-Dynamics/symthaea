@@ -606,6 +606,7 @@ mod tests {
         RetrievalOperationOutcomeV1,
         RetrievalOperationV1,
         RetrievalPolicyMemoryV1,
+        RetrievalPolicyRejectV1,
         RetrievalStopReasonV1,
         RetrievalTraceReceiptV1,
         RetrievalTraceRefV1,
@@ -1063,7 +1064,7 @@ mod tests {
     }
 
     #[test]
-    fn promoted_search_strategy_never_upgrades_rejected_candidate_evidence() {
+    fn acquisition_only_candidate_traces_cannot_promote_or_upgrade_rejected_evidence() {
         let mut policy_memory = RetrievalPolicyMemoryV1::default();
         let traces = [
             successful_candidate_trace("invocation-1", '8', 100),
@@ -1072,29 +1073,37 @@ mod tests {
         ];
         let mut references = Vec::new();
         for trace in traces {
-            policy_memory.record_trace(trace.clone()).expect("record candidate-producing trace");
+            policy_memory
+                .record_trace(trace.clone())
+                .expect("record candidate-producing trace");
             references.push(RetrievalTraceRefV1 {
                 run_id: trace.run_id,
                 query_invocation_id: trace.query_invocation_id,
             });
         }
 
-        let note = policy_memory.promote_strategy(
-            &references,
-            &digest('5'),
-            120,
-            180,
-        ).expect("three distinct invocations may promote an advisory strategy");
+        // Candidate acquisition alone is not decision/outcome evidence. The
+        // promotion guard must fail closed until a separate qualified outcome
+        // receipt and held-out counterfactual certificate are available.
         assert_eq!(
-            policy_memory.applicable_notes("web", &digest('b'), &digest('c'), 130).len(),
-            1
+            policy_memory.promote_strategy(
+                &references,
+                &digest('5'),
+                120,
+                180,
+            ),
+            Err(RetrievalPolicyRejectV1::DecisionOutcomeReceiptRequired)
         );
+        assert_eq!(policy_memory.note_count(), 0);
 
         let mut qualification = receipt();
         qualification.query_invocation_id = "invocation-1".to_owned();
         qualification.query_sha256 = digest('8');
         qualification.candidate_set_sha256 = digest('e');
-        qualification.entries = vec![entry("poisoned-candidate", EvidenceDispositionV1::Rejected)];
+        qualification.entries = vec![entry(
+            "poisoned-candidate",
+            EvidenceDispositionV1::Rejected,
+        )];
         qualification.candidate_evidence_ids_sha256 =
             candidate_ids_sha256(&vec!["poisoned-candidate".to_owned()]);
         qualification.signature = qualification.signing_payload_sha256().into_bytes();
@@ -1121,11 +1130,14 @@ mod tests {
             &qualification,
             &binding,
             &TestSignatureVerifier,
-        ).expect("external qualification result is validly bound");
+        )
+        .expect("external qualification result is validly bound");
         assert!(verified.is_empty());
-        assert!(verified.admissible_evidence_ids_for_use(&binding).expect("fresh token").is_empty());
-        assert!(policy_memory.applicable_notes("web", &digest('b'), &digest('c'), 130)
-            .iter().any(|candidate| candidate.note_sha256 == note.note_sha256));
+        assert!(verified
+            .admissible_evidence_ids_for_use(&binding)
+            .expect("fresh token")
+            .is_empty());
+        assert_eq!(policy_memory.note_count(), 0);
     }
 
     #[test]
