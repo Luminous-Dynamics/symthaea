@@ -99,6 +99,8 @@ Append-only log inclusion and consistency are mandatory through the `AppendOnlyM
 
 The verifier returns a private-field `VerifiedEvaluationManifestCommitmentV1` capability only after all checks, including the injected log verifier, pass. The outcome verifier now requires this capability rather than a caller-supplied hash string; it derives the exact sealed-manifest and witness-receipt digests from the capability. This prevents an application from accidentally passing an arbitrary digest without first verifying the detached witness.
 
+The AML adapter also contains `frozen_decision_episode_manifest.rs`. It performs strict typed decoding, per-manifest JCS digest computation, ordered/unique episode-set validation, suite-identity consistency, and the canonical length-prefixed episode-set root computation. Its `VerifiedFrozenDecisionEpisodeSetV1` checks that root and suite against the verified witness, then issues a private `VerifiedDecisionEpisodeMembershipV1` capability for one exact episode. The outcome verifier requires both the witness capability and this per-episode membership capability; it checks the episode digest, episode ID, suite identity and set root. This closes the gap between a suite-level pre-run commitment and the exact episode whose outcome is being attested.
+
 ## 6. Commit, run, seal, reveal protocol
 
 1. Freeze the public episode manifests and compute their ordered root.
@@ -131,14 +133,13 @@ For each test, preserve the raw witness response, storage/object digest, ACL dec
 
 ## 8. Claim boundary and implementation sequence
 
-This increment supplies three JSON Schemas, protocol semantics, and the consumer-side detached-witness receipt verifier. It does not implement a concrete transparency-log client/checkpoint trust, public/sealed manifest root builder/validator, independent witness service, sealed-store isolation, trace-sealing service, or full benchmark runner. Rust compilation/tests remain unexecuted in the current environment.
+This increment supplies three JSON Schemas, protocol semantics, a strict public episode-manifest/set validator, and the consumer-side detached-witness receipt verifier. The outcome verifier consumes private witness and per-episode membership capabilities. It does not implement a concrete transparency-log client/checkpoint trust, sealed assignment/artifact root builder/validator, independent witness service, sealed-store isolation, trace-sealing service, or full benchmark runner. Rust compilation/tests remain unexecuted in the current environment.
 
 Next engineering steps:
-1. Implement canonical digest/root builders and fixed cross-language JCS vectors for public episode, sealed evaluation and witness receipt objects.
-2. Implement strict public/sealed manifest decoders, exact episode-to-assignment coverage checks and artifact/assignment-root recomputation.
-3. Implement a concrete append-only witness-log verifier with pinned checkpoints, inclusion and consistency proofs, fork detection and rollback controls.
-4. Deploy evaluator/witness principals with separate credentials, KMS keys, ACLs, storage and protected clocks.
-5. Implement trace sealing and delayed reveal so evaluator labels never enter candidate-readable state.
-6. Run paired arms and publish externally reproducible manifests, receipts and per-case results.
+1. Implement the sealed assignment/artifact canonical root builder and strict exact episode-to-assignment coverage validator.
+2. Implement a concrete append-only witness-log verifier with pinned checkpoints, inclusion and consistency proofs, fork detection and rollback controls.
+3. Deploy evaluator/witness principals with separate credentials, KMS keys, ACLs, storage and protected clocks.
+4. Implement trace sealing and delayed reveal so evaluator labels never enter candidate-readable state.
+5. Run paired arms and publish externally reproducible manifests, receipts and per-case results.
 
-No benchmark outcome is claimed by these schemas. The goal is to make evaluator independence and pre-registration verifiable properties of the run, rather than promises in a benchmark README.
+Unit tests are authored for manifest ordering, duplicate IDs, mixed suite identity and malformed fields, in addition to witness signature, timing, log-interface and binding cases. These tests have not been executed because this environment lacks the Rust toolchain. No benchmark outcome is claimed by these schemas. The goal is to make evaluator independence and pre-registration verifiable properties of the run, rather than promises in a benchmark README.
