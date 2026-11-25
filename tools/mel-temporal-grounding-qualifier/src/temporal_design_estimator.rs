@@ -788,6 +788,12 @@ mod tests {
             report.stratum_estimates[0].variance_unavailable_reason,
             Some(VarianceUnavailableReasonV1::FewerThanTwoSelectedSourceWorks)
         );
+        assert!(report.estimated_source_work_population_mean.is_some());
+        assert_eq!(report.estimated_source_work_population_total_variance, None);
+        assert_eq!(
+            report.stratum_estimates[0].source_work_variance_unavailable_reason,
+            Some(VarianceUnavailableReasonV1::FewerThanTwoSelectedSourceWorks)
+        );
         assert!(!report.population_confidence_claim_permitted);
     }
 
