@@ -288,6 +288,7 @@ fn test_epistemic_learner_basics() {
             was_correct: i % 3 != 0, // ~70% correct
             predicted_confidence: 0.8,
             domain: "programming".into(),
+            adjudication_provenance: None,
         };
         learner.record_outcome(outcome).unwrap();
     }
@@ -312,6 +313,7 @@ fn test_source_credibility_learning() {
                 was_correct: true,
                 predicted_confidence: 0.9,
                 domain: "programming".into(),
+                adjudication_provenance: None,
             })
             .unwrap();
     }
@@ -326,6 +328,7 @@ fn test_source_credibility_learning() {
                 was_correct: false,
                 predicted_confidence: 0.5,
                 domain: "programming".into(),
+                adjudication_provenance: None,
             })
             .unwrap();
     }
@@ -432,6 +435,7 @@ fn test_full_epistemic_pipeline() {
             was_correct: true,
             predicted_confidence: verification.confidence,
             domain: "systems".into(),
+            adjudication_provenance: None,
         })
         .unwrap();
 
