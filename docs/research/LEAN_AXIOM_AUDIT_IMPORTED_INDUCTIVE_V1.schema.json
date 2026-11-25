@@ -40,7 +40,8 @@
       "additionalProperties": false,
       "required": [
         "module_a",
-        "module_b"
+        "module_b",
+        "module_proof"
       ],
       "properties": {
         "module_a": {
@@ -76,13 +77,30 @@
               "pattern": "^[a-f0-9]{64}$"
             }
           }
+        },
+        "module_proof": {
+          "type": "object",
+          "additionalProperties": false,
+          "required": [
+            "path",
+            "sha256"
+          ],
+          "properties": {
+            "path": {
+              "const": "scripts/research/lean-proof-extractor/ProofActionCertificateAndComm.lean"
+            },
+            "sha256": {
+              "type": "string",
+              "pattern": "^[a-f0-9]{64}$"
+            }
+          }
         }
       }
     },
     "roots": {
       "type": "array",
-      "minItems": 3,
-      "maxItems": 3,
+      "minItems": 8,
+      "maxItems": 8,
       "items": {
         "type": "object",
         "additionalProperties": false,
@@ -103,7 +121,143 @@
               "Classical.choice"
             ]
           }
-        }
+        },
+        "oneOf": [
+          {
+            "type": "object",
+            "additionalProperties": false,
+            "required": [
+              "name",
+              "expected_fresh_axioms"
+            ],
+            "properties": {
+              "name": {
+                "const": "S9"
+              },
+              "expected_fresh_axioms": {
+                "const": [
+                  "Classical.choice"
+                ]
+              }
+            }
+          },
+          {
+            "type": "object",
+            "additionalProperties": false,
+            "required": [
+              "name",
+              "expected_fresh_axioms"
+            ],
+            "properties": {
+              "name": {
+                "const": "S9.mk"
+              },
+              "expected_fresh_axioms": {
+                "const": [
+                  "Classical.choice"
+                ]
+              }
+            }
+          },
+          {
+            "type": "object",
+            "additionalProperties": false,
+            "required": [
+              "name",
+              "expected_fresh_axioms"
+            ],
+            "properties": {
+              "name": {
+                "const": "usesS9"
+              },
+              "expected_fresh_axioms": {
+                "const": [
+                  "Classical.choice"
+                ]
+              }
+            }
+          },
+          {
+            "type": "object",
+            "additionalProperties": false,
+            "required": [
+              "name",
+              "expected_fresh_axioms"
+            ],
+            "properties": {
+              "name": {
+                "const": "And.comm"
+              },
+              "expected_fresh_axioms": {
+                "const": []
+              }
+            }
+          },
+          {
+            "type": "object",
+            "additionalProperties": false,
+            "required": [
+              "name",
+              "expected_fresh_axioms"
+            ],
+            "properties": {
+              "name": {
+                "const": "ProofPlanActionCertificatePilot.and_comm_split_iff"
+              },
+              "expected_fresh_axioms": {
+                "const": []
+              }
+            }
+          },
+          {
+            "type": "object",
+            "additionalProperties": false,
+            "required": [
+              "name",
+              "expected_fresh_axioms"
+            ],
+            "properties": {
+              "name": {
+                "const": "ProofPlanActionCertificatePilot.and_comm_forward"
+              },
+              "expected_fresh_axioms": {
+                "const": []
+              }
+            }
+          },
+          {
+            "type": "object",
+            "additionalProperties": false,
+            "required": [
+              "name",
+              "expected_fresh_axioms"
+            ],
+            "properties": {
+              "name": {
+                "const": "ProofPlanActionCertificatePilot.and_comm_reverse"
+              },
+              "expected_fresh_axioms": {
+                "const": []
+              }
+            }
+          },
+          {
+            "type": "object",
+            "additionalProperties": false,
+            "required": [
+              "name",
+              "expected_fresh_axioms"
+            ],
+            "properties": {
+              "name": {
+                "const": "ProofPlanActionCertificatePilot.and_comm_plan_replay"
+              },
+              "expected_fresh_axioms": {
+                "const": []
+              }
+            }
+          }
+        ]
       }
     },
     "audit_algorithm": {
