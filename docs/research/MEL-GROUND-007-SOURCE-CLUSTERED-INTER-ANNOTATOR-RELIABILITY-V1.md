@@ -98,12 +98,26 @@ Where a reliable score-to-performance map exists, a future adapter may add beat-
 
 The bootstrap resamples source-work clusters with replacement using a fixed SplitMix64 generator:
 - all query items from a selected source work are included together;
-- point estimates for pairwise metrics are macro-averaged by source-work cluster;
-- nominal alpha is recomputed on the resampled set of query items;
-- 95% percentile intervals are emitted separately for alpha, state agreement, pairwise interval F1, matched IoU, count agreement and boundary MAE;
+- point estimates for pairwise interval/count and boundary metrics are macro-averaged by source-work cluster;
+- nominal alpha is recomputed on the resampled set of query items using its coincidence matrix;
+- 95% percentile intervals are emitted separately for alpha, pairwise state agreement, interval F1, matched IoU, exact count agreement, start/end boundary MAE, and each preregistered start/end/joint boundary-tolerance rate;
 - the seed, replicate count, valid replicate count and source-work cluster count are included.
 
+For a given tolerance, each source work contributes its own within-work boundary-match rate; the estimate is then averaged across source works. Bootstrap replicates resample those same source-work units. This is not the same as treating every note boundary or every query crop as an independent observation.
+
 The current proposed confirmatory floor is 30 independent source-work clusters. This is a reporting warning, not a substitute for a preregistered power analysis or a study-specific sampling design. The report always leaves `population_confidence_claim_permitted=false`; passing the cluster-count floor alone does not authorize a population claim.
+
+### Missingness and ambiguity are not automatically random
+
+Krippendorff's alpha can be computed on incomplete/unbalanced rating matrices, but that algebraic property does not prove the missingness mechanism is harmless. A boundary or event may be marked Ambiguous/NotEstimable precisely because it is gradual, masked, dense or culturally unfamiliar. Those exclusions can therefore depend on the underlying unobserved event and should not be presumed missing completely at random.
+
+The current report preserves and counts Ambiguous/NotEstimable exclusions; it does not convert them to Absent or include them in the nominal coincidence matrix. A real study must report exclusion rates by event family, recording density, source tradition, annotator and other preregistered strata, then run a missingness-sensitivity analysis. Alpha is conditional on the ratings eligible for that calculation; do not interpret it as reliability over excluded cases. The synthetic v1 does not implement a missing-not-at-random correction.
+
+### Keep model performance on a separate axis
+
+The dataset report also embeds the #13560 per-item model-vs-annotator result: raw model prediction, exact artifact and scorer plan, original pseudonymous annotation records, and per-annotator model scores. It adds source-work-macro summaries for Present F1, exact count, one-to-many count-gated F1, Absent claim accuracy, prediction coverage and fully-correct rate.
+
+These model metrics must not be folded into alpha or pairwise human interval agreement. A low alpha may indicate a genuinely ambiguous query; it does not excuse a model's obvious miss. A high alpha does not imply the model is accurate. The report does not calibrate model confidence.
 
 ## 7. External benchmark and industry comparison
 
