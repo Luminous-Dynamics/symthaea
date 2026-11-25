@@ -1,8 +1,8 @@
-name: DMC Complete Restore Contract
+name: DMC Four-Task Restore Extension
 
 on:
   push:
-    branches: ["research/dmc-restore-contract-v0-1-20261124"]
+    branches: ["research/dmc-four-task-restore-smoke-v0-1-20261125"]
     paths:
       - "research/temporal-evaluator/**"
       - "docs/research/DMC_COMPLETE_RESTORE_AND_PREFIX_V0_1.md"
@@ -13,7 +13,7 @@ on:
   pull_request:
     types: [opened, synchronize, reopened, ready_for_review]
     branches:
-      - research/dmc-individual-effect-pilot-v0-1-20261124
+      - research/dmc-restore-contract-v0-1-20261124
     paths:
       - "research/temporal-evaluator/**"
       - "docs/research/DMC_COMPLETE_RESTORE_AND_PREFIX_V0_1.md"
@@ -26,25 +26,24 @@ permissions:
 
 jobs:
   rust-evaluator:
-    name: Rust 1.96 DMC restore contract
+    name: Parent Rust DMC restore package (no changes in this PR)
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
-      - name: Set up pinned Rust
-        uses: dtolnay/rust-toolchain@stable
-        with:
-          toolchain: 1.96.0
-          components: clippy, rustfmt
-      - name: Check changed-module formatting
-        run: rustfmt --edition 2024 --check research/temporal-evaluator/src/dmc_restore_contract.rs
-      - name: Test exact evaluator package
-        run: cargo test --locked --manifest-path research/temporal-evaluator/Cargo.toml
-      - name: Strict Clippy
-        run: cargo clippy --locked --manifest-path research/temporal-evaluator/Cargo.toml --all-targets -- -D warnings
+      - name: No Rust changes in this extension
+        run: echo "The Rust restore evaluator was qualified at parent PR #13568; this extension changes only the pinned Python adapter and workflow matrix."
 
   pinned-python-smoke:
-    name: Pinned dm_control fresh-process restore smoke
+    name: Pinned dm_control restore / replay (${{ matrix.task }})
     runs-on: ubuntu-latest
+    strategy:
+      fail-fast: false
+      matrix:
+        task:
+          - cartpole.swingup
+          - cartpole.two_poles
+          - cartpole.three_poles
+          - walker.walk
     steps:
       - uses: actions/checkout@v4
       - name: Set up Python
@@ -59,6 +58,6 @@ jobs:
       - name: Compile the smoke harness
         run: python -m py_compile tools/dmc-restore-smoke/restore_smoke.py
       - name: Export branch-point snapshot in process A
-        run: python tools/dmc-restore-smoke/restore_smoke.py export "$RUNNER_TEMP/dmc_restore_smoke.npz"
+        run: python tools/dmc-restore-smoke/restore_smoke.py export "$RUNNER_TEMP/dmc_restore_smoke.npz" --task "${{ matrix.task }}"
       - name: Restore and replay in fresh process B
-        run: python tools/dmc-restore-smoke/restore_smoke.py replay "$RUNNER_TEMP/dmc_restore_smoke.npz"
+        run: python tools/dmc-restore-smoke/restore_smoke.py replay "$RUNNER_TEMP/dmc_restore_smoke.npz" --task "${{ matrix.task }}"
