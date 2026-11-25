@@ -11,7 +11,8 @@
     "runtime_identity_sha256",
     "decoding_config_sha256",
     "plan",
-    "cases"
+    "cases",
+    "hardware_identity_sha256"
   ],
   "properties": {
     "schema": {
@@ -39,6 +40,9 @@
       "items": {
         "$ref": "#/$defs/case"
       }
+    },
+    "hardware_identity_sha256": {
+      "$ref": "#/$defs/digest"
     }
   },
   "$defs": {
@@ -420,7 +424,8 @@
         "prediction",
         "unconditional_prediction",
         "decision",
-        "decision_confidence"
+        "decision_confidence",
+        "inference_cost"
       ],
       "properties": {
         "schema": {
@@ -474,6 +479,29 @@
           "type": "number",
           "minimum": 0,
           "maximum": 1
+        },
+        "inference_cost": {
+          "type": "object",
+          "additionalProperties": false,
+          "required": [
+            "forward_passes",
+            "selective_wall_time_ms",
+            "one_pass_baseline_wall_time_ms"
+          ],
+          "properties": {
+            "forward_passes": {
+              "type": "integer",
+              "minimum": 1
+            },
+            "selective_wall_time_ms": {
+              "type": "integer",
+              "minimum": 1
+            },
+            "one_pass_baseline_wall_time_ms": {
+              "type": "integer",
+              "minimum": 1
+            }
+          }
         }
       }
     }
