@@ -7,6 +7,7 @@ on:
     paths:
       - "research/cmaq-002/src/worldtest_exploration.rs"
       - "research/cmaq-002/src/worldtest_phase_contract.rs"
+      - "research/cmaq-002/src/worldtest_phase_contract.rs"
       - "research/cmaq-002/worldtest-*"
       - "research/cmaq-002/fixtures/worldtest-*"
       - "research/cmaq-002/WORLDTEST_ADAPTER_V0_1.md"
@@ -17,6 +18,7 @@ on:
       - research/cmaq-002-safe-decision-value-allocation-2026-10-31
     paths:
       - "research/cmaq-002/src/worldtest_exploration.rs"
+      - "research/cmaq-002/src/worldtest_phase_contract.rs"
       - "research/cmaq-002/worldtest-*"
       - "research/cmaq-002/fixtures/worldtest-*"
       - "research/cmaq-002/WORLDTEST_ADAPTER_V0_1.md"
@@ -39,7 +41,7 @@ jobs:
           components: rustfmt, clippy
 
       - name: Check formatting of the new Rust module
-        run: rustfmt --check --edition 2024 research/cmaq-002/src/worldtest_exploration.rs research/cmaq-002/src/worldtest_phase_contract.rs
+        run: rustfmt --check --edition 2024 research/cmaq-002/src/worldtest_exploration.rs research/cmaq-002/src/worldtest_phase_contract.rs research/cmaq-002/src/worldtest_phase_contract.rs
 
       - name: Run CMAQ-002 evaluator tests
         working-directory: research/cmaq-002
