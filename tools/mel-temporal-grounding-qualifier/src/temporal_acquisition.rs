@@ -1120,6 +1120,10 @@ fn add_active_selection(
         None,
         None,
         None,
+        None,
+        None,
+        None,
+        None,
     ));
     Ok(())
 }
@@ -1174,6 +1178,10 @@ fn selection_record(
     source_work_probability: Option<ProbabilityFractionV1>,
     item_given_source_probability: Option<ProbabilityFractionV1>,
     item_probability: Option<ProbabilityFractionV1>,
+    eligible_source_works_in_stratum: Option<usize>,
+    selected_source_works_in_stratum: Option<usize>,
+    eligible_items_in_source_work: Option<usize>,
+    selected_items_in_source_work: Option<usize>,
 ) -> AnnotationSelectionRecordV1 {
     AnnotationSelectionRecordV1 {
         item_id: candidate.item_id.clone(),
@@ -1194,6 +1202,10 @@ fn selection_record(
         source_work_inclusion_probability: source_work_probability,
         item_given_source_work_probability: item_given_source_probability,
         item_inclusion_probability: item_probability,
+        eligible_source_works_in_stratum,
+        selected_source_works_in_stratum,
+        eligible_items_in_source_work,
+        selected_items_in_source_work,
     }
 }
 
