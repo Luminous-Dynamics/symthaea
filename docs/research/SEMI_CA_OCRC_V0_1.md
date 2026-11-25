@@ -47,6 +47,18 @@ h(x)=x-1-ln(x).
 
 The implementation returns no theoretical bound after a tracked feedback event is excluded as UNKNOWN/BLOCKED, because qualification missingness is not covered by the delay-only theorem.
 
+## Optimized worst-case proxy family
+
+The implementation also includes a deterministic golden-section optimizer for the paper's worst-case family:
+- F(0)=1;
+- F(a)=p for 1<=a<=d_max;
+- 0<p<=min(1,K/d_max).
+
+It minimizes the paper's one-dimensional objective:
+(B/(eta*T)) + ((K+1)/(p*T)) + exp(-K*h(d_max*p/K)).
+
+The optimizer returns p, the complete survival table, tracking load and all risk-bound terms. This is a numerical minimizer over the analytic one-dimensional family, not a replacement for the paper's theorem or assumptions.
+
 ## Evidence separation
 
 Two mechanisms remain distinct:
