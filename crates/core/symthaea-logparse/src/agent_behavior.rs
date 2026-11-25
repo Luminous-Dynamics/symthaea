@@ -17,6 +17,7 @@
 
 use chrono::{DateTime, Utc};
 use std::collections::BTreeSet;
+use std::net::IpAddr;
 
 /// The trusted telemetry plane that produced an observation.
 #[derive(Debug, Clone, Copy, PartialEq, Eq, PartialOrd, Ord, Hash)]
@@ -158,6 +159,9 @@ impl AgentTraceEvent {
         if !source_matches_kind(source, kind) {
             return Err(BehaviorError::SourceKindMismatch { source, kind });
         }
+        let destination = destination
+            .map(|value| canonical_destination(&value))
+            .transpose()?;
         Ok(Self {
             timestamp,
             tenant_id,
@@ -357,6 +361,8 @@ pub enum BehaviorError {
     MixedPrincipal,
     #[error("source receipt is missing or invalid")]
     MissingSourceReceipt,
+    #[error("network destination is malformed or non-canonical")]
+    InvalidDestination,
     #[error("task window contains more than one tenant")]
     MixedTenant,
     #[error("task window contains more than one task")]
@@ -399,6 +405,46 @@ fn source_matches_kind(source: TelemetrySource, kind: AgentEventKind) -> bool {
         }
         AgentEventKind::EvaluatorTruthExposed => source == TelemetrySource::Evaluator,
     }
+}
+
+/// Normalize an IP address or ASCII DNS hostname before it enters
+/// destination-diversity features. This prevents equivalent IPv6 spellings,
+/// case variants and trailing-dot FQDNs from inflating distinct-target counts.
+/// Internationalized names must be converted to IDNA A-labels by the trusted
+/// adapter before this boundary.
+fn canonical_destination(value: &str) -> Result<String, BehaviorError> {
+    let value = value.trim();
+    if value.is_empty()
+        || value.len() > 253
+        || value.chars().any(|ch| ch.is_control() || ch.is_whitespace())
+    {
+        return Err(BehaviorError::InvalidDestination);
+    }
+    if let Ok(address) = value.parse::<IpAddr>() {
+        return Ok(address.to_string());
+    }
+
+    // Do not reinterpret malformed numeric IPv4 literals as DNS names.
+    if value.bytes().all(|byte| byte.is_ascii_digit() || byte == b'.') {
+        return Err(BehaviorError::InvalidDestination);
+    }
+
+    let hostname = value.strip_suffix('.').unwrap_or(value);
+    if hostname.is_empty()
+        || hostname.len() > 253
+        || hostname.split('.').any(|label| {
+            label.is_empty()
+                || label.len() > 63
+                || label.starts_with('-')
+                || label.ends_with('-')
+                || !label
+                    .bytes()
+                    .all(|byte| byte.is_ascii_alphanumeric() || byte == b'-')
+        })
+    {
+        return Err(BehaviorError::InvalidDestination);
+    }
+    Ok(hostname.to_ascii_lowercase())
 }
 
 fn is_valid_digest(value: &str) -> bool {
@@ -902,6 +948,38 @@ mod tests {
                 kind: AgentEventKind::UnapprovedEgressCommitted,
             }
         );
+    }
+
+    #[test]
+    fn canonicalizes_equivalent_ipv6_destinations_before_counting() {
+        let events = vec![
+            event("1", "tenant-a", "task-1", AgentEventKind::DestinationContacted, Some("2001:0db8:0:0::1")),
+            event("2", "tenant-a", "task-1", AgentEventKind::DestinationContacted, Some("2001:db8::1")),
+        ];
+        let assessment = analyze_task_window(&events, BehaviorWindowPolicy::default()).unwrap();
+        assert_eq!(assessment.counters.distinct_destinations, 1);
+    }
+
+    #[test]
+    fn rejects_malformed_destination_before_analysis() {
+        let receipt = VerifiedSourceReceipt::new("network-collector", "receipt-bad-destination")
+            .expect("receipt is valid");
+        let result = AgentTraceEvent::from_verified_receipt(
+            Utc.with_ymd_and_hms(2026, 11, 25, 10, 0, 1).single().unwrap(),
+            "tenant-a",
+            "task-1",
+            "principal",
+            "c".repeat(64),
+            "d".repeat(64),
+            "event-bad-destination",
+            TelemetrySource::Network,
+            AgentEventKind::DestinationContacted,
+            None,
+            Some("203.0.113.1/24".into()),
+            0,
+            receipt,
+        );
+        assert_eq!(result.unwrap_err(), BehaviorError::InvalidDestination);
     }
 
     #[test]
