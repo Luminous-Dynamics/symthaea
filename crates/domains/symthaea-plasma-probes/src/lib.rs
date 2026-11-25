@@ -5283,6 +5283,9 @@ pub const KIRD_POINT_SCHEMA: &str =
 pub const KINETIC_DISCRIMINATION_FIXTURE: &str = include_str!(
     "../../../../benchmarks/plasma/kinetic-discrimination/fixtures/complex-response-eig-known-answers-v0.1.json"
 );
+pub const KINETIC_DISCRIMINATION_SCHEMA: &str = include_str!(
+    "../../../../benchmarks/plasma/kinetic-discrimination/complex-response-eig-design-v0.1.schema.json"
+);
 pub const WEIGHTED_FOURIER_MEASURE_FIXTURE: &str = include_str!(
     "../../../../benchmarks/plasma/topology-lifting/fixtures/weighted-fourier-measure-known-answer-v0.1.json"
 );
@@ -7637,6 +7640,86 @@ mod tests {
                         / report.estimated_evaluation_cost_seconds)
                     .abs()
                     < 1.0e-12
+            );
+        }
+    }
+
+    #[test]
+    fn kinetic_discrimination_portfolio_fixture_matches_expected_pareto_front() {
+        let fixture: serde_json::Value =
+            serde_json::from_str(KINETIC_DISCRIMINATION_FIXTURE).unwrap();
+        let schema: serde_json::Value =
+            serde_json::from_str(KINETIC_DISCRIMINATION_SCHEMA).unwrap();
+        assert_eq!(
+            schema["$schema"],
+            "https://json-schema.org/draft/2020-12/schema"
+        );
+
+        let portfolios = fixture["portfolios"].as_array().unwrap();
+        assert_eq!(portfolios.len(), 1);
+        for portfolio in portfolios {
+            let designs = portfolio["candidate_designs"]
+                .as_array()
+                .unwrap()
+                .iter()
+                .map(|candidate| {
+                    let hypotheses = candidate["hypotheses"]
+                        .as_array()
+                        .unwrap()
+                        .iter()
+                        .map(|hypothesis| KineticDiscriminationHypothesis {
+                            hypothesis_id: hypothesis["hypothesis_id"]
+                                .as_str()
+                                .unwrap()
+                                .to_owned(),
+                            prior_probability: hypothesis["prior_probability"]
+                                .as_f64()
+                                .unwrap(),
+                            predicted_response: ComplexResponse::new(
+                                hypothesis["predicted_response"]["real"]
+                                    .as_f64()
+                                    .unwrap(),
+                                hypothesis["predicted_response"]["imag"]
+                                    .as_f64()
+                                    .unwrap(),
+                            )
+                            .unwrap(),
+                        })
+                        .collect();
+                    KineticDiscriminationDesign {
+                        intervention_id: candidate["intervention_id"]
+                            .as_str()
+                            .unwrap()
+                            .to_owned(),
+                        hypotheses,
+                        noise_variance_per_quadrature: candidate
+                            ["noise_variance_per_quadrature"]
+                            .as_f64()
+                            .unwrap(),
+                        estimated_evaluation_cost_seconds: candidate
+                            ["estimated_evaluation_cost_seconds"]
+                            .as_f64()
+                            .unwrap(),
+                    }
+                })
+                .collect::<Vec<_>>();
+            let report = evaluate_kinetic_discrimination_portfolio(&designs).unwrap();
+            let actual_front = report
+                .pareto_front_indices
+                .iter()
+                .map(|index| report.candidate_reports[*index].intervention_id.as_str())
+                .collect::<Vec<_>>();
+            let expected_front = portfolio["expected_pareto_front_ids"]
+                .as_array()
+                .unwrap()
+                .iter()
+                .map(|value| value.as_str().unwrap())
+                .collect::<Vec<_>>();
+            assert_eq!(actual_front, expected_front);
+            assert_eq!(
+                report.candidate_reports[report.best_information_gain_per_cost_index]
+                    .intervention_id,
+                portfolio["expected_best_ratio_id"].as_str().unwrap()
             );
         }
     }
