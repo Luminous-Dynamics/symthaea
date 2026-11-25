@@ -69,7 +69,7 @@ A missing observation must never be inferred to be safe. A tampered or unverifia
 
 ## 5. Public contract fixtures
 
-The fixture file sat-qualification-contract-smoke-v0.1.jsonl now contains 14 meta-level adapter/oracle cases, including stable retry-attempt identity and causal-splice rejection. They test the contract, not a deployed model and not the 29 behavioral scenarios in the parent SAT proposal.
+The fixture file sat-qualification-contract-smoke-v0.1.jsonl now contains 20 meta-level adapter/oracle cases, including stable retry-attempt identity, causal-splice rejection and six external-checkpoint integrity cases. They test the contract, not a deployed model and not the 29 behavioral scenarios in the parent SAT proposal.
 
 | Case | Property | Expected disposition |
 |---|---|---|
@@ -87,6 +87,12 @@ The fixture file sat-qualification-contract-smoke-v0.1.jsonl now contains 14 met
 | 012 | Revocation and TOCTOU at commit | Deny after revocation/expiry |
 | 013 | Stable idempotency with fresh attempt identity | Deny stale observation from prior attempt |
 | 014 | Causal linkage of sink observation | Invalid evidence on trace-splicing or wrong correlation |
+| 015 | No external trace checkpoint | Report internal consistency as unanchored |
+| 016 | Checkpoint run/manifest/head mismatch | Invalid evidence |
+| 017 | Missing/incorrect transparency inclusion proof | Inconclusive or reject |
+| 018 | Missing/invalid consistency proof | Invalid evidence or inconclusive |
+| 019 | Witness equivocation | Invalid evidence |
+| 020 | Invalid, expired or revoked checkpoint key | Invalid evidence |
 
 ## 6. External benchmarks and comparability
 
@@ -175,6 +181,21 @@ The companion [SAT Matched-Baseline and Claim Protocol V0.1](SAT_MATCHED_BASELIN
 
 Use it before reproducing DelegateGuard, AgentDojo, AgentHarm, AuditBench, ControlArena/SHADE-Arena or LADDER results. A public smoke suite is for adapter development only; published SOTA claims require matched configurations, sealed evaluation, independent sink observations, confidence intervals, complete cost accounting and external regrade/replication.
 
+## 6.4 External trace checkpointing and transparency
+
+An unkeyed event chain establishes internal digest/sequence consistency, not resistance to a full-history rewrite. The companion [SAT External Trace Checkpoint Profile V0.1](SAT_TRACE_CHECKPOINT_PROFILE_V0_1_2026-11-25.md) defines a portable checkpoint receipt that binds the frozen run, manifest and terminal event digest to a signed statement, transparency inclusion/consistency evidence and independent witness attestations.
+
+This profile reuses existing infrastructure rather than creating a new transparency ledger:
+- [IETF SCITT architecture, RFC 9943](https://www.rfc-editor.org/rfc/rfc9943.html) for signed statement transparency;
+- [Sigstore Rekor](https://docs.sigstore.dev/logging/overview/) for transparency entries, signed checkpoints, inclusion proofs and consistency proofs.
+
+New contract artifacts:
+- `schemas/sat-trace-checkpoint-v0.1.schema.json`;
+- `examples/sat-trace-checkpoint-example-v0.1.json`;
+- six checkpoint-integrity cases SAT-CONTRACT-015 through SAT-CONTRACT-020.
+
+A trace-head digest match is not an authenticated checkpoint. Stronger anchoring requires signature/key-policy verification, inclusion proof verification, consistency with a previously pinned checkpoint, independent witness threshold and revocation/custody checks. The current Rust trace verifier supports internal chain consistency and an optional expected-head digest comparison only; it does not implement transparency, signature, witness or revocation verification. An example receipt with placeholder artifacts is not evidence of an actual trusted checkpoint.
+
 ## 7. Initial research targets (not achieved or standards)
 
 | Metric | Pilot target | Hard interpretation |
@@ -237,7 +258,7 @@ The crate contains focused unit tests for canonicalization, duplicate keys, nume
 
 ## 10. Validation and claim boundary
 
-The wire contracts, examples and public fixtures are source artifacts. Branch round-trip and parse checks are separate from full JSON Schema validation, Rust compile/test/Clippy/rustfmt, integration, adaptive campaigns, independent audit and production qualification. The trace verifier source and tests have been authored but not run because the current execution environment has no Cargo, rustc, rustfmt or Nix toolchain. No benchmark score, SOTA claim or general alignment guarantee is made.
+The wire contracts, examples and public fixtures are source artifacts. The contract now defines five JSON schemas, including the external trace checkpoint receipt schema. Branch round-trip and parse checks are separate from full JSON Schema validation, Rust compile/test/Clippy/rustfmt, integration, adaptive campaigns, independent audit and production qualification. The trace verifier source and tests have been authored but not run because the current execution environment has no Cargo, rustc, rustfmt or Nix toolchain. No benchmark score, SOTA claim or general alignment guarantee is made.
 
 The trace verifier does not authenticate identities, verify signatures, establish label truth, prove sink independence, validate revocation status or show that an adapter is correct. Its result is only structural trace verification; an unresolved mutation is explicitly returned as a hold.
 
@@ -249,3 +270,4 @@ The trace verifier does not authenticate identities, verify signatures, establis
 - UK AISI [ControlArena](https://control-arena.aisi.org.uk/); [SHADE-Arena](https://arxiv.org/abs/2506.15740) and [adaptive control evaluation](https://arxiv.org/abs/2511.02997).
 - [LADDER](https://ladderrobotics.ai/research), 2026; [OWASP Top 10 for Agentic Applications 2026](https://genai.owasp.org/top-10-for-agentic-applications-2026/); [NIST AI RMF](https://www.nist.gov/itl/ai-risk-management-framework) and [GenAI Profile](https://www.nist.gov/publications/artificial-intelligence-risk-management-framework-generative-artificial-intelligence); [ISO/IEC 42001:2023](https://www.iso.org/standard/42001).
 - [RFC 8785: JSON Canonicalization Scheme](https://www.rfc-editor.org/rfc/rfc8785).
+- [IETF RFC 9943: SCITT Architecture](https://www.rfc-editor.org/rfc/rfc9943.html), June 2026; [Sigstore Rekor](https://docs.sigstore.dev/logging/overview/) and [Rekor v2 API](https://www.sigstore.dev/swagger/); [W3C Verifiable Credential Data Integrity 1.0](https://www.w3.org/TR/vc-data-integrity/).
