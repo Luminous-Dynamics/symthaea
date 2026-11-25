@@ -136,6 +136,14 @@ pub struct PercentileIntervalV1 {
 }
 
 #[derive(Debug, Clone, PartialEq, Serialize)]
+pub struct BoundaryToleranceBootstrapV1 {
+    pub tolerance_ms: u32,
+    pub start_within_tolerance_rate: Option<PercentileIntervalV1>,
+    pub end_within_tolerance_rate: Option<PercentileIntervalV1>,
+    pub both_boundaries_within_tolerance_rate: Option<PercentileIntervalV1>,
+}
+
+#[derive(Debug, Clone, PartialEq, Serialize)]
 pub struct MultiAnnotatorReliabilityBootstrapV1 {
     pub schema: &'static str,
     pub source_work_clusters: usize,
@@ -150,6 +158,7 @@ pub struct MultiAnnotatorReliabilityBootstrapV1 {
     pub present_pair_exact_count_agreement: Option<PercentileIntervalV1>,
     pub start_boundary_mae_ms: Option<PercentileIntervalV1>,
     pub end_boundary_mae_ms: Option<PercentileIntervalV1>,
+    pub boundary_tolerance_agreement: Vec<BoundaryToleranceBootstrapV1>,
 }
 
 #[derive(Debug, Clone, PartialEq, Serialize)]
@@ -522,6 +531,83 @@ fn nominal_alpha(items: &[MultiAnnotatorReliabilityItemV1]) -> KrippendorffAlpha
     }
 }
 
+fn cluster_boundary_tolerance(
+    pairs: Option<&[&PairwiseAnnotationReliabilityV1]>,
+    tolerance_ms: u32,
+) -> Option<(f64, f64, f64)> {
+    let pairs = pairs?;
+    let mut start_errors = Vec::new();
+    let mut end_errors = Vec::new();
+    for pair in pairs {
+        start_errors.extend(pair.start_boundary_abs_errors_ms.iter().copied());
+        end_errors.extend(pair.end_boundary_abs_errors_ms.iter().copied());
+    }
+    if start_errors.is_empty() || end_errors.is_empty() {
+        return None;
+    }
+    let tolerance = tolerance_ms as f64;
+    let start_within = start_errors
+        .iter()
+        .filter(|error| **error <= tolerance)
+        .count();
+    let end_within = end_errors
+        .iter()
+        .filter(|error| **error <= tolerance)
+        .count();
+    let both_total = start_errors.len().min(end_errors.len());
+    let both_within = start_errors
+        .iter()
+        .zip(&end_errors)
+        .filter(|(start, end)| **start <= tolerance && **end <= tolerance)
+        .count();
+    Some((
+        start_within as f64 / start_errors.len() as f64,
+        end_within as f64 / end_errors.len() as f64,
+        both_within as f64 / both_total as f64,
+    ))
+}
+
+fn boundary_tolerance_summary(
+    pairs: &[PairwiseAnnotationReliabilityV1],
+    tolerance_ms: u32,
+) -> BoundaryToleranceAgreementV1 {
+    let mut by_cluster: BTreeMap<&str, Vec<&PairwiseAnnotationReliabilityV1>> = BTreeMap::new();
+    for pair in pairs {
+        by_cluster
+            .entry(pair.source_work_id_sha256.as_str())
+            .or_default()
+            .push(pair);
+    }
+    let cluster_metrics: Vec<_> = by_cluster
+        .values()
+        .filter_map(|cluster_pairs| {
+            cluster_boundary_tolerance(Some(cluster_pairs.as_slice()), tolerance_ms)
+        })
+        .collect();
+    let start_observations: usize = pairs
+        .iter()
+        .map(|pair| pair.start_boundary_abs_errors_ms.len())
+        .sum();
+    let end_observations: usize = pairs
+        .iter()
+        .map(|pair| pair.end_boundary_abs_errors_ms.len())
+        .sum();
+    BoundaryToleranceAgreementV1 {
+        tolerance_ms,
+        start_within_tolerance_rate: mean(
+            &cluster_metrics.iter().map(|item| item.0).collect::<Vec<_>>(),
+        ),
+        end_within_tolerance_rate: mean(
+            &cluster_metrics.iter().map(|item| item.1).collect::<Vec<_>>(),
+        ),
+        both_boundaries_within_tolerance_rate: mean(
+            &cluster_metrics.iter().map(|item| item.2).collect::<Vec<_>>(),
+        ),
+        start_boundary_observations: start_observations,
+        end_boundary_observations: end_observations,
+    }
+}
+
 fn summarize_dataset(
     items: &[MultiAnnotatorReliabilityItemV1],
     pairwise: &[PairwiseAnnotationReliabilityV1],
@@ -574,32 +660,7 @@ fn summarize_dataset(
         .collect();
     let boundary_tolerance_agreement = tolerances
         .iter()
-        .map(|tolerance| {
-            let start_within = start_errors
-                .iter()
-                .filter(|error| **error <= *tolerance as f64)
-                .count();
-            let end_within = end_errors
-                .iter()
-                .filter(|error| **error <= *tolerance as f64)
-                .count();
-            let both_total = start_errors.len().min(end_errors.len());
-            let start_rate = rate(start_within, start_errors.len());
-            let end_rate = rate(end_within, end_errors.len());
-            let both_within = start_errors
-                .iter()
-                .zip(&end_errors)
-                .filter(|(start, end)| **start <= *tolerance as f64 && **end <= *tolerance as f64)
-                .count();
-            BoundaryToleranceAgreementV1 {
-                tolerance_ms: *tolerance,
-                start_within_tolerance_rate: start_rate,
-                end_within_tolerance_rate: end_rate,
-                both_boundaries_within_tolerance_rate: rate(both_within, both_total),
-                start_boundary_observations: start_errors.len(),
-                end_boundary_observations: end_errors.len(),
-            }
-        })
+        .map(|tolerance| boundary_tolerance_summary(pairwise, *tolerance))
         .collect();
     let clusters = items
         .iter()
@@ -690,6 +751,27 @@ fn bootstrap_dataset(
         .map(|key| cluster_boundary_metric(cluster_pairwise.get(key).map(Vec::as_slice), false))
         .collect::<Vec<_>>();
 
+    let cluster_boundary_tolerances: Vec<Vec<Option<(f64, f64, f64)>>> = dataset
+        .boundary_tolerances_ms
+        .iter()
+        .map(|tolerance| {
+            cluster_keys
+                .iter()
+                .map(|key| {
+                    cluster_boundary_tolerance(
+                        cluster_pairwise.get(key).map(Vec::as_slice),
+                        *tolerance,
+                    )
+                })
+                .collect()
+        })
+        .collect();
+    let point_boundary_tolerances: Vec<_> = dataset
+        .boundary_tolerances_ms
+        .iter()
+        .map(|tolerance| boundary_tolerance_summary(pairwise, *tolerance))
+        .collect();
+
     let point_alpha = nominal_alpha(&dataset.items).alpha;
     let point_state = cluster_mean(&cluster_state_agreement);
     let point_f1 = cluster_mean(&cluster_f1);
@@ -706,6 +788,13 @@ fn bootstrap_dataset(
     let mut count_samples = Vec::with_capacity(dataset.bootstrap_replicates);
     let mut start_samples = Vec::with_capacity(dataset.bootstrap_replicates);
     let mut end_samples = Vec::with_capacity(dataset.bootstrap_replicates);
+    let mut tolerance_start_samples: Vec<Vec<Option<f64>>> = dataset
+        .boundary_tolerances_ms
+        .iter()
+        .map(|_| Vec::with_capacity(dataset.bootstrap_replicates))
+        .collect();
+    let mut tolerance_end_samples = tolerance_start_samples.clone();
+    let mut tolerance_both_samples = tolerance_start_samples.clone();
 
     for _ in 0..dataset.bootstrap_replicates {
         let mut sampled_items = Vec::new();
@@ -715,6 +804,11 @@ fn bootstrap_dataset(
         let mut sampled_count = Vec::new();
         let mut sampled_start = Vec::new();
         let mut sampled_end = Vec::new();
+        let mut sampled_tolerances = dataset
+            .boundary_tolerances_ms
+            .iter()
+            .map(|_| (Vec::new(), Vec::new(), Vec::new()))
+            .collect::<Vec<_>>();
 
         for _ in 0..source_cluster_count {
             let index = unbiased_index(&mut state, source_cluster_count);
@@ -729,6 +823,20 @@ fn bootstrap_dataset(
             push_some(&mut sampled_count, cluster_count_agreement[index]);
             push_some(&mut sampled_start, cluster_start_mae[index]);
             push_some(&mut sampled_end, cluster_end_mae[index]);
+            for (tolerance_index, cluster_values) in
+                cluster_boundary_tolerances.iter().enumerate()
+            {
+                if let Some((start, end, both)) = cluster_values[index] {
+                    sampled_tolerances[tolerance_index].0.push(start);
+                    sampled_tolerances[tolerance_index].1.push(end);
+                    sampled_tolerances[tolerance_index].2.push(both);
+                }
+            }
+        }
+        for (index, (start, end, both)) in sampled_tolerances.iter().enumerate() {
+            tolerance_start_samples[index].push(mean(start));
+            tolerance_end_samples[index].push(mean(end));
+            tolerance_both_samples[index].push(mean(both));
         }
 
         alpha_samples.push(nominal_alpha_refs(&sampled_items).alpha);
@@ -755,6 +863,29 @@ fn bootstrap_dataset(
         present_pair_exact_count_agreement: percentile_interval(point_count, count_samples),
         start_boundary_mae_ms: percentile_interval(point_start, start_samples),
         end_boundary_mae_ms: percentile_interval(point_end, end_samples),
+        boundary_tolerance_agreement: dataset
+            .boundary_tolerances_ms
+            .iter()
+            .enumerate()
+            .map(|(index, tolerance)| {
+                let point = &point_boundary_tolerances[index];
+                BoundaryToleranceBootstrapV1 {
+                    tolerance_ms: *tolerance,
+                    start_within_tolerance_rate: percentile_interval(
+                        point.start_within_tolerance_rate,
+                        tolerance_start_samples[index].clone(),
+                    ),
+                    end_within_tolerance_rate: percentile_interval(
+                        point.end_within_tolerance_rate,
+                        tolerance_end_samples[index].clone(),
+                    ),
+                    both_boundaries_within_tolerance_rate: percentile_interval(
+                        point.both_boundaries_within_tolerance_rate,
+                        tolerance_both_samples[index].clone(),
+                    ),
+                }
+            })
+            .collect(),
     })
 }
 
