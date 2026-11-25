@@ -199,7 +199,9 @@ impl EpistemicVerifier {
         }
     }
 
-    /// Verify a claim from research results
+    /// Assess a claim against explicit support labels already present in research results.
+    ///
+    /// Aggregate result confidence is not reused as claim-specific support.
     pub fn verify_from_results(&self, claim: &str, results: &[WebResearchResult]) -> VerifiedClaim {
         // Build verification context from results
         let sources: Vec<SourceEvidence> = results
