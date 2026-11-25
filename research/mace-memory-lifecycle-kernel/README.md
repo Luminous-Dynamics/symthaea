@@ -47,7 +47,7 @@ For T9, the evidence must show exactly one acknowledged write through the SUT in
 
 Not Applicable and Error require reasons and are excluded from the applicable denominator; neither is credited as a pass. Read-time rejection/reporting and audit-only reporting remain distinct. The module is a typed result validator, not an actual snapshot/restore runner or live SUT adapter. See [MACE T9/T10 control-aware qualification v0.1](../../docs/research/MACE_T9_T10_CONTROL_AWARE_QUALIFICATION_V0_1.md).
 
-The eleven Rust tests are authored but have not been compiled or executed in this environment. No T9/T10 SUT result or security qualification is claimed.
+The fourteen Rust tests are authored but have not been compiled or executed in this environment. No T9/T10 SUT result or security qualification is claimed.
 
 ## Next integration gates
 
