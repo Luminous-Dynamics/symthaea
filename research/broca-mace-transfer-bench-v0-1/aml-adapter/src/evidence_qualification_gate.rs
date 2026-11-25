@@ -137,6 +137,11 @@ pub enum EvidenceQualificationRejectV1 {
     KeyExpired,
     InvalidPublicKey,
     InvalidSignatureEncoding,
+    DsseInvalidEnvelope,
+    DssePayloadTypeMismatch,
+    DsseSignatureCountUnsupported,
+    DssePayloadTooLarge,
+    DssePayloadBindingMismatch,
 }
 
 /// Capability token created only by verify_and_bind. Callers cannot construct

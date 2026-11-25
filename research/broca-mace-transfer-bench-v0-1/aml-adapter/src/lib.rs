@@ -20,6 +20,7 @@ pub mod retrieval_policy_memory;
 pub mod retrieval_policy_store;
 pub mod evidence_qualification_gate;
 pub mod qualification_trust;
+pub mod qualification_dsse;
 pub mod acquisition_receipt_v2;
 
 use std::collections::BTreeMap;

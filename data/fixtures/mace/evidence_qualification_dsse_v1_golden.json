@@ -1,0 +1,14 @@
+{
+  "purpose": "PUBLIC TEST VECTOR ONLY. The deterministic test signing seed is public and must never be used for production qualification.",
+  "test_signing_seed_hex": "4949494949494949494949494949494949494949494949494949494949494949",
+  "public_key_hex": "772c8a442b7db06e166cfbc1ccbcbcde6f3eba76a4e98ef3ffc519502237d6ef",
+  "key_id": "4865dd3e7b398172478f50ef422cd14ef6adbfeeb644c6d8f87a463b55c0bf87",
+  "verifier_profile_sha256": "bc51f63e5a6f46f5357b9fb261fcdb038e3a34f542d7f5dfc36f243d2895b4a2",
+  "candidate_evidence_ids_sha256": "825c8594029105f1599a3de02708e715b72fb353f1fbd796b5faeb15b190b476",
+  "payload_type": "application/vnd.in-toto+json",
+  "payload_bytes": 1776,
+  "payload_sha256": "ff58c1d0853c8f4d399994b5cc99fc4a4d79e626e877cc95c3c37e587c438430",
+  "pae_bytes": 1820,
+  "pae_sha256": "e36506738ab47f4ffe759e3d30da670b76ba64b3b1e294b95168c46de22c506a",
+  "signature_base64": "/pmSIgR/1wUPpORQh1CpvWLlr/kDCJW5ebJD+w7K2JZJuEXDy4YBvyZROOiKBJAUvwc4fLNBwcbaYGpapk8NDw=="
+}
