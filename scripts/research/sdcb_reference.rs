@@ -255,6 +255,128 @@ pub fn deterministic_codeword(seed: u64, dimension: usize) -> Result<Vec<u8>, &'
     Ok(output)
 }
 
+
+/// Rank of a real 2x2 matrix, used by the observability and excitation controls.
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub enum MatrixRank {
+    Zero,
+    One,
+    Two,
+}
+
+/// Rank of the 2x2 observability matrix [C; C A] for a linear state-space model.
+pub fn observability_rank_2x2(
+    a: f64,
+    b: f64,
+    c: f64,
+    d: f64,
+    sensor_1: f64,
+    sensor_2: f64,
+    tolerance: f64,
+) -> Result<MatrixRank, &'static str> {
+    if !finite(&[a, b, c, d, sensor_1, sensor_2]) {
+        return Err("system and sensor entries must be finite");
+    }
+    if !tolerance.is_finite() || tolerance < 0.0 {
+        return Err("tolerance must be finite and nonnegative");
+    }
+
+    let row_2_1 = sensor_1 * a + sensor_2 * c;
+    let row_2_2 = sensor_1 * b + sensor_2 * d;
+    let determinant = sensor_1 * row_2_2 - sensor_2 * row_2_1;
+    let entries = [sensor_1, sensor_2, row_2_1, row_2_2];
+    if !finite(&[row_2_1, row_2_2, determinant]) {
+        return Err("observability calculation overflowed");
+    }
+
+    Ok(if determinant.abs() > tolerance {
+        MatrixRank::Two
+    } else if entries.iter().any(|entry| entry.abs() > tolerance) {
+        MatrixRank::One
+    } else {
+        MatrixRank::Zero
+    })
+}
+
+/// Numerical rank of a two-feature input-regressor matrix via its Gram matrix.
+///
+/// This is a small persistent-excitation control, not a complete theorem about
+/// identifiability for arbitrary nonlinear or time-varying systems.
+pub fn input_regressor_rank_2d(
+    samples: &[[f64; 2]],
+    tolerance: f64,
+) -> Result<MatrixRank, &'static str> {
+    if !tolerance.is_finite() || tolerance < 0.0 {
+        return Err("tolerance must be finite and nonnegative");
+    }
+    if samples.iter().flatten().any(|value| !value.is_finite()) {
+        return Err("input samples must be finite");
+    }
+
+    let mut g_11 = 0.0;
+    let mut g_12 = 0.0;
+    let mut g_22 = 0.0;
+    for sample in samples {
+        g_11 += sample[0] * sample[0];
+        g_12 += sample[0] * sample[1];
+        g_22 += sample[1] * sample[1];
+    }
+    let determinant = g_11 * g_22 - g_12 * g_12;
+    if !finite(&[g_11, g_12, g_22, determinant]) {
+        return Err("input Gram matrix calculation overflowed");
+    }
+
+    Ok(if determinant > tolerance {
+        MatrixRank::Two
+    } else if g_11.max(g_22) > tolerance {
+        MatrixRank::One
+    } else {
+        MatrixRank::Zero
+    })
+}
+
+/// Observations of a diagonal two-state linear system over a finite horizon.
+///
+/// This deliberately tiny simulator makes hidden-mode non-identifiability
+/// controls hand-checkable. It is not a general state-space simulator.
+pub fn diagonal_observation_trace(
+    visible_eigenvalue: f64,
+    hidden_eigenvalue: f64,
+    initial_visible: f64,
+    initial_hidden: f64,
+    sensor_visible: f64,
+    sensor_hidden: f64,
+    steps: usize,
+) -> Result<Vec<f64>, &'static str> {
+    if !finite(&[
+        visible_eigenvalue,
+        hidden_eigenvalue,
+        initial_visible,
+        initial_hidden,
+        sensor_visible,
+        sensor_hidden,
+    ]) {
+        return Err("system, state and sensor values must be finite");
+    }
+    if steps == 0 {
+        return Err("observation horizon must be nonzero");
+    }
+
+    let mut visible = initial_visible;
+    let mut hidden = initial_hidden;
+    let mut observations = Vec::with_capacity(steps);
+    for _ in 0..steps {
+        observations.push(sensor_visible * visible + sensor_hidden * hidden);
+        visible *= visible_eigenvalue;
+        hidden *= hidden_eigenvalue;
+    }
+    if observations.iter().all(|value| value.is_finite()) {
+        Ok(observations)
+    } else {
+        Err("observation simulation overflowed")
+    }
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -395,6 +517,55 @@ mod tests {
         assert_eq!(first, repeated);
         assert_ne!(first, other);
         assert!(first.iter().all(|bit| *bit <= 1));
+    }
+
+
+    #[test]
+    fn observability_distinguishes_visible_hidden_and_unobservable_modes() {
+        assert_eq!(
+            observability_rank_2x2(0.5, 0.0, 0.0, 0.2, 1.0, 0.0, 1e-12).unwrap(),
+            MatrixRank::One
+        );
+        assert_eq!(
+            observability_rank_2x2(0.0, 1.0, -1.0, 0.0, 1.0, 0.0, 1e-12).unwrap(),
+            MatrixRank::Two
+        );
+        assert_eq!(
+            observability_rank_2x2(0.5, 0.0, 0.0, 0.2, 0.0, 0.0, 1e-12).unwrap(),
+            MatrixRank::Zero
+        );
+    }
+
+    #[test]
+    fn different_hidden_dynamics_can_be_observationally_identical() {
+        let first = diagonal_observation_trace(0.5, 0.2, 1.0, 1.0, 1.0, 0.0, 8).unwrap();
+        let second = diagonal_observation_trace(0.5, 0.9, 1.0, 1.0, 1.0, 0.0, 8).unwrap();
+        assert_eq!(first, second);
+        assert_eq!(
+            observability_rank_2x2(0.5, 0.0, 0.0, 0.2, 1.0, 0.0, 1e-12).unwrap(),
+            MatrixRank::One
+        );
+    }
+
+    #[test]
+    fn input_regressor_rank_detects_persistent_excitation_controls() {
+        assert_eq!(
+            input_regressor_rank_2d(&[[1.0, 0.0], [2.0, 0.0]], 1e-12).unwrap(),
+            MatrixRank::One
+        );
+        assert_eq!(
+            input_regressor_rank_2d(&[[1.0, 0.0], [0.0, 1.0]], 1e-12).unwrap(),
+            MatrixRank::Two
+        );
+        assert_eq!(input_regressor_rank_2d(&[], 1e-12).unwrap(), MatrixRank::Zero);
+    }
+
+    #[test]
+    fn identifiability_controls_reject_invalid_inputs() {
+        assert!(observability_rank_2x2(1.0, 0.0, 0.0, 1.0, f64::NAN, 0.0, 1e-12).is_err());
+        assert!(input_regressor_rank_2d(&[[1.0, f64::INFINITY]], 1e-12).is_err());
+        assert!(input_regressor_rank_2d(&[[1.0, 0.0]], -1.0).is_err());
+        assert!(diagonal_observation_trace(0.5, 0.2, 1.0, 1.0, 1.0, 0.0, 0).is_err());
     }
 
     #[test]
