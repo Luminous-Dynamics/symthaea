@@ -52,7 +52,7 @@ A receipt binds:
 3. canonical statement digest;
 4. one or more transparency entries, each identifying a service, log, entry index, tree size/root, signed checkpoint and inclusion proof;
 5. optional consistency proofs between successive checkpoints;
-6. witness attestations that identify the checkpoint they observed;
+6. witness attestations that identify the log service/root they observed (`service_id` + `log_id` + `tree_size` + `root_hash`), with the separate `witness_id` and `key_id` for the attesting party;
 7. a versioned trust-policy reference and key-status/revocation evidence references.
 
 A receipt can contain references to signed payloads/proofs rather than copying large proof objects. Referenced artifacts must be content-addressed and retrievable by the independent evaluator. Private services may use a mutually agreed export bundle, but their trust root and auditability limitations must be declared.
