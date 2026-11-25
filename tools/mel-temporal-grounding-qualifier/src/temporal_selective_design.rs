@@ -419,7 +419,7 @@ pub fn audit_selective_design_risk(
         let work_risk = (covered_work_total > 0.0).then_some(error_work_total / covered_work_total);
         let item_risk_interval = item_risk.map(|risk| {
             let linearized = make_samples(&joined, |item| {
-                let c = f64::from(is_covered(item.outcome, *threshold));
+                let c = bool_value(is_covered(item.outcome, *threshold));
                 let e = bool_value(
                     is_covered(item.outcome, *threshold) && !item.outcome.decision_correct,
                 );
@@ -435,8 +435,8 @@ pub fn audit_selective_design_risk(
         });
         let work_risk_interval = work_risk.map(|risk| {
             let linearized = make_samples(&joined, |item| {
-                let c = f64::from(is_covered(item.outcome, *threshold));
-                let e = f64::from(
+                let c = bool_value(is_covered(item.outcome, *threshold));
+                let e = bool_value(
                     is_covered(item.outcome, *threshold) && !item.outcome.decision_correct,
                 );
                 e - risk * c
@@ -456,7 +456,7 @@ pub fn audit_selective_design_risk(
             .then_some(false_absence_work_total / covered_work_total);
         let item_false_absence_interval = item_false_absence_rate.map(|rate| {
             let linearized = make_samples(&joined, |item| {
-                let c = f64::from(is_covered(item.outcome, *threshold));
+                let c = bool_value(is_covered(item.outcome, *threshold));
                 let f = bool_value(
                     is_covered(item.outcome, *threshold) && item.outcome.false_absence_claim,
                 );
@@ -472,8 +472,8 @@ pub fn audit_selective_design_risk(
         });
         let work_false_absence_interval = work_false_absence_rate.map(|rate| {
             let linearized = make_samples(&joined, |item| {
-                let c = f64::from(is_covered(item.outcome, *threshold));
-                let f = f64::from(
+                let c = bool_value(is_covered(item.outcome, *threshold));
+                let f = bool_value(
                     is_covered(item.outcome, *threshold) && item.outcome.false_absence_claim,
                 );
                 f - rate * c
