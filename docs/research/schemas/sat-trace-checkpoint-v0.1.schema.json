@@ -98,7 +98,10 @@
           "inclusion_proof_ref",
           "root_hash",
           "root_hash_algorithm",
-          "root_hash_encoding"
+          "root_hash_encoding",
+          "signed_statement_ref",
+          "checkpoint_key_id",
+          "verification_policy_ref"
         ],
         "properties": {
           "service_profile": {
@@ -188,7 +191,8 @@
           "root_hash",
           "root_hash_algorithm",
           "root_hash_encoding",
-          "log_id"
+          "log_id",
+          "independence_basis_ref"
         ],
         "properties": {
           "witness_id": {
@@ -252,7 +256,9 @@
         "version",
         "policy_digest",
         "minimum_independent_witnesses",
-        "key_status_evidence_ref"
+        "key_status_evidence_ref",
+        "revocation_snapshot_ref",
+        "governance_policy_ref"
       ],
       "properties": {
         "policy_id": {
