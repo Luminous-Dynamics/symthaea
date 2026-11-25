@@ -96,6 +96,12 @@ pub struct AnnotationAcquisitionCandidateV1 {
     /// A finer query/task family; it may vary within one source work.
     pub task_family: String,
     pub purpose_scope: String,
+    /// Digest of the exact #13560 per-item model-vs-annotator report.
+    pub model_grounding_report_sha256: String,
+    /// Digest of the exact #13617 reliability report/annotation cohort.
+    pub inter_annotator_reliability_report_sha256: String,
+    /// Digest binding this item's frozen Development/Active/Audit cohort role.
+    pub cohort_assignment_manifest_sha256: String,
     pub cohort_role: AnnotationCohortRoleV1,
     pub authorization_state: AuthorizationStateV1,
     pub authorization_receipt_sha256: Option<String>,
@@ -543,6 +549,18 @@ fn validate_candidates(candidates: &[AnnotationAcquisitionCandidateV1]) -> Resul
         }
         validate_digest(&candidate.source_work_id_sha256, "source_work_id_sha256")?;
         validate_digest(&candidate.recording_sha256, "recording_sha256")?;
+        validate_digest(
+            &candidate.model_grounding_report_sha256,
+            "model_grounding_report_sha256",
+        )?;
+        validate_digest(
+            &candidate.inter_annotator_reliability_report_sha256,
+            "inter_annotator_reliability_report_sha256",
+        )?;
+        validate_digest(
+            &candidate.cohort_assignment_manifest_sha256,
+            "cohort_assignment_manifest_sha256",
+        )?;
         if !item_ids.insert(candidate.item_id.as_str()) {
             return Err(format!("duplicate acquisition item ID: {}", candidate.item_id));
         }
@@ -1250,6 +1268,9 @@ mod tests {
             source_stratum_id: stratum.into(),
             task_family: "instrument-entry".into(),
             purpose_scope: "evaluation-only".into(),
+            model_grounding_report_sha256: digest('b'),
+            inter_annotator_reliability_report_sha256: digest('c'),
+            cohort_assignment_manifest_sha256: digest('d'),
             cohort_role,
             authorization_state: AuthorizationStateV1::Authorized,
             authorization_receipt_sha256: Some(digest('f')),
@@ -1495,6 +1516,22 @@ mod tests {
         let report = plan_annotation_acquisition(&dataset).unwrap();
         assert!(report.budget_usage.total_spent_units <= 10);
         assert!(!report.unmet_quotas.is_empty());
+    }
+
+    #[test]
+    fn invalid_or_missing_diagnostic_lineage_digests_fail_closed() {
+        let mut dataset = synthetic_dataset();
+        dataset.candidates[0].model_grounding_report_sha256 = "invalid".into();
+        assert!(plan_annotation_acquisition(&dataset).is_err());
+
+        let mut dataset = synthetic_dataset();
+        dataset.candidates[0].inter_annotator_reliability_report_sha256.clear();
+        assert!(plan_annotation_acquisition(&dataset).is_err());
+
+        let mut dataset = synthetic_dataset();
+        dataset.candidates[0].cohort_assignment_manifest_sha256 =
+            "fffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffG".into();
+        assert!(plan_annotation_acquisition(&dataset).is_err());
     }
 
     #[test]
