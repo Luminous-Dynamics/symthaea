@@ -1,0 +1,121 @@
+{
+  "schema_version": "0.1",
+  "fixture_id": "kinetic-state-discrimination-complex-eig-known-answers-v1",
+  "status": "synthetic_analytic_only",
+  "quadrature_order_per_axis": 9,
+  "cases": [
+    {
+      "case_id": "identical-predictions-zero-information",
+      "intervention_id": "probe-identical",
+      "hypotheses": [
+        {
+          "hypothesis_id": "state-a",
+          "prior_probability": 0.5,
+          "predicted_response": {
+            "real": 1,
+            "imag": -0.25
+          }
+        },
+        {
+          "hypothesis_id": "state-b",
+          "prior_probability": 0.5,
+          "predicted_response": {
+            "real": 1,
+            "imag": -0.25
+          }
+        }
+      ],
+      "noise_variance_per_quadrature": 0.1,
+      "estimated_evaluation_cost_seconds": 2,
+      "expected_prior_entropy_bits": 1,
+      "expected_information_gain_min_bits": 0,
+      "expected_information_gain_max_bits": 1e-12
+    },
+    {
+      "case_id": "phase-only-separation",
+      "intervention_id": "probe-phase-quadrature",
+      "hypotheses": [
+        {
+          "hypothesis_id": "state-real",
+          "prior_probability": 0.5,
+          "predicted_response": {
+            "real": 1,
+            "imag": 0
+          }
+        },
+        {
+          "hypothesis_id": "state-imag",
+          "prior_probability": 0.5,
+          "predicted_response": {
+            "real": 0,
+            "imag": 1
+          }
+        }
+      ],
+      "noise_variance_per_quadrature": 0.02,
+      "estimated_evaluation_cost_seconds": 1,
+      "expected_prior_entropy_bits": 1,
+      "expected_information_gain_min_bits": 0.95,
+      "expected_information_gain_max_bits": 1
+    },
+    {
+      "case_id": "high-noise-blurs-hypotheses",
+      "intervention_id": "probe-noise-limited",
+      "hypotheses": [
+        {
+          "hypothesis_id": "state-minus",
+          "prior_probability": 0.5,
+          "predicted_response": {
+            "real": -1,
+            "imag": 0.25
+          }
+        },
+        {
+          "hypothesis_id": "state-plus",
+          "prior_probability": 0.5,
+          "predicted_response": {
+            "real": 1,
+            "imag": -0.25
+          }
+        }
+      ],
+      "noise_variance_per_quadrature": 4,
+      "estimated_evaluation_cost_seconds": 1,
+      "expected_prior_entropy_bits": 1,
+      "expected_information_gain_min_bits": 0,
+      "expected_information_gain_max_bits": 0.2
+    },
+    {
+      "case_id": "strong-separation-with-imbalanced-prior",
+      "intervention_id": "probe-prior-weighted",
+      "hypotheses": [
+        {
+          "hypothesis_id": "dominant-state",
+          "prior_probability": 0.9,
+          "predicted_response": {
+            "real": -2,
+            "imag": 0
+          }
+        },
+        {
+          "hypothesis_id": "rare-state",
+          "prior_probability": 0.1,
+          "predicted_response": {
+            "real": 2,
+            "imag": 0
+          }
+        }
+      ],
+      "noise_variance_per_quadrature": 0.001,
+      "estimated_evaluation_cost_seconds": 4,
+      "expected_prior_entropy_bits": 0.4689955935892812,
+      "expected_information_gain_min_bits": 0.3,
+      "expected_information_gain_max_bits": 0.4689955935892812
+    }
+  ],
+  "claim_boundary": {
+    "no_kinetic_forward_model_evaluated": true,
+    "noise_is_synthetic_not_calibrated": true,
+    "no_global_state_equivalence_claimed": true
+  }
+}
