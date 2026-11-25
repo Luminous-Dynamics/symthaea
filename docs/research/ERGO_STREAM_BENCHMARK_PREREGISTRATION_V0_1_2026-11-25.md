@@ -57,7 +57,7 @@ The first confirmatory release should include at least three independently gener
 | Partial scope / multiscale | valid substructure or quotient at declared resolution | omitted context changes a required observable | scoped map and abstraction validity |
 | Non-identifiability | multiple maps explain the public prefix | symmetry, missing modality, delayed evidence | set-valued maps / query / abstention |
 | Temporal / hybrid | time scaling, asynchronous observation, event/reset mapping | stale observation, dropped event, clock drift, mode switch | continuous-time and hybrid transfer |
-| Cross-modal | paired audio/visual/action event alignment | shuffled alignment, missing/disagreeing modality | cross-modal structure acquisition |
+| Cross-modal | paired audio/visual/action event alignment ([Symtropy #7442](https://github.com/Luminous-Dynamics/symtropy/issues/7442)) | shuffled alignment, clock offsets, delayed arrival, missing/disagreeing modality | cross-modal structure acquisition |
 | Embodied dynamics | source-to-target action and state mapping | target-side transition or latency changes | behavioural transfer and action utility |
 
 For v0.1, keep the first three families tiny, deterministic, replayable and independently enumerable. Do not introduce raw high-dimensional video/audio or continuous physics before clock, provenance, cost and evaluator-custody contracts are qualified.
