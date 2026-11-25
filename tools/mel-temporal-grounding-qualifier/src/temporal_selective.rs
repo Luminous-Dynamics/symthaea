@@ -39,6 +39,17 @@ pub enum IdentifiabilityBasisV1 {
 
 #[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
 #[serde(deny_unknown_fields)]
+pub struct SelectiveInferenceCostV1 {
+    /// Total model forwards used to produce the selected decision and confidence.
+    pub forward_passes: u32,
+    /// End-to-end selective-policy wall time for this exact query and runtime.
+    pub selective_wall_time_ms: u64,
+    /// Matched single-forward baseline wall time for the same query/audio/runtime.
+    pub one_pass_baseline_wall_time_ms: u64,
+}
+
+#[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
+#[serde(deny_unknown_fields)]
 pub struct SelectiveGroundingCaseV1 {
     pub schema: String,
     pub case_id: String,
@@ -50,6 +61,7 @@ pub struct SelectiveGroundingCaseV1 {
     pub identifiability_basis: IdentifiabilityBasisV1,
     /// Frozen adjudication-policy identity; raw annotation records live in #13560.
     pub adjudication_profile_sha256: String,
+    pub inference_cost: SelectiveInferenceCostV1,
     pub truth: TemporalGroundTruthV1,
     /// Prediction disposition after applying the selective decision.
     pub prediction: TemporalGroundingPredictionV1,
@@ -69,6 +81,7 @@ pub struct SelectiveGroundingBatchV1 {
     pub model_identity_sha256: String,
     pub runtime_identity_sha256: String,
     pub decoding_config_sha256: String,
+    pub hardware_identity_sha256: String,
     pub plan: TemporalGroundingPlanV1,
     pub cases: Vec<SelectiveGroundingCaseV1>,
 }
@@ -82,6 +95,8 @@ pub struct SelectiveCaseResultV1 {
     pub truth_state: GroundTruthStateV1,
     pub decision: SelectiveDecisionV1,
     pub decision_confidence: f64,
+    pub inference_cost: SelectiveInferenceCostV1,
+    pub latency_multiplier: f64,
     pub decision_correct: bool,
     pub unconditional_answer_correct: bool,
     pub covered: bool,
@@ -164,6 +179,12 @@ pub struct SelectiveGroundingSummaryV1 {
     pub answer_present_mean_f1: Option<f64>,
     pub answer_present_mean_recall: Option<f64>,
     pub answer_present_mean_count_gated_f1: Option<f64>,
+    pub mean_forward_passes: Option<f64>,
+    pub p95_forward_passes: Option<f64>,
+    pub mean_selective_wall_time_ms: Option<f64>,
+    pub p95_selective_wall_time_ms: Option<f64>,
+    pub mean_latency_multiplier: Option<f64>,
+    pub p95_latency_multiplier: Option<f64>,
     pub decision_confidence_brier: Option<f64>,
     pub decision_confidence_ece: Option<f64>,
     pub calibration_bins: Vec<CalibrationBinV1>,
@@ -187,6 +208,7 @@ pub struct SelectiveGroundingReportV1 {
     pub model_identity_sha256: String,
     pub runtime_identity_sha256: String,
     pub decoding_config_sha256: String,
+    pub hardware_identity_sha256: String,
     pub plan: TemporalGroundingPlanV1,
     pub summary: SelectiveGroundingSummaryV1,
     pub strata: Vec<StratumSelectiveSummaryV1>,
@@ -194,6 +216,8 @@ pub struct SelectiveGroundingReportV1 {
     pub case_results: Vec<SelectiveCaseResultV1>,
     /// The harness validates digest syntax/identity binding, not authenticity.
     pub runtime_identity_authenticated: bool,
+    pub hardware_identity_authenticated: bool,
+    pub inference_cost_receipts_authenticated: bool,
     pub evidence_receipts_authenticated: bool,
     /// This evaluator has no access to private model reasoning.
     pub model_reasoning_audited: bool,
@@ -217,6 +241,7 @@ pub fn audit_selective_batch(
     validate_digest(&batch.model_identity_sha256, "model_identity_sha256")?;
     validate_digest(&batch.runtime_identity_sha256, "runtime_identity_sha256")?;
     validate_digest(&batch.decoding_config_sha256, "decoding_config_sha256")?;
+    validate_digest(&batch.hardware_identity_sha256, "hardware_identity_sha256")?;
     if batch.cases.is_empty() {
         return Err("selective-grounding batch must contain at least one case".into());
     }
@@ -237,12 +262,15 @@ pub fn audit_selective_batch(
         model_identity_sha256: batch.model_identity_sha256.clone(),
         runtime_identity_sha256: batch.runtime_identity_sha256.clone(),
         decoding_config_sha256: batch.decoding_config_sha256.clone(),
+        hardware_identity_sha256: batch.hardware_identity_sha256.clone(),
         plan: batch.plan.clone(),
         summary,
         strata,
         identifiability_basis_summaries,
         case_results: results,
         runtime_identity_authenticated: false,
+        hardware_identity_authenticated: false,
+        inference_cost_receipts_authenticated: false,
         evidence_receipts_authenticated: false,
         model_reasoning_audited: false,
         always_abstain_is_a_product_baseline: false,
@@ -265,6 +293,12 @@ fn score_case(
         || !(0.0..=1.0).contains(&case.decision_confidence)
     {
         return Err(format!("case {} has confidence outside [0,1]", case.case_id));
+    }
+    if case.inference_cost.forward_passes == 0
+        || case.inference_cost.selective_wall_time_ms == 0
+        || case.inference_cost.one_pass_baseline_wall_time_ms == 0
+    {
+        return Err(format!("case {} has invalid inference-cost measurements", case.case_id));
     }
     if !case_ids.insert(case.case_id.clone()) {
         return Err(format!("duplicate selective-grounding case_id: {}", case.case_id));
@@ -397,6 +431,9 @@ fn score_case(
         truth_state: case.truth.state,
         decision: case.decision,
         decision_confidence: case.decision_confidence,
+        inference_cost: case.inference_cost.clone(),
+        latency_multiplier: case.inference_cost.selective_wall_time_ms as f64
+            / case.inference_cost.one_pass_baseline_wall_time_ms as f64,
         decision_correct,
         unconditional_answer_correct,
         covered,
@@ -453,6 +490,15 @@ fn summarize(results: &[SelectiveCaseResultV1]) -> SelectiveGroundingSummaryV1 {
         .iter()
         .filter(|item| item.truth_state != GroundTruthStateV1::Absent)
         .count();
+    let forward_passes = results.iter()
+        .map(|item| item.inference_cost.forward_passes as f64)
+        .collect::<Vec<_>>();
+    let selective_latency = results.iter()
+        .map(|item| item.inference_cost.selective_wall_time_ms as f64)
+        .collect::<Vec<_>>();
+    let latency_multipliers = results.iter()
+        .map(|item| item.latency_multiplier)
+        .collect::<Vec<_>>();
     let decision_confidence_brier = mean(
         &results
             .iter()
@@ -543,6 +589,12 @@ fn summarize(results: &[SelectiveCaseResultV1]) -> SelectiveGroundingSummaryV1 {
         answer_present_mean_f1: mean(&present_scores),
         answer_present_mean_recall: mean(&present_recalls),
         answer_present_mean_count_gated_f1: mean(&present_count_gated),
+        mean_forward_passes: mean(&forward_passes),
+        p95_forward_passes: percentile(&forward_passes, 0.95),
+        mean_selective_wall_time_ms: mean(&selective_latency),
+        p95_selective_wall_time_ms: percentile(&selective_latency, 0.95),
+        mean_latency_multiplier: mean(&latency_multipliers),
+        p95_latency_multiplier: percentile(&latency_multipliers, 0.95),
         decision_confidence_brier,
         decision_confidence_ece,
         calibration_bins,
@@ -855,6 +907,11 @@ mod tests {
                 GroundTruthStateV1::NotEstimable => "not_estimable".into(),
             },
             adjudication_profile_sha256: POLICY.into(),
+            inference_cost: SelectiveInferenceCostV1 {
+                forward_passes: if confidence > 0.85 { 1 } else { 3 },
+                selective_wall_time_ms: if confidence > 0.85 { 100 } else { 180 },
+                one_pass_baseline_wall_time_ms: 100,
+            },
             truth: truth(state, intervals, reason),
             prediction: selected_prediction,
             unconditional_prediction,
@@ -870,6 +927,7 @@ mod tests {
             model_identity_sha256: MODEL.into(),
             runtime_identity_sha256: RUNTIME.into(),
             decoding_config_sha256: DECODING.into(),
+            hardware_identity_sha256: "1111111111111111111111111111111111111111111111111111111111111111".into(),
             plan: TemporalGroundingPlanV1 {
                 evaluator_version: TEMPORAL_GROUNDING_EVALUATOR_V1.into(),
                 minimum_interval_iou: 0.5,
