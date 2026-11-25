@@ -74,7 +74,7 @@ The evaluator-side module `src/individual_decision_transfer.rs` measures whether
 - Every row must have a unique action/run identity, a verified upstream pairing/trajectory reference, and an applied outcome. Missing action rows or non-applied branches reject; no outcome is silently removed or imputed as zero.
 - Utilities use one frozen integer scale (higher is better). Ties are resolved by lexicographically smallest action ID for selection; all exact realized top-1 actions and the complete epsilon-good set remain reported.
 - The certificate separates latent and rollout choices, realized regret, top-1/epsilon-good membership, the paired rollout-minus-latent regret difference, and pairwise ranking concordance/discordance/ties. Ranking ties are retained so Kendall tau-b can be reconstructed.
-- Output is canonicalized by action ID. It contains per-individual rows only; no confidence interval or cross-individual inference is computed. #8578 remains the independent-cluster inference owner.
+- Output is canonicalized by action ID and echoes the complete frozen decision context plus per-action pairing/trajectory digest references. It contains per-individual rows only; no confidence interval or cross-individual inference is computed. #8578 remains the independent-cluster inference owner.
 
 This implements a known decision-transfer metric family already discussed in Okita (2026), rather than claiming the metric itself as novel. The Symthaea-specific increment is its bounded, typed and provenance-linked Rust evaluator. Digest references are not receipt authentication, and package separation is not a security boundary: validate the underlying artifacts and retain #9437 isolation before confirmatory use.
 
