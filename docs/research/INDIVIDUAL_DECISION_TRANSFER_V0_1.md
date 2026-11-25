@@ -102,6 +102,7 @@ The constant/population baseline must be frozen on training individuals, then ev
 
 ## 8. Comparison strategy
 
+- **TD-MPC2:** include a public frozen-checkpoint / matched-policy baseline wherever the selected DMControl task and interface overlap. Its official registry exposes 324 checkpoints: 312 single-task checkpoints for 104 tasks (including 39 DMControl tasks) and multi-task models from 1M to 317M parameters; the official site explicitly warns that scores across task sets are not comparable. Use exact supported task/checkpoint IDs and report parameter count, inference cost and evaluation configuration. It is a policy/return baseline unless its latent/rollout readouts are separately exposed; do not imply it supplies the individual-effect estimator. [Official checkpoint registry](https://www.tdmpc2.com/models), [datasets](https://www.tdmpc2.com/dataset).
 - **EAWM:** direct DMC model-based-RL comparison only under matched task, observation, update, interaction and compute protocols. It reports gains on DMC 500K and DMC-GB2 500K, but those scores are not individual-effect or decision-transfer scores. [ICLR 2026 paper](https://proceedings.iclr.cc/paper_files/paper/2026/hash/fc09b26b85ab3abb2832bd555a2e4215-Abstract-Conference.html).
 - **World Model Evaluation Lab / CPG:** reuse fixed-planner oracle-dynamics versus learned-dynamics attribution. Change only the dynamics callable; hold planner, initial states, scoring and budgets fixed. [CPG protocol](https://denis-hamon.github.io/world-model-eval-lab/07_cpg.html).
 - **MRS.Q:** compare search with optimistic versus minimum-over-ensemble value aggregation. Search can degrade decisions even with accurate dynamics; value overestimation is a separate failure mode. [ICML 2026 paper](https://proceedings.mlr.press/v306/chang26a.html).
@@ -110,7 +111,13 @@ The constant/population baseline must be frozen on training individuals, then ev
 
 No cross-benchmark scalar leaderboard is proposed. Report matched head-to-heads and their exact task, data, action, planner, compute and hardware conditions.
 
-## 9. Decision-world-model evidence ladder
+## 9. Benchmark landscape and why the evidence ladder matters
+
+The October 18, 2026 final manuscript snapshot of *A Survey of World Model Benchmarks* catalogs 130 representative benchmarks. In its coding, 6 of 74 control-fidelity tracks (8.1%) include closed-loop evaluation; for interventional action fidelity, 3 of 22 (13.6%) include closed-loop evaluation. Its functional-utility subset is more often closed-loop (13 of 15). These are counts within that survey's coded corpus, not a census of every benchmark, but they show why open-loop action metrics must not be mistaken for policy utility. [Benchmark survey](https://world-model-benchmarks.github.io/).
+
+The decision-centric position paper distinguishes L4 intervention fidelity, L5 outcome/value fidelity, L6 fixed-policy evaluation and L7 optimization utility; it explicitly cautions that these axes are not a single monotone scalar. It recommends separate policy sets for behavior, fixed anchors, distribution-shifted policies and optimizer-produced policies. It also says an adaptive planner may discover model-error regions missed by fixed-policy ranking. [Yu et al. (2026)](https://arxiv.org/abs/2606.15032).
+
+## 10. Decision-world-model evidence ladder
 
 A June 2026 decision-making-centric position paper recommends reporting an L0–L7 profile rather than a single pooled world-model score. It explicitly warns that the levels span partly independent axes (observational/interventional, open-/closed-loop, fixed-policy/optimizer-induced), and that the ladder is not monotone in practice. [Yu et al. (2026)](https://arxiv.org/abs/2606.15032).
 
@@ -125,7 +132,7 @@ This scorecard is a **bounded L4 / per-decision outcome slice**, not a complete 
 
 A fixed policy set can miss narrow optimism pockets that an adaptive planner discovers. #9396 already specifies matched-global-MSE structured error families and search ladders over candidate count, search rounds and rollout horizon. Keep the random-action prediction error, optimizer-selected prediction error and realized selected-policy regret separate. Use #13652's per-individual scorecard as an action/effect diagnostic feeding the chain; do not duplicate the XGap owner.
 
-## 10. Prospective gates (targets, not results)
+## 11. Prospective gates (targets, not results)
 
 - positive held-out paired regret improvement with a 95% independent-cluster interval excluding zero;
 - stretch target of at least 10% relative regret reduction versus the strongest matched-cost baseline;
@@ -135,6 +142,6 @@ A fixed policy set can miss narrow optimism pockets that an adaptive planner dis
 
 These are preregistration targets. They are not current benchmark results.
 
-## 11. Execution and claim ceiling
+## 12. Execution and claim ceiling
 
 This PR adds only a finite evaluator primitive, tests and a semantic fixture. It does not authenticate receipts, establish causal identification, train HDC/CfC, reproduce the DMC paper, demonstrate model advantage, provide physical safety evidence, or establish SOTA.
