@@ -15,6 +15,17 @@ From the Symthaea workspace, run:
 
 Pass "-" as the final argument to read JSONL from stdin. The CLI computes the manifest digest from the frozen manifest file using the SAT v0.1 domain-separated JCS profile.
 
+## Reproducible example
+
+From the repository root:
+
+    cargo run -p symthaea-sat-trace-verifier --bin sat-trace-verify -- 00000000-0000-4000-8000-000000000001 docs/research/examples/sat-trace-verifier-manifest-v0.1.json docs/research/examples/sat-trace-verifier-trace-v0.1.jsonl
+
+Expected structural summary: 2 events, 1 authority binding, 1 disclosure binding,
+2 sink projections, 1 effect submission, 1 terminal observation, no unresolved
+attempts. The output must still report `signatures_verified=false` and
+`system_qualified=false`. This fixture is synthetic, not a production effect.
+
 ## What it verifies
 
 - Strict JSON parsing; duplicate object keys and non-safe-integer numbers fail closed.
