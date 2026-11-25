@@ -1310,22 +1310,18 @@ mod tests {
         assert_eq!(report_a.summary.dataset_items, 6);
         assert_eq!(report_a.summary.source_work_clusters, 3);
         assert_eq!(bootstrap.boundary_tolerance_agreement.len(), 3);
-        assert!(
-            bootstrap.boundary_tolerance_agreement[0]
-                .both_boundaries_within_tolerance_rate
-                .as_ref()
-                .unwrap()
-                .estimate
-                < 1.0
-        );
-        assert_eq!(
-            bootstrap.boundary_tolerance_agreement[1]
-                .both_boundaries_within_tolerance_rate
-                .as_ref()
-                .unwrap()
-                .estimate,
-            1.0
-        );
+        let tolerance_25ms = bootstrap.boundary_tolerance_agreement[0]
+            .both_boundaries_within_tolerance_rate
+            .as_ref()
+            .unwrap();
+        assert!((tolerance_25ms.estimate - (8.0 / 9.0)).abs() < 1e-9);
+        assert_eq!(tolerance_25ms.valid_replicates, 1_000);
+        let tolerance_50ms = bootstrap.boundary_tolerance_agreement[1]
+            .both_boundaries_within_tolerance_rate
+            .as_ref()
+            .unwrap();
+        assert_eq!(tolerance_50ms.estimate, 1.0);
+        assert_eq!(tolerance_50ms.valid_replicates, 1_000);
     }
 
     #[test]
@@ -1336,6 +1332,23 @@ mod tests {
 
         let mut data = balanced_agreement_dataset();
         data.boundary_tolerances_ms = vec![50, 25, 100];
+        assert!(audit_multi_annotator_dataset(&data).is_err());
+
+        let mut data = balanced_agreement_dataset();
+        data.items[1].case.query_id = data.items[0].case.query_id.clone();
+        assert!(audit_multi_annotator_dataset(&data).is_err());
+
+        let mut data = balanced_agreement_dataset();
+        data.items[1].case.annotations[0].annotation_sha256 =
+            data.items[0].case.annotations[0].annotation_sha256.clone();
+        assert!(audit_multi_annotator_dataset(&data).is_err());
+
+        let mut data = balanced_agreement_dataset();
+        data.items[0].case.plan.minimum_interval_iou = 0.75;
+        assert!(audit_multi_annotator_dataset(&data).is_err());
+
+        let mut data = balanced_agreement_dataset();
+        data.items[0].case.minimum_annotator_count = 3;
         assert!(audit_multi_annotator_dataset(&data).is_err());
     }
 }
