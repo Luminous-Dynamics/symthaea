@@ -15,8 +15,8 @@ use thiserror::Error;
 
 use super::gated_streaming_adapter::{
     GatedStreamingAdapterEngineV1, StreamingLabelDeliveryV1, StreamingPredictionInputV1,
-    StreamingUpdateDispositionV1, adapter_state_digest_for_reconciliation_v1,
-    deliver_qualified_stream_label_v1, predict_and_register_stream_sample_v1,
+    StreamingUpdateDispositionV1, deliver_qualified_stream_label_v1,
+    predict_and_register_stream_sample_v1,
 };
 use super::label_consumption_guard::{
     LabelConsumptionEligibilityReportV1, LabelConsumptionEligibilityV1,
@@ -102,14 +102,14 @@ pub struct ReconstructionEventReceiptV1 {
     pub ingestion_time_unix_seconds: i64,
     pub source_sequence: u64,
     pub payload_sha256: String,
-    pub original_event_receipt_sha256: Option<String>,
+    pub replay_adapter_receipt_sha256: Option<String>,
     pub disposition: ReconstructionEventDispositionV1,
     pub sample_id: String,
     pub label_id: Option<String>,
     pub label_revision: Option<u64>,
     pub adapter_state_before_sha256: String,
     pub adapter_state_after_sha256: String,
-    pub referenced_original_receipt_unchanged: bool,
+    pub source_event_unchanged: bool,
 }
 
 #[derive(Clone, Debug, PartialEq, Serialize, Deserialize)]
@@ -142,6 +142,12 @@ pub struct EventTimeReconstructionReportV1 {
 #[derive(Clone, Debug, PartialEq, Error)]
 #[error("{0}")]
 pub struct EventTimeReconstructionErrorV1(pub String);
+
+fn adapter_state_digest(
+    engine: &GatedStreamingAdapterEngineV1,
+) -> Result<String, EventTimeReconstructionErrorV1> {
+    json_sha256(&engine.adapter_state)
+}
 
 fn valid_sha256(value: &str) -> bool {
     value.len() == 64
@@ -223,10 +229,7 @@ fn validate_payload_time(
                     "correction report identity, revision, frontier or digest is invalid".into(),
                 ));
             }
-            if *report_available_at_unix_seconds < *effective_at_unix_seconds
-                || *report_available_at_unix_seconds < report.qualified_corrected_value as i64
-                    && false
-            {
+            if *report_available_at_unix_seconds < *effective_at_unix_seconds {
                 return Err(EventTimeReconstructionErrorV1(
                     "correction report availability precedes its valid-time frontier".into(),
                 ));
@@ -254,14 +257,8 @@ fn unknown_report(
         status: ReconstructionStatusV1::Unknown,
         event_log_sha256: json_sha256(&input.events)?,
         canonical_replay_sha256: String::new(),
-        initial_adapter_state_sha256: adapter_state_digest_for_reconciliation_v1(
-            &input.initial_engine,
-        )
-        .map_err(|error| EventTimeReconstructionErrorV1(error.to_string()))?,
-        final_adapter_state_sha256: adapter_state_digest_for_reconciliation_v1(
-            &input.initial_engine,
-        )
-        .map_err(|error| EventTimeReconstructionErrorV1(error.to_string()))?,
+        initial_adapter_state_sha256: adapter_state_digest(&input.initial_engine)?,
+        final_adapter_state_sha256: adapter_state_digest(&input.initial_engine)?,
         accepted_update_count: 0,
         held_unknown_count: 0,
         blocked_count: 0,
@@ -385,8 +382,10 @@ pub fn reconstruct_streaming_adapter_event_time_v1(
     });
 
     let mut engine = input.initial_engine.clone();
-    let mut latest_corrections: BTreeMap<String, LabelConsumptionEligibilityReportV1> =
-        BTreeMap::new();
+    let mut latest_corrections: BTreeMap<
+        String,
+        (LabelConsumptionEligibilityReportV1, i64, i64),
+    > = BTreeMap::new();
     let mut accepted_updates: BTreeMap<String, String> = BTreeMap::new();
     let mut late_corrected_label_ids = BTreeSet::new();
     let mut affected_events = BTreeSet::new();
@@ -399,14 +398,13 @@ pub fn reconstruct_streaming_adapter_event_time_v1(
 
     for event in &eligible_events {
         let sequence = event_sequence(event)?;
-        let before = adapter_state_digest_for_reconciliation_v1(&engine)
-            .map_err(|error| EventTimeReconstructionErrorV1(error.to_string()))?;
-        let mut original_receipt = None;
+        let before = adapter_state_digest(&engine)?;
+        let mut replay_receipt = None;
         let (sample_id, label_id, label_revision, disposition) = match &event.payload {
             StreamingReconstructionPayloadV1::Prediction { input: prediction } => {
                 let receipt = predict_and_register_stream_sample_v1(&mut engine, prediction)
                     .map_err(|error| EventTimeReconstructionErrorV1(error.to_string()))?;
-                original_receipt = Some(receipt.receipt_sha256);
+                replay_receipt = Some(receipt.receipt_sha256);
                 (
                     prediction.sample_id.clone(),
                     None,
@@ -417,18 +415,18 @@ pub fn reconstruct_streaming_adapter_event_time_v1(
             StreamingReconstructionPayloadV1::LabelDelivery { delivery } => {
                 let key = label_key(&delivery.label_id, delivery.label_revision);
                 let mut replay_delivery = delivery.clone();
-                if let Some(corrected) = latest_corrections.get(&key) {
-                    if corrected.requalification_report_sha256
-                        == delivery.eligibility_report.requalification_report_sha256
-                    {
-                        replay_delivery.eligibility_report = corrected.clone();
-                        replay_delivery.eligibility_report_available_at_unix_seconds = event
-                            .event_time_unix_seconds;
-                    }
+                if let Some((corrected, effective_at, report_available_at)) =
+                    latest_corrections.get(&key)
+                    && *effective_at <= event.event_time_unix_seconds
+                    && *report_available_at <= event.event_time_unix_seconds
+                {
+                    replay_delivery.eligibility_report = corrected.clone();
+                    replay_delivery.eligibility_report_available_at_unix_seconds =
+                        *report_available_at;
                 }
                 let receipt = deliver_qualified_stream_label_v1(&mut engine, &replay_delivery)
                     .map_err(|error| EventTimeReconstructionErrorV1(error.to_string()))?;
-                original_receipt = Some(receipt.receipt_sha256);
+                replay_receipt = Some(receipt.receipt_sha256);
                 let result = match receipt.disposition {
                     StreamingUpdateDispositionV1::Updated => {
                         accepted_updates.insert(key, delivery.measurement_event_id.clone());
@@ -459,6 +457,8 @@ pub fn reconstruct_streaming_adapter_event_time_v1(
                 label_id,
                 label_revision,
                 measurement_event_id,
+                effective_at_unix_seconds,
+                report_available_at_unix_seconds,
                 report,
                 ..
             } => {
@@ -468,7 +468,14 @@ pub fn reconstruct_streaming_adapter_event_time_v1(
                         "eligibility correction report digest mismatch".into(),
                     ));
                 }
-                let old_report = latest_corrections.insert(key.clone(), report.clone());
+                latest_corrections.insert(
+                    key.clone(),
+                    (
+                        report.clone(),
+                        *effective_at_unix_seconds,
+                        *report_available_at_unix_seconds,
+                    ),
+                );
                 if accepted_updates.contains_key(&key) {
                     late_corrected_label_ids.insert(label_id.clone());
                     affected_events.insert(measurement_event_id.clone());
@@ -488,22 +495,21 @@ pub fn reconstruct_streaming_adapter_event_time_v1(
                 }
             }
         };
-        let after = adapter_state_digest_for_reconciliation_v1(&engine)
-            .map_err(|error| EventTimeReconstructionErrorV1(error.to_string()))?;
+        let after = adapter_state_digest(&engine)?;
         let receipt = ReconstructionEventReceiptV1 {
             event_id: event.event_id.clone(),
             event_time_unix_seconds: event.event_time_unix_seconds,
             ingestion_time_unix_seconds: event.ingestion_time_unix_seconds,
             source_sequence: sequence,
             payload_sha256: event.payload_sha256.clone(),
-            original_event_receipt_sha256: original_receipt,
+            replay_adapter_receipt_sha256: replay_receipt,
             disposition,
             sample_id,
             label_id,
             label_revision,
             adapter_state_before_sha256: before,
             adapter_state_after_sha256: after,
-            referenced_original_receipt_unchanged: true,
+            referenced_replay_receipt_unchanged: true,
         };
         replay_projection.push((
             event.event_id.clone(),
