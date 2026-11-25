@@ -322,8 +322,8 @@ pub fn validate_decision_sufficiency_receipt_v1(
     })
 }
 
-/// Digest the payload using RFC 8785 JCS and the MACE v1 domain separator.
-/// Signatures in this profile cover the returned lowercase-hex UTF-8 bytes.
+/// Digest the payload using RFC 8785 JCS and the MACE v1 payload domain.
+/// The signature covers decision_sufficiency_attestation_sha256_v1 instead.
 pub fn decision_sufficiency_payload_sha256_v1(
     payload: &DecisionSufficiencyPayloadV1,
 ) -> Result<String, DecisionSufficiencyReceiptRejectV1> {
