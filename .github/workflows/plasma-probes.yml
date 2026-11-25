@@ -16,6 +16,7 @@ on:
       - "benchmarks/plasma/control-interface/**"
       - "benchmarks/plasma/adaptive-refinement/**"
       - "benchmarks/plasma/positivity-projection/**"
+      - "benchmarks/plasma/measure-stability/**"
       - ".github/workflows/plasma-probes.yml"
   pull_request:
     branches: [main]
@@ -32,6 +33,7 @@ on:
       - "benchmarks/plasma/control-interface/**"
       - "benchmarks/plasma/adaptive-refinement/**"
       - "benchmarks/plasma/positivity-projection/**"
+      - "benchmarks/plasma/measure-stability/**"
       - ".github/workflows/plasma-probes.yml"
   workflow_dispatch:
 
@@ -81,6 +83,7 @@ jobs:
           mkdir -p "${tmp_root}/benchmarks/plasma/control-interface/fixtures"
           mkdir -p "${tmp_root}/benchmarks/plasma/adaptive-refinement/fixtures"
           mkdir -p "${tmp_root}/benchmarks/plasma/positivity-projection/fixtures"
+          mkdir -p "${tmp_root}/benchmarks/plasma/measure-stability/fixtures"
           cp crates/domains/symthaea-plasma-probes/src/lib.rs "${crate_dir}/src/lib.rs"
           cp crates/domains/symthaea-plasma-probes/src/bin/kird_point_audit.rs "${crate_dir}/src/bin/kird_point_audit.rs"
           cp crates/domains/symthaea-plasma-probes/src/bin/response_weighted_refinement_audit.rs "${crate_dir}/src/bin/response_weighted_refinement_audit.rs"
@@ -151,6 +154,10 @@ jobs:
             "${tmp_root}/benchmarks/plasma/positivity-projection/"
           cp benchmarks/plasma/positivity-projection/fixtures/three-cell-positive-response-qp-known-answer-v0.1.json \
             "${tmp_root}/benchmarks/plasma/positivity-projection/fixtures/"
+          cp benchmarks/plasma/measure-stability/particle-measure-w1-v0.1.schema.json \
+            "${tmp_root}/benchmarks/plasma/measure-stability/"
+          cp benchmarks/plasma/measure-stability/fixtures/particle-measure-w1-known-answer-v0.1.json \
+            "${tmp_root}/benchmarks/plasma/measure-stability/fixtures/"
           cat > "${crate_dir}/Cargo.toml" <<'EOF'
           [package]
           name = "symthaea-plasma-probes"
@@ -254,6 +261,37 @@ jobs:
           print("topology_lift_schema_validation=PASS")
           print("weighted_fourier_measure_schema_validation=PASS")
           print("weighted_measure_tail_stability_validation=PASS")
+          PY
+
+      - name: Validate fixed-domain particle W1 schema and known answers
+        run: |
+          python3 - <<'PY'
+          import json
+          from pathlib import Path
+          from jsonschema import Draft202012Validator
+
+          root = Path("${{ runner.temp }}/plasma-probe-validation/benchmarks/plasma/measure-stability")
+          schema = json.loads((root / "particle-measure-w1-v0.1.schema.json").read_text())
+          fixture = json.loads((root / "fixtures/particle-measure-w1-known-answer-v0.1.json").read_text())
+          Draft202012Validator.check_schema(schema)
+          Draft202012Validator(schema).validate(fixture)
+          assert fixture["domain"]["topology"] == "interval"
+          assert fixture["domain"]["maximum"] > fixture["domain"]["minimum"]
+          assert fixture["metric"]["id"] == "wasserstein_1_interval_1d"
+          cases = {case["case_id"]: case for case in fixture["cases"]}
+          assert len(cases) == 4
+          assert cases["permutation-is-the-same-measure"]["expected_w1"] == 0.0
+          assert cases["co-located-split-merge-is-the-same-measure"]["expected_w1"] == 0.0
+          assert cases["particle-count-change-preserves-weighted-measure"]["expected_w1"] == 0.0
+          assert abs(cases["move-one-quarter-of-mass-by-one-tenth"]["expected_w1"] - 0.025) < 1e-15
+          for case in fixture["cases"]:
+              assert len(case["left"]["positions"]) == len(case["left"]["weights"])
+              assert len(case["right"]["positions"]) == len(case["right"]["weights"])
+              assert all(weight >= 0 for weight in case["left"]["weights"] + case["right"]["weights"])
+              assert abs(sum(case["left"]["weights"]) - 1.0) < 1e-12
+              assert abs(sum(case["right"]["weights"]) - 1.0) < 1e-12
+          assert fixture["claim_boundary"]["not_a_global_stability_certificate"] is True
+          print("particle_measure_w1_schema_validation=PASS")
           PY
 
       - name: Validate intervention-equivalent kinetic state fixture
