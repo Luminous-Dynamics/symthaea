@@ -374,7 +374,7 @@ where
                 }
                 _ => &mut counts.discordant_pairs,
             };
-            *target = target
+            *target = (*target)
                 .checked_add(1)
                 .ok_or(DecisionTransferError::ArithmeticOverflow)?;
         }
@@ -405,7 +405,7 @@ pub fn evaluate_individual_decision_transfer(
 
     let mut expected = BTreeSet::new();
     for action_id in &input.expected_action_ids {
-        if action_id.trim().is_empty() || action_id.trim() != action_id {
+        if action_id.trim().is_empty() || action_id.trim() != action_id.as_str() {
             return Err(DecisionTransferError::EmptyActionId);
         }
         if !expected.insert(action_id.clone()) {
@@ -428,7 +428,7 @@ pub fn evaluate_individual_decision_transfer(
     let mut action_results = Vec::with_capacity(actions.len());
 
     for action in &actions {
-        if action.action_id.trim().is_empty() || action.action_id.trim() != action.action_id {
+        if action.action_id.trim().is_empty() || action.action_id.trim() != action.action_id.as_str() {
             return Err(DecisionTransferError::EmptyActionId);
         }
         if !observed.insert(action.action_id.clone()) {
