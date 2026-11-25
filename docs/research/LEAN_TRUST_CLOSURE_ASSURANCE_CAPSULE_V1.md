@@ -172,6 +172,8 @@ Use the current Lean comparator path as the primary high-assurance integration t
 
 The legacy lean4checker path can be an additional check, but it is not interchangeable with comparator: the reference notes that it trusts .olean structural correctness and does not itself validate the exported format. Record exactly which checker ran and what it protects against.
 
+The capsule also carries a required `checker_diversity` reference with the registry digest, exact run-profile digest and profile ID. This avoids treating a list of external checker names as a diversity argument. The referenced profile records the six comparator execution paths, known shared algorithm lineages, unknown pairwise relationships, checker-specific outcomes and same-export digest binding. The independent-replay assurance axis may be `satisfied` only when the referenced checker-diversity profile is itself `qualified_under_policy`. A synthetic, inconclusive, rejected or not-assessed profile cannot upgrade that axis. See [CHECKER-DIVERSITY-001](https://github.com/Luminous-Dynamics/symthaea/issues/13637).
+
 ### 4.7 Statement fidelity
 
 The trusted challenge must be authored or reviewed in a trusted environment. The capsule should bind:
@@ -216,6 +218,8 @@ The validator must fail closed on:
 - an unapproved custom axiom, admission or native-computation marker;
 - a proof export that differs from the artifact replayed;
 - an independent checker that checked a different export;
+- an independent-replay axis marked satisfied without a qualified, digest-bound checker-diversity profile;
+- a checker-diversity profile whose registry or profile digest is missing or malformed;
 - a checker error represented as acceptance;
 - a build that escaped the declared sandbox constraints;
 - a root-order change that changes a supposedly deterministic closure result.
