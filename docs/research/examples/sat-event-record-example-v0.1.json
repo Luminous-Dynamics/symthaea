@@ -28,7 +28,9 @@
     ],
     "idempotency_key": "payment-run-01",
     "binding_digest": "sha256:aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
-    "sink_projection_digest": "sha256:dddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddd"
+    "sink_projection_digest": "sha256:dddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddd",
+    "sink_projection_id": "bank-ledger.transfer-record",
+    "sink_projection_version": "1"
   },
   "authority_decision": {
     "decision": "allow",
@@ -46,7 +48,9 @@
     "observed_at": "2026-11-25T10:01:02Z",
     "state_version": "ledger-version-918",
     "idempotency_key": "payment-run-01",
-    "observed_effect_digest": "sha256:dddddddddddddddddddddddddddddddddddddddddddddddddddddddddddd"
+    "observed_effect_digest": "sha256:dddddddddddddddddddddddddddddddddddddddddddddddddddddddddddd",
+    "sink_projection_id": "bank-ledger.transfer-record",
+    "sink_projection_version": "1"
   },
   "evidence_refs": [
     {
