@@ -2802,6 +2802,11 @@ impl WeightedEmpiricalMeasure1D {
     }
 }
 
+/// Fixed-domain one-dimensional particle-measure W1 known-answer fixture.
+pub const PARTICLE_MEASURE_W1_FIXTURE: &str = include_str!(
+    "../../../../benchmarks/plasma/measure-stability/fixtures/particle-measure-w1-known-answer-v0.1.json"
+);
+
 /// Low-order Fourier moments of a weighted empirical particle measure on a torus.
 ///
 /// For modes k=1..K this computes
@@ -7399,6 +7404,62 @@ mod tests {
             .unwrap()[4];
         assert!((fifth_moment.real - 1.0).abs() < 1.0e-12);
         assert!(fifth_moment.imag.abs() < 1.0e-12);
+    }
+
+    #[test]
+    fn wasserstein_measure_fixture_matches_all_declared_known_answers() {
+        let fixture: serde_json::Value =
+            serde_json::from_str(PARTICLE_MEASURE_W1_FIXTURE).unwrap();
+        let minimum = fixture["domain"]["minimum"].as_f64().unwrap();
+        let maximum = fixture["domain"]["maximum"].as_f64().unwrap();
+        let cases = fixture["cases"].as_array().unwrap();
+        assert_eq!(cases.len(), 4);
+        for case in cases {
+            let left_positions = case["left"]["positions"]
+                .as_array()
+                .unwrap()
+                .iter()
+                .map(|value| value.as_f64().unwrap())
+                .collect::<Vec<_>>();
+            let left_weights = case["left"]["weights"]
+                .as_array()
+                .unwrap()
+                .iter()
+                .map(|value| value.as_f64().unwrap())
+                .collect::<Vec<_>>();
+            let right_positions = case["right"]["positions"]
+                .as_array()
+                .unwrap()
+                .iter()
+                .map(|value| value.as_f64().unwrap())
+                .collect::<Vec<_>>();
+            let right_weights = case["right"]["weights"]
+                .as_array()
+                .unwrap()
+                .iter()
+                .map(|value| value.as_f64().unwrap())
+                .collect::<Vec<_>>();
+            let expected = case["expected_w1"].as_f64().unwrap();
+            let left = WeightedEmpiricalMeasure1D::new(
+                &left_positions,
+                &left_weights,
+                minimum,
+                maximum,
+            )
+            .unwrap();
+            let right = WeightedEmpiricalMeasure1D::new(
+                &right_positions,
+                &right_weights,
+                minimum,
+                maximum,
+            )
+            .unwrap();
+            assert!(
+                (left.wasserstein1(&right).unwrap() - expected).abs() < 1.0e-14,
+                "known-answer case {}",
+                case["case_id"].as_str().unwrap()
+            );
+        }
     }
 
     #[test]
