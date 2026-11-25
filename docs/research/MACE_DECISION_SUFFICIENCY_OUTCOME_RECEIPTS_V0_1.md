@@ -223,7 +223,7 @@ Hard constraints are gates. Utility is optimized only among configurations that 
 
 1. **Protocol contracts (#13594):** versioned strict schemas and normative semantics for sufficiency and outcome attestations.
 2. **Consumer-side sufficiency verification (this increment):** strict typed parsing, JCS canonicalization, current binding, requirement/evidence-set consistency, pinned Ed25519 verification and negative tests.
-3. **Outcome receipt verifier:** strict decoding, arithmetic/cross-field consistency, execution-chain verification, evaluator-profile pinning and independent outcome signatures.
+3. **Outcome receipt verification (this increment):** strict decoding, arithmetic/cross-field consistency, execution-chain completeness, preregistered-design binding, evaluator-profile pinning and signed outcome verification.
 4. Build the independent decision assessor with separate OS principal, credentials, source resolver, policy and private key. Recompute evidence qualification and the coverage/uncertainty/contradiction reports independently.
 5. Build a separate action-authority service that issues short-lived, consume-once authorization receipts. It must re-check live rights, purpose, scope, lifecycle, resource and human-approval conditions at use.
 6. Build an outcome evaluator that owns sealed manifests, independently observes execution/outcome, runs paired counterfactual arms and signs outcome receipts. The candidate must not possess evaluator labels or signing credentials.
@@ -238,11 +238,21 @@ The Rust verifier checks the consumer-owned episode/invocation and twelve-field 
 
 The verifier's expected binding and profile pins must come from consumer-controlled configuration/current state. The signer trust profile should be provisioned specifically for the assessor identity; this module does not create or deploy the assessor and cannot establish process, credential, data-access or evaluator independence by itself.
 
-The schema validator and Rust verifier intentionally complement each other. JSON Schema checks the wire structure; the Rust verifier checks cross-field relations and cryptographic/current-use properties. The outcome-receipt validator is still a separate implementation task.
+The schema validator and Rust verifiers intentionally complement each other. JSON Schema checks wire structure; the Rust verifiers check cross-field relations and cryptographic/current-use properties.
+
+### 11.2 Decision outcome receipt verifier
+
+The AML adapter module `decision_outcome_receipt.rs` adds strict typed decoding, duplicate/unknown-field rejection, JCS payload hashing, canonical Base64 Ed25519 verification through the same pinned MACE verifier, full-receipt commitment and a private-field verified capability.
+
+It checks the exact frozen episode/evaluator manifest and decision record, no-memory arm nullability, exact action/authorization/execution receipt digest tuple, observation-window order, fixed-point utility range and `treatment - baseline = delta`, hard-constraint verdict/count/report consistency, exact preregistered causal design and manifest/analysis-plan bindings, independent episode count and the prohibition on causal claims from descriptive-only data.
+
+The outcome verifier does not independently fetch or validate the underlying action-authorization and execution receipts. Their digests must come from separately verified receipt capabilities supplied by the consumer. It also cannot establish that the outcome observer measured reality, that the evaluator was operationally independent, or that the preregistered statistical method was correctly executed. Those require the separate action authority, outcome evaluator, observation instrumentation and evaluator custody.
+
+A valid outcome receipt may correctly report `violated` or `not_evaluable` hard constraints while showing positive utility. The verifier preserves that truth rather than discarding the receipt; downstream benchmark scoring MUST apply the hard-constraint gate lexicographically and MUST NOT treat positive utility as offsetting the violation. The unit tests include this exact counterexample.
 
 ## 12. Claim boundary and acceptance gates
 
-This PR stack adds strict schemas, protocol semantics and a consumer-side Rust sufficiency-receipt verifier. It does not implement or deploy the independent decision assessor, action authorizer, execution receipt, outcome-receipt verifier/evaluator, benchmark harness, independent service deployment, production cryptographic provisioning, or a measured benchmark result. The JSON Schemas enforce structure and selected conditional constraints; they cannot enforce digest recomputation, set inclusion, arithmetic consistency, live lifecycle, authority, signature validity, source truth, causal identification or independence.
+This PR stack adds strict schemas, protocol semantics, and consumer-side Rust sufficiency/outcome receipt verifiers. It does not implement or deploy the independent decision assessor, action authorizer, execution-receipt issuer/verifier, outcome evaluator, trusted observation instrumentation, benchmark harness, independent service deployment, production cryptographic provisioning, or a measured benchmark result. The JSON Schemas enforce structure and selected conditional constraints; they cannot enforce digest recomputation, set inclusion, arithmetic consistency, live lifecycle, authority, signature validity, source truth, causal identification or independence.
 
 Required before production claims:
 
