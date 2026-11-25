@@ -79,53 +79,58 @@ Falsify the hypothesis where rollout rankings match or outperform latent ranking
 
 The architectural objective should not be to reconstruct every aspect of the observation equally well. It should preserve the distinctions that can alter a task-relevant decision, including small but material individual-specific effects. This is a research hypothesis, not a proven general property of HDC/CfC.
 
-For individual (i), frozen history (h_i), action set (mathcal A), and executed task utility (Q_i(a)), define the evaluator-side (epsilon)-good set:
+For individual \(i\), frozen history \(h_i\), action set \(\mathcal A\), and executed task utility \(Q_i(a)\), define the evaluator-side \(\epsilon\)-good set:
 
-[
-mathcal A_epsilon(i,h_i)
+\[
+\mathcal A_\epsilon(i,h_i)
 =
-{ainmathcal A:
-Q_i(a)ge max_{binmathcal A}Q_i(b)-epsilon}.
-]
+\{a\in\mathcal A:
+Q_i(a)\ge \max_{b\in\mathcal A}Q_i(b)-\epsilon\}.
+\]
 
-For representation (rin{\text{latent},\text{rollout}}), the candidate produces (widehat Q_i^r(a)) and selects
-[
-widehat a_i^r = argmax_{ainmathcal A}widehat Q_i^r(a).
-]
+For representation \(r\in\{\text{latent},\text{rollout}\}\), the candidate produces \(\widehat Q_i^r(a)\) and selects
+
+\[
+\widehat a_i^r = \arg\max_{a\in\mathcal A}\widehat Q_i^r(a).
+\]
+
 The primary consequence is realized decision regret
-[
-R_i^r = max_{ainmathcal A}Q_i(a)-Q_i(widehat a_i^r),
-]
-not reconstruction error alone. The scorecard also reports whether (widehat a_i^r) is top-1 or belongs to the evaluator's (epsilon)-good set, and the full action-ranking tie structure.
 
-A candidate representation is decision-sufficient at tolerance (epsilon) on an evaluation cohort only when its emitted selection incurs at most (epsilon) realized regret for that cohort's declared task/action contract. This is an evaluator-side definition; the candidate never sees the hidden realized utilities used to calculate it. Report cohort proportions and independent-cluster uncertainty downstream rather than asserting a universal guarantee.
+\[
+R_i^r = \max_{a\in\mathcal A}Q_i(a)-Q_i(\widehat a_i^r),
+\]
+
+not reconstruction error alone. The scorecard also reports whether \(\widehat a_i^r\) is top-1 or belongs to the evaluator's \(\epsilon\)-good set, and the full action-ranking tie structure.
+
+A candidate representation is decision-sufficient at tolerance \(\epsilon\) on an evaluation cohort only when its emitted selection incurs at most \(\epsilon\) realized regret for that cohort's declared task/action contract. This is an evaluator-side definition; the candidate never sees the hidden realized utilities used to calculate it. Report cohort proportions and independent-cluster uncertainty downstream rather than asserting a universal guarantee.
 
 ### Candidate training objective to ablate
 
 A possible training objective separates rather than hides its terms:
 
-[
-mathcal L =
-lambda_{\mathrm{dyn}}mathcal L_{\mathrm{dyn}}
-+lambda_{\mathrm{cf}}mathcal L_{\mathrm{cf}}
-+lambda_{\mathrm{rank}}mathcal L_{\mathrm{rank}}
-+lambda_{\mathrm{cal}}mathcal L_{\mathrm{cal}}.
-]
+\[
+\mathcal L =
+\lambda_{\mathrm{dyn}}\mathcal L_{\mathrm{dyn}}
++\lambda_{\mathrm{cf}}\mathcal L_{\mathrm{cf}}
++\lambda_{\mathrm{rank}}\mathcal L_{\mathrm{rank}}
++\lambda_{\mathrm{cal}}\mathcal L_{\mathrm{cal}}.
+\]
 
-- (mathcal L_{\mathrm{dyn}}): shared continuous-time transition / observation dynamics, evaluated under irregular time steps and held-out regimes.
-- (mathcal L_{\mathrm{cf}}): paired intervention-contrast prediction for the same individual and common exogenous realization. Normalize effect units and compare against the zero-effect baseline.
-- (mathcal L_{\mathrm{rank}}): margin-aware pairwise action ranking. For action pairs with a realized training margin larger than the preregistered (epsilon), use a pairwise logistic or hinge loss on the sign of (Q_i(a)-Q_i(b)). Treat near-ties as ties rather than manufacturing a ranking target from noise.
-- (mathcal L_{\mathrm{cal}}): proper probabilistic scoring/calibration for outcome and decision uncertainty. A confidence score without calibration is not sufficient.
+- \(\mathcal L_{\mathrm{dyn}}\): shared continuous-time transition / observation dynamics, evaluated under irregular time steps and held-out regimes.
+- \(\mathcal L_{\mathrm{cf}}\): paired intervention-contrast prediction for the same individual and common exogenous realization. Normalize effect units and compare against the zero-effect baseline.
+- \(\mathcal L_{\mathrm{rank}}\): margin-aware pairwise action ranking. For action pairs with a realized training margin larger than the preregistered \(\epsilon\), use a pairwise logistic or hinge loss on the sign of \(Q_i(a)-Q_i(b)\). Treat near-ties as ties rather than manufacturing a ranking target from noise.
+- \(\mathcal L_{\mathrm{cal}}\): proper probabilistic scoring/calibration for outcome and decision uncertainty. A confidence score without calibration is not sufficient.
 
 The coefficients and margins must be preregistered or selected on validation individuals, then frozen before confirmatory evaluation. Report each term, its validation behavior and downstream decision regret; do not select checkpoints by the weighted total alone. Compare reconstruction-only, contrast-only, rank-only, contrast+rank, and full multi-objective arms at matched parameter and compute budgets.
 
 ### Architecture factorization to test
 
 Test, rather than assume, a factorized model of:
-1. stable individual-trait posterior (q(u_imid h_i)) (PCIR owner #13543/#13562);
-2. shared action-conditioned dynamics (F_	heta(z_t,a_t,Delta t,e_t)) (CfC/LTC path);
-3. individual/intervention residual or relational memory (G_psi(u_i,a,	ext{event-role})) (HDC path);
-4. decision head that predicts action utility differences and uncertainty, preserving (epsilon)-good membership.
+
+1. stable individual-trait posterior \(q(u_i\mid h_i)\) (PCIR owner #13543/#13562);
+2. shared action-conditioned dynamics \(F_\theta(z_t,a_t,\Delta t,e_t)\) (CfC/LTC path);
+3. individual/intervention residual or relational memory \(G_\psi(u_i,a,\text{event-role})\) (HDC path);
+4. decision head that predicts action utility differences and uncertainty, preserving \(\epsilon\)-good membership.
 
 Do not simply add the residual as a scalar to every state coordinate. Compare a typed relational residual, a separate value/effect head, and a latent concatenation/binding ablation. Preserve the same full exogenous draw across sibling interventions; endogenous state may diverge after actions diverge.
 
@@ -133,7 +138,7 @@ Do not simply add the residual as a scalar to every state coordinate. Compare a 
 
 - Reconstruction improves while per-individual regret or action-ranking agreement worsens.
 - Population-average utility is calibrated while individual action rankings fail.
-- All actions are within (epsilon): do not reward arbitrary rank order.
+- All actions are within \(\epsilon\): do not reward arbitrary rank order.
 - A tiny effect below the estimator floor must not create a false action distinction.
 - A large effect that flips the selected action must not be erased by population pooling.
 - A model obtains a low random-policy MSE but is exploited by the model optimizer; feed the optimizer-in-loop test to #9396.
