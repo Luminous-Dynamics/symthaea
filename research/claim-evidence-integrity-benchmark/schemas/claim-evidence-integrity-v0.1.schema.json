@@ -89,11 +89,13 @@
         "required": [
           "fixture_id",
           "family",
+          "claim_scope",
           "claim",
           "claim_reference_time",
           "verification_time",
           "model_knowledge_cutoff",
           "evidence",
+          "label_provenance",
           "expected_verdict",
           "required_invariants",
           "description",
@@ -265,6 +267,70 @@
           },
           "status": {
             "const": "SYNTHETIC_KNOWN_ANSWER_NOT_EXPERT_GOLD"
+          },
+          "claim_scope": {
+            "type": "object",
+            "additionalProperties": false,
+            "required": [
+              "population",
+              "outcome_or_measure",
+              "quantifier_or_effect",
+              "domain_or_reference_boundary",
+              "scope_note"
+            ],
+            "properties": {
+              "population": {
+                "type": "string",
+                "minLength": 1
+              },
+              "outcome_or_measure": {
+                "type": "string",
+                "minLength": 1
+              },
+              "quantifier_or_effect": {
+                "type": "string",
+                "minLength": 1
+              },
+              "domain_or_reference_boundary": {
+                "type": "string",
+                "minLength": 1
+              },
+              "scope_note": {
+                "type": "string",
+                "minLength": 1
+              }
+            }
+          },
+          "label_provenance": {
+            "type": "object",
+            "additionalProperties": false,
+            "required": [
+              "label_status",
+              "authority_id",
+              "evidence_reference",
+              "independent_of_candidate",
+              "permitted_use"
+            ],
+            "properties": {
+              "label_status": {
+                "const": "SYNTHETIC_KNOWN_ANSWER"
+              },
+              "authority_id": {
+                "type": "string",
+                "minLength": 1
+              },
+              "evidence_reference": {
+                "type": "string",
+                "minLength": 1
+              },
+              "independent_of_candidate": {
+                "const": true
+              },
+              "permitted_use": {
+                "type": "string",
+                "minLength": 1
+              }
+            }
           }
         }
       }
