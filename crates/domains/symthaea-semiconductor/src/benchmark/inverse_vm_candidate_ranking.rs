@@ -57,7 +57,7 @@ pub enum CandidateRejectionReasonV1 {
     SupportDistanceInvalid,
     OutsideHistoricalSupport,
     ControlDimensionMissing,
-    ControlDimensionDuplicate,
+    ControlDimensionMismatch,
     ControlValueNonFinite,
     ControlValueOutsideDeclaredRange,
     TargetPredictionMissing,
@@ -279,6 +279,7 @@ fn validate_input(input: &InverseVmRankingInputV1) -> Result<(), InverseVmRankin
         || input.diversity_weight < 0.0
         || !input.minimum_diversity_distance.is_finite()
         || input.minimum_diversity_distance < 0.0
+        || (input.diversity_weight > 0.0 && input.minimum_diversity_distance == 0.0)
     {
         return Err(InverseVmRankingErrorV1(
             "ranking input contains invalid identity or policy values".into(),
@@ -359,7 +360,6 @@ pub fn seal_inverse_vm_candidate_v1(
 struct FeasibleCandidate {
     evaluation_index: usize,
     candidate: InverseVmCandidateV1,
-    normalized_controls: Vec<f64>,
     base_score: f64,
 }
 
@@ -396,7 +396,7 @@ fn evaluate_candidate(
     if !valid_sha256(&candidate.recipe_schema_sha256)
         || candidate.recipe_schema_sha256 != input.recipe_schema_sha256
     {
-        set(CandidateDispositionV1::Rejected, CandidateRejectionReasonV1::MalformedModelArtifactDigest);
+        set(CandidateDispositionV1::Rejected, CandidateRejectionReasonV1::CandidateDigestMismatch);
     }
     if !valid_sha256(&candidate.model_artifact_sha256) {
         set(CandidateDispositionV1::Rejected, CandidateRejectionReasonV1::MalformedModelArtifactDigest);
@@ -486,7 +486,7 @@ fn evaluate_candidate(
     {
         set(
             CandidateDispositionV1::Rejected,
-            CandidateRejectionReasonV1::ControlDimensionDuplicate,
+            CandidateRejectionReasonV1::ControlDimensionMismatch,
         );
     }
 
@@ -680,7 +680,6 @@ pub fn rank_feasible_inverse_vm_candidates_v1(
             eligible.push(FeasibleCandidate {
                 evaluation_index: evaluations.len(),
                 candidate: candidate.clone(),
-                normalized_controls,
                 base_score: evaluation.base_score.unwrap_or(f64::INFINITY),
             });
         }
@@ -714,7 +713,8 @@ pub fn rank_feasible_inverse_vm_candidates_v1(
             let diversity_bonus = if selected.is_empty() {
                 0.0
             } else {
-                input.diversity_weight * min_distance
+                input.diversity_weight
+                    * (min_distance / input.minimum_diversity_distance).min(1.0)
             };
             let score = item.base_score - diversity_bonus;
             match best {
@@ -745,6 +745,7 @@ pub fn rank_feasible_inverse_vm_candidates_v1(
         .iter()
         .map(|index| eligible[*index].candidate.candidate_id.clone())
         .collect::<Vec<_>>();
+    evaluations.sort_by(|a, b| a.candidate_id.cmp(&b.candidate_id));
 
     let eligible_count = evaluations
         .iter()
