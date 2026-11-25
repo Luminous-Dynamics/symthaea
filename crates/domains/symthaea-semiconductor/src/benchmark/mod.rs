@@ -149,3 +149,14 @@ pub use gated_streaming_adapter::{
     StreamingUpdateReceiptV1, create_gated_streaming_adapter_engine_v1,
     deliver_qualified_stream_label_v1, predict_and_register_stream_sample_v1,
 };
+
+pub use ca_ocrc::{
+    CA_OCRC_ENGINE_SCHEMA_V1, CA_OCRC_FEEDBACK_SCHEMA_V1, CA_OCRC_POLICY_SCHEMA_V1,
+    CA_OCRC_ROUND_INPUT_SCHEMA_V1, CA_OCRC_ROUND_RECEIPT_SCHEMA_V1,
+    CaOcrcEngineV1, CaOcrcErrorV1, CaOcrcEvidenceDispositionV1,
+    CaOcrcFeedbackArrivalV1, CaOcrcFeedbackDispositionV1, CaOcrcFeedbackReceiptV1,
+    CaOcrcPolicyV1, CaOcrcPredictionSetKindV1, CaOcrcRiskBoundV1,
+    CaOcrcRoundInputV1, CaOcrcRoundReceiptV1, CaOcrcTrackingTicketV1,
+    advance_ca_ocrc_round_v1, ca_ocrc_risk_bound_v1,
+    create_ca_ocrc_engine_v1, sample_ca_ocrc_proxy_delay_v1,
+};
