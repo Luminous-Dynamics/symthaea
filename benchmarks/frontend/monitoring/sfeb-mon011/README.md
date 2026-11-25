@@ -39,6 +39,10 @@ Go 1.23.2 / linux/amd64:
 
 These results cover a synthetic normalized-evidence preflight only.
 
+## Matched industry benchmark
+
+See [MATCHED-BENCHMARK-PROTOCOL-v1.md](MATCHED-BENCHMARK-PROTOCOL-v1.md). It defines W0-W6, CPDC C0-C7, fair comparisons against PostgreSQL outbox/CDC, DBOS, Temporal and SCITT/Rekor, and explicit target gates. It does not claim matched industry measurements have already been run.
+
 ## Trust boundary
 
 Every `Authenticated` field is an assertion supplied by an adapter after separate verification. This package does not authenticate publisher signatures, decision signatures, authority credentials, COSE/SCITT receipts, trusted timestamps or destination transactions. It does not prove that a source statement is true or independently establish that a trust-domain label is honest. Those checks must be implemented and tested by adapters and deployment controls.
