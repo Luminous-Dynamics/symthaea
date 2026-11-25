@@ -673,6 +673,12 @@ mod tests {
         fixture
     }
 
+    pub(super) fn verified_fixture_capability() -> VerifiedEvaluationManifestCommitmentV1 {
+        let fixture = fixture();
+        let expected = fixture.expected();
+        fixture.verify(250, &expected, &AcceptLog).unwrap()
+    }
+
     #[test]
     fn valid_witness_requires_signature_and_log_inclusion() {
         let fixture = fixture();
@@ -773,4 +779,10 @@ mod tests {
             Err(EvaluationManifestCommitmentReceiptRejectV1::InvalidJson)
         );
     }
+}
+
+#[cfg(test)]
+pub(crate) fn test_verified_evaluation_manifest_commitment_v1(
+) -> VerifiedEvaluationManifestCommitmentV1 {
+    tests::verified_fixture_capability()
 }
