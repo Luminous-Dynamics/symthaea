@@ -964,10 +964,8 @@ fn process_round_inner(
         let survival =
             proxy_survival_probability_v1(&engine.policy.proxy_distribution, actual_delay)?;
         if survival <= 0.0 || actual_delay > tracked.proxy_delay {
-            engine.guarantee_state =
-                CaOcrcGuaranteeStateV1::UncertifiedInvalidOrOutOfModelFeedback;
-            engine.rejected_feedback_count =
-                engine.rejected_feedback_count.saturating_add(1);
+            engine.guarantee_state = CaOcrcGuaranteeStateV1::UncertifiedInvalidOrOutOfModelFeedback;
+            engine.rejected_feedback_count = engine.rejected_feedback_count.saturating_add(1);
             feedback_receipts.push(feedback_receipt(
                 delivery,
                 CaOcrcFeedbackDispositionV1::Rejected,
@@ -1660,12 +1658,10 @@ mod tests {
         let bound =
             arbitrary_delay_ca_ocrc_risk_bound_v1(10.0, 0.0, 0.2, 100, 2, &distribution).unwrap();
         assert!(
-            arbitrary_delay_ca_ocrc_risk_bound_v1(10.0, -0.1, 0.2, 100, 2, &distribution)
-                .is_err()
+            arbitrary_delay_ca_ocrc_risk_bound_v1(10.0, -0.1, 0.2, 100, 2, &distribution).is_err()
         );
         assert!(
-            arbitrary_delay_ca_ocrc_risk_bound_v1(10.0, 10.1, 0.2, 100, 2, &distribution)
-                .is_err()
+            arbitrary_delay_ca_ocrc_risk_bound_v1(10.0, 10.1, 0.2, 100, 2, &distribution).is_err()
         );
         let load = 1.0;
         let h = load / 2.0 - 1.0 - (load / 2.0_f64).ln();
@@ -1695,8 +1691,7 @@ mod tests {
                 oracle_tracking.remove(issue_round);
             }
 
-            let set_is_trivial =
-                oracle_threshold < 0.0 || oracle_threshold >= score_bound;
+            let set_is_trivial = oracle_threshold < 0.0 || oracle_threshold >= score_bound;
             let oracle_admission = if set_is_trivial {
                 CaOcrcAdmissionV1::TrivialSetNoTracking
             } else if oracle_tracking.len() >= capacity {
