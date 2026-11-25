@@ -15,8 +15,10 @@ independent evidence infrastructure.
 
 ## Implemented model surface
 
-- Exact effect identity: action + resource + caller-computed digest of the
-  canonical operation parameters.
+- Exact effect identity: action + resource + sink + purpose + caller-computed
+  digest of canonical operation parameters.
+- Payload-label containment: request labels must be a subset of the scope's
+  allowed labels; child scopes may only narrow that set.
 - Root grant insertion as an explicitly trusted fixture/upstream-verifier input.
 - Parent-to-child delegation with exact parent identity, delegator identity,
   effect-scope subset, validity-window subset and decreasing delegation depth.
@@ -39,10 +41,31 @@ The initial unit-test set covers:
 - half-open expiry;
 - invalid delegation flag/depth combinations.
 
+The 14 tests exercise a small reference-model subset. They do not reproduce
+DelegateGuard's full dataset, tool adapters, adaptive attack campaign or
+end-to-end enterprise workflows.
+
 These are reference-model tests, not execution of the complete public SAT
 JSONL corpus. In particular, the model does not implement auditor behavior,
 adaptive agent execution, monitor integrity, human deliberation, distributed
 revocation, persistence or external sink fencing.
+
+## Comparison boundary: DelegateGuard
+
+Tran-Truong et al., *DelegateGuard: Purpose-Bound Capabilities for Delegated LLM
+Agent Workflows* (2026, [arXiv:2610.16005](https://arxiv.org/abs/2610.16005)), is
+the closest direct comparator. It already implements purpose-bound attenuable
+capabilities over holder, purpose, data labels, operations, sinks, delegation
+depth and cascading revocation. SAT's Rust crate should not be described as
+inventing those concepts; its current contribution is a narrow, independently
+authored Rust oracle with exact operation-parameter binding and half-open
+expiry, to be compared against the published semantics.
+
+The paper also establishes a crucial limit: an authority monitor that ignores
+payload content and volume cannot prevent arbitrary secret disclosure through
+an authorized but externally observable sink. This crate does not solve that
+problem. Content-aware declassification, connector-owned label provenance and
+output monitoring remain separate qualification responsibilities.
 
 ## Why exact operation digests matter
 
