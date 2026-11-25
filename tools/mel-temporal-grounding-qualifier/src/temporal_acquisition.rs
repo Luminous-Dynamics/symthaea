@@ -463,7 +463,12 @@ pub fn plan_annotation_acquisition(
 
     // Keep this local counter observable in the debug/test report path; it is
     // also useful for assertions that source-work caps were honored.
-    let _active_source_count = active_source_counts.values().sum::<u32>();
+    if active_source_counts
+        .values()
+        .any(|count| *count > config.maximum_active_items_per_source_work)
+    {
+        return Err("active selector exceeded the source-work cap".into());
+    }
     Ok(report)
 }
 
@@ -641,28 +646,36 @@ fn active_priority(
     candidate: &AnnotationAcquisitionCandidateV1,
     config: &AnnotationAcquisitionConfigV1,
 ) -> Option<(ActivePriorityBandV1, SelectionReasonV1)> {
-    if candidate.human_disagreement_ppm >= config.human_disagreement_threshold_ppm
+    let human_disagreement = candidate.human_disagreement_ppm
+        >= config.human_disagreement_threshold_ppm
         || candidate.occurrence_count_disagreement_ppm
             >= config.occurrence_count_disagreement_threshold_ppm
-        || candidate.boundary_dispersion_ms >= config.boundary_dispersion_threshold_ms
+        || candidate.boundary_dispersion_ms >= config.boundary_dispersion_threshold_ms;
+    let coverage_gap = candidate.current_annotation_count < config.minimum_panel_count
+        || candidate.prediction_coverage_ppm < config.minimum_prediction_coverage_ppm;
+    // A likely model failure is only elevated when the existing human panel
+    // is stable and prediction coverage is adequate. Disagreement instead
+    // triggers annotation refinement; it is not used as a clean model-error
+    // label.
+    if candidate.model_error_ppm >= config.model_error_threshold_ppm
+        && !human_disagreement
+        && !coverage_gap
     {
+        return Some((
+            ActivePriorityBandV1::ModelFailure,
+            SelectionReasonV1::ModelErrorWithStablePanel,
+        ));
+    }
+    if human_disagreement {
         return Some((
             ActivePriorityBandV1::HumanDisagreement,
             SelectionReasonV1::HumanOrBoundaryDisagreement,
         ));
     }
-    if candidate.current_annotation_count < config.minimum_panel_count
-        || candidate.prediction_coverage_ppm < config.minimum_prediction_coverage_ppm
-    {
+    if coverage_gap {
         return Some((
             ActivePriorityBandV1::CoverageGap,
             SelectionReasonV1::PanelOrPredictionCoverageGap,
-        ));
-    }
-    if candidate.model_error_ppm >= config.model_error_threshold_ppm {
-        return Some((
-            ActivePriorityBandV1::ModelFailure,
-            SelectionReasonV1::ModelErrorWithStablePanel,
         ));
     }
     if candidate.hidden_repeat_control {
@@ -806,7 +819,7 @@ fn select_probability_audit(
             });
         }
     }
-    selections.sort_by(|left, right| left.item_id.cmp(&right.item_id));
+    // Preserve randomized source-work draw order in the replayable receipt.
     Ok((selections, unmet, spent, selected_source_count))
 }
 
@@ -1050,8 +1063,15 @@ fn active_candidate_cmp(
     let b = &candidates[right];
     let band_a = active_priority(a, config).map(|value| value.0);
     let band_b = active_priority(b, config).map(|value| value.0);
-    band_a
-        .cmp(&band_b)
+    let priority_rank = |band: Option<ActivePriorityBandV1>| match band {
+        Some(ActivePriorityBandV1::ModelFailure) => 0_u8,
+        Some(ActivePriorityBandV1::HumanDisagreement) => 1,
+        Some(ActivePriorityBandV1::CoverageGap) => 2,
+        Some(ActivePriorityBandV1::HiddenRepeat) => 3,
+        None => 4,
+    };
+    priority_rank(band_a)
+        .cmp(&priority_rank(band_b))
         .then_with(|| match band_a {
             Some(ActivePriorityBandV1::ModelFailure) => b.model_error_ppm.cmp(&a.model_error_ppm),
             Some(ActivePriorityBandV1::HumanDisagreement) => b
@@ -1267,7 +1287,8 @@ mod tests {
             item.item_inclusion_probability.is_none()
                 && item.priority_band.is_some()
         }));
-        assert_eq!(first.budget_usage.active_spent_units, 10);
+        assert_eq!(first.budget_usage.active_spent_units, 20);
+        assert_eq!(first.active_refinement.len(), 4);
         assert_eq!(first.budget_usage.probability_audit_selected_source_works, 4);
         assert_eq!(first.budget_usage.probability_audit_spent_units, 20);
         assert_eq!(first.probability_audit.len(), 4);
@@ -1307,9 +1328,8 @@ mod tests {
     #[test]
     fn confirmatory_source_work_cannot_be_scheduled_into_active_stream() {
         let mut dataset = synthetic_dataset();
-        dataset.candidates[0].cohort_role = AnnotationCohortRoleV1::ConfirmatoryAudit;
-        dataset.candidates[0].source_stratum_id = "stratum-a".into();
-        // It shares its source-work digest with an existing Development candidate.
+        // Reuse a ConfirmatoryAudit source-work digest for a Development
+        // candidate. The same source work may not cross the two streams.
         dataset.candidates[0].source_work_id_sha256 =
             dataset.candidates[5].source_work_id_sha256.clone();
         assert!(plan_annotation_acquisition(&dataset).is_err());
