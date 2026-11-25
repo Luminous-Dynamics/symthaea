@@ -367,7 +367,7 @@
           2,
           1
         ],
-        "scenarios": 36,
+        "scenarios": 27,
         "spatial_stride": {
           "max_erased_shards_per_stripe": 1,
           "unrecoverable_scenarios": 0
@@ -383,7 +383,7 @@
           3,
           1
         ],
-        "scenarios": 16,
+        "scenarios": 12,
         "spatial_stride": {
           "max_erased_shards_per_stripe": 2,
           "unrecoverable_scenarios": 0
@@ -399,14 +399,14 @@
           2,
           2
         ],
-        "scenarios": 27,
+        "scenarios": 18,
         "spatial_stride": {
           "max_erased_shards_per_stripe": 2,
           "unrecoverable_scenarios": 0
         },
         "row_major": {
           "max_erased_shards_per_stripe": 4,
-          "unrecoverable_scenarios": 19
+          "unrecoverable_scenarios": 14
         }
       },
       {
@@ -415,14 +415,14 @@
           3,
           2
         ],
-        "scenarios": 12,
+        "scenarios": 8,
         "spatial_stride": {
           "max_erased_shards_per_stripe": 4,
           "unrecoverable_scenarios": 8
         },
         "row_major": {
           "max_erased_shards_per_stripe": 5,
-          "unrecoverable_scenarios": 12
+          "unrecoverable_scenarios": 8
         }
       },
       {
@@ -442,6 +442,6 @@
         }
       }
     ],
-    "interpretation": "Spatial interleaving eliminates failures for all tested 2x2x1, 3x3x1, and 2x2x2 contiguous boxes, while row-major placement exceeds the two-erasure budget in 13/36, 12/16, and 19/27 placements respectively. The spatial map has a boundary: 3x3x2 boxes exceed the budget in 8/12 placements. These are synthetic combinatorial tests only."
+    "interpretation": "Spatial-stride placement has zero failures for all tested 2x2x1, 3x3x1 and 2x2x2 contiguous boxes, while row-major fails 13/27, 12/12 and 14/18 placements respectively. Neither layout can recover any of the eight 3x3x2 placements under the two-erasure budget; this is a clear boundary. These are synthetic combinatorial tests only."
   }
 }
