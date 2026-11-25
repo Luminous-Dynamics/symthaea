@@ -558,3 +558,40 @@ A fresh source check reinforces the programme's benchmark segmentation. These re
 ### Strategic decision
 
 The defensible competitive position is a reliability-and-comprehension layer composed with existing proof engines and retrieval graphs. The flagship result must show, on a hidden theorem-family holdout, exact statement/context binding, faithful proof-plan reconstruction, checked local warrant evidence, correct response to semantic interventions, low local-to-global reuse of invalid warrants, calibrated abstention, and improved delayed human transfer. No single aggregate can compensate for false acceptance or false context equivalence.
+
+## 20. Lean Kernel Arena: broader checker diversity and differential benchmark lane (2026-11-25)
+
+The current Lean Kernel Arena homepage snapshot is a distinct comparison surface from the six checker paths in Lean's Lake `comparator --paranoid` bundle.
+
+**Captured 2026-11-25:**
+- 37 checker entrants across 15 reported implementation languages;
+- downloadable test set lists 138 good and 92 bad tests (individual files over 10 MB excluded);
+- 30 corner cases per checker;
+- invalid-proof outcome group: correct rejection / false acceptance / decline;
+- valid-proof outcome group: correct acceptance / false rejection / decline;
+- declines include unsupported features, crashes and timeouts;
+- Mathlib virtual CPU time is instruction-derived at a fixed 6.0-Ginstr/s conversion, not wall-clock or parallel throughput; peak memory is separately displayed.
+
+A few useful same-page observations:
+- `gruszka`: 92/92 invalid rejected, 148/148 valid accepted, 76.8 virtual CPU seconds and 2.6 GiB peak memory.
+- `nano-lean`: 92/92 invalid rejected, 147 valid accepted, one decline; 65.8 seconds and 5.0 GiB.
+- official Lean v4.35.0: 92/92 invalid rejected, 148 valid accepted; 2,022 seconds and 9.9 GiB.
+- `nanoda`: 92/92 invalid rejected, 146 valid accepted, two declines; 960 seconds and 5.9 GiB.
+- `con-leche`: four false acceptances in the 92 invalid-proof cohort; 141 valid accepted and seven declines; 1,020 seconds and 4.8 GiB.
+- `con-ron`: four false acceptances in the same cohort; 142 valid accepted and six declines; 579 seconds and 4.4 GiB.
+- `lean4lean`: 92/92 invalid rejected, but seven false rejections in the 148 valid cohort; 2,418 seconds and 9.9 GiB.
+
+These counts are for this small, changing Arena suite and do not estimate general soundness/completeness probabilities. They do demonstrate why acceptance, rejection, decline and resource metrics must be separated. The ranking is not interchangeable with a soundness proof or a same-export high-assurance capsule.
+
+**Important limitations:** the homepage is the in-progress round and explicitly warns that checker/test updates make cross-round comparisons invalid. The 9.4 MB raw `results.json` and tarball were not retrieved in this task; the Symthaea artifact is a cited homepage transcription, not an immutable round archive or raw-results mirror. See issue [#13643 — ARENA-DIFFERENTIAL-001](https://github.com/Luminous-Dynamics/symthaea/issues/13643) and draft [PR #13647](https://github.com/Luminous-Dynamics/symthaea/pull/13647).
+
+### Benchmark decision
+
+Keep two lanes:
+1. **Lake comparator assurance:** exact six-path paranoid bundle, digest-bound same-export records, registry lineage and common-mode risk.
+2. **Arena differential research:** broader experimental entrants, frozen same-round tests, false acceptance/rejection, declines/crashes/timeouts, parser/feature coverage, per-checker runtime/memory, and minimal disagreement cases.
+
+Before any direct leaderboard claim, freeze one exact Arena round's tests, checker commits/binaries, Lean/export version and raw per-checker results. The 25-Nov homepage snapshot is a landscape baseline only.
+
+Source: https://arena.lean-lang.org/
+
