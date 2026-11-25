@@ -703,6 +703,41 @@ mod tests {
         fixture.verify(250, &expected, &AcceptLog).unwrap()
     }
 
+    pub(super) fn verified_fixture_capability_with_suite_and_bindings(
+        suite_id: &str,
+        suite_version: &str,
+        episode_root: &str,
+        sealed_digest: &str,
+        assignment_root: &str,
+        preregistration_root: &str,
+        artifacts_root: &str,
+        candidate_access_profile: &str,
+        reveal_protocol: &str,
+    ) -> VerifiedEvaluationManifestCommitmentV1 {
+        let mut fixture = fixture();
+        fixture.suite_id = suite_id.to_owned();
+        fixture.suite_version = suite_version.to_owned();
+        fixture.receipt.payload.suite_id = suite_id.to_owned();
+        fixture.receipt.payload.suite_version = suite_version.to_owned();
+        fixture.episode_manifest_root_sha256 = episode_root.to_owned();
+        fixture.sealed_evaluation_manifest_sha256 = sealed_digest.to_owned();
+        fixture.arm_assignment_root_sha256 = assignment_root.to_owned();
+        fixture.pre_registration_root_sha256 = preregistration_root.to_owned();
+        fixture.sealed_artifacts_root_sha256 = artifacts_root.to_owned();
+        fixture.candidate_access_profile_sha256 = candidate_access_profile.to_owned();
+        fixture.reveal_protocol_sha256 = reveal_protocol.to_owned();
+        fixture.receipt.payload.episode_manifest_root_sha256 = episode_root.to_owned();
+        fixture.receipt.payload.sealed_evaluation_manifest_sha256 = sealed_digest.to_owned();
+        fixture.receipt.payload.arm_assignment_root_sha256 = assignment_root.to_owned();
+        fixture.receipt.payload.pre_registration_root_sha256 = preregistration_root.to_owned();
+        fixture.receipt.payload.sealed_artifacts_root_sha256 = artifacts_root.to_owned();
+        fixture.receipt.payload.candidate_access_profile_sha256 = candidate_access_profile.to_owned();
+        fixture.receipt.payload.reveal_protocol_sha256 = reveal_protocol.to_owned();
+        fixture.resign();
+        let expected = fixture.expected();
+        fixture.verify(250, &expected, &AcceptLog).unwrap()
+    }
+
     pub(super) fn verified_fixture_capability_with_bindings(
         episode_root: &str,
         sealed_digest: &str,
@@ -847,6 +882,31 @@ pub(crate) fn test_verified_evaluation_manifest_commitment_with_episode_root_v1(
     root: &str,
 ) -> VerifiedEvaluationManifestCommitmentV1 {
     tests::verified_fixture_capability_with_episode_root(root)
+}
+
+#[cfg(test)]
+pub(crate) fn test_verified_evaluation_manifest_commitment_v1_with_suite_and_bindings(
+    suite_id: &str,
+    suite_version: &str,
+    episode_root: &str,
+    sealed_digest: &str,
+    assignment_root: &str,
+    preregistration_root: &str,
+    artifacts_root: &str,
+    candidate_access_profile: &str,
+    reveal_protocol: &str,
+) -> VerifiedEvaluationManifestCommitmentV1 {
+    tests::verified_fixture_capability_with_suite_and_bindings(
+        suite_id,
+        suite_version,
+        episode_root,
+        sealed_digest,
+        assignment_root,
+        preregistration_root,
+        artifacts_root,
+        candidate_access_profile,
+        reveal_protocol,
+    )
 }
 
 #[cfg(test)]
