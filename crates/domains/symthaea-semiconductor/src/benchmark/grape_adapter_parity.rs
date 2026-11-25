@@ -325,7 +325,7 @@ pub fn create_grape_feature_adapter_v1(
         return Err(GrapeAdapterParityErrorV1("adapter dimension or kind is invalid".into()));
     }
     let covariance = if kind == GrapeAdapterKindV1::Rls {
-        let diagonal = 1.0 / policy.rls_ridge_initial;
+        let diagonal = policy.rls_ridge_initial;
         Some((0..dimension).map(|row| {
             (0..dimension).map(|col| if row == col { diagonal } else { 0.0 }).collect()
         }).collect())
@@ -360,6 +360,21 @@ mod tests {
         let expected_p = (1.0 - expected_gain * 2.0) / 0.99;
         assert!((adapter.weights[0] - expected_gain * 0.5).abs() < 1.0e-12);
         assert!((adapter.covariance.as_ref().unwrap()[0][0] - expected_p).abs() < 1.0e-12);
+    }
+
+    #[test]
+    fn rls_initial_covariance_matches_upstream_ridge_init_multiplier() {
+        let mut p = policy(GrapeAdapterKindV1::Rls);
+        p.rls_ridge_initial = 2.5;
+        let adapter = create_grape_feature_adapter_v1(GrapeAdapterKindV1::Rls, 3, &p).unwrap();
+        assert_eq!(
+            adapter.covariance.unwrap(),
+            vec![
+                vec![2.5, 0.0, 0.0],
+                vec![0.0, 2.5, 0.0],
+                vec![0.0, 0.0, 2.5]
+            ]
+        );
     }
 
     #[test]
