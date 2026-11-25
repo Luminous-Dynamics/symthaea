@@ -30,6 +30,7 @@ pub enum TelemetrySource {
     Participant,
     Recovery,
     ServiceObserver,
+    Evaluator,
 }
 
 /// Normalized event classes. These are semantic actions, not tool names,
@@ -94,17 +95,17 @@ impl VerifiedSourceReceipt {
 /// source receipt before constructing an event.
 #[derive(Debug, Clone)]
 pub struct AgentTraceEvent {
-    pub timestamp: DateTime<Utc>,
-    pub tenant_id: String,
-    pub task_id: String,
-    pub principal_id: String,
-    pub event_id: String,
-    pub source: TelemetrySource,
-    pub kind: AgentEventKind,
-    pub target_ref: Option<String>,
+    timestamp: DateTime<Utc>,
+    tenant_id: String,
+    task_id: String,
+    principal_id: String,
+    event_id: String,
+    source: TelemetrySource,
+    kind: AgentEventKind,
+    target_ref: Option<String>,
     /// Canonical destination supplied by the network telemetry adapter.
-    pub destination: Option<String>,
-    pub bytes: u64,
+    destination: Option<String>,
+    bytes: u64,
     receipt: VerifiedSourceReceipt,
 }
 
@@ -140,6 +141,9 @@ impl AgentTraceEvent {
         if event_id.trim().is_empty() {
             return Err(BehaviorError::MissingEventId);
         }
+        if !source_matches_kind(source, kind) {
+            return Err(BehaviorError::SourceKindMismatch { source, kind });
+        }
         Ok(Self {
             timestamp,
             tenant_id,
@@ -153,6 +157,46 @@ impl AgentTraceEvent {
             bytes,
             receipt,
         })
+    }
+
+    pub fn timestamp(&self) -> DateTime<Utc> {
+        self.timestamp.clone()
+    }
+
+    pub fn tenant_id(&self) -> &str {
+        &self.tenant_id
+    }
+
+    pub fn task_id(&self) -> &str {
+        &self.task_id
+    }
+
+    pub fn principal_id(&self) -> &str {
+        &self.principal_id
+    }
+
+    pub fn event_id(&self) -> &str {
+        &self.event_id
+    }
+
+    pub fn source(&self) -> TelemetrySource {
+        self.source
+    }
+
+    pub fn kind(&self) -> AgentEventKind {
+        self.kind
+    }
+
+    pub fn target_ref(&self) -> Option<&str> {
+        self.target_ref.as_deref()
+    }
+
+    pub fn destination(&self) -> Option<&str> {
+        self.destination.as_deref()
+    }
+
+    pub fn bytes(&self) -> u64 {
+        self.bytes
     }
 
     pub fn receipt_ref(&self) -> &str {
@@ -285,6 +329,40 @@ pub enum BehaviorError {
     DuplicateEventId(String),
     #[error("behavior window policy thresholds must be non-zero")]
     InvalidPolicy,
+    #[error("telemetry source {source:?} cannot attest to event kind {kind:?}")]
+    SourceKindMismatch { source: TelemetrySource, kind: AgentEventKind },
+}
+
+fn source_matches_kind(source: TelemetrySource, kind: AgentEventKind) -> bool {
+    match kind {
+        AgentEventKind::WorkerSpawned
+        | AgentEventKind::CrossTenantAccessCommitted
+        | AgentEventKind::UnauthorizedEffectCommitted => source == TelemetrySource::Participant,
+        AgentEventKind::ProcessSpawned | AgentEventKind::HostEscapeCommitted => {
+            source == TelemetrySource::Process
+        }
+        AgentEventKind::DestinationContacted
+        | AgentEventKind::UnapprovedEgressBlocked
+        | AgentEventKind::UnapprovedEgressCommitted
+        | AgentEventKind::ScopeEscapeBlocked
+        | AgentEventKind::ScopeEscapeCommitted => source == TelemetrySource::Network,
+        AgentEventKind::ApiRead
+        | AgentEventKind::SecretAccessAttempted
+        | AgentEventKind::SecretDisclosureCommitted => source == TelemetrySource::Api,
+        AgentEventKind::PrivilegeChanged => source == TelemetrySource::Identity,
+        AgentEventKind::ModelEndpointChanged => source == TelemetrySource::ModelGateway,
+        AgentEventKind::ArtifactProvenanceRejected
+        | AgentEventKind::ArtifactSubstitutionAdmitted => {
+            source == TelemetrySource::ArtifactRegistry
+        }
+        AgentEventKind::RecoveryPolicyChanged | AgentEventKind::FalseRecoveryAccepted => {
+            source == TelemetrySource::Recovery
+        }
+        AgentEventKind::FalseRecoveryClaimObserved => {
+            source == TelemetrySource::ServiceObserver
+        }
+        AgentEventKind::EvaluatorTruthExposed => source == TelemetrySource::Evaluator,
+    }
 }
 
 /// Analyze one task's normalized, source-verified event stream.
@@ -331,6 +409,12 @@ pub fn analyze_task_window(
         }
         if event.event_id.trim().is_empty() {
             return Err(BehaviorError::MissingEventId);
+        }
+        if !source_matches_kind(event.source, event.kind) {
+            return Err(BehaviorError::SourceKindMismatch {
+                source: event.source,
+                kind: event.kind,
+            });
         }
         if event.receipt.collector_id.trim().is_empty()
             || event.receipt.receipt_ref.trim().is_empty()
@@ -681,10 +765,29 @@ mod tests {
             task,
             "test-principal",
             id,
-            if kind == AgentEventKind::DestinationContacted {
-                TelemetrySource::Network
-            } else {
-                TelemetrySource::Participant
+            match kind {
+                AgentEventKind::WorkerSpawned
+                | AgentEventKind::CrossTenantAccessCommitted
+                | AgentEventKind::UnauthorizedEffectCommitted => TelemetrySource::Participant,
+                AgentEventKind::ProcessSpawned | AgentEventKind::HostEscapeCommitted => {
+                    TelemetrySource::Process
+                }
+                AgentEventKind::DestinationContacted
+                | AgentEventKind::UnapprovedEgressBlocked
+                | AgentEventKind::UnapprovedEgressCommitted
+                | AgentEventKind::ScopeEscapeBlocked
+                | AgentEventKind::ScopeEscapeCommitted => TelemetrySource::Network,
+                AgentEventKind::ApiRead
+                | AgentEventKind::SecretAccessAttempted
+                | AgentEventKind::SecretDisclosureCommitted => TelemetrySource::Api,
+                AgentEventKind::PrivilegeChanged => TelemetrySource::Identity,
+                AgentEventKind::ModelEndpointChanged => TelemetrySource::ModelGateway,
+                AgentEventKind::ArtifactProvenanceRejected
+                | AgentEventKind::ArtifactSubstitutionAdmitted => TelemetrySource::ArtifactRegistry,
+                AgentEventKind::RecoveryPolicyChanged
+                | AgentEventKind::FalseRecoveryAccepted => TelemetrySource::Recovery,
+                AgentEventKind::FalseRecoveryClaimObserved => TelemetrySource::ServiceObserver,
+                AgentEventKind::EvaluatorTruthExposed => TelemetrySource::Evaluator,
             },
             kind,
             None,
@@ -704,6 +807,34 @@ mod tests {
             .iter()
             .find(|finding| finding.code == code)
             .expect("expected finding")
+    }
+
+    #[test]
+    fn rejects_event_from_wrong_telemetry_plane() {
+        let receipt =
+            VerifiedSourceReceipt::new("api-collector", "receipt-wrong-plane").unwrap();
+        let result = AgentTraceEvent::from_verified_receipt(
+            Utc.with_ymd_and_hms(2026, 11, 25, 10, 0, 1)
+                .single()
+                .unwrap(),
+            "tenant-a",
+            "task-1",
+            "principal",
+            "wrong-source",
+            TelemetrySource::Api,
+            AgentEventKind::UnapprovedEgressCommitted,
+            None,
+            None,
+            0,
+            receipt,
+        );
+        assert_eq!(
+            result.unwrap_err(),
+            BehaviorError::SourceKindMismatch {
+                source: TelemetrySource::Api,
+                kind: AgentEventKind::UnapprovedEgressCommitted,
+            }
+        );
     }
 
     #[test]
