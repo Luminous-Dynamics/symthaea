@@ -1004,8 +1004,6 @@ mod tests {
     #[test]
     fn unknown_source_lineage_does_not_hide_a_claim_conflict() {
         let mut state = first_state();
-        let updated_prefix = "9".repeat(64);
-        state["evidence_prefix"]["prefix_sha256"] = Value::String(updated_prefix.clone());
 
         let second = serde_json::json!({
             "evidence_id": "ev-a2",
@@ -1021,6 +1019,9 @@ mod tests {
             "retrieval_state": "CAPTURED"
         });
         state["evidence"].as_array_mut().unwrap().push(second);
+        let evidence = state["evidence"].as_array().unwrap().clone();
+        let updated_prefix = evidence_prefix_sha256("synthetic-episode", 1, &evidence);
+        state["evidence_prefix"]["prefix_sha256"] = Value::String(updated_prefix.clone());
 
         let first_relation = &mut state["claims"][0]["evidence_relations"][0];
         first_relation["relation"] = Value::String("SUPPORTS".to_owned());
