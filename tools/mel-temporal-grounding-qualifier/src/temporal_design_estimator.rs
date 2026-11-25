@@ -432,3 +432,202 @@ fn require_text(value: &str, label: &str) -> Result<(), String> {
     }
     Ok(())
 }
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use crate::temporal_acquisition::{
+        AnnotationAcquisitionCandidateV1, AnnotationCohortRoleV1,
+        AnnotationStratumQuotaV1, AuthorizationStateV1,
+    };
+
+    fn digest(byte: char) -> String {
+        byte.to_string().repeat(64)
+    }
+
+    fn candidate(item: &str, work: char) -> AnnotationAcquisitionCandidateV1 {
+        AnnotationAcquisitionCandidateV1 {
+            item_id: item.into(),
+            query_id: format!("query-{item}"),
+            source_work_id_sha256: digest(work),
+            recording_sha256: digest(work.to_ascii_lowercase()),
+            source_stratum_id: "stratum-a".into(),
+            task_family: "piano-entry".into(),
+            purpose_scope: "confirmatory-evaluation".into(),
+            model_grounding_report_sha256: digest('b'),
+            inter_annotator_reliability_report_sha256: digest('c'),
+            cohort_assignment_manifest_sha256: digest('d'),
+            cohort_role: AnnotationCohortRoleV1::ConfirmatoryAudit,
+            authorization_state: AuthorizationStateV1::Authorized,
+            authorization_receipt_sha256: Some(digest('e')),
+            current_annotation_count: 1,
+            maximum_annotation_count: 3,
+            annotation_cost_units: 1,
+            model_error_ppm: 0,
+            human_disagreement_ppm: 0,
+            occurrence_count_disagreement_ppm: 0,
+            prediction_coverage_ppm: 1_000_000,
+            boundary_dispersion_ms: 0,
+            hidden_repeat_control: false,
+        }
+    }
+
+    fn dataset(seed: u64, source_work_quota: u32) -> AnnotationAcquisitionDatasetV1 {
+        let mut candidates = Vec::new();
+        for (work, values) in [
+            ('a', ["a-1", "a-2"]),
+            ('b', ["b-1", "b-2"]),
+            ('c', ["c-1", "c-2"]),
+        ] {
+            candidates.push(candidate(values[0], work));
+            candidates.push(candidate(values[1], work));
+        }
+        AnnotationAcquisitionDatasetV1 {
+            dataset_id: "finite-population-three-work-oracle".into(),
+            config: AnnotationAcquisitionConfigV1 {
+                schema: "mel-annotation-acquisition-plan-v1".into(),
+                planner_id: "mel-annotation-acquisition-v1".into(),
+                seed,
+                minimum_panel_count: 1,
+                maximum_active_items_per_source_work: 1,
+                audit_items_per_source_work: 2,
+                total_budget_units: 20,
+                active_budget_units: 0,
+                probability_audit_budget_units: 20,
+                model_error_threshold_ppm: 300_000,
+                human_disagreement_threshold_ppm: 250_000,
+                occurrence_count_disagreement_threshold_ppm: 100_000,
+                minimum_prediction_coverage_ppm: 750_000,
+                boundary_dispersion_threshold_ms: 80,
+                stratum_quotas: vec![AnnotationStratumQuotaV1 {
+                    source_stratum_id: "stratum-a".into(),
+                    active_minimum_items: 0,
+                    active_maximum_items: 0,
+                    audit_source_work_count: source_work_quota,
+                }],
+            },
+            candidates,
+        }
+    }
+
+    fn value_for_item(item_id: &str) -> u32 {
+        match item_id {
+            "a-1" | "b-1" | "b-2" => PPM_SCALE,
+            "a-2" | "c-1" | "c-2" => 0,
+            _ => panic!("unexpected item ID"),
+        }
+    }
+
+    fn estimator_input(dataset: AnnotationAcquisitionDatasetV1) -> DesignEstimatorInputV1 {
+        let planned = plan_annotation_acquisition(&dataset).unwrap();
+        let observed_audit_outcomes = planned
+            .probability_audit
+            .iter()
+            .map(|selection| ObservedAuditOutcomeV1 {
+                item_id: selection.item_id.clone(),
+                metric_id: "grounded-correct".into(),
+                value_ppm: value_for_item(&selection.item_id),
+            })
+            .collect();
+        DesignEstimatorInputV1 {
+            schema: ESTIMATOR_SCHEMA_V1.into(),
+            dataset,
+            expected_selection_receipt_sha256: planned.selection_receipt_sha256,
+            metric_id: "grounded-correct".into(),
+            observed_audit_outcomes,
+        }
+    }
+
+    #[test]
+    fn exhaustive_two_stage_oracle_recovers_total_and_design_variance() {
+        let mut estimates = Vec::new();
+        let mut variances = Vec::new();
+        let mut selected_work_sets = BTreeSet::new();
+
+        // The finite population has three works with totals [1, 2, 0].
+        // K=2 works are sampled without replacement and both query items
+        // inside each selected work are a within-work census. There are
+        // exactly C(3,2)=3 possible work samples.
+        for seed in 1_u64..=256 {
+            let input = estimator_input(dataset(seed, 2));
+            let report = estimate_design_based_metric(&input).unwrap();
+            let work_set: BTreeSet<_> = report.stratum_estimates[0]
+                .selected_source_work_ids
+                .iter()
+                .cloned()
+                .collect();
+            if selected_work_sets.insert(work_set) {
+                estimates.push(report.estimated_population_total.unwrap());
+                variances.push(
+                    report
+                        .estimated_population_total_variance
+                        .expect("K=2 supports between-work variance"),
+                );
+            }
+        }
+
+        assert_eq!(selected_work_sets.len(), 3);
+        assert_eq!(estimates.len(), 3);
+        assert!((mean(&estimates) - 3.0).abs() < 1e-10);
+        // Exact finite-population variance for PSU totals [1,2,0], W=3,K=2:
+        // W^2 * (1-K/W) * S^2 / K = 1.5.
+        assert!((mean(&variances) - 1.5).abs() < 1e-10);
+        assert!(variances.iter().all(|variance| *variance >= 0.0));
+    }
+
+    #[test]
+    fn one_selected_work_returns_point_estimate_but_withholds_between_work_variance() {
+        let input = estimator_input(dataset(71, 1));
+        let report = estimate_design_based_metric(&input).unwrap();
+        assert!(report.estimated_population_total.is_some());
+        assert!(report.estimated_population_mean.is_some());
+        assert_eq!(report.estimated_population_total_variance, None);
+        assert_eq!(
+            report.stratum_estimates[0].variance_unavailable_reason,
+            Some(VarianceUnavailableReasonV1::FewerThanTwoSelectedSourceWorks)
+        );
+        assert!(!report.population_confidence_claim_permitted);
+    }
+
+    #[test]
+    fn exact_receipt_and_exact_selected_outcome_set_are_required() {
+        let mut input = estimator_input(dataset(19, 2));
+        input.expected_selection_receipt_sha256 = digest('f');
+        assert!(estimate_design_based_metric(&input).is_err());
+
+        let mut input = estimator_input(dataset(19, 2));
+        input.observed_audit_outcomes.pop();
+        assert!(estimate_design_based_metric(&input).is_err());
+
+        let mut input = estimator_input(dataset(19, 2));
+        input.observed_audit_outcomes.push(ObservedAuditOutcomeV1 {
+            item_id: "not-selected-active-item".into(),
+            metric_id: "grounded-correct".into(),
+            value_ppm: PPM_SCALE,
+        });
+        assert!(estimate_design_based_metric(&input).is_err());
+    }
+
+    #[test]
+    fn duplicate_metric_rows_and_active_stream_data_are_rejected() {
+        let mut input = estimator_input(dataset(23, 2));
+        input.observed_audit_outcomes.push(input.observed_audit_outcomes[0].clone());
+        assert!(estimate_design_based_metric(&input).is_err());
+
+        let mut input = estimator_input(dataset(23, 2));
+        input.observed_audit_outcomes[0].metric_id = "other-metric".into();
+        assert!(estimate_design_based_metric(&input).is_err());
+    }
+
+    #[test]
+    fn design_estimator_keeps_audit_and_population_claim_boundaries_explicit() {
+        let input = estimator_input(dataset(31, 2));
+        let report = estimate_design_based_metric(&input).unwrap();
+        assert!(report.exact_selection_receipt_replayed);
+        assert!(!report.adaptive_active_stream_used);
+        assert!(!report.observed_outcomes_authenticated);
+        assert!(!report.population_confidence_claim_permitted);
+        assert_eq!(report.metric_id, "grounded-correct");
+        assert_eq!(report.eligible_probability_audit_items, 6);
+    }
+}
