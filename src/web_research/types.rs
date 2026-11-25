@@ -416,11 +416,23 @@ impl IntegrationResult {
     }
 }
 
+/// Provenance for the independent adjudication used as a correctness label.
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
+pub struct AdjudicationProvenance {
+    /// Type of adjudication that produced the ground-truth label
+    pub kind: AdjudicationKind,
+    /// Stable identity of the human or independent evaluation authority
+    pub authority_id: String,
+    /// Immutable evidence URI, digest, or receipt reference supporting the label
+    pub evidence_reference: String,
+}
+
 /// Outcome of a verification for meta-learning tracking.
 ///
 /// `was_correct` is ground truth supplied by an external adjudicator. It must
 /// never be inferred from `predicted_confidence`, `EpistemicStatus`, or the
-/// same local verifier output being calibrated.
+/// same local verifier output being calibrated. When present, adjudication
+/// provenance is retained with the learner's outcome history.
 #[derive(Debug, Clone, Default, Serialize, Deserialize)]
 pub struct VerificationOutcome {
     /// The claim that was independently adjudicated
@@ -435,6 +447,9 @@ pub struct VerificationOutcome {
     pub predicted_confidence: f32,
     /// Topic/domain of the claim
     pub domain: String,
+    /// Independent adjudication provenance; absent on unadjudicated predictions
+    #[serde(default)]
+    pub adjudication_provenance: Option<AdjudicationProvenance>,
 }
 
 /// Kind of independent evidence used to adjudicate a prediction.
@@ -485,6 +500,7 @@ impl VerificationOutcome {
             was_correct,
             predicted_confidence: 0.5,
             domain: String::new(),
+            adjudication_provenance: None,
         }
     }
 
