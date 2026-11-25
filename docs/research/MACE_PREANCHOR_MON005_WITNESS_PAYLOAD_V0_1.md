@@ -71,11 +71,11 @@ The deterministic two-episode T9/T10 fixture was independently reconstructed in 
 
 \`117579a8803ecedd6b5eee4efbc73c4fe66ce9088c7687a5b8785ac4815d1154\`
 
-The Rust test pins this value and checks that the serialized pre-anchor payload contains no \`anchor_log_id\`, \`anchor_entry_id\` or \`committed_at_unix\`. The vector is source-level cross-language evidence; the Rust assertion has not been executed.
+The ten Rust unit tests pin this value and check that the serialized pre-anchor payload contains no \`anchor_log_id\`, \`anchor_entry_id\` or \`committed_at_unix\`. The vector is source-level cross-language evidence; the Rust assertion has not been executed.
 
 ## Tests authored
 
-Nine Rust tests cover:
+Ten Rust tests cover:
 
 - building the payload from verified evaluator and witness capabilities;
 - fixed independent JCS/domain-separated digest;
@@ -94,13 +94,14 @@ Tests are authored but not executed. No compile, rustfmt, Clippy, CI, MON-005 in
 
 The repository's MON-005 work (#13515 / #13518) already has RFC 9162 inclusion and consistency proof semantics, 3-of-4 test-witness quorum and a SQLite reference state adapter. Its published local 49/49 results and 496 inclusion / 2,016 consistency checks are useful reference evidence, but all witness simulations remain same-host/same-process with fixture keys and no independent operator deployment.
 
-Next steps:
+Completed in follow-on draft PR [#13666](https://github.com/Luminous-Dynamics/symthaea/pull/13666): a source-matched Rust outer-record codec, consumer-side re-verifier, schema, and fixed outer-record / RFC 9162 leaf vectors. The MACE digest remains nested in the canonical MON-005 payload; the full MACE object is retained for retrieval and re-verification.
 
-1. Implement the provider adapter that maps the exact MACE pre-anchor payload bytes into the existing MON-005 outer-record DTO. Do not assume the MACE payload digest is the outer record leaf.
-2. Retain the exact returned outer record bytes and detached witness receipt; verify the checkpoint/quorum, inclusion and consistency proofs from a consumer-pinned prior checkpoint.
-3. Add a cross-language test that computes the outer MON-005 record leaf from the exact payload bytes and proves inclusion using MON-005's proof generator.
-4. Test crash, lost acknowledgement, duplicate append, checkpoint rollback, split-view and witness unavailability as separate outcomes.
-5. Deploy witness identities in independently administered failure/backup domains with production key custody and external transparency monitoring.
-6. Integrate the verified pre-anchor capability into the frozen-decision runner before any candidate exposure.
+Remaining steps:
+
+1. Add the provider/client transport that submits the exact canonical outer record and captures the detached witness receipt. MON-005 must remain the owner of append sequencing and persistence.
+2. Verify the returned record against an independently pinned checkpoint, witness roster/quorum and prior checkpoint; verify RFC 9162 inclusion and append-only consistency. A prepared record or valid record hash is not an external anchor.
+3. Test crash, lost acknowledgement, duplicate append, checkpoint rollback, split-view, witness unavailability and stale cursor races as separate outcomes.
+4. Deploy witness identities in independently administered failure/backup domains with production key custody, key rotation/revocation, and external transparency monitoring.
+5. Integrate the verified outer-record + witness capability into the frozen-decision runner before any candidate exposure.
 
 This increment is a non-circular protocol bridge and a consumer-side payload verifier—not an operationally independent witness service.
