@@ -51,7 +51,10 @@ pub struct SelectiveGroundingCaseV1 {
     /// Frozen adjudication-policy identity; raw annotation records live in #13560.
     pub adjudication_profile_sha256: String,
     pub truth: TemporalGroundTruthV1,
+    /// Prediction disposition after applying the selective decision.
     pub prediction: TemporalGroundingPredictionV1,
+    /// Raw candidate that would be emitted with the abstention policy disabled.
+    pub unconditional_prediction: TemporalGroundingPredictionV1,
     pub decision: SelectiveDecisionV1,
     /// Model's probability that its selected decision is correct, not confidence
     /// in a private reasoning trace. This remains a self-reported model output.
@@ -80,6 +83,7 @@ pub struct SelectiveCaseResultV1 {
     pub decision: SelectiveDecisionV1,
     pub decision_confidence: f64,
     pub decision_correct: bool,
+    pub unconditional_answer_correct: bool,
     pub covered: bool,
     pub selective_risk_contribution: Option<f64>,
     pub answer_f1: Option<f64>,
@@ -293,6 +297,27 @@ fn score_case(
     if !prediction_issues.is_empty() {
         return Err(format!("case {} has invalid prediction: {prediction_issues:?}", case.case_id));
     }
+    let unconditional_issues =
+        validate_temporal_grounding_prediction(&case.unconditional_prediction);
+    if !unconditional_issues.is_empty() {
+        return Err(format!(
+            "case {} has invalid unconditional prediction: {unconditional_issues:?}",
+            case.case_id
+        ));
+    }
+    if case.unconditional_prediction.query_id != case.truth.query_id
+        || case.unconditional_prediction.artifact != case.truth.artifact
+        || !matches!(
+            case.unconditional_prediction.state,
+            GroundingPredictionStateV1::Occurrences { .. }
+                | GroundingPredictionStateV1::QueryAbsent
+        )
+    {
+        return Err(format!(
+            "case {} unconditional prediction must be an answer/absence candidate for the exact query and artifact",
+            case.case_id
+        ));
+    }
 
     match (&case.decision, &case.prediction.state) {
         (SelectiveDecisionV1::Answer, GroundingPredictionStateV1::Occurrences { .. })
@@ -307,8 +332,19 @@ fn score_case(
         }
     }
 
+    if matches!(case.decision, SelectiveDecisionV1::Answer | SelectiveDecisionV1::ClaimAbsent)
+        && case.prediction != case.unconditional_prediction
+    {
+        return Err(format!(
+            "case {} covered decision must use the same prediction as its unconditional candidate",
+            case.case_id
+        ));
+    }
     let score = score_temporal_grounding(&case.truth, &case.prediction, plan)
         .map_err(|issues| format!("case {} rejected by production scorer: {issues:?}", case.case_id))?;
+    let unconditional_score =
+        score_temporal_grounding(&case.truth, &case.unconditional_prediction, plan)
+            .map_err(|issues| format!("case {} unconditional candidate rejected by production scorer: {issues:?}", case.case_id))?;
 
     let reason_correct = match case.truth.state {
         GroundTruthStateV1::Ambiguous => {
@@ -334,6 +370,13 @@ fn score_case(
             case.decision == SelectiveDecisionV1::AbstainNotEstimable
         }
     };
+    let unconditional_answer_correct = match case.truth.state {
+        GroundTruthStateV1::Present => is_perfect_present(&unconditional_score),
+        GroundTruthStateV1::Absent => {
+            unconditional_score.correct_absence_claim == Some(true)
+        }
+        GroundTruthStateV1::Ambiguous | GroundTruthStateV1::NotEstimable => false,
+    };
     let covered = matches!(
         case.decision,
         SelectiveDecisionV1::Answer | SelectiveDecisionV1::ClaimAbsent
@@ -352,6 +395,7 @@ fn score_case(
         decision: case.decision,
         decision_confidence: case.decision_confidence,
         decision_correct,
+        unconditional_answer_correct,
         covered,
         selective_risk_contribution: covered.then_some(if decision_correct { 0.0 } else { 1.0 }),
         answer_f1: answer_present.then_some(score.f1.unwrap_or(0.0)),
@@ -501,10 +545,18 @@ fn summarize(results: &[SelectiveCaseResultV1]) -> SelectiveGroundingSummaryV1 {
         risk_at_80_percent_coverage,
         max_coverage_at_risk_le_5_percent,
         always_answer_coverage: 1.0,
-        always_answer_risk: (selective_errors + cases - covered.len()) as f64 / cases as f64,
-        random_abstention_baseline_risk: rate(selective_errors, covered.len()),
-        random_abstention_baseline_aurc: rate(selective_errors, covered.len())
-            .map(|risk| risk * covered.len() as f64 / cases as f64),
+        always_answer_risk: rate(
+            results.iter().filter(|item| !item.unconditional_answer_correct).count(),
+            cases,
+        ).unwrap_or(1.0),
+        random_abstention_baseline_risk: rate(
+            results.iter().filter(|item| !item.unconditional_answer_correct).count(),
+            cases,
+        ),
+        random_abstention_baseline_aurc: rate(
+            results.iter().filter(|item| !item.unconditional_answer_correct).count(),
+            cases,
+        ),
         always_abstain_coverage: 0.0,
         always_abstain_risk: None,
     }
@@ -771,6 +823,15 @@ mod tests {
         predicted: GroundingPredictionStateV1,
         confidence: f64,
     ) -> SelectiveGroundingCaseV1 {
+        let selected_prediction = prediction(predicted);
+        let unconditional_prediction = if matches!(
+            decision,
+            SelectiveDecisionV1::Answer | SelectiveDecisionV1::ClaimAbsent
+        ) {
+            selected_prediction.clone()
+        } else {
+            prediction(GroundingPredictionStateV1::QueryAbsent)
+        };
         SelectiveGroundingCaseV1 {
             schema: CASE_SCHEMA_V1.into(),
             case_id: id.into(),
@@ -789,7 +850,8 @@ mod tests {
             },
             adjudication_profile_sha256: POLICY.into(),
             truth: truth(state, intervals, reason),
-            prediction: prediction(predicted),
+            prediction: selected_prediction,
+            unconditional_prediction,
             decision,
             decision_confidence: confidence,
         }
