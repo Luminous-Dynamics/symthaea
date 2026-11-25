@@ -57,3 +57,8 @@ The basis is an adjudication label backed by a frozen policy digest; it is not i
 Each case retains both the selected prediction and the unconditional pre-abstention candidate. Covered Answer/ClaimAbsent decisions must use the same prediction as this candidate; abstained cases can retain the candidate that the selective policy suppressed. The evaluator scores the unconditional candidate against the same truth to calculate a paired always-answer baseline. Random-abstention risk is the expected error rate when retaining those candidates independently of confidence. The output includes both predictions and both scorer records per case.
 
 The 10-case synthetic fixture has 2 correct unconditional candidates and 8 incorrect ones, so its always-answer and random-retention risk are 0.8. This is a deliberately adversarial evaluator control, not a performance result for Melothaea.
+
+
+### Selective inference cost
+
+Each case contains matched selective-path wall time, one-pass baseline wall time and model forward-pass count for the same query/audio/runtime. The report emits mean/p95 forward passes, selective latency and latency multiplier. Batch-level hardware identity is required, but runtime, hardware and inference-cost receipts remain unauthenticated unless joined to an independent execution attestation. Synthetic cost values prove report plumbing only; they are not device performance measurements.
