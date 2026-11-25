@@ -1,0 +1,31 @@
+{
+  "schema_version": "0.1",
+  "case_id": "negative-spectral-overshoot-mass-preserving-projection-v1",
+  "input_values": [
+    -0.1,
+    1.1
+  ],
+  "cell_volumes": [
+    1,
+    1
+  ],
+  "target_mass": 1,
+  "expected": {
+    "projected_values": [
+      0,
+      1
+    ],
+    "achieved_mass": 1,
+    "mass_residual": 0,
+    "lagrange_multiplier": 0.1,
+    "active_positive_cell_count": 1,
+    "weighted_correction_norm": 0.1414213562373095,
+    "minimum_projected_value": 0
+  },
+  "claim_boundary": {
+    "status": "synthetic_known_answer_only",
+    "mass_constraint_only": true,
+    "does_not_claim_momentum_or_energy": true,
+    "no_physical_solver_run": true
+  }
+}
