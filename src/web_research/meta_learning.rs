@@ -549,6 +549,8 @@ mod tests {
             .iter()
             .all(|outcome| outcome.adjudication_provenance.is_some()));
 
+        let serialized = serde_json::to_string(&state).unwrap();
+        let state: LearnerState = serde_json::from_str(&serialized).unwrap();
         let mut restored = EpistemicLearner::new();
         assert!(restored.import_state(state));
         assert_eq!(restored.stats().total_outcomes, 12);
@@ -592,6 +594,12 @@ mod tests {
         let mut malformed_state = seeded.export_state();
         malformed_state.adjudicated_outcomes[0].adjudication_provenance = None;
         assert!(!restored.import_state(malformed_state));
+        assert_eq!(restored.stats().total_outcomes, 0);
+        assert_eq!(restored.stats().source_count, 0);
+
+        let mut invalid_confidence_state = seeded.export_state();
+        invalid_confidence_state.adjudicated_outcomes[0].predicted_confidence = f32::INFINITY;
+        assert!(!restored.import_state(invalid_confidence_state));
         assert_eq!(restored.stats().total_outcomes, 0);
         assert_eq!(restored.stats().source_count, 0);
     }
