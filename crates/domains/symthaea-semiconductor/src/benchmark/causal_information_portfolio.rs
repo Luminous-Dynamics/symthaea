@@ -691,13 +691,17 @@ fn subset_is_feasible(
     for index in selected_indices {
         let candidate = &candidates[*index];
         cost += candidate.physical_measurement_cost;
-        capacity = capacity.saturating_add(candidate.capacity_units);
+        let Some(next_capacity) = capacity.checked_add(candidate.capacity_units) else {
+            return false;
+        };
+        capacity = next_capacity;
         audits += usize::from(candidate.randomized_audit);
         if !dependence_groups.insert(candidate.dependence_group_id.as_str()) {
             return false;
         }
     }
-    if cost > input.physical_cost_budget + PROBABILITY_TOLERANCE
+    if !cost.is_finite()
+        || cost > input.physical_cost_budget + PROBABILITY_TOLERANCE
         || capacity > input.maximum_capacity_units
     {
         return false;
