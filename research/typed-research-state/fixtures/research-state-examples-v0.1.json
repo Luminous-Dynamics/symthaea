@@ -122,7 +122,8 @@
                   "output_digest": "aec60285f2a0ff0cc1c698a2b20fa19bad3e126834113b62af776a2172d32a49",
                   "confidence": 0.82,
                   "emitted_at": "2026-11-25T10:06:00Z",
-                  "evidence_prefix_sha256": "95f3c238f106d66cc949e0aa4f4337ce3681eaf816b6a6d4e0a742b15d7e09c2"
+                  "evidence_prefix_sha256": "95f3c238f106d66cc949e0aa4f4337ce3681eaf816b6a6d4e0a742b15d7e09c2",
+                  "claim_sha256": "fc0f55ec3827caef3742459c35392e77beb04307daab9fbfdbdfa1df1ca329a1"
                 },
                 "quote_span": {
                   "byte_start": 0,
@@ -209,7 +210,8 @@
                   "output_digest": "b81d039fa300d04f3427fcbd00fd69b2ec62cf04b25424328b1814a4b54ac7d0",
                   "confidence": 0.91,
                   "emitted_at": "2026-11-25T10:12:00Z",
-                  "evidence_prefix_sha256": "58d2419357d72cc2caabc3872e7cf571496333f99421dfa260bc15cbb71f7722"
+                  "evidence_prefix_sha256": "58d2419357d72cc2caabc3872e7cf571496333f99421dfa260bc15cbb71f7722",
+                  "claim_sha256": "3e024443909006f617e9d63b085685b961d6075e0518c032d3705be0db72f9e6"
                 },
                 "quote_span": {
                   "byte_start": 5,
@@ -227,7 +229,8 @@
                   "output_digest": "a83e4afc653eab4a97514f1d0a2af1fb17bad38a4585280afbdd03d409772984",
                   "confidence": 0.88,
                   "emitted_at": "2026-11-25T10:13:00Z",
-                  "evidence_prefix_sha256": "58d2419357d72cc2caabc3872e7cf571496333f99421dfa260bc15cbb71f7722"
+                  "evidence_prefix_sha256": "58d2419357d72cc2caabc3872e7cf571496333f99421dfa260bc15cbb71f7722",
+                  "claim_sha256": "3e024443909006f617e9d63b085685b961d6075e0518c032d3705be0db72f9e6"
                 },
                 "quote_span": {
                   "byte_start": 9,
@@ -331,7 +334,8 @@
                   "output_digest": "a9a3b52a053f7ea8a9463c1c038e19022358c98d4e699ae12620468d8fd7387e",
                   "confidence": 0.93,
                   "emitted_at": "2026-11-25T10:21:00Z",
-                  "evidence_prefix_sha256": "5ca515038fa3769f36d3736cb3daedad837e06e5d26648c6ad8cf21262a1833c"
+                  "evidence_prefix_sha256": "5ca515038fa3769f36d3736cb3daedad837e06e5d26648c6ad8cf21262a1833c",
+                  "claim_sha256": "6082b8eacdc58ca890390a837523e54acc56aaacf3c13d5c3e0f2c05decbea1e"
                 },
                 "quote_span": {
                   "byte_start": 0,
