@@ -156,3 +156,18 @@ Those require independent annotations, human studies, external benchmark reprodu
 For every predicted occurrence index, the adapter derives a reference-boundary distribution from the production scorer's existing prediction↔annotation matches. It reports the number/fraction of eligible Present annotators who match that occurrence and the min/median/max annotated start/end frames. Predicted occurrences with no match in any eligible Present annotation are listed separately.
 
 The model prediction index is only a common alignment key; the adapter does not invent a canonical event ID or merge annotation intervals. A low support rate can indicate a count/identity disagreement or a boundary outside the frozen IoU threshold; inspect the per-annotator records before interpreting it. This distribution is descriptive, not calibrated model uncertainty.
+
+
+## 3.1 Pairwise temporal concordance (descriptive, not formal IAA)
+
+The implementation also compares every pair of independent annotators. Exact disposition agreement is reported across Present, Absent, Ambiguous and NotEstimable states. For Present/Present pairs only, the adapter uses the production interval matcher in both directions, then reports symmetric event F1, mean matched interval IoU and exact occurrence-count agreement.
+
+This separates three distinct questions:
+- Did both annotators believe the event/query was present, absent, ambiguous or not estimable?
+- When both marked Present, did they enumerate the same number of occurrences?
+- When both marked Present, did their event intervals overlap and align closely?
+
+Pairs with nonmatching dispositions, including Present/Absent, do not receive fabricated interval scores. Ambiguous and NotEstimable remain categorical dispositions and are not treated as absence. The per-pair records are retained so a mean cannot hide a small number of severe disagreements.
+
+This is a descriptive pairwise agreement view for one query, not chance-corrected reliability. The adapter explicitly leaves Cohen's kappa, Fleiss' kappa and Krippendorff's alpha unset. Formal reliability requires a multi-query corpus with preregistered items, raters, tolerance policy, missingness treatment and a justified chance model. For event intervals, report event F1/count agreement separately from matched IoU and boundary deviation; a single kappa over discretized time bins can change substantially with the chosen bin width.
+
