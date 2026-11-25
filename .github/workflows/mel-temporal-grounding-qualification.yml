@@ -124,7 +124,6 @@ jobs:
             and .risk_coverage[2].item_weighted_selective_risk.estimate == 0.0
             and .always_answer_item_weighted_risk.estimate == 0.5
             and .random_retention_baseline_is_unconditional_error == true
-            and .random_retention_baseline_is_unconditional_error == true
             and .risk_coverage[0].item_weighted_selective_risk.standard_error == 0.0
             and .risk_coverage[0].source_work_weighted_selective_risk.estimate == 0.5
             and .selection_receipt_match_verified == false
