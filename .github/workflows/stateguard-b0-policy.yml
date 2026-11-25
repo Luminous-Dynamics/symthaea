@@ -33,6 +33,9 @@ jobs:
       - name: Run locked policy tests
         run: cargo test --manifest-path research/stateguard-b0-policy/Cargo.toml --locked --all-targets
       - name: Run synthetic policy input
-        run: cargo run --manifest-path research/stateguard-b0-policy/Cargo.toml --locked -- research/stateguard-b0-policy/fixtures/policy-input-synthetic-example-v0.1.json
+        run: |
+          cargo run --manifest-path research/stateguard-b0-policy/Cargo.toml --locked -- research/stateguard-b0-policy/fixtures/policy-input-synthetic-example-v0.1.json > /tmp/stateguard-decision.json
+          cat /tmp/stateguard-decision.json
+          jq -e '.disposition == "SELECTED" and .selected_offer_id == "classify-claim-a-ev-a1" and .selected_action_kind == "CLASSIFY_CLAIM_SOURCE"' /tmp/stateguard-decision.json
       - name: Run strict Clippy
         run: cargo clippy --manifest-path research/stateguard-b0-policy/Cargo.toml --locked --all-targets -- -D warnings
