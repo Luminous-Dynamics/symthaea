@@ -27,7 +27,7 @@ pub enum SelectiveDecisionV1 {
     AbstainNotEstimable,
 }
 
-#[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize)]
+#[derive(Debug, Clone, Copy, PartialEq, Eq, PartialOrd, Ord, Serialize, Deserialize)]
 pub enum IdentifiabilityBasisV1 {
     ClearPositive,
     ClearAbsence,
@@ -311,7 +311,7 @@ fn score_case(
     if case.unconditional_prediction.query_id != case.truth.query_id
         || case.unconditional_prediction.artifact != case.truth.artifact
         || !matches!(
-            case.unconditional_prediction.state,
+            &case.unconditional_prediction.state,
             GroundingPredictionStateV1::Occurrences { .. }
                 | GroundingPredictionStateV1::QueryAbsent
         )
