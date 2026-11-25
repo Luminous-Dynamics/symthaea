@@ -40,9 +40,10 @@ Cycle 2's capability reporting should guide optimization, not only the overall r
 
 Use the official harness and public data preparation. The benchmark has 451 curated questions, five memory abilities, up to 500 trajectories per haystack and up to 115M tokens in the largest haystacks, across web and enterprise domains. It evaluates answer accuracy and query latency.
 
-Proposed MACE goals, measured against the strongest reproduced baseline at the same model, context, token, and latency budget:
-- Initial: **+3.2 percentage points** on held-out accuracy.
-- Stretch: **+4.0 percentage points** without a material p95 latency or cost regression.
+The official leaderboard score is the **LAFS gain over a fixed reference accuracy–latency frontier**, not raw answer-accuracy percentage points. Proposed MACE goals, measured with the official harness against the strongest reproduced baseline and fixed reference frontier at matched model/context/runtime settings:
+- Initial: **+3.2 LAFS points** over the strongest independently reproduced matched baseline.
+- Stretch: **+4.0 LAFS points**, without worsening the matched accuracy–latency frontier or violating the declared cost budget.
+- Always publish raw answer accuracy and query-latency operating points alongside LAFS; a LAFS improvement must not conceal a regression in an important task ability or a large cost shift.
 - Report all five abilities separately: static state recall, dynamic state tracking, workflow knowledge, environment gotchas, and premise awareness.
 - Run small and medium tiers separately; preserve online/offline conditions as defined by the official harness.
 
@@ -234,7 +235,19 @@ Every report must distinguish:
 
 No category may be inferred from another.
 
-## 7. Current MACE state and immediate sequencing
+## 7. Primary-source references
+
+The benchmark protocols, leaderboard values and scope statements above should be rechecked against these primary sources before each submission. Dates, model versions and leaderboards can change.
+
+- **Agent Memory Leaderboard, Cycle 2 official results (published 19 November 2026):** https://agentmemoryleaderboard.ai/results/cycle-2/ . The result page separates textual, multimodal and coding tracks and open-source, closed-source and commercial divisions.
+- **LongMemEval-V2 official repository and leaderboard protocol:** https://github.com/xiaowu0162/LongMemEval-V2 . The repository documents the 451-question dataset, five memory abilities, two domains, official baselines, fixed reader/embedding model configurations, and LAFS gain over an accuracy–latency reference frontier.
+- **AMA-Bench, Proceedings of Machine Learning Research (ICML 2026):** https://proceedings.mlr.press/v306/zhao26bs.html . The paper reports AMA-Agent at 57.22% accuracy and 11.16 points above its strongest baseline, and motivates causal/objective information over lossy similarity retrieval.
+- **WorldMemArena official project page and code:** https://worldmemarena-mem.github.io/ and https://github.com/UCSB-AI/WorldMemArena . The project describes 400 multi-session multimodal tasks and the write/maintain/retrieve/use action–world lifecycle.
+- **Memora / FAMA, Findings of ACL 2026:** https://aclanthology.org/2026.findings-acl.1337/ . FAMA penalizes reliance on obsolete or invalidated memory.
+- **TimlMemBench, Findings of EMNLP 2026:** https://aclanthology.org/2026.findings-emnlp.507/ . The paper describes 208 reviewed bilingual samples, 1,566 sessions, 1,715 questions and 1,821 governance/activation cases.
+- **Agent Memory Integrity Internet-Draft:** https://datatracker.ietf.org/doc/draft-khandelwal-bpm-agent-memory-integrity/ . This is a work-in-progress Internet-Draft, not an RFC or IETF standard. It specifies T9 whole-store rollback and T10 erasure resurrection; report not-applicable controls separately from passes.
+
+## 8. Current MACE state and immediate sequencing
 
 - V2 acquisition receipts and sidecar emission exist on draft PR #13586.
 - Exact receipt/invocation binding and full journal-history append validation are follow-on draft PRs #13587 and #13588.
