@@ -250,9 +250,9 @@ impl EpistemicLearner {
         // Store outcome
         self.outcomes.push_back(outcome);
 
-        // The source/domain aggregates are derived from the same bounded
-        // adjudicated window that is persisted. Once an item is evicted,
-        // rebuild those aggregates so export/import remains deterministic.
+        // Keep the live learner bounded to the same adjudicated window
+        // that is exported. Rebuild aggregates after eviction so source/domain
+        // counts and meta-Phi describe exactly the retained evidence window.
         if self.outcomes.len() > MAX_PERSISTED_ADJUDICATED_OUTCOMES {
             self.rebuild_calibration_from_retained_outcomes();
         } else if self.outcomes.len() % 10 == 0 {
@@ -263,6 +263,9 @@ impl EpistemicLearner {
     }
 
     fn rebuild_calibration_from_retained_outcomes(&mut self) {
+        while self.outcomes.len() > MAX_PERSISTED_ADJUDICATED_OUTCOMES {
+            self.outcomes.pop_front();
+        }
         let retained: Vec<VerificationOutcome> = self.outcomes.iter().cloned().collect();
         self.outcomes.clear();
         self.source_credibility.clear();
@@ -598,6 +601,7 @@ mod tests {
         }
 
         let before = learner.stats();
+        assert_eq!(before.total_outcomes, MAX_PERSISTED_ADJUDICATED_OUTCOMES);
         let before_meta_phi = learner.meta_phi.clone();
         let state = learner.export_state();
         assert_eq!(state.adjudicated_outcomes.len(), MAX_PERSISTED_ADJUDICATED_OUTCOMES);
@@ -623,6 +627,33 @@ mod tests {
                 .get_source_credibility("rust-lang.org")
                 .unwrap()
                 .outcome_count
+        );
+    }
+
+    #[test]
+    fn rolling_window_evicts_oldest_outcome_in_live_memory() {
+        let mut learner = EpistemicLearner::new();
+        for index in 0..(MAX_PERSISTED_ADJUDICATED_OUTCOMES + 5) {
+            let mut adjudicated = make_outcome("science", "example.org", true);
+            adjudicated.outcome.claim = format!("claim-{index}");
+            learner.record_adjudicated_outcome(adjudicated).unwrap();
+        }
+
+        assert_eq!(
+            learner.stats().total_outcomes,
+            MAX_PERSISTED_ADJUDICATED_OUTCOMES
+        );
+        assert_eq!(
+            learner.adjudicated_outcomes().next().unwrap().claim,
+            "claim-5"
+        );
+        assert_eq!(
+            learner.adjudicated_outcomes().last().unwrap().claim,
+            format!("claim-{}", MAX_PERSISTED_ADJUDICATED_OUTCOMES + 4)
+        );
+        assert_eq!(
+            learner.export_state().adjudicated_outcomes.len(),
+            MAX_PERSISTED_ADJUDICATED_OUTCOMES
         );
     }
 
