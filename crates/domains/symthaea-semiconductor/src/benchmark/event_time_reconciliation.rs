@@ -321,7 +321,7 @@ pub fn reconstruct_streaming_adapter_event_time_v1(
             "event-time reconstruction schema or identity is invalid".into(),
         ));
     }
-    let initial_state = adapter_state_digest_for_reconciliation_v1(&input.initial_engine)
+    let initial_state = adapter_state_digest(&input.initial_engine)
         .map_err(|error| EventTimeReconstructionErrorV1(error.to_string()))?;
     let mut eligible_events = Vec::new();
     let mut event_ids = BTreeSet::new();
@@ -522,7 +522,7 @@ pub fn reconstruct_streaming_adapter_event_time_v1(
         event_receipts.push(receipt);
     }
 
-    let final_state = adapter_state_digest_for_reconciliation_v1(&engine)
+    let final_state = adapter_state_digest(&engine)
         .map_err(|error| EventTimeReconstructionErrorV1(error.to_string()))?;
     let event_log_sha256 = json_sha256(&input.events)?;
     let canonical_replay_sha256 = json_sha256(&replay_projection)?;
@@ -782,6 +782,64 @@ mod tests {
         assert_eq!(result.affected_measurement_event_ids, vec!["m1"]);
         assert!(!result.prior_receipts_mutated);
         assert!(!result.automatic_rebuild_executed);
+    }
+
+    #[test]
+    fn correction_available_before_future_delivery_replaces_old_k1_report() {
+        let p = envelope(
+            "p1",
+            100,
+            110,
+            1,
+            StreamingReconstructionPayloadV1::Prediction {
+                input: prediction("s1", "m1", 100),
+            },
+        );
+        let mut corrected = eligibility(
+            "l1",
+            1,
+            "m1",
+            11.0,
+            LabelConsumptionEligibilityV1::Blocked,
+            110,
+        );
+        corrected.report_sha256 = {
+            let mut canonical = corrected.clone();
+            canonical.report_sha256.clear();
+            json_sha256(&canonical).unwrap()
+        };
+        let correction = envelope(
+            "c1",
+            110,
+            115,
+            2,
+            StreamingReconstructionPayloadV1::EligibilityCorrection {
+                sample_id: "s1".into(),
+                label_id: "l1".into(),
+                label_revision: 1,
+                measurement_event_id: "m1".into(),
+                effective_at_unix_seconds: 105,
+                report_available_at_unix_seconds: 110,
+                report: corrected,
+            },
+        );
+        let d = envelope(
+            "d1",
+            120,
+            125,
+            3,
+            StreamingReconstructionPayloadV1::LabelDelivery {
+                delivery: delivery("s1", "l1", "m1", 120),
+            },
+        );
+        let report = reconstruct_streaming_adapter_event_time_v1(&input(vec![p, correction, d])).unwrap();
+        assert_eq!(report.status, ReconstructionStatusV1::Complete);
+        assert_eq!(report.blocked_count, 1);
+        assert_eq!(report.accepted_update_count, 0);
+        assert_eq!(
+            report.event_receipts[2].disposition,
+            ReconstructionEventDispositionV1::LabelBlocked
+        );
     }
 
     #[test]
