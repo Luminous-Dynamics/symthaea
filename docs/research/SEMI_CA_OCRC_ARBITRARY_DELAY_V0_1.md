@@ -3,7 +3,7 @@
 **Issue:** #13499  
 **Implementation:** symthaea-semiconductor::benchmark::capacity_aware_ocrcc  
 **Base:** fixed-delay evidence-gated ACI #13498 and the validated evidence-to-model-family stack #13465  
-**Status:** Rust arbitrary-bounded-delay engine with 15 authored tests; exact-head validation pending.
+**Status:** Rust arbitrary-bounded-delay engine with 17 authored tests; exact-head validation pending.
 
 ## Paper and exact algorithm
 
@@ -34,7 +34,7 @@ where F(d) = Pr[proxy_delay >= d]. The independent proxy delay and its survival 
 - Discrete proxy-delay PMF on {-1, 0, ..., d_max} and exact survival probabilities.
 - Seeded SplitMix64 proxy-delay draws; the evolving PRNG state is included in the engine state digest. This is deterministic pseudorandom replay for the benchmark, not a certificate of ideal IID randomness. The theorem's random-draw assumption must be treated as an idealized algorithm assumption; a production randomness source requires its own audit/commitment.
 - Finite tracking set with the paper's strict expiry inequality and post-eviction admission.
-- Scalar regression interval [prediction - threshold, prediction + threshold] with bounded score threshold B.
+- Scalar regression interval [prediction - threshold, prediction + threshold] under the versioned capped absolute-residual score `S_B(x,y)=min(|y-f(x)|,B)`. The score contract is included in the policy digest and every prediction receipt. Thus a threshold `r>=B` selects the full real line, `0<=r<B` selects the bounded interval, and `r<0` selects the empty set.
 - Trivial full-real-line and empty sets derive loss 0 and 1 by construction, update immediately, and are never tracked.
 - Nontrivial intervals are tracked only if proxy delay >= 0 and capacity permits.
 - Same-round delay-0 feedback is received at the end of the same round if the prediction was admitted.
@@ -46,7 +46,8 @@ where F(d) = Pr[proxy_delay >= d]. The independent proxy delay and its survival 
 - Feedback inputs are sorted by stable sample/label/revision identity before IPW accumulation, so permutations of the same same-round delivery set produce byte-identical receipts.
 - The bound helper now validates the theorem's initial-threshold requirement r_1 in [0,B], and policy validation rejects F(d_max)=0.
 - A global UnderDeclaredArbitraryBoundedDelayAssumptions vs UncertifiedInvalidOrOutOfModelFeedback state; no guarantee is claimed after invalid feedback is encountered.
-- Theorem 1 finite-horizon arbitrary-delay bound helper.
+- Theorem 1 finite-horizon arbitrary-delay bound helper, including validation that the initial threshold `r_1` is in `[0,B]`.
+- Policy and prediction receipts pin the exact score semantics and the replay PRNG algorithm identifier (`splitmix64/v1`).
 - Proposition 1 Bernoulli proxy-delay family and a one-dimensional optimizer for p*.
 
 ## Theorem 1 and Proposition 1 implemented
@@ -92,7 +93,9 @@ Twelve Rust tests cover:
 12. deterministic replay and capacity invariant;
 13. independent slow schedule oracle over deterministic maximum proxy delays (evictions, admissions, received losses, IPW updates and threshold sequence);
 14. feedback-input permutation invariance for same-round receipts;
-15. terminal BLOCKED feedback frees capacity only after end-of-round reception, and the next round can reuse the slot.
+15. terminal BLOCKED feedback frees capacity only after end-of-round reception, and the next round can reuse the slot;
+16. a policy with any score-contract identifier other than the declared capped absolute-residual score is rejected;
+17. terminal proxy survival `F(d_max)=0` and initial-threshold values outside `[0,B]` are rejected before a theorem bound is reported.
 
 Exact-head rustfmt, strict Clippy, crate tests and SEMI-BENCH-001 reference workflow are required before pass claims. The v0.1 proxy randomizer uses a deterministic seeded PRNG for replay; its tests do not constitute a proof of independent physical randomness.
 
