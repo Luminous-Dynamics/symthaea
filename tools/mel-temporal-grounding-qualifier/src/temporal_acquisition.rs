@@ -1232,7 +1232,7 @@ mod tests {
             cohort_role,
             authorization_state: AuthorizationStateV1::Authorized,
             authorization_receipt_sha256: Some(digest('f')),
-            current_annotation_count: 2,
+            current_annotation_count: 3,
             maximum_annotation_count: 5,
             annotation_cost_units: 5,
             model_error_ppm: model_error,
@@ -1245,10 +1245,19 @@ mod tests {
     }
 
     fn synthetic_dataset() -> AnnotationAcquisitionDatasetV1 {
+        let mut active_a3 = candidate(
+            "active-a3",
+            'c',
+            "stratum-a",
+            AnnotationCohortRoleV1::Development,
+            0,
+            0,
+        );
+        active_a3.prediction_coverage_ppm = 500_000;
         let candidates = vec![
             candidate("active-a1", 'a', "stratum-a", AnnotationCohortRoleV1::Development, 700_000, 50_000),
             candidate("active-a2", 'b', "stratum-a", AnnotationCohortRoleV1::Development, 100_000, 800_000),
-            candidate("active-a3", 'c', "stratum-a", AnnotationCohortRoleV1::Development, 0, 0),
+            active_a3,
             candidate("active-b1", 'd', "stratum-b", AnnotationCohortRoleV1::ActiveRefinement, 900_000, 20_000),
             candidate("active-b2", 'e', "stratum-b", AnnotationCohortRoleV1::ActiveRefinement, 100_000, 700_000),
             candidate("audit-a1", 'f', "stratum-a", AnnotationCohortRoleV1::ConfirmatoryAudit, 0, 0),
@@ -1296,6 +1305,43 @@ mod tests {
             item.item_inclusion_probability.unwrap().numerator == 2
                 && item.item_inclusion_probability.unwrap().denominator == 3
         }));
+    }
+
+    #[test]
+    fn active_priority_distinguishes_stable_panel_model_error_from_uncertain_labels() {
+        let mut candidate = candidate(
+            "priority-control",
+            'z',
+            "stratum-a",
+            AnnotationCohortRoleV1::Development,
+            800_000,
+            0,
+        );
+        assert_eq!(
+            active_priority(&candidate, &config()).unwrap().0,
+            ActivePriorityBandV1::ModelFailure
+        );
+
+        candidate.human_disagreement_ppm = 900_000;
+        assert_eq!(
+            active_priority(&candidate, &config()).unwrap().0,
+            ActivePriorityBandV1::HumanDisagreement
+        );
+
+        candidate.human_disagreement_ppm = 0;
+        candidate.model_error_ppm = 0;
+        candidate.prediction_coverage_ppm = 500_000;
+        assert_eq!(
+            active_priority(&candidate, &config()).unwrap().0,
+            ActivePriorityBandV1::CoverageGap
+        );
+
+        candidate.prediction_coverage_ppm = 900_000;
+        candidate.hidden_repeat_control = true;
+        assert_eq!(
+            active_priority(&candidate, &config()).unwrap().0,
+            ActivePriorityBandV1::HiddenRepeat
+        );
     }
 
     #[test]
