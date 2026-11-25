@@ -450,7 +450,6 @@ struct OutcomeAccumulatorV1 {
 }
 
 fn enumerate_joint_outcomes(
-    candidate_indices: &[usize],
     outcome_likelihoods: &[&Vec<Vec<f64>>],
     current_outcome_indices: &mut Vec<usize>,
     depth: usize,
@@ -463,7 +462,6 @@ fn enumerate_joint_outcomes(
         for outcome_index in 0..outcome_likelihoods[depth].len() {
             current_outcome_indices.push(outcome_index);
             enumerate_joint_outcomes(
-                candidate_indices,
                 outcome_likelihoods,
                 current_outcome_indices,
                 depth + 1,
@@ -478,16 +476,11 @@ fn enumerate_joint_outcomes(
     }
 
     let mut joint_likelihood = vec![1.0; hypothesis_ids.len()];
-    for (selected_index, outcome_index) in candidate_indices
+    for (candidate_likelihoods, outcome_index) in outcome_likelihoods
         .iter()
         .zip(current_outcome_indices.iter())
     {
-        let candidate_position = outcome_likelihoods
-            .iter()
-            .position(|_| true)
-            .unwrap_or(0);
-        let _ = candidate_position;
-        let row = &outcome_likelihoods[selected_index.min(outcome_likelihoods.len() - 1)][*outcome_index];
+        let row = &candidate_likelihoods[*outcome_index];
         for (hypothesis_index, probability) in row.iter().enumerate() {
             joint_likelihood[hypothesis_index] *= probability;
         }
@@ -521,26 +514,25 @@ fn portfolio_information(
     actions: &[DecisionActionLossV1],
 ) -> (f64, f64) {
     if selected_indices.is_empty() {
-        let entropy = entropy_bits(priors);
-        let risk = bayes_risk(priors, hypothesis_ids, actions);
-        return (0.0, 0.0 + risk - risk);
+        return (0.0, 0.0);
     }
 
     let likelihood_refs: Vec<&Vec<Vec<f64>>> = selected_indices
         .iter()
         .map(|index| &candidate_likelihoods[&candidates[*index].candidate_id])
         .collect();
-    let outcome_count: usize = likelihood_refs.iter().map(|rows| rows.len()).product();
+    let Some(outcome_count) = likelihood_refs
+        .iter()
+        .try_fold(1usize, |total, rows| total.checked_mul(rows.len()))
+    else {
+        return (f64::NAN, f64::NAN);
+    };
     if outcome_count > MAX_JOINT_OUTCOMES_V1 {
         return (f64::NAN, f64::NAN);
     }
 
-    // The candidate positions are mapped explicitly into the selected subset;
-    // the recursive oracle stores one outcome matrix per selected candidate.
-    let selected_positions: Vec<usize> = (0..selected_indices.len()).collect();
     let mut accumulator = OutcomeAccumulatorV1::default();
     enumerate_joint_outcomes(
-        &selected_positions,
         &likelihood_refs,
         &mut Vec::new(),
         0,
@@ -723,12 +715,11 @@ pub fn optimize_causal_information_portfolio_v1(
             .filter(|(bit, _)| mask & (1usize << bit) != 0)
             .map(|(_, index)| *index)
             .collect();
-        let feasible_without_audit = subset_is_feasible(
-            &selected_indices,
-            candidates,
-            input,
-            false,
-        );
+        if selected_indices.is_empty() {
+            continue;
+        }
+        let feasible_without_audit =
+            subset_is_feasible(&selected_indices, candidates, input, false);
         if feasible_without_audit {
             feasible_without_audit_floor_count += 1;
         }
@@ -787,8 +778,8 @@ pub fn optimize_causal_information_portfolio_v1(
     let population_estimation_available = selected_portfolio
         .as_ref()
         .is_some_and(|portfolio| {
-            portfolio.randomized_audit_count >= input.minimum_randomized_audit_count
-                && input.minimum_randomized_audit_count > 0
+            input.minimum_randomized_audit_count > 0
+                && portfolio.randomized_audit_count >= input.minimum_randomized_audit_count
         });
     let mut reason_codes = Vec::new();
     if status == CausalPortfolioStatusV1::AuditFloorUnsatisfied {
@@ -814,25 +805,17 @@ pub fn optimize_causal_information_portfolio_v1(
         population_estimation_available,
         conditional_independence_assumption_used: input
             .conditional_independence_assumption_declared
-            && report_has_multiple_selected_candidates_placeholder(),
+            && selected_portfolio
+                .as_ref()
+                .is_some_and(|portfolio| portfolio.candidate_ids.len() > 1),
         source_likelihood_authenticity_proven: false,
         physical_measurement_executed: false,
         equipment_control_authority: false,
         reason_codes,
         report_sha256: String::new(),
     };
-    report.conditional_independence_assumption_used = input
-        .conditional_independence_assumption_declared
-        && report
-            .selected_portfolio
-            .as_ref()
-            .is_some_and(|portfolio| portfolio.candidate_ids.len() > 1);
     report.report_sha256 = report_digest(&report)?;
     Ok(report)
-}
-
-fn report_has_multiple_selected_candidates_placeholder() -> bool {
-    false
 }
 
 #[cfg(test)]
