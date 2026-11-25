@@ -17,8 +17,8 @@ use serde_json::{Value, json};
 use sha2::{Digest, Sha256};
 
 use crate::candidate_evidence::{
-    CandidateEvidenceBatchV1, CandidateEvidenceReject, encode_candidate_evidence_jsonl,
-    parse_candidate_evidence_jsonl,
+    CandidateEvidenceBatchV1, CandidateEvidenceReject, CandidateEvidenceV1,
+    encode_candidate_evidence_jsonl, parse_candidate_evidence_jsonl,
 };
 use crate::evidence_qualification_gate::{
     EvidenceQualificationBindingV1, EvidenceQualificationRejectV1,
@@ -298,6 +298,24 @@ impl IndependentQualificationExchangeResultV1 {
             pinned,
         )
     }
+
+    /// Return evidence only after revalidating the exact signed qualification
+    /// against a freshly provisioned trust profile and the complete current
+    /// use binding. Call this at every subsequent consumption.
+    pub fn qualified_evidence_at_use<'a>(
+        &'a self,
+        binding: &EvidenceQualificationBindingV1<'_>,
+        pinned: &PinnedEd25519QualificationVerifierV1,
+    ) -> Result<&'a [CandidateEvidenceV1], IndependentQualificationExchangeRejectV1> {
+        let CandidateEvidenceProjectionV1::Qualified(qualified) = &self.projection else {
+            return Err(IndependentQualificationExchangeRejectV1::NoQualifiedEvidence);
+        };
+        let verifier = self.verifier_for_use(pinned)
+            .map_err(IndependentQualificationExchangeRejectV1::Qualification)?;
+        qualified.validate_at_use(binding, &verifier)
+            .map_err(IndependentQualificationExchangeRejectV1::Qualification)?;
+        Ok(qualified.evidence())
+    }
 }
 
 #[derive(Clone, Copy, Debug, Eq, PartialEq)]
@@ -370,6 +388,7 @@ pub enum IndependentQualificationExchangeRejectV1 {
     IssuerMalformedResponse,
     TrustedClockUnavailable,
     TrustedClockUntrusted,
+    NoQualifiedEvidence,
     Qualification(EvidenceQualificationRejectV1),
     Projection(CandidateEvidenceProjectionRejectV1),
 }
@@ -846,7 +865,6 @@ mod tests {
         ).expect("qualification exchange");
         match result.projection() {
             CandidateEvidenceProjectionV1::Qualified(qualified) => {
-                assert_eq!(qualified.evidence().len(), 1);
                 assert_eq!(qualified.source_candidate_set_sha256(), batch.candidate_set_sha256);
                 assert_eq!(qualified.decision_need_sha256(), context.decision_need_sha256);
                 let mut candidate_ids = batch.evidence.iter()
@@ -854,8 +872,9 @@ mod tests {
                     .collect::<Vec<_>>();
                 candidate_ids.sort();
                 let binding = use_binding(&batch, &context, &candidate_ids, 101);
-                let verifier = result.verifier_for_use(&pinned_profile).expect("fresh DSSE verifier");
-                qualified.validate_at_use(&binding, &verifier).expect("same context remains valid");
+                let evidence = result.qualified_evidence_at_use(&binding, &pinned_profile)
+                    .expect("same context and current pinned key remain valid");
+                assert_eq!(evidence.len(), 1);
             }
             CandidateEvidenceProjectionV1::Abstained(_) => panic!("unexpected abstention"),
         }
@@ -869,6 +888,15 @@ mod tests {
             &batch, &context, &expected(&batch), &issuer, &verifier, &test_clock(),
         ).expect("valid signed receipt");
         assert!(matches!(result.projection(), CandidateEvidenceProjectionV1::Abstained(_)));
+        let mut ids = batch.evidence.iter()
+            .map(|item| item.evidence_id.clone())
+            .collect::<Vec<_>>();
+        ids.sort();
+        let binding = use_binding(&batch, &context, &ids, 101);
+        assert_eq!(
+            result.qualified_evidence_at_use(&binding, &verifier),
+            Err(IndependentQualificationExchangeRejectV1::NoQualifiedEvidence)
+        );
     }
 
     #[test]
