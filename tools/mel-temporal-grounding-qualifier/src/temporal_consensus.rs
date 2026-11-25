@@ -11,7 +11,8 @@ use std::collections::BTreeSet;
 use serde::{Deserialize, Serialize};
 
 use crate::temporal_grounding::{
-    AudioArtifactClockV1, FrameIntervalV1, GroundTruthStateV1, TEMPORAL_GROUNDING_SCHEMA_V1,
+    AudioArtifactClockV1, FrameIntervalV1, GroundTruthStateV1, GroundingPredictionStateV1,
+    TEMPORAL_GROUNDING_SCHEMA_V1,
     TemporalGroundTruthV1, TemporalGroundingOutcomeV1, TemporalGroundingPlanV1,
     TemporalGroundingPredictionV1, TemporalGroundingScoreV1, score_temporal_grounding,
     validate_temporal_grounding_prediction,
