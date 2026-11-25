@@ -925,6 +925,20 @@ mod tests {
     }
 
     #[test]
+    fn production_public_state_marker_is_accepted() {
+        let mut state = first_state();
+        state["status"] = Value::String("PRODUCTION_PUBLIC_STATE".to_owned());
+        assert!(validate_state(&state.to_string()).is_ok());
+    }
+
+    #[test]
+    fn claim_level_global_confidence_is_not_an_allowed_field() {
+        let mut state = first_state();
+        state["claims"][0]["confidence"] = Value::from(0.99);
+        assert!(validate_state(&state.to_string()).is_err());
+    }
+
+    #[test]
     fn unclassified_relation_cannot_carry_classifier_or_quote() {
         let mut state = first_state();
         let prefix_sha256 = state["evidence_prefix"]["prefix_sha256"].clone();
