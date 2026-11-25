@@ -20,10 +20,15 @@ Run identical semantics, destination API, data, operation IDs, durability, fault
 6. AEE profile, draft-thaha-scitt-agent-execution-evidence-02.
 7. SCITT AI Agent Execution profile, draft-emirdag-scitt-ai-agent-execution-01.
 8. Vaara Receipt, draft-sirkkavaara-vaara-receipt-15.
-9. SFEB effect-assurance bridge over applicable systems above.
-10. Native sink control: direct conditional write, sink receipt and separate-principal readback.
+9. WIMSE Evidence Binding -03, draft-thaha-wimse-agent-evidence-binding-03 (credential-to-agent identity, per-call caller reference and admission/freshness profile).
+10. SFEB effect-assurance bridge over applicable systems above.
+11. Native sink control: direct conditional write, sink receipt and separate-principal readback.
 
 These profiles differ. Normalize the workload contract and compare only claims each can actually prove.
+
+## Identity and admission sub-campaign
+
+For the WIMSE arm, test valid and revoked workload credentials, runtime-identity-to-logical-agent mapping, stale assurance status, wrong Evidence Service, token reuse across two calls, caller-reference replay at another serving party, caller-supplied call-digest substitution, host/gateway ambiguity, actor-chain disagreement and a mismatch between admission and subsequent linked verification. Serving-party admission must refuse when required identity/status checks cannot complete. Post-hoc linked audit must not be treated as the same thing as the pre-action authorization decision.
 
 ## Workload tiers
 

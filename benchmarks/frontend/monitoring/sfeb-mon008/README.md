@@ -43,7 +43,7 @@ The benchmark matches PostgreSQL outbox, DBOS, Temporal, SCITT/RFC 9942+9943, Re
 
 ## Interoperability landscape (updated 2026-11-25)
 
-MON-008 is deliberately not positioned as a new agent receipt format. See `INTEROPERABILITY-AND-NOVELTY-MAP-v1.md` for the current RFC 9942/9943, AEE, Vaara Receipt and Sigstore comparison. The AEE draft already defines caller/serving-party paired evidence and offline bundles; the next differentiator is to qualify the real destination-side state change, independent readback and declared observation completeness.
+MON-008 is deliberately not positioned as a new agent receipt format. See `INTEROPERABILITY-AND-NOVELTY-MAP-v1.md` for the current RFC 9942/9943, AEE, WIMSE Evidence Binding, Vaara Receipt and Sigstore comparison. The AEE draft already defines caller/serving-party paired evidence and offline bundles; the next differentiator is to qualify the real destination-side state change, independent readback and declared observation completeness.
 
 `ASSURANCE-GAP-BENCHMARK-v2.md` adds AEE, the SCITT AI Agent Execution profile and Vaara Receipt as comparison arms, and adds omission/coverage adversarial tests. It forbids treating missing receipt evidence as proof that an action did not occur outside an independently qualified observation boundary.
 

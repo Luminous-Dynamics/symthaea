@@ -72,3 +72,14 @@ No one layer implies the next.
 - Add AEE/Vaara import/export adapters only behind explicit, version-pinned profiles.
 - Use Rekor/Witness or another established TS/witness implementation. SFEB should qualify action/sink/effect evidence above it.
 - Treat the remote sink's idempotency, fencing, receipt, readback and observation coverage as the actual external trust boundary.
+
+
+### D. WIMSE Evidence Binding -03, draft-thaha-wimse-agent-evidence-binding-03
+
+- Datatracker snapshot: November 2026; published November 1, 2026; active individual Internet-Draft. The I-D announcement says it is a companion to WIMSE AIMS and makes no change to AIMS.
+- Maps AIMS minimum audit fields into AEE Execution Receipt fields and defines the `aee_evidence` workload-credential claim. The claim binds authenticated runtime identity to a persistent `logical_agent_id`, an expected Evidence Service, governing policy and optional assurance context.
+- Defines `AEE-Caller-Ref` as a per-request HTTP Structured Field carrying the caller's evidence-service identifier, receipt sequence/hash, transaction ID and call digest. It MUST NOT be carried in a token intended for more than one call.
+- Admission and post-hoc audit are deliberately separate: a serving party validates the token, identity, proof of possession, registration, freshness and assurance before acting; the later linked-bundle audit checks caller/serving-party evidence. The serving party computes its own call digest; it does not trust the caller-supplied digest.
+- Scope limitation: this is a binding profile. It does not itself specify the evidence retrieval protocol, registry/status service or audit schema. It is not a sink receipt or proof of the resulting external state.
+
+**SFEB response:** add WIMSE -03 as an identity/admission integration arm, and explicitly test credential-to-logical-agent mapping, status freshness/revocation, single-call token binding, caller-reference replay, serving-party host binding and separation between admission and post-hoc execution verification. Keep the actual external destination receipt and independent readback separate.
