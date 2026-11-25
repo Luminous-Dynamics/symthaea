@@ -240,7 +240,12 @@ pub fn audit_reliability_corpus(
             .not_estimable
             .checked_add(counts.not_estimable)
             .ok_or_else(|| "global NotEstimable count overflow".to_string())?;
-        unit_summaries.push(summarize_unit(unit, &corpus.plan, &corpus.interval_iou_thresholds)?);
+        unit_summaries.push(summarize_unit(
+            unit,
+            &corpus.plan,
+            &corpus.annotation_policy_version,
+            &corpus.interval_iou_thresholds,
+        )?);
     }
 
     let observed_disagreement = (total_ratings > 0)
@@ -575,21 +580,18 @@ fn validate_corpus(corpus: &TemporalReliabilityCorpusV1) -> Result<(), String> {
 fn summarize_unit(
     unit: &TemporalReliabilityUnitV1,
     plan: &TemporalGroundingPlanV1,
+    annotation_policy_version: &str,
     thresholds: &[f64],
 ) -> Result<TemporalReliabilityUnitSummaryV1, String> {
     let count = unit.annotations.len();
     let pair_count = count.saturating_mul(count.saturating_sub(1)) / 2;
     let mut agreement_pairs = 0_usize;
-    let mut present_pairs = 0_usize;
     for left in 0..count {
         for right in (left + 1)..count {
             let a = &unit.annotations[left];
             let b = &unit.annotations[right];
             if a.state == b.state {
                 agreement_pairs += 1;
-            }
-            if a.state == GroundTruthStateV1::Present && b.state == GroundTruthStateV1::Present {
-                present_pairs += 1;
             }
         }
     }
@@ -612,8 +614,8 @@ fn summarize_unit(
                 }
                 let mut threshold_plan = plan.clone();
                 threshold_plan.minimum_interval_iou = *threshold;
-                let left_truth = annotation_truth_for_unit(unit, a, &plan.evaluator_version);
-                let right_truth = annotation_truth_for_unit(unit, b, &plan.evaluator_version);
+                let left_truth = annotation_truth_for_unit(unit, a, annotation_policy_version);
+                let right_truth = annotation_truth_for_unit(unit, b, annotation_policy_version);
                 let left_prediction = annotation_prediction(unit, a);
                 let right_prediction = annotation_prediction(unit, b);
                 let left_score = score_temporal_grounding(
