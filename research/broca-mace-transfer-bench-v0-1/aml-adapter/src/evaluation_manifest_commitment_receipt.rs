@@ -651,7 +651,7 @@ mod tests {
             arm_assignment_root_sha256: arm_assignment_root_sha256.clone(),
             pre_registration_root_sha256: pre_registration_root_sha256.clone(),
             sealed_artifacts_root_sha256: sealed_artifacts_root_sha256.clone(),
-            committed_at_unix: 100,
+            committed_at_unix: 120,
             candidate_access_profile_sha256: candidate_access_profile_sha256.clone(),
             reveal_protocol_sha256: reveal_protocol_sha256.clone(),
             anchor_log_id: anchor_log_id.clone(),
@@ -665,7 +665,7 @@ mod tests {
                     witness_profile_sha256: witness_profile_sha256.clone(),
                     verifier_profile_sha256: verifier_profile_sha256.clone(),
                     key_id,
-                    issued_at_unix: 110,
+                    issued_at_unix: 130,
                     payload_sha256: digest('3'),
                     attestation_sha256: digest('4'),
                     signature_base64: String::new(),
@@ -739,7 +739,7 @@ mod tests {
         let fixture = fixture();
         let expected = fixture.expected();
         let verified = fixture.verify(250, &expected, &AcceptLog).unwrap();
-        assert_eq!(verified.committed_at_unix(), 100);
+        assert_eq!(verified.committed_at_unix(), 120);
         assert_eq!(verified.suite_id(), "mace-test");
         assert_eq!(verified.sealed_evaluation_manifest_sha256(), digest('c'));
         assert_eq!(verified.receipt_sha256().len(), 64);
