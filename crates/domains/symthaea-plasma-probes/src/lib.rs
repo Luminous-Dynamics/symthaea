@@ -91,6 +91,8 @@ pub enum ContractError {
     NonMonotonicKineticPulseSequence,
     #[error("pulse sequence observation horizon is invalid")]
     InvalidPulseSequenceObservationHorizon,
+    #[error("kinetic path response signature is invalid: {0}")]
+    InvalidKineticPathResponseSignature(&'static str),
     #[error("unknown response mode ID: {0}")]
     UnknownResponseMode(u32),
     #[error("response matrix dimensions overflow")]
@@ -2507,6 +2509,80 @@ impl KineticPulseSequence {
 
     pub fn digest(&self) -> &str {
         &self.digest
+    }
+}
+
+/// A path-conditioned KRS response signature bound to one immutable pulse sequence.
+///
+/// The response signature's sole intervention identity must equal the sequence
+/// digest. Its observation samples must lie after the final active pulse (or
+/// after time zero for a baseline path) and no later than the sequence horizon.
+/// Missing complex responses and unresolved branch IDs are retained explicitly;
+/// they make downstream qualification UNKNOWN rather than being imputed as zero.
+#[derive(Clone, Debug, PartialEq, Serialize)]
+pub struct KineticPulsePathResponseSignature {
+    sequence_digest: String,
+    response_signature: KineticResponseSignature,
+}
+
+impl KineticPulsePathResponseSignature {
+    pub fn new(
+        sequence: &KineticPulseSequence,
+        response_signature: KineticResponseSignature,
+    ) -> Result<Self, ContractError> {
+        if response_signature.intervention_ids.len() != 1
+            || response_signature.intervention_ids[0] != sequence.digest
+        {
+            return Err(ContractError::InvalidKineticPathResponseSignature(
+                "intervention axis must bind exactly to the pulse sequence digest",
+            ));
+        }
+        let observation_start = sequence
+            .pulses
+            .last()
+            .map_or(0.0, |pulse| pulse.application_time);
+        if response_signature.time_samples.iter().any(|time| {
+            *time < observation_start || *time > sequence.observation_end_time
+        }) {
+            return Err(ContractError::InvalidKineticPathResponseSignature(
+                "response samples must lie within the post-sequence observation window",
+            ));
+        }
+        Ok(Self {
+            sequence_digest: sequence.digest.clone(),
+            response_signature,
+        })
+    }
+
+    pub fn sequence_digest(&self) -> &str {
+        &self.sequence_digest
+    }
+
+    pub fn response_signature(&self) -> &KineticResponseSignature {
+        &self.response_signature
+    }
+
+    /// True only when every response entry has a branch association.
+    pub fn has_complete_branch_association(&self) -> bool {
+        self.response_signature.branch_ids.iter().all(Option::is_some)
+    }
+
+    /// True only when every response entry has a measured complex value.
+    pub fn has_complete_response_coverage(&self) -> bool {
+        self.response_signature.responses.iter().all(Option::is_some)
+    }
+
+    /// Compare two candidate/reference responses for the same immutable path.
+    pub fn compare(
+        &self,
+        other: &Self,
+    ) -> Result<ResponseSignatureComparison, ContractError> {
+        if self.sequence_digest != other.sequence_digest {
+            return Err(ContractError::InvalidKineticPathResponseSignature(
+                "cannot compare response signatures from different pulse paths",
+            ));
+        }
+        self.response_signature.compare(&other.response_signature)
     }
 }
 
@@ -11319,6 +11395,193 @@ mod tests {
         assert_ne!(
             pulse.canonical_digest(&family).unwrap(),
             reversed.canonical_digest(&family).unwrap()
+        );
+    }
+
+    fn synthetic_path_response_signature(
+        sequence: &KineticPulseSequence,
+        structure_class_id: &str,
+        time_samples: Vec<f64>,
+        responses: Vec<Option<ComplexResponse>>,
+        branch_ids: Vec<Option<String>>,
+    ) -> Result<KineticPulsePathResponseSignature, ContractError> {
+        let signature = KineticResponseSignature::new(KineticResponseSignatureInput {
+            contract_id: "kirr-path-response-contract-v0.1".to_owned(),
+            structure_class_id: structure_class_id.to_owned(),
+            intervention_ids: vec![sequence.digest().to_owned()],
+            qoi_ids: vec!["electric-field-mode-2".to_owned()],
+            qoi_scales: vec![1.0],
+            time_samples,
+            responses,
+            branch_ids,
+        })?;
+        KineticPulsePathResponseSignature::new(sequence, signature)
+    }
+
+    #[test]
+    fn kinetic_path_response_signature_binds_sequence_and_observation_window() {
+        let family = contract();
+        let sequence = KineticPulseSequence::new(
+            &family,
+            &[candidate(1, 0.2, 0.01, 1.0), candidate(2, -0.3, 0.008, 3.0)],
+            8.0,
+        )
+        .unwrap();
+        let response = synthetic_path_response_signature(
+            &sequence,
+            "independent-reference",
+            vec![3.5, 4.0, 5.0],
+            vec![
+                Some(ComplexResponse::new(0.1, 0.0).unwrap()),
+                Some(ComplexResponse::new(0.2, 0.1).unwrap()),
+                Some(ComplexResponse::new(0.1, 0.2).unwrap()),
+            ],
+            vec![Some("echo-branch-a".to_owned()); 3],
+        )
+        .unwrap();
+        assert_eq!(response.sequence_digest(), sequence.digest());
+        assert!(response.has_complete_response_coverage());
+        assert!(response.has_complete_branch_association());
+    }
+
+    #[test]
+    fn kinetic_path_response_signature_rejects_wrong_sequence_identity() {
+        let family = contract();
+        let first = KineticPulseSequence::new(
+            &family,
+            &[candidate(1, 0.2, 0.01, 1.0), candidate(2, -0.3, 0.008, 3.0)],
+            8.0,
+        )
+        .unwrap();
+        let second = KineticPulseSequence::new(
+            &family,
+            &[candidate(1, 0.2, 0.01, 1.0), candidate(3, -0.3, 0.008, 3.0)],
+            8.0,
+        )
+        .unwrap();
+        let foreign_signature = KineticResponseSignature::new(KineticResponseSignatureInput {
+            contract_id: "kirr-path-response-contract-v0.1".to_owned(),
+            structure_class_id: "reference".to_owned(),
+            intervention_ids: vec![second.digest().to_owned()],
+            qoi_ids: vec!["electric-field-mode-2".to_owned()],
+            qoi_scales: vec![1.0],
+            time_samples: vec![3.5, 4.0],
+            responses: vec![Some(ComplexResponse::new(0.1, 0.0).unwrap()); 2],
+            branch_ids: vec![Some("branch".to_owned()); 2],
+        })
+        .unwrap();
+        assert_eq!(
+            KineticPulsePathResponseSignature::new(&first, foreign_signature),
+            Err(ContractError::InvalidKineticPathResponseSignature(
+                "intervention axis must bind exactly to the pulse sequence digest"
+            ))
+        );
+    }
+
+    #[test]
+    fn kinetic_path_response_signature_rejects_samples_before_final_pulse_or_after_horizon() {
+        let family = contract();
+        let sequence = KineticPulseSequence::new(
+            &family,
+            &[candidate(1, 0.2, 0.01, 2.0), candidate(2, -0.3, 0.008, 4.0)],
+            8.0,
+        )
+        .unwrap();
+        let early = synthetic_path_response_signature(
+            &sequence,
+            "reference",
+            vec![3.0, 5.0],
+            vec![Some(ComplexResponse::new(0.1, 0.0).unwrap()); 2],
+            vec![Some("branch".to_owned()); 2],
+        );
+        assert_eq!(
+            early,
+            Err(ContractError::InvalidKineticPathResponseSignature(
+                "response samples must lie within the post-sequence observation window"
+            ))
+        );
+        let late = synthetic_path_response_signature(
+            &sequence,
+            "reference",
+            vec![5.0, 8.5],
+            vec![Some(ComplexResponse::new(0.1, 0.0).unwrap()); 2],
+            vec![Some("branch".to_owned()); 2],
+        );
+        assert_eq!(
+            late,
+            Err(ContractError::InvalidKineticPathResponseSignature(
+                "response samples must lie within the post-sequence observation window"
+            ))
+        );
+    }
+
+    #[test]
+    fn kinetic_path_response_signature_preserves_missing_values_and_unknown_branches() {
+        let family = contract();
+        let sequence = KineticPulseSequence::new(
+            &family,
+            &[candidate(1, 0.2, 0.01, 1.0)],
+            6.0,
+        )
+        .unwrap();
+        let response = synthetic_path_response_signature(
+            &sequence,
+            "reference",
+            vec![2.0, 3.0],
+            vec![Some(ComplexResponse::new(0.1, 0.0).unwrap()), None],
+            vec![Some("branch".to_owned()), None],
+        )
+        .unwrap();
+        assert!(!response.has_complete_response_coverage());
+        assert!(!response.has_complete_branch_association());
+    }
+
+    #[test]
+    fn kinetic_path_response_comparison_requires_the_same_sequence_digest() {
+        let family = contract();
+        let first_sequence = KineticPulseSequence::new(
+            &family,
+            &[candidate(1, 0.2, 0.01, 1.0)],
+            6.0,
+        )
+        .unwrap();
+        let second_sequence = KineticPulseSequence::new(
+            &family,
+            &[candidate(2, 0.2, 0.01, 1.0)],
+            6.0,
+        )
+        .unwrap();
+        let first = synthetic_path_response_signature(
+            &first_sequence,
+            "reference",
+            vec![2.0, 3.0],
+            vec![Some(ComplexResponse::new(0.1, 0.0).unwrap()); 2],
+            vec![Some("branch".to_owned()); 2],
+        )
+        .unwrap();
+        let same_path_candidate = synthetic_path_response_signature(
+            &first_sequence,
+            "reduced",
+            vec![2.0, 3.0],
+            vec![Some(ComplexResponse::new(0.11, 0.0).unwrap()); 2],
+            vec![Some("branch".to_owned()); 2],
+        )
+        .unwrap();
+        let other_path = synthetic_path_response_signature(
+            &second_sequence,
+            "reduced",
+            vec![2.0, 3.0],
+            vec![Some(ComplexResponse::new(0.11, 0.0).unwrap()); 2],
+            vec![Some("branch".to_owned()); 2],
+        )
+        .unwrap();
+        let comparison = first.compare(&same_path_candidate).unwrap();
+        assert!(comparison.structure_class_compatible == false);
+        assert_eq!(
+            first.compare(&other_path),
+            Err(ContractError::InvalidKineticPathResponseSignature(
+                "cannot compare response signatures from different pulse paths"
+            ))
         );
     }
 
