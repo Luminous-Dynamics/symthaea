@@ -44,7 +44,12 @@ pub struct TraceVerificationReport {
     pub run_id: String,
     pub manifest_digest: String,
     pub event_count: usize,
-    pub event_chain_verified: bool,
+    /// Internal event/hash-chain consistency only; a complete rewrite can be rehashed.
+    pub event_chain_consistent: bool,
+    pub head_digest: String,
+    /// True only when the head digest equals a caller-supplied external checkpoint.
+    /// This does not authenticate the checkpoint or its signer.
+    pub head_digest_matches_supplied_anchor: bool,
     pub authority_bindings_checked: usize,
     pub disclosure_bindings_checked: usize,
     pub sink_projections_checked: usize,
@@ -88,6 +93,7 @@ pub enum VerificationErrorCode {
     RootMustBeObject,
     InvalidEventShape(String),
     InvalidDigest(String),
+    HeadDigestAnchorMismatch,
     RunIdMismatch,
     ManifestDigestMismatch,
     SequenceMismatch { expected: u64, actual: u64 },
@@ -132,6 +138,7 @@ impl fmt::Display for VerificationErrorCode {
             Self::RootMustBeObject => write!(f, "event must be a JSON object"),
             Self::InvalidEventShape(reason) => write!(f, "invalid event shape: {reason}"),
             Self::InvalidDigest(field) => write!(f, "invalid digest in {field}"),
+            Self::HeadDigestAnchorMismatch => write!(f, "trace head digest does not match supplied external anchor"),
             Self::RunIdMismatch => write!(f, "event run_id differs from the expected run"),
             Self::ManifestDigestMismatch => {
                 write!(f, "event manifest_digest differs from the frozen manifest")
@@ -690,10 +697,10 @@ pub fn compute_manifest_digest(
     Ok(digest_json(MANIFEST_DOMAIN, &raw))
 }
 
-/// Verify a JSONL trace against an externally supplied run and manifest.
-///
-/// The caller supplies the expected manifest digest from the frozen manifest;
-/// the event stream cannot choose its own trust anchor.
+/// Verify internal JSONL trace consistency against an externally supplied run
+/// and frozen-manifest identity. This does not detect a complete trace rewrite:
+/// use `verify_trace_with_anchor` with a head digest obtained from a separately
+/// qualified checkpoint or witness when that stronger claim is required.
 pub fn verify_trace(
     jsonl: &str,
     expected_run_id: &str,
@@ -705,6 +712,27 @@ pub fn verify_trace(
         expected_manifest_digest,
         VerificationOptions::default(),
     )
+}
+
+/// Verify a trace and compare its final event digest with an externally
+/// supplied checkpoint. The caller is responsible for separately qualifying
+/// the checkpoint source, custody, signer and revocation status.
+pub fn verify_trace_with_anchor(
+    jsonl: &str,
+    expected_run_id: &str,
+    expected_manifest_digest: &str,
+    expected_head_digest: &str,
+) -> Result<TraceVerificationReport, TraceVerificationError> {
+    check_digest(expected_head_digest, "expected_head_digest", 0)?;
+    let mut report = verify_trace(jsonl, expected_run_id, expected_manifest_digest)?;
+    if report.head_digest != expected_head_digest {
+        return Err(TraceVerificationError::new(
+            0,
+            VerificationErrorCode::HeadDigestAnchorMismatch,
+        ));
+    }
+    report.head_digest_matches_supplied_anchor = true;
+    Ok(report)
 }
 
 pub fn verify_trace_with_options(
@@ -768,6 +796,28 @@ pub fn verify_trace_with_options(
             return Err(TraceVerificationError::new(
                 line_number,
                 VerificationErrorCode::RootMustBeObject,
+            ));
+        }
+        let raw_integrity = raw.get("integrity").ok_or_else(|| {
+            TraceVerificationError::new(
+                line_number,
+                VerificationErrorCode::InvalidEventShape("missing integrity object".to_owned()),
+            )
+        })?;
+        if raw_integrity.get("previous_event_digest").is_none() {
+            return Err(TraceVerificationError::new(
+                line_number,
+                VerificationErrorCode::InvalidEventShape(
+                    "integrity.previous_event_digest must be present (null on the first event)".to_owned(),
+                ),
+            ));
+        }
+        if !matches!(raw.get("evidence_refs"), Some(StrictJson::Array(_))) {
+            return Err(TraceVerificationError::new(
+                line_number,
+                VerificationErrorCode::InvalidEventShape(
+                    "evidence_refs must be present as an array".to_owned(),
+                ),
             ));
         }
 
@@ -1146,7 +1196,9 @@ pub fn verify_trace_with_options(
         run_id: expected_run_id.to_owned(),
         manifest_digest: expected_manifest_digest.to_owned(),
         event_count,
-        event_chain_verified: true,
+        event_chain_consistent: true,
+        head_digest: previous_digest.unwrap_or_default(),
+        head_digest_matches_supplied_anchor: false,
         authority_bindings_checked: authority_checked,
         disclosure_bindings_checked: disclosure_checked,
         sink_projections_checked: sink_checked,
@@ -1842,6 +1894,29 @@ mod tests {
     }
 
     #[test]
+    fn unanchored_trace_reports_consistency_without_claiming_tamper_evidence() {
+        let event = sample_event(1, "event-1", "authorization_decided", None, None, vec![]);
+        let report = verify_trace(&trace(vec![event]), RUN_ID, MANIFEST).unwrap();
+        assert!(report.event_chain_consistent);
+        assert!(!report.head_digest_matches_supplied_anchor);
+        assert!(!report.signatures_verified);
+    }
+
+    #[test]
+    fn supplied_head_digest_anchor_is_compared_but_not_authenticated() {
+        let event = sample_event(1, "event-1", "authorization_decided", None, None, vec![]);
+        let head = event_digest(&event);
+        let report = verify_trace_with_anchor(&trace(vec![event.clone()]), RUN_ID, MANIFEST, &head).unwrap();
+        assert!(report.head_digest_matches_supplied_anchor);
+        assert_eq!(report.head_digest, head);
+        assert!(!report.signatures_verified);
+
+        let wrong = "sha256:bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb";
+        let result = verify_trace_with_anchor(&trace(vec![event]), RUN_ID, MANIFEST, wrong);
+        assert!(matches!(result.unwrap_err().code, VerificationErrorCode::HeadDigestAnchorMismatch));
+    }
+
+    #[test]
     fn committed_cross_language_example_verifies_end_to_end() {
         const MANIFEST_JSON: &str = include_str!(
             "../../../../docs/research/examples/sat-trace-verifier-manifest-v0.1.json"
@@ -1936,6 +2011,25 @@ mod tests {
         assert!(matches!(
             result.unwrap_err().code,
             VerificationErrorCode::ManifestDigestMismatch
+        ));
+    }
+
+    #[test]
+    fn required_previous_digest_and_evidence_array_cannot_be_omitted() {
+        let mut missing_previous = sample_event(1, "event-1", "authorization_decided", None, None, vec![]);
+        missing_previous["integrity"].as_object_mut().unwrap().remove("previous_event_digest");
+        let result = verify_trace(&trace(vec![missing_previous]), RUN_ID, MANIFEST);
+        assert!(matches!(
+            result.unwrap_err().code,
+            VerificationErrorCode::InvalidEventShape(_)
+        ));
+
+        let mut missing_evidence = sample_event(1, "event-1", "authorization_decided", None, None, vec![]);
+        missing_evidence.as_object_mut().unwrap().remove("evidence_refs");
+        let result = verify_trace(&trace(vec![missing_evidence]), RUN_ID, MANIFEST);
+        assert!(matches!(
+            result.unwrap_err().code,
+            VerificationErrorCode::InvalidEventShape(_)
         ));
     }
 
