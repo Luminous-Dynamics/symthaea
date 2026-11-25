@@ -6,6 +6,7 @@ on:
       - research/mel-temporal-grounding-count-gated-f1-v1-20261124
       - research/mel-temporal-revision-audit-v1-20261124
       - research/mel-multi-annotator-grounding-v1-20261124
+      - research/mel-annotator-reliability-corpus-v1-20261125
     paths:
       - "crates/domains/symthaea-muse/src/temporal_grounding.rs"
       - "crates/domains/symthaea-muse/src/evidence_digest.rs"
@@ -121,6 +122,34 @@ jobs:
             and .synthetic_consensus_ground_truth_created == false
             and .population_confidence_interval_computed == false
           ' "$RUNNER_TEMP/multi-annotator-report.json" > /dev/null
+
+      - name: Replay corpus-level multi-annotator reliability when module is present
+        if: hashFiles('tools/mel-temporal-grounding-qualifier/src/temporal_reliability.rs') != ''
+        shell: bash
+        run: |
+          set -euo pipefail
+          cargo +1.96.0 run --locked --manifest-path tools/mel-temporal-grounding-qualifier/Cargo.toml --bin mel-temporal-reliability-audit -- tools/mel-temporal-grounding-qualifier/fixtures/mel-temporal-reliability-corpus.synthetic.json > "$RUNNER_TEMP/temporal-reliability-report.json"
+          jq -e '
+            .schema == "mel-temporal-annotation-reliability-report-v1"
+            and .item_count == 4
+            and .source_work_clusters == 3
+            and .total_annotation_records == 9
+            and .disposition_alpha.ratings == 9
+            and .disposition_alpha.observed_disagreement > 0.44
+            and .disposition_alpha.observed_disagreement < 0.45
+            and .disposition_alpha.expected_disagreement == 0.75
+            and .disposition_alpha.alpha > 0.40
+            and .disposition_alpha.alpha < 0.42
+            and (.pairwise_by_iou_threshold | length) == 4
+            and .pairwise_by_iou_threshold[0].symmetric_event_f1_mean == 1.0
+            and .pairwise_by_iou_threshold[2].symmetric_event_f1_mean == 1.0
+            and .pairwise_by_iou_threshold[3].symmetric_event_f1_mean > 0.33
+            and .pairwise_by_iou_threshold[3].symmetric_event_f1_mean < 0.34
+            and .consensus_ground_truth_created == false
+            and .model_performance_scored == false
+            and .population_confidence_interval_computed == false
+            and .source_work_bootstrap_computed == false
+          ' "$RUNNER_TEMP/temporal-reliability-report.json" > /dev/null
 
       - name: Replay paired temporal revision when module is present
         if: hashFiles('tools/mel-temporal-grounding-qualifier/src/temporal_revision.rs') != ''
