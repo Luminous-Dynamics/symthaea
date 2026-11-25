@@ -162,6 +162,11 @@ jobs:
             and .disposition_alpha_source_work_bootstrap.estimate >= .disposition_alpha.alpha
             and .disposition_alpha_source_work_bootstrap.percentile_95_low <= .disposition_alpha.alpha
             and .disposition_alpha_source_work_bootstrap.percentile_95_high >= .disposition_alpha.alpha
+            and (.pairwise_temporal_source_work_bootstrap | length) == 4
+            and .pairwise_temporal_source_work_bootstrap[0].symmetric_event_f1.eligible_source_work_clusters == 1
+            and .pairwise_temporal_source_work_bootstrap[0].symmetric_event_f1.point_estimate == 1.0
+            and .pairwise_temporal_source_work_bootstrap[0].symmetric_event_f1.percentile_95_low == null
+            and .pairwise_temporal_source_work_bootstrap[0].symmetric_event_f1.status_reason != null
           ' "$RUNNER_TEMP/temporal-reliability-report.json" > /dev/null
 
       - name: Replay paired temporal revision when module is present
