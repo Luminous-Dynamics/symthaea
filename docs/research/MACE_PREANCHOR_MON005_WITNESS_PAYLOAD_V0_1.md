@@ -94,7 +94,7 @@ Tests are authored but not executed. No compile, rustfmt, Clippy, CI, MON-005 in
 
 The repository's MON-005 work (#13515 / #13518) already has RFC 9162 inclusion and consistency proof semantics, 3-of-4 test-witness quorum and a SQLite reference state adapter. Its published local 49/49 results and 496 inclusion / 2,016 consistency checks are useful reference evidence, but all witness simulations remain same-host/same-process with fixture keys and no independent operator deployment.
 
-Completed in follow-on draft PR [#13666](https://github.com/Luminous-Dynamics/symthaea/pull/13666): a source-matched Rust outer-record codec, consumer-side re-verifier, schema, and fixed outer-record / RFC 9162 leaf vectors. The MACE digest remains nested in the canonical MON-005 payload; the full MACE object is retained for retrieval and re-verification.
+Completed in follow-on draft PR [#13666](https://github.com/Luminous-Dynamics/symthaea/pull/13681): a source-matched Rust outer-record codec, consumer-side re-verifier, schema, and fixed outer-record / RFC 9162 leaf vectors. The MACE digest remains nested in the canonical MON-005 payload; the full MACE object is retained for retrieval and re-verification.
 
 Remaining steps:
 
