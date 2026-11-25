@@ -62,6 +62,7 @@ fn hypothesis(
         scope: "tool-1/chamber-2".into(),
         evidence,
         matched_contrast: None,
+        clustered_matched_contrast: None,
         controlled_intervention: None,
         negative_controls: Vec::new(),
         measured_confounders: vec!["recipe_id".into()],
@@ -84,6 +85,7 @@ fn input(hypotheses: Vec<CausalDriftHypothesisInputV1>) -> CausalDriftDiagnosisI
             minimum_group_count: 10,
             maximum_covariate_smd: 0.10,
             maximum_pretrend_slope_difference: 0.05,
+            minimum_independent_clusters: 10,
         },
         hypotheses,
     }
