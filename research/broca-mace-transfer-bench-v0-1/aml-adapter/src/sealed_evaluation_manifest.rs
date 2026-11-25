@@ -891,10 +891,17 @@ mod tests {
 
     #[test]
     fn t10_artifact_cannot_be_removed_without_breaking_witness() {
-        let mut fixture = Fixture::new();
-        fixture.manifest.sealed_artifacts.remove(0);
+        let fixture = Fixture::new();
+        // Preserve the independently committed baseline witness. Recomputing
+        // a new witness after mutation would incorrectly model the evaluator
+        // as cooperating with the tampering.
+        let witness = fixture.witness();
+        let mut altered = fixture.manifest.clone();
+        altered.sealed_artifacts.remove(0);
         assert_eq!(
-            fixture.verify(),
+            validate_sealed_evaluation_manifest_v1(
+                &altered, &fixture.episodes, &witness, &fixture.expected
+            ),
             Err(SealedEvaluationManifestRejectV1::ArtifactRootMismatch)
         );
     }
