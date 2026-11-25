@@ -39,7 +39,8 @@
       "currency": "USD",
       "transaction_reference": "invoice-2026-42",
       "idempotency_key": "payment-run-01"
-    }
+    },
+    "attempt_id": "attempt-0001"
   },
   "authority_decision": {
     "decision": "allow",
@@ -68,7 +69,8 @@
       "currency": "USD",
       "transaction_reference": "invoice-2026-42",
       "idempotency_key": "payment-run-01"
-    }
+    },
+    "attempt_id": "attempt-0001"
   },
   "evidence_refs": [
     {
