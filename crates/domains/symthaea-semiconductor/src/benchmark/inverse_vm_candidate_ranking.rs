@@ -48,6 +48,7 @@ pub enum CandidateRejectionReasonV1 {
     DuplicateCandidateId,
     MalformedModelArtifactDigest,
     MalformedPredictionReceiptDigest,
+    MalformedModelEvidenceReceiptDigest,
     MalformedSupportReceiptDigest,
     ModelEvidenceUnknown,
     ModelEvidenceBlocked,
@@ -154,6 +155,7 @@ pub struct InverseVmRankingInputV1 {
     pub requested_top_k: usize,
     /// Lower is better. Target risk and support ratio are separately exposed.
     pub support_score_weight: f64,
+    pub constraint_margin_weight: f64,
     /// Greedy normalized control-space separation bonus.
     pub diversity_weight: f64,
     pub minimum_diversity_distance: f64,
@@ -282,6 +284,8 @@ fn validate_input(input: &InverseVmRankingInputV1) -> Result<(), InverseVmRankin
         || input.confidence_multiplier <= 0.0
         || !input.support_score_weight.is_finite()
         || input.support_score_weight < 0.0
+        || !input.constraint_margin_weight.is_finite()
+        || input.constraint_margin_weight < 0.0
         || !input.diversity_weight.is_finite()
         || input.diversity_weight < 0.0
         || !input.minimum_diversity_distance.is_finite()
@@ -412,7 +416,7 @@ fn evaluate_candidate(
         set(CandidateDispositionV1::Rejected, CandidateRejectionReasonV1::MalformedPredictionReceiptDigest);
     }
     if !valid_sha256(&candidate.model_evidence_receipt_sha256) {
-        set(CandidateDispositionV1::Rejected, CandidateRejectionReasonV1::MalformedPredictionReceiptDigest);
+        set(CandidateDispositionV1::Rejected, CandidateRejectionReasonV1::MalformedModelEvidenceReceiptDigest);
     }
     if !valid_sha256(&candidate.support_manifest_sha256)
         || candidate.support_manifest_sha256 != input.historical_support_manifest_sha256
@@ -563,7 +567,7 @@ fn evaluate_candidate(
         }
         map
     };
-    let mut minimum_constraint_margin_ratio = f64::INFINITY;
+    let mut minimum_constraint_margin_ratio: f64 = 1.0;
     for spec in &input.side_constraints {
         let Some(prediction) = constraint_predictions.get(spec.constraint_id.as_str()) else {
             set(
@@ -604,17 +608,17 @@ fn evaluate_candidate(
             CandidateRejectionReasonV1::ConstraintPredictionMissing,
         );
     }
-    if minimum_constraint_margin_ratio == f64::INFINITY {
-        minimum_constraint_margin_ratio = 0.0;
-    }
-
     let support_ratio = if candidate.historical_support_radius > 0.0 {
         candidate.historical_support_distance / candidate.historical_support_radius
     } else {
         f64::INFINITY
     };
+    let constraint_margin_penalty =
+        1.0 - minimum_constraint_margin_ratio.clamp(0.0, 1.0);
     let base_score = if robust_target_risk.is_finite() && support_ratio.is_finite() {
-        robust_target_risk + input.support_score_weight * support_ratio
+        robust_target_risk
+            + input.support_score_weight * support_ratio
+            + input.constraint_margin_weight * constraint_margin_penalty
     } else {
         f64::INFINITY
     };
@@ -710,6 +714,8 @@ pub fn rank_feasible_inverse_vm_candidates_v1(
                 .into_iter()
                 .fold(1.0_f64, f64::min);
             let diversity_bonus = if selected.is_empty() {
+                0.0
+            } else if input.diversity_weight == 0.0 {
                 0.0
             } else {
                 input.diversity_weight
@@ -810,6 +816,7 @@ mod tests {
             minimum_support_count: 20,
             requested_top_k: 2,
             support_score_weight: 0.2,
+            constraint_margin_weight: 0.1,
             diversity_weight: 0.1,
             minimum_diversity_distance: 0.2,
             control_bounds: vec![
@@ -945,6 +952,19 @@ mod tests {
         let b_eval = report.evaluations.iter().find(|item| item.candidate_id == "b").unwrap();
         assert_eq!(b_eval.disposition, CandidateDispositionV1::Eligible);
         assert_eq!(b_eval.selected_rank, None);
+    }
+
+    #[test]
+    fn zero_diversity_weight_allows_zero_diversity_distance_threshold() {
+        let mut data = input(vec![
+            candidate("a", 12.0, 120.0, 100.0, 0.2, 0.1),
+            candidate("b", 12.1, 121.0, 100.0, 0.2, 0.1),
+        ]);
+        data.diversity_weight = 0.0;
+        data.minimum_diversity_distance = 0.0;
+        let report = rank_feasible_inverse_vm_candidates_v1(&data).unwrap();
+        assert_eq!(report.selected_candidate_ids.len(), 2);
+        assert!(report.evaluations.iter().all(|item| item.selection_score.is_some()));
     }
 
     #[test]
