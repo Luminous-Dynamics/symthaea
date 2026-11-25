@@ -1,5 +1,5 @@
 use std::process::ExitCode;
-use stateguard_b0_policy::{decide_json, PolicyInput};
+use stateguard_b0_policy::decide_json;
 
 fn main() -> ExitCode {
     let path = std::env::args()
