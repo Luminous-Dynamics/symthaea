@@ -9,6 +9,10 @@
     "receipt_type",
     "source_revision",
     "source_revision_provenance",
+    "repository_head",
+    "git_working_tree_clean",
+    "build_command",
+    "rustflags",
     "compiler_version",
     "operating_system",
     "architecture",
@@ -32,7 +36,7 @@
       "pattern": "^[0-9a-f]{40}$"
     },
     "source_revision_provenance": {
-      "const": "caller_supplied_not_independently_verified"
+      "const": "observed_git_head_matches_clean_worktree"
     },
     "compiler_version": {
       "type": "string",
@@ -94,6 +98,19 @@
           }
         }
       }
+    },
+    "repository_head": {
+      "type": "string",
+      "pattern": "^[0-9a-f]{40}$"
+    },
+    "git_working_tree_clean": {
+      "const": true
+    },
+    "build_command": {
+      "const": "rustc --edition=2024 scripts/research/sdcb_reference_receipt.rs"
+    },
+    "rustflags": {
+      "type": "string"
     }
   }
 }
