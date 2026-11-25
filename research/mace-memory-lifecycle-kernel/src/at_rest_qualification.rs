@@ -47,6 +47,45 @@ pub enum AtRestControlIdV1 {
     C2GenuineWriteAfterRestart,
 }
 
+/// Ordered experiment events. These record the experiment's causal sequence,
+/// not just caller-supplied booleans about what supposedly happened.
+#[derive(Clone, Copy, Debug, Eq, PartialEq)]
+pub enum AtRestEvidenceEventKindV1 {
+    SutRestartedBeforeOperation,
+    WriteRequested,
+    WriteAcknowledged,
+    ErasureRequested,
+    ErasureAcknowledged,
+    SutStoppedForRestore,
+    RestoreApplied,
+    SutRestartedAfterRestore,
+    OrdinaryReadCompleted,
+}
+
+/// Provenance boundary expected to emit each event.
+#[derive(Clone, Copy, Debug, Eq, PartialEq)]
+pub enum AtRestEvidenceEventSourceV1 {
+    SutProcessObserver,
+    SutWriteApi,
+    SutErasureApi,
+    RestoreHarness,
+    SutReadApi,
+}
+
+#[derive(Clone, Debug, Eq, PartialEq)]
+pub struct AtRestEvidenceEventV1 {
+    pub sequence: u64,
+    pub case_run_id: String,
+    pub event_id: String,
+    pub kind: AtRestEvidenceEventKindV1,
+    pub source: AtRestEvidenceEventSourceV1,
+    /// Monotonic elapsed nanoseconds from one declared experiment clock.
+    pub monotonic_elapsed_ns: u64,
+    pub clock_profile_sha256: String,
+    /// Digest of the original event/receipt bytes retained by the adapter.
+    pub receipt_sha256: String,
+}
+
 #[derive(Clone, Debug, Eq, PartialEq)]
 pub struct AtRestControlReceiptV1 {
     pub passed: bool,
@@ -98,6 +137,7 @@ pub struct T9WholeStoreRollbackEvidenceV1 {
     pub new_record_id: String,
     pub new_record_payload_sha256: String,
     pub operation_receipt_sha256: String,
+    pub events: Vec<AtRestEvidenceEventV1>,
     pub operation_performed_via_sut_write_path: bool,
     pub operation_after_restart: bool,
     pub operation_acknowledged: bool,
@@ -122,6 +162,7 @@ pub struct T10ErasureResurrectionEvidenceV1 {
     pub erased_record_id: String,
     pub erased_record_payload_sha256: String,
     pub erasure_receipt_sha256: String,
+    pub events: Vec<AtRestEvidenceEventV1>,
     pub erasure_performed_via_sut_interface: bool,
     pub erasure_acknowledged: bool,
     pub sut_stopped_during_restore: bool,
@@ -199,6 +240,12 @@ pub enum AtRestRejectV1 {
     MissingRestartAfterRestore,
     ReadPathNotInvoked,
     InvalidObservation,
+    EventTraceMismatch,
+    EventBindingMismatch,
+    EventReceiptInvalid,
+    DuplicateEventId,
+    EventTimeNotMonotonic,
+    EventClockProfileMismatch,
 }
 
 #[derive(Clone, Copy, Debug, Default, Eq, PartialEq)]
@@ -295,7 +342,7 @@ pub fn validate_and_score_at_rest_report_v1(
                 family.errors += 1;
             }
             AtRestCaseDispositionV1::Observed { evidence, observation } => {
-                validate_case_evidence(case.case_id, evidence)?;
+                validate_case_evidence(case.case_id, evidence, &case.case_run_id)?;
                 validate_observation(observation)?;
                 family.applicable += 1;
                 match (observation.verdict, observation.detection_point) {
@@ -327,25 +374,35 @@ pub fn validate_and_score_at_rest_report_v1(
 fn validate_case_evidence(
     case_id: AtRestCaseIdV1,
     evidence: &AtRestCaseEvidenceV1,
+    case_run_id: &str,
 ) -> Result<(), AtRestRejectV1> {
     match (case_id, evidence) {
         (AtRestCaseIdV1::T9WholeStoreRollback, AtRestCaseEvidenceV1::T9(value)) => {
-            validate_t9_evidence(value)
+            validate_t9_evidence(value, case_run_id)
         }
         (AtRestCaseIdV1::T10ErasureResurrection, AtRestCaseEvidenceV1::T10(value)) => {
-            validate_t10_evidence(value)
+            validate_t10_evidence(value, case_run_id)
         }
         _ => Err(AtRestRejectV1::EvidenceCaseMismatch),
     }
 }
 
-fn validate_t9_evidence(value: &T9WholeStoreRollbackEvidenceV1) -> Result<(), AtRestRejectV1> {
+fn validate_t9_evidence(
+    value: &T9WholeStoreRollbackEvidenceV1,
+    case_run_id: &str,
+) -> Result<(), AtRestRejectV1> {
     validate_snapshot_digests(
         &value.before_snapshot_sha256,
         &value.after_genuine_write_snapshot_sha256,
         &value.restored_snapshot_sha256,
     )?;
     validate_edit_delta(&value.expected_edit_delta_sha256, &value.observed_edit_delta_sha256)?;
+    validate_operation_event_trace(
+        &value.events,
+        case_run_id,
+        &value.operation_receipt_sha256,
+        AtRestCaseIdV1::T9WholeStoreRollback,
+    )?;
     value.before_inventory.validate().map_err(|_| AtRestRejectV1::InventoryInvalid)?;
     value.after_genuine_write_inventory.validate().map_err(|_| AtRestRejectV1::InventoryInvalid)?;
     value.restored_inventory.validate().map_err(|_| AtRestRejectV1::InventoryInvalid)?;
@@ -388,13 +445,22 @@ fn validate_t9_evidence(value: &T9WholeStoreRollbackEvidenceV1) -> Result<(), At
     )
 }
 
-fn validate_t10_evidence(value: &T10ErasureResurrectionEvidenceV1) -> Result<(), AtRestRejectV1> {
+fn validate_t10_evidence(
+    value: &T10ErasureResurrectionEvidenceV1,
+    case_run_id: &str,
+) -> Result<(), AtRestRejectV1> {
     validate_snapshot_digests(
         &value.before_snapshot_sha256,
         &value.after_erasure_snapshot_sha256,
         &value.restored_snapshot_sha256,
     )?;
     validate_edit_delta(&value.expected_edit_delta_sha256, &value.observed_edit_delta_sha256)?;
+    validate_operation_event_trace(
+        &value.events,
+        case_run_id,
+        &value.erasure_receipt_sha256,
+        AtRestCaseIdV1::T10ErasureResurrection,
+    )?;
     value.before_inventory.validate().map_err(|_| AtRestRejectV1::InventoryInvalid)?;
     value.after_erasure_inventory.validate().map_err(|_| AtRestRejectV1::InventoryInvalid)?;
     value.restored_inventory.validate().map_err(|_| AtRestRejectV1::InventoryInvalid)?;
@@ -433,6 +499,79 @@ fn validate_t10_evidence(value: &T10ErasureResurrectionEvidenceV1) -> Result<(),
         &value.before_inventory,
         &value.restored_inventory,
     )
+}
+
+fn validate_operation_event_trace(
+    events: &[AtRestEvidenceEventV1],
+    case_run_id: &str,
+    operation_receipt_sha256: &str,
+    case_id: AtRestCaseIdV1,
+) -> Result<(), AtRestRejectV1> {
+    validate_sha256(operation_receipt_sha256)
+        .map_err(|_| AtRestRejectV1::OperationReceiptInvalid)?;
+
+    let expected: &[(AtRestEvidenceEventKindV1, AtRestEvidenceEventSourceV1)] = match case_id {
+        AtRestCaseIdV1::T9WholeStoreRollback => &[
+            (AtRestEvidenceEventKindV1::SutRestartedBeforeOperation, AtRestEvidenceEventSourceV1::SutProcessObserver),
+            (AtRestEvidenceEventKindV1::WriteRequested, AtRestEvidenceEventSourceV1::SutWriteApi),
+            (AtRestEvidenceEventKindV1::WriteAcknowledged, AtRestEvidenceEventSourceV1::SutWriteApi),
+            (AtRestEvidenceEventKindV1::SutStoppedForRestore, AtRestEvidenceEventSourceV1::SutProcessObserver),
+            (AtRestEvidenceEventKindV1::RestoreApplied, AtRestEvidenceEventSourceV1::RestoreHarness),
+            (AtRestEvidenceEventKindV1::SutRestartedAfterRestore, AtRestEvidenceEventSourceV1::SutProcessObserver),
+            (AtRestEvidenceEventKindV1::OrdinaryReadCompleted, AtRestEvidenceEventSourceV1::SutReadApi),
+        ],
+        AtRestCaseIdV1::T10ErasureResurrection => &[
+            (AtRestEvidenceEventKindV1::SutRestartedBeforeOperation, AtRestEvidenceEventSourceV1::SutProcessObserver),
+            (AtRestEvidenceEventKindV1::ErasureRequested, AtRestEvidenceEventSourceV1::SutErasureApi),
+            (AtRestEvidenceEventKindV1::ErasureAcknowledged, AtRestEvidenceEventSourceV1::SutErasureApi),
+            (AtRestEvidenceEventKindV1::SutStoppedForRestore, AtRestEvidenceEventSourceV1::SutProcessObserver),
+            (AtRestEvidenceEventKindV1::RestoreApplied, AtRestEvidenceEventSourceV1::RestoreHarness),
+            (AtRestEvidenceEventKindV1::SutRestartedAfterRestore, AtRestEvidenceEventSourceV1::SutProcessObserver),
+            (AtRestEvidenceEventKindV1::OrdinaryReadCompleted, AtRestEvidenceEventSourceV1::SutReadApi),
+        ],
+    };
+
+    if events.len() != expected.len() {
+        return Err(AtRestRejectV1::EventTraceMismatch);
+    }
+
+    let mut seen_ids = BTreeSet::new();
+    let mut prior_time: Option<u64> = None;
+    let mut clock_profile: Option<&str> = None;
+    for (index, (event, expected_event)) in events.iter().zip(expected.iter()).enumerate() {
+        if event.sequence != index as u64
+            || event.case_run_id != case_run_id
+            || event.kind != expected_event.0
+            || event.source != expected_event.1
+        {
+            return Err(AtRestRejectV1::EventBindingMismatch);
+        }
+        validate_atom(&event.event_id).map_err(|_| AtRestRejectV1::EventBindingMismatch)?;
+        if !seen_ids.insert(event.event_id.as_str()) {
+            return Err(AtRestRejectV1::DuplicateEventId);
+        }
+        validate_sha256(&event.clock_profile_sha256)
+            .map_err(|_| AtRestRejectV1::EventClockProfileMismatch)?;
+        validate_sha256(&event.receipt_sha256)
+            .map_err(|_| AtRestRejectV1::EventReceiptInvalid)?;
+        if let Some(expected_clock) = clock_profile {
+            if expected_clock != event.clock_profile_sha256 {
+                return Err(AtRestRejectV1::EventClockProfileMismatch);
+            }
+        } else {
+            clock_profile = Some(&event.clock_profile_sha256);
+        }
+        if prior_time.is_some_and(|prior| event.monotonic_elapsed_ns <= prior) {
+            return Err(AtRestRejectV1::EventTimeNotMonotonic);
+        }
+        prior_time = Some(event.monotonic_elapsed_ns);
+    }
+
+    let acknowledgement = events.get(2).ok_or(AtRestRejectV1::EventTraceMismatch)?;
+    if acknowledgement.receipt_sha256 != operation_receipt_sha256 {
+        return Err(AtRestRejectV1::OperationReceiptInvalid);
+    }
+    Ok(())
 }
 
 fn validate_edit_delta(expected: &str, observed: &str) -> Result<(), AtRestRejectV1> {
@@ -584,7 +723,52 @@ mod tests {
         }
     }
 
-    fn t9_evidence() -> T9WholeStoreRollbackEvidenceV1 {
+    fn event_trace(
+        case_run_id: &str,
+        case_id: AtRestCaseIdV1,
+        operation_receipt_sha256: &str,
+    ) -> Vec<AtRestEvidenceEventV1> {
+        let expected: &[(AtRestEvidenceEventKindV1, AtRestEvidenceEventSourceV1)] = match case_id {
+            AtRestCaseIdV1::T9WholeStoreRollback => &[
+                (AtRestEvidenceEventKindV1::SutRestartedBeforeOperation, AtRestEvidenceEventSourceV1::SutProcessObserver),
+                (AtRestEvidenceEventKindV1::WriteRequested, AtRestEvidenceEventSourceV1::SutWriteApi),
+                (AtRestEvidenceEventKindV1::WriteAcknowledged, AtRestEvidenceEventSourceV1::SutWriteApi),
+                (AtRestEvidenceEventKindV1::SutStoppedForRestore, AtRestEvidenceEventSourceV1::SutProcessObserver),
+                (AtRestEvidenceEventKindV1::RestoreApplied, AtRestEvidenceEventSourceV1::RestoreHarness),
+                (AtRestEvidenceEventKindV1::SutRestartedAfterRestore, AtRestEvidenceEventSourceV1::SutProcessObserver),
+                (AtRestEvidenceEventKindV1::OrdinaryReadCompleted, AtRestEvidenceEventSourceV1::SutReadApi),
+            ],
+            AtRestCaseIdV1::T10ErasureResurrection => &[
+                (AtRestEvidenceEventKindV1::SutRestartedBeforeOperation, AtRestEvidenceEventSourceV1::SutProcessObserver),
+                (AtRestEvidenceEventKindV1::ErasureRequested, AtRestEvidenceEventSourceV1::SutErasureApi),
+                (AtRestEvidenceEventKindV1::ErasureAcknowledged, AtRestEvidenceEventSourceV1::SutErasureApi),
+                (AtRestEvidenceEventKindV1::SutStoppedForRestore, AtRestEvidenceEventSourceV1::SutProcessObserver),
+                (AtRestEvidenceEventKindV1::RestoreApplied, AtRestEvidenceEventSourceV1::RestoreHarness),
+                (AtRestEvidenceEventKindV1::SutRestartedAfterRestore, AtRestEvidenceEventSourceV1::SutProcessObserver),
+                (AtRestEvidenceEventKindV1::OrdinaryReadCompleted, AtRestEvidenceEventSourceV1::SutReadApi),
+            ],
+        };
+        expected
+            .iter()
+            .enumerate()
+            .map(|(index, (kind, source))| AtRestEvidenceEventV1 {
+                sequence: index as u64,
+                case_run_id: case_run_id.to_owned(),
+                event_id: format!("{case_run_id}-event-{index}"),
+                kind: *kind,
+                source: *source,
+                monotonic_elapsed_ns: ((index as u64) + 1) * 10,
+                clock_profile_sha256: digest('c'),
+                receipt_sha256: if index == 2 {
+                    operation_receipt_sha256.to_owned()
+                } else {
+                    digest(char::from(b'a' + index as u8))
+                },
+            })
+            .collect()
+    }
+
+    fn t9_evidence(case_run_id: &str) -> T9WholeStoreRollbackEvidenceV1 {
         let before = inventory(&[("a", 'a'), ("b", 'b'), ("c", 'c')]);
         let after = inventory(&[("a", 'a'), ("b", 'b'), ("c", 'c'), ("d", 'd')]);
         T9WholeStoreRollbackEvidenceV1 {
@@ -599,6 +783,7 @@ mod tests {
             new_record_id: "d".to_owned(),
             new_record_payload_sha256: digest('d'),
             operation_receipt_sha256: digest('e'),
+            events: event_trace(case_run_id, AtRestCaseIdV1::T9WholeStoreRollback, &digest('e')),
             operation_performed_via_sut_write_path: true,
             operation_after_restart: true,
             operation_acknowledged: true,
@@ -608,7 +793,7 @@ mod tests {
         }
     }
 
-    fn t10_evidence() -> T10ErasureResurrectionEvidenceV1 {
+    fn t10_evidence(case_run_id: &str) -> T10ErasureResurrectionEvidenceV1 {
         let before = inventory(&[("a", 'a'), ("b", 'b'), ("c", 'c')]);
         let after = inventory(&[("a", 'a'), ("c", 'c')]);
         T10ErasureResurrectionEvidenceV1 {
@@ -623,6 +808,7 @@ mod tests {
             erased_record_id: "b".to_owned(),
             erased_record_payload_sha256: digest('b'),
             erasure_receipt_sha256: digest('f'),
+            events: event_trace(case_run_id, AtRestCaseIdV1::T10ErasureResurrection, &digest('f')),
             erasure_performed_via_sut_interface: true,
             erasure_acknowledged: true,
             sut_stopped_during_restore: true,
@@ -655,7 +841,7 @@ mod tests {
                     case_id: AtRestCaseIdV1::T9WholeStoreRollback,
                     case_run_id: "t9-run-1".to_owned(),
                     disposition: AtRestCaseDispositionV1::Observed {
-                        evidence: AtRestCaseEvidenceV1::T9(t9_evidence()),
+                        evidence: AtRestCaseEvidenceV1::T9(t9_evidence("t9-run-1")),
                         observation: t9_observation,
                     },
                 },
@@ -663,7 +849,7 @@ mod tests {
                     case_id: AtRestCaseIdV1::T10ErasureResurrection,
                     case_run_id: "t10-run-1".to_owned(),
                     disposition: AtRestCaseDispositionV1::Observed {
-                        evidence: AtRestCaseEvidenceV1::T10(t10_evidence()),
+                        evidence: AtRestCaseEvidenceV1::T10(t10_evidence("t10-run-1")),
                         observation: t10_observation,
                     },
                 },
@@ -740,6 +926,84 @@ mod tests {
         assert_eq!(
             validate_and_score_at_rest_report_v1(&value),
             Err(AtRestRejectV1::MissingControl)
+        );
+    }
+
+    #[test]
+    fn event_trace_rejects_reordered_unbound_or_wrong_source_events() {
+        let mut value = report(rejected_on_read(), rejected_on_read());
+        if let AtRestCaseDispositionV1::Observed {
+            evidence: AtRestCaseEvidenceV1::T10(evidence),
+            ..
+        } = &mut value.cases[1].disposition {
+            evidence.events.swap(3, 4);
+        }
+        assert_eq!(
+            validate_and_score_at_rest_report_v1(&value),
+            Err(AtRestRejectV1::EventBindingMismatch)
+        );
+
+        let mut value = report(rejected_on_read(), rejected_on_read());
+        if let AtRestCaseDispositionV1::Observed {
+            evidence: AtRestCaseEvidenceV1::T10(evidence),
+            ..
+        } = &mut value.cases[1].disposition {
+            evidence.events[4].case_run_id = "other-run".to_owned();
+        }
+        assert_eq!(
+            validate_and_score_at_rest_report_v1(&value),
+            Err(AtRestRejectV1::EventBindingMismatch)
+        );
+
+        let mut value = report(rejected_on_read(), rejected_on_read());
+        if let AtRestCaseDispositionV1::Observed {
+            evidence: AtRestCaseEvidenceV1::T10(evidence),
+            ..
+        } = &mut value.cases[1].disposition {
+            evidence.events[1].source = AtRestEvidenceEventSourceV1::RestoreHarness;
+        }
+        assert_eq!(
+            validate_and_score_at_rest_report_v1(&value),
+            Err(AtRestRejectV1::EventBindingMismatch)
+        );
+    }
+
+    #[test]
+    fn event_trace_rejects_non_monotonic_times_duplicate_ids_and_receipt_rebinding() {
+        let mut value = report(rejected_on_read(), rejected_on_read());
+        if let AtRestCaseDispositionV1::Observed {
+            evidence: AtRestCaseEvidenceV1::T9(evidence),
+            ..
+        } = &mut value.cases[0].disposition {
+            evidence.events[4].monotonic_elapsed_ns = evidence.events[3].monotonic_elapsed_ns;
+        }
+        assert_eq!(
+            validate_and_score_at_rest_report_v1(&value),
+            Err(AtRestRejectV1::EventTimeNotMonotonic)
+        );
+
+        let mut value = report(rejected_on_read(), rejected_on_read());
+        if let AtRestCaseDispositionV1::Observed {
+            evidence: AtRestCaseEvidenceV1::T9(evidence),
+            ..
+        } = &mut value.cases[0].disposition {
+            evidence.events[4].event_id = evidence.events[3].event_id.clone();
+        }
+        assert_eq!(
+            validate_and_score_at_rest_report_v1(&value),
+            Err(AtRestRejectV1::DuplicateEventId)
+        );
+
+        let mut value = report(rejected_on_read(), rejected_on_read());
+        if let AtRestCaseDispositionV1::Observed {
+            evidence: AtRestCaseEvidenceV1::T9(evidence),
+            ..
+        } = &mut value.cases[0].disposition {
+            evidence.events[2].receipt_sha256 = digest('9');
+        }
+        assert_eq!(
+            validate_and_score_at_rest_report_v1(&value),
+            Err(AtRestRejectV1::OperationReceiptInvalid)
         );
     }
 
