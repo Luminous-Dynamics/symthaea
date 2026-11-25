@@ -29,6 +29,26 @@ to exercise the optional head comparison. The output must still report
 `signatures_verified=false` and `system_qualified=false`. The static example
 anchor is a test vector, not a qualified external witness or production effect.
 
+## External checkpoint receipt inspection
+
+The `checkpoint` module provides `inspect_checkpoint_receipt`. It checks that a
+receipt matches the verified run/manifest/head, recomputes the canonical
+trace-head statement digest, validates entry index/tree-size shape, detects
+conflicting roots for the same service/log/tree-size, checks each witness
+against a supplied log root, and enforces the declared count of distinct
+witness IDs.
+
+This is **structural inspection only**. It does not verify checkpoint or witness
+signatures, transparency inclusion proofs, consistency proofs, key status,
+revocation, witness independence, trust-policy governance or artifact custody.
+Its report always has `signatures_verified=false`,
+`inclusion_proofs_verified=false`, `consistency_proofs_verified=false`,
+`witness_independence_verified=false` and
+`checkpoint_authenticated=false`.
+
+See `docs/research/SAT_TRACE_CHECKPOINT_PROFILE_V0_1_2026-11-25.md` for the
+portable receipt contract and SCITT / Sigstore Rekor adapter boundary.
+
 ## Integrity boundary
 
 The unkeyed event hash chain establishes internal ordering and digest consistency. An attacker who can rewrite the entire trace can recompute the chain. To detect that, the terminal digest (or a checkpoint) must be stored with an independent, qualified witness or signed/custodied receipt. The optional CLI anchor only compares bytes; this crate does not authenticate the witness, signature, key status or custody.
