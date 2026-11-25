@@ -90,6 +90,8 @@ impl DecisionNeedV1 {
         if self.risk_limit_ppm > 1_000_000
             || !(500_000..=999_999).contains(&self.minimum_confidence_level_ppm)
             || self.regret_tolerance_micros < 0
+            || self.regret_tolerance_micros > 1_000_000_000_000
+            || self.maximum_cost_micros > 1_000_000_000_000
             || self.maximum_evidence_age_seconds == 0
             || self.maximum_context_tokens == 0
             || self.maximum_tool_calls == 0
@@ -814,6 +816,12 @@ impl DecisionSufficiencyReceiptV1 {
         if self.calibration_receipt_sha256.as_ref().is_some_and(|v| !valid_sha256(v)) {
             return Err(DecisionSufficiencyRejectV1::InvalidDigest);
         }
+        if self.regret_upper_bound_micros.is_some_and(|v| v > 1_000_000_000_000)
+            || self.regret_limit_micros.is_some_and(|v| v > 1_000_000_000_000)
+            || self.observed_cost_micros.is_some_and(|v| v > 1_000_000_000_000)
+        {
+            return Err(DecisionSufficiencyRejectV1::InvalidReceipt);
+        }
         if self.status == DecisionSufficiencyStatusV1::Sufficient {
             if self.requirements.iter().any(|r| r.status != DecisionRequirementStatusV1::Met) {
                 return Err(DecisionSufficiencyRejectV1::SufficientRequirementsNotMet);
@@ -1111,6 +1119,9 @@ fn validate_receipt_binding(
         return Err(DecisionSufficiencyRejectV1::InvalidReceipt);
     }
     if receipt.risk_limit_ppm.is_some_and(|risk| risk != binding.risk_limit_ppm)
+        || receipt.regret_limit_micros.is_some_and(|limit| {
+            limit != binding.decision_need.regret_tolerance_micros as u64
+        })
         || receipt.calibration_receipt_sha256.as_deref()
             .is_some_and(|digest| digest != binding.calibration_receipt_sha256)
     {
@@ -1743,6 +1754,78 @@ mod tests {
             Some(6000),
             Some(5000),
         );
+        assert_eq!(
+            verify_decision_sufficiency_v1(
+                &qualified,
+                &qualification_binding(&qualified, &["evidence-1".to_owned()], 160),
+                &TestQualificationVerifier,
+                &binding,
+                &envelope,
+                &profile,
+            ),
+            Err(DecisionSufficiencyRejectV1::SufficientRiskBoundInvalid)
+        );
+    }
+
+    #[test]
+    fn sufficient_receipt_with_regret_upper_bound_over_tolerance_is_rejected() {
+        let qualified = qualified_batch(&repeat('f'));
+        let (binding, profile, _) = build_valid_assessment(
+            &qualified,
+            DecisionSufficiencyStatusV1::Sufficient,
+            DecisionRequirementStatusV1::Met,
+            Some(1000),
+            Some(5000),
+        );
+        let signing_key = SigningKey::from_bytes(&[73; 32]);
+        let evaluator_key_id = qualification_key_id_v1(&signing_key.verifying_key().to_bytes());
+        let mut assessment = receipt(
+            &qualified,
+            &binding,
+            &evaluator_key_id,
+            DecisionSufficiencyStatusV1::Sufficient,
+            DecisionRequirementStatusV1::Met,
+            Some(1000),
+            Some(5000),
+        );
+        assessment.regret_upper_bound_micros = Some(2000);
+        let envelope = signed_envelope(&assessment, &signing_key);
+        assert_eq!(
+            verify_decision_sufficiency_v1(
+                &qualified,
+                &qualification_binding(&qualified, &["evidence-1".to_owned()], 160),
+                &TestQualificationVerifier,
+                &binding,
+                &envelope,
+                &profile,
+            ),
+            Err(DecisionSufficiencyRejectV1::SufficientRiskBoundInvalid)
+        );
+    }
+
+    #[test]
+    fn sufficient_receipt_cannot_exceed_declared_resource_budget() {
+        let qualified = qualified_batch(&repeat('f'));
+        let (binding, profile, _) = build_valid_assessment(
+            &qualified,
+            DecisionSufficiencyStatusV1::Sufficient,
+            DecisionRequirementStatusV1::Met,
+            Some(1000),
+            Some(5000),
+        );
+        let signing_key = SigningKey::from_bytes(&[73; 32]);
+        let evaluator_key_id = qualification_key_id_v1(&signing_key.verifying_key().to_bytes());
+        let mut assessment = receipt(
+            &qualified,
+            &binding,
+            &evaluator_key_id,
+            DecisionSufficiencyStatusV1::Sufficient,
+            DecisionRequirementStatusV1::Met,
+            Some(1000),
+            Some(5000),
+        );
+        assessment.observed_cost_micros = Some(binding.decision_need.maximum_cost_micros + 1);
+        let envelope = signed_envelope(&assessment, &signing_key);
         assert_eq!(
             verify_decision_sufficiency_v1(
                 &qualified,
