@@ -104,6 +104,8 @@ pub trait EvidenceQualificationSignatureVerifierV1 {
         key_id: &str,
         payload_sha256: &str,
         signature: &[u8],
+        issued_at_unix: u64,
+        now_unix: u64,
     ) -> Result<(), EvidenceQualificationRejectV1>;
 }
 
@@ -127,6 +129,14 @@ pub enum EvidenceQualificationRejectV1 {
     EmptySignature,
     SignatureTooLarge,
     SignatureRejected,
+    TrustProfileInvalid,
+    TrustProfileDigestMismatch,
+    UnknownKey,
+    RevokedKey,
+    KeyNotYetValid,
+    KeyExpired,
+    InvalidPublicKey,
+    InvalidSignatureEncoding,
 }
 
 /// Capability token created only by verify_and_bind. Callers cannot construct
@@ -134,6 +144,21 @@ pub enum EvidenceQualificationRejectV1 {
 #[derive(Clone, Debug, Eq, PartialEq)]
 pub struct VerifiedEvidenceQualificationV1 {
     receipt_sha256: String,
+    run_id: String,
+    query_invocation_id: String,
+    domain_id: String,
+    subject_scope_sha256: String,
+    environment_revision_sha256: String,
+    tool_profile_sha256: String,
+    query_sha256: String,
+    candidate_set_sha256: String,
+    candidate_evidence_ids_sha256: String,
+    decision_need_sha256: String,
+    purpose_sha256: String,
+    qualification_policy_sha256: String,
+    lifecycle_snapshot_sha256: String,
+    verifier_profile_sha256: String,
+    issued_at_unix: u64,
     admissible_evidence_ids: Vec<String>,
     rejected_evidence_ids: Vec<String>,
     indeterminate_evidence_ids: Vec<String>,
@@ -204,8 +229,10 @@ impl VerifiedEvidenceQualificationV1 {
                 &receipt.key_id,
                 &payload_sha256,
                 &receipt.signature,
+                receipt.issued_at_unix,
+                binding.now_unix,
             )
-            .map_err(|_| EvidenceQualificationRejectV1::SignatureRejected)?;
+             ?;
 
         let mut admissible = Vec::new();
         let mut rejected = Vec::new();
@@ -220,6 +247,21 @@ impl VerifiedEvidenceQualificationV1 {
 
         Ok(Self {
             receipt_sha256: receipt.receipt_sha256(),
+            run_id: receipt.run_id.clone(),
+            query_invocation_id: receipt.query_invocation_id.clone(),
+            domain_id: receipt.domain_id.clone(),
+            subject_scope_sha256: receipt.subject_scope_sha256.clone(),
+            environment_revision_sha256: receipt.environment_revision_sha256.clone(),
+            tool_profile_sha256: receipt.tool_profile_sha256.clone(),
+            query_sha256: receipt.query_sha256.clone(),
+            candidate_set_sha256: receipt.candidate_set_sha256.clone(),
+            candidate_evidence_ids_sha256: receipt.candidate_evidence_ids_sha256.clone(),
+            decision_need_sha256: receipt.decision_need_sha256.clone(),
+            purpose_sha256: receipt.purpose_sha256.clone(),
+            qualification_policy_sha256: receipt.qualification_policy_sha256.clone(),
+            lifecycle_snapshot_sha256: receipt.lifecycle_snapshot_sha256.clone(),
+            verifier_profile_sha256: receipt.verifier_profile_sha256.clone(),
+            issued_at_unix: receipt.issued_at_unix,
             admissible_evidence_ids: admissible,
             rejected_evidence_ids: rejected,
             indeterminate_evidence_ids: indeterminate,
@@ -227,13 +269,41 @@ impl VerifiedEvidenceQualificationV1 {
         })
     }
 
-    /// Only IDs that passed the independent, decision-scoped admissibility
-    /// check. The executor must still re-check live authority and lifecycle.
-    pub fn admissible_evidence_ids_at(
+    /// Re-bind the verified capability to the exact query, subject/tenant scope,
+    /// DecisionNeed, purpose, candidate set, policy and lifecycle snapshot at
+    /// consumption time. Live authorization and lifecycle checks remain
+    /// mandatory at consequential use.
+    pub fn admissible_evidence_ids_for_use(
         &self,
-        now_unix: u64,
+        binding: &EvidenceQualificationBindingV1<'_>,
     ) -> Result<&[String], EvidenceQualificationRejectV1> {
-        if now_unix >= self.expires_at_unix {
+        validate_binding(binding)?;
+        for (actual, expected) in [
+            (self.run_id.as_str(), binding.run_id),
+            (self.query_invocation_id.as_str(), binding.query_invocation_id),
+            (self.domain_id.as_str(), binding.domain_id),
+            (self.subject_scope_sha256.as_str(), binding.subject_scope_sha256),
+            (self.environment_revision_sha256.as_str(), binding.environment_revision_sha256),
+            (self.tool_profile_sha256.as_str(), binding.tool_profile_sha256),
+            (self.query_sha256.as_str(), binding.query_sha256),
+            (self.candidate_set_sha256.as_str(), binding.candidate_set_sha256),
+            (self.decision_need_sha256.as_str(), binding.decision_need_sha256),
+            (self.purpose_sha256.as_str(), binding.purpose_sha256),
+            (self.qualification_policy_sha256.as_str(), binding.qualification_policy_sha256),
+            (self.lifecycle_snapshot_sha256.as_str(), binding.lifecycle_snapshot_sha256),
+            (self.verifier_profile_sha256.as_str(), binding.verifier_profile_sha256),
+        ] {
+            if actual != expected {
+                return Err(EvidenceQualificationRejectV1::BindingMismatch);
+            }
+        }
+        if self.candidate_evidence_ids_sha256 != candidate_ids_sha256(binding.candidate_evidence_ids) {
+            return Err(EvidenceQualificationRejectV1::BindingMismatch);
+        }
+        if binding.now_unix < self.issued_at_unix {
+            return Err(EvidenceQualificationRejectV1::ReceiptNotYetValid);
+        }
+        if binding.now_unix >= self.expires_at_unix {
             return Err(EvidenceQualificationRejectV1::ReceiptExpired);
         }
         Ok(&self.admissible_evidence_ids)
@@ -540,12 +610,21 @@ mod tests {
         RetrievalTraceReceiptV1,
         RetrievalTraceRefV1,
     };
+    use crate::qualification_trust::{
+        PinnedEd25519QualificationVerifierV1,
+        QualificationKeyStatusV1,
+        QualificationTrustKeyV1,
+        QualificationTrustProfileV1,
+        qualification_key_id_v1,
+    };
+    use ed25519_dalek::{Signer, SigningKey};
 
     struct TestSignatureVerifier;
 
     impl EvidenceQualificationSignatureVerifierV1 for TestSignatureVerifier {
         fn verify_signature(
             &self, profile: &str, key_id: &str, payload: &str, signature: &[u8],
+            _issued_at_unix: u64, _now_unix: u64,
         ) -> Result<(), EvidenceQualificationRejectV1> {
             if valid_sha256(profile) && key_id == "test-key" && signature == payload.as_bytes() {
                 Ok(())
@@ -636,6 +715,28 @@ mod tests {
         }
     }
 
+    fn binding_for_test<'a>(
+        receipt: &'a EvidenceQualificationReceiptV1, ids: &'a [String], now: u64,
+    ) -> EvidenceQualificationBindingV1<'a> {
+        EvidenceQualificationBindingV1 {
+            run_id: &receipt.run_id,
+            query_invocation_id: &receipt.query_invocation_id,
+            domain_id: &receipt.domain_id,
+            subject_scope_sha256: &receipt.subject_scope_sha256,
+            environment_revision_sha256: &receipt.environment_revision_sha256,
+            tool_profile_sha256: &receipt.tool_profile_sha256,
+            query_sha256: &receipt.query_sha256,
+            candidate_set_sha256: &receipt.candidate_set_sha256,
+            candidate_evidence_ids: ids,
+            decision_need_sha256: &receipt.decision_need_sha256,
+            purpose_sha256: &receipt.purpose_sha256,
+            qualification_policy_sha256: &receipt.qualification_policy_sha256,
+            lifecycle_snapshot_sha256: &receipt.lifecycle_snapshot_sha256,
+            verifier_profile_sha256: &receipt.verifier_profile_sha256,
+            now_unix: now,
+        }
+    }
+
     fn binding<'a>(
         receipt: &'a EvidenceQualificationReceiptV1, ids: &'a [String], now: u64,
     ) -> EvidenceQualificationBindingV1<'a> {
@@ -659,6 +760,90 @@ mod tests {
     }
 
     #[test]
+    fn pinned_ed25519_profile_verifies_the_complete_qualification_gate() {
+        let signing_key = SigningKey::from_bytes(&[42; 32]);
+        let public_key = signing_key.verifying_key().to_bytes();
+        let key_id = qualification_key_id_v1(&public_key);
+        let profile = QualificationTrustProfileV1 {
+            schema_version: 1,
+            verifier_id: "mace-independent-qualifier".to_owned(),
+            profile_version: 1,
+            keys: vec![QualificationTrustKeyV1 {
+                key_id: key_id.clone(),
+                public_key,
+                status: QualificationKeyStatusV1::Active,
+                not_before_unix: 10,
+                not_after_unix: 1_000,
+            }],
+        };
+        let pin = profile.profile_sha256().expect("canonical trust-profile digest");
+        let verifier = PinnedEd25519QualificationVerifierV1::from_pinned_profile(
+            &profile,
+            &pin,
+            profile.profile_version,
+        ).expect("profile pin");
+        let mut receipt = receipt();
+        receipt.key_id = key_id;
+        receipt.verifier_profile_sha256 = pin.clone();
+        receipt.signature = signing_key
+            .sign(receipt.signing_payload_sha256().as_bytes())
+            .to_bytes()
+            .to_vec();
+
+        let ids = candidate_ids();
+        let binding = binding(&receipt, &ids, 150);
+        let verified = VerifiedEvidenceQualificationV1::verify_and_bind(
+            &receipt,
+            &binding,
+            &verifier,
+        ).expect("real Ed25519 signature over exact receipt digest");
+        assert_eq!(verified.admissible_evidence_ids_for_use(&binding).expect("fresh"), &["evidence-a".to_owned()]);
+    }
+
+    #[test]
+    fn pinned_ed25519_profile_revocation_survives_a_valid_old_signature() {
+        let signing_key = SigningKey::from_bytes(&[43; 32]);
+        let public_key = signing_key.verifying_key().to_bytes();
+        let key_id = qualification_key_id_v1(&public_key);
+        let profile = QualificationTrustProfileV1 {
+            schema_version: 1,
+            verifier_id: "mace-independent-qualifier".to_owned(),
+            profile_version: 2,
+            keys: vec![QualificationTrustKeyV1 {
+                key_id: key_id.clone(),
+                public_key,
+                status: QualificationKeyStatusV1::Revoked,
+                not_before_unix: 10,
+                not_after_unix: 1_000,
+            }],
+        };
+        let pin = profile.profile_sha256().expect("revoked profile digest");
+        let verifier = PinnedEd25519QualificationVerifierV1::from_pinned_profile(
+            &profile,
+            &pin,
+            profile.profile_version,
+        ).expect("pinned profile records revocation");
+        let mut receipt = receipt();
+        receipt.key_id = key_id;
+        receipt.verifier_profile_sha256 = pin;
+        receipt.signature = signing_key
+            .sign(receipt.signing_payload_sha256().as_bytes())
+            .to_bytes()
+            .to_vec();
+
+        let ids = candidate_ids();
+        let binding = binding(&receipt, &ids, 150);
+        assert_eq!(
+            VerifiedEvidenceQualificationV1::verify_and_bind(
+                &receipt,
+                &binding,
+                &verifier,
+            ),
+            Err(EvidenceQualificationRejectV1::RevokedKey)
+        );
+    }
+
+    #[test]
     fn only_independently_admissible_ids_cross_the_gate() {
         let receipt = signed_receipt();
         let ids = candidate_ids();
@@ -666,7 +851,7 @@ mod tests {
         let verified = VerifiedEvidenceQualificationV1::verify_and_bind(
             &receipt, &binding, &TestSignatureVerifier,
         ).expect("valid scoped receipt");
-        assert_eq!(verified.admissible_evidence_ids_at(150).expect("still valid"), &["evidence-a".to_owned()]);
+        assert_eq!(verified.admissible_evidence_ids_for_use(&binding).expect("still valid"), &["evidence-a".to_owned()]);
         assert_eq!(verified.rejected_evidence_ids(), &["evidence-b".to_owned()]);
         assert_eq!(verified.indeterminate_evidence_ids(), &["evidence-c".to_owned()]);
         assert_eq!(verified.expires_at_unix(), 200);
@@ -810,9 +995,70 @@ mod tests {
         let verified = VerifiedEvidenceQualificationV1::verify_and_bind(
             &receipt, &binding, &TestSignatureVerifier,
         ).expect("valid at issuance");
+        let mut expired_binding = binding;
+        expired_binding.now_unix = 200;
         assert_eq!(
-            verified.admissible_evidence_ids_at(200),
+            verified.admissible_evidence_ids_for_use(&expired_binding),
             Err(EvidenceQualificationRejectV1::ReceiptExpired)
+        );
+    }
+
+    #[test]
+    fn verified_token_cannot_be_rebound_to_another_purpose_or_subject_at_use() {
+        let receipt = signed_receipt();
+        let ids = candidate_ids();
+        let original = binding(&receipt, &ids, 150);
+        let verified = VerifiedEvidenceQualificationV1::verify_and_bind(
+            &receipt, &original, &TestSignatureVerifier,
+        ).expect("valid receipt");
+
+        let changed_purpose = digest('6');
+        let mut wrong_purpose = binding_for_test(&receipt, &ids, 150);
+        wrong_purpose.purpose_sha256 = &changed_purpose;
+        assert_eq!(
+            verified.admissible_evidence_ids_for_use(&wrong_purpose),
+            Err(EvidenceQualificationRejectV1::BindingMismatch)
+        );
+
+        let changed_subject = digest('8');
+        let mut wrong_subject = binding_for_test(&receipt, &ids, 150);
+        wrong_subject.subject_scope_sha256 = &changed_subject;
+        assert_eq!(
+            verified.admissible_evidence_ids_for_use(&wrong_subject),
+            Err(EvidenceQualificationRejectV1::BindingMismatch)
+        );
+    }
+
+    #[test]
+    fn verified_token_cannot_be_rebound_to_a_different_candidate_id_set_at_use() {
+        let receipt = signed_receipt();
+        let ids = candidate_ids();
+        let original = binding(&receipt, &ids, 150);
+        let verified = VerifiedEvidenceQualificationV1::verify_and_bind(
+            &receipt, &original, &TestSignatureVerifier,
+        ).expect("valid receipt");
+
+        let changed_ids = vec!["evidence-a".to_owned(), "evidence-b".to_owned()];
+        let wrong_candidates = binding_for_test(&receipt, &changed_ids, 150);
+        assert_eq!(
+            verified.admissible_evidence_ids_for_use(&wrong_candidates),
+            Err(EvidenceQualificationRejectV1::BindingMismatch)
+        );
+    }
+
+    #[test]
+    fn verified_token_rejects_use_before_issuance_time() {
+        let receipt = signed_receipt();
+        let ids = candidate_ids();
+        let original = binding(&receipt, &ids, 150);
+        let verified = VerifiedEvidenceQualificationV1::verify_and_bind(
+            &receipt, &original, &TestSignatureVerifier,
+        ).expect("valid receipt");
+
+        let before_issue = binding_for_test(&receipt, &ids, 99);
+        assert_eq!(
+            verified.admissible_evidence_ids_for_use(&before_issue),
+            Err(EvidenceQualificationRejectV1::ReceiptNotYetValid)
         );
     }
 
@@ -877,7 +1123,7 @@ mod tests {
             &TestSignatureVerifier,
         ).expect("external qualification result is validly bound");
         assert!(verified.is_empty());
-        assert!(verified.admissible_evidence_ids_at(150).expect("fresh token").is_empty());
+        assert!(verified.admissible_evidence_ids_for_use(&binding).expect("fresh token").is_empty());
         assert!(policy_memory.applicable_notes("web", &digest('b'), &digest('c'), 130)
             .iter().any(|candidate| candidate.note_sha256 == note.note_sha256));
     }
@@ -893,6 +1139,6 @@ mod tests {
             &receipt, &binding, &TestSignatureVerifier,
         ).expect("valid receipt can qualify zero candidates");
         assert!(verified.is_empty());
-        assert!(verified.admissible_evidence_ids_at(150).expect("still valid").is_empty());
+        assert!(verified.admissible_evidence_ids_for_use(&binding).expect("still valid").is_empty());
     }
 }
