@@ -548,6 +548,12 @@
                 "const": "sink_observer"
               }
             }
+          },
+          "effect_binding": {
+            "required": [
+              "idempotency_key",
+              "attempt_id"
+            ]
           }
         }
       }
@@ -567,7 +573,15 @@
         "required": [
           "effect_binding",
           "effect_observation"
-        ]
+        ],
+        "properties": {
+          "effect_binding": {
+            "required": [
+              "idempotency_key",
+              "attempt_id"
+            ]
+          }
+        }
       }
     },
     {
