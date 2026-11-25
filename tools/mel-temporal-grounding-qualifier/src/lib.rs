@@ -19,3 +19,5 @@ pub mod temporal_acquisition;
 pub mod temporal_design_estimator;
 
 pub mod temporal_selective;
+
+pub mod temporal_selective_design;
