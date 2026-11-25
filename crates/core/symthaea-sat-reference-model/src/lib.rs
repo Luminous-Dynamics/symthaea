@@ -801,6 +801,60 @@ mod tests {
     }
 
     #[test]
+    fn non_delegable_parent_cannot_issue_a_child() {
+        let mut ledger = AuthorityLedger::new();
+        ledger
+            .insert_root_grant(grant(
+                "root",
+                "owner",
+                "agent-a",
+                &[scope("read", "project-1", "project-api", "project-review",
+                    &["public"], "read-p1-v1")],
+                900,
+                1_500,
+                false,
+                0,
+                None,
+            ))
+            .expect("non-delegable root is valid");
+        assert_eq!(
+            ledger.delegate(
+                &GrantId::from("root"),
+                grant(
+                    "child",
+                    "agent-a",
+                    "agent-b",
+                    &[scope("read", "project-1", "project-api", "project-review",
+                        &["public"], "read-p1-v1")],
+                    950,
+                    1_400,
+                    false,
+                    0,
+                    Some("root"),
+                ),
+                NOW,
+            ),
+            Err(AuthorityError::ParentCannotDelegate)
+        );
+    }
+
+    #[test]
+    fn grant_is_not_valid_before_its_start_time() {
+        let ledger = root_ledger();
+        assert_eq!(
+            ledger.authorize(
+                &PrincipalId::from("agent-a"),
+                &request("read", "project-1", "project-api", "project-review",
+                    &["public"], "read-p1-v1"),
+                899,
+            ),
+            AuthorizationDecision::Denied {
+                reason: DenialReason::GrantNotYetValid
+            }
+        );
+    }
+
+    #[test]
     fn delegator_must_be_the_parent_subject() {
         let mut ledger = root_ledger();
         assert_eq!(
