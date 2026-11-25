@@ -369,6 +369,61 @@ Use CL-Bench for expert-validated cross-instance latent-structure reuse; CLE for
 
 Advance only when the UPDATE branch beats its paired HOLD and strongest matched memory/model control on a preregistered transfer or decision estimand, while (a) stale-use and false-transfer rates remain within the predeclared guardrails, (b) qualified prior capabilities do not regress beyond their declared margins, (c) counterexamples propagate to derived entries, and (d) total resources are charged. Include recurrence and drift families separately; a high average score cannot hide either needless forgetting or harmful retention.
 
+## 14. Incremental value of explicit structural witnesses
+
+### Falsifiable question
+
+Do explicit typed structural correspondences, scope declarations, transformation classes and ambiguity profiles predict target transfer validity or decision improvement **beyond** simpler representation-overlap, task-complexity and graph-domain diagnostics?
+
+Structural witnesses must earn their extra complexity. Correctly validating a supplied finite mapping is not, by itself, evidence that a witness improves transfer prediction, target decisions or negative-transfer detection. This lane therefore distinguishes (a) correctness of the proposed mapping, (b) prediction of whether transfer will succeed, and (c) realized decision value.
+
+### External theory and adversarial comparators
+
+- **Feature Overlap Rate (FOR) and Effective Task Complexity (ETC):** Gao (AAAI 2026) proposes a transfer-risk framework based on target representation overlap with the source-induced subspace and entropy of latent subtasks. On six GLUE transfer pairs, the paper reports that FOR and ETC together explain over 80% of transfer-risk variance, while the tested classical divergences do not. This is a direct diagnostic baseline, not a result on ERGOstream's graph or multimodal worlds. Reproduce the operational definitions and report estimator uncertainty rather than copying the headline figure. https://doi.org/10.1609/aaai.v40i25.39270
+- **Graphon-based domain discrepancy and positional-encoding stability:** Zhu et al. (ICML 2026) decompose graph-foundation-model output shift into finite-sample approximation and a relabeling-invariant structural domain discrepancy under their graphon / dense-graph assumptions. Use the theory only on compatible graph regimes; do not extend dense graphon assumptions silently to sparse, directed, temporal or hypergraph worlds. https://proceedings.mlr.press/v306/zhu26e.html
+- **ReCoG relative contexts:** Tong et al. (2026-11-01) report that removing a large proportion of source-graph edges improved cross-domain transfer for four graph-pretraining methods; their relative-node-context method reports gains on 18 target datasets. This is an important adversarial baseline: raw source topology can be a transfer liability. Compare full-graph structural learning, edge-thinned source learning and relative-context construction under matched parameters, data and compute. The reported gains are paper results, not ERGOstream results. https://arxiv.org/abs/2611.01753
+
+### Nested diagnostic tournament
+
+Freeze the acquisition representation, source library and target predictions before hidden target outcomes. Fit diagnostic models only on development/calibration world families; evaluate on held-out generator families and sealed refreshes. Do not feed evaluator truth, hidden mechanism labels, oracle correspondence results or post-freeze holdout metrics into any candidate feature.
+
+Use the following nested models to predict independently scored transfer qualification and, in a separate analysis, downstream decision utility:
+
+1. **M0 — task/source floor:** source validation error, declared sample count, model scale/parameter count, target support size, acquisition budget and nuisance metadata available to the candidate.
+2. **M1 — generic transfer diagnostics:** M0 plus FOR, ETC, MMD/Wasserstein or other predeclared feature-distribution discrepancies, and calibration/support-overlap diagnostics where assumptions apply.
+3. **M2 — graph-domain diagnostics:** M1 plus graphon discrepancy / finite-sample term and positional-encoding stability diagnostics only for graph families satisfying their assumptions. For sparse, directed, temporal and hypergraph families, use separately specified compatible statistics or mark the diagnostic unavailable.
+4. **M3 — explicit witness diagnostics:** M2 plus candidate-produced witness features: declared map kind and scope, mapped/excluded fraction, relation-kind and transform commitments, node-map ambiguity, set-valued alternatives, unresolved/abstain state, counterexample count and evidence-prefix age. These are candidate-visible proposals and metadata, not evaluator-side truth.
+5. **M4 — intervention / counterexample diagnostics:** M3 plus candidate-proposed discriminating probes and prospective outcomes, frozen before those observations arrive. Score only on the subsequent independently observed outcomes.
+
+Run the comparison per transfer family and claim level (structural, predictive, behavioural/dynamics, mechanism) rather than pooling them into one label. Use paired world/seed blocks and cross-fitting; preserve generator-family holdouts to prevent leakage from near-duplicate recipes.
+
+### Required model and representation arms
+
+- Dense / modality-native representation with no explicit structural witness.
+- Feature-overlap and ETC diagnostic baseline with a simple linear/regularized predictor.
+- MMD/Wasserstein baseline and, where valid, graphon-domain discrepancy.
+- Full raw-graph / full relation-structure encoder.
+- ReCoG-style relative-context encoder and source-edge-thinned pretraining arm.
+- Explicit witness-only diagnostic model.
+- Hybrid representation plus explicit witness model.
+- Randomized / structure-destroyed witness control, matched for feature count, serialized bytes and compute.
+
+All arms receive the same public acquisition stream and target-time evidence. Normalize or report model parameters, persistent state, source and target observations, target labels, tuning budget, compute, memory, latency and energy. A larger or more expensive hybrid does not win solely because it has more capacity.
+
+### Metrics and incremental-value gate
+
+Primary prediction metrics: held-out Brier/log loss, AUROC and AUPRC for transfer failure, calibration slope/intercept, reliability by shift family, selective risk/coverage and false high-confidence transfer. Report structural-witness acceptance correctness separately from predicting downstream transfer success.
+
+Primary decision metrics: paired target terminal loss/regret, negative-transfer cost, decision-sufficiency rate and cost to first qualified transfer. Include per-family tail risk and CVaR where decision costs are asymmetric.
+
+Report M3−M2 and M4−M3 incremental effects on sealed families, with paired cluster-aware confidence intervals, preregistered multiplicity correction and practical effect margins. Also report inference/verification cost added by witness construction and checking.
+
+**Gate 2A — witness incremental value:** explicit witness diagnostics advance only if they improve a preregistered held-out estimand over M2 on unseen generator families, with a paired lower confidence bound beyond the practical margin, improved or non-inferior calibration, and no false-transfer, negative-transfer or resource regression. An improvement confined to graph families where the baseline assumptions are mismatched does not qualify.
+
+**Gate 2B — representation choice:** if ReCoG-style edge thinning or relative contexts outperform the full raw-graph arm, preserve that result. Do not force explicit graphs into the candidate architecture. Retain a structural-witness layer only where it demonstrably contributes independent transfer prediction, diagnostic value, decision utility or auditable scope/abstention—even if its main advantage is epistemic reliability rather than average task accuracy.
+
+**Negative-result rule:** if FOR/ETC and compatible graph-domain diagnostics explain transfer outcomes as well as M3, report that the explicit witness has not demonstrated incremental predictive value. It may still be useful as an audit contract, but that is a separate claim from better transfer generalization.
+
 ## 14. References (snapshot 2026-11-25)
 
 - Continual Learning Bench (CL-Bench, 2026-06-04): https://arxiv.org/abs/2606.05661
@@ -390,3 +445,6 @@ Advance only when the UPDATE branch beats its paired HOLD and strongest matched 
 - DS-CP (ICML 2026): https://proceedings.mlr.press/v306/lin26t.html
 - Transported Conformal Calibration (ICML 2026): https://proceedings.mlr.press/v306/doula26a.html
 - KMM-CP (UAI 2026): https://proceedings.mlr.press/v337/laghuvarapu26a.html
+- Unified Structural Factors / Feature Overlap Rate and Effective Task Complexity (AAAI 2026): https://doi.org/10.1609/aaai.v40i25.39270
+- When Do Graph Foundation Models Transfer? A Data-Centric Theory (ICML 2026): https://proceedings.mlr.press/v306/zhu26e.html
+- ReCoG: Relative Node Contexts for Multi-Domain Graph Pre-training (2026-11-01): https://arxiv.org/abs/2611.01753
