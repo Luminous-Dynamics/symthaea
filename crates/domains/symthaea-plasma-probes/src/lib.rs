@@ -4990,17 +4990,101 @@ pub fn solve_small_positive_mass_response_qp(
         if !determinant.is_finite() {
             return Err(ContractError::PositivityProjectionArithmeticOverflow);
         }
-        if determinant_scale == 0.0 || determinant.abs() <= 1.0e-12 * determinant_scale {
-            continue;
-        }
+        let (lambda_0, lambda_1) =
+            if determinant_scale > 0.0
+                && determinant.abs() > 1.0e-12 * determinant_scale
+            {
+                let lambda_0_numerator = rhs_0.mul_add(gram_11, -(gram_01 * rhs_1));
+                let lambda_1_numerator = gram_00.mul_add(rhs_1, -(gram_01 * rhs_0));
+                if !lambda_0_numerator.is_finite() || !lambda_1_numerator.is_finite() {
+                    return Err(ContractError::PositivityProjectionArithmeticOverflow);
+                }
+                (
+                    lambda_0_numerator / determinant,
+                    lambda_1_numerator / determinant,
+                )
+            } else {
+                // On a rank-deficient free set, the response row may be
+                // proportional to the mass row. Solve the mass projection
+                // and choose a response multiplier from the interval that
+                // satisfies all inactive-cell dual inequalities.
+                let mut first_free = None;
+                for index in 0..cell_count {
+                    if (mask & (1_u32 << index)) != 0 {
+                        first_free = Some(index);
+                        break;
+                    }
+                }
+                let Some(reference_index) = first_free else {
+                    continue;
+                };
+                let alpha = response_coefficients[reference_index]
+                    / cell_volumes[reference_index];
+                let ratio_scale = alpha.abs().max(1.0e-300);
+                let proportional = (0..cell_count).all(|index| {
+                    if (mask & (1_u32 << index)) == 0 {
+                        true
+                    } else {
+                        let ratio =
+                            response_coefficients[index] / cell_volumes[index];
+                        (ratio - alpha).abs()
+                            <= 1.0e-12 * ratio_scale.max(ratio.abs())
+                    }
+                });
+                if !proportional {
+                    continue;
+                }
+                let response_consistency = alpha * target_mass - target_response;
+                let response_tolerance =
+                    1.0e-10_f64.max(target_response.abs() * 1.0e-9);
+                if !response_consistency.is_finite() {
+                    return Err(ContractError::PositivityProjectionArithmeticOverflow);
+                }
+                if response_consistency.abs() > response_tolerance || gram_00 <= 0.0 {
+                    continue;
+                }
 
-        let lambda_0_numerator = rhs_0.mul_add(gram_11, -(gram_01 * rhs_1));
-        let lambda_1_numerator = gram_00.mul_add(rhs_1, -(gram_01 * rhs_0));
-        if !lambda_0_numerator.is_finite() || !lambda_1_numerator.is_finite() {
-            return Err(ContractError::PositivityProjectionArithmeticOverflow);
-        }
-        let lambda_0 = lambda_0_numerator / determinant;
-        let lambda_1 = lambda_1_numerator / determinant;
+                let effective_lambda = rhs_0 / gram_00;
+                let mut lower_lambda = f64::NEG_INFINITY;
+                let mut upper_lambda = f64::INFINITY;
+                let mut dual_interval_feasible = true;
+                for index in 0..cell_count {
+                    if (mask & (1_u32 << index)) != 0 {
+                        continue;
+                    }
+                    let volume = cell_volumes[index];
+                    let base = volume * (effective_lambda - input_values[index]);
+                    let slope = response_coefficients[index] - volume * alpha;
+                    if !base.is_finite() || !slope.is_finite() {
+                        return Err(ContractError::PositivityProjectionArithmeticOverflow);
+                    }
+                    if slope > 0.0 {
+                        lower_lambda =
+                            lower_lambda.max((-1.0e-10 - base) / slope);
+                    } else if slope < 0.0 {
+                        upper_lambda =
+                            upper_lambda.min((-1.0e-10 - base) / slope);
+                    } else if base < -1.0e-10 {
+                        dual_interval_feasible = false;
+                        break;
+                    }
+                }
+                if !dual_interval_feasible || lower_lambda > upper_lambda {
+                    continue;
+                }
+                let selected_lambda_1 = match (
+                    lower_lambda.is_finite(),
+                    upper_lambda.is_finite(),
+                ) {
+                    (true, true) => 0.5 * (lower_lambda + upper_lambda),
+                    (true, false) => lower_lambda,
+                    (false, true) => upper_lambda,
+                    (false, false) => 0.0,
+                };
+                let selected_lambda_0 =
+                    effective_lambda - selected_lambda_1 * alpha;
+                (selected_lambda_0, selected_lambda_1)
+            };
         if !lambda_0.is_finite() || !lambda_1.is_finite() {
             return Err(ContractError::PositivityProjectionArithmeticOverflow);
         }
@@ -10005,6 +10089,25 @@ mod tests {
         assert_eq!(report.positive_cell_count, 2);
         assert!(report.maximum_dual_violation < 1.0e-10);
         assert!(report.maximum_stationarity_residual < 1.0e-10);
+    }
+
+    #[test]
+    fn small_positive_response_qp_handles_single_positive_cell_optimum() {
+        let report = solve_small_positive_mass_response_qp(
+            &[0.2, 0.4, 0.4],
+            &[1.0, 1.0, 1.0],
+            &[2.0, 1.0, 0.0],
+            1.0,
+            2.0,
+        )
+        .unwrap();
+        assert!((report.projected_values[0] - 1.0).abs() < 1.0e-10);
+        assert_eq!(report.projected_values[1], 0.0);
+        assert_eq!(report.projected_values[2], 0.0);
+        assert_eq!(report.positive_cell_count, 1);
+        assert!(report.maximum_dual_violation < 1.0e-10);
+        assert!(report.maximum_stationarity_residual < 1.0e-10);
+        assert!(report.maximum_complementarity_residual < 1.0e-10);
     }
 
     #[test]
