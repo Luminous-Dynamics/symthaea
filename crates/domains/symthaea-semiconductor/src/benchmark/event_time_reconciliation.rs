@@ -721,13 +721,16 @@ mod tests {
                 input: prediction("s1", "m1", 100),
             },
         );
+        let mut same_time_delivery = delivery("s1", "l1", "m1", 100);
+        same_time_delivery.label_available_at_unix_seconds = 99;
+        same_time_delivery.eligibility_report_available_at_unix_seconds = 99;
         let d = envelope(
             "d1",
             100,
             115,
             20,
             StreamingReconstructionPayloadV1::LabelDelivery {
-                delivery: delivery("s1", "l1", "m1", 100),
+                delivery: same_time_delivery,
             },
         );
         let report = reconstruct_streaming_adapter_event_time_v1(&input(vec![d, p])).unwrap();
