@@ -1493,7 +1493,7 @@ mod tests {
     }
 
     fn finish_event(mut event: Value) -> Value {
-        if let Some(mut binding) = event.get("effect_binding").cloned() {
+        if let Some(binding) = event.get("effect_binding").cloned() {
             let projection = json!({
                 "projection_id": binding["sink_projection_id"],
                 "projection_version": binding["sink_projection_version"],
@@ -1515,7 +1515,7 @@ mod tests {
                 "sink": binding["sink"],
                 "purpose": binding["purpose"],
                 "parameters_digest": binding["parameters_digest"],
-                "payload_labels": labels
+                "payload_labels": labels.clone()
             });
             if event.get("authority_decision").is_some() {
                 event["authority_decision"]["exact_effect_digest"] =
@@ -1527,7 +1527,7 @@ mod tests {
                     "sink": binding["sink"],
                     "purpose": binding["purpose"],
                     "payload_digest": binding["payload_digest"],
-                    "payload_labels": labels,
+                    "payload_labels": labels.clone(),
                     "lineage_proof_ref": binding.get("lineage_proof_ref").cloned().unwrap_or(Value::Null),
                     "interaction_intent_ref": binding.get("interaction_intent_ref").cloned().unwrap_or(Value::Null),
                     "lineage_evidence_refs": event["disclosure_decision"]["lineage_evidence_refs"]
@@ -1548,10 +1548,13 @@ mod tests {
                     json!(digest_value(SINK_PROJECTION_DOMAIN, &observed_projection));
             }
 
-            binding = event["effect_binding"].clone();
-            binding.as_object_mut().unwrap().remove("binding_digest");
+            let mut binding_for_hash = event["effect_binding"].clone();
+            binding_for_hash
+                .as_object_mut()
+                .unwrap()
+                .remove("binding_digest");
             event["effect_binding"]["binding_digest"] =
-                json!(digest_value(BINDING_DOMAIN, &binding));
+                json!(digest_value(BINDING_DOMAIN, &binding_for_hash));
         }
 
         event["integrity"]["event_digest"] =
