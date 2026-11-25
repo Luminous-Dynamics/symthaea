@@ -243,6 +243,11 @@ pub fn validate_decision_sufficiency_receipt_v1(
     validate_hash(&receipt.attestation.attestation_sha256)?;
 
     validate_sorted_ids(expected.qualified_evidence_ids)?;
+    if expected.binding.qualified_evidence_set_sha256
+        != qualified_evidence_ids_sha256_v1(expected.qualified_evidence_ids)
+    {
+        return Err(DecisionSufficiencyReceiptRejectV1::QualifiedEvidenceSetMismatch);
+    }
     validate_assessment(
         &receipt.payload.assessment,
         expected.qualified_evidence_ids,
@@ -361,6 +366,17 @@ pub fn decision_sufficiency_attestation_sha256_v1(
     hasher.update(b"luminous:mace:decision-sufficiency-attestation:v1\0");
     hasher.update(&canonical);
     Ok(hex_digest(&hasher.finalize()))
+}
+
+fn qualified_evidence_ids_sha256_v1(ids: &[String]) -> String {
+    let mut hasher = Sha256::new();
+    hasher.update(b"luminous:mace:candidate-evidence-ids:v1\0");
+    hasher.update((ids.len() as u64).to_be_bytes());
+    for id in ids {
+        hasher.update((id.len() as u64).to_be_bytes());
+        hasher.update(id.as_bytes());
+    }
+    hex_digest(&hasher.finalize())
 }
 
 fn validate_assessment(
@@ -679,6 +695,18 @@ mod tests {
         assert_eq!(
             result,
             Err(DecisionSufficiencyReceiptRejectV1::RequirementPartitionMismatch)
+        );
+    }
+
+    #[test]
+    fn qualified_evidence_digest_must_match_exact_consumer_id_set() {
+        let (receipt, binding, _qualified, assessor, verifier_profile, verifier) = fixture();
+        let different_ids = vec!["different-evidence".to_owned()];
+        let expected = expected(&binding, &different_ids, &assessor, &verifier_profile);
+        let result = validate_decision_sufficiency_receipt_v1(&receipt, &expected, 200, &verifier);
+        assert_eq!(
+            result,
+            Err(DecisionSufficiencyReceiptRejectV1::QualifiedEvidenceSetMismatch)
         );
     }
 
