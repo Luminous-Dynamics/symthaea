@@ -413,7 +413,6 @@ fn source_matches_kind(source: TelemetrySource, kind: AgentEventKind) -> bool {
 /// Internationalized names must be converted to IDNA A-labels by the trusted
 /// adapter before this boundary.
 fn canonical_destination(value: &str) -> Result<String, BehaviorError> {
-    let value = value.trim();
     if value.is_empty()
         || value.len() > 253
         || value.chars().any(|ch| ch.is_control() || ch.is_whitespace())
@@ -958,6 +957,38 @@ mod tests {
         ];
         let assessment = analyze_task_window(&events, BehaviorWindowPolicy::default()).unwrap();
         assert_eq!(assessment.counters.distinct_destinations, 1);
+    }
+
+    #[test]
+    fn canonicalizes_dns_case_and_terminal_dot_before_counting() {
+        let events = vec![
+            event("1", "tenant-a", "task-1", AgentEventKind::DestinationContacted, Some("Example.COM.")),
+            event("2", "tenant-a", "task-1", AgentEventKind::DestinationContacted, Some("example.com")),
+        ];
+        let assessment = analyze_task_window(&events, BehaviorWindowPolicy::default()).unwrap();
+        assert_eq!(assessment.counters.distinct_destinations, 1);
+    }
+
+    #[test]
+    fn rejects_surrounding_whitespace_in_destination() {
+        let receipt =
+            VerifiedSourceReceipt::new("network-collector", "receipt-space").expect("receipt valid");
+        let result = AgentTraceEvent::from_verified_receipt(
+            Utc.with_ymd_and_hms(2026, 11, 25, 10, 0, 1).single().unwrap(),
+            "tenant-a",
+            "task-1",
+            "principal",
+            "c".repeat(64),
+            "d".repeat(64),
+            "event-space",
+            TelemetrySource::Network,
+            AgentEventKind::DestinationContacted,
+            None,
+            Some("example.com ".into()),
+            0,
+            receipt,
+        );
+        assert_eq!(result.unwrap_err(), BehaviorError::InvalidDestination);
     }
 
     #[test]
