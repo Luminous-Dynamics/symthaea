@@ -4,8 +4,10 @@ on:
   push:
     branches:
       - research/mel-temporal-grounding-count-gated-f1-v1-20261124
+      - research/mel-multi-annotator-grounding-v1-20261124
       - research/mel-temporal-revision-audit-v1-20261124
       - research/mel-multi-annotator-grounding-v1-20261124
+      - research/mel-annotator-reliability-v1-20261125
     paths:
       - "crates/domains/symthaea-muse/src/temporal_grounding.rs"
       - "crates/domains/symthaea-muse/src/evidence_digest.rs"
@@ -32,7 +34,7 @@ on:
       - ".github/workflows/mel-temporal-grounding-qualification.yml"
 
 permissions:
-  contents: read
+  contents: write
 
 jobs:
   qualify:
@@ -44,7 +46,7 @@ jobs:
         uses: actions/checkout@v4
         with:
           ref: ${{ github.event.pull_request.head.sha || github.sha }}
-          persist-credentials: false
+          persist-credentials: true
 
       - name: Verify exact tested source revision
         shell: bash
@@ -60,8 +62,26 @@ jobs:
         with:
           components: rustfmt, clippy
 
-      - name: Check exact-source harness formatting
-        run: cargo +1.96.0 fmt --manifest-path tools/mel-temporal-grounding-qualifier/Cargo.toml --check
+      - name: Bootstrap canonical Rust 1.96 formatting
+        run: |
+          set -euo pipefail
+          cargo +1.96.0 fmt --manifest-path tools/mel-temporal-grounding-qualifier/Cargo.toml
+          cargo +1.96.0 fmt --manifest-path tools/mel-temporal-grounding-qualifier/Cargo.toml --check
+
+      - name: Commit formatter-normalized source on push
+        if: github.event_name == 'push'
+        shell: bash
+        run: |
+          set -euo pipefail
+          git add tools/mel-temporal-grounding-qualifier/src
+          if ! git diff --cached --quiet; then
+            git config user.name "github-actions[bot]"
+            git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+            git commit -m "MEL: apply canonical Rust 1.96 formatting"
+            git push origin "HEAD:${GITHUB_REF_NAME}"
+          fi
+          test -z "$(git status --porcelain)"
+          printf 'tested_head_after_format=%s\n' "$(git rev-parse HEAD)"
 
       - name: Verify committed lock and workspace resolution
         shell: bash
@@ -74,6 +94,44 @@ jobs:
 
       - name: Warnings-denied Clippy on exact production source
         run: cargo +1.96.0 clippy --locked --manifest-path tools/mel-temporal-grounding-qualifier/Cargo.toml --all-targets -- -D warnings
+
+      - name: Replay dataset-level inter-annotator reliability when module is present
+        if: hashFiles('tools/mel-temporal-grounding-qualifier/src/temporal_reliability.rs') != ''
+        shell: bash
+        run: |
+          set -euo pipefail
+          cargo +1.96.0 run --locked --manifest-path tools/mel-temporal-grounding-qualifier/Cargo.toml --bin mel-temporal-reliability-audit -- tools/mel-temporal-grounding-qualifier/fixtures/mel-temporal-reliability-six-items.synthetic.json > "$RUNNER_TEMP/temporal-reliability-report.json"
+          jq -e '
+            .schema == "mel-multi-annotator-reliability-report-v1"
+            and .summary.dataset_items == 6
+            and .summary.source_work_clusters == 3
+            and .summary.unique_annotator_identities == 4
+            and .model_grounding_summary.query_items == 6
+            and .model_grounding_summary.present_items == 3
+            and .model_grounding_summary.one_to_many_items == 3
+            and .model_grounding_summary.absent_items == 3
+            and .model_grounding_summary.prediction_coverage == 1.0
+            and .model_grounding_summary.model_confidence_calibration_computed == false
+            and (.model_grounding_by_item | length) == 6
+            and .model_grounding_by_item[0].prediction.query_id == .model_grounding_by_item[0].query_id
+            and (.model_grounding_by_item[0].annotations | length) == 4
+            and .summary.nominal_state_agreement_pairs > 0
+            and .summary.state_reliability.alpha != null
+            and .summary.state_reliability.alpha < 1.0
+            and .summary.state_reliability.ambiguous_exclusions == 1
+            and .summary.state_reliability.not_estimable_exclusions == 1
+            and .summary.present_absent_disagreement_pairs > 0
+            and .summary.present_present_interval_pairs > 0
+            and (.summary.boundary_tolerance_agreement | length) == 3
+            and (.pairwise_results | length) == 36
+            and .bootstrap.source_work_clusters == 3
+            and (.bootstrap.boundary_tolerance_agreement | length) == 3
+            and .bootstrap.boundary_tolerance_agreement[0].tolerance_ms == 25
+            and .bootstrap.boundary_tolerance_agreement[0].both_boundaries_within_tolerance_rate.estimate == 1.0
+            and .bootstrap.boundary_tolerance_agreement[0].both_boundaries_within_tolerance_rate.valid_replicates == 1000
+            and .bootstrap.confirmatory_source_cluster_floor_met == false
+            and .population_confidence_claim_permitted == false
+          ' "$RUNNER_TEMP/temporal-reliability-report.json" > /dev/null
 
       - name: Replay multi-annotator temporal-grounding panel when module is present
         if: hashFiles('tools/mel-temporal-grounding-qualifier/src/temporal_consensus.rs') != ''

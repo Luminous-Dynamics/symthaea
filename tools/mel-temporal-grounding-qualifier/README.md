@@ -30,3 +30,23 @@ Research protocol: `docs/research/MEL-GROUND-006-MULTI-ANNOTATOR-TEMPORAL-GROUND
 
 
 For each predicted occurrence, the report also derives a **per-event reference-boundary distribution** from the production scorer's existing prediction↔annotation match records. It reports the number and fraction of eligible Present annotators who match that event, plus min/median/max start and end frames and boundary spread. Events that match no eligible Present annotation appear in `unmatched_prediction_indices`. This is not an interval consensus: original annotation records remain intact, and the support denominator is visible.
+
+
+## Dataset-level inter-annotator reliability
+
+The temporal_reliability module consumes multiple #13560 cases across query items and source works. It reports three different quantities without combining them:
+
+1. Krippendorff's nominal alpha over Present/Absent labels across multiple query items. Ambiguous and NotEstimable labels remain in the source records but are excluded as missing for this nominal-state measure. If expected disagreement is zero, alpha is undefined rather than being reported as 1.
+2. Symmetric interval-set agreement for Present/Present annotator pairs. Each pair is scored in both directions using the production scorer; interval F1, matched IoU, exact occurrence-count agreement and count difference remain separate.
+3. Boundary agreement in milliseconds, with tolerance rates at the dataset's strictly ascending preregistered millisecond thresholds. These are event boundary comparisons, not model confidence.
+
+Every dataset item binds a source_work_id_sha256. The bootstrap resamples all query items from a source work together using deterministic SplitMix64, and reports separate intervals for alpha, pairwise state agreement, interval F1/IoU, count agreement, start/end boundary MAE, and each preregistered start/end/joint boundary-tolerance rate. Point estimates for pairwise and boundary metrics are source-work macro-averages, matching the bootstrap estimand. A proposed 30-source-work floor is reported but does not by itself authorize population claims; the output always sets population_confidence_claim_permitted to false.
+
+Run the synthetic six-query/three-source-work dataset with:
+
+    cargo +1.96.0 run --locked --manifest-path tools/mel-temporal-grounding-qualifier/Cargo.toml --bin mel-temporal-reliability-audit -- tools/mel-temporal-grounding-qualifier/fixtures/mel-temporal-reliability-six-items.synthetic.json
+
+The fixture is schema-backed by schemas/mel-multi-annotator-reliability-dataset-v1.schema.json. It is a deterministic implementation control, not a musician-reliability study or SOTA result. Dataset items must share one scoring plan and annotation-policy version; source-work cluster IDs and annotation record IDs must be unique/consistent under the dataset contract.
+
+
+The reliability report also retains a **separate model-vs-annotator evaluation** for every query item. It includes the exact model prediction, source/audio identity, frozen scorer plan, original pseudonymous annotation records, per-annotator model scores, and the #13560 coverage/F1/count/absence summaries. Dataset model-performance summaries are macro-averaged by source work and keep Present F1, exact count, one-to-many count-gated F1, Absent claim accuracy, coverage and fully-correct rate separate. The inter-annotator alpha and pairwise interval reliability remain independent quantities. This prevents a high/low alpha from being mistaken for model performance. Model confidence calibration is not computed.
