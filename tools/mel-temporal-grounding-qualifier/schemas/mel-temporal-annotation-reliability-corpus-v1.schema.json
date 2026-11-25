@@ -1,0 +1,200 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://luminousdynamics.io/schemas/mel-temporal-annotation-reliability-corpus-v1.schema.json",
+  "title": "MEL Temporal Annotation Reliability Corpus V1",
+  "type": "object",
+  "additionalProperties": false,
+  "required": [
+    "schema",
+    "annotation_policy_version",
+    "minimum_annotations_per_unit",
+    "plan",
+    "interval_iou_thresholds",
+    "units"
+  ],
+  "properties": {
+    "schema": {
+      "const": "mel-temporal-annotation-reliability-corpus-v1"
+    },
+    "annotation_policy_version": {
+      "type": "string",
+      "minLength": 1
+    },
+    "minimum_annotations_per_unit": {
+      "type": "integer",
+      "minimum": 2,
+      "maximum": 65535
+    },
+    "plan": {
+      "type": "object",
+      "required": [
+        "evaluator_version",
+        "minimum_interval_iou"
+      ],
+      "properties": {
+        "evaluator_version": {
+          "type": "string",
+          "minLength": 1
+        },
+        "minimum_interval_iou": {
+          "type": "number",
+          "exclusiveMinimum": 0,
+          "maximum": 1
+        }
+      },
+      "additionalProperties": false
+    },
+    "interval_iou_thresholds": {
+      "type": "array",
+      "minItems": 1,
+      "uniqueItems": true,
+      "items": {
+        "type": "number",
+        "exclusiveMinimum": 0,
+        "maximum": 1
+      }
+    },
+    "units": {
+      "type": "array",
+      "minItems": 2,
+      "items": {
+        "$ref": "#/$defs/unit"
+      }
+    }
+  },
+  "$defs": {
+    "digest": {
+      "type": "string",
+      "pattern": "^[0-9a-f]{64}$"
+    },
+    "artifact": {
+      "type": "object",
+      "required": [
+        "audio_sha256",
+        "sample_rate_hz",
+        "channels",
+        "total_frames"
+      ],
+      "additionalProperties": false,
+      "properties": {
+        "audio_sha256": {
+          "$ref": "#/$defs/digest"
+        },
+        "sample_rate_hz": {
+          "type": "integer",
+          "minimum": 1,
+          "maximum": 4294967295
+        },
+        "channels": {
+          "type": "integer",
+          "minimum": 1,
+          "maximum": 65535
+        },
+        "total_frames": {
+          "type": "integer",
+          "minimum": 1
+        }
+      }
+    },
+    "interval": {
+      "type": "object",
+      "required": [
+        "start_frame",
+        "end_frame"
+      ],
+      "additionalProperties": false,
+      "properties": {
+        "start_frame": {
+          "type": "integer",
+          "minimum": 0
+        },
+        "end_frame": {
+          "type": "integer",
+          "minimum": 1
+        }
+      }
+    },
+    "annotation": {
+      "type": "object",
+      "required": [
+        "annotator_id_sha256",
+        "annotation_sha256",
+        "state",
+        "intervals",
+        "status_reason"
+      ],
+      "additionalProperties": false,
+      "properties": {
+        "annotator_id_sha256": {
+          "$ref": "#/$defs/digest"
+        },
+        "annotation_sha256": {
+          "$ref": "#/$defs/digest"
+        },
+        "state": {
+          "enum": [
+            "Present",
+            "Absent",
+            "Ambiguous",
+            "NotEstimable"
+          ]
+        },
+        "intervals": {
+          "type": "array",
+          "items": {
+            "$ref": "#/$defs/interval"
+          }
+        },
+        "status_reason": {
+          "type": [
+            "string",
+            "null"
+          ]
+        }
+      }
+    },
+    "unit": {
+      "type": "object",
+      "required": [
+        "unit_id",
+        "source_lineage_sha256",
+        "query_id",
+        "query_text",
+        "artifact",
+        "annotation_manifest_sha256",
+        "annotations"
+      ],
+      "additionalProperties": false,
+      "properties": {
+        "unit_id": {
+          "type": "string",
+          "minLength": 1
+        },
+        "source_lineage_sha256": {
+          "$ref": "#/$defs/digest"
+        },
+        "query_id": {
+          "type": "string",
+          "minLength": 1
+        },
+        "query_text": {
+          "type": "string",
+          "minLength": 1
+        },
+        "artifact": {
+          "$ref": "#/$defs/artifact"
+        },
+        "annotation_manifest_sha256": {
+          "$ref": "#/$defs/digest"
+        },
+        "annotations": {
+          "type": "array",
+          "minItems": 2,
+          "items": {
+            "$ref": "#/$defs/annotation"
+          }
+        }
+      }
+    }
+  }
+}
