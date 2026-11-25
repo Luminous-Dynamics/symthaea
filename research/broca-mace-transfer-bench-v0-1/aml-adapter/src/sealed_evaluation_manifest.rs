@@ -746,7 +746,7 @@ mod tests {
                     verifier_profile_sha256: digest('c'),
                     access_control_profile_sha256: digest('d'),
                     sealed_store_profile_sha256: digest('e'),
-                    committed_at_unix: 90,
+                    committed_at_unix: 110,
                     key_id: "mace-evaluator-key-1".to_owned(),
                 },
                 anti_leakage: SealedEvaluationAntiLeakageV1 {
@@ -1041,7 +1041,7 @@ mod tests {
         );
 
         let mut after_witness = Fixture::new();
-        after_witness.manifest.custody.committed_at_unix = 120;
+        after_witness.manifest.custody.committed_at_unix = 121;
         let witness = after_witness.witness();
         assert_eq!(
             validate_sealed_evaluation_manifest_v1(
