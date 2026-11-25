@@ -117,5 +117,109 @@
     "no_kinetic_forward_model_evaluated": true,
     "noise_is_synthetic_not_calibrated": true,
     "no_global_state_equivalence_claimed": true
-  }
+  },
+  "portfolios": [
+    {
+      "portfolio_id": "four-candidate-matched-hypothesis-cost-frontier",
+      "candidate_designs": [
+        {
+          "intervention_id": "weak-low-cost",
+          "hypotheses": [
+            {
+              "hypothesis_id": "state-a",
+              "prior_probability": 0.5,
+              "predicted_response": {
+                "real": 0,
+                "imag": 0
+              }
+            },
+            {
+              "hypothesis_id": "state-b",
+              "prior_probability": 0.5,
+              "predicted_response": {
+                "real": 0.2,
+                "imag": 0
+              }
+            }
+          ],
+          "noise_variance_per_quadrature": 0.5,
+          "estimated_evaluation_cost_seconds": 1
+        },
+        {
+          "intervention_id": "strong-high-cost",
+          "hypotheses": [
+            {
+              "hypothesis_id": "state-a",
+              "prior_probability": 0.5,
+              "predicted_response": {
+                "real": -2,
+                "imag": 0
+              }
+            },
+            {
+              "hypothesis_id": "state-b",
+              "prior_probability": 0.5,
+              "predicted_response": {
+                "real": 2,
+                "imag": 0
+              }
+            }
+          ],
+          "noise_variance_per_quadrature": 0.5,
+          "estimated_evaluation_cost_seconds": 10
+        },
+        {
+          "intervention_id": "dominated-weak-expensive",
+          "hypotheses": [
+            {
+              "hypothesis_id": "state-a",
+              "prior_probability": 0.5,
+              "predicted_response": {
+                "real": 0,
+                "imag": 0
+              }
+            },
+            {
+              "hypothesis_id": "state-b",
+              "prior_probability": 0.5,
+              "predicted_response": {
+                "real": 0.1,
+                "imag": 0
+              }
+            }
+          ],
+          "noise_variance_per_quadrature": 0.5,
+          "estimated_evaluation_cost_seconds": 2
+        },
+        {
+          "intervention_id": "strong-low-cost",
+          "hypotheses": [
+            {
+              "hypothesis_id": "state-a",
+              "prior_probability": 0.5,
+              "predicted_response": {
+                "real": -2,
+                "imag": 0
+              }
+            },
+            {
+              "hypothesis_id": "state-b",
+              "prior_probability": 0.5,
+              "predicted_response": {
+                "real": 2,
+                "imag": 0
+              }
+            }
+          ],
+          "noise_variance_per_quadrature": 0.5,
+          "estimated_evaluation_cost_seconds": 2
+        }
+      ],
+      "expected_pareto_front_ids": [
+        "weak-low-cost",
+        "strong-low-cost"
+      ],
+      "expected_best_ratio_id": "strong-low-cost"
+    }
+  ]
 }
