@@ -934,6 +934,42 @@ mod tests {
     }
 
     #[test]
+    fn prediction_with_no_reference_match_is_reported_as_unmatched() {
+        let input = case(
+            vec![
+                annotation(
+                    '1',
+                    'a',
+                    GroundTruthStateV1::Present,
+                    vec![FrameIntervalV1 {
+                        start_frame: 100,
+                        end_frame: 200,
+                    }],
+                    None,
+                ),
+                annotation(
+                    '2',
+                    'b',
+                    GroundTruthStateV1::Present,
+                    vec![FrameIntervalV1 {
+                        start_frame: 110,
+                        end_frame: 210,
+                    }],
+                    None,
+                ),
+            ],
+            prediction(vec![FrameIntervalV1 {
+                start_frame: 800,
+                end_frame: 900,
+            }]),
+        );
+        let report = audit_multi_annotator_case(&input).unwrap();
+        assert!(report.event_reference_boundary_distributions.is_empty());
+        assert_eq!(report.unmatched_prediction_indices, vec![0]);
+        assert_eq!(report.summary.present_mean_f1, Some(0.0));
+    }
+
+    #[test]
     fn ambiguous_annotation_is_excluded_only_from_its_own_denominator() {
         let intervals = vec![FrameIntervalV1 {
             start_frame: 100,
