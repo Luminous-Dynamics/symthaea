@@ -189,6 +189,9 @@
         },
         "declared_reversible": {
           "type": "boolean"
+        },
+        "physical_entropy_sign_convention": {
+          "const": "boltzmann_entropy_increase"
         }
       },
       "allOf": [
@@ -206,6 +209,7 @@
           "then": {
             "required": [
               "physical_entropy_measure_id",
+              "physical_entropy_sign_convention",
               "physical_entropy_production"
             ],
             "not": {
@@ -218,6 +222,16 @@
                 {
                   "required": [
                     "numerical_entropy_delta"
+                  ]
+                },
+                {
+                  "required": [
+                    "discarded_effect_metric_id"
+                  ]
+                },
+                {
+                  "required": [
+                    "discarded_effect_measure"
                   ]
                 }
               ]
@@ -251,6 +265,46 @@
                 {
                   "required": [
                     "physical_entropy_measure_id"
+                  ]
+                },
+                {
+                  "required": [
+                    "physical_entropy_sign_convention"
+                  ]
+                },
+                {
+                  "required": [
+                    "physical_entropy_production"
+                  ]
+                }
+              ]
+            }
+          }
+        },
+        {
+          "if": {
+            "properties": {
+              "operation_class": {
+                "not": {
+                  "const": "physical_collision"
+                }
+              }
+            },
+            "required": [
+              "operation_class"
+            ]
+          },
+          "then": {
+            "not": {
+              "anyOf": [
+                {
+                  "required": [
+                    "physical_entropy_measure_id"
+                  ]
+                },
+                {
+                  "required": [
+                    "physical_entropy_sign_convention"
                   ]
                 },
                 {
