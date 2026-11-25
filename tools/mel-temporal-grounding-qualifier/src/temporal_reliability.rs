@@ -98,6 +98,29 @@ pub struct TemporalPairwiseReliabilityV1 {
 }
 
 #[derive(Debug, Clone, PartialEq, Serialize)]
+pub struct SourceWorkTemporalMetricBootstrapV1 {
+    pub eligible_source_work_clusters: usize,
+    pub point_estimate: Option<f64>,
+    pub bootstrap_replicates_valid: usize,
+    pub percentile_95_low: Option<f64>,
+    pub percentile_95_high: Option<f64>,
+    pub status_reason: Option<String>,
+}
+
+#[derive(Debug, Clone, PartialEq, Serialize)]
+pub struct SourceWorkTemporalThresholdBootstrapV1 {
+    pub threshold: f64,
+    pub bootstrap_replicates_requested: usize,
+    pub seed: u64,
+    pub recommended_confirmatory_cluster_floor: usize,
+    pub symmetric_event_f1: SourceWorkTemporalMetricBootstrapV1,
+    pub matched_interval_iou: SourceWorkTemporalMetricBootstrapV1,
+    pub exact_occurrence_count_agreement: SourceWorkTemporalMetricBootstrapV1,
+    pub start_boundary_mae_frames: SourceWorkTemporalMetricBootstrapV1,
+    pub end_boundary_mae_frames: SourceWorkTemporalMetricBootstrapV1,
+}
+
+#[derive(Debug, Clone, PartialEq, Serialize)]
 pub struct TemporalReliabilityUnitSummaryV1 {
     pub unit_id: String,
     pub source_lineage_sha256: String,
@@ -119,6 +142,7 @@ pub struct TemporalReliabilityReportV1 {
     /// Formal alpha applies only to the nominal four-state disposition.
     pub disposition_alpha: NominalKrippendorffAlphaV1,
     pub disposition_alpha_source_work_bootstrap: Option<SourceWorkAlphaBootstrapV1>,
+    pub pairwise_temporal_source_work_bootstrap: Vec<SourceWorkTemporalThresholdBootstrapV1>,
     /// Macro average across query items, so a heavily annotated item cannot
     /// dominate a sparsely annotated item.
     pub pairwise_by_iou_threshold: Vec<TemporalPairwiseReliabilityV1>,
@@ -313,6 +337,7 @@ pub fn audit_reliability_corpus(
         minimum_annotations_per_unit: corpus.minimum_annotations_per_unit,
         disposition_alpha,
         disposition_alpha_source_work_bootstrap: None,
+        pairwise_temporal_source_work_bootstrap: Vec::new(),
         pairwise_by_iou_threshold,
         unit_summaries,
         raw_annotation_records_preserved: true,
@@ -415,7 +440,142 @@ pub fn audit_reliability_corpus_with_source_bootstrap(
         status_reason,
     });
     report.source_work_bootstrap_computed = true;
+    report.pairwise_temporal_source_work_bootstrap =
+        bootstrap_temporal_metrics_by_source_work(
+            &report.unit_summaries,
+            bootstrap_replicates,
+            seed,
+        )?;
     Ok(report)
+}
+
+fn bootstrap_temporal_metrics_by_source_work(
+    units: &[TemporalReliabilityUnitSummaryV1],
+    bootstrap_replicates: usize,
+    seed: u64,
+) -> Result<Vec<SourceWorkTemporalThresholdBootstrapV1>, String> {
+    let Some(first_unit) = units.first() else {
+        return Err("temporal metric bootstrap requires unit summaries".into());
+    };
+    let threshold_count = first_unit.pairwise_by_iou_threshold.len();
+    let mut results = Vec::with_capacity(threshold_count);
+    for threshold_index in 0..threshold_count {
+        let threshold = first_unit.pairwise_by_iou_threshold[threshold_index].threshold;
+        for unit in units {
+            if unit.pairwise_by_iou_threshold.len() != threshold_count
+                || unit.pairwise_by_iou_threshold[threshold_index].threshold != threshold
+            {
+                return Err("unit summaries disagree on the frozen IoU threshold sweep".into());
+            }
+        }
+        let threshold_summaries: Vec<_> = units
+            .iter()
+            .map(|unit| &unit.pairwise_by_iou_threshold[threshold_index])
+            .collect();
+        results.push(SourceWorkTemporalThresholdBootstrapV1 {
+            threshold,
+            bootstrap_replicates_requested: bootstrap_replicates,
+            seed,
+            recommended_confirmatory_cluster_floor: 30,
+            symmetric_event_f1: bootstrap_temporal_metric(
+                units,
+                &threshold_summaries,
+                |item| item.symmetric_event_f1_mean,
+                bootstrap_replicates,
+                seed,
+            )?,
+            matched_interval_iou: bootstrap_temporal_metric(
+                units,
+                &threshold_summaries,
+                |item| item.matched_interval_iou_mean,
+                bootstrap_replicates,
+                seed,
+            )?,
+            exact_occurrence_count_agreement: bootstrap_temporal_metric(
+                units,
+                &threshold_summaries,
+                |item| item.exact_occurrence_count_agreement_rate,
+                bootstrap_replicates,
+                seed,
+            )?,
+            start_boundary_mae_frames: bootstrap_temporal_metric(
+                units,
+                &threshold_summaries,
+                |item| item.start_boundary_mae_frames,
+                bootstrap_replicates,
+                seed,
+            )?,
+            end_boundary_mae_frames: bootstrap_temporal_metric(
+                units,
+                &threshold_summaries,
+                |item| item.end_boundary_mae_frames,
+                bootstrap_replicates,
+                seed,
+            )?,
+        });
+    }
+    Ok(results)
+}
+
+fn bootstrap_temporal_metric<F>(
+    units: &[TemporalReliabilityUnitSummaryV1],
+    summaries: &[&TemporalPairwiseReliabilityV1],
+    metric: F,
+    bootstrap_replicates: usize,
+    seed: u64,
+) -> Result<SourceWorkTemporalMetricBootstrapV1, String>
+where
+    F: Fn(&TemporalPairwiseReliabilityV1) -> Option<f64>,
+{
+    let mut by_lineage: BTreeMap<&str, Vec<f64>> = BTreeMap::new();
+    for (unit, summary) in units.iter().zip(summaries) {
+        if let Some(value) = metric(summary) {
+            if !value.is_finite() {
+                return Err("temporal agreement metric contains a non-finite value".into());
+            }
+            by_lineage
+                .entry(unit.source_lineage_sha256.as_str())
+                .or_default()
+                .push(value);
+        }
+    }
+    let cluster_values: Vec<f64> = by_lineage
+        .values()
+        .map(|values| mean(values).unwrap_or(0.0))
+        .collect();
+    let point_estimate = mean(&cluster_values);
+    if cluster_values.len() < 2 {
+        return Ok(SourceWorkTemporalMetricBootstrapV1 {
+            eligible_source_work_clusters: cluster_values.len(),
+            point_estimate,
+            bootstrap_replicates_valid: 0,
+            percentile_95_low: None,
+            percentile_95_high: None,
+            status_reason: Some(
+                "fewer than two source works contain eligible temporal event pairs".into(),
+            ),
+        });
+    }
+
+    let mut state = seed;
+    let samples = bootstrap_cluster_means(
+        &cluster_values,
+        bootstrap_replicates,
+        &mut state,
+    );
+    let mut ordered = samples;
+    ordered.sort_by(f64::total_cmp);
+    let last = ordered.len() - 1;
+    let low_index = ((last as f64) * 0.025).floor() as usize;
+    let high_index = ((last as f64) * 0.975).ceil() as usize;
+    Ok(SourceWorkTemporalMetricBootstrapV1 {
+        eligible_source_work_clusters: cluster_values.len(),
+        point_estimate,
+        bootstrap_replicates_valid: bootstrap_replicates,
+        percentile_95_low: Some(ordered[low_index]),
+        percentile_95_high: Some(ordered[high_index.min(last)]),
+        status_reason: None,
+    })
 }
 
 fn nominal_alpha_for_units(
