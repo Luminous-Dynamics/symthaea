@@ -1,6 +1,7 @@
 # SEMI-DELAYED-ACI-001 — fixed-delay conformal calibration v0.1
 
-**Issue:** #13479  
+**Implementation issue:** #13576  
+**Parent research issue:** #13479  
 **Implementation:** `symthaea-semiconductor::benchmark::delayed_aci`  
 **Status:** implementation + authored known-answer tests; exact-head validation pending.
 
@@ -52,6 +53,8 @@ Primary source: https://arxiv.org/abs/2609.07251
 
 - The caller opens sequential discrete rounds beginning at zero.
 - At most one prediction is issued per round in v0.1.
+- A round with no prediction invalidates the complete-round fixed-delay guarantee claim.
+- Before issuing a prediction in a round, any outcome due in that round must first be K1-delivered, degenerate-resolved, or explicitly forfeited.
 - The engine chooses `phase = round mod tau` and obtains that phase's current alpha.
 - The caller supplies the interval built from that exact alpha and frozen model output.
 - The prediction receipt records sample/event identity, issue round, due round, phase, alpha, interval, model-artifact SHA, policy SHA, point forecast, timestamps and state digest.
@@ -82,9 +85,29 @@ UNKNOWN is held; it may be explicitly re-presented as qualified during the same 
 
 ### Missing feedback and claim status
 
-At the next round, an outcome that was not qualified and delivered in its due round is recorded as missing. It is **not** imputed as covered or uncovered, and the engine changes its guarantee state to `UncertifiedMissingOrInvalidFeedback`. End-of-stream closure marks all remaining pending feedback missing. This is intentionally stricter than silently omitting a lost label from the denominator.
+At the next round, an outcome that was not qualified and delivered in its due round is recorded as missing. It is **not** imputed as covered or uncovered, and the engine changes its guarantee state to `UncertifiedMissingOrInvalidFeedback`. End-of-stream closure marks all remaining pending feedback missing. An explicit due-round forfeit releases the pending slot but permanently changes the guarantee state to `UncertifiedMissingOrInvalidFeedback`. A new prediction cannot be issued in a phase's due round while its previous phase outcome remains unresolved; this prevents a stale alpha from being reused. This is intentionally stricter than silently omitting a lost label from the denominator.
 
 The K1 gate is software evidence qualification, not physical source authentication. A valid digest and declared K1 status do not prove that a physical source issuer or reference chain is authentic.
+
+## Authored test coverage
+
+Twenty-three Rust unit tests are authored for:
+- independent phase initialization and alpha freezing;
+- τ=1 and τ>1 update order;
+- delayed undercoverage / overcoverage direction;
+- UNKNOWN same-round re-presentation and BLOCKED no-update;
+- missing-feedback assumption revocation and end-of-stream closure;
+- explicit full-real-line / empty interval resolution and rejection of label-free bounded resolution;
+- duplicate accepted revision, revision mismatch, stale K0 and wrong delivery-round rejection;
+- deterministic replay and finite-horizon bound calculation;
+- delay-to-memory input checks and interval/alpha semantic validation;
+- strict due-feedback-before-next-prediction ordering;
+- explicit due-round forfeit and guarantee-state downgrade;
+- duplicate pending sample/event rejection;
+- skipped-round guarantee-state downgrade;
+- finite-horizon helper rejects invalid initial phase alpha values.
+
+The tests are authored; exact-head rustfmt, strict Clippy, crate tests and SEMI-BENCH-001 reference workflow are still required before validation can be claimed.
 
 ## Delay-to-memory diagnostic
 
