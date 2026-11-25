@@ -21,7 +21,7 @@ The public repository must not contain before a round closes:
 - private evaluation credentials;
 - secret salts/nonces used for dataset commitments.
 
-The current 28-task manifest is design-only and contains development/validation specifications. It is not a hidden test set. The hidden split must be generated and held by an independent steward before confirmatory evaluation.
+The current 30-task manifest is design-only and contains development/validation specifications. It is not a hidden test set. The hidden split must be generated and held by an independent steward before confirmatory evaluation.
 
 ## 2. Commitment and reveal
 
