@@ -309,6 +309,27 @@ Every update must retain parent snapshot identity, evidence-prefix identity, cha
 
 Do not optimize forgetting to zero. Under genuine mechanism change, refusing to reuse obsolete knowledge is correct; under recurrence, relearning a previously valid structure may be wasteful. Report adaptation and retention as competing outcomes, as #7029 requires.
 
+### Decision-sufficient structure: learn what to retain, retrieve and forget
+
+Compose with MACE #13284 (decision-sufficiency frontier and active evidence acquisition) and #13319 (adversarial memory lifecycle, poisoning, repair and erasure). ERGOstream must not create a second evidence graph, lifecycle authority, memory manager or decision policy.
+
+The target is not the smallest library in bytes, nor maximum reconstruction of the acquisition stream. It is the least costly *admissible structural representation* that preserves a fixed downstream decision policy's performance within a preregistered regret margin, while satisfying provenance, scope, authority, currentness and independence constraints.
+
+For a frozen decision need and policy, compare the full admitted library with budgeted retained subsets and abstractions. Report:
+
+- **Decision-sufficiency rate:** fraction of target decisions for which the retained structure keeps paired regret gap within the preregistered epsilon.
+- **Minimum sufficient cost:** bytes, retrieval/index work, verification work, inference compute, latency and energy required to meet the decision-sufficiency constraint.
+- **Absolute and tail regret:** paired mean regret, worst-family regret, violation probability and CVaR; an average must not hide high-consequence failure.
+- **Compression damage:** which relation, scope, counterexample, alternative or provenance dependency was removed and which decision changed as a result.
+- **Acquisition/retrieval trade-off:** whether acquiring a new observation is cheaper than retaining/retrieving a larger ambiguous library; compare to MACE's EVSI/query baselines.
+- **Hard-constraint violations:** any subset that loses required lineage, currentness, scope, authority or independence is inadmissible even if task accuracy remains unchanged.
+
+Compare full library, recency/frequency truncation, top-k similarity retrieval, MDL/predictive-compression, graph/hypergraph simplification, counterexample-preserving pruning, decision-aware selection and an evaluator-only exact-scope ceiling. Randomized and structure-destroyed subsets remain attribution controls. Keep selector tuning on development/calibration worlds; use sealed decision outcomes only for final scoring.
+
+Adversarially test a poisoned or superseded parent, a derived motif that still appears semantically similar, a stale backup/replay path, and a retracted relation that remains in a cached index. Reuse #13319's lifecycle and counterfactual influence contract. A compact representation does not gain truth or authority from compression; derived entries must remain traceable to their source evidence and must be invalidated when a necessary parent is invalidated.
+
+This yields a new measurable trade-off: **decision quality × structural transfer × evidence integrity per unit of retained and verified knowledge**. A library that is smaller but forgets a critical counterexample is not efficient; a library that retains everything but cannot identify stale or irrelevant relations is not robust.
+
 ### Baselines and external adapters
 
 At matched stream, feedback, update and resource budgets, compare:
