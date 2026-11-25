@@ -467,12 +467,12 @@ pub fn advance_ca_ocrc_round_v1(
         }
     };
 
-    let mut arrivals = canonical_input.feedback_arrivals;
+    let arrivals = canonical_input.feedback_arrivals;
     let mut feedback_receipts = Vec::with_capacity(arrivals.len());
     let mut feedback_term = 0.0;
     let mut seen_this_round = BTreeSet::new();
 
-    for arrival in arrivals.drain(..) {
+    for arrival in arrivals {
         if !seen_this_round.insert(arrival.origin_round_id)
             || next.seen_feedback_round_ids.contains(&arrival.origin_round_id)
         {
