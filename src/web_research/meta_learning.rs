@@ -12,6 +12,8 @@ use serde::{Deserialize, Serialize};
 use std::collections::{HashMap, VecDeque};
 
 use super::types::{AdjudicatedVerificationOutcome, ResearchSource, VerificationOutcome};
+
+const ADJUDICATED_LEARNER_STATE_VERSION: u16 = 1;
 #[cfg(test)]
 use super::types::AdjudicationKind;
 
@@ -412,6 +414,7 @@ impl EpistemicLearner {
     /// Export learner state for persistence
     pub fn export_state(&self) -> LearnerState {
         LearnerState {
+            adjudication_schema_version: ADJUDICATED_LEARNER_STATE_VERSION,
             source_credibility: self.source_credibility.clone(),
             strategies: self.strategies.clone(),
             meta_phi: self.meta_phi.clone(),
@@ -419,12 +422,27 @@ impl EpistemicLearner {
         }
     }
 
-    /// Import learner state from persistence
+    /// Import learner state from persistence.
+    ///
+    /// Unversioned legacy snapshots are rejected fail-closed because their
+    /// calibration aggregates predate adjudication provenance and may include
+    /// confidence-derived correctness labels. A rejected snapshot resets all
+    /// calibration-derived state rather than silently retaining it.
     pub fn import_state(&mut self, state: LearnerState) {
+        if state.adjudication_schema_version != ADJUDICATED_LEARNER_STATE_VERSION {
+            self.source_credibility.clear();
+            self.strategies.clear();
+            self.outcomes.clear();
+            self.meta_phi = MetaPhi::default();
+            self.domain_expertise.clear();
+            return;
+        }
+
         self.source_credibility = state.source_credibility;
         self.strategies = state.strategies;
         self.meta_phi = state.meta_phi;
         self.domain_expertise = state.domain_expertise;
+        self.outcomes.clear();
     }
 }
 
@@ -450,6 +468,10 @@ pub struct LearnerStats {
 /// Exportable learner state
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct LearnerState {
+    /// Version of the independent-adjudication contract used to build this state.
+    /// Missing values deserialize as zero and are rejected by import_state().
+    #[serde(default)]
+    pub adjudication_schema_version: u16,
     /// Source credibility data
     pub source_credibility: HashMap<String, SourceCredibility>,
     /// Learned strategies
