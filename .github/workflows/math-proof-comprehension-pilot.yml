@@ -197,6 +197,11 @@ jobs:
             and .status == "frozen_expected_behavior_specification_not_execution"
             and (.cases | length) == 11
             and ([.cases[] | .id] | unique | length) == 11
+            and all(.cases[]; (.mutation_kind | type) == "string")
+            and ([.cases[].mutation_kind] | unique | length) == 11
+            and ([.cases[] | select(.id == "OBL-004-subgoal-without-producer" and .expected_counts.unresolved_goals == 1)] | length) == 1
+            and ([.cases[] | select(.id == "OBL-005-orphan-create-edge" and .expected_counts.produced_subgoals == 2)] | length) == 1
+            and ([.cases[] | select(.id == "OBL-006-action-output-without-create-edge" and .expected_counts.produced_subgoals == 3 and .expected_counts.unresolved_goals == 1)] | length) == 1
             and ([.cases[] | select(.id == "OBL-001-and-comm-complete" and .expected == "complete")] | length) == 1
             and ([.cases[] | select(.id == "OBL-002-missing-discharge-provisional" and .expected == "incomplete" and .expected_counts.unresolved_goals == 1)] | length) == 1
             and ([.cases[] | select(.id == "OBL-008-accepted-with-unresolved-leaf" and .expected == "reject")] | length) == 1
