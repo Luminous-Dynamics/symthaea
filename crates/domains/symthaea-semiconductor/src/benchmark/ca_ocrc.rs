@@ -239,6 +239,147 @@ pub fn sample_ca_ocrc_proxy_delay_v1(
     Ok(policy.maximum_feedback_delay as i64)
 }
 
+#[derive(Clone, Debug, PartialEq, Serialize, Deserialize)]
+pub struct CaOcrcProxyOptimizationV1 {
+    pub optimized_probability: f64,
+    pub proxy_delay_survival: Vec<f64>,
+    pub tracking_load: f64,
+    pub objective_value: f64,
+    pub risk_bound: CaOcrcRiskBoundV1,
+}
+
+fn worst_case_proxy_objective(
+    p: f64,
+    capacity: usize,
+    maximum_feedback_delay: u64,
+    learning_rate: f64,
+    score_bound: f64,
+    horizon: u64,
+) -> f64 {
+    let delay = maximum_feedback_delay as f64;
+    let load = delay * p;
+    let ratio = load / capacity as f64;
+    let capacity_term = if load == 0.0 {
+        0.0
+    } else {
+        let h = ratio - 1.0 - ratio.ln();
+        (-((capacity as f64) * h)).exp()
+    };
+    score_bound / (learning_rate * horizon as f64)
+        + (capacity as f64 + 1.0) / (p * horizon as f64)
+        + capacity_term
+}
+
+/// Chooses the paper's worst-case proxy family F(0)=1 and F(a)=p for
+/// 1<=a<=d_max, minimizing Eq. (26)'s one-dimensional risk-bound objective.
+/// A deterministic golden-section search avoids an opaque random optimizer.
+pub fn optimize_worst_case_ca_ocrc_proxy_v1(
+    capacity: usize,
+    maximum_feedback_delay: u64,
+    learning_rate: f64,
+    score_bound: f64,
+    horizon: u64,
+) -> Result<CaOcrcProxyOptimizationV1, CaOcrcErrorV1> {
+    if capacity == 0
+        || !learning_rate.is_finite()
+        || learning_rate <= 0.0
+        || !score_bound.is_finite()
+        || score_bound <= 0.0
+        || horizon == 0
+    {
+        return Err(CaOcrcErrorV1(
+            "proxy optimizer requires positive K, eta, B and horizon".into(),
+        ));
+    }
+    let upper = if maximum_feedback_delay == 0 {
+        1.0
+    } else {
+        (capacity as f64 / maximum_feedback_delay as f64).min(1.0)
+    };
+    let (probability, objective) = if maximum_feedback_delay == 0 || upper <= 1.0e-12 {
+        let p = upper.max(1.0e-12);
+        (
+            p,
+            worst_case_proxy_objective(
+                p,
+                capacity,
+                maximum_feedback_delay,
+                learning_rate,
+                score_bound,
+                horizon,
+            ),
+        )
+    } else {
+        let mut left = upper * 1.0e-9;
+        let mut right = upper;
+        let golden = (5.0_f64.sqrt() - 1.0) / 2.0;
+        let mut x1 = right - golden * (right - left);
+        let mut x2 = left + golden * (right - left);
+        let mut f1 = worst_case_proxy_objective(
+            x1, capacity, maximum_feedback_delay, learning_rate, score_bound, horizon,
+        );
+        let mut f2 = worst_case_proxy_objective(
+            x2, capacity, maximum_feedback_delay, learning_rate, score_bound, horizon,
+        );
+        for _ in 0..256 {
+            if f1 <= f2 {
+                right = x2;
+                x2 = x1;
+                f2 = f1;
+                x1 = right - golden * (right - left);
+                f1 = worst_case_proxy_objective(
+                    x1, capacity, maximum_feedback_delay, learning_rate, score_bound, horizon,
+                );
+            } else {
+                left = x1;
+                x1 = x2;
+                f1 = f2;
+                x2 = left + golden * (right - left);
+                f2 = worst_case_proxy_objective(
+                    x2, capacity, maximum_feedback_delay, learning_rate, score_bound, horizon,
+                );
+            }
+        }
+        let p = (left + right) / 2.0;
+        (
+            p,
+            worst_case_proxy_objective(
+                p, capacity, maximum_feedback_delay, learning_rate, score_bound, horizon,
+            ),
+        )
+    };
+    if !probability.is_finite()
+        || probability <= 0.0
+        || probability > upper + 1.0e-10
+        || !objective.is_finite()
+    {
+        return Err(CaOcrcErrorV1(
+            "worst-case proxy optimization returned an invalid point".into(),
+        ));
+    }
+    let mut survival = vec![probability; maximum_feedback_delay as usize + 1];
+    survival[0] = 1.0;
+    let policy = CaOcrcPolicyV1 {
+        schema: CA_OCRC_POLICY_SCHEMA_V1.into(),
+        policy_id: "ca-ocrc-optimized-worst-case-proxy.v1".into(),
+        capacity,
+        maximum_feedback_delay,
+        target_risk: 0.10,
+        learning_rate,
+        score_bound,
+        proxy_delay_survival: survival.clone(),
+    };
+    let risk_bound = ca_ocrc_risk_bound_v1(&policy, horizon)?
+        .ok_or_else(|| CaOcrcErrorV1("optimized proxy unexpectedly has no risk bound".into()))?;
+    Ok(CaOcrcProxyOptimizationV1 {
+        optimized_probability: probability,
+        proxy_delay_survival: survival,
+        tracking_load: risk_bound.tracking_load,
+        objective_value: objective,
+        risk_bound,
+    })
+}
+
 /// Equation (25) from the arbitrary-bounded-delay theorem.
 pub fn ca_ocrc_risk_bound_v1(
     policy: &CaOcrcPolicyV1,
@@ -820,6 +961,21 @@ mod tests {
             (json_sha256(&e).unwrap(), format!("{}:{}", r1.receipt_sha256, r2.receipt_sha256))
         }
         assert_eq!(run(), run());
+    }
+
+    #[test]
+    fn optimized_worst_case_proxy_is_deterministic_and_underloaded() {
+        let first = optimize_worst_case_ca_ocrc_proxy_v1(2, 4, 0.05, 1.0, 10_000).unwrap();
+        let second = optimize_worst_case_ca_ocrc_proxy_v1(2, 4, 0.05, 1.0, 10_000).unwrap();
+        assert_eq!(first, second);
+        assert!(first.optimized_probability > 0.0);
+        assert!(first.optimized_probability <= 0.5);
+        assert!(first.tracking_load <= 2.0 + 1.0e-10);
+        assert_eq!(first.proxy_delay_survival[0], 1.0);
+        assert!(first.proxy_delay_survival[1..]
+            .iter()
+            .all(|value| (*value - first.optimized_probability).abs() < 1.0e-12));
+        assert!((first.objective_value - first.risk_bound.total).abs() < 1.0e-9);
     }
 
     #[test]
