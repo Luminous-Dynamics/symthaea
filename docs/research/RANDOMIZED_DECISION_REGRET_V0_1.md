@@ -43,7 +43,7 @@ The deterministic minimax-regret action/floor is also emitted for context. It is
 
 The Rust module:
 
-- binds one frozen candidate policy digest and one action distribution to an equivalence class;
+- records one policy-artifact identity alongside the exact action-distribution rows for an equivalence class (the policy digest is not a hash of those rows);
 - requires all hidden worlds to have identical candidate-visible observation history, recurrent-state identity, model/configuration identity and policy seed through the existing canonical oracle;
 - checks that every positive-probability action is admissible in every world;
 - reuses the existing decision-observability implementation for action-set and view validation and for the deterministic comparator;
