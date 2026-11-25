@@ -486,6 +486,47 @@ pub struct AdjudicatedVerificationOutcome {
     pub evidence_reference: String,
 }
 
+impl AdjudicatedVerificationOutcome {
+    /// Validate and convert an independently adjudicated outcome.
+    ///
+    /// This checks required metadata and confidence bounds, but does not
+    /// authenticate the authority or resolve the evidence reference. Those
+    /// remain responsibilities of the independent adjudication/custody process.
+    pub fn into_outcome(mut self) -> Result<VerificationOutcome, &'static str> {
+        let outcome = &self.outcome;
+        if outcome.claim.trim().is_empty() {
+            return Err("adjudicated verification claim must be non-empty");
+        }
+        if outcome.source_domain.trim().is_empty() {
+            return Err("adjudicated verification source domain must be non-empty");
+        }
+        if outcome.domain.trim().is_empty() {
+            return Err("adjudicated verification topic domain must be non-empty");
+        }
+        if !outcome.predicted_confidence.is_finite()
+            || !(0.0..=1.0).contains(&outcome.predicted_confidence)
+        {
+            return Err("adjudicated verification confidence must be finite and in [0, 1]");
+        }
+        if outcome.adjudication_provenance.is_some() {
+            return Err("verification outcome already contains adjudication provenance");
+        }
+        if self.authority_id.trim().is_empty() {
+            return Err("adjudication authority ID must be non-empty");
+        }
+        if self.evidence_reference.trim().is_empty() {
+            return Err("adjudication evidence reference must be non-empty");
+        }
+
+        self.outcome.adjudication_provenance = Some(AdjudicationProvenance {
+            kind: self.adjudication_kind,
+            authority_id: self.authority_id,
+            evidence_reference: self.evidence_reference,
+        });
+        Ok(self.outcome)
+    }
+}
+
 impl VerificationOutcome {
     /// Create a new verification outcome
     pub fn new(
