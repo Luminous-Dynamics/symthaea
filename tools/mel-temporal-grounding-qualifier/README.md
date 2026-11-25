@@ -77,3 +77,20 @@ Run the synthetic dual-stream plan with:
     cargo +1.96.0 run --locked --manifest-path tools/mel-temporal-grounding-qualifier/Cargo.toml --bin mel-annotation-acquisition-plan -- tools/mel-temporal-grounding-qualifier/fixtures/mel-annotation-acquisition.synthetic.json
 
 The committed fixture is 11 candidates across two strata. It is a deterministic planner control only; no human study, unbiased population estimate, or annotation-quality improvement is established.
+
+
+## Two-stage finite-population design estimator
+
+The temporal_design_estimator module replays the exact source-balanced acquisition planner from the candidate frame, config and seed. Audited runs should supply expected_selection_receipt_sha256; a mismatch is rejected. A null expected digest is allowed only for a fresh demonstration and the output explicitly marks selection_receipt_match_verified=false.
+
+Only completed outcomes for selected ProbabilityAudit items are accepted. Missing, duplicate, extra, non-audit, wrong-metric and out-of-range outcomes are rejected. The module reports item-level Horvitz–Thompson totals and means by stratum and for the full finite population.
+
+For a two-stage stratum with W eligible source works and K selected works, and a selected work w containing N_w eligible queries with m_w selected, the first-order inclusion probability is K/W × m_w/N_w. The general HT variance estimator uses the second-order probabilities for two distinct items from the same work and two different works. It does not assume a constant total number of sampled query items across works.
+
+Variance is unavailable when the design cannot estimate between-work variation (for example K<2 with W>1), or when required inclusion probabilities are zero/invalid. Negative or non-finite variance estimates are surfaced as typed unavailable reasons; no confidence interval is emitted from them. The report always sets population_confidence_claim_permitted=false and outcomes_authenticated=false.
+
+Run the synthetic complete-work census example with:
+
+    cargo +1.96.0 run --locked --manifest-path tools/mel-temporal-grounding-qualifier/Cargo.toml --bin mel-two-stage-design-estimator -- tools/mel-temporal-grounding-qualifier/fixtures/mel-two-stage-design-estimator.synthetic.json
+
+The fixture fully observes one selected source work with two queries, so its item total and mean are exact and its design variance is zero. The Rust exhaustive oracle test separately enumerates all three possible two-of-three source-work samples and verifies that the average HT total equals the known population total and the average estimated variance equals the exact design variance. This is deterministic synthetic validation, not a field estimate.
