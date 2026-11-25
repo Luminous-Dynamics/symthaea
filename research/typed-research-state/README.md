@@ -33,10 +33,11 @@ cargo clippy --manifest-path research/typed-research-state/Cargo.toml --locked -
 - Conflicts cannot be marked SUFFICIENT.
 - HIGH/CRITICAL decisions cannot be marked SUFFICIENT without independent SUPPORTED adjudication.
 - The returned state digest is computed over the exact serialized candidate-state bytes and should be copied to the existing #11015 prospective trace.
+- The validator rejects global claim-confidence fields; classifier-specific confidence is allowed only inside claim-source relation provenance.
 - No free-floating global claim-confidence field is accepted.
 
 ## Important limitations
 
-The examples are synthetic. The validator checks shape and policy-state transitions, not natural-language entailment, artifact custody signatures or truth. It does not implement the production sequential research policy. The source tree audit in #11171 still identifies the production callable as unresolved.
+The examples are synthetic. The schema/validator also accepts PRODUCTION_PUBLIC_STATE, but the checked-in examples are explicitly synthetic. The validator checks shape and policy-state transitions, not natural-language entailment, artifact custody signatures or truth. It does not implement the production sequential research policy. The source tree audit in #11171 still identifies the production callable as unresolved.
 
 Do not use this crate as a second evidence store, a source trust service, a posterior engine, or a scheduler. ResearchState is a projection over existing evidence-prefix, custody and adjudication references.
