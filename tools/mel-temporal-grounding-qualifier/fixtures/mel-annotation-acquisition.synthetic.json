@@ -27,7 +27,8 @@
         "active_maximum_items": 2,
         "audit_source_work_count": 2
       }
-    ]
+    ],
+    "audit_items_per_source_work": 2
   },
   "candidates": [
     {
