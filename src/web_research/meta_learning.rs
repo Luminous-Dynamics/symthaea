@@ -411,38 +411,67 @@ impl EpistemicLearner {
         self.strategies.push(strategy);
     }
 
-    /// Export learner state for persistence
+    /// Export the adjudicated observations needed to deterministically rebuild
+    /// calibration state. Cached aggregates are deliberately not persisted as
+    /// an authority; they are recomputed from the provenance-bearing records.
     pub fn export_state(&self) -> LearnerState {
         LearnerState {
             adjudication_schema_version: ADJUDICATED_LEARNER_STATE_VERSION,
-            source_credibility: self.source_credibility.clone(),
-            strategies: self.strategies.clone(),
-            meta_phi: self.meta_phi.clone(),
-            domain_expertise: self.domain_expertise.clone(),
+            adjudicated_outcomes: self.adjudicated_outcomes().cloned().collect(),
         }
     }
 
-    /// Import learner state from persistence.
+    fn reset_calibration_state(&mut self) {
+        self.source_credibility.clear();
+        self.strategies.clear();
+        self.outcomes.clear();
+        self.meta_phi = MetaPhi::default();
+        self.domain_expertise.clear();
+    }
+
+    fn valid_persisted_adjudication(outcome: &VerificationOutcome) -> bool {
+        let Some(provenance) = &outcome.adjudication_provenance else {
+            return false;
+        };
+        !outcome.claim.trim().is_empty()
+            && !outcome.source_domain.trim().is_empty()
+            && !outcome.domain.trim().is_empty()
+            && outcome.predicted_confidence.is_finite()
+            && (0.0..=1.0).contains(&outcome.predicted_confidence)
+            && !provenance.authority_id.trim().is_empty()
+            && !provenance.evidence_reference.trim().is_empty()
+    }
+
+    /// Import learner state from persistence, rebuilding aggregates from
+    /// provenance-bearing outcome records.
     ///
     /// Unversioned legacy snapshots are rejected fail-closed because their
     /// calibration aggregates predate adjudication provenance and may include
-    /// confidence-derived correctness labels. A rejected snapshot resets all
-    /// calibration-derived state rather than silently retaining it.
-    pub fn import_state(&mut self, state: LearnerState) {
-        if state.adjudication_schema_version != ADJUDICATED_LEARNER_STATE_VERSION {
-            self.source_credibility.clear();
-            self.strategies.clear();
-            self.outcomes.clear();
-            self.meta_phi = MetaPhi::default();
-            self.domain_expertise.clear();
-            return;
+    /// confidence-derived correctness labels. This also rejects versioned
+    /// snapshots containing any unadjudicated or malformed outcome. In either
+    /// case all calibration-derived state is reset.
+    ///
+    /// Returns true only when a compatible state was imported successfully.
+    /// This validates provenance structure, not authority signatures or the
+    /// truth of the referenced evidence.
+    pub fn import_state(&mut self, state: LearnerState) -> bool {
+        self.reset_calibration_state();
+        if state.adjudication_schema_version != ADJUDICATED_LEARNER_STATE_VERSION
+            || state
+                .adjudicated_outcomes
+                .iter()
+                .any(|outcome| !Self::valid_persisted_adjudication(outcome))
+        {
+            return false;
         }
 
-        self.source_credibility = state.source_credibility;
-        self.strategies = state.strategies;
-        self.meta_phi = state.meta_phi;
-        self.domain_expertise = state.domain_expertise;
-        self.outcomes.clear();
+        for outcome in state.adjudicated_outcomes {
+            if self.record_outcome_verified(outcome).is_err() {
+                self.reset_calibration_state();
+                return false;
+            }
+        }
+        true
     }
 }
 
@@ -472,14 +501,10 @@ pub struct LearnerState {
     /// Missing values deserialize as zero and are rejected by import_state().
     #[serde(default)]
     pub adjudication_schema_version: u16,
-    /// Source credibility data
-    pub source_credibility: HashMap<String, SourceCredibility>,
-    /// Learned strategies
-    pub strategies: Vec<VerificationStrategy>,
-    /// Meta-phi tracking
-    pub meta_phi: MetaPhi,
-    /// Domain expertise
-    pub domain_expertise: HashMap<String, f32>,
+    /// Ground-truth records used to rebuild source/domain/meta-learning state.
+    /// Every entry must carry non-empty adjudication provenance.
+    #[serde(default)]
+    pub adjudicated_outcomes: Vec<VerificationOutcome>,
 }
 
 #[cfg(test)]
