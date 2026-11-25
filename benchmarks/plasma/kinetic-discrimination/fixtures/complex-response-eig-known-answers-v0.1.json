@@ -14,7 +14,9 @@
           "predicted_response": {
             "real": 1,
             "imag": -0.25
-          }
+          },
+          "response_branch_id": "identical-predictions-zero-information-branch-0",
+          "branch_association_stable": true
         },
         {
           "hypothesis_id": "state-b",
@@ -22,7 +24,9 @@
           "predicted_response": {
             "real": 1,
             "imag": -0.25
-          }
+          },
+          "response_branch_id": "identical-predictions-zero-information-branch-1",
+          "branch_association_stable": true
         }
       ],
       "noise_variance_per_quadrature": 0.1,
@@ -41,7 +45,9 @@
           "predicted_response": {
             "real": 1,
             "imag": 0
-          }
+          },
+          "response_branch_id": "phase-only-separation-branch-0",
+          "branch_association_stable": true
         },
         {
           "hypothesis_id": "state-imag",
@@ -49,7 +55,9 @@
           "predicted_response": {
             "real": 0,
             "imag": 1
-          }
+          },
+          "response_branch_id": "phase-only-separation-branch-1",
+          "branch_association_stable": true
         }
       ],
       "noise_variance_per_quadrature": 0.02,
@@ -68,7 +76,9 @@
           "predicted_response": {
             "real": -1,
             "imag": 0.25
-          }
+          },
+          "response_branch_id": "high-noise-blurs-hypotheses-branch-0",
+          "branch_association_stable": true
         },
         {
           "hypothesis_id": "state-plus",
@@ -76,7 +86,9 @@
           "predicted_response": {
             "real": 1,
             "imag": -0.25
-          }
+          },
+          "response_branch_id": "high-noise-blurs-hypotheses-branch-1",
+          "branch_association_stable": true
         }
       ],
       "noise_variance_per_quadrature": 4,
@@ -95,7 +107,9 @@
           "predicted_response": {
             "real": -2,
             "imag": 0
-          }
+          },
+          "response_branch_id": "strong-separation-with-imbalanced-prior-branch-0",
+          "branch_association_stable": true
         },
         {
           "hypothesis_id": "rare-state",
@@ -103,7 +117,9 @@
           "predicted_response": {
             "real": 2,
             "imag": 0
-          }
+          },
+          "response_branch_id": "strong-separation-with-imbalanced-prior-branch-1",
+          "branch_association_stable": true
         }
       ],
       "noise_variance_per_quadrature": 0.001,
@@ -131,7 +147,9 @@
               "predicted_response": {
                 "real": 0,
                 "imag": 0
-              }
+              },
+              "response_branch_id": "weak-low-cost-branch-0",
+              "branch_association_stable": true
             },
             {
               "hypothesis_id": "state-b",
@@ -139,7 +157,9 @@
               "predicted_response": {
                 "real": 0.2,
                 "imag": 0
-              }
+              },
+              "response_branch_id": "weak-low-cost-branch-1",
+              "branch_association_stable": true
             }
           ],
           "noise_variance_per_quadrature": 0.5,
@@ -154,7 +174,9 @@
               "predicted_response": {
                 "real": -2,
                 "imag": 0
-              }
+              },
+              "response_branch_id": "strong-high-cost-branch-0",
+              "branch_association_stable": true
             },
             {
               "hypothesis_id": "state-b",
@@ -162,7 +184,9 @@
               "predicted_response": {
                 "real": 2,
                 "imag": 0
-              }
+              },
+              "response_branch_id": "strong-high-cost-branch-1",
+              "branch_association_stable": true
             }
           ],
           "noise_variance_per_quadrature": 0.5,
@@ -177,7 +201,9 @@
               "predicted_response": {
                 "real": 0,
                 "imag": 0
-              }
+              },
+              "response_branch_id": "dominated-weak-expensive-branch-0",
+              "branch_association_stable": true
             },
             {
               "hypothesis_id": "state-b",
@@ -185,7 +211,9 @@
               "predicted_response": {
                 "real": 0.1,
                 "imag": 0
-              }
+              },
+              "response_branch_id": "dominated-weak-expensive-branch-1",
+              "branch_association_stable": true
             }
           ],
           "noise_variance_per_quadrature": 0.5,
@@ -200,7 +228,9 @@
               "predicted_response": {
                 "real": -2,
                 "imag": 0
-              }
+              },
+              "response_branch_id": "strong-low-cost-branch-0",
+              "branch_association_stable": true
             },
             {
               "hypothesis_id": "state-b",
@@ -208,7 +238,9 @@
               "predicted_response": {
                 "real": 2,
                 "imag": 0
-              }
+              },
+              "response_branch_id": "strong-low-cost-branch-1",
+              "branch_association_stable": true
             }
           ],
           "noise_variance_per_quadrature": 0.5,
