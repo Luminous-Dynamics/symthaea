@@ -1,9 +1,9 @@
 # Symthaea SAT Reference Model
 
 An independent, dependency-free Rust oracle for a narrow subset of the
-Sovereignty Assurance Tournament (SAT): purpose-bound effect scopes covering action, resource, sink, purpose, parameter
-digest and payload labels; delegation attenuation, lineage revocation and
-validity windows.
+Sovereignty Assurance Tournament (SAT): purpose-bound effect scopes covering
+action, resource, sink, purpose, parameter digest and payload labels; delegation
+attenuation, lineage revocation and validity windows.
 
 ## Run
 
