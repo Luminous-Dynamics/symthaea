@@ -49,10 +49,10 @@ pub struct RandomizedPolicyWorld {
 #[derive(Clone, Debug, Eq, PartialEq)]
 pub struct RandomizedDecisionClass {
     pub equivalence_class_id: u64,
-    /// Commitment to the candidate's emitted distribution and canonical
-    /// action ordering. A nonzero digest is an identity reference, not proof
-    /// that the candidate executed this policy or that the bytes are authentic.
-    pub candidate_policy_sha256: [u8; 32],
+    /// Opaque identity digest for the candidate policy artifact. This is not
+    /// a digest of the action-probability rows and does not authenticate the
+    /// candidate's execution or the provenance of this supplied distribution.
+    pub candidate_policy_artifact_sha256: [u8; 32],
     pub action_probabilities: Vec<CandidateActionProbability>,
     pub alternatives: Vec<RandomizedPolicyWorld>,
 }
@@ -77,7 +77,8 @@ pub struct RandomizedWorldRegret {
 #[derive(Clone, Debug, Eq, PartialEq)]
 pub struct RandomizedDecisionRegretCertificate {
     pub equivalence_class_id: u64,
-    pub candidate_policy_sha256: [u8; 32],
+    /// Opaque candidate policy artifact identity; does not hash the distribution rows.
+    pub candidate_policy_artifact_sha256: [u8; 32],
     pub policy_probability_mass_ppm: u32,
     pub policy_support_action_count: u64,
     pub alternative_world_count: u64,
@@ -226,7 +227,7 @@ fn to_u32(value: u128) -> Result<u32, RandomizedDecisionError> {
 fn validate_policy_distribution(
     class: &RandomizedDecisionClass,
 ) -> Result<(), RandomizedDecisionError> {
-    if digest_is_zero(&class.candidate_policy_sha256) {
+    if digest_is_zero(&class.candidate_policy_artifact_sha256) {
         return Err(RandomizedDecisionError::EmptyPolicyDigest);
     }
     if class.action_probabilities.is_empty() {
@@ -429,7 +430,7 @@ pub fn evaluate_randomized_decision_regret(
 
     Ok(RandomizedDecisionRegretCertificate {
         equivalence_class_id: class.equivalence_class_id,
-        candidate_policy_sha256: class.candidate_policy_sha256,
+        candidate_policy_artifact_sha256: class.candidate_policy_artifact_sha256,
         policy_probability_mass_ppm: RANDOMIZED_POLICY_MASS_PPM,
         policy_support_action_count: u64::try_from(class.action_probabilities.len())
             .map_err(|_| RandomizedDecisionError::ArithmeticOverflow)?,
@@ -485,7 +486,7 @@ mod tests {
     fn class(probabilities: Vec<CandidateActionProbability>) -> RandomizedDecisionClass {
         RandomizedDecisionClass {
             equivalence_class_id: 77,
-            candidate_policy_sha256: digest(9),
+            candidate_policy_artifact_sha256: digest(9),
             action_probabilities: probabilities,
             alternatives: vec![world(1, 0, 1_000_000), world(2, 1_000_000, 0)],
         }
@@ -640,7 +641,7 @@ mod tests {
     #[test]
     fn zero_policy_commitment_and_zero_hidden_world_digest_are_rejected() {
         let mut invalid_policy = class(mixture());
-        invalid_policy.candidate_policy_sha256 = [0; 32];
+        invalid_policy.candidate_policy_artifact_sha256 = [0; 32];
         assert_eq!(
             evaluate_randomized_decision_regret(&invalid_policy),
             Err(RandomizedDecisionError::EmptyPolicyDigest)
