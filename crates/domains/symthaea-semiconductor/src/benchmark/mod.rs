@@ -1,6 +1,7 @@
 //! Versioned benchmark protocols and independent scoring primitives.
 
 pub mod binary_metrics;
+pub mod causal_drift_diagnosis;
 pub mod calibration_requalification;
 pub mod dtco_manifest;
 pub mod gated_streaming_adapter;
@@ -148,4 +149,15 @@ pub use gated_streaming_adapter::{
     StreamingPredictionReceiptV1, StreamingUpdateDispositionV1, StreamingUpdateReasonV1,
     StreamingUpdateReceiptV1, create_gated_streaming_adapter_engine_v1,
     deliver_qualified_stream_label_v1, predict_and_register_stream_sample_v1,
+};
+
+pub use causal_drift_diagnosis::{
+    CAUSAL_DRIFT_EVIDENCE_SCHEMA_V1, CAUSAL_DRIFT_INPUT_SCHEMA_V1,
+    CAUSAL_DRIFT_REPORT_SCHEMA_V1, CausalAssessmentStatusV1,
+    CausalDriftDiagnosisErrorV1, CausalDriftDiagnosisInputV1, CausalDriftDiagnosisReportV1,
+    CausalDriftEvidenceKindV1, CausalDriftEvidenceV1, CausalDriftHypothesisInputV1,
+    CausalDriftHypothesisKindV1, CausalDriftPolicyV1, CausalEffectEstimateV1,
+    CausalHypothesisAssessmentV1, ControlledInterventionEvidenceV1,
+    ExpectedEffectDirectionV1, MatchedDifferenceInDifferencesV1, NegativeControlEvidenceV1,
+    diagnose_causal_drift_v1, seal_causal_drift_diagnosis_input_v1,
 };
