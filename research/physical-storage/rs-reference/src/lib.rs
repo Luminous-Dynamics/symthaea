@@ -1,4 +1,4 @@
-//! Deterministic physical-storage reference with spatially interleaved RS(6, 4) stripes.
+//! Deterministic physical-storage reference with spatially interleaved MDS(6,4) stripes.
 //!
 //! This is an algorithmic channel fixture, not a physical optical, magnetic, NAND,
 //! or tape model. Erasures are known to the decoder; unflagged substitutions are
@@ -168,7 +168,7 @@ impl MediaImage {
                 data[data_shard].copy_from_slice(&payload[offset..offset + BLOCK_BYTES]);
             }
 
-            let encoded = rs_encode(data);
+            let encoded = mds_encode(data);
             for shard in 0..SHARDS_PER_STRIPE {
                 let tile = layout.shard_tile(stripe, shard).ok_or(
                     StorageError::TileOutOfRange(shard),
@@ -232,7 +232,7 @@ impl MediaImage {
                     self.cells[tile]
                 });
 
-            match rs_recover(shards) {
+            match mds_recover(shards) {
                 Ok(recovered) => {
                     for data_shard in 0..DATA_SHARDS {
                         let offset = (stripe * DATA_SHARDS + data_shard) * BLOCK_BYTES;
@@ -270,7 +270,7 @@ impl MediaImage {
 /// Each shard is eight bytes. Any four of six shard rows recover the data.
 /// This is an erasure-only decoder: unknown substitutions are rejected by
 /// the end-to-end digest and are not corrected here.
-pub fn rs_encode(data: [[u8; BLOCK_BYTES]; DATA_SHARDS])
+pub fn mds_encode(data: [[u8; BLOCK_BYTES]; DATA_SHARDS])
     -> [[u8; BLOCK_BYTES]; SHARDS_PER_STRIPE]
 {
     let mut encoded = [[0u8; BLOCK_BYTES]; SHARDS_PER_STRIPE];
@@ -289,7 +289,7 @@ pub fn rs_encode(data: [[u8; BLOCK_BYTES]; DATA_SHARDS])
     encoded
 }
 
-pub fn rs_recover(
+pub fn mds_recover(
     shards: [Option<[u8; BLOCK_BYTES]>; SHARDS_PER_STRIPE],
 ) -> Result<[[u8; BLOCK_BYTES]; SHARDS_PER_STRIPE], StorageError> {
     let selected: Vec<usize> = (0..SHARDS_PER_STRIPE)
@@ -321,7 +321,7 @@ pub fn rs_recover(
         }
     }
 
-    Ok(rs_encode(data))
+    Ok(mds_encode(data))
 }
 
 fn generator_row(shard: usize) -> [u8; DATA_SHARDS] {
@@ -556,14 +556,14 @@ mod tests {
             [0x32; BLOCK_BYTES],
             [0x43; BLOCK_BYTES],
         ];
-        let encoded = rs_encode(data);
+        let encoded = mds_encode(data);
 
         for first in 0..SHARDS_PER_STRIPE {
             for second in first + 1..SHARDS_PER_STRIPE {
                 let mut damaged = encoded.map(Some);
                 damaged[first] = None;
                 damaged[second] = None;
-                assert_eq!(rs_recover(damaged).unwrap(), encoded);
+                assert_eq!(mds_recover(damaged).unwrap(), encoded);
             }
         }
     }
