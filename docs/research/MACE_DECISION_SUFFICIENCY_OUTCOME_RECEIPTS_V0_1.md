@@ -249,4 +249,4 @@ Until those gates pass, describe this as a protocol/schema contribution, not a d
 - Agent Memory Leaderboard Cycle 2 official results (published 2026-11-19): https://agentmemoryleaderboard.ai/results/cycle-2/
 - Agent Memory Integrity Internet-Draft, revision -00 (published 2026-11-01; work in progress, not an IETF standard): https://datatracker.ietf.org/doc/draft-khandelwal-bpm-agent-memory-integrity/
 - MACE independent qualification exchange v1: `MACE_INDEPENDENT_QUALIFICATION_EXCHANGE_V1.md`
-- MACE decision influence and selective repair benchmark v0.1: `MACE_DECISION_INFLUENCE_REPAIR_BENCH_V0_1.md`
+- Related MACE decision-influence and selective-repair specification: https://github.com/Luminous-Dynamics/symthaea/pull/13397
