@@ -2,6 +2,7 @@
 
 pub mod binary_metrics;
 pub mod calibration_requalification;
+pub mod delayed_aci;
 pub mod dtco_manifest;
 pub mod label_consumption_guard;
 pub mod metrology_audit;
@@ -136,4 +137,18 @@ pub use vm_snapshot_dependency_impact::{
     VmSnapshotDependencyGraphV1, VmSnapshotImpactEntryV1, VmSnapshotImpactStateV1,
     compute_vm_snapshot_impact_closure_v1, seal_vm_snapshot_dependency_edge_v1,
     seal_vm_snapshot_dependency_graph_v1,
+};
+
+pub use delayed_aci::{
+    AciDegenerateResolutionReceiptV1, AciGuaranteeStateV1, AciIntervalKindV1,
+    AciMissingFeedbackRecordV1, AciPredictionIntervalV1, AciUpdateDispositionV1, AciUpdateReasonV1,
+    DELAYED_ACI_DELIVERY_SCHEMA_V1, DELAYED_ACI_POLICY_SCHEMA_V1,
+    DELAYED_ACI_PREDICTION_RECEIPT_SCHEMA_V1, DELAYED_ACI_PREDICTION_SCHEMA_V1,
+    DELAYED_ACI_SCHEMA_V1, DELAYED_ACI_UPDATE_RECEIPT_SCHEMA_V1, DelayedAciEngineV1,
+    DelayedAciErrorV1, DelayedAciLabelDeliveryV1, DelayedAciPolicyV1, DelayedAciPredictionInputV1,
+    DelayedAciPredictionReceiptV1, DelayedAciUpdateReceiptV1, begin_delayed_aci_round_v1,
+    close_delayed_aci_stream_v1, create_delayed_aci_engine_v1, delay_to_memory_ratio_v1,
+    delayed_aci_finite_horizon_miscoverage_bound_v1, deliver_delayed_aci_label_v1,
+    forfeit_due_delayed_aci_feedback_v1, issue_delayed_aci_prediction_v1,
+    resolve_degenerate_aci_interval_v1,
 };
