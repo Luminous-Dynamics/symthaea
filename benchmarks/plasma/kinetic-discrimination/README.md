@@ -53,3 +53,10 @@ The selector rejects portfolios that change hypothesis ordering, normalized prio
 `evaluate_kinetic_discrimination_noise_envelope` evaluates the same candidate design at the minimum and maximum of a caller-declared positive observation-noise variance interval. Under the stated additive independent Gaussian model, the higher-variance response is a degraded channel (it can be obtained by adding independent Gaussian noise to the lower-variance observation). The data-processing inequality therefore implies non-increasing EIG as variance increases.
 
 The helper checks the endpoint ordering numerically and reports both endpoint EIG and cost-normalized EIG. This is a model-conditional sensitivity check; it does not certify that real instrument noise, numerical reference error or correlated QoI uncertainty lies inside the interval.
+
+
+## Branch-association gate
+
+Every finite hypothesis carries an explicit non-empty response-branch identity and `branch_association_stable=true`. The schema and Rust evaluator both reject unresolved branch association. The branch IDs are hypothesis metadata; they are not silently inferred from nearest complex-amplitude peaks. If a branch is below floor, created, cancelled or misassociated, the observation must be treated as UNKNOWN / unscorable until a branch-aware likelihood is implemented.
+
+This first KSDD scorer still assumes a stable scalar complex response per hypothesis. It does not model stochastic branch transitions or a mixture of branch-conditioned response distributions.
