@@ -31,6 +31,10 @@ use broca_aml_adapter::retrieval_policy_memory::{
     RetrievalOperationOutcomeV1, RetrievalOperationV1, RetrievalPolicyMemoryV1,
     RetrievalStopReasonV1, RetrievalTraceReceiptV1,
 };
+use broca_aml_adapter::acquisition_receipt_v2::{
+    AcquisitionOperationV2, AcquisitionReceiptV2, AcquisitionStatusV2, OperationOutcomeV2,
+    append_jsonl, verify_candidate_batch,
+};
 use broca_aml_adapter::retrieval_policy_store::RetrievalPolicyTraceFileStoreV1;
 use serde_json::{json, Value};
 use sha2::{Digest, Sha256};
@@ -419,7 +423,8 @@ fn handle_request(
             let mut bm25_hit_count = 0_usize;
             let mut entity_literal_hit_count = 0_usize;
 
-            let result = match config.retrieval_mode {
+            let acquisition_result = (|| -> Result<LongMemEvalV2SearchResultV1, String> {
+            Ok(match config.retrieval_mode {
                 RetrievalModeV1::Bm25Only => {
                     let retrieved = index_ref.bm25.as_ref()
                         .ok_or("BM25 index unavailable for BM25-only mode")?
@@ -518,6 +523,41 @@ fn handle_request(
                         config.top_k,
                         bm25.search_latency_ns.saturating_add(entity.search_latency_ns),
                     )
+                }
+            })
+            })();
+            let result = match acquisition_result {
+                Ok(result) => result,
+                Err(error) => {
+                    let failure = AcquisitionReceiptV2 {
+                        run_id: config.run_id.clone(),
+                        query_invocation_id: candidate_id.to_owned(),
+                        domain_id: config.domain.clone(),
+                        environment_revision_sha256: config.environment_revision_sha256.clone(),
+                        tool_profile_sha256: config.backend_revision_sha256.clone(),
+                        query_sha256: sha256_hex(query.as_bytes()),
+                        candidate_set_sha256: None,
+                        operations: vec![AcquisitionOperationV2 {
+                            tool_id: "mace.acquisition.controller".into(),
+                            tool_revision_sha256: config.backend_revision_sha256.clone(),
+                            action_template_sha256: sha256_hex(b"mace-acquisition-error:v2"),
+                            observed_evidence_ids: Vec::new(),
+                            outcome: OperationOutcomeV2::ToolError,
+                            elapsed_ns: u64::try_from(query_started.elapsed().as_nanos()).unwrap_or(u64::MAX),
+                            inspected_bytes: 0,
+                            inspected_bytes_measured: false,
+                        }],
+                        acquisition_status: AcquisitionStatusV2::ToolError,
+                        tool_call_budget: 1,
+                        tool_calls_used: 1,
+                        elapsed_ns: u64::try_from(query_started.elapsed().as_nanos()).unwrap_or(u64::MAX),
+                        inspected_bytes: 0,
+                        inspected_bytes_complete: false,
+                        created_at_unix: unix_now_seconds()?,
+                    };
+                    append_jsonl(&config.policy_trace_dir.with_file_name("policy-acquisition-v2.jsonl"), &failure)
+                        .map_err(|write_error| format!("persist V2 acquisition failure: {write_error:?}"))?;
+                    return Ok(json!({"ok":false,"error":error,"acquisition_receipt_v2":failure.to_json_value()}));
                 }
             };
 
@@ -619,6 +659,48 @@ fn handle_request(
                 inspected_bytes_complete: false,
                 created_at_unix,
             };
+            let acquisition_v2 = AcquisitionReceiptV2 {
+                run_id: trace.run_id.clone(),
+                query_invocation_id: trace.query_invocation_id.clone(),
+                domain_id: trace.domain_id.clone(),
+                environment_revision_sha256: trace.environment_revision_sha256.clone(),
+                tool_profile_sha256: trace.tool_profile_sha256.clone(),
+                query_sha256: trace.query_sha256.clone(),
+                candidate_set_sha256: candidate_set_sha256.clone(),
+                operations: trace.operations.iter().map(|operation| AcquisitionOperationV2 {
+                    tool_id: operation.tool_id.clone(),
+                    tool_revision_sha256: operation.tool_revision_sha256.clone(),
+                    action_template_sha256: operation.action_template_sha256.clone(),
+                    observed_evidence_ids: operation.observed_evidence_ids.clone(),
+                    outcome: match operation.outcome {
+                        RetrievalOperationOutcomeV1::EvidenceObserved => OperationOutcomeV2::EvidenceObserved,
+                        RetrievalOperationOutcomeV1::NoEvidence => OperationOutcomeV2::NoEvidence,
+                        RetrievalOperationOutcomeV1::ToolError => OperationOutcomeV2::ToolError,
+                    },
+                    elapsed_ns: operation.elapsed_ns,
+                    inspected_bytes: operation.inspected_bytes,
+                    inspected_bytes_measured: operation.inspected_bytes_measured,
+                }).collect(),
+                acquisition_status: if trace.operations.iter().any(|o| o.outcome == RetrievalOperationOutcomeV1::ToolError) {
+                    AcquisitionStatusV2::ToolError
+                } else if candidate_record_count > 0 {
+                    AcquisitionStatusV2::CandidatesReturned
+                } else {
+                    AcquisitionStatusV2::NoCandidateEvidence
+                },
+                tool_call_budget: trace.tool_call_budget,
+                tool_calls_used: trace.tool_calls_used,
+                elapsed_ns: trace.elapsed_ns,
+                inspected_bytes: trace.inspected_bytes,
+                inspected_bytes_complete: trace.inspected_bytes_complete,
+                created_at_unix: trace.created_at_unix,
+            };
+            acquisition_v2.validate().map_err(|error| format!("V2 acquisition receipt: {error:?}"))?;
+            if let Some(batch) = &candidate_evidence {
+                verify_candidate_batch(&acquisition_v2, batch).map_err(|error| format!("V2 candidate binding: {error:?}"))?;
+            }
+            let v2_receipt_path = config.policy_trace_dir.with_file_name("policy-acquisition-v2.jsonl");
+            append_jsonl(&v2_receipt_path, &acquisition_v2).map_err(|error| format!("persist V2 acquisition receipt: {error:?}"))?;
             let retrieval_trace_sha256 = policy_trace_store
                 .record_trace(policy_memory, &trace)
                 .map_err(|error| format!("persist retrieval policy trace: {error}"))?;
@@ -631,6 +713,7 @@ fn handle_request(
                 "candidate_set_sha256": candidate_set_sha256,
                 "candidate_record_count": candidate_record_count,
                 "retrieval_trace": retrieval_trace_json,
+                "acquisition_receipt_v2": acquisition_v2.to_json_value(),
                 "retrieval_trace_sha256": retrieval_trace_sha256,
                 "policy_trace_count": policy_memory.trace_count(),
                 "run_id": config.run_id,
@@ -919,6 +1002,11 @@ mod tests {
         assert_eq!(response["candidate_id"], "query-invocation-1");
         assert_eq!(response["candidate_record_count"], 3);
         assert_eq!(response["retrieval_trace"]["stop_reason"], "candidates_returned");
+        assert_eq!(response["acquisition_receipt_v2"]["schema_version"], "mace_retrieval_acquisition_receipt_v2");
+        assert_eq!(response["acquisition_receipt_v2"]["acquisition_status"], "candidates_returned");
+        assert_eq!(response["acquisition_receipt_v2"]["candidate_set_sha256"], response["candidate_set_sha256"]);
+        let persisted = fs::read_to_string(config.policy_trace_dir.with_file_name("policy-acquisition-v2.jsonl")).expect("persisted V2 acquisition receipt");
+        assert!(persisted.contains("mace_retrieval_acquisition_receipt_v2"));
         assert!(response["candidate_set_sha256"].as_str().is_some());
         assert!(response["candidate_evidence_jsonl"].as_str().unwrap().contains("lmev2:text:"));
         assert_eq!(response["retrieval_trace"]["run_id"], "fixture-run");
@@ -971,6 +1059,36 @@ mod tests {
             item["type"] == "image" && item["value"].as_str()
                 == expected_image.to_str()
         }));
+        fs::remove_dir_all(root).expect("cleanup");
+    }
+
+    #[test]
+    fn empty_acquisition_emits_no_candidate_receipt() {
+        let root=fixture_root("empty-acquisition");
+        let trajectory=fixture_trajectory(&root,b"screenshot");
+        let config=fixture_config(root.clone());
+        let store=RetrievalPolicyTraceFileStoreV1::open(&config.policy_trace_dir).expect("trace store");
+        let mut trajectories=Vec::new(); let mut index=None; let mut memory=RetrievalPolicyMemoryV1::default();
+        handle_request(json!({"op":"insert","trajectory":trajectory}),&config,&mut trajectories,&mut index,&mut memory,&store).expect("insert");
+        let response=handle_request(json!({"op":"query","query":"zzzxxyy-no-match","candidate_id":"empty-invocation"}),&config,&mut trajectories,&mut index,&mut memory,&store).expect("empty query");
+        assert_eq!(response["acquisition_receipt_v2"]["acquisition_status"],"no_candidate_evidence");
+        assert!(response["acquisition_receipt_v2"]["candidate_set_sha256"].is_null());
+        assert_eq!(response["retrieval_trace"]["stop_reason"],"no_candidate_evidence");
+        fs::remove_dir_all(root).expect("cleanup");
+    }
+
+    #[test]
+    fn acquisition_tool_error_emits_explicit_failure_receipt() {
+        let root=fixture_root("tool-error");
+        let config=fixture_config(root.clone());
+        let store=RetrievalPolicyTraceFileStoreV1::open(&config.policy_trace_dir).expect("trace store");
+        let mut trajectories=Vec::new();
+        let mut index=Some(RetrievalIndexesV1{bm25:None,entity_literal:None});
+        let mut memory=RetrievalPolicyMemoryV1::default();
+        let response=handle_request(json!({"op":"query","query":"anything","candidate_id":"failed-invocation"}),&config,&mut trajectories,&mut index,&mut memory,&store).expect("failure receipt response");
+        assert_eq!(response["ok"],false);
+        assert_eq!(response["acquisition_receipt_v2"]["acquisition_status"],"tool_error");
+        assert_eq!(response["acquisition_receipt_v2"]["operations"][0]["outcome"],"tool_error");
         fs::remove_dir_all(root).expect("cleanup");
     }
 
@@ -1029,7 +1147,7 @@ mod tests {
         fs::write(&image_path, b"replaced bytes").expect("tamper image bytes");
 
         let result = handle_request(
-            json!({"op": "query", "query": "customer Ada pending order"}),
+            json!({"op": "query", "query": "customer Ada pending order", "candidate_id":"tampered-image-invocation"}),
             &config,
             &mut trajectories,
             &mut index,
