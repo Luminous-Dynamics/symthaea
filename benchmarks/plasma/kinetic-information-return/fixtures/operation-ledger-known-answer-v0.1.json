@@ -58,7 +58,8 @@
           "state_after_sha256": "ffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffff",
           "physical_entropy_measure_id": "physical-boltzmann-h-theorem-production",
           "physical_entropy_production": 0.04,
-          "declared_reversible": false
+          "declared_reversible": false,
+          "physical_entropy_sign_convention": "boltzmann_entropy_increase"
         }
       ]
     }
