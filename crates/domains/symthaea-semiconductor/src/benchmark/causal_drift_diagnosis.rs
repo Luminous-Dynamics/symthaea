@@ -21,6 +21,8 @@ pub const CAUSAL_DRIFT_EVIDENCE_SCHEMA_V1: &str =
     "luminous.semi-bench.causal-drift-evidence.v1";
 
 const NORMAL_95_Z: f64 = 1.959_963_984_540_054;
+/// Conservative 95% Student-t critical value for df >= 9 (10 independent clusters).
+const T_95_DF9: f64 = 2.262_157_162_740_992;
 
 #[derive(Clone, Copy, Debug, Eq, PartialEq, Ord, PartialOrd, Serialize, Deserialize)]
 #[serde(rename_all = "snake_case")]
@@ -107,6 +109,31 @@ pub struct MatchedDifferenceInDifferencesV1 {
 }
 
 #[derive(Clone, Debug, PartialEq, Serialize, Deserialize)]
+pub struct ClusterDidSummaryV1 {
+    pub cluster_id: String,
+    pub treated_pre_mean: f64,
+    pub treated_post_mean: f64,
+    pub control_pre_mean: f64,
+    pub control_post_mean: f64,
+    pub treated_pre_count: usize,
+    pub treated_post_count: usize,
+    pub control_pre_count: usize,
+    pub control_post_count: usize,
+    pub maximum_absolute_covariate_smd: f64,
+    pub treated_pretrend_slope: f64,
+    pub control_pretrend_slope: f64,
+}
+
+#[derive(Clone, Debug, PartialEq, Serialize, Deserialize)]
+pub struct ClusteredDifferenceInDifferencesV1 {
+    /// Each row is one independent top-level unit (e.g. tool, chamber or lot).
+    /// Units nested within a cluster are summarized before this estimator.
+    pub clusters: Vec<ClusterDidSummaryV1>,
+    pub protocol_sha256: String,
+    pub source_summary_sha256: String,
+}
+
+#[derive(Clone, Debug, PartialEq, Serialize, Deserialize)]
 pub struct ControlledInterventionEvidenceV1 {
     pub randomized_assignment: bool,
     pub preregistered_analysis: bool,
@@ -140,6 +167,7 @@ pub struct CausalDriftHypothesisInputV1 {
     pub scope: String,
     pub evidence: Vec<CausalDriftEvidenceV1>,
     pub matched_contrast: Option<MatchedDifferenceInDifferencesV1>,
+    pub clustered_matched_contrast: Option<ClusteredDifferenceInDifferencesV1>,
     pub controlled_intervention: Option<ControlledInterventionEvidenceV1>,
     pub negative_controls: Vec<NegativeControlEvidenceV1>,
     pub measured_confounders: Vec<String>,
@@ -151,6 +179,8 @@ pub struct CausalDriftPolicyV1 {
     pub minimum_group_count: usize,
     pub maximum_covariate_smd: f64,
     pub maximum_pretrend_slope_difference: f64,
+    /// Minimum number of independent top-level clusters for cluster-level DiD.
+    pub minimum_independent_clusters: usize,
 }
 
 #[derive(Clone, Debug, PartialEq, Serialize, Deserialize)]
@@ -367,6 +397,114 @@ fn estimate_matched_contrast(
     let pretrend_ok = (contrast.treated_pretrend_slope - contrast.control_pretrend_slope).abs()
         <= policy.maximum_pretrend_slope_difference;
     Ok((effect, balance_ok && pretrend_ok))
+}
+
+fn estimate_clustered_contrast(
+    contrast: &ClusteredDifferenceInDifferencesV1,
+    policy: &CausalDriftPolicyV1,
+) -> Result<(CausalEffectEstimateV1, bool), CausalDriftDiagnosisErrorV1> {
+    if contrast.clusters.len() < policy.minimum_independent_clusters {
+        return Err(CausalDriftDiagnosisErrorV1(format!(
+            "clustered contrast has {} independent clusters; at least {} are required",
+            contrast.clusters.len(),
+            policy.minimum_independent_clusters
+        )));
+    }
+    if !valid_sha256(&contrast.protocol_sha256)
+        || !valid_sha256(&contrast.source_summary_sha256)
+    {
+        return Err(CausalDriftDiagnosisErrorV1(
+            "clustered contrast protocol/source digest is malformed".into(),
+        ));
+    }
+
+    let mut cluster_ids = BTreeSet::new();
+    let mut effects = Vec::with_capacity(contrast.clusters.len());
+    let mut diagnostics_ok = true;
+    for cluster in &contrast.clusters {
+        require_text(&cluster.cluster_id, "clustered_contrast.cluster_id")?;
+        if !cluster_ids.insert(cluster.cluster_id.as_str()) {
+            return Err(CausalDriftDiagnosisErrorV1(
+                "clustered contrast repeats an independent cluster ID".into(),
+            ));
+        }
+        let values = [
+            cluster.treated_pre_mean,
+            cluster.treated_post_mean,
+            cluster.control_pre_mean,
+            cluster.control_post_mean,
+            cluster.maximum_absolute_covariate_smd,
+            cluster.treated_pretrend_slope,
+            cluster.control_pretrend_slope,
+        ];
+        if values.iter().any(|value| !value.is_finite()) {
+            return Err(CausalDriftDiagnosisErrorV1(format!(
+                "cluster {} contains non-finite summary values",
+                cluster.cluster_id
+            )));
+        }
+        for (name, count) in [
+            ("treated_pre_count", cluster.treated_pre_count),
+            ("treated_post_count", cluster.treated_post_count),
+            ("control_pre_count", cluster.control_pre_count),
+            ("control_post_count", cluster.control_post_count),
+        ] {
+            if count < policy.minimum_group_count {
+                return Err(CausalDriftDiagnosisErrorV1(format!(
+                    "cluster {} {name} is below the minimum group count",
+                    cluster.cluster_id
+                )));
+            }
+        }
+        if cluster.maximum_absolute_covariate_smd > policy.maximum_covariate_smd
+            || (cluster.treated_pretrend_slope - cluster.control_pretrend_slope).abs()
+                > policy.maximum_pretrend_slope_difference
+        {
+            diagnostics_ok = false;
+        }
+        let treated_delta = cluster.treated_post_mean - cluster.treated_pre_mean;
+        let control_delta = cluster.control_post_mean - cluster.control_pre_mean;
+        let effect = treated_delta - control_delta;
+        if !effect.is_finite() {
+            return Err(CausalDriftDiagnosisErrorV1(format!(
+                "cluster {} DiD effect is non-finite",
+                cluster.cluster_id
+            )));
+        }
+        effects.push(effect);
+    }
+
+    // Equal-weight cluster-average estimand. Standard error is computed from
+    // between-cluster variation, not by treating wafer rows as independent.
+    let cluster_count = effects.len();
+    let estimate = effects.iter().sum::<f64>() / cluster_count as f64;
+    let sum_squared_deviation = effects
+        .iter()
+        .map(|effect| (effect - estimate).powi(2))
+        .sum::<f64>();
+    let sample_variance = sum_squared_deviation / (cluster_count - 1) as f64;
+    let standard_error = (sample_variance / cluster_count as f64).sqrt();
+    if !estimate.is_finite() || !standard_error.is_finite() {
+        return Err(CausalDriftDiagnosisErrorV1(
+            "clustered contrast estimate or standard error is non-finite".into(),
+        ));
+    }
+    let radius = T_95_DF9 * standard_error;
+    let effect = CausalEffectEstimateV1 {
+        estimate,
+        standard_error,
+        lower_95: estimate - radius,
+        upper_95: estimate + radius,
+        method: format!(
+            "equal_weight_cluster_mean_did_student_t95_conservative_df9_n{cluster_count}"
+        ),
+    };
+    if !effect.lower_95.is_finite() || !effect.upper_95.is_finite() {
+        return Err(CausalDriftDiagnosisErrorV1(
+            "clustered contrast interval overflows".into(),
+        ));
+    }
+    Ok((effect, diagnostics_ok))
 }
 
 fn estimate_intervention(
