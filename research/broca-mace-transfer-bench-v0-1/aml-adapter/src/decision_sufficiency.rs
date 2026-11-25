@@ -17,6 +17,10 @@ use crate::qualification_dsse::{
 };
 use crate::qualification_trust::PinnedEd25519QualificationVerifierV1;
 use crate::qualified_candidate_evidence::QualifiedCandidateEvidenceBatchV1;
+use crate::evidence_qualification_gate::{
+    EvidenceQualificationBindingV1, EvidenceQualificationRejectV1,
+    EvidenceQualificationSignatureVerifierV1,
+};
 
 pub const DECISION_SUFFICIENCY_VERIFIER_ID_V1: &str =
     "mace-independent-decision-sufficiency-evaluator";
@@ -137,6 +141,7 @@ pub enum DecisionSufficiencyRejectV1 {
     NotYetValid,
     Expired,
     InvalidSignature,
+    Qualification(EvidenceQualificationRejectV1),
 }
 
 #[derive(Clone, Debug, Eq, PartialEq)]
@@ -520,9 +525,16 @@ impl VerifiedDecisionSufficiencyV1 {
     pub fn validate_at_use(
         &self,
         qualified: &QualifiedCandidateEvidenceBatchV1,
+        qualification_binding: &EvidenceQualificationBindingV1<'_>,
+        current_qualification_verifier: &impl EvidenceQualificationSignatureVerifierV1,
         binding: &DecisionSufficiencyUseBindingV1<'_>,
         current_evaluator_profile: &PinnedEd25519QualificationVerifierV1,
     ) -> Result<(), DecisionSufficiencyRejectV1> {
+        qualified.validate_at_use(qualification_binding, current_qualification_verifier)
+            .map_err(DecisionSufficiencyRejectV1::Qualification)?;
+        if qualification_binding.now_unix != binding.now_unix {
+            return Err(DecisionSufficiencyRejectV1::BindingMismatch);
+        }
         validate_binding_against_qualified(qualified, binding)?;
         validate_evaluator_role(current_evaluator_profile, qualified, &self.receipt)?;
         validate_receipt_binding(&self.receipt, binding)?;
@@ -558,10 +570,17 @@ impl VerifiedDecisionSufficiencyV1 {
 /// against one exact qualified projection and the consumer's DecisionNeed.
 pub fn verify_decision_sufficiency_v1(
     qualified: &QualifiedCandidateEvidenceBatchV1,
+    qualification_binding: &EvidenceQualificationBindingV1<'_>,
+    current_qualification_verifier: &impl EvidenceQualificationSignatureVerifierV1,
     binding: &DecisionSufficiencyUseBindingV1<'_>,
     envelope_json: &str,
     evaluator_profile: &PinnedEd25519QualificationVerifierV1,
 ) -> Result<VerifiedDecisionSufficiencyV1, DecisionSufficiencyRejectV1> {
+    qualified.validate_at_use(qualification_binding, current_qualification_verifier)
+        .map_err(DecisionSufficiencyRejectV1::Qualification)?;
+    if qualification_binding.now_unix != binding.now_unix {
+        return Err(DecisionSufficiencyRejectV1::BindingMismatch);
+    }
     validate_binding_against_qualified(qualified, binding)?;
     if evaluator_profile.profile_sha256() != binding.issuer_profile_sha256 {
         return Err(DecisionSufficiencyRejectV1::ProfileDigestMismatch);
