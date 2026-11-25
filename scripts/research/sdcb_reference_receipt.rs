@@ -20,7 +20,7 @@ use reference::{
     DiscreteStability, MatrixRank,
 };
 use std::env;
-use std::process::ExitCode;
+use std::process::{Command, ExitCode};
 use std::time::{SystemTime, UNIX_EPOCH};
 
 struct CaseResult {
@@ -86,6 +86,45 @@ fn parse_args() -> Result<(String, String), String> {
         return Err("compiler version must not be empty".to_string());
     }
     Ok((revision.to_ascii_lowercase(), compiler))
+}
+
+
+fn verify_git_provenance(source_revision: &str) -> Result<String, String> {
+    let head = Command::new("git")
+        .args(["rev-parse", "HEAD"])
+        .output()
+        .map_err(|error| format!("could not execute git rev-parse: {error}"))?;
+    if !head.status.success() {
+        return Err("git rev-parse HEAD failed; run from the repository root".to_string());
+    }
+    let head = String::from_utf8(head.stdout)
+        .map_err(|_| "git rev-parse returned non-UTF-8 output".to_string())?
+        .trim()
+        .to_ascii_lowercase();
+    if head.len() != 40 || !head.bytes().all(|byte| byte.is_ascii_hexdigit()) {
+        return Err("git rev-parse did not return a 40-character commit SHA".to_string());
+    }
+    if head != source_revision {
+        return Err(format!(
+            "provided source revision does not match repository HEAD: provided={source_revision}, observed={head}"
+        ));
+    }
+
+    let status = Command::new("git")
+        .args(["status", "--porcelain", "--untracked-files=all"])
+        .output()
+        .map_err(|error| format!("could not execute git status: {error}"))?;
+    if !status.status.success() {
+        return Err("git status --porcelain failed".to_string());
+    }
+    if !status.stdout.is_empty() {
+        let dirty = String::from_utf8_lossy(&status.stdout);
+        return Err(format!(
+            "working tree is not clean; refusing to emit a source-pinned receipt: {dirty}"
+        ));
+    }
+
+    Ok(head)
 }
 
 fn build_cases() -> Vec<CaseResult> {
@@ -283,6 +322,15 @@ fn main() -> ExitCode {
             return ExitCode::from(2);
         }
     };
+    let observed_repository_head = match verify_git_provenance(&source_revision) {
+        Ok(head) => head,
+        Err(error) => {
+            eprintln!("SDCB_RECEIPT_PROVENANCE_ERROR: {error}");
+            return ExitCode::from(2);
+        }
+    };
+    let rustflags = env::var("RUSTFLAGS").unwrap_or_default();
+
     let created_unix_seconds = match SystemTime::now().duration_since(UNIX_EPOCH) {
         Ok(duration) => duration.as_secs(),
         Err(error) => {
@@ -301,7 +349,11 @@ fn main() -> ExitCode {
     println!("  \"schema_version\": \"1.0.0\",");
     println!("  \"receipt_type\": \"sdcb_reference_control_run_v1\",");
     println!("  \"source_revision\": \"{}\",", json_escape(&source_revision));
-    println!("  \"source_revision_provenance\": \"caller_supplied_not_independently_verified\",");
+    println!("  \"source_revision_provenance\": \"observed_git_head_matches_clean_worktree\",");
+    println!("  \"repository_head\": \"{}\",", observed_repository_head);
+    println!("  \"git_working_tree_clean\": true,");
+    println!("  \"build_command\": \"rustc --edition=2024 scripts/research/sdcb_reference_receipt.rs\",");
+    println!("  \"rustflags\": \"{}\",", json_escape(&rustflags));
     println!("  \"compiler_version\": \"{}\",", json_escape(&compiler_version));
     println!("  \"operating_system\": \"{}\",", json_escape(env::consts::OS));
     println!("  \"architecture\": \"{}\",", json_escape(env::consts::ARCH));
