@@ -1676,12 +1676,8 @@ mod tests {
 
     #[test]
     fn bound_helper_rejects_invalid_initial_phase_levels() {
-        assert!(
-            delayed_aci_finite_horizon_miscoverage_bound_v1(&[-0.1], 0.2, 100).is_err()
-        );
-        assert!(
-            delayed_aci_finite_horizon_miscoverage_bound_v1(&[1.1], 0.2, 100).is_err()
-        );
+        assert!(delayed_aci_finite_horizon_miscoverage_bound_v1(&[-0.1], 0.2, 100).is_err());
+        assert!(delayed_aci_finite_horizon_miscoverage_bound_v1(&[1.1], 0.2, 100).is_err());
     }
 
     #[test]
