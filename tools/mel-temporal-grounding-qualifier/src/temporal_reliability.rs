@@ -945,15 +945,14 @@ mod tests {
     };
 
     const MANIFEST: &str = "eeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeee";
-    const MODEL_AUDIO: &str = "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa";
 
     fn digest(byte: char) -> String {
         byte.to_string().repeat(64)
     }
 
-    fn artifact() -> AudioArtifactClockV1 {
+    fn artifact_for(source_work: char) -> AudioArtifactClockV1 {
         AudioArtifactClockV1 {
-            audio_sha256: MODEL_AUDIO.into(),
+            audio_sha256: digest(source_work),
             sample_rate_hz: 48_000,
             channels: 2,
             total_frames: 48_000 * 60,
@@ -978,6 +977,7 @@ mod tests {
 
     fn case(
         query: &str,
+        source_work: char,
         annotations: Vec<IndependentTemporalAnnotationV1>,
         prediction: GroundingPredictionStateV1,
     ) -> MultiAnnotatorTemporalCaseV1 {
@@ -985,7 +985,7 @@ mod tests {
             schema: "mel-multi-annotator-temporal-grounding-v1".into(),
             query_id: query.into(),
             query_text: "Every piano entrance".into(),
-            artifact: artifact(),
+            artifact: artifact_for(source_work),
             annotation_policy_version: "musician-annotation-v1".into(),
             annotation_manifest_sha256: MANIFEST.into(),
             minimum_annotator_count: 2,
@@ -996,7 +996,7 @@ mod tests {
             prediction: TemporalGroundingPredictionV1 {
                 schema_version: TEMPORAL_GROUNDING_SCHEMA_V1.into(),
                 query_id: query.into(),
-                artifact: artifact(),
+                artifact: artifact_for(source_work),
                 state: prediction,
             },
             annotations,
@@ -1045,6 +1045,7 @@ mod tests {
             source_work_id_sha256: digest(cluster),
             case: case(
                 query,
+                cluster,
                 annotations,
                 if state == GroundTruthStateV1::Present {
                     GroundingPredictionStateV1::Occurrences { intervals }
