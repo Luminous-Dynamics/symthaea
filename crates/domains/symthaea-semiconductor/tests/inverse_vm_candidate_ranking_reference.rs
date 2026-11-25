@@ -134,14 +134,34 @@ fn fixed_topk_fixture_matches_independent_candidate_and_diversity_oracle() {
     assert!(!report.apc_r2r_authority);
     assert!(!report.equipment_control_authority);
 
-    let evaluation = |id: &str| report.evaluations.iter().find(|value| value.candidate_id == id).unwrap();
-    assert_eq!(evaluation("a-near").disposition, CandidateDispositionV1::Eligible);
-    assert_eq!(evaluation("b-far").disposition, CandidateDispositionV1::Eligible);
-    assert_eq!(evaluation("c-near-duplicate").disposition, CandidateDispositionV1::Eligible);
-    assert_eq!(evaluation("d-side-constraint-fail").disposition, CandidateDispositionV1::Infeasible);
-    assert_eq!(evaluation("e-unknown-model").disposition, CandidateDispositionV1::Unknown);
-    assert_eq!(evaluation("f-outside-support").disposition, CandidateDispositionV1::Unsupported);
-    assert_eq!(evaluation("c-near-duplicate").selected_rank, None);
+    assert_eq!(
+        report.evaluations.iter().find(|value| value.candidate_id == "a-near").unwrap().disposition,
+        CandidateDispositionV1::Eligible
+    );
+    assert_eq!(
+        report.evaluations.iter().find(|value| value.candidate_id == "b-far").unwrap().disposition,
+        CandidateDispositionV1::Eligible
+    );
+    assert_eq!(
+        report.evaluations.iter().find(|value| value.candidate_id == "c-near-duplicate").unwrap().disposition,
+        CandidateDispositionV1::Eligible
+    );
+    assert_eq!(
+        report.evaluations.iter().find(|value| value.candidate_id == "d-side-constraint-fail").unwrap().disposition,
+        CandidateDispositionV1::Infeasible
+    );
+    assert_eq!(
+        report.evaluations.iter().find(|value| value.candidate_id == "e-unknown-model").unwrap().disposition,
+        CandidateDispositionV1::Unknown
+    );
+    assert_eq!(
+        report.evaluations.iter().find(|value| value.candidate_id == "f-outside-support").unwrap().disposition,
+        CandidateDispositionV1::Unsupported
+    );
+    assert_eq!(
+        report.evaluations.iter().find(|value| value.candidate_id == "c-near-duplicate").unwrap().selected_rank,
+        None
+    );
 }
 
 #[test]
