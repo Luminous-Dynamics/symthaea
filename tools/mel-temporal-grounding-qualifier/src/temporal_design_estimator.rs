@@ -6,7 +6,7 @@
 //! first- and second-order ultimate-item inclusion probabilities; strata with
 //! zero pairwise inclusion support report variance unavailable.
 
-use std::collections::BTreeMap;
+use std::collections::{BTreeMap, BTreeSet};
 
 use serde::{Deserialize, Serialize};
 
@@ -168,10 +168,14 @@ pub fn estimate_design_based_metric(
     }
 
     let mut outcomes = BTreeMap::new();
+    let mut scoring_receipts = BTreeSet::new();
     for outcome in &input.observed_audit_outcomes {
         require_text(&outcome.item_id, "observed_audit_outcomes.item_id")?;
         validate_digest(&outcome.source_work_id_sha256, "outcome.source_work_id_sha256")?;
         validate_digest(&outcome.scoring_report_sha256, "outcome.scoring_report_sha256")?;
+        if !scoring_receipts.insert(outcome.scoring_report_sha256.as_str()) {
+            return Err(format!("duplicate scoring-report receipt for item {}", outcome.item_id));
+        }
         validate_digest(&outcome.model_identity_sha256, "outcome.model_identity_sha256")?;
         validate_digest(&outcome.scoring_plan_sha256, "outcome.scoring_plan_sha256")?;
         if outcome.model_identity_sha256 != input.model_identity_sha256
@@ -833,6 +837,14 @@ mod tests {
     }
 
     #[test]
+    fn scoring_report_receipts_must_be_unique_per_audited_query_item() {
+        let mut input = estimator_input(dataset(29, 2));
+        input.observed_audit_outcomes[1].scoring_report_sha256 =
+            input.observed_audit_outcomes[0].scoring_report_sha256.clone();
+        assert!(estimate_design_based_metric(&input).is_err());
+    }
+
+    #[test]
     fn design_estimator_keeps_audit_and_population_claim_boundaries_explicit() {
         let input = estimator_input(dataset(31, 2));
         let report = estimate_design_based_metric(&input).unwrap();
@@ -844,5 +856,10 @@ mod tests {
         assert!(!report.population_confidence_claim_permitted);
         assert_eq!(report.metric_id, "grounded-correct");
         assert_eq!(report.eligible_probability_audit_items, 6);
+        assert_eq!(report.estimated_source_work_population_mean, Some(0.5));
+        assert_eq!(
+            report.estimated_source_work_population_total_variance,
+            Some(0.375)
+        );
     }
 }
