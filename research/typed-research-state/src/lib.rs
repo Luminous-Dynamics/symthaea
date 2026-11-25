@@ -586,10 +586,14 @@ pub fn validate_state(input: &str) -> Result<ValidationReport, Vec<ValidationIss
     {
         issue(&mut issues, "$.schema_version", "unsupported schema version");
     }
-    if string(root, "status", "$", &mut issues)
-        != Some("SYNTHETIC_CONFORMANCE_EXAMPLE_NOT_PRODUCTION_STATE")
-    {
-        issue(&mut issues, "$.status", "example must be marked synthetic and non-production");
+    if !string(root, "status", "$", &mut issues).is_some_and(|status| {
+        [
+            "SYNTHETIC_CONFORMANCE_EXAMPLE_NOT_PRODUCTION_STATE",
+            "PRODUCTION_PUBLIC_STATE",
+        ]
+        .contains(&status)
+    }) {
+        issue(&mut issues, "$.status", "unknown ResearchState origin mode");
     }
     let episode = string(root, "research_episode_id", "$", &mut issues)
         .unwrap_or_default()
