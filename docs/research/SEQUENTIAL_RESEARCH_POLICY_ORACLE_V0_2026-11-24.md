@@ -76,6 +76,8 @@ The maximum over possible outcomes is the prior-free worst case. Every branch ca
 
 This recurrence is a finite-horizon reference, not a claim that all real scientific decisions are finite or fully observable.
 
+**Current-state and planned-policy gates are distinct.** Emit `current_minimax_loss = R(S)` and `current_risk_gate_passed = R(S) <= threshold` separately from the selected policy's `worst_case_terminal_loss` and `policy_terminal_risk_gate_passed`. A policy may start in an unsafe information state and still guarantee a safe terminal decision after permitted observations. That planned result does not make the current decision admissible and does not authorize the first experiment or any physical action.
+
 ### 3.3 Bayesian sequential dynamic programme
 
 For a separate, defensible prior and observation-likelihood model, define terminal Bayes risk:
