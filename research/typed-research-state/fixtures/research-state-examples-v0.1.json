@@ -13,7 +13,7 @@
         "research_episode_id": "synthetic-episode",
         "evidence_prefix": {
           "prefix_id": "prefix:RS-01",
-          "prefix_sha256": "ac2135de38983c9e77d1bbe8f9076ece19cac22c3520d98410780a5a4d445013",
+          "prefix_sha256": "90843308b5be69105614950b7fb398652120c39d87cf9ba485dea21da196b1ab",
           "lineage_snapshot_ref": "urn:synthetic:lineage:RS-01",
           "sequence_number": 1
         },
@@ -89,7 +89,7 @@
         "research_episode_id": "synthetic-episode",
         "evidence_prefix": {
           "prefix_id": "prefix:RS-02",
-          "prefix_sha256": "16fe8fa3aed4fc4aba004c00028c4cfae7b86961750453c0d52cdf68fe86e449",
+          "prefix_sha256": "95f3c238f106d66cc949e0aa4f4337ce3681eaf816b6a6d4e0a742b15d7e09c2",
           "lineage_snapshot_ref": "urn:synthetic:lineage:RS-02",
           "sequence_number": 1
         },
@@ -122,7 +122,7 @@
                   "output_digest": "aec60285f2a0ff0cc1c698a2b20fa19bad3e126834113b62af776a2172d32a49",
                   "confidence": 0.82,
                   "emitted_at": "2026-11-25T10:06:00Z",
-                  "evidence_prefix_sha256": "16fe8fa3aed4fc4aba004c00028c4cfae7b86961750453c0d52cdf68fe86e449"
+                  "evidence_prefix_sha256": "95f3c238f106d66cc949e0aa4f4337ce3681eaf816b6a6d4e0a742b15d7e09c2"
                 },
                 "quote_span": {
                   "byte_start": 0,
@@ -176,7 +176,7 @@
         "research_episode_id": "synthetic-episode",
         "evidence_prefix": {
           "prefix_id": "prefix:RS-03",
-          "prefix_sha256": "4d0b5585597a027830e8287fb2071bb62d2a6a8250ba403683dce76a8b357ff8",
+          "prefix_sha256": "58d2419357d72cc2caabc3872e7cf571496333f99421dfa260bc15cbb71f7722",
           "lineage_snapshot_ref": "urn:synthetic:lineage:RS-03",
           "sequence_number": 1
         },
@@ -209,7 +209,7 @@
                   "output_digest": "b81d039fa300d04f3427fcbd00fd69b2ec62cf04b25424328b1814a4b54ac7d0",
                   "confidence": 0.91,
                   "emitted_at": "2026-11-25T10:12:00Z",
-                  "evidence_prefix_sha256": "4d0b5585597a027830e8287fb2071bb62d2a6a8250ba403683dce76a8b357ff8"
+                  "evidence_prefix_sha256": "58d2419357d72cc2caabc3872e7cf571496333f99421dfa260bc15cbb71f7722"
                 },
                 "quote_span": {
                   "byte_start": 5,
@@ -227,7 +227,7 @@
                   "output_digest": "a83e4afc653eab4a97514f1d0a2af1fb17bad38a4585280afbdd03d409772984",
                   "confidence": 0.88,
                   "emitted_at": "2026-11-25T10:13:00Z",
-                  "evidence_prefix_sha256": "4d0b5585597a027830e8287fb2071bb62d2a6a8250ba403683dce76a8b357ff8"
+                  "evidence_prefix_sha256": "58d2419357d72cc2caabc3872e7cf571496333f99421dfa260bc15cbb71f7722"
                 },
                 "quote_span": {
                   "byte_start": 9,
@@ -298,7 +298,7 @@
         "research_episode_id": "synthetic-episode",
         "evidence_prefix": {
           "prefix_id": "prefix:RS-04",
-          "prefix_sha256": "f19e7e624a8654c90141cbfb80143ff540bcd1936d8a25267004f01f2e999db6",
+          "prefix_sha256": "5ca515038fa3769f36d3736cb3daedad837e06e5d26648c6ad8cf21262a1833c",
           "lineage_snapshot_ref": "urn:synthetic:lineage:RS-04",
           "sequence_number": 1
         },
@@ -331,7 +331,7 @@
                   "output_digest": "a9a3b52a053f7ea8a9463c1c038e19022358c98d4e699ae12620468d8fd7387e",
                   "confidence": 0.93,
                   "emitted_at": "2026-11-25T10:21:00Z",
-                  "evidence_prefix_sha256": "f19e7e624a8654c90141cbfb80143ff540bcd1936d8a25267004f01f2e999db6"
+                  "evidence_prefix_sha256": "5ca515038fa3769f36d3736cb3daedad837e06e5d26648c6ad8cf21262a1833c"
                 },
                 "quote_span": {
                   "byte_start": 0,
