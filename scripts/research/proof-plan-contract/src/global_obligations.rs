@@ -301,7 +301,7 @@ fn find_transition_cycles(transitions: &HashMap<String, Vec<String>>) -> Vec<Str
         match marks.get(node).copied().unwrap_or(0) {
             2 => return,
             1 => {
-                if let Some(start) = stack.iter().position(|entry| entry == node) {
+                if let Some(start) = stack.iter().position(|entry| entry.as_str() == node) {
                     for entry in &stack[start..] {
                         cycles.insert(entry.clone());
                     }
@@ -359,6 +359,15 @@ pub fn analyze_global_obligations(plan: &ProofPlan) -> GlobalObligationReport {
                 .iter()
                 .any(|alternative| alternative.id == report.alternative_id)
         }) {
+            if primary_alternatives
+                .iter()
+                .find(|alternative| alternative.id == primary.alternative_id)
+                .is_some_and(|alternative| alternative.root_goal_id != plan.root_goal_id)
+            {
+                errors.push(
+                    "accepted primary alternative root must match ProofPlanV1.root_goal_id".to_owned(),
+                );
+            }
             if !primary.unresolved_goals.is_empty() {
                 errors.push(format!(
                     "accepted plan has unresolved primary-route obligations: {}",
@@ -594,4 +603,5 @@ mod tests {
         let report = analyzed(&value);
         assert!(report.errors.iter().any(|error| error.contains("goal-transition cycle")));
     }
-}}
+}
+}
