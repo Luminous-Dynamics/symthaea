@@ -1,0 +1,38 @@
+name: Typed ResearchState Contract
+
+on:
+  push:
+    branches: [main]
+    paths:
+      - "research/typed-research-state/**"
+      - ".github/workflows/typed-research-state.yml"
+      - "docs/research/TYPED_PUBLIC_RESEARCH_STATE_V0_2026-11-25.md"
+  pull_request:
+    types: [opened, synchronize, reopened, ready_for_review]
+    paths:
+      - "research/typed-research-state/**"
+      - ".github/workflows/typed-research-state.yml"
+      - "docs/research/TYPED_PUBLIC_RESEARCH_STATE_V0_2026-11-25.md"
+
+permissions:
+  contents: read
+
+jobs:
+  qualify:
+    name: Rust 1.96 ResearchState conformance
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - name: Set up Rust
+        uses: dtolnay/rust-toolchain@stable
+        with:
+          toolchain: "1.96.0"
+          components: clippy, rustfmt
+      - name: Check formatting
+        run: cargo fmt --manifest-path research/typed-research-state/Cargo.toml -- --check
+      - name: Run locked validator tests
+        run: cargo test --manifest-path research/typed-research-state/Cargo.toml --locked --all-targets
+      - name: Run ResearchState examples
+        run: cargo run --manifest-path research/typed-research-state/Cargo.toml --locked
+      - name: Run strict Clippy
+        run: cargo clippy --manifest-path research/typed-research-state/Cargo.toml --locked --all-targets -- -D warnings
