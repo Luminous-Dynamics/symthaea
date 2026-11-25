@@ -811,6 +811,33 @@ pub fn validate_separated_views(
                 );
             }
         }
+        required_string(candidate_fixture, "claim", &format!("candidate.{path}"), &mut issues);
+        if let Some(scope_value) = candidate_fixture.get("claim_scope") {
+            if let Some(scope) = object(scope_value, &format!("candidate.{path}.claim_scope"), &mut issues) {
+                const SCOPE_KEYS: &[&str] = &[
+                    "population", "outcome_or_measure", "quantifier_or_effect",
+                    "domain_or_reference_boundary", "scope_note",
+                ];
+                validate_exact_keys(scope, SCOPE_KEYS, &format!("candidate.{path}.claim_scope"), &mut issues);
+                for key in SCOPE_KEYS {
+                    required_string(scope, key, &format!("candidate.{path}.claim_scope"), &mut issues);
+                }
+            }
+        } else {
+            issue(&mut issues, format!("candidate.{path}.claim_scope"), "missing claim scope");
+        }
+        for key in ["claim_reference_time", "verification_time", "model_knowledge_cutoff"] {
+            if let Some(time) = required_string(candidate_fixture, key, &format!("candidate.{path}"), &mut issues) {
+                if !valid_time(time) {
+                    issue(&mut issues, format!("candidate.{path}.{key}"), "invalid RFC3339 timestamp");
+                }
+            }
+        }
+        if let Some(invariants) = required_array(evaluator_fixture, "required_invariants", &format!("evaluator.{path}"), &mut issues) {
+            if invariants.is_empty() || invariants.iter().any(|item| item.as_str().is_none_or(|value| value.trim().is_empty())) {
+                issue(&mut issues, format!("evaluator.{path}.required_invariants"), "required invariants must be non-empty strings");
+            }
+        }
         if let Some(verdict) =
             required_string(evaluator_fixture, "expected_verdict", &format!("evaluator.{path}"), &mut issues)
         {
@@ -929,6 +956,19 @@ pub fn validate_separated_views(
                     );
                 }
             }
+            required_string(candidate_item, "source_id", &format!("candidate.{evidence_path}"), &mut issues);
+            if let Some(url) = required_string(candidate_item, "canonical_url", &format!("candidate.{evidence_path}"), &mut issues) {
+                if !(url.starts_with("https://") || url.starts_with("http://")) {
+                    issue(&mut issues, format!("candidate.{evidence_path}.canonical_url"), "URL must use HTTP(S)");
+                }
+            }
+            for key in ["publication_time", "retrieval_time"] {
+                if let Some(time) = required_string(candidate_item, key, &format!("candidate.{evidence_path}"), &mut issues) {
+                    if !valid_time(time) {
+                        issue(&mut issues, format!("candidate.{evidence_path}.{key}"), "invalid RFC3339 timestamp");
+                    }
+                }
+            }
             let artifact = required_string(
                 candidate_item,
                 "artifact_text",
@@ -966,6 +1006,25 @@ pub fn validate_separated_views(
                 }
             }
 
+            required_string(key_item, "source_family_id", &format!("evaluator.{evidence_path}"), &mut issues);
+            if let Some(role) = required_string(key_item, "source_role", &format!("evaluator.{evidence_path}"), &mut issues) {
+                if !["primary", "secondary", "registry", "syndicated", "unknown"].contains(&role) {
+                    issue(&mut issues, format!("evaluator.{evidence_path}.source_role"), "unknown source role");
+                }
+            }
+            if let Some(integrity) = required_string(key_item, "content_integrity", &format!("evaluator.{evidence_path}"), &mut issues) {
+                if !["clean", "compromised", "missing", "unknown"].contains(&integrity) {
+                    issue(&mut issues, format!("evaluator.{evidence_path}.content_integrity"), "unknown integrity state");
+                }
+            }
+            if let Some(correction) = required_string(key_item, "correction_status", &format!("evaluator.{evidence_path}"), &mut issues) {
+                if !["none", "corrected", "retracted", "superseded"].contains(&correction) {
+                    issue(&mut issues, format!("evaluator.{evidence_path}.correction_status"), "unknown correction status");
+                }
+            }
+            if !key_item.get("relationship_notes").is_some_and(Value::is_string) {
+                issue(&mut issues, format!("evaluator.{evidence_path}.relationship_notes"), "relationship_notes must be a string");
+            }
             if let Some(relation) = required_string(
                 key_item,
                 "relation_to_claim",
@@ -1059,6 +1118,8 @@ pub fn validate_checked_in_views() -> Result<SeparatedViewReport, Vec<Validation
 /// Run deterministic negative controls against the checked-in pack.
 pub fn self_test() -> Result<ValidationReport, String> {
     let valid = validate_pack(FIXTURE_PACK).map_err(|issues| format!("fixture pack invalid: {issues:?}"))?;
+    validate_checked_in_views()
+        .map_err(|issues| format!("separated candidate/evaluator views invalid: {issues:?}"))?;
     let mut tampered: Value =
         serde_json::from_str(FIXTURE_PACK).map_err(|error| error.to_string())?;
     tampered["fixtures"][0]["evidence"][0]["artifact_text"] =
