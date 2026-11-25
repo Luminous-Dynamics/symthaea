@@ -10,3 +10,5 @@ description = "Provider-neutral Add/Search contract core for future Agent Memory
 serde_json = "1.0"
 sha2 = "0.10"
 ed25519-dalek = "=2.1.0"
+base64 = "=0.22.1"
+serde = "1.0"
