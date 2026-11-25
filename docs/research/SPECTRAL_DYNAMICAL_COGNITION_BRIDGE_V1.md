@@ -198,7 +198,7 @@ The 15-root axiom-audit prototype in this repository is a small, separate fixtur
 6. Execute the exploratory pilot and publish raw per-seed results, then preregister hidden/confirmatory runs.
 7. Seek independent reproduction on a second machine and independent review of the statistical analysis.
 
-**Current evidence state:** protocol, 30-task design manifest, and a dependency-free Rust analytic reference harness with 24 authored unit tests are present. The Rust source has not been compiled or executed. No dataset generation, HDC/CfC or transformer model run, EEG analysis, RH proof verification, SOTA reproduction, or performance result is claimed by this artifact.
+**Current evidence state:** protocol, 34-task design manifest, and a dependency-free Rust analytic reference harness with 27 authored unit tests are present. A standalone receipt runner defines 24 analytic control cases and a JSON receipt schema. Neither Rust source file has been compiled or executed. No dataset generation, HDC/CfC or transformer model run, EEG analysis, RH proof verification, SOTA reproduction, or performance result is claimed by this artifact.
 
 
 ## 11. References and evidence boundaries
@@ -237,6 +237,8 @@ The following supporting artifacts extend this protocol:
 - [Industry and research benchmark landscape snapshot](SDCB_INDUSTRY_BENCHMARK_LANDSCAPE_2026_11_25.md): current external baselines, reported metrics, comparison caveats, and SDCB promotion gates.
 - [Hidden evaluation and reproducibility protocol](SDCB_HIDDEN_EVALUATION_AND_REPRODUCIBILITY_V1.md): sealed holdouts, salted commitments, anti-leakage, exact system identity, independent evaluator and delayed reveal.
 - [Dependency-free Rust analytic reference harness](../../scripts/research/sdcb_reference.rs) with [run instructions and limitations](../../scripts/research/SDCB_REFERENCE_HARNESS_README.md).
+- [Machine-readable reference receipt runner](../../scripts/research/sdcb_reference_receipt.rs) and [receipt schema](SDCB_REFERENCE_CONTROL_RECEIPT_V1.schema.json).
+- [Scientific-discovery benchmark interoperability](SDCB_SCIENTIFIC_DISCOVERY_INTEROPERABILITY_V1.md).
 
 A key refinement from current Koopman/system-identification work is to evaluate *identifiability*, not just prediction accuracy. Each dynamical experiment must state persistent excitation, observability, sampling, noise, stationarity or regime assumptions, sequence length, and approximation error. Include adversarial non-identifiable trajectories and allow the correct result to be “insufficient evidence to identify the dynamics.”
 
@@ -256,7 +258,7 @@ The standard-library Rust reference harness includes 2x2 observability-rank, inp
 
 This adopts a critical lesson from current Koopman work: report the assumptions and conditions under which a spectral/dynamical approximation is learnable, and include adversarial systems where the same observations are consistent with different hidden dynamics. Identifiability is task-relative: the observed output may be predictable even when the hidden mechanism is not identifiable. The system should preserve that limited prediction while refusing the stronger mechanistic claim, then propose a sensor or excitation intervention that would distinguish the alternatives. A model that knows what it does not know—and how to reduce that uncertainty—is more scientifically useful than one that always emits a unique model.
 
-The pilot manifest now contains 28 design-only task specifications, 14 negative controls, and seven task families. No generated trajectory, fitted model or model performance has been measured.
+The pilot manifest now contains 34 design-only task specifications across eight families, 20 negative controls and 16 outcome metrics. No generated trajectory, fitted model or model performance has been measured.
 
 
 ## 13. Sequential scientific discovery and benchmark interoperability
