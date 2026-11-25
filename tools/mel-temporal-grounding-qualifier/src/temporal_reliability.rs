@@ -21,6 +21,7 @@ use crate::temporal_grounding::{
 const CORPUS_SCHEMA_V1: &str = "mel-temporal-annotation-reliability-corpus-v1";
 const REPORT_SCHEMA_V1: &str = "mel-temporal-annotation-reliability-report-v1";
 const RELIABILITY_EVALUATOR_V1: &str = "mel-temporal-annotation-reliability-v1";
+const MAX_ANNOTATIONS_PER_UNIT_V1: usize = 256;
 
 #[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
 #[serde(deny_unknown_fields)]
@@ -165,38 +166,75 @@ pub fn audit_reliability_corpus(
             counts.increment(annotation.state);
         }
         let item_ratings = unit.annotations.len();
-        let sum_squares = counts
-            .values()
-            .iter()
-            .map(|count| count.saturating_mul(*count))
-            .sum::<usize>();
-        let ordered_disagreements = item_ratings
-            .saturating_mul(item_ratings)
-            .saturating_sub(sum_squares);
+        let sum_squares = counts.values().iter().try_fold(0_usize, |sum, count| {
+            let square = count
+                .checked_mul(*count)
+                .ok_or_else(|| "item category count square overflow".to_string())?;
+            sum.checked_add(square)
+                .ok_or_else(|| "item category count sum overflow".to_string())
+        })?;
+        let all_ordered_pairs = item_ratings
+            .checked_mul(item_ratings)
+            .ok_or_else(|| "item ordered-pair count overflow".to_string())?;
+        let ordered_disagreements = all_ordered_pairs
+            .checked_sub(sum_squares)
+            .ok_or_else(|| "item coincidence disagreement underflow".to_string())?;
+        let item_denominator = item_ratings
+            .checked_sub(1)
+            .ok_or_else(|| "item has fewer than two ratings".to_string())?;
         observed_disagreement_total +=
-            ordered_disagreements as f64 / (item_ratings.saturating_sub(1) as f64);
-        total_ratings += item_ratings;
-        total_annotation_records += item_ratings;
-        global_counts.present += counts.present;
-        global_counts.absent += counts.absent;
-        global_counts.ambiguous += counts.ambiguous;
-        global_counts.not_estimable += counts.not_estimable;
+            ordered_disagreements as f64 / item_denominator as f64;
+        total_ratings = total_ratings
+            .checked_add(item_ratings)
+            .ok_or_else(|| "corpus rating count overflow".to_string())?;
+        total_annotation_records = total_annotation_records
+            .checked_add(item_ratings)
+            .ok_or_else(|| "corpus annotation record count overflow".to_string())?;
+        global_counts.present = global_counts
+            .present
+            .checked_add(counts.present)
+            .ok_or_else(|| "global Present count overflow".to_string())?;
+        global_counts.absent = global_counts
+            .absent
+            .checked_add(counts.absent)
+            .ok_or_else(|| "global Absent count overflow".to_string())?;
+        global_counts.ambiguous = global_counts
+            .ambiguous
+            .checked_add(counts.ambiguous)
+            .ok_or_else(|| "global Ambiguous count overflow".to_string())?;
+        global_counts.not_estimable = global_counts
+            .not_estimable
+            .checked_add(counts.not_estimable)
+            .ok_or_else(|| "global NotEstimable count overflow".to_string())?;
         unit_summaries.push(summarize_unit(unit, &corpus.plan, &corpus.interval_iou_thresholds)?);
     }
 
     let observed_disagreement = (total_ratings > 0)
         .then_some(observed_disagreement_total / total_ratings as f64);
-    let global_sum_squares = global_counts
-        .values()
-        .iter()
-        .map(|count| count.saturating_mul(*count))
-        .sum::<usize>();
-    let expected_disagreement = (total_ratings > 1).then(|| {
-        let numerator = total_ratings
-            .saturating_mul(total_ratings)
-            .saturating_sub(global_sum_squares);
-        numerator as f64 / (total_ratings.saturating_mul(total_ratings - 1)) as f64
-    });
+    let global_sum_squares = global_counts.values().iter().try_fold(
+        0_usize,
+        |sum, count| {
+            let square = count
+                .checked_mul(*count)
+                .ok_or_else(|| "global category count square overflow".to_string())?;
+            sum.checked_add(square)
+                .ok_or_else(|| "global category count sum overflow".to_string())
+        },
+    )?;
+    let expected_disagreement = if total_ratings > 1 {
+        let all_pairs = total_ratings
+            .checked_mul(total_ratings)
+            .ok_or_else(|| "global ordered-pair count overflow".to_string())?;
+        let denominator = total_ratings
+            .checked_mul(total_ratings - 1)
+            .ok_or_else(|| "global coincidence denominator overflow".to_string())?;
+        let numerator = all_pairs
+            .checked_sub(global_sum_squares)
+            .ok_or_else(|| "global coincidence disagreement underflow".to_string())?;
+        Some(numerator as f64 / denominator as f64)
+    } else {
+        None
+    };
     let (alpha, alpha_status_reason) = match (observed_disagreement, expected_disagreement) {
         (Some(_observed), Some(expected)) if expected > f64::EPSILON => {
             let value = 1.0 - _observed / expected;
@@ -289,6 +327,13 @@ fn validate_corpus(corpus: &TemporalReliabilityCorpusV1) -> Result<(), String> {
                 unit.unit_id,
                 unit.annotations.len(),
                 corpus.minimum_annotations_per_unit
+            ));
+        }
+        if unit.annotations.len() > MAX_ANNOTATIONS_PER_UNIT_V1 {
+            return Err(format!(
+                "unit {} exceeds the maximum of {} independent annotations",
+                unit.unit_id,
+                MAX_ANNOTATIONS_PER_UNIT_V1
             ));
         }
         let mut annotator_ids = BTreeSet::new();
