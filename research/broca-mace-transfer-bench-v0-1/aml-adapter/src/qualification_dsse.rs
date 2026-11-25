@@ -500,8 +500,11 @@ mod tests {
             hasher.update((id.len() as u64).to_be_bytes());
             hasher.update(id.as_bytes());
         }
-        let bytes = hasher.finalize();
-        let mut output = String::with_capacity(64);
+        hex_bytes(&hasher.finalize())
+    }
+
+    fn hex_bytes(bytes: &[u8]) -> String {
+        let mut output = String::with_capacity(bytes.len() * 2);
         for byte in bytes {
             output.push_str(&format!("{byte:02x}"));
         }
@@ -612,7 +615,7 @@ mod tests {
         let verifier = pinned(&key, QualificationKeyStatusV1::Active, 1);
         assert_eq!(key_id, fixture["key_id"].as_str().unwrap());
         assert_eq!(
-            public_key.iter().map(|byte| format!("{byte:02x}")).collect::<String>(),
+            hex_bytes(&public_key),
             fixture["public_key_hex"].as_str().unwrap()
         );
         assert_eq!(
@@ -628,14 +631,14 @@ mod tests {
         let payload = in_toto_qualification_payload_v1(&receipt).unwrap();
         assert_eq!(payload.len(), fixture["payload_bytes"].as_u64().unwrap() as usize);
         assert_eq!(
-            format!("{:x}", Sha256::digest(&payload)),
+            hex_bytes(&Sha256::digest(&payload)),
             fixture["payload_sha256"].as_str().unwrap()
         );
 
         let pae = dsse_pae_v1(DSSE_PAYLOAD_TYPE_V1, &payload);
         assert_eq!(pae.len(), fixture["pae_bytes"].as_u64().unwrap() as usize);
         assert_eq!(
-            format!("{:x}", Sha256::digest(&pae)),
+            hex_bytes(&Sha256::digest(&pae)),
             fixture["pae_sha256"].as_str().unwrap()
         );
         let signature = key.sign(&pae).to_bytes();
