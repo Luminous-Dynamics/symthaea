@@ -27,6 +27,16 @@ pub enum SelectiveDecisionV1 {
     AbstainNotEstimable,
 }
 
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize)]
+pub enum IdentifiabilityBasisV1 {
+    ClearPositive,
+    ClearAbsence,
+    AnnotatorDisagreement,
+    TaskAmbiguity,
+    SignalInsufficient,
+    UnsupportedQuery,
+}
+
 #[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
 #[serde(deny_unknown_fields)]
 pub struct SelectiveGroundingCaseV1 {
@@ -36,6 +46,8 @@ pub struct SelectiveGroundingCaseV1 {
     pub source_lineage_id: String,
     /// Examples: clear, dense_polyphony, masked, cropped, ambiguous_boundary.
     pub evidence_stratum: String,
+    /// Why the ground-truth disposition is identifiable or not identifiable.
+    pub identifiability_basis: IdentifiabilityBasisV1,
     /// Frozen adjudication-policy identity; raw annotation records live in #13560.
     pub adjudication_profile_sha256: String,
     pub truth: TemporalGroundTruthV1,
@@ -63,6 +75,7 @@ pub struct SelectiveCaseResultV1 {
     pub case_id: String,
     pub source_lineage_id: String,
     pub evidence_stratum: String,
+    pub identifiability_basis: IdentifiabilityBasisV1,
     pub truth_state: GroundTruthStateV1,
     pub decision: SelectiveDecisionV1,
     pub decision_confidence: f64,
@@ -106,6 +119,17 @@ pub struct StratumSelectiveSummaryV1 {
     pub ambiguous_abstentions: usize,
     pub not_estimable_abstentions: usize,
     pub reason_correct_rate: Option<f64>,
+}
+
+#[derive(Debug, Clone, PartialEq, Serialize)]
+pub struct IdentifiabilityBasisSummaryV1 {
+    pub basis: IdentifiabilityBasisV1,
+    pub cases: usize,
+    pub decision_correct: usize,
+    pub decision_correct_rate: Option<f64>,
+    pub covered_cases: usize,
+    pub abstained_cases: usize,
+    pub false_absence_claims: usize,
 }
 
 #[derive(Debug, Clone, PartialEq, Serialize)]
@@ -159,6 +183,7 @@ pub struct SelectiveGroundingReportV1 {
     pub plan: TemporalGroundingPlanV1,
     pub summary: SelectiveGroundingSummaryV1,
     pub strata: Vec<StratumSelectiveSummaryV1>,
+    pub identifiability_basis_summaries: Vec<IdentifiabilityBasisSummaryV1>,
     pub case_results: Vec<SelectiveCaseResultV1>,
     /// The harness validates digest syntax/identity binding, not authenticity.
     pub runtime_identity_authenticated: bool,
@@ -197,6 +222,7 @@ pub fn audit_selective_batch(
 
     let summary = summarize(&results);
     let strata = summarize_strata(&results);
+    let identifiability_basis_summaries = summarize_identifiability_basis(&results);
 
     Ok(SelectiveGroundingReportV1 {
         schema: "mel-selective-temporal-report-v1",
@@ -207,6 +233,7 @@ pub fn audit_selective_batch(
         plan: batch.plan.clone(),
         summary,
         strata,
+        identifiability_basis_summaries,
         case_results: results,
         runtime_identity_authenticated: false,
         evidence_receipts_authenticated: false,
@@ -234,6 +261,28 @@ fn score_case(
     }
     if !case_ids.insert(case.case_id.clone()) {
         return Err(format!("duplicate selective-grounding case_id: {}", case.case_id));
+    }
+
+    let basis_matches_truth = matches!(
+        (case.truth.state, case.identifiability_basis),
+        (GroundTruthStateV1::Present, IdentifiabilityBasisV1::ClearPositive)
+            | (GroundTruthStateV1::Absent, IdentifiabilityBasisV1::ClearAbsence)
+            | (
+                GroundTruthStateV1::Ambiguous,
+                IdentifiabilityBasisV1::AnnotatorDisagreement
+                    | IdentifiabilityBasisV1::TaskAmbiguity
+            )
+            | (
+                GroundTruthStateV1::NotEstimable,
+                IdentifiabilityBasisV1::SignalInsufficient
+                    | IdentifiabilityBasisV1::UnsupportedQuery
+            )
+    );
+    if !basis_matches_truth {
+        return Err(format!(
+            "case {} identifiability basis {:?} contradicts adjudicated state {:?}",
+            case.case_id, case.identifiability_basis, case.truth.state
+        ));
     }
 
     let truth_issues = validate_temporal_ground_truth(&case.truth);
@@ -298,6 +347,7 @@ fn score_case(
         case_id: case.case_id.clone(),
         source_lineage_id: case.source_lineage_id.clone(),
         evidence_stratum: case.evidence_stratum.clone(),
+        identifiability_basis: case.identifiability_basis,
         truth_state: case.truth.state,
         decision: case.decision,
         decision_confidence: case.decision_confidence,
@@ -487,6 +537,35 @@ fn summarize_strata(results: &[SelectiveCaseResultV1]) -> Vec<StratumSelectiveSu
                     .filter(|item| item.decision == SelectiveDecisionV1::AbstainNotEstimable)
                     .count(),
                 reason_correct_rate: mean(&reasons.iter().map(|value| if *value { 1.0 } else { 0.0 }).collect::<Vec<_>>()),
+            }
+        })
+        .collect()
+}
+
+fn summarize_identifiability_basis(
+    results: &[SelectiveCaseResultV1],
+) -> Vec<IdentifiabilityBasisSummaryV1> {
+    let mut groups: BTreeMap<IdentifiabilityBasisV1, Vec<&SelectiveCaseResultV1>> =
+        BTreeMap::new();
+    for result in results {
+        groups
+            .entry(result.identifiability_basis)
+            .or_default()
+            .push(result);
+    }
+    groups
+        .into_iter()
+        .map(|(basis, items)| {
+            let decision_correct = items.iter().filter(|item| item.decision_correct).count();
+            let covered_cases = items.iter().filter(|item| item.covered).count();
+            IdentifiabilityBasisSummaryV1 {
+                basis,
+                cases: items.len(),
+                decision_correct,
+                decision_correct_rate: rate(decision_correct, items.len()),
+                covered_cases,
+                abstained_cases: items.len() - covered_cases,
+                false_absence_claims: items.iter().filter(|item| item.false_absence_claim).count(),
             }
         })
         .collect()
@@ -696,6 +775,12 @@ mod tests {
             schema: CASE_SCHEMA_V1.into(),
             case_id: id.into(),
             source_lineage_id: format!("lineage-{id}"),
+            identifiability_basis: match state {
+                GroundTruthStateV1::Present => IdentifiabilityBasisV1::ClearPositive,
+                GroundTruthStateV1::Absent => IdentifiabilityBasisV1::ClearAbsence,
+                GroundTruthStateV1::Ambiguous => IdentifiabilityBasisV1::TaskAmbiguity,
+                GroundTruthStateV1::NotEstimable => IdentifiabilityBasisV1::SignalInsufficient,
+            },
             evidence_stratum: match state {
                 GroundTruthStateV1::Present => "clear_or_localized".into(),
                 GroundTruthStateV1::Absent => "genuine_absence".into(),
@@ -940,6 +1025,69 @@ mod tests {
             0.7,
         )]);
         assert!(audit_selective_batch(&invalid).is_err());
+    }
+
+    #[test]
+    fn annotator_disagreement_and_task_ambiguity_remain_distinct_bases() {
+        let mut disagreement = case(
+            "disagreement",
+            GroundTruthStateV1::Ambiguous,
+            vec![],
+            Some("annotators disagree on event identity"),
+            SelectiveDecisionV1::AbstainAmbiguous,
+            GroundingPredictionStateV1::Ambiguous {
+                candidate_intervals: vec![crate::temporal_grounding::FrameIntervalV1 {
+                    start_frame: 100,
+                    end_frame: 200,
+                }],
+                reason: "two annotator interpretations".into(),
+            },
+            0.8,
+        );
+        disagreement.identifiability_basis = IdentifiabilityBasisV1::AnnotatorDisagreement;
+
+        let task_ambiguity = case(
+            "task-ambiguity",
+            GroundTruthStateV1::Ambiguous,
+            vec![],
+            Some("gradual entrance lacks a stable operational boundary"),
+            SelectiveDecisionV1::AbstainAmbiguous,
+            GroundingPredictionStateV1::Ambiguous {
+                candidate_intervals: vec![crate::temporal_grounding::FrameIntervalV1 {
+                    start_frame: 100,
+                    end_frame: 200,
+                }],
+                reason: "several valid segmentations".into(),
+            },
+            0.8,
+        );
+        let report = audit_selective_batch(&batch(vec![disagreement, task_ambiguity])).unwrap();
+        assert_eq!(report.identifiability_basis_summaries.len(), 2);
+        assert_eq!(
+            report.identifiability_basis_summaries[0].basis,
+            IdentifiabilityBasisV1::AnnotatorDisagreement
+        );
+        assert_eq!(
+            report.identifiability_basis_summaries[1].basis,
+            IdentifiabilityBasisV1::TaskAmbiguity
+        );
+    }
+
+    #[test]
+    fn basis_cannot_relabel_signal_insufficiency_as_annotator_disagreement() {
+        let mut invalid = case(
+            "wrong-basis",
+            GroundTruthStateV1::NotEstimable,
+            vec![],
+            Some("source masked"),
+            SelectiveDecisionV1::AbstainNotEstimable,
+            GroundingPredictionStateV1::NotEstimable {
+                reason: "not enough signal".into(),
+            },
+            0.8,
+        );
+        invalid.identifiability_basis = IdentifiabilityBasisV1::AnnotatorDisagreement;
+        assert!(audit_selective_batch(&batch(vec![invalid])).is_err());
     }
 
     #[test]
