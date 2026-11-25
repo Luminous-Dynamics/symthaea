@@ -17,7 +17,7 @@ const CHECKER_IDS: [&str; 6] = [
     "leanchecker_paranoid",
 ];
 
-const SUMMARY_FIELDS: [&str; 14] = [
+const SUMMARY_FIELDS: [&str; 15] = [
     "requested_count",
     "executed_count",
     "accepted_count",
@@ -32,6 +32,7 @@ const SUMMARY_FIELDS: [&str; 14] = [
     "known_term_representation_families",
     "known_parser_families",
     "independent_external_algorithm_lineages",
+    "unknown_relationship_count",
 ];
 
 fn object_string<'a>(value: &'a Value, key: &str) -> Option<&'a str> {
@@ -387,10 +388,9 @@ fn summarize(
     let mut parsers = BTreeSet::new();
     let mut independent_lineages = BTreeSet::new();
 
-    let export = object_string(
-        profile.get("subject").unwrap_or(&Value::Null),
-        "export_sha256",
-    );
+    let export = profile
+        .get("subject")
+        .and_then(|subject| object_string(subject, "export_sha256"));
     if export.is_none_or(|digest| !is_sha256(digest)) {
         push(&mut errors, "subject.export_sha256 must be a lowercase SHA-256 digest");
     }
@@ -425,16 +425,16 @@ fn summarize(
                 push(&mut errors, format!("checker {checker_id} has invalid binary_sha256"));
             }
         }
-        if object_string(run, "raw_receipt_sha256")
-            .is_none_or(|digest| !is_sha256(digest))
+        let result = object_string(run, "result").unwrap_or("invalid");
+        if result != "not_run"
+            && object_string(run, "raw_receipt_sha256")
+                .is_none_or(|digest| !is_sha256(digest))
         {
             push(
                 &mut errors,
                 format!("checker {checker_id} requires a raw receipt digest"),
             );
         }
-
-        let result = object_string(run, "result").unwrap_or("invalid");
         if result != "not_run" {
             executed_count += 1;
         }
@@ -535,6 +535,9 @@ pub fn validate_profile(
     registry_input_bytes: &[u8],
 ) -> Vec<String> {
     let mut errors = validate_registry(registry);
+    if !errors.is_empty() {
+        return errors;
+    }
 
     if object_string(profile, "schema_version") != Some("1.0.0")
         || object_string(profile, "artifact_id") != Some("LEAN-CHECKER-DIVERSITY-RUN-001")
@@ -682,11 +685,6 @@ mod tests {
             serde_json::from_str(REGISTRY).expect("registry JSON"),
             serde_json::from_str(SYNTHETIC_PROFILE).expect("profile JSON"),
         )
-    }
-
-    fn refresh_registry_digest(registry: &Value, profile: &mut Value) {
-        let bytes = serde_json::to_vec_pretty(registry).expect("registry serialization");
-        profile["registry_sha256"] = json!(sha256_hex(&bytes));
     }
 
     #[test]
