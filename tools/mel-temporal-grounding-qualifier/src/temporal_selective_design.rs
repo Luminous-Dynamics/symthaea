@@ -246,7 +246,7 @@ pub fn audit_selective_design_risk(
             selected_ids.len()
         ));
     }
-    if outcomes.keys().any(|item_id| !selected_ids.contains(item_id)) {
+    if outcomes.keys().any(|item_id| !selected_ids.contains(*item_id)) {
         return Err("selective outcomes include an unselected or active-refinement item".into());
     }
 
@@ -354,15 +354,15 @@ pub fn audit_selective_design_risk(
     let mut risk_coverage = Vec::with_capacity(input.threshold_plan.thresholds_ppm.len());
     for threshold in &input.threshold_plan.thresholds_ppm {
         let covered = make_samples(&joined, |item| {
-            f64::from(is_covered(item.outcome, *threshold))
+            bool_value(is_covered(item.outcome, *threshold))
         });
         let errors = make_samples(&joined, |item| {
-            f64::from(
+            bool_value(
                 is_covered(item.outcome, *threshold) && !item.outcome.decision_correct,
             )
         });
         let false_absences = make_samples(&joined, |item| {
-            f64::from(
+            bool_value(
                 is_covered(item.outcome, *threshold) && item.outcome.false_absence_claim,
             )
         });
@@ -420,7 +420,7 @@ pub fn audit_selective_design_risk(
         let item_risk_interval = item_risk.map(|risk| {
             let linearized = make_samples(&joined, |item| {
                 let c = f64::from(is_covered(item.outcome, *threshold));
-                let e = f64::from(
+                let e = bool_value(
                     is_covered(item.outcome, *threshold) && !item.outcome.decision_correct,
                 );
                 e - risk * c
@@ -457,7 +457,7 @@ pub fn audit_selective_design_risk(
         let item_false_absence_interval = item_false_absence_rate.map(|rate| {
             let linearized = make_samples(&joined, |item| {
                 let c = f64::from(is_covered(item.outcome, *threshold));
-                let f = f64::from(
+                let f = bool_value(
                     is_covered(item.outcome, *threshold) && item.outcome.false_absence_claim,
                 );
                 f - rate * c
@@ -595,6 +595,10 @@ fn validate_threshold_plan(plan: &FrozenSelectiveThresholdPlanV1) -> Result<(), 
         previous = Some(*threshold);
     }
     Ok(())
+}
+
+fn bool_value(value: bool) -> f64 {
+    if value { 1.0 } else { 0.0 }
 }
 
 fn is_covered(outcome: &SelectiveAuditOutcomeV1, threshold_ppm: u32) -> bool {
