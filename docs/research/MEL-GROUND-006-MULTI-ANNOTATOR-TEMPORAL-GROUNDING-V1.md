@@ -149,3 +149,10 @@ The current v1 code is an evaluation adapter and synthetic test harness. It does
 - an overall SOTA or commercial advantage.
 
 Those require independent annotations, human studies, external benchmark reproduction and authenticated execution/evidence receipts.
+
+
+## Per-event boundary distribution
+
+For every predicted occurrence index, the adapter derives a reference-boundary distribution from the production scorer's existing prediction↔annotation matches. It reports the number/fraction of eligible Present annotators who match that occurrence and the min/median/max annotated start/end frames. Predicted occurrences with no match in any eligible Present annotation are listed separately.
+
+The model prediction index is only a common alignment key; the adapter does not invent a canonical event ID or merge annotation intervals. A low support rate can indicate a count/identity disagreement or a boundary outside the frozen IoU threshold; inspect the per-annotator records before interpreting it. This distribution is descriptive, not calibrated model uncertainty.
