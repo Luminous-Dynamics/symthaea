@@ -876,6 +876,20 @@ mod tests {
     }
 
     #[test]
+    fn certificate_echoes_frozen_context_and_action_receipts() {
+        let original = input(vec![
+            action("a", 1, 10, 9, 1),
+            action("b", 2, 5, 1, 10),
+            action("c", 3, 0, 0, 0),
+        ]);
+        let certificate = evaluate_individual_decision_transfer(&original).unwrap();
+        assert_eq!(certificate.context, original.context);
+        assert_eq!(certificate.actions[0].action_id, "a");
+        assert_eq!(certificate.actions[0].pairing_receipt_sha256, digest(21));
+        assert_eq!(certificate.actions[0].trajectory_sha256, digest(41));
+    }
+
+    #[test]
     fn ranking_counts_sum_to_all_unordered_pairs() {
         let certificate = evaluate_individual_decision_transfer(&input(vec![
             action("a", 1, 10, 10, 10),
