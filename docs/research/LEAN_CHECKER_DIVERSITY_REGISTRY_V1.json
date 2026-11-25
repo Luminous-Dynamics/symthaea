@@ -1,0 +1,338 @@
+{
+  "schema_version": "1.0.0",
+  "artifact_id": "LEAN-CHECKER-DIVERSITY-REGISTRY-001",
+  "status": "source_grounded_ecosystem_registry_not_a_run_receipt",
+  "reference_date": "2026-11-25",
+  "checker_set": {
+    "comparator_paranoid_bundle": [
+      "lean_official_kernel",
+      "lean4lean",
+      "nanoda",
+      "con_leche",
+      "con_ron",
+      "leanchecker_paranoid"
+    ],
+    "note": "The official kernel plus five bundled checker binaries. This is six execution paths, not six independent algorithms."
+  },
+  "checkers": [
+    {
+      "checker_id": "lean_official_kernel",
+      "role": "official_kernel",
+      "implementation_family_id": "lean_official_kernel_cpp",
+      "algorithm_lineage_id": "lean_core_kernel_lineage",
+      "implementation_language": "cpp",
+      "representation_family_id": "lean_core_expr",
+      "parser_family_id": null,
+      "independence_class": "reference_kernel",
+      "assurance_basis": "official_kernel_trusted_component",
+      "revision_policy": "pin_exact_lean_toolchain_and_binary_digest",
+      "evidence_refs": [
+        "https://lean-lang.org/doc/reference/latest/ValidatingProofs/",
+        "https://lean-lang.org/doc/reference/latest/releases/v4.35.0/"
+      ],
+      "residual_trust": [
+        "Lean kernel implementation",
+        "Lean runtime/compiler and host environment",
+        "export and comparator plumbing"
+      ]
+    },
+    {
+      "checker_id": "lean4lean",
+      "role": "external_checker",
+      "implementation_family_id": "lean4lean",
+      "algorithm_lineage_id": "lean_core_kernel_lineage",
+      "implementation_language": "lean",
+      "representation_family_id": null,
+      "parser_family_id": null,
+      "independence_class": "derived_from_official",
+      "assurance_basis": "partially_formally_verified_kernel_port",
+      "revision_policy": "pin_lean4lean_source_revision_and_its_lean_toolchain",
+      "evidence_refs": [
+        "https://arena.lean-lang.org/checker/lean4lean/",
+        "https://lean-lang.org/doc/reference/latest/ValidatingProofs/"
+      ],
+      "residual_trust": [
+        "Derived directly from the C++ kernel; may share algorithmic bugs",
+        "Primitive definitions are toolchain-sensitive",
+        "Checker-specific completeness and resource limits"
+      ]
+    },
+    {
+      "checker_id": "nanoda",
+      "role": "external_checker",
+      "implementation_family_id": "nanoda_rust",
+      "algorithm_lineage_id": "nanoda_independent_lineage",
+      "implementation_language": "rust",
+      "representation_family_id": null,
+      "parser_family_id": null,
+      "independence_class": "independent_implementation",
+      "assurance_basis": "independently_implemented_checker",
+      "revision_policy": "pin_exact_source_commit_binary_digest_rust_toolchain_and_features",
+      "evidence_refs": [
+        "https://arena.lean-lang.org/checker/nanoda/",
+        "https://github.com/ammkrn/nanoda_lib"
+      ],
+      "residual_trust": [
+        "Implementation is trusted rather than backed by the same consistency theorem as con-leche",
+        "Export parser and driver",
+        "Stack, allocator, compiler and runtime behavior"
+      ]
+    },
+    {
+      "checker_id": "con_leche",
+      "role": "external_checker",
+      "implementation_family_id": "con_leche_lean",
+      "algorithm_lineage_id": "con_leche_model_lineage",
+      "implementation_language": "lean",
+      "representation_family_id": "con_leche_own_term_representation",
+      "parser_family_id": "con_leche_verified_byte_parser",
+      "independence_class": "independent_implementation",
+      "assurance_basis": "machine_checked_consistency_argument",
+      "revision_policy": "pin_exact_con_leche_source_revision_toolchain_and_export_format",
+      "evidence_refs": [
+        "https://github.com/leanprover/con-leche",
+        "https://arena.lean-lang.org/checker/con-leche/"
+      ],
+      "residual_trust": [
+        "Lean formalization and metatheory assumptions of its consistency argument",
+        "Unverified driver and external runtime",
+        "Axiom policy and export compatibility"
+      ]
+    },
+    {
+      "checker_id": "con_ron",
+      "role": "external_checker",
+      "implementation_family_id": "con_ron_rust",
+      "algorithm_lineage_id": "con_leche_model_lineage",
+      "implementation_language": "rust",
+      "representation_family_id": "con_ron_hash_consed_representation",
+      "parser_family_id": null,
+      "independence_class": "verified_port_shared_algorithm",
+      "assurance_basis": "verified_refinement_via_aeneas",
+      "revision_policy": "pin_exact_con_ron_source_revision_aeneas_and_rust_toolchain",
+      "evidence_refs": [
+        "https://arena.lean-lang.org/round/2026-09/checker/con-ron/",
+        "https://github.com/leanprover/con-leche"
+      ],
+      "residual_trust": [
+        "Shares core checking algorithm lineage with con-leche",
+        "Aeneas translation/refinement chain",
+        "Unverified driver for reading files and scheduling threads"
+      ]
+    },
+    {
+      "checker_id": "leanchecker_paranoid",
+      "role": "hardened_kernel_variant",
+      "implementation_family_id": "leanchecker_paranoid_hardened_binary",
+      "algorithm_lineage_id": "lean_core_kernel_lineage",
+      "implementation_language": "cpp",
+      "representation_family_id": "lean_core_expr",
+      "parser_family_id": null,
+      "independence_class": "hardening_variant",
+      "assurance_basis": "official_checker_with_hardened_allocator",
+      "revision_policy": "pin_exact_lean_toolchain_binary_digest_and_allocator_hardening_build",
+      "evidence_refs": [
+        "https://lean-lang.org/doc/reference/latest/releases/v4.35.0/",
+        "https://kt3k.github.io/changelog/leanprover/lean4/2026-08-26"
+      ],
+      "residual_trust": [
+        "Same official Lean checker algorithm lineage",
+        "Hardening narrows memory-corruption exposure but is not a second kernel implementation",
+        "Host OS and hardware"
+      ]
+    }
+  ],
+  "relationships": [
+    {
+      "from": "lean4lean",
+      "to": "lean_official_kernel",
+      "relation": "derived_from",
+      "scope": "implementation_and_algorithm_lineage",
+      "independence_effect": "not_independent_algorithm_family",
+      "evidence_refs": [
+        "https://arena.lean-lang.org/checker/lean4lean/"
+      ]
+    },
+    {
+      "from": "leanchecker_paranoid",
+      "to": "lean_official_kernel",
+      "relation": "hardened_build_of",
+      "scope": "binary_and_runtime_hardening",
+      "independence_effect": "no_new_algorithm_family",
+      "evidence_refs": [
+        "https://lean-lang.org/doc/reference/latest/releases/v4.35.0/",
+        "https://kt3k.github.io/changelog/leanprover/lean4/2026-08-26"
+      ]
+    },
+    {
+      "from": "con_ron",
+      "to": "con_leche",
+      "relation": "verified_refinement_port_of",
+      "scope": "same_core_checking_algorithm_distinct_rust_implementation",
+      "independence_effect": "implementation_and_runtime_diversity_not_algorithm_diversity",
+      "evidence_refs": [
+        "https://arena.lean-lang.org/round/2026-09/checker/con-ron/"
+      ]
+    },
+    {
+      "from": "con_leche",
+      "to": "lean_official_kernel",
+      "relation": "independent_implementation_of",
+      "scope": "own_term_representation_and_model_based_consistency_argument",
+      "independence_effect": "distinct_algorithm_lineage",
+      "evidence_refs": [
+        "https://github.com/leanprover/con-leche"
+      ]
+    },
+    {
+      "from": "nanoda",
+      "to": "lean_official_kernel",
+      "relation": "independent_implementation_of",
+      "scope": "independent_rust_checker",
+      "independence_effect": "distinct_algorithm_lineage",
+      "evidence_refs": [
+        "https://arena.lean-lang.org/checker/nanoda/"
+      ]
+    },
+    {
+      "from": "nanoda",
+      "to": "con_leche",
+      "relation": "independent_implementation_of",
+      "scope": "distinct_checker_implementations",
+      "independence_effect": "distinct_implementation_lineage",
+      "evidence_refs": [
+        "https://arena.lean-lang.org/checker/nanoda/",
+        "https://github.com/leanprover/con-leche"
+      ]
+    },
+    {
+      "from": "lean4lean",
+      "to": "con_leche",
+      "relation": "unknown",
+      "scope": "no_pairwise_shared_code_or_algorithm_claim_made",
+      "independence_effect": "unknown_not_counted",
+      "evidence_refs": []
+    },
+    {
+      "from": "lean4lean",
+      "to": "nanoda",
+      "relation": "unknown",
+      "scope": "no_pairwise_shared_code_or_algorithm_claim_made",
+      "independence_effect": "unknown_not_counted",
+      "evidence_refs": []
+    },
+    {
+      "from": "lean4lean",
+      "to": "con_ron",
+      "relation": "unknown",
+      "scope": "no_pairwise_shared_code_or_algorithm_claim_made",
+      "independence_effect": "unknown_not_counted",
+      "evidence_refs": []
+    },
+    {
+      "from": "lean4lean",
+      "to": "leanchecker_paranoid",
+      "relation": "shares_algorithm_lineage_with",
+      "scope": "both_in_lean_core_kernel_lineage",
+      "independence_effect": "not_independent_algorithm_family",
+      "evidence_refs": [
+        "https://arena.lean-lang.org/checker/lean4lean/",
+        "https://lean-lang.org/doc/reference/latest/releases/v4.35.0/"
+      ]
+    },
+    {
+      "from": "nanoda",
+      "to": "con_ron",
+      "relation": "unknown",
+      "scope": "no_pairwise_shared_code_or_algorithm_claim_made",
+      "independence_effect": "unknown_not_counted",
+      "evidence_refs": []
+    },
+    {
+      "from": "nanoda",
+      "to": "leanchecker_paranoid",
+      "relation": "unknown",
+      "scope": "no_pairwise_shared_code_or_algorithm_claim_made",
+      "independence_effect": "unknown_not_counted",
+      "evidence_refs": []
+    },
+    {
+      "from": "con_leche",
+      "to": "leanchecker_paranoid",
+      "relation": "unknown",
+      "scope": "no_pairwise_shared_code_or_algorithm_claim_made",
+      "independence_effect": "unknown_not_counted",
+      "evidence_refs": []
+    },
+    {
+      "from": "con_ron",
+      "to": "leanchecker_paranoid",
+      "relation": "unknown",
+      "scope": "no_pairwise_shared_code_or_algorithm_claim_made",
+      "independence_effect": "unknown_not_counted",
+      "evidence_refs": []
+    }
+  ],
+  "common_mode_domains": [
+    {
+      "domain_id": "challenge_and_statement_intent",
+      "scope": "all_checker_paths",
+      "risk": "All checkers may agree on a proposition that was incorrectly specified or whose informal meaning was misrepresented.",
+      "mitigation": "Trusted challenge review and dependency/notation/typeclass inspection."
+    },
+    {
+      "domain_id": "export_artifact_and_exporter",
+      "scope": "all_export_checker_paths",
+      "risk": "Checkers consume a common serialized export and may share exporter or format assumptions.",
+      "mitigation": "Pin export digest; independent parser implementations where documented; preserve raw bytes and parser receipts."
+    },
+    {
+      "domain_id": "comparator_orchestration",
+      "scope": "comparator_invocations",
+      "risk": "A defect in challenge/solution matching, checker invocation or result aggregation can invalidate an otherwise diverse checker set.",
+      "mitigation": "Record comparator version/config; independently compare challenge statements; inspect raw per-checker logs."
+    },
+    {
+      "domain_id": "lean_core_algorithm_lineage",
+      "scope": "lean_official_kernel,lean4lean,leanchecker_paranoid",
+      "risk": "These paths share official-kernel ancestry or algorithm lineage; they must not count as three independent algorithm families.",
+      "mitigation": "Treat as one conservative algorithm-lineage family while separately recording language/build hardening."
+    },
+    {
+      "domain_id": "con_leche_algorithm_lineage",
+      "scope": "con_leche,con_ron",
+      "risk": "con-ron is a verified Rust port/refinement of con-leche, not a wholly independent algorithm family.",
+      "mitigation": "Count as one algorithm lineage and two implementation/runtime paths."
+    },
+    {
+      "domain_id": "host_platform_and_hardware",
+      "scope": "all_checkers_on_same_host",
+      "risk": "All local processes may share OS, kernel, memory, hardware and operational compromise.",
+      "mitigation": "Separate-machine or independently administered execution where threat model warrants it."
+    },
+    {
+      "domain_id": "axiom_and_environment_policy",
+      "scope": "all_checker_paths",
+      "risk": "A checker can correctly accept a proof relative to an unintended permitted-axiom set or environment.",
+      "mitigation": "Pin policy and environment digests; report actual axiom profile independently."
+    }
+  ],
+  "diversity_dimensions": [
+    "checker_execution_count",
+    "distinct_implementation_families",
+    "distinct_algorithm_lineages",
+    "distinct_languages",
+    "distinct_known_term_representations",
+    "distinct_known_parser_families",
+    "independent_external_algorithm_lineages",
+    "unknown_pairwise_relationship_count",
+    "same_export_acceptance_coverage"
+  ],
+  "claim_ceiling": [
+    "This registry records source-grounded relationships and known shared lineages; it does not prove any checker sound by itself.",
+    "A checker count is not an independence count. con-ron shares the con-leche algorithm lineage; lean4lean is derived from the official C++ kernel; leanchecker-paranoid is a hardening variant of the official checker.",
+    "nanoda and con-leche are documented independently implemented checkers; their own trust assumptions and input/parser paths remain explicit.",
+    "Unknown relationships are not treated as independence.",
+    "No scalar diversity or independence score is emitted."
+  ]
+}
