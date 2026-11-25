@@ -152,14 +152,15 @@ impl PinnedEd25519QualificationVerifierV1 {
     pub fn profile_sha256(&self) -> &str { &self.profile_sha256 }
     pub fn verifier_id(&self) -> &str { &self.verifier_id }
     pub fn profile_version(&self) -> u64 { self.profile_version }
-}
 
-impl EvidenceQualificationSignatureVerifierV1 for PinnedEd25519QualificationVerifierV1 {
-    fn verify_signature(
+    /// Verify arbitrary DSSE PAE bytes under this exact pinned profile.
+    /// The caller remains responsible for enforcing the expected payload type
+    /// and exact statement binding before calling this method.
+    pub(crate) fn verify_message(
         &self,
         verifier_profile_sha256: &str,
         key_id: &str,
-        payload_sha256: &str,
+        message: &[u8],
         signature: &[u8],
         issued_at_unix: u64,
         now_unix: u64,
@@ -167,12 +168,8 @@ impl EvidenceQualificationSignatureVerifierV1 for PinnedEd25519QualificationVeri
         if verifier_profile_sha256 != self.profile_sha256 {
             return Err(EvidenceQualificationRejectV1::TrustProfileDigestMismatch);
         }
-        if !valid_sha256(payload_sha256) {
-            return Err(EvidenceQualificationRejectV1::InvalidDigest);
-        }
         let key = self.keys.get(key_id)
             .ok_or(EvidenceQualificationRejectV1::UnknownKey)?;
-
         if key.status == QualificationKeyStatusV1::Revoked {
             return Err(EvidenceQualificationRejectV1::RevokedKey);
         }
@@ -190,8 +187,32 @@ impl EvidenceQualificationSignatureVerifierV1 for PinnedEd25519QualificationVeri
             .map_err(|_| EvidenceQualificationRejectV1::InvalidSignatureEncoding)?;
         let signature = Signature::from_bytes(signature_bytes);
         key.verifying_key
-            .verify_strict(payload_sha256.as_bytes(), &signature)
+            .verify_strict(message, &signature)
             .map_err(|_| EvidenceQualificationRejectV1::SignatureRejected)
+    }
+}
+
+impl EvidenceQualificationSignatureVerifierV1 for PinnedEd25519QualificationVerifierV1 {
+    fn verify_signature(
+        &self,
+        verifier_profile_sha256: &str,
+        key_id: &str,
+        payload_sha256: &str,
+        signature: &[u8],
+        issued_at_unix: u64,
+        now_unix: u64,
+    ) -> Result<(), EvidenceQualificationRejectV1> {
+        if !valid_sha256(payload_sha256) {
+            return Err(EvidenceQualificationRejectV1::InvalidDigest);
+        }
+        self.verify_message(
+            verifier_profile_sha256,
+            key_id,
+            payload_sha256.as_bytes(),
+            signature,
+            issued_at_unix,
+            now_unix,
+        )
     }
 }
 
