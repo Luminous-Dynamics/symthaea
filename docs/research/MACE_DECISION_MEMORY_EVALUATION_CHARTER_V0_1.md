@@ -92,6 +92,24 @@ Proposed MACE target: **+3 absolute task-success points** over the strongest ind
 
 The architectural shift is from "remember successful behavior" to **compile verified procedures with explicit preconditions and authority, then prove that the current context still satisfies them**. A successful old trace is evidence of what happened in one environment; it is not universal permission to repeat the action.
 
+### 2.3b Compose with the existing Symthaea memory owners
+
+The new BEAM and procedural-skill lanes do not authorize a second memory store, evidence authority, or skill broker. Compose with existing owners:
+
+- **EPF-006 #6457:** memory-to-Epistemic-Fabric bridge. Episodic, semantic, procedural, HDC and vector memories remain experience/retrieval representations; the Epistemic Fabric remains canonical epistemic state.
+- **EPF-007 #6458:** executable polyglot-memory identity/provenance. One canonical semantic identity may have multiple backend representations; HDC similarity, vector score, cache freshness and retrieval count must not create independent corroboration.
+- **EPF-009 #6463:** frontier-aware retrieval and provenance-family deduplication. Historical replay, same-family grouping, contradiction preservation and deterministic retrieval receipts belong here.
+- **#9139:** governed consolidation, compression, promotion and forgetting. MACE should consume its append-only transition records and source/rollback/erasure boundaries, not build a competing consolidation controller.
+- **#9516:** causal experience transfer across dependent sessions. It owns qualified experience-transition knowledge, prediction-before-action and downstream transfer assessment; MACE adds rights/lifecycle/evaluator assurance to its use.
+- **#11629:** broker-owned affine capability representation and attenuation. A skill can request or carry a capability reference but cannot mint or amplify authority.
+- **#12685:** bounded agentic manipulation, skill memory and whole-body tool execution. Reuse its safe tool/action admission and embodied skill owner where the procedural memory lane includes robotics.
+
+The integration contract is:
+
+`experience / trace -> memory representation -> candidate evidence or skill -> owner-specific qualification -> MACE decision/lifecycle assurance -> separately authorized action`
+
+MACE must not collapse these steps. In particular, successful execution is not a truth claim, a verified trace is not universal applicability, and a skill artifact is not an effect authorization. Each existing issue remains owner of its domain semantics; MACE owns the cross-cutting independently witnessed decision/evaluation contract.
+
 ### 2.4 Lifecycle-governed memory
 
 Use Memora/FAMA and TimlMemBench to evaluate memory mutation and governed use:
@@ -403,6 +421,10 @@ The benchmark protocols, leaderboard values and scope statements above should be
 - **Mem0 Platform v3 migration guide:** https://github.com/mem0ai/mem0/blob/main/docs/migration/platform-v2-to-v3.mdx . Documents single-pass ADD-only extraction, built-in graph linking, hybrid retrieval and vendor-reported LoCoMo / original LongMemEval scores.
 - **Zep Graphiti and benchmark methodology:** https://www.getzep.com/platform/graphiti/ and https://www.getzep.com/research/memory-benchmarks/ . Vendor-published original LoCoMo / LongMemEval operating points; not LongMemEval-V2 results.
 - **AWS AgentCore memory lifecycle policy:** https://aws.amazon.com/blogs/machine-learning/designing-lifecycle-policies-for-agentcore-memory/ . Documents configurable TTL, recency/access/frequency scoring, LLM consolidation and pruning.
+- **Symthaea EPF-006 / EPF-007 / EPF-009:** https://github.com/Luminous-Dynamics/symthaea/issues/6457 , https://github.com/Luminous-Dynamics/symthaea/issues/6458 , https://github.com/Luminous-Dynamics/symthaea/issues/6463 . Existing memory-to-epistemic bridge, polyglot identity/provenance and frontier-aware retrieval owners.
+- **Symthaea governed consolidation and procedural promotion:** https://github.com/Luminous-Dynamics/symthaea/issues/9139 . Append-only, reversible-by-default consolidation/promotion/forgetting contract.
+- **Symthaea causal experience transfer:** https://github.com/Luminous-Dynamics/symthaea/issues/9516 . Qualified state/action/outcome transitions and downstream cross-session transfer.
+- **Symthaea capability attenuation / skill composition:** https://github.com/Luminous-Dynamics/symthaea/issues/11629 and https://github.com/Luminous-Dynamics/symthaea/issues/12685 . Broker-owned non-amplifiable authority and bounded embodied skill use.
 - **BEAM, ICLR 2026:** https://proceedings.iclr.cc/paper_files/paper/2026/hash/d7f0cfa0fe759b033d5262e1bb7d4065-Abstract-Conference.html . 100 coherent conversations, 2,000 validated questions, up to 10M tokens; paper reports a LIGHT improvement range of 3.5–12.69% depending on backbone.
 - **Zep Agent Skills, November 2026:** https://arxiv.org/abs/2611.01386 . Procedural memory compiled from verified traces, with event citations and version gates; paper evaluates τ³-bench Banking, AppWorld, EnterpriseOps-Gym and ALFWorld.
 - **Mem0 Platform v3 migration guide:** https://github.com/mem0ai/mem0/blob/main/docs/migration/platform-v2-to-v3.mdx . Documents ADD-only extraction, built-in entity graph, hybrid retrieval and vendor-reported LoCoMo/LongMemEval scores.
