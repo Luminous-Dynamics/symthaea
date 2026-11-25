@@ -217,6 +217,11 @@ impl VerifiedDecisionOutcomeReceiptV1 {
         self.hard_constraint_verdict
     }
 
+    /// True only for an explicit satisfied verdict; not-evaluable is not a pass.
+    pub fn hard_constraints_satisfied(&self) -> bool {
+        self.hard_constraint_verdict == DecisionOutcomeHardConstraintVerdictV1::Satisfied
+    }
+
     pub fn utility_delta_microunits(&self) -> i64 {
         self.utility_delta_microunits
     }
@@ -234,6 +239,8 @@ impl VerifiedDecisionOutcomeReceiptV1 {
     }
 }
 
+/// Verifies one archival outcome statement. It is not an action-authorization
+/// token; validate the linked action/execution receipts independently.
 pub fn parse_and_verify_decision_outcome_receipt_v1(
     wire: &[u8],
     expected: &DecisionOutcomeExpectedBindingV1<'_>,
@@ -898,6 +905,7 @@ mod tests {
             DecisionOutcomeHardConstraintVerdictV1::Violated
         );
         assert!(verified.utility_delta_microunits() > 0);
+        assert!(!verified.hard_constraints_satisfied());
     }
 
     #[test]
