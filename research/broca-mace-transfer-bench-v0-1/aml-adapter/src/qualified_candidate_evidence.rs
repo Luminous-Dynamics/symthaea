@@ -521,6 +521,7 @@ mod tests {
         let token = token(&initial_binding, &[EvidenceDispositionV1::Admissible]);
         let result = project_qualified_candidate_evidence_v1(
             &batch, &token, &initial_binding, &expectation(&batch),
+            &TestVerifier,
         ).unwrap();
         let CandidateEvidenceProjectionV1::Qualified(projected) = result else {
             panic!("expected qualified projection");
@@ -541,6 +542,7 @@ mod tests {
         let token = token(&initial_binding, &[EvidenceDispositionV1::Admissible]);
         let result = project_qualified_candidate_evidence_v1(
             &batch, &token, &initial_binding, &expectation(&batch),
+            &TestVerifier,
         ).unwrap();
         let CandidateEvidenceProjectionV1::Qualified(projected) = result else {
             panic!("expected qualified projection");
@@ -561,6 +563,7 @@ mod tests {
         let token = token(&initial_binding, &[EvidenceDispositionV1::Admissible]);
         let result = project_qualified_candidate_evidence_v1(
             &batch, &token, &initial_binding, &expectation(&batch),
+            &TestVerifier,
         ).unwrap();
         let CandidateEvidenceProjectionV1::Qualified(projected) = result else {
             panic!("expected qualified projection");
@@ -581,6 +584,7 @@ mod tests {
         let token = token(&initial_binding, &[EvidenceDispositionV1::Admissible]);
         let result = project_qualified_candidate_evidence_v1(
             &batch, &token, &initial_binding, &expectation(&batch),
+            &TestVerifier,
         ).unwrap();
         let CandidateEvidenceProjectionV1::Qualified(projected) = result else {
             panic!("expected qualified projection");
@@ -596,7 +600,7 @@ mod tests {
         let mut changed_lifecycle = binding(&batch, &ids);
         changed_lifecycle.lifecycle_snapshot_sha256 = A;
         assert_eq!(
-            projected.validate_at_use(&changed_lifecycle),
+            projected.validate_at_use(&changed_lifecycle, &TestVerifier),
             Err(EvidenceQualificationRejectV1::BindingMismatch)
         );
 
@@ -604,7 +608,7 @@ mod tests {
         let mut changed_candidates = binding(&batch, &ids);
         changed_candidates.candidate_evidence_ids = &substituted_ids;
         assert_eq!(
-            projected.validate_at_use(&changed_candidates),
+            projected.validate_at_use(&changed_candidates, &TestVerifier),
             Err(EvidenceQualificationRejectV1::BindingMismatch)
         );
     }
