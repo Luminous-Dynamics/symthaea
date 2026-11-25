@@ -32,6 +32,8 @@ const MAX_PERIODIC_DERIVATIVE_SAMPLES: usize = 65_536;
 const MAX_PERIODIC_DERIVATIVE_WORK: usize = 8_388_608;
 const MAX_RESPONSE_SIGNATURE_CLUSTER_MEMBERS: usize = 128;
 const MAX_RESPONSE_SIGNATURE_CLUSTER_WORK: usize = 4_194_304;
+const MAX_KINETIC_DISCRIMINATION_HYPOTHESES: usize = 16;
+const MAX_KINETIC_DISCRIMINATION_WORK: usize = 32_768;
 const DIGEST_DOMAIN: &[u8] = b"symthaea.akpd.pulse-candidate.v0.1\0";
 
 /// Errors returned while parsing, validating or enumerating probe contracts.
@@ -116,6 +118,20 @@ pub enum ContractError {
     EmptyResponseSignatureCluster,
     #[error("response signature cluster exceeds its member or pairwise work budget")]
     ResponseSignatureClusterWorkBudgetExceeded,
+    #[error("kinetic discrimination requires at least two competing hypotheses")]
+    InsufficientDiscriminationHypotheses,
+    #[error("kinetic discrimination hypothesis IDs must be unique and non-empty")]
+    InvalidDiscriminationHypothesisIdentity,
+    #[error("kinetic discrimination priors must be finite and strictly positive")]
+    InvalidDiscriminationPrior,
+    #[error("kinetic discrimination noise variance must be finite and positive")]
+    InvalidDiscriminationNoiseVariance,
+    #[error("kinetic discrimination cost must be finite and positive")]
+    InvalidDiscriminationCost,
+    #[error("kinetic discrimination quadrature exceeded its bounded work budget")]
+    DiscriminationWorkBudgetExceeded,
+    #[error("kinetic discrimination arithmetic produced an invalid information gain")]
+    InvalidDiscriminationArithmetic,
     #[error("finite-amplitude response estimator requires positive finite pulse amplitudes")]
     InvalidResponseAmplitude,
     #[error("storage byte-count arithmetic overflowed")]
@@ -1047,6 +1063,246 @@ pub struct ResponseSignatureComparison {
     pub branch_mismatch_count: usize,
     pub unresolved_branch_count: usize,
     pub structure_class_compatible: bool,
+}
+
+/// One competing kinetic-state hypothesis for a candidate intervention.
+///
+/// The predicted response is one registered complex output coefficient. The
+/// first implementation uses a finite categorical hypothesis set and a
+/// circularly phase-aware complex observation likelihood with independent,
+/// equal-variance real/imaginary noise.
+#[derive(Clone, Debug, PartialEq, Serialize, Deserialize)]
+pub struct KineticDiscriminationHypothesis {
+    pub hypothesis_id: String,
+    pub prior_probability: f64,
+    pub predicted_response: ComplexResponse,
+}
+
+/// One candidate intervention evaluated for expected information gain.
+///
+/// \`noise_variance_per_quadrature\` is the independently calibrated variance
+/// of each real/imaginary observation quadrature. It is not inferred from the
+/// same candidate predictions. \`estimated_evaluation_cost_seconds\` is an
+/// external cost estimate and is reported separately from information gain.
+#[derive(Clone, Debug, PartialEq, Serialize, Deserialize)]
+pub struct KineticDiscriminationDesign {
+    pub intervention_id: String,
+    pub hypotheses: Vec<KineticDiscriminationHypothesis>,
+    pub noise_variance_per_quadrature: f64,
+    pub estimated_evaluation_cost_seconds: f64,
+}
+
+/// Expected-information-gain report for one finite complex-response design.
+#[derive(Clone, Copy, Debug, PartialEq, Serialize)]
+pub struct KineticDiscriminationReport {
+    pub hypothesis_count: usize,
+    pub prior_entropy_bits: f64,
+    pub expected_posterior_entropy_bits: f64,
+    pub expected_information_gain_bits: f64,
+    pub estimated_evaluation_cost_seconds: f64,
+    pub information_gain_bits_per_cost_second: f64,
+    pub noise_variance_per_quadrature: f64,
+    pub quadrature_order_per_axis: usize,
+}
+
+/// Nine-point Gauss-Hermite rule for an expectation under a standard normal.
+/// Nodes and weights are the physicists' exp(-x^2) rule; the evaluator applies
+/// z=sqrt(2)*x and divides weights by sqrt(pi).
+const GAUSS_HERMITE_9_NODES: [f64; 9] = [
+    -3.190_993_201_781_528,
+    -2.266_580_584_531_843,
+    -1.468_553_289_216_668,
+    -0.723_551_018_752_838,
+    0.0,
+    0.723_551_018_752_838,
+    1.468_553_289_216_668,
+    2.266_580_584_531_843,
+    3.190_993_201_781_528,
+];
+
+const GAUSS_HERMITE_9_WEIGHTS: [f64; 9] = [
+    0.000_039_606_977_263_264_4,
+    0.004_943_624_275_536_947,
+    0.088_474_527_394_376_57,
+    0.432_651_559_002_555_75,
+    0.720_235_215_606_050_9,
+    0.432_651_559_002_555_75,
+    0.088_474_527_394_376_57,
+    0.004_943_624_275_536_947,
+    0.000_039_606_977_263_264_4,
+];
+
+/// Estimate mutual information I(H;Y|u) in bits for one candidate intervention.
+///
+/// The expectation is integrated by deterministic 9x9 Gauss-Hermite
+/// quadrature over independent Gaussian real/imaginary observation noise.
+/// This is a finite-hypothesis, homoscedastic complex-Gaussian likelihood
+/// primitive; it is not a universal likelihood for kinetic solver residuals.
+pub fn evaluate_kinetic_discrimination_design(
+    design: &KineticDiscriminationDesign,
+) -> Result<KineticDiscriminationReport, ContractError> {
+    if design.intervention_id.trim().is_empty() {
+        return Err(ContractError::InvalidDiscriminationHypothesisIdentity);
+    }
+    let hypothesis_count = design.hypotheses.len();
+    if hypothesis_count < 2 {
+        return Err(ContractError::InsufficientDiscriminationHypotheses);
+    }
+    if hypothesis_count > MAX_KINETIC_DISCRIMINATION_HYPOTHESES {
+        return Err(ContractError::DiscriminationWorkBudgetExceeded);
+    }
+    if !design.noise_variance_per_quadrature.is_finite()
+        || design.noise_variance_per_quadrature <= 0.0
+    {
+        return Err(ContractError::InvalidDiscriminationNoiseVariance);
+    }
+    if !design.estimated_evaluation_cost_seconds.is_finite()
+        || design.estimated_evaluation_cost_seconds <= 0.0
+    {
+        return Err(ContractError::InvalidDiscriminationCost);
+    }
+    let work = hypothesis_count
+        .checked_mul(hypothesis_count)
+        .and_then(|count| count.checked_mul(9 * 9))
+        .ok_or(ContractError::DiscriminationWorkBudgetExceeded)?;
+    if work > MAX_KINETIC_DISCRIMINATION_WORK {
+        return Err(ContractError::DiscriminationWorkBudgetExceeded);
+    }
+
+    let mut seen_ids = BTreeSet::new();
+    let mut maximum_prior = 0.0_f64;
+    for hypothesis in &design.hypotheses {
+        if hypothesis.hypothesis_id.trim().is_empty()
+            || !seen_ids.insert(hypothesis.hypothesis_id.as_str())
+        {
+            return Err(ContractError::InvalidDiscriminationHypothesisIdentity);
+        }
+        if !hypothesis.prior_probability.is_finite() || hypothesis.prior_probability <= 0.0 {
+            return Err(ContractError::InvalidDiscriminationPrior);
+        }
+        if !hypothesis.predicted_response.real.is_finite()
+            || !hypothesis.predicted_response.imag.is_finite()
+        {
+            return Err(ContractError::NonFiniteResponseValue);
+        }
+        maximum_prior = maximum_prior.max(hypothesis.prior_probability);
+    }
+
+    // Max scaling avoids overflow when perfectly valid unnormalized priors are large.
+    let scaled_prior_sum = design
+        .hypotheses
+        .iter()
+        .map(|hypothesis| hypothesis.prior_probability / maximum_prior)
+        .sum::<f64>();
+    if !scaled_prior_sum.is_finite() || scaled_prior_sum <= 0.0 {
+        return Err(ContractError::InvalidDiscriminationPrior);
+    }
+    let probabilities = design
+        .hypotheses
+        .iter()
+        .map(|hypothesis| (hypothesis.prior_probability / maximum_prior) / scaled_prior_sum)
+        .collect::<Vec<_>>();
+    let prior_entropy_bits = probabilities
+        .iter()
+        .map(|probability| -probability * probability.log2())
+        .sum::<f64>();
+    if !prior_entropy_bits.is_finite() {
+        return Err(ContractError::InvalidDiscriminationArithmetic);
+    }
+
+    let variance = design.noise_variance_per_quadrature;
+    let standard_deviation = variance.sqrt();
+    let log_two = std::f64::consts::LN_2;
+    let weight_normalizer = PI.sqrt();
+    let mut expected_information_nats = 0.0_f64;
+
+    for (true_index, true_hypothesis) in design.hypotheses.iter().enumerate() {
+        let true_prior = probabilities[true_index];
+        for real_index in 0..GAUSS_HERMITE_9_NODES.len() {
+            let real_noise = std::f64::consts::SQRT_2
+                * GAUSS_HERMITE_9_NODES[real_index]
+                * standard_deviation;
+            let real_weight = GAUSS_HERMITE_9_WEIGHTS[real_index] / weight_normalizer;
+            for imag_index in 0..GAUSS_HERMITE_9_NODES.len() {
+                let imag_noise = std::f64::consts::SQRT_2
+                    * GAUSS_HERMITE_9_NODES[imag_index]
+                    * standard_deviation;
+                let quadrature_weight =
+                    real_weight * GAUSS_HERMITE_9_WEIGHTS[imag_index] / weight_normalizer;
+                let observation_real = true_hypothesis.predicted_response.real + real_noise;
+                let observation_imag = true_hypothesis.predicted_response.imag + imag_noise;
+                if !observation_real.is_finite() || !observation_imag.is_finite() {
+                    return Err(ContractError::InvalidDiscriminationArithmetic);
+                }
+
+                let mut log_joint = Vec::with_capacity(hypothesis_count);
+                for (hypothesis_index, hypothesis) in design.hypotheses.iter().enumerate() {
+                    let delta_real = observation_real - hypothesis.predicted_response.real;
+                    let delta_imag = observation_imag - hypothesis.predicted_response.imag;
+                    let normalized_distance = delta_real.hypot(delta_imag) / standard_deviation;
+                    // Very remote hypotheses can underflow to effectively zero likelihood;
+                    // clamp the log likelihood to retain stable log-sum-exp arithmetic.
+                    let log_likelihood = if normalized_distance.is_finite()
+                        && normalized_distance < 1.0e150
+                    {
+                        -0.5 * normalized_distance * normalized_distance
+                    } else {
+                        -1.0e300
+                    };
+                    log_joint.push(probabilities[hypothesis_index].ln() + log_likelihood);
+                }
+
+                let maximum_log_joint = log_joint.iter().copied().fold(f64::NEG_INFINITY, f64::max);
+                let log_mixture = maximum_log_joint
+                    + log_joint
+                        .iter()
+                        .map(|value| (value - maximum_log_joint).exp())
+                        .sum::<f64>()
+                        .ln();
+                let true_delta_real = observation_real - true_hypothesis.predicted_response.real;
+                let true_delta_imag = observation_imag - true_hypothesis.predicted_response.imag;
+                let true_normalized_distance =
+                    true_delta_real.hypot(true_delta_imag) / standard_deviation;
+                let true_log_likelihood = -0.5 * true_normalized_distance * true_normalized_distance;
+                let information_nats = true_log_likelihood - log_mixture;
+                if !information_nats.is_finite() || !quadrature_weight.is_finite() {
+                    return Err(ContractError::InvalidDiscriminationArithmetic);
+                }
+                expected_information_nats +=
+                    true_prior * quadrature_weight * information_nats;
+            }
+        }
+    }
+
+    if !expected_information_nats.is_finite() {
+        return Err(ContractError::InvalidDiscriminationArithmetic);
+    }
+    let information_tolerance = 1.0e-10_f64.max(prior_entropy_bits * 1.0e-9);
+    if expected_information_nats < -information_tolerance * log_two
+        || expected_information_nats / log_two > prior_entropy_bits + information_tolerance
+    {
+        return Err(ContractError::InvalidDiscriminationArithmetic);
+    }
+    let expected_information_gain_bits =
+        (expected_information_nats / log_two).clamp(0.0, prior_entropy_bits);
+    let expected_posterior_entropy_bits =
+        (prior_entropy_bits - expected_information_gain_bits).max(0.0);
+    let information_gain_bits_per_cost_second =
+        expected_information_gain_bits / design.estimated_evaluation_cost_seconds;
+    if !information_gain_bits_per_cost_second.is_finite() {
+        return Err(ContractError::InvalidDiscriminationArithmetic);
+    }
+
+    Ok(KineticDiscriminationReport {
+        hypothesis_count,
+        prior_entropy_bits,
+        expected_posterior_entropy_bits,
+        expected_information_gain_bits,
+        estimated_evaluation_cost_seconds: design.estimated_evaluation_cost_seconds,
+        information_gain_bits_per_cost_second,
+        noise_variance_per_quadrature: variance,
+        quadrature_order_per_axis: GAUSS_HERMITE_9_NODES.len(),
+    })
 }
 
 /// Finite all-pairs diameter audit for a proposed response-equivalence class.
@@ -7136,6 +7392,170 @@ mod tests {
         assert!(!audit.complete_response_coverage);
         assert!(!audit.stable_branch_association);
         assert!(!audit.within_finite_class_diameter);
+    }
+
+    fn gaussian_discrimination_design(
+        responses: &[(f64, f64)],
+        priors: &[f64],
+        variance: f64,
+        cost_seconds: f64,
+    ) -> KineticDiscriminationDesign {
+        assert_eq!(responses.len(), priors.len());
+        KineticDiscriminationDesign {
+            intervention_id: "manufactured-pulse-probe-v1".to_owned(),
+            hypotheses: responses
+                .iter()
+                .zip(priors)
+                .enumerate()
+                .map(|(index, ((real, imag), prior))| KineticDiscriminationHypothesis {
+                    hypothesis_id: format!("state-{index}"),
+                    prior_probability: *prior,
+                    predicted_response: ComplexResponse::new(*real, *imag).unwrap(),
+                })
+                .collect(),
+            noise_variance_per_quadrature: variance,
+            estimated_evaluation_cost_seconds: cost_seconds,
+        }
+    }
+
+    #[test]
+    fn kinetic_discrimination_eig_is_zero_for_identical_predictions() {
+        let design = gaussian_discrimination_design(
+            &[(1.0, -0.25), (1.0, -0.25), (1.0, -0.25)],
+            &[0.2, 0.3, 0.5],
+            0.1,
+            2.0,
+        );
+        let report = evaluate_kinetic_discrimination_design(&design).unwrap();
+        assert!(report.expected_information_gain_bits.abs() < 1.0e-12);
+        assert!((report.expected_posterior_entropy_bits - report.prior_entropy_bits).abs() < 1.0e-12);
+    }
+
+    #[test]
+    fn kinetic_discrimination_eig_detects_phase_only_response_differences() {
+        let design = gaussian_discrimination_design(
+            &[(1.0, 0.0), (0.0, 1.0)],
+            &[0.5, 0.5],
+            0.02,
+            1.0,
+        );
+        let report = evaluate_kinetic_discrimination_design(&design).unwrap();
+        assert!(report.expected_information_gain_bits > 0.95);
+        assert!(report.expected_information_gain_bits <= report.prior_entropy_bits + 1.0e-12);
+        assert!(report.expected_posterior_entropy_bits < 0.05);
+    }
+
+    #[test]
+    fn kinetic_discrimination_eig_decreases_as_observation_noise_increases() {
+        let responses = [(-1.0, 0.25), (1.0, -0.25)];
+        let priors = [0.5, 0.5];
+        let low_noise = evaluate_kinetic_discrimination_design(
+            &gaussian_discrimination_design(&responses, &priors, 0.02, 1.0),
+        )
+        .unwrap();
+        let high_noise = evaluate_kinetic_discrimination_design(
+            &gaussian_discrimination_design(&responses, &priors, 4.0, 1.0),
+        )
+        .unwrap();
+        assert!(low_noise.expected_information_gain_bits > high_noise.expected_information_gain_bits);
+        assert!(high_noise.expected_information_gain_bits < 0.2);
+    }
+
+    #[test]
+    fn kinetic_discrimination_eig_respects_imbalanced_priors() {
+        let report = evaluate_kinetic_discrimination_design(&gaussian_discrimination_design(
+            &[(-2.0, 0.0), (2.0, 0.0)],
+            &[0.9, 0.1],
+            0.001,
+            1.0,
+        ))
+        .unwrap();
+        let expected_entropy = -(0.9_f64 * 0.9_f64.log2() + 0.1_f64 * 0.1_f64.log2());
+        assert!((report.prior_entropy_bits - expected_entropy).abs() < 1.0e-12);
+        assert!(report.expected_information_gain_bits <= expected_entropy + 1.0e-12);
+        assert!(report.expected_information_gain_bits > 0.3);
+    }
+
+    #[test]
+    fn kinetic_discrimination_cost_changes_only_cost_normalized_utility() {
+        let responses = [(-1.0, 0.0), (1.0, 0.0)];
+        let priors = [0.5, 0.5];
+        let cheap = evaluate_kinetic_discrimination_design(&gaussian_discrimination_design(
+            &responses, &priors, 0.1, 2.0,
+        ))
+        .unwrap();
+        let expensive = evaluate_kinetic_discrimination_design(&gaussian_discrimination_design(
+            &responses, &priors, 0.1, 8.0,
+        ))
+        .unwrap();
+        assert!((cheap.expected_information_gain_bits - expensive.expected_information_gain_bits).abs() < 1.0e-12);
+        assert!((cheap.information_gain_bits_per_cost_second
+            - 4.0 * expensive.information_gain_bits_per_cost_second)
+            .abs()
+            < 1.0e-12);
+    }
+
+    #[test]
+    fn kinetic_discrimination_normalizes_extreme_prior_magnitudes_safely() {
+        let design = gaussian_discrimination_design(
+            &[(-1.0, 0.0), (1.0, 0.0)],
+            &[1.0e308, 1.0e308],
+            0.1,
+            1.0,
+        );
+        let report = evaluate_kinetic_discrimination_design(&design).unwrap();
+        assert!((report.prior_entropy_bits - 1.0).abs() < 1.0e-12);
+    }
+
+    #[test]
+    fn kinetic_discrimination_rejects_invalid_designs_and_bounded_work_overflow() {
+        let mut design = gaussian_discrimination_design(
+            &[(-1.0, 0.0), (1.0, 0.0)],
+            &[0.5, 0.5],
+            0.1,
+            1.0,
+        );
+        design.intervention_id.clear();
+        assert_eq!(
+            evaluate_kinetic_discrimination_design(&design),
+            Err(ContractError::InvalidDiscriminationHypothesisIdentity)
+        );
+        design.intervention_id = "probe".to_owned();
+        design.noise_variance_per_quadrature = 0.0;
+        assert_eq!(
+            evaluate_kinetic_discrimination_design(&design),
+            Err(ContractError::InvalidDiscriminationNoiseVariance)
+        );
+        design.noise_variance_per_quadrature = 0.1;
+        design.estimated_evaluation_cost_seconds = f64::NAN;
+        assert_eq!(
+            evaluate_kinetic_discrimination_design(&design),
+            Err(ContractError::InvalidDiscriminationCost)
+        );
+        design.estimated_evaluation_cost_seconds = 1.0;
+        design.hypotheses[0].prior_probability = 0.0;
+        assert_eq!(
+            evaluate_kinetic_discrimination_design(&design),
+            Err(ContractError::InvalidDiscriminationPrior)
+        );
+        design.hypotheses[0].prior_probability = 0.5;
+        design.hypotheses[1].hypothesis_id = design.hypotheses[0].hypothesis_id.clone();
+        assert_eq!(
+            evaluate_kinetic_discrimination_design(&design),
+            Err(ContractError::InvalidDiscriminationHypothesisIdentity)
+        );
+        design.hypotheses[1].hypothesis_id = "second".to_owned();
+        design.hypotheses = (0..=MAX_KINETIC_DISCRIMINATION_HYPOTHESES)
+            .map(|index| KineticDiscriminationHypothesis {
+                hypothesis_id: format!("state-{index}"),
+                prior_probability: 1.0,
+                predicted_response: ComplexResponse::new(index as f64, 0.0).unwrap(),
+            })
+            .collect();
+        assert_eq!(
+            evaluate_kinetic_discrimination_design(&design),
+            Err(ContractError::DiscriminationWorkBudgetExceeded)
+        );
     }
 
     #[test]
