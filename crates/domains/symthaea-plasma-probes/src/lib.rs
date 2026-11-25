@@ -5104,6 +5104,9 @@ pub const KIRD_SYNTHETIC_CERTIFIED_FIXTURE: &str = include_str!(
 /// validator; this constant makes the exact source available to integration tests.
 pub const KIRD_POINT_SCHEMA: &str =
     include_str!("../../../../benchmarks/plasma/rate-distortion/kird-point-v0.1.schema.json");
+pub const KINETIC_DISCRIMINATION_FIXTURE: &str = include_str!(
+    "../../../../benchmarks/plasma/kinetic-discrimination/fixtures/complex-response-eig-known-answers-v0.1.json"
+);
 pub const WEIGHTED_FOURIER_MEASURE_FIXTURE: &str = include_str!(
     "../../../../benchmarks/plasma/topology-lifting/fixtures/weighted-fourier-measure-known-answer-v0.1.json"
 );
@@ -7392,6 +7395,74 @@ mod tests {
         assert!(!audit.complete_response_coverage);
         assert!(!audit.stable_branch_association);
         assert!(!audit.within_finite_class_diameter);
+    }
+
+    #[test]
+    fn kinetic_discrimination_known_answer_fixture_matches_eig_bounds() {
+        let fixture: serde_json::Value =
+            serde_json::from_str(KINETIC_DISCRIMINATION_FIXTURE).unwrap();
+        assert_eq!(fixture["status"], "synthetic_analytic_only");
+        assert_eq!(fixture["quadrature_order_per_axis"], 9);
+        let cases = fixture["cases"].as_array().unwrap();
+        assert_eq!(cases.len(), 4);
+
+        for case in cases {
+            let hypotheses = case["hypotheses"]
+                .as_array()
+                .unwrap()
+                .iter()
+                .map(|hypothesis| KineticDiscriminationHypothesis {
+                    hypothesis_id: hypothesis["hypothesis_id"].as_str().unwrap().to_owned(),
+                    prior_probability: hypothesis["prior_probability"].as_f64().unwrap(),
+                    predicted_response: ComplexResponse::new(
+                        hypothesis["predicted_response"]["real"].as_f64().unwrap(),
+                        hypothesis["predicted_response"]["imag"].as_f64().unwrap(),
+                    )
+                    .unwrap(),
+                })
+                .collect();
+            let design = KineticDiscriminationDesign {
+                intervention_id: case["intervention_id"].as_str().unwrap().to_owned(),
+                hypotheses,
+                noise_variance_per_quadrature: case["noise_variance_per_quadrature"]
+                    .as_f64()
+                    .unwrap(),
+                estimated_evaluation_cost_seconds: case["estimated_evaluation_cost_seconds"]
+                    .as_f64()
+                    .unwrap(),
+            };
+            let report = evaluate_kinetic_discrimination_design(&design).unwrap();
+            let expected_prior_entropy =
+                case["expected_prior_entropy_bits"].as_f64().unwrap();
+            let minimum_eig = case["expected_information_gain_min_bits"].as_f64().unwrap();
+            let maximum_eig = case["expected_information_gain_max_bits"].as_f64().unwrap();
+            assert!(
+                (report.prior_entropy_bits - expected_prior_entropy).abs() < 1.0e-10,
+                "prior entropy mismatch for {}",
+                case["case_id"].as_str().unwrap()
+            );
+            assert!(
+                report.expected_information_gain_bits + 1.0e-10 >= minimum_eig
+                    && report.expected_information_gain_bits <= maximum_eig + 1.0e-10,
+                "EIG outside known-answer bounds for {}: {}",
+                case["case_id"].as_str().unwrap(),
+                report.expected_information_gain_bits
+            );
+            assert!(
+                (report.prior_entropy_bits
+                    - report.expected_information_gain_bits
+                    - report.expected_posterior_entropy_bits)
+                    .abs()
+                    < 1.0e-12
+            );
+            assert!(
+                (report.information_gain_bits_per_cost_second
+                    - report.expected_information_gain_bits
+                        / report.estimated_evaluation_cost_seconds)
+                    .abs()
+                    < 1.0e-12
+            );
+        }
     }
 
     fn gaussian_discrimination_design(
