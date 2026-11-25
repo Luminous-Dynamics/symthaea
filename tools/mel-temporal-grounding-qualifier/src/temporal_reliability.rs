@@ -1159,8 +1159,14 @@ mod tests {
         data.items[0].case.annotations[2].state = GroundTruthStateV1::Ambiguous;
         data.items[0].case.annotations[2].intervals.clear();
         data.items[0].case.annotations[2].status_reason = Some("gradual onset".into());
+        data.items[0].case.annotations[3].state = GroundTruthStateV1::NotEstimable;
+        data.items[0].case.annotations[3].intervals.clear();
+        data.items[0].case.annotations[3].status_reason = Some("masking prevents a reliable judgement".into());
         let report = audit_multi_annotator_dataset(&data).unwrap();
-        assert!(report.summary.ambiguous_or_not_estimable_excluded_pairs > 0);
+        assert_eq!(report.summary.ambiguous_or_not_estimable_excluded_pairs, 5);
+        assert_eq!(report.summary.state_reliability.ambiguous_exclusions, 1);
+        assert_eq!(report.summary.state_reliability.not_estimable_exclusions, 1);
+        assert_eq!(report.summary.state_reliability.eligible_ratings, 19);
         assert!(report.summary.present_absent_disagreement_pairs < report.pairwise_results.len());
     }
 
