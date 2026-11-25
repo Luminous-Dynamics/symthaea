@@ -18,7 +18,9 @@ use crate::evidence_qualification_gate::{
     EvidenceQualificationRejectV1, EvidenceQualificationSignatureVerifierV1,
 };
 use crate::evaluation_manifest_commitment_receipt::VerifiedEvaluationManifestCommitmentV1;
-use crate::frozen_decision_episode_manifest::VerifiedDecisionEpisodeMembershipV1;
+use crate::frozen_decision_episode_manifest::{
+    DecisionEpisodeSplitV1, VerifiedDecisionEpisodeMembershipV1,
+};
 
 pub const DECISION_OUTCOME_RECEIPT_SCHEMA_V1: &str = "mace_decision_outcome_receipt_v1";
 pub const DECISION_OUTCOME_PAYLOAD_SCHEMA_V1: &str = "mace_decision_outcome_payload_v1";
@@ -148,6 +150,8 @@ pub struct DecisionOutcomeExpectedBindingV1<'a> {
     /// Capability returned only after the canonical episode-set root and exact
     /// episode digest have been bound to the verified detached witness.
     pub episode_membership: &'a VerifiedDecisionEpisodeMembershipV1,
+    /// Split required by the consumer's sealed evaluation protocol.
+    pub required_split: DecisionEpisodeSplitV1,
     /// Capability returned only after the detached witness signature, bindings,
     /// pre-run time and append-only log proof have been verified.
     pub evaluation_manifest_commitment: &'a VerifiedEvaluationManifestCommitmentV1,
@@ -288,6 +292,7 @@ pub fn validate_decision_outcome_receipt_v1(
         || expected.episode_membership.suite_id() != expected.evaluation_manifest_commitment.suite_id()
         || expected.episode_membership.suite_version()
             != expected.evaluation_manifest_commitment.suite_version()
+        || expected.episode_membership.split() != expected.required_split
         || receipt.payload.evaluation_manifest_sha256
             != expected.evaluation_manifest_commitment.sealed_evaluation_manifest_sha256()
         || receipt.payload.evaluation_manifest_commitment_receipt_sha256
@@ -694,6 +699,7 @@ mod tests {
             DecisionOutcomeExpectedBindingV1 {
                 decision_episode_id: "episode-1",
                 episode_membership: &self.episode_membership,
+                required_split: DecisionEpisodeSplitV1::HeldOut,
                 evaluation_manifest_commitment: &self.evaluation_manifest_commitment,
                 qualification_receipt_sha256: self.qualification_receipt_sha256.as_deref(),
                 decision_sufficiency_receipt_sha256: self
