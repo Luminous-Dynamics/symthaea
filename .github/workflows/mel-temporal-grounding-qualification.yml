@@ -99,6 +99,12 @@ jobs:
             and .summary.one_to_many_annotators == 2
             and .summary.one_to_many_mean_count_gated_f1 == 1.0
             and .summary.unanimous_correct_across_scored_annotators == false
+            and (.event_reference_boundary_distributions | length) == 2
+            and .event_reference_boundary_distributions[0].matching_annotators == 3
+            and .event_reference_boundary_distributions[0].start_spread_frames == 5
+            and .event_reference_boundary_distributions[1].matching_annotators == 2
+            and .event_reference_boundary_distributions[1].present_annotators == 3
+            and (.unmatched_prediction_indices | length) == 0
             and (.annotator_results | length) == 6
             and .pairwise_inter_annotator_agreement_computed == false
             and .model_confidence_calibration_computed == false
