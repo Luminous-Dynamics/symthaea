@@ -156,7 +156,9 @@ For complex coefficient (a_k), phase-resolved response (G_{qk}), and non-negativ
 
 `b_k = |a_k| * sum_q w_q * |G_qk|`.
 
-It uses a triangle-inequality sum, not an unqualified RMS / orthogonality assumption. It ranks known modes by response-loss bound per encoded byte and greedily discards only those whose accumulated bound stays within the caller's response-loss budget. This greedy byte heuristic is deterministic but is **not** a globally optimal knapsack solver.
+It uses a triangle-inequality sum, not an unqualified RMS / orthogonality assumption. The caller must scale each QoI weight into the task contract's normalized error units and importance weights; raw outputs with incompatible physical units must not be mixed. It ranks known modes by response-loss bound per encoded byte and greedily discards only those whose accumulated bound stays within the caller's response-loss budget. This greedy byte heuristic is deterministic but is **not** a globally optimal knapsack solver.
+
+This is a first-order empirical indicator conditional on the supplied response matrix. It is not a certified nonlinear truncation bound; mode coupling, amplitude dependence, evolving branch identity and sensitivity remainder require separate validation or a certified error envelope.
 
 Missing response entries are represented as `RetainedUnknownResponse`: they are never treated as zero sensitivity and are never discarded by the planner. The scoring contract validates exact mode registries, non-negative finite QoI weights, positive encoded byte counts and finite arithmetic.
 
