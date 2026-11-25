@@ -1048,6 +1048,195 @@ mod tests {
         }
     }
 
+
+    struct TinyRng(u64);
+
+    impl TinyRng {
+        fn next(&mut self) -> u64 {
+            self.0 = self
+                .0
+                .wrapping_mul(6_364_136_223_846_793_005)
+                .wrapping_add(1_442_695_040_888_963_407);
+            self.0
+        }
+
+        fn range(&mut self, upper: usize) -> usize {
+            (self.next() % upper as u64) as usize
+        }
+
+        fn unit(&mut self) -> f64 {
+            (self.next() % 1_001) as f64 / 1_000.0
+        }
+    }
+
+    fn random_support_partition(
+        states: &[String],
+        max_groups: usize,
+        rng: &mut TinyRng,
+    ) -> Vec<Vec<String>> {
+        let group_count = 1 + rng.range(max_groups.min(states.len()));
+        let mut groups = vec![Vec::new(); group_count];
+
+        // Seed each group with one state so no outcome is empty.
+        for (index, state_id) in states.iter().enumerate() {
+            groups[index % group_count].push(state_id.clone());
+            if rng.range(3) == 0 {
+                let other = rng.range(group_count);
+                if !groups[other].contains(state_id) {
+                    groups[other].push(state_id.clone());
+                }
+            }
+        }
+
+        // Add further overlaps without ever removing coverage.
+        for state_id in states {
+            for group in &mut groups {
+                if rng.range(5) == 0 && !group.contains(state_id) {
+                    group.push(state_id.clone());
+                }
+            }
+        }
+        groups
+    }
+
+    fn generated_tiny_world(rng: &mut TinyRng) -> SequentialRobustProblem {
+        let state_count = 2 + rng.range(3);
+        let state_ids: Vec<String> = (0..state_count).map(|i| format!("s{i}")).collect();
+        let decision_count = 2 + rng.range(2);
+        let decision_ids: Vec<String> =
+            (0..decision_count).map(|i| format!("d{i}")).collect();
+
+        let mut decision_loss = BTreeMap::new();
+        for decision_id in &decision_ids {
+            let losses = state_ids
+                .iter()
+                .map(|state_id| (state_id.clone(), rng.unit()))
+                .collect();
+            decision_loss.insert(decision_id.clone(), losses);
+        }
+
+        let resource_budget = BTreeMap::from([
+            ("compute_units".to_owned(), 1),
+            ("experiment_units".to_owned(), 2),
+        ]);
+        let action_costs = |rng: &mut TinyRng| {
+            BTreeMap::from([
+                ("compute_units".to_owned(), rng.range(2) as u64),
+                ("experiment_units".to_owned(), 1),
+            ])
+        };
+
+        let mut protocol_states = Vec::new();
+        let mut actions = Vec::new();
+        let mut root_action_ids = Vec::new();
+
+        for root_index in 0..2 {
+            let root_action_id = format!("A{root_index}");
+            root_action_ids.push(root_action_id.clone());
+            let root_groups = random_support_partition(&state_ids, 3, rng);
+            let mut root_outcomes = Vec::new();
+
+            for (branch_index, branch_support) in root_groups.iter().enumerate() {
+                let branch_protocol = format!("after_{root_index}_{branch_index}");
+                let child_action_id = format!("C{root_index}_{branch_index}");
+                protocol_states.push(SequentialProtocolState {
+                    protocol_state_id: branch_protocol.clone(),
+                    legal_action_ids: vec![child_action_id.clone()],
+                });
+
+                let child_groups = random_support_partition(branch_support, 3, rng);
+                let mut child_outcomes = Vec::new();
+                for (child_index, child_support) in child_groups.into_iter().enumerate() {
+                    let terminal_protocol = format!(
+                        "terminal_{root_index}_{branch_index}_{child_index}"
+                    );
+                    protocol_states.push(SequentialProtocolState {
+                        protocol_state_id: terminal_protocol.clone(),
+                        legal_action_ids: Vec::new(),
+                    });
+                    child_outcomes.push(SequentialOutcome {
+                        outcome_id: format!("c{child_index}"),
+                        possible_state_ids: child_support,
+                        next_protocol_state_id: terminal_protocol,
+                    });
+                }
+
+                actions.push(SequentialAction {
+                    action_id: child_action_id,
+                    resource_costs: action_costs(rng),
+                    result_delay_steps: 1,
+                    outcomes: child_outcomes,
+                });
+                root_outcomes.push(SequentialOutcome {
+                    outcome_id: format!("o{branch_index}"),
+                    possible_state_ids: branch_support.clone(),
+                    next_protocol_state_id: branch_protocol,
+                });
+            }
+
+            actions.push(SequentialAction {
+                action_id: root_action_id,
+                resource_costs: action_costs(rng),
+                result_delay_steps: 1,
+                outcomes: root_outcomes,
+            });
+        }
+
+        protocol_states.push(SequentialProtocolState {
+            protocol_state_id: "root".to_owned(),
+            legal_action_ids: root_action_ids,
+        });
+
+        SequentialRobustProblem {
+            state_ids,
+            decision_ids,
+            decision_loss,
+            maximum_worst_case_loss: rng.unit(),
+            initial_protocol_state_id: "root".to_owned(),
+            protocol_states,
+            actions,
+            resource_budget,
+            current_step: 0,
+            decision_deadline_step: 1 + rng.range(2) as u64,
+            maximum_actions: 1 + rng.range(2) as u8,
+        }
+    }
+
+    #[test]
+    fn generated_tiny_worlds_match_independent_exhaustive_policy_tree_oracle() {
+        let mut rng = TinyRng(0x5a17_c3d1);
+        for case_index in 0..96 {
+            let problem = generated_tiny_world(&mut rng);
+            let dynamic = evaluate_sequential_robust(&problem).unwrap_or_else(|error| {
+                panic!("dynamic oracle failed on generated case {case_index}: {error}")
+            });
+            let exhaustive = enumerate_sequential_robust(&problem).unwrap_or_else(|error| {
+                panic!("exhaustive oracle failed on generated case {case_index}: {error}")
+            });
+
+            assert_eq!(
+                dynamic.current_minimax_loss,
+                exhaustive.current_minimax_loss,
+                "current minimax mismatch on generated case {case_index}"
+            );
+            assert_eq!(
+                dynamic.current_risk_gate_passed,
+                exhaustive.current_risk_gate_passed,
+                "current risk-gate mismatch on generated case {case_index}"
+            );
+            assert_eq!(
+                dynamic.worst_case_terminal_loss,
+                exhaustive.worst_case_terminal_loss,
+                "terminal value mismatch on generated case {case_index}"
+            );
+            assert_eq!(
+                dynamic.policy_terminal_risk_gate_passed,
+                exhaustive.policy_terminal_risk_gate_passed,
+                "policy-terminal risk-gate mismatch on generated case {case_index}"
+            );
+        }
+    }
+
     #[test]
     fn dynamic_programme_finds_non_myopic_branch_unlock_policy() {
         let problem = branch_unlock_world();
