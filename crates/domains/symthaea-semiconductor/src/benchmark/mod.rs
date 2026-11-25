@@ -5,6 +5,7 @@ pub mod calibration_requalification;
 pub mod dtco_manifest;
 pub mod gated_streaming_adapter;
 pub mod label_consumption_guard;
+pub mod inverse_vm_candidate_ranking;
 pub mod metrology_audit;
 pub mod metrology_qualification_gate;
 pub mod metrology_semantics;
@@ -148,4 +149,14 @@ pub use gated_streaming_adapter::{
     StreamingPredictionReceiptV1, StreamingUpdateDispositionV1, StreamingUpdateReasonV1,
     StreamingUpdateReceiptV1, create_gated_streaming_adapter_engine_v1,
     deliver_qualified_stream_label_v1, predict_and_register_stream_sample_v1,
+};
+
+pub use inverse_vm_candidate_ranking::{
+    INVERSE_VM_CANDIDATE_SCHEMA_V1, INVERSE_VM_RANKING_SCHEMA_V1,
+    INVERSE_VM_REPORT_SCHEMA_V1, CandidateConstraintPredictionV1,
+    CandidateDispositionV1, CandidateEvidenceStatusV1, CandidateRejectionReasonV1,
+    CandidateTargetPredictionV1, InverseVmCandidateEvaluationV1, InverseVmCandidateV1,
+    InverseVmRankingErrorV1, InverseVmRankingInputV1, InverseVmRankingReportV1,
+    InverseVmSideConstraintV1, InverseVmTargetSpecV1, RecipeControlBoundV1,
+    rank_feasible_inverse_vm_candidates_v1, seal_inverse_vm_candidate_v1,
 };
