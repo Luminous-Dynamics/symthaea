@@ -1,3 +1,5 @@
+pub mod worldtest_exploration;
+
 use std::collections::{BTreeMap, BTreeSet};
 use std::env;
 use std::process;
