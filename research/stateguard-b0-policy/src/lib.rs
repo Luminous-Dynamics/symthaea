@@ -164,8 +164,8 @@ fn need_for_claim(
         let retrieval = get_str(item, "retrieval_state").unwrap_or("UNKNOWN");
         let integrity = get_str(item, "integrity_status").unwrap_or("UNKNOWN");
         let correction = get_str(item, "correction_status").unwrap_or("UNKNOWN");
-        if ["NOT_FOUND", "DIGEST_MISMATCH", "UNATTRIBUTED"].contains(&retrieval)
-            || ["UNKNOWN", "COMPROMISED", "MISSING"].contains(&integrity)
+        if retrieval != "CAPTURED"
+            || integrity != "CLEAN"
             || ["CORRECTED", "RETRACTED", "SUPERSEDED"].contains(&correction)
         {
             let evidence_id = get_str(item, "evidence_id").map(str::to_owned);
@@ -181,8 +181,8 @@ fn need_for_claim(
                 ],
                 reason_codes: vec![if source_changed {
                     "SOURCE_CORRECTED_RETRACTED_OR_SUPERSEDED".to_owned()
-                } else if integrity == "UNKNOWN" {
-                    "ARTIFACT_INTEGRITY_NOT_YET_VERIFIED".to_owned()
+                } else if integrity == "UNKNOWN" || retrieval != "CAPTURED" {
+                    "ARTIFACT_NOT_YET_CAPTURED_AND_INTEGRITY_VERIFIED".to_owned()
                 } else {
                     "ARTIFACT_INTEGRITY_OR_ATTRIBUTION_GAP".to_owned()
                 }],
@@ -698,8 +698,41 @@ mod tests {
         assert_eq!(decision.selected_offer_id.as_deref(), Some("verify-artifact"));
         assert_eq!(
             decision.reason_codes,
-            vec!["ARTIFACT_INTEGRITY_NOT_YET_VERIFIED"]
+            vec!["ARTIFACT_NOT_YET_CAPTURED_AND_INTEGRITY_VERIFIED"]
         );
+    }
+
+    #[test]
+    fn fetched_but_not_captured_source_requires_artifact_verification() {
+        let mut state: Value = serde_json::from_str(&sample_state(1)).unwrap();
+        state["evidence"][0]["retrieval_state"] = Value::String("FETCHED".to_owned());
+        let evidence = state["evidence"].as_array().unwrap().clone();
+        let episode = get_str(&state, "research_episode_id").unwrap().to_owned();
+        let sequence = state["evidence_prefix"]["sequence_number"].as_u64().unwrap();
+        let prefix = typed_research_state_contract::evidence_prefix_sha256(
+            &episode,
+            sequence,
+            &evidence,
+        );
+        state["evidence_prefix"]["prefix_sha256"] = Value::String(prefix.clone());
+        for relation in state["claims"][0]["evidence_relations"].as_array_mut().unwrap() {
+            if relation["classifier_provenance"].is_object() {
+                relation["classifier_provenance"]["evidence_prefix_sha256"] =
+                    Value::String(prefix.clone());
+            }
+        }
+        let input = input(
+            state.to_string(),
+            vec![offer(
+                "verify-before-use",
+                ActionKind::VerifyArtifact,
+                Some("claim-b"),
+                Some("ev-b1"),
+                &[("query_units", 0), ("experiment_units", 0), ("review_minutes", 1)],
+            )],
+        );
+        let decision = decide(&input).unwrap();
+        assert_eq!(decision.selected_offer_id.as_deref(), Some("verify-before-use"));
     }
 
     #[test]
