@@ -209,9 +209,11 @@ impl EpistemicVerifier {
                 domain: self.extract_domain(&r.url),
                 source_type: r.source_type,
                 relevant_text: r.summary.clone(),
-                supports: Some(r.confidence > 0.5),
+                // A prior result's aggregate confidence is not a
+                // claim-specific support classification or source authority.
+                supports: None,
                 similarity: r.relevance,
-                credibility: r.confidence,
+                credibility: 0.5,
             })
             .collect();
 
