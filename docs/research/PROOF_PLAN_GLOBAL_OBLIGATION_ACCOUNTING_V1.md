@@ -94,8 +94,9 @@ Added to the existing Rust crate:
 - `src/global_obligations.rs` — global obligation analysis, per-alternative reports and cycle detection.
 - `src/lib.rs` — integrates the analyzer into ProofPlanV1 validation and exports the module.
 - `src/main.rs` — CLI reports global accounting status and counts instead of only printing structural validity.
-- `docs/research/PROOF_PLAN_GLOBAL_OBLIGATION_MUTATIONS_V1.json` — 11 frozen controls.
+- `docs/research/PROOF_PLAN_GLOBAL_OBLIGATION_MUTATIONS_V1.json` — 11 frozen controls with executable `mutation_kind` identifiers and expected dispositions/counts.
 - `docs/research/PROOF_PLAN_GLOBAL_OBLIGATION_MUTATIONS_V1.schema.json` — strict fixture schema.
+- The Rust unit suite reads this corpus, applies each named mutation to the pinned And.comm ProofPlanV1 seed, executes global accounting and checks the declared status and all five count fields. The focused workflow also checks that the 11 mutation kinds are unique and the frozen expected counts have not drifted.
 
 ### Mutation corpus
 
