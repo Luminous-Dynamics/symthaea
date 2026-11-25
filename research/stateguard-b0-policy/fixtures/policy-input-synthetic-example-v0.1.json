@@ -1,0 +1,21 @@
+{
+  "research_state_json": "{\n  \"schema_version\": \"symthaea-public-research-state-v0.1\",\n  \"status\": \"SYNTHETIC_CONFORMANCE_EXAMPLE_NOT_PRODUCTION_STATE\",\n  \"research_episode_id\": \"synthetic-episode\",\n  \"evidence_prefix\": {\n    \"prefix_id\": \"prefix:RS-01\",\n    \"prefix_sha256\": \"870102f0989df451d0da16646adf4abe39619426b144b1aee3034dacf88f64a0\",\n    \"lineage_snapshot_ref\": \"urn:synthetic:lineage:RS-01\",\n    \"sequence_number\": 1\n  },\n  \"decision_context\": {\n    \"decision_id\": \"deployment-efficacy-01\",\n    \"question\": \"Does compound A reduce symptom duration enough to inform a deployment decision?\",\n    \"reference_time\": \"2026-11-25T00:00:00Z\",\n    \"risk_class\": \"MODERATE\"\n  },\n  \"claims\": [\n    {\n      \"claim_id\": \"claim-a\",\n      \"statement\": \"Compound A reduces symptom duration by at least 20%.\",\n      \"scope\": {\n        \"population\": \"adults in the stated trial population\",\n        \"outcome_or_measure\": \"mean symptom duration\",\n        \"quantifier_or_effect\": \"reduction >= 20 percent\",\n        \"domain_or_reference_boundary\": \"current evidence as of 2026-11-25\",\n        \"scope_note\": \"effect threshold must be met in a comparable population\"\n      },\n      \"reference_time\": \"2026-11-25T00:00:00Z\",\n      \"evidence_relations\": [\n        {\n          \"claim_id\": \"claim-a\",\n          \"evidence_id\": \"ev-a1\",\n          \"relation\": \"UNCLASSIFIED\",\n          \"classifier_provenance\": null,\n          \"quote_span\": null\n        }\n      ],\n      \"truth_adjudication\": {\n        \"status\": \"NOT_ADJUDICATED\",\n        \"result\": null,\n        \"authority_id\": null,\n        \"evidence_reference\": null,\n        \"adjudicated_at\": null\n      },\n      \"decision_usability\": {\n        \"status\": \"INSUFFICIENT\",\n        \"decision_scope_id\": \"deployment-efficacy-01\",\n        \"policy_id\": \"evidence-sufficiency-moderate-v1\",\n        \"reason_codes\": [\n          \"NO_CLAIM_SPECIFIC_RELATION\",\n          \"NOT_INDEPENDENTLY_ADJUDICATED\"\n        ]\n      }\n    }\n  ],\n  \"evidence\": [\n    {\n      \"evidence_id\": \"ev-a1\",\n      \"artifact_ref\": \"urn:synthetic:artifact:rs01-a1\",\n      \"artifact_sha256\": \"0b64f0c41daa6d5beba22fd851c401cdfc77ca9b47998ae9942362db6f2811f5\",\n      \"canonical_source_ref\": \"https://example.org/compound-a-overview\",\n      \"published_at\": \"2026-01-10T00:00:00Z\",\n      \"captured_at\": \"2026-11-25T10:00:00Z\",\n      \"source_lineage\": {\n        \"status\": \"UNKNOWN\"\n      },\n      \"integrity_status\": \"CLEAN\",\n      \"correction_status\": \"UNKNOWN\",\n      \"retrieval_state\": \"CAPTURED\",\n      \"source_role\": \"UNKNOWN\"\n    }\n  ]\n}",
+  "permitted_action_offers": [
+    {
+      "offer_id": "classify-claim-a-ev-a1",
+      "kind": "CLASSIFY_CLAIM_SOURCE",
+      "target_claim_id": "claim-a",
+      "target_evidence_id": "ev-a1",
+      "resource_cost": {
+        "query_units": 1,
+        "experiment_units": 0,
+        "review_minutes": 1
+      }
+    }
+  ],
+  "remaining_budget": {
+    "query_units": 10,
+    "experiment_units": 10,
+    "review_minutes": 10
+  }
+}
