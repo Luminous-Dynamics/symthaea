@@ -480,6 +480,31 @@ mod tests {
     }
 
     #[test]
+    fn explicit_claim_support_is_not_reweighted_by_query_similarity() {
+        let verifier = EpistemicVerifier::new();
+        let sources = (0..3)
+            .map(|index| SourceEvidence {
+                url: format!("https://support{index}.example/claim"),
+                domain: format!("support{index}.example"),
+                source_type: ResearchSource::Academic,
+                relevant_text: "An upstream claim-specific classifier marked this as supporting".to_owned(),
+                supports: Some(true),
+                similarity: 0.0,
+                credibility: 0.95,
+            })
+            .collect();
+        let context = VerificationContext {
+            sources,
+            query: "A broad topic with little lexical overlap".to_owned(),
+            domain: "science".to_owned(),
+        };
+
+        let result = verifier.verify_claim("The independently classified claim", &context);
+        assert_eq!(result.status, EpistemicStatus::HighConfidence);
+        assert_eq!(result.supporting_sources.len(), 3);
+    }
+
+    #[test]
     fn test_verify_with_contradiction() {
         let verifier = EpistemicVerifier::new();
         let context = VerificationContext {
