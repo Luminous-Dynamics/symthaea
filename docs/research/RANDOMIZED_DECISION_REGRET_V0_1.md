@@ -35,7 +35,7 @@ The mean statistic averages r(w,p) uniformly over the supplied worlds. The suppo
 
     R_support(p) = max_(w,a:p(a|v)>0) (L(w,a) - min_b L(w,b))
 
-The evaluator receives action probabilities as integer parts-per-million. They must be strictly positive for listed rows, canonically sorted by unique action ID, and sum to exactly 1,000,000. Zero-mass actions are omitted. The weighted numerators are retained exactly; PPM outputs round upward, so rounding cannot make a candidate appear better.
+The evaluator receives action probabilities as integer parts-per-million. They must be strictly positive for listed rows, canonically sorted by unique action ID, and sum to exactly 1,000,000. Zero-mass actions are omitted. The reported result is exact for the encoded PPM distribution; it is not an exact evaluation of an arbitrary higher-precision source distribution. Any quantization from a float/softmax policy must be defined and reported by the policy adapter, not silently assumed here. The weighted numerators are retained exactly; PPM outputs round upward, so rounding cannot make the encoded candidate distribution appear better. The policy-artifact digest is an identity reference only, not a hash of the action-probability rows; a surrounding run receipt should bind the emitted rows verbatim to the run.
 
 The deterministic minimax-regret action/floor is also emitted for context. It is a comparator only. A randomized policy can achieve a smaller worst-case expected regret than every deterministic action, so the deterministic floor is not a lower bound for the randomized problem.
 
