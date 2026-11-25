@@ -173,6 +173,10 @@ jobs:
             "${tmp_root}/benchmarks/plasma/kinetic-information-return/"
           cp benchmarks/plasma/kinetic-information-return/fixtures/path-response-dispositions-v0.1.json \
             "${tmp_root}/benchmarks/plasma/kinetic-information-return/fixtures/"
+          cp benchmarks/plasma/kinetic-information-return/operation-ledger-v0.1.schema.json \
+            "${tmp_root}/benchmarks/plasma/kinetic-information-return/"
+          cp benchmarks/plasma/kinetic-information-return/fixtures/operation-ledger-known-answer-v0.1.json \
+            "${tmp_root}/benchmarks/plasma/kinetic-information-return/fixtures/"
           cat > "${crate_dir}/Cargo.toml" <<'EOF'
           [package]
           name = "symthaea-plasma-probes"
@@ -335,6 +339,37 @@ jobs:
           assert response_fixture["claim_boundary"]["no_solver_run"] is True
           assert response_fixture["claim_boundary"]["no_echo_measured"] is True
           print("kinetic_path_response_dispositions_validation=PASS")
+
+          ledger_schema = json.loads((root / "operation-ledger-v0.1.schema.json").read_text())
+          ledger_fixture = json.loads((root / "fixtures/operation-ledger-known-answer-v0.1.json").read_text())
+          Draft202012Validator.check_schema(ledger_schema)
+          ledger_validator = Draft202012Validator(ledger_schema)
+          ledger_validator.validate(ledger_fixture)
+          assert len(ledger_fixture["ledgers"]) == 2
+          for ledger in ledger_fixture["ledgers"]:
+              times = [event["application_time"] for event in ledger["events"]]
+              assert times == sorted(times)
+              assert all(0 <= time <= ledger["maximum_time"] for time in times)
+              assert len({event["event_id"] for event in ledger["events"]}) == len(ledger["events"])
+              for event in ledger["events"]:
+                  if event["operation_class"] == "physical_collision":
+                      assert ledger["physical_model"] != "collisionless_vlasov"
+                      assert "physical_entropy_production" in event
+                      assert "numerical_entropy_delta" not in event
+                  else:
+                      assert "physical_entropy_production" not in event
+                  if event["declared_reversible"]:
+                      assert event.get("discarded_effect_measure", 0) == 0
+          invalid_collisionless = json.loads(json.dumps(ledger_fixture))
+          invalid_collisionless["ledgers"][0]["events"].append(
+              json.loads(json.dumps(ledger_fixture["ledgers"][1]["events"][0]))
+          )
+          assert not ledger_validator.is_valid(invalid_collisionless)
+          invalid_numerical = json.loads(json.dumps(ledger_fixture))
+          invalid_numerical["ledgers"][0]["events"][0]["physical_entropy_measure_id"] = "physical-entropy"
+          invalid_numerical["ledgers"][0]["events"][0]["physical_entropy_production"] = 0.02
+          assert not ledger_validator.is_valid(invalid_numerical)
+          print("kinetic_operation_ledger_validation=PASS")
           PY
 
       - name: Validate fixed-domain particle W1 schema and known answers
