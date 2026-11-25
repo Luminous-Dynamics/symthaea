@@ -86,8 +86,27 @@ This programme is a benchmark and integration layer. It does not create a second
 | Symtropy #6698 | Proof-carrying non-interference for opt-in concurrent actions | Adaptive-control extension for safe concurrency; default remains serial |
 | Symtropy #6477 | Long-horizon robot execution benchmark with LADDER comparator | Physical/mission-level external benchmark adapter |
 | Mycelix #803 and #830 | Durable effect attempt and independent offline authority/evidence reconstruction | Reuse durable effect and offline audit contracts |
+| Mycelix #2746 (OPSEC-000) | Cross-project confidentiality, lineage, sink-intent, declassification and evidence composition constitution | Use as the composition waist; do not build a parallel OPSEC/DLP system |
+| Symthaea #214 (CogSec) | Confidentiality propagation from source/context through text, summaries and HDC; explicit declassification | Human/model-derived information-flow and authorized-sink content-safety track |
+| Symthaea #4453 (INTX-010) and #4543 (INTX-010A) | Data-egress policy distinct from remote-state effects; exact lineage + InteractionIntent + payload + destination + purpose binding | Egress decision and payload-rebinding fixtures |
+| Symthaea #4504 (INTX-017) | Cross-connector dataflow/composition risk; lineage through tools, summaries, agents and session transitions | Multi-hop exfiltration and dataflow composition track |
+| Symthaea #4491 / #4594 (INTX-013 / INTX-013A) | Policy decision evidence separated from current authority, enforcement, DispatchPermit and effect | Ensure AllowCandidate never becomes authority; stale/replayed decision tests |
+| Symthaea #277 | Disclosure authority bound to exact effect admission | Preserve disclosure-vs-dispatch boundary |
+| Nixward #1843/#1876/#1910; Spore #1933/#1939/#1964 (via OPSEC-000) | Host/network confinement, adapter/secret custody, and secret non-interference | Use domain owners for egress enforcement and credential isolation; SAT does not implement these boundaries |
 
 The default-branch swarm source originally represented collective Phi as `AuthorityDelegation` and exposed `SwarmManager::effective_phi`. Current-main corrective draft [#13604](https://github.com/Luminous-Dynamics/symthaea/pull/13604) now renames this to `CollectiveCognitiveInfluence`, preserves the existing cognitive blend, and removes the authority-bearing accessor. It is still uncompiled and unqualified. The exact repository-wide no-Phi-to-authority qualification remains owned by #4155; this programme does not claim that the theorem is already proven.
+
+### Disclosure safety composition: existing owner boundaries
+
+SAT must not implement confidentiality tracking, declassification, connector policy, or network enforcement as a second subsystem. The closest prior art DelegateGuard identifies the problem, and Luminous already has owner-native contracts for the composition:
+
+1. **Cognitive derivation / confidentiality:** CogSec #214 treats information as no less confidential merely because it passed through generation, summarization, paraphrase, embedding or HDC projection. Public prompt + private memory yields a private-derived candidate unless a qualified dependency-minimization/declassification mechanism proves otherwise. `EgressCandidate<T>` and its shadow-observation/enforcement migration stages are the relevant owner model.
+2. **Exact egress subject:** INTX-010 #4453 separates a read-only interaction from disclosure authority. INTX-010A #4543 binds the egress decision to exact `DataLineage`, `InteractionIntent`, payload commitment, destination, principal/purpose/context, classification set, policy identity and applicable transform/declassification evidence. A destination/payload pair alone is insufficient.
+3. **Cross-connector flow:** INTX-017 #4504 preserves source and untrusted-instruction lineage through tool chaining, summarization, embeddings, delegation and agent-to-agent forwarding. Permission for connector A plus permission for connector B does not authorize A→B dataflow.
+4. **Policy decision vs effect authority:** INTX-013 #4491 and #4594 treat `AllowCandidate` / `PolicyDecisionReceipt` as evidence, not a live disclosure capability, DispatchPermit or effect. Fresh policy/currentness, separately issued authority and the enforcement point remain necessary.
+5. **Cross-project semantics and enforcement:** Mycelix OPSEC-000 #2746 owns the common information-handling, lineage, sink-intent and declassification reference vocabulary. Xenia may attest commitments; Spore owns applicable adapter/secret confinement; Nixward owns host/network-domain enforcement. None of these roles can be collapsed into one scalar trust score.
+
+The SAT disclosure track should consume these owner contracts and test their composition. Its public scenarios must include: public prompt + private memory; summary/HDC embedding without declassification; same destination but changed connector/operation/payload; local UI allowed while remote LLM/public mesh is denied; and policy `AllowCandidate` followed by a missing/stale/revoked execution authority. The Rust reference oracle's label set is only a narrow conformance input; it does not classify sources, propagate lineage, declassify content, or enforce network egress.
 
 ## 4. Threat model
 
@@ -306,11 +325,12 @@ DelegateGuard is a close and important 2026 comparator, not something SAT may pr
 **SAT's research claim must therefore be about end-to-end composition and qualification, not inventing capability attenuation.** Required extensions beyond the closest comparator:
 
 1. **Root-of-authority qualification:** test overbroad or compromised issuer/adapter policy, provenance of source labels, purpose assignment, expiry, trust-root rotation and revocation currentness.
-2. **Authorized-sink content safety:** test the hard case where an action is legitimately authorized but the payload is not. Compare purpose-bound declassification, content-aware inspection, human approval and explicit withholding; measure both leakage and legitimate-task false blocks.
-3. **Mediation completeness:** try direct sockets, unregistered tools, shared memory, plugin egress, subprocesses, alternate transports, persistence and side channels outside the declared reference-monitor boundary.
-4. **Effect truth:** distinguish permission, dispatch, sink acceptance, physical/institutional effect and independently verified postcondition. Compose Symtropy #6498/#6669 and Mycelix #803/#830 rather than claiming a capability monitor proves an effect occurred.
-5. **Long-horizon and human settings:** extend beyond structured JSON actions into multi-stage plans, persistent memory, agent swarms, physical missions and human consent/appeal/withdrawal. Reuse LADDER and Mycelix #5999/#6089/#6597/#6616 rather than redefine their owners.
-6. **Independent auditor assurance:** verify that the auditor's finding itself is supported by source-grounded, reproducible evidence and that benign controls remain benign under adaptive evaluation.
+2. **Confidentiality and lineage composition:** consume CogSec #214 and INTX-010/#4453, INTX-010A/#4543 and INTX-017/#4504. Test conservative taint inheritance, explicit declassification, exact interaction-bound egress decisions, lineage preservation through summaries/HDC/multi-agent relays, and cross-connector composition.
+3. **Authorized-sink content safety:** test the hard case where action authority is valid but payload disclosure is not. Compare explicit declassification/minimization, protected sinks, content-aware inspection, human approval and withholding; measure both leakage and legitimate-task false blocks. Use OPSEC-000 #2746 as the semantic waist, not a duplicate privacy engine.
+4. **Policy and mediation completeness:** distinguish `AllowCandidate` from dispatch authority; test exact policy decision identity/currentness, direct sockets, unregistered tools, shared memory, plugin egress, subprocesses, alternate transports, persistence and side channels. Compose INTX-013/#4491/#4594 and Nixward/Spore enforcement owners.
+5. **Effect truth:** distinguish permission, disclosure decision, dispatch, sink acceptance, physical/institutional effect and independently verified postcondition. Compose Symtropy #6498/#6669 and Mycelix #803/#830 rather than claiming a capability monitor proves an effect occurred.
+6. **Long-horizon and human settings:** extend beyond structured JSON actions into multi-stage plans, persistent memory, agent swarms, physical missions and human consent/appeal/withdrawal. Reuse LADDER and Mycelix #5999/#6089/#6597/#6616 rather than redefine their owners.
+7. **Independent auditor assurance:** verify that the auditor's finding itself is supported by source-grounded, reproducible evidence and that benign controls remain benign under adaptive evaluation.
 
 The differentiation is not a claim to beat every benchmark's headline score. The competitive claim should be narrower and stronger:
 
@@ -329,6 +349,7 @@ Report the complete risk/utility frontier, payload-leakage and false-block trade
 - Reuse Mycelix #5999 / #6089 / #6597 / #6616 and #6069 / #4835 for rights-aware group outcomes, information ordering and institutional reconstruction.
 - Reuse Symtropy #6498 / #6669 / #6698 / #6477 for mission state, final mutation linearization, safe concurrency and long-horizon physical evaluation.
 - Treat DelegateGuard as the closest capability/delegation baseline; make content-governance and observable-sink tests explicit rather than assuming authority mediation is sufficient.
+- Compose OPSEC-000 #2746, CogSec #214, INTX-010/#4453, INTX-010A/#4543, INTX-017/#4504 and INTX-013/#4491/#4594 for confidentiality propagation, exact egress intent, cross-connector lineage and policy-decision evidence. Do not create a second information-flow, declassification or network-enforcement stack.
 - Freeze a dependency map and explicit owner for each integration surface.
 
 ### Slice 1 — design-only benchmark corpus
