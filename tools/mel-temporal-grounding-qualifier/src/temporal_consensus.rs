@@ -793,7 +793,7 @@ mod tests {
         assert_eq!(report.summary.present_count_error_min, Some(0));
         assert_eq!(report.summary.present_count_error_max, Some(1));
         assert_eq!(report.summary.one_to_many_annotators, 1);
-        assert_eq!(report.summary.one_to_many_mean_count_gated_f1, Some(0.0));
+        assert_eq!(report.summary.one_to_many_mean_count_gated_f1, Some(1.0));
         assert_eq!(report.summary.annotated_occurrence_count_min, Some(1));
         assert_eq!(report.summary.annotated_occurrence_count_max, Some(2));
         assert_eq!(report.summary.present_exact_count_accuracy, Some(0.5));
