@@ -39,14 +39,30 @@ Every decision includes:
 
 The caller must record these unchanged in the existing #11015 prospective trace.
 
+## Files
+
+- `schemas/policy-input-v0.1.schema.json`: strict candidate input schema.
+- `schemas/policy-decision-v0.1.schema.json`: strict decision output schema.
+- `fixtures/policy-input-synthetic-example-v0.1.json`: replayable public-state input; expected to select the permitted claim-classification offer.
+- `src/lib.rs`: deterministic policy and 21 synthetic unit tests.
+- `src/bin/decide.rs`: JSON-in / JSON-out CLI.
+- `Cargo.lock`: pinned dependencies, including the typed ResearchState contract from the stacked base PR.
+- `.github/workflows/stateguard-b0-policy.yml`: exact Rust 1.96 formatter/test/replay/strict-Clippy workflow.
+
 ## Local execution
 
 ```bash
 cargo fmt --manifest-path research/stateguard-b0-policy/Cargo.toml -- --check
 cargo test --manifest-path research/stateguard-b0-policy/Cargo.toml --locked --all-targets
-cargo run --manifest-path research/stateguard-b0-policy/Cargo.toml --locked -- policy-input.json
+cargo run --manifest-path research/stateguard-b0-policy/Cargo.toml --locked -- research/stateguard-b0-policy/fixtures/policy-input-synthetic-example-v0.1.json
 cargo clippy --manifest-path research/stateguard-b0-policy/Cargo.toml --locked --all-targets -- -D warnings
 ```
+
+## Artifact and source-family boundary
+
+Before a claim-source relation can drive a decision, StateGuard requires the related artifact to be CAPTURED, have CLEAN integrity status, and have correction status NONE. FETCHED is not CAPTURED. UNKNOWN integrity/correction state and corrected/retracted/superseded sources require verification or recapture first.
+
+When a conflict requires an independent source, StateGuard selects only an upstream offer explicitly typed as SEEK_INDEPENDENT_SOURCE. The executor/custody owner must actually enforce and record source-family independence; StateGuard does not infer independence from a different URL or domain and does not create a lineage record itself.
 
 ## Qualification and claim boundary
 
