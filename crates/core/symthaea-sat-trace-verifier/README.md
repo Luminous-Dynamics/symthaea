@@ -33,7 +33,8 @@ attempts. The output must still report `signatures_verified=false` and
   UTF-16 code units and preservation of Unicode strings without normalization.
 - Exact run and frozen-manifest identity on every event.
 - Consecutive event sequence, unique event IDs, prior-only causal references,
-  previous-event digest and domain-separated event digest.
+  same-correlation/direct-parent linkage for effect observations, previous-event
+  digest and domain-separated event digest.
 - Full intent, authority exact-effect, disclosure and versioned sink-projection
   commitments.
 - Independent sink-observer role/identity and observed projection equality.
