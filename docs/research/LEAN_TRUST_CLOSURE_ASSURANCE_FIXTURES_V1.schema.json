@@ -1,0 +1,164 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://luminousdynamics.io/schemas/LEAN_TRUST_CLOSURE_ASSURANCE_FIXTURES_V1.schema.json",
+  "title": "LeanTrustClosureAssuranceFixturesV1",
+  "type": "object",
+  "additionalProperties": false,
+  "required": [
+    "schema_version",
+    "artifact_id",
+    "status",
+    "protocol",
+    "source_policy",
+    "cases"
+  ],
+  "properties": {
+    "schema_version": {
+      "const": "1.0.0"
+    },
+    "artifact_id": {
+      "const": "LEAN-TRUST-CLOSURE-ASSURANCE-FIXTURES-001"
+    },
+    "status": {
+      "const": "design_only_no_execution_claimed"
+    },
+    "protocol": {
+      "const": "docs/research/LEAN_TRUST_CLOSURE_ASSURANCE_CAPSULE_V1.md"
+    },
+    "source_policy": {
+      "type": "string",
+      "minLength": 1
+    },
+    "cases": {
+      "type": "array",
+      "minItems": 18,
+      "items": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": [
+          "id",
+          "class",
+          "precondition",
+          "mutation",
+          "expected_disposition",
+          "expected_axes",
+          "expected_observations",
+          "must_not_emit"
+        ],
+        "properties": {
+          "id": {
+            "type": "string",
+            "pattern": "^TCAC-[0-9]{3}-[a-z0-9-]+$"
+          },
+          "class": {
+            "enum": [
+              "positive_control",
+              "policy_control",
+              "negative_control",
+              "regression_control",
+              "adversarial_control",
+              "fail_closed_control",
+              "separation_control",
+              "determinism_control"
+            ]
+          },
+          "precondition": {
+            "type": "string",
+            "minLength": 1
+          },
+          "mutation": {
+            "type": "string",
+            "minLength": 1
+          },
+          "expected_disposition": {
+            "enum": [
+              "qualified_under_policy",
+              "rejected",
+              "inconclusive",
+              "draft"
+            ]
+          },
+          "expected_axes": {
+            "type": "object",
+            "minProperties": 1,
+            "additionalProperties": false,
+            "properties": {
+              "statement_fidelity": {
+                "enum": [
+                  "satisfied",
+                  "failed",
+                  "unknown",
+                  "not_applicable"
+                ]
+              },
+              "logical_dependency_closure": {
+                "enum": [
+                  "satisfied",
+                  "failed",
+                  "unknown",
+                  "not_applicable"
+                ]
+              },
+              "official_kernel_replay": {
+                "enum": [
+                  "satisfied",
+                  "failed",
+                  "unknown",
+                  "not_applicable"
+                ]
+              },
+              "independent_checker_replay": {
+                "enum": [
+                  "satisfied",
+                  "failed",
+                  "unknown",
+                  "not_applicable"
+                ]
+              },
+              "construction_containment": {
+                "enum": [
+                  "satisfied",
+                  "failed",
+                  "unknown",
+                  "not_applicable"
+                ]
+              },
+              "environment_reproducibility": {
+                "enum": [
+                  "satisfied",
+                  "failed",
+                  "unknown",
+                  "not_applicable"
+                ]
+              },
+              "computational_trust": {
+                "enum": [
+                  "satisfied",
+                  "failed",
+                  "unknown",
+                  "not_applicable"
+                ]
+              }
+            }
+          },
+          "expected_observations": {
+            "type": "array",
+            "minItems": 1,
+            "items": {
+              "type": "string",
+              "minLength": 1
+            }
+          },
+          "must_not_emit": {
+            "type": "array",
+            "minItems": 1,
+            "items": {
+              "type": "string",
+              "minLength": 1
+            }
+          }
+        }
+      }
+    }
+  }
+}
