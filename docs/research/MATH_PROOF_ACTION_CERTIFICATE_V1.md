@@ -203,3 +203,9 @@ The positive certificate workflow retains Lean `#print axioms` output and checks
 ### 12.5. Fresh closure test now includes transitive controls
 
 The independent trust-audit fixture now imports the actual proof-action module and checks an expanded fifteen-root corpus. In addition to the `Classical.choice` imported-inductive roots and empty proof roots, it includes a direct custom axiom, a theorem that transitively references it, a downstream theorem that references that theorem, and mutually recursive `Even`/`Odd` inductives. Each root is audited twice in opposite orders, with exact expected sets. The run is still pending, and this larger corpus is not covered by the earlier action-certificate receipt.
+
+### 12.6. Successful bounded Lean replay receipt
+
+Focused run [45496916375](https://github.com/Luminous-Dynamics/symthaea/actions/runs/45496916375), exact head `15bd3da46e6f25cbff813db18a5d6073a9a86e99`, passed the Mathlib v4.37 local action-certificate replay. Its `proof-action-certificate-and-comm-lean-replay` artifact contains an accepted receipt for the split iff lemma, forward and reverse action certificates, and composed root theorem. The workflow also rejected a wrong-proposition control and detected a deliberately injected axiom in its diagnostic control.
+
+This does not establish general proof-action correctness or complete axiom closure; the native axiom report is diagnostic-only, and the independent 15-root fresh-walk audit is tracked separately by [#13575](https://github.com/Luminous-Dynamics/symthaea/issues/13575).
