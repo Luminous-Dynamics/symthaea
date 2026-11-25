@@ -127,15 +127,19 @@ For both schemas:
 
 1. Parse strict JSON; reject duplicate object keys, unknown fields, missing fields and invalid UTF-8.
 2. Canonicalize the `payload` object using JSON Canonicalization Scheme (JCS, RFC 8785).
-3. Compute `payload_sha256 = SHA-256(domain_prefix || 0x00 || JCS(payload))`, with these exact ASCII domain prefixes:
+3. Compute `payload_sha256 = SHA-256(payload_domain || 0x00 || JCS(payload))`, with these exact ASCII domain prefixes:
    - `luminous:mace:decision-sufficiency-payload:v1`
    - `luminous:mace:decision-outcome-payload:v1`
-4. Verify the Ed25519 signature over the UTF-8 bytes of the 64-character lowercase-hex `payload_sha256` value. This matches the existing pinned MACE Ed25519 qualification profile; do not sign the raw 32 digest bytes. Resolve `key_id` only through the separately pinned verifier profile.
-5. Require the supplied lower-case hex `payload_sha256` to match the recomputed value.
+4. Construct an attestation preimage object. For sufficiency it contains `schema_version = mace_decision_sufficiency_attestation_preimage_v1`, `payload_sha256`, `assessor_profile_sha256`, `verifier_profile_sha256`, `key_id`, `issued_at_unix` and `expires_at_unix`. For outcome it contains `schema_version = mace_decision_outcome_attestation_preimage_v1`, `payload_sha256`, `evaluator_profile_sha256`, `verifier_profile_sha256`, `key_id` and `issued_at_unix`.
+5. Canonicalize the attestation preimage with JCS and compute `attestation_sha256 = SHA-256(attestation_domain || 0x00 || JCS(attestation_preimage))`, using:
+   - `luminous:mace:decision-sufficiency-attestation:v1`
+   - `luminous:mace:decision-outcome-attestation:v1`
+6. Verify the Ed25519 signature over the UTF-8 bytes of the 64-character lowercase-hex `attestation_sha256` value. Do not sign only `payload_sha256` or the raw 32 digest bytes. Resolve `key_id` only through a separately pinned, service-scoped verifier profile.
+7. Require both supplied digests to match their recomputed values. The attestation digest binds validity metadata and signer identity/profile claims so they cannot be altered independently of the signature.
 
-The `signature_base64` value is canonical padded standard Base64 for exactly 64 Ed25519 signature bytes. The digest is a signed commitment, not a substitute for independent semantic validation. The verifier must check exact binding and cross-field constraints after cryptographic verification.
+The `signature_base64` value is canonical padded standard Base64 for exactly 64 Ed25519 signature bytes. Payload and attestation digests are distinct commitments. Cryptographic verification does not replace exact binding, cross-field, lifecycle or evaluator-independence checks. The verifier profile should be scoped to the decision assessor or outcome evaluator signer set; a broad shared key ring does not establish service identity or operational independence.
 
-The decision-sufficiency receipt has a maximum 900-second lifetime in v1. No caller-supplied clock value is trusted. The issuer uses its own authoritative clock; the consumer uses a protected trusted clock after receipt delivery and again at consequential use. The process-local monotonic guard in the qualification exchange does not provide cross-restart rollback protection.
+The decision-sufficiency receipt has a maximum 900-second lifetime in v1. The issuer uses its own authoritative clock; the consumer uses protected trusted time after receipt delivery and again at consequential use. The caller does not supply a signing timestamp. The process-local monotonic guard in the qualification exchange does not provide cross-restart rollback protection.
 
 The existing MACE Ed25519 typed receipt is not DSSE. These schemas do not claim DSSE compatibility. A future standard envelope can be introduced only as a versioned migration with cross-implementation vectors.
 
@@ -232,19 +236,19 @@ Hard constraints are gates. Utility is optimized only among configurations that 
 
 ## 11. Rust consumer-side verifier increment
 
-The AML adapter module `decision_sufficiency_receipt.rs` implements the consumer-side v1 receipt verifier. It uses strict typed Serde decoding with unknown-field rejection (including duplicate known fields), RFC 8785 canonicalization through the pinned `serde_json_canonicalizer = 0.3.2` dependency, the MACE v1 lowercase-hex digest signing convention, canonical Base64 decoding, and the existing `EvidenceQualificationSignatureVerifierV1` / pinned Ed25519 trust-profile verifier.
+The AML adapter module `decision_sufficiency_receipt.rs` implements the consumer-side v1 receipt verifier. It uses strict typed Serde decoding with unknown-field rejection (including duplicate known fields), RFC 8785 canonicalization through the pinned `serde_json_canonicalizer = 0.3.2` dependency, a separate attestation-preimage digest that binds signer metadata and validity times, canonical Base64 decoding, and the existing `EvidenceQualificationSignatureVerifierV1` / pinned Ed25519 trust-profile verifier.
 
-The Rust verifier checks the consumer-owned episode/invocation and twelve-field decision binding, assessor/verifier profile pins, the exact qualified-evidence ID set supplied by the already verified qualification stage, sorted unique IDs, evidence-set subset relations, a complete disjoint partition of applicable requirements, sufficient/insufficient disposition consistency, the 900-second TTL and use-time validity, canonical digest, signature and full-receipt commitment. It returns a capability type whose fields cannot be constructed directly from unverified JSON.
+The Rust verifier checks the consumer-owned episode/invocation and twelve-field decision binding, consumer-pinned assessor/verifier profile hashes, the exact qualified-evidence ID set supplied by the already verified qualification stage, sorted unique IDs, evidence-set subset relations, a complete disjoint partition of applicable requirements, sufficient/insufficient disposition consistency, the 900-second TTL and use-time validity, payload and attestation digests, metadata-bound signature and full-receipt commitment. It returns a capability type whose fields cannot be constructed directly from unverified JSON.
 
-The verifier's expected binding and profile pins must come from consumer-controlled configuration/current state. The signer trust profile should be provisioned specifically for the assessor identity; this module does not create or deploy the assessor and cannot establish process, credential, data-access or evaluator independence by itself.
+The verifier's expected binding and profile pins must come from consumer-controlled configuration/current state. The signer trust profile should be provisioned specifically for the assessor identity; this module does not create or deploy the assessor and cannot establish process, credential, data-access or evaluator independence by itself. The outcome evaluator likewise requires its own separately provisioned signer profile.
 
 The schema validator and Rust verifiers intentionally complement each other. JSON Schema checks wire structure; the Rust verifiers check cross-field relations and cryptographic/current-use properties.
 
 ### 11.2 Decision outcome receipt verifier
 
-The AML adapter module `decision_outcome_receipt.rs` adds strict typed decoding, duplicate/unknown-field rejection, JCS payload hashing, canonical Base64 Ed25519 verification through the same pinned MACE verifier, full-receipt commitment and a private-field verified capability.
+The AML adapter module `decision_outcome_receipt.rs` adds strict typed decoding, duplicate/unknown-field rejection, JCS payload and attestation-preimage hashing, canonical Base64 Ed25519 verification through the same pinned MACE verifier, full-receipt commitment and a private-field verified capability.
 
-It checks the exact frozen episode/evaluator manifest and decision record, no-memory arm nullability, exact action/authorization/execution receipt digest tuple, observation-window order, fixed-point utility range and `treatment - baseline = delta`, hard-constraint verdict/count/report consistency, exact preregistered causal design and manifest/analysis-plan bindings, independent episode count and the prohibition on causal claims from descriptive-only data.
+It checks the exact frozen episode/evaluator manifest and decision record, no-memory arm nullability, exact action/authorization/execution receipt digest tuple, observation-window order, fixed-point utility range and `treatment - baseline = delta`, hard-constraint verdict/count/report consistency, exact preregistered causal design and manifest/analysis-plan bindings, independent episode count and the prohibition on causal claims from descriptive-only data. The signature preimage binds the payload digest, evaluator profile, verifier profile, key ID and issue time.
 
 The outcome verifier does not independently fetch or validate the underlying action-authorization and execution receipts. Their digests must come from separately verified receipt capabilities supplied by the consumer. It also cannot establish that the outcome observer measured reality, that the evaluator was operationally independent, or that the preregistered statistical method was correctly executed. Those require the separate action authority, outcome evaluator, observation instrumentation and evaluator custody.
 
