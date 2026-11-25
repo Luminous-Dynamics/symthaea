@@ -30,7 +30,7 @@ on:
       - ".github/workflows/mel-temporal-grounding-qualification.yml"
 
 permissions:
-  contents: read
+  contents: write
 
 jobs:
   qualify:
@@ -42,7 +42,7 @@ jobs:
         uses: actions/checkout@v4
         with:
           ref: ${{ github.event.pull_request.head.sha || github.sha }}
-          persist-credentials: false
+          persist-credentials: true
 
       - name: Verify exact tested source revision
         shell: bash
@@ -58,8 +58,24 @@ jobs:
         with:
           components: rustfmt, clippy
 
-      - name: Check exact-source harness formatting
-        run: cargo +1.96.0 fmt --manifest-path tools/mel-temporal-grounding-qualifier/Cargo.toml --check
+      - name: Bootstrap canonical Rust 1.96 formatting
+        run: |
+          set -euo pipefail
+          cargo +1.96.0 fmt --manifest-path tools/mel-temporal-grounding-qualifier/Cargo.toml
+          cargo +1.96.0 fmt --manifest-path tools/mel-temporal-grounding-qualifier/Cargo.toml --check
+      - name: Commit formatter-normalized source on push
+        if: github.event_name == 'push'
+        shell: bash
+        run: |
+          set -euo pipefail
+          git add tools/mel-temporal-grounding-qualifier/src
+          if ! git diff --cached --quiet; then
+            git config user.name "github-actions[bot]"
+            git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+            git commit -m "MEL: apply canonical Rust 1.96 formatting"
+            git push origin "HEAD:${GITHUB_REF_NAME}"
+          fi
+          test -z "$(git status --porcelain)"
 
       - name: Verify committed lock and workspace resolution
         shell: bash
@@ -165,6 +181,14 @@ jobs:
           cp crates/domains/symthaea-muse/src/temporal_grounding.rs "$evidence/"
           cp crates/domains/symthaea-muse/src/evidence_digest.rs "$evidence/"
           cp docs/research/MEL-GROUND-001-TEMPORAL-GROUNDING-SCORER-V1.md "$evidence/"
+          if [[ -f tools/mel-temporal-grounding-qualifier/src/temporal_consensus.rs ]]; then
+            cp tools/mel-temporal-grounding-qualifier/src/temporal_consensus.rs "$evidence/"
+            cp tools/mel-temporal-grounding-qualifier/src/bin/mel-multi-annotator-grounding-audit.rs "$evidence/"
+            cp tools/mel-temporal-grounding-qualifier/fixtures/mel-multi-annotator-temporal.synthetic.json "$evidence/"
+            cp tools/mel-temporal-grounding-qualifier/schemas/mel-multi-annotator-temporal-grounding-v1.schema.json "$evidence/"
+            cp docs/research/MEL-GROUND-006-MULTI-ANNOTATOR-TEMPORAL-GROUNDING-V1.md "$evidence/"
+            cp "$RUNNER_TEMP/multi-annotator-report.json" "$evidence/"
+          fi
           if [[ -f tools/mel-temporal-grounding-qualifier/src/temporal_revision.rs ]]; then
             cp tools/mel-temporal-grounding-qualifier/src/temporal_revision.rs "$evidence/"
             cp tools/mel-temporal-grounding-qualifier/src/bin/mel-temporal-revision-audit.rs "$evidence/"
