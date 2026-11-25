@@ -466,7 +466,7 @@ A second scope-equivalence tier now has a source-level Lean seed. The local cont
 
 The manifest maps six declarations to the Tier-2 obligations and pins the source digest plus Lean 4.37/Mathlib environment. The focused workflow runs the Lean source and, on success, emits a separate exact-run receipt with source, manifest, toolchain, Lake manifest and axiom-log digests.
 
-**Status:** source, manifest, schema and workflow integration are committed; exact-head replay is pending. The static manifest intentionally remains `kernel_replay_pending` until a successful run reports the receipt.
+**Status:** passed on exact code-bearing head `15bd3da46e6f25cbff813db18a5d6073a9a86e99` in focused run [45496916375](https://github.com/Luminous-Dynamics/symthaea/actions/runs/45496916375). The `scope-equivalence-tier2-and-comm-lean-replay` artifact contains an accepted six-certificate receipt with source, manifest, toolchain, Mathlib, Lake manifest and axiom-log digests. The static manifest remains a pre-execution input; the exact-run receipt is the acceptance record.
 
 **Claim ceiling:** synthetic, non-dependent propositional context permutation only; same target; no dependent binders, typeclasses, local instances, universe changes, altered premises or arbitrary context transport. Axiom output is captured but not parsed. This is not a model score or evidence that general Tier-2 scope equivalence is solved.
 
@@ -494,3 +494,11 @@ The source-pinned two-module reproduction has an imported structure `S9` with a 
 The A/B source pair has been expanded to fifteen roots: three exact `Classical.choice` cases; three direct/transitive custom-axiom cases; and nine expected-empty roots including `Even`/`Odd` mutually recursive inductives and the five `And.comm`/proof-action roots. Every root is audited twice, with the second pass in reverse order. The manifest/schema and workflow now require exact per-root sets and two matching log occurrences.
 
 **Status:** this expanded source and the exact-root workflow are committed; the new exact-head run is pending. The earlier bounded Lean action/Tier-2 receipts are separate results and do not qualify this expanded audit.
+
+## 22. Exact-run receipts for action certificates and Tier-2 transport (2026-11-25)
+
+Focused run [45496916375](https://github.com/Luminous-Dynamics/symthaea/actions/runs/45496916375), at exact head `15bd3da46e6f25cbff813db18a5d6073a9a86e99`, completed all four focused jobs successfully. This includes the finite Rust/fixture lane, Mathlib v4.29 direct extraction, Mathlib v4.37 elaborated extraction with the local action-certificate pilot, and the v4.29/v4.37 differential comparison.
+
+The uploaded `proof-action-certificate-and-comm-lean-replay` receipt is accepted for the four local action declarations and the composed root theorem; its negative controls rejected a wrong proposition and detected the deliberately injected axiom. The separate `scope-equivalence-tier2-and-comm-lean-replay` receipt is accepted for six context/warrant-transport declarations. Both artifacts bind the exact sources, manifests and pinned Lean/Mathlib environment.
+
+**Claim ceiling:** these are bounded, synthetic `And.comm` demonstrations. The native axiom report is diagnostic-only; the separate 15-root independent axiom audit is under development and is not qualified by this run. Neither receipt demonstrates real-world model performance, human learning, dependent-context transport or general proof-action correctness.
