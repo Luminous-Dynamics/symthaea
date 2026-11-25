@@ -350,9 +350,11 @@ fn validate_input(
                 candidate.candidate_id
             )));
         }
-        if candidate.outcomes.len() < 2 {
+        if candidate.outcomes.len() < 2
+            || candidate.outcomes.len() > MAX_JOINT_OUTCOMES_V1
+        {
             return Err(CausalInformationPortfolioErrorV1(format!(
-                "candidate {} requires at least two possible outcomes",
+                "candidate {} requires 2..={MAX_JOINT_OUTCOMES_V1} possible outcomes",
                 candidate.candidate_id
             )));
         }
@@ -1021,6 +1023,18 @@ mod tests {
         );
         assert_eq!(report.status, CausalPortfolioStatusV1::NoFeasiblePortfolio);
         assert!(report.selected_portfolio.is_none());
+    }
+
+    #[test]
+    fn unqualified_source_path_receives_no_information_credit() {
+        let mut candidate = candidate("source-unknown", "ref-a", 0.99, 0.01, 1.0, false);
+        candidate.source_path_qualified = false;
+        let report = optimize_causal_information_portfolio_v1(&input(vec![candidate])).unwrap();
+        assert_eq!(report.status, CausalPortfolioStatusV1::NoFeasiblePortfolio);
+        assert_eq!(
+            report.candidate_eligibility[0].reason_codes,
+            vec!["source_path_not_qualified"]
+        );
     }
 
     #[test]
