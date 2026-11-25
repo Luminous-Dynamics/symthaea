@@ -183,6 +183,41 @@
         "minimum": 0,
         "maximum": 255
       }
+    },
+    "regret_upper_bound_micros": {
+      "type": "integer",
+      "minimum": 0,
+      "maximum": 1000000000000
+    },
+    "regret_limit_micros": {
+      "type": "integer",
+      "minimum": 0,
+      "maximum": 1000000000000
+    },
+    "observed_cost_micros": {
+      "type": "integer",
+      "minimum": 0,
+      "maximum": 1000000000000
+    },
+    "observed_latency_ms": {
+      "type": "integer",
+      "minimum": 0,
+      "maximum": 86400000
+    },
+    "observed_context_tokens": {
+      "type": "integer",
+      "minimum": 0,
+      "maximum": 1000000000000
+    },
+    "observed_tool_calls": {
+      "type": "integer",
+      "minimum": 0,
+      "maximum": 1000000
+    },
+    "maximum_evidence_age_seconds": {
+      "type": "integer",
+      "minimum": 0,
+      "maximum": 315360000
     }
   },
   "allOf": [
@@ -202,7 +237,14 @@
           "risk_upper_bound_ppm",
           "risk_limit_ppm",
           "confidence_level_ppm",
-          "calibration_receipt_sha256"
+          "calibration_receipt_sha256",
+          "regret_upper_bound_micros",
+          "regret_limit_micros",
+          "observed_cost_micros",
+          "observed_latency_ms",
+          "observed_context_tokens",
+          "observed_tool_calls",
+          "maximum_evidence_age_seconds"
         ],
         "properties": {
           "requirements": {
