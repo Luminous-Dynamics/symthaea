@@ -346,6 +346,22 @@ mod tests {
     const F: &str = "ffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffff";
 
     struct TestVerifier;
+    struct RevokedAtUseVerifier;
+
+    impl EvidenceQualificationSignatureVerifierV1 for RevokedAtUseVerifier {
+        fn verify_signature(
+            &self,
+            _profile: &str,
+            _key: &str,
+            _payload: &str,
+            _signature: &[u8],
+            _issued: u64,
+            _now: u64,
+        ) -> Result<(), EvidenceQualificationRejectV1> {
+            Err(EvidenceQualificationRejectV1::RevokedKey)
+        }
+    }
+
     impl EvidenceQualificationSignatureVerifierV1 for TestVerifier {
         fn verify_signature(&self, profile: &str, key: &str, payload: &str,
             signature: &[u8], _issued: u64, _now: u64)
@@ -512,6 +528,30 @@ mod tests {
         let token = token(&binding, &[EvidenceDispositionV1::Admissible, EvidenceDispositionV1::Admissible]);
         assert_eq!(project_qualified_candidate_evidence_v1(&batch, &token, &binding, &expectation(&batch), &TestVerifier),
             Err(CandidateEvidenceProjectionRejectV1::DependencyCycle));
+    }
+
+    #[test]
+    fn qualified_projection_rechecks_signer_status_at_each_use() {
+        let batch = make_batch(&[record("a", 1, vec![])]);
+        let ids = ids(&batch);
+        let initial_binding = binding(&batch, &ids);
+        let token = token(&initial_binding, &[EvidenceDispositionV1::Admissible]);
+        let result = project_qualified_candidate_evidence_v1(
+            &batch,
+            &token,
+            &initial_binding,
+            &expectation(&batch),
+            &TestVerifier,
+        )
+        .expect("initial qualification");
+        let CandidateEvidenceProjectionV1::Qualified(projected) = result else {
+            panic!("expected qualified projection");
+        };
+
+        assert_eq!(
+            projected.validate_at_use(&initial_binding, &RevokedAtUseVerifier),
+            Err(EvidenceQualificationRejectV1::RevokedKey)
+        );
     }
 
     #[test]
