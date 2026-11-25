@@ -2512,6 +2512,32 @@ impl KineticPulseSequence {
     }
 }
 
+/// Empirical disposition for one candidate/reference pulse-path comparison.
+#[derive(Clone, Copy, Debug, PartialEq, Eq, Serialize)]
+pub enum KineticPathResponseDisposition {
+    Pass,
+    Fail,
+    Unknown,
+    Unsupported,
+}
+
+/// Path-conditioned empirical response qualification.
+///
+/// This is a finite measured comparison, not a global response guarantee.
+#[derive(Clone, Debug, PartialEq, Serialize)]
+pub struct KineticPathResponseQualification {
+    pub sequence_digest: String,
+    pub disposition: KineticPathResponseDisposition,
+    pub normalized_response_distance: Option<f64>,
+    pub maximum_normalized_entry_error: Option<f64>,
+    pub measured_entry_count: usize,
+    pub missing_response_count: usize,
+    pub branch_mismatch_count: usize,
+    pub unresolved_branch_count: usize,
+    pub structure_class_compatible: bool,
+    pub empirical_tolerance: f64,
+}
+
 /// A path-conditioned KRS response signature bound to one immutable pulse sequence.
 ///
 /// The response signature's sole intervention identity must equal the sequence
@@ -2583,6 +2609,52 @@ impl KineticPulsePathResponseSignature {
             ));
         }
         self.response_signature.compare(&other.response_signature)
+    }
+
+    /// Classify a finite path comparison without treating missingness as zero.
+    ///
+    /// Structure mismatch is UNSUPPORTED. Missing responses or unresolved
+    /// branches are UNKNOWN. A confirmed branch mismatch or error above the
+    /// empirical tolerance is FAIL. Only complete, branch-stable signatures
+    /// within tolerance are PASS.
+    pub fn qualify_against(
+        &self,
+        reference: &Self,
+        empirical_tolerance: f64,
+    ) -> Result<KineticPathResponseQualification, ContractError> {
+        if !empirical_tolerance.is_finite() || empirical_tolerance < 0.0 {
+            return Err(ContractError::InvalidResponseSignatureTolerance);
+        }
+        let comparison = self.compare(reference)?;
+        let disposition = if !comparison.structure_class_compatible {
+            KineticPathResponseDisposition::Unsupported
+        } else if comparison.missing_response_count > 0
+            || comparison.unresolved_branch_count > 0
+            || comparison.measured_entry_count == 0
+            || comparison.maximum_normalized_entry_error.is_none()
+        {
+            KineticPathResponseDisposition::Unknown
+        } else if comparison.branch_mismatch_count > 0
+            || comparison
+                .maximum_normalized_entry_error
+                .is_some_and(|error| error > empirical_tolerance)
+        {
+            KineticPathResponseDisposition::Fail
+        } else {
+            KineticPathResponseDisposition::Pass
+        };
+        Ok(KineticPathResponseQualification {
+            sequence_digest: self.sequence_digest.clone(),
+            disposition,
+            normalized_response_distance: comparison.normalized_response_distance,
+            maximum_normalized_entry_error: comparison.maximum_normalized_entry_error,
+            measured_entry_count: comparison.measured_entry_count,
+            missing_response_count: comparison.missing_response_count,
+            branch_mismatch_count: comparison.branch_mismatch_count,
+            unresolved_branch_count: comparison.unresolved_branch_count,
+            structure_class_compatible: comparison.structure_class_compatible,
+            empirical_tolerance,
+        })
     }
 }
 
@@ -11534,6 +11606,167 @@ mod tests {
         .unwrap();
         assert!(!response.has_complete_response_coverage());
         assert!(!response.has_complete_branch_association());
+    }
+
+    #[test]
+    fn kinetic_path_response_qualification_passes_complete_matching_signature() {
+        let family = contract();
+        let sequence = KineticPulseSequence::new(
+            &family,
+            &[candidate(1, 0.2, 0.01, 1.0)],
+            6.0,
+        )
+        .unwrap();
+        let reference = synthetic_path_response_signature(
+            &sequence,
+            "same-structure",
+            vec![2.0, 3.0],
+            vec![
+                Some(ComplexResponse::new(0.1, 0.0).unwrap()),
+                Some(ComplexResponse::new(0.2, 0.1).unwrap()),
+            ],
+            vec![Some("branch-a".to_owned()); 2],
+        )
+        .unwrap();
+        let candidate = synthetic_path_response_signature(
+            &sequence,
+            "same-structure",
+            vec![2.0, 3.0],
+            vec![
+                Some(ComplexResponse::new(0.1001, 0.0).unwrap()),
+                Some(ComplexResponse::new(0.2001, 0.1).unwrap()),
+            ],
+            vec![Some("branch-a".to_owned()); 2],
+        )
+        .unwrap();
+        let report = candidate.qualify_against(&reference, 1.0e-3).unwrap();
+        assert_eq!(report.disposition, KineticPathResponseDisposition::Pass);
+        assert_eq!(report.measured_entry_count, 2);
+        assert_eq!(report.missing_response_count, 0);
+        assert_eq!(report.unresolved_branch_count, 0);
+    }
+
+    #[test]
+    fn kinetic_path_response_qualification_marks_missingness_unknown() {
+        let family = contract();
+        let sequence = KineticPulseSequence::new(
+            &family,
+            &[candidate(1, 0.2, 0.01, 1.0)],
+            6.0,
+        )
+        .unwrap();
+        let reference = synthetic_path_response_signature(
+            &sequence,
+            "same-structure",
+            vec![2.0, 3.0],
+            vec![
+                Some(ComplexResponse::new(0.1, 0.0).unwrap()),
+                Some(ComplexResponse::new(0.2, 0.1).unwrap()),
+            ],
+            vec![Some("branch-a".to_owned()); 2],
+        )
+        .unwrap();
+        let incomplete = synthetic_path_response_signature(
+            &sequence,
+            "same-structure",
+            vec![2.0, 3.0],
+            vec![Some(ComplexResponse::new(0.1, 0.0).unwrap()), None],
+            vec![Some("branch-a".to_owned()), None],
+        )
+        .unwrap();
+        let report = incomplete.qualify_against(&reference, 1.0).unwrap();
+        assert_eq!(report.disposition, KineticPathResponseDisposition::Unknown);
+        assert_eq!(report.missing_response_count, 1);
+        assert_eq!(report.unresolved_branch_count, 1);
+    }
+
+    #[test]
+    fn kinetic_path_response_qualification_fails_on_branch_mismatch_or_excess_error() {
+        let family = contract();
+        let sequence = KineticPulseSequence::new(
+            &family,
+            &[candidate(1, 0.2, 0.01, 1.0)],
+            6.0,
+        )
+        .unwrap();
+        let reference = synthetic_path_response_signature(
+            &sequence,
+            "same-structure",
+            vec![2.0, 3.0],
+            vec![
+                Some(ComplexResponse::new(0.1, 0.0).unwrap()),
+                Some(ComplexResponse::new(0.2, 0.1).unwrap()),
+            ],
+            vec![Some("branch-a".to_owned()); 2],
+        )
+        .unwrap();
+        let wrong_branch = synthetic_path_response_signature(
+            &sequence,
+            "same-structure",
+            vec![2.0, 3.0],
+            vec![
+                Some(ComplexResponse::new(0.1, 0.0).unwrap()),
+                Some(ComplexResponse::new(0.2, 0.1).unwrap()),
+            ],
+            vec![Some("branch-a".to_owned()), Some("branch-b".to_owned())],
+        )
+        .unwrap();
+        let branch_report = wrong_branch.qualify_against(&reference, 1.0).unwrap();
+        assert_eq!(
+            branch_report.disposition,
+            KineticPathResponseDisposition::Fail
+        );
+        assert_eq!(branch_report.branch_mismatch_count, 1);
+
+        let high_error = synthetic_path_response_signature(
+            &sequence,
+            "same-structure",
+            vec![2.0, 3.0],
+            vec![
+                Some(ComplexResponse::new(0.1, 0.0).unwrap()),
+                Some(ComplexResponse::new(0.8, 0.1).unwrap()),
+            ],
+            vec![Some("branch-a".to_owned()); 2],
+        )
+        .unwrap();
+        let error_report = high_error.qualify_against(&reference, 0.1).unwrap();
+        assert_eq!(
+            error_report.disposition,
+            KineticPathResponseDisposition::Fail
+        );
+    }
+
+    #[test]
+    fn kinetic_path_response_qualification_marks_structure_mismatch_unsupported() {
+        let family = contract();
+        let sequence = KineticPulseSequence::new(
+            &family,
+            &[candidate(1, 0.2, 0.01, 1.0)],
+            6.0,
+        )
+        .unwrap();
+        let reference = synthetic_path_response_signature(
+            &sequence,
+            "reference-structure",
+            vec![2.0, 3.0],
+            vec![Some(ComplexResponse::new(0.1, 0.0).unwrap()); 2],
+            vec![Some("branch-a".to_owned()); 2],
+        )
+        .unwrap();
+        let candidate = synthetic_path_response_signature(
+            &sequence,
+            "reduced-structure-not-comparable",
+            vec![2.0, 3.0],
+            vec![Some(ComplexResponse::new(0.1, 0.0).unwrap()); 2],
+            vec![Some("branch-a".to_owned()); 2],
+        )
+        .unwrap();
+        let report = candidate.qualify_against(&reference, 1.0).unwrap();
+        assert_eq!(
+            report.disposition,
+            KineticPathResponseDisposition::Unsupported
+        );
+        assert!(!report.structure_class_compatible);
     }
 
     #[test]
