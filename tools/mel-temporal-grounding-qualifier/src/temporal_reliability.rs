@@ -564,22 +564,6 @@ fn summarize_dataset(
         .iter()
         .filter(|pair| pair.state_agreement.is_none())
         .count();
-    let f1: Vec<_> = present_pairs
-        .iter()
-        .filter_map(|pair| pair.interval_f1_symmetric)
-        .collect();
-    let iou: Vec<_> = present_pairs
-        .iter()
-        .filter_map(|pair| pair.matched_iou_symmetric)
-        .collect();
-    let exact_count: Vec<_> = present_pairs
-        .iter()
-        .filter_map(|pair| pair.exact_occurrence_count_agreement.map(bool_to_f64))
-        .collect();
-    let count_difference: Vec<_> = present_pairs
-        .iter()
-        .filter_map(|pair| pair.occurrence_count_difference.map(|value| value as f64))
-        .collect();
     let start_errors: Vec<_> = present_pairs
         .iter()
         .flat_map(|pair| pair.start_boundary_abs_errors_ms.iter().copied())
@@ -628,18 +612,28 @@ fn summarize_dataset(
         source_work_clusters: clusters,
         unique_annotator_identities: unique_annotators,
         nominal_state_agreement_pairs: state_pairs.len(),
-        nominal_state_agreement_rate: mean_bool(&state_pairs),
+        nominal_state_agreement_rate: mean_by_source_cluster(pairwise, |pair| {
+            pair.state_agreement.map(bool_to_f64)
+        }),
         same_state_present_pairs,
         same_state_absent_pairs,
         present_absent_disagreement_pairs,
         ambiguous_or_not_estimable_excluded_pairs: excluded_pairs,
         present_present_interval_pairs: present_present_pairs,
-        mean_symmetric_interval_f1: mean(&f1),
-        mean_symmetric_matched_iou: mean(&iou),
-        exact_occurrence_count_agreement_rate: mean(&exact_count),
-        mean_occurrence_count_difference: mean(&count_difference),
-        mean_start_boundary_mae_ms: mean(&start_errors),
-        mean_end_boundary_mae_ms: mean(&end_errors),
+        mean_symmetric_interval_f1: mean_by_source_cluster(pairwise, |pair| {
+            pair.interval_f1_symmetric
+        }),
+        mean_symmetric_matched_iou: mean_by_source_cluster(pairwise, |pair| {
+            pair.matched_iou_symmetric
+        }),
+        exact_occurrence_count_agreement_rate: mean_by_source_cluster(pairwise, |pair| {
+            pair.exact_occurrence_count_agreement.map(bool_to_f64)
+        }),
+        mean_occurrence_count_difference: mean_by_source_cluster(pairwise, |pair| {
+            pair.occurrence_count_difference.map(|value| value as f64)
+        }),
+        mean_start_boundary_mae_ms: mean_boundary_by_source_cluster(pairwise, true),
+        mean_end_boundary_mae_ms: mean_boundary_by_source_cluster(pairwise, false),
         boundary_tolerance_agreement,
         state_reliability: alpha,
         recommended_confirmatory_source_cluster_floor: CONFIRMATORY_SOURCE_CLUSTER_FLOOR,
@@ -769,6 +763,49 @@ fn nominal_alpha_refs(items: &[&MultiAnnotatorReliabilityItemV1]) -> Krippendorf
     // bootstrap resampling to repeat an entire source-work cluster.
     let owned: Vec<_> = items.iter().map(|item| (*item).clone()).collect();
     nominal_alpha(&owned)
+}
+
+fn mean_by_source_cluster(
+    pairs: &[PairwiseAnnotationReliabilityV1],
+    field: impl Fn(&PairwiseAnnotationReliabilityV1) -> Option<f64>,
+) -> Option<f64> {
+    let mut clusters: BTreeMap<&str, Vec<f64>> = BTreeMap::new();
+    for pair in pairs {
+        if let Some(value) = field(pair) {
+            clusters
+                .entry(pair.source_work_id_sha256.as_str())
+                .or_default()
+                .push(value);
+        }
+    }
+    let cluster_means: Vec<_> = clusters
+        .values()
+        .filter_map(|values| mean(values))
+        .collect();
+    mean(&cluster_means)
+}
+
+fn mean_boundary_by_source_cluster(
+    pairs: &[PairwiseAnnotationReliabilityV1],
+    start: bool,
+) -> Option<f64> {
+    let mut clusters: BTreeMap<&str, Vec<f64>> = BTreeMap::new();
+    for pair in pairs {
+        let errors = if start {
+            &pair.start_boundary_abs_errors_ms
+        } else {
+            &pair.end_boundary_abs_errors_ms
+        };
+        clusters
+            .entry(pair.source_work_id_sha256.as_str())
+            .or_default()
+            .extend(errors.iter().copied());
+    }
+    let cluster_means: Vec<_> = clusters
+        .values()
+        .filter_map(|values| mean(values))
+        .collect();
+    mean(&cluster_means)
 }
 
 fn cluster_pair_metric(
