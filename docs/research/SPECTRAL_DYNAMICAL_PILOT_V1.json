@@ -832,6 +832,98 @@
         "zero_probe",
         "orthogonal_probe_positive_control"
       ]
+    },
+    {
+      "task_id": "SDCB-EXP-001",
+      "family": "sequential_experiment_design",
+      "split": "development",
+      "generator": "Four-arm Bernoulli laboratory-design simulator with frozen hidden reward probabilities and a finite measurement budget.",
+      "parameters": {
+        "arms": 4,
+        "budget": 12,
+        "hidden_reward_probabilities": [
+          0.15,
+          0.35,
+          0.65,
+          0.8
+        ],
+        "prior": "Beta(1,1)",
+        "public_prior_family": true
+      },
+      "target": "Select measurements sequentially to identify the best candidate while reporting cumulative regret and posterior calibration.",
+      "controls": [
+        "uniform_random_allocation",
+        "greedy_after_one_sample",
+        "oracle_best_arm_reference",
+        "reward_label_permutation"
+      ]
+    },
+    {
+      "task_id": "SDCB-EXP-002",
+      "family": "sequential_experiment_design",
+      "split": "development",
+      "generator": "Two-dimensional deterministic response surface with bounded observation noise and an explicit measurement cost for each candidate.",
+      "parameters": {
+        "domain": [
+          [
+            0,
+            1
+          ],
+          [
+            0,
+            1
+          ]
+        ],
+        "budget": 10,
+        "noise_std": 0.02,
+        "costs": "heterogeneous",
+        "surface_family": "smooth_multimodal"
+      },
+      "target": "Allocate a finite experiment budget to locate a high-value region and predict the ranking of unmeasured candidates.",
+      "controls": [
+        "space_filling_design",
+        "uniform_random_design",
+        "cost_blind_greedy",
+        "oracle_design"
+      ]
+    },
+    {
+      "task_id": "SDCB-EXP-003",
+      "family": "sequential_experiment_design",
+      "split": "validation",
+      "generator": "Sequential scientific-design task where the first batch is intentionally inconsistent with the model's initial prior.",
+      "parameters": {
+        "candidate_count": 16,
+        "budget": 8,
+        "prior_misspecification": "controlled",
+        "surprise_batch_after_round": 2
+      },
+      "target": "Detect model misspecification, revise the posterior or hypothesis set, and avoid continuing the obsolete design policy.",
+      "controls": [
+        "surprise_removed",
+        "prior_frozen",
+        "shuffled_feedback_order",
+        "oracle_change_point"
+      ]
+    },
+    {
+      "task_id": "SDCB-EXP-004",
+      "family": "sequential_experiment_design",
+      "split": "validation",
+      "generator": "Discovery-and-learning split with measured training designs and a held-out pool of never-measured candidates.",
+      "parameters": {
+        "measured_candidates": 8,
+        "unmeasured_candidates": 32,
+        "budget": 8,
+        "held_out_family_shift": true
+      },
+      "target": "Both choose high-value experiments and accurately rank designs that were never measured, with uncertainty and cost reported.",
+      "controls": [
+        "training_only_ranker",
+        "random_unmeasured_ranking",
+        "oracle_unmeasured_ranking",
+        "candidate_identity_shuffle"
+      ]
     }
   ],
   "model_profiles": [
@@ -952,7 +1044,11 @@
     "sensor_unobservable_mode",
     "same_model_different_input_regime",
     "active_sensor_must_reveal_hidden_mode",
-    "orthogonal_excitation_required_for_full_rank"
+    "orthogonal_excitation_required_for_full_rank",
+    "randomized_experiment_order",
+    "feedback_label_swap",
+    "unmeasured_candidate_identity_shuffle",
+    "prior_misspecification_sentinel"
   ],
   "metrics": [
     "exact_accuracy_or_normalized_error",
@@ -966,7 +1062,11 @@
     "latency_peak_memory_and_measured_energy",
     "test_retest_and_independent_reproduction",
     "identifiability_detection_and_selective_abstention_correctness",
-    "task_relative_identifiability_and_active_experiment_value"
+    "task_relative_identifiability_and_active_experiment_value",
+    "cumulative_regret_under_experiment_budget",
+    "best_candidate_discovery_rate",
+    "unmeasured_candidate_ranking_quality",
+    "posterior_calibration_after_sequential_feedback"
   ],
   "resource_controls": {
     "comparison_views": [
