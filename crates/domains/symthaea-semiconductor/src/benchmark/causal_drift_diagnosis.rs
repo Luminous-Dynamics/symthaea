@@ -546,6 +546,27 @@ fn assess_hypothesis(
         }
     }
 
+    let has_matched_evidence = hypothesis
+        .evidence
+        .iter()
+        .any(|evidence| evidence.evidence_kind == CausalDriftEvidenceKindV1::MatchedContrast);
+    let has_intervention_evidence = hypothesis
+        .evidence
+        .iter()
+        .any(|evidence| evidence.evidence_kind == CausalDriftEvidenceKindV1::ControlledIntervention);
+    if hypothesis.matched_contrast.is_some() && !has_matched_evidence {
+        return Err(CausalDriftDiagnosisErrorV1(format!(
+            "hypothesis {} has a matched contrast without a typed evidence record",
+            hypothesis.hypothesis_id
+        )));
+    }
+    if hypothesis.controlled_intervention.is_some() && !has_intervention_evidence {
+        return Err(CausalDriftDiagnosisErrorV1(format!(
+            "hypothesis {} has intervention statistics without a typed evidence record",
+            hypothesis.hypothesis_id
+        )));
+    }
+
     let violations = negative_control_violations(&hypothesis.negative_controls)?;
     if status != CausalAssessmentStatusV1::Unknown && !violations.is_empty() {
         status = CausalAssessmentStatusV1::Unidentifiable;
@@ -916,6 +937,21 @@ mod tests {
     }
 
     #[test]
+    fn intervention_statistics_without_intervention_evidence_are_rejected() {
+        let mut candidate = hypothesis(
+            "repair",
+            CausalDriftHypothesisKindV1::ToolStateChange,
+            vec![evidence(
+                "repair",
+                "only-attribution",
+                CausalDriftEvidenceKindV1::FeatureAttribution,
+            )],
+        );
+        candidate.controlled_intervention = Some(intervention());
+        assert!(diagnose_causal_drift_v1(&input(vec![candidate])).is_err());
+    }
+
+    #[test]
     fn non_randomized_intervention_is_unidentifiable() {
         let mut candidate = hypothesis(
             "repair",
@@ -1000,7 +1036,7 @@ mod tests {
             CausalDriftHypothesisKindV1::RecipeOrProcessChange,
             vec![evidence("a-process", "ev-a", CausalDriftEvidenceKindV1::TemporalPrecedence)],
         );
-        let mut first = input(vec![first_hypothesis.clone(), second_hypothesis.clone()]);
+        let first = input(vec![first_hypothesis.clone(), second_hypothesis.clone()]);
         let digest_first = seal_causal_drift_diagnosis_input_v1(&first).unwrap();
         let mut second = input(vec![second_hypothesis, first_hypothesis]);
         second.hypotheses.reverse();
