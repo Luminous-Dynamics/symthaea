@@ -38,3 +38,19 @@ This prevents accidental comparison of two different pulse paths under a shared 
 No missing response is assigned zero. A path can only be compared against a candidate/reference signature bound to the same sequence digest. The report carries maximum normalized entry error, RMS normalized distance, missing count, branch mismatch count and structure compatibility.
 
 This is an empirical disposition over the registered pulse path and sampled observation times. It is not a certified bound over untested pulse sequences or a global nonlinear echo theorem; that remains subject to CIC #13452 and independent reference coverage.
+
+
+## Physical / numerical operation ledger
+
+The KIRR operation ledger is defined in `operation-ledger-v0.1.schema.json`, with collisionless and collisional known-answer examples in `fixtures/operation-ledger-known-answer-v0.1.json`.
+
+The Rust `KineticOperationLedger`:
+- distinguishes collisionless Vlasov, Vlasov–Fokker–Planck and Vlasov–Poisson–Landau model classes;
+- records physical collision operators separately from numerical filter, truncation, hypercollision, projection, compression, basis transition, coordinate remap and fallback operations;
+- binds every event to before/after state digests and nondecreasing physical time;
+- requires a named effect metric for lossy numerical operations;
+- requires a named physical entropy-production quantity for physical collision events;
+- prohibits numerical operations from claiming physical entropy production and prohibits physical collision events in collisionless cohorts;
+- sums discarded-effect measures only within the same metric ID, never across unlike quantities.
+
+This is an attribution ledger, not a thermodynamic proof. It does not infer physical entropy production from a filtered state or certify that a declared operation measurement is authentic; those require independent run receipts and reference checks.
