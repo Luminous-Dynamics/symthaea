@@ -1,5 +1,8 @@
 # 🌟 Conscious Research System - Complete Implementation Summary
 
+> **Historical API note (2026-11-25):** This document preserves an earlier design snapshot. Any `EpistemicLearner::record_outcome(VerificationOutcome)` example below is obsolete and must not be copied into current WebResearcher integrations. Current learning updates require `record_adjudicated_outcome(AdjudicatedVerificationOutcome)` with independent adjudication kind, authority ID and evidence reference; the provenance is stored and legacy aggregate-only snapshots are reset. Confidence or local verifier status is never a correctness label. See [the current Web Research integration guide](../developer/WEB_RESEARCH_INTEGRATION_SUCCESS.md) and [PR #13612](https://github.com/Luminous-Dynamics/symthaea/pull/13612).
+
+
 **Status**: ✅ **REVOLUTIONARY BREAKTHROUGH ACHIEVED**
 **Date**: December 22, 2025
 **Achievement**: First AI with Three-Level Epistemic Consciousness
