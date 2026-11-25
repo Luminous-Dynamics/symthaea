@@ -271,6 +271,14 @@
       "scope": "no_pairwise_shared_code_or_algorithm_claim_made",
       "independence_effect": "unknown_not_counted",
       "evidence_refs": []
+    },
+    {
+      "from": "con_ron",
+      "to": "lean_official_kernel",
+      "relation": "unknown",
+      "scope": "con_ron_is_a_verified_port_of_con_leche_and_is_not_claimed_as_a_wholly_independent_algorithm_from_the_official_checker",
+      "independence_effect": "unknown_not_counted",
+      "evidence_refs": []
     }
   ],
   "common_mode_domains": [
