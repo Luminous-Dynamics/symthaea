@@ -374,10 +374,28 @@ mod tests {
             .record_adjudicated_outcome(invalid_confidence)
             .is_err());
 
+        let mut out_of_range_confidence = adjudicated_outcome();
+        out_of_range_confidence.outcome.predicted_confidence = 1.01;
+        assert!(consciousness
+            .record_adjudicated_outcome(out_of_range_confidence)
+            .is_err());
+
         let mut empty_claim = adjudicated_outcome();
         empty_claim.outcome.claim = "   ".to_owned();
         assert!(consciousness
             .record_adjudicated_outcome(empty_claim)
+            .is_err());
+
+        let mut empty_source_domain = adjudicated_outcome();
+        empty_source_domain.outcome.source_domain.clear();
+        assert!(consciousness
+            .record_adjudicated_outcome(empty_source_domain)
+            .is_err());
+
+        let mut empty_topic_domain = adjudicated_outcome();
+        empty_topic_domain.outcome.domain.clear();
+        assert!(consciousness
+            .record_adjudicated_outcome(empty_topic_domain)
             .is_err());
 
         assert_eq!(consciousness.learner.stats().total_outcomes, 0);
