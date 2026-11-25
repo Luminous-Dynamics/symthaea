@@ -130,7 +130,7 @@ For both schemas:
 3. Compute `payload_sha256 = SHA-256(domain_prefix || 0x00 || JCS(payload))`, with these exact ASCII domain prefixes:
    - `luminous:mace:decision-sufficiency-payload:v1`
    - `luminous:mace:decision-outcome-payload:v1`
-4. Verify the Ed25519 signature over the 32 digest bytes, with `key_id` resolved only through the separately pinned verifier profile.
+4. Verify the Ed25519 signature over the UTF-8 bytes of the 64-character lowercase-hex `payload_sha256` value. This matches the existing pinned MACE Ed25519 qualification profile; do not sign the raw 32 digest bytes. Resolve `key_id` only through the separately pinned verifier profile.
 5. Require the supplied lower-case hex `payload_sha256` to match the recomputed value.
 
 The `signature_base64` value is canonical padded standard Base64 for exactly 64 Ed25519 signature bytes. The digest is a signed commitment, not a substitute for independent semantic validation. The verifier must check exact binding and cross-field constraints after cryptographic verification.
