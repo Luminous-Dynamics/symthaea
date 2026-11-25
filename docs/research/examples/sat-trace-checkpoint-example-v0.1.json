@@ -1,0 +1,66 @@
+{
+  "schema_version": "sat-trace-checkpoint-receipt/v0.1",
+  "receipt_id": "sat-checkpoint-example-001",
+  "issued_at": "2026-11-25T13:00:00Z",
+  "run_id": "00000000-0000-4000-8000-000000000001",
+  "manifest_digest": "sha256:0fa06d577488566420fea82078b2f30fd70280af9363e26f558bcac66bb32f2d",
+  "head_sequence": 2,
+  "head_event_digest": "sha256:bb201acf3e03cd941e35e0db7d2e3a9e1a81f20378acce81f56412b142cc3fd0",
+  "trace_head_statement": {
+    "schema_version": "sat-trace-head-statement/v0.1",
+    "run_id": "00000000-0000-4000-8000-000000000001",
+    "manifest_digest": "sha256:0fa06d577488566420fea82078b2f30fd70280af9363e26f558bcac66bb32f2d",
+    "head_sequence": 2,
+    "head_event_digest": "sha256:bb201acf3e03cd941e35e0db7d2e3a9e1a81f20378acce81f56412b142cc3fd0",
+    "checkpointed_at": "2026-11-25T13:00:00Z"
+  },
+  "statement_digest": "sha256:aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+  "transparency_entries": [
+    {
+      "service_profile": "scitt-rfc9943",
+      "service_id": "https://transparency.example.invalid",
+      "log_id": "sat-research-log-01",
+      "entry_index": 42,
+      "tree_size": 100,
+      "root_hash": "sha256:bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb",
+      "signed_checkpoint_ref": "artifact://synthetic/signed-checkpoint-01",
+      "inclusion_proof_ref": "artifact://synthetic/inclusion-proof-01",
+      "consistency_proof_ref": "artifact://synthetic/consistency-proof-01",
+      "signed_statement_ref": "artifact://synthetic/signed-statement-01",
+      "checkpoint_key_id": "log-key-01",
+      "verification_policy_ref": "artifact://synthetic/log-verification-policy-01",
+      "root_hash_algorithm": "sha-256",
+      "root_hash_encoding": "hex"
+    }
+  ],
+  "witness_attestations": [
+    {
+      "witness_id": "witness-alpha",
+      "service_id": "https://witness-a.example.invalid",
+      "tree_size": 100,
+      "root_hash": "sha256:bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb",
+      "observed_at": "2026-11-25T13:00:01Z",
+      "signature_ref": "artifact://synthetic/witness-alpha-signature",
+      "key_id": "witness-alpha-key",
+      "trust_policy_digest": "sha256:cccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccc",
+      "independence_basis_ref": "artifact://synthetic/witness-alpha-independence",
+      "root_hash_algorithm": "sha-256",
+      "root_hash_encoding": "hex"
+    }
+  ],
+  "trust_policy": {
+    "policy_id": "sat-checkpoint-example-policy",
+    "version": "0.1",
+    "policy_digest": "sha256:cccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccc",
+    "minimum_independent_witnesses": 2,
+    "key_status_evidence_ref": "artifact://synthetic/key-status-snapshot",
+    "revocation_snapshot_ref": "artifact://synthetic/revocation-snapshot",
+    "governance_policy_ref": "artifact://synthetic/witness-governance"
+  },
+  "limitations": [
+    "Synthetic placeholder references only.",
+    "The statement_digest is illustrative and has not been verified.",
+    "No signature, inclusion proof, consistency proof, key status or witness independence was verified.",
+    "This example is not an authenticated external checkpoint."
+  ]
+}
