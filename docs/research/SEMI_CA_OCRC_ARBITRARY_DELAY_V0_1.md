@@ -3,7 +3,7 @@
 **Issue:** #13499  
 **Implementation:** symthaea-semiconductor::benchmark::capacity_aware_ocrcc  
 **Base:** fixed-delay evidence-gated ACI #13498 and the validated evidence-to-model-family stack #13465  
-**Status:** Rust arbitrary-bounded-delay engine and 12 authored tests; exact-head validation pending.
+**Status:** Rust arbitrary-bounded-delay engine with 15 authored tests; exact-head validation pending.
 
 ## Paper and exact algorithm
 
@@ -32,7 +32,7 @@ where F(d) = Pr[proxy_delay >= d]. The independent proxy delay and its survival 
 ## Implemented v0.1
 
 - Discrete proxy-delay PMF on {-1, 0, ..., d_max} and exact survival probabilities.
-- Deterministic PRNG state sealed into the replay digest.
+- Seeded SplitMix64 proxy-delay draws; the evolving PRNG state is included in the engine state digest. This is deterministic pseudorandom replay for the benchmark, not a certificate of ideal IID randomness. The theorem's random-draw assumption must be treated as an idealized algorithm assumption; a production randomness source requires its own audit/commitment.
 - Finite tracking set with the paper's strict expiry inequality and post-eviction admission.
 - Scalar regression interval [prediction - threshold, prediction + threshold] with bounded score threshold B.
 - Trivial full-real-line and empty sets derive loss 0 and 1 by construction, update immediately, and are never tracked.
@@ -40,9 +40,11 @@ where F(d) = Pr[proxy_delay >= d]. The independent proxy delay and its survival 
 - Same-round delay-0 feedback is received at the end of the same round if the prediction was admitted.
 - Feedback received while tracked is weighted by 1/F(actual_delay); an expired/unadmitted result is recorded as UNTRACKED and does not update.
 - K1 eligibility gate: current K1 frontier, eligible status, downstream permission, exact label ID/revision, measurement-event identity, full payload digest, corrected numeric value, uncertainty, certificate/report digest and clock/availability order.
-- UNKNOWN feedback is held while the proxy tracking window remains open; a later K1-qualified receipt may be accepted before expiry. If the window expires with unresolved UNKNOWN feedback, the guarantee state becomes uncertified.
-- BLOCKED or identity/digest/timing/value-mismatched feedback never updates the threshold and marks the guarantee state uncertified.
+- The feedback delay used in CA-OCRC is the arrival round of the **K1-qualified loss usable by the conformal controller**, not merely when a raw physical result first appears in a lab system. If a physical result is available but the K1 report remains UNKNOWN, the tracked slot stays occupied while qualification is pending; a later valid K1 receipt is accepted before proxy expiry and its qualified-feedback delay determines F(d). If the proxy window expires first, the guarantee state becomes uncertified.
+- A terminal BLOCKED report frees its tracking slot at end-of-round, marks the run uncertified and never updates the threshold. Identity/digest/timing/value-mismatched attempts never update; the slot remains subject to the normal proxy expiry unless the report is a terminal K1 BLOCKED outcome.
 - Immutable prediction, feedback and round receipts; state updates are transactional through a cloned engine.
+- Feedback inputs are sorted by stable sample/label/revision identity before IPW accumulation, so permutations of the same same-round delivery set produce byte-identical receipts.
+- The bound helper now validates the theorem's initial-threshold requirement r_1 in [0,B], and policy validation rejects F(d_max)=0.
 - A global UnderDeclaredArbitraryBoundedDelayAssumptions vs UncertifiedInvalidOrOutOfModelFeedback state; no guarantee is claimed after invalid feedback is encountered.
 - Theorem 1 finite-horizon arbitrary-delay bound helper.
 - Proposition 1 Bernoulli proxy-delay family and a one-dimensional optimizer for p*.
@@ -62,6 +64,10 @@ p* = argmin_(0<p<=min(1,K/d_max)) [(K+1)/(p*T) + exp(-K*h(d_max*p/K))]
 and the PMF is Pr[proxy=-1]=1-p*, Pr[proxy=d_max]=p*.
 
 The helper refuses a distribution whose tracking load exceeds K and refuses a bound with F(d_max)=0.
+
+## Missingness boundary
+
+This engine's K is the capacity to track **usable delayed feedback** under the paper's policy. It does not model the probability that a wafer is physically selected for metrology in the first place, and it does not correct active-selection bias. That is a separate estimand and is tracked in #13579. A CA-OCRC IPW factor is not a substitute for inverse selection probability or randomized audit coverage.
 
 ## Explicit exclusions
 
@@ -83,9 +89,12 @@ Twelve Rust tests cover:
 9. PMF survival, tracking load and Assumption 4 validation;
 10. optimal arbitrary-delay p* against a dense grid oracle;
 11. Theorem 1 bound against a known numeric expression;
-12. deterministic replay and capacity invariant.
+12. deterministic replay and capacity invariant;
+13. independent slow schedule oracle over deterministic maximum proxy delays (evictions, admissions, received losses, IPW updates and threshold sequence);
+14. feedback-input permutation invariance for same-round receipts;
+15. terminal BLOCKED feedback frees capacity only after end-of-round reception, and the next round can reuse the slot.
 
-Exact-head rustfmt, strict Clippy, crate tests and SEMI-BENCH-001 reference workflow are required before pass claims.
+Exact-head rustfmt, strict Clippy, crate tests and SEMI-BENCH-001 reference workflow are required before pass claims. The v0.1 proxy randomizer uses a deterministic seeded PRNG for replay; its tests do not constitute a proof of independent physical randomness.
 
 ## Future stochastic-delay extension
 
