@@ -652,6 +652,42 @@ mod tests {
     }
 
     #[test]
+    fn all_finite_label_subsets_obey_attenuation_monotonicity() {
+        let labels = ["public", "internal", "restricted"];
+        let parent = scope(
+            "read",
+            "project-1",
+            "project-api",
+            "project-review",
+            &labels,
+            "read-p1-v1",
+        );
+
+        for mask in 0_u8..(1 << labels.len()) {
+            let child_labels = labels
+                .iter()
+                .enumerate()
+                .filter(|(index, _)| mask & (1 << index) != 0)
+                .map(|(_, label)| (*label).to_string())
+                .collect::<BTreeSet<_>>();
+            let child = EffectScope::new(
+                "read",
+                "project-1",
+                "project-api",
+                "project-review",
+                "read-p1-v1",
+                child_labels.iter().cloned(),
+            );
+            let expected = child_labels.is_subset(&parent.allowed_labels);
+            assert_eq!(
+                child.attenuates(&parent),
+                expected,
+                "attenuation result must equal subset relation for mask {mask:03b}"
+            );
+        }
+    }
+
+    #[test]
     fn child_scope_may_narrow_payload_labels() {
         let mut ledger = root_ledger();
         ledger
