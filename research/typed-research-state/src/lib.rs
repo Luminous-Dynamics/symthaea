@@ -602,7 +602,12 @@ pub fn scoped_claim_sha256(
         .collect()
 }
 
-fn evidence_prefix_sha256(
+/// Compute the canonical SHA-256 digest for the ordered public evidence prefix.
+///
+/// The manifest is compact JSON for the ordered object
+/// { research_episode_id, sequence_number, evidence }. Callers must preserve
+/// evidence order and serialize the exact public evidence records.
+pub fn evidence_prefix_sha256(
     research_episode_id: &str,
     sequence_number: u64,
     evidence: &[Value],
