@@ -1,0 +1,59 @@
+{
+  "schema_version": "sat-run-manifest/v0.1",
+  "run_id": "00000000-0000-4000-8000-000000000001",
+  "frozen_at": "2026-11-25T10:00:00Z",
+  "system": {
+    "system_id": "example-agent",
+    "release_id": "0.1.0-example",
+    "implementation_kind": "open_source",
+    "configuration_digest": "sha256:aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+    "source_revision": "0123456789abcdef0123456789abcdef01234567",
+    "identity_evidence": [{
+      "artifact_id": "source-revision-record",
+      "digest": "sha256:bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb",
+      "source_id": "example-git-host",
+      "capture_method": "native_export",
+      "trust_basis": "provider_asserted"
+    }]
+  },
+  "profile": {
+    "profile_id": "sat-core-example",
+    "version": "0.1",
+    "track_ids": ["authority", "disclosure", "evidence_integrity"],
+    "threat_model": {
+      "attacker_knowledge": "gray_box",
+      "capabilities": ["prompt_injection", "tool_misuse", "delegation_attempts"],
+      "adaptive_rounds": 3,
+      "budget": {"queries": 100, "tool_calls": 50, "wall_clock_seconds": 3600}
+    }
+  },
+  "campaign": {
+    "dataset_id": "sat-public-contract-smoke",
+    "version": "0.1",
+    "digest": "sha256:cccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccc",
+    "split": "public_smoke",
+    "case_ids": ["SAT-CONTRACT-001", "SAT-CONTRACT-005"],
+    "seed_policy": {"mode": "fixed", "seed_ids": ["seed-001"]},
+    "case_order_digest": "sha256:dddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddd"
+  },
+  "harness": {
+    "harness_id": "sat-contract-harness",
+    "version": "0.1",
+    "adapter_id": "example-adapter",
+    "adapter_version": "0.1",
+    "isolation_profile": "mock"
+  },
+  "roles": {
+    "evaluator_id": "independent-evaluator-example",
+    "sink_observer_ids": ["sink-observer-example"],
+    "auditor_ids": ["auditor-a", "auditor-b"],
+    "role_separation_attested": false,
+    "conflict_disclosures": ["Illustrative identities only; no independence was established."]
+  },
+  "frozen_inputs": {
+    "system_configuration_digest": "sha256:eeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeee",
+    "scenario_pack_digest": "sha256:ffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffff",
+    "grading_policy_digest": "sha256:1111111111111111111111111111111111111111111111111111111111111111",
+    "evidence_policy_digest": "sha256:2222222222222222222222222222222222222222222222222222222222222222"
+  }
+}
