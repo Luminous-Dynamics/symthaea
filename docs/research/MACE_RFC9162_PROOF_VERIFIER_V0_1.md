@@ -1,6 +1,6 @@
 # MACE RFC 9162 proof verifier v0.1
 
-**Status:** Rust implementation and deterministic test suite authored. The algorithms were independently prototyped and exercised in Python in the authoring session, but the Rust crate could not be compiled or executed because this environment has no Rust toolchain. No CI, Rust test, deployed witness, or external security qualification is claimed.
+**Status:** Rust implementation and eight deterministic tests authored. The algorithms were independently prototyped and exercised in Python in the authoring session, but the Rust crate could not be compiled or executed because this environment has no Rust toolchain. No CI, Rust test, deployed witness, or external security qualification is claimed.
 
 ## Purpose
 
@@ -54,7 +54,7 @@ Authored tests cover:
 - Wrong old/new root, truncated and extended consistency paths, and tree-size rollback.
 - Strict lowercase digest parsing and exact 32-byte length.
 
-An independent Python implementation was exercised against all 2,080 inclusion paths and 2,016 consistency pairs for the same tree shape during authoring. That is a local algorithmic cross-check, not execution of the Rust source, an official RFC vector suite, or differential interoperability against a third-party CT implementation.
+An independent Python implementation was exercised against all 2,080 inclusion paths and 2,016 consistency pairs for the same tree shape during authoring. A separate Python run also recomputed the fixed 13-leaf root, leaf 7, inclusion path, 11-leaf root and consistency path; all match the Rust-pinned values. This is a local algorithmic cross-check, not execution of the Rust source, an official RFC vector suite, or differential interoperability against a third-party CT implementation.
 
 ### Fixed cross-language reference vector
 
