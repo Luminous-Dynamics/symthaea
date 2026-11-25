@@ -112,7 +112,7 @@
       "class": "regression_control",
       "precondition": "Reproduce the two-module imported-inductive dependency case documented in Lean issue #15226.",
       "mutation": "Audit imported structure S9, constructor S9.mk and theorem usesS9 in both root orders.",
-      "expected_disposition": "qualified_under_policy",
+      "expected_disposition": "inconclusive",
       "expected_axes": {
         "logical_dependency_closure": "satisfied",
         "environment_reproducibility": "satisfied"
@@ -120,7 +120,8 @@
       "expected_observations": [
         "Fresh per-root traversal finds exactly Classical.choice for all three affected roots.",
         "The cached/native diagnostic may disagree and is retained as diagnostic evidence.",
-        "The closure is invariant under root-order permutation."
+        "The closure is invariant under root-order permutation.",
+        "This single-axis integration fixture does not qualify the entire capsule; other required axes remain unknown unless independently satisfied by the harness."
       ],
       "must_not_emit": [
         "An axiom-free closure for S9, S9.mk or usesS9.",
@@ -274,7 +275,7 @@
       "class": "positive_control",
       "precondition": "The official kernel and a separately implemented checker are configured for the same pinned export format.",
       "mutation": "Run both checkers on byte-identical exported proof artifacts under recorded policies.",
-      "expected_disposition": "qualified_under_policy",
+      "expected_disposition": "inconclusive",
       "expected_axes": {
         "official_kernel_replay": "satisfied",
         "independent_checker_replay": "satisfied"
@@ -282,7 +283,8 @@
       "expected_observations": [
         "Both replay records carry the same export SHA-256.",
         "Checker implementation identities and versions are distinct and recorded.",
-        "The axiom policy is explicit."
+        "The axiom policy is explicit.",
+        "This single-axis integration fixture does not qualify the entire capsule; other required axes remain unknown unless independently satisfied by the harness."
       ],
       "must_not_emit": [
         "Independent replay based only on two invocations of the official Lean kernel."
