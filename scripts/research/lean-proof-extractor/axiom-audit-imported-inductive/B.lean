@@ -43,8 +43,8 @@ partial def freshAxiomDependencies
           let next := info.type.getUsedConstants.toList ++ info.ctors.toList ++ rest
           freshAxiomDependencies env next visited axioms
       | none =>
-          -- An unresolved declaration must not look like an axiom-free result.
-          axioms.insert `sorryAx
+          -- Preserve the unresolved name so the exact expected-set assertion fails closed.
+          axioms.insert name
 
 def freshAxiomDependenciesFor (env : Environment) (root : Name) : NameSet :=
   let privateEnv := env.setExporting false
@@ -59,8 +59,8 @@ elab_rules : command
       let ordered := dependencies.toList.mergeSort Name.quickLt
       let rendered := String.intercalate ", " (ordered.map toString)
       logInfo m!"FRESH_AXIOM_AUDIT root={root} axioms=[{rendered}]"
-      unless dependencies.contains `Classical.choice do
-        throwError m!"fresh audit failed to find Classical.choice for {root}"
+      unless dependencies.toList == [`Classical.choice] do
+        throwError m!"fresh audit did not produce the exact expected axiom set for {root}: {rendered}"
 
 theorem usesS9 (_ : S9) : True := trivial
 
