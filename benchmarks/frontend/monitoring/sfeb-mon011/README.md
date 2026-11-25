@@ -11,10 +11,10 @@ MON-011 qualifies the joins *between* those layers.
 The package checks:
 
 - source evidence ID, evidence digest and exact statement digest binding to the decision;
-- explicit decision authority state and exact approval/policy digest;
+- explicit decision authority state and exact approval/policy digest binding;
 - decision-to-intent binding for principal, tenant, resource, mutation path, operation ID, request digest and approval digest;
 - intent-to-sink binding plus exact policy digest;
-- separately authenticated commit-time authority evidence bound to principal, tenant/resource/path and policy digest, with validity interval, revocation state/time, revocation-check freshness and a trust domain independent from the sink when required;
+- separately authenticated commit-time authority evidence bound to principal, tenant/resource/path and policy digest, with validity interval, revocation status/time, revocation-check freshness and a trust domain independent from the sink when required;
 - sink-to-observation binding for sink ID/digest, operation, tenant/resource, state revision and state digest;
 - independent sink/observer trust domains, causal timestamp order and bounded readback freshness;
 - explicit `qualified`, `indeterminate`, `contradicted`, `stale` and `unauthorized` outcomes.
@@ -27,15 +27,15 @@ A missing observation is indeterminate, never success. A trace ID alone is not a
 sh reproduce.sh
 ```
 
-The Go implementation uses only the standard library. The sources are published as gzip snapshots; the runner extracts them to a temporary directory before executing tests and vet.
+The Go implementation uses only the standard library. The sources are published as gzip snapshots; the runner expands them into a temporary module before executing tests and vet.
 
 ## Local preflight
 
 Go 1.23.2 / linux/amd64:
-- 33 named test functions;
+- 34 named test functions;
 - `go test -race -count=5 ./...` passed;
-- `go vet ./...` passed;
-- 92.5% statement coverage.
+- `go vet` passed;
+- 93.4% statement coverage.
 
 These results cover a synthetic normalized-evidence preflight only.
 
@@ -43,11 +43,11 @@ These results cover a synthetic normalized-evidence preflight only.
 
 Every `Authenticated` field is an assertion supplied by an adapter after separate verification. This package does not authenticate publisher signatures, decision signatures, authority credentials, COSE/SCITT receipts, trusted timestamps or destination transactions. It does not prove that a source statement is true or independently establish that a trust-domain label is honest. Those checks must be implemented and tested by adapters and deployment controls.
 
-The package does not compute a universal/cross-language canonical payload digest. It requires adapters to supply already-verified SHA-256 digests and exact references. A `qualified` result means only that the supplied normalized records satisfy these join invariants and configured policy checks.
+The package does not compute a universal/cross-language canonical payload digest. It requires adapters to supply already-verified SHA-256 digests and exact references. A `qualified` result means only that the supplied normalized records satisfy these cross-layer join invariants and configured policy checks.
 
 ## Test corpus
 
-The suite mutates source and decision linkage, approval bytes, decision authority, operation identity, intent/sink references, authority scope, expiry, revocation, revocation freshness, observer independence, readback revision/digest, timestamps, observation freshness, and missing/unauthenticated evidence. Tests do not call a real database, COSE verifier, transparency service or live destination.
+The suite mutates source and decision linkage, approval bytes, decision authority, operation identity, intent/sink references, authority scope, expiry, revocation, revocation freshness, authority-evidence/sink independence, observer independence, readback revision/digest, timestamps, observation freshness and missing/unauthenticated evidence. Tests do not call a real database, COSE verifier, transparency service or live destination.
 
 ## Next gates
 
