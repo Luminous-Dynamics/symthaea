@@ -1,0 +1,378 @@
+{
+  "schema_version": "symthaea-public-research-state-v0.1",
+  "status": "SYNTHETIC_CONFORMANCE_EXAMPLES_NOT_PRODUCTION_STATE",
+  "created_at": "2026-11-25T14:30:00+02:00",
+  "issue": 13663,
+  "owner": "issue-11171",
+  "examples": [
+    {
+      "fixture_id": "RS-01-retrieved-unclassified",
+      "state": {
+        "schema_version": "symthaea-public-research-state-v0.1",
+        "status": "SYNTHETIC_CONFORMANCE_EXAMPLE_NOT_PRODUCTION_STATE",
+        "research_episode_id": "synthetic-episode",
+        "evidence_prefix": {
+          "prefix_id": "prefix:RS-01",
+          "prefix_sha256": "ac2135de38983c9e77d1bbe8f9076ece19cac22c3520d98410780a5a4d445013",
+          "lineage_snapshot_ref": "urn:synthetic:lineage:RS-01",
+          "sequence_number": 1
+        },
+        "decision_context": {
+          "decision_id": "deployment-efficacy-01",
+          "question": "Does compound A reduce symptom duration enough to inform a deployment decision?",
+          "reference_time": "2026-11-25T00:00:00Z",
+          "risk_class": "MODERATE"
+        },
+        "claims": [
+          {
+            "claim_id": "claim-a",
+            "statement": "Compound A reduces symptom duration by at least 20%.",
+            "scope": {
+              "population": "adults in the stated trial population",
+              "outcome_or_measure": "mean symptom duration",
+              "quantifier_or_effect": "reduction >= 20 percent",
+              "domain_or_reference_boundary": "current evidence as of 2026-11-25",
+              "scope_note": "effect threshold must be met in a comparable population"
+            },
+            "reference_time": "2026-11-25T00:00:00Z",
+            "evidence_relations": [
+              {
+                "claim_id": "claim-a",
+                "evidence_id": "ev-a1",
+                "relation": "UNCLASSIFIED",
+                "classifier_provenance": null,
+                "quote_span": null
+              }
+            ],
+            "truth_adjudication": {
+              "status": "NOT_ADJUDICATED",
+              "result": null,
+              "authority_id": null,
+              "evidence_reference": null,
+              "adjudicated_at": null
+            },
+            "decision_usability": {
+              "status": "INSUFFICIENT",
+              "decision_scope_id": "deployment-efficacy-01",
+              "policy_id": "evidence-sufficiency-moderate-v1",
+              "reason_codes": [
+                "NO_CLAIM_SPECIFIC_RELATION",
+                "NOT_INDEPENDENTLY_ADJUDICATED"
+              ]
+            }
+          }
+        ],
+        "evidence": [
+          {
+            "evidence_id": "ev-a1",
+            "artifact_ref": "urn:synthetic:artifact:rs01-a1",
+            "artifact_sha256": "0b64f0c41daa6d5beba22fd851c401cdfc77ca9b47998ae9942362db6f2811f5",
+            "canonical_source_ref": "https://example.org/compound-a-overview",
+            "published_at": "2026-01-10T00:00:00Z",
+            "captured_at": "2026-11-25T10:00:00Z",
+            "source_lineage": {
+              "status": "UNKNOWN"
+            },
+            "integrity_status": "UNKNOWN",
+            "correction_status": "UNKNOWN",
+            "retrieval_state": "CAPTURED"
+          }
+        ]
+      }
+    },
+    {
+      "fixture_id": "RS-02-classified-not-adjudicated",
+      "state": {
+        "schema_version": "symthaea-public-research-state-v0.1",
+        "status": "SYNTHETIC_CONFORMANCE_EXAMPLE_NOT_PRODUCTION_STATE",
+        "research_episode_id": "synthetic-episode",
+        "evidence_prefix": {
+          "prefix_id": "prefix:RS-02",
+          "prefix_sha256": "16fe8fa3aed4fc4aba004c00028c4cfae7b86961750453c0d52cdf68fe86e449",
+          "lineage_snapshot_ref": "urn:synthetic:lineage:RS-02",
+          "sequence_number": 1
+        },
+        "decision_context": {
+          "decision_id": "protocol-selection-02",
+          "question": "Does the cited trial support the specified effect claim?",
+          "reference_time": "2026-11-25T00:00:00Z",
+          "risk_class": "MODERATE"
+        },
+        "claims": [
+          {
+            "claim_id": "claim-b",
+            "statement": "Compound B reduced mean symptom duration by 20% in Trial B.",
+            "scope": {
+              "population": "participants enrolled in Trial B",
+              "outcome_or_measure": "mean symptom duration",
+              "quantifier_or_effect": "20 percent reduction",
+              "domain_or_reference_boundary": "Trial B and its prespecified comparator",
+              "scope_note": "claim-level relation is classified but truth is not independently adjudicated"
+            },
+            "reference_time": "2026-11-25T00:00:00Z",
+            "evidence_relations": [
+              {
+                "claim_id": "claim-b",
+                "evidence_id": "ev-b1",
+                "relation": "SUPPORTS",
+                "classifier_provenance": {
+                  "classifier_id": "synthetic-claim-pair-classifier",
+                  "version": "0.1",
+                  "output_digest": "aec60285f2a0ff0cc1c698a2b20fa19bad3e126834113b62af776a2172d32a49",
+                  "confidence": 0.82,
+                  "emitted_at": "2026-11-25T10:06:00Z",
+                  "evidence_prefix_sha256": "16fe8fa3aed4fc4aba004c00028c4cfae7b86961750453c0d52cdf68fe86e449"
+                },
+                "quote_span": {
+                  "byte_start": 0,
+                  "byte_end": 37,
+                  "quote_sha256": "406070abc502bc6cbf46c0ab78c0db559ee3e627b60dd1118819861fafd7a4b0"
+                }
+              }
+            ],
+            "truth_adjudication": {
+              "status": "NOT_ADJUDICATED",
+              "result": null,
+              "authority_id": null,
+              "evidence_reference": null,
+              "adjudicated_at": null
+            },
+            "decision_usability": {
+              "status": "INSUFFICIENT",
+              "decision_scope_id": "protocol-selection-02",
+              "policy_id": "evidence-sufficiency-moderate-v1",
+              "reason_codes": [
+                "CLAIM_RELATION_CLASSIFIED_BUT_TRUTH_NOT_ADJUDICATED"
+              ]
+            }
+          }
+        ],
+        "evidence": [
+          {
+            "evidence_id": "ev-b1",
+            "artifact_ref": "urn:synthetic:artifact:rs02-b1",
+            "artifact_sha256": "8c0f3e7e22115964c7078064ead2a3409d865e8f9e29fe6724b5ae98e64a46bb",
+            "canonical_source_ref": "https://example.org/trial-b-results",
+            "published_at": "2026-05-01T00:00:00Z",
+            "captured_at": "2026-11-25T10:05:00Z",
+            "source_lineage": {
+              "status": "KNOWN",
+              "family_ref": "source-family:trial-b-paper"
+            },
+            "integrity_status": "CLEAN",
+            "correction_status": "NONE",
+            "retrieval_state": "CAPTURED"
+          }
+        ]
+      }
+    },
+    {
+      "fixture_id": "RS-03-independent-conflict",
+      "state": {
+        "schema_version": "symthaea-public-research-state-v0.1",
+        "status": "SYNTHETIC_CONFORMANCE_EXAMPLE_NOT_PRODUCTION_STATE",
+        "research_episode_id": "synthetic-episode",
+        "evidence_prefix": {
+          "prefix_id": "prefix:RS-03",
+          "prefix_sha256": "4d0b5585597a027830e8287fb2071bb62d2a6a8250ba403683dce76a8b357ff8",
+          "lineage_snapshot_ref": "urn:synthetic:lineage:RS-03",
+          "sequence_number": 1
+        },
+        "decision_context": {
+          "decision_id": "treatment-choice-03",
+          "question": "Is intervention C supported for reducing relapse risk?",
+          "reference_time": "2026-11-25T00:00:00Z",
+          "risk_class": "HIGH"
+        },
+        "claims": [
+          {
+            "claim_id": "claim-c",
+            "statement": "Intervention C reduces long-term relapse risk in the target population.",
+            "scope": {
+              "population": "target population from the specified studies",
+              "outcome_or_measure": "long-term relapse risk",
+              "quantifier_or_effect": "reduction versus matched control",
+              "domain_or_reference_boundary": "studies available by 2026-11-25",
+              "scope_note": "conflicting primary analyses must remain visible"
+            },
+            "reference_time": "2026-11-25T00:00:00Z",
+            "evidence_relations": [
+              {
+                "claim_id": "claim-c",
+                "evidence_id": "ev-c1",
+                "relation": "SUPPORTS",
+                "classifier_provenance": {
+                  "classifier_id": "synthetic-claim-pair-classifier",
+                  "version": "0.1",
+                  "output_digest": "b81d039fa300d04f3427fcbd00fd69b2ec62cf04b25424328b1814a4b54ac7d0",
+                  "confidence": 0.91,
+                  "emitted_at": "2026-11-25T10:12:00Z",
+                  "evidence_prefix_sha256": "4d0b5585597a027830e8287fb2071bb62d2a6a8250ba403683dce76a8b357ff8"
+                },
+                "quote_span": {
+                  "byte_start": 5,
+                  "byte_end": 25,
+                  "quote_sha256": "4c0cbf20e81901fe148e3419fe2e457969445e7388ad26e7f767199c8feab1ee"
+                }
+              },
+              {
+                "claim_id": "claim-c",
+                "evidence_id": "ev-c2",
+                "relation": "REFUTES",
+                "classifier_provenance": {
+                  "classifier_id": "synthetic-claim-pair-classifier",
+                  "version": "0.1",
+                  "output_digest": "a83e4afc653eab4a97514f1d0a2af1fb17bad38a4585280afbdd03d409772984",
+                  "confidence": 0.88,
+                  "emitted_at": "2026-11-25T10:13:00Z",
+                  "evidence_prefix_sha256": "4d0b5585597a027830e8287fb2071bb62d2a6a8250ba403683dce76a8b357ff8"
+                },
+                "quote_span": {
+                  "byte_start": 9,
+                  "byte_end": 42,
+                  "quote_sha256": "00b7731d5c637ec79bed944fb9f0f063d2c707f050e9740d1ecb7d4e76bfd711"
+                }
+              }
+            ],
+            "truth_adjudication": {
+              "status": "NOT_ADJUDICATED",
+              "result": null,
+              "authority_id": null,
+              "evidence_reference": null,
+              "adjudicated_at": null
+            },
+            "decision_usability": {
+              "status": "CONFLICTED",
+              "decision_scope_id": "treatment-choice-03",
+              "policy_id": "high-risk-evidence-v1",
+              "reason_codes": [
+                "INDEPENDENT_SOURCE_CONFLICT",
+                "REQUIRES_ADJUDICATION_OR_ADDITIONAL_EXPERIMENT"
+              ]
+            }
+          }
+        ],
+        "evidence": [
+          {
+            "evidence_id": "ev-c1",
+            "artifact_ref": "urn:synthetic:artifact:rs03-c1",
+            "artifact_sha256": "09fa4da3657814767e9258ec6477a34d122c8c2cefdd606d9f7440fee0d65cee",
+            "canonical_source_ref": "https://example.org/cohort-c-positive",
+            "published_at": "2025-06-01T00:00:00Z",
+            "captured_at": "2026-11-25T10:10:00Z",
+            "source_lineage": {
+              "status": "KNOWN",
+              "family_ref": "source-family:cohort-c-one"
+            },
+            "integrity_status": "CLEAN",
+            "correction_status": "NONE",
+            "retrieval_state": "CAPTURED"
+          },
+          {
+            "evidence_id": "ev-c2",
+            "artifact_ref": "urn:synthetic:artifact:rs03-c2",
+            "artifact_sha256": "658d521bcc26d2416b9957ccc815c841e1b6715b0640fa4937e6f357b2125493",
+            "canonical_source_ref": "https://example.org/registry-c-null",
+            "published_at": "2025-07-01T00:00:00Z",
+            "captured_at": "2026-11-25T10:11:00Z",
+            "source_lineage": {
+              "status": "KNOWN",
+              "family_ref": "source-family:registry-c-two"
+            },
+            "integrity_status": "CLEAN",
+            "correction_status": "NONE",
+            "retrieval_state": "CAPTURED"
+          }
+        ]
+      }
+    },
+    {
+      "fixture_id": "RS-04-historical-truth-stale-for-current-use",
+      "state": {
+        "schema_version": "symthaea-public-research-state-v0.1",
+        "status": "SYNTHETIC_CONFORMANCE_EXAMPLE_NOT_PRODUCTION_STATE",
+        "research_episode_id": "synthetic-episode",
+        "evidence_prefix": {
+          "prefix_id": "prefix:RS-04",
+          "prefix_sha256": "f19e7e624a8654c90141cbfb80143ff540bcd1936d8a25267004f01f2e999db6",
+          "lineage_snapshot_ref": "urn:synthetic:lineage:RS-04",
+          "sequence_number": 1
+        },
+        "decision_context": {
+          "decision_id": "current-policy-use-04",
+          "question": "Can Policy D be relied upon for a current 2026 deployment?",
+          "reference_time": "2026-11-25T00:00:00Z",
+          "risk_class": "HIGH"
+        },
+        "claims": [
+          {
+            "claim_id": "claim-d",
+            "statement": "Policy D was in force during calendar year 2020.",
+            "scope": {
+              "population": "jurisdictions covered by Policy D",
+              "outcome_or_measure": "policy legal status",
+              "quantifier_or_effect": "in force throughout 2020",
+              "domain_or_reference_boundary": "historical interval 2020-01-01 through 2020-12-31",
+              "scope_note": "historical truth does not establish present applicability"
+            },
+            "reference_time": "2020-12-31T23:59:59Z",
+            "evidence_relations": [
+              {
+                "claim_id": "claim-d",
+                "evidence_id": "ev-d1",
+                "relation": "SUPPORTS",
+                "classifier_provenance": {
+                  "classifier_id": "synthetic-claim-pair-classifier",
+                  "version": "0.1",
+                  "output_digest": "a9a3b52a053f7ea8a9463c1c038e19022358c98d4e699ae12620468d8fd7387e",
+                  "confidence": 0.93,
+                  "emitted_at": "2026-11-25T10:21:00Z",
+                  "evidence_prefix_sha256": "f19e7e624a8654c90141cbfb80143ff540bcd1936d8a25267004f01f2e999db6"
+                },
+                "quote_span": {
+                  "byte_start": 0,
+                  "byte_end": 31,
+                  "quote_sha256": "ed72365a88076831ae7667f0d1785d4404c04a435c86f69e7c3107e3df9da7f2"
+                }
+              }
+            ],
+            "truth_adjudication": {
+              "status": "ADJUDICATED",
+              "result": "SUPPORTED",
+              "authority_id": "synthetic-independent-reviewer-04",
+              "evidence_reference": "urn:synthetic:adjudication:rs04",
+              "adjudicated_at": "2026-11-25T10:22:00Z"
+            },
+            "decision_usability": {
+              "status": "STALE",
+              "decision_scope_id": "current-policy-use-04",
+              "policy_id": "high-risk-current-validity-v1",
+              "reason_codes": [
+                "HISTORICAL_CLAIM_ONLY",
+                "CURRENT_APPLICABILITY_NOT_ESTABLISHED",
+                "SOURCE_SUPERSEDED"
+              ]
+            }
+          }
+        ],
+        "evidence": [
+          {
+            "evidence_id": "ev-d1",
+            "artifact_ref": "urn:synthetic:artifact:rs04-d1",
+            "artifact_sha256": "4f90a7be543f2d7ae10021305230a1b5d9c3785dde10a51da2da7a24554ecc7f",
+            "canonical_source_ref": "https://example.org/policy-d-archive-2020",
+            "published_at": "2020-01-01T00:00:00Z",
+            "captured_at": "2026-11-25T10:20:00Z",
+            "source_lineage": {
+              "status": "KNOWN",
+              "family_ref": "source-family:official-policy-archive"
+            },
+            "integrity_status": "CLEAN",
+            "correction_status": "SUPERSEDED",
+            "retrieval_state": "CAPTURED"
+          }
+        ]
+      }
+    }
+  ]
+}
