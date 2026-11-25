@@ -529,6 +529,68 @@ mod tests {
     }
 
     #[test]
+    fn persisted_state_rebuilds_calibration_from_adjudicated_records() {
+        let mut learner = EpistemicLearner::new();
+        for index in 0..12 {
+            learner
+                .record_adjudicated_outcome(make_outcome(
+                    "programming",
+                    "rust-lang.org",
+                    index % 4 != 0,
+                ))
+                .unwrap();
+        }
+
+        let state = learner.export_state();
+        assert_eq!(state.adjudication_schema_version, ADJUDICATED_LEARNER_STATE_VERSION);
+        assert_eq!(state.adjudicated_outcomes.len(), 12);
+        assert!(state
+            .adjudicated_outcomes
+            .iter()
+            .all(|outcome| outcome.adjudication_provenance.is_some()));
+
+        let mut restored = EpistemicLearner::new();
+        assert!(restored.import_state(state));
+        assert_eq!(restored.stats().total_outcomes, 12);
+        assert_eq!(restored.adjudicated_outcomes().count(), 12);
+        assert_eq!(
+            restored
+                .get_source_credibility("rust-lang.org")
+                .unwrap()
+                .outcome_count,
+            12
+        );
+    }
+
+    #[test]
+    fn legacy_or_malformed_persisted_state_resets_calibration() {
+        let mut seeded = EpistemicLearner::new();
+        for _ in 0..12 {
+            seeded
+                .record_adjudicated_outcome(make_outcome("programming", "rust-lang.org", true))
+                .unwrap();
+        }
+        let mut legacy_state = seeded.export_state();
+        legacy_state.adjudication_schema_version = 0;
+
+        let mut restored = EpistemicLearner::new();
+        restored
+            .record_adjudicated_outcome(make_outcome("history", "example.org", false))
+            .unwrap();
+        assert!(!restored.import_state(legacy_state));
+        assert_eq!(restored.stats().total_outcomes, 0);
+        assert_eq!(restored.stats().source_count, 0);
+        assert_eq!(restored.stats().domain_count, 0);
+        assert_eq!(restored.adjudicated_outcomes().count(), 0);
+
+        let mut malformed_state = seeded.export_state();
+        malformed_state.adjudicated_outcomes[0].adjudication_provenance = None;
+        assert!(!restored.import_state(malformed_state));
+        assert_eq!(restored.stats().total_outcomes, 0);
+        assert_eq!(restored.stats().source_count, 0);
+    }
+
+    #[test]
     fn test_record_outcomes() {
         let mut learner = EpistemicLearner::new();
 
