@@ -727,6 +727,38 @@ fn select_probability_audit(
         .map(|quota| (quota.source_stratum_id.as_str(), quota))
         .collect();
 
+    // Determine every stratum's fixed source-work sample size before drawing
+    // any random source or item. Reserve worst-case item cost for each planned
+    // source. Thus the sample size in later strata cannot depend on whether an
+    // earlier random draw happened to select a cheap or expensive item.
+    let mut reserved_budget = config.probability_audit_budget_units;
+    let mut sample_size_by_stratum: BTreeMap<&str, usize> = BTreeMap::new();
+    for (stratum, source_items) in &by_stratum {
+        let quota = quotas
+            .get(stratum)
+            .copied()
+            .ok_or_else(|| format!("eligible audit stratum {stratum} has no quota"))?;
+        let maximum_item_cost = source_items
+            .values()
+            .flat_map(|items| items.iter().map(|index| candidates[*index].annotation_cost_units))
+            .max()
+            .unwrap_or(0);
+        if maximum_item_cost == 0 {
+            sample_size_by_stratum.insert(*stratum, 0);
+            continue;
+        }
+        let selected_sources = (quota.audit_source_work_count as usize)
+            .min(source_items.len())
+            .min((reserved_budget / maximum_item_cost) as usize);
+        let reservation = (selected_sources as u64)
+            .checked_mul(maximum_item_cost)
+            .ok_or_else(|| "audit worst-case budget reservation overflow".to_string())?;
+        reserved_budget = reserved_budget
+            .checked_sub(reservation)
+            .ok_or_else(|| "audit worst-case budget reservation underflow".to_string())?;
+        sample_size_by_stratum.insert(*stratum, selected_sources);
+    }
+
     let mut selections = Vec::new();
     let mut unmet = Vec::new();
     let mut spent = 0_u64;
@@ -747,25 +779,10 @@ fn select_probability_audit(
             continue;
         };
         let eligible_sources = source_items.len();
-        let maximum_item_cost = source_items
-            .values()
-            .flat_map(|items| items.iter().map(|index| candidates[*index].annotation_cost_units))
-            .max()
+        let selected_sources = sample_size_by_stratum
+            .get(stratum)
+            .copied()
             .unwrap_or(0);
-        if maximum_item_cost == 0 {
-            unmet.push(UnmetAnnotationQuotaV1 {
-                source_stratum_id: stratum.to_string(),
-                stream: QuotaStreamV1::ProbabilityAudit,
-                requested: requested as u32,
-                selected: 0,
-            });
-            continue;
-        }
-        let remaining_budget = config.probability_audit_budget_units.saturating_sub(spent);
-        let budget_limited_sources = (remaining_budget / maximum_item_cost) as usize;
-        let selected_sources = requested
-            .min(eligible_sources)
-            .min(budget_limited_sources);
 
         let mut source_ids: Vec<_> = source_items.keys().copied().collect();
         for index in (1..source_ids.len()).rev() {
@@ -818,6 +835,10 @@ fn select_probability_audit(
                 selected: selected_sources as u32,
             });
         }
+    }
+
+    if spent > config.probability_audit_budget_units {
+        return Err("probability audit exceeded its reserved budget".into());
     }
     // Preserve randomized source-work draw order in the replayable receipt.
     Ok((selections, unmet, spent, selected_source_count))
