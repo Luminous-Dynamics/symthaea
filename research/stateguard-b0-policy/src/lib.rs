@@ -760,6 +760,67 @@ mod tests {
     }
 
     #[test]
+    fn deterministic_replay_returns_identical_decision() {
+        let input = input(
+            artifact_verified_state(0),
+            vec![offer(
+                "classify-claim-a",
+                ActionKind::ClassifyClaimSource,
+                Some("claim-a"),
+                Some("ev-a1"),
+                &[("query_units", 1), ("experiment_units", 0), ("review_minutes", 1)],
+            )],
+        );
+        let first = decide(&input).unwrap();
+        let second = decide(&input).unwrap();
+        assert_eq!(first, second);
+    }
+
+    #[test]
+    fn resource_dimension_mismatch_in_offer_is_rejected() {
+        let input = input(
+            artifact_verified_state(0),
+            vec![offer(
+                "classify-missing-review-dimension",
+                ActionKind::ClassifyClaimSource,
+                Some("claim-a"),
+                Some("ev-a1"),
+                &[("query_units", 1), ("experiment_units", 0)],
+            )],
+        );
+        assert!(decide(&input).is_err());
+    }
+
+    #[test]
+    fn action_offer_change_changes_offer_digest_not_state_digest() {
+        let state = artifact_verified_state(0);
+        let first_input = input(
+            state.clone(),
+            vec![offer(
+                "classify-a",
+                ActionKind::ClassifyClaimSource,
+                Some("claim-a"),
+                Some("ev-a1"),
+                &[("query_units", 1), ("experiment_units", 0), ("review_minutes", 1)],
+            )],
+        );
+        let second_input = input(
+            state,
+            vec![offer(
+                "classify-b",
+                ActionKind::ClassifyClaimSource,
+                Some("claim-a"),
+                Some("ev-a1"),
+                &[("query_units", 1), ("experiment_units", 0), ("review_minutes", 1)],
+            )],
+        );
+        let first = decide(&first_input).unwrap();
+        let second = decide(&second_input).unwrap();
+        assert_eq!(first.research_state_sha256, second.research_state_sha256);
+        assert_ne!(first.action_offers_sha256, second.action_offers_sha256);
+    }
+
+    #[test]
     fn no_permitted_action_causes_abstention() {
         let decision = decide(&input(sample_state(0), vec![])).unwrap();
         assert_eq!(decision.disposition, DecisionDisposition::Abstain);
