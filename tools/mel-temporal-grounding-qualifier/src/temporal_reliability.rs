@@ -1243,6 +1243,50 @@ mod tests {
     }
 
     #[test]
+    fn temporal_bootstrap_with_one_eligible_work_reports_point_estimate_without_interval() {
+        let json = include_str!("../fixtures/mel-temporal-reliability-corpus.synthetic.json");
+        let corpus: TemporalReliabilityCorpusV1 = serde_json::from_str(json).unwrap();
+        let report =
+            audit_reliability_corpus_with_source_bootstrap(&corpus, 1_000, 0x2026_1125)
+                .unwrap();
+        assert_eq!(report.pairwise_temporal_source_work_bootstrap.len(), 4);
+        let first = &report.pairwise_temporal_source_work_bootstrap[0];
+        assert_eq!(first.symmetric_event_f1.eligible_source_work_clusters, 1);
+        assert_eq!(first.symmetric_event_f1.point_estimate, Some(1.0));
+        assert_eq!(first.symmetric_event_f1.percentile_95_low, None);
+        assert!(first.symmetric_event_f1.status_reason.is_some());
+    }
+
+    #[test]
+    fn temporal_bootstrap_emits_intervals_only_when_two_source_works_have_pairs() {
+        let json = include_str!("../fixtures/mel-temporal-reliability-corpus.synthetic.json");
+        let mut corpus: TemporalReliabilityCorpusV1 = serde_json::from_str(json).unwrap();
+        for annotation in &mut corpus.units[2].annotations {
+            annotation.state = GroundTruthStateV1::Present;
+            annotation.intervals = vec![FrameIntervalV1 {
+                start_frame: 1_000,
+                end_frame: 1_100,
+            }];
+            annotation.status_reason = None;
+        }
+        let first =
+            audit_reliability_corpus_with_source_bootstrap(&corpus, 1_000, 0xB00757).unwrap();
+        let second =
+            audit_reliability_corpus_with_source_bootstrap(&corpus, 1_000, 0xB00757).unwrap();
+        assert_eq!(
+            first.pairwise_temporal_source_work_bootstrap,
+            second.pairwise_temporal_source_work_bootstrap
+        );
+        let threshold = &first.pairwise_temporal_source_work_bootstrap[0];
+        assert_eq!(threshold.symmetric_event_f1.eligible_source_work_clusters, 2);
+        assert_eq!(threshold.symmetric_event_f1.bootstrap_replicates_valid, 1_000);
+        assert!(threshold.symmetric_event_f1.percentile_95_low.is_some());
+        assert!(threshold.symmetric_event_f1.percentile_95_high.is_some());
+        assert_eq!(threshold.matched_interval_iou.eligible_source_work_clusters, 2);
+        assert!(threshold.matched_interval_iou.percentile_95_low.is_some());
+    }
+
+    #[test]
     fn source_work_alpha_bootstrap_keeps_degenerate_alpha_undefined() {
         let json = include_str!("../fixtures/mel-temporal-reliability-corpus.synthetic.json");
         let mut corpus: TemporalReliabilityCorpusV1 = serde_json::from_str(json).unwrap();
