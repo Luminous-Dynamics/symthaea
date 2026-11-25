@@ -192,7 +192,8 @@
           "minItems": 2,
           "items": {
             "$ref": "#/$defs/annotation"
-          }
+          },
+          "maxItems": 256
         }
       }
     }
