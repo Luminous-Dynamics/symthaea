@@ -1,0 +1,2 @@
+task_id	start_state_id	horizon	gamma_ppm	safety_threshold_ppm
+smoke	s0	2	1000000	500000

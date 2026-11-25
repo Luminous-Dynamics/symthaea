@@ -1,0 +1,35 @@
+name: CMAQ-002 closed-loop evaluator
+
+on:
+  pull_request:
+    paths:
+      - 'research/cmaq-002/**'
+      - '.github/workflows/cmaq-002-closed-loop.yml'
+  push:
+    paths:
+      - 'research/cmaq-002/**'
+      - '.github/workflows/cmaq-002-closed-loop.yml'
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  closed-loop-evaluator:
+    runs-on: ubuntu-latest
+    defaults:
+      run:
+        working-directory: research/cmaq-002
+    steps:
+      - uses: actions/checkout@v4
+      - uses: dtolnay/rust-toolchain@1.96.0
+      - name: Unit tests
+        run: cargo test --locked
+      - name: Exact-model known-answer fixture
+        run: |
+          cargo run --locked -- --environment fixtures/environment.tsv --model fixtures/model-exact.tsv --support fixtures/support.tsv --starts fixtures/starts.tsv > /tmp/cmaq-002-exact.tsv
+          diff -u fixtures/expected.tsv /tmp/cmaq-002-exact.tsv
+      - name: Optimizer-exploitation negative control
+        run: |
+          cargo run --locked -- --environment fixtures/environment.tsv --model fixtures/model-exploit.tsv --support fixtures/support.tsv --starts fixtures/starts.tsv > /tmp/cmaq-002-exploit.tsv
+          diff -u fixtures/expected-exploit.tsv /tmp/cmaq-002-exploit.tsv

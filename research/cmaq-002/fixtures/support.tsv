@@ -1,0 +1,7 @@
+task_id	state_id	action_id	support_count
+smoke	s0	0	5
+smoke	s0	1	0
+smoke	s1	0	5
+smoke	s1	1	0
+smoke	s2	0	0
+smoke	s2	1	0
