@@ -177,9 +177,9 @@ struct TransparencyEntry {
     signed_checkpoint_ref: String,
     inclusion_proof_ref: String,
     consistency_proof_ref: Option<String>,
-    signed_statement_ref: Option<String>,
-    checkpoint_key_id: Option<String>,
-    verification_policy_ref: Option<String>,
+    signed_statement_ref: String,
+    checkpoint_key_id: String,
+    verification_policy_ref: String,
     previous_checkpoint_ref: Option<String>,
 }
 
@@ -197,7 +197,7 @@ struct WitnessAttestation {
     signature_ref: String,
     key_id: String,
     trust_policy_digest: String,
-    independence_basis_ref: Option<String>,
+    independence_basis_ref: String,
 }
 
 #[derive(Debug, Deserialize)]
@@ -208,8 +208,8 @@ struct TrustPolicy {
     policy_digest: String,
     minimum_independent_witnesses: u64,
     key_status_evidence_ref: String,
-    revocation_snapshot_ref: Option<String>,
-    governance_policy_ref: Option<String>,
+    revocation_snapshot_ref: String,
+    governance_policy_ref: String,
 }
 
 fn valid_digest(value: &str, field: &str) -> Result<(), CheckpointVerificationError> {
@@ -327,7 +327,16 @@ pub fn inspect_checkpoint_receipt(
     // Detect conflicting roots for one service/log/tree-size tuple.
     let mut roots: HashMap<(String, String, u64), (String, String, String)> = HashMap::new();
     for entry in &receipt.transparency_entries {
-        non_empty(&entry.service_profile, "transparency_entries.service_profile")?;
+        if ![
+            "scitt-rfc9943",
+            "sigstore-rekor-v2",
+            "signed-note",
+            "private-transparency-service",
+        ].contains(&entry.service_profile.as_str()) {
+            return Err(CheckpointVerificationError::InvalidShape(
+                "unsupported transparency service profile".to_owned(),
+            ));
+        }
         non_empty(&entry.service_id, "transparency_entries.service_id")?;
         non_empty(&entry.log_id, "transparency_entries.log_id")?;
         non_empty(&entry.root_hash, "transparency_entries.root_hash")?;
@@ -347,14 +356,15 @@ pub fn inspect_checkpoint_receipt(
                 entry.log_id.clone(),
             ));
         }
-        if let Some(statement_ref) = &entry.signed_statement_ref {
-            non_empty(statement_ref, "transparency_entries.signed_statement_ref")?;
-        }
-        if let Some(key_id) = &entry.checkpoint_key_id {
-            non_empty(key_id, "transparency_entries.checkpoint_key_id")?;
-        }
-        if let Some(policy_ref) = &entry.verification_policy_ref {
-            non_empty(policy_ref, "transparency_entries.verification_policy_ref")?;
+        non_empty(&entry.signed_statement_ref, "transparency_entries.signed_statement_ref")?;
+        non_empty(&entry.checkpoint_key_id, "transparency_entries.checkpoint_key_id")?;
+        non_empty(&entry.verification_policy_ref, "transparency_entries.verification_policy_ref")?;
+        if !["hex", "base64", "base64url", "provider-defined"]
+            .contains(&entry.root_hash_encoding.as_str())
+        {
+            return Err(CheckpointVerificationError::InvalidShape(
+                "unsupported transparency root hash encoding".to_owned(),
+            ));
         }
         let key = (
             entry.service_id.clone(),
@@ -384,11 +394,18 @@ pub fn inspect_checkpoint_receipt(
         &receipt.trust_policy.key_status_evidence_ref,
         "trust_policy.key_status_evidence_ref",
     )?;
-    if let Some(revocation_ref) = &receipt.trust_policy.revocation_snapshot_ref {
-        non_empty(revocation_ref, "trust_policy.revocation_snapshot_ref")?;
-    }
-    if let Some(governance_ref) = &receipt.trust_policy.governance_policy_ref {
-        non_empty(governance_ref, "trust_policy.governance_policy_ref")?;
+    non_empty(
+        &receipt.trust_policy.revocation_snapshot_ref,
+        "trust_policy.revocation_snapshot_ref",
+    )?;
+    non_empty(
+        &receipt.trust_policy.governance_policy_ref,
+        "trust_policy.governance_policy_ref",
+    )?;
+    if receipt.trust_policy.minimum_independent_witnesses == 0 {
+        return Err(CheckpointVerificationError::InvalidShape(
+            "minimum_independent_witnesses must be at least one".to_owned(),
+        ));
     }
 
     let mut witness_ids = HashSet::new();
@@ -406,8 +423,16 @@ pub fn inspect_checkpoint_receipt(
                 witness.witness_id.clone(),
             ));
         }
-        if let Some(basis) = &witness.independence_basis_ref {
-            non_empty(basis, "witness_attestations.independence_basis_ref")?;
+        non_empty(
+            &witness.independence_basis_ref,
+            "witness_attestations.independence_basis_ref",
+        )?;
+        if !["hex", "base64", "base64url", "provider-defined"]
+            .contains(&witness.root_hash_encoding.as_str())
+        {
+            return Err(CheckpointVerificationError::InvalidShape(
+                "unsupported witness root hash encoding".to_owned(),
+            ));
         }
         if !witness_ids.insert(witness.witness_id.clone()) {
             return Err(CheckpointVerificationError::DuplicateWitnessId(
@@ -440,8 +465,12 @@ pub fn inspect_checkpoint_receipt(
     let references_present = receipt.transparency_entries.iter().all(|entry| {
         !entry.signed_checkpoint_ref.trim().is_empty()
             && !entry.inclusion_proof_ref.trim().is_empty()
+            && !entry.signed_statement_ref.trim().is_empty()
+            && !entry.verification_policy_ref.trim().is_empty()
     }) && receipt.witness_attestations.iter().all(|witness| {
-        !witness.signature_ref.trim().is_empty() && !witness.key_id.trim().is_empty()
+        !witness.signature_ref.trim().is_empty()
+            && !witness.key_id.trim().is_empty()
+            && !witness.independence_basis_ref.trim().is_empty()
     });
 
     // Read otherwise informational fields so future schema changes are visible.
