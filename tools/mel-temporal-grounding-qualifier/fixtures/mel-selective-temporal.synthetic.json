@@ -79,6 +79,11 @@
             ]
           }
         }
+      },
+      "inference_cost": {
+        "forward_passes": 1,
+        "selective_wall_time_ms": 100,
+        "one_pass_baseline_wall_time_ms": 100
       }
     },
     {
@@ -151,6 +156,11 @@
             ]
           }
         }
+      },
+      "inference_cost": {
+        "forward_passes": 1,
+        "selective_wall_time_ms": 100,
+        "one_pass_baseline_wall_time_ms": 100
       }
     },
     {
@@ -200,6 +210,11 @@
           "total_frames": 480000
         },
         "state": "QueryAbsent"
+      },
+      "inference_cost": {
+        "forward_passes": 1,
+        "selective_wall_time_ms": 100,
+        "one_pass_baseline_wall_time_ms": 100
       }
     },
     {
@@ -267,6 +282,11 @@
             ]
           }
         }
+      },
+      "inference_cost": {
+        "forward_passes": 1,
+        "selective_wall_time_ms": 100,
+        "one_pass_baseline_wall_time_ms": 100
       }
     },
     {
@@ -326,6 +346,11 @@
           "total_frames": 480000
         },
         "state": "QueryAbsent"
+      },
+      "inference_cost": {
+        "forward_passes": 3,
+        "selective_wall_time_ms": 180,
+        "one_pass_baseline_wall_time_ms": 100
       }
     },
     {
@@ -379,6 +404,11 @@
           "total_frames": 480000
         },
         "state": "QueryAbsent"
+      },
+      "inference_cost": {
+        "forward_passes": 3,
+        "selective_wall_time_ms": 180,
+        "one_pass_baseline_wall_time_ms": 100
       }
     },
     {
@@ -432,6 +462,11 @@
           "total_frames": 480000
         },
         "state": "QueryAbsent"
+      },
+      "inference_cost": {
+        "forward_passes": 1,
+        "selective_wall_time_ms": 100,
+        "one_pass_baseline_wall_time_ms": 100
       }
     },
     {
@@ -481,6 +516,11 @@
           "total_frames": 480000
         },
         "state": "QueryAbsent"
+      },
+      "inference_cost": {
+        "forward_passes": 1,
+        "selective_wall_time_ms": 100,
+        "one_pass_baseline_wall_time_ms": 100
       }
     },
     {
@@ -539,6 +579,11 @@
           "total_frames": 480000
         },
         "state": "QueryAbsent"
+      },
+      "inference_cost": {
+        "forward_passes": 1,
+        "selective_wall_time_ms": 100,
+        "one_pass_baseline_wall_time_ms": 100
       }
     },
     {
@@ -615,7 +660,13 @@
             ]
           }
         }
+      },
+      "inference_cost": {
+        "forward_passes": 3,
+        "selective_wall_time_ms": 180,
+        "one_pass_baseline_wall_time_ms": 100
       }
     }
-  ]
+  ],
+  "hardware_identity_sha256": "2222222222222222222222222222222222222222222222222222222222222222"
 }
