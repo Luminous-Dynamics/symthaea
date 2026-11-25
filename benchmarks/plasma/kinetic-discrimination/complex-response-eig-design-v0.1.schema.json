@@ -1,0 +1,148 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://github.com/Luminous-Dynamics/symthaea/blob/main/benchmarks/plasma/kinetic-discrimination/complex-response-eig-design-v0.1.schema.json",
+  "title": "Kinetic state discrimination design v0.1",
+  "description": "Finite categorical state hypotheses observed through one complex response coefficient with independent equal-variance Gaussian real/imaginary noise. This is not a universal kinetic response likelihood.",
+  "type": "object",
+  "additionalProperties": false,
+  "required": [
+    "schema_version",
+    "fixture_id",
+    "status",
+    "quadrature_order_per_axis",
+    "cases",
+    "claim_boundary"
+  ],
+  "properties": {
+    "schema_version": {
+      "const": "0.1"
+    },
+    "fixture_id": {
+      "type": "string",
+      "minLength": 1
+    },
+    "status": {
+      "const": "synthetic_analytic_only"
+    },
+    "quadrature_order_per_axis": {
+      "const": 9
+    },
+    "cases": {
+      "type": "array",
+      "minItems": 4,
+      "maxItems": 16,
+      "items": {
+        "$ref": "#/$defs/case"
+      }
+    },
+    "claim_boundary": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "no_kinetic_forward_model_evaluated",
+        "noise_is_synthetic_not_calibrated",
+        "no_global_state_equivalence_claimed"
+      ],
+      "properties": {
+        "no_kinetic_forward_model_evaluated": {
+          "const": true
+        },
+        "noise_is_synthetic_not_calibrated": {
+          "const": true
+        },
+        "no_global_state_equivalence_claimed": {
+          "const": true
+        }
+      }
+    }
+  },
+  "$defs": {
+    "hypothesis": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "hypothesis_id",
+        "prior_probability",
+        "predicted_response"
+      ],
+      "properties": {
+        "hypothesis_id": {
+          "type": "string",
+          "minLength": 1
+        },
+        "prior_probability": {
+          "type": "number",
+          "exclusiveMinimum": 0
+        },
+        "predicted_response": {
+          "type": "object",
+          "additionalProperties": false,
+          "required": [
+            "real",
+            "imag"
+          ],
+          "properties": {
+            "real": {
+              "type": "number"
+            },
+            "imag": {
+              "type": "number"
+            }
+          }
+        }
+      }
+    },
+    "case": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "case_id",
+        "intervention_id",
+        "hypotheses",
+        "noise_variance_per_quadrature",
+        "estimated_evaluation_cost_seconds",
+        "expected_prior_entropy_bits",
+        "expected_information_gain_min_bits",
+        "expected_information_gain_max_bits"
+      ],
+      "properties": {
+        "case_id": {
+          "type": "string",
+          "minLength": 1
+        },
+        "intervention_id": {
+          "type": "string",
+          "minLength": 1
+        },
+        "hypotheses": {
+          "type": "array",
+          "minItems": 2,
+          "maxItems": 16,
+          "items": {
+            "$ref": "#/$defs/hypothesis"
+          }
+        },
+        "noise_variance_per_quadrature": {
+          "type": "number",
+          "exclusiveMinimum": 0
+        },
+        "estimated_evaluation_cost_seconds": {
+          "type": "number",
+          "exclusiveMinimum": 0
+        },
+        "expected_prior_entropy_bits": {
+          "type": "number",
+          "minimum": 0
+        },
+        "expected_information_gain_min_bits": {
+          "type": "number",
+          "minimum": 0
+        },
+        "expected_information_gain_max_bits": {
+          "type": "number",
+          "minimum": 0
+        }
+      }
+    }
+  }
+}
