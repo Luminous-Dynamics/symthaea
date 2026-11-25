@@ -903,19 +903,13 @@ mod tests {
     fn candidate_must_not_read_evaluator_state_before_trace_seal() {
         let mut fixture = Fixture::new();
         fixture.manifest.anti_leakage.candidate_readable_before_trace_seal = true;
+        // Fixture::witness recomputes and signs the changed full-manifest digest,
+        // proving the explicit anti-leakage condition is checked independently
+        // of digest/commitment tampering.
         assert_eq!(
             fixture.verify(),
-            Err(SealedEvaluationManifestRejectV1::SealedManifestDigestMismatch)
+            Err(SealedEvaluationManifestRejectV1::CandidateReadableBeforeTraceSeal)
         );
-        // Even a re-committed manifest must be rejected for explicit leakage.
-        let mut manifest = fixture.manifest.clone();
-        manifest.anti_leakage.candidate_readable_before_trace_seal = true;
-        assert_eq!(
-            validate_manifest_shape(&manifest),
-            Ok(())
-        );
-        // The full validator's digest binding rejects the changed sealed object
-        // before it can be treated as the pre-registered manifest.
     }
 
     #[test]
