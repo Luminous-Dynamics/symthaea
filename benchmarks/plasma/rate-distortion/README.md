@@ -43,14 +43,24 @@ The KIRD semantic auditor requires a certified-global record to carry:
 - metric identity, covering radius and verified Lipschitz constant;
 - separate reference, candidate and measurement uncertainty terms;
 - maximum sampled normalized response error and a conservative global upper bound;
-- non-placeholder cover-set, bound-proof and branch-stability digests;
+- non-placeholder intervention-domain, metric, compactness, covering-set, radius, bound and branch-stability evidence digests;
 - an independent checker revision;
 - explicit stable response-branch association.
 
-It verifies the arithmetic `global_bound >= sampled_max + L*cover_radius + total_uncertainty`, checks that the declared sampled maximum is not below the worst confirmed response error, and refuses certification when branch association is unstable. A `PASS` response disposition under certified-global coverage additionally requires the upper bound to be at most one.
+The Rust verifier checks the upper-bound arithmetic `global_bound >= sampled_max + L*cover_radius + total_uncertainty`, confirms that every registered probe has been independently confirmed, checks the declared sampled maximum against the worst confirmed response error, and rejects unstable branch association.
 
-The checked-in `synthetic-kird-certified-cover-v0.1.json` is a schema-conformant KIRD wire record. Its mathematical known-answer definition is documented here rather than added as an extra schema field: U=[0,0.1], d(u,v)=|u-v|, e(u)=0.5+2u, P={0}, r=0.1, L=2, eta_ref=0.01, eta_candidate=0.02, eta_measurement=0.02, so the bound is 0.5 + 2*0.1 + 0.05 = 0.75. U=[0,0.1], e(u)=0.5+2u, one probe at zero, r=0.1, L=2, and eta=0.05; the exact global upper bound is 0.75. This fixture tests the theorem and auditor only. It does not assert Lipschitz continuity of a Vlasov response map or certify any physical plasma model.
+It also reconstructs a **one-dimensional normalized-interval r-net** from integer ticks. The record declares domain endpoints, tick scale, common probe-ball radius and probe centers. The verifier checks that centers are unique and in-domain, their radius-balls cover the interval without gaps, the center count matches the registered / confirmed probe count, and `covering_radius = radius_ticks / tick_scale`.
 
+This geometric verifier currently supports only the one-dimensional absolute-distance interval metric. Phase-circle, multidimensional, mixed discrete/continuous and branch-stratified covers remain UNSUPPORTED until their own metric and cover checkers exist. The supplied independent proof digests still require external proof replay; the Rust auditor does not prove the Lipschitz constant or physical reference convergence.
+
+The checked-in `synthetic-kird-certified-cover-v0.1.json` is a manufactured mathematical record:
+- intervention domain U=[0,0.1], metric d(u,v)=|u-v|;
+- response error e(u)=0.5+2u;
+- one probe at 0, exact covering radius r=0.1;
+- verified L=2 and uncertainty eta=0.05;
+- exact upper bound 0.5 + 2*0.1 + 0.05 = 0.75.
+
+This fixture validates the schema, cover geometry, bound arithmetic and semantic auditor only. It does not establish Lipschitz continuity of a Vlasov response map or certify a physical plasma model.
 
 ## Synthetic fixture
 
