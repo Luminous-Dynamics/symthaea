@@ -329,6 +329,9 @@ pub fn audit_reliability_corpus_with_source_bootstrap(
     if bootstrap_replicates < 1_000 {
         return Err("source-work alpha bootstrap requires at least 1,000 replicates".into());
     }
+    if bootstrap_replicates > 1_000_000 {
+        return Err("source-work alpha bootstrap is capped at 1,000,000 replicates".into());
+    }
     if seed == 0 {
         return Err("source-work alpha bootstrap seed must be nonzero".into());
     }
@@ -368,7 +371,11 @@ pub fn audit_reliability_corpus_with_source_bootstrap(
     }
 
     let valid_fraction = samples.len() as f64 / bootstrap_replicates as f64;
-    let (low, high, status_reason) = if samples.len() >= (bootstrap_replicates * 9).div_ceil(10) {
+    let required_valid_replicates = bootstrap_replicates
+        .checked_mul(9)
+        .ok_or_else(|| "bootstrap valid-replicate threshold overflow".to_string())?
+        .div_ceil(10);
+    let (low, high, status_reason) = if samples.len() >= required_valid_replicates {
         let mut ordered = samples.clone();
         ordered.sort_by(f64::total_cmp);
         let last = ordered.len() - 1;
@@ -1059,6 +1066,18 @@ mod tests {
         assert_eq!(bootstrap.estimate, first.disposition_alpha.alpha);
         assert!(!first.population_confidence_interval_computed);
         assert!(first.source_work_bootstrap_computed);
+    }
+
+    #[test]
+    fn source_work_alpha_bootstrap_rejects_unbounded_replicate_request() {
+        let json = include_str!("../fixtures/mel-temporal-reliability-corpus.synthetic.json");
+        let corpus: TemporalReliabilityCorpusV1 = serde_json::from_str(json).unwrap();
+        assert!(audit_reliability_corpus_with_source_bootstrap(
+            &corpus,
+            1_000_001,
+            1,
+        )
+        .is_err());
     }
 
     #[test]
