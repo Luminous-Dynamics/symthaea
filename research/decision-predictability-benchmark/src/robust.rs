@@ -425,8 +425,7 @@ pub fn evaluate_robust_probe(
         });
     }
     let post_observation_risk_gate_passed =
-        worst_case_post_observation_minimax_loss
-            <= problem.maximum_worst_case_loss + TOLERANCE;
+        worst_case_post_observation_minimax_loss <= problem.maximum_worst_case_loss + TOLERANCE;
 
     let admission = if !permitted.contains(probe.probe_id.as_str()) {
         RobustProbeAdmission::NotPermitted
