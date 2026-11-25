@@ -869,7 +869,15 @@ mod tests {
                 receipt_sha256: if index == 2 {
                     operation_receipt_sha256.to_owned()
                 } else {
-                    digest(char::from(b'a' + index as u8))
+                    digest(match index {
+                        0 => 'a',
+                        1 => 'b',
+                        3 => 'd',
+                        4 => 'e',
+                        5 => 'f',
+                        6 => '0',
+                        _ => '0',
+                    })
                 },
             })
             .collect()
