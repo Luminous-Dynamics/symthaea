@@ -218,6 +218,7 @@ def export_checkpoint(path: Path, task_name: str) -> None:
 
     payload = {
         "task_id": np.asarray(task_name),
+        "compiled_model_sha256": np.asarray(digest_bytes(physics.model.to_bytes())),
         "integration_state": full_state,
         "integration_state_size": np.asarray(expected_state_size, dtype=np.int64),
         "prefix_state_sha256": np.asarray(digest_array(full_state)),
@@ -285,6 +286,25 @@ def replay_checkpoint(path: Path, task_name: str) -> None:
     env = make_environment(task_name)
     env.reset()
     signature = int(mujoco.mjtState.mjSTATE_INTEGRATION.value)
+    replay_model_digest = digest_bytes(env.physics.model.to_bytes())
+    if replay_model_digest != str(saved["compiled_model_sha256"].item()):
+        raise AssertionError("fresh-process compiled MuJoCo model digest differs")
+
+    expected_control_timestep = float(saved["control_timestep"])
+    actual_control_timestep = float(env.control_timestep())
+    if np.asarray([actual_control_timestep], dtype="<f8").tobytes() != np.asarray(
+        [expected_control_timestep], dtype="<f8"
+    ).tobytes():
+        raise AssertionError("fresh-process control timestep differs")
+
+    if int(env._n_sub_steps) != int(saved["wrapper_n_sub_steps"]):
+        raise AssertionError("fresh-process wrapper n_sub_steps differs")
+    if np.asarray([env._step_limit], dtype="<f8").tobytes() != np.asarray(
+        [float(saved["wrapper_step_limit"])], dtype="<f8"
+    ).tobytes():
+        raise AssertionError("fresh-process wrapper step limit differs")
+    if bool(env.physics.legacy_step) != bool(saved["wrapper_legacy_step"]):
+        raise AssertionError("fresh-process legacy_step differs")
     if signature != EXPECTED_INTEGRATION_MASK:
         raise AssertionError(f"wrong pinned integration mask: {signature}")
 
@@ -305,9 +325,6 @@ def replay_checkpoint(path: Path, task_name: str) -> None:
     env.task.random.set_state(task_rng_state)
     env._step_count = int(saved["wrapper_step_count"])
     env._reset_next_step = bool(saved["wrapper_reset_next_step"])
-    env._n_sub_steps = int(saved["wrapper_n_sub_steps"])
-    env._step_limit = float(saved["wrapper_step_limit"])
-    env.physics.legacy_step = bool(saved["wrapper_legacy_step"])
 
     # Recompute derived MuJoCo quantities before reading observations.
     env.physics.forward()
