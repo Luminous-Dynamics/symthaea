@@ -11,6 +11,7 @@
 
 use base64::{engine::general_purpose::STANDARD, Engine as _};
 use serde::{Deserialize, Serialize};
+use serde_json::json;
 use sha2::{Digest, Sha256};
 
 use crate::evidence_qualification_gate::{
@@ -133,6 +134,7 @@ pub struct DecisionOutcomeAttestationV1 {
     pub key_id: String,
     pub issued_at_unix: u64,
     pub payload_sha256: String,
+    pub attestation_sha256: String,
     pub signature_base64: String,
 }
 
@@ -175,6 +177,7 @@ pub enum DecisionOutcomeReceiptRejectV1 {
     ReceiptIssuedInFuture,
     InvalidSignatureEncoding,
     PayloadDigestMismatch,
+    AttestationDigestMismatch,
     CanonicalizationFailed,
     SignatureRejected(EvidenceQualificationRejectV1),
 }
@@ -290,6 +293,7 @@ pub fn validate_decision_outcome_receipt_v1(
     }
     validate_atom(&receipt.attestation.key_id)?;
     validate_hash(&receipt.attestation.payload_sha256)?;
+    validate_hash(&receipt.attestation.attestation_sha256)?;
 
     validate_memory_arm_binding(receipt, expected)?;
     validate_execution_chain(&receipt.payload.execution)?;
@@ -312,6 +316,14 @@ pub fn validate_decision_outcome_receipt_v1(
         return Err(DecisionOutcomeReceiptRejectV1::PayloadDigestMismatch);
     }
 
+    let calculated_attestation_sha256 = decision_outcome_attestation_sha256_v1(
+        &calculated_payload_sha256,
+        &receipt.attestation,
+    )?;
+    if calculated_attestation_sha256 != receipt.attestation.attestation_sha256 {
+        return Err(DecisionOutcomeReceiptRejectV1::AttestationDigestMismatch);
+    }
+
     if receipt.attestation.signature_base64.len() != 88 {
         return Err(DecisionOutcomeReceiptRejectV1::InvalidSignatureEncoding);
     }
@@ -328,7 +340,7 @@ pub fn validate_decision_outcome_receipt_v1(
         .verify_signature(
             &receipt.attestation.verifier_profile_sha256,
             &receipt.attestation.key_id,
-            &calculated_payload_sha256,
+            &calculated_attestation_sha256,
             &signature,
             receipt.attestation.issued_at_unix,
             trusted_now_unix,
@@ -362,6 +374,30 @@ pub fn decision_outcome_payload_sha256_v1(
         .map_err(|_| DecisionOutcomeReceiptRejectV1::CanonicalizationFailed)?;
     let mut hasher = Sha256::new();
     hasher.update(b"luminous:mace:decision-outcome-payload:v1\0");
+    hasher.update(&canonical);
+    Ok(hex_digest(&hasher.finalize()))
+}
+
+
+/// Hash the payload digest with the evaluator/verifier identity and issuance
+/// metadata so the signature cannot be rebound to another signer or date.
+pub fn decision_outcome_attestation_sha256_v1(
+    payload_sha256: &str,
+    attestation: &DecisionOutcomeAttestationV1,
+) -> Result<String, DecisionOutcomeReceiptRejectV1> {
+    validate_hash(payload_sha256)?;
+    let preimage = json!({
+        "schema_version": "mace_decision_outcome_attestation_preimage_v1",
+        "payload_sha256": payload_sha256,
+        "evaluator_profile_sha256": attestation.evaluator_profile_sha256,
+        "verifier_profile_sha256": attestation.verifier_profile_sha256,
+        "key_id": attestation.key_id,
+        "issued_at_unix": attestation.issued_at_unix
+    });
+    let canonical = serde_json_canonicalizer::to_vec(&preimage)
+        .map_err(|_| DecisionOutcomeReceiptRejectV1::CanonicalizationFailed)?;
+    let mut hasher = Sha256::new();
+    hasher.update(b"luminous:mace:decision-outcome-attestation:v1\0");
     hasher.update(&canonical);
     Ok(hex_digest(&hasher.finalize()))
 }
@@ -650,8 +686,13 @@ mod tests {
 
         fn resign(&mut self) {
             let payload_sha256 = decision_outcome_payload_sha256_v1(&self.receipt.payload).unwrap();
-            let signature = self.signer.sign(payload_sha256.as_bytes()).to_bytes();
-            self.receipt.attestation.payload_sha256 = payload_sha256;
+            self.receipt.attestation.payload_sha256 = payload_sha256.clone();
+            let attestation_sha256 = decision_outcome_attestation_sha256_v1(
+                &payload_sha256,
+                &self.receipt.attestation,
+            ).unwrap();
+            self.receipt.attestation.attestation_sha256 = attestation_sha256.clone();
+            let signature = self.signer.sign(attestation_sha256.as_bytes()).to_bytes();
             self.receipt.attestation.signature_base64 = STANDARD.encode(signature);
         }
 
@@ -746,6 +787,7 @@ mod tests {
                     key_id,
                     issued_at_unix: 200,
                     payload_sha256: digest('0'),
+                    attestation_sha256: String::new(),
                     signature_base64: String::new(),
                 },
             },
@@ -902,6 +944,16 @@ mod tests {
                 &fixture.verifier,
             ),
             Err(DecisionOutcomeReceiptRejectV1::InvalidJson)
+        );
+    }
+
+    #[test]
+    fn issuance_metadata_cannot_be_rebound_without_resigning() {
+        let mut fixture = fixture();
+        fixture.receipt.attestation.issued_at_unix += 1;
+        assert_eq!(
+            fixture.verify(250),
+            Err(DecisionOutcomeReceiptRejectV1::AttestationDigestMismatch)
         );
     }
 
