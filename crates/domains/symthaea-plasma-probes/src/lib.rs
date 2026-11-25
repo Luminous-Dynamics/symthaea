@@ -5782,6 +5782,9 @@ pub const KIRD_POINT_SCHEMA: &str =
 pub const RESPONSE_WEIGHTED_REFINEMENT_FIXTURE: &str = include_str!(
     "../../../../benchmarks/plasma/adversarial-probes/fixtures/response-weighted-refinement-known-answer-v0.1.json"
 );
+pub const POSITIVE_MASS_PROJECTION_FIXTURE: &str = include_str!(
+    "../../../../benchmarks/plasma/positivity-projection/fixtures/negative-spectral-overshoot-known-answer-v0.1.json"
+);
 
 pub const KINETIC_DISCRIMINATION_FIXTURE: &str = include_str!(
     "../../../../benchmarks/plasma/kinetic-discrimination/fixtures/complex-response-eig-known-answers-v0.1.json"
@@ -9475,6 +9478,58 @@ mod tests {
         assert_eq!(
             plan_response_weighted_refinement(&matrix, &coefficients, &bytes, &[1.0], f64::NAN),
             Err(ContractError::InvalidResponseRefinementInput)
+        );
+    }
+
+    #[test]
+    fn positivity_projection_matches_checked_in_known_answer_fixture() {
+        let fixture: serde_json::Value =
+            serde_json::from_str(POSITIVE_MASS_PROJECTION_FIXTURE).unwrap();
+        let input = fixture["input_values"]
+            .as_array()
+            .unwrap()
+            .iter()
+            .map(|value| value.as_f64().unwrap())
+            .collect::<Vec<_>>();
+        let volumes = fixture["cell_volumes"]
+            .as_array()
+            .unwrap()
+            .iter()
+            .map(|value| value.as_f64().unwrap())
+            .collect::<Vec<_>>();
+        let report = project_nonnegative_preserving_mass(
+            &input,
+            &volumes,
+            fixture["target_mass"].as_f64().unwrap(),
+        )
+        .unwrap();
+        let expected = &fixture["expected"];
+        let expected_values = expected["projected_values"].as_array().unwrap();
+        assert_eq!(report.projected_values.len(), expected_values.len());
+        for (actual, expected) in report.projected_values.iter().zip(expected_values) {
+            assert!((actual - expected.as_f64().unwrap()).abs() < 1.0e-12);
+        }
+        for (actual, key) in [
+            (report.achieved_mass, "achieved_mass"),
+            (report.mass_residual, "mass_residual"),
+            (report.lagrange_multiplier, "lagrange_multiplier"),
+            (
+                report.weighted_correction_norm,
+                "weighted_correction_norm",
+            ),
+            (report.minimum_projected_value, "minimum_projected_value"),
+        ] {
+            assert!((actual - expected[key].as_f64().unwrap()).abs() < 1.0e-12);
+        }
+        assert_eq!(
+            report.active_positive_cell_count,
+            expected["active_positive_cell_count"].as_u64().unwrap() as usize
+        );
+        assert!(fixture["claim_boundary"]["mass_constraint_only"].as_bool().unwrap());
+        assert!(
+            fixture["claim_boundary"]["does_not_claim_momentum_or_energy"]
+                .as_bool()
+                .unwrap()
         );
     }
 
