@@ -1,0 +1,60 @@
+{
+  "schema_version": "1.0.0",
+  "artifact_id": "LEAN-AXIOM-AUDIT-IMPORTED-INDUCTIVE-001",
+  "status": "independent_audit_pending",
+  "lean_toolchain": "leanprover/lean4:v4.37.0-rc1",
+  "lean_core_revision": "0b77e12952ad39077d80d8bd6b66d601f225c321",
+  "mathlib_revision": "6ebcce37335bcb6bca64596e5d57bb3035648030",
+  "sources": {
+    "module_a": {
+      "path": "scripts/research/lean-proof-extractor/axiom-audit-imported-inductive/A.lean",
+      "sha256": "e70af7d30ac091e8a50f219a1c53a7c85be5c750f2eb3ff127fcedc3b99a3003"
+    },
+    "module_b": {
+      "path": "scripts/research/lean-proof-extractor/axiom-audit-imported-inductive/B.lean",
+      "sha256": "18ca5b91051479397d826fe37432bca2e35320e9bbb47adb115186e7dfee9e09"
+    }
+  },
+  "roots": [
+    {
+      "name": "S9",
+      "expected_fresh_axioms": [
+        "Classical.choice"
+      ]
+    },
+    {
+      "name": "S9.mk",
+      "expected_fresh_axioms": [
+        "Classical.choice"
+      ]
+    },
+    {
+      "name": "usesS9",
+      "expected_fresh_axioms": [
+        "Classical.choice"
+      ]
+    }
+  ],
+  "audit_algorithm": {
+    "lookup": "env.setExporting false then env.checked.get.find?",
+    "state": "fresh per-root DFS; visited set only; no partial dependency result cache",
+    "traversed_constant_kinds": [
+      "axiom",
+      "definition",
+      "theorem",
+      "opaque",
+      "quotient",
+      "constructor",
+      "recursor",
+      "inductive"
+    ],
+    "inductive_edges": "inductive type plus all constructors",
+    "unresolved_policy": "insert sorryAx sentinel and fail expected-axiom assertion"
+  },
+  "claim_ceiling": [
+    "A successful run shows that the project-side fresh DFS detects the direct/transitive Classical.choice dependency in the imported-inductive reproduction under this exact Lean core revision.",
+    "Native #print axioms output is diagnostic only and is not used as the independent audit acceptance oracle.",
+    "The walker is a research prototype, not a verified replacement for Lean's kernel or a complete audit of every kernel trust path.",
+    "This reproduction covers one imported inductive/constructor cycle and one downstream theorem; mutual inductives, nested inductives, all declaration forms and full repository-wide trust closure require separate tests."
+  ]
+}
