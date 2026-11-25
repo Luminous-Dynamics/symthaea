@@ -288,9 +288,13 @@ pub fn evaluate_randomized_decision_regret(
         return Err(RandomizedDecisionError::TooManyAlternatives);
     }
 
-    let first_policy_action = &class.action_probabilities[0].action_id;
     let mut seen_world_ids = BTreeSet::new();
     let mut base_worlds = Vec::with_capacity(class.alternatives.len());
+    let comparator_action_id = class.alternatives[0]
+        .action_losses
+        .first()
+        .map(|loss| loss.action_id.clone())
+        .unwrap_or_else(|| class.action_probabilities[0].action_id.clone());
 
     for world in &class.alternatives {
         if !seen_world_ids.insert(world.evaluator_world_id) {
@@ -306,27 +310,14 @@ pub fn evaluate_randomized_decision_regret(
             });
         }
 
-        let admissible: BTreeSet<&str> = world
-            .action_losses
-            .iter()
-            .map(|loss| loss.action_id.as_str())
-            .collect();
-        for probability in &class.action_probabilities {
-            if !admissible.contains(probability.action_id.as_str()) {
-                return Err(RandomizedDecisionError::PolicyActionUnknown {
-                    world_id: world.evaluator_world_id,
-                    action_id: probability.action_id.clone(),
-                });
-            }
-        }
-
         base_worlds.push(CounterfactualWorld {
             evaluator_world_id: world.evaluator_world_id,
             hidden_world_sha256: world.hidden_world_sha256,
             candidate_view: world.candidate_view.clone(),
-            // The base oracle is used only for validation and the deterministic
-            // comparator. The first supported action is a valid placeholder.
-            candidate_action_id: first_policy_action.clone(),
+            // Use an evaluator-defined common action only for canonical
+            // structural validation. The candidate distribution is validated
+            // against the validated action set in the scoring loop below.
+            candidate_action_id: comparator_action_id.clone(),
             action_losses: world.action_losses.clone(),
         });
     }
