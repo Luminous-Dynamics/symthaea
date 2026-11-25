@@ -848,6 +848,23 @@ mod tests {
     }
 
     #[test]
+    fn outcome_cannot_rebind_pre_run_manifest_witness() {
+        let fixture = fixture();
+        let changed_witness_digest = digest('0');
+        let mut expected = fixture.expected();
+        expected.evaluation_manifest_commitment_receipt_sha256 = &changed_witness_digest;
+        assert_eq!(
+            validate_decision_outcome_receipt_v1(
+                &fixture.receipt,
+                &expected,
+                250,
+                &fixture.verifier,
+            ),
+            Err(DecisionOutcomeReceiptRejectV1::BindingMismatch)
+        );
+    }
+
+    #[test]
     fn utility_delta_must_match_treatment_minus_baseline() {
         let mut fixture = fixture();
         fixture.receipt.payload.outcome.utility_delta_microunits = 6;
