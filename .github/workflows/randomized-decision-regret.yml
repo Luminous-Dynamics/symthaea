@@ -10,6 +10,7 @@ on:
       - docs/research/fixtures/randomized_decision_regret_v0.1.json
       - .github/workflows/randomized-decision-regret.yml
   pull_request:
+    types: [opened, synchronize, reopened, ready_for_review]
     branches:
       - research/dmc-restore-contract-v0-1-20261124
     paths:
