@@ -19,10 +19,11 @@ All are active Internet-Drafts, not published RFCs. Treat them as work-in-progre
 
 ### A. Agent Execution Evidence (AEE), draft-thaha-scitt-agent-execution-evidence-02
 
-- Datatracker snapshot: November 2026; intended Standards Track; active individual Internet-Draft.
+- Datatracker snapshot: November 25, 2026; active individual Internet-Draft. The current Datatracker record has no assigned RFC stream or intended status and explicitly says the draft has no formal standing. The source repository README describes it as intended Standards Track; that author-maintained label is not IETF endorsement.
 - Profiles RFC 9942/9943 with registered agent identity, capabilities/assurance, runtime identity, policy/configuration digests, per-call hash-chained execution receipts, serving-party admission receipts, cross-party call linking, and offline-verifiable bundles.
 - Its useful insight is two-sided evidence: the caller records why a call was made; the serving party independently records what it admitted and on what basis. Linked verification compares the same `call_digest` and exposes a mismatch when one side's record is absent or inconsistent.
 - Its explicit limits: PASS does not prove the harness recorded every call, that a decision was correct, or that every call-chain hop is present. Harness completeness must be composed with remote attestation and external telemetry. A channel not mediated by the harness may be outside the evidence boundary.
+- The draft's own §15 implementation-status section calls the implementation a prototype. It says the prototype does not yet implement COSE wrapping, epochs, bundles, SCITT registration, serving-party admission receipts, linked verification, or the `call_digest` / host-binding checks added in -02. Its published Appendix A vectors are still useful as an independent profile-conformance corpus; they must not be mistaken for a complete -02 implementation.
 
 **SFEB response:** use the receipt vocabulary and cross-party binding as a baseline; extend qualification at the sink boundary. The actual destination should produce a receipt bound to atomic operation ID, tenant/resource, authority revision, fencing token, request digest and committed resource revision. A separate principal reads back the exact state. Compare those facts against caller, receiver and transparency records.
 
