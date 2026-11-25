@@ -2179,6 +2179,38 @@ mod tests {
     }
 
     #[test]
+    fn observation_must_reference_latest_attempt_event() {
+        let submission = sample_event(1, "event-1", "effect_submitted", None, None, vec![]);
+        let submitted_digest = event_digest(&submission);
+        let intermediate = sample_event(
+            2,
+            "event-2",
+            "proposal_created",
+            Some(&submitted_digest),
+            None,
+            vec!["event-1"],
+        );
+        let intermediate_digest = event_digest(&intermediate);
+        let observed = sample_event(
+            3,
+            "event-3",
+            "effect_observed",
+            Some(&intermediate_digest),
+            Some("observed_applied"),
+            vec!["event-2"],
+        );
+        let result = verify_trace(
+            &trace(vec![submission, intermediate, observed]),
+            RUN_ID,
+            MANIFEST,
+        );
+        assert!(matches!(
+            result.unwrap_err().code,
+            VerificationErrorCode::EffectCausalityMismatch(_)
+        ));
+    }
+
+    #[test]
     fn duplicate_terminal_observation_is_rejected() {
         let submission = sample_event(1, "event-1", "effect_submitted", None, None, vec![]);
         let submitted_digest = event_digest(&submission);
