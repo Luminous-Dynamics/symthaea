@@ -60,6 +60,7 @@ jobs:
           rustfmt --edition 2024 --check crates/domains/symthaea-plasma-probes/src/bin/kird_point_audit.rs
           rustfmt --edition 2024 --check crates/domains/symthaea-plasma-probes/src/bin/response_weighted_refinement_audit.rs
           rustfmt --edition 2024 --check crates/domains/symthaea-plasma-probes/src/bin/sensor_actuator_contract_audit.rs
+          rustfmt --edition 2024 --check crates/domains/symthaea-plasma-probes/src/bin/positive_mass_projection_audit.rs
 
       - name: Prepare isolated crate validation workspace
         shell: bash
@@ -76,10 +77,12 @@ jobs:
           mkdir -p "${tmp_root}/benchmarks/plasma/micro-macro/fixtures"
           mkdir -p "${tmp_root}/benchmarks/plasma/control-interface/fixtures"
           mkdir -p "${tmp_root}/benchmarks/plasma/adaptive-refinement/fixtures"
+          mkdir -p "${tmp_root}/benchmarks/plasma/positivity-projection/fixtures"
           cp crates/domains/symthaea-plasma-probes/src/lib.rs "${crate_dir}/src/lib.rs"
           cp crates/domains/symthaea-plasma-probes/src/bin/kird_point_audit.rs "${crate_dir}/src/bin/kird_point_audit.rs"
           cp crates/domains/symthaea-plasma-probes/src/bin/response_weighted_refinement_audit.rs "${crate_dir}/src/bin/response_weighted_refinement_audit.rs"
           cp crates/domains/symthaea-plasma-probes/src/bin/sensor_actuator_contract_audit.rs "${crate_dir}/src/bin/sensor_actuator_contract_audit.rs"
+          cp crates/domains/symthaea-plasma-probes/src/bin/positive_mass_projection_audit.rs "${crate_dir}/src/bin/positive_mass_projection_audit.rs"
           cp benchmarks/plasma/adversarial-probes/fixtures/synthetic-pulse-family-v0.1.json \
             "${tmp_root}/benchmarks/plasma/adversarial-probes/fixtures/"
           cp benchmarks/plasma/adversarial-probes/response-weighted-refinement-v0.1.schema.json \
@@ -136,6 +139,10 @@ jobs:
             "${tmp_root}/benchmarks/plasma/adaptive-refinement/"
           cp benchmarks/plasma/adaptive-refinement/fixtures/synthetic-refinement-cases-v0.1.json \
             "${tmp_root}/benchmarks/plasma/adaptive-refinement/fixtures/"
+          cp benchmarks/plasma/positivity-projection/positive-mass-projection-v0.1.schema.json \
+            "${tmp_root}/benchmarks/plasma/positivity-projection/"
+          cp benchmarks/plasma/positivity-projection/fixtures/negative-spectral-overshoot-known-answer-v0.1.json \
+            "${tmp_root}/benchmarks/plasma/positivity-projection/fixtures/"
           cat > "${crate_dir}/Cargo.toml" <<'EOF'
           [package]
           name = "symthaea-plasma-probes"
@@ -380,6 +387,35 @@ jobs:
           assert probe_fixture["claim_boundary"]["no_physical_solver_run"] is True
           print("response_weighted_refinement_schema_validation=PASS")
           PY
+
+      - name: Validate positivity-preserving mass projection schema and known answer
+        run: |
+          python3 - <<'PY'
+          import json
+          from pathlib import Path
+          from jsonschema import Draft202012Validator
+
+          root = Path("${{ runner.temp }}/plasma-probe-validation/benchmarks/plasma/positivity-projection")
+          schema = json.loads((root / "positive-mass-projection-v0.1.schema.json").read_text())
+          fixture = json.loads((root / "fixtures/negative-spectral-overshoot-known-answer-v0.1.json").read_text())
+          Draft202012Validator.check_schema(schema)
+          Draft202012Validator(schema).validate(fixture)
+          assert len(fixture["input_values"]) == len(fixture["cell_volumes"])
+          assert len(fixture["expected"]["projected_values"]) == len(fixture["input_values"])
+          assert min(fixture["input_values"]) < 0.0
+          assert min(fixture["expected"]["projected_values"]) >= 0.0
+          achieved = sum(v * x for v, x in zip(fixture["cell_volumes"], fixture["expected"]["projected_values"]))
+          assert abs(achieved - fixture["target_mass"]) < 1e-12
+          assert fixture["claim_boundary"]["mass_constraint_only"] is True
+          assert fixture["claim_boundary"]["does_not_claim_momentum_or_energy"] is True
+          print("positive_mass_projection_schema_validation=PASS")
+          PY
+
+      - name: Run positive mass projection audit fixture
+        run: |
+          manifest="${RUNNER_TEMP}/plasma-probe-validation/crates/domains/symthaea-plasma-probes/Cargo.toml"
+          fixture="${RUNNER_TEMP}/plasma-probe-validation/benchmarks/plasma/positivity-projection/fixtures/negative-spectral-overshoot-known-answer-v0.1.json"
+          cargo run --locked --manifest-path "$manifest" --bin positive_mass_projection_audit -- "$fixture"
 
       - name: Run sensor/actuator timing semantic audit
         run: cargo run --locked --manifest-path "${RUNNER_TEMP}/plasma-probe-validation/crates/domains/symthaea-plasma-probes/Cargo.toml" --bin sensor_actuator_contract_audit -- "${RUNNER_TEMP}/plasma-probe-validation/benchmarks/plasma/control-interface/fixtures/synthetic-multirate-interface-v0.1.json"
