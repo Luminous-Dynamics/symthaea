@@ -11,10 +11,9 @@ use serde::{Deserialize, Serialize};
 
 use crate::temporal_consensus::IndependentTemporalAnnotationV1;
 use crate::temporal_grounding::{
-    AudioArtifactClockV1, FrameIntervalV1, GroundTruthStateV1,
-    GroundingPredictionStateV1, TEMPORAL_GROUNDING_SCHEMA_V1,
-    TemporalGroundTruthV1, TemporalGroundingPlanV1,
-    TemporalGroundingPredictionV1, TemporalGroundingScoreV1,
+    AudioArtifactClockV1, GroundTruthStateV1, GroundingPredictionStateV1,
+    TEMPORAL_GROUNDING_SCHEMA_V1, TemporalGroundTruthV1, TemporalGroundingPlanV1,
+    TemporalGroundingPredictionV1,
     score_temporal_grounding, validate_temporal_ground_truth,
     validate_temporal_grounding_plan,
 };
@@ -572,7 +571,9 @@ fn percentile(values: &[f64], quantile: f64) -> Option<f64> {
 mod tests {
     use super::*;
     use crate::temporal_consensus::IndependentTemporalAnnotationV1;
-    use crate::temporal_grounding::TEMPORAL_GROUNDING_EVALUATOR_V1;
+    use crate::temporal_grounding::{
+        FrameIntervalV1, TEMPORAL_GROUNDING_EVALUATOR_V1,
+    };
 
     const AUDIO_A: &str = "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa";
     const AUDIO_B: &str = "bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb";
