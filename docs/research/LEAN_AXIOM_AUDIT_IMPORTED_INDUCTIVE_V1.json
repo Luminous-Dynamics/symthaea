@@ -12,7 +12,7 @@
     },
     "module_b": {
       "path": "scripts/research/lean-proof-extractor/axiom-audit-imported-inductive/B.lean",
-      "sha256": "18ca5b91051479397d826fe37432bca2e35320e9bbb47adb115186e7dfee9e09"
+      "sha256": "eb194ed45ae694adcd963a6fef0294e98dcf2e9833b143dc7829794e7a2d614c"
     }
   },
   "roots": [
@@ -49,7 +49,7 @@
       "inductive"
     ],
     "inductive_edges": "inductive type plus all constructors",
-    "unresolved_policy": "insert sorryAx sentinel and fail expected-axiom assertion"
+    "unresolved_policy": "preserve unresolved constant name in dependency set; exact expected-set assertion fails closed"
   },
   "claim_ceiling": [
     "A successful run shows that the project-side fresh DFS detects the direct/transitive Classical.choice dependency in the imported-inductive reproduction under this exact Lean core revision.",
