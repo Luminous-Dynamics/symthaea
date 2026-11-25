@@ -1,0 +1,15 @@
+[package]
+name = "typed-research-state-contract"
+version = "0.1.0"
+edition = "2024"
+rust-version = "1.96"
+license = "AGPL-3.0-or-later"
+publish = false
+description = "Conformance validator for typed public research state"
+
+[workspace]
+
+[dependencies]
+serde = { version = "=1.0.228", features = ["derive"] }
+serde_json = { version = "=1.0.150", features = ["preserve_order"] }
+sha2 = { version = "=0.10.9", features = ["oid"] }
