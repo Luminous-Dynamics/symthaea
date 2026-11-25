@@ -20,7 +20,7 @@ The runner expands committed gzip source and fixture files into sibling working-
 - MON-007 Go suite: 30 test functions; repeated suite, race and vet evidence is recorded in its own reports.
 - MON-007 Node Merkle verifier: 7 tests per invocation; five fresh invocations (35 passing executions).
 - MON-008 Go: 18 test functions, three fresh full-suite runs; separate race-detector run passed; `go vet` passed; checkpoint package statement coverage 75.3%.
-- MON-008 Node: 5 test cases across five fresh invocations (25 passing executions).
+- MON-008 Node: 6 test cases across five fresh invocations (30 passing executions), including exact 64-bit integer handling.
 - Go/Node generated fixtures verify bidirectionally.
 - Five-run Go verifier-only medians: 132.729 µs (one witness), 202.110 µs (two), 292.231 µs (three).
 
@@ -36,17 +36,13 @@ A signature proves that a key signed exact bytes. A valid Merkle proof proves a 
 
 ## Paradigm-shift benchmark
 
-See `ASSURANCE-GAP-BENCHMARK-v1.md`. The Assurance Gap Challenge deliberately removes trust in the original orchestrator, its database and its credentials after the action. A fresh auditor receives only portable evidence plus independently configured trust roots, then reconstructs authority, source, action, sink result, readback, checkpoint, append-only history and historical policy context. Scores are verified, missing, contradicted, stale or indeterminate—not just throughput.
+See `ASSURANCE-GAP-BENCHMARK-v1.md` and `ASSURANCE-GAP-BENCHMARK-v2.md`. The Assurance Gap Challenge deliberately removes trust in the original orchestrator, its database and its credentials after the action. A fresh auditor receives only portable evidence plus independently configured trust roots, then reconstructs authority, source, action, sink result, readback, checkpoint, append-only history and historical policy context. Scores are verified, missing, contradicted, stale or indeterminate—not just throughput.
 
-The benchmark matches PostgreSQL outbox, DBOS, Temporal, SCITT/RFC 9942+9943, Rekor, SFEB overlays and a native sink control across W0–W6 workload tiers. It keeps no-op orchestration separate from external-effect qualification.
+The benchmark compares PostgreSQL outbox, DBOS, Temporal, SCITT/RFC 9942+9943, Rekor, AEE, WIMSE Evidence Binding, the SCITT AI Agent Execution profile, Vaara Receipt, SFEB overlays and a native sink control across W0–W6. It includes two-sided evidence mismatch, identity/admission freshness, omission and out-of-band action cases. It keeps no-op orchestration separate from external-effect qualification.
 
+## Interoperability landscape
 
-## Interoperability landscape (updated 2026-11-25)
-
-MON-008 is deliberately not positioned as a new agent receipt format. See `INTEROPERABILITY-AND-NOVELTY-MAP-v1.md` for the current RFC 9942/9943, AEE, WIMSE Evidence Binding, Vaara Receipt and Sigstore comparison. The AEE draft already defines caller/serving-party paired evidence and offline bundles; the next differentiator is to qualify the real destination-side state change, independent readback and declared observation completeness.
-
-`ASSURANCE-GAP-BENCHMARK-v2.md` adds AEE, the SCITT AI Agent Execution profile and Vaara Receipt as comparison arms, and adds omission/coverage adversarial tests. It forbids treating missing receipt evidence as proof that an action did not occur outside an independently qualified observation boundary.
-
+MON-008 is deliberately not positioned as a new agent receipt format. See `INTEROPERABILITY-AND-NOVELTY-MAP-v1.md` for the current RFC 9942/9943, AEE, WIMSE Evidence Binding, Vaara Receipt and Sigstore comparison. The AEE draft already defines caller/serving-party paired evidence and offline bundles; WIMSE Evidence Binding maps workload credentials to agent identity, policy and a per-call caller reference. The next differentiator is destination-side state change, independent readback and declared observation completeness.
 
 ## Industry baseline facts
 
