@@ -123,7 +123,7 @@ impl DecisionNeedV1 {
     pub fn digest(&self) -> Result<String, DecisionSufficiencyRejectV1> {
         self.validate()?;
         let mut hasher = Sha256::new();
-        hasher.update(b"luminous:mace:decision-need:v1\\0");
+        hasher.update(b"luminous:mace:decision-need:v1\0");
         for value in [
             self.decision_need_id.as_str(),
             self.domain_id.as_str(),
@@ -153,6 +153,103 @@ impl DecisionNeedV1 {
             hasher.update(requirement.maximum_evidence_age_seconds.to_be_bytes());
         }
         Ok(hex_digest(&hasher.finalize()))
+    }
+
+    /// Decode a consumer-owned manifest from strict duplicate-safe JSON.
+    /// The caller must obtain this document from its authorized policy registry,
+    /// not from candidate memory or the qualification issuer.
+    pub fn from_json_str(input: &str) -> Result<Self, DecisionSufficiencyRejectV1> {
+        let value = parse_strict_json_bounded(input.as_bytes(), 1024 * 1024)
+            .map_err(|_| DecisionSufficiencyRejectV1::InvalidJson)?;
+        Self::from_json_value(&value)
+    }
+
+    pub fn from_json_value(value: &Value) -> Result<Self, DecisionSufficiencyRejectV1> {
+        let object = value.as_object().ok_or(DecisionSufficiencyRejectV1::InvalidJson)?;
+        const FIELDS: &[&str] = &[
+            "schema_version", "decision_need_id", "domain_id", "subject_scope_sha256",
+            "purpose_sha256", "action_set_sha256", "utility_profile_sha256",
+            "risk_limit_ppm", "minimum_confidence_level_ppm", "regret_tolerance_micros",
+            "sufficiency_policy_sha256", "calibration_profile_sha256",
+            "calibration_receipt_sha256", "maximum_evidence_age_seconds",
+            "maximum_context_tokens", "maximum_tool_calls", "maximum_cost_micros",
+            "maximum_latency_ms", "requirements",
+        ];
+        if object.len() != FIELDS.len()
+            || object.keys().any(|key| !FIELDS.contains(&key.as_str()))
+            || object.get("schema_version").and_then(Value::as_str)
+                != Some("mace_decision_need_v1")
+        {
+            return Err(DecisionSufficiencyRejectV1::InvalidJson);
+        }
+        let string = |field: &str| -> Result<String, DecisionSufficiencyRejectV1> {
+            object.get(field).and_then(Value::as_str).map(str::to_owned)
+                .ok_or(DecisionSufficiencyRejectV1::InvalidJson)
+        };
+        let u64_value = |field: &str| -> Result<u64, DecisionSufficiencyRejectV1> {
+            object.get(field).and_then(Value::as_u64)
+                .ok_or(DecisionSufficiencyRejectV1::InvalidJson)
+        };
+        let u32_value = |field: &str| -> Result<u32, DecisionSufficiencyRejectV1> {
+            u32::try_from(u64_value(field)?)
+                .map_err(|_| DecisionSufficiencyRejectV1::InvalidJson)
+        };
+        let i64_value = |field: &str| -> Result<i64, DecisionSufficiencyRejectV1> {
+            object.get(field).and_then(Value::as_i64)
+                .ok_or(DecisionSufficiencyRejectV1::InvalidJson)
+        };
+        let values = object.get("requirements").and_then(Value::as_array)
+            .ok_or(DecisionSufficiencyRejectV1::InvalidJson)?;
+        if values.is_empty() || values.len() > 1024 {
+            return Err(DecisionSufficiencyRejectV1::InvalidDecisionNeed);
+        }
+        let mut requirements = Vec::with_capacity(values.len());
+        for value in values {
+            let item = value.as_object().ok_or(DecisionSufficiencyRejectV1::InvalidJson)?;
+            if item.len() != 4
+                || item.keys().any(|key| ![
+                    "requirement_id", "evidence_class_sha256",
+                    "minimum_independent_root_families", "maximum_evidence_age_seconds",
+                ].contains(&key.as_str()))
+            {
+                return Err(DecisionSufficiencyRejectV1::InvalidJson);
+            }
+            requirements.push(DecisionNeedRequirementV1 {
+                requirement_id: item.get("requirement_id").and_then(Value::as_str)
+                    .ok_or(DecisionSufficiencyRejectV1::InvalidJson)?.to_owned(),
+                evidence_class_sha256: item.get("evidence_class_sha256").and_then(Value::as_str)
+                    .ok_or(DecisionSufficiencyRejectV1::InvalidJson)?.to_owned(),
+                minimum_independent_root_families: u32::try_from(
+                    item.get("minimum_independent_root_families").and_then(Value::as_u64)
+                        .ok_or(DecisionSufficiencyRejectV1::InvalidJson)?
+                ).map_err(|_| DecisionSufficiencyRejectV1::InvalidJson)?,
+                maximum_evidence_age_seconds: item.get("maximum_evidence_age_seconds")
+                    .and_then(Value::as_u64)
+                    .ok_or(DecisionSufficiencyRejectV1::InvalidJson)?,
+            });
+        }
+        let result = Self {
+            decision_need_id: string("decision_need_id")?,
+            domain_id: string("domain_id")?,
+            subject_scope_sha256: string("subject_scope_sha256")?,
+            purpose_sha256: string("purpose_sha256")?,
+            action_set_sha256: string("action_set_sha256")?,
+            utility_profile_sha256: string("utility_profile_sha256")?,
+            risk_limit_ppm: u32_value("risk_limit_ppm")?,
+            minimum_confidence_level_ppm: u32_value("minimum_confidence_level_ppm")?,
+            regret_tolerance_micros: i64_value("regret_tolerance_micros")?,
+            sufficiency_policy_sha256: string("sufficiency_policy_sha256")?,
+            calibration_profile_sha256: string("calibration_profile_sha256")?,
+            calibration_receipt_sha256: string("calibration_receipt_sha256")?,
+            maximum_evidence_age_seconds: u64_value("maximum_evidence_age_seconds")?,
+            maximum_context_tokens: u64_value("maximum_context_tokens")?,
+            maximum_tool_calls: u32_value("maximum_tool_calls")?,
+            maximum_cost_micros: u64_value("maximum_cost_micros")?,
+            maximum_latency_ms: u64_value("maximum_latency_ms")?,
+            requirements,
+        };
+        result.validate()?;
+        Ok(result)
     }
 
     pub fn requirement_ids(&self) -> Vec<String> {
@@ -864,7 +961,8 @@ fn validate_binding_against_qualified(
         || binding.calibration_receipt_sha256 != need.calibration_receipt_sha256
         || binding.risk_limit_ppm != need.risk_limit_ppm
         || binding.minimum_confidence_level_ppm != need.minimum_confidence_level_ppm
-        || binding.required_requirement_ids.as_slice() != need.requirement_ids().as_slice()
+        || binding.required_requirement_ids.iter().map(String::as_str)
+            .ne(need.requirements.iter().map(|item| item.requirement_id.as_str()))
     {
         return Err(DecisionSufficiencyRejectV1::BindingMismatch);
     }
@@ -1413,6 +1511,31 @@ mod tests {
         );
         let envelope = signed_envelope(&assessment, &signing_key);
         (binding, profile, envelope)
+    }
+
+    #[test]
+    fn consumer_decision_need_manifest_roundtrips_and_binds_every_policy_field() {
+        let need = test_decision_need();
+        let value = need.to_json_value().expect("valid DecisionNeed");
+        let wire = serde_json::to_string(&value).unwrap();
+        let decoded = DecisionNeedV1::from_json_str(&wire).expect("strict manifest decode");
+        assert_eq!(&decoded, need);
+        assert_eq!(decoded.digest().unwrap(), need.digest().unwrap());
+
+        let mut changed = value;
+        changed["risk_limit_ppm"] = Value::from(6000);
+        let altered = DecisionNeedV1::from_json_value(&changed).expect("altered but valid manifest");
+        assert_ne!(altered.digest().unwrap(), need.digest().unwrap());
+
+        let duplicate = wire.replacen(
+            "\"risk_limit_ppm\":",
+            "\"risk_limit_ppm\":5000,\"risk_limit_ppm\":",
+            1,
+        );
+        assert_eq!(
+            DecisionNeedV1::from_json_str(&duplicate),
+            Err(DecisionSufficiencyRejectV1::InvalidJson)
+        );
     }
 
     #[test]
