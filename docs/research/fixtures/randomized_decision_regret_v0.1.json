@@ -1,0 +1,68 @@
+{
+  "schema_version": "luminous.randomized-decision-regret.v0.1",
+  "status": "semantic_fixture_not_empirical_result",
+  "probability_scale_ppm": 1000000,
+  "candidate_policy": {
+    "digest_hex": "0909090909090909090909090909090909090909090909090909090909090909",
+    "action_probabilities": [
+      {
+        "action_id": "left",
+        "probability_ppm": 500000
+      },
+      {
+        "action_id": "right",
+        "probability_ppm": 500000
+      }
+    ]
+  },
+  "candidate_view": {
+    "observation_history_digest_hex": "0101010101010101010101010101010101010101010101010101010101010101",
+    "recurrent_state_digest_hex": "0202020202020202020202020202020202020202020202020202020202020202",
+    "model_configuration_digest_hex": "0303030303030303030303030303030303030303030303030303030303030303",
+    "policy_seed": 19
+  },
+  "hidden_worlds": [
+    {
+      "evaluator_world_id": 1,
+      "hidden_world_digest_hex": "0b0b0b0b0b0b0b0b0b0b0b0b0b0b0b0b0b0b0b0b0b0b0b0b0b0b0b0b0b0b0b0b",
+      "action_losses_ppm": {
+        "left": 0,
+        "right": 1000000
+      },
+      "expected_policy_loss_ppm": 500000,
+      "expected_policy_regret_ppm": 500000
+    },
+    {
+      "evaluator_world_id": 2,
+      "hidden_world_digest_hex": "0c0c0c0c0c0c0c0c0c0c0c0c0c0c0c0c0c0c0c0c0c0c0c0c0c0c0c0c0c0c0c0c",
+      "action_losses_ppm": {
+        "left": 1000000,
+        "right": 0
+      },
+      "expected_policy_loss_ppm": 500000,
+      "expected_policy_regret_ppm": 500000
+    }
+  ],
+  "expected_certificate": {
+    "policy_probability_mass_ppm": 1000000,
+    "deterministic_minimax_regret_comparator_ppm": 1000000,
+    "worst_case_expected_regret_ppm_ceil": 500000,
+    "mean_expected_regret_ppm_ceil": 500000,
+    "worst_supported_action_regret_ppm": 1000000
+  },
+  "negative_controls": [
+    "Reject policy probability mass below or above 1000000",
+    "Reject zero-probability rows instead of silently including them",
+    "Reject policy action IDs not admissible in every hidden world",
+    "Reject different candidate-view identities within one equivalence class",
+    "Reject duplicate evaluator world IDs and zero hidden-world digests",
+    "Preserve worst-supported-action regret separately from expected regret"
+  ],
+  "non_claims": [
+    "Not a trained policy or model result",
+    "Not a randomized minimax optimizer",
+    "Not a calibrated CVaR or chance-constraint estimator",
+    "Not a causal identification certificate",
+    "Not proof that a candidate executed the committed action distribution"
+  ]
+}
