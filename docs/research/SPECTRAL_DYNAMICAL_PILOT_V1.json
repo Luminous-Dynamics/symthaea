@@ -603,6 +603,143 @@
         "layer permutation",
         "no-op intervention"
       ]
+    },
+    {
+      "task_id": "SDCB-ID-001",
+      "family": "identifiability_abstention",
+      "split": "development",
+      "generator": "Two diagonal two-state systems observed through the first coordinate only.",
+      "parameters": {
+        "system_a": [
+          [
+            0.5,
+            0
+          ],
+          [
+            0,
+            0.2
+          ]
+        ],
+        "system_b": [
+          [
+            0.5,
+            0
+          ],
+          [
+            0,
+            0.9
+          ]
+        ],
+        "sensor": [
+          1,
+          0
+        ],
+        "initial_state": [
+          1,
+          1
+        ],
+        "horizon": 8
+      },
+      "target": "Detect that the hidden eigenvalue is not identifiable from these observations and abstain from selecting between the systems.",
+      "controls": [
+        "full_state_sensor_positive_control",
+        "visible_eigenvalue_mutation",
+        "same_observation_different_hidden_mode"
+      ]
+    },
+    {
+      "task_id": "SDCB-ID-002",
+      "family": "identifiability_abstention",
+      "split": "development",
+      "generator": "Two-feature linear regressor with rank-deficient input excitation.",
+      "parameters": {
+        "input_rows": [
+          [
+            1,
+            0
+          ],
+          [
+            2,
+            0
+          ],
+          [
+            3,
+            0
+          ]
+        ],
+        "feature_count": 2
+      },
+      "target": "Report excitation rank one and refuse a unique two-parameter estimate.",
+      "controls": [
+        "orthogonal_excitation_positive_control",
+        "duplicate_input_rows",
+        "zero_input_sequence"
+      ]
+    },
+    {
+      "task_id": "SDCB-ID-003",
+      "family": "identifiability_abstention",
+      "split": "validation",
+      "generator": "Fully observable two-state linear system under independently varied initial states.",
+      "parameters": {
+        "system": [
+          [
+            0,
+            1
+          ],
+          [
+            -1,
+            0
+          ]
+        ],
+        "sensor": [
+          1,
+          0
+        ],
+        "initial_states": [
+          [
+            1,
+            0
+          ],
+          [
+            0,
+            1
+          ]
+        ],
+        "horizon": 12
+      },
+      "target": "Recover full observability rank and distinguish it from the hidden-mode negative control.",
+      "controls": [
+        "single_sensor_unobservable_control",
+        "state_initialization_permutation",
+        "noiseless_exact_reference"
+      ]
+    },
+    {
+      "task_id": "SDCB-ID-004",
+      "family": "identifiability_abstention",
+      "split": "validation",
+      "generator": "Finite noisy and intermittently observed two-state linear system with a pinned noise generator.",
+      "parameters": {
+        "noise_std": [
+          0,
+          0.01,
+          0.05,
+          0.1
+        ],
+        "observation_dropout": [
+          0,
+          0.1,
+          0.25
+        ],
+        "seed_policy": "independent_holdout_seed"
+      },
+      "target": "Distinguish structural observability from practical finite-data identifiability and abstain when uncertainty exceeds the declared bound.",
+      "controls": [
+        "noise_free_positive_control",
+        "sensor_dropout_ablation",
+        "noise_seed_permutation"
+      ]
     }
   ],
   "model_profiles": [
@@ -717,7 +854,11 @@
     "random_fourier_and_wavelet_bases_with_equal_feature_count",
     "rank_norm_and_condition_number_matched_random_ablation",
     "time_reversal_and_sequence_permutation",
-    "known_positive_known_negative_and_no_op_controls"
+    "known_positive_known_negative_and_no_op_controls",
+    "different_hidden_dynamics_same_observations",
+    "rank_deficient_input_excitation",
+    "sensor_unobservable_mode",
+    "same_model_different_input_regime"
   ],
   "metrics": [
     "exact_accuracy_or_normalized_error",
@@ -729,7 +870,8 @@
     "temporal_prediction_horizon_and_uncertainty",
     "proof_plan_consistency_and_unresolved_obligations",
     "latency_peak_memory_and_measured_energy",
-    "test_retest_and_independent_reproduction"
+    "test_retest_and_independent_reproduction",
+    "identifiability_detection_and_selective_abstention_correctness"
   ],
   "resource_controls": {
     "comparison_views": [
