@@ -141,11 +141,13 @@ This is a decision-sufficient, evidence-carrying world model—not a claim that 
 - #13543/#13562: posterior-draw coupling and per-individual cohort summaries.
 - #13568/#13566: DMC restore and factual-prefix qualification.
 - #10372/#10377: structural support, cross-world assumptions and analytic identification fixtures.
-- #13239/#13152 and existing decision-observability modules: decision sufficiency and regret.
+- #13239/#13152 and existing decision-observability modules: deterministic decision sufficiency and regret.
+- #9094 (CMAQ-011) owns the external decision-centric benchmark bridge; #9289 (CMAQ-013) owns causal advantage-of-prediction/sham-model controls; #9396 (CMAQ-016) owns optimizer exploitability. This PR adds a randomized-policy scoring lane for those programmes; it does not replace their environment adapters or broad benchmark ownership.
+- #10693 (HLB-002) owns HDC/CfC neuron correctness and gradient qualification. Its one-step-vs-sequence-BPTT boundary must be resolved before any HDC/LTC temporal trainer result is described as sequence-level learning.
 - #9437: candidate/evaluator process isolation.
 - #8578: independent-cluster inference.
 
-The new module is an evaluator primitive, not a candidate trainer and not a second causal-pairing verifier. No DMC paper replication, trained HDC/CfC gain, randomized-policy optimality, closed-loop improvement, physical result, SOTA win or safety authorization is claimed.
+The new module is an evaluator primitive, not a candidate trainer, not a randomized minimax optimizer, not a standalone benchmark suite, and not a second causal-pairing verifier. No DMC paper replication, trained HDC/CfC gain, randomized-policy optimality, closed-loop improvement, physical result, SOTA win or safety authorization is claimed.
 
 
 ## 9. External evidence snapshot (checked 2026-11-25)
