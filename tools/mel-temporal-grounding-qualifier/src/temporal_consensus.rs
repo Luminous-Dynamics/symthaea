@@ -826,6 +826,188 @@ mod tests {
     }
 
     #[test]
+    fn pairwise_present_agreement_uses_symmetric_production_scorer() {
+        let intervals = vec![
+            FrameIntervalV1 {
+                start_frame: 100,
+                end_frame: 200,
+            },
+            FrameIntervalV1 {
+                start_frame: 500,
+                end_frame: 600,
+            },
+        ];
+        let input = case(
+            vec![
+                annotation('1', 'a', GroundTruthStateV1::Present, intervals.clone(), None),
+                annotation('2', 'b', GroundTruthStateV1::Present, intervals.clone(), None),
+            ],
+            prediction(intervals),
+        );
+        let report = audit_multi_annotator_case(&input).unwrap();
+        assert_eq!(report.pairwise_annotation_concordance.len(), 1);
+        let pair = &report.pairwise_annotation_concordance[0];
+        assert!(pair.disposition_agreement);
+        assert!(pair.present_interval_comparison_eligible);
+        assert_eq!(pair.left_as_truth_right_as_prediction_f1, Some(1.0));
+        assert_eq!(pair.right_as_truth_left_as_prediction_f1, Some(1.0));
+        assert_eq!(pair.symmetric_present_event_f1, Some(1.0));
+        assert_eq!(pair.mean_matched_interval_iou, Some(1.0));
+        assert_eq!(pair.exact_occurrence_count_agreement, Some(true));
+        assert_eq!(report.summary.pairwise_annotation_pairs, 1);
+        assert_eq!(report.summary.pairwise_disposition_agreement_rate, Some(1.0));
+        assert_eq!(report.summary.pairwise_present_symmetric_event_f1, Some(1.0));
+        assert!(!report.pairwise_inter_annotator_agreement_computed);
+    }
+
+    #[test]
+    fn pairwise_boundary_tolerance_is_separate_from_boundary_similarity() {
+        let input = case(
+            vec![
+                annotation(
+                    '1',
+                    'a',
+                    GroundTruthStateV1::Present,
+                    vec![FrameIntervalV1 {
+                        start_frame: 100,
+                        end_frame: 200,
+                    }],
+                    None,
+                ),
+                annotation(
+                    '2',
+                    'b',
+                    GroundTruthStateV1::Present,
+                    vec![FrameIntervalV1 {
+                        start_frame: 120,
+                        end_frame: 220,
+                    }],
+                    None,
+                ),
+            ],
+            prediction(vec![FrameIntervalV1 {
+                start_frame: 100,
+                end_frame: 200,
+            }]),
+        );
+        let report = audit_multi_annotator_case(&input).unwrap();
+        let pair = &report.pairwise_annotation_concordance[0];
+        assert_eq!(pair.symmetric_present_event_f1, Some(1.0));
+        assert!(pair.mean_matched_interval_iou.unwrap() < 1.0);
+        assert!(pair.mean_matched_interval_iou.unwrap() > 0.5);
+        assert_eq!(pair.exact_occurrence_count_agreement, Some(true));
+    }
+
+    #[test]
+    fn pairwise_occurrence_cardinality_disagreement_is_not_hidden_by_mean_f1() {
+        let input = case(
+            vec![
+                annotation(
+                    '1',
+                    'a',
+                    GroundTruthStateV1::Present,
+                    vec![
+                        FrameIntervalV1 {
+                            start_frame: 100,
+                            end_frame: 200,
+                        },
+                        FrameIntervalV1 {
+                            start_frame: 500,
+                            end_frame: 600,
+                        },
+                    ],
+                    None,
+                ),
+                annotation(
+                    '2',
+                    'b',
+                    GroundTruthStateV1::Present,
+                    vec![FrameIntervalV1 {
+                        start_frame: 100,
+                        end_frame: 200,
+                    }],
+                    None,
+                ),
+            ],
+            prediction(vec![
+                FrameIntervalV1 {
+                    start_frame: 100,
+                    end_frame: 200,
+                },
+                FrameIntervalV1 {
+                    start_frame: 500,
+                    end_frame: 600,
+                },
+            ]),
+        );
+        let report = audit_multi_annotator_case(&input).unwrap();
+        let pair = &report.pairwise_annotation_concordance[0];
+        assert_eq!(pair.exact_occurrence_count_agreement, Some(false));
+        assert!(pair.symmetric_present_event_f1.unwrap() < 1.0);
+        assert_eq!(
+            report.summary.pairwise_present_exact_count_agreement,
+            Some(0.0)
+        );
+    }
+
+    #[test]
+    fn mixed_annotation_states_report_pairwise_disposition_without_fabricated_interval_scores() {
+        let input = case(
+            vec![
+                annotation(
+                    '1',
+                    'a',
+                    GroundTruthStateV1::Present,
+                    vec![FrameIntervalV1 {
+                        start_frame: 100,
+                        end_frame: 200,
+                    }],
+                    None,
+                ),
+                annotation(
+                    '2',
+                    'b',
+                    GroundTruthStateV1::Absent,
+                    Vec::new(),
+                    None,
+                ),
+                annotation(
+                    '3',
+                    'c',
+                    GroundTruthStateV1::Ambiguous,
+                    Vec::new(),
+                    Some("gradual onset"),
+                ),
+            ],
+            prediction(vec![FrameIntervalV1 {
+                start_frame: 100,
+                end_frame: 200,
+            }]),
+        );
+        let report = audit_multi_annotator_case(&input).unwrap();
+        assert_eq!(report.pairwise_annotation_concordance.len(), 3);
+        assert!(
+            report
+                .pairwise_annotation_concordance
+                .iter()
+                .all(|pair| !pair.disposition_agreement)
+        );
+        assert!(
+            report
+                .pairwise_annotation_concordance
+                .iter()
+                .all(|pair| !pair.present_interval_comparison_eligible)
+        );
+        assert!(
+            report
+                .pairwise_annotation_concordance
+                .iter()
+                .all(|pair| pair.symmetric_present_event_f1.is_none())
+        );
+        assert_eq!(report.summary.pairwise_disposition_agreement_rate, Some(0.0));
+    }
+
+    #[test]
     fn identical_annotators_preserve_independent_records_and_zero_spread() {
         let intervals = vec![
             FrameIntervalV1 {
