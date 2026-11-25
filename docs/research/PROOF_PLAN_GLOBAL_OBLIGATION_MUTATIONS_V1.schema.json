@@ -1,0 +1,121 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://luminousdynamics.io/schemas/PROOF_PLAN_GLOBAL_OBLIGATION_MUTATIONS_V1.schema.json",
+  "title": "ProofPlanGlobalObligationMutationsV1",
+  "type": "object",
+  "additionalProperties": false,
+  "required": [
+    "schema_version",
+    "artifact_id",
+    "status",
+    "base_fixture",
+    "accounting_implementation",
+    "cases"
+  ],
+  "properties": {
+    "schema_version": {
+      "const": "1.0.0"
+    },
+    "artifact_id": {
+      "const": "PROOF-PLAN-GLOBAL-OBLIGATION-MUTATIONS-001"
+    },
+    "status": {
+      "const": "frozen_expected_behavior_specification_not_execution"
+    },
+    "base_fixture": {
+      "const": "docs/research/PROOF_PLAN_AND_COMM_V1.json"
+    },
+    "accounting_implementation": {
+      "const": "scripts/research/proof-plan-contract/src/global_obligations.rs"
+    },
+    "cases": {
+      "type": "array",
+      "minItems": 11,
+      "maxItems": 11,
+      "uniqueItems": true,
+      "items": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": [
+          "id",
+          "class",
+          "plan_status",
+          "mutation",
+          "expected",
+          "expected_counts",
+          "claim_ceiling"
+        ],
+        "properties": {
+          "id": {
+            "type": "string",
+            "pattern": "^OBL-[0-9]{3}-[a-z0-9-]+$"
+          },
+          "class": {
+            "enum": [
+              "positive_control",
+              "incomplete_control",
+              "negative_control",
+              "alternative_control"
+            ]
+          },
+          "plan_status": {
+            "enum": [
+              "source_pinned_provisional",
+              "in_progress",
+              "accepted"
+            ]
+          },
+          "mutation": {
+            "type": "string",
+            "minLength": 1
+          },
+          "expected": {
+            "enum": [
+              "complete",
+              "incomplete",
+              "reject",
+              "primary_complete_candidate_incomplete"
+            ]
+          },
+          "expected_counts": {
+            "type": "object",
+            "additionalProperties": false,
+            "required": [
+              "produced_subgoals",
+              "transformed_goals",
+              "discharged_goals",
+              "unresolved_goals",
+              "cycle_nodes"
+            ],
+            "properties": {
+              "produced_subgoals": {
+                "type": "integer",
+                "minimum": 0
+              },
+              "transformed_goals": {
+                "type": "integer",
+                "minimum": 0
+              },
+              "discharged_goals": {
+                "type": "integer",
+                "minimum": 0
+              },
+              "unresolved_goals": {
+                "type": "integer",
+                "minimum": 0
+              },
+              "cycle_nodes": {
+                "type": "integer",
+                "minimum": 0
+              }
+            }
+          },
+          "claim_ceiling": {
+            "type": "string",
+            "minLength": 1
+          }
+        }
+      }
+    }
+  }
+}
