@@ -656,6 +656,112 @@ mod tests {
     }
 
     #[test]
+    fn empty_classes_and_distributions_fail_closed() {
+        let empty_distribution = class(Vec::new());
+        assert_eq!(
+            evaluate_randomized_decision_regret(&empty_distribution),
+            Err(RandomizedDecisionError::EmptyPolicyDistribution)
+        );
+
+        let mut empty_alternatives = class(mixture());
+        empty_alternatives.alternatives.clear();
+        assert_eq!(
+            evaluate_randomized_decision_regret(&empty_alternatives),
+            Err(RandomizedDecisionError::EmptyAlternatives)
+        );
+    }
+
+    #[test]
+    fn probability_bounds_and_empty_action_ids_fail_closed() {
+        let out_of_range = class(vec![CandidateActionProbability {
+            action_id: "left".to_owned(),
+            probability_ppm: 1_000_001,
+        }]);
+        assert_eq!(
+            evaluate_randomized_decision_regret(&out_of_range),
+            Err(RandomizedDecisionError::ProbabilityOutOfRange {
+                action_id: "left".to_owned(),
+                probability_ppm: 1_000_001,
+            })
+        );
+
+        let empty_id = class(vec![CandidateActionProbability {
+            action_id: String::new(),
+            probability_ppm: 1_000_000,
+        }]);
+        assert_eq!(
+            evaluate_randomized_decision_regret(&empty_id),
+            Err(RandomizedDecisionError::EmptyActionId)
+        );
+    }
+
+    #[test]
+    fn action_and_world_limits_are_enforced_before_iteration() {
+        let too_many_actions = class(
+            (0..=MAX_RANDOMIZED_ACTIONS)
+                .map(|index| CandidateActionProbability {
+                    action_id: format!("action-{index:03}"),
+                    probability_ppm: 1,
+                })
+                .collect(),
+        );
+        assert_eq!(
+            evaluate_randomized_decision_regret(&too_many_actions),
+            Err(RandomizedDecisionError::TooManyPolicyActions)
+        );
+
+        let mut too_many_worlds = class(mixture());
+        too_many_worlds.alternatives = vec![world(1, 0, 1_000_000); MAX_RANDOMIZED_ALTERNATIVES + 1];
+        assert_eq!(
+            evaluate_randomized_decision_regret(&too_many_worlds),
+            Err(RandomizedDecisionError::TooManyAlternatives)
+        );
+    }
+
+    #[test]
+    fn inconsistent_action_sets_and_out_of_range_losses_are_rejected() {
+        let mut mismatched = class(mixture());
+        mismatched.alternatives[1].action_losses.pop();
+        assert!(matches!(
+            evaluate_randomized_decision_regret(&mismatched),
+            Err(RandomizedDecisionError::DecisionObservability(
+                DecisionObservabilityError::ActionSetMismatch { world_id: 2 }
+            ))
+        ));
+
+        let mut invalid_loss = class(mixture());
+        invalid_loss.alternatives[0].action_losses[0].loss_ppm = 1_000_001;
+        assert!(matches!(
+            evaluate_randomized_decision_regret(&invalid_loss),
+            Err(RandomizedDecisionError::DecisionObservability(
+                DecisionObservabilityError::LossOutOfRange {
+                    world_id: 1,
+                    action_id
+                }
+            )) if action_id == "left"
+        ));
+    }
+
+    #[test]
+    fn asymmetric_mixture_is_scored_from_its_actual_probability_mass() {
+        let asymmetric = class(vec![
+            CandidateActionProbability {
+                action_id: "left".to_owned(),
+                probability_ppm: 200_000,
+            },
+            CandidateActionProbability {
+                action_id: "right".to_owned(),
+                probability_ppm: 800_000,
+            },
+        ]);
+        let result = evaluate_randomized_decision_regret(&asymmetric).unwrap();
+        assert_eq!(result.worlds[0].expected_regret_ppm_ceil, 800_000);
+        assert_eq!(result.worlds[1].expected_regret_ppm_ceil, 200_000);
+        assert_eq!(result.worst_case_expected_regret_ppm_ceil, 800_000);
+        assert_eq!(result.mean_expected_regret_ppm_ceil, 500_000);
+    }
+
+    #[test]
     fn upper_rounding_is_conservative_for_fractional_expected_regret() {
         let mut fractional = class(vec![
             CandidateActionProbability {
