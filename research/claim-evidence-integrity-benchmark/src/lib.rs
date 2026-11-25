@@ -9,6 +9,8 @@ use sha2::{Digest, Sha256};
 use std::collections::HashSet;
 
 const FIXTURE_PACK: &str = include_str!("../fixtures/claim-evidence-integrity-v0.1.json");
+const CANDIDATE_INPUTS: &str = include_str!("../fixtures/candidate-inputs-v0.1.json");
+const EVALUATOR_KEY: &str = include_str!("../fixtures/evaluator-key-v0.1.json");
 
 const VERDICTS: &[&str] = &[
     "SUPPORTED",
@@ -632,6 +634,428 @@ pub fn validate_value(value: &Value) -> Result<ValidationReport, Vec<ValidationI
     })
 }
 
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub struct SeparatedViewReport {
+    pub fixture_count: usize,
+    pub evidence_count: usize,
+    pub verified_digest_count: usize,
+    pub verified_quote_count: usize,
+}
+
+/// Validate the candidate-visible inputs and evaluator-only key as a pair.
+///
+/// Exact field allowlists prevent evaluator labels from entering candidate
+/// inputs; ID/digest binding prevents the key from being detached from the
+/// artifact bytes that the candidate actually received.
+pub fn validate_separated_views(
+    candidate_json: &str,
+    evaluator_json: &str,
+) -> Result<SeparatedViewReport, Vec<ValidationIssue>> {
+    let candidate: Value = serde_json::from_str(candidate_json).map_err(|error| {
+        vec![ValidationIssue {
+            path: "candidate".to_owned(),
+            message: format!("invalid candidate JSON: {error}"),
+        }]
+    })?;
+    let evaluator: Value = serde_json::from_str(evaluator_json).map_err(|error| {
+        vec![ValidationIssue {
+            path: "evaluator".to_owned(),
+            message: format!("invalid evaluator JSON: {error}"),
+        }]
+    })?;
+    let mut issues = Vec::new();
+
+    let Some(candidate_map) = object(&candidate, "candidate", &mut issues) else {
+        return Err(issues);
+    };
+    const CANDIDATE_KEYS: &[&str] = &["schema_version", "status", "fixtures"];
+    validate_exact_keys(candidate_map, CANDIDATE_KEYS, "candidate", &mut issues);
+    if required_string(candidate_map, "schema_version", "candidate", &mut issues)
+        != Some("symthaea-claim-evidence-candidate-input-v0.1")
+    {
+        issue(&mut issues, "candidate.schema_version", "unsupported candidate schema");
+    }
+    if required_string(candidate_map, "status", "candidate", &mut issues)
+        != Some("SYNTHETIC_CANDIDATE_INPUT_NOT_EXPERT_DATA")
+    {
+        issue(&mut issues, "candidate.status", "candidate view must retain synthetic-only status");
+    }
+
+    let Some(evaluator_map) = object(&evaluator, "evaluator", &mut issues) else {
+        return Err(issues);
+    };
+    const EVALUATOR_KEYS: &[&str] = &["schema_version", "status", "fixtures"];
+    validate_exact_keys(evaluator_map, EVALUATOR_KEYS, "evaluator", &mut issues);
+    if required_string(evaluator_map, "schema_version", "evaluator", &mut issues)
+        != Some("symthaea-claim-evidence-evaluator-key-v0.1")
+    {
+        issue(&mut issues, "evaluator.schema_version", "unsupported evaluator schema");
+    }
+    if required_string(evaluator_map, "status", "evaluator", &mut issues)
+        != Some("SYNTHETIC_EVALUATOR_ONLY_NOT_EXPERT_GOLD")
+    {
+        issue(&mut issues, "evaluator.status", "evaluator key must remain evaluator-only");
+    }
+
+    let candidate_fixtures = required_array(candidate_map, "fixtures", "candidate", &mut issues);
+    let evaluator_fixtures = required_array(evaluator_map, "fixtures", "evaluator", &mut issues);
+    let (Some(candidate_fixtures), Some(evaluator_fixtures)) =
+        (candidate_fixtures, evaluator_fixtures)
+    else {
+        return Err(issues);
+    };
+    if candidate_fixtures.len() < 12 || candidate_fixtures.len() != evaluator_fixtures.len() {
+        issue(
+            &mut issues,
+            "fixtures",
+            "candidate and evaluator views must contain the same 12+ fixtures",
+        );
+    }
+
+    const CANDIDATE_FIXTURE_KEYS: &[&str] = &[
+        "fixture_id",
+        "claim",
+        "claim_scope",
+        "claim_reference_time",
+        "verification_time",
+        "model_knowledge_cutoff",
+        "evidence",
+    ];
+    const KEY_FIXTURE_KEYS: &[&str] = &[
+        "fixture_id",
+        "expected_verdict",
+        "required_invariants",
+        "label_provenance",
+        "evidence_labels",
+    ];
+    const CANDIDATE_EVIDENCE_KEYS: &[&str] = &[
+        "evidence_id",
+        "source_id",
+        "canonical_url",
+        "publication_time",
+        "retrieval_time",
+        "artifact_text",
+        "artifact_sha256",
+    ];
+    const KEY_EVIDENCE_KEYS: &[&str] = &[
+        "evidence_id",
+        "artifact_sha256",
+        "source_family_id",
+        "source_role",
+        "content_integrity",
+        "quote_span",
+        "relation_to_claim",
+        "correction_status",
+        "relationship_notes",
+    ];
+
+    let mut seen_fixture_ids = HashSet::new();
+    let mut fixture_count = 0;
+    let mut evidence_count = 0;
+    let mut verified_digest_count = 0;
+    let mut verified_quote_count = 0;
+
+    for index in 0..candidate_fixtures.len().min(evaluator_fixtures.len()) {
+        let path = format!("fixtures[{index}]");
+        let Some(candidate_fixture) = object(
+            &candidate_fixtures[index],
+            &format!("candidate.{path}"),
+            &mut issues,
+        ) else {
+            continue;
+        };
+        let Some(evaluator_fixture) = object(
+            &evaluator_fixtures[index],
+            &format!("evaluator.{path}"),
+            &mut issues,
+        ) else {
+            continue;
+        };
+        validate_exact_keys(
+            candidate_fixture,
+            CANDIDATE_FIXTURE_KEYS,
+            &format!("candidate.{path}"),
+            &mut issues,
+        );
+        validate_exact_keys(
+            evaluator_fixture,
+            KEY_FIXTURE_KEYS,
+            &format!("evaluator.{path}"),
+            &mut issues,
+        );
+        let candidate_id = required_string(
+            candidate_fixture,
+            "fixture_id",
+            &format!("candidate.{path}"),
+            &mut issues,
+        );
+        let evaluator_id = required_string(
+            evaluator_fixture,
+            "fixture_id",
+            &format!("evaluator.{path}"),
+            &mut issues,
+        );
+        if candidate_id != evaluator_id {
+            issue(
+                &mut issues,
+                &path,
+                "candidate/evaluator fixture IDs or ordering do not match",
+            );
+        }
+        if let Some(id) = candidate_id {
+            if !seen_fixture_ids.insert(id.to_owned()) {
+                issue(
+                    &mut issues,
+                    format!("candidate.{path}.fixture_id"),
+                    "duplicate fixture ID",
+                );
+            }
+        }
+        if let Some(verdict) =
+            required_string(evaluator_fixture, "expected_verdict", &format!("evaluator.{path}"), &mut issues)
+        {
+            if !VERDICTS.contains(&verdict) {
+                issue(
+                    &mut issues,
+                    format!("evaluator.{path}.expected_verdict"),
+                    "unsupported expected verdict",
+                );
+            }
+        }
+        if let Some(provenance_value) = evaluator_fixture.get("label_provenance") {
+            if let Some(provenance) = object(
+                provenance_value,
+                &format!("evaluator.{path}.label_provenance"),
+                &mut issues,
+            ) {
+                if provenance.get("independent_of_candidate").and_then(Value::as_bool) != Some(true)
+                    || provenance.get("label_status").and_then(Value::as_str)
+                        != Some("SYNTHETIC_KNOWN_ANSWER")
+                {
+                    issue(
+                        &mut issues,
+                        format!("evaluator.{path}.label_provenance"),
+                        "synthetic labels must remain evaluator-only",
+                    );
+                }
+            }
+        } else {
+            issue(
+                &mut issues,
+                format!("evaluator.{path}.label_provenance"),
+                "missing evaluator label provenance",
+            );
+        }
+
+        let Some(candidate_evidence) = required_array(
+            candidate_fixture,
+            "evidence",
+            &format!("candidate.{path}"),
+            &mut issues,
+        ) else {
+            continue;
+        };
+        let Some(key_evidence) = required_array(
+            evaluator_fixture,
+            "evidence_labels",
+            &format!("evaluator.{path}"),
+            &mut issues,
+        ) else {
+            continue;
+        };
+        if candidate_evidence.len() != key_evidence.len() {
+            issue(
+                &mut issues,
+                &path,
+                "candidate and evaluator evidence counts do not match",
+            );
+        }
+        let mut seen_evidence_ids = HashSet::new();
+
+        for evidence_index in 0..candidate_evidence.len().min(key_evidence.len()) {
+            let evidence_path = format!("{path}.evidence[{evidence_index}]");
+            let Some(candidate_item) = object(
+                &candidate_evidence[evidence_index],
+                &format!("candidate.{evidence_path}"),
+                &mut issues,
+            ) else {
+                continue;
+            };
+            let Some(key_item) = object(
+                &key_evidence[evidence_index],
+                &format!("evaluator.{evidence_path}"),
+                &mut issues,
+            ) else {
+                continue;
+            };
+            validate_exact_keys(
+                candidate_item,
+                CANDIDATE_EVIDENCE_KEYS,
+                &format!("candidate.{evidence_path}"),
+                &mut issues,
+            );
+            validate_exact_keys(
+                key_item,
+                KEY_EVIDENCE_KEYS,
+                &format!("evaluator.{evidence_path}"),
+                &mut issues,
+            );
+
+            let candidate_evidence_id = required_string(
+                candidate_item,
+                "evidence_id",
+                &format!("candidate.{evidence_path}"),
+                &mut issues,
+            );
+            let key_evidence_id = required_string(
+                key_item,
+                "evidence_id",
+                &format!("evaluator.{evidence_path}"),
+                &mut issues,
+            );
+            if candidate_evidence_id != key_evidence_id {
+                issue(
+                    &mut issues,
+                    &evidence_path,
+                    "candidate/evaluator evidence IDs or ordering do not match",
+                );
+            }
+            if let Some(id) = candidate_evidence_id {
+                if !seen_evidence_ids.insert(id.to_owned()) {
+                    issue(
+                        &mut issues,
+                        format!("candidate.{evidence_path}.evidence_id"),
+                        "duplicate evidence ID within fixture",
+                    );
+                }
+            }
+            let artifact = required_string(
+                candidate_item,
+                "artifact_text",
+                &format!("candidate.{evidence_path}"),
+                &mut issues,
+            );
+            let candidate_digest = required_string(
+                candidate_item,
+                "artifact_sha256",
+                &format!("candidate.{evidence_path}"),
+                &mut issues,
+            );
+            let key_digest = required_string(
+                key_item,
+                "artifact_sha256",
+                &format!("evaluator.{evidence_path}"),
+                &mut issues,
+            );
+            if candidate_digest != key_digest {
+                issue(
+                    &mut issues,
+                    &evidence_path,
+                    "candidate artifact digest and evaluator binding differ",
+                );
+            }
+            if let (Some(artifact), Some(digest)) = (artifact, candidate_digest) {
+                if sha256_hex(artifact) == digest {
+                    verified_digest_count += 1;
+                } else {
+                    issue(
+                        &mut issues,
+                        format!("candidate.{evidence_path}.artifact_sha256"),
+                        "candidate artifact SHA-256 mismatch",
+                    );
+                }
+            }
+
+            if let Some(relation) = required_string(
+                key_item,
+                "relation_to_claim",
+                &format!("evaluator.{evidence_path}"),
+                &mut issues,
+            ) {
+                if !RELATIONS.contains(&relation) {
+                    issue(
+                        &mut issues,
+                        format!("evaluator.{evidence_path}.relation_to_claim"),
+                        "unsupported evidence relation",
+                    );
+                }
+            }
+            if let Some(span_value) = key_item.get("quote_span") {
+                if let Some(span) = object(
+                    span_value,
+                    &format!("evaluator.{evidence_path}.quote_span"),
+                    &mut issues,
+                ) {
+                    const SPAN_KEYS: &[&str] = &["byte_start", "byte_end", "quote"];
+                    validate_exact_keys(
+                        span,
+                        SPAN_KEYS,
+                        &format!("evaluator.{evidence_path}.quote_span"),
+                        &mut issues,
+                    );
+                    let start = span.get("byte_start").and_then(Value::as_u64).map(|n| n as usize);
+                    let end = span.get("byte_end").and_then(Value::as_u64).map(|n| n as usize);
+                    let quote = required_string(
+                        span,
+                        "quote",
+                        &format!("evaluator.{evidence_path}.quote_span"),
+                        &mut issues,
+                    );
+                    match (artifact, start, end, quote) {
+                        (Some(text), Some(start), Some(end), Some(quote)) => {
+                            let bytes = text.as_bytes();
+                            if start >= end || end > bytes.len() {
+                                issue(
+                                    &mut issues,
+                                    format!("evaluator.{evidence_path}.quote_span"),
+                                    "invalid quote byte range",
+                                );
+                            } else if std::str::from_utf8(&bytes[start..end]).ok() != Some(quote) {
+                                issue(
+                                    &mut issues,
+                                    format!("evaluator.{evidence_path}.quote_span"),
+                                    "evaluator quote does not match candidate-visible artifact",
+                                );
+                            } else {
+                                verified_quote_count += 1;
+                            }
+                        }
+                        _ => issue(
+                            &mut issues,
+                            format!("evaluator.{evidence_path}.quote_span"),
+                            "quote span, candidate artifact and offsets are required",
+                        ),
+                    }
+                }
+            } else {
+                issue(
+                    &mut issues,
+                    format!("evaluator.{evidence_path}.quote_span"),
+                    "missing evaluator quote span",
+                );
+            }
+            evidence_count += 1;
+        }
+        fixture_count += 1;
+    }
+
+    if !issues.is_empty() {
+        return Err(issues);
+    }
+    Ok(SeparatedViewReport {
+        fixture_count,
+        evidence_count,
+        verified_digest_count,
+        verified_quote_count,
+    })
+}
+
+/// Validate the checked-in split views, including answer-key isolation and
+/// cross-binding to the exact candidate-visible evidence bytes.
+pub fn validate_checked_in_views() -> Result<SeparatedViewReport, Vec<ValidationIssue>> {
+    validate_separated_views(CANDIDATE_INPUTS, EVALUATOR_KEY)
+}
+
 /// Run deterministic negative controls against the checked-in pack.
 pub fn self_test() -> Result<ValidationReport, String> {
     let valid = validate_pack(FIXTURE_PACK).map_err(|issues| format!("fixture pack invalid: {issues:?}"))?;
@@ -664,6 +1088,40 @@ pub fn self_test() -> Result<ValidationReport, String> {
 #[cfg(test)]
 mod tests {
     use super::*;
+
+    #[test]
+    fn candidate_and_evaluator_views_cross_bind_without_label_leakage() {
+        let report = validate_checked_in_views().unwrap();
+        assert_eq!(report.fixture_count, 15);
+        assert_eq!(report.evidence_count, 23);
+        assert_eq!(report.verified_digest_count, 23);
+        assert_eq!(report.verified_quote_count, 23);
+    }
+
+    #[test]
+    fn candidate_view_rejects_evaluator_label_leakage() {
+        let mut candidate: Value = serde_json::from_str(CANDIDATE_INPUTS).unwrap();
+        let evaluator: Value = serde_json::from_str(EVALUATOR_KEY).unwrap();
+        candidate["fixtures"][0]["expected_verdict"] = Value::String("SUPPORTED".to_owned());
+        assert!(validate_separated_views(
+            &candidate.to_string(),
+            &evaluator.to_string()
+        )
+        .is_err());
+    }
+
+    #[test]
+    fn evaluator_key_cannot_be_detached_from_candidate_artifact() {
+        let candidate: Value = serde_json::from_str(CANDIDATE_INPUTS).unwrap();
+        let mut evaluator: Value = serde_json::from_str(EVALUATOR_KEY).unwrap();
+        evaluator["fixtures"][0]["evidence_labels"][0]["artifact_sha256"] =
+            Value::String("0".repeat(64));
+        assert!(validate_separated_views(
+            &candidate.to_string(),
+            &evaluator.to_string()
+        )
+        .is_err());
+    }
 
     #[test]
     fn timestamps_require_valid_calendar_and_timezone_fields() {
