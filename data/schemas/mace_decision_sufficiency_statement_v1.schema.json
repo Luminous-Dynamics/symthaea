@@ -54,38 +54,27 @@
       "type": "object",
       "additionalProperties": false,
       "required": [
-        "calibration_profile_sha256",
-        "calibration_receipt_sha256",
-        "candidate_set_sha256",
-        "confidence_level_ppm",
-        "decision_need_sha256",
-        "domain_id",
-        "environment_revision_sha256",
-        "expires_at_unix",
-        "issued_at_unix",
-        "issuer_profile_sha256",
-        "key_id",
-        "maximum_evidence_age_seconds",
-        "observed_context_tokens",
-        "observed_cost_micros",
-        "observed_latency_ms",
-        "observed_tool_calls",
-        "purpose_sha256",
-        "qualification_receipt_sha256",
-        "qualified_evidence_set_sha256",
-        "query_invocation_id",
-        "query_sha256",
-        "regret_limit_micros",
-        "regret_upper_bound_micros",
-        "requirements",
-        "risk_limit_ppm",
-        "risk_upper_bound_ppm",
-        "run_id",
         "schema_version",
-        "status",
+        "run_id",
+        "query_invocation_id",
+        "domain_id",
         "subject_scope_sha256",
+        "environment_revision_sha256",
+        "tool_profile_sha256",
+        "query_sha256",
+        "candidate_set_sha256",
+        "qualified_evidence_set_sha256",
+        "qualification_receipt_sha256",
+        "decision_need_sha256",
+        "purpose_sha256",
         "sufficiency_policy_sha256",
-        "tool_profile_sha256"
+        "calibration_profile_sha256",
+        "status",
+        "requirements",
+        "issued_at_unix",
+        "expires_at_unix",
+        "issuer_profile_sha256",
+        "key_id"
       ],
       "properties": {
         "schema_version": {
@@ -279,7 +268,10 @@
               "status": {
                 "const": "sufficient"
               }
-            }
+            },
+            "required": [
+              "status"
+            ]
           }
         },
         "required": [
