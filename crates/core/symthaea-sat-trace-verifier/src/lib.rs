@@ -2057,13 +2057,16 @@ mod tests {
             vec!["event-2"],
         );
         let reconciled_digest = event_digest(&reconciled);
-        let second_submission = sample_event(
-            4,
-            "event-4",
-            "effect_submitted",
-            Some(&reconciled_digest),
-            None,
-            vec!["event-3"],
+        let second_submission = with_attempt_id(
+            sample_event(
+                4,
+                "event-4",
+                "effect_submitted",
+                Some(&reconciled_digest),
+                None,
+                vec!["event-3"],
+            ),
+            "attempt-0002",
         );
         let result = verify_trace(
             &trace(vec![submission, unknown, reconciled, second_submission]),
@@ -2073,6 +2076,93 @@ mod tests {
         .unwrap();
         assert_eq!(result.effect_submissions, 2);
         assert!(!result.hold_required);
+    }
+
+    #[test]
+    fn late_observation_for_previous_attempt_cannot_settle_retry() {
+        let first_submission = sample_event(1, "event-1", "effect_submitted", None, None, vec![]);
+        let first_digest = event_digest(&first_submission);
+        let first_unknown = sample_event(
+            2,
+            "event-2",
+            "effect_observed",
+            Some(&first_digest),
+            Some("unknown"),
+            vec!["event-1"],
+        );
+        let unknown_digest = event_digest(&first_unknown);
+        let reconciled = sample_event(
+            3,
+            "event-3",
+            "effect_reconciled",
+            Some(&unknown_digest),
+            Some("observed_not_applied"),
+            vec!["event-2"],
+        );
+        let reconciled_digest = event_digest(&reconciled);
+        let retry = with_attempt_id(
+            sample_event(
+                4,
+                "event-4",
+                "effect_submitted",
+                Some(&reconciled_digest),
+                None,
+                vec!["event-3"],
+            ),
+            "attempt-0002",
+        );
+        let retry_digest = event_digest(&retry);
+        let delayed_old_observation = sample_event(
+            5,
+            "event-5",
+            "effect_observed",
+            Some(&retry_digest),
+            Some("observed_applied"),
+            vec!["event-4"],
+        );
+        let result = verify_trace(
+            &trace(vec![
+                first_submission,
+                first_unknown,
+                reconciled,
+                retry,
+                delayed_old_observation,
+            ]),
+            RUN_ID,
+            MANIFEST,
+        );
+        assert!(matches!(
+            result.unwrap_err().code,
+            VerificationErrorCode::StaleAttemptObservation { .. }
+        ));
+    }
+
+    #[test]
+    fn duplicate_terminal_observation_is_rejected() {
+        let submission = sample_event(1, "event-1", "effect_submitted", None, None, vec![]);
+        let submitted_digest = event_digest(&submission);
+        let applied = sample_event(
+            2,
+            "event-2",
+            "effect_observed",
+            Some(&submitted_digest),
+            Some("observed_applied"),
+            vec!["event-1"],
+        );
+        let applied_digest = event_digest(&applied);
+        let duplicate = sample_event(
+            3,
+            "event-3",
+            "effect_reconciled",
+            Some(&applied_digest),
+            Some("observed_applied"),
+            vec!["event-2"],
+        );
+        let result = verify_trace(&trace(vec![submission, applied, duplicate]), RUN_ID, MANIFEST);
+        assert!(matches!(
+            result.unwrap_err().code,
+            VerificationErrorCode::DuplicateTerminalObservation(_)
+        ));
     }
 
     #[test]
@@ -2175,6 +2265,7 @@ mod tests {
         assert!(matches!(
             result.unwrap_err().code,
             VerificationErrorCode::DuplicateAppliedIdempotencyKey(_)
+                | VerificationErrorCode::DuplicateAttemptId(_)
         ));
     }
 
