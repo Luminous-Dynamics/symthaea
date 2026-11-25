@@ -1,0 +1,465 @@
+{
+  "schema": "mel-selective-temporal-batch-v1",
+  "evaluation_id": "synthetic-selective-grounding-v1",
+  "model_identity_sha256": "1111111111111111111111111111111111111111111111111111111111111111",
+  "runtime_identity_sha256": "2222222222222222222222222222222222222222222222222222222222222222",
+  "decoding_config_sha256": "3333333333333333333333333333333333333333333333333333333333333333",
+  "plan": {
+    "evaluator_version": "mel-temporal-grounding-evaluator-v1",
+    "minimum_interval_iou": 0.5
+  },
+  "cases": [
+    {
+      "schema": "mel-selective-temporal-case-v1",
+      "case_id": "selective-0",
+      "source_lineage_id": "source-work-1",
+      "evidence_stratum": "clear",
+      "adjudication_profile_sha256": "ffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffff",
+      "truth": {
+        "schema_version": "mel-temporal-grounding-v1",
+        "query_id": "query-0",
+        "query_text": "Every piano entrance",
+        "artifact": {
+          "audio_sha256": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+          "sample_rate_hz": 48000,
+          "channels": 2,
+          "total_frames": 480000
+        },
+        "annotation_policy_version": "selective-adjudication-v1",
+        "annotation_set_sha256": "ffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffff",
+        "annotator_count": 3,
+        "state": "Present",
+        "intervals": [
+          {
+            "start_frame": 100,
+            "end_frame": 200
+          }
+        ],
+        "status_reason": null
+      },
+      "prediction": {
+        "schema_version": "mel-temporal-grounding-v1",
+        "query_id": "query-0",
+        "artifact": {
+          "audio_sha256": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+          "sample_rate_hz": 48000,
+          "channels": 2,
+          "total_frames": 480000
+        },
+        "state": {
+          "Occurrences": {
+            "intervals": [
+              {
+                "start_frame": 100,
+                "end_frame": 200
+              }
+            ]
+          }
+        }
+      },
+      "decision": "Answer",
+      "decision_confidence": 0.95
+    },
+    {
+      "schema": "mel-selective-temporal-case-v1",
+      "case_id": "selective-1",
+      "source_lineage_id": "source-work-1",
+      "evidence_stratum": "dense_decoy",
+      "adjudication_profile_sha256": "ffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffff",
+      "truth": {
+        "schema_version": "mel-temporal-grounding-v1",
+        "query_id": "query-1",
+        "query_text": "Every piano entrance",
+        "artifact": {
+          "audio_sha256": "bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb",
+          "sample_rate_hz": 48000,
+          "channels": 2,
+          "total_frames": 480000
+        },
+        "annotation_policy_version": "selective-adjudication-v1",
+        "annotation_set_sha256": "eeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeee",
+        "annotator_count": 3,
+        "state": "Present",
+        "intervals": [
+          {
+            "start_frame": 100,
+            "end_frame": 200
+          }
+        ],
+        "status_reason": null
+      },
+      "prediction": {
+        "schema_version": "mel-temporal-grounding-v1",
+        "query_id": "query-1",
+        "artifact": {
+          "audio_sha256": "bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb",
+          "sample_rate_hz": 48000,
+          "channels": 2,
+          "total_frames": 480000
+        },
+        "state": {
+          "Occurrences": {
+            "intervals": [
+              {
+                "start_frame": 300,
+                "end_frame": 400
+              }
+            ]
+          }
+        }
+      },
+      "decision": "Answer",
+      "decision_confidence": 0.99
+    },
+    {
+      "schema": "mel-selective-temporal-case-v1",
+      "case_id": "selective-2",
+      "source_lineage_id": "source-work-1",
+      "evidence_stratum": "genuine_absence",
+      "adjudication_profile_sha256": "ffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffff",
+      "truth": {
+        "schema_version": "mel-temporal-grounding-v1",
+        "query_id": "query-2",
+        "query_text": "Every piano entrance",
+        "artifact": {
+          "audio_sha256": "cccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccc",
+          "sample_rate_hz": 48000,
+          "channels": 2,
+          "total_frames": 480000
+        },
+        "annotation_policy_version": "selective-adjudication-v1",
+        "annotation_set_sha256": "dddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddd",
+        "annotator_count": 3,
+        "state": "Absent",
+        "intervals": [],
+        "status_reason": null
+      },
+      "prediction": {
+        "schema_version": "mel-temporal-grounding-v1",
+        "query_id": "query-2",
+        "artifact": {
+          "audio_sha256": "cccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccc",
+          "sample_rate_hz": 48000,
+          "channels": 2,
+          "total_frames": 480000
+        },
+        "state": "QueryAbsent"
+      },
+      "decision": "ClaimAbsent",
+      "decision_confidence": 0.9
+    },
+    {
+      "schema": "mel-selective-temporal-case-v1",
+      "case_id": "selective-3",
+      "source_lineage_id": "source-work-1",
+      "evidence_stratum": "dense_decoy",
+      "adjudication_profile_sha256": "ffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffff",
+      "truth": {
+        "schema_version": "mel-temporal-grounding-v1",
+        "query_id": "query-3",
+        "query_text": "Every piano entrance",
+        "artifact": {
+          "audio_sha256": "dddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddd",
+          "sample_rate_hz": 48000,
+          "channels": 2,
+          "total_frames": 480000
+        },
+        "annotation_policy_version": "selective-adjudication-v1",
+        "annotation_set_sha256": "cccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccc",
+        "annotator_count": 3,
+        "state": "Absent",
+        "intervals": [],
+        "status_reason": null
+      },
+      "prediction": {
+        "schema_version": "mel-temporal-grounding-v1",
+        "query_id": "query-3",
+        "artifact": {
+          "audio_sha256": "dddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddd",
+          "sample_rate_hz": 48000,
+          "channels": 2,
+          "total_frames": 480000
+        },
+        "state": {
+          "Occurrences": {
+            "intervals": [
+              {
+                "start_frame": 100,
+                "end_frame": 200
+              }
+            ]
+          }
+        }
+      },
+      "decision": "Answer",
+      "decision_confidence": 0.97
+    },
+    {
+      "schema": "mel-selective-temporal-case-v1",
+      "case_id": "selective-4",
+      "source_lineage_id": "source-work-2",
+      "evidence_stratum": "ambiguous_boundary",
+      "adjudication_profile_sha256": "ffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffff",
+      "truth": {
+        "schema_version": "mel-temporal-grounding-v1",
+        "query_id": "query-4",
+        "query_text": "Every piano entrance",
+        "artifact": {
+          "audio_sha256": "eeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeee",
+          "sample_rate_hz": 48000,
+          "channels": 2,
+          "total_frames": 480000
+        },
+        "annotation_policy_version": "selective-adjudication-v1",
+        "annotation_set_sha256": "bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb",
+        "annotator_count": 3,
+        "state": "Ambiguous",
+        "intervals": [],
+        "status_reason": "gradual entrance has no stable onset"
+      },
+      "prediction": {
+        "schema_version": "mel-temporal-grounding-v1",
+        "query_id": "query-4",
+        "artifact": {
+          "audio_sha256": "eeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeee",
+          "sample_rate_hz": 48000,
+          "channels": 2,
+          "total_frames": 480000
+        },
+        "state": {
+          "Ambiguous": {
+            "candidate_intervals": [
+              {
+                "start_frame": 90,
+                "end_frame": 210
+              }
+            ],
+            "reason": "multiple valid boundaries"
+          }
+        }
+      },
+      "decision": "AbstainAmbiguous",
+      "decision_confidence": 0.8
+    },
+    {
+      "schema": "mel-selective-temporal-case-v1",
+      "case_id": "selective-5",
+      "source_lineage_id": "source-work-2",
+      "evidence_stratum": "ambiguous_source",
+      "adjudication_profile_sha256": "ffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffff",
+      "truth": {
+        "schema_version": "mel-temporal-grounding-v1",
+        "query_id": "query-5",
+        "query_text": "Every piano entrance",
+        "artifact": {
+          "audio_sha256": "ffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffff",
+          "sample_rate_hz": 48000,
+          "channels": 2,
+          "total_frames": 480000
+        },
+        "annotation_policy_version": "selective-adjudication-v1",
+        "annotation_set_sha256": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+        "annotator_count": 3,
+        "state": "Ambiguous",
+        "intervals": [],
+        "status_reason": "overlapping sources make identity uncertain"
+      },
+      "prediction": {
+        "schema_version": "mel-temporal-grounding-v1",
+        "query_id": "query-5",
+        "artifact": {
+          "audio_sha256": "ffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffff",
+          "sample_rate_hz": 48000,
+          "channels": 2,
+          "total_frames": 480000
+        },
+        "state": {
+          "NotEstimable": {
+            "reason": "source identity cannot be estimated"
+          }
+        }
+      },
+      "decision": "AbstainNotEstimable",
+      "decision_confidence": 0.85
+    },
+    {
+      "schema": "mel-selective-temporal-case-v1",
+      "case_id": "selective-6",
+      "source_lineage_id": "source-work-2",
+      "evidence_stratum": "masked",
+      "adjudication_profile_sha256": "ffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffff",
+      "truth": {
+        "schema_version": "mel-temporal-grounding-v1",
+        "query_id": "query-6",
+        "query_text": "Every piano entrance",
+        "artifact": {
+          "audio_sha256": "0000000000000000000000000000000000000000000000000000000000000000",
+          "sample_rate_hz": 48000,
+          "channels": 2,
+          "total_frames": 480000
+        },
+        "annotation_policy_version": "selective-adjudication-v1",
+        "annotation_set_sha256": "9999999999999999999999999999999999999999999999999999999999999999",
+        "annotator_count": 3,
+        "state": "NotEstimable",
+        "intervals": [],
+        "status_reason": "masking prevents reliable event detection"
+      },
+      "prediction": {
+        "schema_version": "mel-temporal-grounding-v1",
+        "query_id": "query-6",
+        "artifact": {
+          "audio_sha256": "0000000000000000000000000000000000000000000000000000000000000000",
+          "sample_rate_hz": 48000,
+          "channels": 2,
+          "total_frames": 480000
+        },
+        "state": {
+          "NotEstimable": {
+            "reason": "masked event evidence"
+          }
+        }
+      },
+      "decision": "AbstainNotEstimable",
+      "decision_confidence": 0.88
+    },
+    {
+      "schema": "mel-selective-temporal-case-v1",
+      "case_id": "selective-7",
+      "source_lineage_id": "source-work-3",
+      "evidence_stratum": "cropped",
+      "adjudication_profile_sha256": "ffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffff",
+      "truth": {
+        "schema_version": "mel-temporal-grounding-v1",
+        "query_id": "query-7",
+        "query_text": "Every piano entrance",
+        "artifact": {
+          "audio_sha256": "1111111111111111111111111111111111111111111111111111111111111111",
+          "sample_rate_hz": 48000,
+          "channels": 2,
+          "total_frames": 480000
+        },
+        "annotation_policy_version": "selective-adjudication-v1",
+        "annotation_set_sha256": "8888888888888888888888888888888888888888888888888888888888888888",
+        "annotator_count": 3,
+        "state": "NotEstimable",
+        "intervals": [],
+        "status_reason": "clipped window removes the event onset"
+      },
+      "prediction": {
+        "schema_version": "mel-temporal-grounding-v1",
+        "query_id": "query-7",
+        "artifact": {
+          "audio_sha256": "1111111111111111111111111111111111111111111111111111111111111111",
+          "sample_rate_hz": 48000,
+          "channels": 2,
+          "total_frames": 480000
+        },
+        "state": "QueryAbsent"
+      },
+      "decision": "ClaimAbsent",
+      "decision_confidence": 0.99
+    },
+    {
+      "schema": "mel-selective-temporal-case-v1",
+      "case_id": "selective-8",
+      "source_lineage_id": "source-work-3",
+      "evidence_stratum": "clear",
+      "adjudication_profile_sha256": "ffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffff",
+      "truth": {
+        "schema_version": "mel-temporal-grounding-v1",
+        "query_id": "query-8",
+        "query_text": "Every piano entrance",
+        "artifact": {
+          "audio_sha256": "2222222222222222222222222222222222222222222222222222222222222222",
+          "sample_rate_hz": 48000,
+          "channels": 2,
+          "total_frames": 480000
+        },
+        "annotation_policy_version": "selective-adjudication-v1",
+        "annotation_set_sha256": "7777777777777777777777777777777777777777777777777777777777777777",
+        "annotator_count": 3,
+        "state": "Present",
+        "intervals": [
+          {
+            "start_frame": 100,
+            "end_frame": 200
+          }
+        ],
+        "status_reason": null
+      },
+      "prediction": {
+        "schema_version": "mel-temporal-grounding-v1",
+        "query_id": "query-8",
+        "artifact": {
+          "audio_sha256": "2222222222222222222222222222222222222222222222222222222222222222",
+          "sample_rate_hz": 48000,
+          "channels": 2,
+          "total_frames": 480000
+        },
+        "state": {
+          "NotEstimable": {
+            "reason": "model elected not to answer"
+          }
+        }
+      },
+      "decision": "AbstainNotEstimable",
+      "decision_confidence": 0.9
+    },
+    {
+      "schema": "mel-selective-temporal-case-v1",
+      "case_id": "selective-9",
+      "source_lineage_id": "source-work-3",
+      "evidence_stratum": "repeated_occurrence",
+      "adjudication_profile_sha256": "ffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffff",
+      "truth": {
+        "schema_version": "mel-temporal-grounding-v1",
+        "query_id": "query-9",
+        "query_text": "Every piano entrance",
+        "artifact": {
+          "audio_sha256": "3333333333333333333333333333333333333333333333333333333333333333",
+          "sample_rate_hz": 48000,
+          "channels": 2,
+          "total_frames": 480000
+        },
+        "annotation_policy_version": "selective-adjudication-v1",
+        "annotation_set_sha256": "6666666666666666666666666666666666666666666666666666666666666666",
+        "annotator_count": 3,
+        "state": "Present",
+        "intervals": [
+          {
+            "start_frame": 100,
+            "end_frame": 200
+          },
+          {
+            "start_frame": 300,
+            "end_frame": 400
+          }
+        ],
+        "status_reason": null
+      },
+      "prediction": {
+        "schema_version": "mel-temporal-grounding-v1",
+        "query_id": "query-9",
+        "artifact": {
+          "audio_sha256": "3333333333333333333333333333333333333333333333333333333333333333",
+          "sample_rate_hz": 48000,
+          "channels": 2,
+          "total_frames": 480000
+        },
+        "state": {
+          "Occurrences": {
+            "intervals": [
+              {
+                "start_frame": 100,
+                "end_frame": 200
+              }
+            ]
+          }
+        }
+      },
+      "decision": "Answer",
+      "decision_confidence": 0.5
+    }
+  ]
+}
