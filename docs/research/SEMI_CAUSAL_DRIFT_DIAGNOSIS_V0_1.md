@@ -41,11 +41,13 @@ The difference-in-differences point estimate is:
 
 `(treated_post - treated_pre) - (control_post - control_pre)`
 
-The current v0.1 standard error is a transparent independent-cell Wald approximation:
+The initial cell-summary path uses a transparent independent-cell Wald approximation:
 
 `sqrt(var_Tpre/n_Tpre + var_Tpost/n_Tpost + var_Cpre/n_Cpre + var_Cpost/n_Cpost)`
 
-This is intentionally labelled `difference_in_differences_independent_cell_wald_95`. It does **not** account for paired-panel covariance, serial autocorrelation, clustering by tool/chamber/lot or repeated-wafer dependence. The 95% interval is suitable for the frozen synthetic known-answer tests only; it is not a production inferential interval. Before use on real fab data, replace or supplement it with an appropriate cluster-robust estimator and/or blocked/cluster bootstrap, with cluster identity and effective sample size explicitly represented.
+This is intentionally labelled `difference_in_differences_independent_cell_wald_95`. It does **not** account for paired-panel covariance, serial autocorrelation, clustering by tool/chamber/lot or repeated-wafer dependence. It is suitable only for frozen synthetic known-answer tests, not as a production interval.
+
+A separate cluster-summary path is now implemented. Each row represents one declared independent top-level unit (e.g. chamber, tool or lot) and contains its four treated/control pre/post means, per-cell support counts, covariate SMD and pre-trend slopes. The estimator computes one DiD effect per cluster, then reports the equal-weight mean cluster effect. Its standard error is the sample standard deviation of cluster effects divided by the square root of the number of clusters. It uses the conservative 95% Student-t critical value for 9 degrees of freedom and requires at least 10 independent clusters. The method is explicitly labelled `equal_weight_cluster_mean_did_student_t95_conservative_df9_nG`. This estimates an equal-cluster average, not a wafer-weighted average. It still assumes independent clusters; it does not solve higher-level nesting or hidden confounding. A real fab study must predefine the independent unit, avoid overlapping clusters, and consider higher-level cluster/bootstrap or randomization inference where the design requires it.
 
 Balance and pre-trend thresholds are diagnostics, not proof of parallel trends or absence of unmeasured confounding. A matched contrast can only return ASSOCIATION_ONLY or CONTRADICTED, never INTERVENTION_CONSISTENT.
 
@@ -80,7 +82,7 @@ Contradictions remain visible. The evaluator does not average contradictory evid
 
 ## Authored test coverage
 
-The module currently has 12 unit tests; the integration reference file has 3 tests. They cover:
+The module currently has 15 unit tests; the integration reference file has 4 tests. They cover:
 1. feature attribution never produces a causal claim;
 2. difference-in-differences known answer remains association-only;
 3. failed covariate balance downgrades identification;
@@ -94,7 +96,9 @@ The module currently has 12 unit tests; the integration reference file has 3 tes
 11. malformed digests and duplicate hypothesis IDs are rejected;
 12. independent integration oracle verifies the DiD estimate and standard error;
 13. independent integration oracle verifies negative-control falsification;
-14. independent integration oracle verifies all intervention design gates.
+14. independent integration oracle verifies all intervention design gates;
+15. cluster-level DiD uses between-cluster variance and refuses fewer than 10 independent clusters;
+16. cluster-level known-answer mean/standard error/Student-t interval are independently recomputed.
 
 Tests are authored, not yet claimed passing. Exact-head rustfmt, strict Clippy, semiconductor crate tests, independent binary/reference controls and SEMI-BENCH-001 reference run are pending.
 
