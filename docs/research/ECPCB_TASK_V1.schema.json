@@ -1,0 +1,978 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://luminousdynamics.io/schemas/ECPCB_TASK_V1.schema.json",
+  "title": "ECPCBTaskV1",
+  "type": "object",
+  "additionalProperties": false,
+  "required": [
+    "schema_version",
+    "artifact_id",
+    "record_status",
+    "identity",
+    "statement",
+    "formal_dependency_graph",
+    "proof_routes",
+    "mathematical_role_annotations",
+    "proof_plan",
+    "local_action_certificates",
+    "explanation_claims",
+    "mutations",
+    "trust_capsule",
+    "licensing",
+    "contamination",
+    "claim_ceiling"
+  ],
+  "properties": {
+    "schema_version": {
+      "const": "1.0.0"
+    },
+    "artifact_id": {
+      "const": "ECPCB-TASK-001"
+    },
+    "record_status": {
+      "enum": [
+        "candidate",
+        "source_pinned",
+        "expert_reviewed",
+        "eligible",
+        "rejected",
+        "inconclusive"
+      ]
+    },
+    "identity": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "task_id",
+        "task_version",
+        "family",
+        "source",
+        "environment",
+        "root_declaration"
+      ],
+      "properties": {
+        "task_id": {
+          "type": "string",
+          "pattern": "^ECPCB-[A-Z0-9][A-Z0-9-]+$"
+        },
+        "task_version": {
+          "type": "string",
+          "pattern": "^[0-9]+\\.[0-9]+\\.[0-9]+$"
+        },
+        "family": {
+          "enum": [
+            "logic",
+            "algebra",
+            "number_theory",
+            "combinatorics",
+            "analysis",
+            "order_lattice",
+            "topology_geometry",
+            "algorithms_semantics"
+          ]
+        },
+        "source": {
+          "type": "object",
+          "additionalProperties": false,
+          "required": [
+            "repository",
+            "commit",
+            "path",
+            "blob_sha256"
+          ],
+          "properties": {
+            "repository": {
+              "type": "string",
+              "pattern": "^[^/]+/[^/]+$"
+            },
+            "commit": {
+              "type": "string",
+              "pattern": "^[a-f0-9]{40}$"
+            },
+            "path": {
+              "type": "string",
+              "minLength": 1
+            },
+            "blob_sha256": {
+              "type": "string",
+              "pattern": "^[a-f0-9]{64}$"
+            },
+            "source_url": {
+              "type": "string",
+              "format": "uri"
+            }
+          }
+        },
+        "environment": {
+          "type": "object",
+          "additionalProperties": false,
+          "required": [
+            "lean_toolchain",
+            "lean_core_revision",
+            "lake_manifest_sha256",
+            "imports"
+          ],
+          "properties": {
+            "lean_toolchain": {
+              "type": "string",
+              "minLength": 1
+            },
+            "lean_core_revision": {
+              "type": "string",
+              "pattern": "^[a-f0-9]{40}$"
+            },
+            "mathlib_revision": {
+              "type": "string",
+              "pattern": "^[a-f0-9]{40}$"
+            },
+            "lake_manifest_sha256": {
+              "type": "string",
+              "pattern": "^[a-f0-9]{64}$"
+            },
+            "imports": {
+              "type": "array",
+              "items": {
+                "type": "object",
+                "additionalProperties": false,
+                "required": [
+                  "module",
+                  "artifact_sha256"
+                ],
+                "properties": {
+                  "module": {
+                    "type": "string",
+                    "minLength": 1
+                  },
+                  "artifact_sha256": {
+                    "type": "string",
+                    "pattern": "^[a-f0-9]{64}$"
+                  }
+                }
+              }
+            }
+          }
+        },
+        "root_declaration": {
+          "type": "object",
+          "additionalProperties": false,
+          "required": [
+            "fully_qualified_name",
+            "declaration_kind",
+            "elaborated_type_sha256"
+          ],
+          "properties": {
+            "fully_qualified_name": {
+              "type": "string",
+              "minLength": 1
+            },
+            "declaration_kind": {
+              "enum": [
+                "theorem",
+                "definition",
+                "opaque",
+                "example",
+                "unknown"
+              ]
+            },
+            "elaborated_type_sha256": {
+              "type": "string",
+              "pattern": "^[a-f0-9]{64}$"
+            },
+            "proof_value_sha256": {
+              "type": "string",
+              "pattern": "^[a-f0-9]{64}$"
+            }
+          }
+        }
+      }
+    },
+    "statement": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "rendered_statement",
+        "target_type_sha256",
+        "context_sha256",
+        "binders",
+        "hypotheses",
+        "conclusion_sha256"
+      ],
+      "properties": {
+        "rendered_statement": {
+          "type": "string",
+          "minLength": 1
+        },
+        "target_type_sha256": {
+          "type": "string",
+          "pattern": "^[a-f0-9]{64}$"
+        },
+        "context_sha256": {
+          "type": "string",
+          "pattern": "^[a-f0-9]{64}$"
+        },
+        "binders": {
+          "type": "array",
+          "items": {
+            "type": "object",
+            "additionalProperties": false,
+            "required": [
+              "binder_id",
+              "binder_kind",
+              "type_sha256",
+              "position"
+            ],
+            "properties": {
+              "binder_id": {
+                "type": "string",
+                "minLength": 1
+              },
+              "binder_kind": {
+                "enum": [
+                  "explicit",
+                  "implicit",
+                  "strict_implicit",
+                  "instance_implicit",
+                  "lambda",
+                  "let"
+                ]
+              },
+              "type_sha256": {
+                "type": "string",
+                "pattern": "^[a-f0-9]{64}$"
+              },
+              "position": {
+                "type": "integer",
+                "minimum": 0
+              },
+              "name_hint": {
+                "type": "string"
+              }
+            }
+          }
+        },
+        "hypotheses": {
+          "type": "array",
+          "items": {
+            "type": "object",
+            "additionalProperties": false,
+            "required": [
+              "hypothesis_id",
+              "type_sha256",
+              "position"
+            ],
+            "properties": {
+              "hypothesis_id": {
+                "type": "string",
+                "minLength": 1
+              },
+              "type_sha256": {
+                "type": "string",
+                "pattern": "^[a-f0-9]{64}$"
+              },
+              "position": {
+                "type": "integer",
+                "minimum": 0
+              },
+              "multiplicity": {
+                "type": "integer",
+                "minimum": 1
+              }
+            }
+          }
+        },
+        "conclusion_sha256": {
+          "type": "string",
+          "pattern": "^[a-f0-9]{64}$"
+        }
+      }
+    },
+    "formal_dependency_graph": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "extractor",
+        "status",
+        "nodes",
+        "edges",
+        "closure_sha256",
+        "coverage_limitations"
+      ],
+      "properties": {
+        "extractor": {
+          "type": "string",
+          "minLength": 1
+        },
+        "status": {
+          "enum": [
+            "not_run",
+            "partial",
+            "extracted",
+            "independently_reviewed"
+          ]
+        },
+        "nodes": {
+          "type": "array",
+          "items": {
+            "type": "object",
+            "additionalProperties": false,
+            "required": [
+              "node_id",
+              "fully_qualified_name",
+              "kind",
+              "type_sha256",
+              "value_availability"
+            ],
+            "properties": {
+              "node_id": {
+                "type": "string",
+                "minLength": 1
+              },
+              "fully_qualified_name": {
+                "type": "string",
+                "minLength": 1
+              },
+              "kind": {
+                "enum": [
+                  "axiom",
+                  "definition",
+                  "theorem",
+                  "opaque",
+                  "inductive",
+                  "constructor",
+                  "recursor",
+                  "quotient",
+                  "unknown"
+                ]
+              },
+              "source_module": {
+                "type": "string",
+                "minLength": 1
+              },
+              "type_sha256": {
+                "type": "string",
+                "pattern": "^[a-f0-9]{64}$"
+              },
+              "value_sha256": {
+                "type": "string",
+                "pattern": "^[a-f0-9]{64}$"
+              },
+              "value_availability": {
+                "enum": [
+                  "available",
+                  "opaque_available",
+                  "unavailable",
+                  "not_applicable"
+                ]
+              }
+            }
+          }
+        },
+        "edges": {
+          "type": "array",
+          "items": {
+            "type": "object",
+            "additionalProperties": false,
+            "required": [
+              "source_node_id",
+              "target_node_id",
+              "kind"
+            ],
+            "properties": {
+              "source_node_id": {
+                "type": "string",
+                "minLength": 1
+              },
+              "target_node_id": {
+                "type": "string",
+                "minLength": 1
+              },
+              "kind": {
+                "enum": [
+                  "type_reference",
+                  "proof_reference",
+                  "definition_reference",
+                  "constructor",
+                  "recursor_rule",
+                  "inductive_parent",
+                  "module_import"
+                ]
+              }
+            }
+          }
+        },
+        "closure_sha256": {
+          "type": "string",
+          "pattern": "^[a-f0-9]{64}$"
+        },
+        "coverage_limitations": {
+          "type": "array",
+          "items": {
+            "type": "string",
+            "minLength": 1
+          }
+        }
+      }
+    },
+    "proof_routes": {
+      "type": "array",
+      "minItems": 1,
+      "items": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": [
+          "route_id",
+          "status",
+          "root_goal_sha256",
+          "proof_source",
+          "proof_sha256",
+          "replay_status"
+        ],
+        "properties": {
+          "route_id": {
+            "type": "string",
+            "minLength": 1
+          },
+          "status": {
+            "enum": [
+              "primary",
+              "alternative",
+              "candidate",
+              "rejected",
+              "unknown"
+            ]
+          },
+          "root_goal_sha256": {
+            "type": "string",
+            "pattern": "^[a-f0-9]{64}$"
+          },
+          "proof_source": {
+            "type": "object",
+            "additionalProperties": false,
+            "required": [
+              "path",
+              "sha256"
+            ],
+            "properties": {
+              "path": {
+                "type": "string",
+                "minLength": 1
+              },
+              "sha256": {
+                "type": "string",
+                "pattern": "^[a-f0-9]{64}$"
+              }
+            }
+          },
+          "proof_sha256": {
+            "type": "string",
+            "pattern": "^[a-f0-9]{64}$"
+          },
+          "replay_status": {
+            "enum": [
+              "accepted",
+              "rejected",
+              "error",
+              "not_run",
+              "unknown"
+            ]
+          },
+          "replay_receipt_sha256": {
+            "type": "string",
+            "pattern": "^[a-f0-9]{64}$"
+          }
+        }
+      }
+    },
+    "mathematical_role_annotations": {
+      "type": "array",
+      "items": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": [
+          "declaration",
+          "role_class",
+          "role_description",
+          "review_status",
+          "evidence_refs"
+        ],
+        "properties": {
+          "declaration": {
+            "type": "string",
+            "minLength": 1
+          },
+          "role_class": {
+            "enum": [
+              "main_construction",
+              "key_estimate",
+              "reduction",
+              "invariant",
+              "helper",
+              "infrastructure",
+              "typeclass_or_instance",
+              "recursor",
+              "other",
+              "unknown"
+            ]
+          },
+          "role_description": {
+            "type": "string",
+            "minLength": 1
+          },
+          "review_status": {
+            "enum": [
+              "not_reviewed",
+              "reviewed_agree",
+              "reviewed_disagree",
+              "adjudicated",
+              "unknown"
+            ]
+          },
+          "reviewer_ref": {
+            "type": "string",
+            "minLength": 1
+          },
+          "evidence_refs": {
+            "type": "array",
+            "items": {
+              "type": "object",
+              "additionalProperties": false,
+              "required": [
+                "path",
+                "sha256"
+              ],
+              "properties": {
+                "path": {
+                  "type": "string",
+                  "minLength": 1
+                },
+                "sha256": {
+                  "type": "string",
+                  "pattern": "^[a-f0-9]{64}$"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "proof_plan": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "status",
+        "plan_id",
+        "artifact"
+      ],
+      "properties": {
+        "status": {
+          "enum": [
+            "not_run",
+            "provisional",
+            "reviewed",
+            "rejected",
+            "inconclusive"
+          ]
+        },
+        "plan_id": {
+          "type": "string",
+          "minLength": 1
+        },
+        "artifact": {
+          "type": "object",
+          "additionalProperties": false,
+          "required": [
+            "path",
+            "sha256"
+          ],
+          "properties": {
+            "path": {
+              "type": "string",
+              "minLength": 1
+            },
+            "sha256": {
+              "type": "string",
+              "pattern": "^[a-f0-9]{64}$"
+            }
+          }
+        },
+        "role_annotation_status": {
+          "enum": [
+            "not_reviewed",
+            "partial",
+            "reviewed",
+            "adjudicated"
+          ]
+        }
+      }
+    },
+    "local_action_certificates": {
+      "type": "array",
+      "items": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": [
+          "action_id",
+          "certificate_status",
+          "artifact"
+        ],
+        "properties": {
+          "action_id": {
+            "type": "string",
+            "minLength": 1
+          },
+          "certificate_status": {
+            "enum": [
+              "kernel_checked",
+              "represented_not_replayed",
+              "rejected",
+              "unknown"
+            ]
+          },
+          "artifact": {
+            "type": "object",
+            "additionalProperties": false,
+            "required": [
+              "path",
+              "sha256"
+            ],
+            "properties": {
+              "path": {
+                "type": "string",
+                "minLength": 1
+              },
+              "sha256": {
+                "type": "string",
+                "pattern": "^[a-f0-9]{64}$"
+              }
+            }
+          },
+          "exact_context_sha256": {
+            "type": "string",
+            "pattern": "^[a-f0-9]{64}$"
+          },
+          "input_goal_sha256": {
+            "type": "string",
+            "pattern": "^[a-f0-9]{64}$"
+          },
+          "output_obligation_sha256s": {
+            "type": "array",
+            "items": {
+              "type": "string",
+              "pattern": "^[a-f0-9]{64}$"
+            }
+          },
+          "consumed_hypothesis_ids": {
+            "type": "array",
+            "items": {
+              "type": "string",
+              "minLength": 1
+            }
+          },
+          "side_condition_ids": {
+            "type": "array",
+            "items": {
+              "type": "string",
+              "minLength": 1
+            }
+          }
+        }
+      }
+    },
+    "explanation_claims": {
+      "type": "array",
+      "items": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": [
+          "claim_id",
+          "text",
+          "epistemic_class",
+          "evidence_refs"
+        ],
+        "properties": {
+          "claim_id": {
+            "type": "string",
+            "minLength": 1
+          },
+          "text": {
+            "type": "string",
+            "minLength": 1
+          },
+          "epistemic_class": {
+            "enum": [
+              "formal_fact",
+              "mathematical_interpretation",
+              "analogy_with_boundary",
+              "unknown"
+            ]
+          },
+          "evidence_refs": {
+            "type": "array",
+            "items": {
+              "type": "object",
+              "additionalProperties": false,
+              "required": [
+                "path",
+                "sha256"
+              ],
+              "properties": {
+                "path": {
+                  "type": "string",
+                  "minLength": 1
+                },
+                "sha256": {
+                  "type": "string",
+                  "pattern": "^[a-f0-9]{64}$"
+                }
+              }
+            }
+          },
+          "analogy_boundary": {
+            "type": "string",
+            "minLength": 1
+          },
+          "unresolved_reason": {
+            "type": "string",
+            "minLength": 1
+          }
+        }
+      }
+    },
+    "mutations": {
+      "type": "array",
+      "items": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": [
+          "mutation_id",
+          "transformation_class",
+          "description",
+          "expected_disposition",
+          "answer_key_status"
+        ],
+        "properties": {
+          "mutation_id": {
+            "type": "string",
+            "minLength": 1
+          },
+          "transformation_class": {
+            "enum": [
+              "semantics_preserving",
+              "semantics_changing",
+              "proof_route_only",
+              "environment_only",
+              "unknown"
+            ]
+          },
+          "description": {
+            "type": "string",
+            "minLength": 1
+          },
+          "expected_disposition": {
+            "enum": [
+              "still_provable",
+              "refuted_by_checked_witness",
+              "unknown",
+              "ill_formed",
+              "proof_route_changed_only",
+              "incomparable"
+            ]
+          },
+          "answer_key_status": {
+            "enum": [
+              "not_reviewed",
+              "reviewed",
+              "adjudicated",
+              "unknown"
+            ]
+          },
+          "witness_artifact": {
+            "type": "object",
+            "additionalProperties": false,
+            "required": [
+              "path",
+              "sha256"
+            ],
+            "properties": {
+              "path": {
+                "type": "string",
+                "minLength": 1
+              },
+              "sha256": {
+                "type": "string",
+                "pattern": "^[a-f0-9]{64}$"
+              }
+            }
+          },
+          "oracle_receipt": {
+            "type": "object",
+            "additionalProperties": false,
+            "required": [
+              "path",
+              "sha256"
+            ],
+            "properties": {
+              "path": {
+                "type": "string",
+                "minLength": 1
+              },
+              "sha256": {
+                "type": "string",
+                "pattern": "^[a-f0-9]{64}$"
+              }
+            }
+          },
+          "hidden_at_evaluation": {
+            "type": "boolean"
+          }
+        }
+      }
+    },
+    "trust_capsule": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "status",
+        "artifact",
+        "checker_diversity_profile"
+      ],
+      "properties": {
+        "status": {
+          "enum": [
+            "not_run",
+            "draft",
+            "inconclusive",
+            "qualified_under_policy",
+            "rejected"
+          ]
+        },
+        "artifact": {
+          "type": "object",
+          "additionalProperties": false,
+          "required": [
+            "path",
+            "sha256"
+          ],
+          "properties": {
+            "path": {
+              "type": "string",
+              "minLength": 1
+            },
+            "sha256": {
+              "type": "string",
+              "pattern": "^[a-f0-9]{64}$"
+            }
+          }
+        },
+        "checker_diversity_profile": {
+          "type": "object",
+          "additionalProperties": false,
+          "required": [
+            "status",
+            "profile_id",
+            "registry_sha256",
+            "profile_sha256"
+          ],
+          "properties": {
+            "status": {
+              "enum": [
+                "not_assessed",
+                "synthetic_fixture_only",
+                "inconclusive",
+                "qualified_under_policy",
+                "rejected"
+              ]
+            },
+            "profile_id": {
+              "type": "string",
+              "minLength": 1
+            },
+            "registry_sha256": {
+              "type": "string",
+              "pattern": "^[a-f0-9]{64}$"
+            },
+            "profile_sha256": {
+              "type": [
+                "string",
+                "null"
+              ],
+              "pattern": "^[a-f0-9]{64}$"
+            }
+          }
+        }
+      }
+    },
+    "licensing": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "status",
+        "license_id",
+        "source_terms_reviewed"
+      ],
+      "properties": {
+        "status": {
+          "enum": [
+            "approved",
+            "restricted",
+            "rejected",
+            "unknown"
+          ]
+        },
+        "license_id": {
+          "type": "string",
+          "minLength": 1
+        },
+        "source_terms_reviewed": {
+          "type": "boolean"
+        },
+        "notes": {
+          "type": "string"
+        }
+      }
+    },
+    "contamination": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "status",
+        "split",
+        "exposure_notes"
+      ],
+      "properties": {
+        "status": {
+          "enum": [
+            "development_only",
+            "public_validation",
+            "hidden_test",
+            "suspected_contamination",
+            "unknown"
+          ]
+        },
+        "split": {
+          "enum": [
+            "development",
+            "validation",
+            "hidden_test",
+            "mutation",
+            "transfer"
+          ]
+        },
+        "exposure_notes": {
+          "type": "string"
+        },
+        "model_cutoff_known": {
+          "type": "boolean"
+        }
+      }
+    },
+    "claim_ceiling": {
+      "type": "array",
+      "minItems": 1,
+      "items": {
+        "type": "string",
+        "minLength": 1
+      }
+    }
+  }
+}
