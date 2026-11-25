@@ -18,7 +18,8 @@
         "unresolved_goals": 0,
         "cycle_nodes": 0
       },
-      "claim_ceiling": "Global accounting only; no theorem or kernel verdict."
+      "claim_ceiling": "Global accounting only; no theorem or kernel verdict.",
+      "mutation_kind": "no_op"
     },
     {
       "id": "OBL-002-missing-discharge-provisional",
@@ -33,7 +34,8 @@
         "unresolved_goals": 1,
         "cycle_nodes": 0
       },
-      "claim_ceiling": "The unresolved leaf must be reported and must not be described as a completed plan."
+      "claim_ceiling": "The unresolved leaf must be reported and must not be described as a completed plan.",
+      "mutation_kind": "remove_discharge"
     },
     {
       "id": "OBL-003-double-discharge",
@@ -48,7 +50,8 @@
         "unresolved_goals": 0,
         "cycle_nodes": 0
       },
-      "claim_ceiling": "Two consumers for one goal are a plan-accounting violation, not a theorem refutation."
+      "claim_ceiling": "Two consumers for one goal are a plan-accounting violation, not a theorem refutation.",
+      "mutation_kind": "double_discharge"
     },
     {
       "id": "OBL-004-subgoal-without-producer",
@@ -60,10 +63,11 @@
         "produced_subgoals": 2,
         "transformed_goals": 1,
         "discharged_goals": 2,
-        "unresolved_goals": 0,
+        "unresolved_goals": 1,
         "cycle_nodes": 0
       },
-      "claim_ceiling": "Every subgoal must be created by exactly one action."
+      "claim_ceiling": "Every subgoal must be created by exactly one action.",
+      "mutation_kind": "orphan_subgoal"
     },
     {
       "id": "OBL-005-orphan-create-edge",
@@ -72,13 +76,14 @@
       "mutation": "Add a creates_subgoal edge that is not listed in the source action output_subgoal_ids.",
       "expected": "reject",
       "expected_counts": {
-        "produced_subgoals": 3,
+        "produced_subgoals": 2,
         "transformed_goals": 1,
         "discharged_goals": 2,
         "unresolved_goals": 0,
         "cycle_nodes": 0
       },
-      "claim_ceiling": "The action output list and created-obligation edges must match exactly."
+      "claim_ceiling": "The action output list and created-obligation edges must match exactly.",
+      "mutation_kind": "orphan_create_edge"
     },
     {
       "id": "OBL-006-action-output-without-create-edge",
@@ -90,10 +95,11 @@
         "produced_subgoals": 3,
         "transformed_goals": 1,
         "discharged_goals": 2,
-        "unresolved_goals": 0,
+        "unresolved_goals": 1,
         "cycle_nodes": 0
       },
-      "claim_ceiling": "A declared output without a created obligation is unaccounted."
+      "claim_ceiling": "A declared output without a created obligation is unaccounted.",
+      "mutation_kind": "declared_output_without_edge"
     },
     {
       "id": "OBL-007-transformed-without-successor",
@@ -108,7 +114,8 @@
         "unresolved_goals": 0,
         "cycle_nodes": 0
       },
-      "claim_ceiling": "A transformed goal must produce at least one successor obligation."
+      "claim_ceiling": "A transformed goal must produce at least one successor obligation.",
+      "mutation_kind": "transform_without_successor"
     },
     {
       "id": "OBL-008-accepted-with-unresolved-leaf",
@@ -123,7 +130,8 @@
         "unresolved_goals": 1,
         "cycle_nodes": 0
       },
-      "claim_ceiling": "Accepted status requires zero unresolved obligations and at least one terminal discharge."
+      "claim_ceiling": "Accepted status requires zero unresolved obligations and at least one terminal discharge.",
+      "mutation_kind": "accept_unresolved_plan"
     },
     {
       "id": "OBL-009-primary-route-cycle",
@@ -138,7 +146,8 @@
         "unresolved_goals": 0,
         "cycle_nodes": 2
       },
-      "claim_ceiling": "Every goal transition must be acyclic; no topological completion can be inferred from a cycle."
+      "claim_ceiling": "Every goal transition must be acyclic; no topological completion can be inferred from a cycle.",
+      "mutation_kind": "add_goal_transition_cycle"
     },
     {
       "id": "OBL-010-candidate-route-not-primary",
@@ -153,7 +162,8 @@
         "unresolved_goals": 2,
         "cycle_nodes": 0
       },
-      "claim_ceiling": "Candidate alternatives do not become the accepted proof route; only exactly one complete primary alternative qualifies."
+      "claim_ceiling": "Candidate alternatives do not become the accepted proof route; only exactly one complete primary alternative qualifies.",
+      "mutation_kind": "candidate_route_with_unresolved_goals"
     },
     {
       "id": "OBL-011-multiple-primary-alternatives",
@@ -168,7 +178,8 @@
         "unresolved_goals": 0,
         "cycle_nodes": 0
       },
-      "claim_ceiling": "An accepted plan must identify exactly one primary alternative."
+      "claim_ceiling": "An accepted plan must identify exactly one primary alternative.",
+      "mutation_kind": "duplicate_primary_alternative"
     }
   ]
 }
