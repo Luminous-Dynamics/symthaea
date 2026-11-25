@@ -329,7 +329,7 @@ fn same_cost(left: &BTreeMap<String, u64>, right: &BTreeMap<String, u64>) -> boo
 }
 
 fn fits_budget(cost: &BTreeMap<String, u64>, budget: &BTreeMap<String, u64>) -> bool {
-    if cost.keys().collect::<Vec<_>>() != budget.keys().collect::<Vec<_>>() {
+    if cost.len() != budget.len() || !cost.keys().eq(budget.keys()) {
         return false;
     }
     cost.iter()
@@ -498,7 +498,7 @@ pub fn decide(input: &PolicyInput) -> Result<PolicyDecision, Vec<PolicyIssue>> {
                 issue(&mut issues, format!("permitted_action_offers[{index}].target_evidence_id"), "offer references unknown evidence");
             }
         }
-        if offer.resource_cost.keys().collect::<Vec<_>>() != input.remaining_budget.keys().collect::<Vec<_>>() {
+        if !offer.resource_cost.keys().eq(input.remaining_budget.keys()) {
             issue(
                 &mut issues,
                 format!("permitted_action_offers[{index}].resource_cost"),
