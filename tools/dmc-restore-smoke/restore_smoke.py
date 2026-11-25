@@ -73,11 +73,22 @@ def digest_task_rng(state: tuple[str, np.ndarray, int, int, float]) -> str:
     return digest_bytes(payload)
 
 
-def make_environment():
+TASKS = (
+    "cartpole.swingup",
+    "cartpole.two_poles",
+    "cartpole.three_poles",
+    "walker.walk",
+)
+
+
+def make_environment(task_name: str):
+    if task_name not in TASKS:
+        raise ValueError(f"unsupported DMC smoke task: {task_name}")
+    domain_name, suite_task_name = task_name.split(".", maxsplit=1)
     random_state = np.random.RandomState(SEED)
     env = suite.load(
-        domain_name="cartpole",
-        task_name="swingup",
+        domain_name=domain_name,
+        task_name=suite_task_name,
         task_kwargs={
             "random": random_state,
             "time_limit": TIME_LIMIT_SECONDS,
@@ -156,8 +167,8 @@ def verify_physics_copy_is_independent(env) -> dict[str, Any]:
     return {"physics_copy_data_independent": True, "physics_copy_share_model": False}
 
 
-def export_checkpoint(path: Path) -> None:
-    env = make_environment()
+def export_checkpoint(path: Path, task_name: str) -> None:
+    env = make_environment(task_name)
     env.reset()
     action = midpoint_action(env)
 
@@ -249,8 +260,9 @@ def export_checkpoint(path: Path) -> None:
         "prefix_observation_sha256": digest_observation(prefix_observation),
         "task_rng_sha256": digest_task_rng(task_rng),
         "snapshot_contains_plugin_state": physics.model.nplugin == 0 or hasattr(physics.data, "plugin_state"),
-        **verify_legacy_state_is_incomplete(make_environment()),
-        **verify_physics_copy_is_independent(make_environment()),
+        "task_id": task_name,
+        **verify_legacy_state_is_incomplete(make_environment(task_name)),
+        **verify_physics_copy_is_independent(make_environment(task_name)),
     }, sort_keys=True))
 
 
@@ -262,11 +274,14 @@ def load_observation(data: Any, prefix: str) -> dict[str, np.ndarray]:
     }
 
 
-def replay_checkpoint(path: Path) -> None:
+def replay_checkpoint(path: Path, task_name: str) -> None:
     with np.load(path, allow_pickle=False) as data:
         saved = {key: data[key].copy() for key in data.files}
 
-    env = make_environment()
+    saved_task = str(saved["task_id"].item())
+    if saved_task != task_name:
+        raise AssertionError(f"checkpoint task {saved_task} does not match requested task {task_name}")
+    env = make_environment(task_name)
     env.reset()
     signature = int(mujoco.mjtState.mjSTATE_INTEGRATION.value)
     if signature != EXPECTED_INTEGRATION_MASK:
@@ -344,6 +359,7 @@ def main() -> None:
     parser = argparse.ArgumentParser()
     parser.add_argument("mode", choices=("export", "replay"))
     parser.add_argument("checkpoint", type=Path)
+    parser.add_argument("--task", choices=TASKS, default="cartpole.swingup")
     arguments = parser.parse_args()
 
     installed_dm_control = importlib.metadata.version("dm-control")
@@ -358,9 +374,9 @@ def main() -> None:
         raise RuntimeError("pinned MuJoCo integration-state mask differs")
 
     if arguments.mode == "export":
-        export_checkpoint(arguments.checkpoint)
+        export_checkpoint(arguments.checkpoint, arguments.task)
     else:
-        replay_checkpoint(arguments.checkpoint)
+        replay_checkpoint(arguments.checkpoint, arguments.task)
 
 
 if __name__ == "__main__":
