@@ -174,6 +174,14 @@ pub enum ContractError {
     InvalidParticleMeasureWeights,
     #[error("particle measure sample exceeds the bounded work budget")]
     ParticleMeasureWorkBudgetExceeded,
+    #[error("fixed physical particle-measure interval is invalid")]
+    InvalidParticleMeasureDomain,
+    #[error("particle position lies outside the declared fixed physical interval")]
+    ParticlePositionOutsideDomain,
+    #[error("particle measures use different physical domains")]
+    ParticleMeasureDomainMismatch,
+    #[error("Wasserstein transport accumulation is non-finite")]
+    InvalidWassersteinArithmetic,
     #[error("spectral refinement signal or threshold is invalid")]
     InvalidRefinementSignal,
     #[error("memory budget is smaller than the reserved headroom")]
@@ -2590,6 +2598,208 @@ fn linspace(minimum: f64, maximum: f64, steps: usize) -> Result<Vec<f64>, Contra
         values.push(canonical_zero(value));
     }
     Ok(values)
+}
+
+/// Canonical positive empirical probability measure on a fixed one-dimensional interval.
+///
+/// The constructor normalizes non-negative particle weights, removes zero-mass
+/// particles, sorts by physical position and aggregates co-located atoms.
+/// Consequently particle order and exact co-located split/merge do not change
+/// the mathematical measure. Coordinates are never inferred from the sample
+/// extrema: the physical interval is supplied by the caller.
+///
+/// This type is deliberately limited to an interval in R. Periodic W1 on a
+/// torus and multidimensional transport require separate metric definitions.
+#[derive(Clone, Debug, PartialEq)]
+pub struct WeightedEmpiricalMeasure1D {
+    domain_minimum: f64,
+    domain_maximum: f64,
+    atoms: Vec<(f64, f64)>,
+}
+
+impl WeightedEmpiricalMeasure1D {
+    /// Build a probability measure from particle positions and non-negative weights.
+    pub fn new(
+        positions: &[f64],
+        weights: &[f64],
+        domain_minimum: f64,
+        domain_maximum: f64,
+    ) -> Result<Self, ContractError> {
+        if !domain_minimum.is_finite()
+            || !domain_maximum.is_finite()
+            || domain_minimum >= domain_maximum
+        {
+            return Err(ContractError::InvalidParticleMeasureDomain);
+        }
+        if positions.is_empty()
+            || positions.len() != weights.len()
+            || positions.len() > MAX_MEASURE_PARTICLES
+        {
+            return Err(ContractError::InvalidParticleMeasureShape);
+        }
+        if positions.iter().any(|position| !position.is_finite()) {
+            return Err(ContractError::NonFiniteNormalizationCoordinate);
+        }
+        if positions
+            .iter()
+            .any(|position| *position < domain_minimum || *position > domain_maximum)
+        {
+            return Err(ContractError::ParticlePositionOutsideDomain);
+        }
+        if weights
+            .iter()
+            .any(|weight| !weight.is_finite() || *weight < 0.0)
+        {
+            return Err(ContractError::InvalidParticleMeasureWeights);
+        }
+
+        let maximum_weight = weights.iter().copied().fold(0.0_f64, f64::max);
+        if maximum_weight <= 0.0 {
+            return Err(ContractError::InvalidParticleMeasureWeights);
+        }
+        let scaled_total = weights
+            .iter()
+            .map(|weight| weight / maximum_weight)
+            .sum::<f64>();
+        if !scaled_total.is_finite() || scaled_total <= 0.0 {
+            return Err(ContractError::InvalidParticleMeasureWeights);
+        }
+
+        let mut sorted = positions
+            .iter()
+            .zip(weights)
+            .filter_map(|(position, weight)| {
+                let normalized_weight = (weight / maximum_weight) / scaled_total;
+                (normalized_weight > 0.0)
+                    .then_some((canonical_zero(*position), normalized_weight))
+            })
+            .collect::<Vec<_>>();
+        if sorted.is_empty() {
+            return Err(ContractError::InvalidParticleMeasureWeights);
+        }
+        sorted.sort_by(|left, right| left.0.total_cmp(&right.0));
+
+        let mut aggregated: Vec<(f64, f64, f64)> = Vec::with_capacity(sorted.len());
+        for (position, weight) in sorted {
+            if let Some((last_position, total, compensation)) = aggregated.last_mut() {
+                if *last_position == position {
+                    kahan_add(weight, total, compensation);
+                    if !total.is_finite() || *total < 0.0 {
+                        return Err(ContractError::InvalidParticleMeasureWeights);
+                    }
+                    continue;
+                }
+            }
+            aggregated.push((position, weight, 0.0));
+        }
+
+        let mut aggregate_total = 0.0;
+        let mut aggregate_compensation = 0.0;
+        for (_, weight, _) in &aggregated {
+            kahan_add(*weight, &mut aggregate_total, &mut aggregate_compensation);
+        }
+        if !aggregate_total.is_finite() || aggregate_total <= 0.0 {
+            return Err(ContractError::InvalidParticleMeasureWeights);
+        }
+
+        let atoms = aggregated
+            .into_iter()
+            .map(|(position, weight, _)| (position, weight / aggregate_total))
+            .collect::<Vec<_>>();
+        if atoms.iter().any(|(_, weight)| !weight.is_finite() || *weight < 0.0) {
+            return Err(ContractError::InvalidParticleMeasureWeights);
+        }
+
+        Ok(Self {
+            domain_minimum: canonical_zero(domain_minimum),
+            domain_maximum: canonical_zero(domain_maximum),
+            atoms,
+        })
+    }
+
+    /// Exact one-dimensional W1 formula: integral of the absolute CDF difference.
+    ///
+    /// The two probability measures must use identical fixed physical intervals.
+    /// The sweep is O(n+m) over already-sorted, coalesced atoms.
+    pub fn wasserstein1(&self, other: &Self) -> Result<f64, ContractError> {
+        if self.domain_minimum != other.domain_minimum
+            || self.domain_maximum != other.domain_maximum
+        {
+            return Err(ContractError::ParticleMeasureDomainMismatch);
+        }
+
+        let mut left_index = 0;
+        let mut right_index = 0;
+        let mut left_cdf = 0.0;
+        let mut right_cdf = 0.0;
+        let mut previous_position = self.domain_minimum;
+        let mut distance = 0.0;
+        let mut compensation = 0.0;
+
+        while left_index < self.atoms.len() || right_index < other.atoms.len() {
+            let next_left = self
+                .atoms
+                .get(left_index)
+                .map(|(position, _)| *position);
+            let next_right = other
+                .atoms
+                .get(right_index)
+                .map(|(position, _)| *position);
+            let next_position = match (next_left, next_right) {
+                (Some(left), Some(right)) => left.min(right),
+                (Some(left), None) => left,
+                (None, Some(right)) => right,
+                (None, None) => break,
+            };
+
+            let interval = next_position - previous_position;
+            let cdf_gap = (left_cdf - right_cdf).abs();
+            let area = cdf_gap * interval;
+            if !interval.is_finite() || interval < 0.0 || !area.is_finite() {
+                return Err(ContractError::InvalidWassersteinArithmetic);
+            }
+            kahan_add(area, &mut distance, &mut compensation);
+
+            while self
+                .atoms
+                .get(left_index)
+                .is_some_and(|(position, _)| *position == next_position)
+            {
+                left_cdf += self.atoms[left_index].1;
+                left_index += 1;
+            }
+            while other
+                .atoms
+                .get(right_index)
+                .is_some_and(|(position, _)| *position == next_position)
+            {
+                right_cdf += other.atoms[right_index].1;
+                right_index += 1;
+            }
+            if !left_cdf.is_finite() || !right_cdf.is_finite() {
+                return Err(ContractError::InvalidWassersteinArithmetic);
+            }
+            previous_position = next_position;
+        }
+
+        if !distance.is_finite() || distance < 0.0 {
+            return Err(ContractError::InvalidWassersteinArithmetic);
+        }
+        Ok(distance)
+    }
+
+    /// Sorted, coalesced atoms (position, normalized probability mass).
+    pub fn atoms(&self) -> &[(f64, f64)] {
+        &self.atoms
+    }
+
+    pub fn domain(&self) -> (f64, f64) {
+        (self.domain_minimum, self.domain_maximum)
+    }
+
+    pub fn particle_count(&self) -> usize {
+        self.atoms.len()
+    }
 }
 
 /// Low-order Fourier moments of a weighted empirical particle measure on a torus.
@@ -7189,6 +7399,155 @@ mod tests {
             .unwrap()[4];
         assert!((fifth_moment.real - 1.0).abs() < 1.0e-12);
         assert!(fifth_moment.imag.abs() < 1.0e-12);
+    }
+
+    #[test]
+    fn wasserstein_measure_is_invariant_to_particle_permutation() {
+        let forward = WeightedEmpiricalMeasure1D::new(
+            &[0.1, 0.4, 0.8],
+            &[0.2, 0.3, 0.5],
+            0.0,
+            1.0,
+        )
+        .unwrap();
+        let shuffled = WeightedEmpiricalMeasure1D::new(
+            &[0.8, 0.1, 0.4],
+            &[0.5, 0.2, 0.3],
+            0.0,
+            1.0,
+        )
+        .unwrap();
+        assert_eq!(forward.atoms(), shuffled.atoms());
+        assert_eq!(forward.wasserstein1(&shuffled), Ok(0.0));
+    }
+
+    #[test]
+    fn wasserstein_measure_is_invariant_to_exact_colocated_split_and_merge() {
+        let merged = WeightedEmpiricalMeasure1D::new(
+            &[0.2, 0.8],
+            &[0.4, 0.6],
+            0.0,
+            1.0,
+        )
+        .unwrap();
+        let split = WeightedEmpiricalMeasure1D::new(
+            &[0.2, 0.2, 0.8, 0.8],
+            &[0.1, 0.3, 0.2, 0.4],
+            0.0,
+            1.0,
+        )
+        .unwrap();
+        assert_eq!(merged.atoms(), split.atoms());
+        assert_eq!(merged.wasserstein1(&split), Ok(0.0));
+    }
+
+    #[test]
+    fn wasserstein_measure_matches_known_single_atom_displacement() {
+        let left =
+            WeightedEmpiricalMeasure1D::new(&[0.2], &[1.0], 0.0, 1.0).unwrap();
+        let right =
+            WeightedEmpiricalMeasure1D::new(&[0.7], &[1.0], 0.0, 1.0).unwrap();
+        assert!((left.wasserstein1(&right).unwrap() - 0.5).abs() < 1.0e-15);
+        assert!((right.wasserstein1(&left).unwrap() - 0.5).abs() < 1.0e-15);
+    }
+
+    #[test]
+    fn wasserstein_measure_scales_with_moved_probability_mass() {
+        let base = WeightedEmpiricalMeasure1D::new(
+            &[0.2, 0.8],
+            &[0.25, 0.75],
+            0.0,
+            1.0,
+        )
+        .unwrap();
+        let shifted = WeightedEmpiricalMeasure1D::new(
+            &[0.3, 0.8],
+            &[0.25, 0.75],
+            0.0,
+            1.0,
+        )
+        .unwrap();
+        assert!((base.wasserstein1(&shifted).unwrap() - 0.025).abs() < 1.0e-15);
+    }
+
+    #[test]
+    fn wasserstein_measure_is_particle_count_invariant_for_identical_measure() {
+        let coarse = WeightedEmpiricalMeasure1D::new(
+            &[0.1, 0.5, 0.9],
+            &[0.2, 0.5, 0.3],
+            0.0,
+            1.0,
+        )
+        .unwrap();
+        let fine = WeightedEmpiricalMeasure1D::new(
+            &[0.1, 0.1, 0.5, 0.9, 0.9],
+            &[0.05, 0.15, 0.5, 0.1, 0.2],
+            0.0,
+            1.0,
+        )
+        .unwrap();
+        assert_eq!(coarse.atoms(), fine.atoms());
+        assert_eq!(coarse.wasserstein1(&fine), Ok(0.0));
+    }
+
+    #[test]
+    fn wasserstein_measure_rejects_domain_mismatch_and_out_of_domain_positions() {
+        let first =
+            WeightedEmpiricalMeasure1D::new(&[0.2], &[1.0], 0.0, 1.0).unwrap();
+        let second =
+            WeightedEmpiricalMeasure1D::new(&[0.2], &[1.0], -1.0, 1.0).unwrap();
+        assert_eq!(
+            first.wasserstein1(&second),
+            Err(ContractError::ParticleMeasureDomainMismatch)
+        );
+        assert_eq!(
+            WeightedEmpiricalMeasure1D::new(&[-0.01], &[1.0], 0.0, 1.0),
+            Err(ContractError::ParticlePositionOutsideDomain)
+        );
+    }
+
+    #[test]
+    fn wasserstein_measure_rejects_invalid_domains_weights_and_shapes() {
+        assert_eq!(
+            WeightedEmpiricalMeasure1D::new(&[0.2], &[1.0], 1.0, 1.0),
+            Err(ContractError::InvalidParticleMeasureDomain)
+        );
+        assert_eq!(
+            WeightedEmpiricalMeasure1D::new(&[], &[], 0.0, 1.0),
+            Err(ContractError::InvalidParticleMeasureShape)
+        );
+        assert_eq!(
+            WeightedEmpiricalMeasure1D::new(&[0.2, 0.4], &[1.0], 0.0, 1.0),
+            Err(ContractError::InvalidParticleMeasureShape)
+        );
+        assert_eq!(
+            WeightedEmpiricalMeasure1D::new(&[0.2, 0.4], &[0.0, 0.0], 0.0, 1.0),
+            Err(ContractError::InvalidParticleMeasureWeights)
+        );
+        assert_eq!(
+            WeightedEmpiricalMeasure1D::new(&[0.2, 0.4], &[1.0, f64::NAN], 0.0, 1.0),
+            Err(ContractError::InvalidParticleMeasureWeights)
+        );
+    }
+
+    #[test]
+    fn wasserstein_measure_handles_weight_scale_without_overflow() {
+        let ordinary = WeightedEmpiricalMeasure1D::new(
+            &[0.2, 0.8],
+            &[1.0, 3.0],
+            0.0,
+            1.0,
+        )
+        .unwrap();
+        let huge = WeightedEmpiricalMeasure1D::new(
+            &[0.2, 0.8],
+            &[f64::MAX, 3.0 * f64::MAX / 4.0],
+            0.0,
+            1.0,
+        )
+        .unwrap();
+        assert_eq!(ordinary.atoms(), huge.atoms());
+        assert_eq!(ordinary.wasserstein1(&huge), Ok(0.0));
     }
 
     #[test]
