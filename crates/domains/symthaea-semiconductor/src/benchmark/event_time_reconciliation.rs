@@ -18,9 +18,7 @@ use super::gated_streaming_adapter::{
     StreamingUpdateDispositionV1, deliver_qualified_stream_label_v1,
     predict_and_register_stream_sample_v1,
 };
-use super::label_consumption_guard::{
-    LabelConsumptionEligibilityReportV1, LabelConsumptionEligibilityV1,
-};
+use super::label_consumption_guard::LabelConsumptionEligibilityReportV1;
 
 pub const EVENT_RECONSTRUCTION_SCHEMA_V1: &str =
     "luminous.semi-bench.event-reconstruction.v1";
@@ -710,6 +708,35 @@ mod tests {
         assert_eq!(a.canonical_replay_sha256, b.canonical_replay_sha256);
         assert_eq!(a.final_adapter_state_sha256, b.final_adapter_state_sha256);
         assert_ne!(a.event_log_sha256, b.event_log_sha256);
+    }
+
+    #[test]
+    fn equal_event_times_are_ordered_by_source_sequence() {
+        let p = envelope(
+            "p1",
+            100,
+            110,
+            10,
+            StreamingReconstructionPayloadV1::Prediction {
+                input: prediction("s1", "m1", 100),
+            },
+        );
+        let d = envelope(
+            "d1",
+            100,
+            115,
+            20,
+            StreamingReconstructionPayloadV1::LabelDelivery {
+                delivery: delivery("s1", "l1", "m1", 100),
+            },
+        );
+        let report = reconstruct_streaming_adapter_event_time_v1(&input(vec![d, p])).unwrap();
+        assert_eq!(report.ordered_event_ids, vec!["p1", "d1"]);
+        assert_eq!(report.accepted_update_count, 1);
+        assert_eq!(
+            report.event_receipts[1].disposition,
+            ReconstructionEventDispositionV1::LabelUpdated
+        );
     }
 
     #[test]
