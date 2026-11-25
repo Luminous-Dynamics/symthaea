@@ -2437,6 +2437,7 @@ impl PulseCandidate {
 
 /// Physical model class used to interpret entropy and collision events.
 #[derive(Clone, Copy, Debug, PartialEq, Eq, Serialize, Deserialize)]
+#[serde(rename_all = "snake_case")]
 pub enum KineticPhysicalModelKind {
     CollisionlessVlasov,
     VlasovFokkerPlanck,
@@ -2445,6 +2446,7 @@ pub enum KineticPhysicalModelKind {
 
 /// Operation class recorded in a kinetic information / irreversibility ledger.
 #[derive(Clone, Copy, Debug, PartialEq, Eq, Serialize, Deserialize)]
+#[serde(rename_all = "snake_case")]
 pub enum KineticOperationClass {
     PhysicalCollision,
     NumericalFilter,
@@ -7139,6 +7141,9 @@ pub const KIRR_PULSE_GRAPH_FIXTURE: &str = include_str!(
 );
 pub const KIRR_PATH_RESPONSE_FIXTURE: &str = include_str!(
     "../../../../benchmarks/plasma/kinetic-information-return/fixtures/path-response-dispositions-v0.1.json"
+);
+pub const KIRR_OPERATION_LEDGER_FIXTURE: &str = include_str!(
+    "../../../../benchmarks/plasma/kinetic-information-return/fixtures/operation-ledger-known-answer-v0.1.json"
 );
 
 #[cfg(test)]
@@ -12289,6 +12294,53 @@ mod tests {
                     .iter()
                     .all(|pulse| pulse.application_time < sequence.observation_end_time())
             );
+        }
+    }
+
+    #[test]
+    fn kinetic_operation_ledger_fixture_parses_both_physical_regimes() {
+        let fixture: serde_json::Value =
+            serde_json::from_str(KIRR_OPERATION_LEDGER_FIXTURE).unwrap();
+        let ledgers = fixture["ledgers"].as_array().unwrap();
+        assert_eq!(ledgers.len(), 2);
+
+        for value in ledgers {
+            let physical_model: KineticPhysicalModelKind =
+                serde_json::from_value(value["physical_model"].clone()).unwrap();
+            let maximum_time = value["maximum_time"].as_f64().unwrap();
+            let events = value["events"]
+                .as_array()
+                .unwrap()
+                .iter()
+                .cloned()
+                .map(serde_json::from_value::<KineticOperationRecord>)
+                .collect::<Result<Vec<_>, _>>()
+                .unwrap();
+            let ledger =
+                KineticOperationLedger::new(physical_model, maximum_time, events).unwrap();
+            assert!(ledger.events().iter().all(|event| event.application_time <= maximum_time));
+            match physical_model {
+                KineticPhysicalModelKind::CollisionlessVlasov => {
+                    assert_eq!(ledger.physical_collision_count(), 0);
+                    assert_eq!(ledger.numerical_event_count(), 3);
+                    assert_eq!(
+                        ledger.total_discarded_effect_for_metric("hermite-modal-l2-squared"),
+                        Some(0.025)
+                    );
+                    assert_eq!(
+                        ledger.total_discarded_effect_for_metric("phase-space-weighted-l2"),
+                        Some(0.004)
+                    );
+                }
+                KineticPhysicalModelKind::VlasovPoissonLandau => {
+                    assert_eq!(ledger.physical_collision_count(), 1);
+                    assert_eq!(ledger.numerical_event_count(), 0);
+                    assert_eq!(ledger.events()[0].physical_entropy_production, Some(0.04));
+                }
+                KineticPhysicalModelKind::VlasovFokkerPlanck => {
+                    panic!("fixture should use collisionless and Landau regimes only")
+                }
+            }
         }
     }
 
