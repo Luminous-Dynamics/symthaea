@@ -325,14 +325,14 @@ fn test_source_credibility_learning() {
                 predicted_confidence: 0.9,
                 domain: "programming".into(),
                 adjudication_provenance: None,
-            })
+            }))
             .unwrap();
     }
 
     // Unreliable source - often wrong
     for _ in 0..20 {
         learner
-            .record_outcome(VerificationOutcome {
+            .record_adjudicated_outcome(synthetic_adjudication(VerificationOutcome {
                 claim: "Test".into(),
                 source_domain: "unreliable-blog.com".into(),
                 source_type: ResearchSource::Web,
@@ -340,7 +340,7 @@ fn test_source_credibility_learning() {
                 predicted_confidence: 0.5,
                 domain: "programming".into(),
                 adjudication_provenance: None,
-            })
+            }))
             .unwrap();
     }
 
@@ -439,7 +439,7 @@ fn test_full_epistemic_pipeline() {
 
     // 3. Record outcome for learning
     learner
-        .record_outcome(VerificationOutcome {
+        .record_adjudicated_outcome(synthetic_adjudication(VerificationOutcome {
             claim: verification.claim.clone(),
             source_domain: "nixos.org".into(),
             source_type: ResearchSource::Documentation,
