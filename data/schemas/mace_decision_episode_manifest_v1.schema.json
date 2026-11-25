@@ -182,8 +182,7 @@
       "additionalProperties": false,
       "required": [
         "episode_seed_commitment_sha256",
-        "arm_assignment_commitment_sha256",
-        "sealed_evaluation_manifest_sha256"
+        "arm_assignment_commitment_sha256"
       ],
       "properties": {
         "episode_seed_commitment_sha256": {
@@ -191,10 +190,6 @@
           "pattern": "^[0-9a-f]{64}$"
         },
         "arm_assignment_commitment_sha256": {
-          "type": "string",
-          "pattern": "^[0-9a-f]{64}$"
-        },
-        "sealed_evaluation_manifest_sha256": {
           "type": "string",
           "pattern": "^[0-9a-f]{64}$"
         }
