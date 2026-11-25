@@ -1,0 +1,174 @@
+{
+  "schema_version": "1.0.0",
+  "artifact_id": "PROOF-PLAN-GLOBAL-OBLIGATION-MUTATIONS-001",
+  "status": "frozen_expected_behavior_specification_not_execution",
+  "base_fixture": "docs/research/PROOF_PLAN_AND_COMM_V1.json",
+  "accounting_implementation": "scripts/research/proof-plan-contract/src/global_obligations.rs",
+  "cases": [
+    {
+      "id": "OBL-001-and-comm-complete",
+      "class": "positive_control",
+      "plan_status": "source_pinned_provisional",
+      "mutation": "None. The primary And.comm route splits the iff into two subgoals and each is discharged once.",
+      "expected": "complete",
+      "expected_counts": {
+        "produced_subgoals": 2,
+        "transformed_goals": 1,
+        "discharged_goals": 2,
+        "unresolved_goals": 0,
+        "cycle_nodes": 0
+      },
+      "claim_ceiling": "Global accounting only; no theorem or kernel verdict."
+    },
+    {
+      "id": "OBL-002-missing-discharge-provisional",
+      "class": "incomplete_control",
+      "plan_status": "in_progress",
+      "mutation": "Remove the discharge edge for G_REVERSE while leaving the action's declared input in place.",
+      "expected": "incomplete",
+      "expected_counts": {
+        "produced_subgoals": 2,
+        "transformed_goals": 1,
+        "discharged_goals": 1,
+        "unresolved_goals": 1,
+        "cycle_nodes": 0
+      },
+      "claim_ceiling": "The unresolved leaf must be reported and must not be described as a completed plan."
+    },
+    {
+      "id": "OBL-003-double-discharge",
+      "class": "negative_control",
+      "plan_status": "in_progress",
+      "mutation": "Add a second action input and discharge edge for G_REVERSE.",
+      "expected": "reject",
+      "expected_counts": {
+        "produced_subgoals": 2,
+        "transformed_goals": 1,
+        "discharged_goals": 2,
+        "unresolved_goals": 0,
+        "cycle_nodes": 0
+      },
+      "claim_ceiling": "Two consumers for one goal are a plan-accounting violation, not a theorem refutation."
+    },
+    {
+      "id": "OBL-004-subgoal-without-producer",
+      "class": "negative_control",
+      "plan_status": "in_progress",
+      "mutation": "Add G_ORPHAN as a subgoal in the primary alternative without any creates_subgoal edge.",
+      "expected": "reject",
+      "expected_counts": {
+        "produced_subgoals": 2,
+        "transformed_goals": 1,
+        "discharged_goals": 2,
+        "unresolved_goals": 0,
+        "cycle_nodes": 0
+      },
+      "claim_ceiling": "Every subgoal must be created by exactly one action."
+    },
+    {
+      "id": "OBL-005-orphan-create-edge",
+      "class": "negative_control",
+      "plan_status": "in_progress",
+      "mutation": "Add a creates_subgoal edge that is not listed in the source action output_subgoal_ids.",
+      "expected": "reject",
+      "expected_counts": {
+        "produced_subgoals": 3,
+        "transformed_goals": 1,
+        "discharged_goals": 2,
+        "unresolved_goals": 0,
+        "cycle_nodes": 0
+      },
+      "claim_ceiling": "The action output list and created-obligation edges must match exactly."
+    },
+    {
+      "id": "OBL-006-action-output-without-create-edge",
+      "class": "negative_control",
+      "plan_status": "in_progress",
+      "mutation": "Add an output_subgoal_id to an action without a corresponding creates_subgoal edge.",
+      "expected": "reject",
+      "expected_counts": {
+        "produced_subgoals": 3,
+        "transformed_goals": 1,
+        "discharged_goals": 2,
+        "unresolved_goals": 0,
+        "cycle_nodes": 0
+      },
+      "claim_ceiling": "A declared output without a created obligation is unaccounted."
+    },
+    {
+      "id": "OBL-007-transformed-without-successor",
+      "class": "negative_control",
+      "plan_status": "in_progress",
+      "mutation": "Change A_FORWARD's input disposition from discharges to transforms without creating any successor subgoal.",
+      "expected": "reject",
+      "expected_counts": {
+        "produced_subgoals": 2,
+        "transformed_goals": 2,
+        "discharged_goals": 1,
+        "unresolved_goals": 0,
+        "cycle_nodes": 0
+      },
+      "claim_ceiling": "A transformed goal must produce at least one successor obligation."
+    },
+    {
+      "id": "OBL-008-accepted-with-unresolved-leaf",
+      "class": "negative_control",
+      "plan_status": "accepted",
+      "mutation": "Remove the discharge of G_REVERSE and mark the ProofPlan Accepted.",
+      "expected": "reject",
+      "expected_counts": {
+        "produced_subgoals": 2,
+        "transformed_goals": 1,
+        "discharged_goals": 1,
+        "unresolved_goals": 1,
+        "cycle_nodes": 0
+      },
+      "claim_ceiling": "Accepted status requires zero unresolved obligations and at least one terminal discharge."
+    },
+    {
+      "id": "OBL-009-primary-route-cycle",
+      "class": "negative_control",
+      "plan_status": "in_progress",
+      "mutation": "Add two produced subgoals and two transform actions that consume each other's outputs, forming a directed goal-transition cycle.",
+      "expected": "reject",
+      "expected_counts": {
+        "produced_subgoals": 4,
+        "transformed_goals": 3,
+        "discharged_goals": 2,
+        "unresolved_goals": 0,
+        "cycle_nodes": 2
+      },
+      "claim_ceiling": "Every goal transition must be acyclic; no topological completion can be inferred from a cycle."
+    },
+    {
+      "id": "OBL-010-candidate-route-not-primary",
+      "class": "alternative_control",
+      "plan_status": "accepted",
+      "mutation": "Keep the complete route as the unique primary alternative and add a candidate alternative containing only the root split and its generated subgoals.",
+      "expected": "primary_complete_candidate_incomplete",
+      "expected_counts": {
+        "produced_subgoals": 4,
+        "transformed_goals": 2,
+        "discharged_goals": 2,
+        "unresolved_goals": 2,
+        "cycle_nodes": 0
+      },
+      "claim_ceiling": "Candidate alternatives do not become the accepted proof route; only exactly one complete primary alternative qualifies."
+    },
+    {
+      "id": "OBL-011-multiple-primary-alternatives",
+      "class": "negative_control",
+      "plan_status": "accepted",
+      "mutation": "Duplicate the complete And.comm route as a second primary alternative.",
+      "expected": "reject",
+      "expected_counts": {
+        "produced_subgoals": 4,
+        "transformed_goals": 2,
+        "discharged_goals": 4,
+        "unresolved_goals": 0,
+        "cycle_nodes": 0
+      },
+      "claim_ceiling": "An accepted plan must identify exactly one primary alternative."
+    }
+  ]
+}
