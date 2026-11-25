@@ -101,7 +101,10 @@ impl WebResearcher {
                                 // separate entailment/adjudication stage supplies it.
                                 supports: None,
                                 similarity: self.calculate_similarity(&extraction.body_text, query),
-                                credibility: extraction.quality,
+                                // Extraction quality is not source authority.
+                                // Leave source credibility neutral until it is
+                                // assessed independently by the existing verifier.
+                                credibility: 0.5,
                             };
 
                             all_sources.push(source);
