@@ -61,7 +61,21 @@
         "no_support_source_may_be_emitted"
       ],
       "description": "A page is about the same topic but does not make a claim-specific statement.",
-      "status": "SYNTHETIC_KNOWN_ANSWER_NOT_EXPERT_GOLD"
+      "status": "SYNTHETIC_KNOWN_ANSWER_NOT_EXPERT_GOLD",
+      "claim_scope": {
+        "population": "people with acute fever",
+        "outcome_or_measure": "mean duration of fever",
+        "quantifier_or_effect": "reduction of 20 percent",
+        "domain_or_reference_boundary": "clinical trial populations",
+        "scope_note": "Compound Q and the stated comparator"
+      },
+      "label_provenance": {
+        "label_status": "SYNTHETIC_KNOWN_ANSWER",
+        "authority_id": "fixture-oracle:CEI-01",
+        "evidence_reference": "fixtures/claim-evidence-integrity-v0.1.json#CEI-01",
+        "independent_of_candidate": true,
+        "permitted_use": "evaluator-only known-answer control; never a live calibration label"
+      }
     },
     {
       "fixture_id": "CEI-02",
@@ -118,7 +132,21 @@
         "sources_have_distinct_families"
       ],
       "description": "Two independent, claim-specific supporting records.",
-      "status": "SYNTHETIC_KNOWN_ANSWER_NOT_EXPERT_GOLD"
+      "status": "SYNTHETIC_KNOWN_ANSWER_NOT_EXPERT_GOLD",
+      "claim_scope": {
+        "population": "200 randomized trial participants",
+        "outcome_or_measure": "mean fever duration",
+        "quantifier_or_effect": "reduction of 20 percent",
+        "domain_or_reference_boundary": "trial population and protocol",
+        "scope_note": "Compound R versus placebo"
+      },
+      "label_provenance": {
+        "label_status": "SYNTHETIC_KNOWN_ANSWER",
+        "authority_id": "fixture-oracle:CEI-02",
+        "evidence_reference": "fixtures/claim-evidence-integrity-v0.1.json#CEI-02",
+        "independent_of_candidate": true,
+        "permitted_use": "evaluator-only known-answer control; never a live calibration label"
+      }
     },
     {
       "fixture_id": "CEI-03",
@@ -175,7 +203,21 @@
         "verdict_must_not_be_supported_by_topic_relevance"
       ],
       "description": "Independent primary records refute a precise claim.",
-      "status": "SYNTHETIC_KNOWN_ANSWER_NOT_EXPERT_GOLD"
+      "status": "SYNTHETIC_KNOWN_ANSWER_NOT_EXPERT_GOLD",
+      "claim_scope": {
+        "population": "trial S participants",
+        "outcome_or_measure": "prespecified primary endpoint",
+        "quantifier_or_effect": "met versus not met",
+        "domain_or_reference_boundary": "the named trial",
+        "scope_note": "Compound S"
+      },
+      "label_provenance": {
+        "label_status": "SYNTHETIC_KNOWN_ANSWER",
+        "authority_id": "fixture-oracle:CEI-03",
+        "evidence_reference": "fixtures/claim-evidence-integrity-v0.1.json#CEI-03",
+        "independent_of_candidate": true,
+        "permitted_use": "evaluator-only known-answer control; never a live calibration label"
+      }
     },
     {
       "fixture_id": "CEI-04",
@@ -252,7 +294,21 @@
         "both_support_and_refute_sources_remain_visible"
       ],
       "description": "Evidence families disagree; preserve the conflict rather than majority-vote it away.",
-      "status": "SYNTHETIC_KNOWN_ANSWER_NOT_EXPERT_GOLD"
+      "status": "SYNTHETIC_KNOWN_ANSWER_NOT_EXPERT_GOLD",
+      "claim_scope": {
+        "population": "target population in intervention T studies",
+        "outcome_or_measure": "long-term relapse risk",
+        "quantifier_or_effect": "reduction in risk",
+        "domain_or_reference_boundary": "studied cohorts only",
+        "scope_note": "contradictory independent analyses"
+      },
+      "label_provenance": {
+        "label_status": "SYNTHETIC_KNOWN_ANSWER",
+        "authority_id": "fixture-oracle:CEI-04",
+        "evidence_reference": "fixtures/claim-evidence-integrity-v0.1.json#CEI-04",
+        "independent_of_candidate": true,
+        "permitted_use": "evaluator-only known-answer control; never a live calibration label"
+      }
     },
     {
       "fixture_id": "CEI-05",
@@ -329,7 +385,21 @@
         "mirrors_do_not_create_independent_corroboration"
       ],
       "description": "Three URLs contain one syndicated source family, not three independent confirmations.",
-      "status": "SYNTHETIC_KNOWN_ANSWER_NOT_EXPERT_GOLD"
+      "status": "SYNTHETIC_KNOWN_ANSWER_NOT_EXPERT_GOLD",
+      "claim_scope": {
+        "population": "national population",
+        "outcome_or_measure": "incidence rate",
+        "quantifier_or_effect": "any measured change in 2025",
+        "domain_or_reference_boundary": "national scope",
+        "scope_note": "policy U"
+      },
+      "label_provenance": {
+        "label_status": "SYNTHETIC_KNOWN_ANSWER",
+        "authority_id": "fixture-oracle:CEI-05",
+        "evidence_reference": "fixtures/claim-evidence-integrity-v0.1.json#CEI-05",
+        "independent_of_candidate": true,
+        "permitted_use": "evaluator-only known-answer control; never a live calibration label"
+      }
     },
     {
       "fixture_id": "CEI-06",
@@ -387,7 +457,21 @@
         "later_correction_is_not_backdated"
       ],
       "description": "Retrospective verification sees a later correction and must not erase the original evidence chronology.",
-      "status": "SYNTHETIC_KNOWN_ANSWER_NOT_EXPERT_GOLD"
+      "status": "SYNTHETIC_KNOWN_ANSWER_NOT_EXPERT_GOLD",
+      "claim_scope": {
+        "population": "human population referenced by the 2015 article",
+        "outcome_or_measure": "attention span measured in seconds",
+        "quantifier_or_effect": "an eight-second average",
+        "domain_or_reference_boundary": "United States / source study as alleged",
+        "scope_note": "retrospective review may use later corrections"
+      },
+      "label_provenance": {
+        "label_status": "SYNTHETIC_KNOWN_ANSWER",
+        "authority_id": "fixture-oracle:CEI-06",
+        "evidence_reference": "fixtures/claim-evidence-integrity-v0.1.json#CEI-06",
+        "independent_of_candidate": true,
+        "permitted_use": "evaluator-only known-answer control; never a live calibration label"
+      }
     },
     {
       "fixture_id": "CEI-07",
@@ -424,7 +508,21 @@
         "secondary_repetition_is_not_primary_confirmation"
       ],
       "description": "A contemporaneous verifier cannot use a 2017 correction that had not yet been published.",
-      "status": "SYNTHETIC_KNOWN_ANSWER_NOT_EXPERT_GOLD"
+      "status": "SYNTHETIC_KNOWN_ANSWER_NOT_EXPERT_GOLD",
+      "claim_scope": {
+        "population": "human population referenced by the 2015 article",
+        "outcome_or_measure": "attention span measured in seconds",
+        "quantifier_or_effect": "measured as eight seconds",
+        "domain_or_reference_boundary": "as known by 2015-12-31",
+        "scope_note": "future corrections are excluded"
+      },
+      "label_provenance": {
+        "label_status": "SYNTHETIC_KNOWN_ANSWER",
+        "authority_id": "fixture-oracle:CEI-07",
+        "evidence_reference": "fixtures/claim-evidence-integrity-v0.1.json#CEI-07",
+        "independent_of_candidate": true,
+        "permitted_use": "evaluator-only known-answer control; never a live calibration label"
+      }
     },
     {
       "fixture_id": "CEI-08",
@@ -461,7 +559,21 @@
         "model_cutoff_and_retrieval_time_are_not_reference_time"
       ],
       "description": "Evidence published after the claim's reference time cannot substantiate an as-of-2015 statement.",
-      "status": "SYNTHETIC_KNOWN_ANSWER_NOT_EXPERT_GOLD"
+      "status": "SYNTHETIC_KNOWN_ANSWER_NOT_EXPERT_GOLD",
+      "claim_scope": {
+        "population": "population implied by Study V",
+        "outcome_or_measure": "prevention of condition W",
+        "quantifier_or_effect": "prevents rather than reduces",
+        "domain_or_reference_boundary": "as of 2015-12-31",
+        "scope_note": "evidence published in 2019 is not available at claim reference time"
+      },
+      "label_provenance": {
+        "label_status": "SYNTHETIC_KNOWN_ANSWER",
+        "authority_id": "fixture-oracle:CEI-08",
+        "evidence_reference": "fixtures/claim-evidence-integrity-v0.1.json#CEI-08",
+        "independent_of_candidate": true,
+        "permitted_use": "evaluator-only known-answer control; never a live calibration label"
+      }
     },
     {
       "fixture_id": "CEI-09",
@@ -518,7 +630,21 @@
         "scope_and_population_must_match"
       ],
       "description": "A partial subset result does not entail a universal quantifier.",
-      "status": "SYNTHETIC_KNOWN_ANSWER_NOT_EXPERT_GOLD"
+      "status": "SYNTHETIC_KNOWN_ANSWER_NOT_EXPERT_GOLD",
+      "claim_scope": {
+        "population": "all enrolled participants",
+        "outcome_or_measure": "primary symptom measure",
+        "quantifier_or_effect": "universal quantifier all",
+        "domain_or_reference_boundary": "trial M population",
+        "scope_note": "three of twenty is not all"
+      },
+      "label_provenance": {
+        "label_status": "SYNTHETIC_KNOWN_ANSWER",
+        "authority_id": "fixture-oracle:CEI-09",
+        "evidence_reference": "fixtures/claim-evidence-integrity-v0.1.json#CEI-09",
+        "independent_of_candidate": true,
+        "permitted_use": "evaluator-only known-answer control; never a live calibration label"
+      }
     },
     {
       "fixture_id": "CEI-10",
@@ -555,7 +681,21 @@
         "no_binary_verdict_from_vague_adjective"
       ],
       "description": "The term effective lacks an endpoint, threshold and reference population.",
-      "status": "SYNTHETIC_KNOWN_ANSWER_NOT_EXPERT_GOLD"
+      "status": "SYNTHETIC_KNOWN_ANSWER_NOT_EXPERT_GOLD",
+      "claim_scope": {
+        "population": "unspecified population",
+        "outcome_or_measure": "unspecified outcome and threshold",
+        "quantifier_or_effect": "unqualified adjective effective",
+        "domain_or_reference_boundary": "no domain boundary supplied",
+        "scope_note": "claim lacks endpoint and threshold"
+      },
+      "label_provenance": {
+        "label_status": "SYNTHETIC_KNOWN_ANSWER",
+        "authority_id": "fixture-oracle:CEI-10",
+        "evidence_reference": "fixtures/claim-evidence-integrity-v0.1.json#CEI-10",
+        "independent_of_candidate": true,
+        "permitted_use": "evaluator-only known-answer control; never a live calibration label"
+      }
     },
     {
       "fixture_id": "CEI-11",
@@ -592,7 +732,21 @@
         "time_interval_endpoints_must_be_bound"
       ],
       "description": "The measured change is 0.3 percentage points, not five.",
-      "status": "SYNTHETIC_KNOWN_ANSWER_NOT_EXPERT_GOLD"
+      "status": "SYNTHETIC_KNOWN_ANSWER_NOT_EXPERT_GOLD",
+      "claim_scope": {
+        "population": "national unemployment population",
+        "outcome_or_measure": "unemployment rate change",
+        "quantifier_or_effect": "five percentage points",
+        "domain_or_reference_boundary": "January through December 2024",
+        "scope_note": "compare interval endpoints in the same units"
+      },
+      "label_provenance": {
+        "label_status": "SYNTHETIC_KNOWN_ANSWER",
+        "authority_id": "fixture-oracle:CEI-11",
+        "evidence_reference": "fixtures/claim-evidence-integrity-v0.1.json#CEI-11",
+        "independent_of_candidate": true,
+        "permitted_use": "evaluator-only known-answer control; never a live calibration label"
+      }
     },
     {
       "fixture_id": "CEI-12",
@@ -629,7 +783,21 @@
         "quoted_span_must_match_claim_polarity"
       ],
       "description": "The citation resolves and is topical, but the cited result contradicts the claim.",
-      "status": "SYNTHETIC_KNOWN_ANSWER_NOT_EXPERT_GOLD"
+      "status": "SYNTHETIC_KNOWN_ANSWER_NOT_EXPERT_GOLD",
+      "claim_scope": {
+        "population": "trial survival population",
+        "outcome_or_measure": "overall survival",
+        "quantifier_or_effect": "statistically significant improvement",
+        "domain_or_reference_boundary": "the cited paper and population",
+        "scope_note": "citation resolves but result is opposite"
+      },
+      "label_provenance": {
+        "label_status": "SYNTHETIC_KNOWN_ANSWER",
+        "authority_id": "fixture-oracle:CEI-12",
+        "evidence_reference": "fixtures/claim-evidence-integrity-v0.1.json#CEI-12",
+        "independent_of_candidate": true,
+        "permitted_use": "evaluator-only known-answer control; never a live calibration label"
+      }
     },
     {
       "fixture_id": "CEI-13",
@@ -645,7 +813,21 @@
         "absence_claim_requires_bounded_search_scope_and_registry_coverage"
       ],
       "description": "No results from a finite search do not prove a universal negative.",
-      "status": "SYNTHETIC_KNOWN_ANSWER_NOT_EXPERT_GOLD"
+      "status": "SYNTHETIC_KNOWN_ANSWER_NOT_EXPERT_GOLD",
+      "claim_scope": {
+        "population": "all possible clinical trial registries and sources",
+        "outcome_or_measure": "existence of any clinical trial",
+        "quantifier_or_effect": "universal negative ever",
+        "domain_or_reference_boundary": "unbounded temporal and registry scope",
+        "scope_note": "finite searched-no-match cannot prove absence"
+      },
+      "label_provenance": {
+        "label_status": "SYNTHETIC_KNOWN_ANSWER",
+        "authority_id": "fixture-oracle:CEI-13",
+        "evidence_reference": "fixtures/claim-evidence-integrity-v0.1.json#CEI-13",
+        "independent_of_candidate": true,
+        "permitted_use": "evaluator-only known-answer control; never a live calibration label"
+      }
     },
     {
       "fixture_id": "CEI-14",
@@ -702,7 +884,21 @@
         "compromised_source_cannot_outvote_primary_guideline"
       ],
       "description": "Compromised source context and contradictory primary guidance must be handled explicitly.",
-      "status": "SYNTHETIC_KNOWN_ANSWER_NOT_EXPERT_GOLD"
+      "status": "SYNTHETIC_KNOWN_ANSWER_NOT_EXPERT_GOLD",
+      "claim_scope": {
+        "population": "patients under current official guideline",
+        "outcome_or_measure": "recommended dose of Compound Y",
+        "quantifier_or_effect": "doubles versus remains unchanged",
+        "domain_or_reference_boundary": "guideline current as of 2026-01-10",
+        "scope_note": "source compromise is a separate admissibility/context signal"
+      },
+      "label_provenance": {
+        "label_status": "SYNTHETIC_KNOWN_ANSWER",
+        "authority_id": "fixture-oracle:CEI-14",
+        "evidence_reference": "fixtures/claim-evidence-integrity-v0.1.json#CEI-14",
+        "independent_of_candidate": true,
+        "permitted_use": "evaluator-only known-answer control; never a live calibration label"
+      }
     },
     {
       "fixture_id": "CEI-15",
@@ -739,7 +935,21 @@
         "historical_record_remains_auditable"
       ],
       "description": "A retracted positive paper remains part of the historical record but cannot be counted as reliable current support.",
-      "status": "SYNTHETIC_KNOWN_ANSWER_NOT_EXPERT_GOLD"
+      "status": "SYNTHETIC_KNOWN_ANSWER_NOT_EXPERT_GOLD",
+      "claim_scope": {
+        "population": "population enrolled in Study P",
+        "outcome_or_measure": "mortality reduction",
+        "quantifier_or_effect": "reliable evidence of reduced mortality",
+        "domain_or_reference_boundary": "current assessment, with historical study preserved",
+        "scope_note": "retracted result is not current admissible support"
+      },
+      "label_provenance": {
+        "label_status": "SYNTHETIC_KNOWN_ANSWER",
+        "authority_id": "fixture-oracle:CEI-15",
+        "evidence_reference": "fixtures/claim-evidence-integrity-v0.1.json#CEI-15",
+        "independent_of_candidate": true,
+        "permitted_use": "evaluator-only known-answer control; never a live calibration label"
+      }
     }
   ],
   "evaluation_policy": {
