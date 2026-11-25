@@ -137,6 +137,22 @@ A next-generation system should:
 This is a decision-sufficient, evidence-carrying world model—not a claim that one model architecture dominates every task.
 
 
+
+### Architecture hypothesis to test: separate shared dynamics from individual-effect preservation
+
+The published direct-readout experiment motivates an additional architecture ablation. In the RSSM study, a frozen branch-point latent readout recovers more individual-effect information than the decoded imagination rollout; a sequence-regression readout does not close the gap even with a larger labelled-individual budget. This suggests that information can be inferred and retained in a latent representation yet lost as the model converts that representation into future observations.
+
+A falsifiable Symthaea hypothesis is a **two-path world model**:
+
+- **Shared physical-dynamics path:** continuous CfC/LTC state predicts the intervention-independent trajectory component and within-event dynamics.
+- **Persistent individual-effect path:** an HDC/role-bound memory preserves the inferred individual signature; a pair-conditioned contrast head predicts the individual intervention delta directly.
+- **Reconciliation path:** decoded output combines shared trajectory and individual/intervention delta, with explicit uncertainty and a safe fallback when the paths disagree. The rollout must not silently overwrite the persistent effect state.
+
+Measure the information ladder at the factual history, branch-point latent, each post-branch latent step, direct latent contrast readout, and decoded rollout at multiple horizons. Mandatory ablations are reconstruction-only, reconstruction-plus-contrast, direct branch-point readout without rollout, shared rollout only, shared rollout plus persistent HDC effect path, memory reset/eviction, role-binding corruption, and horizon/training-length sweeps.
+
+Fit the backbone, contrast readout and final evaluation on disjoint individual cohorts with separate counterfactual-pair budgets. Compare direct latent readout and sequence readout with the same labelled individuals and head capacity. Report `(β, τ, ρ; m)` plus the abducible-share/floor chain and task regret. A probe that reads information from the latent state is not proof that a planner can use that information through imagination.
+
+Source: Okita (2026), Sections 7.4 and 8.3, Tables 11–12: https://www.mdpi.com/2504-4990/8/11/363.
 ### Counterfactual calibration and training-selection price
 
 The published individual-effect calibration certificate is a joint tuple `(β, τ, ρ; m)`, not a single score: `β` is the calibration slope (realised centred effect regressed on predicted centred effect), `τ` is within-individual intervention-rank correlation, `ρ` is prediction error relative to the zero-effect predictor, and `m` is the count of counterfactual pairs consumed by fitting the predictor. These can disagree: affine recalibration can repair slope without repairing ordering; a predictor that collapses toward zero can look competitive on a single normalised error while carrying almost no useful rank signal.
