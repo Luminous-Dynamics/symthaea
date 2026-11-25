@@ -46,7 +46,8 @@
       "trust_policy_digest": "sha256:cccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccc",
       "independence_basis_ref": "artifact://synthetic/witness-alpha-independence",
       "root_hash_algorithm": "sha-256",
-      "root_hash_encoding": "hex"
+      "root_hash_encoding": "hex",
+      "log_id": "sat-research-log-01"
     },
     {
       "witness_id": "witness-beta",
@@ -59,7 +60,8 @@
       "signature_ref": "artifact://synthetic/witness-beta-signature",
       "key_id": "witness-beta-key",
       "trust_policy_digest": "sha256:cccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccc",
-      "independence_basis_ref": "artifact://synthetic/witness-beta-independence"
+      "independence_basis_ref": "artifact://synthetic/witness-beta-independence",
+      "log_id": "sat-research-log-01"
     }
   ],
   "trust_policy": {
