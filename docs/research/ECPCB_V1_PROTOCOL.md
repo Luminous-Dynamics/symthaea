@@ -209,6 +209,16 @@ Keep each tier in a separate numerator and denominator. Never pool a larger Tier
 
 A local action is kernel_checked only when a Lean artifact proves the exact local proposition under the exact recorded context. Role labels remain expert-reviewed interpretations.
 
+Global accounting is a separate sub-scorecard, using [PROOF-OBLIGATION-ACCOUNTING-001](https://github.com/Luminous-Dynamics/symthaea/issues/13641):
+- every generated subgoal has exactly one producer action;
+- every primary-route goal has exactly one disposition (discharged or transformed);
+- every transformed goal has successor subgoals;
+- no duplicate discharge, orphan output, or goal-transition cycle;
+- an accepted plan has zero unresolved primary-route obligations and exactly one primary alternative;
+- candidate alternatives remain isolated from the primary route.
+
+These checks establish plan-graph completeness only. They do not prove an action valid or a goal true. Local terminal discharges still require exact-context Lean certificates.
+
 ### 6.4 Counterfactual and metamorphic robustness
 
 Paired transformations:
@@ -249,6 +259,31 @@ Report:
 
 A green final theorem check cannot compensate for an unknown target or undisclosed axiom. LLM/agent agreement is not proof authority.
 
+### 6.5.1 Checker diversity and common-mode risk
+
+Use the source-grounded checker registry and same-export profile from [CHECKER-DIVERSITY-001](https://github.com/Luminous-Dynamics/symthaea/issues/13637). Lean's current `lake comparator --paranoid` adds five external checker paths to the official Lean kernel: `leanchecker-paranoid`, `lean4lean`, `nanoda`, `con-leche`, and `con-ron`. The six paths must not be counted as six independent algorithms.
+
+The conservative current registry groups:
+- official Lean kernel, `lean4lean` and `leanchecker-paranoid` in one official-kernel lineage;
+- `con-leche` and its verified Rust refinement `con-ron` in one shared algorithm lineage;
+- `nanoda` as a separate implementation/algorithm lineage.
+
+It records three algorithm lineages and two distinct independently implemented external algorithm lineages for the complete bundle, while separately recording implementation/language diversity and pairwise relationships that remain unknown. This is an evidence classification, not a scalar independence score.
+
+Report:
+- all-checker same-export digest binding;
+- checker version, source revision and binary digest;
+- accepted, rejected, declined, error, timeout and resource-exhausted outcomes separately;
+- distinct implementation families and algorithm lineages;
+- independent external algorithm lineages;
+- known term representations and parser families;
+- unknown pairwise relationships;
+- checker disagreement and per-checker resource usage.
+
+A decline, timeout, crash or out-of-memory event is not a theorem refutation. It makes the assurance profile inconclusive. A checker rejection blocks concordance and triggers triage; it does not by itself establish that the informal theorem is false. For a `--paranoid` result, record the complete six-path bundle and preserve the raw per-checker receipts.
+
+The primary reference is the [Lean Lake comparator documentation](https://lean-lang.org/doc/reference/latest/Build-Tools-and-Distribution/Lake/), which documents the checker bundle, exact statement/axiom checks, sandbox behavior and residual assumptions.
+
 ### 6.6 Explanation and human transfer
 
 Separate:
@@ -288,6 +323,15 @@ These are **prospective research targets**, not current measurements. The first 
 | Seeded axiom/admission dependency recall | 100% | Per-declaration-kind and per-Lean-version reporting |
 | Unresolved dependencies silently treated as empty | 0 | Hard gate |
 | Local certificate replay for actions marked checked | 100% | Exact artifact + exact context |
+| Primary-route goal disposition | 100% | Every goal is discharged or transformed exactly once |
+| Subgoal producer accounting | 100% | Exactly one producer per generated subgoal |
+| Accepted plans with unresolved leaves | 0 | Hard gate |
+| Accepted plans with goal-transition cycles | 0 | Hard gate |
+| Checker input export digest binding | 100% | Every executed checker uses identical export bytes |
+| Full paranoid checker bundle coverage when claimed | 100% | All six execution paths requested and observed |
+| Checker outcome classification | 100% | Decline/error/timeout/resource exhaustion never collapsed into rejection |
+| Distinct documented checker algorithm lineages | ≥3 | Do not count implementation ports as new algorithms |
+| Independent external checker algorithm lineages | ≥2 | Count only supported lineage claims |
 | Side-condition / subgoal accounting | ≥95% | Grow only after the gold annotation protocol is stable |
 | Mutation sensitivity on scope-changing controls | ≥95% | Report false positives separately |
 | Metamorphic invariance on allowed transformations | ≥99% | Only for transformations whose semantics are independently established |
@@ -344,6 +388,8 @@ These are **published comparator results on their own protocols**, not head-to-h
 | HumanLean (2026) | Staged source/definition/scaffold/proof review for paper-to-Lean fidelity | Reuse source-fidelity contract; human learning is a separate outcome |
 | APE-Bench / APE-Harness (2026) | Dual syntactic and semantic verification across proof-engineering task types | Reuse task contracts and dual-verification structure |
 | LeanLean (2026) | Repository-scale proof compression evaluation | Compare explanation compression only with matched fidelity/learning measures |
+| Lean Kernel Arena / Lake Comparator | Positive/negative proof exports, multiple independent checker implementations, and checker-specific performance / decline behavior | Freeze specific rounds as same-export checker-diversity and differential-failure regression sets |
+| RH / Dirichlet-GRH Lean verification (Nov 2026) | 175,187 modules; full export around 61 GB; official kernel, paranoid mode and independent checkers have reported acceptance, with an end-to-end v4.36 comparator stage still running as of 24 Nov | Large-artifact scalability and operational evidence lane; do not treat it as a Symthaea result or human-comprehension benchmark |
 
 Public references:
 - LeanSearch v2: https://arxiv.org/abs/2605.13137
@@ -355,8 +401,31 @@ Public references:
 - APE-Bench: https://proceedings.mlr.press/v306/xin26c.html
 - HumanLean: https://files.sri.inf.ethz.ch/website/papers/yuhao2026humanlean.pdf
 - LeanLean: https://www.sri.inf.ethz.ch/publications/rognvaldsson2026leanlean
+- Lean Lake / Comparator validation: https://lean-lang.org/doc/reference/latest/Build-Tools-and-Distribution/Lake/
+- Lean Kernel Arena: https://arena.lean-lang.org/
+- RH / GRH verification status (updated 24 Nov 2026): https://cairn-commons.com/guides/riemann-hypothesis-proof-claim-november-2026
+- Independent RH / GRH Lean replay report: https://mrubinst.github.io/grh-lean-verification/
 
 The papers differ in query sets, models, context, proof budgets and scoring. Do not add their percentages together or rank them as though they measured one task.
+
+## 10.1 Large-artifact verification and human-understanding stress case
+
+The 2026 Lean formalization of the Riemann Hypothesis and GRH for Dirichlet L-functions is an unusually valuable external stress case for ECPCB, but its status must be represented precisely.
+
+The 24 November 2026 status page reports 175,187 modules, a full exported proof of about 61 GB, byte-identical sandbox rebuilds, standard axiom dependencies for the five headline theorems, module-by-module Lean kernel replay, acceptance by nanoda and lean4lean, statement comparisons through con-leche/con-ron, and acceptance of the full export by Lean's default and paranoid kernels (48 and 72 hours respectively). The same dated page says the final stage of a fully end-to-end Lake comparator run under Lean v4.36 was still in progress on 24 November. An independent Waterloo report also records complete replay of 175,187 modules and nanoda checking 1,484,729 declarations by 21 November.
+
+Scope caveat: the formalized targets are the classical Riemann zeta hypothesis and GRH for Dirichlet L-functions. This does not extend to Dedekind zeta functions, Hecke or general automorphic L-functions. Nor should one conflate separate versioned checks: v4.33.1 module/kernel/independent checker results, a v4.33 comparator report with a stubbed build, and the v4.36 end-to-end comparator run have different evidential scope.
+
+For ECPCB this is a **stress and comprehension challenge**, not a gold set by default:
+- measure source-to-formal statement identity and dependency coverage;
+- map proof modules into reviewed mathematical-role clusters;
+- reconstruct selected local proof plans and global obligation paths;
+- preserve all toolchain, export and module digests;
+- measure checker runtime, peak memory, resource exhaustion, declines and replay throughput;
+- ask experts to annotate selected modules, then test whether explanations help readers reconstruct the argument;
+- keep the formal verification result separate from human understanding and publication status.
+
+A 17-million-line formal proof can pass extensive machine checks while remaining difficult for humans to understand. That gap is central to ECPCB's research purpose, not a reason to diminish the machine-verification evidence.
 
 ## 11. Strategy to exceed the state of the art
 
@@ -364,8 +433,8 @@ Do not try to beat the strongest prover on every theorem benchmark at once. Purs
 
 1. **Match first:** reproduce a strong LeanSearch v2 / LeanGraphSearch retrieval slice on the exact public snapshot and budget. Establish no regression in the retrieval substrate.
 2. **Add evidence:** show improved typed-edge and proof-role fidelity over raw static graph extraction, with expert adjudication.
-3. **Add proof-plan correctness:** show that local certificates and global obligation accounting reduce false explanation claims and invalid warrant reuse.
-4. **Add adversarial robustness:** outperform LLM-only and LLM+Lean baselines on target mutation, assumption mutation, missing side conditions and proof-route-only controls.
+3. **Add proof-plan correctness:** show that local certificates and global obligation accounting reduce false explanation claims, lost obligations and invalid warrant reuse.
+4. **Add adversarial robustness:** outperform LLM-only and LLM+Lean baselines on target mutation, assumption mutation, missing side conditions, double-discharge and goal-cycle controls, and proof-route-only changes.
 5. **Add human utility:** demonstrate that evidence-bound proof plans improve delayed transfer, not only immediate explanation ratings.
 6. **Add efficiency:** lower the cost per independently accepted explanation while maintaining hard gates.
 7. **Ablate architecture:** only then attribute gains to HDC/CfC or Symthaea-specific mechanisms.
@@ -385,7 +454,8 @@ The publishable result is not “Symthaea beats LeanGraphSearch at retrieval” 
 - add reviewed role annotations;
 - produce ProofPlanV1 on a small theorem family;
 - attach local certificates where formalizable;
-- require full subgoal accounting or explicit unknowns.
+- run global obligation accounting and preserve unresolved goal IDs;
+- require zero unresolved primary-route obligations before any accepted plan status.
 
 ### Phase P2 — matched baselines
 - run BM25, dense, LeanSearch v2, LeanGraphSearch, LLM-only and LLM+Lean;
@@ -396,7 +466,8 @@ The publishable result is not “Symthaea beats LeanGraphSearch at retrieval” 
 - run scope and metamorphic mutations;
 - qualify the 15-root independent axiom audit on its exact head;
 - validate the new trust-closure capsule against positive, negative and inconclusive fixtures;
-- integrate comparator/export and independent checker for one small challenge.
+- integrate comparator/export and the complete same-export checker-diversity profile for one small challenge;
+- preserve checker declines/timeouts/resource failures as inconclusive, never theorem falsity.
 
 ### Phase P4 — human study
 - finish expert task gold review;
