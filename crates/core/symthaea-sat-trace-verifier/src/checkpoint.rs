@@ -536,9 +536,10 @@ mod tests {
     #[test]
     fn trace_head_statement_digest_is_recomputed() {
         let mut receipt = parse_receipt();
-        receipt["trace_head_statement"]["head_sequence"] = serde_json::json!(3);
+        receipt["trace_head_statement"]["checkpointed_at"] =
+            serde_json::json!("2026-11-25T13:01:00Z");
         let error = inspect_checkpoint_receipt(&receipt.to_string(), &trace_report()).unwrap_err();
-        assert!(matches!(error, CheckpointVerificationError::InvalidShape(_)));
+        assert_eq!(error, CheckpointVerificationError::StatementDigestMismatch);
     }
 
     #[test]
