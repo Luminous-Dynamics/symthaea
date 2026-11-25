@@ -543,18 +543,27 @@ pub fn append_jsonl(path: &Path, receipt: &AcquisitionReceiptV2) -> Result<(), R
         .open(path)
         .map_err(|_| ReceiptError::Io)?;
     f.lock().map_err(|_| ReceiptError::Io)?;
+
     let mut history = Vec::new();
     f.seek(SeekFrom::Start(0)).map_err(|_| ReceiptError::Io)?;
     f.read_to_end(&mut history).map_err(|_| ReceiptError::Io)?;
-    if !history.is_empty() && *history.last().unwrap() != b'\n' {
+
+    // Treat only a non-newline-terminated final fragment as an interrupted append.
+    // Validate all complete records before mutating the journal.
+    let incomplete_tail = !history.is_empty() && *history.last().unwrap() != b'\n';
+    if incomplete_tail {
         let end = history
             .iter()
             .rposition(|b| *b == b'\n')
             .map_or(0, |i| i + 1);
-        f.set_len(end as u64).map_err(|_| ReceiptError::Io)?;
         history.truncate(end);
     }
+
     let key = (receipt.run_id.clone(), receipt.query_invocation_id.clone());
+    let incoming_digest = receipt.receipt_sha256();
+    let mut invocations = BTreeMap::<(String, String), String>::new();
+    let mut idempotent_replay = false;
+
     for line in history
         .split(|b| *b == b'\n')
         .filter(|line| !line.is_empty())
@@ -565,29 +574,54 @@ pub fn append_jsonl(path: &Path, receipt: &AcquisitionReceiptV2) -> Result<(), R
             SCHEMA => {
                 let old = AcquisitionReceiptV2::from_json_value(&value)
                     .map_err(|_| ReceiptError::CorruptHistory)?;
-                let old_key = (old.run_id.clone(), old.query_invocation_id.clone());
-                (old_key, old.receipt_sha256())
+                (
+                    (old.run_id.clone(), old.query_invocation_id.clone()),
+                    old.receipt_sha256(),
+                )
             }
             "mace_retrieval_trace_receipt_v1" => {
                 let old = crate::retrieval_policy_memory::RetrievalTraceReceiptV1::from_json_value(
                     &value,
                 )
                 .map_err(|_| ReceiptError::CorruptHistory)?;
-                let old_key = (old.run_id.clone(), old.query_invocation_id.clone());
-                (old_key, old.receipt_sha256())
+                (
+                    (old.run_id.clone(), old.query_invocation_id.clone()),
+                    old.receipt_sha256(),
+                )
             }
             _ => return Err(ReceiptError::CorruptHistory),
         };
-        if old_key == key {
-            let result = if digest == receipt.receipt_sha256() {
-                Ok(())
+
+        // Match recovery semantics: the entire existing journal must have unique
+        // invocation identities, not merely a unique key for the incoming record.
+        if let Some(previous_digest) = invocations.insert(old_key.clone(), digest.clone()) {
+            return Err(if previous_digest == digest {
+                ReceiptError::CorruptHistory
             } else {
-                Err(ReceiptError::InvocationConflict)
-            };
-            let _ = f.unlock();
-            return result;
+                ReceiptError::InvocationConflict
+            });
+        }
+
+        if old_key == key {
+            if digest != incoming_digest {
+                return Err(ReceiptError::InvocationConflict);
+            }
+            idempotent_replay = true;
         }
     }
+
+    // Persist tail repair even when the incoming receipt is an idempotent replay.
+    if incomplete_tail {
+        f.set_len(history.len() as u64)
+            .map_err(|_| ReceiptError::Io)?;
+        f.sync_all().map_err(|_| ReceiptError::Io)?;
+    }
+
+    if idempotent_replay {
+        f.unlock().map_err(|_| ReceiptError::Io)?;
+        return Ok(());
+    }
+
     f.seek(SeekFrom::End(0)).map_err(|_| ReceiptError::Io)?;
     let mut encoded = serde_json::to_vec(&receipt.to_json_value()).map_err(|_| ReceiptError::Io)?;
     encoded.push(b'\n');
@@ -928,6 +962,67 @@ mod tests {
             .write_all(b"{broken}\n")
             .unwrap();
         assert_eq!(recover_jsonl(&p), Err(ReceiptError::CorruptHistory));
+        let _ = fs::remove_file(p);
+    }
+
+    #[test]
+    fn append_rejects_duplicate_history_for_an_unrelated_invocation() {
+        let p = std::env::temp_dir().join(format!(
+            "mace-v2-duplicate-history-{}.jsonl",
+            std::process::id()
+        ));
+        let _ = fs::remove_file(&p);
+
+        let first = receipt();
+        let mut unrelated = receipt();
+        unrelated.query_invocation_id = "other-invocation".into();
+        let mut conflicting = unrelated.clone();
+        conflicting.elapsed_ns += 1;
+        let incoming = {
+            let mut value = receipt();
+            value.query_invocation_id = "new-invocation".into();
+            value
+        };
+
+        let mut bytes = serde_json::to_vec(&first.to_json_value()).unwrap();
+        bytes.push(b'\n');
+        bytes.extend(serde_json::to_vec(&unrelated.to_json_value()).unwrap());
+        bytes.push(b'\n');
+        bytes.extend(serde_json::to_vec(&conflicting.to_json_value()).unwrap());
+        bytes.push(b'\n');
+        fs::write(&p, &bytes).unwrap();
+
+        assert_eq!(
+            append_jsonl(&p, &incoming),
+            Err(ReceiptError::InvocationConflict)
+        );
+        assert_eq!(fs::read(&p).unwrap(), bytes);
+        let _ = fs::remove_file(p);
+    }
+
+    #[test]
+    fn idempotent_append_durably_repairs_an_incomplete_tail() {
+        let p = std::env::temp_dir().join(format!(
+            "mace-v2-idempotent-tail-{}.jsonl",
+            std::process::id()
+        ));
+        let _ = fs::remove_file(&p);
+        let r = receipt();
+        append_jsonl(&p, &r).unwrap();
+        let complete = fs::read(&p).unwrap();
+
+        OpenOptions::new()
+            .append(true)
+            .open(&p)
+            .unwrap()
+            .write_all(b"{interrupted")
+            .unwrap();
+
+        assert_eq!(
+            append_jsonl(&p, &r),
+            Ok(())
+        );
+        assert_eq!(fs::read(&p).unwrap(), complete);
         let _ = fs::remove_file(p);
     }
 
