@@ -15,3 +15,5 @@ pub mod temporal_consensus;
 pub mod temporal_reliability;
 
 pub mod temporal_acquisition;
+
+pub mod temporal_design_estimator;

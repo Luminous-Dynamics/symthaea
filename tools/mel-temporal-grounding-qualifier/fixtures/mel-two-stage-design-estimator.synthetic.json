@@ -1,0 +1,107 @@
+{
+  "schema": "mel-two-stage-design-estimator-input-v1",
+  "dataset": {
+    "dataset_id": "synthetic-estimator-complete-work-census",
+    "config": {
+      "schema": "mel-annotation-acquisition-plan-v1",
+      "planner_id": "mel-annotation-acquisition-v1",
+      "seed": 13628,
+      "minimum_panel_count": 2,
+      "maximum_active_items_per_source_work": 1,
+      "audit_items_per_source_work": 2,
+      "total_budget_units": 2,
+      "active_budget_units": 0,
+      "probability_audit_budget_units": 2,
+      "model_error_threshold_ppm": 300000,
+      "human_disagreement_threshold_ppm": 250000,
+      "occurrence_count_disagreement_threshold_ppm": 100000,
+      "minimum_prediction_coverage_ppm": 750000,
+      "boundary_dispersion_threshold_ms": 80,
+      "stratum_quotas": [
+        {
+          "source_stratum_id": "stratum-a",
+          "active_minimum_items": 0,
+          "active_maximum_items": 0,
+          "audit_source_work_count": 1
+        }
+      ]
+    },
+    "candidates": [
+      {
+        "item_id": "work-a-query-1",
+        "query_id": "query-work-a-1",
+        "source_work_id_sha256": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+        "recording_sha256": "bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb",
+        "source_stratum_id": "stratum-a",
+        "task_family": "piano-entry",
+        "purpose_scope": "confirmatory-evaluation",
+        "model_grounding_report_sha256": "cccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccc",
+        "inter_annotator_reliability_report_sha256": "dddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddd",
+        "cohort_assignment_manifest_sha256": "eeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeee",
+        "cohort_role": "ConfirmatoryAudit",
+        "authorization_state": "Authorized",
+        "authorization_receipt_sha256": "ffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffff",
+        "current_annotation_count": 3,
+        "maximum_annotation_count": 5,
+        "annotation_cost_units": 1,
+        "model_error_ppm": 0,
+        "human_disagreement_ppm": 0,
+        "occurrence_count_disagreement_ppm": 0,
+        "prediction_coverage_ppm": 1000000,
+        "boundary_dispersion_ms": 0,
+        "hidden_repeat_control": false
+      },
+      {
+        "item_id": "work-a-query-2",
+        "query_id": "query-work-a-2",
+        "source_work_id_sha256": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+        "recording_sha256": "bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb",
+        "source_stratum_id": "stratum-a",
+        "task_family": "piano-entry",
+        "purpose_scope": "confirmatory-evaluation",
+        "model_grounding_report_sha256": "cccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccc",
+        "inter_annotator_reliability_report_sha256": "dddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddd",
+        "cohort_assignment_manifest_sha256": "eeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeee",
+        "cohort_role": "ConfirmatoryAudit",
+        "authorization_state": "Authorized",
+        "authorization_receipt_sha256": "ffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffff",
+        "current_annotation_count": 3,
+        "maximum_annotation_count": 5,
+        "annotation_cost_units": 1,
+        "model_error_ppm": 0,
+        "human_disagreement_ppm": 0,
+        "occurrence_count_disagreement_ppm": 0,
+        "prediction_coverage_ppm": 1000000,
+        "boundary_dispersion_ms": 0,
+        "hidden_repeat_control": false
+      }
+    ]
+  },
+  "expected_selection_receipt_sha256": null,
+  "metric_id": "grounded-event-correct",
+  "observed_audit_outcomes": [
+    {
+      "item_id": "work-a-query-1",
+      "source_work_id_sha256": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+      "scoring_report_sha256": "3333333333333333333333333333333333333333333333333333333333333333",
+      "model_identity_sha256": "1111111111111111111111111111111111111111111111111111111111111111",
+      "evaluator_version": "mel-grounding-model-eval-v1",
+      "scoring_plan_sha256": "2222222222222222222222222222222222222222222222222222222222222222",
+      "metric_id": "grounded-event-correct",
+      "value_ppm": 750000
+    },
+    {
+      "item_id": "work-a-query-2",
+      "source_work_id_sha256": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+      "scoring_report_sha256": "4444444444444444444444444444444444444444444444444444444444444444",
+      "model_identity_sha256": "1111111111111111111111111111111111111111111111111111111111111111",
+      "evaluator_version": "mel-grounding-model-eval-v1",
+      "scoring_plan_sha256": "2222222222222222222222222222222222222222222222222222222222222222",
+      "metric_id": "grounded-event-correct",
+      "value_ppm": 250000
+    }
+  ],
+  "model_identity_sha256": "1111111111111111111111111111111111111111111111111111111111111111",
+  "evaluator_version": "mel-grounding-model-eval-v1",
+  "scoring_plan_sha256": "2222222222222222222222222222222222222222222222222222222222222222"
+}

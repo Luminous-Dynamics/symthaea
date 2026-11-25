@@ -77,3 +77,29 @@ Run the synthetic dual-stream plan with:
     cargo +1.96.0 run --locked --manifest-path tools/mel-temporal-grounding-qualifier/Cargo.toml --bin mel-annotation-acquisition-plan -- tools/mel-temporal-grounding-qualifier/fixtures/mel-annotation-acquisition.synthetic.json
 
 The committed fixture is 11 candidates across two strata. It is a deterministic planner control only; no human study, unbiased population estimate, or annotation-quality improvement is established.
+
+
+## Two-stage finite-population design estimator
+
+The `temporal_design_estimator` module replays the source-balanced annotation acquisition planner from the exact candidate frame, configuration and seed. Reviewed runs should supply `expected_selection_receipt_sha256`; a mismatch is rejected. A null expected digest is allowed only for a fresh deterministic demonstration and is explicitly marked unverified.
+
+Only completed outcomes for selected `ProbabilityAudit` items are accepted. Each outcome is bound to the selected item’s source-work digest, scoring-report digest, model identity, evaluator version and scoring-plan digest. The whole run must use one model/evaluator/plan identity. Missing, duplicate, extra, non-audit, wrong-metric, wrong-source and out-of-range outcomes are rejected. These references are still unauthenticated metadata until an independent evidence verifier authenticates them.
+
+The estimator reports two different finite-population estimands; they must not be conflated:
+
+- **Query-item-weighted total and mean:** every eligible query item has equal target weight. The Horvitz–Thompson total is \(\hat T_{item}=\sum_{i\in s}y_i/\pi_i\), and the mean divides by the known number of eligible query items.
+- **Source-work-weighted total and mean:** every source work has equal target weight, regardless of its number of eligible query items. Each item contributes \(y_{wi}/N_w\) to the source-work total before Horvitz–Thompson weighting. The estimated total is the sum of work means; the population mean divides by the number of eligible source works.
+
+For a two-stage stratum with \(W\) eligible source works and \(K\) selected works, and work \(w\) containing \(N_w\) eligible items with \(m_w\) sampled, the first-order item inclusion probability is \(\pi_{wi}=(K/W)(m_w/N_w)\). For two distinct items in the same work, \(\pi_{ij}=(K/W)\,m_w(m_w-1)/(N_w(N_w-1))\). For different works, \(\pi_{ij}=K(K-1)/(W(W-1))\,(m_w/N_w)(m_v/N_v)\). The general HT variance estimator uses these first- and second-order probabilities for each estimand separately.
+
+Variance is withheld when the design does not support it (for example, fewer than two sampled works when multiple works exist, or insufficient within-work sampling), or when an inclusion probability is zero/invalid or the computed variance is negative/non-finite. It never fabricates a confidence interval from an unavailable variance. A complete census of a one-work finite population has zero design variance; observing one work out of several does **not** identify between-work variance.
+
+Run the synthetic one-work complete-census example with:
+
+    cargo +1.96.0 run --locked --manifest-path tools/mel-temporal-grounding-qualifier/Cargo.toml --bin mel-two-stage-design-estimator -- tools/mel-temporal-grounding-qualifier/fixtures/mel-two-stage-design-estimator.synthetic.json
+
+That fixture has one eligible work and two eligible query items, both selected. It returns query-item total 1.0 and mean 0.5; source-work total and mean are both 0.5; both design variances are zero because the entire finite population is observed.
+
+The Rust exhaustive oracle separately enumerates all three possible two-of-three source-work samples for a six-query finite population. It verifies that the average query-item HT total equals the true population total 3.0 and the average estimated query-item variance equals 1.5. It also verifies that the source-work-weighted HT mean is 0.5 and its average estimated total variance equals 0.375. This validates the estimator equations on synthetic finite populations, not a field result or authenticated human/model outcome.
+
+The report flags `observed_outcomes_authenticated=false` and `population_confidence_claim_permitted=false`. A design-based variance estimate is not a license to claim population generalization unless the sampling frame, selection receipts, scoring outputs, rights/consent, and measurement process are independently qualified.
