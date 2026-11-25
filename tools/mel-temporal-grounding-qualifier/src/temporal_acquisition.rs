@@ -1386,15 +1386,49 @@ mod tests {
         let mut dataset = synthetic_dataset();
         dataset.config.stratum_quotas[0].audit_source_work_count = 1;
         dataset.config.stratum_quotas[1].audit_source_work_count = 1;
+
+        // stratum-a now has two eligible source works: work f has two items,
+        // while work h has one. The sampled item's conditional probability
+        // must reflect its work's eligible item count.
+        dataset.candidates[6].source_work_id_sha256 =
+            dataset.candidates[5].source_work_id_sha256.clone();
+        dataset.candidates[6].recording_sha256 =
+            dataset.candidates[5].recording_sha256.clone();
+
         let report = plan_annotation_acquisition(&dataset).unwrap();
-        assert!(report.probability_audit.iter().all(|item| {
-            item.source_work_inclusion_probability.unwrap()
-                == ProbabilityFractionV1 { numerator: 1, denominator: 3 }
-                && item.item_given_source_work_probability.unwrap()
-                    == ProbabilityFractionV1 { numerator: 1, denominator: 1 }
-                && item.item_inclusion_probability.unwrap()
-                    == ProbabilityFractionV1 { numerator: 1, denominator: 3 }
-        }));
+        assert_eq!(report.probability_audit.len(), 2);
+        for item in &report.probability_audit {
+            assert_eq!(
+                item.source_work_inclusion_probability.unwrap(),
+                ProbabilityFractionV1 {
+                    numerator: 1,
+                    denominator: 2,
+                }
+            );
+            let conditional = item.item_given_source_work_probability.unwrap();
+            let expected = if item.source_work_id_sha256
+                == dataset.candidates[5].source_work_id_sha256
+            {
+                ProbabilityFractionV1 {
+                    numerator: 1,
+                    denominator: 2,
+                }
+            } else {
+                ProbabilityFractionV1 {
+                    numerator: 1,
+                    denominator: 1,
+                }
+            };
+            assert_eq!(conditional, expected);
+            let item_probability = item.item_inclusion_probability.unwrap();
+            let lhs = item_probability.numerator
+                * (item.source_work_inclusion_probability.unwrap().denominator)
+                * conditional.denominator;
+            let rhs = item.source_work_inclusion_probability.unwrap().numerator
+                * conditional.numerator
+                * item_probability.denominator;
+            assert_eq!(lhs, rhs);
+        }
     }
 
     #[test]
