@@ -58,7 +58,8 @@
         "not_qualified",
         "invalid_evidence",
         "independent_adjudication",
-        "measure_and_report"
+        "measure_and_report",
+        "inconclusive"
       ]
     },
     "oracle_assertions": {
