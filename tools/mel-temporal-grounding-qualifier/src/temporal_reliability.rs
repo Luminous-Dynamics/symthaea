@@ -65,6 +65,25 @@ pub struct NominalKrippendorffAlphaV1 {
 }
 
 #[derive(Debug, Clone, PartialEq, Serialize)]
+pub struct SourceWorkAlphaBootstrapV1 {
+    pub metric: &'static str,
+    pub source_work_clusters: usize,
+    pub bootstrap_replicates_requested: usize,
+    pub bootstrap_replicates_valid: usize,
+    pub bootstrap_replicates_degenerate: usize,
+    pub seed: u64,
+    pub valid_fraction: f64,
+    pub estimate: Option<f64>,
+    pub percentile_95_low: Option<f64>,
+    pub percentile_95_high: Option<f64>,
+    /// Proposed confirmatory floor; not a substitute for power analysis or
+    /// representative source-work sampling.
+    pub recommended_confirmatory_cluster_floor: usize,
+    pub confirmatory_cluster_floor_met: bool,
+    pub status_reason: Option<String>,
+}
+
+#[derive(Debug, Clone, PartialEq, Serialize)]
 pub struct TemporalPairwiseReliabilityV1 {
     pub threshold: f64,
     pub present_present_pairs: usize,
@@ -99,6 +118,7 @@ pub struct TemporalReliabilityReportV1 {
     pub minimum_annotations_per_unit: u16,
     /// Formal alpha applies only to the nominal four-state disposition.
     pub disposition_alpha: NominalKrippendorffAlphaV1,
+    pub disposition_alpha_source_work_bootstrap: Option<SourceWorkAlphaBootstrapV1>,
     /// Macro average across query items, so a heavily annotated item cannot
     /// dominate a sparsely annotated item.
     pub pairwise_by_iou_threshold: Vec<TemporalPairwiseReliabilityV1>,
@@ -273,6 +293,7 @@ pub fn audit_reliability_corpus(
         total_annotation_records,
         minimum_annotations_per_unit: corpus.minimum_annotations_per_unit,
         disposition_alpha,
+        disposition_alpha_source_work_bootstrap: None,
         pairwise_by_iou_threshold,
         unit_summaries,
         raw_annotation_records_preserved: true,
@@ -281,6 +302,174 @@ pub fn audit_reliability_corpus(
         population_confidence_interval_computed: false,
         source_work_bootstrap_computed: false,
     })
+}
+
+/// Audit the corpus and add a deterministic source-work-cluster bootstrap
+/// interval for nominal disposition alpha. All query-items from a sampled
+/// source work travel together in each replicate.
+pub fn audit_reliability_corpus_with_source_bootstrap(
+    corpus: &TemporalReliabilityCorpusV1,
+    bootstrap_replicates: usize,
+    seed: u64,
+) -> Result<TemporalReliabilityReportV1, String> {
+    if bootstrap_replicates < 1_000 {
+        return Err("source-work alpha bootstrap requires at least 1,000 replicates".into());
+    }
+    if seed == 0 {
+        return Err("source-work alpha bootstrap seed must be nonzero".into());
+    }
+
+    let mut report = audit_reliability_corpus(corpus)?;
+    let mut by_lineage: BTreeMap<&str, Vec<&TemporalReliabilityUnitV1>> = BTreeMap::new();
+    for unit in &corpus.units {
+        by_lineage
+            .entry(unit.source_lineage_sha256.as_str())
+            .or_default()
+            .push(unit);
+    }
+    if by_lineage.len() < 2 {
+        return Err("source-work bootstrap requires at least two independent lineages".into());
+    }
+
+    let lineages: Vec<Vec<&TemporalReliabilityUnitV1>> =
+        by_lineage.values().cloned().collect();
+    let original_units: Vec<&TemporalReliabilityUnitV1> = corpus.units.iter().collect();
+    let estimate = nominal_alpha_for_units(&original_units)?;
+    let mut rng_state = seed;
+    let mut samples = Vec::with_capacity(bootstrap_replicates);
+    let mut degenerate = 0_usize;
+
+    for _ in 0..bootstrap_replicates {
+        let mut sampled_units = Vec::new();
+        for _ in 0..lineages.len() {
+            let selected = unbiased_index(&mut rng_state, lineages.len());
+            sampled_units.extend(lineages[selected].iter().copied());
+        }
+        match nominal_alpha_for_units(&sampled_units)? {
+            Some(value) if value.is_finite() => samples.push(value),
+            _ => degenerate = degenerate
+                .checked_add(1)
+                .ok_or_else(|| "degenerate bootstrap replicate count overflow".to_string())?,
+        }
+    }
+
+    let valid_fraction = samples.len() as f64 / bootstrap_replicates as f64;
+    let (low, high, status_reason) = if samples.len() >= (bootstrap_replicates * 9).div_ceil(10) {
+        let mut ordered = samples.clone();
+        ordered.sort_by(f64::total_cmp);
+        let last = ordered.len() - 1;
+        let low_index = ((last as f64) * 0.025).floor() as usize;
+        let high_index = ((last as f64) * 0.975).ceil() as usize;
+        (
+            Some(ordered[low_index]),
+            Some(ordered[high_index.min(last)]),
+            None,
+        )
+    } else {
+        (
+            None,
+            None,
+            Some("fewer than 90% of bootstrap replicates had defined alpha".into()),
+        )
+    };
+
+    report.disposition_alpha_source_work_bootstrap = Some(SourceWorkAlphaBootstrapV1 {
+        metric: "krippendorff_alpha_nominal_source_work_cluster_bootstrap",
+        source_work_clusters: lineages.len(),
+        bootstrap_replicates_requested: bootstrap_replicates,
+        bootstrap_replicates_valid: samples.len(),
+        bootstrap_replicates_degenerate: degenerate,
+        seed,
+        valid_fraction,
+        estimate,
+        percentile_95_low: low,
+        percentile_95_high: high,
+        recommended_confirmatory_cluster_floor: 30,
+        confirmatory_cluster_floor_met: lineages.len() >= 30,
+        status_reason,
+    });
+    report.source_work_bootstrap_computed = true;
+    Ok(report)
+}
+
+fn nominal_alpha_for_units(
+    units: &[&TemporalReliabilityUnitV1],
+) -> Result<Option<f64>, String> {
+    let mut pooled = CategoryCounts::default();
+    let mut total_ratings = 0_usize;
+    let mut observed_sum = 0.0_f64;
+
+    for unit in units {
+        let mut counts = CategoryCounts::default();
+        for annotation in &unit.annotations {
+            counts.increment(annotation.state);
+        }
+        let ratings = unit.annotations.len();
+        if ratings < 2 {
+            return Err("bootstrap item has fewer than two ratings".into());
+        }
+        let squares = counts.values().iter().try_fold(0_usize, |sum, count| {
+            sum.checked_add(
+                count.checked_mul(*count)
+                    .ok_or_else(|| "bootstrap category square overflow".to_string())?
+            ).ok_or_else(|| "bootstrap category-square sum overflow".to_string())
+        })?;
+        let ordered_pairs = ratings.checked_mul(ratings)
+            .ok_or_else(|| "bootstrap item pair count overflow".to_string())?;
+        let disagreement = ordered_pairs.checked_sub(squares)
+            .ok_or_else(|| "bootstrap item disagreement underflow".to_string())?;
+        observed_sum += disagreement as f64 / (ratings - 1) as f64;
+        total_ratings = total_ratings.checked_add(ratings)
+            .ok_or_else(|| "bootstrap rating total overflow".to_string())?;
+        pooled.present = pooled.present.checked_add(counts.present)
+            .ok_or_else(|| "bootstrap Present total overflow".to_string())?;
+        pooled.absent = pooled.absent.checked_add(counts.absent)
+            .ok_or_else(|| "bootstrap Absent total overflow".to_string())?;
+        pooled.ambiguous = pooled.ambiguous.checked_add(counts.ambiguous)
+            .ok_or_else(|| "bootstrap Ambiguous total overflow".to_string())?;
+        pooled.not_estimable = pooled.not_estimable.checked_add(counts.not_estimable)
+            .ok_or_else(|| "bootstrap NotEstimable total overflow".to_string())?;
+    }
+    if total_ratings < 2 {
+        return Ok(None);
+    }
+    let squares = pooled.values().iter().try_fold(0_usize, |sum, count| {
+        sum.checked_add(
+            count.checked_mul(*count)
+                .ok_or_else(|| "bootstrap pooled category square overflow".to_string())?
+        ).ok_or_else(|| "bootstrap pooled category-square sum overflow".to_string())
+    })?;
+    let all_pairs = total_ratings.checked_mul(total_ratings)
+        .ok_or_else(|| "bootstrap pooled pair count overflow".to_string())?;
+    let denominator = total_ratings.checked_mul(total_ratings - 1)
+        .ok_or_else(|| "bootstrap pooled denominator overflow".to_string())?;
+    let expected_num = all_pairs.checked_sub(squares)
+        .ok_or_else(|| "bootstrap expected disagreement underflow".to_string())?;
+    let expected = expected_num as f64 / denominator as f64;
+    if expected <= f64::EPSILON {
+        return Ok(None);
+    }
+    let observed = observed_sum / total_ratings as f64;
+    Ok(Some(1.0 - observed / expected))
+}
+
+fn next_splitmix64(state: &mut u64) -> u64 {
+    *state = state.wrapping_add(0x9E37_79B9_7F4A_7C15);
+    let mut value = *state;
+    value = (value ^ (value >> 30)).wrapping_mul(0xBF58_476D_1CE4_E5B9);
+    value = (value ^ (value >> 27)).wrapping_mul(0x94D0_49BB_1331_11EB);
+    value ^ (value >> 31)
+}
+
+fn unbiased_index(state: &mut u64, upper_bound: usize) -> usize {
+    let bound = upper_bound as u64;
+    let limit = u64::MAX - (u64::MAX % bound);
+    loop {
+        let value = next_splitmix64(state);
+        if value < limit {
+            return (value % bound) as usize;
+        }
+    }
 }
 
 fn validate_corpus(corpus: &TemporalReliabilityCorpusV1) -> Result<(), String> {
@@ -828,6 +1017,48 @@ mod tests {
         assert_eq!(result.disposition_alpha.category_counts["Absent"], 1);
         assert_eq!(result.disposition_alpha.category_counts["Ambiguous"], 1);
         assert_eq!(result.disposition_alpha.category_counts["NotEstimable"], 2);
+    }
+
+    #[test]
+    fn source_work_alpha_bootstrap_is_deterministic_and_warns_on_small_corpus() {
+        let json = include_str!("../fixtures/mel-temporal-reliability-corpus.synthetic.json");
+        let corpus: TemporalReliabilityCorpusV1 = serde_json::from_str(json).unwrap();
+        let first =
+            audit_reliability_corpus_with_source_bootstrap(&corpus, 1_000, 0x2026_1125)
+                .unwrap();
+        let second =
+            audit_reliability_corpus_with_source_bootstrap(&corpus, 1_000, 0x2026_1125)
+                .unwrap();
+        let bootstrap = first
+            .disposition_alpha_source_work_bootstrap
+            .as_ref()
+            .unwrap();
+        assert_eq!(
+            first.disposition_alpha_source_work_bootstrap,
+            second.disposition_alpha_source_work_bootstrap
+        );
+        assert_eq!(bootstrap.source_work_clusters, 3);
+        assert_eq!(bootstrap.bootstrap_replicates_requested, 1_000);
+        assert!(bootstrap.bootstrap_replicates_valid >= 900);
+        assert_eq!(bootstrap.recommended_confirmatory_cluster_floor, 30);
+        assert!(!bootstrap.confirmatory_cluster_floor_met);
+        assert_eq!(bootstrap.estimate, first.disposition_alpha.alpha);
+        assert!(!first.population_confidence_interval_computed);
+        assert!(first.source_work_bootstrap_computed);
+    }
+
+    #[test]
+    fn source_work_alpha_bootstrap_requires_multiple_lineages_and_valid_seed() {
+        let json = include_str!("../fixtures/mel-temporal-reliability-corpus.synthetic.json");
+        let mut corpus: TemporalReliabilityCorpusV1 = serde_json::from_str(json).unwrap();
+        for unit in &mut corpus.units {
+            unit.source_lineage_sha256 = "eeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeee".into();
+        }
+        assert!(audit_reliability_corpus_with_source_bootstrap(&corpus, 1_000, 1).is_err());
+
+        let corpus: TemporalReliabilityCorpusV1 = serde_json::from_str(json).unwrap();
+        assert!(audit_reliability_corpus_with_source_bootstrap(&corpus, 999, 1).is_err());
+        assert!(audit_reliability_corpus_with_source_bootstrap(&corpus, 1_000, 0).is_err());
     }
 
     #[test]
