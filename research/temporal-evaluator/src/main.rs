@@ -8,6 +8,7 @@
 //!
 //! No function here supplies evaluator outcomes to candidate-side policies.
 
+pub mod dmc_restore_contract;
 pub mod decision_observability;
 pub mod decision_regret_voi;
 pub mod decision_sufficient_representation;

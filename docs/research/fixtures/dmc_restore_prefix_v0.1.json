@@ -1,0 +1,114 @@
+{
+  "schema_version": "dmc-restore-prefix-fixtures-v0.1",
+  "status": "semantic-fixtures-only",
+  "pinned_sources": {
+    "dm_control_commit": "d7e52e3602a555df6cc20cc928ea5b41e9920158",
+    "dm_control_version": "1.0.52",
+    "mujoco_version": "4.0.1",
+    "mujoco_state_signature": "mjSTATE_INTEGRATION",
+    "mujoco_state_signature_value": 32767,
+    "mujoco_state_signature_hex": "0x7fff"
+  },
+  "admission_invariants": [
+    "Default Physics.get_state() with sig=None is a legacy compact state and is not accepted as complete branch-point state.",
+    "Only explicit mjSTATE_INTEGRATION at pinned numeric mask 32767 or Physics.copy(share_model=False) is accepted as physics snapshot type.",
+    "Python task, wrapper and driver/controller state are separate from MjData and must be captured and bound.",
+    "Task RandomState is required; if sensor noise is enabled, its independent MuJoCo RNG state is required separately.",
+    "Prefix state and observation maximum absolute error must each be <= 1e-9 before intervention.",
+    "Auxiliary rest/settling may only be present if part of the common factual prefix.",
+    "All sibling branches share the same snapshot, exogenous schedule, prefix trace and branch-point step.",
+    "Post-intervention trajectories may diverge or remain identical in a null case."
+  ],
+  "fixtures": [
+    {
+      "id": "DMC-RST-01-LEGACY-COMPACT-REJECT",
+      "purpose": "Reject default compact Physics.get_state() as complete state.",
+      "expected": "REJECT_LEGACY_COMPACT"
+    },
+    {
+      "id": "DMC-RST-02-PINNED-INTEGRATION-ADMIT",
+      "purpose": "Admit explicit 4.0.1 mjSTATE_INTEGRATION at 32767 with fresh-process prefix matches.",
+      "expected": "ACCEPT"
+    },
+    {
+      "id": "DMC-RST-03-WRONG-INTEGRATION-MASK",
+      "purpose": "Reject a symbolic integration signature with a wrong numeric value.",
+      "expected": "REJECT_WRONG_MASK"
+    },
+    {
+      "id": "DMC-RST-04-PLUGIN-STATE-MISSING",
+      "purpose": "Reject a plugin model whose snapshot omits plugin state.",
+      "expected": "REJECT_MISSING_PLUGIN_STATE"
+    },
+    {
+      "id": "DMC-RST-05-SENSOR-RNG-MISSING",
+      "purpose": "Reject enabled MuJoCo sensor noise without a captured independent RNG state.",
+      "expected": "REJECT_MISSING_SENSOR_RNG"
+    },
+    {
+      "id": "DMC-RST-06-WRAPPER-RESET-PENDING",
+      "purpose": "Reject a branch point whose dm_env wrapper will reset on the next step.",
+      "expected": "REJECT_RESET_PENDING"
+    },
+    {
+      "id": "DMC-RST-07-WRAPPER-STEP-COUNT-MISMATCH",
+      "purpose": "Reject wrapper step count that differs from the claimed branch-point tick.",
+      "expected": "REJECT_STEP_COUNT"
+    },
+    {
+      "id": "DMC-RST-08-BRANCH-ONLY-REST",
+      "purpose": "Reject an auxiliary rest operation applied only to a branch.",
+      "expected": "REJECT_BRANCH_ONLY_REST"
+    },
+    {
+      "id": "DMC-RST-09-DEEP-PHYSICS-COPY",
+      "purpose": "Accept Physics.copy(share_model=False) with bound model and data digests.",
+      "expected": "ACCEPT"
+    },
+    {
+      "id": "DMC-RST-10-PREFIX-STATE-ERROR",
+      "purpose": "Reject state-prefix error above 1e-9.",
+      "expected": "REJECT_PREFIX_STATE"
+    },
+    {
+      "id": "DMC-RST-11-PREFIX-OBSERVATION-ERROR",
+      "purpose": "Reject observation-prefix error above 1e-9.",
+      "expected": "REJECT_PREFIX_OBSERVATION"
+    },
+    {
+      "id": "DMC-RST-12-FRESH-PROCESS-REPLAY-MISSING",
+      "purpose": "Reject missing fresh-process replay evidence.",
+      "expected": "REJECT_NO_FRESH_REPLAY"
+    },
+    {
+      "id": "DMC-RST-13-EXOGENOUS-SCHEDULE-MISMATCH",
+      "purpose": "Reject sibling branch with different exogenous schedule.",
+      "expected": "REJECT_EXOGENOUS_MISMATCH"
+    },
+    {
+      "id": "DMC-RST-14-LEGAL-BRANCH-DIVERGENCE",
+      "purpose": "Allow post-intervention trajectories to differ after common complete reset.",
+      "expected": "ACCEPT"
+    },
+    {
+      "id": "DMC-RST-15-NULL-TRAJECTORY",
+      "purpose": "Allow identical post-intervention trajectories for a valid null case.",
+      "expected": "ACCEPT"
+    }
+  ],
+  "ownership": {
+    "dm_control_physics_state": "Pinned Python adapter provides complete-state evidence; the Rust validator does not execute MuJoCo.",
+    "individual_effect_arithmetic": "Symthaea #13520",
+    "DMC_formulation": "Symthaea #13530",
+    "generic_branch_lineage": "Symthaea #13375/#13377",
+    "stochastic_correspondence": "Symtropy #3690/#3741/#3743",
+    "evaluator_isolation": "Symthaea #9437",
+    "DMC_restore_qualification": "Symthaea #13566"
+  },
+  "non_claims": [
+    "No MuJoCo or dm_control simulation was run by this validator.",
+    "No complete Python object-graph snapshot is created or authenticated here.",
+    "No posterior training, DMC eligibility replication, world-model training or outcome benchmark is run.",
+    "No physical validation, policy improvement, safety or SOTA claim is made."
+  ]
+}
