@@ -159,6 +159,9 @@ pub struct CaOcrcLabelDeliveryV1 {
     pub label_available_at_unix_seconds: i64,
     pub eligibility_report_available_at_unix_seconds: i64,
     pub delivered_at_unix_seconds: i64,
+    /// Round when this K1-qualified loss becomes usable by CA-OCRC.
+    /// If a physical result arrives before it is K1-eligible, the qualified
+    /// feedback delay ends only when the valid K1 receipt is available.
     pub delivered_round: u64,
     pub clock_domain_id: String,
     pub idempotency_key: String,
@@ -361,8 +364,8 @@ fn validate_distribution(
             "proxy PMF probabilities must sum to one".into(),
         ));
     }
-    let load = proxy_tracking_load_v1(distribution)?;
-    Ok(load)
+    proxy_tracking_load_v1(distribution)?;
+    Ok(())
 }
 
 pub fn proxy_survival_probability_v1(
@@ -407,6 +410,15 @@ fn validate_policy(policy: &CaOcrcPolicyV1) -> Result<(), CaOcrcErrorV1> {
     }
     validate_distribution(&policy.proxy_distribution, policy.maximum_real_delay)?;
     let load = proxy_tracking_load_v1(&policy.proxy_distribution)?;
+    let final_survival = proxy_survival_probability_v1(
+        &policy.proxy_distribution,
+        policy.maximum_real_delay,
+    )?;
+    if final_survival <= 0.0 {
+        return Err(CaOcrcErrorV1(
+            "F(d_max) must be positive for a finite arbitrary-delay theorem bound".into(),
+        ));
+    }
     if load > policy.tracking_capacity as f64 + 1.0e-12 {
         return Err(CaOcrcErrorV1(
             "proxy tracking load exceeds the declared capacity under Assumption 4".into(),
@@ -840,7 +852,14 @@ fn process_round_inner(
     let mut feedback_receipts = Vec::with_capacity(deliveries.len());
     let mut feedback_update_sum = 0.0;
     let mut received_issue_rounds = BTreeSet::new();
-    for delivery in deliveries {
+    let mut ordered_deliveries: Vec<&CaOcrcLabelDeliveryV1> = deliveries.iter().collect();
+    ordered_deliveries.sort_by(|left, right| {
+        left.sample_id
+            .cmp(&right.sample_id)
+            .then_with(|| left.label_id.cmp(&right.label_id))
+            .then_with(|| left.label_revision.cmp(&right.label_revision))
+    });
+    for delivery in ordered_deliveries {
         require_text(&delivery.sample_id, "delivery.sample_id")?;
         require_text(&delivery.label_id, "delivery.label_id")?;
         require_text(
@@ -912,6 +931,9 @@ fn process_round_inner(
                 engine.guarantee_state =
                     CaOcrcGuaranteeStateV1::UncertifiedInvalidOrOutOfModelFeedback;
                 engine.rejected_feedback_count = engine.rejected_feedback_count.saturating_add(1);
+                // The K1 decision is final BLOCKED, so there is no future
+                // qualified loss to wait for. Free the feedback-tracking slot.
+                engine.tracking_set.remove(&issue_round);
                 CaOcrcFeedbackDispositionV1::Blocked
             } else {
                 engine.guarantee_state =
@@ -1137,6 +1159,7 @@ pub fn bernoulli_proxy_distribution_v1(
 /// policy satisfies Assumption 4 (tracking load <= capacity).
 pub fn arbitrary_delay_ca_ocrc_risk_bound_v1(
     score_bound: f64,
+    initial_threshold: f64,
     learning_rate: f64,
     horizon: u64,
     capacity: usize,
@@ -1144,6 +1167,9 @@ pub fn arbitrary_delay_ca_ocrc_risk_bound_v1(
 ) -> Result<f64, CaOcrcErrorV1> {
     if !score_bound.is_finite()
         || score_bound <= 0.0
+        || !initial_threshold.is_finite()
+        || initial_threshold < 0.0
+        || initial_threshold > score_bound
         || !learning_rate.is_finite()
         || learning_rate <= 0.0
         || horizon == 0
@@ -1593,7 +1619,7 @@ mod tests {
     fn arbitrary_delay_risk_bound_matches_known_formula() {
         let distribution = bernoulli_proxy_distribution_v1("p", 2, 0.5).unwrap();
         let bound =
-            arbitrary_delay_ca_ocrc_risk_bound_v1(10.0, 0.2, 100, 2, &distribution).unwrap();
+            arbitrary_delay_ca_ocrc_risk_bound_v1(10.0, 0.0, 0.2, 100, 2, &distribution).unwrap();
         let load = 1.0;
         let h = load / 2.0 - 1.0 - (load / 2.0_f64).ln();
         let expected = 10.0 / (0.2 * 100.0) + 3.0 / (0.5 * 100.0) + (-2.0 * h).exp();
