@@ -425,6 +425,15 @@ mod tests {
                 .outcome_count,
             1
         );
+
+        let recorded = consciousness.learner.adjudicated_outcomes().next().unwrap();
+        let provenance = recorded.adjudication_provenance.as_ref().unwrap();
+        assert_eq!(provenance.kind, AdjudicationKind::IndependentEvaluator);
+        assert_eq!(provenance.authority_id, "independent-evaluator-test");
+        assert_eq!(
+            provenance.evidence_reference,
+            "urn:example:receipt:sha256:0123456789abcdef"
+        );
     }
 
     #[test]
