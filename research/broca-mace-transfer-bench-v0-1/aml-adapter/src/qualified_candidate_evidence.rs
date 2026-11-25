@@ -458,8 +458,9 @@ mod tests {
         let ids = ids(&batch); let binding = binding(&batch, &ids);
         let token = token(&binding, &[EvidenceDispositionV1::Admissible]);
         let mut expected = expectation(&batch); expected.query_scope = "tenant:other";
-        assert_eq!(project_qualified_candidate_evidence_v1(&batch, &token, &binding, &expected),
-            Err(CandidateEvidenceProjectionRejectV1::BatchIdentityMismatch));
+        assert_eq!(project_qualified_candidate_evidence_v1(
+            &batch, &token, &binding, &expected, &TestVerifier,
+        ), Err(CandidateEvidenceProjectionRejectV1::BatchIdentityMismatch));
     }
 
     #[test]
