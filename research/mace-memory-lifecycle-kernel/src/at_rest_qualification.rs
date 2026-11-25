@@ -88,6 +88,10 @@ pub struct T9WholeStoreRollbackEvidenceV1 {
     pub before_snapshot_sha256: String,
     pub after_genuine_write_snapshot_sha256: String,
     pub restored_snapshot_sha256: String,
+    /// Digest of the exact normalized storage delta expected for this write.
+    pub expected_edit_delta_sha256: String,
+    /// Digest of the normalized raw-store delta measured by the evaluator adapter.
+    pub observed_edit_delta_sha256: String,
     pub before_inventory: StoreInventoryV1,
     pub after_genuine_write_inventory: StoreInventoryV1,
     pub restored_inventory: StoreInventoryV1,
@@ -108,6 +112,10 @@ pub struct T10ErasureResurrectionEvidenceV1 {
     pub before_snapshot_sha256: String,
     pub after_erasure_snapshot_sha256: String,
     pub restored_snapshot_sha256: String,
+    /// Digest of the exact normalized storage delta expected for this erasure.
+    pub expected_edit_delta_sha256: String,
+    /// Digest of the normalized raw-store delta measured by the evaluator adapter.
+    pub observed_edit_delta_sha256: String,
     pub before_inventory: StoreInventoryV1,
     pub after_erasure_inventory: StoreInventoryV1,
     pub restored_inventory: StoreInventoryV1,
@@ -180,6 +188,7 @@ pub enum AtRestRejectV1 {
     OperationReceiptInvalid,
     SnapshotDigestInvalid,
     SnapshotDidNotChange,
+    EditDeltaMismatch,
     RestoredSnapshotMismatch,
     InventoryInvalid,
     UnexpectedInventoryChange,
@@ -336,6 +345,7 @@ fn validate_t9_evidence(value: &T9WholeStoreRollbackEvidenceV1) -> Result<(), At
         &value.after_genuine_write_snapshot_sha256,
         &value.restored_snapshot_sha256,
     )?;
+    validate_edit_delta(&value.expected_edit_delta_sha256, &value.observed_edit_delta_sha256)?;
     value.before_inventory.validate().map_err(|_| AtRestRejectV1::InventoryInvalid)?;
     value.after_genuine_write_inventory.validate().map_err(|_| AtRestRejectV1::InventoryInvalid)?;
     value.restored_inventory.validate().map_err(|_| AtRestRejectV1::InventoryInvalid)?;
@@ -384,6 +394,7 @@ fn validate_t10_evidence(value: &T10ErasureResurrectionEvidenceV1) -> Result<(),
         &value.after_erasure_snapshot_sha256,
         &value.restored_snapshot_sha256,
     )?;
+    validate_edit_delta(&value.expected_edit_delta_sha256, &value.observed_edit_delta_sha256)?;
     value.before_inventory.validate().map_err(|_| AtRestRejectV1::InventoryInvalid)?;
     value.after_erasure_inventory.validate().map_err(|_| AtRestRejectV1::InventoryInvalid)?;
     value.restored_inventory.validate().map_err(|_| AtRestRejectV1::InventoryInvalid)?;
@@ -422,6 +433,15 @@ fn validate_t10_evidence(value: &T10ErasureResurrectionEvidenceV1) -> Result<(),
         &value.before_inventory,
         &value.restored_inventory,
     )
+}
+
+fn validate_edit_delta(expected: &str, observed: &str) -> Result<(), AtRestRejectV1> {
+    validate_sha256(expected).map_err(|_| AtRestRejectV1::InvalidDigest)?;
+    validate_sha256(observed).map_err(|_| AtRestRejectV1::InvalidDigest)?;
+    if expected != observed {
+        return Err(AtRestRejectV1::EditDeltaMismatch);
+    }
+    Ok(())
 }
 
 fn validate_snapshot_digests(
@@ -571,6 +591,8 @@ mod tests {
             before_snapshot_sha256: digest('1'),
             after_genuine_write_snapshot_sha256: digest('2'),
             restored_snapshot_sha256: digest('1'),
+            expected_edit_delta_sha256: digest('7'),
+            observed_edit_delta_sha256: digest('7'),
             before_inventory: before.clone(),
             after_genuine_write_inventory: after,
             restored_inventory: before,
@@ -593,6 +615,8 @@ mod tests {
             before_snapshot_sha256: digest('1'),
             after_erasure_snapshot_sha256: digest('3'),
             restored_snapshot_sha256: digest('1'),
+            expected_edit_delta_sha256: digest('8'),
+            observed_edit_delta_sha256: digest('8'),
             before_inventory: before.clone(),
             after_erasure_inventory: after,
             restored_inventory: before,
@@ -716,6 +740,21 @@ mod tests {
         assert_eq!(
             validate_and_score_at_rest_report_v1(&value),
             Err(AtRestRejectV1::MissingControl)
+        );
+    }
+
+    #[test]
+    fn raw_storage_edit_delta_must_match_the_expected_single_operation() {
+        let mut value = report(rejected_on_read(), rejected_on_read());
+        if let AtRestCaseDispositionV1::Observed {
+            evidence: AtRestCaseEvidenceV1::T10(evidence),
+            ..
+        } = &mut value.cases[1].disposition {
+            evidence.observed_edit_delta_sha256 = digest('9');
+        }
+        assert_eq!(
+            validate_and_score_at_rest_report_v1(&value),
+            Err(AtRestRejectV1::EditDeltaMismatch)
         );
     }
 
