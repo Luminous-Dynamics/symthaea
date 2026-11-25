@@ -109,7 +109,7 @@ Not Applicable cases require a reason and are excluded from the denominator. Err
 
 ## Authored negative and positive tests
 
-The module includes tests for:
+The module now has **17 authored Rust tests** covering:
 
 - independently scored T9 and T10 outcomes;
 - T9 success alongside T10 failure, demonstrating that a combined score must not conceal the T10 weakness;
@@ -120,9 +120,22 @@ The module includes tests for:
 - expected versus observed raw-store delta mismatch;
 - N/A and Error exclusion without pass credit;
 - duplicate case-run identifiers;
-- invalid observation-class/detection-point combinations.
+- invalid observation-class/detection-point combinations;
+- ordered and source-bound event traces for C1/C2 and T9/T10;
+- cross-run event substitution, wrong source role, duplicated event IDs and non-monotonic event times;
+- operation acknowledgement / event receipt rebinding and trace-digest tampering;
+- fixed cross-language digest vectors for the four event traces.
 
-These tests are source additions only and have not been executed with Rust. No compile, format, Clippy, CI, benchmark run or security qualification is claimed.
+The independently calculated Python vectors, pinned in the Rust tests, are:
+
+| Trace | SHA-256 |
+|---|---|
+| T9 write/rollback episode | `783cd5060014ac6207f88ec1fc04999b500db95d0752af0f5c1520a00ba1dc61` |
+| T10 erase/resurrection episode | `c8a1ed06770d71e8ffd7942a5b46522d94de7aa47293499b96dc110a7f70442f` |
+| C1 no-op reload control | `b007969ea593e0fd9a63f672fb1993fa7a0f87dae15aaa5132d38a313e6fad1f` |
+| C2 genuine-write control | `5981de16e109a496de49bdc069ab16e88579b6e7eb09038f983ae1dee01c56a9` |
+
+These tests and vectors are source additions only and have **not** been executed with Rust. No compile, format, Clippy, CI, benchmark run or security qualification is claimed.
 
 ## Integration sequence
 
