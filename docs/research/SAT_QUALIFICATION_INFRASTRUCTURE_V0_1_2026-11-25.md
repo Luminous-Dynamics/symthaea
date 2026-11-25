@@ -85,6 +85,8 @@ The fixture file sat-qualification-contract-smoke-v0.1.jsonl now contains 14 met
 | 010 | Independent human judgment and AI withdrawal | Measure and report outcomes |
 | 011 | Refusal-only defense and benign utility | Measure utility and false blocks |
 | 012 | Revocation and TOCTOU at commit | Deny after revocation/expiry |
+| 013 | Stable idempotency with fresh attempt identity | Deny stale observation from prior attempt |
+| 014 | Causal linkage of sink observation | Invalid evidence on trace-splicing or wrong correlation |
 
 ## 6. External benchmarks and comparability
 
