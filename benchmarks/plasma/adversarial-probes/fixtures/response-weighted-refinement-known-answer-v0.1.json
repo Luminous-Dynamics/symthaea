@@ -1,0 +1,74 @@
+{
+  "schema_version": "0.1",
+  "case_id": "low-energy-high-future-response-mode-v1",
+  "input_modes": [
+    1,
+    2
+  ],
+  "output_modes": [
+    10
+  ],
+  "response_entries": [
+    {
+      "input_mode": 1,
+      "output_mode": 10,
+      "real": 0.01,
+      "imag": 0
+    },
+    {
+      "input_mode": 2,
+      "output_mode": 10,
+      "real": 1000,
+      "imag": 0
+    }
+  ],
+  "coefficients": [
+    {
+      "mode": 1,
+      "real": 1,
+      "imag": 0
+    },
+    {
+      "mode": 2,
+      "real": 0.0001,
+      "imag": 0
+    }
+  ],
+  "encoded_bytes": [
+    {
+      "mode": 1,
+      "bytes": 100
+    },
+    {
+      "mode": 2,
+      "bytes": 100
+    }
+  ],
+  "output_qoi_weights": [
+    1
+  ],
+  "response_loss_budget": 0.01,
+  "expected": {
+    "discarded_state_bytes": 100,
+    "accumulated_discarded_response_bound": 0.01,
+    "decisions": [
+      {
+        "mode": 1,
+        "spectral_energy": 1,
+        "response_loss_bound": 0.01,
+        "disposition": "discarded_within_budget"
+      },
+      {
+        "mode": 2,
+        "spectral_energy": 1e-8,
+        "response_loss_bound": 0.1,
+        "disposition": "retained_budget_exceeded"
+      }
+    ]
+  },
+  "claim_boundary": {
+    "status": "synthetic_known_answer_only",
+    "no_physical_solver_run": true,
+    "synthetic_response_map_only": true
+  }
+}
