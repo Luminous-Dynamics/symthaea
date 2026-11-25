@@ -888,7 +888,7 @@ mod tests {
             item_id: item_id.into(),
             query_id: format!("query-{item_id}"),
             source_work_id_sha256: work,
-            selective_report_sha256: digest(if item_id.starts_with('a') { '1' } else { '2' }),
+            selective_report_sha256: crate::evidence_digest::sha256_hex(item_id.as_bytes()),
             adjudication_profile_sha256: digest('3'),
             model_identity_sha256: digest('4'),
             runtime_identity_sha256: digest('5'),
@@ -1021,10 +1021,22 @@ mod tests {
 
     #[test]
     fn item_and_work_weighted_curves_are_distinct_for_unequal_work_sizes() {
-        let mut data = dataset(19, 3, 2);
-        data.candidates.push(candidate("a-extra", 'a'));
-        data.config.audit_items_per_source_work = 2;
-        let mut input = base_input(data);
+        let mut input = None;
+        for seed in 1_u64..=256 {
+            let mut data = dataset(seed, 3, 2);
+            data.candidates.push(candidate("a-extra", 'a'));
+            data.config.audit_items_per_source_work = 2;
+            let planned = plan_annotation_acquisition(&data).unwrap();
+            if planned
+                .probability_audit
+                .iter()
+                .any(|selection| selection.source_work_id_sha256 == digest('a'))
+            {
+                input = Some(base_input(data));
+                break;
+            }
+        }
+        let mut input = input.expect("a deterministic seed should select the larger source work");
         for outcome in &mut input.observed_probability_audit_outcomes {
             if outcome.item_id.starts_with('a') {
                 outcome.decision_correct = false;
