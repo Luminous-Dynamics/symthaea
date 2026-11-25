@@ -91,7 +91,10 @@ pub struct SelectiveCaseResultV1 {
     pub count_gated_f1: Option<f64>,
     pub false_absence_claim: bool,
     pub reason_correct: Option<bool>,
+    pub prediction: TemporalGroundingPredictionV1,
+    pub unconditional_prediction: TemporalGroundingPredictionV1,
     pub score: TemporalGroundingScoreV1,
+    pub unconditional_score: TemporalGroundingScoreV1,
 }
 
 #[derive(Debug, Clone, PartialEq, Serialize)]
@@ -409,7 +412,10 @@ fn score_case(
         }),
         false_absence_claim,
         reason_correct,
+        prediction: case.prediction.clone(),
+        unconditional_prediction: case.unconditional_prediction.clone(),
         score,
+        unconditional_score,
     })
 }
 
@@ -999,6 +1005,63 @@ mod tests {
     }
 
     #[test]
+    fn logged_unconditional_candidate_can_be_correct_even_when_policy_abstains() {
+        let mut abstain = case(
+            "abstain-with-correct-candidate",
+            GroundTruthStateV1::Present,
+            vec![crate::temporal_grounding::FrameIntervalV1 {
+                start_frame: 100,
+                end_frame: 200,
+            }],
+            None,
+            SelectiveDecisionV1::AbstainNotEstimable,
+            GroundingPredictionStateV1::NotEstimable {
+                reason: "policy abstained".into(),
+            },
+            0.6,
+        );
+        abstain.unconditional_prediction = prediction(
+            GroundingPredictionStateV1::Occurrences {
+                intervals: vec![crate::temporal_grounding::FrameIntervalV1 {
+                    start_frame: 100,
+                    end_frame: 200,
+                }],
+            },
+        );
+        let report = audit_selective_batch(&batch(vec![abstain])).unwrap();
+        assert_eq!(report.summary.coverage, 0.0);
+        assert_eq!(report.summary.always_answer_risk, 0.0);
+        assert_eq!(
+            report.case_results[0].unconditional_score.f1,
+            Some(1.0)
+        );
+        assert_eq!(report.case_results[0].unconditional_answer_correct, true);
+    }
+
+    #[test]
+    fn covered_decision_must_match_its_unconditional_candidate() {
+        let mut selected = case(
+            "mismatched-candidate",
+            GroundTruthStateV1::Present,
+            vec![crate::temporal_grounding::FrameIntervalV1 {
+                start_frame: 100,
+                end_frame: 200,
+            }],
+            None,
+            SelectiveDecisionV1::Answer,
+            GroundingPredictionStateV1::Occurrences {
+                intervals: vec![crate::temporal_grounding::FrameIntervalV1 {
+                    start_frame: 100,
+                    end_frame: 200,
+                }],
+            },
+            0.9,
+        );
+        selected.unconditional_prediction = prediction(GroundingPredictionStateV1::QueryAbsent);
+        assert!(audit_selective_batch(&batch(vec![selected])).is_err());
+    }
+
+    #[test]
     fn always_answer_and_random_abstention_baselines_are_reported() {
         let right = case(
             "baseline-right",
@@ -1024,8 +1087,8 @@ mod tests {
         assert_eq!(report.summary.coverage, 0.5);
         assert_eq!(report.summary.always_answer_coverage, 1.0);
         assert_eq!(report.summary.always_answer_risk, 0.5);
-        assert_eq!(report.summary.random_abstention_baseline_risk, Some(0.0));
-        assert_eq!(report.summary.random_abstention_baseline_aurc, Some(0.0));
+        assert_eq!(report.summary.random_abstention_baseline_risk, Some(0.5));
+        assert_eq!(report.summary.random_abstention_baseline_aurc, Some(0.5));
         assert_eq!(report.summary.always_abstain_coverage, 0.0);
         assert_eq!(report.summary.always_abstain_risk, None);
     }
