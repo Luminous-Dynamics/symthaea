@@ -1160,6 +1160,7 @@ fn verify_authority_binding(
         "authority_decision.exact_effect_digest",
         line_number,
     )?;
+    let _ = &authority.grant_refs;
     let projection = StrictJson::object(vec![
         ("action", StrictJson::string(&binding.action)),
         ("resource", StrictJson::string(&binding.resource)),
@@ -1685,6 +1686,9 @@ mod tests {
                 "sink_projection_id":"bank-ledger.transfer-record",
                 "sink_projection_version":"1"
             });
+            if event_type == "effect_reconciled" {
+                observation["reconciliation_ref"] = json!("reconciliation-read-1");
+            }
             if outcome == "observed_applied" {
                 observation["observed_projection"] = sink_projection.clone();
                 observation["observed_effect_digest"] =
@@ -1970,6 +1974,63 @@ mod tests {
         assert!(result.hold_required);
         assert_eq!(result.unresolved_idempotency_keys, vec!["pay-001"]);
         assert!(!result.system_qualified);
+    }
+
+    #[test]
+    fn altered_sink_projection_is_rejected_even_when_its_own_digest_is_valid() {
+        let submission = sample_event(1, "event-1", "effect_submitted", None, None, vec![]);
+        let previous = event_digest(&submission);
+        let mut observed = finish_event(sample_event(
+            2,
+            "event-2",
+            "effect_observed",
+            Some(&previous),
+            Some("observed_applied"),
+            vec!["event-1"],
+        ));
+        observed["effect_observation"]["observed_projection"]["recipient"] =
+            json!("attacker-account");
+        let observed = reseal_event_digest(observed);
+        let result = verify_trace(&trace(vec![submission, observed]), RUN_ID, MANIFEST);
+        assert!(matches!(
+            result.unwrap_err().code,
+            VerificationErrorCode::ObservedProjectionMismatch
+                | VerificationErrorCode::ObservedEffectDigestMismatch
+        ));
+    }
+
+    #[test]
+    fn commit_at_authority_expiry_is_rejected() {
+        let mut event = sample_event(1, "event-1", "effect_submitted", None, None, vec![]);
+        event["occurred_at"] = json!("2026-11-25T10:05:00Z");
+        let event = finish_event(event);
+        let result = verify_trace(&trace(vec![event]), RUN_ID, MANIFEST);
+        assert!(matches!(
+            result.unwrap_err().code,
+            VerificationErrorCode::SubmissionWithoutCurrentAllows
+        ));
+    }
+
+    #[test]
+    fn empty_trace_is_not_a_successful_verification() {
+        let result = verify_trace("", RUN_ID, MANIFEST);
+        assert!(matches!(
+            result.unwrap_err().code,
+            VerificationErrorCode::EmptyTrace
+        ));
+    }
+
+    #[test]
+    fn duplicate_json_keys_are_rejected_by_public_verifier() {
+        let result = verify_trace(
+            r#"{"schema_version":"sat-event-record/v0.1","run_id":"x","run_id":"y"}"#,
+            RUN_ID,
+            MANIFEST,
+        );
+        assert!(matches!(
+            result.unwrap_err().code,
+            VerificationErrorCode::DuplicateJsonKey(_)
+        ));
     }
 
     #[test]
