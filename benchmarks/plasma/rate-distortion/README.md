@@ -29,7 +29,7 @@ It records:
    - physical-gate PASS requires every listed gate to pass; synthetic fixtures cannot pass physical gates.
 3. **Independent scientific review:** verify actual digest targets, reference convergence, physical admissibility, branch association, split leakage and any claimed global response bound.
 
-The semantic audit cannot prove that a digest resolves to an authentic external file, establish physical convergence, or turn a finite probe library into a continuous worst-case certificate. It is a fail-closed consistency layer, not a substitute for scientific evidence.
+The Rust semantic audit checks KIRD schema version 0.1 itself as well as the cross-field rules, so direct CLI use cannot bypass version admission. It cannot prove that a digest resolves to an authentic external file, establish physical convergence, or turn a finite probe library into a continuous worst-case certificate. It is a fail-closed consistency layer, not a substitute for scientific evidence.
 
 ## Certified intervention cover (CIC)
 
