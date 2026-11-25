@@ -1,0 +1,344 @@
+{
+  "schema_version": "1.0.0",
+  "artifact_id": "LEAN-TRUST-CLOSURE-ASSURANCE-FIXTURES-001",
+  "status": "design_only_no_execution_claimed",
+  "protocol": "docs/research/LEAN_TRUST_CLOSURE_ASSURANCE_CAPSULE_V1.md",
+  "source_policy": "Each case is a test specification. No case in this file is claimed to have been executed or passed.",
+  "cases": [
+    {
+      "id": "TCAC-001-clean-kernel-proof",
+      "class": "positive_control",
+      "precondition": "A source-pinned theorem with no non-policy axiom dependencies and a trusted challenge.",
+      "mutation": "None. Build, export, kernel replay and independent replay all bind the same artifact digest.",
+      "expected_disposition": "qualified_under_policy",
+      "expected_axes": {
+        "statement_fidelity": "satisfied",
+        "logical_dependency_closure": "satisfied",
+        "official_kernel_replay": "satisfied",
+        "independent_checker_replay": "satisfied",
+        "construction_containment": "satisfied",
+        "environment_reproducibility": "satisfied",
+        "computational_trust": "satisfied"
+      },
+      "expected_observations": [
+        "Fresh closure is complete within declared coverage.",
+        "Official kernel accepts the exact export.",
+        "A distinct independent checker accepts the same export.",
+        "Challenge and solution target identities match."
+      ],
+      "must_not_emit": [
+        "A generic claim that the informal theorem meaning is thereby proven."
+      ]
+    },
+    {
+      "id": "TCAC-002-explicit-foundational-axiom",
+      "class": "policy_control",
+      "precondition": "The proof depends on a foundational axiom explicitly allowed by a versioned policy.",
+      "mutation": "Add an explicit Classical.choice dependency and include its exact name in the policy allowlist.",
+      "expected_disposition": "qualified_under_policy",
+      "expected_axes": {
+        "statement_fidelity": "satisfied",
+        "logical_dependency_closure": "satisfied",
+        "official_kernel_replay": "satisfied",
+        "independent_checker_replay": "satisfied",
+        "construction_containment": "satisfied",
+        "environment_reproducibility": "satisfied",
+        "computational_trust": "satisfied"
+      },
+      "expected_observations": [
+        "The axiom remains visible in the closure.",
+        "The policy rationale and version are recorded.",
+        "Allowing the axiom does not erase it from the receipt."
+      ],
+      "must_not_emit": [
+        "An empty axiom set.",
+        "A silent default allowlist."
+      ]
+    },
+    {
+      "id": "TCAC-003-direct-custom-axiom",
+      "class": "negative_control",
+      "precondition": "The root theorem directly uses a custom axiom not on the policy allowlist.",
+      "mutation": "Replace the proof body with a direct use of the custom axiom.",
+      "expected_disposition": "rejected",
+      "expected_axes": {
+        "logical_dependency_closure": "failed"
+      },
+      "expected_observations": [
+        "The custom axiom is named and classified.",
+        "Policy disposition is reject.",
+        "Official kernel replay may still accept the theorem relative to the axiom; that does not satisfy the trust policy."
+      ],
+      "must_not_emit": [
+        "qualified_under_policy merely because Lean accepted the declaration."
+      ]
+    },
+    {
+      "id": "TCAC-004-transitive-custom-axiom",
+      "class": "negative_control",
+      "precondition": "A helper theorem uses a custom axiom and the root depends on that helper.",
+      "mutation": "Move the custom axiom one or more declaration edges away from the root.",
+      "expected_disposition": "rejected",
+      "expected_axes": {
+        "logical_dependency_closure": "failed"
+      },
+      "expected_observations": [
+        "The transitive custom axiom appears in the root closure.",
+        "The edge path is retained for audit."
+      ],
+      "must_not_emit": [
+        "A root closure containing only direct references."
+      ]
+    },
+    {
+      "id": "TCAC-005-sorry-admission",
+      "class": "negative_control",
+      "precondition": "A root or transitive dependency is admitted through sorryAx.",
+      "mutation": "Insert sorry in the root or helper declaration.",
+      "expected_disposition": "rejected",
+      "expected_axes": {
+        "logical_dependency_closure": "failed"
+      },
+      "expected_observations": [
+        "sorryAx or the equivalent admission marker is explicit.",
+        "The policy rejects admissions by default."
+      ],
+      "must_not_emit": [
+        "An admission treated as an ordinary proved theorem."
+      ]
+    },
+    {
+      "id": "TCAC-006-imported-inductive-cache-regression",
+      "class": "regression_control",
+      "precondition": "Reproduce the two-module imported-inductive dependency case documented in Lean issue #15226.",
+      "mutation": "Audit imported structure S9, constructor S9.mk and theorem usesS9 in both root orders.",
+      "expected_disposition": "qualified_under_policy",
+      "expected_axes": {
+        "logical_dependency_closure": "satisfied",
+        "environment_reproducibility": "satisfied"
+      },
+      "expected_observations": [
+        "Fresh per-root traversal finds exactly Classical.choice for all three affected roots.",
+        "The cached/native diagnostic may disagree and is retained as diagnostic evidence.",
+        "The closure is invariant under root-order permutation."
+      ],
+      "must_not_emit": [
+        "An axiom-free closure for S9, S9.mk or usesS9.",
+        "A claim that the Lean kernel itself accepted an invalid proof."
+      ]
+    },
+    {
+      "id": "TCAC-007-mutual-inductive-cycle",
+      "class": "adversarial_control",
+      "precondition": "A mutually recursive Even/Odd inductive family with constructors referencing the sibling type.",
+      "mutation": "Audit each inductive and constructor root in forward and reverse permutations.",
+      "expected_disposition": "inconclusive",
+      "expected_axes": {
+        "logical_dependency_closure": "unknown"
+      },
+      "expected_observations": [
+        "All nodes and cycle edges are preserved.",
+        "Unknown coverage remains explicit until this declaration form is executed on the pinned toolchain."
+      ],
+      "must_not_emit": [
+        "A universal completeness claim based on the S9 case."
+      ]
+    },
+    {
+      "id": "TCAC-008-unresolved-declaration",
+      "class": "fail_closed_control",
+      "precondition": "A dependency name is present but cannot be resolved in the imported environment.",
+      "mutation": "Remove or make inaccessible the imported declaration/artifact.",
+      "expected_disposition": "inconclusive",
+      "expected_axes": {
+        "logical_dependency_closure": "unknown",
+        "environment_reproducibility": "failed"
+      },
+      "expected_observations": [
+        "The missing name is retained with a reason.",
+        "No empty closure is generated."
+      ],
+      "must_not_emit": [
+        "qualified_under_policy.",
+        "A zero-dependency result."
+      ]
+    },
+    {
+      "id": "TCAC-009-opaque-value-unavailable",
+      "class": "fail_closed_control",
+      "precondition": "The root depends on an opaque declaration whose value cannot be inspected under the selected environment/export mode.",
+      "mutation": "Remove the value-bearing artifact or use an environment that exposes only the opaque interface.",
+      "expected_disposition": "inconclusive",
+      "expected_axes": {
+        "logical_dependency_closure": "unknown"
+      },
+      "expected_observations": [
+        "The node is classified opaque with value_availability unavailable.",
+        "The policy decides whether independent export replay can still qualify a narrower claim."
+      ],
+      "must_not_emit": [
+        "An inference that opaque means axiom-free or dependency-free."
+      ]
+    },
+    {
+      "id": "TCAC-010-target-substitution",
+      "class": "negative_control",
+      "precondition": "A trusted challenge defines a specific target proposition.",
+      "mutation": "Supply a solution with the same display name but a different binder, hypothesis, type, universe or conclusion.",
+      "expected_disposition": "rejected",
+      "expected_axes": {
+        "statement_fidelity": "failed"
+      },
+      "expected_observations": [
+        "Comparator or equivalent identity check reports mismatch.",
+        "The root is not compared by short name or pretty-printed surface text alone."
+      ],
+      "must_not_emit": [
+        "qualified_under_policy based on successful proof of the substituted target."
+      ]
+    },
+    {
+      "id": "TCAC-011-environment-digest-drift",
+      "class": "negative_control",
+      "precondition": "The capsule binds a fixed source, Lean toolchain, Lake manifest and import artifact set.",
+      "mutation": "Change one source blob, imported olean, Lean revision, Mathlib revision or manifest digest.",
+      "expected_disposition": "rejected",
+      "expected_axes": {
+        "environment_reproducibility": "failed"
+      },
+      "expected_observations": [
+        "At least one immutable input binding differs.",
+        "Old replay receipts are not reused for the new environment."
+      ],
+      "must_not_emit": [
+        "Reuse of an exact-head receipt after an environment mutation."
+      ]
+    },
+    {
+      "id": "TCAC-012-native-computation-versioned",
+      "class": "policy_control",
+      "precondition": "A theorem uses decide +native, bv_decide native evaluation, or another native-computation path.",
+      "mutation": "Run the same semantic fixture under each pinned Lean version and inspect the version-specific axiom/marker profile.",
+      "expected_disposition": "rejected",
+      "expected_axes": {
+        "computational_trust": "failed"
+      },
+      "expected_observations": [
+        "Native computation is detected and classified for the exact Lean version.",
+        "The reject policy is applied explicitly; a separately configured explicit allow policy creates a different cohort."
+      ],
+      "must_not_emit": [
+        "A kernel-only or external-checker claim that the compiler calculation itself was independently verified."
+      ]
+    },
+    {
+      "id": "TCAC-013-build-time-plugin-separation",
+      "class": "separation_control",
+      "precondition": "A tactic or plugin executes during elaboration and emits a conventional kernel-checkable proof term.",
+      "mutation": "Record the plugin as construction provenance while keeping it out of the final logical dependency graph unless the proof term itself references a declaration.",
+      "expected_disposition": "inconclusive",
+      "expected_axes": {
+        "logical_dependency_closure": "satisfied",
+        "construction_containment": "unknown"
+      },
+      "expected_observations": [
+        "Logical dependencies and executable build components remain separate.",
+        "Without a declared sandbox/replay receipt, construction containment remains unknown."
+      ],
+      "must_not_emit": [
+        "An unsafe modifier treated as sufficient evidence of malicious-code containment.",
+        "A claim that the plugin is a logical axiom dependency without an actual proof-term edge."
+      ]
+    },
+    {
+      "id": "TCAC-014-hostile-export",
+      "class": "negative_control",
+      "precondition": "An exported proof artifact is parsed and replayed outside the potentially adversarial build environment.",
+      "mutation": "Corrupt the export or inject an invalid declaration/proof object.",
+      "expected_disposition": "rejected",
+      "expected_axes": {
+        "official_kernel_replay": "failed",
+        "independent_checker_replay": "failed"
+      },
+      "expected_observations": [
+        "The relevant parser/checker rejects the artifact or reports an explicit error.",
+        "No checker error is converted into acceptance."
+      ],
+      "must_not_emit": [
+        "qualified_under_policy.",
+        "A success receipt for an artifact other than the corrupted export."
+      ]
+    },
+    {
+      "id": "TCAC-015-independent-checker-same-export",
+      "class": "positive_control",
+      "precondition": "The official kernel and a separately implemented checker are configured for the same pinned export format.",
+      "mutation": "Run both checkers on byte-identical exported proof artifacts under recorded policies.",
+      "expected_disposition": "qualified_under_policy",
+      "expected_axes": {
+        "official_kernel_replay": "satisfied",
+        "independent_checker_replay": "satisfied"
+      },
+      "expected_observations": [
+        "Both replay records carry the same export SHA-256.",
+        "Checker implementation identities and versions are distinct and recorded.",
+        "The axiom policy is explicit."
+      ],
+      "must_not_emit": [
+        "Independent replay based only on two invocations of the official Lean kernel."
+      ]
+    },
+    {
+      "id": "TCAC-016-same-kernel-twice",
+      "class": "negative_control",
+      "precondition": "The same official Lean kernel is invoked twice on the same export.",
+      "mutation": "Label the second invocation as an independent checker.",
+      "expected_disposition": "inconclusive",
+      "expected_axes": {
+        "official_kernel_replay": "satisfied",
+        "independent_checker_replay": "unknown"
+      },
+      "expected_observations": [
+        "Both official-kernel runs may be recorded.",
+        "Independent replay remains unknown because implementation identity is not diverse."
+      ],
+      "must_not_emit": [
+        "independent_checker_replay = satisfied."
+      ]
+    },
+    {
+      "id": "TCAC-017-checker-disagreement",
+      "class": "negative_control",
+      "precondition": "The official kernel and a distinct checker both process the same export.",
+      "mutation": "One checker accepts and the other rejects or errors.",
+      "expected_disposition": "rejected",
+      "expected_axes": {
+        "independent_checker_replay": "failed"
+      },
+      "expected_observations": [
+        "Disagreement is preserved with raw logs and exact checker revisions.",
+        "No majority vote hides the disagreement."
+      ],
+      "must_not_emit": [
+        "qualified_under_policy by selecting the favorable checker."
+      ]
+    },
+    {
+      "id": "TCAC-018-root-order-permutation",
+      "class": "determinism_control",
+      "precondition": "A frozen set of roots includes cyclic and shared dependencies.",
+      "mutation": "Audit the exact same roots in multiple permutations.",
+      "expected_disposition": "rejected",
+      "expected_axes": {
+        "logical_dependency_closure": "failed"
+      },
+      "expected_observations": [
+        "Every root closure and canonical digest is identical across permutations.",
+        "A differing result fails the deterministic closure gate."
+      ],
+      "must_not_emit": [
+        "A deterministic status based only on a single traversal order."
+      ]
+    }
+  ]
+}
