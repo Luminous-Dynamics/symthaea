@@ -112,6 +112,9 @@ pub enum VerificationErrorCode {
     ObservationWithoutSubmission(String),
     UnresolvedOutcomeBlocksNewMutation(String),
     DuplicateAppliedIdempotencyKey(String),
+    DuplicateAttemptId(String),
+    DuplicateTerminalObservation(String),
+    StaleAttemptObservation { key: String, expected_attempt_id: String, observed_attempt_id: String },
     IdempotencyKeyRebound(String),
 }
 
@@ -185,6 +188,15 @@ impl fmt::Display for VerificationErrorCode {
             }
             Self::DuplicateAppliedIdempotencyKey(key) => {
                 write!(f, "idempotency key {key} was already observed applied")
+            }
+            Self::DuplicateAttemptId(attempt_id) => {
+                write!(f, "attempt_id {attempt_id} was reused")
+            }
+            Self::DuplicateTerminalObservation(key) => {
+                write!(f, "attempt for idempotency key {key} already has a terminal observation")
+            }
+            Self::StaleAttemptObservation { key, expected_attempt_id, observed_attempt_id } => {
+                write!(f, "observation for idempotency key {key} names stale attempt {observed_attempt_id}; current attempt is {expected_attempt_id}")
             }
             Self::IdempotencyKeyRebound(key) => {
                 write!(f, "idempotency key {key} was rebound to a different intent")
@@ -522,6 +534,7 @@ struct EffectBinding {
     lineage_proof_ref: Option<String>,
     interaction_intent_ref: Option<String>,
     idempotency_key: Option<String>,
+    attempt_id: Option<String>,
 }
 
 #[derive(Debug, Clone, Copy, Deserialize, PartialEq, Eq)]
@@ -582,6 +595,7 @@ struct EffectObservation {
     state_version: Option<String>,
     reconciliation_ref: Option<String>,
     idempotency_key: String,
+    attempt_id: String,
     sink_projection_id: String,
     sink_projection_version: String,
     observed_effect_digest: Option<String>,
@@ -636,6 +650,7 @@ enum AttemptStatus {
 #[derive(Debug, Clone)]
 struct Attempt {
     binding_digest: String,
+    attempt_id: String,
     status: AttemptStatus,
 }
 
@@ -702,6 +717,7 @@ pub fn verify_trace_with_options(
     let mut previous_digest: Option<String> = None;
     let mut seen_event_ids = HashSet::new();
     let mut seen_prior_event_ids = HashSet::new();
+    let mut seen_attempt_ids = HashSet::new();
     let mut attempts: HashMap<String, Attempt> = HashMap::new();
     let mut event_count = 0usize;
     let mut authority_checked = 0usize;
@@ -957,6 +973,24 @@ pub fn verify_trace_with_options(
                             VerificationErrorCode::MissingIdempotencyKey,
                         )
                     })?;
+                let attempt_id = binding
+                    .attempt_id
+                    .as_ref()
+                    .filter(|attempt_id| !attempt_id.trim().is_empty())
+                    .ok_or_else(|| {
+                        TraceVerificationError::new(
+                            line_number,
+                            VerificationErrorCode::InvalidEventShape(
+                                "effect submission requires a non-empty attempt_id".to_owned(),
+                            ),
+                        )
+                    })?;
+                if !seen_attempt_ids.insert(attempt_id.clone()) {
+                    return Err(TraceVerificationError::new(
+                        line_number,
+                        VerificationErrorCode::DuplicateAttemptId(attempt_id.clone()),
+                    ));
+                }
 
                 if let Some((pending_key, _)) = attempts
                     .iter()
@@ -1002,6 +1036,7 @@ pub fn verify_trace_with_options(
                     key.clone(),
                     Attempt {
                         binding_digest: binding.binding_digest.clone(),
+                        attempt_id: attempt_id.clone(),
                         status: AttemptStatus::Pending,
                     },
                 );
@@ -1020,7 +1055,9 @@ pub fn verify_trace_with_options(
                             VerificationErrorCode::MissingIdempotencyKey,
                         )
                     })?;
-                if key != &observation.idempotency_key {
+                if key != &observation.idempotency_key
+                    || binding.attempt_id.as_deref() != Some(observation.attempt_id.as_str())
+                {
                     return Err(TraceVerificationError::new(
                         line_number,
                         VerificationErrorCode::IdempotencyKeyMismatch,
@@ -1036,6 +1073,22 @@ pub fn verify_trace_with_options(
                     return Err(TraceVerificationError::new(
                         line_number,
                         VerificationErrorCode::IdempotencyKeyRebound(key.clone()),
+                    ));
+                }
+                if attempt.attempt_id != observation.attempt_id {
+                    return Err(TraceVerificationError::new(
+                        line_number,
+                        VerificationErrorCode::StaleAttemptObservation {
+                            key: key.clone(),
+                            expected_attempt_id: attempt.attempt_id.clone(),
+                            observed_attempt_id: observation.attempt_id.clone(),
+                        },
+                    ));
+                }
+                if attempt.status != AttemptStatus::Pending {
+                    return Err(TraceVerificationError::new(
+                        line_number,
+                        VerificationErrorCode::DuplicateTerminalObservation(key.clone()),
                     ));
                 }
                 match observation.outcome {
@@ -1135,14 +1188,17 @@ fn verify_binding(
     require_sorted_unique(&binding.payload_labels, "payload_labels")
         .map_err(|code| TraceVerificationError::new(line_number, code))?;
 
-    let binding_without_digest = raw_binding.without_key("binding_digest").ok_or_else(|| {
-        TraceVerificationError::new(
-            line_number,
-            VerificationErrorCode::InvalidEventShape(
-                "effect_binding must be an object".to_owned(),
-            ),
-        )
-    })?;
+    let binding_without_digest = raw_binding
+        .without_key("binding_digest")
+        .and_then(|value| value.without_key("attempt_id"))
+        .ok_or_else(|| {
+            TraceVerificationError::new(
+                line_number,
+                VerificationErrorCode::InvalidEventShape(
+                    "effect_binding must be an object".to_owned(),
+                ),
+            )
+        })?;
     if digest_json(BINDING_DOMAIN, &binding_without_digest) != binding.binding_digest {
         return Err(TraceVerificationError::new(
             line_number,
@@ -1405,6 +1461,8 @@ fn validate_effect_observation(
     }
     if observation.idempotency_key.trim().is_empty()
         || observation.idempotency_key != binding.idempotency_key.as_deref().unwrap_or("")
+        || observation.attempt_id.trim().is_empty()
+        || observation.attempt_id != binding.attempt_id.as_deref().unwrap_or("")
         || (event.event_type == EventType::EffectReconciled
             && observation.reconciliation_ref.as_deref().is_none_or(|value| value.trim().is_empty()))
     {
@@ -1585,6 +1643,10 @@ mod tests {
                 .as_object_mut()
                 .unwrap()
                 .remove("binding_digest");
+            binding_for_hash
+                .as_object_mut()
+                .unwrap()
+                .remove("attempt_id");
             event["effect_binding"]["binding_digest"] =
                 json!(digest_value(BINDING_DOMAIN, &binding_for_hash));
         }
@@ -1670,7 +1732,7 @@ mod tests {
                 "sink_projection":sink_projection,
                 "lineage_proof_ref":"lineage-1",
                 "interaction_intent_ref":"intent-1",
-                "idempotency_key":"pay-001"
+                "idempotency_key":"pay-001","attempt_id":"attempt-0001"
             });
             event["authority_decision"] = json!({
                 "decision":"allow",
@@ -1705,7 +1767,7 @@ mod tests {
                 "sink_projection":sink_projection,
                 "lineage_proof_ref":"lineage-1",
                 "interaction_intent_ref":"intent-1",
-                "idempotency_key":"pay-001"
+                "idempotency_key":"pay-001","attempt_id":"attempt-0001"
             });
             let mut observation = json!({
                 "outcome":outcome,
@@ -1713,7 +1775,7 @@ mod tests {
                 "source_of_truth":"bank-ledger-readback",
                 "observed_at":"2026-11-25T10:00:01Z",
                 "state_version":"v-2",
-                "idempotency_key":"pay-001",
+                "idempotency_key":"pay-001","attempt_id":"attempt-0001",
                 "sink_projection_id":"bank-ledger.transfer-record",
                 "sink_projection_version":"1"
             });
@@ -1733,6 +1795,14 @@ mod tests {
                 "capture_method":"independent_api_read",
                 "independently_observed":true
             }]);
+        }
+        finish_event(event)
+    }
+
+    fn with_attempt_id(mut event: Value, attempt_id: &str) -> Value {
+        event["effect_binding"]["attempt_id"] = json!(attempt_id);
+        if event.get("effect_observation").is_some() {
+            event["effect_observation"]["attempt_id"] = json!(attempt_id);
         }
         finish_event(event)
     }
