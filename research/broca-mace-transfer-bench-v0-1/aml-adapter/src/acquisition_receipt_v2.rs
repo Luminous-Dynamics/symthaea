@@ -985,11 +985,11 @@ mod tests {
         };
 
         let mut bytes = serde_json::to_vec(&first.to_json_value()).unwrap();
-        bytes.push(b'\\n');
+        bytes.push(b'\n');
         bytes.extend(serde_json::to_vec(&unrelated.to_json_value()).unwrap());
-        bytes.push(b'\\n');
+        bytes.push(b'\n');
         bytes.extend(serde_json::to_vec(&conflicting.to_json_value()).unwrap());
-        bytes.push(b'\\n');
+        bytes.push(b'\n');
         fs::write(&p, &bytes).unwrap();
 
         assert_eq!(
