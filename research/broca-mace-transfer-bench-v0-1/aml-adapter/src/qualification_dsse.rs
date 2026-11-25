@@ -31,6 +31,8 @@ pub const DSSE_PAYLOAD_TYPE_V1: &str = "application/vnd.in-toto+json";
 pub const IN_TOTO_STATEMENT_TYPE_V1: &str = "https://in-toto.io/Statement/v1";
 pub const MACE_QUALIFICATION_PREDICATE_TYPE_V1: &str =
     "https://luminousdynamics.io/attestations/mace/evidence-qualification/v1";
+pub const MACE_DECISION_SUFFICIENCY_PREDICATE_TYPE_V1: &str =
+    "https://luminousdynamics.io/attestations/mace/decision-sufficiency/v1";
 
 const MAX_DSSE_ENVELOPE_BYTES_V1: usize = 12 * 1024 * 1024;
 const MAX_DSSE_PAYLOAD_BYTES_V1: usize = 8 * 1024 * 1024;
@@ -112,6 +114,67 @@ pub fn encode_dsse_envelope_v1(
         .map_err(|_| EvidenceQualificationRejectV1::DsseInvalidEnvelope)
 }
 
+/// Parsed DSSE v1.0.2 envelope. The PAE is built from the exact payload
+/// bytes received; consumers must not reconstruct or canonicalize the payload
+/// before signature verification.
+pub(crate) struct ParsedDsseEnvelopeV1 {
+    pub payload_type: String,
+    pub payload: Vec<u8>,
+    pub key_id_hint: Option<String>,
+    pub signature: Vec<u8>,
+    pub pae: Vec<u8>,
+}
+
+pub(crate) fn parse_dsse_envelope_v1(
+    envelope_json: &str,
+    expected_payload_type: &str,
+) -> Result<ParsedDsseEnvelopeV1, EvidenceQualificationRejectV1> {
+    if envelope_json.len() > MAX_DSSE_ENVELOPE_BYTES_V1 {
+        return Err(EvidenceQualificationRejectV1::DssePayloadTooLarge);
+    }
+    let envelope_value = parse_strict_json(envelope_json.as_bytes())?;
+    let envelope = envelope_value.as_object()
+        .ok_or(EvidenceQualificationRejectV1::DsseInvalidEnvelope)?;
+    let payload_type = envelope.get("payloadType").and_then(Value::as_str)
+        .ok_or(EvidenceQualificationRejectV1::DsseInvalidEnvelope)?;
+    if payload_type != expected_payload_type {
+        return Err(EvidenceQualificationRejectV1::DssePayloadTypeMismatch);
+    }
+    let payload_b64 = envelope.get("payload").and_then(Value::as_str)
+        .ok_or(EvidenceQualificationRejectV1::DsseInvalidEnvelope)?;
+    let payload = decode_dsse_base64(payload_b64)?;
+    if payload.len() > MAX_DSSE_PAYLOAD_BYTES_V1 {
+        return Err(EvidenceQualificationRejectV1::DssePayloadTooLarge);
+    }
+    let signatures = envelope.get("signatures").and_then(Value::as_array)
+        .ok_or(EvidenceQualificationRejectV1::DsseInvalidEnvelope)?;
+    if signatures.len() != 1 {
+        return Err(EvidenceQualificationRejectV1::DsseSignatureCountUnsupported);
+    }
+    let signature_object = signatures[0].as_object()
+        .ok_or(EvidenceQualificationRejectV1::DsseInvalidEnvelope)?;
+    let key_id_hint = match signature_object.get("keyid") {
+        None => None,
+        Some(Value::String(value)) if value.is_empty() => None,
+        Some(Value::String(value)) if value.len() <= 256 => Some(value.clone()),
+        _ => return Err(EvidenceQualificationRejectV1::DsseInvalidEnvelope),
+    };
+    let signature_b64 = signature_object.get("sig").and_then(Value::as_str)
+        .ok_or(EvidenceQualificationRejectV1::DsseInvalidEnvelope)?;
+    let signature = decode_dsse_base64(signature_b64)?;
+    if signature.len() != 64 {
+        return Err(EvidenceQualificationRejectV1::InvalidSignatureEncoding);
+    }
+    let pae = dsse_pae_v1(payload_type, &payload);
+    Ok(ParsedDsseEnvelopeV1 {
+        payload_type: payload_type.to_owned(),
+        payload,
+        key_id_hint,
+        signature,
+        pae,
+    })
+}
+
 /// A verifier prepared from one exact DSSE envelope and one currently pinned
 /// trust profile. Reconstruct this verifier from the envelope and fresh trust
 /// profile for every use-time check; do not retain a stale verifier across
@@ -129,59 +192,12 @@ impl<'a> DsseQualificationSignatureVerifierV1<'a> {
         envelope_json: &str,
         pinned: &'a PinnedEd25519QualificationVerifierV1,
     ) -> Result<Self, EvidenceQualificationRejectV1> {
-        if envelope_json.len() > MAX_DSSE_ENVELOPE_BYTES_V1 {
-            return Err(EvidenceQualificationRejectV1::DssePayloadTooLarge);
-        }
-        let envelope_value = parse_strict_json(envelope_json.as_bytes())?;
-        let envelope = envelope_value
-            .as_object()
-            .ok_or(EvidenceQualificationRejectV1::DsseInvalidEnvelope)?;
-        // DSSE requires known fields but future envelope extensions must be
-        // ignored. Duplicate keys remain rejected by parse_strict_json.
-        let payload_type = envelope
-            .get("payloadType")
-            .and_then(Value::as_str)
-            .ok_or(EvidenceQualificationRejectV1::DsseInvalidEnvelope)?;
-        if payload_type != DSSE_PAYLOAD_TYPE_V1 {
-            return Err(EvidenceQualificationRejectV1::DssePayloadTypeMismatch);
-        }
-
-        let payload_b64 = envelope
-            .get("payload")
-            .and_then(Value::as_str)
-            .ok_or(EvidenceQualificationRejectV1::DsseInvalidEnvelope)?;
-        let payload = decode_dsse_base64(payload_b64)?;
-        if payload.len() > MAX_DSSE_PAYLOAD_BYTES_V1 {
-            return Err(EvidenceQualificationRejectV1::DssePayloadTooLarge);
-        }
-
-        let signatures = envelope
-            .get("signatures")
-            .and_then(Value::as_array)
-            .ok_or(EvidenceQualificationRejectV1::DsseInvalidEnvelope)?;
-        if signatures.len() != 1 {
-            return Err(EvidenceQualificationRejectV1::DsseSignatureCountUnsupported);
-        }
-        let signature_object = signatures[0]
-            .as_object()
-            .ok_or(EvidenceQualificationRejectV1::DsseInvalidEnvelope)?;
-        // DSSE keyid is OPTIONAL and unauthenticated. It is only a lookup
-        // hint; the authenticated key identity comes from the signed MACE
-        // predicate and is checked against the pinned profile.
-        let key_id_hint = match signature_object.get("keyid") {
-            None => None,
-            Some(Value::String(value)) if value.is_empty() => None,
-            Some(Value::String(value)) if value.len() <= 256 => Some(value.as_str()),
-            _ => return Err(EvidenceQualificationRejectV1::DsseInvalidEnvelope),
-        };
-        let signature_b64 = signature_object
-            .get("sig")
-            .and_then(Value::as_str)
-            .ok_or(EvidenceQualificationRejectV1::DsseInvalidEnvelope)?;
-        let signature = decode_dsse_base64(signature_b64)?;
-        if signature.len() != 64 {
-            return Err(EvidenceQualificationRejectV1::InvalidSignatureEncoding);
-        }
+        let parsed = parse_dsse_envelope_v1(envelope_json, DSSE_PAYLOAD_TYPE_V1)?;
+        let payload_type = parsed.payload_type;
+        let payload = parsed.payload;
+        let key_id_hint = parsed.key_id_hint;
+        let signature = parsed.signature;
+        let pae = parsed.pae;
 
         let statement_value = parse_strict_json(&payload)?;
         let statement = statement_value
@@ -268,7 +284,6 @@ impl<'a> DsseQualificationSignatureVerifierV1<'a> {
             return Err(EvidenceQualificationRejectV1::DssePayloadBindingMismatch);
         }
 
-        let pae = dsse_pae_v1(payload_type, &payload);
         Ok(Self {
             pinned,
             receipt,
