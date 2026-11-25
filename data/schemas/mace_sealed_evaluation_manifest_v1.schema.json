@@ -206,7 +206,6 @@
         "verifier_profile_sha256",
         "access_control_profile_sha256",
         "sealed_store_profile_sha256",
-        "commitment_anchor_receipt_sha256",
         "committed_at_unix",
         "key_id"
       ],
@@ -224,10 +223,6 @@
           "pattern": "^[0-9a-f]{64}$"
         },
         "sealed_store_profile_sha256": {
-          "type": "string",
-          "pattern": "^[0-9a-f]{64}$"
-        },
-        "commitment_anchor_receipt_sha256": {
           "type": "string",
           "pattern": "^[0-9a-f]{64}$"
         },
