@@ -55,6 +55,15 @@ fn report_for_alternative(
             continue;
         }
         if edge.relation == EdgeRelation::CreatesSubgoal {
+            if nodes
+                .get(edge.source_id.as_str())
+                .is_none_or(|source| source.kind != NodeKind::PlanAction)
+            {
+                errors.push(format!(
+                    "alternative {} creates_subgoal edge source {} is not a plan_action",
+                    alternative.id, edge.source_id
+                ));
+            }
             creators
                 .entry(edge.target_id.clone())
                 .or_default()
@@ -160,7 +169,13 @@ fn report_for_alternative(
                 .map(|edge| edge.relation)
                 .collect();
 
-            if relations.len() != 1 {
+            if relations.is_empty() {
+                // An unfinished plan may leave an input unresolved. The
+                // accepted-plan gate below rejects this state.
+                unresolved.insert(input_id.clone());
+                continue;
+            }
+            if relations.len() > 1 {
                 errors.push(format!(
                     "alternative {} action {} must account for input goal {} exactly once; found {} discharge/transform edges",
                     alternative.id,
@@ -234,6 +249,12 @@ fn report_for_alternative(
         if node.kind == NodeKind::GoalState && node.id != alternative.root_goal_id {
             errors.push(format!(
                 "alternative {} contains non-root goal_state {}",
+                alternative.id, node.id
+            ));
+        }
+        if node.id == alternative.root_goal_id && creators.contains_key(node_id) {
+            errors.push(format!(
+                "alternative {} root goal {} must not be produced by another action",
                 alternative.id, node.id
             ));
         }
