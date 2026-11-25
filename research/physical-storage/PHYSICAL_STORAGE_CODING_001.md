@@ -136,7 +136,7 @@ These are software benchmark gates. They do not establish physical device perfor
 
 ## 9. Deterministic starter corpus
 
-The companion fixture `fixtures/physical_storage_channel_cases_v0_1.json` contains one 256-byte known payload, fixed SHA-256 digest, a 4 × 4 × 2 logical tile grid and deterministic error/erasure masks. It is a protocol seed only. It does not model a particular glass, magnetic or NAND device and does not include ECC outputs.
+The companion fixture `fixtures/physical_storage_channel_cases_v0_1.json` contains one 224-byte known payload (28 payload tiles × 8 bytes), fixed SHA-256 digest, a 4 × 4 × 2 logical tile grid and four explicitly reserved control tiles for headers/calibration. It is a protocol seed only. It does not model a particular glass, magnetic or NAND device and does not include ECC outputs.
 
 The starter corpus deliberately includes pristine, clustered, directional burst, layer-dropout and calibration/metadata damage cases. Tests should reject changed coordinates, changed payloads, mismatched layout identities, wrong format versions, invalid hashes and unsupported evidence claims.
 
