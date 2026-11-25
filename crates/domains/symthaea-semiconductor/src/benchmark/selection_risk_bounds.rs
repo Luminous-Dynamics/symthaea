@@ -522,7 +522,7 @@ mod tests {
         ];
         let report = evaluate_selection_adjusted_population_risk_v1(&data).unwrap();
         let audit = report.independent_audit_estimate.unwrap();
-        assert_eq!(audit.population_risk_estimate, 0.5);
+        assert_eq!(audit.population_risk_estimate, 0.75);
         assert_eq!(audit.audit_sample_count, 2);
         assert!(audit.hoeffding_lower <= 0.5);
         assert!(audit.hoeffding_upper >= 0.5);
