@@ -112,24 +112,40 @@
       "left": "A",
       "right": "B",
       "normalized_rms_distance": 0.75,
-      "pairwise_compatible": true
+      "pairwise_compatible": true,
+      "maximum_normalized_entry_error": 0.75
     },
     {
       "left": "B",
       "right": "C",
       "normalized_rms_distance": 0.75,
-      "pairwise_compatible": true
+      "pairwise_compatible": true,
+      "maximum_normalized_entry_error": 0.75
     },
     {
       "left": "A",
       "right": "C",
       "normalized_rms_distance": 1.5,
-      "pairwise_compatible": false
+      "pairwise_compatible": false,
+      "maximum_normalized_entry_error": 1.5
     }
   ],
   "claim_boundary": {
     "approximate_pairwise_compatibility_is_not_transitive": true,
     "no_kinetic_state_pair_evaluated": true,
-    "no_physical_plasma_run": true
+    "no_physical_plasma_run": true,
+    "finite_cluster_requires_all_pairwise_comparisons": true
+  },
+  "expected_finite_class_audit": {
+    "member_count": 3,
+    "compared_pair_count": 3,
+    "compatible_pair_count": 2,
+    "incompatible_pair_count": 1,
+    "maximum_pairwise_normalized_rms_distance": 1.5,
+    "maximum_pairwise_normalized_entry_error": 1.5,
+    "complete_response_coverage": true,
+    "stable_branch_association": true,
+    "compatible_structure_class": true,
+    "within_finite_class_diameter": false
   }
 }
