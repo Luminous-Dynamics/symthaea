@@ -719,13 +719,15 @@ jobs:
           manifest="$GITHUB_WORKSPACE/docs/research/LEAN_AXIOM_AUDIT_IMPORTED_INDUCTIVE_V1.json"
           module_a="$GITHUB_WORKSPACE/scripts/research/lean-proof-extractor/axiom-audit-imported-inductive/A.lean"
           module_b="$GITHUB_WORKSPACE/scripts/research/lean-proof-extractor/axiom-audit-imported-inductive/B.lean"
+          module_proof="$GITHUB_WORKSPACE/scripts/research/lean-proof-extractor/ProofActionCertificateAndComm.lean"
           jq -e '.schema_version == "1.0.0"
             and .status == "independent_audit_pending"
             and .lean_toolchain == "leanprover/lean4:v4.37.0-rc1"
             and .lean_core_revision == "0b77e12952ad39077d80d8bd6b66d601f225c321"
             and .sources.module_a.sha256 == "e70af7d30ac091e8a50f219a1c53a7c85be5c750f2eb3ff127fcedc3b99a3003"
-            and .sources.module_b.sha256 == "eb194ed45ae694adcd963a6fef0294e98dcf2e9833b143dc7829794e7a2d614c"
-            and ([.roots[].name] == ["S9", "S9.mk", "usesS9"])' "$manifest" >/dev/null
+            and .sources.module_b.sha256 == "b3bc644eab2fd0c4036ff02a463637ad854d76a5fb7ddb6cbb761641b9da3b1a"
+            and .sources.module_proof.sha256 == "9d1096dc51b80c06b35ee6ac987ec6f2bb92be4f0a3267f1df4074ed4372dcc4"
+            and ([.roots[].name] == ["S9", "S9.mk", "usesS9", "And.comm", "ProofPlanActionCertificatePilot.and_comm_split_iff", "ProofPlanActionCertificatePilot.and_comm_forward", "ProofPlanActionCertificatePilot.and_comm_reverse", "ProofPlanActionCertificatePilot.and_comm_plan_replay"])' "$manifest" >/dev/null
           jq -e '."$schema" == "https://json-schema.org/draft/2020-12/schema"
             and .properties.status.const == "independent_audit_pending"
             and .properties.roots.minItems == 3
@@ -736,17 +738,23 @@ jobs:
           test "$(git rev-parse HEAD)" = "6ebcce37335bcb6bca64596e5d57bb3035648030"
           test "$(sha256sum "$module_a" | cut -d' ' -f1)" = "$(jq -r '.sources.module_a.sha256' "$manifest")"
           test "$(sha256sum "$module_b" | cut -d' ' -f1)" = "$(jq -r '.sources.module_b.sha256' "$manifest")"
+          test "$(sha256sum "$module_proof" | cut -d' ' -f1)" = "$(jq -r '.sources.module_proof.sha256' "$manifest")"
 
           repro_dir="$GITHUB_WORKSPACE/mathlib4/axiom-audit-imported-inductive-repro"
           mkdir -p "$repro_dir"
           cp "$module_a" "$repro_dir/A.lean"
           cp "$module_b" "$repro_dir/B.lean"
+          cp "$module_proof" "$repro_dir/ProofActionCertificateAndComm.lean"
           pushd "$repro_dir"
           lake env lean -o A.olean A.lean 2>&1 | tee module-a-build.log
+          lake env lean -o ProofActionCertificateAndComm.olean ProofActionCertificateAndComm.lean 2>&1 | tee proof-module-build.log
           lake env bash -c 'LEAN_PATH="$PWD:$LEAN_PATH" lean B.lean' 2>&1 | tee module-b-import-audit.log
 
           for root in S9 S9.mk usesS9; do
             grep -Fq "FRESH_AXIOM_AUDIT root=$root axioms=[Classical.choice]" module-b-import-audit.log
+          done
+          for root in And.comm ProofPlanActionCertificatePilot.and_comm_split_iff ProofPlanActionCertificatePilot.and_comm_forward ProofPlanActionCertificatePilot.and_comm_reverse ProofPlanActionCertificatePilot.and_comm_plan_replay; do
+            grep -Fq "FRESH_NO_AXIOMS_AUDIT root=$root axioms=[]" module-b-import-audit.log
           done
           grep -Fq "'S9'" module-b-import-audit.log
           grep -Fq "'S9.mk'" module-b-import-audit.log
@@ -764,6 +772,9 @@ jobs:
 
           module_a_sha256="$(sha256sum A.lean | cut -d' ' -f1)"
           module_b_sha256="$(sha256sum B.lean | cut -d' ' -f1)"
+          module_proof_sha256="$(sha256sum ProofActionCertificateAndComm.lean | cut -d' ' -f1)"
+          module_proof_olean_sha256="$(sha256sum ProofActionCertificateAndComm.olean | cut -d' ' -f1)"
+          module_proof_log_sha256="$(sha256sum proof-module-build.log | cut -d' ' -f1)"
           module_a_olean_sha256="$(sha256sum A.olean | cut -d' ' -f1)"
           module_a_log_sha256="$(sha256sum module-a-build.log | cut -d' ' -f1)"
           module_b_log_sha256="$(sha256sum module-b-import-audit.log | cut -d' ' -f1)"
@@ -777,6 +788,9 @@ jobs:
             --arg lean_version "$lean_version" \
             --arg module_a_sha256 "$module_a_sha256" \
             --arg module_b_sha256 "$module_b_sha256" \
+            --arg module_proof_sha256 "$module_proof_sha256" \
+            --arg module_proof_olean_sha256 "$module_proof_olean_sha256" \
+            --arg module_proof_log_sha256 "$module_proof_log_sha256" \
             --arg module_a_olean_sha256 "$module_a_olean_sha256" \
             --arg module_a_log_sha256 "$module_a_log_sha256" \
             --arg module_b_log_sha256 "$module_b_log_sha256" \
@@ -798,10 +812,16 @@ jobs:
               lake_manifest_sha256: $lake_manifest_sha256,
               module_a: {source_sha256: $module_a_sha256, olean_sha256: $module_a_olean_sha256, build_log_sha256: $module_a_log_sha256},
               module_b: {source_sha256: $module_b_sha256, import_audit_log_sha256: $module_b_log_sha256},
+              proof_certificate_module: {source_sha256: $module_proof_sha256, olean_sha256: $module_proof_olean_sha256, build_log_sha256: $module_proof_log_sha256},
               roots: [
                 {name: "S9", fresh_audit_axioms: ["Classical.choice"], accepted: true},
                 {name: "S9.mk", fresh_audit_axioms: ["Classical.choice"], accepted: true},
-                {name: "usesS9", fresh_audit_axioms: ["Classical.choice"], accepted: true}
+                {name: "usesS9", fresh_audit_axioms: ["Classical.choice"], accepted: true},
+                {name: "And.comm", fresh_audit_axioms: [], accepted: true},
+                {name: "ProofPlanActionCertificatePilot.and_comm_split_iff", fresh_audit_axioms: [], accepted: true},
+                {name: "ProofPlanActionCertificatePilot.and_comm_forward", fresh_audit_axioms: [], accepted: true},
+                {name: "ProofPlanActionCertificatePilot.and_comm_reverse", fresh_audit_axioms: [], accepted: true},
+                {name: "ProofPlanActionCertificatePilot.and_comm_plan_replay", fresh_audit_axioms: [], accepted: true}
               ],
               native_collect_axioms_diagnostic_only: {
                 s9: $native_s9,
@@ -824,7 +844,11 @@ jobs:
                 "Mutual/nested inductives, all declaration forms and complete repository-wide trust closure require more adversarial cases."
               ]
             }' > "$receipt"
-          jq -e '.status == "accepted" and (.roots | length) == 3 and all(.roots[]; .accepted == true and .fresh_audit_axioms == ["Classical.choice"]) and .algorithm.memoization == "visited names only; no partial axiom result cache"' "$receipt" >/dev/null
+          jq -e '.status == "accepted" and (.roots | length) == 8
+            and ([.roots[] | select(.fresh_audit_axioms == ["Classical.choice"]) | .name] == ["S9", "S9.mk", "usesS9"])
+            and ([.roots[] | select(.fresh_audit_axioms == []) | .name] == ["And.comm", "ProofPlanActionCertificatePilot.and_comm_split_iff", "ProofPlanActionCertificatePilot.and_comm_forward", "ProofPlanActionCertificatePilot.and_comm_reverse", "ProofPlanActionCertificatePilot.and_comm_plan_replay"])
+            and all(.roots[]; .accepted == true)
+            and .algorithm.memoization == "visited names only; no partial axiom result cache"' "$receipt" >/dev/null
           cat "$receipt" >> "$GITHUB_STEP_SUMMARY"
           popd
           echo "LEAN_IMPORTED_INDUCTIVE_AXIOM_AUDIT_RECEIPT_PASS"
@@ -837,6 +861,8 @@ jobs:
           path: |
             mathlib4/axiom-audit-imported-inductive-repro/lean-imported-inductive-axiom-audit-receipt.json
             mathlib4/axiom-audit-imported-inductive-repro/module-a-build.log
+            mathlib4/axiom-audit-imported-inductive-repro/proof-module-build.log
+            mathlib4/axiom-audit-imported-inductive-repro/ProofActionCertificateAndComm.lean
             mathlib4/axiom-audit-imported-inductive-repro/module-b-import-audit.log
           if-no-files-found: error
 
