@@ -43,3 +43,10 @@ Run the synthetic selective-control panel:
     cargo +1.96.0 run --locked --manifest-path tools/mel-temporal-grounding-qualifier/Cargo.toml --bin mel-selective-grounding-audit -- tools/mel-temporal-grounding-qualifier/fixtures/mel-selective-temporal.synthetic.json
 
 Decision confidence is self-reported. Runtime identity and evidence receipts are not authenticated by this evaluator, and it does not inspect hidden reasoning. Calibration thresholds must be selected on source-lineage-disjoint calibration data, not the held-out test. Do not compare a risk-coverage/AURC result to a multiple-choice abstention result without reproducing the same task, units and coverage protocol.
+
+
+### Identifiability basis is separate from the abstention action
+
+Every case carries one adjudicated basis: ClearPositive, ClearAbsence, AnnotatorDisagreement, TaskAmbiguity, SignalInsufficient or UnsupportedQuery. The evaluator checks the basis against the adjudicated truth state and reports reason correctness by basis. Annotator disagreement is not silently treated as sensor/signal insufficiency, and a not-estimable case cannot be relabelled as mere annotator disagreement.
+
+The basis is an adjudication label backed by a frozen policy digest; it is not independently authenticated by this adapter. Use #13560 to retain the underlying per-annotator evidence.
