@@ -176,3 +176,46 @@ Add these explicit tests to the Decision Advantage Protocol:
 6. **Counterfactual observability:** vary which latent state features are available (e.g., position only, position + velocity, history probes) and test whether this changes individual-effect information and decision regret, not just reconstruction.
 
 The strongest Symthaea claim would not be "our model is more realistic." It would be: *under a frozen, matched budget, it retains more decision-relevant individual-effect information, chooses actions with lower held-out regret, detects when imagined futures are unreliable, and falls back before model exploitation causes a failure.* This is a falsifiable research hypothesis, not a current result.
+
+
+## 10. 2026 comparator expansion: event-aware, video-predictive and world-action models
+
+The comparator matrix must include the strongest model class for each track rather than treating a single "world model" score as universal.
+
+### Vector-control / DMC track
+
+**Event-Aware World Model (EAWM, ICLR 2026)** is a direct comparator for low-dimensional control. It learns event boundaries from observations and predicts meaningful event transitions; its paper reports 10–45% gains over strong MBRL baselines across Atari 100K, Craftax 1M, DeepMind Control 500K and DMC-GB2 500K. This is important prior art: event segmentation as such is not a new Symthaea contribution. The Symthaea question should be whether HDC/CfC plus the paired-individual-effect objective preserves *which individual responds to which intervention*, improves held-out decision regret, and does so at a better complete resource cost than EAWM and matched RSSM baselines. Reproduce the exact DMC task subset, training interactions, seeds, and evaluation protocol before comparing numbers.
+
+Source: https://proceedings.iclr.cc/paper_files/paper/2026/hash/fc09b26b85ab3abb2832bd555a2e4215-Abstract-Conference.html
+
+### Visual / embodied track
+
+**V-JEPA 2 / V-JEPA 2-AC (Meta, June 2025)** is a major representation-and-planning baseline. Its paper reports pretraining on more than one million hours of internet video and post-training V-JEPA 2-AC with less than 62 hours of unlabeled DROID robot video; the authors demonstrate zero-shot Franka pick-and-place planning in two labs. The released results include per-task manipulation outcomes and comparisons with Octo and Cosmos. This is not a matched low-dimensional DMC comparator. It belongs in a visual/robot track with the same image-goal interface, action space, robot task, reset protocol, and physical success criteria.
+
+Sources:
+- https://ai.meta.com/research/publications/v-jepa-2-self-supervised-video-models-enable-understanding-prediction-and-planning/
+- https://github.com/facebookresearch/vjepa2
+
+**Cosmos-Predict 2.5 (NVIDIA)** provides a current large-scale generative/action-conditioned video baseline. The technical report describes 2B and 14B models, 200 million pretraining video clips, domain-specific robot and driving variants, and an action-conditioned robot model. On the reported action-conditioned robotic video comparison, Cosmos-Predict2.5-2B reports PSNR 24.95, SSIM 0.85, latent L2 0.28 and FVD 146 versus Cosmos-Predict1-7B at 21.14, 0.82, 0.32 and 190. These are video-prediction metrics, not closed-loop task-success numbers; they must not be presented as action or causal-effect superiority.
+
+Source: https://research.nvidia.com/labs/dir/cosmos-predict2.5/
+
+**OSCAR (June 2026)** fine-tunes Cosmos-Predict2.5-2B with a skeleton-conditioned action interface to improve action following and cross-embodiment coverage; its paper also evaluates generated-world policy scores against real RoboArena evaluations. It is a relevant baseline for action-conditioned virtual policy evaluation and cross-embodiment transfer, not an apples-to-apples DMC score.
+
+Source: https://arxiv.org/abs/2606.04463
+
+**WorldArena 2.0** remains the integration target for the visuo-tactile, online-RL-environment, and real-world manipulation lanes. Its 2026 challenge exposes separate tracks for video quality, world model as RL environment and real-world WAM manipulation; use the official task/data/API and report the correct track-specific score.
+
+Sources:
+- https://world-arena.ai/
+- https://iros2026challenge.world-arena.ai/
+
+### Required benchmark consequences
+
+1. Add an **event-abstraction ablation**: no event segmentation, fixed-window segments, ground-truth event boundaries for evaluator-only ceiling, learned event boundaries, and EAWM-style generic event segmentation. Compare individual-effect retention and decision regret, not just transition-prediction loss.
+2. Add **action-following and optimism** arms from MiraBench: physically impossible actions, action-sign reversal, contact/failure cases, and out-of-support actions; score physics adherence, action-conditioned state change, false-success rate, and planner-selected optimism.
+3. Keep three independent scoreboards: (a) vector-control/DMC and model-based RL; (b) visual/video prediction and action-conditioned reliability; (c) closed-loop and real-robot task utility. Never rank them by a pooled scalar.
+4. A head-to-head claim requires matched interfaces, actions, data access, model-query/interaction budgets, training compute, inference latency and task/reset protocol. Otherwise report "related external result; not directly comparable" and use it to motivate a local reproduction.
+5. The intended Symthaea edge is a falsifiable systems claim: higher individual-effect information retention and lower held-out action regret under matched resource constraints, with calibrated abstention/fallback when the model is unreliable—not visual realism or parameter count.
+
+No benchmark numbers from these external systems are treated as reproduced Symthaea results.
