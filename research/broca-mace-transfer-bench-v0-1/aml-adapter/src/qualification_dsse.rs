@@ -483,6 +483,23 @@ mod tests {
         QualificationTrustProfileV1,
         qualification_key_id_v1,
     };
+    use sha2::{Digest, Sha256};
+
+    fn candidate_ids_digest(ids: &[String]) -> String {
+        let mut hasher = Sha256::new();
+        hasher.update(b"luminous:mace:candidate-evidence-ids:v1\\0");
+        hasher.update((ids.len() as u64).to_be_bytes());
+        for id in ids {
+            hasher.update((id.len() as u64).to_be_bytes());
+            hasher.update(id.as_bytes());
+        }
+        let bytes = hasher.finalize();
+        let mut output = String::with_capacity(64);
+        for byte in bytes {
+            output.push_str(&format!("{byte:02x}"));
+        }
+        output
+    }
 
     fn signing_key() -> SigningKey {
         SigningKey::from_bytes(&[73; 32])
@@ -498,7 +515,7 @@ mod tests {
             tool_profile_sha256: "33".repeat(32),
             query_sha256: "44".repeat(32),
             candidate_set_sha256: "55".repeat(32),
-            candidate_evidence_ids_sha256: "66".repeat(32),
+            candidate_evidence_ids_sha256: candidate_ids_digest(&vec!["evidence-a".to_owned()]),
             decision_need_sha256: "77".repeat(32),
             purpose_sha256: "88".repeat(32),
             qualification_policy_sha256: "99".repeat(32),
