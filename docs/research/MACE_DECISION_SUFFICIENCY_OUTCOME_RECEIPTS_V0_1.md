@@ -221,13 +221,14 @@ Hard constraints are gates. Utility is optimized only among configurations that 
 
 ## 10. Engineering sequence
 
-1. **This increment:** versioned strict schemas and normative semantics for sufficiency and outcome attestations.
-2. Implement shared Rust types, strict parsing, JCS canonicalization, Ed25519 verification, fixed digest/signature vectors and negative tests. JSON Schema alone is not sufficient.
-3. Build the independent decision assessor with separate OS principal, credentials, source resolver, policy and private key. Recompute evidence qualification and the coverage/uncertainty/contradiction reports independently.
-4. Build a separate action-authority service that issues short-lived, consume-once authorization receipts. It must re-check live rights, purpose, scope, lifecycle, resource and human-approval conditions at use.
-5. Build an outcome evaluator that owns sealed manifests, independently observes execution/outcome, runs paired counterfactual arms and signs outcome receipts. The candidate must not possess evaluator labels or signing credentials.
-6. Add adapters for AML, LongMemEval-V2, MemoryArena, WorldMemArena, TimlMemBench, FAMA, MemForm, MemSecBench, MemoryDojo and all ten Agent Memory Integrity cases.
-7. Publish matched baseline results and Pareto frontiers. Promote strategy memory only after a held-out causal improvement without hard-constraint regression.
+1. **Protocol contracts (#13594):** versioned strict schemas and normative semantics for sufficiency and outcome attestations.
+2. **Consumer-side sufficiency verification (this increment):** strict typed parsing, JCS canonicalization, current binding, requirement/evidence-set consistency, pinned Ed25519 verification and negative tests.
+3. **Outcome receipt verifier:** strict decoding, arithmetic/cross-field consistency, execution-chain verification, evaluator-profile pinning and independent outcome signatures.
+4. Build the independent decision assessor with separate OS principal, credentials, source resolver, policy and private key. Recompute evidence qualification and the coverage/uncertainty/contradiction reports independently.
+5. Build a separate action-authority service that issues short-lived, consume-once authorization receipts. It must re-check live rights, purpose, scope, lifecycle, resource and human-approval conditions at use.
+6. Build an outcome evaluator that owns sealed manifests, independently observes execution/outcome, runs paired counterfactual arms and signs outcome receipts. The candidate must not possess evaluator labels or signing credentials.
+7. Add adapters for AML, LongMemEval-V2, MemoryArena, WorldMemArena, TimlMemBench, FAMA, MemForm, MemSecBench, MemoryDojo and all ten Agent Memory Integrity cases.
+8. Publish matched baseline results and Pareto frontiers. Promote strategy memory only after a held-out causal improvement without hard-constraint regression.
 
 ## 11. Rust consumer-side verifier increment
 
