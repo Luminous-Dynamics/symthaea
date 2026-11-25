@@ -386,9 +386,9 @@ impl PairedArmContrast {
         self.a2_minus_a0_probe_actions += a2.probe_count as i64 - a0.probe_count as i64;
         self.a0_legal_probe_actions_scored += pair.a0_probe_work.legal_actions_scored;
         self.a2_legal_probe_actions_scored += pair.a2_probe_work.legal_actions_scored;
-        self.a2_minus_a0_legal_probe_actions_scored +=
-            pair.a2_probe_work.legal_actions_scored as i64
-                - pair.a0_probe_work.legal_actions_scored as i64;
+        self.a2_minus_a0_legal_probe_actions_scored += pair.a2_probe_work.legal_actions_scored
+            as i64
+            - pair.a0_probe_work.legal_actions_scored as i64;
         self.a0_model_prediction_evaluations += pair.a0_probe_work.model_prediction_evaluations;
         self.a2_model_prediction_evaluations += pair.a2_probe_work.model_prediction_evaluations;
         self.a2_minus_a0_model_prediction_evaluations +=
@@ -799,10 +799,7 @@ mod tests {
             },
             ..false_unique.clone()
         };
-        aggregate.record(
-            &missed,
-            crate::strategies::ProbeScoringWork::default(),
-        );
+        aggregate.record(&missed, crate::strategies::ProbeScoringWork::default());
 
         let correct = EvaluatorScore {
             structure_score: StructureScore {
@@ -815,10 +812,7 @@ mod tests {
             },
             ..false_unique
         };
-        aggregate.record(
-            &correct,
-            crate::strategies::ProbeScoringWork::default(),
-        );
+        aggregate.record(&correct, crate::strategies::ProbeScoringWork::default());
 
         // The claimed parameterized-model set has two members in all
         // three fixtures. Structural singleton claims are scored separately.
