@@ -69,6 +69,18 @@ The DSSE follow-up adds a transport adapter for the existing typed qualification
 
 The signed bytes are not canonicalized and are never reconstructed for verification: the verifier signs/verifies DSSE PAE over the exact payload bytes received, then passes the same parsed statement/predicate object to the typed MACE binding gate. The receiver must not re-read or reparse a different payload after verification.
 
+### Executable consumer DecisionNeed sufficiency gate (follow-up branch)
+
+The next runtime increment adds a separate DecisionSufficiency consumer verifier and a consumer-owned DecisionNeed manifest:
+
+- DecisionNeed v1 is loaded from an authorized consumer policy registry, strictly decoded, validated and domain-separated-hashed. It fixes the decision/domain/scope/purpose, action-set and utility-profile commitments, risk limit, confidence floor, regret tolerance, calibration artifacts, maximum evidence age, context/tool/cost/latency budgets, and the exact sorted evidence requirements (evidence classes and independent-root counts).
+- The signed DecisionSufficiency receipt is bound to the exact qualified-evidence-set digest and original qualification receipt, as well as the DecisionNeed, sufficiency policy and calibration profile.
+- A sufficient status requires every declared requirement to be met, a calibrated risk upper bound within the consumer limit, a regret upper bound within the consumer tolerance, and measured cost/latency/context/tool/evidence-age values within the DecisionNeed budgets.
+- The sufficiency evaluator has a distinct verifier role, trust-profile digest and signer key ID from the qualifier. The receipt is DSSE/in-toto signed; it is not a candidate-side status flag.
+- At every use the consumer revalidates the original qualification with the current qualifier verifier and the sufficiency receipt with the current evaluator verifier, using the same trusted current time. A new sufficiency receipt cannot revive an expired/revoked qualification.
+
+This is a **consumer verifier**, not the evaluator implementation. It verifies the evaluator's signed claim and declared measurements; it does not independently reproduce the evaluator's risk model/calibration, measure resource telemetry, or prove the regret bound from held-out outcomes. Those require a separately operated evaluator and measurement pipeline. Even a valid sufficient result is not action authorization.
+
 ### Decision sufficiency is a different question
 
 Admissibility answers: "May this evidence be considered under this policy and use context?"
@@ -97,7 +109,7 @@ Not implemented by this integration:
 - remote trust-profile rotation/revocation distribution or a monotonic trust-profile witness;
 - an independently operated qualifier service that produces the DSSE/in-toto envelope, or sidecar request/response consumption of that envelope; the follow-up branch adds only the library-level DSSE/in-toto verifier and schemas;
 - V2 sidecar request/response integration that consumes an external signed qualification and withholds unqualified context;
-- a DecisionNeed sufficiency decision, executor authorization, consume-once action ledger, or outcome/promotion integration;
+- the decision-sufficiency evaluator/calibration service, executor authorization, consume-once action ledger, or outcome/promotion integration; the follow-up branch adds the consumer-side verifier and DecisionNeed contract only;
 - authenticated journal checkpoints or T9/T10 rollback/erasure-resurrection protection.
 
 Accordingly, the LongMemEval-V2 sidecar's current query result remains **unqualified benchmark evidence**. The presence of a V2 acquisition receipt or a locally verifiable signature must never be presented as production permission to use the evidence for a consequential action.

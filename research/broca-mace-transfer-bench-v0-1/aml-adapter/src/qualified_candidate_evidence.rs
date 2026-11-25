@@ -148,6 +148,20 @@ impl QualifiedCandidateEvidenceBatchV1 {
             .map(|_| ())
     }
 
+    pub fn run_id(&self) -> &str { &self.use_snapshot.run_id }
+    pub fn query_invocation_id(&self) -> &str { &self.use_snapshot.query_invocation_id }
+    pub fn domain_id(&self) -> &str { &self.use_snapshot.domain_id }
+    pub fn subject_scope_sha256(&self) -> &str { &self.use_snapshot.subject_scope_sha256 }
+    pub fn environment_revision_sha256(&self) -> &str { &self.use_snapshot.environment_revision_sha256 }
+    pub fn tool_profile_sha256(&self) -> &str { &self.use_snapshot.tool_profile_sha256 }
+    pub fn query_sha256(&self) -> &str { &self.use_snapshot.query_sha256 }
+    pub fn qualification_signer_key_id(&self) -> &str { self.qualification.key_id() }
+    pub fn qualification_verifier_profile_sha256(&self) -> &str {
+        self.qualification.verifier_profile_sha256()
+    }
+    pub fn qualification_policy_sha256(&self) -> &str {
+        &self.use_snapshot.qualification_policy_sha256
+    }
     pub fn batch(&self) -> &CandidateEvidenceBatchV1 { &self.batch }
     pub fn evidence(&self) -> &[CandidateEvidenceV1] { &self.batch.evidence }
     pub fn source_candidate_set_sha256(&self) -> &str { &self.source_candidate_set_sha256 }

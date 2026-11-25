@@ -334,6 +334,8 @@ impl VerifiedEvidenceQualificationV1 {
         )?;
         Ok(&self.admissible_evidence_ids)
     }
+    pub fn key_id(&self) -> &str { &self.key_id }
+    pub fn verifier_profile_sha256(&self) -> &str { &self.verifier_profile_sha256 }
     pub fn rejected_evidence_ids(&self) -> &[String] { &self.rejected_evidence_ids }
     pub fn indeterminate_evidence_ids(&self) -> &[String] { &self.indeterminate_evidence_ids }
     pub fn receipt_sha256(&self) -> &str { &self.receipt_sha256 }

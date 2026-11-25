@@ -1,0 +1,316 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://luminousdynamics.io/schemas/mace_decision_sufficiency_statement_v1.schema.json",
+  "title": "MACE Decision Sufficiency in-toto Statement V1",
+  "description": "DSSE-signed in-toto Statement v1. The subject binds the exact qualified evidence set, while the closed MACE predicate binds the qualification receipt, DecisionNeed, purpose, sufficiency policy and calibration profile. This attestation is not action authorization.",
+  "type": "object",
+  "additionalProperties": true,
+  "required": [
+    "_type",
+    "subject",
+    "predicateType",
+    "predicate"
+  ],
+  "properties": {
+    "_type": {
+      "const": "https://in-toto.io/Statement/v1"
+    },
+    "subject": {
+      "type": "array",
+      "minItems": 1,
+      "maxItems": 1,
+      "items": {
+        "type": "object",
+        "additionalProperties": true,
+        "required": [
+          "name",
+          "digest"
+        ],
+        "properties": {
+          "name": {
+            "type": "string",
+            "pattern": "^urn:luminous:mace:qualified-evidence-set:v1:[0-9a-f]{64}$"
+          },
+          "digest": {
+            "type": "object",
+            "additionalProperties": true,
+            "required": [
+              "sha256"
+            ],
+            "properties": {
+              "sha256": {
+                "type": "string",
+                "pattern": "^[0-9a-f]{64}$"
+              }
+            }
+          }
+        }
+      }
+    },
+    "predicateType": {
+      "const": "https://luminousdynamics.io/attestations/mace/decision-sufficiency/v1"
+    },
+    "predicate": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "schema_version",
+        "run_id",
+        "query_invocation_id",
+        "domain_id",
+        "subject_scope_sha256",
+        "environment_revision_sha256",
+        "tool_profile_sha256",
+        "query_sha256",
+        "candidate_set_sha256",
+        "qualified_evidence_set_sha256",
+        "qualification_receipt_sha256",
+        "decision_need_sha256",
+        "purpose_sha256",
+        "sufficiency_policy_sha256",
+        "calibration_profile_sha256",
+        "status",
+        "requirements",
+        "issued_at_unix",
+        "expires_at_unix",
+        "issuer_profile_sha256",
+        "key_id"
+      ],
+      "properties": {
+        "schema_version": {
+          "const": "mace_decision_sufficiency_receipt_v1"
+        },
+        "run_id": {
+          "type": "string",
+          "minLength": 1,
+          "maxLength": 256
+        },
+        "query_invocation_id": {
+          "type": "string",
+          "minLength": 1,
+          "maxLength": 256
+        },
+        "domain_id": {
+          "type": "string",
+          "minLength": 1,
+          "maxLength": 512
+        },
+        "subject_scope_sha256": {
+          "type": "string",
+          "pattern": "^[0-9a-f]{64}$"
+        },
+        "environment_revision_sha256": {
+          "type": "string",
+          "pattern": "^[0-9a-f]{64}$"
+        },
+        "tool_profile_sha256": {
+          "type": "string",
+          "pattern": "^[0-9a-f]{64}$"
+        },
+        "query_sha256": {
+          "type": "string",
+          "pattern": "^[0-9a-f]{64}$"
+        },
+        "candidate_set_sha256": {
+          "type": "string",
+          "pattern": "^[0-9a-f]{64}$"
+        },
+        "qualified_evidence_set_sha256": {
+          "type": "string",
+          "pattern": "^[0-9a-f]{64}$"
+        },
+        "qualification_receipt_sha256": {
+          "type": "string",
+          "pattern": "^[0-9a-f]{64}$"
+        },
+        "decision_need_sha256": {
+          "type": "string",
+          "pattern": "^[0-9a-f]{64}$"
+        },
+        "purpose_sha256": {
+          "type": "string",
+          "pattern": "^[0-9a-f]{64}$"
+        },
+        "sufficiency_policy_sha256": {
+          "type": "string",
+          "pattern": "^[0-9a-f]{64}$"
+        },
+        "calibration_profile_sha256": {
+          "type": "string",
+          "pattern": "^[0-9a-f]{64}$"
+        },
+        "status": {
+          "enum": [
+            "sufficient",
+            "insufficient",
+            "indeterminate",
+            "abstained"
+          ]
+        },
+        "requirements": {
+          "type": "array",
+          "minItems": 1,
+          "maxItems": 1024,
+          "items": {
+            "type": "object",
+            "additionalProperties": false,
+            "required": [
+              "requirement_id",
+              "status",
+              "basis_receipt_sha256"
+            ],
+            "properties": {
+              "requirement_id": {
+                "type": "string",
+                "minLength": 1,
+                "maxLength": 256
+              },
+              "status": {
+                "enum": [
+                  "met",
+                  "unmet",
+                  "unknown"
+                ]
+              },
+              "basis_receipt_sha256": {
+                "type": "array",
+                "minItems": 1,
+                "maxItems": 256,
+                "uniqueItems": true,
+                "items": {
+                  "type": "string",
+                  "pattern": "^[0-9a-f]{64}$"
+                }
+              }
+            }
+          }
+        },
+        "risk_upper_bound_ppm": {
+          "type": "integer",
+          "minimum": 0,
+          "maximum": 1000000
+        },
+        "risk_limit_ppm": {
+          "type": "integer",
+          "minimum": 0,
+          "maximum": 1000000
+        },
+        "confidence_level_ppm": {
+          "type": "integer",
+          "minimum": 500000,
+          "maximum": 999999
+        },
+        "calibration_receipt_sha256": {
+          "type": "string",
+          "pattern": "^[0-9a-f]{64}$"
+        },
+        "issued_at_unix": {
+          "type": "integer",
+          "minimum": 0
+        },
+        "expires_at_unix": {
+          "type": "integer",
+          "minimum": 0
+        },
+        "issuer_profile_sha256": {
+          "type": "string",
+          "pattern": "^[0-9a-f]{64}$"
+        },
+        "key_id": {
+          "type": "string",
+          "minLength": 1,
+          "maxLength": 256
+        },
+        "regret_upper_bound_micros": {
+          "type": "integer",
+          "minimum": 0,
+          "maximum": 1000000000000
+        },
+        "regret_limit_micros": {
+          "type": "integer",
+          "minimum": 0,
+          "maximum": 1000000000000
+        },
+        "observed_cost_micros": {
+          "type": "integer",
+          "minimum": 0,
+          "maximum": 1000000000000
+        },
+        "observed_latency_ms": {
+          "type": "integer",
+          "minimum": 0,
+          "maximum": 86400000
+        },
+        "observed_context_tokens": {
+          "type": "integer",
+          "minimum": 0,
+          "maximum": 1000000000000
+        },
+        "observed_tool_calls": {
+          "type": "integer",
+          "minimum": 0,
+          "maximum": 1000000
+        },
+        "maximum_evidence_age_seconds": {
+          "type": "integer",
+          "minimum": 0,
+          "maximum": 315360000
+        }
+      }
+    }
+  },
+  "allOf": [
+    {
+      "if": {
+        "properties": {
+          "predicate": {
+            "properties": {
+              "status": {
+                "const": "sufficient"
+              }
+            },
+            "required": [
+              "status"
+            ]
+          }
+        },
+        "required": [
+          "predicate"
+        ]
+      },
+      "then": {
+        "properties": {
+          "predicate": {
+            "required": [
+              "risk_upper_bound_ppm",
+              "risk_limit_ppm",
+              "confidence_level_ppm",
+              "calibration_receipt_sha256",
+              "regret_upper_bound_micros",
+              "regret_limit_micros",
+              "observed_cost_micros",
+              "observed_latency_ms",
+              "observed_context_tokens",
+              "observed_tool_calls",
+              "maximum_evidence_age_seconds"
+            ],
+            "properties": {
+              "requirements": {
+                "items": {
+                  "properties": {
+                    "status": {
+                      "const": "met"
+                    }
+                  },
+                  "required": [
+                    "status"
+                  ]
+                }
+              }
+            }
+          }
+        }
+      }
+    }
+  ]
+}

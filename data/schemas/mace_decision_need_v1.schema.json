@@ -1,0 +1,149 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://luminousdynamics.io/schemas/mace_decision_need_v1.schema.json",
+  "title": "MACE Consumer DecisionNeed V1",
+  "description": "Consumer-owned decision contract. Load from an authorized policy registry, never from candidate memory or an evidence qualifier. Its domain-separated digest pins all decision, risk, regret, calibration, evidence and resource constraints.",
+  "type": "object",
+  "additionalProperties": false,
+  "required": [
+    "schema_version",
+    "decision_need_id",
+    "domain_id",
+    "subject_scope_sha256",
+    "purpose_sha256",
+    "action_set_sha256",
+    "utility_profile_sha256",
+    "risk_limit_ppm",
+    "minimum_confidence_level_ppm",
+    "regret_tolerance_micros",
+    "sufficiency_policy_sha256",
+    "calibration_profile_sha256",
+    "calibration_receipt_sha256",
+    "maximum_evidence_age_seconds",
+    "maximum_context_tokens",
+    "maximum_tool_calls",
+    "maximum_cost_micros",
+    "maximum_latency_ms",
+    "requirements"
+  ],
+  "properties": {
+    "schema_version": {
+      "const": "mace_decision_need_v1"
+    },
+    "decision_need_id": {
+      "type": "string",
+      "minLength": 1,
+      "maxLength": 256
+    },
+    "domain_id": {
+      "type": "string",
+      "minLength": 1,
+      "maxLength": 512
+    },
+    "subject_scope_sha256": {
+      "type": "string",
+      "pattern": "^[0-9a-f]{64}$"
+    },
+    "purpose_sha256": {
+      "type": "string",
+      "pattern": "^[0-9a-f]{64}$"
+    },
+    "action_set_sha256": {
+      "type": "string",
+      "pattern": "^[0-9a-f]{64}$"
+    },
+    "utility_profile_sha256": {
+      "type": "string",
+      "pattern": "^[0-9a-f]{64}$"
+    },
+    "risk_limit_ppm": {
+      "type": "integer",
+      "minimum": 0,
+      "maximum": 1000000
+    },
+    "minimum_confidence_level_ppm": {
+      "type": "integer",
+      "minimum": 500000,
+      "maximum": 999999
+    },
+    "regret_tolerance_micros": {
+      "type": "integer",
+      "minimum": 0,
+      "maximum": 1000000000000
+    },
+    "sufficiency_policy_sha256": {
+      "type": "string",
+      "pattern": "^[0-9a-f]{64}$"
+    },
+    "calibration_profile_sha256": {
+      "type": "string",
+      "pattern": "^[0-9a-f]{64}$"
+    },
+    "calibration_receipt_sha256": {
+      "type": "string",
+      "pattern": "^[0-9a-f]{64}$"
+    },
+    "maximum_evidence_age_seconds": {
+      "type": "integer",
+      "minimum": 1,
+      "maximum": 315360000
+    },
+    "maximum_context_tokens": {
+      "type": "integer",
+      "minimum": 1,
+      "maximum": 1000000000000
+    },
+    "maximum_tool_calls": {
+      "type": "integer",
+      "minimum": 1,
+      "maximum": 1000000
+    },
+    "maximum_cost_micros": {
+      "type": "integer",
+      "minimum": 1,
+      "maximum": 1000000000000
+    },
+    "maximum_latency_ms": {
+      "type": "integer",
+      "minimum": 1,
+      "maximum": 86400000
+    },
+    "requirements": {
+      "type": "array",
+      "minItems": 1,
+      "maxItems": 1024,
+      "items": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": [
+          "requirement_id",
+          "evidence_class_sha256",
+          "minimum_independent_root_families",
+          "maximum_evidence_age_seconds"
+        ],
+        "properties": {
+          "requirement_id": {
+            "type": "string",
+            "minLength": 1,
+            "maxLength": 256
+          },
+          "evidence_class_sha256": {
+            "type": "string",
+            "pattern": "^[0-9a-f]{64}$"
+          },
+          "minimum_independent_root_families": {
+            "type": "integer",
+            "minimum": 1,
+            "maximum": 10000
+          },
+          "maximum_evidence_age_seconds": {
+            "type": "integer",
+            "minimum": 1,
+            "maximum": 315360000
+          }
+        }
+      }
+    }
+  },
+  "$comment": "requirements must be sorted by requirement_id and unique; each requirement maximum_evidence_age_seconds must not exceed the manifest-wide maximum. Runtime validation enforces these order and cross-field constraints."
+}

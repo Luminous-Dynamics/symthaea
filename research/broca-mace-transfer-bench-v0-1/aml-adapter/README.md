@@ -85,3 +85,14 @@ The exchange samples protected consumer time after the issuer response; the requ
 This is still a consumer-side library contract, not an independent qualifier or production transport. The production issuer must run under separate credentials and trust roots, independently resolve payload/source material, recompute provenance, and check rights, purpose, scope, correction/revocation and erasure state. The public test-signing key is deterministic and must never be used in production.
 
 Protocol: [MACE independent qualification exchange v1](../../../docs/research/MACE_INDEPENDENT_QUALIFICATION_EXCHANGE_V1.md). Request schema: [mace_evidence_qualification_request_v1.schema.json](../../../data/schemas/mace_evidence_qualification_request_v1.schema.json).
+
+
+## Consumer DecisionNeed sufficiency verifier
+
+The `decision_sufficiency` module verifies a separately DSSE-signed DecisionSufficiency receipt against a qualified candidate projection and a consumer-owned `DecisionNeedV1` manifest. Load the DecisionNeed from an authorized policy registry; never accept it from candidate memory or the qualifier. The manifest digest pins the decision domain/scope/purpose, allowed action set, utility profile, risk and confidence thresholds, regret tolerance, calibration artifacts, evidence-age policy, exact requirement/evidence classes, independent-root minimums, and resource budgets.
+
+A sufficient status is rejected unless all requirements are marked met, the risk upper bound and regret upper bound are within the manifest limits, and the signed telemetry stays within cost, latency, context-token, tool-call and evidence-age budgets. The evaluator role/profile/key must be distinct from the qualification authority. The DSSE in-toto Statement subject is the exact qualified-evidence-set digest, and its predicate binds the original qualification receipt plus the DecisionNeed.
+
+At every subsequent use, callers must revalidate the original qualification using a fresh qualifier verifier and the sufficiency receipt using a fresh evaluator verifier at the same trusted current time. A sufficient receipt cannot revive expired or revoked qualification. The result is never an action permit.
+
+This is a consumer-side verification library. It does not implement the independent sufficiency evaluator, calibration pipeline, independent telemetry measurement, held-out regret calculation, live action authorization, consume-once execution, or outcome receipt. The verifier confirms what the separate evaluator signed; it does not prove the evaluator's underlying risk model or measurements.
