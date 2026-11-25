@@ -497,7 +497,7 @@ mod tests {
             Err(Rfc9162ProofRejectV1::TreeSizeRegression)
         );
         assert_eq!(
-            verify_rfc9162_consistency_v1(1, 1, &old_root, &old_root, &[]),
+            verify_rfc9162_consistency_v1(1, 1, &old_root, &wrong_new, &[]),
             Err(Rfc9162ProofRejectV1::ConsistencyRootMismatch)
         );
     }
