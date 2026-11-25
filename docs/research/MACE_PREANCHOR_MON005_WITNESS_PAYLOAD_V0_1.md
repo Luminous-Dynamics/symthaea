@@ -1,6 +1,6 @@
 # MACE pre-anchor payload for MON-005 witnessing v0.1
 
-**Status:** a typed Rust pre-anchor payload and consumer-side digest verifier are authored in the AML adapter. Nine Rust tests are authored but have not been compiled or executed. No live MON-005 adapter, distributed witness deployment, transparency-log publication, or external security qualification is claimed.
+**Status:** a typed Rust pre-anchor payload and consumer-side digest verifier are authored in the AML adapter. Ten Rust tests are authored but have not been compiled or executed. No live MON-005 adapter, distributed witness deployment, transparency-log publication, or external security qualification is claimed.
 
 ## Purpose
 
@@ -83,6 +83,7 @@ Nine Rust tests cover:
 - round-trip retrieval and consumer-side digest verification;
 - payload mutation and digest mismatch;
 - unknown and duplicate JSON fields;
+- attempted candidate-readability and early-reveal mutations;
 - altered manifest rejection;
 - a valid but wrong episode-set witness root;
 - custody, candidate-access and reveal profile pinning.
