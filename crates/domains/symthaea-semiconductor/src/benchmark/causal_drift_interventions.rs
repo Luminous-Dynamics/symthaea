@@ -298,7 +298,7 @@ pub fn diagnose_causal_drift_v1(
         return invalid_report(input, vec![CausalDriftReasonV1::NonFiniteObservation]);
     }
     if input.intervention_time_unix_seconds > input.diagnosis_knowledge_cutoff_unix_seconds {
-        return invalid_report(input, vec![CausalDriftReasonV1::EvidenceUnavailableAtKnowledgeCutoff]);
+        return unknown_report(input, vec![CausalDriftReasonV1::EvidenceUnavailableAtKnowledgeCutoff]);
     }
 
     let mut seen = BTreeMap::new();
@@ -341,6 +341,14 @@ pub fn diagnose_causal_drift_v1(
             reasons.push(CausalDriftReasonV1::NonFiniteObservation);
         }
     }
+    if let (Some(primary), Some(independent)) = (
+        seen.get(&CausalDriftChannelV1::PrimaryProcessSensor),
+        seen.get(&CausalDriftChannelV1::IndependentProcessSensor),
+    ) && primary.source_artifact_sha256 == independent.source_artifact_sha256
+    {
+        reasons.push(CausalDriftReasonV1::ChannelsNotIndependent);
+    }
+
     for required in [
         CausalDriftChannelV1::PrimaryProcessSensor,
         CausalDriftChannelV1::IndependentProcessSensor,
