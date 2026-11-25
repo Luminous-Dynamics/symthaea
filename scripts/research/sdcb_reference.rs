@@ -408,6 +408,118 @@ pub fn diagonal_observation_trace(
 }
 
 
+
+/// Conjugate posterior parameters for a Bernoulli response model.
+#[derive(Debug, Clone, Copy, PartialEq)]
+pub struct BetaBernoulliPosterior {
+    pub alpha: f64,
+    pub beta: f64,
+}
+
+/// Update a Beta(alpha, beta) prior after Bernoulli successes and failures.
+///
+/// Counts above 2^53 are rejected because their conversion to f64 would not
+/// preserve every integer exactly. This is a deterministic analytic reference,
+/// not a full Bayesian optimization package.
+pub fn beta_bernoulli_update(
+    prior_alpha: f64,
+    prior_beta: f64,
+    successes: u64,
+    failures: u64,
+) -> Result<BetaBernoulliPosterior, &'static str> {
+    const MAX_EXACT_F64_INTEGER: u64 = 1_u64 << 53;
+    if !finite(&[prior_alpha, prior_beta]) || prior_alpha <= 0.0 || prior_beta <= 0.0 {
+        return Err("Beta prior parameters must be finite and strictly positive");
+    }
+    if successes > MAX_EXACT_F64_INTEGER || failures > MAX_EXACT_F64_INTEGER {
+        return Err("observation count exceeds exact f64 integer range");
+    }
+    let posterior = BetaBernoulliPosterior {
+        alpha: prior_alpha + successes as f64,
+        beta: prior_beta + failures as f64,
+    };
+    if finite(&[posterior.alpha, posterior.beta])
+        && posterior.alpha > 0.0
+        && posterior.beta > 0.0
+        && (posterior.alpha + posterior.beta).is_finite()
+    {
+        Ok(posterior)
+    } else {
+        Err("Beta posterior parameters overflowed")
+    }
+}
+
+/// Mean of a Beta posterior, used as the Bernoulli posterior-predictive mean.
+pub fn beta_bernoulli_mean(
+    posterior: BetaBernoulliPosterior,
+) -> Result<f64, &'static str> {
+    if !finite(&[posterior.alpha, posterior.beta])
+        || posterior.alpha <= 0.0
+        || posterior.beta <= 0.0
+    {
+        return Err("Beta posterior parameters must be finite and strictly positive");
+    }
+    let total = posterior.alpha + posterior.beta;
+    if !total.is_finite() || total <= 0.0 {
+        return Err("Beta posterior normalization overflowed");
+    }
+    let mean = posterior.alpha / total;
+    if mean.is_finite() && (0.0..=1.0).contains(&mean) {
+        Ok(mean)
+    } else {
+        Err("Beta posterior mean is invalid")
+    }
+}
+
+/// Deterministic UCB1-style arm selection for Bernoulli posterior means.
+///
+/// Untried arms are selected first (lowest index wins ties). Otherwise choose
+/// argmax(mean + exploration * sqrt(2 ln(total_pulls) / arm_pulls)).
+/// This is a simple baseline/reference, not a claim of optimal policy.
+pub fn select_bernoulli_ucb_arm(
+    posteriors: &[BetaBernoulliPosterior],
+    pulls: &[u64],
+    exploration: f64,
+) -> Result<usize, &'static str> {
+    if posteriors.is_empty() || posteriors.len() != pulls.len() {
+        return Err("posterior and pull-count arrays must be nonempty and equal length");
+    }
+    if !exploration.is_finite() || exploration < 0.0 {
+        return Err("exploration coefficient must be finite and nonnegative");
+    }
+    let mut total_pulls = 0_u64;
+    for (posterior, count) in posteriors.iter().zip(pulls) {
+        let _ = beta_bernoulli_mean(*posterior)?;
+        total_pulls = total_pulls
+            .checked_add(*count)
+            .ok_or("total pull count overflowed")?;
+    }
+
+    if let Some(untried) = pulls.iter().position(|count| *count == 0) {
+        return Ok(untried);
+    }
+    if total_pulls > (1_u64 << 53) {
+        return Err("total pull count exceeds exact f64 integer range");
+    }
+
+    let total = total_pulls as f64;
+    let mut best_index = 0;
+    let mut best_score = f64::NEG_INFINITY;
+    for (index, (posterior, count)) in posteriors.iter().zip(pulls).enumerate() {
+        let mean = beta_bernoulli_mean(*posterior)?;
+        let bonus = exploration * (2.0 * total.ln() / (*count as f64)).sqrt();
+        let score = mean + bonus;
+        if !score.is_finite() {
+            return Err("UCB score is not finite");
+        }
+        if score > best_score {
+            best_index = index;
+            best_score = score;
+        }
+    }
+    Ok(best_index)
+}
+
 /// Result of selecting a sensor that separates competing hidden-state models.
 #[derive(Debug, Clone, Copy, PartialEq)]
 pub struct SensorSelection {
@@ -783,6 +895,44 @@ mod tests {
         .unwrap()
         .unwrap();
         assert_eq!(selected.candidate_index, 0);
+    }
+
+    #[test]
+    fn beta_bernoulli_update_matches_conjugate_posterior() {
+        let posterior = beta_bernoulli_update(1.0, 1.0, 3, 1).unwrap();
+        assert_eq!(posterior, BetaBernoulliPosterior { alpha: 4.0, beta: 2.0 });
+        assert!((beta_bernoulli_mean(posterior).unwrap() - (2.0 / 3.0)).abs() < 1e-12);
+    }
+
+    #[test]
+    fn beta_bernoulli_rejects_invalid_priors_and_inexact_counts() {
+        assert!(beta_bernoulli_update(0.0, 1.0, 1, 0).is_err());
+        assert!(beta_bernoulli_update(1.0, f64::NAN, 1, 0).is_err());
+        assert!(beta_bernoulli_update(1.0, 1.0, (1_u64 << 53) + 1, 0).is_err());
+    }
+
+    #[test]
+    fn ucb_selects_first_untried_arm() {
+        let priors = [BetaBernoulliPosterior { alpha: 1.0, beta: 1.0 }; 3];
+        assert_eq!(select_bernoulli_ucb_arm(&priors, &[5, 0, 2], 1.0).unwrap(), 1);
+    }
+
+    #[test]
+    fn ucb_greedy_limit_selects_highest_posterior_mean() {
+        let posteriors = [
+            BetaBernoulliPosterior { alpha: 8.0, beta: 2.0 },
+            BetaBernoulliPosterior { alpha: 3.0, beta: 7.0 },
+        ];
+        assert_eq!(select_bernoulli_ucb_arm(&posteriors, &[20, 20], 0.0).unwrap(), 0);
+    }
+
+    #[test]
+    fn ucb_rejects_invalid_shapes_and_overflow() {
+        let prior = BetaBernoulliPosterior { alpha: 1.0, beta: 1.0 };
+        assert!(select_bernoulli_ucb_arm(&[], &[], 1.0).is_err());
+        assert!(select_bernoulli_ucb_arm(&[prior], &[], 1.0).is_err());
+        assert!(select_bernoulli_ucb_arm(&[prior], &[u64::MAX, 1], 1.0).is_err());
+        assert!(select_bernoulli_ucb_arm(&[prior], &[1], f64::NAN).is_err());
     }
 
     #[test]
