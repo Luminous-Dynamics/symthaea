@@ -40,3 +40,24 @@ The general IRCKP programme is [#13629](https://github.com/Luminous-Dynamics/sym
 - account for QP/projection cost, active-set work, state storage and fallback.
 
 This is a synthetic numerical primitive, not a Vlasov/VPFP simulation, a new positivity algorithm claim, or a physical result.
+
+
+## Manufactured two-cell response-constrained feasibility oracle
+
+The Rust crate also exposes `solve_two_cell_positive_mass_response_projection`. This is a two-unknown exact feasibility oracle, not a general QP.
+
+Use:
+- input candidate [-0.1, 1.1];
+- unit cell volumes;
+- target mass M=1;
+- response functional R(g)=g[0];
+- target response R=0.1 (from a separately declared reference state).
+
+The positivity-plus-mass projection alone returns [0,1], changing this response from the input value -0.1 to 0. The joint two-cell solve returns [0.1,0.9], satisfying both mass and the declared response exactly while remaining non-negative. A target response of 1.1 would require a negative second cell and is rejected as infeasible.
+
+This counterexample separates three concepts:
+1. preserving mass;
+2. preserving positivity;
+3. preserving a future response observable.
+
+The two-cell oracle proves only that these requirements can be jointly checked in a manufactured finite-dimensional fixture. It does not provide a multi-cell constrained optimizer, a nonlinear kinetic response approximation, or a physical echo guarantee.
