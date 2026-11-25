@@ -165,10 +165,11 @@ fn need_for_claim(
         let integrity = get_str(item, "integrity_status").unwrap_or("UNKNOWN");
         let correction = get_str(item, "correction_status").unwrap_or("UNKNOWN");
         if ["NOT_FOUND", "DIGEST_MISMATCH", "UNATTRIBUTED"].contains(&retrieval)
-            || ["COMPROMISED", "MISSING"].contains(&integrity)
-            || ["RETRACTED", "SUPERSEDED"].contains(&correction)
+            || ["UNKNOWN", "COMPROMISED", "MISSING"].contains(&integrity)
+            || ["CORRECTED", "RETRACTED", "SUPERSEDED"].contains(&correction)
         {
             let evidence_id = get_str(item, "evidence_id").map(str::to_owned);
+            let source_changed = ["CORRECTED", "RETRACTED", "SUPERSEDED"].contains(&correction);
             return Some(PolicyNeed {
                 priority: 0,
                 claim_id,
@@ -178,8 +179,10 @@ fn need_for_claim(
                     ActionKind::RetrieveOrRecapture,
                     ActionKind::Escalate,
                 ],
-                reason_codes: vec![if ["RETRACTED", "SUPERSEDED"].contains(&correction) {
-                    "SOURCE_RETRACTED_OR_SUPERSEDED".to_owned()
+                reason_codes: vec![if source_changed {
+                    "SOURCE_CORRECTED_RETRACTED_OR_SUPERSEDED".to_owned()
+                } else if integrity == "UNKNOWN" {
+                    "ARTIFACT_INTEGRITY_NOT_YET_VERIFIED".to_owned()
                 } else {
                     "ARTIFACT_INTEGRITY_OR_ATTRIBUTION_GAP".to_owned()
                 }],
@@ -588,6 +591,33 @@ mod tests {
         pack["examples"][index]["state"].to_string()
     }
 
+    fn artifact_verified_state(index: usize) -> String {
+        let mut state: Value = serde_json::from_str(&sample_state(index)).unwrap();
+        for item in state["evidence"].as_array_mut().unwrap() {
+            if item["integrity_status"] == "UNKNOWN" {
+                item["integrity_status"] = Value::String("CLEAN".to_owned());
+            }
+        }
+        let evidence = state["evidence"].as_array().unwrap().clone();
+        let episode = get_str(&state, "research_episode_id").unwrap().to_owned();
+        let sequence = state["evidence_prefix"]["sequence_number"].as_u64().unwrap();
+        let prefix = typed_research_state_contract::evidence_prefix_sha256(
+            &episode,
+            sequence,
+            &evidence,
+        );
+        state["evidence_prefix"]["prefix_sha256"] = Value::String(prefix.clone());
+        for claim in state["claims"].as_array_mut().unwrap() {
+            for relation in claim["evidence_relations"].as_array_mut().unwrap() {
+                if relation["classifier_provenance"].is_object() {
+                    relation["classifier_provenance"]["evidence_prefix_sha256"] =
+                        Value::String(prefix.clone());
+                }
+            }
+        }
+        state.to_string()
+    }
+
     fn offer(
         offer_id: &str,
         kind: ActionKind,
@@ -621,7 +651,7 @@ mod tests {
     #[test]
     fn unclassified_retrieval_selects_only_an_offered_classifier_action() {
         let input = input(
-            sample_state(0),
+            artifact_verified_state(0),
             vec![offer(
                 "classify-claim-a",
                 ActionKind::ClassifyClaimSource,
@@ -641,6 +671,35 @@ mod tests {
         let mut input = input(sample_state(0), vec![]);
         input.remaining_budget.insert(String::new(), 1);
         assert!(decide(&input).is_err());
+    }
+
+    #[test]
+    fn unknown_integrity_requires_verification_before_classification() {
+        let input = input(
+            sample_state(0),
+            vec![
+                offer(
+                    "verify-artifact",
+                    ActionKind::VerifyArtifact,
+                    Some("claim-a"),
+                    Some("ev-a1"),
+                    &[("query_units", 0), ("experiment_units", 0), ("review_minutes", 1)],
+                ),
+                offer(
+                    "classify-claim-a",
+                    ActionKind::ClassifyClaimSource,
+                    Some("claim-a"),
+                    Some("ev-a1"),
+                    &[("query_units", 1), ("experiment_units", 0), ("review_minutes", 1)],
+                ),
+            ],
+        );
+        let decision = decide(&input).unwrap();
+        assert_eq!(decision.selected_offer_id.as_deref(), Some("verify-artifact"));
+        assert_eq!(
+            decision.reason_codes,
+            vec!["ARTIFACT_INTEGRITY_NOT_YET_VERIFIED"]
+        );
     }
 
     #[test]
@@ -666,7 +725,10 @@ mod tests {
         );
         let decision = decide(&input).unwrap();
         assert_eq!(decision.selected_offer_id.as_deref(), Some("refresh-retracted"));
-        assert_eq!(decision.reason_codes, vec!["SOURCE_RETRACTED_OR_SUPERSEDED"]);
+        assert_eq!(
+            decision.reason_codes,
+            vec!["SOURCE_CORRECTED_RETRACTED_OR_SUPERSEDED"]
+        );
     }
 
     #[test]
