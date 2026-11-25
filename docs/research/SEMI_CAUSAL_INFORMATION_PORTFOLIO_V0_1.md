@@ -33,6 +33,8 @@ For each candidate outcome, likelihood probabilities are provided for every hypo
 
 The exact optimizer enumerates candidate subsets (at most 10 candidates) and enumerates the joint outcome space (at most 4,096 combinations per subset). Larger portfolios are explicitly outside V1.
 
+V1 also accepts up to 16 deterministic likelihood stress scenarios. Each scenario must cover every candidate exactly once, use the same outcome IDs and normalize its likelihoods for every hypothesis. The optimizer calculates each selected portfolio's information gain under the nominal likelihoods and each stress scenario, then reports the minimum, maximum and range. A separate robust-information-gain objective weight can prioritize the minimum across declared scenarios. These are stress cases, not probability-weighted states of nature; no probability of the scenarios is inferred.
+
 ## Information gain
 
 For prior hypothesis distribution p(H), measurement outcome Y, and posterior p(H|Y), the expected information gain is:
@@ -91,7 +93,7 @@ The integration reference tests independently enumerate a two-candidate joint-ou
 
 ## Authored adversarial coverage
 
-The source currently includes 14 Rust unit tests plus 2 integration reference tests covering:
+The source currently includes 16 Rust unit tests plus 2 integration reference tests covering:
 1. known binary-test information gain;
 2. hard cost and capacity;
 3. same dependency-group exclusion;
@@ -105,7 +107,9 @@ The source currently includes 14 Rust unit tests plus 2 integration reference te
 11. positive decision-loss reduction under an informative test;
 12. Pareto frontier retaining information/cost trade-offs;
 13. independent joint-outcome entropy oracle;
-14. no multi-candidate assumption when conditional independence is undeclared.
+14. no multi-candidate assumption when conditional independence is undeclared;
+15. robust objective avoids a nominally strong candidate whose information collapses under a declared likelihood stress scenario;
+16. malformed/incomplete stress likelihood scenarios are rejected.
 
 Tests are authored; exact-head rustfmt, strict Clippy, semiconductor crate tests, independent reference controls and SEMI-BENCH-001 are pending.
 
