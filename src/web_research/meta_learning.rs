@@ -509,14 +509,14 @@ mod tests {
         // Source that is mostly correct
         for _ in 0..20 {
             learner
-                .record_outcome(make_outcome("programming", "docs.rust-lang.org", true))
+                .record_adjudicated_outcome(make_outcome("programming", "docs.rust-lang.org", true))
                 .unwrap();
         }
 
         // Source that is often wrong
         for _ in 0..20 {
             learner
-                .record_outcome(make_outcome("programming", "random-blog.com", false))
+                .record_adjudicated_outcome(make_outcome("programming", "random-blog.com", false))
                 .unwrap();
         }
 
@@ -537,7 +537,7 @@ mod tests {
         // Build expertise in programming
         for _ in 0..30 {
             learner
-                .record_outcome(make_outcome("programming", "rust-lang.org", true))
+                .record_adjudicated_outcome(make_outcome("programming", "rust-lang.org", true))
                 .unwrap();
         }
 
@@ -564,15 +564,15 @@ mod tests {
         // Build history with different sources
         for _ in 0..10 {
             learner
-                .record_outcome(make_outcome("programming", "rust-lang.org", true))
+                .record_adjudicated_outcome(make_outcome("programming", "rust-lang.org", true))
                 .unwrap();
         }
         for _ in 0..10 {
             learner
-                .record_outcome(make_outcome("programming", "stackoverflow.com", true))
+                .record_adjudicated_outcome(make_outcome("programming", "stackoverflow.com", true))
                 .unwrap();
             learner
-                .record_outcome(make_outcome("programming", "stackoverflow.com", false))
+                .record_adjudicated_outcome(make_outcome("programming", "stackoverflow.com", false))
                 .unwrap();
         }
 
