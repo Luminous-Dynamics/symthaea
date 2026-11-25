@@ -77,20 +77,36 @@
           "const": 5
         },
         "public_release_environment_count": {
-          "const": 20
+          "type": [
+            "integer",
+            "null"
+          ],
+          "minimum": 1
         },
         "public_release_task_count": {
-          "const": 60
+          "type": [
+            "integer",
+            "null"
+          ],
+          "minimum": 1
         },
         "public_release_count_basis": {
           "type": "string",
-          "minLength": 20
+          "minLength": 40
         },
         "withheld_environment_count_inferred": {
-          "const": 23
+          "type": [
+            "integer",
+            "null"
+          ],
+          "minimum": 0
         },
         "withheld_task_count_inferred": {
-          "const": 69
+          "type": [
+            "integer",
+            "null"
+          ],
+          "minimum": 0
         }
       }
     },
@@ -282,10 +298,13 @@
           "format": "uri"
         },
         "reported_public_data_license": {
-          "const": "CC-BY-4.0"
+          "type": [
+            "string",
+            "null"
+          ]
         },
         "license_status": {
-          "const": "reported_by_secondary_catalogue_pending_per_file_manifest_audit"
+          "const": "official_zenodo_license_value_not_visible; secondary_cc_by_claim_unverified"
         },
         "immutable_manifest_sha256": {
           "type": [
@@ -304,6 +323,147 @@
           "const": "not_downloaded"
         },
         "asset_or_weight_download_status": {
+          "const": "not_applicable"
+        },
+        "public_file_source_script_git_blob_sha": {
+          "type": "string",
+          "pattern": "^[0-9a-f]{40}$"
+        },
+        "official_paper_linked_zenodo_record": {
+          "type": "object",
+          "additionalProperties": false,
+          "required": [
+            "url",
+            "doi",
+            "version",
+            "record_published_date",
+            "archive_filename",
+            "archive_size_label",
+            "published_md5",
+            "published_md5_locally_verified",
+            "archive_sha256",
+            "visible_license_value",
+            "license_status",
+            "archive_contents_described_by_record"
+          ],
+          "properties": {
+            "url": {
+              "type": "string",
+              "format": "uri"
+            },
+            "doi": {
+              "const": "10.5281/zenodo.19498269"
+            },
+            "version": {
+              "const": "v1"
+            },
+            "record_published_date": {
+              "const": "2026-04-10"
+            },
+            "archive_filename": {
+              "const": "autumnbench_public.zip"
+            },
+            "archive_size_label": {
+              "const": "71.1 kB"
+            },
+            "published_md5": {
+              "const": "f276390c6ea102187c072a0fafda9888"
+            },
+            "published_md5_locally_verified": {
+              "const": false
+            },
+            "archive_sha256": {
+              "type": [
+                "string",
+                "null"
+              ],
+              "pattern": "^[0-9a-f]{64}$"
+            },
+            "visible_license_value": {
+              "type": [
+                "string",
+                "null"
+              ]
+            },
+            "license_status": {
+              "const": "no_license_value_visible_on_landing_page"
+            },
+            "archive_contents_described_by_record": {
+              "const": [
+                "prompts/",
+                "answers/",
+                "programs/",
+                "color_dict.yaml"
+              ]
+            }
+          }
+        },
+        "mara_protocol_firebase_distribution": {
+          "type": "object",
+          "additionalProperties": false,
+          "required": [
+            "manifest_url",
+            "source_repository_commit",
+            "source_script_git_blob_sha",
+            "manifest_sha256",
+            "manifest_downloaded"
+          ],
+          "properties": {
+            "manifest_url": {
+              "type": "string",
+              "format": "uri"
+            },
+            "source_repository_commit": {
+              "type": "string",
+              "pattern": "^[0-9a-f]{40}$"
+            },
+            "source_script_git_blob_sha": {
+              "type": "string",
+              "pattern": "^[0-9a-f]{40}$"
+            },
+            "manifest_sha256": {
+              "type": [
+                "string",
+                "null"
+              ],
+              "pattern": "^[0-9a-f]{64}$"
+            },
+            "manifest_downloaded": {
+              "const": false
+            }
+          }
+        },
+        "distribution_equivalence_status": {
+          "const": "zenodo_archive_and_mara_firebase_manifest_not_yet_byte_matched"
+        },
+        "secondary_catalogue_claims": {
+          "type": "object",
+          "additionalProperties": false,
+          "required": [
+            "public_environment_count",
+            "public_task_count",
+            "reported_license",
+            "verification_status"
+          ],
+          "properties": {
+            "public_environment_count": {
+              "const": 20
+            },
+            "public_task_count": {
+              "const": 60
+            },
+            "reported_license": {
+              "const": "CC-BY-4.0"
+            },
+            "verification_status": {
+              "const": "unverified_secondary_source_only"
+            }
+          }
+        },
+        "license_review_status": {
+          "const": "unresolved"
+        },
+        "archive_or_asset_download_status": {
           "const": "not_applicable"
         }
       }

@@ -7,18 +7,20 @@
 
 WorldTest asks whether an agent learns a reusable environment model that can answer new environment-level queries, not merely predict the next observation or maximize reward on the same rollout distribution. Its two-phase protocol separates reward-free exploration from a query in a related but different challenge environment.
 
-The ICML 2026 paper reports 43 environments, 129 tasks, 19 stochastic environments, 517 human participants and five frontier models. The public release is reported as 20 environments / 60 tasks; do not describe a public-subset evaluation as a full-paper reproduction. The withheld 23/69 counts are derived differences, not a claim that those tasks can be downloaded. Sources: [PMLR paper](https://proceedings.mlr.press/v306/warrier26a.html), [author project page](https://archanarw.github.io/projects/autumnbench.html), [WorldTest presentation](https://datvo06.github.io/assets/talks/worldtest/).
+The ICML 2026 paper reports 43 environments, 129 tasks, 19 stochastic environments, 517 human participants and five frontier models. The paper-linked public Zenodo record is v1 (DOI 10.5281/zenodo.19498269) and lists a 71.1 kB archive, autumnbench_public.zip, with published MD5 f276390c6ea102187c072a0fafda9888. Its description says the archive contains prompts, ground-truth answers, environment programs and color_dict.yaml. The PMLR landing page does not display a license value. A secondary catalogue reports 20 environments / 60 tasks and CC-BY-4.0, but neither the counts nor license are verified from the archive/manifest. Do not use the inferred 23/69 withheld counts as a fact. Sources: [PMLR paper](https://proceedings.mlr.press/v306/warrier26a.html), [author project page](https://archanarw.github.io/projects/autumnbench.html), [WorldTest presentation](https://datvo06.github.io/assets/talks/worldtest/).
 
 This complements CMAQ-002's finite EVoI simulator: EVoI measures which safe probe to perform inside a small known hypothesis catalog; WorldTest asks whether reward-free exploration creates a model that generalizes to new queries in a related environment.
 
 ## Source and data boundary
+
+The PMLR paper links directly to the Zenodo v1 archive record. Separately, the pinned MARAProtocol download script (blob a0eb99dfd39b8cab9ffa5e577d2e2e1b738301e9) points to a Firebase Storage manifest_public.json endpoint. These are currently two independent distribution routes; we have not downloaded either manifest/archive or matched their bytes. The Firebase manifest SHA-256 and Zenodo archive SHA-256 remain null. A download attempt from this execution environment failed at DNS resolution.
 
 The lock pins:
 - Autumn.cpp at 0929d175c3d296de091ac4b998d09b9b55a38f67 (MIT; C++20 native interpreter, plus WASM/Python/Julia).
 - MARAProtocol at d0d4e9251151778415cc5195c5dfb8296a5ded24 (MIT; protocol buffers pinned by file blob SHA).
 - The public data manifest endpoint, without claiming immutable dataset identity or per-file checksums.
 
-The two pinned commits are unsigned. The public data license is reported as CC BY 4.0 by a secondary catalogue, but remains pending per-file manifest and attribution review. The dataset is not downloaded. The MARA reference runner requires Python 3.12 and Protobuf tooling; Symthaea should implement a thin Rust adapter to the pinned protobuf contract rather than importing the Python runner into production. Use the native Autumn interpreter as a pinned external process; do not vendor code or data.
+The two pinned commits are unsigned. The official Zenodo landing page currently shows no license value. A secondary catalogue reports CC-BY-4.0, but this remains unverified and must not be treated as permission to redistribute. The dataset is not downloaded; per-file license and attribution review are still required. The MARA reference runner requires Python 3.12 and Protobuf tooling; Symthaea should implement a thin Rust adapter to the pinned protobuf contract rather than importing the Python runner into production. Use the native Autumn interpreter as a pinned external process; do not vendor code or data.
 
 ## Protocol custody
 
@@ -34,7 +36,7 @@ Test:
 - Task prompt may be visible as the task requires; answer key, true change timestep and evaluator scoring artifacts remain evaluator-only.
 - Program-visible reference agents are a separate interface arm, not a matched comparison to observation-only agents.
 
-The JSON Schema fixture validates this metadata/custody contract only. It does not establish actual dataset integrity or a successful simulator adapter.
+The JSON Schema fixture validates this metadata/custody contract only. It does not establish actual dataset integrity or a successful simulator adapter. The Zenodo archive's MD5 is recorded as published metadata only; it has not been verified locally, and SHA-256 is unknown.
 
 ## Pinned MARA runner reward and phase audit
 
