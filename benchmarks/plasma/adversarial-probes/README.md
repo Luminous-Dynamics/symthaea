@@ -176,3 +176,20 @@ The synthetic scorer can be run directly:
 The CLI parses the complex response matrix, mode coefficients, encoded bytes and QoI weights, runs the planner, and emits a JSON decision receipt. It exits non-zero on malformed registries, missing/duplicate mode metadata, invalid weights, unmeasured matrix entries used as data, or arithmetic failures. Missing response entries are retained as UNKNOWN in the output, never coerced to zero sensitivity.
 
 The focused Plasma Probe Contract workflow validates the Draft 2020-12 fixture schema, Rust-formats the CLI, runs it on the known-answer fixture, and tests the same scenario in the Rust unit suite.
+
+
+## Positivity- and invariant-constrained transitions (IRCKP)
+
+The first IRCKP primitive is `project_nonnegative_preserving_mass` in the crate. It solves the exact weighted least-squares projection onto non-negative cell values while preserving one declared discrete mass:
+
+`min_g 0.5 * sum_i v_i * (g_i - f_i)^2`
+
+subject to `g_i >= 0` and `sum_i v_i*g_i = target_mass`.
+
+It uses the active-set form `g_i=max(0,f_i-lambda)` and reports the Lagrange multiplier, mass residual, active positive-cell count, minimum output and weighted correction norm. The known-answer fixture under `benchmarks/plasma/positivity-projection/` starts at [-0.1, 1.1] with unit cell volumes and target mass one, yielding [0,1].
+
+Replay it with:
+
+`cargo run --bin positive_mass_projection_audit -- benchmarks/plasma/positivity-projection/fixtures/negative-spectral-overshoot-known-answer-v0.1.json`
+
+**Scope:** this is positivity plus one discrete mass only. It does not preserve momentum, energy, entropy/Casimirs, L1/L2 or future response. It is not yet a general constrained QP or a physical solver transition. The broader contract and prior-art comparison are in [#13629](https://github.com/Luminous-Dynamics/symthaea/issues/13629).
