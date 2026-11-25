@@ -892,6 +892,34 @@ mod tests {
     }
 
     #[test]
+    fn evaluator_artifact_content_is_bound_to_the_original_witness() {
+        let fixture = Fixture::new();
+        let witness = fixture.witness();
+        let mut altered = fixture.manifest.clone();
+        altered.sealed_artifacts[0].content_sha256 = digest('f');
+        assert_eq!(
+            validate_sealed_evaluation_manifest_v1(
+                &altered, &fixture.episodes, &witness, &fixture.expected
+            ),
+            Err(SealedEvaluationManifestRejectV1::ArtifactRootMismatch)
+        );
+    }
+
+    #[test]
+    fn preregistration_policy_is_bound_to_the_original_witness() {
+        let fixture = Fixture::new();
+        let witness = fixture.witness();
+        let mut altered = fixture.manifest.clone();
+        altered.pre_registration.exclusion_policy_sha256 = digest('f');
+        assert_eq!(
+            validate_sealed_evaluation_manifest_v1(
+                &altered, &fixture.episodes, &witness, &fixture.expected
+            ),
+            Err(SealedEvaluationManifestRejectV1::PreRegistrationRootMismatch)
+        );
+    }
+
+    #[test]
     fn t9_and_t10_are_distinct_sealed_artifacts() {
         let fixture = Fixture::new();
         let ids: Vec<&str> = fixture.manifest.sealed_artifacts
