@@ -161,7 +161,8 @@ fn replay_pair(
     if maximum_length == 0 {
         return Err(WorldTestExplorationError::ArithmeticOverflow);
     }
-    let numerator = u128::try_from(longest_common_subsequence_length(before, after)?)
+    let lcs = longest_common_subsequence_length(before, after)?;
+    let numerator = u128::try_from(lcs)
         .map_err(|_| WorldTestExplorationError::ArithmeticOverflow)?
         .checked_mul(u128::from(WORLDTEST_RATIO_PPM))
         .ok_or(WorldTestExplorationError::ArithmeticOverflow)?;
@@ -173,7 +174,7 @@ fn replay_pair(
             .map_err(|_| WorldTestExplorationError::ArithmeticOverflow)?,
         after_action_count: u64::try_from(after.len())
             .map_err(|_| WorldTestExplorationError::ArithmeticOverflow)?,
-        lcs_length: u64::try_from(longest_common_subsequence_length(before, after)?)
+        lcs_length: u64::try_from(lcs)
             .map_err(|_| WorldTestExplorationError::ArithmeticOverflow)?,
         replay_lcs_ratio_ppm: u32::try_from(ratio)
             .map_err(|_| WorldTestExplorationError::ArithmeticOverflow)?,
@@ -323,6 +324,14 @@ mod tests {
 
     fn trace(events: Vec<ExplorationEvent>) -> ExplorationTrace {
         ExplorationTrace { events }
+    }
+
+    #[test]
+    fn empty_trace_is_rejected() {
+        assert_eq!(
+            evaluate_worldtest_exploration(&trace(Vec::new())),
+            Err(WorldTestExplorationError::EmptyTrace)
+        );
     }
 
     #[test]
