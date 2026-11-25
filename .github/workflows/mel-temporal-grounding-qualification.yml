@@ -83,6 +83,11 @@ jobs:
             .schema == "mel-multi-annotator-grounding-report-v1"
             and .summary.panel_size == 6
             and .summary.scored_annotators == 4
+            and .summary.abstained_predictions == 0
+            and .summary.parse_failure_predictions == 0
+            and .summary.prediction_coverage == 1.0
+            and .summary.present_prediction_coverage == 1.0
+            and .summary.absent_prediction_coverage == 1.0
             and .summary.present_annotators == 3
             and .summary.absent_annotators == 1
             and .summary.ambiguous_exclusions == 1
@@ -96,6 +101,7 @@ jobs:
             and .summary.unanimous_correct_across_scored_annotators == false
             and (.annotator_results | length) == 6
             and .pairwise_inter_annotator_agreement_computed == false
+            and .model_confidence_calibration_computed == false
             and .synthetic_consensus_ground_truth_created == false
             and .population_confidence_interval_computed == false
           ' "$RUNNER_TEMP/multi-annotator-report.json" > /dev/null
