@@ -1,0 +1,153 @@
+{
+  "schema_version": "1.0.0",
+  "artifact_id": "LEAN-CHECKER-DIVERSITY-RUN-001",
+  "profile_status": "synthetic_fixture_not_execution",
+  "profile_id": "CHECKER-DIVERSITY-SYNTHETIC-ALL-ACCEPT-001",
+  "registry_sha256": "e17c063f20c7338dda1352e5493793f36a0bdb688a5b320503e4906000beb813",
+  "subject": {
+    "export_sha256": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+    "export_format": "Lean 4.35.0 export NDJSON",
+    "lean_toolchain": "leanprover/lean4:v4.35.0",
+    "challenge_sha256": "2222222222222222222222222222222222222222222222222222222222222222",
+    "solution_source_sha256": "3333333333333333333333333333333333333333333333333333333333333333"
+  },
+  "orchestrator": {
+    "name": "lake comparator",
+    "version": "4.35.0 --paranoid",
+    "configuration_sha256": "4444444444444444444444444444444444444444444444444444444444444444",
+    "paranoid_mode": true,
+    "sandbox_profile_sha256": "5555555555555555555555555555555555555555555555555555555555555555",
+    "exit_status": "not_run",
+    "stdout_sha256": "6666666666666666666666666666666666666666666666666666666666666666",
+    "stderr_sha256": "7777777777777777777777777777777777777777777777777777777777777777"
+  },
+  "policy": {
+    "policy_id": "LEAN-STANDARD-AXIOMS-V1",
+    "policy_sha256": "8888888888888888888888888888888888888888888888888888888888888888",
+    "permitted_axioms": [
+      "propext",
+      "Classical.choice",
+      "Quot.sound"
+    ]
+  },
+  "requested_checker_ids": [
+    "lean_official_kernel",
+    "lean4lean",
+    "nanoda",
+    "con_leche",
+    "con_ron",
+    "leanchecker_paranoid"
+  ],
+  "checker_runs": [
+    {
+      "checker_id": "lean_official_kernel",
+      "checker_version": "Lean 4.35.0 fixture",
+      "implementation_revision": "lean-v4.35.0-fixture",
+      "binary_sha256": "bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb",
+      "input_export_sha256": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+      "result": "accepted",
+      "exit_code": 0,
+      "raw_receipt_sha256": "bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb",
+      "raw_stdout_sha256": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+      "raw_stderr_sha256": "bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb",
+      "environment_ref": "synthetic_fixture_only"
+    },
+    {
+      "checker_id": "lean4lean",
+      "checker_version": "Arena 932afa1 fixture",
+      "implementation_revision": "932afa1-fixture",
+      "binary_sha256": "cccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccc",
+      "input_export_sha256": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+      "result": "accepted",
+      "exit_code": 0,
+      "raw_receipt_sha256": "cccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccc",
+      "raw_stdout_sha256": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+      "raw_stderr_sha256": "bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb",
+      "environment_ref": "synthetic_fixture_only"
+    },
+    {
+      "checker_id": "nanoda",
+      "checker_version": "Arena 0da9f98 fixture",
+      "implementation_revision": "0da9f98-fixture",
+      "binary_sha256": "dddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddd",
+      "input_export_sha256": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+      "result": "accepted",
+      "exit_code": 0,
+      "raw_receipt_sha256": "dddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddd",
+      "raw_stdout_sha256": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+      "raw_stderr_sha256": "bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb",
+      "environment_ref": "synthetic_fixture_only"
+    },
+    {
+      "checker_id": "con_leche",
+      "checker_version": "con-leche cd2eceab fixture",
+      "implementation_revision": "cd2eceab-fixture",
+      "binary_sha256": "eeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeee",
+      "input_export_sha256": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+      "result": "accepted",
+      "exit_code": 0,
+      "raw_receipt_sha256": "eeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeee",
+      "raw_stdout_sha256": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+      "raw_stderr_sha256": "bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb",
+      "environment_ref": "synthetic_fixture_only"
+    },
+    {
+      "checker_id": "con_ron",
+      "checker_version": "Arena 39de395 fixture",
+      "implementation_revision": "39de395-fixture",
+      "binary_sha256": "ffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffff",
+      "input_export_sha256": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+      "result": "accepted",
+      "exit_code": 0,
+      "raw_receipt_sha256": "ffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffff",
+      "raw_stdout_sha256": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+      "raw_stderr_sha256": "bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb",
+      "environment_ref": "synthetic_fixture_only"
+    },
+    {
+      "checker_id": "leanchecker_paranoid",
+      "checker_version": "Lean 4.35.0 paranoid fixture",
+      "implementation_revision": "lean-v4.35.0-paranoid-fixture",
+      "binary_sha256": "1111111111111111111111111111111111111111111111111111111111111111",
+      "input_export_sha256": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+      "result": "accepted",
+      "exit_code": 0,
+      "raw_receipt_sha256": "9999999999999999999999999999999999999999999999999999999999999999",
+      "raw_stdout_sha256": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+      "raw_stderr_sha256": "bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb",
+      "environment_ref": "synthetic_fixture_only"
+    }
+  ],
+  "diversity_requirements": {
+    "minimum_algorithm_lineages": 3,
+    "minimum_independent_external_algorithm_lineages": 2,
+    "minimum_languages": 3,
+    "minimum_implementation_families": 4,
+    "require_all_requested_accept": true
+  },
+  "diversity_summary": {
+    "requested_count": 6,
+    "executed_count": 6,
+    "accepted_count": 6,
+    "rejected_count": 0,
+    "declined_count": 0,
+    "error_count": 0,
+    "timeout_count": 0,
+    "resource_exhausted_count": 0,
+    "distinct_implementation_families": 6,
+    "distinct_algorithm_lineages": 3,
+    "distinct_languages": 3,
+    "known_term_representation_families": 3,
+    "known_parser_families": 1,
+    "independent_external_algorithm_lineages": 2,
+    "unknown_relationship_count": 8
+  },
+  "profile_disposition": "draft",
+  "claim_ceiling": [
+    "This record is a synthetic validator fixture. It is not an observed comparator run.",
+    "The six checker paths describe six executable records but only three documented algorithm-lineage families in this registry.",
+    "con-ron adds a distinct Rust implementation/runtime path but shares the con-leche algorithm lineage.",
+    "lean4lean and leanchecker-paranoid share the official Lean kernel lineage; leanchecker-paranoid is a hardening variant, not a second algorithm.",
+    "The diversity vector is not a scalar score or a theorem-validity verdict."
+  ]
+}
