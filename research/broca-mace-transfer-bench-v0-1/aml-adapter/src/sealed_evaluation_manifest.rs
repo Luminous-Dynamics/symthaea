@@ -1069,4 +1069,26 @@ mod tests {
             Err(SealedEvaluationManifestRejectV1::InvalidJson)
         );
     }
+    pub(super) fn verified_fixture_capabilities(
+    ) -> (
+        SealedEvaluationManifestV1,
+        VerifiedSealedEvaluationManifestV1,
+        VerifiedEvaluationManifestCommitmentV1,
+    ) {
+        let fixture = Fixture::new();
+        let witness = fixture.witness();
+        let verified = fixture.verify().unwrap();
+        (fixture.manifest.clone(), verified, witness)
+    }
+
+}
+
+#[cfg(test)]
+pub(crate) fn test_verified_sealed_evaluation_fixture_v1(
+) -> (
+    SealedEvaluationManifestV1,
+    VerifiedSealedEvaluationManifestV1,
+    VerifiedEvaluationManifestCommitmentV1,
+) {
+    tests::verified_fixture_capabilities()
 }

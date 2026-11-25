@@ -1,0 +1,114 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://github.com/Luminous-Dynamics/symthaea/blob/main/data/schemas/mace_evaluation_anchor_payload_v1.schema.json",
+  "title": "MACE Evaluation Anchor Payload v1",
+  "type": "object",
+  "additionalProperties": false,
+  "required": [
+    "schema_version",
+    "suite_id",
+    "suite_version",
+    "evaluation_protocol_sha256",
+    "split",
+    "episode_count",
+    "episode_manifest_root_sha256",
+    "sealed_evaluation_manifest_sha256",
+    "arm_assignment_root_sha256",
+    "pre_registration_root_sha256",
+    "sealed_artifacts_root_sha256",
+    "evaluator_profile_sha256",
+    "verifier_profile_sha256",
+    "access_control_profile_sha256",
+    "sealed_store_profile_sha256",
+    "candidate_access_profile_sha256",
+    "reveal_protocol_sha256",
+    "trace_seal_protocol_sha256",
+    "candidate_readable_before_trace_seal",
+    "reveal_condition"
+  ],
+  "properties": {
+    "schema_version": {
+      "const": "mace_evaluation_anchor_payload_v1"
+    },
+    "suite_id": {
+      "type": "string",
+      "minLength": 1,
+      "maxLength": 256
+    },
+    "suite_version": {
+      "type": "string",
+      "minLength": 1,
+      "maxLength": 256
+    },
+    "evaluation_protocol_sha256": {
+      "type": "string",
+      "pattern": "^[0-9a-f]{64}$"
+    },
+    "split": {
+      "enum": [
+        "development",
+        "validation",
+        "held_out"
+      ]
+    },
+    "episode_count": {
+      "type": "integer",
+      "minimum": 1,
+      "maximum": 10000
+    },
+    "episode_manifest_root_sha256": {
+      "type": "string",
+      "pattern": "^[0-9a-f]{64}$"
+    },
+    "sealed_evaluation_manifest_sha256": {
+      "type": "string",
+      "pattern": "^[0-9a-f]{64}$"
+    },
+    "arm_assignment_root_sha256": {
+      "type": "string",
+      "pattern": "^[0-9a-f]{64}$"
+    },
+    "pre_registration_root_sha256": {
+      "type": "string",
+      "pattern": "^[0-9a-f]{64}$"
+    },
+    "sealed_artifacts_root_sha256": {
+      "type": "string",
+      "pattern": "^[0-9a-f]{64}$"
+    },
+    "evaluator_profile_sha256": {
+      "type": "string",
+      "pattern": "^[0-9a-f]{64}$"
+    },
+    "verifier_profile_sha256": {
+      "type": "string",
+      "pattern": "^[0-9a-f]{64}$"
+    },
+    "access_control_profile_sha256": {
+      "type": "string",
+      "pattern": "^[0-9a-f]{64}$"
+    },
+    "sealed_store_profile_sha256": {
+      "type": "string",
+      "pattern": "^[0-9a-f]{64}$"
+    },
+    "candidate_access_profile_sha256": {
+      "type": "string",
+      "pattern": "^[0-9a-f]{64}$"
+    },
+    "reveal_protocol_sha256": {
+      "type": "string",
+      "pattern": "^[0-9a-f]{64}$"
+    },
+    "trace_seal_protocol_sha256": {
+      "type": "string",
+      "pattern": "^[0-9a-f]{64}$"
+    },
+    "candidate_readable_before_trace_seal": {
+      "const": false
+    },
+    "reveal_condition": {
+      "const": "all_candidate_traces_sealed"
+    }
+  }
+}
