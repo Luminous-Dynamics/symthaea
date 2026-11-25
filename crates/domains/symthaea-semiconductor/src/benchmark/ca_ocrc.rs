@@ -804,9 +804,7 @@ mod tests {
             &input(2, CaOcrcPredictionSetKindV1::NonTrivial, Some(0.0),
                 vec![feedback(1, 2, Some(CaOcrcEvidenceDispositionV1::Qualified), Some(1.0))]));
         assert!(result.is_err());
-        assert_eq!(e.round_index, after_first.round_index);
-        assert_eq!(e.threshold, after_first.threshold);
-        assert_eq!(e.tracking_set, after_first.tracking_set);
+        assert_eq!(e, after_first);
         assert_ne!(before, e);
     }
 
