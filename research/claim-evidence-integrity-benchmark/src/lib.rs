@@ -321,7 +321,19 @@ fn validate_fixture(
 
     if let Some(evidence) = required_array(map, "evidence", &path, issues) {
         *evidence_count += evidence.len();
+        let mut evidence_ids = HashSet::new();
         for (i, item) in evidence.iter().enumerate() {
+            if let Some(item_map) = item.as_object() {
+                if let Some(id) = item_map.get("evidence_id").and_then(Value::as_str) {
+                    if !evidence_ids.insert(id.to_owned()) {
+                        issue(
+                            issues,
+                            format!("{path}.evidence[{i}].evidence_id"),
+                            "duplicate evidence ID within fixture",
+                        );
+                    }
+                }
+            }
             if validate_evidence(item, &format!("{path}.evidence[{i}]"), issues) {
                 *verified_digests += 1;
             }
@@ -373,10 +385,97 @@ pub fn validate_value(value: &Value) -> Result<ValidationReport, Vec<ValidationI
     {
         issue(&mut issues, "$.status", "pack must retain synthetic-only status");
     }
-    required_string(map, "created_at", "$", &mut issues);
+    if let Some(created_at) = required_string(map, "created_at", "$", &mut issues) {
+        if !valid_time(created_at) {
+            issue(&mut issues, "$.created_at", "expected RFC3339 timestamp");
+        }
+    }
     required_string(map, "purpose", "$", &mut issues);
     if map.get("source_issue").and_then(Value::as_u64) != Some(13635) {
         issue(&mut issues, "$.source_issue", "unexpected source issue");
+    }
+    if required_string(map, "evidence_digest_algorithm", "$", &mut issues)
+        != Some("SHA-256 over artifact_text UTF-8 bytes; fixture strings are ASCII so byte offsets are unambiguous.")
+    {
+        issue(
+            &mut issues,
+            "$.evidence_digest_algorithm",
+            "unsupported or missing artifact digest contract",
+        );
+    }
+
+    let expected_verdicts: HashSet<&str> = VERDICTS.iter().copied().collect();
+    if let Some(values) = required_array(map, "verdicts", "$", &mut issues) {
+        let actual: HashSet<&str> = values.iter().filter_map(Value::as_str).collect();
+        if actual != expected_verdicts || actual.len() != values.len() {
+            issue(&mut issues, "$.verdicts", "declared verdicts must exactly match supported verdict enum");
+        }
+    }
+    let expected_relations: HashSet<&str> = RELATIONS.iter().copied().collect();
+    if let Some(values) = required_array(map, "relation_labels", "$", &mut issues) {
+        let actual: HashSet<&str> = values.iter().filter_map(Value::as_str).collect();
+        if actual != expected_relations || actual.len() != values.len() {
+            issue(&mut issues, "$.relation_labels", "declared relation labels must exactly match supported relation enum");
+        }
+    }
+    let expected_axes: HashSet<&str> = [
+        "claim_reference_time",
+        "evidence_publication_time",
+        "evidence_retrieval_time",
+        "model_knowledge_cutoff",
+    ]
+    .into_iter()
+    .collect();
+    if let Some(values) = required_array(map, "temporal_axes", "$", &mut issues) {
+        let actual: HashSet<&str> = values.iter().filter_map(Value::as_str).collect();
+        if actual != expected_axes || actual.len() != values.len() {
+            issue(&mut issues, "$.temporal_axes", "all four temporal axes must be declared exactly once");
+        }
+    }
+
+    if let Some(policy_value) = map.get("evaluation_policy") {
+        if let Some(policy) = object(policy_value, "$.evaluation_policy", &mut issues) {
+            const POLICY_KEYS: &[&str] = &[
+                "denominator",
+                "score_separation",
+                "primary_contract",
+                "no_single_scalar",
+                "oracle_custody",
+            ];
+            validate_exact_keys(policy, POLICY_KEYS, "$.evaluation_policy", &mut issues);
+            for key in ["denominator", "primary_contract", "no_single_scalar", "oracle_custody"] {
+                required_string(policy, key, "$.evaluation_policy", &mut issues);
+            }
+            if let Some(scores) = required_array(policy, "score_separation", "$.evaluation_policy", &mut issues) {
+                let names: Vec<&str> = scores.iter().filter_map(Value::as_str).collect();
+                let unique: HashSet<&str> = names.iter().copied().collect();
+                if names.len() < 8 || unique.len() != names.len() || names.len() != scores.len() {
+                    issue(
+                        &mut issues,
+                        "$.evaluation_policy.score_separation",
+                        "at least eight unique non-empty score dimensions are required",
+                    );
+                }
+                if names.iter().any(|name| name.trim().is_empty()) {
+                    issue(
+                        &mut issues,
+                        "$.evaluation_policy.score_separation",
+                        "score dimensions cannot be empty",
+                    );
+                }
+            }
+        }
+    } else {
+        issue(&mut issues, "$.evaluation_policy", "required object is missing");
+    }
+    if let Some(limitations) = required_array(map, "limitations", "$", &mut issues) {
+        if limitations.len() < 3
+            || limitations
+                .iter()
+                .any(|item| item.as_str().is_none_or(|value| value.trim().is_empty()))
+        {
+            issue(&mut issues, "$.limitations", "at least three non-empty limitations are required");
+        }
     }
 
     let mut seen_ids = HashSet::new();
@@ -477,4 +576,30 @@ mod tests {
         value["fixtures"][0].as_object_mut().unwrap().remove("claim_reference_time");
         assert!(validate_value(&value).is_err());
     }
-}
+    #[test]
+    fn unsupported_relation_enum_fails_closed() {
+        let mut value: Value = serde_json::from_str(FIXTURE_PACK).unwrap();
+        value["fixtures"][0]["evidence"][0]["relation_to_claim"] =
+            Value::String("weakly_relevant".to_owned());
+        assert!(validate_value(&value).is_err());
+    }
+
+    #[test]
+    fn missing_top_level_temporal_axis_fails_closed() {
+        let mut value: Value = serde_json::from_str(FIXTURE_PACK).unwrap();
+        let axes = value["temporal_axes"].as_array_mut().unwrap();
+        axes.retain(|axis| axis.as_str() != Some("model_knowledge_cutoff"));
+        assert!(validate_value(&value).is_err());
+    }
+
+    #[test]
+    fn duplicate_evidence_ids_fail_closed() {
+        let mut value: Value = serde_json::from_str(FIXTURE_PACK).unwrap();
+        let duplicate = value["fixtures"][0]["evidence"][0].clone();
+        value["fixtures"][0]["evidence"]
+            .as_array_mut()
+            .unwrap()
+            .push(duplicate);
+        assert!(validate_value(&value).is_err());
+    }
+}}
