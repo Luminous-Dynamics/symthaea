@@ -2,6 +2,7 @@
 
 pub mod binary_metrics;
 pub mod causal_drift_diagnosis;
+pub mod causal_information_portfolio;
 pub mod calibration_requalification;
 pub mod dtco_manifest;
 pub mod gated_streaming_adapter;
@@ -160,4 +161,13 @@ pub use causal_drift_diagnosis::{
     CausalHypothesisAssessmentV1, ControlledInterventionEvidenceV1,
     ExpectedEffectDirectionV1, MatchedDifferenceInDifferencesV1, NegativeControlEvidenceV1,
     diagnose_causal_drift_v1, seal_causal_drift_diagnosis_input_v1,
+};
+
+pub use causal_information_portfolio::{
+    CAUSAL_PORTFOLIO_INPUT_SCHEMA_V1, CAUSAL_PORTFOLIO_REPORT_SCHEMA_V1,
+    CandidateOutcomeLikelihoodV1, CausalCandidateEligibilityV1,
+    CausalInformationPortfolioErrorV1, CausalInformationPortfolioInputV1,
+    CausalInformationPortfolioReportV1, CausalMeasurementCandidateV1,
+    CausalPortfolioMetricsV1, CausalPortfolioObjectiveWeightsV1, CausalPortfolioStatusV1,
+    DecisionActionLossV1, HypothesisPriorV1, optimize_causal_information_portfolio_v1,
 };
