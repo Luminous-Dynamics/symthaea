@@ -13,6 +13,7 @@ pub mod decision_observability;
 pub mod decision_regret_voi;
 pub mod decision_sufficient_representation;
 pub mod individual_effect_retention;
+pub mod individual_decision_transfer;
 pub mod randomized_decision_regret;
 pub mod sensing;
 pub mod temporal_representation_preservation;
