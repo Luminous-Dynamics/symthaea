@@ -1,0 +1,99 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://github.com/Luminous-Dynamics/symthaea/research/stateguard-b0-policy/schemas/policy-decision-v0.1.schema.json",
+  "title": "StateGuard B0 Policy Decision v0.1",
+  "type": "object",
+  "additionalProperties": false,
+  "required": [
+    "policy_id",
+    "policy_version",
+    "disposition",
+    "selected_offer_id",
+    "selected_action_kind",
+    "target_claim_id",
+    "target_evidence_id",
+    "reason_codes",
+    "research_state_sha256",
+    "evidence_prefix_sha256",
+    "action_offers_sha256",
+    "resource_estimate"
+  ],
+  "properties": {
+    "policy_id": {
+      "const": "stateguard-b0"
+    },
+    "policy_version": {
+      "const": "0.1.0"
+    },
+    "disposition": {
+      "enum": [
+        "SELECTED",
+        "ABSTAIN",
+        "STOP"
+      ]
+    },
+    "selected_offer_id": {
+      "type": [
+        "string",
+        "null"
+      ]
+    },
+    "selected_action_kind": {
+      "type": [
+        "string",
+        "null"
+      ],
+      "enum": [
+        "RETRIEVE_OR_RECAPTURE",
+        "VERIFY_ARTIFACT",
+        "CLASSIFY_CLAIM_SOURCE",
+        "SEEK_INDEPENDENT_SOURCE",
+        "REQUEST_DISCRIMINATING_EXPERIMENT",
+        "REPLICATE",
+        "REQUEST_INDEPENDENT_ADJUDICATION",
+        "REFINE_SCOPE",
+        "ESCALATE",
+        null
+      ]
+    },
+    "target_claim_id": {
+      "type": [
+        "string",
+        "null"
+      ]
+    },
+    "target_evidence_id": {
+      "type": [
+        "string",
+        "null"
+      ]
+    },
+    "reason_codes": {
+      "type": "array",
+      "minItems": 1,
+      "items": {
+        "type": "string",
+        "minLength": 1
+      }
+    },
+    "research_state_sha256": {
+      "type": "string",
+      "pattern": "^[a-f0-9]{64}$"
+    },
+    "evidence_prefix_sha256": {
+      "type": "string",
+      "pattern": "^[a-f0-9]{64}$"
+    },
+    "action_offers_sha256": {
+      "type": "string",
+      "pattern": "^[a-f0-9]{64}$"
+    },
+    "resource_estimate": {
+      "type": "object",
+      "additionalProperties": {
+        "type": "integer",
+        "minimum": 0
+      }
+    }
+  }
+}
