@@ -26,6 +26,7 @@ on:
       - research/mel-ground-temporal-evaluator-v1-20261103
       - research/mel-temporal-grounding-count-gated-f1-v1-20261124
       - research/mel-temporal-grounding-count-gated-f1-v1-20261124
+      - research/mel-annotation-acquisition-v1-20261125
     paths:
       - "crates/domains/symthaea-muse/src/temporal_grounding.rs"
       - "crates/domains/symthaea-muse/src/evidence_digest.rs"
