@@ -26,7 +26,7 @@ The executable audit is:
 
 `cargo run --bin positive_mass_projection_audit -- benchmarks/plasma/positivity-projection/fixtures/negative-spectral-overshoot-known-answer-v0.1.json`
 
-The focused Plasma Probe Contract workflow validates the Draft 2020-12 schema, runs the CLI and checks the same case in the Rust unit tests.
+The CLI verifies every projected cell and the reported mass, multiplier, active-set count and correction norm against the fixture's expected values; it exits non-zero on mismatch. The focused Plasma Probe Contract workflow validates the Draft 2020-12 schema, runs the known-answer audit, and checks the same case in the Rust unit tests.
 
 ## Strict scope boundary
 
