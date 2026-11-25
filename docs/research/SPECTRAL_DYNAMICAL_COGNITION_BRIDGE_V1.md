@@ -239,3 +239,19 @@ The following supporting artifacts extend this protocol:
 - [Dependency-free Rust analytic reference harness](../../scripts/research/sdcb_reference.rs) with [run instructions and limitations](../../scripts/research/SDCB_REFERENCE_HARNESS_README.md).
 
 A key refinement from current Koopman/system-identification work is to evaluate *identifiability*, not just prediction accuracy. Each dynamical experiment must state persistent excitation, observability, sampling, noise, stationarity or regime assumptions, sequence length, and approximation error. Include adversarial non-identifiable trajectories and allow the correct result to be “insufficient evidence to identify the dynamics.”
+
+
+### Identifiability and abstention track (added 25 November 2026)
+
+This track upgrades system identification from a pure prediction task to a **know-when-not-identifiable** task. It is represented by the seventh pilot family, `identifiability_abstention`, with four task specifications:
+
+- two distinct hidden dynamics that yield identical measurements under an unobservable sensor;
+- rank-deficient input regressors that cannot identify a two-feature model;
+- an observable positive control using independently varied initial states;
+- finite/noisy/partially observed dynamics where structural observability does not guarantee practical identifiability at the available sample size.
+
+The standard-library Rust reference harness includes 2x2 observability-rank, input-regressor-rank and hidden-mode indistinguishability controls. It should return an explicit insufficient-evidence disposition on the unobservable/rank-deficient cases, not invent a unique model. A full-rank observability or excitation matrix is necessary for the relevant linear identification problem, but not sufficient to guarantee good finite-data estimation under noise or model mismatch.
+
+This adopts a critical lesson from current Koopman work: report the assumptions and conditions under which a spectral/dynamical approximation is learnable, and include adversarial systems where the same observations are consistent with different hidden dynamics. A model that knows when it cannot identify a system is more scientifically useful than one that always emits a forecast.
+
+The pilot manifest now contains 28 design-only task specifications, 14 negative controls, and seven task families. No generated trajectory, fitted model or model performance has been measured.
