@@ -38,3 +38,20 @@ This harness does not:
 - establish consciousness, intelligence, or biological correspondence.
 
 The Rust source currently authors 24 unit tests, including observability, excitation, and selective-abstention controls. A passing run would validate these small reference functions only. It would not count as an SDCB model result or a SOTA comparison.
+
+
+## Machine-readable reference receipt
+
+A standalone runner emits one JSON receipt for the analytic reference controls:
+
+```bash
+rustc --edition=2024 scripts/research/sdcb_reference_receipt.rs -o /tmp/sdcb-reference-receipt
+/tmp/sdcb-reference-receipt \
+  --source-revision "$(git rev-parse HEAD)" \
+  --compiler-version "$(rustc --version)" \
+  > /tmp/sdcb-reference-receipt.json
+```
+
+Validate the JSON structure against `docs/research/SDCB_REFERENCE_CONTROL_RECEIPT_V1.schema.json`. The runner exits zero only when every reference control passes. It records the source revision as **caller-supplied and not independently verified**, plus compiler/platform metadata and per-case dispositions. It does not sign the receipt or authenticate the source revision; those claims require the existing Luminous attestation/checkpoint infrastructure.
+
+Receipt claim ceiling: `analytic_reference_controls_only`. A valid receipt is not an SDCB model benchmark, theorem proof, proof-checker qualification, physical experiment, or consciousness result.
