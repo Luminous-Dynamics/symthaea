@@ -550,7 +550,16 @@
         "required": [
           "effect_binding",
           "effect_observation"
-        ]
+        ],
+        "properties": {
+          "actor": {
+            "properties": {
+              "role": {
+                "const": "sink_observer"
+              }
+            }
+          }
+        }
       }
     },
     {
