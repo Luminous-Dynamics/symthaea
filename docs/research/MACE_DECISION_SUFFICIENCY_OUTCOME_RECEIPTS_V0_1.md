@@ -127,13 +127,17 @@ For both schemas:
 
 1. Parse strict JSON; reject duplicate object keys, unknown fields, missing fields and invalid UTF-8.
 2. Canonicalize the `payload` object using JSON Canonicalization Scheme (JCS, RFC 8785).
-3. Compute `payload_sha256 = SHA-256(domain_prefix || 0x00 || JCS(payload))`, with these exact ASCII domain prefixes:
+3. Compute `payload_sha256 = SHA-256(payload_domain || 0x00 || JCS(payload))`, with these exact ASCII domain prefixes:
    - `luminous:mace:decision-sufficiency-payload:v1`
    - `luminous:mace:decision-outcome-payload:v1`
-4. Verify the Ed25519 signature over the UTF-8 bytes of the 64-character lowercase-hex `payload_sha256` value. This matches the existing pinned MACE Ed25519 qualification profile; do not sign the raw 32 digest bytes. Resolve `key_id` only through the separately pinned verifier profile.
-5. Require the supplied lower-case hex `payload_sha256` to match the recomputed value.
+4. Construct a separate attestation preimage object. For sufficiency it contains `schema_version = mace_decision_sufficiency_attestation_preimage_v1`, `payload_sha256`, `assessor_profile_sha256`, `verifier_profile_sha256`, `key_id`, `issued_at_unix` and `expires_at_unix`. For outcome it contains `schema_version = mace_decision_outcome_attestation_preimage_v1`, `payload_sha256`, `evaluator_profile_sha256`, `verifier_profile_sha256`, `key_id` and `issued_at_unix`.
+5. Canonicalize the attestation preimage with JCS and compute `attestation_sha256 = SHA-256(attestation_domain || 0x00 || JCS(attestation_preimage))`, using:
+   - `luminous:mace:decision-sufficiency-attestation:v1`
+   - `luminous:mace:decision-outcome-attestation:v1`
+6. Verify the Ed25519 signature over the UTF-8 bytes of the 64-character lowercase-hex `attestation_sha256` value. This matches the existing pinned MACE Ed25519 verifier's signing convention. Do not sign only `payload_sha256` or the raw 32 digest bytes. Resolve `key_id` only through a separately pinned, service-scoped verifier profile.
+7. Require both supplied digests to match their recomputed values. The attestation digest binds validity metadata and signer identity/profile claims so they cannot be altered independently of the signature.
 
-The `signature_base64` value is canonical padded standard Base64 for exactly 64 Ed25519 signature bytes. The digest is a signed commitment, not a substitute for independent semantic validation. The verifier must check exact binding and cross-field constraints after cryptographic verification.
+The `signature_base64` value is canonical padded standard Base64 for exactly 64 Ed25519 signature bytes. Payload and attestation digests are distinct commitments. Cryptographic verification does not replace exact binding, cross-field, lifecycle or evaluator-independence checks.
 
 The decision-sufficiency receipt has a maximum 900-second lifetime in v1. No caller-supplied clock value is trusted. The issuer uses its own authoritative clock; the consumer uses a protected trusted clock after receipt delivery and again at consequential use. The process-local monotonic guard in the qualification exchange does not provide cross-restart rollback protection.
 
