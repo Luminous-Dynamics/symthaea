@@ -193,7 +193,9 @@ jobs:
             cp tools/mel-temporal-grounding-qualifier/fixtures/mel-multi-annotator-temporal.synthetic.json "$evidence/"
             cp tools/mel-temporal-grounding-qualifier/schemas/mel-multi-annotator-temporal-grounding-v1.schema.json "$evidence/"
             cp docs/research/MEL-GROUND-006-MULTI-ANNOTATOR-TEMPORAL-GROUNDING-V1.md "$evidence/"
-            cp "$RUNNER_TEMP/multi-annotator-report.json" "$evidence/"
+            if [[ -f "$RUNNER_TEMP/multi-annotator-report.json" ]]; then
+              cp "$RUNNER_TEMP/multi-annotator-report.json" "$evidence/"
+            fi
           fi
           if [[ -f tools/mel-temporal-grounding-qualifier/src/temporal_revision.rs ]]; then
             cp tools/mel-temporal-grounding-qualifier/src/temporal_revision.rs "$evidence/"
