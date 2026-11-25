@@ -12,7 +12,11 @@
     },
     "module_b": {
       "path": "scripts/research/lean-proof-extractor/axiom-audit-imported-inductive/B.lean",
-      "sha256": "eb194ed45ae694adcd963a6fef0294e98dcf2e9833b143dc7829794e7a2d614c"
+      "sha256": "b3bc644eab2fd0c4036ff02a463637ad854d76a5fb7ddb6cbb761641b9da3b1a"
+    },
+    "module_proof": {
+      "path": "scripts/research/lean-proof-extractor/ProofActionCertificateAndComm.lean",
+      "sha256": "9d1096dc51b80c06b35ee6ac987ec6f2bb92be4f0a3267f1df4074ed4372dcc4"
     }
   },
   "roots": [
@@ -33,6 +37,26 @@
       "expected_fresh_axioms": [
         "Classical.choice"
       ]
+    },
+    {
+      "name": "And.comm",
+      "expected_fresh_axioms": []
+    },
+    {
+      "name": "ProofPlanActionCertificatePilot.and_comm_split_iff",
+      "expected_fresh_axioms": []
+    },
+    {
+      "name": "ProofPlanActionCertificatePilot.and_comm_forward",
+      "expected_fresh_axioms": []
+    },
+    {
+      "name": "ProofPlanActionCertificatePilot.and_comm_reverse",
+      "expected_fresh_axioms": []
+    },
+    {
+      "name": "ProofPlanActionCertificatePilot.and_comm_plan_replay",
+      "expected_fresh_axioms": []
     }
   ],
   "audit_algorithm": {
@@ -52,9 +76,9 @@
     "unresolved_policy": "preserve unresolved constant name in dependency set; exact expected-set assertion fails closed"
   },
   "claim_ceiling": [
-    "A successful run shows that the project-side fresh DFS detects the direct/transitive Classical.choice dependency in the imported-inductive reproduction under this exact Lean core revision.",
-    "Native #print axioms output is diagnostic only and is not used as the independent audit acceptance oracle.",
-    "The walker is a research prototype, not a verified replacement for Lean's kernel or a complete audit of every kernel trust path.",
-    "This reproduction covers one imported inductive/constructor cycle and one downstream theorem; mutual inductives, nested inductives, all declaration forms and full repository-wide trust closure require separate tests."
+    "The project-side fresh DFS detected Classical.choice through the imported S9 inductive/constructor cycle and theorem usesS9, and returned an empty axiom set for And.comm plus all four local proof-action declarations, in this exact Lean environment.",
+    "Native #print axioms output is captured as a diagnostic and is not the independent audit acceptance oracle.",
+    "This is a research prototype, not a verified replacement for Lean's kernel or a complete repository-wide trust audit.",
+    "The reproduction covers one imported inductive/constructor cycle and one downstream theorem; mutual/nested inductives, all declaration forms and complete repository-wide trust closure require more adversarial cases."
   ]
 }
