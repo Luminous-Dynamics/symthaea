@@ -483,8 +483,14 @@ The `And.comm` proof-action pilot has two more fail-closed controls in the focus
 
 A new research lane, [#13575](https://github.com/Luminous-Dynamics/symthaea/issues/13575), tests a known limitation in native axiom reporting. Lean issue [#15226](https://github.com/leanprover/lean4/issues/15226) describes under-reporting through a shared imported-inductive axiom cache in affected Lean versions. The exact pinned Symthaea toolchain is Lean `4.37.0-rc1`; whether the issue reproduces there is being tested, not assumed.
 
-The source-pinned two-module reproduction has an imported structure `S9` with a field depending on `Classical.choice`, then audits three roots through the import boundary. A fresh per-root DFS also audits `And.comm` plus the four local proof-action certificate roots. It disables exporting, reads kernel constant information, traverses types and values plus inductive constructors, uses a visited set only, and preserves unresolved names so exact-set validation fails closed.
+The source-pinned two-module reproduction has an imported structure `S9` with a field depending on `Classical.choice`, then audits three roots through the import boundary; three roots through direct/transitive custom-axiom paths; and nine expected-empty roots including a mutual inductive cycle. A fresh per-root DFS also audits `And.comm` plus the four local proof-action certificate roots. It disables exporting, reads kernel constant information, traverses types and values plus inductive constructors, uses a visited set only, and preserves unresolved names so exact-set validation fails closed.
 
 **Status:** source, manifest, schema and focused workflow integration are committed. The new run is pending exact-head execution. The receipt is separate from native `#print axioms` diagnostics; no general or verified trust-closure claim is made.
 
 **Prospective targets:** 100% seeded direct/transitive dependency detection; zero false negatives across imported, mutual and nested inductive controls; deterministic exact closure; fail-closed behavior for unresolved constants; independent agreement with a second oracle. These are targets, not measured benchmark scores.
+
+### 21.1. Expanded closure corpus and root-order replay
+
+The A/B source pair has been expanded to fifteen roots: three exact `Classical.choice` cases; three direct/transitive custom-axiom cases; and nine expected-empty roots including `Even`/`Odd` mutually recursive inductives and the five `And.comm`/proof-action roots. Every root is audited twice, with the second pass in reverse order. The manifest/schema and workflow now require exact per-root sets and two matching log occurrences.
+
+**Status:** this expanded source and the exact-root workflow are committed; the new exact-head run is pending. The earlier bounded Lean action/Tier-2 receipts are separate results and do not qualify this expanded audit.
