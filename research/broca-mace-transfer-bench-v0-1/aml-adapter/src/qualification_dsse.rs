@@ -397,23 +397,28 @@ impl<'de> Visitor<'de> for StrictJsonVisitor {
         formatter.write_str("a JSON value with no duplicate object keys")
     }
 
-    fn visit_unit<E>(self) -> Result<Self::Value, E> {
+    fn visit_unit<E>(self) -> Result<Self::Value, E>
+    where E: DeError {
         Ok(StrictJsonValue::Null)
     }
 
-    fn visit_none<E>(self) -> Result<Self::Value, E> {
+    fn visit_none<E>(self) -> Result<Self::Value, E>
+    where E: DeError {
         Ok(StrictJsonValue::Null)
     }
 
-    fn visit_bool<E>(self, value: bool) -> Result<Self::Value, E> {
+    fn visit_bool<E>(self, value: bool) -> Result<Self::Value, E>
+    where E: DeError {
         Ok(StrictJsonValue::Bool(value))
     }
 
-    fn visit_i64<E>(self, value: i64) -> Result<Self::Value, E> {
+    fn visit_i64<E>(self, value: i64) -> Result<Self::Value, E>
+    where E: DeError {
         Ok(StrictJsonValue::Number(Number::from(value)))
     }
 
-    fn visit_u64<E>(self, value: u64) -> Result<Self::Value, E> {
+    fn visit_u64<E>(self, value: u64) -> Result<Self::Value, E>
+    where E: DeError {
         Ok(StrictJsonValue::Number(Number::from(value)))
     }
 
@@ -426,11 +431,13 @@ impl<'de> Visitor<'de> for StrictJsonVisitor {
             .ok_or_else(|| E::custom("non-finite JSON number"))
     }
 
-    fn visit_str<E>(self, value: &str) -> Result<Self::Value, E> {
+    fn visit_str<E>(self, value: &str) -> Result<Self::Value, E>
+    where E: DeError {
         Ok(StrictJsonValue::String(value.to_owned()))
     }
 
-    fn visit_string<E>(self, value: String) -> Result<Self::Value, E> {
+    fn visit_string<E>(self, value: String) -> Result<Self::Value, E>
+    where E: DeError {
         Ok(StrictJsonValue::String(value))
     }
 
@@ -487,7 +494,7 @@ mod tests {
 
     fn candidate_ids_digest(ids: &[String]) -> String {
         let mut hasher = Sha256::new();
-        hasher.update(b"luminous:mace:candidate-evidence-ids:v1\\0");
+        hasher.update(b"luminous:mace:candidate-evidence-ids:v1\0");
         hasher.update((ids.len() as u64).to_be_bytes());
         for id in ids {
             hasher.update((id.len() as u64).to_be_bytes());
