@@ -10,6 +10,7 @@ pub mod evidence_qualification_gate;
 pub mod qualification_trust;
 pub mod independent_qualification_exchange;
 pub mod decision_sufficiency_receipt;
+pub mod decision_outcome_receipt;
 
 // Copyright (C) 2026 Luminous Dynamics
 // SPDX-License-Identifier: AGPL-3.0-or-later
