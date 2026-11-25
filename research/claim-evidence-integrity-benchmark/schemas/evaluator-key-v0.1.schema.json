@@ -1,0 +1,181 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://github.com/Luminous-Dynamics/symthaea/research/claim-evidence-integrity-benchmark/schemas/evaluator-key-v0.1.schema.json",
+  "title": "Evaluator-only Claim-Evidence Integrity Key v0.1",
+  "type": "object",
+  "additionalProperties": false,
+  "required": [
+    "schema_version",
+    "status",
+    "fixtures"
+  ],
+  "properties": {
+    "schema_version": {
+      "const": "symthaea-claim-evidence-evaluator-key-v0.1"
+    },
+    "status": {
+      "const": "SYNTHETIC_EVALUATOR_ONLY_NOT_EXPERT_GOLD"
+    },
+    "fixtures": {
+      "type": "array",
+      "minItems": 12,
+      "items": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": [
+          "fixture_id",
+          "expected_verdict",
+          "required_invariants",
+          "label_provenance",
+          "evidence_labels"
+        ],
+        "properties": {
+          "fixture_id": {
+            "type": "string",
+            "minLength": 1
+          },
+          "expected_verdict": {
+            "enum": [
+              "SUPPORTED",
+              "REFUTED",
+              "MIXED",
+              "UNDECIDABLE",
+              "OUT_OF_SCOPE"
+            ]
+          },
+          "required_invariants": {
+            "type": "array",
+            "minItems": 1,
+            "items": {
+              "type": "string",
+              "minLength": 1
+            }
+          },
+          "label_provenance": {
+            "type": "object",
+            "additionalProperties": false,
+            "required": [
+              "label_status",
+              "authority_id",
+              "evidence_reference",
+              "independent_of_candidate",
+              "permitted_use"
+            ],
+            "properties": {
+              "label_status": {
+                "const": "SYNTHETIC_KNOWN_ANSWER"
+              },
+              "authority_id": {
+                "type": "string",
+                "minLength": 1
+              },
+              "evidence_reference": {
+                "type": "string",
+                "minLength": 1
+              },
+              "independent_of_candidate": {
+                "const": true
+              },
+              "permitted_use": {
+                "type": "string",
+                "minLength": 1
+              }
+            }
+          },
+          "evidence_labels": {
+            "type": "array",
+            "items": {
+              "type": "object",
+              "additionalProperties": false,
+              "required": [
+                "evidence_id",
+                "artifact_sha256",
+                "source_family_id",
+                "source_role",
+                "content_integrity",
+                "quote_span",
+                "relation_to_claim",
+                "correction_status",
+                "relationship_notes"
+              ],
+              "properties": {
+                "evidence_id": {
+                  "type": "string",
+                  "minLength": 1
+                },
+                "artifact_sha256": {
+                  "type": "string",
+                  "pattern": "^[a-f0-9]{64}$"
+                },
+                "source_family_id": {
+                  "type": "string",
+                  "minLength": 1
+                },
+                "source_role": {
+                  "enum": [
+                    "primary",
+                    "secondary",
+                    "registry",
+                    "syndicated",
+                    "unknown"
+                  ]
+                },
+                "content_integrity": {
+                  "enum": [
+                    "clean",
+                    "compromised",
+                    "missing",
+                    "unknown"
+                  ]
+                },
+                "quote_span": {
+                  "type": "object",
+                  "additionalProperties": false,
+                  "required": [
+                    "byte_start",
+                    "byte_end",
+                    "quote"
+                  ],
+                  "properties": {
+                    "byte_start": {
+                      "type": "integer",
+                      "minimum": 0
+                    },
+                    "byte_end": {
+                      "type": "integer",
+                      "minimum": 1
+                    },
+                    "quote": {
+                      "type": "string",
+                      "minLength": 1
+                    }
+                  }
+                },
+                "relation_to_claim": {
+                  "enum": [
+                    "supports",
+                    "refutes",
+                    "qualifies",
+                    "irrelevant",
+                    "unresolved"
+                  ]
+                },
+                "correction_status": {
+                  "enum": [
+                    "none",
+                    "corrected",
+                    "retracted",
+                    "superseded"
+                  ]
+                },
+                "relationship_notes": {
+                  "type": "string"
+                }
+              }
+            }
+          }
+        }
+      }
+    }
+  }
+}
