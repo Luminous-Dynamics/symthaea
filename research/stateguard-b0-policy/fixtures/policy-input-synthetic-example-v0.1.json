@@ -1,0 +1,21 @@
+{
+  "research_state_json": "{\"schema_version\":\"symthaea-public-research-state-v0.1\",\"status\":\"SYNTHETIC_CONFORMANCE_EXAMPLE_NOT_PRODUCTION_STATE\",\"research_episode_id\":\"synthetic-episode\",\"evidence_prefix\":{\"prefix_id\":\"prefix:RS-01\",\"prefix_sha256\":\"90843308b5be69105614950b7fb398652120c39d87cf9ba485dea21da196b1ab\",\"lineage_snapshot_ref\":\"urn:synthetic:lineage:RS-01\",\"sequence_number\":1},\"decision_context\":{\"decision_id\":\"deployment-efficacy-01\",\"question\":\"Does compound A reduce symptom duration enough to inform a deployment decision?\",\"reference_time\":\"2026-11-25T00:00:00Z\",\"risk_class\":\"MODERATE\"},\"claims\":[{\"claim_id\":\"claim-a\",\"statement\":\"Compound A reduces symptom duration by at least 20%.\",\"scope\":{\"population\":\"adults in the stated trial population\",\"outcome_or_measure\":\"mean symptom duration\",\"quantifier_or_effect\":\"reduction >= 20 percent\",\"domain_or_reference_boundary\":\"current evidence as of 2026-11-25\",\"scope_note\":\"effect threshold must be met in a comparable population\"},\"reference_time\":\"2026-11-25T00:00:00Z\",\"evidence_relations\":[{\"claim_id\":\"claim-a\",\"evidence_id\":\"ev-a1\",\"relation\":\"UNCLASSIFIED\",\"classifier_provenance\":null,\"quote_span\":null}],\"truth_adjudication\":{\"status\":\"NOT_ADJUDICATED\",\"result\":null,\"authority_id\":null,\"evidence_reference\":null,\"adjudicated_at\":null},\"decision_usability\":{\"status\":\"INSUFFICIENT\",\"decision_scope_id\":\"deployment-efficacy-01\",\"policy_id\":\"evidence-sufficiency-moderate-v1\",\"reason_codes\":[\"NO_CLAIM_SPECIFIC_RELATION\",\"NOT_INDEPENDENTLY_ADJUDICATED\"]}}],\"evidence\":[{\"evidence_id\":\"ev-a1\",\"artifact_ref\":\"urn:synthetic:artifact:rs01-a1\",\"artifact_sha256\":\"0b64f0c41daa6d5beba22fd851c401cdfc77ca9b47998ae9942362db6f2811f5\",\"canonical_source_ref\":\"https://example.org/compound-a-overview\",\"published_at\":\"2026-01-10T00:00:00Z\",\"captured_at\":\"2026-11-25T10:00:00Z\",\"source_lineage\":{\"status\":\"UNKNOWN\"},\"integrity_status\":\"UNKNOWN\",\"correction_status\":\"UNKNOWN\",\"retrieval_state\":\"CAPTURED\",\"source_role\":\"UNKNOWN\"}]}",
+  "permitted_action_offers": [
+    {
+      "offer_id": "classify-claim-a-ev-a1",
+      "kind": "CLASSIFY_CLAIM_SOURCE",
+      "target_claim_id": "claim-a",
+      "target_evidence_id": "ev-a1",
+      "resource_cost": {
+        "query_units": 1,
+        "experiment_units": 0,
+        "review_minutes": 1
+      }
+    }
+  ],
+  "remaining_budget": {
+    "query_units": 10,
+    "experiment_units": 10,
+    "review_minutes": 10
+  }
+}
