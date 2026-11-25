@@ -6858,6 +6858,9 @@ pub const WEIGHTED_MEASURE_TAIL_STABILITY_FIXTURE: &str = include_str!(
 pub const KIRR_PULSE_GRAPH_FIXTURE: &str = include_str!(
     "../../../../benchmarks/plasma/kinetic-information-return/fixtures/kinetic-pulse-graph-known-answer-v0.1.json"
 );
+pub const KIRR_PATH_RESPONSE_FIXTURE: &str = include_str!(
+    "../../../../benchmarks/plasma/kinetic-information-return/fixtures/path-response-dispositions-v0.1.json"
+);
 
 #[cfg(test)]
 mod tests {
@@ -11488,6 +11491,145 @@ mod tests {
             branch_ids,
         })?;
         KineticPulsePathResponseSignature::new(sequence, signature)
+    }
+
+    #[test]
+    fn kinetic_path_response_fixture_matches_all_five_dispositions() {
+        let paths_fixture: serde_json::Value =
+            serde_json::from_str(KIRR_PULSE_GRAPH_FIXTURE).unwrap();
+        let response_fixture: serde_json::Value =
+            serde_json::from_str(KIRR_PATH_RESPONSE_FIXTURE).unwrap();
+        let family = contract();
+        let cases = response_fixture["cases"].as_array().unwrap();
+        assert_eq!(cases.len(), 5);
+
+        for case in cases {
+            let path_id = case["sequence_path_id"].as_str().unwrap();
+            let path = paths_fixture["paths"]
+                .as_array()
+                .unwrap()
+                .iter()
+                .find(|path| path["path_id"].as_str() == Some(path_id))
+                .expect("response fixture must reference a registered pulse path");
+            let pulses = path["pulses"]
+                .as_array()
+                .unwrap()
+                .iter()
+                .map(|pulse| {
+                    candidate(
+                        pulse["spatial_mode"].as_u64().unwrap() as u32,
+                        pulse["phase_rad"].as_f64().unwrap(),
+                        pulse["kick_velocity_amplitude"].as_f64().unwrap(),
+                        pulse["application_time"].as_f64().unwrap(),
+                    )
+                })
+                .collect::<Vec<_>>();
+            let horizon = path["observation_end_time"].as_f64().unwrap();
+            let sequence = KineticPulseSequence::new(&family, &pulses, horizon).unwrap();
+
+            let parse_signature = |value: &serde_json::Value| {
+                let qoi_ids = value["qoi_ids"]
+                    .as_array()
+                    .unwrap()
+                    .iter()
+                    .map(|item| item.as_str().unwrap().to_owned())
+                    .collect::<Vec<_>>();
+                let qoi_scales = value["qoi_scales"]
+                    .as_array()
+                    .unwrap()
+                    .iter()
+                    .map(|item| item.as_f64().unwrap())
+                    .collect::<Vec<_>>();
+                let time_samples = value["time_samples"]
+                    .as_array()
+                    .unwrap()
+                    .iter()
+                    .map(|item| item.as_f64().unwrap())
+                    .collect::<Vec<_>>();
+                let responses = value["responses"]
+                    .as_array()
+                    .unwrap()
+                    .iter()
+                    .map(|item| {
+                        if item.is_null() {
+                            None
+                        } else {
+                            Some(
+                                ComplexResponse::new(
+                                    item["real"].as_f64().unwrap(),
+                                    item["imag"].as_f64().unwrap(),
+                                )
+                                .unwrap(),
+                            )
+                        }
+                    })
+                    .collect::<Vec<_>>();
+                let branch_ids = value["branch_ids"]
+                    .as_array()
+                    .unwrap()
+                    .iter()
+                    .map(|item| item.as_str().map(str::to_owned))
+                    .collect::<Vec<_>>();
+                KineticResponseSignature::new(KineticResponseSignatureInput {
+                    contract_id: value["contract_id"].as_str().unwrap().to_owned(),
+                    structure_class_id: value["structure_class_id"].as_str().unwrap().to_owned(),
+                    intervention_ids: vec![sequence.digest().to_owned()],
+                    qoi_ids,
+                    qoi_scales,
+                    time_samples,
+                    responses,
+                    branch_ids,
+                })
+                .unwrap()
+            };
+
+            let reference = KineticPulsePathResponseSignature::new(
+                &sequence,
+                parse_signature(&case["reference_signature"]),
+            )
+            .unwrap();
+            let candidate = KineticPulsePathResponseSignature::new(
+                &sequence,
+                parse_signature(&case["candidate_signature"]),
+            )
+            .unwrap();
+            let tolerance = case["empirical_tolerance"].as_f64().unwrap();
+            let report = candidate.qualify_against(&reference, tolerance).unwrap();
+            let expected_disposition = match case["expected_disposition"].as_str().unwrap() {
+                "PASS" => KineticPathResponseDisposition::Pass,
+                "FAIL" => KineticPathResponseDisposition::Fail,
+                "UNKNOWN" => KineticPathResponseDisposition::Unknown,
+                "UNSUPPORTED" => KineticPathResponseDisposition::Unsupported,
+                other => panic!("unsupported fixture disposition {other}"),
+            };
+            assert_eq!(
+                report.disposition,
+                expected_disposition,
+                "fixture case {}",
+                case["case_id"].as_str().unwrap()
+            );
+            assert_eq!(
+                report.missing_response_count,
+                case["expected_missing_response_count"].as_u64().unwrap() as usize
+            );
+            assert_eq!(
+                report.branch_mismatch_count,
+                case["expected_branch_mismatch_count"].as_u64().unwrap() as usize
+            );
+            assert_eq!(
+                report.unresolved_branch_count,
+                case["expected_unresolved_branch_count"].as_u64().unwrap() as usize
+            );
+            let expected_error = case["expected_maximum_normalized_error"]
+                .as_f64()
+                .unwrap();
+            let observed_error = report.maximum_normalized_entry_error.unwrap();
+            assert!(
+                (observed_error - expected_error).abs() < 1.0e-12,
+                "fixture case {}",
+                case["case_id"].as_str().unwrap()
+            );
+        }
     }
 
     #[test]
