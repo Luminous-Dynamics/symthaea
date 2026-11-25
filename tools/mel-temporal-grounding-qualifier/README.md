@@ -40,7 +40,7 @@ The temporal_reliability module consumes multiple #13560 cases across query item
 2. Symmetric interval-set agreement for Present/Present annotator pairs. Each pair is scored in both directions using the production scorer; interval F1, matched IoU, exact occurrence-count agreement and count difference remain separate.
 3. Boundary agreement in milliseconds, with tolerance rates at the dataset's strictly ascending preregistered millisecond thresholds. These are event boundary comparisons, not model confidence.
 
-Every dataset item binds a source_work_id_sha256. The bootstrap resamples all query items from a source work together using deterministic SplitMix64, and reports separate intervals for alpha, pairwise state agreement, interval F1/IoU, count agreement and start/end boundary MAE. A proposed 30-source-work floor is reported but does not by itself authorize population claims; the output always sets population_confidence_claim_permitted to false.
+Every dataset item binds a source_work_id_sha256. The bootstrap resamples all query items from a source work together using deterministic SplitMix64, and reports separate intervals for alpha, pairwise state agreement, interval F1/IoU, count agreement, start/end boundary MAE, and each preregistered start/end/joint boundary-tolerance rate. Point estimates for pairwise and boundary metrics are source-work macro-averages, matching the bootstrap estimand. A proposed 30-source-work floor is reported but does not by itself authorize population claims; the output always sets population_confidence_claim_permitted to false.
 
 Run the synthetic six-query/three-source-work dataset with:
 
