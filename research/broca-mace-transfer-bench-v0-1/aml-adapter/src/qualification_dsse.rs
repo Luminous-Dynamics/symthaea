@@ -169,7 +169,8 @@ impl<'a> DsseQualificationSignatureVerifierV1<'a> {
         // hint; the authenticated key identity comes from the signed MACE
         // predicate and is checked against the pinned profile.
         let key_id_hint = match signature_object.get("keyid") {
-            None | Some(Value::String(value)) if value.is_empty() => None,
+            None => None,
+            Some(Value::String(value)) if value.is_empty() => None,
             Some(Value::String(value)) if value.len() <= 256 => Some(value.as_str()),
             _ => return Err(EvidenceQualificationRejectV1::DsseInvalidEnvelope),
         };
