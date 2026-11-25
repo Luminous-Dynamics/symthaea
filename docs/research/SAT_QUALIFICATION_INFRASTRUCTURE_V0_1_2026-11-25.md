@@ -37,7 +37,7 @@ The contract consists of four records: a frozen run manifest, a causal event rec
 
 ## 4. Wire semantics
 
-Every event carries both the run ID and the exact frozen manifest digest. The trace verifier must compare these to the externally supplied manifest rather than trusting an event's self-declared run identity.
+Compute manifest_digest = SHA-256("SAT-MANIFEST-v0.1\\n" || JCS(frozen_run_manifest)); the manifest object does not contain its own digest. Every event carries both the run ID and this exact frozen manifest digest. The trace verifier CLI computes it from the supplied manifest file and compares each event against it rather than trusting the event's self-declared run identity.
 
 See the schemas directory for JSON Schema Draft 2020-12 contracts and the examples directory for illustrative records. Schema validation checks shape, not signatures, authorization, source truth, lineage or actual system behavior.
 
