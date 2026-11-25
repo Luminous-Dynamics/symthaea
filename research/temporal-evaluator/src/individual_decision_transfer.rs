@@ -79,6 +79,8 @@ pub struct DecisionTransferActionResult {
     pub action_id: String,
     pub run_id: u64,
     pub applied_at_us: u64,
+    pub pairing_receipt_sha256: [u8; 32],
+    pub trajectory_sha256: [u8; 32],
     pub realized_utility_units: i64,
     pub latent_predicted_utility_units: i64,
     pub rollout_predicted_utility_units: i64,
@@ -114,6 +116,9 @@ pub struct DecisionSelection {
 
 #[derive(Clone, Debug, Eq, PartialEq)]
 pub struct IndividualDecisionTransferCertificate {
+    /// Complete frozen context is echoed so the result remains bound to the
+    /// exact individual, history, snapshot, exogenous realization and model.
+    pub context: DecisionTransferContext,
     pub decision_point_id: u64,
     pub individual_id_sha256: [u8; 32],
     pub action_count: u64,
@@ -447,6 +452,8 @@ pub fn evaluate_individual_decision_transfer(
             action_id: action.action_id.clone(),
             run_id: action.run_id,
             applied_at_us,
+            pairing_receipt_sha256: action.pairing_receipt_sha256,
+            trajectory_sha256: action.trajectory_sha256,
             realized_utility_units,
             latent_predicted_utility_units: action.latent_predicted_utility_units,
             rollout_predicted_utility_units: action.rollout_predicted_utility_units,
@@ -530,6 +537,7 @@ pub fn evaluate_individual_decision_transfer(
     };
 
     Ok(IndividualDecisionTransferCertificate {
+        context: input.context.clone(),
         decision_point_id: input.context.decision_point_id,
         individual_id_sha256: input.context.individual_id_sha256,
         action_count: u64::try_from(action_results.len())
