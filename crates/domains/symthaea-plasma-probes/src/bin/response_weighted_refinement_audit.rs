@@ -12,7 +12,8 @@ use std::{
 
 use serde::Deserialize;
 use symthaea_plasma_probes::{
-    ComplexResponse, ModeResponseMatrix, plan_response_weighted_refinement,
+    ComplexResponse, ModeResponseMatrix, ModeRefinementDisposition,
+    plan_response_weighted_refinement,
 };
 
 #[derive(Debug, Deserialize)]
@@ -26,6 +27,7 @@ struct RefinementInput {
     encoded_bytes: Vec<ModeBytes>,
     output_qoi_weights: Vec<f64>,
     response_loss_budget: f64,
+    expected: ExpectedPlan,
 }
 
 #[derive(Debug, Deserialize)]
@@ -47,6 +49,41 @@ struct ModeCoefficient {
 struct ModeBytes {
     mode: u32,
     bytes: u64,
+}
+
+#[derive(Debug, Deserialize)]
+struct ExpectedPlan {
+    discarded_state_bytes: u64,
+    accumulated_discarded_response_bound: f64,
+    decisions: Vec<ExpectedDecision>,
+}
+
+#[derive(Debug, Deserialize)]
+struct ExpectedDecision {
+    mode: u32,
+    spectral_energy: f64,
+    response_loss_bound: f64,
+    disposition: String,
+}
+
+fn assert_close(actual: f64, expected: f64, field: &str) -> Result<(), Box<dyn Error>> {
+    let tolerance = 1.0e-12_f64.max(expected.abs() * 1.0e-10);
+    if !actual.is_finite() || (actual - expected).abs() > tolerance {
+        return Err(IoError::new(
+            ErrorKind::InvalidData,
+            format!("{field} mismatch: actual={actual}, expected={expected}, tolerance={tolerance}"),
+        )
+        .into());
+    }
+    Ok(())
+}
+
+fn disposition_name(disposition: ModeRefinementDisposition) -> &'static str {
+    match disposition {
+        ModeRefinementDisposition::DiscardedWithinBudget => "discarded_within_budget",
+        ModeRefinementDisposition::RetainedBudgetExceeded => "retained_budget_exceeded",
+        ModeRefinementDisposition::RetainedUnknownResponse => "retained_unknown_response",
+    }
 }
 
 fn run() -> Result<(), Box<dyn Error>> {
@@ -102,8 +139,60 @@ fn run() -> Result<(), Box<dyn Error>> {
         &input.output_qoi_weights,
         input.response_loss_budget,
     )?;
+    if plan.discarded_state_bytes != input.expected.discarded_state_bytes {
+        return Err(IoError::new(
+            ErrorKind::InvalidData,
+            "discarded_state_bytes differs from expected fixture",
+        )
+        .into());
+    }
+    assert_close(
+        plan.accumulated_discarded_response_bound,
+        input.expected.accumulated_discarded_response_bound,
+        "accumulated_discarded_response_bound",
+    )?;
+    if plan.decisions.len() != input.expected.decisions.len() {
+        return Err(IoError::new(
+            ErrorKind::InvalidData,
+            "mode decision count differs from expected fixture",
+        )
+        .into());
+    }
+    for expected in &input.expected.decisions {
+        let actual = plan
+            .decisions
+            .iter()
+            .find(|decision| decision.input_mode == expected.mode)
+            .ok_or_else(|| {
+                IoError::new(
+                    ErrorKind::InvalidData,
+                    format!("missing decision for mode {}", expected.mode),
+                )
+            })?;
+        assert_close(
+            actual.spectral_energy,
+            expected.spectral_energy,
+            "spectral_energy",
+        )?;
+        let actual_bound = actual.response_loss_bound.ok_or_else(|| {
+            IoError::new(
+                ErrorKind::InvalidData,
+                format!("mode {} has no measured response bound", expected.mode),
+            )
+        })?;
+        assert_close(actual_bound, expected.response_loss_bound, "response_loss_bound")?;
+        if disposition_name(actual.disposition) != expected.disposition {
+            return Err(IoError::new(
+                ErrorKind::InvalidData,
+                format!("mode {} disposition differs from expected fixture", expected.mode),
+            )
+            .into());
+        }
+    }
+
     let output = serde_json::json!({
         "audit_status": "PASS",
+        "known_answer_verified": true,
         "case_id": input.case_id,
         "claim_boundary": "scoring primitive only; no physical solver result",
         "plan": plan
