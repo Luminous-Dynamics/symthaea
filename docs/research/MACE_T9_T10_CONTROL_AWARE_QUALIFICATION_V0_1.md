@@ -49,6 +49,19 @@ For T9, C3 requires exactly one new record and no other logical record changes. 
 
 The storage adapter must define and independently calculate the normalized edit-delta digest. A caller-provided boolean is not a substitute for the before/after evidence.
 
+## Ordered experiment evidence
+
+Each applicable T9/T10 episode now carries a run-bound event trace with a contiguous sequence number, unique event ID, monotonic elapsed time, one pinned clock-profile digest, typed event kind/source, and digest of the original receipt bytes.
+
+The required event sequence is explicit:
+
+- T9: SUT restarted before write → write requested through the SUT write API → write acknowledged → SUT stopped → restore harness applies the pre-write image → SUT restarted → ordinary SUT read completes.
+- T10: SUT restarted before erasure → erasure requested through the SUT erasure API → erasure acknowledged → SUT stopped → restore harness applies the pre-erasure image → SUT restarted → ordinary SUT read completes.
+
+The acknowledgement event must bind the exact operation/erasure receipt digest. The verifier rejects missing/reordered events, source-role substitution, cross-run event transplantation, duplicate event IDs, non-monotonic event time, clock-profile drift, receipt rebinding and event-trace digest mismatch.
+
+The entire ordered trace is committed with a domain-separated SHA-256 root and retained in the case evidence. This is still a consumer-side integrity check: the live adapter must authenticate the event issuers, preserve original receipts and pin the clock/observer/restore-harness profiles independently. A self-authored event log with a recomputed digest is not independent proof.
+
 ## T9 procedure
 
 1. Start from a fresh seeded store copy.
