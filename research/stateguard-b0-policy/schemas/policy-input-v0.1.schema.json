@@ -1,0 +1,80 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://github.com/Luminous-Dynamics/symthaea/research/stateguard-b0-policy/schemas/policy-input-v0.1.schema.json",
+  "title": "StateGuard B0 Policy Input v0.1",
+  "type": "object",
+  "additionalProperties": false,
+  "required": [
+    "research_state_json",
+    "permitted_action_offers",
+    "remaining_budget"
+  ],
+  "properties": {
+    "research_state_json": {
+      "type": "string",
+      "minLength": 1,
+      "description": "Exact serialized public ResearchState v0.1 bytes, passed to the typed validator before policy selection."
+    },
+    "permitted_action_offers": {
+      "type": "array",
+      "items": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": [
+          "offer_id",
+          "kind",
+          "target_claim_id",
+          "target_evidence_id",
+          "resource_cost"
+        ],
+        "properties": {
+          "offer_id": {
+            "type": "string",
+            "minLength": 1
+          },
+          "kind": {
+            "enum": [
+              "RETRIEVE_OR_RECAPTURE",
+              "VERIFY_ARTIFACT",
+              "CLASSIFY_CLAIM_SOURCE",
+              "SEEK_INDEPENDENT_SOURCE",
+              "REQUEST_DISCRIMINATING_EXPERIMENT",
+              "REPLICATE",
+              "REQUEST_INDEPENDENT_ADJUDICATION",
+              "REFINE_SCOPE",
+              "ESCALATE"
+            ]
+          },
+          "target_claim_id": {
+            "type": [
+              "string",
+              "null"
+            ],
+            "minLength": 1
+          },
+          "target_evidence_id": {
+            "type": [
+              "string",
+              "null"
+            ],
+            "minLength": 1
+          },
+          "resource_cost": {
+            "type": "object",
+            "additionalProperties": {
+              "type": "integer",
+              "minimum": 0
+            }
+          }
+        }
+      }
+    },
+    "remaining_budget": {
+      "type": "object",
+      "additionalProperties": {
+        "type": "integer",
+        "minimum": 0
+      }
+    }
+  }
+}
