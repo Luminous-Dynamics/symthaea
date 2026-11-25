@@ -31,13 +31,13 @@ A deterministic exhaustive geometry tournament compared the spatial-stride layou
 
 | Contiguous fault region | Spatial-stride failures | Row-major failures |
 |---|---:|---:|
-| 2 × 2 × 1 boxes | 0 / 36 | 13 / 36 |
-| 3 × 3 × 1 boxes | 0 / 16 | 12 / 16 |
-| 2 × 2 × 2 boxes | 0 / 27 | 19 / 27 |
-| 3 × 3 × 2 boxes | 8 / 12 | 12 / 12 |
+| 2 × 2 × 1 boxes | 0 / 27 | 13 / 27 |
+| 3 × 3 × 1 boxes | 0 / 12 | 12 / 12 |
+| 2 × 2 × 2 boxes | 0 / 18 | 14 / 18 |
+| 3 × 3 × 2 boxes | 8 / 8 | 8 / 8 |
 | Any one complete layer | 0 / 3 | 3 / 3 |
 
-The spatial-stride map is materially better than row-major for these synthetic cases, but it has a clear failure boundary: some 3 × 3 × 2 damage regions exceed the two-erasure budget. This is deterministic combinatorial evidence about the declared toy geometry—not a physical defect probability or storage-device result. Matching Rust unit tests are authored; their Cargo execution remains pending.
+The spatial-stride map is materially better than row-major for smaller tested regions, but it does not improve the 3 × 3 × 2 class: both layouts exceed the two-erasure budget in all eight placements. This is deterministic combinatorial evidence about the declared toy geometry—not a physical defect probability or storage-device result. Matching Rust unit tests are authored; their Cargo execution remains pending.
 
 ## Deliberately limited claims
 
