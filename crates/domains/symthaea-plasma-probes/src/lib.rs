@@ -7541,7 +7541,7 @@ mod tests {
         .unwrap();
         let huge = WeightedEmpiricalMeasure1D::new(
             &[0.2, 0.8],
-            &[f64::MAX, 3.0 * f64::MAX / 4.0],
+            &[f64::MAX, 0.75 * f64::MAX],
             0.0,
             1.0,
         )
