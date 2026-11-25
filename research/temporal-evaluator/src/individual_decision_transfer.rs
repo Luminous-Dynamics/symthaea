@@ -82,8 +82,7 @@ pub struct DecisionTransferActionResult {
     pub realized_utility_units: i64,
     pub latent_predicted_utility_units: i64,
     pub rollout_predicted_utility_units: i64,
-    pub latent_regret_units: i128,
-    pub rollout_regret_units: i128,
+    pub realized_regret_units: i128,
     pub is_realized_top1: bool,
     pub is_realized_epsilon_good: bool,
 }
@@ -140,6 +139,7 @@ pub enum DecisionTransferError {
     NegativeEpsilon { epsilon_units: i64 },
     EmptyExpectedActionSet,
     TooManyActions { requested: usize, maximum: usize },
+    TooFewActions { requested: usize },
     EmptyActionId,
     DuplicateExpectedActionId { action_id: String },
     DuplicateActionId { action_id: String },
@@ -167,6 +167,7 @@ impl fmt::Display for DecisionTransferError {
                 write!(formatter, "epsilon must be nonnegative, received {epsilon_units}")
             }
             Self::EmptyExpectedActionSet => write!(formatter, "expected action set must not be empty"),
+            Self::TooFewActions { requested } => write!(formatter, "decision-transfer requires at least two actions, received {requested}"),
             Self::TooManyActions { requested, maximum } => write!(
                 formatter,
                 "decision-transfer action count {requested} exceeds the bounded maximum {maximum}"
@@ -409,8 +410,10 @@ pub fn evaluate_individual_decision_transfer(
         }
     }
 
-    if input.actions.len() < 2 {
-        return Err(DecisionTransferError::EmptyExpectedActionSet);
+    if input.expected_action_ids.len() < 2 || input.actions.len() < 2 {
+        return Err(DecisionTransferError::TooFewActions {
+            requested: input.expected_action_ids.len().min(input.actions.len()),
+        });
     }
 
     let mut actions = input.actions.clone();
@@ -447,8 +450,7 @@ pub fn evaluate_individual_decision_transfer(
             realized_utility_units,
             latent_predicted_utility_units: action.latent_predicted_utility_units,
             rollout_predicted_utility_units: action.rollout_predicted_utility_units,
-            latent_regret_units: 0,
-            rollout_regret_units: 0,
+            realized_regret_units: 0,
             is_realized_top1: false,
             is_realized_epsilon_good: false,
         });
@@ -474,8 +476,7 @@ pub fn evaluate_individual_decision_transfer(
         let regret = i128::from(realized_best)
             .checked_sub(i128::from(action.realized_utility_units))
             .ok_or(DecisionTransferError::ArithmeticOverflow)?;
-        action.latent_regret_units = regret;
-        action.rollout_regret_units = regret;
+        action.realized_regret_units = regret;
         action.is_realized_top1 = action.realized_utility_units == realized_best;
         action.is_realized_epsilon_good =
             regret <= i128::from(input.epsilon_units);
