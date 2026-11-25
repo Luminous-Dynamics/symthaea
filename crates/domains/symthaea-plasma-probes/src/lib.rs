@@ -2625,9 +2625,12 @@ impl WeightedEmpiricalMeasure1D {
         domain_minimum: f64,
         domain_maximum: f64,
     ) -> Result<Self, ContractError> {
+        let domain_length = domain_maximum - domain_minimum;
         if !domain_minimum.is_finite()
             || !domain_maximum.is_finite()
             || domain_minimum >= domain_maximum
+            || !domain_length.is_finite()
+            || domain_length <= 0.0
         {
             return Err(ContractError::InvalidParticleMeasureDomain);
         }
@@ -2786,6 +2789,128 @@ impl WeightedEmpiricalMeasure1D {
             return Err(ContractError::InvalidWassersteinArithmetic);
         }
         Ok(distance)
+    }
+
+    /// Geodesic W1 on the one-dimensional torus defined by this interval.
+    ///
+    /// The two interval endpoints are identified. For normalized circle
+    /// coordinates, the 1D circular transport formula is
+    /// min_c integral_0^1 |F_mu(x)-F_nu(x)-c| dx. For the discrete measures
+    /// above, the CDF difference is piecewise constant; its minimizing c is a
+    /// length-weighted median of those values. The returned distance is scaled
+    /// back into the physical interval's length units.
+    ///
+    /// This is intentionally separate from wasserstein1(), which treats the
+    /// interval endpoints as distinct open-boundary faces.
+    pub fn wasserstein1_periodic(&self, other: &Self) -> Result<f64, ContractError> {
+        if self.domain_minimum != other.domain_minimum
+            || self.domain_maximum != other.domain_maximum
+        {
+            return Err(ContractError::ParticleMeasureDomainMismatch);
+        }
+        let event_count = self
+            .atoms
+            .len()
+            .checked_add(other.atoms.len())
+            .ok_or(ContractError::ParticleMeasureWorkBudgetExceeded)?;
+        if event_count > MAX_MEASURE_PARTICLES.saturating_mul(2) {
+            return Err(ContractError::ParticleMeasureWorkBudgetExceeded);
+        }
+
+        let domain_length = self.domain_maximum - self.domain_minimum;
+        if !domain_length.is_finite() || domain_length <= 0.0 {
+            return Err(ContractError::InvalidParticleMeasureDomain);
+        }
+        let mut events = Vec::with_capacity(event_count);
+        for (position, weight) in &self.atoms {
+            let normalized = ((*position - self.domain_minimum) / domain_length).rem_euclid(1.0);
+            if !normalized.is_finite() {
+                return Err(ContractError::InvalidWassersteinArithmetic);
+            }
+            events.push((normalized, *weight, 0.0));
+        }
+        for (position, weight) in &other.atoms {
+            let normalized = ((*position - self.domain_minimum) / domain_length).rem_euclid(1.0);
+            if !normalized.is_finite() {
+                return Err(ContractError::InvalidWassersteinArithmetic);
+            }
+            events.push((normalized, 0.0, *weight));
+        }
+        events.sort_by(|left, right| left.0.total_cmp(&right.0));
+
+        let mut segments = Vec::with_capacity(events.len());
+        let mut left_cdf = 0.0;
+        let mut right_cdf = 0.0;
+        let mut index = 0;
+        while index < events.len() {
+            let position = events[index].0;
+            let mut next_index = index;
+            while next_index < events.len() && events[next_index].0 == position {
+                left_cdf += events[next_index].1;
+                right_cdf += events[next_index].2;
+                next_index += 1;
+            }
+            if !left_cdf.is_finite() || !right_cdf.is_finite() {
+                return Err(ContractError::InvalidWassersteinArithmetic);
+            }
+            let next_position = if next_index < events.len() {
+                events[next_index].0
+            } else {
+                events[0].0 + 1.0
+            };
+            let interval = next_position - position;
+            if !interval.is_finite() || interval < 0.0 {
+                return Err(ContractError::InvalidWassersteinArithmetic);
+            }
+            if interval > 0.0 {
+                segments.push(((left_cdf - right_cdf), interval));
+            }
+            index = next_index;
+        }
+        if segments.is_empty() {
+            return Err(ContractError::InvalidWassersteinArithmetic);
+        }
+
+        segments.sort_by(|left, right| left.0.total_cmp(&right.0));
+        let mut total_length = 0.0;
+        let mut total_compensation = 0.0;
+        for (_, interval) in &segments {
+            kahan_add(*interval, &mut total_length, &mut total_compensation);
+        }
+        if !total_length.is_finite() || (total_length - 1.0).abs() > 1.0e-10 {
+            return Err(ContractError::InvalidWassersteinArithmetic);
+        }
+
+        let mut cumulative_length = 0.0;
+        let mut median_gap = None;
+        for (gap, interval) in &segments {
+            cumulative_length += *interval;
+            if cumulative_length >= 0.5 {
+                median_gap = Some(*gap);
+                break;
+            }
+        }
+        let median_gap = median_gap.ok_or(ContractError::InvalidWassersteinArithmetic)?;
+
+        let mut normalized_distance = 0.0;
+        let mut distance_compensation = 0.0;
+        for (gap, interval) in segments {
+            let area = (gap - median_gap).abs() * interval;
+            if !area.is_finite() {
+                return Err(ContractError::InvalidWassersteinArithmetic);
+            }
+            kahan_add(
+                area,
+                &mut normalized_distance,
+                &mut distance_compensation,
+            );
+        }
+
+        let physical_distance = normalized_distance * domain_length;
+        if !physical_distance.is_finite() || physical_distance < 0.0 {
+            return Err(ContractError::InvalidWassersteinArithmetic);
+        }
+        Ok(physical_distance)
     }
 
     /// Sorted, coalesced atoms (position, normalized probability mass).
@@ -7549,6 +7674,71 @@ mod tests {
         .unwrap();
         assert_eq!(coarse.atoms(), fine.atoms());
         assert_eq!(coarse.wasserstein1(&fine), Ok(0.0));
+    }
+
+    #[test]
+    fn periodic_wasserstein_identifies_the_two_interval_endpoints() {
+        let at_lower =
+            WeightedEmpiricalMeasure1D::new(&[0.0], &[1.0], 0.0, 1.0).unwrap();
+        let at_upper =
+            WeightedEmpiricalMeasure1D::new(&[1.0], &[1.0], 0.0, 1.0).unwrap();
+        assert!((at_lower.wasserstein1(&at_upper).unwrap() - 1.0).abs() < 1.0e-15);
+        assert_eq!(at_lower.wasserstein1_periodic(&at_upper), Ok(0.0));
+    }
+
+    #[test]
+    fn periodic_wasserstein_uses_shortest_arc_across_the_seam() {
+        let left =
+            WeightedEmpiricalMeasure1D::new(&[0.95], &[1.0], 0.0, 1.0).unwrap();
+        let right =
+            WeightedEmpiricalMeasure1D::new(&[0.05], &[1.0], 0.0, 1.0).unwrap();
+        assert!((left.wasserstein1(&right).unwrap() - 0.9).abs() < 1.0e-15);
+        assert!((left.wasserstein1_periodic(&right).unwrap() - 0.1).abs() < 1.0e-15);
+    }
+
+    #[test]
+    fn periodic_wasserstein_is_invariant_to_common_global_translation() {
+        let left = WeightedEmpiricalMeasure1D::new(
+            &[0.1, 0.4, 0.8],
+            &[0.2, 0.3, 0.5],
+            0.0,
+            1.0,
+        )
+        .unwrap();
+        let right = WeightedEmpiricalMeasure1D::new(
+            &[0.2, 0.5, 0.9],
+            &[0.2, 0.3, 0.5],
+            0.0,
+            1.0,
+        )
+        .unwrap();
+        let shift_left = WeightedEmpiricalMeasure1D::new(
+            &[0.37, 0.67, 0.07],
+            &[0.2, 0.3, 0.5],
+            0.0,
+            1.0,
+        )
+        .unwrap();
+        let shift_right = WeightedEmpiricalMeasure1D::new(
+            &[0.47, 0.77, 0.17],
+            &[0.2, 0.3, 0.5],
+            0.0,
+            1.0,
+        )
+        .unwrap();
+        let original = left.wasserstein1_periodic(&right).unwrap();
+        let translated = shift_left.wasserstein1_periodic(&shift_right).unwrap();
+        assert!((original - 0.1).abs() < 1.0e-14);
+        assert!((translated - original).abs() < 1.0e-14);
+    }
+
+    #[test]
+    fn periodic_wasserstein_scales_with_physical_domain_length() {
+        let left =
+            WeightedEmpiricalMeasure1D::new(&[0.95], &[1.0], -2.0, 3.0).unwrap();
+        let right =
+            WeightedEmpiricalMeasure1D::new(&[-1.75], &[1.0], -2.0, 3.0).unwrap();
+        assert!((left.wasserstein1_periodic(&right).unwrap() - 1.5).abs() < 1.0e-14);
     }
 
     #[test]
