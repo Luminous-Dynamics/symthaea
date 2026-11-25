@@ -666,6 +666,112 @@ mod tests {
         assert!(!no_calibration.read_and_recover(&layout).exact_recovery);
     }
 
+    fn tile_for(layout: &PhysicalLayout, stripe: usize, shard: usize, row_major: bool) -> usize {
+        if row_major {
+            layout.active_tiles()[stripe * SHARDS_PER_STRIPE + shard]
+        } else {
+            layout.shard_tile(stripe, shard).unwrap()
+        }
+    }
+
+    fn worst_erasures(
+        layout: &PhysicalLayout,
+        mask: &[bool; TILE_COUNT],
+        row_major: bool,
+    ) -> usize {
+        (0..STRIPE_COUNT)
+            .map(|stripe| {
+                (0..SHARDS_PER_STRIPE)
+                    .filter(|&shard| mask[tile_for(layout, stripe, shard, row_major)])
+                    .count()
+            })
+            .max()
+            .unwrap_or(0)
+    }
+
+    fn rectangular_fault_tournament(
+        layout: &PhysicalLayout,
+        dimensions: (usize, usize, usize),
+        row_major: bool,
+    ) -> (usize, usize, usize) {
+        let (dx, dy, dz) = dimensions;
+        let mut worst = 0usize;
+        let mut failures = 0usize;
+        let mut scenarios = 0usize;
+
+        for z in 0..=3 - dz {
+            for y in 0..=4 - dy {
+                for x in 0..=4 - dx {
+                    let mut mask = [false; TILE_COUNT];
+                    for zz in z..z + dz {
+                        for yy in y..y + dy {
+                            for xx in x..x + dx {
+                                mask[zz * 16 + yy * 4 + xx] = true;
+                            }
+                        }
+                    }
+                    let score = worst_erasures(layout, &mask, row_major);
+                    worst = worst.max(score);
+                    if score > PARITY_SHARDS {
+                        failures += 1;
+                    }
+                    scenarios += 1;
+                }
+            }
+        }
+
+        (worst, failures, scenarios)
+    }
+
+    #[test]
+    fn spatial_interleaving_outperforms_row_major_on_local_fault_masks() {
+        let layout = PhysicalLayout::new();
+
+        // Exhaustively score all axis-aligned 2x2x1 boxes in this 4x4x3
+        // fixture. The spatial-stride map keeps every box within one erasure
+        // per stripe; row-major placement exceeds the two-erasure budget in
+        // 13 of 36 positions.
+        assert_eq!(
+            rectangular_fault_tournament(&layout, (2, 2, 1), false),
+            (1, 0, 36)
+        );
+        assert_eq!(
+            rectangular_fault_tournament(&layout, (2, 2, 1), true),
+            (4, 13, 36)
+        );
+
+        // 2x2x2 boxes remain recoverable under the spatial mapping; row-major
+        // fails 19 of 27 positions.
+        assert_eq!(
+            rectangular_fault_tournament(&layout, (2, 2, 2), false),
+            (2, 0, 27)
+        );
+        assert_eq!(
+            rectangular_fault_tournament(&layout, (2, 2, 2), true),
+            (4, 19, 27)
+        );
+
+        // The measured design envelope has a visible boundary: 3x3x2 boxes
+        // exceed two erasures in eight of twelve positions.
+        assert_eq!(
+            rectangular_fault_tournament(&layout, (3, 3, 2), false),
+            (4, 8, 12)
+        );
+    }
+
+    #[test]
+    fn row_major_mapping_cannot_survive_any_single_full_layer_dropout() {
+        let layout = PhysicalLayout::new();
+        for z in 0..3 {
+            let mut mask = [false; TILE_COUNT];
+            for tile in z * 16..(z + 1) * 16 {
+                mask[tile] = true;
+            }
+            assert_eq!(worst_erasures(&layout, &mask, false), 2);
+            assert_eq!(worst_erasures(&layout, &mask, true), 6);
+        }
+    }
+
     #[test]
     fn wrong_payload_length_is_rejected() {
         let layout = PhysicalLayout::new();
