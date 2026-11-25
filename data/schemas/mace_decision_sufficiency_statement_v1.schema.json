@@ -54,27 +54,38 @@
       "type": "object",
       "additionalProperties": false,
       "required": [
-        "schema_version",
-        "run_id",
-        "query_invocation_id",
-        "domain_id",
-        "subject_scope_sha256",
-        "environment_revision_sha256",
-        "tool_profile_sha256",
-        "query_sha256",
-        "candidate_set_sha256",
-        "qualified_evidence_set_sha256",
-        "qualification_receipt_sha256",
-        "decision_need_sha256",
-        "purpose_sha256",
-        "sufficiency_policy_sha256",
         "calibration_profile_sha256",
-        "status",
-        "requirements",
-        "issued_at_unix",
+        "calibration_receipt_sha256",
+        "candidate_set_sha256",
+        "confidence_level_ppm",
+        "decision_need_sha256",
+        "domain_id",
+        "environment_revision_sha256",
         "expires_at_unix",
+        "issued_at_unix",
         "issuer_profile_sha256",
-        "key_id"
+        "key_id",
+        "maximum_evidence_age_seconds",
+        "observed_context_tokens",
+        "observed_cost_micros",
+        "observed_latency_ms",
+        "observed_tool_calls",
+        "purpose_sha256",
+        "qualification_receipt_sha256",
+        "qualified_evidence_set_sha256",
+        "query_invocation_id",
+        "query_sha256",
+        "regret_limit_micros",
+        "regret_upper_bound_micros",
+        "requirements",
+        "risk_limit_ppm",
+        "risk_upper_bound_ppm",
+        "run_id",
+        "schema_version",
+        "status",
+        "subject_scope_sha256",
+        "sufficiency_policy_sha256",
+        "tool_profile_sha256"
       ],
       "properties": {
         "schema_version": {
@@ -220,8 +231,94 @@
           "type": "string",
           "minLength": 1,
           "maxLength": 256
+        },
+        "regret_upper_bound_micros": {
+          "type": "integer",
+          "minimum": 0,
+          "maximum": 1000000000000
+        },
+        "regret_limit_micros": {
+          "type": "integer",
+          "minimum": 0,
+          "maximum": 1000000000000
+        },
+        "observed_cost_micros": {
+          "type": "integer",
+          "minimum": 0,
+          "maximum": 1000000000000
+        },
+        "observed_latency_ms": {
+          "type": "integer",
+          "minimum": 0,
+          "maximum": 86400000
+        },
+        "observed_context_tokens": {
+          "type": "integer",
+          "minimum": 0,
+          "maximum": 1000000000000
+        },
+        "observed_tool_calls": {
+          "type": "integer",
+          "minimum": 0,
+          "maximum": 1000000
+        },
+        "maximum_evidence_age_seconds": {
+          "type": "integer",
+          "minimum": 0,
+          "maximum": 315360000
         }
       }
     }
-  }
+  },
+  "allOf": [
+    {
+      "if": {
+        "properties": {
+          "predicate": {
+            "properties": {
+              "status": {
+                "const": "sufficient"
+              }
+            }
+          }
+        },
+        "required": [
+          "predicate"
+        ]
+      },
+      "then": {
+        "properties": {
+          "predicate": {
+            "required": [
+              "risk_upper_bound_ppm",
+              "risk_limit_ppm",
+              "confidence_level_ppm",
+              "calibration_receipt_sha256",
+              "regret_upper_bound_micros",
+              "regret_limit_micros",
+              "observed_cost_micros",
+              "observed_latency_ms",
+              "observed_context_tokens",
+              "observed_tool_calls",
+              "maximum_evidence_age_seconds"
+            ],
+            "properties": {
+              "requirements": {
+                "items": {
+                  "properties": {
+                    "status": {
+                      "const": "met"
+                    }
+                  },
+                  "required": [
+                    "status"
+                  ]
+                }
+              }
+            }
+          }
+        }
+      }
+    }
+  ]
 }
