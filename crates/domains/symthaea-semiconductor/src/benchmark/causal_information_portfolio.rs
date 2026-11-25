@@ -591,14 +591,23 @@ fn make_portfolio(
         .iter()
         .map(|index| candidates[*index].physical_measurement_cost)
         .sum();
-    let total_expected_result_delay_seconds: u64 = selected_indices
-        .iter()
-        .map(|index| candidates[*index].expected_result_delay_seconds)
-        .sum();
-    let total_capacity_units: usize = selected_indices
-        .iter()
-        .map(|index| candidates[*index].capacity_units)
-        .sum();
+    let total_expected_result_delay_seconds = selected_indices.iter().try_fold(
+        0_u64,
+        |total, index| total.checked_add(candidates[*index].expected_result_delay_seconds),
+    ).ok_or_else(|| {
+        CausalInformationPortfolioErrorV1("portfolio result-delay sum overflow".into())
+    })?;
+    let total_capacity_units = selected_indices.iter().try_fold(
+        0_usize,
+        |total, index| total.checked_add(candidates[*index].capacity_units),
+    ).ok_or_else(|| {
+        CausalInformationPortfolioErrorV1("portfolio capacity sum overflow".into())
+    })?;
+    if !total_physical_measurement_cost.is_finite() {
+        return Err(CausalInformationPortfolioErrorV1(
+            "portfolio physical measurement cost overflow".into(),
+        ));
+    }
     let randomized_audit_count = selected_indices
         .iter()
         .filter(|index| candidates[**index].randomized_audit)
@@ -613,6 +622,11 @@ fn make_portfolio(
             * expected_predictive_risk_reduction
         - objective_weights.physical_cost_weight * total_physical_measurement_cost
         - objective_weights.delay_weight * total_expected_result_delay_seconds as f64;
+    if !objective_score.is_finite() {
+        return Err(CausalInformationPortfolioErrorV1(
+            "portfolio objective score overflow".into(),
+        ));
+    }
     let mut portfolio = CausalPortfolioMetricsV1 {
         candidate_ids,
         expected_hypothesis_information_gain_bits: information_gain,
@@ -668,7 +682,8 @@ fn subset_is_feasible(
 pub fn optimize_causal_information_portfolio_v1(
     input: &CausalInformationPortfolioInputV1,
 ) -> Result<CausalInformationPortfolioReportV1, CausalInformationPortfolioErrorV1> {
-    let (prior_map, candidate_likelihoods, candidate_eligibility) = validate_input(input)?;
+    let (prior_map, candidate_likelihoods, mut candidate_eligibility) = validate_input(input)?;
+    candidate_eligibility.sort_by(|left, right| left.candidate_id.cmp(&right.candidate_id));
     let hypothesis_ids: Vec<String> = prior_map.keys().cloned().collect();
     let priors: Vec<f64> = hypothesis_ids
         .iter()
@@ -715,15 +730,9 @@ pub fn optimize_causal_information_portfolio_v1(
             .filter(|(bit, _)| mask & (1usize << bit) != 0)
             .map(|(_, index)| *index)
             .collect();
-        if selected_indices.is_empty() {
-            continue;
-        }
-        let feasible_without_audit =
-            subset_is_feasible(&selected_indices, candidates, input, false);
-        if feasible_without_audit {
-            feasible_without_audit_floor_count += 1;
-        }
-        if !subset_is_feasible(&selected_indices, candidates, input, true) {
+        if selected_indices.is_empty()
+            || !subset_is_feasible(&selected_indices, candidates, input, false)
+        {
             continue;
         }
 
@@ -736,6 +745,10 @@ pub fn optimize_causal_information_portfolio_v1(
             &input.decision_actions,
         );
         if !information_gain.is_finite() || !decision_gain.is_finite() {
+            continue;
+        }
+        feasible_without_audit_floor_count += 1;
+        if !subset_is_feasible(&selected_indices, candidates, input, true) {
             continue;
         }
         feasible.push(make_portfolio(
@@ -788,7 +801,7 @@ pub fn optimize_causal_information_portfolio_v1(
     if selected_portfolio.is_none() {
         reason_codes.push("no_feasible_portfolio_selected".into());
     }
-    if !input.conditional_independence_assumption_declared {
+    if !input.conditional_independence_assumption_declared && eligible_indices.len() > 1 {
         reason_codes.push("multi_candidate_conditional_independence_not_declared".into());
     }
 
@@ -1017,6 +1030,35 @@ mod tests {
             .unwrap()
             .candidate_ids;
         assert_eq!(selected_first, selected_second);
+    }
+
+    #[test]
+    fn pareto_frontier_preserves_information_cost_tradeoffs() {
+        let mut strong = candidate("strong", "ref-a", 0.9, 0.1, 2.0, false);
+        strong.expected_predictive_risk_reduction = 0.1;
+        let mut cheap = candidate("cheap", "ref-b", 0.7, 0.3, 0.5, false);
+        cheap.expected_predictive_risk_reduction = 0.05;
+        let mut value = input(vec![strong, cheap]);
+        value.physical_cost_budget = 2.0;
+        value.maximum_capacity_units = 2;
+        value.conditional_independence_assumption_declared = true;
+        value.conditional_independence_assumption_sha256 = Some(digest('c'));
+        value.objective_weights.information_gain_weight = 0.0;
+        value.objective_weights.predictive_risk_reduction_weight = 1.0;
+        value.objective_weights.physical_cost_weight = 0.1;
+        let report = optimize_causal_information_portfolio_v1(&value).unwrap();
+        assert!(report.pareto_frontier.len() >= 2);
+        assert!(report.pareto_frontier.iter().any(|portfolio| portfolio.candidate_ids == vec!["cheap"]));
+        assert!(report.pareto_frontier.iter().any(|portfolio| portfolio.candidate_ids == vec!["strong"]));
+    }
+
+    #[test]
+    fn ineligible_candidates_do_not_create_an_empty_selected_portfolio() {
+        let mut invalid = candidate("invalid", "ref-a", 0.99, 0.01, 1.0, false);
+        invalid.safety_preconditions_satisfied = false;
+        let report = optimize_causal_information_portfolio_v1(&input(vec![invalid])).unwrap();
+        assert_eq!(report.status, CausalPortfolioStatusV1::NoFeasiblePortfolio);
+        assert!(report.selected_portfolio.is_none());
     }
 
     #[test]
