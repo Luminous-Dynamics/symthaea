@@ -169,6 +169,10 @@ jobs:
             "${tmp_root}/benchmarks/plasma/kinetic-information-return/"
           cp benchmarks/plasma/kinetic-information-return/fixtures/kinetic-pulse-graph-known-answer-v0.1.json \
             "${tmp_root}/benchmarks/plasma/kinetic-information-return/fixtures/"
+          cp benchmarks/plasma/kinetic-information-return/path-response-signature-v0.1.schema.json \
+            "${tmp_root}/benchmarks/plasma/kinetic-information-return/"
+          cp benchmarks/plasma/kinetic-information-return/fixtures/path-response-dispositions-v0.1.json \
+            "${tmp_root}/benchmarks/plasma/kinetic-information-return/fixtures/"
           cat > "${crate_dir}/Cargo.toml" <<'EOF'
           [package]
           name = "symthaea-plasma-probes"
@@ -302,6 +306,35 @@ jobs:
           assert fixture["claim_boundary"]["no_vlasov_solver_executed"] is True
           assert fixture["claim_boundary"]["no_echo_response_measured"] is True
           print("kinetic_information_return_pulse_graph_validation=PASS")
+
+          response_schema = json.loads((root / "path-response-signature-v0.1.schema.json").read_text())
+          response_fixture = json.loads((root / "fixtures/path-response-dispositions-v0.1.json").read_text())
+          Draft202012Validator.check_schema(response_schema)
+          Draft202012Validator(response_schema).validate(response_fixture)
+          assert len(response_fixture["cases"]) == 5
+          expected_dispositions = {case["expected_disposition"] for case in response_fixture["cases"]}
+          assert expected_dispositions == {"PASS", "FAIL", "UNKNOWN", "UNSUPPORTED"}
+          path_map = {path["path_id"]: path for path in fixture["paths"]}
+          for case in response_fixture["cases"]:
+              path = path_map[case["sequence_path_id"]]
+              final_pulse_time = max(
+                  [pulse["application_time"] for pulse in path["pulses"]],
+                  default=0.0,
+              )
+              assert case["observation_end_time"] == path["observation_end_time"]
+              for signature_name in ("reference_signature", "candidate_signature"):
+                  signature = case[signature_name]
+                  assert signature["contract_id"]
+                  assert signature["qoi_ids"] and len(signature["qoi_ids"]) == len(signature["qoi_scales"])
+                  assert all(scale > 0 for scale in signature["qoi_scales"])
+                  assert signature["time_samples"] == sorted(signature["time_samples"])
+                  assert all(final_pulse_time <= time <= case["observation_end_time"] for time in signature["time_samples"])
+                  expected_entries = len(signature["qoi_ids"]) * len(signature["time_samples"])
+                  assert len(signature["responses"]) == expected_entries
+                  assert len(signature["branch_ids"]) == expected_entries
+          assert response_fixture["claim_boundary"]["no_solver_run"] is True
+          assert response_fixture["claim_boundary"]["no_echo_measured"] is True
+          print("kinetic_path_response_dispositions_validation=PASS")
           PY
 
       - name: Validate fixed-domain particle W1 schema and known answers
