@@ -369,6 +369,7 @@ fn validate(problem: &SequentialRobustProblem) -> Result<(), SequentialOracleErr
             });
         }
         let mut outcome_seen = BTreeSet::new();
+        let mut action_covered_states = BTreeSet::new();
         for outcome in &action.outcomes {
             if outcome.outcome_id.trim().is_empty() {
                 return Err(SequentialOracleError::EmptyIdentifier("outcome"));
@@ -400,6 +401,15 @@ fn validate(problem: &SequentialRobustProblem) -> Result<(), SequentialOracleErr
                         id: state_id.clone(),
                     });
                 }
+                action_covered_states.insert(state_id.as_str());
+            }
+        }
+        for state_id in &problem.state_ids {
+            if !action_covered_states.contains(state_id.as_str()) {
+                return Err(SequentialOracleError::UncoveredState {
+                    action_id: action.action_id.clone(),
+                    state_id: state_id.clone(),
+                });
             }
         }
     }
