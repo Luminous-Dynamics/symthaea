@@ -20,6 +20,7 @@ pub const CAUSAL_PORTFOLIO_REPORT_SCHEMA_V1: &str =
 const PROBABILITY_TOLERANCE: f64 = 1.0e-9;
 const MAX_CANDIDATES_V1: usize = 10;
 const MAX_JOINT_OUTCOMES_V1: usize = 4096;
+const MAX_LIKELIHOOD_STRESS_SCENARIOS_V1: usize = 16;
 
 #[derive(Clone, Debug, PartialEq, Serialize, Deserialize)]
 pub struct HypothesisPriorV1 {
@@ -32,6 +33,20 @@ pub struct CandidateOutcomeLikelihoodV1 {
     pub outcome_id: String,
     /// Conditional probability P(outcome | hypothesis).
     pub probability_by_hypothesis: BTreeMap<String, f64>,
+}
+
+#[derive(Clone, Debug, PartialEq, Serialize, Deserialize)]
+pub struct CandidateLikelihoodStressV1 {
+    pub candidate_id: String,
+    /// Alternative likelihood rows must use exactly the candidate's outcome IDs.
+    pub outcomes: Vec<CandidateOutcomeLikelihoodV1>,
+}
+
+#[derive(Clone, Debug, PartialEq, Serialize, Deserialize)]
+pub struct PortfolioLikelihoodStressScenarioV1 {
+    pub scenario_id: String,
+    /// Complete alternative likelihood set, one entry per candidate.
+    pub candidate_likelihoods: Vec<CandidateLikelihoodStressV1>,
 }
 
 #[derive(Clone, Debug, PartialEq, Serialize, Deserialize)]
@@ -63,6 +78,8 @@ pub struct DecisionActionLossV1 {
 #[derive(Clone, Debug, PartialEq, Serialize, Deserialize)]
 pub struct CausalPortfolioObjectiveWeightsV1 {
     pub information_gain_weight: f64,
+    /// Weight on the minimum information gain across declared stress scenarios.
+    pub robust_information_gain_weight: f64,
     pub decision_loss_reduction_weight: f64,
     pub predictive_risk_reduction_weight: f64,
     pub physical_cost_weight: f64,
@@ -76,6 +93,8 @@ pub struct CausalInformationPortfolioInputV1 {
     pub hypotheses: Vec<HypothesisPriorV1>,
     pub decision_actions: Vec<DecisionActionLossV1>,
     pub candidates: Vec<CausalMeasurementCandidateV1>,
+    /// Deterministic sensitivity cases, not probabilities over model truth.
+    pub likelihood_stress_scenarios: Vec<PortfolioLikelihoodStressScenarioV1>,
     pub physical_cost_budget: f64,
     pub maximum_capacity_units: usize,
     pub minimum_randomized_audit_count: usize,
@@ -103,6 +122,10 @@ pub struct CausalCandidateEligibilityV1 {
 pub struct CausalPortfolioMetricsV1 {
     pub candidate_ids: Vec<String>,
     pub expected_hypothesis_information_gain_bits: f64,
+    pub minimum_stress_information_gain_bits: f64,
+    pub maximum_stress_information_gain_bits: f64,
+    pub likelihood_model_sensitivity_range_bits: f64,
+    pub likelihood_stress_scenario_count: usize,
     pub expected_decision_loss_reduction: f64,
     pub expected_predictive_risk_reduction: f64,
     pub total_physical_measurement_cost: f64,
@@ -180,8 +203,19 @@ fn canonical_input_digest(
     canonical.hypotheses.sort_by(|a, b| a.hypothesis_id.cmp(&b.hypothesis_id));
     canonical.candidates.sort_by(|a, b| a.candidate_id.cmp(&b.candidate_id));
     canonical.decision_actions.sort_by(|a, b| a.action_id.cmp(&b.action_id));
+    canonical
+        .likelihood_stress_scenarios
+        .sort_by(|a, b| a.scenario_id.cmp(&b.scenario_id));
     for candidate in &mut canonical.candidates {
         candidate.outcomes.sort_by(|a, b| a.outcome_id.cmp(&b.outcome_id));
+    }
+    for scenario in &mut canonical.likelihood_stress_scenarios {
+        scenario
+            .candidate_likelihoods
+            .sort_by(|a, b| a.candidate_id.cmp(&b.candidate_id));
+        for candidate in &mut scenario.candidate_likelihoods {
+            candidate.outcomes.sort_by(|a, b| a.outcome_id.cmp(&b.outcome_id));
+        }
     }
     json_sha256(&canonical)
 }
@@ -261,13 +295,14 @@ fn validate_input(
 
     let weights = [
         input.objective_weights.information_gain_weight,
+        input.objective_weights.robust_information_gain_weight,
         input.objective_weights.decision_loss_reduction_weight,
         input.objective_weights.predictive_risk_reduction_weight,
         input.objective_weights.physical_cost_weight,
         input.objective_weights.delay_weight,
     ];
     if weights.iter().any(|value| !value.is_finite() || *value < 0.0)
-        || weights[..3].iter().all(|value| *value == 0.0)
+        || weights[..4].iter().all(|value| *value == 0.0)
     {
         return Err(CausalInformationPortfolioErrorV1(
             "objective weights must be finite/non-negative with at least one benefit weight".into(),
@@ -450,7 +485,101 @@ fn validate_input(
         }
     }
 
-    Ok((priors, eligible_likelihoods, eligibility))
+    if input.likelihood_stress_scenarios.len() > MAX_LIKELIHOOD_STRESS_SCENARIOS_V1 {
+        return Err(CausalInformationPortfolioErrorV1(format!(
+            "at most {MAX_LIKELIHOOD_STRESS_SCENARIOS_V1} likelihood stress scenarios are supported"
+        )));
+    }
+    let mut stress_scenario_ids = BTreeSet::new();
+    let expected_candidate_ids: BTreeSet<&str> =
+        input.candidates.iter().map(|candidate| candidate.candidate_id.as_str()).collect();
+    let mut stress_likelihoods = Vec::new();
+    for scenario in &input.likelihood_stress_scenarios {
+        require_text(&scenario.scenario_id, "likelihood_stress_scenario.scenario_id")?;
+        if !stress_scenario_ids.insert(scenario.scenario_id.as_str()) {
+            return Err(CausalInformationPortfolioErrorV1(
+                "duplicate likelihood stress scenario ID".into(),
+            ));
+        }
+        let mut scenario_map = BTreeMap::new();
+        for stressed_candidate in &scenario.candidate_likelihoods {
+            let Some(base_candidate) = input.candidates.iter().find(|candidate| {
+                candidate.candidate_id == stressed_candidate.candidate_id
+            }) else {
+                return Err(CausalInformationPortfolioErrorV1(format!(
+                    "stress scenario {} references an unknown candidate",
+                    scenario.scenario_id
+                )));
+            };
+            if stressed_candidate.outcomes.len() != base_candidate.outcomes.len() {
+                return Err(CausalInformationPortfolioErrorV1(format!(
+                    "stress scenario {} changes candidate {} outcome cardinality",
+                    scenario.scenario_id, stressed_candidate.candidate_id
+                )));
+            }
+            let base_outcome_ids: BTreeSet<&str> =
+                base_candidate.outcomes.iter().map(|outcome| outcome.outcome_id.as_str()).collect();
+            let mut probability_sums: BTreeMap<String, f64> =
+                priors.keys().map(|id| (id.clone(), 0.0)).collect();
+            let mut outcome_ids = BTreeSet::new();
+            let mut rows = Vec::with_capacity(stressed_candidate.outcomes.len());
+            for outcome in &stressed_candidate.outcomes {
+                require_text(&outcome.outcome_id, "stress.outcome_id")?;
+                if !base_outcome_ids.contains(outcome.outcome_id.as_str())
+                    || !outcome_ids.insert(outcome.outcome_id.as_str())
+                    || outcome.probability_by_hypothesis.len() != priors.len()
+                {
+                    return Err(CausalInformationPortfolioErrorV1(format!(
+                        "stress scenario {} changes outcome schema or repeats outcomes for {}",
+                        scenario.scenario_id, stressed_candidate.candidate_id
+                    )));
+                }
+                let mut row = Vec::with_capacity(priors.len());
+                for hypothesis_id in priors.keys() {
+                    let Some(probability) = outcome.probability_by_hypothesis.get(hypothesis_id) else {
+                        return Err(CausalInformationPortfolioErrorV1(format!(
+                            "stress scenario {} is missing hypothesis {}",
+                            scenario.scenario_id, hypothesis_id
+                        )));
+                    };
+                    if !probability.is_finite() || !(0.0..=1.0).contains(probability) {
+                        return Err(CausalInformationPortfolioErrorV1(format!(
+                            "stress scenario {} contains invalid likelihood",
+                            scenario.scenario_id
+                        )));
+                    }
+                    *probability_sums.get_mut(hypothesis_id).unwrap() += probability;
+                    row.push(*probability);
+                }
+                rows.push(row);
+            }
+            if outcome_ids != base_outcome_ids
+                || probability_sums.values().any(|sum| (*sum - 1.0).abs() > PROBABILITY_TOLERANCE)
+            {
+                return Err(CausalInformationPortfolioErrorV1(format!(
+                    "stress scenario {} likelihoods are incomplete or unnormalized for {}",
+                    scenario.scenario_id, stressed_candidate.candidate_id
+                )));
+            }
+            if scenario_map.insert(stressed_candidate.candidate_id.clone(), rows).is_some() {
+                return Err(CausalInformationPortfolioErrorV1(format!(
+                    "stress scenario {} repeats candidate {}",
+                    scenario.scenario_id, stressed_candidate.candidate_id
+                )));
+            }
+        }
+        let scenario_candidate_ids: BTreeSet<&str> =
+            scenario_map.keys().map(String::as_str).collect();
+        if scenario_candidate_ids != expected_candidate_ids {
+            return Err(CausalInformationPortfolioErrorV1(format!(
+                "stress scenario {} must cover every candidate exactly once",
+                scenario.scenario_id
+            )));
+        }
+        stress_likelihoods.push((scenario.scenario_id.clone(), scenario_map));
+    }
+
+    Ok((priors, eligible_likelihoods, eligibility, stress_likelihoods))
 }
 
 fn bayes_risk(
@@ -583,6 +712,8 @@ fn dominates(left: &CausalPortfolioMetricsV1, right: &CausalPortfolioMetricsV1) 
     let no_worse = left.expected_hypothesis_information_gain_bits
         + PROBABILITY_TOLERANCE
         >= right.expected_hypothesis_information_gain_bits
+        && left.minimum_stress_information_gain_bits + PROBABILITY_TOLERANCE
+            >= right.minimum_stress_information_gain_bits
         && left.expected_decision_loss_reduction + PROBABILITY_TOLERANCE
             >= right.expected_decision_loss_reduction
         && left.expected_predictive_risk_reduction + PROBABILITY_TOLERANCE
@@ -594,6 +725,8 @@ fn dominates(left: &CausalPortfolioMetricsV1, right: &CausalPortfolioMetricsV1) 
         && left.total_capacity_units <= right.total_capacity_units;
     let strictly_better = left.expected_hypothesis_information_gain_bits
         > right.expected_hypothesis_information_gain_bits + PROBABILITY_TOLERANCE
+        || left.minimum_stress_information_gain_bits
+            > right.minimum_stress_information_gain_bits + PROBABILITY_TOLERANCE
         || left.expected_decision_loss_reduction
             > right.expected_decision_loss_reduction + PROBABILITY_TOLERANCE
         || left.expected_predictive_risk_reduction
@@ -610,6 +743,7 @@ fn make_portfolio(
     candidates: &[CausalMeasurementCandidateV1],
     information_gain: f64,
     decision_gain: f64,
+    stress_information_gains: &[f64],
     objective_weights: &CausalPortfolioObjectiveWeightsV1,
 ) -> Result<CausalPortfolioMetricsV1, CausalInformationPortfolioErrorV1> {
     let mut candidate_ids: Vec<String> = selected_indices
@@ -655,7 +789,16 @@ fn make_portfolio(
             })
         })
         .collect();
+    let minimum_stress_information_gain_bits = stress_information_gains
+        .iter()
+        .copied()
+        .fold(information_gain, f64::min);
+    let maximum_stress_information_gain_bits = stress_information_gains
+        .iter()
+        .copied()
+        .fold(information_gain, f64::max);
     let objective_score = objective_weights.information_gain_weight * information_gain
+        + objective_weights.robust_information_gain_weight * minimum_stress_information_gain_bits
         + objective_weights.decision_loss_reduction_weight * decision_gain
         + objective_weights.predictive_risk_reduction_weight
             * expected_predictive_risk_reduction
@@ -669,6 +812,11 @@ fn make_portfolio(
     let mut portfolio = CausalPortfolioMetricsV1 {
         candidate_ids,
         expected_hypothesis_information_gain_bits: information_gain,
+        minimum_stress_information_gain_bits,
+        maximum_stress_information_gain_bits,
+        likelihood_model_sensitivity_range_bits: maximum_stress_information_gain_bits
+            - minimum_stress_information_gain_bits,
+        likelihood_stress_scenario_count: stress_information_gains.len(),
         expected_decision_loss_reduction: decision_gain,
         expected_predictive_risk_reduction,
         total_physical_measurement_cost,
@@ -726,7 +874,8 @@ fn subset_is_feasible(
 pub fn optimize_causal_information_portfolio_v1(
     input: &CausalInformationPortfolioInputV1,
 ) -> Result<CausalInformationPortfolioReportV1, CausalInformationPortfolioErrorV1> {
-    let (prior_map, candidate_likelihoods, mut candidate_eligibility) = validate_input(input)?;
+    let (prior_map, candidate_likelihoods, mut candidate_eligibility, stress_likelihoods) =
+        validate_input(input)?;
     candidate_eligibility.sort_by(|left, right| left.candidate_id.cmp(&right.candidate_id));
     let hypothesis_ids: Vec<String> = prior_map.keys().cloned().collect();
     let priors: Vec<f64> = hypothesis_ids
@@ -795,11 +944,29 @@ pub fn optimize_causal_information_portfolio_v1(
         if !subset_is_feasible(&selected_indices, candidates, input, true) {
             continue;
         }
+        let mut stress_information_gains = Vec::with_capacity(stress_likelihoods.len());
+        for (_, scenario_likelihoods) in &stress_likelihoods {
+            let (stress_information_gain, _) = portfolio_information(
+                &selected_indices,
+                candidates,
+                scenario_likelihoods,
+                &hypothesis_ids,
+                &priors,
+                &input.decision_actions,
+            );
+            if !stress_information_gain.is_finite() {
+                return Err(CausalInformationPortfolioErrorV1(
+                    "stress likelihood portfolio exceeds bounded outcome space".into(),
+                ));
+            }
+            stress_information_gains.push(stress_information_gain);
+        }
         feasible.push(make_portfolio(
             &selected_indices,
             candidates,
             information_gain,
             decision_gain,
+            &stress_information_gains,
             &input.objective_weights,
         )?);
     }
