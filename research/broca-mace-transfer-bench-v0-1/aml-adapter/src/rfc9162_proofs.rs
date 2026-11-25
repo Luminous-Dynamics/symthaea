@@ -396,6 +396,53 @@ mod tests {
     }
 
     #[test]
+    fn fixed_python_reference_vectors_verify_rfc9162_inclusion_and_consistency() {
+        let leaves = fixture_leaves(13);
+        let new_root = tree_hash(&leaves);
+        assert_eq!(
+            rfc9162_digest_hex_v1(&new_root),
+            "6adfcbd4eb5db2afdffcdaf31ee4231e0b899dc28228716130b5d3f202ceddf8"
+        );
+
+        let leaf = rfc9162_leaf_hash_v1(&leaves[7]);
+        assert_eq!(
+            rfc9162_digest_hex_v1(&leaf),
+            "806c793bf78be40e761f9baf94ff64166614a684e190ee363e8687711e345901"
+        );
+        let inclusion_hex = [
+            "0a78e48e15fa16087f065ff1c7f3843d5811893c933b638f573244031a3d7d22",
+            "936b56edc35add7c6c00a9ba8462af6de6ff9af1aa45c520d0f505d8cb64074d",
+            "a277d6157e3259f4b8fa06c37919cfe187887a6c48c9be47ef6e122673108bd8",
+            "acc53ef4dc6e4231066f998755ead88abcb3fbecc7b269fb36c1761b869529ef",
+        ];
+        let inclusion: Vec<_> = inclusion_hex
+            .iter()
+            .map(|value| parse_rfc9162_digest_hex_v1(value).unwrap())
+            .collect();
+        verify_rfc9162_inclusion_v1(&leaf, 7, 13, &inclusion, &new_root)
+            .expect("published independent inclusion vector");
+
+        let old_root = tree_hash(&leaves[..11]);
+        assert_eq!(
+            rfc9162_digest_hex_v1(&old_root),
+            "7f199e2a6d6e4a05e029092dd52e806710ab4068200d11b5108360e2f84e3517"
+        );
+        let consistency_hex = [
+            "0668bf3d2da641fb778ed7de825d8c2bac5d0b1852e1b3cffcd88d714378feca",
+            "69445a2b0b81ca07ba1669623a1b436d3fa7b77256494bd416d8dbd85eab3b09",
+            "d72998b280a4b46d0fb053c9e5dd4f41588fcb9e527b87ce12853c5b181822d0",
+            "7ea68c137f8fa8f3c2dc6ebb65b8f17b82a5b56e94496208a57673ac48893ee5",
+            "ad8c19924a5c0b3b61e2a9203ee62c01f90227328990e1a16cb37ec2e7b85c8f",
+        ];
+        let consistency: Vec<_> = consistency_hex
+            .iter()
+            .map(|value| parse_rfc9162_digest_hex_v1(value).unwrap())
+            .collect();
+        verify_rfc9162_consistency_v1(11, 13, &old_root, &new_root, &consistency)
+            .expect("published independent consistency vector");
+    }
+
+    #[test]
     fn valid_genesis_extension_requires_the_exact_empty_root_and_no_proof() {
         let leaves = fixture_leaves(7);
         let new_root = tree_hash(&leaves);
