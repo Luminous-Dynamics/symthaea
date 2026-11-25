@@ -132,6 +132,43 @@ A promising theoretical line for the probabilistic arm is the September 2026 pap
 
 - **AstaBench:** secondary breadth/cost target: at least 0.60 mean score at no more than $3.40 per problem under the same official task set and scoring version. Report the domain and workflow-stage vector, not only the aggregate.
 
+### Research taste: problem, approach, experiment and interpretation
+
+A closed-loop research system needs more than experimental selection. Compose with [#10877 — research direction, concrete ideas, experimental taste and interpretation](https://github.com/Luminous-Dynamics/symthaea/issues/10877), and keep the components separate.
+
+Two recent comparators make the decomposition concrete:
+
+- **IdeaTaste** (arXiv:2611.03424, 2026-11-02) measures retrospective alignment of research proposals with work published by the same communities in 2026, given a frozen 2025 literature snapshot. Its paper evaluates six models, four areas and >90,000 proposals; LLM populations reach about 26% of human-community level on citation matching and 18% on concrete-idea matching. This is a community-matching diagnostic, not a scientific-truth oracle. Do not penalize a potentially valuable novel idea solely because it does not match a later paper.
+- **TasteVal** (arXiv:2610.06824, 2026-10-05) isolates experimental planning by using a Researcher model to propose experiments while a fixed Coder implements them and reports outcomes. It has eight private open-ended tasks, 24 recruited experts, and resource ceilings of 40 H100-hours / 120 wall-clock hours. The reported Opus 5.5 experimental-compute multiplier is 2.30× (95% CI 1.15–4.37) on seven scored tasks, with one refused task excluded as missing. The final normalized-performance multiplier is separate; Researcher inference tokens are excluded from the compute multiplier. Therefore this is not a 2.3× quality gain or an inclusive-cost multiplier.
+
+Symthaea should benchmark five distinct constructs:
+
+1. **Direction taste:** choose important, underexplored and feasible problems with explicit opportunity cost.
+2. **Approach taste:** propose a concrete mechanism, measurable intermediate effects, and falsifiable predicted consequences.
+3. **Experimental taste:** design sequential tests that distinguish mechanisms and change decisions per complete resource budget.
+4. **Interpretive taste:** correctly handle positive, null, negative, noisy, conflicting and invalid outcomes; select stop, pivot, replicate or escalate.
+5. **Transferable taste:** preserve these abilities on held-out research families and new domains.
+
+Use paired policy comparisons with a fixed Coder: expert researcher + Coder, frontier-model researcher + same Coder, frozen Symthaea policy + same Coder, fixed/threshold/EIG/EVSI policies, matched-cost random policy, and evaluator-only exact tiny-world oracle. Hold model, Coder, tool permissions, initial evidence, task, context and inclusive limits constant; vary research policy only.
+
+Report separately:
+- experimental compute and physical/simulation query use;
+- final task quality and scientific validity;
+- researcher inference tokens, tool/API costs, analysis and verification costs;
+- failed experiments, retries, waiting and human intervention;
+- prospective forecast calibration and realized decision regret;
+- expert judgments, inter-rater agreement and adjudication burden;
+- fresh-family transfer.
+
+Do not select the best of many attempts on held-out outcomes, omit refusals or score missing outcomes as zero without an explicit rule. Retain all task denominators. Human expertise is an important comparator but not an infallible oracle; community matching and LLM judges are secondary diagnostics.
+
+Primary links:
+- IdeaTaste: https://arxiv.org/abs/2611.03424
+- TasteVal: https://arxiv.org/abs/2610.06824
+- [#10877](https://github.com/Luminous-Dynamics/symthaea/issues/10877)
+- [#11171](https://github.com/Luminous-Dynamics/symthaea/issues/11171)
+- [#11012](https://github.com/Luminous-Dynamics/symthaea/issues/11012)
+
 ### Decision and active evidence acquisition
 
 - Demonstrate at least one preregistered task where decision-focused EVSI outperforms entropy-only or parameter-EIG ranking because the observation changes the action.
