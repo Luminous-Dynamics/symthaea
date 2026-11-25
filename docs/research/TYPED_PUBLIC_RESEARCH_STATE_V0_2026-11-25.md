@@ -35,7 +35,7 @@ Every claim includes population, outcome/measure, quantifier/effect, domain/time
 
 ### Claim-source relation
 
-Each relation binds one claim ID to one evidence ID. A classified relation requires classifier ID/version, output digest, classifier-specific confidence, emission time, the exact evidence-prefix hash used, and an exact quote span represented by byte offsets and a digest of quoted bytes.
+Each relation binds one claim ID to one evidence ID. A classified relation requires classifier ID/version, output digest, classifier-specific confidence, emission time, the exact evidence-prefix hash used, and a digest over the canonical claim manifest {claim_id, statement, scope, reference_time}. It also carries an exact quote span represented by byte offsets and a digest of quoted bytes. This prevents classifier output from being replayed against modified claim text or scope while the evidence set remains unchanged.
 
 An UNCLASSIFIED relation must not carry classifier provenance or a quote span presented as classified support. The candidate policy may request classification or more evidence but cannot manufacture this state from retrieval relevance.
 
