@@ -17,6 +17,7 @@ use sha2::{Digest, Sha256};
 use crate::evidence_qualification_gate::{
     EvidenceQualificationRejectV1, EvidenceQualificationSignatureVerifierV1,
 };
+use crate::evaluation_manifest_commitment_receipt::VerifiedEvaluationManifestCommitmentV1;
 
 pub const DECISION_OUTCOME_RECEIPT_SCHEMA_V1: &str = "mace_decision_outcome_receipt_v1";
 pub const DECISION_OUTCOME_PAYLOAD_SCHEMA_V1: &str = "mace_decision_outcome_payload_v1";
@@ -144,9 +145,9 @@ pub struct DecisionOutcomeAttestationV1 {
 pub struct DecisionOutcomeExpectedBindingV1<'a> {
     pub decision_episode_id: &'a str,
     pub episode_manifest_sha256: &'a str,
-    pub evaluation_manifest_sha256: &'a str,
-    /// Digest of the independently verified, pre-run commitment witness receipt.
-    pub evaluation_manifest_commitment_receipt_sha256: &'a str,
+    /// Capability returned only after the detached witness signature, bindings,
+    /// pre-run time and append-only log proof have been verified.
+    pub evaluation_manifest_commitment: &'a VerifiedEvaluationManifestCommitmentV1,
     pub qualification_receipt_sha256: Option<&'a str>,
     pub decision_sufficiency_receipt_sha256: Option<&'a str>,
     pub decision_record_sha256: &'a str,
@@ -278,9 +279,10 @@ pub fn validate_decision_outcome_receipt_v1(
     validate_atom(expected.decision_episode_id)?;
     if receipt.payload.decision_episode_id != expected.decision_episode_id
         || receipt.payload.episode_manifest_sha256 != expected.episode_manifest_sha256
-        || receipt.payload.evaluation_manifest_sha256 != expected.evaluation_manifest_sha256
+        || receipt.payload.evaluation_manifest_sha256
+            != expected.evaluation_manifest_commitment.sealed_evaluation_manifest_sha256()
         || receipt.payload.evaluation_manifest_commitment_receipt_sha256
-            != expected.evaluation_manifest_commitment_receipt_sha256
+            != expected.evaluation_manifest_commitment.receipt_sha256()
         || receipt.payload.decision_record_sha256 != expected.decision_record_sha256
     {
         return Err(DecisionOutcomeReceiptRejectV1::BindingMismatch);
@@ -288,8 +290,8 @@ pub fn validate_decision_outcome_receipt_v1(
 
     for digest in [
         expected.episode_manifest_sha256,
-        expected.evaluation_manifest_sha256,
-        expected.evaluation_manifest_commitment_receipt_sha256,
+        expected.evaluation_manifest_commitment.sealed_evaluation_manifest_sha256(),
+        expected.evaluation_manifest_commitment.receipt_sha256(),
         expected.decision_record_sha256,
         expected.evaluator_profile_sha256,
         expected.verifier_profile_sha256,
@@ -667,8 +669,7 @@ mod tests {
         verifier: PinnedEd25519QualificationVerifierV1,
         signer: SigningKey,
         episode_manifest_sha256: String,
-        evaluation_manifest_sha256: String,
-        evaluation_manifest_commitment_receipt_sha256: String,
+        evaluation_manifest_commitment: VerifiedEvaluationManifestCommitmentV1,
         qualification_receipt_sha256: Option<String>,
         decision_sufficiency_receipt_sha256: Option<String>,
         decision_record_sha256: String,
@@ -684,8 +685,7 @@ mod tests {
             DecisionOutcomeExpectedBindingV1 {
                 decision_episode_id: "episode-1",
                 episode_manifest_sha256: &self.episode_manifest_sha256,
-                evaluation_manifest_sha256: &self.evaluation_manifest_sha256,
-                evaluation_manifest_commitment_receipt_sha256: &self.evaluation_manifest_commitment_receipt_sha256,
+                evaluation_manifest_commitment: &self.evaluation_manifest_commitment,
                 qualification_receipt_sha256: self.qualification_receipt_sha256.as_deref(),
                 decision_sufficiency_receipt_sha256: self
                     .decision_sufficiency_receipt_sha256
@@ -748,8 +748,12 @@ mod tests {
         .unwrap();
 
         let episode_manifest_sha256 = digest('a');
-        let evaluation_manifest_sha256 = digest('b');
-        let evaluation_manifest_commitment_receipt_sha256 = digest('9');
+        let evaluation_manifest_commitment =
+            crate::evaluation_manifest_commitment_receipt::test_verified_evaluation_manifest_commitment_v1();
+        let evaluation_manifest_sha256 =
+            evaluation_manifest_commitment.sealed_evaluation_manifest_sha256().to_owned();
+        let evaluation_manifest_commitment_receipt_sha256 =
+            evaluation_manifest_commitment.receipt_sha256().to_owned();
         let qualification_receipt_sha256 = Some(digest('c'));
         let decision_sufficiency_receipt_sha256 = Some(digest('d'));
         let decision_record_sha256 = digest('e');
@@ -813,8 +817,7 @@ mod tests {
             verifier,
             signer,
             episode_manifest_sha256,
-            evaluation_manifest_sha256,
-            evaluation_manifest_commitment_receipt_sha256,
+            evaluation_manifest_commitment,
             qualification_receipt_sha256,
             decision_sufficiency_receipt_sha256,
             decision_record_sha256,
@@ -849,10 +852,10 @@ mod tests {
 
     #[test]
     fn outcome_cannot_rebind_pre_run_manifest_witness() {
-        let fixture = fixture();
-        let changed_witness_digest = digest('0');
-        let mut expected = fixture.expected();
-        expected.evaluation_manifest_commitment_receipt_sha256 = &changed_witness_digest;
+        let mut fixture = fixture();
+        fixture.receipt.payload.evaluation_manifest_commitment_receipt_sha256 = digest('0');
+        fixture.resign();
+        let expected = fixture.expected();
         assert_eq!(
             validate_decision_outcome_receipt_v1(
                 &fixture.receipt,
