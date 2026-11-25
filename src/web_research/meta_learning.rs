@@ -250,17 +250,33 @@ impl EpistemicLearner {
         // Store outcome
         self.outcomes.push_back(outcome);
 
-        // Trim old outcomes
-        if self.outcomes.len() > 1000 {
-            self.outcomes.pop_front();
-        }
-
-        // Periodically update meta-phi
-        if self.outcomes.len() % 10 == 0 {
+        // The source/domain aggregates are derived from the same bounded
+        // adjudicated window that is persisted. Once an item is evicted,
+        // rebuild those aggregates so export/import remains deterministic.
+        if self.outcomes.len() > MAX_PERSISTED_ADJUDICATED_OUTCOMES {
+            self.rebuild_calibration_from_retained_outcomes();
+        } else if self.outcomes.len() % 10 == 0 {
             self.update_meta_phi();
         }
 
         Ok(())
+    }
+
+    fn rebuild_calibration_from_retained_outcomes(&mut self) {
+        let retained: Vec<VerificationOutcome> = self.outcomes.iter().cloned().collect();
+        self.outcomes.clear();
+        self.source_credibility.clear();
+        self.domain_expertise.clear();
+        self.meta_phi = MetaPhi::default();
+
+        for outcome in retained {
+            self.update_source_credibility(&outcome);
+            self.update_domain_expertise(&outcome);
+            self.outcomes.push_back(outcome);
+            if self.outcomes.len() % 10 == 0 {
+                self.update_meta_phi();
+            }
+        }
     }
 
     /// Update source credibility based on outcome
