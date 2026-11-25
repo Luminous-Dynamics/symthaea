@@ -168,13 +168,11 @@ impl<'a> DsseQualificationSignatureVerifierV1<'a> {
         // DSSE keyid is OPTIONAL and unauthenticated. It is only a lookup
         // hint; the authenticated key identity comes from the signed MACE
         // predicate and is checked against the pinned profile.
-        let key_id_hint = signature_object
-            .get("keyid")
-            .and_then(Value::as_str)
-            .filter(|value| !value.is_empty());
-        if key_id_hint.is_some_and(|value| value.len() > 256) {
-            return Err(EvidenceQualificationRejectV1::DsseInvalidEnvelope);
-        }
+        let key_id_hint = match signature_object.get("keyid") {
+            None | Some(Value::String(value)) if value.is_empty() => None,
+            Some(Value::String(value)) if value.len() <= 256 => Some(value.as_str()),
+            _ => return Err(EvidenceQualificationRejectV1::DsseInvalidEnvelope),
+        };
         let signature_b64 = signature_object
             .get("sig")
             .and_then(Value::as_str)
@@ -785,6 +783,53 @@ mod tests {
             DsseQualificationSignatureVerifierV1::from_envelope_json(&duplicate, &pinned)
                 .err(),
             Some(EvidenceQualificationRejectV1::DsseInvalidEnvelope)
+        );
+    }
+
+    #[test]
+    fn dsse_accepts_urlsafe_base64_optional_keyid_and_extension_fields() {
+        let key = signing_key();
+        let public_key = key.verifying_key().to_bytes();
+        let key_id = qualification_key_id_v1(&public_key);
+        let pinned = pinned(&key, QualificationKeyStatusV1::Active, 1);
+        let receipt = receipt(&key_id, pinned.profile_sha256());
+        let mut statement: Value = serde_json::from_slice(
+            &in_toto_qualification_payload_v1(&receipt).unwrap()
+        ).unwrap();
+
+        // in-toto statement and subject extension fields are ignored under
+        // the v1 extension rules; the MACE predicate remains strictly typed.
+        statement["x-statement-extension"] = Value::String("ignored".to_owned());
+        statement["subject"][0]["x-subject-extension"] = Value::Bool(true);
+        statement["subject"][0]["digest"]["sha512"] = Value::String("f".repeat(128));
+        let payload = serde_json::to_vec(&statement).unwrap();
+        let pae = dsse_pae_v1(DSSE_PAYLOAD_TYPE_V1, &payload);
+        let signature = key.sign(&pae).to_bytes();
+
+        let envelope = serde_json::json!({
+            "payloadType": DSSE_PAYLOAD_TYPE_V1,
+            "payload": URL_SAFE_NO_PAD.encode(&payload),
+            "signatures": [{
+                "sig": URL_SAFE_NO_PAD.encode(signature),
+                "x-signature-extension": "ignored"
+            }],
+            "x-envelope-extension": {"producer": "future-version"}
+        });
+        let envelope_json = serde_json::to_string(&envelope).unwrap();
+        let verifier = DsseQualificationSignatureVerifierV1::from_envelope_json(
+            &envelope_json,
+            &pinned,
+        ).expect("URL-safe Base64, optional keyid and extensions are interoperable");
+        let ids = vec!["evidence-a".to_owned()];
+        let binding = binding(&receipt, &ids);
+        let verified = VerifiedEvidenceQualificationV1::verify_and_bind(
+            verifier.receipt(),
+            &binding,
+            &verifier,
+        ).expect("exact signed MACE predicate remains bound");
+        assert_eq!(
+            verified.admissible_evidence_ids_for_use(&binding, &verifier).unwrap(),
+            &["evidence-a".to_owned()]
         );
     }
 
