@@ -76,6 +76,19 @@ jobs:
       - name: Warnings-denied Clippy on exact production source
         run: cargo +1.96.0 clippy --locked --manifest-path tools/mel-temporal-grounding-qualifier/Cargo.toml --all-targets -- -D warnings
 
+      - name: Validate selective batch schema JSON and version contract
+        shell: bash
+        run: |
+          set -euo pipefail
+          jq -e '
+            .["$schema"] == "https://json-schema.org/draft/2020-12/schema"
+            and .properties.schema.const == "mel-selective-temporal-batch-v1"
+            and .additionalProperties == false
+            and (.properties.cases.items["$ref"] == "#/$defs/case")
+            and (.["$defs"].case.required | index("unconditional_prediction")) != null
+            and (.["$defs"].case.required | index("inference_cost")) != null
+          ' tools/mel-temporal-grounding-qualifier/schemas/mel-selective-temporal-batch-v1.schema.json > /dev/null
+
       - name: Replay selective grounding and abstention controls when module is present
         if: hashFiles('tools/mel-temporal-grounding-qualifier/src/temporal_selective.rs') != ''
         shell: bash
