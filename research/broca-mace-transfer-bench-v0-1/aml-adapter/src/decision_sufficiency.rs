@@ -195,7 +195,7 @@ impl DecisionSufficiencyReceiptV1 {
         };
         let optional_u32 = |field: &str| -> Result<Option<u32>, DecisionSufficiencyRejectV1> {
             match object.get(field) {
-                None | Some(Value::Null) => Ok(None),
+                None => Ok(None),
                 Some(value) => value.as_u64()
                     .and_then(|number| u32::try_from(number).ok())
                     .map(Some)
@@ -204,7 +204,7 @@ impl DecisionSufficiencyReceiptV1 {
         };
         let optional_digest = |field: &str| -> Result<Option<String>, DecisionSufficiencyRejectV1> {
             match object.get(field) {
-                None | Some(Value::Null) => Ok(None),
+                None => Ok(None),
                 Some(Value::String(value)) => Ok(Some(value.clone())),
                 _ => Err(DecisionSufficiencyRejectV1::InvalidJson),
             }
@@ -1296,7 +1296,7 @@ mod tests {
             Some(5000),
         );
         let candidate_ids = vec!["evidence-1".to_owned()];
-        let mut qualification_binding = qualification_binding(&qualified, &candidate_ids, 250);
+        let qualification_binding = qualification_binding(&qualified, &candidate_ids, 250);
         let mut later_binding = binding.clone();
         later_binding.now_unix = 250;
         assert_eq!(
@@ -1312,7 +1312,6 @@ mod tests {
                 EvidenceQualificationRejectV1::ReceiptExpired
             ))
         );
-        qualification_binding.now_unix = 250;
     }
 
     #[test]
