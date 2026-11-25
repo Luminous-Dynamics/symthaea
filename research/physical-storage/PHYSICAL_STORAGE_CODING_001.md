@@ -136,11 +136,34 @@ These are software benchmark gates. They do not establish physical device perfor
 
 ## 9. Deterministic starter corpus
 
-The companion fixture `fixtures/physical_storage_channel_cases_v0_1.json` contains one 224-byte known payload (28 payload tiles × 8 bytes), fixed SHA-256 digest, a 4 × 4 × 2 logical tile grid and four explicitly reserved control tiles for headers/calibration. It is a protocol seed only. It does not model a particular glass, magnetic or NAND device and does not include ECC outputs.
+The media-neutral companion fixture `fixtures/physical_storage_channel_cases_v0_1.json` contains a 224-byte known payload, fixed SHA-256 digest, a 4 × 4 × 2 tile grid and four reserved control tiles. It remains an ECC-free channel-input corpus for baseline comparisons.
+
+The separate executable layout fixture is `mds-reference/layout_and_fault_cases_v0_1.json`: a synthetic 4 × 4 × 3 grid, 28 data tiles, 14 parity tiles, four control tiles and two spares. Its exact payload is 224 bytes; the physical tile and stripe mappings are machine-readable.
 
 The starter corpus deliberately includes pristine, clustered, directional burst, layer-dropout and calibration/metadata damage cases. Tests should reject changed coordinates, changed payloads, mismatched layout identities, wrong format versions, invalid hashes and unsupported evidence claims.
 
-## 10. Receipt contract
+
+## 10. Executable linear-MDS reference
+
+The standalone zero-dependency Rust crate is under `mds-reference/`. It implements a systematic linear [6,4,3] MDS array code over GF(256) with generator rows [I; (1,1,1,1); (1,2,3,4)]. It is accurately described as a linear MDS code, not a standards-conformant Reed–Solomon/GRS implementation. A pinned standards RS comparator remains in the future baseline tournament.
+
+The synthetic 4 × 4 × 3 physical layout has 48 tiles: 28 data, 14 parity, four redundant control tiles and two spares. Seven six-shard stripes are spatially interleaved so every physical layer contains two shards from each stripe. Any two known erasures in a stripe can therefore be reconstructed; any one full layer loss removes exactly two shards per stripe.
+
+The reference includes checks for all 15 pairs of erased shards in one stripe; each of the three whole-layer dropouts; a localized 2 × 2 cluster; more than two erasures in one stripe (must fail closed); an unflagged byte substitution (must fail final SHA-256 integrity); and redundant header/calibration control loss.
+
+An independent Python oracle verified the generator-matrix nonsingularity for all 15 four-row subsets, all three whole-layer recovery cases, the cluster case, the over-budget negative and SHA-256 payload. These independent checks are **not Cargo tests**. No Rust compiler/Cargo is available in the current execution environment; rustfmt, strict Clippy, Cargo test and executable output remain pending.
+
+The toy yields 224 payload bytes / (48 × 8) = 58.33% end-to-end tile efficiency, intentionally sacrificing density to tolerate losing one-third of the volume. This is a falsifiable recovery reference, not a density improvement. For a 301-layer-class medium, a hypothetical 10-data + 1-parity code has 90.91% coding rate before controls/metadata/spares and can tolerate one known erasure per stripe when every layer contains at most one symbol from each stripe. This is a design calculation, not a measured glass result.
+
+Run locally:
+```bash
+cargo fmt --manifest-path research/physical-storage/mds-reference/Cargo.toml -- --check
+cargo clippy --manifest-path research/physical-storage/mds-reference/Cargo.toml --all-targets -- -D warnings
+cargo test --manifest-path research/physical-storage/mds-reference/Cargo.toml --all-targets
+cargo run --manifest-path research/physical-storage/mds-reference/Cargo.toml --bin run_cases
+```
+
+## 11. Receipt contract
 
 Each experiment receipt binds:
 - payload byte length and SHA-256 digest;
@@ -155,11 +178,11 @@ Each experiment receipt binds:
 
 Do not treat a hash as proof of who produced the data. Authentication and source provenance require a separate trust mechanism.
 
-## 11. Evidence boundary
+## 12. Evidence boundary
 
 The first tranche is an algorithmic benchmark over deterministic byte arrays and synthetic fault masks. It is not a physical glass, tape, HDD, MRAM or flash experiment. No HDC coding advantage, physical density improvement, retention result, or 10^-15 reliability result is claimed. Actual media error maps must come from Symtropy/partner-lab metrology or a clearly identified public dataset.
 
-## 12. References
+## 13. References
 
 - Symtropy physical storage twin: https://github.com/Luminous-Dynamics/symtropy/issues/7447
 - Symtropy magnetic solver qualification (useful evidence pattern, not a recording model): https://github.com/Luminous-Dynamics/symtropy/issues/7444
