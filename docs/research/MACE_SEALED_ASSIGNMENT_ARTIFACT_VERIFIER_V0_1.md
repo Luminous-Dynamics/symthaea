@@ -42,7 +42,7 @@ The committed object has six required digests: analysis plan, utility scale, har
 
 ### Sealed-artifact root
 
-\`SHA-256("luminous:mace:sealed-artifact-set:v1" || 0x00 || u64_be(count) || Σ(u64_be(id_utf8_len) || id_utf8 || role_utf8_len_prefixed || content_sha256_raw32 || sealed_object_commitment_sha256_raw32))\`
+\`SHA-256("luminous:mace:sealed-artifact-set:v1" || 0x00 || u64_be(count) || Σ(u64_be(id_utf8_len) || id_utf8 || u64_be(role_utf8_len) || role_utf8 || content_sha256_raw32 || sealed_object_commitment_sha256_raw32))\`
 
 Artifact IDs must be unique and strictly ordered by UTF-8 bytes. Each leaf binds its ID, role, content digest and sealed-object commitment. The supported roles remain the schema's enumerated roles; arbitrary role strings are rejected.
 
