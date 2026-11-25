@@ -826,7 +826,7 @@ mod tests {
 
     #[test]
     fn action_not_in_the_offer_list_cannot_be_invented() {
-        let input = input(sample_state(0), vec![offer(
+        let input = input(artifact_verified_state(0), vec![offer(
             "only-search",
             ActionKind::SeekIndependentSource,
             Some("claim-a"),
@@ -842,7 +842,7 @@ mod tests {
     #[test]
     fn insufficient_component_budget_causes_abstention() {
         let mut input = input(
-            sample_state(0),
+            artifact_verified_state(0),
             vec![offer(
                 "classify-too-expensive",
                 ActionKind::ClassifyClaimSource,
@@ -859,7 +859,7 @@ mod tests {
     #[test]
     fn pareto_incomparable_same_intent_offers_abstain() {
         let input = input(
-            sample_state(0),
+            artifact_verified_state(0),
             vec![
                 offer("offer-a", ActionKind::ClassifyClaimSource, Some("claim-a"), Some("ev-a1"),
                     &[("query_units", 2), ("experiment_units", 0), ("review_minutes", 1)]),
@@ -875,7 +875,7 @@ mod tests {
     #[test]
     fn dominated_same_intent_offer_is_not_selected() {
         let input = input(
-            sample_state(0),
+            artifact_verified_state(0),
             vec![
                 offer("offer-a", ActionKind::ClassifyClaimSource, Some("claim-a"), Some("ev-a1"),
                     &[("query_units", 2), ("experiment_units", 0), ("review_minutes", 1)]),
@@ -890,7 +890,7 @@ mod tests {
     #[test]
     fn selected_decision_binds_state_prefix_and_offer_hashes() {
         let input = input(
-            sample_state(0),
+            artifact_verified_state(0),
             vec![offer(
                 "classify",
                 ActionKind::ClassifyClaimSource,
