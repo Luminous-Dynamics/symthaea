@@ -59,7 +59,27 @@
       },
       "decision": "Answer",
       "decision_confidence": 0.95,
-      "identifiability_basis": "ClearPositive"
+      "identifiability_basis": "ClearPositive",
+      "unconditional_prediction": {
+        "schema_version": "mel-temporal-grounding-v1",
+        "query_id": "query-0",
+        "artifact": {
+          "audio_sha256": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+          "sample_rate_hz": 48000,
+          "channels": 2,
+          "total_frames": 480000
+        },
+        "state": {
+          "Occurrences": {
+            "intervals": [
+              {
+                "start_frame": 100,
+                "end_frame": 200
+              }
+            ]
+          }
+        }
+      }
     },
     {
       "schema": "mel-selective-temporal-case-v1",
@@ -111,7 +131,27 @@
       },
       "decision": "Answer",
       "decision_confidence": 0.99,
-      "identifiability_basis": "ClearPositive"
+      "identifiability_basis": "ClearPositive",
+      "unconditional_prediction": {
+        "schema_version": "mel-temporal-grounding-v1",
+        "query_id": "query-1",
+        "artifact": {
+          "audio_sha256": "bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb",
+          "sample_rate_hz": 48000,
+          "channels": 2,
+          "total_frames": 480000
+        },
+        "state": {
+          "Occurrences": {
+            "intervals": [
+              {
+                "start_frame": 300,
+                "end_frame": 400
+              }
+            ]
+          }
+        }
+      }
     },
     {
       "schema": "mel-selective-temporal-case-v1",
@@ -149,7 +189,18 @@
       },
       "decision": "ClaimAbsent",
       "decision_confidence": 0.9,
-      "identifiability_basis": "ClearAbsence"
+      "identifiability_basis": "ClearAbsence",
+      "unconditional_prediction": {
+        "schema_version": "mel-temporal-grounding-v1",
+        "query_id": "query-2",
+        "artifact": {
+          "audio_sha256": "cccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccc",
+          "sample_rate_hz": 48000,
+          "channels": 2,
+          "total_frames": 480000
+        },
+        "state": "QueryAbsent"
+      }
     },
     {
       "schema": "mel-selective-temporal-case-v1",
@@ -196,7 +247,27 @@
       },
       "decision": "Answer",
       "decision_confidence": 0.97,
-      "identifiability_basis": "ClearAbsence"
+      "identifiability_basis": "ClearAbsence",
+      "unconditional_prediction": {
+        "schema_version": "mel-temporal-grounding-v1",
+        "query_id": "query-3",
+        "artifact": {
+          "audio_sha256": "dddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddd",
+          "sample_rate_hz": 48000,
+          "channels": 2,
+          "total_frames": 480000
+        },
+        "state": {
+          "Occurrences": {
+            "intervals": [
+              {
+                "start_frame": 100,
+                "end_frame": 200
+              }
+            ]
+          }
+        }
+      }
     },
     {
       "schema": "mel-selective-temporal-case-v1",
@@ -244,7 +315,18 @@
       },
       "decision": "AbstainAmbiguous",
       "decision_confidence": 0.8,
-      "identifiability_basis": "TaskAmbiguity"
+      "identifiability_basis": "TaskAmbiguity",
+      "unconditional_prediction": {
+        "schema_version": "mel-temporal-grounding-v1",
+        "query_id": "query-4",
+        "artifact": {
+          "audio_sha256": "eeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeee",
+          "sample_rate_hz": 48000,
+          "channels": 2,
+          "total_frames": 480000
+        },
+        "state": "QueryAbsent"
+      }
     },
     {
       "schema": "mel-selective-temporal-case-v1",
@@ -286,7 +368,18 @@
       },
       "decision": "AbstainNotEstimable",
       "decision_confidence": 0.85,
-      "identifiability_basis": "AnnotatorDisagreement"
+      "identifiability_basis": "AnnotatorDisagreement",
+      "unconditional_prediction": {
+        "schema_version": "mel-temporal-grounding-v1",
+        "query_id": "query-5",
+        "artifact": {
+          "audio_sha256": "ffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffff",
+          "sample_rate_hz": 48000,
+          "channels": 2,
+          "total_frames": 480000
+        },
+        "state": "QueryAbsent"
+      }
     },
     {
       "schema": "mel-selective-temporal-case-v1",
@@ -328,7 +421,18 @@
       },
       "decision": "AbstainNotEstimable",
       "decision_confidence": 0.88,
-      "identifiability_basis": "SignalInsufficient"
+      "identifiability_basis": "SignalInsufficient",
+      "unconditional_prediction": {
+        "schema_version": "mel-temporal-grounding-v1",
+        "query_id": "query-6",
+        "artifact": {
+          "audio_sha256": "0000000000000000000000000000000000000000000000000000000000000000",
+          "sample_rate_hz": 48000,
+          "channels": 2,
+          "total_frames": 480000
+        },
+        "state": "QueryAbsent"
+      }
     },
     {
       "schema": "mel-selective-temporal-case-v1",
@@ -366,7 +470,18 @@
       },
       "decision": "ClaimAbsent",
       "decision_confidence": 0.99,
-      "identifiability_basis": "UnsupportedQuery"
+      "identifiability_basis": "UnsupportedQuery",
+      "unconditional_prediction": {
+        "schema_version": "mel-temporal-grounding-v1",
+        "query_id": "query-7",
+        "artifact": {
+          "audio_sha256": "1111111111111111111111111111111111111111111111111111111111111111",
+          "sample_rate_hz": 48000,
+          "channels": 2,
+          "total_frames": 480000
+        },
+        "state": "QueryAbsent"
+      }
     },
     {
       "schema": "mel-selective-temporal-case-v1",
@@ -413,7 +528,18 @@
       },
       "decision": "AbstainNotEstimable",
       "decision_confidence": 0.9,
-      "identifiability_basis": "ClearPositive"
+      "identifiability_basis": "ClearPositive",
+      "unconditional_prediction": {
+        "schema_version": "mel-temporal-grounding-v1",
+        "query_id": "query-8",
+        "artifact": {
+          "audio_sha256": "2222222222222222222222222222222222222222222222222222222222222222",
+          "sample_rate_hz": 48000,
+          "channels": 2,
+          "total_frames": 480000
+        },
+        "state": "QueryAbsent"
+      }
     },
     {
       "schema": "mel-selective-temporal-case-v1",
@@ -469,7 +595,27 @@
       },
       "decision": "Answer",
       "decision_confidence": 0.5,
-      "identifiability_basis": "ClearPositive"
+      "identifiability_basis": "ClearPositive",
+      "unconditional_prediction": {
+        "schema_version": "mel-temporal-grounding-v1",
+        "query_id": "query-9",
+        "artifact": {
+          "audio_sha256": "3333333333333333333333333333333333333333333333333333333333333333",
+          "sample_rate_hz": 48000,
+          "channels": 2,
+          "total_frames": 480000
+        },
+        "state": {
+          "Occurrences": {
+            "intervals": [
+              {
+                "start_frame": 100,
+                "end_frame": 200
+              }
+            ]
+          }
+        }
+      }
     }
   ]
 }
