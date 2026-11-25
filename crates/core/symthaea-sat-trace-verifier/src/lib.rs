@@ -12,6 +12,7 @@
 //! The implemented JCS profile deliberately restricts JSON numbers to safe
 //! integers. High-precision quantities must be represented as strings.
 
+use chrono::{DateTime, FixedOffset};
 use serde::de::{self, MapAccess, SeqAccess, Visitor};
 use serde::{Deserialize, Deserializer};
 use sha2::{Digest, Sha256};
@@ -624,7 +625,7 @@ struct Integrity {
     signer_id: Option<String>,
 }
 
-#[derive(Debug, Clone, PartialEq, Eq)]
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
 enum AttemptStatus {
     Pending,
     Applied,
@@ -884,6 +885,36 @@ pub fn verify_trace_with_options(
                         VerificationErrorCode::SubmissionWithoutCurrentAllows,
                     ));
                 }
+                let receipt_ref = authority
+                    .decision_receipt_ref
+                    .as_deref()
+                    .filter(|value| !value.trim().is_empty())
+                    .ok_or_else(|| TraceVerificationError::new(
+                        line_number,
+                        VerificationErrorCode::SubmissionWithoutCurrentAllows,
+                    ))?;
+                let valid_until = authority
+                    .valid_until
+                    .as_deref()
+                    .and_then(parse_timestamp)
+                    .ok_or_else(|| TraceVerificationError::new(
+                        line_number,
+                        VerificationErrorCode::SubmissionWithoutCurrentAllows,
+                    ))?;
+                let committed_at = parse_timestamp(&event.occurred_at)
+                    .ok_or_else(|| TraceVerificationError::new(
+                        line_number,
+                        VerificationErrorCode::InvalidEventShape(
+                            "occurred_at must be RFC 3339".to_owned(),
+                        ),
+                    ))?;
+                if committed_at >= valid_until {
+                    return Err(TraceVerificationError::new(
+                        line_number,
+                        VerificationErrorCode::SubmissionWithoutCurrentAllows,
+                    ));
+                }
+                let _ = receipt_ref;
 
                 let key = binding
                     .idempotency_key
@@ -1025,6 +1056,10 @@ pub fn verify_trace_with_options(
         signatures_verified: false,
         system_qualified: false,
     })
+}
+
+fn parse_timestamp(value: &str) -> Option<DateTime<FixedOffset>> {
+    DateTime::parse_from_rfc3339(value).ok()
 }
 
 fn check_digest(
@@ -1269,6 +1304,11 @@ fn validate_event_roles_and_requirements(
         }
         _ => {}
     }
+    if parse_timestamp(&event.occurred_at).is_none() {
+        return Err(invalid("occurred_at must be RFC 3339"));
+    }
+    let _ = (&event.integrity.signature_ref, &event.integrity.signer_id);
+
     if event.event_id.trim().is_empty()
         || event.actor.principal_id.trim().is_empty()
         || event.actor.component_id.trim().is_empty()
@@ -1324,6 +1364,7 @@ fn validate_effect_observation(
     if event.actor.role != ActorRole::SinkObserver
         || event.actor.principal_id != observation.observer_id
         || observation.source_of_truth.trim().is_empty()
+        || parse_timestamp(&observation.observed_at).is_none()
     {
         return Err(TraceVerificationError::new(
             line_number,
@@ -1332,6 +1373,8 @@ fn validate_effect_observation(
     }
     if observation.idempotency_key.trim().is_empty()
         || observation.idempotency_key != binding.idempotency_key.as_deref().unwrap_or("")
+        || (event.event_type == EventType::EffectReconciled
+            && observation.reconciliation_ref.as_deref().is_none_or(|value| value.trim().is_empty()))
     {
         return Err(TraceVerificationError::new(
             line_number,
