@@ -160,7 +160,7 @@ fn need_for_claim(
     let evidence = evidence_for_claim(state, relations);
 
     // Repair broken artifact capture/attribution before reasoning over content.
-    for item in evidence {
+    for item in &evidence {
         let retrieval = get_str(item, "retrieval_state").unwrap_or("UNKNOWN");
         let integrity = get_str(item, "integrity_status").unwrap_or("UNKNOWN");
         if ["NOT_FOUND", "DIGEST_MISMATCH", "UNATTRIBUTED"].contains(&retrieval)
@@ -452,6 +452,11 @@ pub fn decide(input: &PolicyInput) -> Result<PolicyDecision, Vec<PolicyIssue>> {
     let action_offers_sha256 = sha256_hex(&action_offer_bytes);
 
     let mut issues = Vec::new();
+    for dimension in input.remaining_budget.keys() {
+        if dimension.trim().is_empty() {
+            issue(&mut issues, "remaining_budget", "resource dimension names must be non-empty");
+        }
+    }
     let mut offer_ids = HashSet::new();
     let known_claims: HashSet<&str> = array(&state, "claims")
         .into_iter()
@@ -620,6 +625,13 @@ mod tests {
         assert_eq!(decision.disposition, DecisionDisposition::Selected);
         assert_eq!(decision.selected_offer_id.as_deref(), Some("classify-claim-a"));
         assert_eq!(decision.selected_action_kind, Some(ActionKind::ClassifyClaimSource));
+    }
+
+    #[test]
+    fn unknown_resource_dimensions_fail_closed() {
+        let mut input = input(sample_state(0), vec![]);
+        input.remaining_budget.insert(String::new(), 1);
+        assert!(decide(&input).is_err());
     }
 
     #[test]
