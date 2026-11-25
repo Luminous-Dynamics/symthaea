@@ -1571,6 +1571,21 @@ mod tests {
         event
     }
 
+    fn reseal_event_digest(mut event: Value) -> Value {
+        event["integrity"]["event_digest"] =
+            json!("sha256:0000000000000000000000000000000000000000000000000000000000000000");
+        let raw: StrictJson =
+            serde_json::from_value(event.clone()).expect("strict event value");
+        let integrity = raw
+            .get("integrity")
+            .unwrap()
+            .without_key("event_digest")
+            .unwrap();
+        let raw = replace_nested(raw, "integrity", integrity).unwrap();
+        event["integrity"]["event_digest"] = json!(digest_json(EVENT_DOMAIN, &raw));
+        event
+    }
+
     fn sample_event(
         sequence: u64,
         event_id: &str,
@@ -1818,10 +1833,17 @@ mod tests {
 
     #[test]
     fn authority_parameter_rebinding_is_rejected() {
-        let mut event = sample_event(1, "event-1", "authorization_decided", None, None, vec![]);
-        event["effect_binding"]["parameters_digest"] =
+        let mut event = finish_event(sample_event(
+            1,
+            "event-1",
+            "authorization_decided",
+            None,
+            None,
+            vec![],
+        ));
+        event["authority_decision"]["exact_effect_digest"] =
             json!("sha256:9999999999999999999999999999999999999999999999999999999999999999");
-        let result = verify_trace(&trace(vec![finish_event(event)]), RUN_ID, MANIFEST);
+        let result = verify_trace(&trace(vec![reseal_event_digest(event)]), RUN_ID, MANIFEST);
         assert!(matches!(
             result.unwrap_err().code,
             VerificationErrorCode::AuthorityDigestMismatch
@@ -1830,10 +1852,17 @@ mod tests {
 
     #[test]
     fn disclosure_payload_rebinding_is_rejected() {
-        let mut event = sample_event(1, "event-1", "authorization_decided", None, None, vec![]);
-        event["effect_binding"]["payload_digest"] =
+        let mut event = finish_event(sample_event(
+            1,
+            "event-1",
+            "authorization_decided",
+            None,
+            None,
+            vec![],
+        ));
+        event["disclosure_decision"]["exact_disclosure_digest"] =
             json!("sha256:9999999999999999999999999999999999999999999999999999999999999999");
-        let result = verify_trace(&trace(vec![finish_event(event)]), RUN_ID, MANIFEST);
+        let result = verify_trace(&trace(vec![reseal_event_digest(event)]), RUN_ID, MANIFEST);
         assert!(matches!(
             result.unwrap_err().code,
             VerificationErrorCode::DisclosureDigestMismatch
