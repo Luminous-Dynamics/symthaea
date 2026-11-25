@@ -641,6 +641,22 @@ mod tests {
 
     struct TestSignatureVerifier;
 
+    struct RevokedAtUseVerifier;
+
+    impl EvidenceQualificationSignatureVerifierV1 for RevokedAtUseVerifier {
+        fn verify_signature(
+            &self,
+            _profile: &str,
+            _key_id: &str,
+            _payload: &str,
+            _signature: &[u8],
+            _issued_at_unix: u64,
+            _now_unix: u64,
+        ) -> Result<(), EvidenceQualificationRejectV1> {
+            Err(EvidenceQualificationRejectV1::RevokedKey)
+        }
+    }
+
     impl EvidenceQualificationSignatureVerifierV1 for TestSignatureVerifier {
         fn verify_signature(
             &self, profile: &str, key_id: &str, payload: &str, signature: &[u8],
@@ -859,6 +875,24 @@ mod tests {
                 &binding,
                 &verifier,
             ),
+            Err(EvidenceQualificationRejectV1::RevokedKey)
+        );
+    }
+
+    #[test]
+    fn previously_verified_capability_rechecks_signer_revocation_at_use() {
+        let receipt = signed_receipt();
+        let ids = candidate_ids();
+        let binding = binding(&receipt, &ids, 150);
+        let verified = VerifiedEvidenceQualificationV1::verify_and_bind(
+            &receipt,
+            &binding,
+            &TestSignatureVerifier,
+        )
+        .expect("initial signature verification succeeds");
+
+        assert_eq!(
+            verified.admissible_evidence_ids_for_use(&binding, &RevokedAtUseVerifier),
             Err(EvidenceQualificationRejectV1::RevokedKey)
         );
     }
