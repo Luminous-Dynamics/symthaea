@@ -168,6 +168,20 @@ pub fn audit_reliability_corpus_json(input: &str) -> Result<TemporalReliabilityR
     audit_reliability_corpus(&corpus)
 }
 
+pub fn audit_reliability_corpus_json_with_source_bootstrap(
+    input: &str,
+    bootstrap_replicates: usize,
+    seed: u64,
+) -> Result<TemporalReliabilityReportV1, String> {
+    let corpus: TemporalReliabilityCorpusV1 = serde_json::from_str(input)
+        .map_err(|error| format!("invalid temporal reliability corpus JSON: {error}"))?;
+    audit_reliability_corpus_with_source_bootstrap(
+        &corpus,
+        bootstrap_replicates,
+        seed,
+    )
+}
+
 pub fn audit_reliability_corpus(
     corpus: &TemporalReliabilityCorpusV1,
 ) -> Result<TemporalReliabilityReportV1, String> {
