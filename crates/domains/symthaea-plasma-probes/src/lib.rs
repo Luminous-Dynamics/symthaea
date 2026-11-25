@@ -188,6 +188,8 @@ pub enum ContractError {
     InvalidPositivityProjectionInput,
     #[error("positivity projection arithmetic overflowed")]
     PositivityProjectionArithmeticOverflow,
+    #[error("two-cell positivity/mass/response constraints are infeasible or singular")]
+    InfeasibleTwoCellResponseProjection,
     #[error("invalid coupled-mode authority contract: {0}")]
     InvalidCoupledModeAuthority(&'static str),
     #[error("invalid periodic derivative configuration: {0}")]
@@ -4880,6 +4882,138 @@ pub fn validate_canonical_symplectic_pair_2d(
     Ok(defect)
 }
 
+/// Exact two-cell joint feasibility oracle for positivity, discrete mass
+/// and one linear response functional.
+///
+/// It solves the two independent equalities for the two cell values. This is
+/// a manufactured transition oracle, not a general multi-cell quadratic
+/// program or a model of a nonlinear kinetic response map.
+#[derive(Clone, Copy, Debug, PartialEq, Serialize)]
+pub struct TwoCellMassResponseProjectionReport {
+    pub projected_values: [f64; 2],
+    pub target_mass: f64,
+    pub achieved_mass: f64,
+    pub mass_residual: f64,
+    pub target_response: f64,
+    pub achieved_response: f64,
+    pub response_residual: f64,
+    pub weighted_correction_norm: f64,
+    pub minimum_projected_value: f64,
+}
+
+/// Solve positivity + weighted mass + one linear response constraint for two cells.
+///
+/// The constraints are:
+/// sum_i volume_i * g_i = target_mass
+/// sum_i response_coefficient_i * g_i = target_response
+///
+/// If the constraints are singular or imply a negative cell value, the
+/// function returns InfeasibleTwoCellResponseProjection rather than clipping.
+pub fn solve_two_cell_positive_mass_response_projection(
+    input_values: [f64; 2],
+    cell_volumes: [f64; 2],
+    response_coefficients: [f64; 2],
+    target_mass: f64,
+    target_response: f64,
+) -> Result<TwoCellMassResponseProjectionReport, ContractError> {
+    if input_values.iter().any(|value| !value.is_finite())
+        || cell_volumes
+            .iter()
+            .any(|volume| !volume.is_finite() || *volume <= 0.0)
+        || response_coefficients
+            .iter()
+            .any(|coefficient| !coefficient.is_finite())
+        || !target_mass.is_finite()
+        || target_mass < 0.0
+        || !target_response.is_finite()
+    {
+        return Err(ContractError::InvalidPositivityProjectionInput);
+    }
+
+    let determinant = cell_volumes[0].mul_add(
+        response_coefficients[1],
+        -(cell_volumes[1] * response_coefficients[0]),
+    );
+    let determinant_scale = (cell_volumes[0] * response_coefficients[1])
+        .abs()
+        .max((cell_volumes[1] * response_coefficients[0]).abs())
+        .max(1.0);
+    if !determinant.is_finite()
+        || determinant.abs() <= 1.0e-12 * determinant_scale
+    {
+        return Err(ContractError::InfeasibleTwoCellResponseProjection);
+    }
+
+    let projected_first = target_mass.mul_add(
+        response_coefficients[1],
+        -(cell_volumes[1] * target_response),
+    ) / determinant;
+    let projected_second = cell_volumes[0].mul_add(
+        target_response,
+        -(response_coefficients[0] * target_mass),
+    ) / determinant;
+    if !projected_first.is_finite()
+        || !projected_second.is_finite()
+        || projected_first < 0.0
+        || projected_second < 0.0
+    {
+        return Err(ContractError::InfeasibleTwoCellResponseProjection);
+    }
+
+    let achieved_mass = cell_volumes[0].mul_add(
+        projected_first,
+        cell_volumes[1] * projected_second,
+    );
+    let achieved_response = response_coefficients[0].mul_add(
+        projected_first,
+        response_coefficients[1] * projected_second,
+    );
+    let mass_residual = achieved_mass - target_mass;
+    let response_residual = achieved_response - target_response;
+    let correction_first = projected_first - input_values[0];
+    let correction_second = projected_second - input_values[1];
+    let correction_squared = cell_volumes[0].mul_add(
+        correction_first * correction_first,
+        cell_volumes[1] * correction_second * correction_second,
+    );
+    let weighted_correction_norm = correction_squared.sqrt();
+    let minimum_projected_value = projected_first.min(projected_second);
+    if [
+        achieved_mass,
+        achieved_response,
+        mass_residual,
+        response_residual,
+        correction_squared,
+        weighted_correction_norm,
+        minimum_projected_value,
+    ]
+    .iter()
+    .any(|value| !value.is_finite())
+    {
+        return Err(ContractError::PositivityProjectionArithmeticOverflow);
+    }
+
+    let mass_tolerance = 1.0e-12_f64.max(target_mass.abs() * 1.0e-10);
+    let response_tolerance = 1.0e-12_f64.max(target_response.abs() * 1.0e-10);
+    if mass_residual.abs() > mass_tolerance
+        || response_residual.abs() > response_tolerance
+    {
+        return Err(ContractError::InfeasibleTwoCellResponseProjection);
+    }
+
+    Ok(TwoCellMassResponseProjectionReport {
+        projected_values: [projected_first, projected_second],
+        target_mass,
+        achieved_mass,
+        mass_residual,
+        target_response,
+        achieved_response,
+        response_residual,
+        weighted_correction_norm,
+        minimum_projected_value,
+    })
+}
+
 /// Result of a weighted least-squares projection onto non-negative states
 /// with an exactly declared discrete mass constraint.
 ///
@@ -9530,6 +9664,57 @@ mod tests {
             fixture["claim_boundary"]["does_not_claim_momentum_or_energy"]
                 .as_bool()
                 .unwrap()
+        );
+    }
+
+    #[test]
+    fn joint_two_cell_projection_preserves_mass_and_response_when_feasible() {
+        let positivity_only =
+            project_nonnegative_preserving_mass(&[-0.1, 1.1], &[1.0, 1.0], 1.0).unwrap();
+        let response_before = -0.1;
+        let response_after_positivity_only = positivity_only.projected_values[0];
+        assert!((response_after_positivity_only - response_before).abs() > 0.09);
+
+        let joint = solve_two_cell_positive_mass_response_projection(
+            [-0.1, 1.1],
+            [1.0, 1.0],
+            [1.0, 0.0],
+            1.0,
+            0.1,
+        )
+        .unwrap();
+        assert!((joint.projected_values[0] - 0.1).abs() < 1.0e-12);
+        assert!((joint.projected_values[1] - 0.9).abs() < 1.0e-12);
+        assert!(joint.minimum_projected_value >= 0.0);
+        assert!(joint.mass_residual.abs() < 1.0e-12);
+        assert!(joint.response_residual.abs() < 1.0e-12);
+    }
+
+    #[test]
+    fn joint_two_cell_projection_refuses_response_constraints_that_require_negative_values() {
+        assert_eq!(
+            solve_two_cell_positive_mass_response_projection(
+                [-0.1, 1.1],
+                [1.0, 1.0],
+                [1.0, 0.0],
+                1.0,
+                1.1,
+            ),
+            Err(ContractError::InfeasibleTwoCellResponseProjection)
+        );
+    }
+
+    #[test]
+    fn joint_two_cell_projection_refuses_singular_or_degenerate_response_constraints() {
+        assert_eq!(
+            solve_two_cell_positive_mass_response_projection(
+                [0.4, 0.6],
+                [1.0, 1.0],
+                [1.0, 1.0],
+                1.0,
+                0.5,
+            ),
+            Err(ContractError::InfeasibleTwoCellResponseProjection)
         );
     }
 
