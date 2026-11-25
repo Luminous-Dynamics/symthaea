@@ -15,7 +15,9 @@ A Go standard-library implementation of SHA-256 Merkle hashing, inclusion proofs
 
 Tests cover every inclusion position and every consistency pair for all tree sizes through 256: 65,536 generated proof checks. They also cover three seven-leaf examples from RFC 9162 Section 2.1.5, wrong roots, altered proofs, truncation, excess nodes, invalid sizes and suffix mutations.
 
-On Go 1.23.2, linux/amd64, AMD EPYC 9V74, five 300 ms benchmark runs measured 0 B/op and 0 allocations/op. Median consistency verification: 534.5 ns (16→256), 529.3 ns (256→4,096), 527.5 ns (4,096→65,536). Median inclusion verification: 525.9 ns (16 leaves), 1,046 ns (256 leaves), 1,564 ns (4,096 leaves).
+An independent Node implementation using Node's built-in SHA-256 verifies a Go-generated corpus of 136 inclusion and 120 consistency vectors. The Node fixture builder independently emits the same roots and proof paths; Go verifies 136 inclusion and 120 consistency proofs from the Node corpus. This is bidirectional differential testing, not a standards certification.
+
+On Go 1.23.2, linux/amd64, AMD EPYC 9V74, five 300 ms benchmark runs measured 0 B/op and 0 allocations/op. Median consistency verification: 534.5 ns (16→256), 529.3 ns (256→4,096), 527.5 ns (4,096→65,536). Median inclusion verification: 525.9 ns (16 leaves), 1,046 ns (256), 1,564 ns (4,096).
 
 ## Trust boundary
 

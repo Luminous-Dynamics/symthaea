@@ -1,0 +1,40 @@
+{
+  "benchmark": "sfeb-mon007-semantic-assurance-model-v1",
+  "date": "2026-11-25",
+  "runs": 5,
+  "runtime": "v22.16.0",
+  "platform": "linux-6.18.57",
+  "architecture": "x64",
+  "logicalCpuCount": 3,
+  "iterationsPerRun": 30000,
+  "samplesPerRun": 30,
+  "warmupPerRun": 3000,
+  "allRunsVerified": true,
+  "verifiedPerRun": [
+    30000,
+    30000,
+    30000,
+    30000,
+    30000
+  ],
+  "throughputOpsPerSecond": {
+    "runs": [
+      38182,
+      39662,
+      39124,
+      38070,
+      41198
+    ],
+    "median": 39124,
+    "range": [
+      38070,
+      41198
+    ]
+  },
+  "perEvaluationMs": {
+    "p50MedianAcrossRuns": 0.024361,
+    "p95MedianAcrossRuns": 0.028215,
+    "p99MedianAcrossRuns": 0.047588
+  },
+  "scope": "Pure in-process semantic evaluator only; excludes signatures, CBOR/COSE, Merkle proofs, network, storage, source/sink adapters and external readback. Not an end-to-end workflow or vendor/SOTA comparison."
+}

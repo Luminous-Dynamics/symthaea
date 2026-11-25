@@ -1,0 +1,66 @@
+{
+  "schema": "sfeb-mon007-artifact-manifest-v5",
+  "date": "2026-11-25",
+  "qualification": "JavaScript/Go semantic assurance preflights plus bidirectional Node/Go RFC 9162 inclusion and consistency differential tests and Go exhaustive generated proof tests. Not complete crypto/SCITT, authenticated checkpoint, witness, live sink, production or SOTA qualification.",
+  "sourceFiles": {
+    "README.md": "61fdc6588d6b32e5fcde0bf522c50d94b7ed2d62ad659353381defdac206f014",
+    "SOTA-COMPARISON-PLAN-v1.md": "ce8b2f735db9f0b6346a66a1e4a59dbdede67b90ff5c1dc984c9a05f6a67fb39",
+    "js/rfc9162.mjs": "8607981f251434a10c43b64cef99c581bbe8096957fa7cdd7d401f184821ec07",
+    "js/rfc9162.test.mjs": "d412030f86e49b2ec5fc14a874bf37dc0a381faf6f1b8e350c6824438150e12f",
+    "js/generate-rfc9162-vectors.mjs": "6d57a8335e01dd8f8f785da16b5daa2b93bb8243d6e8220117612451e4c393e6",
+    "go/rfc9162/differential_test.go": "649c066d52e8ab6581fe6989bca8bf8cf458a8fb25021c51d56912c4725fb51d",
+    "go/cmd/rfc9162-vectors/main.go": "5ab147db3a3b407e76f0da4dea2f2e40a5512a719eb2d7aca185791759a048d8"
+  },
+  "testEvidence": {
+    "javascriptSemantic": {
+      "casesPerInvocation": 31,
+      "freshInvocations": 5,
+      "successfulExecutions": 155,
+      "failures": 0,
+      "singleFieldMutationCases": 36
+    },
+    "javascriptRFC9162": {
+      "casesPerInvocation": 7,
+      "freshInvocations": 5,
+      "successfulExecutions": 35,
+      "failures": 0,
+      "goGeneratedInclusionVectorsVerified": 136,
+      "goGeneratedConsistencyVectorsVerified": 120
+    },
+    "go": {
+      "testFunctionsPerSuite": 30,
+      "freshSuiteInvocations": 3,
+      "testFunctionExecutions": 90,
+      "race": "passed",
+      "vet": "passed",
+      "semanticCoveragePercent": 72.9,
+      "rfc9162CoveragePercent": 95.5,
+      "nodeGeneratedInclusionVectorsVerified": 136,
+      "nodeGeneratedConsistencyVectorsVerified": 120
+    }
+  },
+  "differential": {
+    "implementations": [
+      "Go standard library",
+      "Node.js node:crypto"
+    ],
+    "goToNodeVectors": 256,
+    "nodeToGoVectors": 256,
+    "vectorComposition": {
+      "inclusion": 136,
+      "consistency": 120
+    },
+    "fixtureBuildersMatch": true,
+    "treeSizesThrough": 16,
+    "scope": "Proof structure/root/path comparisons only; supplied roots are unauthenticated."
+  },
+  "exhaustiveGoMerkle": {
+    "inclusionPositions": 32896,
+    "consistencyTreeSizePairs": 32640,
+    "totalProofChecks": 65536,
+    "maxTreeSize": 256,
+    "workedExamplesFromRFC9162Section215": 3
+  },
+  "performanceScope": "JavaScript semantic microbenchmark and Go Merkle microbenchmarks only. Not end-to-end workflow throughput or SOTA comparison.",
+  "trustBoundary": "Merkle proof relationships are verified against caller-supplied roots; checkpoints, COSE receipts, SCITT policy, issuer keys, witnesses and split views are not authenticated. Semantic *Verified facts are adapter-produced. No live sink/readback or production qualification."
+}
