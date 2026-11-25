@@ -44,7 +44,7 @@
           "retrieval_time": "2026-11-25T00:00:00Z",
           "content_integrity": "clean",
           "artifact_text": "The clinic blog discusses fever treatments and compares several compounds. The page contains no measured result for Compound Q.",
-          "artifact_sha256": "168ebcce3c3a48bb66ff4b5efb26c14d78fb37b9f50f2f5e2f88046b8195e129",
+          "artifact_sha256": "1d697766081a6c228a86df1158cdcebb4ba74b683eb108b9817d8a1a4ec348ce",
           "quote_span": {
             "byte_start": 0,
             "byte_end": 74,
@@ -95,7 +95,7 @@
           "retrieval_time": "2026-11-25T00:00:00Z",
           "content_integrity": "clean",
           "artifact_text": "In a randomized trial of 200 participants, Compound R reduced mean fever duration by 20 percent versus placebo.",
-          "artifact_sha256": "de454a82d933e4d6389449d763f1a21abbf3acd1975ea79a051227d2e271fc2d",
+          "artifact_sha256": "61898b5ab7efd0b3768af9f42cba03b2d23022b71a4ff56eef13d4e25a5784dc",
           "quote_span": {
             "byte_start": 43,
             "byte_end": 111,
@@ -115,7 +115,7 @@
           "retrieval_time": "2026-11-25T00:00:00Z",
           "content_integrity": "clean",
           "artifact_text": "The prespecified primary endpoint was mean fever duration. The registry result reports a 20 percent reduction for Compound R.",
-          "artifact_sha256": "85412704617b9b1964f6f8bc29daa8f3f8cfee6a60436fd2fb6786e4fdb508f6",
+          "artifact_sha256": "a67b3ae8e450a9f64f633e918403714ddf53a2609b22f630bc0a6f3ab8f33ce1",
           "quote_span": {
             "byte_start": 59,
             "byte_end": 125,
@@ -166,7 +166,7 @@
           "retrieval_time": "2026-11-25T00:00:00Z",
           "content_integrity": "clean",
           "artifact_text": "The prespecified primary endpoint was not met. The confidence interval crossed the null threshold.",
-          "artifact_sha256": "646106f9e5611e15fe03202fdbe11b943e0a95a4b0a71cfb0e9dc69272fe1999",
+          "artifact_sha256": "ee5ca554610977053f61c33ff38b989d5444d0abe12e67a4f3c47e0d36190ddc",
           "quote_span": {
             "byte_start": 0,
             "byte_end": 46,
@@ -186,7 +186,7 @@
           "retrieval_time": "2026-11-25T00:00:00Z",
           "content_integrity": "clean",
           "artifact_text": "The authors report that Compound S did not meet the prespecified primary endpoint.",
-          "artifact_sha256": "33f28fc157f8749092d6396c30d9d72e5a46a12e221a39e2310d30a0c9dbdd00",
+          "artifact_sha256": "632d2d307b966e63821c093eeb1f52c81132b3fb19be188a7e59ba144ec6fbe9",
           "quote_span": {
             "byte_start": 24,
             "byte_end": 82,
@@ -237,7 +237,7 @@
           "retrieval_time": "2026-11-25T00:00:00Z",
           "content_integrity": "clean",
           "artifact_text": "The cohort analysis found a lower adjusted relapse rate in the intervention group.",
-          "artifact_sha256": "13377c2c11750d7d489fadefe8c0d6c76d5c73db41a5028e93f2dee1c064cc29",
+          "artifact_sha256": "36c3350616acc29cc506f0dd5ce953d0ba96be666518d0451587fdefa2fb4e0d",
           "quote_span": {
             "byte_start": 20,
             "byte_end": 55,
@@ -257,7 +257,7 @@
           "retrieval_time": "2026-11-25T00:00:00Z",
           "content_integrity": "clean",
           "artifact_text": "The preregistered analysis found no statistically significant reduction in relapse risk.",
-          "artifact_sha256": "3b219b5eed77c29be581b5305714135a59b7a9a806332a75cbc91a932c608929",
+          "artifact_sha256": "cdf323056e263e8ffa9d7b6593fb6e14666a8f1994ff8da07a11e59d9b515bff",
           "quote_span": {
             "byte_start": 27,
             "byte_end": 87,
@@ -277,7 +277,7 @@
           "retrieval_time": "2026-11-25T00:00:00Z",
           "content_integrity": "clean",
           "artifact_text": "The review concludes that available studies are inconsistent and the effect remains uncertain.",
-          "artifact_sha256": "7ee0bc8eb89da5c0df0df9001bc72c913fac999d768670ec6b9005dfb37f5487",
+          "artifact_sha256": "ca0be9a4c5b05f5d60196334173c0b29d50ef4bf7874b967cdeb33849ad229a8",
           "quote_span": {
             "byte_start": 36,
             "byte_end": 93,
@@ -328,7 +328,7 @@
           "retrieval_time": "2026-11-25T00:00:00Z",
           "content_integrity": "clean",
           "artifact_text": "The wire report discusses a policy announcement but reports no measured change in national incidence.",
-          "artifact_sha256": "67b32b40ddbc1b627e670a49aea7418ab88ac5bfc88d515818fcc7c0169d8ff9",
+          "artifact_sha256": "4593b758badf23181a770b7666eaa0ec425b1da164f7fe2b10e110309584ea43",
           "quote_span": {
             "byte_start": 52,
             "byte_end": 100,
@@ -348,7 +348,7 @@
           "retrieval_time": "2026-11-25T00:00:00Z",
           "content_integrity": "clean",
           "artifact_text": "The wire report discusses a policy announcement but reports no measured change in national incidence.",
-          "artifact_sha256": "67b32b40ddbc1b627e670a49aea7418ab88ac5bfc88d515818fcc7c0169d8ff9",
+          "artifact_sha256": "4593b758badf23181a770b7666eaa0ec425b1da164f7fe2b10e110309584ea43",
           "quote_span": {
             "byte_start": 52,
             "byte_end": 100,
@@ -368,7 +368,7 @@
           "retrieval_time": "2026-11-25T00:00:00Z",
           "content_integrity": "clean",
           "artifact_text": "The wire report discusses a policy announcement but reports no measured change in national incidence.",
-          "artifact_sha256": "67b32b40ddbc1b627e670a49aea7418ab88ac5bfc88d515818fcc7c0169d8ff9",
+          "artifact_sha256": "4593b758badf23181a770b7666eaa0ec425b1da164f7fe2b10e110309584ea43",
           "quote_span": {
             "byte_start": 52,
             "byte_end": 100,
@@ -419,7 +419,7 @@
           "retrieval_time": "2026-11-25T00:00:00Z",
           "content_integrity": "clean",
           "artifact_text": "A 2015 article repeats the claim that a Microsoft study measured an average attention span of eight seconds.",
-          "artifact_sha256": "a4aa274697833890e3e01f64d012ea98b9ebfbd6134cba160519dd07418df704",
+          "artifact_sha256": "895387796db0236d4c6217286dae7edc3d50e858bdba45e3277423e9f3c25b15",
           "quote_span": {
             "byte_start": 56,
             "byte_end": 107,
@@ -439,7 +439,7 @@
           "retrieval_time": "2026-11-25T00:00:00Z",
           "content_integrity": "clean",
           "artifact_text": "The underlying Microsoft report did not measure attention in seconds and did not mention goldfish.",
-          "artifact_sha256": "0490fe7047e08bc2a5a2bf44133f2be582fdb3750940f3981e07f6704aff3039",
+          "artifact_sha256": "3cdf7b313927f3f216ecd57342700a234e83f8f97cb0c3e7f622bbbd4f275b1e",
           "quote_span": {
             "byte_start": 32,
             "byte_end": 68,
@@ -491,7 +491,7 @@
           "retrieval_time": "2015-12-31T23:59:59Z",
           "content_integrity": "clean",
           "artifact_text": "A 2015 article repeats the claim that a Microsoft study measured an average attention span of eight seconds.",
-          "artifact_sha256": "a4aa274697833890e3e01f64d012ea98b9ebfbd6134cba160519dd07418df704",
+          "artifact_sha256": "895387796db0236d4c6217286dae7edc3d50e858bdba45e3277423e9f3c25b15",
           "quote_span": {
             "byte_start": 56,
             "byte_end": 107,
@@ -542,7 +542,7 @@
           "retrieval_time": "2026-11-25T00:00:00Z",
           "content_integrity": "clean",
           "artifact_text": "A 2019 randomized study reports a reduction in condition W after intervention V.",
-          "artifact_sha256": "07f8c8269776de8b3ae539380cc0cd07d538bc8d11112cb8feb4a0dcadd3683f",
+          "artifact_sha256": "5156c34479ea10353bf3faf5fff2b01d61ca170fc149c88d90023ce753db8463",
           "quote_span": {
             "byte_start": 24,
             "byte_end": 79,
@@ -593,7 +593,7 @@
           "retrieval_time": "2026-11-25T00:00:00Z",
           "content_integrity": "clean",
           "artifact_text": "Three of twenty participants improved on the primary symptom measure; the remaining seventeen did not improve.",
-          "artifact_sha256": "ca940123cb8e595e47373ea38df5f14e13e1f947ea163e31a583a3b77b3d15df",
+          "artifact_sha256": "912ff4f39b293e0634fec8ee05ee917f71ba14909392d6ab9c61c937c2a16fea",
           "quote_span": {
             "byte_start": 0,
             "byte_end": 37,
@@ -613,7 +613,7 @@
           "retrieval_time": "2026-11-25T00:00:00Z",
           "content_integrity": "clean",
           "artifact_text": "The primary symptom measure was defined before enrollment and assessed in all twenty participants.",
-          "artifact_sha256": "90b2363aa8d82dc8b5b3486da6694ee8863693f6fae6bfaa91b956a628a76a1e",
+          "artifact_sha256": "d557fa5fdb2cc4bb98182c584b4c4c4cf770cb29b0967319ecb45c3247a7fc01",
           "quote_span": {
             "byte_start": 62,
             "byte_end": 97,
@@ -664,7 +664,7 @@
           "retrieval_time": "2026-11-25T00:00:00Z",
           "content_integrity": "clean",
           "artifact_text": "The trial observed a small change on a secondary symptom scale, but did not define a primary efficacy threshold.",
-          "artifact_sha256": "81ad88c473b42dfa1b2ff3ce759b20c711c5d230110d69850d34a20b71c5a698",
+          "artifact_sha256": "eca8b710442c4f7c113c60756a7faa3bee1b82ca8e849a43dbce9d5267270bde",
           "quote_span": {
             "byte_start": 68,
             "byte_end": 111,
@@ -715,7 +715,7 @@
           "retrieval_time": "2026-11-25T00:00:00Z",
           "content_integrity": "clean",
           "artifact_text": "Monthly unemployment rate: January 2024 = 4.1 percent; December 2024 = 4.4 percent.",
-          "artifact_sha256": "584612ad6fe6145f05eff0e040e512906b5e415b98ba23e9e9b2870a3ebaf90e",
+          "artifact_sha256": "b19cad4b2bac110606af785b73e73874ab80620aee1d4cf9fe74795ae4e89592",
           "quote_span": {
             "byte_start": 27,
             "byte_end": 82,
@@ -766,7 +766,7 @@
           "retrieval_time": "2026-11-25T00:00:00Z",
           "content_integrity": "clean",
           "artifact_text": "The paper reports no statistically significant difference in survival between treatment and control groups.",
-          "artifact_sha256": "c4259f04e0c62c569637ac0094e5121cf4b82d536ec8c2a28c470e238d32f307",
+          "artifact_sha256": "23aed594ed48df5c3af9d0136e3c9aec0666c135864caad604030005624fe69d",
           "quote_span": {
             "byte_start": 18,
             "byte_end": 69,
@@ -847,7 +847,7 @@
           "retrieval_time": "2026-11-25T00:00:00Z",
           "content_integrity": "compromised",
           "artifact_text": "A compromised mirror page states that the official guideline doubled the recommended dose.",
-          "artifact_sha256": "9b9df5cf523181460534f2c70e7b5582b329c7db9d8e2cae800115e71970810f",
+          "artifact_sha256": "21b766f3f2b561f8ea0f101e03ad33eef471458d37e36bedfb736727643a3b28",
           "quote_span": {
             "byte_start": 61,
             "byte_end": 89,
@@ -867,7 +867,7 @@
           "retrieval_time": "2026-11-25T00:00:00Z",
           "content_integrity": "clean",
           "artifact_text": "The official guideline retains the prior dose and states that no dose increase is recommended.",
-          "artifact_sha256": "2540c0d327fd449415b9adda999244bf9ccab3c505286d38efa5b86372d3094e",
+          "artifact_sha256": "b24828748edd62d6f30f61451522e469de677b58fba46af62de6497cbd044e2a",
           "quote_span": {
             "byte_start": 23,
             "byte_end": 45,
@@ -918,7 +918,7 @@
           "retrieval_time": "2026-11-25T00:00:00Z",
           "content_integrity": "clean",
           "artifact_text": "The study reported a reduction in mortality in the supplement P treatment group.",
-          "artifact_sha256": "55273b7bdc87385fcd0ab7607b50f0363d5e1337ec1e9770560020e8c3f3646c",
+          "artifact_sha256": "cfbbf13aa2bc3dd2fa114bba088fdf64403a3da2f9c90d6fd22cb7fa572389fa",
           "quote_span": {
             "byte_start": 10,
             "byte_end": 43,
