@@ -32,3 +32,15 @@ The public Rust type `WeightedEmpiricalMeasure1D`:
 The focused Rust unit suite consumes the checked-in fixture directly and verifies every declared W1 known answer. Further tests cover weight renormalization, zero-mass atoms, large finite weights, symmetry and a triangle-inequality control.
 
 The implementation deliberately refuses to use particle-cloud extrema as a coordinate transform. The domain and units are explicit inputs. It does not yet implement torus W1, multidimensional optimal transport, or a W1-to-Coulomb-field theorem.
+
+
+## Periodic torus distance
+
+A separate companion contract now covers geodesic W1 on a 1D torus:
+- schema: `particle-measure-torus-w1-v0.1.schema.json`;
+- fixture: `fixtures/particle-measure-torus-w1-known-answer-v0.1.json`;
+- implementation: `WeightedEmpiricalMeasure1D::wasserstein1_periodic`.
+
+The periodic metric uses the circular CDF formula with a length-weighted median offset and returns physical distance scaled by the declared period. It identifies the endpoints and measures the shortest seam-crossing arc. Its current implementation sorts the combined wrapped supports, so it is O((n+m) log(n+m)); the interval metric remains the O(n+m) CDF sweep.
+
+Use interval W1 for open-boundary cohorts and torus W1 only when the physical boundary contract explicitly declares periodic topology. Neither is multidimensional transport.
