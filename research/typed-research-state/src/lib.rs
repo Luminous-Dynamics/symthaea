@@ -339,18 +339,22 @@ fn validate_quote_span(value: &Value, path: &str, issues: &mut Vec<ValidationIss
     digest_string(map, "quote_sha256", path, issues);
 }
 
+struct RelationValidationContext<'a> {
+    claim_id: &'a str,
+    evidence_ids: &'a HashMap<String, Option<String>>,
+    prefix_sha256: &'a str,
+    classified_authorities: &'a mut HashSet<String>,
+    supports: &'a mut HashSet<String>,
+    refutes: &'a mut HashSet<String>,
+}
+
 fn validate_relation(
     value: &Value,
     index: usize,
-    claim_id: &str,
-    evidence_ids: &HashMap<String, Option<String>>,
-    prefix_sha256: &str,
-    classified_authorities: &mut HashSet<String>,
-    supports: &mut HashSet<String>,
-    refutes: &mut HashSet<String>,
+    context: &mut RelationValidationContext<'_>,
     issues: &mut Vec<ValidationIssue>,
 ) {
-    let path = format!("claims[{claim_id}].evidence_relations[{index}]");
+    let path = format!("claims[{}].evidence_relations[{index}]", context.claim_id);
     let Some(map) = object(value, &path, issues) else {
         return;
     };
@@ -362,11 +366,11 @@ fn validate_relation(
         "quote_span",
     ];
     exact_keys(map, KEYS, &path, issues);
-    if string(map, "claim_id", &path, issues) != Some(claim_id) {
+    if string(map, "claim_id", &path, issues) != Some(context.claim_id) {
         issue(issues, format!("{path}.claim_id"), "relation claim_id must match containing claim");
     }
     let evidence_id = string(map, "evidence_id", &path, issues).map(str::to_owned);
-    let family = evidence_id.as_ref().and_then(|id| evidence_ids.get(id)).cloned();
+    let family = evidence_id.as_ref().and_then(|id| context.evidence_ids.get(id)).cloned();
     if family.is_none() {
         issue(issues, format!("{path}.evidence_id"), "relation references missing evidence");
     }
@@ -395,12 +399,12 @@ fn validate_relation(
             .or_else(|| evidence_id.as_ref().map(|id| format!("unknown-origin:{id}")));
         if relation == "SUPPORTS" {
             if let Some(origin) = origin.as_ref() {
-                supports.insert(origin.clone());
+                context.supports.insert(origin.clone());
             }
         }
         if relation == "REFUTES" {
             if let Some(origin) = origin.as_ref() {
-                refutes.insert(origin.clone());
+                context.refutes.insert(origin.clone());
             }
         }
     }
@@ -418,7 +422,7 @@ fn validate_relation(
             let classifier = validate_classifier(
                 map.get("classifier_provenance").unwrap(),
                 &format!("{path}.classifier_provenance"),
-                prefix_sha256,
+                context.prefix_sha256,
                 issues,
             );
             if let Some(classifier) = classifier {
@@ -497,14 +501,18 @@ fn validate_adjudication(
     }
 }
 
+struct UsabilityValidationContext<'a> {
+    decision_id: &'a str,
+    risk_class: &'a str,
+    adjudicated: bool,
+    adjudication_result: Option<&'a str>,
+    has_conflict: bool,
+}
+
 fn validate_usability(
     value: &Value,
     path: &str,
-    decision_id: &str,
-    risk_class: &str,
-    adjudicated: bool,
-    adjudication_result: Option<&str>,
-    has_conflict: bool,
+    context: &UsabilityValidationContext<'_>,
     issues: &mut Vec<ValidationIssue>,
 ) {
     let Some(map) = object(value, path, issues) else {
@@ -526,7 +534,7 @@ fn validate_usability(
     }) {
         issue(issues, format!("{path}.status"), "unknown decision-usability status");
     }
-    if string(map, "decision_scope_id", path, issues) != Some(decision_id) {
+    if string(map, "decision_scope_id", path, issues) != Some(context.decision_id) {
         issue(issues, format!("{path}.decision_scope_id"), "usability must be scoped to the active decision");
     }
     string(map, "policy_id", path, issues);
@@ -537,12 +545,12 @@ fn validate_usability(
             }
         }
     }
-    if status == Some("SUFFICIENT") && has_conflict {
+    if status == Some("SUFFICIENT") && context.has_conflict {
         issue(issues, format!("{path}.status"), "conflicting support/refutation cannot be decision-sufficient");
     }
     if status == Some("SUFFICIENT")
-        && ["HIGH", "CRITICAL"].contains(&risk_class)
-        && (!adjudicated || adjudication_result != Some("SUPPORTED"))
+        && ["HIGH", "CRITICAL"].contains(&context.risk_class)
+        && (!context.adjudicated || context.adjudication_result != Some("SUPPORTED"))
     {
         issue(
             issues,
@@ -709,17 +717,15 @@ pub fn validate_state(input: &str) -> Result<ValidationReport, Vec<ValidationIss
         if let Some(relations) = array(claim, "evidence_relations", &path, &mut issues) {
             relation_count += relations.len();
             for (relation_index, relation) in relations.iter().enumerate() {
-                validate_relation(
-                    relation,
-                    relation_index,
-                    &claim_id,
-                    &evidence_ids,
-                    &prefix_sha256,
-                    &mut classifier_ids,
-                    &mut support_families,
-                    &mut refute_families,
-                    &mut issues,
-                );
+                let mut relation_context = RelationValidationContext {
+                    claim_id: &claim_id,
+                    evidence_ids: &evidence_ids,
+                    prefix_sha256: &prefix_sha256,
+                    classified_authorities: &mut classifier_ids,
+                    supports: &mut support_families,
+                    refutes: &mut refute_families,
+                };
+                validate_relation(relation, relation_index, &mut relation_context, &mut issues);
                 if let Some(relation_map) = relation.as_object() {
                     if let (Some(claim_ref), Some(evidence_ref)) = (
                         relation_map.get("claim_id").and_then(Value::as_str),
@@ -749,14 +755,17 @@ pub fn validate_state(input: &str) -> Result<ValidationReport, Vec<ValidationIss
         };
         let has_conflict = !support_families.is_empty() && !refute_families.is_empty();
         if let Some(usability) = claim.get("decision_usability") {
+            let usability_context = UsabilityValidationContext {
+                decision_id: &decision_id,
+                risk_class: &risk_class,
+                adjudicated,
+                adjudication_result: result.as_deref(),
+                has_conflict,
+            };
             validate_usability(
                 usability,
                 &format!("{path}.decision_usability"),
-                &decision_id,
-                &risk_class,
-                adjudicated,
-                result.as_deref(),
-                has_conflict,
+                &usability_context,
                 &mut issues,
             );
         } else {
