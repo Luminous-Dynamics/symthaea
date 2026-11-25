@@ -15,6 +15,7 @@ on:
       - "benchmarks/plasma/micro-macro/**"
       - "benchmarks/plasma/control-interface/**"
       - "benchmarks/plasma/adaptive-refinement/**"
+      - "benchmarks/plasma/positivity-projection/**"
       - ".github/workflows/plasma-probes.yml"
   pull_request:
     branches: [main]
@@ -30,6 +31,7 @@ on:
       - "benchmarks/plasma/micro-macro/**"
       - "benchmarks/plasma/control-interface/**"
       - "benchmarks/plasma/adaptive-refinement/**"
+      - "benchmarks/plasma/positivity-projection/**"
       - ".github/workflows/plasma-probes.yml"
   workflow_dispatch:
 
