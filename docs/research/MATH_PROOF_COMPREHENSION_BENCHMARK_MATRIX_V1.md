@@ -478,3 +478,13 @@ The `And.comm` proof-action pilot has two more fail-closed controls in the focus
 - **Injected-axiom detection:** a separate Lean source deliberately introduces `ProofActionCertificateAxiomControl.injected_premise` and proves a proposition from it. The workflow requires Lean's `#print axioms` output to contain that exact declaration name, and stores the source/log digests in the action-certificate replay receipt. This tests one known dependency-detection path rather than accepting arbitrary kernel-checked terms without scrutiny.
 
 **Status:** these checks are committed to the focused workflow, but they remain pending exact-head execution. Their claim ceiling is narrow: one omitted-subgoal mutation, one wrong-proposition rejection and one explicit injected-axiom observation. General proof-graph accounting and a parsed transitive axiom/admission closure are still future work.
+
+## 21. Independent imported-inductive trust-closure audit (2026-11-25)
+
+A new research lane, [#13575](https://github.com/Luminous-Dynamics/symthaea/issues/13575), tests a known limitation in native axiom reporting. Lean issue [#15226](https://github.com/leanprover/lean4/issues/15226) describes under-reporting through a shared imported-inductive axiom cache in affected Lean versions. The exact pinned Symthaea toolchain is Lean `4.37.0-rc1`; whether the issue reproduces there is being tested, not assumed.
+
+The source-pinned two-module reproduction has an imported structure `S9` with a field depending on `Classical.choice`, then audits three roots through the import boundary. A fresh per-root DFS also audits `And.comm` plus the four local proof-action certificate roots. It disables exporting, reads kernel constant information, traverses types and values plus inductive constructors, uses a visited set only, and preserves unresolved names so exact-set validation fails closed.
+
+**Status:** source, manifest, schema and focused workflow integration are committed. The new run is pending exact-head execution. The receipt is separate from native `#print axioms` diagnostics; no general or verified trust-closure claim is made.
+
+**Prospective targets:** 100% seeded direct/transitive dependency detection; zero false negatives across imported, mutual and nested inductive controls; deterministic exact closure; fail-closed behavior for unresolved constants; independent agreement with a second oracle. These are targets, not measured benchmark scores.
