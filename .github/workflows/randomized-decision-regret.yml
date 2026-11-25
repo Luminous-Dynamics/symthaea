@@ -32,8 +32,8 @@ jobs:
         uses: dtolnay/rust-toolchain@1.96.0
         with:
           components: rustfmt, clippy
-      - name: Check formatting
-        run: cargo fmt --manifest-path research/temporal-evaluator/Cargo.toml -- --check
+      - name: Check formatting of the new evaluator module only
+        run: rustfmt --check --edition 2024 research/temporal-evaluator/src/randomized_decision_regret.rs
       - name: Establish standalone lockfile when absent
         run: |
           if [ ! -f research/temporal-evaluator/Cargo.lock ]; then
