@@ -80,6 +80,38 @@ Especially important:
 
 Proposed gate: every applicable deterministic integrity attack must be rejected or reported on the read path before memory is supplied as context to an agent. Audit-only detection is reported separately and is not equivalent to read-time prevention. A hash chain without a protected external anchor is not a T9/T10 defense.
 
+### 2.6 Interdependent multi-session and poisoning benchmarks
+
+Keep these protocols as separate external result lanes; they expose different missing capabilities.
+
+- **MemoryArena (ICML 2026):** multi-session Memory-Agent-Environment tasks with interdependent subtasks across web navigation, preference-constrained planning, progressive information search and sequential formal reasoning. Its central finding is that near-saturated long-context recall does not guarantee strong agentic memory performance. Use it to measure whether experiences acquired in earlier sessions improve later task decisions.
+- **MemoryDojo (November 2026):** 155 multi-session long-horizon trajectories across four domains and five memory systems. It traces poison persistence, propagation, retrieval and downstream behavioral influence. Use it alongside—not instead of—the controlled Write–Execute–Forget protocol.
+- **MemSecBench (July 2026):** 310 cases across 48 contexts and a 24-configuration harness/backend/model matrix. Its published configurations report malicious-memory persistence in 84.2% of cases, full Write–Execute success in 50.3%, and selective repair in 56.1% of successfully poisoned cases. These are protocol/configuration-specific findings, not universal rates. Use its seven lifecycle checkpoints and selective-repair protocol without pooling its metrics with MemoryDojo.
+- **WorldMemArena:** retain the 400-task multimodal Action–World Interaction evaluation as its own lane. Its Lifelong Evolution regime tests evolving personal/project state; Agentic Execution tests memory built from GUI, visual and embodied action feedback. Require stage-level reporting for write, maintain, retrieve and use; a good write score does not establish good downstream action.
+- **MemoryArena and AMA-Bench are different benchmarks.** Preserve the existing AMA-Bench result/target separately from MemoryArena's interdependent multi-session gym. Do not transfer one paper's baseline or reported improvement to the other.
+
+Proposed MACE use:
+1. Reproduce the published benchmark protocols and strongest public baselines under exact model, harness, tool, memory-budget and latency settings.
+2. Add MACE-specific provenance, authority, lifecycle and counterfactual instrumentation as a separately labelled overlay; do not alter official benchmark inputs or scorer.
+3. Report stage failures, task success, unsafe action, causal influence, repair, benign preservation, latency and all-in cost separately.
+4. Use paired clean/poisoned/repaired episodes, with evaluator labels sealed until all candidate traces are committed.
+
+### 2.7 At-rest integrity and erasure protocol controls
+
+The current Agent Memory Integrity Internet-Draft -00 (published 1 November 2026) adds T10 and explicitly requires three controls. It remains an individual work-in-progress Internet-Draft, not an adopted IETF standard.
+
+- **T9:** restore a complete pre-write store after a genuine write.
+- **T10:** restore a complete pre-erasure store after the SUT has acknowledged erasure through its own interface.
+- **C1:** no-op reload preserves the seeded memory without an integrity signal.
+- **C2:** a genuine write after restart is accepted and served.
+- **C3:** the evaluator verifies that the exact intended edit landed and nothing else changed before restart.
+
+Each case starts from a fresh seeded copy; the SUT is stopped during the external storage edit/restore; the result is obtained through the ordinary read path. Rejected and read-time Reported count as passes; audit-only Reported is partial; Accepted is failure. Not Applicable and edit Error have explicit reasons and are excluded from the denominator, never treated as passes.
+
+MACE should publish separate T9 and T10 rates, plus read-time versus audit-only detection. A successful erasure API response is not a T10 pass. A monotonic write counter is not sufficient: erasure must be included in the independently protected current-state commitment.
+
+The new control-aware validator [#13657](https://github.com/Luminous-Dynamics/symthaea/pull/13657) enforces C1/C2, derives C3 from exact transition evidence, and scores T9/T10 separately. It is a result validator, not a live SUT snapshot/restore adapter; real storage adapters and independent witness custody remain required.
+
 ## 3. Internal MACE Decision Memory Benchmark
 
 ### 3.1 DecisionNeed contract
@@ -246,6 +278,9 @@ The benchmark protocols, leaderboard values and scope statements above should be
 - **Memora / FAMA, Findings of ACL 2026:** https://aclanthology.org/2026.findings-acl.1337/ . FAMA penalizes reliance on obsolete or invalidated memory.
 - **TimlMemBench, Findings of EMNLP 2026:** https://aclanthology.org/2026.findings-emnlp.507/ . The paper describes 208 reviewed bilingual samples, 1,566 sessions, 1,715 questions and 1,821 governance/activation cases.
 - **Agent Memory Integrity Internet-Draft:** https://datatracker.ietf.org/doc/draft-khandelwal-bpm-agent-memory-integrity/ . This is a work-in-progress Internet-Draft, not an RFC or IETF standard. It specifies T9 whole-store rollback and T10 erasure resurrection; report not-applicable controls separately from passes.
+- **MemoryArena, ICML 2026:** https://proceedings.mlr.press/v306/he26am.html . Multi-session interdependent agentic tasks; its evaluation shows that recall-centric memory scores can miss downstream task performance.
+- **MemoryDojo, November 2026:** https://arxiv.org/abs/2611.09721 . 155 multi-session poisoning trajectories across four domains and five memory systems.
+- **MemSecBench, July 2026:** https://arxiv.org/abs/2607.27080 . 310 Write–Execute–Forget cases, 48 contexts, seven lifecycle checkpoints and selective repair.
 
 ## 8. Current MACE state and immediate sequencing
 
@@ -253,8 +288,12 @@ The benchmark protocols, leaderboard values and scope statements above should be
 - Exact receipt/invocation binding and full journal-history append validation are follow-on draft PRs #13587 and #13588.
 - LMEv2 operation-to-candidate and parent-lineage binding is a further draft PR #13589.
 - The pinned Ed25519 verifier and binding-aware projection are being brought onto the V2 runtime by draft PR #13590.
-- The sidecar still does not consume an external qualification receipt; the current context results remain unqualified.
-- The full adapter suite reported in the V2 implementation update had 125 passes and 5 failures. Follow-on PR tests are authored but unexecuted, no hosted CI pass is claimed, and no external benchmark is reproduced by these code changes.
+- The sidecar still does not consume an independently operated qualification service; the current context results remain unqualified. Draft #13586–#13590 form the V2 runtime/receipt/qualification stack and remain separate from the sealed evaluator and lifecycle work below.
+- #13625 adds consumer-side exact sealed assignment/artifact/preregistration verification and binds the roots to the detached evaluator witness. Its tests remain authored, not executed.
+- #13655 adds Rust RFC 9162 inclusion/consistency proof verification; the exact MACE-to-MON-005 leaf projection and authenticated proof-provider adapter remain pending.
+- #13657 adds a control-aware T9/T10 result validator with separate score families; a live SUT storage snapshot/restore adapter remains pending.
+- The previously reported V2 adapter suite had 125 passes and 5 failures. Do not erase those failures in a later green summary; preserve attempt history and re-run the exact subject.
+- No Rust compile/test, hosted CI pass, independent reproduction, production witness deployment, or external benchmark reproduction is claimed by these additions.
 
 Recommended execution order:
 1. Triage the five existing failing adapter tests without weakening gates.
