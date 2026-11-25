@@ -1077,8 +1077,13 @@ pub struct ResponseWeightedRefinementPlan {
 ///
 /// All input modes must have exactly one complex coefficient and one positive
 /// encoded-byte count. Every output mode has a finite, non-negative QoI weight;
-/// at least one weight must be positive. Any unmeasured response entry prevents
-/// that input mode from being discarded.
+/// at least one weight must be positive. Callers must scale each weight into the
+/// declared normalized QoI error units before invoking this function. Any
+/// unmeasured response entry prevents that input mode from being discarded.
+///
+/// The result is a first-order empirical indicator conditional on the supplied
+/// response matrix. It is not a certified nonlinear truncation bound; that
+/// requires a separately validated sensitivity / remainder contract.
 pub fn plan_response_weighted_refinement(
     response: &ModeResponseMatrix,
     coefficients: &[(u32, ComplexResponse)],
