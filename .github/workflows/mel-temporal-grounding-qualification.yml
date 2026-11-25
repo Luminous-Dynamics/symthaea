@@ -158,6 +158,10 @@ jobs:
             and .disposition_alpha_source_work_bootstrap.estimate < 0.42
             and .disposition_alpha_source_work_bootstrap.percentile_95_low != null
             and .disposition_alpha_source_work_bootstrap.percentile_95_high != null
+            and .disposition_alpha_source_work_bootstrap.valid_fraction >= 0.9
+            and .disposition_alpha_source_work_bootstrap.estimate >= .disposition_alpha.alpha
+            and .disposition_alpha_source_work_bootstrap.percentile_95_low <= .disposition_alpha.alpha
+            and .disposition_alpha_source_work_bootstrap.percentile_95_high >= .disposition_alpha.alpha
           ' "$RUNNER_TEMP/temporal-reliability-report.json" > /dev/null
 
       - name: Replay paired temporal revision when module is present
