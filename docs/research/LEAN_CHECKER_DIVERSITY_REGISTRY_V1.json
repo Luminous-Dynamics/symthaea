@@ -342,5 +342,19 @@
     "nanoda and con-leche are documented independently implemented checkers; their own trust assumptions and input/parser paths remain explicit.",
     "Unknown relationships are not treated as independence.",
     "No scalar diversity or independence score is emitted."
-  ]
+  ],
+  "scope": "lake_comparator_paranoid_bundle_only",
+  "external_landscape": {
+    "source_url": "https://arena.lean-lang.org/",
+    "captured_date": "2026-11-25",
+    "snapshot_issue": "https://github.com/Luminous-Dynamics/symthaea/issues/13643",
+    "visible_checker_count": 37,
+    "reported_languages": 15,
+    "downloadable_suite": {
+      "good_tests": 138,
+      "bad_tests": 92
+    },
+    "round_status": "mutable_current_round_not_archived",
+    "note": "This is a separate wider Arena ecosystem; it is not part of the six-checker comparator bundle registry."
+  }
 }
