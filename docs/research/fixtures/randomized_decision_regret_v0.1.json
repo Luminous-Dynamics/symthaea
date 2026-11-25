@@ -3,7 +3,6 @@
   "status": "semantic_fixture_not_empirical_result",
   "probability_scale_ppm": 1000000,
   "candidate_policy": {
-    "digest_hex": "0909090909090909090909090909090909090909090909090909090909090909",
     "action_probabilities": [
       {
         "action_id": "left",
@@ -13,7 +12,8 @@
         "action_id": "right",
         "probability_ppm": 500000
       }
-    ]
+    ],
+    "candidate_policy_artifact_sha256": "0909090909090909090909090909090909090909090909090909090909090909"
   },
   "candidate_view": {
     "observation_history_digest_hex": "0101010101010101010101010101010101010101010101010101010101010101",
