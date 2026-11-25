@@ -1056,6 +1056,54 @@ mod tests {
     }
 
     #[test]
+    fn exhaustive_two_of_three_source_work_ratio_oracle_matches_sampling_variance() {
+        let mut seen = BTreeSet::new();
+        let mut risks = Vec::new();
+        let mut risk_variances = Vec::new();
+
+        for seed in 1_u64..=512 {
+            let input = base_input(dataset(seed, 3, 2));
+            let planned = plan_annotation_acquisition(&input.dataset).unwrap();
+            let selected: BTreeSet<_> = planned
+                .probability_audit
+                .iter()
+                .map(|selection| selection.source_work_id_sha256.clone())
+                .collect();
+            if selected.len() != 2 || !seen.insert(selected) {
+                continue;
+            }
+            let mut input = input;
+            for outcome in &mut input.observed_probability_audit_outcomes {
+                if outcome.source_work_id_sha256 == digest('a') {
+                    outcome.decision_correct = false;
+                    outcome.unconditional_answer_correct = false;
+                }
+            }
+            let report = audit_selective_design_risk(&input).unwrap();
+            let point = &report.risk_coverage[0];
+            risks.push(point.item_weighted_selective_risk.as_ref().unwrap().estimate);
+            risk_variances.push(
+                point
+                    .item_weighted_selective_risk
+                    .as_ref()
+                    .unwrap()
+                    .standard_error
+                    .unwrap()
+                    .powi(2),
+            );
+            if seen.len() == 3 {
+                break;
+            }
+        }
+
+        assert_eq!(seen.len(), 3);
+        let mean_risk = risks.iter().sum::<f64>() / risks.len() as f64;
+        let mean_variance = risk_variances.iter().sum::<f64>() / risk_variances.len() as f64;
+        assert!((mean_risk - (1.0 / 3.0)).abs() < 1e-10);
+        assert!((mean_variance - (1.0 / 18.0)).abs() < 1e-10);
+    }
+
+    #[test]
     fn one_selected_work_from_a_larger_population_withholds_variance() {
         let mut data = dataset(21, 3, 2);
         data.config.stratum_quotas[0].audit_source_work_count = 1;
