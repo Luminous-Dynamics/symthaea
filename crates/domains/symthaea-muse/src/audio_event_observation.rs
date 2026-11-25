@@ -78,6 +78,90 @@ pub struct AudioEventObservationReceiptV1 {
     pub receipt_sha256: String,
 }
 
+pub const AUDIO_EVENT_BOUNDARY_SCHEMA_V1: &str =
+    "muse-audio-event-boundary-observation-v1";
+pub const AUDIO_EVENT_BOUNDARY_DEFAULT_SEARCH_MARGIN_MS_V1: u32 = 250;
+pub const AUDIO_EVENT_BOUNDARY_MAX_SEARCH_MARGIN_MS_V1: u32 = 2_000;
+pub const AUDIO_EVENT_BOUNDARY_ANALYSIS_WINDOW_MS_V1: u32 = 10;
+pub const AUDIO_EVENT_BOUNDARY_ANALYSIS_HOP_MS_V1: u32 = 5;
+pub const AUDIO_EVENT_BOUNDARY_MIN_CONTRAST_DB_V1: f64 = 6.0;
+
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize)]
+pub enum AudioEventBoundaryStatusV1 {
+    Measured,
+    InsufficientPreEventContext,
+    InsufficientContrast,
+    OnsetOutsideSearchWindow,
+    ActivityEndOutsideSearchWindow,
+    InsufficientOnsetEvidence,
+    TruncatedByAudio,
+}
+
+#[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
+pub struct AudioEventBoundaryObservationV1 {
+    pub source_note_ordinal: usize,
+    pub part_id: u16,
+    pub segment_id: String,
+    pub instrument_id: String,
+    pub expected_start_frame: u64,
+    pub expected_end_frame: u64,
+    pub search_start_frame: u64,
+    pub search_end_frame: u64,
+    pub observed_acoustic_activity_start_frame: Option<u64>,
+    pub observed_acoustic_activity_end_frame: Option<u64>,
+    /// Signed observed-start minus expected-MIDI-start, in sample frames.
+    pub acoustic_onset_delta_frames: Option<i64>,
+    /// Signed acoustic-activity-end minus expected-MIDI-end, not a note-off error.
+    pub acoustic_activity_end_delta_frames: Option<i64>,
+    pub baseline_rms: Option<f64>,
+    pub peak_rms: Option<f64>,
+    pub onset_contrast_db: Option<f64>,
+    pub activity_end_contrast_db: Option<f64>,
+    pub onset_status: AudioEventBoundaryStatusV1,
+    pub activity_end_status: AudioEventBoundaryStatusV1,
+}
+
+#[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
+pub struct AudioEventBoundaryObservationReceiptV1 {
+    pub schema: String,
+    pub detector_version: String,
+    pub score_sha256: String,
+    pub midi_sha256: String,
+    pub midi_manifest_sha256: String,
+    pub wav_sha256: String,
+    pub wav_info: AudioEventObservationWavInfoV1,
+    pub search_margin_ms: u32,
+    pub analysis_window_frames: u32,
+    pub analysis_hop_frames: u32,
+    pub note_observations: Vec<AudioEventBoundaryObservationV1>,
+    pub source_attribution_established: bool,
+    pub limitations: Vec<String>,
+    pub receipt_sha256: String,
+}
+
+#[derive(Serialize)]
+struct BoundaryReceiptCommitmentV1<'a> {
+    schema: &'a str,
+    detector_version: &'a str,
+    score_sha256: &'a str,
+    midi_sha256: &'a str,
+    midi_manifest_sha256: &'a str,
+    wav_sha256: &'a str,
+    wav_info: &'a AudioEventObservationWavInfoV1,
+    search_margin_ms: u32,
+    analysis_window_frames: u32,
+    analysis_hop_frames: u32,
+    note_observations: &'a [AudioEventBoundaryObservationV1],
+    source_attribution_established: bool,
+    limitations: &'a [String],
+}
+
+#[derive(Debug, Clone, Copy)]
+struct ActivityEnvelopeFrameV1 {
+    center_frame: u64,
+    rms: f64,
+}
+
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
 pub enum AudioEventObservationIssueV1 {
     WrongMidiSchema,
@@ -98,6 +182,7 @@ pub enum AudioEventObservationIssueV1 {
     ReceiptInputBindingMismatch,
     ReceiptNoteCoverageMismatch,
     ReceiptEventMismatch { ordinal: usize },
+    InvalidBoundarySearchMargin,
 }
 
 #[derive(Serialize)]
@@ -710,6 +795,356 @@ pub fn observe_rendered_audio_events_v1(
     receipt.receipt_sha256 = audio_event_observation_commitment_v1(&receipt)
         .map_err(|_| vec![AudioEventObservationIssueV1::ReceiptDigestMismatch])?;
     Ok(receipt)
+}
+
+fn signed_frame_delta(observed: u64, expected: u64) -> Option<i64> {
+    if observed >= expected {
+        i64::try_from(observed - expected).ok()
+    } else {
+        i64::try_from(expected - observed).ok().map(|delta| -delta)
+    }
+}
+
+fn activity_envelope_v1(
+    wav: &DecodedWavV1,
+    window_frames: usize,
+    hop_frames: usize,
+) -> Vec<ActivityEnvelopeFrameV1> {
+    let channels = usize::from(wav.info.channels);
+    let frame_count = wav.info.frame_count as usize;
+    if channels == 0 || window_frames == 0 || hop_frames == 0 || frame_count < window_frames {
+        return Vec::new();
+    }
+
+    let mut envelope = Vec::with_capacity((frame_count - window_frames) / hop_frames + 1);
+    for start in (0..=frame_count - window_frames).step_by(hop_frames) {
+        let mut energy = 0.0_f64;
+        for frame in start..start + window_frames {
+            let base = frame * channels;
+            for channel in 0..channels {
+                let sample = f64::from(wav.interleaved_samples[base + channel]);
+                energy += sample * sample;
+            }
+        }
+        let sample_count = (window_frames * channels) as f64;
+        envelope.push(ActivityEnvelopeFrameV1 {
+            center_frame: (start + window_frames / 2) as u64,
+            rms: (energy / sample_count).sqrt(),
+        });
+    }
+    envelope
+}
+
+fn median_f64(values: &[f64]) -> Option<f64> {
+    if values.is_empty() {
+        return None;
+    }
+    let mut sorted = values.to_vec();
+    sorted.sort_by(f64::total_cmp);
+    let middle = sorted.len() / 2;
+    Some(if sorted.len() % 2 == 0 {
+        (sorted[middle - 1] + sorted[middle]) * 0.5
+    } else {
+        sorted[middle]
+    })
+}
+
+fn amplitude_contrast_db(peak: f64, baseline: f64) -> f64 {
+    20.0 * ((peak + 1e-9) / (baseline + 1e-9)).log10()
+}
+
+fn observe_activity_boundaries_v1(
+    envelope: &[ActivityEnvelopeFrameV1],
+    wav_frame_count: u64,
+    note: &crate::midi_performance::MidiPerformanceNoteReceiptV1,
+    tempo_us: u32,
+    ppq: u16,
+    sample_rate_hz: u32,
+    search_margin_ms: u32,
+    analysis_window_frames: u32,
+    analysis_hop_frames: u32,
+) -> AudioEventBoundaryObservationV1 {
+    let expected_start = expected_frame(note.start_tick, tempo_us, ppq, sample_rate_hz)
+        .unwrap_or(u64::MAX);
+    let expected_end = expected_frame(note.end_tick, tempo_us, ppq, sample_rate_hz)
+        .unwrap_or(u64::MAX);
+    let margin_numerator = u64::from(sample_rate_hz) * u64::from(search_margin_ms);
+    let margin_frames = margin_numerator.div_ceil(1_000);
+    let half_margin = margin_frames / 2;
+    let search_start = expected_start.saturating_sub(margin_frames);
+    let search_end = expected_end.saturating_add(margin_frames);
+    let observed_search_end = search_end.min(wav_frame_count);
+
+    let mut result = AudioEventBoundaryObservationV1 {
+        source_note_ordinal: note.source_note_ordinal,
+        part_id: note.part_id,
+        segment_id: note.segment_id.clone(),
+        instrument_id: note.instrument_id.clone(),
+        expected_start_frame: expected_start,
+        expected_end_frame: expected_end,
+        search_start_frame: search_start,
+        search_end_frame: search_end,
+        observed_acoustic_activity_start_frame: None,
+        observed_acoustic_activity_end_frame: None,
+        acoustic_onset_delta_frames: None,
+        acoustic_activity_end_delta_frames: None,
+        baseline_rms: None,
+        peak_rms: None,
+        onset_contrast_db: None,
+        activity_end_contrast_db: None,
+        onset_status: AudioEventBoundaryStatusV1::InsufficientPreEventContext,
+        activity_end_status: AudioEventBoundaryStatusV1::InsufficientPreEventContext,
+    };
+
+    if expected_start == u64::MAX
+        || expected_end == u64::MAX
+        || expected_end <= expected_start
+        || expected_end > wav_frame_count
+    {
+        result.onset_status = AudioEventBoundaryStatusV1::TruncatedByAudio;
+        result.activity_end_status = AudioEventBoundaryStatusV1::TruncatedByAudio;
+        return result;
+    }
+
+    // The first half of the bounded pre-event margin establishes a local
+    // baseline. If there is not enough pre-event audio, do not invent an onset.
+    if expected_start < margin_frames {
+        result.onset_status = AudioEventBoundaryStatusV1::InsufficientPreEventContext;
+        result.activity_end_status = AudioEventBoundaryStatusV1::InsufficientPreEventContext;
+        return result;
+    }
+    let baseline_start = expected_start - margin_frames;
+    let baseline_end = expected_start - half_margin;
+    let baseline_values: Vec<_> = envelope
+        .iter()
+        .filter(|frame| {
+            frame.center_frame >= baseline_start && frame.center_frame < baseline_end
+        })
+        .map(|frame| frame.rms)
+        .collect();
+    let Some(baseline) = median_f64(&baseline_values) else {
+        return result;
+    };
+    if baseline_values.len() < 3 {
+        return result;
+    }
+    result.baseline_rms = Some(baseline);
+
+    let onset_search_start = expected_start.saturating_sub(half_margin);
+    let onset_search_end = expected_start.saturating_add(half_margin);
+    let region_peak = envelope
+        .iter()
+        .filter(|frame| {
+            frame.center_frame >= onset_search_start
+                && frame.center_frame <= observed_search_end
+        })
+        .map(|frame| frame.rms)
+        .fold(0.0_f64, f64::max);
+    result.peak_rms = Some(region_peak);
+    let contrast_db = amplitude_contrast_db(region_peak, baseline);
+    result.onset_contrast_db = Some(contrast_db);
+    result.activity_end_contrast_db = Some(contrast_db);
+
+    if contrast_db < AUDIO_EVENT_BOUNDARY_MIN_CONTRAST_DB_V1 {
+        result.onset_status = AudioEventBoundaryStatusV1::InsufficientContrast;
+        result.activity_end_status = AudioEventBoundaryStatusV1::InsufficientContrast;
+        return result;
+    }
+
+    let threshold = baseline + 0.2 * (region_peak - baseline);
+    let onset_candidates: Vec<_> = envelope
+        .iter()
+        .filter(|frame| {
+            frame.center_frame >= onset_search_start
+                && frame.center_frame <= onset_search_end
+        })
+        .collect();
+    let mut onset_index = None;
+    for index in 0..onset_candidates.len().saturating_sub(1) {
+        if onset_candidates[index].rms >= threshold
+            && onset_candidates[index + 1].rms >= threshold
+        {
+            onset_index = Some(index);
+            break;
+        }
+    }
+
+    let Some(onset_index) = onset_index else {
+        result.onset_status = AudioEventBoundaryStatusV1::OnsetOutsideSearchWindow;
+        result.activity_end_status = AudioEventBoundaryStatusV1::InsufficientOnsetEvidence;
+        return result;
+    };
+    let observed_start = onset_candidates[onset_index].center_frame;
+    result.observed_acoustic_activity_start_frame = Some(observed_start);
+    result.acoustic_onset_delta_frames = signed_frame_delta(observed_start, expected_start);
+    result.onset_status = AudioEventBoundaryStatusV1::Measured;
+
+    // Acoustic activity end is the first sustained drop below the local
+    // threshold. It may precede MIDI NoteOff for a naturally decaying sound,
+    // or follow it due to release/reverb. It is not a symbolic note-off estimate.
+    let end_candidates: Vec<_> = envelope
+        .iter()
+        .filter(|frame| {
+            frame.center_frame >= observed_start
+                && frame.center_frame <= observed_search_end
+        })
+        .collect();
+    let mut end_index = None;
+    for index in 0..end_candidates.len().saturating_sub(2) {
+        if end_candidates[index].rms < threshold
+            && end_candidates[index + 1].rms < threshold
+            && end_candidates[index + 2].rms < threshold
+        {
+            end_index = Some(index);
+            break;
+        }
+    }
+
+    if let Some(index) = end_index {
+        let observed_end = end_candidates[index].center_frame;
+        result.observed_acoustic_activity_end_frame = Some(observed_end);
+        result.acoustic_activity_end_delta_frames = signed_frame_delta(observed_end, expected_end);
+        result.activity_end_status = AudioEventBoundaryStatusV1::Measured;
+    } else if search_end > wav_frame_count {
+        result.activity_end_status = AudioEventBoundaryStatusV1::TruncatedByAudio;
+    } else {
+        result.activity_end_status = AudioEventBoundaryStatusV1::ActivityEndOutsideSearchWindow;
+    }
+    let _ = analysis_window_frames;
+    let _ = analysis_hop_frames;
+    result
+}
+
+/// Domain-separated commitment for the independently recomputable boundary
+/// observation. The unkeyed digest is a tamper-evident commitment, not a signature.
+pub fn audio_event_boundary_observation_commitment_v1(
+    receipt: &AudioEventBoundaryObservationReceiptV1,
+) -> Result<String, serde_json::Error> {
+    let commitment = BoundaryReceiptCommitmentV1 {
+        schema: &receipt.schema,
+        detector_version: &receipt.detector_version,
+        score_sha256: &receipt.score_sha256,
+        midi_sha256: &receipt.midi_sha256,
+        midi_manifest_sha256: &receipt.midi_manifest_sha256,
+        wav_sha256: &receipt.wav_sha256,
+        wav_info: &receipt.wav_info,
+        search_margin_ms: receipt.search_margin_ms,
+        analysis_window_frames: receipt.analysis_window_frames,
+        analysis_hop_frames: receipt.analysis_hop_frames,
+        note_observations: &receipt.note_observations,
+        source_attribution_established: receipt.source_attribution_established,
+        limitations: &receipt.limitations,
+    };
+    Ok(domain_separated_sha256(
+        AUDIO_EVENT_BOUNDARY_SCHEMA_V1,
+        &serde_json::to_vec(&commitment)?,
+    ))
+}
+
+/// Observe acoustic-activity boundaries around each expected MIDI event.
+/// This emits waveform-activity diagnostics only: it does not establish
+/// source-note/PartId attribution or exact symbolic note-off time.
+pub fn observe_rendered_audio_event_boundaries_v1(
+    wav_bytes: &[u8],
+    midi: &MidiPerformanceArtifactV1,
+    search_margin_ms: u32,
+) -> Result<AudioEventBoundaryObservationReceiptV1, Vec<AudioEventObservationIssueV1>> {
+    if search_margin_ms == 0 || search_margin_ms > AUDIO_EVENT_BOUNDARY_MAX_SEARCH_MARGIN_MS_V1 {
+        return Err(vec![AudioEventObservationIssueV1::InvalidBoundarySearchMargin]);
+    }
+    let midi_issues = validate_midi_artifact(midi);
+    if !midi_issues.is_empty() {
+        return Err(midi_issues);
+    }
+    let wav = decode_wav(wav_bytes).map_err(|issue| vec![issue])?;
+    let window_frames = (u64::from(wav.info.sample_rate_hz)
+        * u64::from(AUDIO_EVENT_BOUNDARY_ANALYSIS_WINDOW_MS_V1)
+        / 1_000)
+        .max(64) as usize;
+    let hop_frames = (u64::from(wav.info.sample_rate_hz)
+        * u64::from(AUDIO_EVENT_BOUNDARY_ANALYSIS_HOP_MS_V1)
+        / 1_000)
+        .max(1) as usize;
+    let envelope = activity_envelope_v1(&wav, window_frames, hop_frames);
+
+    let mut note_observations: Vec<_> = midi
+        .manifest
+        .notes
+        .iter()
+        .map(|note| {
+            observe_activity_boundaries_v1(
+                &envelope,
+                wav.info.frame_count,
+                note,
+                midi.manifest.tempo_microseconds_per_quarter,
+                midi.manifest.ticks_per_quarter,
+                wav.info.sample_rate_hz,
+                search_margin_ms,
+                window_frames as u32,
+                hop_frames as u32,
+            )
+        })
+        .collect();
+    note_observations.sort_by_key(|item| item.source_note_ordinal);
+
+    let mut receipt = AudioEventBoundaryObservationReceiptV1 {
+        schema: AUDIO_EVENT_BOUNDARY_SCHEMA_V1.into(),
+        detector_version: "muse-acoustic-activity-envelope-v1".into(),
+        score_sha256: midi.manifest.score_sha256.clone(),
+        midi_sha256: midi.manifest.midi_sha256.clone(),
+        midi_manifest_sha256: midi.manifest_sha256.clone(),
+        wav_sha256: sha256_hex(wav_bytes),
+        wav_info: wav.info,
+        search_margin_ms,
+        analysis_window_frames: window_frames as u32,
+        analysis_hop_frames: hop_frames as u32,
+        note_observations,
+        source_attribution_established: false,
+        limitations: vec![
+            "This is an acoustic activity envelope, not an exact symbolic note-on or note-off detector.".into(),
+            "A decaying/plucked sound may become inactive before MIDI NoteOff; a release/reverb tail may remain after MIDI NoteOff.".into(),
+            "A mixed WAV can contain overlapping events from other parts; source-note and PartId attribution are not established.".into(),
+            "The relative RMS threshold is a deterministic diagnostic heuristic, not a calibrated probability or universal audibility threshold.".into(),
+        ],
+        receipt_sha256: String::new(),
+    };
+    receipt.receipt_sha256 = audio_event_boundary_observation_commitment_v1(&receipt)
+        .map_err(|_| vec![AudioEventObservationIssueV1::ReceiptDigestMismatch])?;
+    Ok(receipt)
+}
+
+/// Recompute the complete boundary analysis from the exact WAV and MIDI
+/// inputs. Receipt-only edits cannot be promoted by resealing the public hash.
+pub fn validate_audio_event_boundary_observation_v1(
+    receipt: &AudioEventBoundaryObservationReceiptV1,
+    wav_bytes: &[u8],
+    midi: &MidiPerformanceArtifactV1,
+) -> Vec<AudioEventObservationIssueV1> {
+    let mut issues = Vec::new();
+    match audio_event_boundary_observation_commitment_v1(receipt) {
+        Ok(commitment) if commitment == receipt.receipt_sha256 => {}
+        _ => issues.push(AudioEventObservationIssueV1::ReceiptDigestMismatch),
+    }
+    match observe_rendered_audio_event_boundaries_v1(wav_bytes, midi, receipt.search_margin_ms) {
+        Ok(expected) => {
+            if expected.wav_sha256 != receipt.wav_sha256
+                || expected.midi_sha256 != receipt.midi_sha256
+                || expected.midi_manifest_sha256 != receipt.midi_manifest_sha256
+                || expected.wav_info != receipt.wav_info
+            {
+                issues.push(AudioEventObservationIssueV1::ReceiptInputBindingMismatch);
+            }
+            if expected.note_observations != receipt.note_observations
+                || expected.source_attribution_established != receipt.source_attribution_established
+                || expected.limitations != receipt.limitations
+                || expected.detector_version != receipt.detector_version
+            {
+                issues.push(AudioEventObservationIssueV1::ReceiptEventMismatch { ordinal: usize::MAX });
+            }
+        }
+        Err(mut errors) => issues.append(&mut errors),
+    }
+    issues
 }
 
 /// Recheck receipt integrity and its bindings to the supplied exact inputs.
