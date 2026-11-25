@@ -1453,6 +1453,40 @@ mod tests {
     }
 
     #[test]
+    fn later_stratum_sample_size_does_not_depend_on_random_earlier_item_cost() {
+        for seed in 1_u64..=64 {
+            let mut dataset = synthetic_dataset();
+            dataset.config.seed = seed;
+            dataset.config.probability_audit_budget_units = 9;
+            dataset.config.stratum_quotas[0].audit_source_work_count = 1;
+            dataset.config.stratum_quotas[1].audit_source_work_count = 1;
+            // Work f has two candidate queries with different costs. One is
+            // cheap, one expensive. Its random item draw must not change the
+            // pre-reserved source-work sample size in stratum-b.
+            dataset.candidates[6].source_work_id_sha256 =
+                dataset.candidates[5].source_work_id_sha256.clone();
+            dataset.candidates[6].recording_sha256 =
+                dataset.candidates[5].recording_sha256.clone();
+            dataset.candidates[6].annotation_cost_units = 1;
+
+            let report = plan_annotation_acquisition(&dataset).unwrap();
+            assert_eq!(report.probability_audit.len(), 1);
+            assert_eq!(report.probability_audit[0].source_stratum_id, "stratum-a");
+            assert!(report.budget_usage.probability_audit_spent_units <= 5);
+            assert_eq!(
+                report.unmet_quotas
+                    .iter()
+                    .find(|quota| {
+                        quota.stream == QuotaStreamV1::ProbabilityAudit
+                            && quota.source_stratum_id == "stratum-b"
+                    })
+                    .map(|quota| quota.selected),
+                Some(0)
+            );
+        }
+    }
+
+    #[test]
     fn budgets_and_unmet_minimums_are_reported_without_relaxation() {
         let mut dataset = synthetic_dataset();
         dataset.config.active_budget_units = 5;
