@@ -1,4 +1,5 @@
 pub mod worldtest_exploration;
+pub mod worldtest_phase_contract;
 
 use std::collections::{BTreeMap, BTreeSet};
 use std::env;
