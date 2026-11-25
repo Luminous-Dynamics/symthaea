@@ -49,7 +49,10 @@
       "occurrence_count_disagreement_ppm": 25000,
       "prediction_coverage_ppm": 900000,
       "boundary_dispersion_ms": 5,
-      "hidden_repeat_control": false
+      "hidden_repeat_control": false,
+      "model_grounding_report_sha256": "bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb",
+      "inter_annotator_reliability_report_sha256": "cccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccc",
+      "cohort_assignment_manifest_sha256": "dddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddd"
     },
     {
       "item_id": "active-a2",
@@ -70,7 +73,10 @@
       "occurrence_count_disagreement_ppm": 400000,
       "prediction_coverage_ppm": 900000,
       "boundary_dispersion_ms": 80,
-      "hidden_repeat_control": false
+      "hidden_repeat_control": false,
+      "model_grounding_report_sha256": "bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb",
+      "inter_annotator_reliability_report_sha256": "cccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccc",
+      "cohort_assignment_manifest_sha256": "dddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddd"
     },
     {
       "item_id": "active-a3",
@@ -91,7 +97,10 @@
       "occurrence_count_disagreement_ppm": 0,
       "prediction_coverage_ppm": 500000,
       "boundary_dispersion_ms": 0,
-      "hidden_repeat_control": false
+      "hidden_repeat_control": false,
+      "model_grounding_report_sha256": "bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb",
+      "inter_annotator_reliability_report_sha256": "cccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccc",
+      "cohort_assignment_manifest_sha256": "dddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddd"
     },
     {
       "item_id": "active-b1",
@@ -112,7 +121,10 @@
       "occurrence_count_disagreement_ppm": 10000,
       "prediction_coverage_ppm": 900000,
       "boundary_dispersion_ms": 2,
-      "hidden_repeat_control": false
+      "hidden_repeat_control": false,
+      "model_grounding_report_sha256": "bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb",
+      "inter_annotator_reliability_report_sha256": "cccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccc",
+      "cohort_assignment_manifest_sha256": "dddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddd"
     },
     {
       "item_id": "active-b2",
@@ -133,7 +145,10 @@
       "occurrence_count_disagreement_ppm": 350000,
       "prediction_coverage_ppm": 900000,
       "boundary_dispersion_ms": 70,
-      "hidden_repeat_control": false
+      "hidden_repeat_control": false,
+      "model_grounding_report_sha256": "bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb",
+      "inter_annotator_reliability_report_sha256": "cccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccc",
+      "cohort_assignment_manifest_sha256": "dddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddd"
     },
     {
       "item_id": "audit-a1",
@@ -154,7 +169,10 @@
       "occurrence_count_disagreement_ppm": 0,
       "prediction_coverage_ppm": 900000,
       "boundary_dispersion_ms": 0,
-      "hidden_repeat_control": false
+      "hidden_repeat_control": false,
+      "model_grounding_report_sha256": "bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb",
+      "inter_annotator_reliability_report_sha256": "cccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccc",
+      "cohort_assignment_manifest_sha256": "dddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddd"
     },
     {
       "item_id": "audit-a2",
@@ -175,7 +193,10 @@
       "occurrence_count_disagreement_ppm": 0,
       "prediction_coverage_ppm": 900000,
       "boundary_dispersion_ms": 0,
-      "hidden_repeat_control": false
+      "hidden_repeat_control": false,
+      "model_grounding_report_sha256": "bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb",
+      "inter_annotator_reliability_report_sha256": "cccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccc",
+      "cohort_assignment_manifest_sha256": "dddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddd"
     },
     {
       "item_id": "audit-a3",
@@ -196,7 +217,10 @@
       "occurrence_count_disagreement_ppm": 0,
       "prediction_coverage_ppm": 900000,
       "boundary_dispersion_ms": 0,
-      "hidden_repeat_control": false
+      "hidden_repeat_control": false,
+      "model_grounding_report_sha256": "bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb",
+      "inter_annotator_reliability_report_sha256": "cccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccc",
+      "cohort_assignment_manifest_sha256": "dddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddd"
     },
     {
       "item_id": "audit-b1",
@@ -217,7 +241,10 @@
       "occurrence_count_disagreement_ppm": 0,
       "prediction_coverage_ppm": 900000,
       "boundary_dispersion_ms": 0,
-      "hidden_repeat_control": false
+      "hidden_repeat_control": false,
+      "model_grounding_report_sha256": "bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb",
+      "inter_annotator_reliability_report_sha256": "cccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccc",
+      "cohort_assignment_manifest_sha256": "dddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddd"
     },
     {
       "item_id": "audit-b2",
@@ -238,7 +265,10 @@
       "occurrence_count_disagreement_ppm": 0,
       "prediction_coverage_ppm": 900000,
       "boundary_dispersion_ms": 0,
-      "hidden_repeat_control": false
+      "hidden_repeat_control": false,
+      "model_grounding_report_sha256": "bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb",
+      "inter_annotator_reliability_report_sha256": "cccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccc",
+      "cohort_assignment_manifest_sha256": "dddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddd"
     },
     {
       "item_id": "audit-b3",
@@ -259,7 +289,10 @@
       "occurrence_count_disagreement_ppm": 0,
       "prediction_coverage_ppm": 900000,
       "boundary_dispersion_ms": 0,
-      "hidden_repeat_control": false
+      "hidden_repeat_control": false,
+      "model_grounding_report_sha256": "bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb",
+      "inter_annotator_reliability_report_sha256": "cccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccc",
+      "cohort_assignment_manifest_sha256": "dddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddd"
     }
   ]
 }
