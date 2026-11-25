@@ -89,22 +89,6 @@ fn string<'a>(
     }
 }
 
-fn nullable_string(
-    map: &serde_json::Map<String, Value>,
-    key: &str,
-    path: &str,
-    issues: &mut Vec<ValidationIssue>,
-) -> Option<String> {
-    match map.get(key) {
-        Some(Value::Null) => None,
-        Some(Value::String(value)) if !value.trim().is_empty() => Some(value.clone()),
-        _ => {
-            issue(issues, format!("{path}.{key}"), "expected null or non-empty string");
-            None
-        }
-    }
-}
-
 fn array<'a>(
     map: &'a serde_json::Map<String, Value>,
     key: &str,
@@ -394,14 +378,22 @@ fn validate_relation(
         {
             issue(issues, format!("{path}.relation"), "unknown claim-source relation");
         }
+        // Known lineage uses the authoritative source-family reference.
+        // Unknown lineage still remains a distinct observed source for conflict
+        // detection, but its synthetic key is never evidence of independence.
+        let origin = family
+            .as_ref()
+            .and_then(Option::as_ref)
+            .cloned()
+            .or_else(|| evidence_id.as_ref().map(|id| format!("unknown-origin:{id}")));
         if relation == "SUPPORTS" {
-            if let Some(family) = family.as_ref().and_then(Option::as_ref) {
-                supports.insert(family.clone());
+            if let Some(origin) = origin.as_ref() {
+                supports.insert(origin.clone());
             }
         }
         if relation == "REFUTES" {
-            if let Some(family) = family.as_ref().and_then(Option::as_ref) {
-                refutes.insert(family.clone());
+            if let Some(origin) = origin.as_ref() {
+                refutes.insert(origin.clone());
             }
         }
     }
@@ -915,16 +907,15 @@ mod tests {
     #[test]
     fn unclassified_relation_cannot_carry_classifier_or_quote() {
         let mut state = first_state();
-        state["claims"][0]["evidence_relations"][0]["classifier_provenance"] =
-            serde_json::from_value(serde_json::json!({
-                "classifier_id": "classifier",
-                "version": "1",
-                "output_digest": "a".repeat(64),
-                "confidence": 0.9,
-                "emitted_at": "2026-11-25T10:00:00Z",
-                "evidence_prefix_sha256": state["evidence_prefix"]["prefix_sha256"]
-            }))
-            .unwrap();
+        let prefix_sha256 = state["evidence_prefix"]["prefix_sha256"].clone();
+        state["claims"][0]["evidence_relations"][0]["classifier_provenance"] = serde_json::json!({
+            "classifier_id": "classifier",
+            "version": "1",
+            "output_digest": "a".repeat(64),
+            "confidence": 0.9,
+            "emitted_at": "2026-11-25T10:00:00Z",
+            "evidence_prefix_sha256": prefix_sha256
+        });
         assert!(validate_state(&state.to_string()).is_err());
     }
 
@@ -934,6 +925,65 @@ mod tests {
         let state = &mut state["examples"][1]["state"];
         state["claims"][0]["evidence_relations"][0]["classifier_provenance"]["evidence_prefix_sha256"] =
             Value::String("0".repeat(64));
+        assert!(validate_state(&state.to_string()).is_err());
+    }
+
+    #[test]
+    fn unknown_source_lineage_does_not_hide_a_claim_conflict() {
+        let mut state = first_state();
+        let second = serde_json::json!({
+            "evidence_id": "ev-a2",
+            "artifact_ref": "urn:synthetic:artifact:rs-unknown-second",
+            "artifact_sha256": "b".repeat(64),
+            "canonical_source_ref": "https://example.org/second",
+            "published_at": "2026-01-10T00:00:00Z",
+            "captured_at": "2026-11-25T10:00:00Z",
+            "source_lineage": { "status": "UNKNOWN" },
+            "integrity_status": "CLEAN",
+            "correction_status": "NONE",
+            "retrieval_state": "CAPTURED"
+        });
+        state["evidence"].as_array_mut().unwrap().push(second);
+        let second_relation = serde_json::json!({
+            "claim_id": "claim-a",
+            "evidence_id": "ev-a2",
+            "relation": "REFUTES",
+            "classifier_provenance": {
+                "classifier_id": "synthetic-classifier",
+                "version": "0.1",
+                "output_digest": "c".repeat(64),
+                "confidence": 0.9,
+                "emitted_at": "2026-11-25T10:00:00Z",
+                "evidence_prefix_sha256": state["evidence_prefix"]["prefix_sha256"]
+            },
+            "quote_span": {
+                "byte_start": 0,
+                "byte_end": 5,
+                "quote_sha256": "d".repeat(64)
+            }
+        });
+        // The relation needs a classifier output bound to the existing prefix.
+        state["claims"][0]["evidence_relations"][0]["relation"] = Value::String("SUPPORTS".to_owned());
+        state["claims"][0]["evidence_relations"][0]["classifier_provenance"] = serde_json::json!({
+            "classifier_id": "synthetic-classifier",
+            "version": "0.1",
+            "output_digest": "e".repeat(64),
+            "confidence": 0.9,
+            "emitted_at": "2026-11-25T10:00:00Z",
+            "evidence_prefix_sha256": state["evidence_prefix"]["prefix_sha256"]
+        });
+        state["claims"][0]["evidence_relations"][0]["quote_span"] = serde_json::json!({
+            "byte_start": 0, "byte_end": 5, "quote_sha256": "f".repeat(64)
+        });
+        state["claims"][0]["evidence_relations"].as_array_mut().unwrap().push(second_relation);
+        state["claims"][0]["decision_usability"]["status"] = Value::String("SUFFICIENT".to_owned());
+        state["claims"][0]["truth_adjudication"] = serde_json::json!({
+            "status": "NOT_ADJUDICATED",
+            "result": null,
+            "authority_id": null,
+            "evidence_reference": null,
+            "adjudicated_at": null
+        });
         assert!(validate_state(&state.to_string()).is_err());
     }
 
