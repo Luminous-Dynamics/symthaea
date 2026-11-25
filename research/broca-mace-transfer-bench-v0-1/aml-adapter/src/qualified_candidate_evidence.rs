@@ -159,6 +159,9 @@ impl QualifiedCandidateEvidenceBatchV1 {
     pub fn qualification_verifier_profile_sha256(&self) -> &str {
         self.qualification.verifier_profile_sha256()
     }
+    pub fn qualification_policy_sha256(&self) -> &str {
+        &self.use_snapshot.qualification_policy_sha256
+    }
     pub fn batch(&self) -> &CandidateEvidenceBatchV1 { &self.batch }
     pub fn evidence(&self) -> &[CandidateEvidenceV1] { &self.batch.evidence }
     pub fn source_candidate_set_sha256(&self) -> &str { &self.source_candidate_set_sha256 }
