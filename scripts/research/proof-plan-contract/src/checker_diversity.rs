@@ -225,24 +225,22 @@ pub fn validate_registry(registry: &Value) -> Vec<String> {
             "con-ron must remain grouped with con-leche's algorithm lineage",
         );
     }
+    let independence_class = |id: &str| {
+        map.get(id)
+            .and_then(|checker| object_string(checker, "independence_class"))
+    };
     for id in ["nanoda", "con_leche"] {
-        if object_string(map[id], "independence_class") != Some("independent_implementation") {
+        if independence_class(id) != Some("independent_implementation") {
             push(&mut errors, format!("{id} must be recorded as an independently implemented external checker"));
         }
     }
-    if object_string(map["con_ron"], "independence_class")
-        != Some("verified_port_shared_algorithm")
-    {
+    if independence_class("con_ron") != Some("verified_port_shared_algorithm") {
         push(&mut errors, "con-ron must be recorded as a verified port sharing con-leche's algorithm");
     }
-    if object_string(map["lean4lean"], "independence_class")
-        != Some("derived_from_official")
-    {
+    if independence_class("lean4lean") != Some("derived_from_official") {
         push(&mut errors, "lean4lean must be recorded as derived from the official kernel");
     }
-    if object_string(map["leanchecker_paranoid"], "independence_class")
-        != Some("hardening_variant")
-    {
+    if independence_class("leanchecker_paranoid") != Some("hardening_variant") {
         push(&mut errors, "leanchecker-paranoid must be recorded as a hardening variant");
     }
 
@@ -719,6 +717,17 @@ mod tests {
     fn validates_source_grounded_registry() {
         let (registry, _) = values();
         assert!(validate_registry(&registry).is_empty());
+    }
+
+    #[test]
+    fn incomplete_registry_fails_closed_without_panicking() {
+        let (mut registry, _) = values();
+        registry["checkers"]
+            .as_array_mut()
+            .unwrap()
+            .retain(|checker| checker["checker_id"] != "nanoda");
+        let errors = validate_registry(&registry);
+        assert!(!errors.is_empty());
     }
 
     #[test]
