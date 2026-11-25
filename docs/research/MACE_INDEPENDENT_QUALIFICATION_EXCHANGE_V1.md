@@ -21,7 +21,7 @@ The exchange order is:
 - `QualificationUseContextV1` is consumer-owned context; it is not populated from the issuer response.
 - `EvidenceQualificationRequestV1` carries canonical candidate JSONL and a strict complete use binding. Its request digest is a transport/idempotency identity, not a trust assertion.
 - `IndependentEvidenceQualificationIssuerV1` is an injected transport contract. It returns a DSSE JSON envelope, not a custom typed receipt. A real implementation must connect to a different authority and map timeout/ambiguous outcomes to `Unavailable`.
-- `independently_qualify_candidate_batch_v1` is the fail-closed consumer path. It verifies the returned receipt with the caller's pinned verifier and applies `project_qualified_candidate_evidence_v1`. It obtains receipt-verification time from an injected `QualificationTrustedClockV1`; the request carries no timestamp supplied by the candidate backend.
+- `independently_qualify_candidate_batch_v1` is the fail-closed consumer path. It verifies the DSSE/in-toto envelope with the caller's pinned Ed25519 profile, checks the MACE predicate against the exact consumer-owned request binding, and applies `project_qualified_candidate_evidence_v1`. It obtains receipt-verification time from an injected `QualificationTrustedClockV1`; the request carries no timestamp supplied by the candidate backend. The returned `IndependentQualificationExchangeResultV1` contains only the qualified projection or abstention plus the signed envelope. `qualified_evidence_at_use(binding, current_pinned_profile)` re-parses and re-verifies the retained envelope against the exact current use binding before returning any evidence; abstention returns `NoQualifiedEvidence`.
 
 Wire schema: `data/schemas/mace_evidence_qualification_request_v1.schema.json`. Rust consumers may decode with `EvidenceQualificationRequestV1::from_json_value`; this rejects unknown/missing fields, non-canonical JSONL, candidate/binding mismatches, unsorted IDs and request-digest mismatches.
 
@@ -59,7 +59,7 @@ The verifier profile in the consumer must be pinned out of band; copying the pro
 - Issuer unavailable, timeout, malformed response, signature failure, or any binding mismatch: return an error and expose no candidate payload.
 - Signed receipt with no admissible candidates: return explicit abstention.
 - Admissible derived record whose required parent is rejected, indeterminate, absent, or cyclic: remove the dependent record; if no evidence remains, abstain.
-- Qualification receipt expiry or use-context change: reject at use. Before each later consequential read, the consumer must sample its trusted clock again and put that value into the use-time binding; it must not reuse the exchange timestamp.
+- Qualification expiry, signer revocation/profile rotation, or use-context change: reject at use. Before each later consequential read, the consumer must sample its trusted clock again, reconstruct the verifier from the current pinned profile, and call `qualified_evidence_at_use` with the new time and exact use binding; it must not reuse the exchange timestamp or a cached verifier.
 - A qualified projection is not an action authorization. Live authorization and lifecycle currentness must be rechecked at consequential use. Decision sufficiency, decision, action authorization, consume-once state and outcome receipts remain separate objects.
 
 ## Claim boundary
