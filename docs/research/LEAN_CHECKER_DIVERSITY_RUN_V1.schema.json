@@ -165,10 +165,6 @@
         "additionalProperties": false,
         "required": [
           "checker_id",
-          "checker_version",
-          "implementation_revision",
-          "binary_sha256",
-          "input_export_sha256",
           "result"
         ],
         "properties": {
