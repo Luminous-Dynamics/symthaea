@@ -243,15 +243,17 @@ A key refinement from current Koopman/system-identification work is to evaluate 
 
 ### Identifiability and abstention track (added 25 November 2026)
 
-This track upgrades system identification from a pure prediction task to a **know-when-not-identifiable** task. It is represented by the seventh pilot family, `identifiability_abstention`, with four task specifications:
+This track upgrades system identification from a pure prediction task to a **know-when-not-identifiable** task. It is represented by the seventh pilot family, `identifiability_abstention`, with six task specifications:
 
 - two distinct hidden dynamics that yield identical measurements under an unobservable sensor;
 - rank-deficient input regressors that cannot identify a two-feature model;
 - an observable positive control using independently varied initial states;
-- finite/noisy/partially observed dynamics where structural observability does not guarantee practical identifiability at the available sample size.
+- finite/noisy/partially observed dynamics where structural observability does not guarantee practical identifiability at the available sample size;
+- active sensor selection that distinguishes currently observationally equivalent hidden models;
+- active input-probe selection that raises rank-deficient excitation to a full-rank design.
 
 The standard-library Rust reference harness includes 2x2 observability-rank, input-regressor-rank and hidden-mode indistinguishability controls. It should return an explicit insufficient-evidence disposition on the unobservable/rank-deficient cases, not invent a unique model. A full-rank observability or excitation matrix is necessary for the relevant linear identification problem, but not sufficient to guarantee good finite-data estimation under noise or model mismatch.
 
-This adopts a critical lesson from current Koopman work: report the assumptions and conditions under which a spectral/dynamical approximation is learnable, and include adversarial systems where the same observations are consistent with different hidden dynamics. A model that knows when it cannot identify a system is more scientifically useful than one that always emits a forecast.
+This adopts a critical lesson from current Koopman work: report the assumptions and conditions under which a spectral/dynamical approximation is learnable, and include adversarial systems where the same observations are consistent with different hidden dynamics. Identifiability is task-relative: the observed output may be predictable even when the hidden mechanism is not identifiable. The system should preserve that limited prediction while refusing the stronger mechanistic claim, then propose a sensor or excitation intervention that would distinguish the alternatives. A model that knows what it does not know—and how to reduce that uncertainty—is more scientifically useful than one that always emits a unique model.
 
 The pilot manifest now contains 28 design-only task specifications, 14 negative controls, and seven task families. No generated trajectory, fitted model or model performance has been measured.
