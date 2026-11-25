@@ -11,7 +11,7 @@
 use serde::{Deserialize, Serialize};
 use std::collections::{HashMap, VecDeque};
 
-use super::types::{AdjudicatedVerificationOutcome, ResearchSource, VerificationOutcome};
+use super::types::{AdjudicatedVerificationOutcome, AdjudicationKind, ResearchSource, VerificationOutcome};
 
 /// Configuration for the epistemic learner
 #[derive(Debug, Clone, Serialize, Deserialize)]
@@ -473,7 +473,7 @@ mod tests {
                 domain: domain.to_string(),
                 adjudication_provenance: None,
             },
-            adjudication_kind: super::types::AdjudicationKind::Other,
+            adjudication_kind: AdjudicationKind::Other,
             authority_id: "synthetic-unit-test-authority".to_owned(),
             evidence_reference: "test-fixture://epistemic-outcome".to_owned(),
         }
