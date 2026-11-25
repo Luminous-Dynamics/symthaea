@@ -558,7 +558,9 @@ mod tests {
     fn witness_root_substitution_is_rejected() {
         let (manifest, verified, _) = test_verified_sealed_evaluation_fixture_v1();
         let wrong_witness =
-            crate::evaluation_manifest_commitment_receipt::test_verified_evaluation_manifest_commitment_v1_with_bindings(
+            crate::evaluation_manifest_commitment_receipt::test_verified_evaluation_manifest_commitment_v1_with_suite_and_bindings(
+                "mace-t10-integrity",
+                "v1",
                 &digest('9'),
                 verified.manifest_sha256(),
                 verified.arm_assignment_root_sha256(),
