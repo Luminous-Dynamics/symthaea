@@ -191,7 +191,9 @@ let outcome = VerificationOutcome {
     verification_level: VerificationLevel::Standard,
 };
 
-learner.record_outcome(outcome)?;
+// Legacy API removed: ordinary predictions cannot supply correctness labels.
+// Use record_adjudicated_outcome(AdjudicatedVerificationOutcome) only after
+// independent ground truth and evidence provenance have been established.
 ```
 
 ### 2. Learning Source Performance
@@ -399,7 +401,9 @@ fn main() -> Result<()> {
     };
 
     // Record for learning
-    learner.record_outcome(outcome)?;
+    // Legacy API removed: ordinary predictions cannot supply correctness labels.
+// Use record_adjudicated_outcome(AdjudicatedVerificationOutcome) only after
+// independent ground truth and evidence provenance have been established.
 
     // Check meta-learning stats
     let stats = learner.get_stats();
@@ -485,7 +489,9 @@ async fn research_with_learning(
         verification_level: VerificationLevel::Standard,
     };
 
-    learner.record_outcome(outcome)?;
+    // Legacy API removed: ordinary predictions cannot supply correctness labels.
+// Use record_adjudicated_outcome(AdjudicatedVerificationOutcome) only after
+// independent ground truth and evidence provenance have been established.
 
     // 4. Return response
     Ok(result.summary)
@@ -636,7 +642,7 @@ learned_credibility = accuracy * 0.7 + prior_credibility * 0.3
 - **Lines**: 820+
 - **Core Types**: `EpistemicLearner`, `VerificationOutcome`, `SourcePerformance`, `DomainExpertise`, `VerificationStrategy`
 - **Key Functions**:
-  - `record_outcome()` - Record verification for learning
+  - `record_adjudicated_outcome(AdjudicatedVerificationOutcome)` - Record independently adjudicated ground truth; confidence is never correctness
   - `update_source_performance()` - Learn source accuracy
   - `update_domain_expertise()` - Develop domain knowledge
   - `update_strategy_performance()` - Optimize strategies
