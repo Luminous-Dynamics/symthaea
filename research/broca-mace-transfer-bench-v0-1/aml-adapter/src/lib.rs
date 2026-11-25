@@ -14,6 +14,7 @@ pub mod decision_outcome_receipt;
 pub mod evaluation_manifest_commitment_receipt;
 pub mod frozen_decision_episode_manifest;
 pub mod sealed_evaluation_manifest;
+pub mod rfc9162_proofs;
 
 // Copyright (C) 2026 Luminous Dynamics
 // SPDX-License-Identifier: AGPL-3.0-or-later
