@@ -198,6 +198,11 @@ Report observations, interventions, wall time, CPU/GPU time, FLOPs if measured, 
 | Dreamer 4 | Separate scalable-world-model work reports an offline Minecraft diamond task requiring over 20,000 action steps, learned from diverse offline video data | Strong long-horizon world-model / imagination comparator; do not conflate its Minecraft result with Dreamer 3's 150-task evaluation. |
 | AgentIdeaBench | 33 LLMs, 40 subfields, 5 disciplines; active exploration improved grounding/feasibility/clarity while measured originality did not improve | Distinguish better-grounded hypotheses from novel discovery; score independently reviewed originality separately. |
 | AutoSciBench | Adaptive benchmark recipes reduced average solver accuracy by 22.4 pp (computational biology) and 25.5 pp (materials) versus curated benchmarks | Motivates a sealed refresh lane; do not let adaptive task generation contaminate immutable longitudinal anchors. |
+| Continual Learning Bench (CL-Bench) | Six expert-validated domains with shared latent structure; its study finds agents often overfit immediate observations and fail to reuse knowledge across instances, and dedicated memory systems do not automatically solve this | External real-world stateful-learning adapter. Compare pre-task library value and gain over prior capability; do not pool its score with ERGOstream's synthetic structural estimands. |
+| Continual Learning Exam (CLE) | 120 expert-authored workflows, 600 levels, 89 roles and 12 domains; 17 harness/model configurations; best reported configuration passes 47.7% of levels | External long-horizon professional-workflow adapter for staged experience/feedback. Its rubric-based task ladder is complementary, not a structural-isomorphism measure. |
+| Continual-ARC | Recurring ARC tasks return after dormant gaps with fresh instances; learner pays for feedback, and memory-/weight-based systems are compared under a common budget | Strong memory-versus-weight adaptation comparator. Include recurrence after dormancy and fresh-instance generalization; don't mistake demonstration caching for reusable structure. |
+| Compositional continual world models (2026) | Robot-manipulation curricula factor reuse across action, perception and full composition; modular dynamics trade off reuse and forgetting, with no complete solution reported | Physical-AI adapter for compositional transfer after continual acquisition; use matched simulator/task budgets and add explicit structural-library treatment arms. |
+| Memora / FAMA | Multi-session memory benchmark with explicit consolidation and mutation; reports frequent reuse of obsolete/invalidated memories | Lifecycle/retraction guardrail for structural entries. Adapt its obsolete-memory principle, but keep memory QA results distinct from structural transfer. |
 | DS-CP / TCC / KMM-CP | 2026 work on domain-shift-aware or transported conformal calibration; TCC uses paired unlabeled source/target data, KMM-CP is selective under support overlap | Required calibration-transfer baselines. Do not transport calibration across invalid structural/mechanism maps or claim arbitrary-shift coverage. |
 
 These figures are reported by their respective papers or benchmark maintainers, not reproduced by Symthaea. Model/agent/harness configurations, trial counts, data budgets, hardware and scoring protocols differ. They cannot be ranked against ErgoStream without a matched adapter and protocol.
@@ -255,8 +260,78 @@ Arms 1–6 must hold constant model weights, parameter count, retrieval calls, c
 
 Advance only when the intact frozen library improves a preregistered downstream estimand over the strongest capacity/marginal-matched control on sealed target worlds, with a paired lower confidence bound above zero (or above a predeclared practically meaningful margin), while preserving the false-unification, false-causal-transfer, calibration and resource guardrails. Otherwise retain the result as a negative or inconclusive finding and revise the acquisition hypothesis rather than relaxing the controls.
 
-## 13. References (snapshot 2026-11-25)
+## 13. Continual structural-library lifecycle
 
+This track composes with Symthaea #55 (continual-compositional evaluation), #7029 (matched HOLD/UPDATE adaptation and retention), and #7030 (action-dependent observation and evaluator-state integrity). It does **not** create a second continual-learning runner, change-policy owner, evaluator or memory authority. Use their shared evaluation spine and attach ERGOstream-specific structural-library snapshots and transfer probes.
+
+### Why this is a separate estimand
+
+A frozen-library transfer test asks whether acquired structure transfers once. A continual-library test asks whether the knowledge remains useful, revisable and safe as tasks and mechanisms evolve. These are not the same capability.
+
+Use controlled curricula with hidden boundaries and no task-family labels:
+
+1. **A → B:** acquire source structure in A, then encounter a related world B with both shared and changed factors.
+2. **A → B → A:** return to an A-like regime after a dormant gap with fresh instances; measure recognition, relearning cost and whether the system has needlessly overwritten reusable A knowledge.
+3. **A → B → C-composition:** combine previously acquired primitives in a new relation/action/perception composition, not merely a fresh instance of a seen task.
+4. **Within-family mechanism mutation:** preserve superficial observations or selected relations while changing one hidden action-conditioned dependency; old entries should become limited, suspended or rejected for that claim scope.
+5. **Recurring and unsignaled drift:** use abrupt, gradual, cyclic and stochastic-hazard changes without revealing the change point to the learner.
+
+### Paired counterfactual update design
+
+At each preregistered update point, fork from the exact same parent learner/library state and evidence prefix:
+
+- **HOLD:** continue without incorporating the newly available candidate evidence.
+- **UPDATE:** apply the frozen update policy to the same permitted evidence.
+- **No-op update:** execute the update pathway without decision-relevant information.
+- **Irrelevant-trigger update:** vary irrelevant metadata while keeping evidence unchanged.
+- **Counterexample update:** provide a valid, decision-relevant contradiction that should cause scope narrowing, alternative retention, retraction or supersession.
+- **Rate-matched random update:** match update frequency and resource consumption without using decision-relevant evidence.
+
+Reuse #7029's candidate-selection/evaluation separation, paired branch ledger and update/retention estimands. Reuse #7030's frozen evaluator state and action-dependent-observation controls. Do not expose evaluator labels, future task identities, change-point locations or HOLD/UPDATE assignment.
+
+### Structural-library lifecycle semantics
+
+Preserve #13401's existing lifecycle (`candidate`, `replayed`, `holdout_supported`, `qualified_in_scope`, `retracted`, `superseded`). Add evaluator dispositions for the particular transfer claim—`still_applicable`, `scope_limited`, `challenge_pending`, `suspended`, `rejected`—rather than allowing the learner to self-promote or silently overwrite prior knowledge. A previously qualified entry is not automatically valid for a new target, time, sensor or intervention scope.
+
+Every update must retain parent snapshot identity, evidence-prefix identity, changed entries, derived descendants, counterexamples and the reason for each state transition. At use time, resolve current applicability and invalidation through existing evidence/lifecycle owners; do not treat a stored vector or digest as proof that the relationship remains true.
+
+### Metrics
+
+- **Forward transfer:** target adaptation gain attributable to prior library content on new tasks/compositions.
+- **Backward transfer and forgetting:** changes in previously qualified family performance after later learning, reported by family and horizon.
+- **Negative transfer:** loss/regret increase caused by retrieved but inapplicable prior structure.
+- **Stale-use rate:** rate at which superseded, retracted, out-of-scope or contradicted entries influence a candidate prediction/action.
+- **Correction latency:** observations, actions, compute and wall time from a valid counterexample becoming available to correct scope/revision disposition.
+- **Counterexample propagation completeness:** proportion of derived entries that are correctly narrowed or invalidated after a necessary parent is retracted.
+- **Recurrence cost:** observations/interventions required to regain prior A performance after A → B → A, compared with cold-start and HOLD controls.
+- **Library churn and bloat:** bytes, entry revisions, duplicate/superseded records, retrieval candidates and index/update work over the whole stream.
+- **All-in transfer efficiency:** downstream quality versus acquisition, update, replay, memory, retrieval, verification, latency and energy cost.
+
+Do not optimize forgetting to zero. Under genuine mechanism change, refusing to reuse obsolete knowledge is correct; under recurrence, relearning a previously valid structure may be wasteful. Report adaptation and retention as competing outcomes, as #7029 requires.
+
+### Baselines and external adapters
+
+At matched stream, feedback, update and resource budgets, compare:
+
+- no persistent state; passive episodic cache; nearest-neighbour retrieval; standard retrieval-augmented memory; exact task/example lookup;
+- frozen acquired structural library; library-only update; model-parameter update with replay; modular/factorized model; hybrid library-plus-model update;
+- HOLD, no-op, random-trigger and counterexample-trigger branches;
+- cold-start target learning and evaluator-only oracle-library ceiling.
+
+Use CL-Bench for expert-validated cross-instance latent-structure reuse; CLE for staged professional workflows and diagnostic revision; Continual-ARC for recurring tasks after dormant gaps and memory-versus-weight comparison; and the 2026 compositional continual world-model benchmark for action/perception/full-composition reuse in robot manipulation. Use Memora/FAMA as an obsolete-memory stressor. Preserve every external benchmark's native tasks, splits, evaluator and reported metrics; an adapter is an additional lane, not permission to merge scores.
+
+### Gate 1B — continual value without harmful persistence
+
+Advance only when the UPDATE branch beats its paired HOLD and strongest matched memory/model control on a preregistered transfer or decision estimand, while (a) stale-use and false-transfer rates remain within the predeclared guardrails, (b) qualified prior capabilities do not regress beyond their declared margins, (c) counterexamples propagate to derived entries, and (d) total resources are charged. Include recurrence and drift families separately; a high average score cannot hide either needless forgetting or harmful retention.
+
+## 14. References (snapshot 2026-11-25)
+
+- Continual Learning Bench (CL-Bench, 2026-06-04): https://arxiv.org/abs/2606.05661
+- Continual Learning Exam (CLE, 2026-10-25): https://arxiv.org/abs/2610.33956
+- Continual-ARC (2026-11-10; v3 updated 2026-11-15): https://arxiv.org/abs/2611.14505
+- Compositional continual world models (2026-09-18): https://arxiv.org/abs/2609.22055
+- Memora / Forgetting-Aware Memory Accuracy: https://aclanthology.org/2026.findings-acl.1337/
+- Causal-Discovery-Bench (2026-10-13): https://arxiv.org/abs/2611.09934
 - Unsatz: https://arxiv.org/abs/2611.03713
 - Autonomous Science Bench: https://asb.open-ssi.org/about and https://asb.open-ssi.org/leaderboard
 - RoboDyna: https://arxiv.org/abs/2611.26969 and https://robodyna.github.io/robodyna/
