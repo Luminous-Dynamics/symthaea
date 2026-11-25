@@ -50,3 +50,30 @@ The fixture is schema-backed by schemas/mel-multi-annotator-reliability-dataset-
 
 
 The reliability report also retains a **separate model-vs-annotator evaluation** for every query item. It includes the exact model prediction, source/audio identity, frozen scorer plan, original pseudonymous annotation records, per-annotator model scores, and the #13560 coverage/F1/count/absence summaries. Dataset model-performance summaries are macro-averaged by source work and keep Present F1, exact count, one-to-many count-gated F1, Absent claim accuracy, coverage and fully-correct rate separate. The inter-annotator alpha and pairwise interval reliability remain independent quantities. This prevents a high/low alpha from being mistaken for model performance. Model confidence calibration is not computed.
+
+
+## Dual-stream annotation acquisition
+
+The temporal_acquisition module consumes candidate-level outputs from the #13560 per-annotator model scorer and #13617 dataset reliability evaluator. Each candidate binds:
+- exact source-work and recording digests;
+- the purpose scope and pseudonymous cohort role;
+- a rights/consent receipt digest;
+- the #13560 model-grounding report digest;
+- the #13617 inter-annotator reliability report digest;
+- a frozen cohort-assignment manifest digest;
+- annotation panel, cost, model-error, disagreement, count, coverage and boundary-dispersion signals.
+
+The planner produces two separate streams:
+
+1. Active refinement: deterministic priority bands for likely model failure on a stable/covered panel, human disagreement, coverage gaps and hidden repeated-event controls. It round-robins across source strata, enforces per-source-work caps, and respects active budget/quotas. An uncertain panel is routed to annotation refinement, not mislabelled as a clean model failure.
+2. Probability audit: source works are sampled uniformly within each stratum, then one eligible item is drawn uniformly within each selected source work. The report records source-work, conditional-item, and product inclusion probabilities. Per-stratum sample sizes are fixed before any random draw using worst-case item-cost reservation, so a cheap random item in an earlier stratum cannot change the sample size/probability in later strata.
+
+The active and audit source-work sets are required to be disjoint. Active selections are not a probability sample; probability-audit selections are not adapted to model error. Their results must not be pooled without the proper design weights. A non-selected item is unreviewed, not a negative event.
+
+Rights/consent receipt digests and diagnostic report digests are structurally validated and included in the replayable receipt, but this planner does not authenticate those external records. Its selection receipt is also not an authentication token.
+
+Run the synthetic dual-stream plan with:
+
+    cargo +1.96.0 run --locked --manifest-path tools/mel-temporal-grounding-qualifier/Cargo.toml --bin mel-annotation-acquisition-plan -- tools/mel-temporal-grounding-qualifier/fixtures/mel-annotation-acquisition.synthetic.json
+
+The committed fixture is 11 candidates across two strata. It is a deterministic planner control only; no human study, unbiased population estimate, or annotation-quality improvement is established.
