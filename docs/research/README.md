@@ -393,6 +393,9 @@ A falsifiable programme for spectral statistics, RH/prime-structure controls, ne
 - [Benchmark manifest schema](SPECTRAL_DYNAMICAL_BENCHMARK_MANIFEST_V1.schema.json)
 - [Dependency-free Rust analytic reference harness](../../scripts/research/sdcb_reference.rs)
 - [Reference harness run instructions and limits](../../scripts/research/SDCB_REFERENCE_HARNESS_README.md)
+- [Machine-readable reference receipt runner](../../scripts/research/sdcb_reference_receipt.rs)
+- [Reference receipt schema](SDCB_REFERENCE_CONTROL_RECEIPT_V1.schema.json)
+- [Scientific-discovery benchmark interoperability](SDCB_SCIENTIFIC_DISCOVERY_INTEROPERABILITY_V1.md)
 
 **Evidence boundary:** artifacts are research specifications and authored reference tests. Rust compilation/tests, model inference, generated trajectory experiments, hidden-set creation, external baseline reproduction, and scientific results remain pending.
 
