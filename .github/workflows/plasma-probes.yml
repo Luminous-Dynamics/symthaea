@@ -80,6 +80,10 @@ jobs:
           cp crates/domains/symthaea-plasma-probes/src/bin/sensor_actuator_contract_audit.rs "${crate_dir}/src/bin/sensor_actuator_contract_audit.rs"
           cp benchmarks/plasma/adversarial-probes/fixtures/synthetic-pulse-family-v0.1.json \
             "${tmp_root}/benchmarks/plasma/adversarial-probes/fixtures/"
+          cp benchmarks/plasma/adversarial-probes/response-weighted-refinement-v0.1.schema.json \
+            "${tmp_root}/benchmarks/plasma/adversarial-probes/"
+          cp benchmarks/plasma/adversarial-probes/fixtures/response-weighted-refinement-known-answer-v0.1.json \
+            "${tmp_root}/benchmarks/plasma/adversarial-probes/fixtures/"
           cp benchmarks/plasma/rate-distortion/kird-point-v0.1.schema.json \
             "${tmp_root}/benchmarks/plasma/rate-distortion/"
           cp benchmarks/plasma/rate-distortion/fixtures/synthetic-kird-point-v0.1.json \
@@ -360,6 +364,19 @@ jobs:
           assert paired[0]["expected_decision"] == "Hold" and paired[1]["expected_decision"] == "Refine"
           assert fixture["claim_boundary"]["spectral_solver_evaluated"] is False
           print("adaptive_refinement_schema_validation=PASS")
+
+          probe_root = Path("${{ runner.temp }}/plasma-probe-validation/benchmarks/plasma/adversarial-probes")
+          probe_schema = json.loads((probe_root / "response-weighted-refinement-v0.1.schema.json").read_text())
+          probe_fixture = json.loads((probe_root / "fixtures/response-weighted-refinement-known-answer-v0.1.json").read_text())
+          Draft202012Validator.check_schema(probe_schema)
+          Draft202012Validator(probe_schema).validate(probe_fixture)
+          expected = {item["mode"]: item for item in probe_fixture["expected"]["decisions"]}
+          assert expected[1]["spectral_energy"] > expected[2]["spectral_energy"]
+          assert expected[1]["response_loss_bound"] < expected[2]["response_loss_bound"]
+          assert expected[1]["disposition"] == "discarded_within_budget"
+          assert expected[2]["disposition"] == "retained_budget_exceeded"
+          assert probe_fixture["claim_boundary"]["no_physical_solver_run"] is True
+          print("response_weighted_refinement_schema_validation=PASS")
           PY
 
       - name: Run sensor/actuator timing semantic audit
