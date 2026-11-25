@@ -1327,6 +1327,43 @@ mod tests {
     }
 
     #[test]
+    fn model_performance_and_human_reliability_are_reported_on_separate_axes() {
+        let report = audit_multi_annotator_dataset(&balanced_agreement_dataset()).unwrap();
+        assert_eq!(report.model_grounding_summary.query_items, 6);
+        assert_eq!(report.model_grounding_summary.source_work_clusters, 3);
+        assert_eq!(report.model_grounding_summary.present_items, 3);
+        assert_eq!(report.model_grounding_summary.one_to_many_items, 3);
+        assert_eq!(report.model_grounding_summary.absent_items, 3);
+        assert_eq!(
+            report.model_grounding_summary.source_work_macro_present_mean_f1,
+            Some(1.0)
+        );
+        assert_eq!(
+            report.model_grounding_summary.source_work_macro_one_to_many_count_gated_f1,
+            Some(1.0)
+        );
+        assert_eq!(
+            report.model_grounding_summary.source_work_macro_absent_claim_accuracy,
+            Some(1.0)
+        );
+        assert_eq!(
+            report.model_grounding_summary.source_work_macro_prediction_coverage,
+            Some(1.0)
+        );
+        assert!(!report.model_grounding_summary.model_confidence_calibration_computed);
+        assert_eq!(report.model_grounding_by_item.len(), 6);
+        assert_eq!(report.model_grounding_by_item[0].annotations.len(), 3);
+        assert_eq!(
+            report.model_grounding_by_item[0].prediction.query_id,
+            report.model_grounding_by_item[0].query_id
+        );
+        assert_eq!(
+            report.model_grounding_by_item[0].artifact.audio_sha256,
+            report.model_grounding_by_item[0].prediction.artifact.audio_sha256
+        );
+    }
+
+    #[test]
     fn unanimous_states_with_prevalence_diversity_produce_alpha_one() {
         let report = audit_multi_annotator_dataset(&balanced_agreement_dataset()).unwrap();
         assert_eq!(report.summary.state_reliability.alpha, Some(1.0));
@@ -1353,6 +1390,11 @@ mod tests {
         let report = audit_multi_annotator_dataset(&data).unwrap();
         assert!(report.summary.state_reliability.alpha.unwrap() < 1.0);
         assert_eq!(report.summary.present_absent_disagreement_pairs, 2);
+        assert_eq!(
+            report.model_grounding_by_item[0].summary.absent_claim_accuracy,
+            Some(0.0)
+        );
+        assert!(report.model_grounding_summary.source_work_macro_absent_claim_accuracy.unwrap() < 1.0);
     }
 
     #[test]
