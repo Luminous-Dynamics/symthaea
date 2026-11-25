@@ -350,6 +350,18 @@ impl EpistemicLearner {
         &self.meta_phi
     }
 
+    /// Iterate over outcomes that retain independent adjudication provenance.
+    ///
+    /// Unadjudicated predictions are intentionally excluded from this view and
+    /// must not be used as correctness labels.
+    pub fn adjudicated_outcomes(
+        &self,
+    ) -> impl Iterator<Item = &VerificationOutcome> {
+        self.outcomes
+            .iter()
+            .filter(|outcome| outcome.adjudication_provenance.is_some())
+    }
+
     /// Get learning statistics
     pub fn stats(&self) -> LearnerStats {
         LearnerStats {
