@@ -36,6 +36,19 @@ These numbers come from different experiment designs and should not be combined 
 
 A file-disjoint split reduces one source of leakage. It does not establish host-, incident-, campaign-, time- or cross-corpus generalization. The known OOD failure remains until independently reproduced and repaired.
 
+
+## Agentic-threat behavioural baseline (new, unqualified)
+
+The `agent_behavior` module adds a deterministic, tenant/task-scoped feature baseline for autonomous-agent telemetry. It correlates normalized worker creation, destination expansion, API-read volume, privilege changes, model-endpoint drift, secret-access attempts, egress/scope enforcement, artifact provenance, and recovery-control events.
+
+- Findings carry event IDs, source collector IDs, and opaque verified-receipt references.
+- Mixed-tenant or mixed-task windows, duplicate event IDs, and missing source receipts are rejected.
+- Only independently observed committed boundary effects produce hard-gate findings; blocked egress/scope attempts remain detections, not safety violations.
+- A model-authored claim is not an effect. False recovery claims and platform acceptance of a false recovery claim are represented separately.
+- The module emits typed findings, not one compensatory risk score, and never performs remediation.
+
+**Limitations:** trusted adapters still need to perform source-receipt verification before constructing events; no production collectors or live response path are implemented here. Thresholds are starting points, not calibrated detection settings. This is a rules/feature baseline, not a claim of HDC/CfC advantage or SOTA. Rust tests have been added but must run in CI or a local Rust toolchain before this code is considered tested.
+
 ## Running the experiments
 
 Run from the Symthaea workspace in its pinned Nix development environment.
