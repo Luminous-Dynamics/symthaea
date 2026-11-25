@@ -16,6 +16,7 @@ pub mod frozen_decision_episode_manifest;
 pub mod sealed_evaluation_manifest;
 pub mod rfc9162_proofs;
 pub mod mace_evaluation_anchor_payload;
+pub mod mon005_record_adapter;
 
 // Copyright (C) 2026 Luminous Dynamics
 // SPDX-License-Identifier: AGPL-3.0-or-later
