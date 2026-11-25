@@ -257,3 +257,21 @@ The standard-library Rust reference harness includes 2x2 observability-rank, inp
 This adopts a critical lesson from current Koopman work: report the assumptions and conditions under which a spectral/dynamical approximation is learnable, and include adversarial systems where the same observations are consistent with different hidden dynamics. Identifiability is task-relative: the observed output may be predictable even when the hidden mechanism is not identifiable. The system should preserve that limited prediction while refusing the stronger mechanistic claim, then propose a sensor or excitation intervention that would distinguish the alternatives. A model that knows what it does not know—and how to reduce that uncertainty—is more scientifically useful than one that always emits a unique model.
 
 The pilot manifest now contains 28 design-only task specifications, 14 negative controls, and seven task families. No generated trajectory, fitted model or model performance has been measured.
+
+
+## 13. Sequential scientific discovery and benchmark interoperability
+
+SDCB now includes a sequential experiment-design family with four design-only tasks: budgeted multi-arm measurement, noisy/costed response-surface search, prior-misspecification recovery, and ranking of never-measured designs under held-out family shift. The pilot now contains 34 tasks across eight families, 20 negative controls and 16 outcome metrics.
+
+Do not create an isolated scientific-agent benchmark and claim leadership. Compose with existing suites using a non-invasive parallel report:
+- Autonomous Science Bench (ASB) for lab-like experiment selection and learning about unmeasured designs;
+- FIRE-Bench for independently rediscovering verifiable published findings;
+- SciAgentArena for interactive, stepwise-verified scientific research;
+- AstaBench for broad discovery-workflow coverage and cost;
+- SorryDB for real evolving Lean proof obligations;
+- Goedel-Prover-V2 for high-capability formal proving;
+- Open Agent Leaderboard / Exgentic for full-system capability and cost.
+
+Keep upstream scores untouched. Report SDCB's parallel dimensions: hypothesis discrimination, experiment value, cumulative regret, surprise detection/recovery, unmeasured-candidate ranking/calibration, identifiability/abstention, provenance, replayability and total cost. Discovery and learning are separate gates; no single aggregate score can hide failure of either.
+
+See [SDCB scientific-discovery benchmark interoperability](SDCB_SCIENTIFIC_DISCOVERY_INTEROPERABILITY_V1.md) for comparator scope, baseline policy and proposed integration sequence.
