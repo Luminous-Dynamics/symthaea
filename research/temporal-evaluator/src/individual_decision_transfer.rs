@@ -675,6 +675,25 @@ mod tests {
     }
 
     #[test]
+    fn every_action_can_be_epsilon_good_without_being_top1() {
+        let mut candidate = input(vec![
+            action("a", 1, 10, 0, 0),
+            action("b", 2, 8, 0, 0),
+            action("c", 3, 7, 100, 100),
+        ]);
+        candidate.epsilon_units = 3;
+        let certificate = evaluate_individual_decision_transfer(&candidate).unwrap();
+        assert_eq!(
+            certificate.realized_epsilon_good_action_ids,
+            vec!["a", "b", "c"]
+        );
+        assert_eq!(certificate.latent_selection.action_id, "c");
+        assert!(!certificate.latent_selection.is_realized_top1);
+        assert!(certificate.latent_selection.is_realized_epsilon_good);
+        assert_eq!(certificate.latent_selection.realized_regret_units, 3);
+    }
+
+    #[test]
     fn ties_use_lexicographically_first_action_id_for_selection() {
         let certificate = evaluate_individual_decision_transfer(&input(vec![
             action("b", 2, 8, 4, 3),
