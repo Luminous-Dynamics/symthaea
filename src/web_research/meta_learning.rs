@@ -219,7 +219,12 @@ impl EpistemicLearner {
         }
     }
 
-    /// Record a verification outcome for learning
+    /// Record an independently adjudicated ground-truth outcome for learning.
+    ///
+    /// Callers must not derive `was_correct` from predicted confidence,
+    /// epistemic status, source reputation, or the same verifier being
+    /// calibrated. The WebResearcher integration accepts these outcomes only
+    /// through its explicit adjudication boundary.
     pub fn record_outcome(&mut self, outcome: VerificationOutcome) -> anyhow::Result<()> {
         // Update source credibility
         self.update_source_credibility(&outcome);
