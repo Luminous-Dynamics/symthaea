@@ -277,8 +277,10 @@ impl VerifiedEvidenceQualificationV1 {
 
     /// Re-bind the verified capability to the exact query, subject/tenant scope,
     /// DecisionNeed, purpose, candidate set, policy and lifecycle snapshot at
-    /// consumption time. Live authorization and lifecycle checks remain
-    /// mandatory at consequential use.
+    /// consumption time, then re-verify its signature against the caller's
+    /// current pinned verifier. The verifier source itself must be fresh and
+    /// outside the candidate-store rollback domain. Live authorization and
+    /// lifecycle checks remain mandatory at consequential use.
     pub fn admissible_evidence_ids_for_use(
         &self,
         binding: &EvidenceQualificationBindingV1<'_>,
