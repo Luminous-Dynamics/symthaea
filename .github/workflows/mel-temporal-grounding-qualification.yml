@@ -108,6 +108,14 @@ jobs:
             and .event_reference_boundary_distributions[1].present_annotators == 3
             and (.unmatched_prediction_indices | length) == 0
             and (.annotator_results | length) == 6
+            and (.pairwise_annotation_concordance | length) == 15
+            and .summary.pairwise_annotation_pairs == 15
+            and .summary.pairwise_disposition_agreement_rate == 0.2
+            and .summary.pairwise_present_present_pairs == 3
+            and .summary.pairwise_present_exact_count_agreement > 0.33
+            and .summary.pairwise_present_exact_count_agreement < 0.34
+            and .summary.pairwise_present_symmetric_event_f1 > 0.77
+            and .summary.pairwise_present_symmetric_event_f1 < 0.78
             and .pairwise_inter_annotator_agreement_computed == false
             and .model_confidence_calibration_computed == false
             and .synthetic_consensus_ground_truth_created == false
