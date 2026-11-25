@@ -1,0 +1,265 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://luminousdynamics.io/schemas/mel-annotation-acquisition-plan-v1.schema.json",
+  "title": "MEL source-balanced annotation acquisition dataset v1",
+  "type": "object",
+  "additionalProperties": false,
+  "required": [
+    "dataset_id",
+    "config",
+    "candidates"
+  ],
+  "properties": {
+    "dataset_id": {
+      "type": "string",
+      "minLength": 1
+    },
+    "config": {
+      "$ref": "#/$defs/config"
+    },
+    "candidates": {
+      "type": "array",
+      "minItems": 1,
+      "items": {
+        "$ref": "#/$defs/candidate"
+      }
+    }
+  },
+  "$defs": {
+    "digest": {
+      "type": "string",
+      "pattern": "^[0-9a-f]{64}$"
+    },
+    "config": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "schema",
+        "planner_id",
+        "seed",
+        "minimum_panel_count",
+        "maximum_active_items_per_source_work",
+        "total_budget_units",
+        "active_budget_units",
+        "probability_audit_budget_units",
+        "model_error_threshold_ppm",
+        "human_disagreement_threshold_ppm",
+        "occurrence_count_disagreement_threshold_ppm",
+        "minimum_prediction_coverage_ppm",
+        "boundary_dispersion_threshold_ms",
+        "stratum_quotas"
+      ],
+      "properties": {
+        "schema": {
+          "const": "mel-annotation-acquisition-plan-v1"
+        },
+        "planner_id": {
+          "type": "string",
+          "minLength": 1
+        },
+        "seed": {
+          "type": "integer",
+          "minimum": 1
+        },
+        "minimum_panel_count": {
+          "type": "integer",
+          "minimum": 1,
+          "maximum": 65535
+        },
+        "maximum_active_items_per_source_work": {
+          "type": "integer",
+          "minimum": 1
+        },
+        "total_budget_units": {
+          "type": "integer",
+          "minimum": 1
+        },
+        "active_budget_units": {
+          "type": "integer",
+          "minimum": 0
+        },
+        "probability_audit_budget_units": {
+          "type": "integer",
+          "minimum": 0
+        },
+        "model_error_threshold_ppm": {
+          "type": "integer",
+          "minimum": 0,
+          "maximum": 1000000
+        },
+        "human_disagreement_threshold_ppm": {
+          "type": "integer",
+          "minimum": 0,
+          "maximum": 1000000
+        },
+        "occurrence_count_disagreement_threshold_ppm": {
+          "type": "integer",
+          "minimum": 0,
+          "maximum": 1000000
+        },
+        "minimum_prediction_coverage_ppm": {
+          "type": "integer",
+          "minimum": 0,
+          "maximum": 1000000
+        },
+        "boundary_dispersion_threshold_ms": {
+          "type": "integer",
+          "minimum": 0
+        },
+        "stratum_quotas": {
+          "type": "array",
+          "minItems": 1,
+          "items": {
+            "$ref": "#/$defs/quota"
+          }
+        }
+      }
+    },
+    "quota": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "source_stratum_id",
+        "active_minimum_items",
+        "active_maximum_items",
+        "audit_source_work_count"
+      ],
+      "properties": {
+        "source_stratum_id": {
+          "type": "string",
+          "minLength": 1
+        },
+        "active_minimum_items": {
+          "type": "integer",
+          "minimum": 0
+        },
+        "active_maximum_items": {
+          "type": "integer",
+          "minimum": 0
+        },
+        "audit_source_work_count": {
+          "type": "integer",
+          "minimum": 0
+        }
+      }
+    },
+    "candidate": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "item_id",
+        "query_id",
+        "source_work_id_sha256",
+        "recording_sha256",
+        "source_stratum_id",
+        "task_family",
+        "purpose_scope",
+        "cohort_role",
+        "authorization_state",
+        "authorization_receipt_sha256",
+        "current_annotation_count",
+        "maximum_annotation_count",
+        "annotation_cost_units",
+        "model_error_ppm",
+        "human_disagreement_ppm",
+        "occurrence_count_disagreement_ppm",
+        "prediction_coverage_ppm",
+        "boundary_dispersion_ms",
+        "hidden_repeat_control"
+      ],
+      "properties": {
+        "item_id": {
+          "type": "string",
+          "minLength": 1
+        },
+        "query_id": {
+          "type": "string",
+          "minLength": 1
+        },
+        "source_work_id_sha256": {
+          "$ref": "#/$defs/digest"
+        },
+        "recording_sha256": {
+          "$ref": "#/$defs/digest"
+        },
+        "source_stratum_id": {
+          "type": "string",
+          "minLength": 1
+        },
+        "task_family": {
+          "type": "string",
+          "minLength": 1
+        },
+        "purpose_scope": {
+          "type": "string",
+          "minLength": 1
+        },
+        "cohort_role": {
+          "enum": [
+            "Development",
+            "ActiveRefinement",
+            "ConfirmatoryAudit"
+          ]
+        },
+        "authorization_state": {
+          "enum": [
+            "Authorized",
+            "Denied",
+            "Unknown"
+          ]
+        },
+        "authorization_receipt_sha256": {
+          "oneOf": [
+            {
+              "$ref": "#/$defs/digest"
+            },
+            {
+              "type": "null"
+            }
+          ]
+        },
+        "current_annotation_count": {
+          "type": "integer",
+          "minimum": 0,
+          "maximum": 65535
+        },
+        "maximum_annotation_count": {
+          "type": "integer",
+          "minimum": 1,
+          "maximum": 65535
+        },
+        "annotation_cost_units": {
+          "type": "integer",
+          "minimum": 1
+        },
+        "model_error_ppm": {
+          "type": "integer",
+          "minimum": 0,
+          "maximum": 1000000
+        },
+        "human_disagreement_ppm": {
+          "type": "integer",
+          "minimum": 0,
+          "maximum": 1000000
+        },
+        "occurrence_count_disagreement_ppm": {
+          "type": "integer",
+          "minimum": 0,
+          "maximum": 1000000
+        },
+        "prediction_coverage_ppm": {
+          "type": "integer",
+          "minimum": 0,
+          "maximum": 1000000
+        },
+        "boundary_dispersion_ms": {
+          "type": "integer",
+          "minimum": 0
+        },
+        "hidden_repeat_control": {
+          "type": "boolean"
+        }
+      }
+    }
+  }
+}
