@@ -288,19 +288,35 @@ Use existing benchmarks as comparators and adapters, not as substitutes for this
 
 | External work | What it already measures | Gap this programme targets |
 |---|---|---|
+| [DelegateGuard](https://arxiv.org/abs/2610.16005) | Purpose-bound capabilities over holder, purpose, labels, operations, sinks, delegation depth and cascading revocation; adaptive attacks and five enterprise workflows | Treat as the closest direct authority/delegation comparator. Extend evaluation to source-label trust, authorized-but-observable sinks, content governance, physical effect sinks, long-horizon action and human consent/appeal |
 | [AuditBench](https://alignment.anthropic.com/2026/auditbench/) | 56 fine-tuned models, 14 hidden behaviors and 13 investigator tool configurations | Add attack on the auditor, evaluator and evidence chain; require benign controls and verified findings |
 | [Training Alignment Auditors via RL](https://alignment.anthropic.com/2026/training-alignment-auditors/) | Auditor training; reports pointwise reward hacking and improved robustness from pairwise rewards plus benign-target calibration | Qualify reward hacking, false positives and cross-family transfer as first-class outcomes |
-| [SHADE-Arena control protocols](https://arxiv.org/abs/2511.02997) | Red/blue control protocols against untrusted agents and adaptive attacks | Add hard effect-sink capability enforcement, authority lineage, revocation and evidence continuity |
+| [SHADE-Arena control protocols](https://arxiv.org/abs/2511.02997) | Red/blue control protocols against untrusted agents and adaptive attacks; naive-protocol results can deteriorate when attackers simulate monitors | Compare critical-action deferral, trusted review and externally enforced sink capabilities under adaptive attacker knowledge |
+| [ControlArena](https://control-arena.aisi.org.uk/) | Open framework for AI-control experiments, settings, monitor/policy micro-protocols and attack-aware evaluations | Build a SAT adapter and benchmark owner-native controls; do not rebuild an evaluation runner |
 | [AgentDojo](https://proceedings.neurips.cc/paper_files/paper/2024/hash/97091a5177d8dc64b1da8bf3e1f6fb54-Abstract-Datasets_and_Benchmarks_Track.html) | 97 realistic tasks and 629 prompt-injection security cases | Add multi-agent capability composition and post-effect verification |
 | [AgentHarm](https://www.aisi.gov.uk/research/agentharm-a-benchmark-for-measuring-harmfulness-of-llm-agents) | 110 malicious agent tasks, 440 with augmentations and 11 harm categories | Add defense-side authority control and evidence-qualified outcomes |
+| [LADDER](https://ladderrobotics.ai/research) | 145 long-horizon manipulation tasks, 1–10 subgoals, three suites, two embodiments and 2,024 simulated episodes per system | Measure evidence-gated mission completion, recovery, subgoal verification and authority at physical mutation boundaries |
 | [Inspect](https://inspect.aisi.org.uk/) | Extensible evaluation framework with more than 200 prebuilt evaluations | Integrate where useful; contribute task adapters rather than rebuild a general runner |
 | [International AI Safety Report 2026](https://internationalaisafetyreport.org/publication/international-ai-safety-report-2026) | Synthesis of current evidence, capability and control concerns | Convert unresolved evidence gaps into explicit, testable failure modes |
 
+### Critical novelty and prior-art boundary
+
+DelegateGuard is a close and important 2026 comparator, not something SAT may present as a novel invention. It uses a model-independent reference monitor and purpose-bound attenuable capabilities over holder, purpose, data labels, operations, sinks and delegation depth, with cascading revocation. Its deterministic conformance set reports 45/45 benign actions allowed and 45/45 specified violations blocked; its adaptive-within-authority study reports 3 leaks in 26 attacks for its capability monitor, compared with 18/26 unrestricted, 3/26 static allowlists, 3/26 label-flow IFC and 0/26 output monitoring (which false-blocked four of five benign controls). Its remaining leaks pass through a legitimate but externally observable code-review sink. The paper proves that a content- and quantity-blind capability predicate cannot prevent arbitrary secret disclosure through an authorized observable sink; capability enforcement therefore needs composition with content governance or declassification. It also identifies important limits: JSON-envelope tool mediation, connector-owned labels, a trusted adapter/root-grant problem, and no unconstrained human collaboration or open-ended long-horizon agent dynamics. These are paper-reported results on its stated setup, not universal performance estimates. [DelegateGuard paper](https://arxiv.org/abs/2610.16005).
+
+**SAT's research claim must therefore be about end-to-end composition and qualification, not inventing capability attenuation.** Required extensions beyond the closest comparator:
+
+1. **Root-of-authority qualification:** test overbroad or compromised issuer/adapter policy, provenance of source labels, purpose assignment, expiry, trust-root rotation and revocation currentness.
+2. **Authorized-sink content safety:** test the hard case where an action is legitimately authorized but the payload is not. Compare purpose-bound declassification, content-aware inspection, human approval and explicit withholding; measure both leakage and legitimate-task false blocks.
+3. **Mediation completeness:** try direct sockets, unregistered tools, shared memory, plugin egress, subprocesses, alternate transports, persistence and side channels outside the declared reference-monitor boundary.
+4. **Effect truth:** distinguish permission, dispatch, sink acceptance, physical/institutional effect and independently verified postcondition. Compose Symtropy #6498/#6669 and Mycelix #803/#830 rather than claiming a capability monitor proves an effect occurred.
+5. **Long-horizon and human settings:** extend beyond structured JSON actions into multi-stage plans, persistent memory, agent swarms, physical missions and human consent/appeal/withdrawal. Reuse LADDER and Mycelix #5999/#6089/#6597/#6616 rather than redefine their owners.
+6. **Independent auditor assurance:** verify that the auditor's finding itself is supported by source-grounded, reproducible evidence and that benign controls remain benign under adaptive evaluation.
+
 The differentiation is not a claim to beat every benchmark's headline score. The competitive claim should be narrower and stronger:
 
-> At matched authorized-task utility, our composed architecture should have a measurably lower rate of unauthorized effects and false audit conclusions under adaptive attack, with independently verifiable evidence and no loss of human decision rights.
+> At matched authorized-task utility, the composed Luminous system should reduce unauthorized effects, payload leakage through authorized sinks, false audit conclusions and unverified completion under adaptive attack—while preserving independent human authority and providing reproducible cross-domain evidence.
 
-Report the complete risk/utility curve, resource cost and exact evaluation conditions. Only make comparative claims after reproducing the relevant external baseline under a compatible harness and license.
+Report the complete risk/utility frontier, payload-leakage and false-block trade-off, resource cost, mediation coverage, and exact evaluation conditions. Only make comparative claims after reproducing the relevant external baseline under a compatible harness and license.
 
 ## 9. Research sequence that does not depend on CI runners
 
@@ -309,8 +325,10 @@ Report the complete risk/utility curve, resource cost and exact evaluation condi
 - Reuse #4155 for the Phi/authority registry and behavior tests.
 - Reuse #5439 for cognitive-caution versus permission semantics.
 - Reuse #10064 for untrusted execution isolation.
-- Reuse #13518 / #13550 / #13565 for evidence and independent qualification.
-- Reuse Mycelix #5999 / #6089 / #6597 for rights-aware group outcomes.
+- Reuse #13518 / #13550 / #13565 and #13597 / #13599 / #13600 for evidence, trust continuity, signer revalidation and sealed evaluator inputs.
+- Reuse Mycelix #5999 / #6089 / #6597 / #6616 and #6069 / #4835 for rights-aware group outcomes, information ordering and institutional reconstruction.
+- Reuse Symtropy #6498 / #6669 / #6698 / #6477 for mission state, final mutation linearization, safe concurrency and long-horizon physical evaluation.
+- Treat DelegateGuard as the closest capability/delegation baseline; make content-governance and observable-sink tests explicit rather than assuming authority mediation is sufficient.
 - Freeze a dependency map and explicit owner for each integration surface.
 
 ### Slice 1 — design-only benchmark corpus
@@ -321,7 +339,7 @@ No untrusted program, build script, patch, model-generated attack payload or phy
 
 ### Slice 2 — pure reference model
 
-Implement a small, deterministic Rust reference model for capability attenuation, expiry, revocation, exact-action binding and unknown-outcome handling. Compare it to an independently implemented test oracle. Keep this model separate from production authority implementations so it can challenge them rather than silently share their assumptions.
+Implement a small, deterministic Rust reference oracle for exact effect identity, capability scope, delegation attenuation, expiry and lineage revocation. Keep it separate from production authority implementations and compare it with DelegateGuard's purpose/label/sink capability semantics. The reference crate intentionally does not implement mutation reconciliation; Symtropy #6498/#6669 own that state machine and final sink boundary. Do not claim the bounded oracle alone proves system-wide authority non-amplification.
 
 ### Slice 3 — safe local adversarial harness
 
@@ -329,7 +347,7 @@ Only after the isolation gate is qualified, run the harness in an isolated dispo
 
 ### Slice 4 — matched external comparisons
 
-Add compatible adapters for SHADE-Arena, AgentDojo, AgentHarm and AuditBench. Record exact dataset versions, licenses, model/provider versions, prompts, scaffolds, tool policies, graders and resource budgets.
+Add compatible adapters for DelegateGuard, SHADE-Arena / ControlArena, AgentDojo, AgentHarm and AuditBench, plus LADDER for physical missions. Record exact dataset versions, licenses, model/provider versions, prompts, scaffolds, tool policies, adapters, graders and resource budgets. Keep official benchmark scores separate from SAT-specific extensions.
 
 ### Slice 5 — independent and human evaluation
 
@@ -367,6 +385,9 @@ This is a bounded operational assurance case, not a proof of universal alignment
 
 ## 12. Research references
 
+- Tran-Truong et al., [DelegateGuard: Purpose-Bound Capabilities for Delegated LLM Agent Workflows](https://arxiv.org/abs/2610.16005), 12 October 2026.
+- [ControlArena](https://control-arena.aisi.org.uk/), UK AI Security Institute and Redwood Research.
+- Petkov et al., [LADDER: A Long-Horizon Robot Manipulation Benchmark](https://arxiv.org/abs/2610.18053), 2026.
 - Sheshadri et al., [AuditBench: Evaluating Alignment Auditing Techniques on Models with Hidden Behaviors](https://arxiv.org/abs/2602.22755), 2026.
 - Rosu and Wang, [Training Alignment Auditors via Reinforcement Learning](https://alignment.anthropic.com/2026/training-alignment-auditors/), 15 October 2026.
 - Kutasov et al., [Evaluating Control Protocols for Untrusted AI Agents](https://arxiv.org/abs/2511.02997), 2025.
