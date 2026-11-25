@@ -394,7 +394,7 @@ mod tests {
             schema_version: DECISION_EPISODE_MANIFEST_SCHEMA_V1.to_owned(),
             episode_id: id.to_owned(),
             suite: DecisionEpisodeSuiteV1 {
-                suite_id: "mace-suite".to_owned(),
+                suite_id: "mace-test".to_owned(),
                 suite_version: "v1".to_owned(),
                 task_family: "memory-governance".to_owned(),
                 split: DecisionEpisodeSplitV1::HeldOut,
