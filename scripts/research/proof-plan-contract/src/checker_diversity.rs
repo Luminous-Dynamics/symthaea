@@ -112,6 +112,20 @@ pub fn validate_registry(registry: &Value) -> Vec<String> {
     {
         push(&mut errors, "registry status must not imply an observed checker run");
     }
+    if object_string(registry, "scope") != Some("lake_comparator_paranoid_bundle_only") {
+        push(&mut errors, "registry scope must be Lake comparator paranoid bundle only");
+    }
+    let external = registry.get("external_landscape").unwrap_or(&Value::Null);
+    if object_string(external, "source_url") != Some("https://arena.lean-lang.org/")
+        || object_string(external, "captured_date") != Some("2026-11-25")
+        || object_string(external, "round_status") != Some("mutable_current_round_not_archived")
+        || external.get("visible_checker_count").and_then(Value::as_u64) != Some(37)
+        || external.get("reported_languages").and_then(Value::as_u64) != Some(15)
+        || external.get("downloadable_suite").and_then(|v| v.get("good_tests")).and_then(Value::as_u64) != Some(138)
+        || external.get("downloadable_suite").and_then(|v| v.get("bad_tests")).and_then(Value::as_u64) != Some(92)
+    {
+        push(&mut errors, "external Arena landscape must remain a separate 2026-11-25 mutable 37-checker snapshot");
+    }
 
     let map = match checker_map(registry) {
         Ok(map) => map,
