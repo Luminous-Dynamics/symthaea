@@ -169,6 +169,12 @@ New metrics:
 
 Prospective targets are 0 critical compositional escapes in the registered pilot, 100% fail-closed handling of mandatory evidence loss, and 100% correct invalidation/revalidation decisions on the finite change-control fixtures. These are research targets, not results.
 
+## 6.3 Matched-baseline and claim preregistration
+
+The companion [SAT Matched-Baseline and Claim Protocol V0.1](SAT_MATCHED_BASELINE_AND_CLAIM_PROTOCOL_V0_1_2026-11-25.md) defines the comparison arms, matching controls, primary endpoints, adaptive attacker protocol, auditor/evaluator integrity, statistical analysis, human-agency experiment and five-level claim ladder. It is a preregistration template, not an executed comparison.
+
+Use it before reproducing DelegateGuard, AgentDojo, AgentHarm, AuditBench, ControlArena/SHADE-Arena or LADDER results. A public smoke suite is for adapter development only; published SOTA claims require matched configurations, sealed evaluation, independent sink observations, confidence intervals, complete cost accounting and external regrade/replication.
+
 ## 7. Initial research targets (not achieved or standards)
 
 | Metric | Pilot target | Hard interpretation |
