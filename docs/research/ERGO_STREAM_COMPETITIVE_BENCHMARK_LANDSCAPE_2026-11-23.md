@@ -193,6 +193,18 @@ Compositional continual world-model research (2026) isolates reuse by composing 
 
 Sources: https://arxiv.org/abs/2606.05661 · https://arxiv.org/abs/2610.33956 · https://arxiv.org/abs/2611.14505 · https://arxiv.org/abs/2609.22055 · https://aclanthology.org/2026.findings-acl.1337/
 
+### Explicit structural witnesses must beat simpler transfer diagnostics
+
+The FOR/ETC result creates a high bar for ERGOstream. A 2026 AAAI study proposes Feature Overlap Rate (FOR)—how much target representation lies in the source-induced subspace—and Effective Task Complexity (ETC)—entropy of latent subtasks. Across six GLUE transfer pairs, the paper reports that FOR and ETC together explain over 80% of transfer-risk variance, while the tested classical distribution divergences do not. This is not evidence for graph or causal correspondence, but it is a strong challenge to any claim that explicit structural maps are needed to predict transfer.
+
+A complementary ICML 2026 graph-foundation-model theory decomposes transfer output shift into finite-sample approximation and a relabeling-invariant structural domain discrepancy under graphon/dense-graph assumptions, and analyzes positional-encoding stability. That suggests a direct data-centric diagnostic baseline. The graphon assumptions must not be silently extended to sparse, directed, temporal or hypergraph families.
+
+ReCoG (2026-11-01) supplies an adversarial architectural baseline: it reports that removing many source-graph edges improved cross-domain transfer across four representative pretraining methods. Its relative node contexts aim to preserve reusable neighborhood/topological information without relying on raw graph ordering. Reported results include gains across 18 target datasets. This directly tests whether ERGOstream's explicit raw structural representation is sometimes a transfer liability.
+
+**Response:** the preregistered ERGOstream tournament now nests diagnostics: source-only task metadata; FOR/ETC and MMD/Wasserstein; graphon discrepancy/PE stability only where appropriate; then candidate-produced structural-witness scope, relation-kind, transform and ambiguity features; then prospective discriminating-probe forecasts. Compare full-graph, edge-thinned, relative-context, witness-only and hybrid systems at matched capacity/data/compute. The witness layer must demonstrate incremental predictive or decision value on sealed generator families, with improved calibration and no false-transfer/resource regression. If FOR/ETC explains transfer outcomes as well as explicit witnesses, report that structural witnesses have not demonstrated incremental predictive value—even if they remain useful as audit contracts.
+
+References: https://doi.org/10.1609/aaai.v40i25.39270 · https://proceedings.mlr.press/v306/zhu26e.html · https://arxiv.org/abs/2611.01753
+
 ### Structural transfer should be diagnosed, not presumed
 
 The 2026 AAAI paper *Unified Structural Factors for Transfer Learning Generalization with PAC-Bayesian Guarantees* proposes Feature Overlap Rate (FOR) and Effective Task Complexity (ETC) as factors explaining transfer risk. The authors report that their pair explains over 80% of transfer-risk variance across six GLUE transfer pairs. This is a theoretical/representation-level diagnostic, not a standalone structural-discovery benchmark.
@@ -402,6 +414,9 @@ The current ErgoStream baseline is an offline split-conformal predictor conditio
 - CARV compositional visual analogy: https://arxiv.org/abs/2603.27958
 - ERD / latent displacement analogical reasoning: https://proceedings.mlr.press/v326/dats26a.html
 - Continual Learning of Domain-Invariant Representations (ICML 2026): https://proceedings.mlr.press/v306/janetzky26a.html
+- Unified Structural Factors / Feature Overlap Rate and Effective Task Complexity (AAAI 2026): https://doi.org/10.1609/aaai.v40i25.39270
+- When Do Graph Foundation Models Transfer? A Data-Centric Theory (ICML 2026): https://proceedings.mlr.press/v306/zhu26e.html
+- ReCoG: Relative Node Contexts for Multi-Domain Graph Pre-training (2026-11-01): https://arxiv.org/abs/2611.01753
 - Continual Learning Bench (CL-Bench, 2026): https://arxiv.org/abs/2606.05661
 - Continual Learning Exam (CLE, 2026): https://arxiv.org/abs/2610.33956
 - Continual-ARC (2026): https://arxiv.org/abs/2611.14505
