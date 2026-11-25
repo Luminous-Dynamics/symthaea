@@ -410,10 +410,8 @@ fn validate_policy(policy: &CaOcrcPolicyV1) -> Result<(), CaOcrcErrorV1> {
     }
     validate_distribution(&policy.proxy_distribution, policy.maximum_real_delay)?;
     let load = proxy_tracking_load_v1(&policy.proxy_distribution)?;
-    let final_survival = proxy_survival_probability_v1(
-        &policy.proxy_distribution,
-        policy.maximum_real_delay,
-    )?;
+    let final_survival =
+        proxy_survival_probability_v1(&policy.proxy_distribution, policy.maximum_real_delay)?;
     if final_survival <= 0.0 {
         return Err(CaOcrcErrorV1(
             "F(d_max) must be positive for a finite arbitrary-delay theorem bound".into(),
@@ -938,8 +936,7 @@ fn process_round_inner(
             } else {
                 engine.guarantee_state =
                     CaOcrcGuaranteeStateV1::UncertifiedInvalidOrOutOfModelFeedback;
-                engine.rejected_feedback_count =
-                    engine.rejected_feedback_count.saturating_add(1);
+                engine.rejected_feedback_count = engine.rejected_feedback_count.saturating_add(1);
                 CaOcrcFeedbackDispositionV1::Rejected
             };
             feedback_receipts.push(feedback_receipt(
