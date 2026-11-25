@@ -863,7 +863,10 @@ mod tests {
     fn quadratic_term_is_limited_to_direct_response_and_bounded_coefficients() {
         assert!(NumericWorld::new_with_quadratic_term(direct_truth(), 1).is_ok());
         assert!(matches!(
-            NumericWorld::new_with_quadratic_term(direct_truth(), MAX_STRUCTURAL_QUADRATIC_TERM + 1),
+            NumericWorld::new_with_quadratic_term(
+                direct_truth(),
+                MAX_STRUCTURAL_QUADRATIC_TERM + 1
+            ),
             Err(NumericError::InvalidStructuralTerm)
         ));
         assert!(matches!(
