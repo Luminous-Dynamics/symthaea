@@ -261,6 +261,8 @@ fn validate_fixture(
         "fixture_id",
         "family",
         "claim",
+        "claim_scope",
+        "label_provenance",
         "claim_reference_time",
         "verification_time",
         "model_knowledge_cutoff",
@@ -280,6 +282,71 @@ fn validate_fixture(
     required_string(map, "family", &path, issues);
     required_string(map, "claim", &path, issues);
     required_string(map, "description", &path, issues);
+
+    if let Some(scope_value) = map.get("claim_scope") {
+        if let Some(scope) = object(scope_value, &format!("{path}.claim_scope"), issues) {
+            const SCOPE_KEYS: &[&str] = &[
+                "population",
+                "outcome_or_measure",
+                "quantifier_or_effect",
+                "domain_or_reference_boundary",
+                "scope_note",
+            ];
+            validate_exact_keys(scope, SCOPE_KEYS, &format!("{path}.claim_scope"), issues);
+            for key in SCOPE_KEYS {
+                required_string(scope, key, &format!("{path}.claim_scope"), issues);
+            }
+        }
+    } else {
+        issue(issues, format!("{path}.claim_scope"), "required claim scope object is missing");
+    }
+
+    if let Some(provenance_value) = map.get("label_provenance") {
+        if let Some(provenance) = object(
+            provenance_value,
+            &format!("{path}.label_provenance"),
+            issues,
+        ) {
+            const PROVENANCE_KEYS: &[&str] = &[
+                "label_status",
+                "authority_id",
+                "evidence_reference",
+                "independent_of_candidate",
+                "permitted_use",
+            ];
+            validate_exact_keys(
+                provenance,
+                PROVENANCE_KEYS,
+                &format!("{path}.label_provenance"),
+                issues,
+            );
+            if required_string(provenance, "label_status", &format!("{path}.label_provenance"), issues)
+                != Some("SYNTHETIC_KNOWN_ANSWER")
+            {
+                issue(
+                    issues,
+                    format!("{path}.label_provenance.label_status"),
+                    "only synthetic known-answer labels are allowed in v0.1",
+                );
+            }
+            required_string(provenance, "authority_id", &format!("{path}.label_provenance"), issues);
+            required_string(provenance, "evidence_reference", &format!("{path}.label_provenance"), issues);
+            required_string(provenance, "permitted_use", &format!("{path}.label_provenance"), issues);
+            if provenance.get("independent_of_candidate").and_then(Value::as_bool) != Some(true) {
+                issue(
+                    issues,
+                    format!("{path}.label_provenance.independent_of_candidate"),
+                    "known-answer labels must remain evaluator-only",
+                );
+            }
+        }
+    } else {
+        issue(
+            issues,
+            format!("{path}.label_provenance"),
+            "synthetic label provenance is required",
+        );
+    }
 
     for key in [
         "claim_reference_time",
