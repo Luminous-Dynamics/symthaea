@@ -398,7 +398,26 @@ mod tests {
         ).unwrap();
         assert_eq!(
             payload.mon005_payload_sha256(),
-            "0000000000000000000000000000000000000000000000000000000000000000"
+            "117579a8803ecedd6b5eee4efbc73c4fe66ce9088c7687a5b8785ac4815d1154"
+        );
+    }
+
+    #[test]
+    fn pre_anchor_payload_omits_log_coordinates_and_is_stable() {
+        let (manifest, verified, witness) = test_verified_sealed_evaluation_fixture_v1();
+        let payload = build_mace_evaluation_anchor_payload_v1(
+            &manifest,
+            &verified,
+            &witness,
+            &expected(),
+        ).unwrap();
+        let wire = serde_json::to_value(payload.payload()).unwrap();
+        assert!(wire.get("anchor_log_id").is_none());
+        assert!(wire.get("anchor_entry_id").is_none());
+        assert!(wire.get("committed_at_unix").is_none());
+        assert_eq!(
+            payload.payload_sha256(),
+            "117579a8803ecedd6b5eee4efbc73c4fe66ce9088c7687a5b8785ac4815d1154"
         );
     }
 
