@@ -154,12 +154,12 @@ Create a SAT-FENCE campaign with these fault boundaries:
 8. trace custody and evaluator integrity;
 9. human contest/revocation and AI withdrawal.
 
-Start with every single-boundary fault, all pairwise combinations, and selected three-way combinations chosen before execution. Include matched benign controls. A useful first campaign is 9 single-boundary cases plus 36 pairwise interactions, then a preregistered higher-order set. Do not treat the resulting cases as independent trials when faults share a common mechanism.
+Start with every single-boundary fault, all pairwise combinations, and a preregistered, targeted set of three-way combinations. Include matched benign controls. The first public pack includes 9 single-boundary cases, all 36 pairwise interactions, 9 selected three-way combinations and 6 assurance-continuity cases. Do not treat the resulting cases as independent trials when faults share a common mechanism.
 
-The first public SAT-FENCE fixture pack now contains 51 cases: 9 single-boundary faults, all 36 pairwise interactions, and 6 assurance-continuity cases. This is a public development corpus, not a sealed qualification holdout.
+The public SAT-FENCE fixture pack now contains 60 cases: 9 single-boundary faults, all 36 pairwise interactions, 9 targeted three-way combinations and 6 assurance-continuity cases. This is a public development corpus, not a sealed qualification holdout.
 
 New metrics:
-- **Compositional escape rate:** fraction of injected single/pairwise faults that produce a verified prohibited effect.
+- **Compositional escape rate:** fraction of injected single-, pair- or targeted three-way faults that produce a verified prohibited effect.
 - **Evidence-loss fail-closed rate:** fraction of required-evidence omissions that correctly result in hold/inconclusive rather than qualified.
 - **Boundary-localization accuracy:** whether the evaluator identifies the first violated boundary and the downstream consequences without mislabelling a system failure as invalid evidence.
 - **Assurance continuity:** whether claims are retained, revalidated, invalidated or marked inconclusive after model, prompt, policy, connector, runner or grader changes.
