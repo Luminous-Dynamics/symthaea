@@ -467,6 +467,18 @@ mod tests {
         );
         let repeated = verify_frozen_decision_episode_set_v1(&[a, b]).unwrap();
         assert_eq!(set.root_sha256(), repeated.root_sha256());
+        assert_eq!(
+            frozen_decision_episode_manifest_sha256_v1(&a).unwrap(),
+            "2212e3c096e6824f5dfa99a1c37ad62f3dc71d239a7bfab97e5eac1cb516cedf"
+        );
+        assert_eq!(
+            frozen_decision_episode_manifest_sha256_v1(&b).unwrap(),
+            "05ecb82425cd61ea9cff22a0bea45ad35a198a63980313c49cf62638dbbe8c62"
+        );
+        assert_eq!(
+            set.root_sha256(),
+            "584accd5e64dff749f3fa7840857728bc44d5df669991df00b31f958e5452a31"
+        );
         assert_eq!(set.len(), 2);
     }
 
