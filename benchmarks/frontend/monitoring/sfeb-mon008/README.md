@@ -1,43 +1,41 @@
 # SFEB MON-008 — authenticated checkpoint preflight
 
-**Status:** research reference implementation; draft PR stacked on [MON-007 #13551](https://github.com/Luminous-Dynamics/symthaea/pull/13551), tracked by [MON-008 issue #13583](https://github.com/Luminous-Dynamics/symthaea/issues/13583).
+**Status:** research reference implementation; draft PR [#13620](https://github.com/Luminous-Dynamics/symthaea/pull/13620), stacked on [MON-007 PR #13551](https://github.com/Luminous-Dynamics/symthaea/pull/13551). Follow-on programme: [issue #13583](https://github.com/Luminous-Dynamics/symthaea/issues/13583).
 
-MON-008 moves beyond checking Merkle proof relationships. This increment adds domain-separated Ed25519 checkpoint authentication, external bootstrap pins (no TOFU), sequential dual-threshold trust-root rotation, monotonic tree/time/policy state, RFC 9162 extension checks, and witness quorums counted by distinct configured failure domains. An older witness view needs its own consistency path to the accepted head. Go and Node independently generate and verify each other's checkpoint and witness fixtures.
+MON-008 extends MON-007's independent RFC 9162 proof checks with authenticated, monotonic checkpoint observations. It adds domain-separated Ed25519 signatures, an externally provisioned bootstrap pin (no TOFU), sequential dual-threshold root rotation, policy-version/digest continuity, tree-extension proofs, witness quorums counted by distinct configured failure domains, per-witness last-seen state, and Go/Node cross-language fixtures.
 
-## Critical boundaries
+## Reproduce
 
-The binary signing profile here is a test profile, **not COSE and not wire-compatible with RFC 9942**. It does not parse RFC 9942 receipts, RFC 9943 Signed Statements or historical policy collateral. It is a pre-adapter executable model, not a replacement transparency service.
-
-Verifier state is in memory. Snapshot rollback resistance is a deployment responsibility. The verifier retains the active trust root only; historical archive replay needs a separately retained and validated root-update chain. Witness failure-domain labels are configured out of band and require independent operational auditing. Signatures, Merkle proofs and witness agreement do not establish that an external action actually happened.
-
-## Reproduce from the repository root
+From a clean checkout of this branch, run:
 
 ```sh
-for f in checkpoint/profile.go checkpoint/profile_test.go cmd/checkpoint-vectors/main.go; do
-  gzip -dc "benchmarks/frontend/monitoring/sfeb-mon008/go/${f}.gz" > "benchmarks/frontend/monitoring/sfeb-mon008/go/${f}"
-done
-for f in checkpoint.mjs checkpoint.test.mjs generate-vectors.mjs; do
-  gzip -dc "benchmarks/frontend/monitoring/sfeb-mon008/js/${f}.gz" > "benchmarks/frontend/monitoring/sfeb-mon008/js/${f}"
-done
-for f in go-generated-v1.json node-generated-v1.json; do
-  gzip -dc "benchmarks/frontend/monitoring/sfeb-mon008/js/testdata/${f}.gz" > "benchmarks/frontend/monitoring/sfeb-mon008/js/testdata/${f}"
-done
-cd benchmarks/frontend/monitoring/sfeb-mon008/go
-go test -count=1 ./...
-go test -race -count=1 ./...
-go vet ./...
-go test -cover ./...
-go test -run '^$' -bench 'BenchmarkVerifyCheckpointWitnessQuorum' -benchmem -count=5 ./checkpoint
-cd ../js
-node --test checkpoint.test.mjs
+bash benchmarks/frontend/monitoring/sfeb-mon008/scripts/reproduce.sh
 ```
 
-The parent MON-007 Go module supplies RFC 9162 consistency verification. The Node implementation uses built-in `node:crypto`; no npm dependencies are required.
+The script expands the committed gzip source/fixture files into their sibling working-tree paths, including the MON-007 Go module used by MON-008, then runs the semantic, Merkle and checkpoint suites, race detector, vet and coverage. The expanded files are local build inputs and need not be committed. Set `RUN_BENCHMARKS=1` to run the verifier-only MON-008 benchmark after tests.
 
-## Local preflight, not CI
+## Local preflight results (2026-11-25; not CI)
 
-Go: 18 test functions, three fresh complete suite runs, one separate race-detector run, `go vet`, and 75.3% checkpoint-package statement coverage. Node: five tests across five fresh invocations (25 passing executions). Both directions of cross-language Ed25519 fixtures pass.
+- MON-007 semantic model: 31 tests; five fresh invocations (155 passing executions).
+- MON-007 Go suite: 30 test functions; repeated suite, race and vet evidence is recorded in its own reports.
+- MON-007 Node Merkle verifier: 7 tests per invocation; five fresh invocations (35 passing executions).
+- MON-008 Go: 18 test functions, three fresh full-suite runs; separate race-detector run passed; `go vet` passed; checkpoint package statement coverage 75.3%.
+- MON-008 Node: 5 test cases across five fresh invocations (25 passing executions).
+- Go/Node generated fixtures verify bidirectionally.
+- Five-run Go verifier-only medians: 132.729 µs (one witness), 202.110 µs (two), 292.231 µs (three).
 
-Five-run verifier-only medians on Xeon Platinum 8573C: 132.729 µs (one witness), 202.110 µs (two), 292.231 µs (three). These exclude network, disk, COSE, SCITT, sink mutation, readback and offline audit. They are not end-to-end or SOTA measurements.
+The benchmark covers in-process signature, quorum and verifier-state checks only. It excludes network, durable storage, COSE, SCITT registration, external sink mutation, independent readback and offline audit. It is not an end-to-end latency or SOTA result. Machine details and raw samples are in `benchmark-report-v1.json.gz`; test counts and scope are in `test-report-v1.json.gz`.
 
-The detailed assurance-gap benchmark protocol, test report, benchmark report, and language READMEs are stored as gzip assets alongside the source. The downloadable self-contained preflight bundle is attached to the conversation.
+## Critical trust and standards boundaries
+
+The signed binary envelope is a **custom research test profile**, not COSE and not wire-compatible with RFC 9942. It does not parse RFC 9942 receipts, RFC 9943 Signed Statements, or historical registration-policy/trust-anchor collateral. It is a semantic preflight, not a replacement transparency service.
+
+The initial log trust root, bootstrap pin, witness registry and failure-domain assignments are provisioned out of band. Verifier state is in memory; production rollback resistance requires separately governed durable monotonic storage. The verifier retains the active root only; a historical archive auditor must retain and validate the complete root-update chain and applicable policy collateral. Witness identities/failure domains require independent operational governance.
+
+A signature proves that a key signed exact bytes. A valid Merkle proof proves a relationship to the authenticated root. A witness quorum indicates that distinct configured failure domains attested to the same checkpoint. None of those alone proves the underlying statement is true or that an external action occurred. Sink-side fencing, a stable operation ID, the sink receipt and separately authorized readback remain distinct assurance claims.
+
+## Paradigm-shift benchmark
+
+See `ASSURANCE-GAP-BENCHMARK-v1.md`. The Assurance Gap Challenge deliberately removes trust in the original orchestrator, its database and its credentials after the action. A fresh auditor receives only portable evidence plus independently configured trust roots, then reconstructs authority, source, action, sink result, readback, checkpoint, append-only history and historical policy context. Scores are verified, missing, contradicted, stale or indeterminate—not just throughput.
+
+The benchmark matches PostgreSQL outbox, DBOS, Temporal, SCITT/RFC 9942+9943, Rekor, SFEB overlays and a native sink control across W0–W6 workload tiers. It keeps no-op orchestration separate from external-effect qualification.
