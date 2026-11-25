@@ -71,6 +71,7 @@ fn input(
         ],
         decision_actions: Vec::new(),
         candidates,
+        likelihood_stress_scenarios: Vec::new(),
         physical_cost_budget: budget,
         maximum_capacity_units: 2,
         minimum_randomized_audit_count: 0,
@@ -78,6 +79,7 @@ fn input(
         conditional_independence_assumption_sha256: independence_declared.then(|| digest('c')),
         objective_weights: CausalPortfolioObjectiveWeightsV1 {
             information_gain_weight: 1.0,
+            robust_information_gain_weight: 0.0,
             decision_loss_reduction_weight: 0.0,
             predictive_risk_reduction_weight: 0.0,
             physical_cost_weight: 0.0,
