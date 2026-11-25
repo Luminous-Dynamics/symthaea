@@ -39,3 +39,10 @@ A signature proves that a key signed exact bytes. A valid Merkle proof proves a 
 See `ASSURANCE-GAP-BENCHMARK-v1.md`. The Assurance Gap Challenge deliberately removes trust in the original orchestrator, its database and its credentials after the action. A fresh auditor receives only portable evidence plus independently configured trust roots, then reconstructs authority, source, action, sink result, readback, checkpoint, append-only history and historical policy context. Scores are verified, missing, contradicted, stale or indeterminate—not just throughput.
 
 The benchmark matches PostgreSQL outbox, DBOS, Temporal, SCITT/RFC 9942+9943, Rekor, SFEB overlays and a native sink control across W0–W6 workload tiers. It keeps no-op orchestration separate from external-effect qualification.
+
+
+## Interoperability landscape (updated 2026-11-25)
+
+MON-008 is deliberately not positioned as a new agent receipt format. See `INTEROPERABILITY-AND-NOVELTY-MAP-v1.md` for the current RFC 9942/9943, AEE, Vaara Receipt and Sigstore comparison. The AEE draft already defines caller/serving-party paired evidence and offline bundles; the next differentiator is to qualify the real destination-side state change, independent readback and declared observation completeness.
+
+`ASSURANCE-GAP-BENCHMARK-v2.md` adds AEE, the SCITT AI Agent Execution profile and Vaara Receipt as comparison arms, and adds omission/coverage adversarial tests. It forbids treating missing receipt evidence as proof that an action did not occur outside an independently qualified observation boundary.
