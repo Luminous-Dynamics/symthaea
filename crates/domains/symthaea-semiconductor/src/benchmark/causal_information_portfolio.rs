@@ -42,8 +42,10 @@ pub struct CausalMeasurementCandidateV1 {
     pub capacity_units: usize,
     pub expected_result_delay_seconds: u64,
     pub randomized_audit: bool,
+    pub audit_design_sha256: Option<String>,
+    pub audit_inclusion_probability: Option<f64>,
     pub calibration_qualified: bool,
-    pub label_eligibility_qualified: bool,
+    pub source_path_qualified: bool,
     pub safety_preconditions_satisfied: bool,
     pub expected_predictive_risk_reduction: f64,
     pub likelihood_model_sha256: String,
@@ -107,6 +109,7 @@ pub struct CausalPortfolioMetricsV1 {
     pub total_expected_result_delay_seconds: u64,
     pub total_capacity_units: usize,
     pub randomized_audit_count: usize,
+    pub audit_inclusion_probabilities: BTreeMap<String, f64>,
     pub objective_score: f64,
     pub portfolio_sha256: String,
 }
@@ -123,6 +126,7 @@ pub struct CausalInformationPortfolioReportV1 {
     pub feasible_portfolio_count: usize,
     pub feasible_without_audit_floor_count: usize,
     pub population_estimation_available: bool,
+    pub future_outcomes_require_k1_before_consumption: bool,
     pub conditional_independence_assumption_used: bool,
     pub source_likelihood_authenticity_proven: bool,
     pub physical_measurement_executed: bool,
@@ -353,11 +357,32 @@ fn validate_input(
             )));
         }
         let mut reasons = Vec::new();
+        if candidate.randomized_audit {
+            let design_digest = candidate.audit_design_sha256.as_deref().unwrap_or_default();
+            let inclusion_probability = candidate.audit_inclusion_probability;
+            if !valid_sha256(design_digest)
+                || !inclusion_probability.is_some_and(|value| {
+                    value.is_finite() && value > 0.0 && value <= 1.0
+                })
+            {
+                return Err(CausalInformationPortfolioErrorV1(format!(
+                    "randomized audit candidate {} requires a valid design digest and inclusion probability",
+                    candidate.candidate_id
+                )));
+            }
+        } else if candidate.audit_design_sha256.is_some()
+            || candidate.audit_inclusion_probability.is_some()
+        {
+            return Err(CausalInformationPortfolioErrorV1(format!(
+                "non-audit candidate {} cannot declare audit-only metadata",
+                candidate.candidate_id
+            )));
+        }
         if !candidate.calibration_qualified {
             reasons.push("calibration_not_qualified".into());
         }
-        if !candidate.label_eligibility_qualified {
-            reasons.push("label_eligibility_not_qualified".into());
+        if !candidate.source_path_qualified {
+            reasons.push("source_path_not_qualified".into());
         }
         if !candidate.safety_preconditions_satisfied {
             reasons.push("safety_preconditions_not_satisfied".into());
@@ -616,6 +641,15 @@ fn make_portfolio(
         .iter()
         .map(|index| candidates[*index].expected_predictive_risk_reduction)
         .sum();
+    let audit_inclusion_probabilities: BTreeMap<String, f64> = selected_indices
+        .iter()
+        .filter_map(|index| {
+            let candidate = &candidates[*index];
+            candidate.audit_inclusion_probability.map(|probability| {
+                (candidate.candidate_id.clone(), probability)
+            })
+        })
+        .collect();
     let objective_score = objective_weights.information_gain_weight * information_gain
         + objective_weights.decision_loss_reduction_weight * decision_gain
         + objective_weights.predictive_risk_reduction_weight
@@ -636,6 +670,7 @@ fn make_portfolio(
         total_expected_result_delay_seconds,
         total_capacity_units,
         randomized_audit_count,
+        audit_inclusion_probabilities,
         objective_score,
         portfolio_sha256: String::new(),
     };
@@ -816,6 +851,7 @@ pub fn optimize_causal_information_portfolio_v1(
         feasible_portfolio_count: feasible.len(),
         feasible_without_audit_floor_count,
         population_estimation_available,
+        future_outcomes_require_k1_before_consumption: true,
         conditional_independence_assumption_used: input
             .conditional_independence_assumption_declared
             && selected_portfolio
@@ -854,8 +890,10 @@ mod tests {
             capacity_units: 1,
             expected_result_delay_seconds: 10,
             randomized_audit: audit,
+            audit_design_sha256: audit.then(|| digest('d')),
+            audit_inclusion_probability: audit.then_some(0.5),
             calibration_qualified: true,
-            label_eligibility_qualified: true,
+            source_path_qualified: true,
             safety_preconditions_satisfied: true,
             expected_predictive_risk_reduction: 0.0,
             likelihood_model_sha256: digest('a'),
