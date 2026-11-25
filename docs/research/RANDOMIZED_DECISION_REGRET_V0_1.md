@@ -117,6 +117,7 @@ Other comparison roles remain distinct:
 
 - World-In-World: closed-loop embodied task success and action-interface comparison.
 - Rollback: checkpoint rewind and branch-outcome supervision on real robots; compare only with the same task, robot, reset and recovery protocol.
+- World Model Evaluation Lab v0.18 / CPG: fixed-planner oracle-dynamics versus learned-dynamics task-success gap with interval gating, paired initial-state comparisons and task-distribution checks. Reuse its protocol; keep this as the planner/dynamics layer, distinct from individual-effect retention.
 - MRS.Q: model-based search baseline; report search-induced overestimation and the effect of pessimistic ensemble aggregation, not prediction error alone.
 - Causal-JEPA: visual causal representation comparison in a matching observation/action setting; do not transfer its visual benchmark numbers to low-dimensional DMC.
 
@@ -197,6 +198,22 @@ The strongest Symthaea claim would not be "our model is more realistic." It woul
 
 The comparator matrix must include the strongest model class for each track rather than treating a single "world model" score as universal.
 
+
+### Decision-quality baseline: Counterfactual Planning Gap (CPG)
+
+The public **World Model Evaluation Lab v0.18** is a particularly relevant external reference for the planner × dynamics part of this protocol. It defines the Counterfactual Planning Gap by running the same planner against oracle dynamics and learned dynamics, then comparing success rates. It uses Agresti–Caffo confidence intervals, paired-bootstrap intervals when both arms share initial states, and a verdict gate that can return inconclusive. Its task-distribution rerun is instructive: a fixed-initial-state Acrobot result that suggested a model bottleneck changed to a planner bottleneck when initial states were sampled from the actual task distribution and the oracle planner solved only about 3% of starts. Reacher retained a model bottleneck, while a high-capacity Cartpole/CEM cell showed the learned model outperforming oracle dynamics. The heterogeneity is a feature, not a defect.
+
+Reference implementation and results: https://github.com/Denis-hamon/world-model-eval-lab and https://denis-hamon.github.io/world-model-eval-lab/index.html
+
+We should **reuse CPG rather than reimplement it**. CPG diagnoses the effect of substituting learned dynamics for oracle dynamics under one fixed planner; it does not measure individual-effect identification, same-individual cross-world consistency, or whether the model retains a subject-specific treatment effect. In Symthaea, report the CPG-compatible planner/dynamics arm separately from:
+
+- environment abducible-share certificate `(A, phi; Sigma)`;
+- latent and rollout individual-effect retention;
+- within-individual intervention ranking/regret and calibration;
+- randomized-policy expected regret and positive-support regret;
+- all-in model/planner cost.
+
+This creates a layered failure diagnosis: planner ceiling, learned-dynamics contribution, individual-information retention, decision quality, and runtime economics. It avoids blaming the world model when the planner cannot solve the task even under oracle dynamics.
 ### Vector-control / DMC track
 
 **Event-Aware World Model (EAWM, ICLR 2026)** is a direct comparator for low-dimensional control. It learns event boundaries from observations and predicts meaningful event transitions; its paper reports 10–45% gains over strong MBRL baselines across Atari 100K, Craftax 1M, DeepMind Control 500K and DMC-GB2 500K. This is important prior art: event segmentation as such is not a new Symthaea contribution. The Symthaea question should be whether HDC/CfC plus the paired-individual-effect objective preserves *which individual responds to which intervention*, improves held-out decision regret, and does so at a better complete resource cost than EAWM and matched RSSM baselines. Reproduce the exact DMC task subset, training interactions, seeds, and evaluation protocol before comparing numbers.
