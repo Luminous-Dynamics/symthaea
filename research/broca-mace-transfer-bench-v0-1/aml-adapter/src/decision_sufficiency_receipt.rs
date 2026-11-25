@@ -356,7 +356,7 @@ pub fn decision_sufficiency_attestation_sha256_v1(
     let canonical = serde_json_canonicalizer::to_vec(&preimage)
         .map_err(|_| DecisionSufficiencyReceiptRejectV1::CanonicalizationFailed)?;
     let mut hasher = Sha256::new();
-    hasher.update(b"luminous:mace:decision-sufficiency-attestation:v1\\0");
+    hasher.update(b"luminous:mace:decision-sufficiency-attestation:v1\0");
     hasher.update(&canonical);
     Ok(hex_digest(&hasher.finalize()))
 }
