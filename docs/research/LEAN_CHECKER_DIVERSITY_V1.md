@@ -82,6 +82,18 @@ These are not interchangeable assurance bases:
 
 The synthetic fixture [LEAN_CHECKER_DIVERSITY_RUN_SYNTHETIC_V1.json](LEAN_CHECKER_DIVERSITY_RUN_SYNTHETIC_V1.json) demonstrates the expected six-path vector. It is deliberately labelled `synthetic_fixture_not_execution`; its disposition is `draft`. It is not a comparator receipt.
 
+### 3.3 Binding into proof assurance and ECPCB
+
+The LeanTrustClosureCapsuleV1 schema now requires a `checker_diversity` reference containing:
+- the registry SHA-256;
+- the profile ID;
+- the exact run-profile SHA-256;
+- a status of `not_assessed`, `synthetic_fixture_only`, `inconclusive`, `qualified_under_policy` or `rejected`.
+
+The trust-capsule validator enforces a cross-field rule: `independent_checker_replay=satisfied` is legal only when the digest-bound checker-diversity profile is `qualified_under_policy`. Conversely, a qualified checker profile requires the independent-replay axis to be satisfied. A synthetic profile can test the validator but cannot upgrade assurance.
+
+ECPCB's `ECPCB_TASK_V1` schema requires the same reference inside each task's `trust_capsule`. Tasks with no observed same-export run must explicitly use `not_assessed` and a null profile digest rather than omit the field.
+
 ### 3.1 Outcome semantics
 
 The run model does not force every exit code into pass/fail.
