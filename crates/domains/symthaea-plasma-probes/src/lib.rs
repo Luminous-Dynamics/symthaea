@@ -7119,7 +7119,7 @@ mod tests {
 
     #[test]
     fn response_signature_cluster_audit_rejects_missing_or_unresolved_response() {
-        let mut incomplete = KineticResponseSignatureInput {
+        let incomplete = KineticResponseSignatureInput {
             contract_id: "contract".to_owned(),
             structure_class_id: "class".to_owned(),
             intervention_ids: vec!["pulse".to_owned()],
@@ -7136,8 +7136,6 @@ mod tests {
         assert!(!audit.complete_response_coverage);
         assert!(!audit.stable_branch_association);
         assert!(!audit.within_finite_class_diameter);
-        incomplete.responses = vec![Some(ComplexResponse::new(0.0, 0.0).unwrap())];
-        incomplete.branch_ids = vec![Some("branch".to_owned())];
     }
 
     #[test]
