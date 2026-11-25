@@ -357,7 +357,11 @@ fn estimate_matched_contrast(
         + contrast.control_pre_variance / contrast.control_pre_count as f64
         + contrast.control_post_variance / contrast.control_post_count as f64;
     let standard_error = variance.sqrt();
-    let effect = estimate_interval(estimate, standard_error, "difference_in_differences_wald_95")?;
+    let effect = estimate_interval(
+        estimate,
+        standard_error,
+        "difference_in_differences_independent_cell_wald_95",
+    )?;
 
     let balance_ok = contrast.maximum_absolute_covariate_smd <= policy.maximum_covariate_smd;
     let pretrend_ok = (contrast.treated_pretrend_slope - contrast.control_pretrend_slope).abs()
