@@ -326,6 +326,63 @@ fn check_construction(value: &Value, errors: &mut Vec<String>) {
     }
 }
 
+fn check_checker_diversity(value: &Value, errors: &mut Vec<String>) {
+    let status = string_at(value, &["checker_diversity", "status"]);
+    let profile_id = string_at(value, &["checker_diversity", "profile_id"]);
+    if profile_id.is_none_or(|id| id.trim().is_empty()) {
+        push_missing(errors, "checker_diversity.profile_id");
+    }
+    check_digest(
+        value,
+        &["checker_diversity", "registry_sha256"],
+        "checker_diversity.registry_sha256",
+        errors,
+    );
+
+    let profile_digest = at(value, &["checker_diversity", "profile_sha256"]);
+    let has_profile_digest = profile_digest.and_then(Value::as_str);
+    match status {
+        Some("not_assessed") => {
+            if profile_digest.is_none_or(|digest| !digest.is_null()) {
+                errors.push(
+                    "not_assessed checker diversity must use a null profile_sha256".to_owned(),
+                );
+            }
+        }
+        Some("synthetic_fixture_only" | "inconclusive" | "qualified_under_policy" | "rejected") => {
+            if has_profile_digest.is_none_or(|digest| !is_hex(digest, 64)) {
+                push_missing(errors, "checker_diversity.profile_sha256");
+            }
+        }
+        _ => errors.push("checker_diversity.status is missing or invalid".to_owned()),
+    }
+
+    let replay_axis = axis_status(value, "independent_checker_replay");
+    match status {
+        Some("qualified_under_policy") if replay_axis != Some("satisfied") => {
+            errors.push(
+                "qualified checker-diversity profile requires independent_checker_replay=satisfied"
+                    .to_owned(),
+            );
+        }
+        Some("rejected") if replay_axis != Some("failed") => {
+            errors.push(
+                "rejected checker-diversity profile requires independent_checker_replay=failed"
+                    .to_owned(),
+            );
+        }
+        Some("inconclusive" | "synthetic_fixture_only" | "not_assessed")
+            if replay_axis == Some("satisfied") =>
+        {
+            errors.push(
+                "independent_checker_replay cannot be satisfied by an unqualified checker-diversity profile"
+                    .to_owned(),
+            );
+        }
+        _ => {}
+    }
+}
+
 fn check_computational_trust(value: &Value, errors: &mut Vec<String>) {
     if !is_satisfied(value, "computational_trust") {
         return;
@@ -384,6 +441,7 @@ pub fn validate_capsule(value: &Value) -> Vec<String> {
     check_logical_closure(value, &mut errors);
     check_statement_fidelity(value, &mut errors);
     check_replays(value, &mut errors);
+    check_checker_diversity(value, &mut errors);
     check_construction(value, &mut errors);
     check_computational_trust(value, &mut errors);
 
@@ -451,7 +509,7 @@ mod tests {
         json!({
             "schema_version":"1.0.0",
             "artifact_id":"LEAN-TRUST-CLOSURE-ASSURANCE-CAPSULE-001",
-            "disposition":"qualified_under_policy",
+            "disposition":"inconclusive",
             "policy":{
                 "policy_id":"TEST-POLICY",
                 "version":"1",
@@ -529,11 +587,17 @@ mod tests {
                     "comparator_version":"test","raw_log_sha256":digest
                 }
             },
+            "checker_diversity":{
+                "status":"synthetic_fixture_only",
+                "profile_id":"SYNTHETIC-CHECKER-PROFILE",
+                "registry_sha256":digest,
+                "profile_sha256":digest
+            },
             "assurance_axes":{
                 "statement_fidelity":{"status":"satisfied","rationale":"trusted challenge matched","evidence_digests":[digest]},
                 "logical_dependency_closure":{"status":"satisfied","rationale":"fresh closure complete","evidence_digests":[digest]},
                 "official_kernel_replay":{"status":"satisfied","rationale":"kernel accepted exact export","evidence_digests":[digest]},
-                "independent_checker_replay":{"status":"satisfied","rationale":"distinct checker accepted exact export","evidence_digests":[digest]},
+                "independent_checker_replay":{"status":"unknown","rationale":"only a synthetic checker profile exists; no observed full-bundle receipt","evidence_digests":[digest]},
                 "construction_containment":{"status":"satisfied","rationale":"build isolated","evidence_digests":[digest]},
                 "environment_reproducibility":{"status":"satisfied","rationale":"inputs pinned","evidence_digests":[digest]},
                 "computational_trust":{"status":"satisfied","rationale":"no native computation observed","evidence_digests":[digest]}
@@ -551,9 +615,40 @@ mod tests {
     #[test]
     fn rejects_qualification_with_unknown_axis() {
         let mut capsule = baseline();
+        capsule["disposition"] = json!("qualified_under_policy");
         capsule["assurance_axes"]["independent_checker_replay"]["status"] = json!("unknown");
         let errors = validate_capsule(&capsule);
         assert!(errors.iter().any(|error| error.contains("qualified_under_policy")));
+    }
+
+    #[test]
+    fn accepts_capsule_with_digest_bound_qualified_checker_profile() {
+        let mut capsule = baseline();
+        capsule["disposition"] = json!("qualified_under_policy");
+        capsule["checker_diversity"]["status"] = json!("qualified_under_policy");
+        capsule["assurance_axes"]["independent_checker_replay"]["status"] = json!("satisfied");
+        let errors = validate_capsule(&capsule);
+        assert!(errors.is_empty(), "{errors:?}");
+    }
+
+    #[test]
+    fn independent_replay_requires_a_qualified_checker_profile() {
+        let mut capsule = baseline();
+        capsule["disposition"] = json!("qualified_under_policy");
+        capsule["assurance_axes"]["independent_checker_replay"]["status"] = json!("satisfied");
+        capsule["checker_diversity"]["status"] = json!("synthetic_fixture_only");
+        let errors = validate_capsule(&capsule);
+        assert!(errors.iter().any(|error| error.contains("unqualified checker-diversity")));
+    }
+
+    #[test]
+    fn qualified_checker_profile_requires_replay_axis_satisfied() {
+        let mut capsule = baseline();
+        capsule["checker_diversity"]["status"] = json!("qualified_under_policy");
+        capsule["assurance_axes"]["independent_checker_replay"]["status"] = json!("unknown");
+        capsule["disposition"] = json!("inconclusive");
+        let errors = validate_capsule(&capsule);
+        assert!(errors.iter().any(|error| error.contains("profile requires independent_checker_replay")));
     }
 
     #[test]
@@ -567,6 +662,9 @@ mod tests {
     #[test]
     fn same_kernel_twice_is_not_independent_replay() {
         let mut capsule = baseline();
+        capsule["disposition"] = json!("qualified_under_policy");
+        capsule["checker_diversity"]["status"] = json!("qualified_under_policy");
+        capsule["assurance_axes"]["independent_checker_replay"]["status"] = json!("satisfied");
         capsule["replays"]["independent_checkers"][0]["checker"] = json!("lean-kernel");
         capsule["replays"]["independent_checkers"][0]["independent_from_official_kernel"] = json!(false);
         let errors = validate_capsule(&capsule);
@@ -576,6 +674,9 @@ mod tests {
     #[test]
     fn independent_checker_must_check_identical_export() {
         let mut capsule = baseline();
+        capsule["disposition"] = json!("qualified_under_policy");
+        capsule["checker_diversity"]["status"] = json!("qualified_under_policy");
+        capsule["assurance_axes"]["independent_checker_replay"]["status"] = json!("satisfied");
         capsule["replays"]["independent_checkers"][0]["export_sha256"] = json!("c".repeat(64));
         let errors = validate_capsule(&capsule);
         assert!(errors.iter().any(|error| error.contains("distinct implementation")));

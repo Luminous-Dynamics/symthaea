@@ -956,3 +956,5 @@ pub mod metamorphic;
 pub mod scope_equivalence;
 
 pub mod trust_closure;
+
+pub mod checker_diversity;

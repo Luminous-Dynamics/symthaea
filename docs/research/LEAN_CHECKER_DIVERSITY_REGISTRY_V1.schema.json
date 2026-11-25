@@ -1,0 +1,323 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://luminousdynamics.io/schemas/LEAN_CHECKER_DIVERSITY_REGISTRY_V1.schema.json",
+  "title": "LeanCheckerDiversityRegistryV1",
+  "type": "object",
+  "additionalProperties": false,
+  "required": [
+    "schema_version",
+    "artifact_id",
+    "status",
+    "reference_date",
+    "checker_set",
+    "checkers",
+    "relationships",
+    "common_mode_domains",
+    "diversity_dimensions",
+    "claim_ceiling",
+    "scope",
+    "external_landscape"
+  ],
+  "properties": {
+    "schema_version": {
+      "const": "1.0.0"
+    },
+    "artifact_id": {
+      "const": "LEAN-CHECKER-DIVERSITY-REGISTRY-001"
+    },
+    "status": {
+      "const": "source_grounded_ecosystem_registry_not_a_run_receipt"
+    },
+    "reference_date": {
+      "type": "string",
+      "format": "date"
+    },
+    "checker_set": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "comparator_paranoid_bundle",
+        "note"
+      ],
+      "properties": {
+        "comparator_paranoid_bundle": {
+          "type": "array",
+          "minItems": 6,
+          "maxItems": 6,
+          "uniqueItems": true,
+          "items": {
+            "type": "string",
+            "pattern": "^[a-z][a-z0-9_]+$"
+          }
+        },
+        "note": {
+          "type": "string",
+          "minLength": 1
+        }
+      }
+    },
+    "checkers": {
+      "type": "array",
+      "minItems": 6,
+      "maxItems": 6,
+      "items": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": [
+          "checker_id",
+          "role",
+          "implementation_family_id",
+          "algorithm_lineage_id",
+          "implementation_language",
+          "representation_family_id",
+          "parser_family_id",
+          "independence_class",
+          "assurance_basis",
+          "revision_policy",
+          "evidence_refs",
+          "residual_trust"
+        ],
+        "properties": {
+          "checker_id": {
+            "type": "string",
+            "pattern": "^[a-z][a-z0-9_]+$"
+          },
+          "role": {
+            "enum": [
+              "official_kernel",
+              "external_checker",
+              "hardened_kernel_variant"
+            ]
+          },
+          "implementation_family_id": {
+            "type": "string",
+            "pattern": "^[a-z][a-z0-9_]+$"
+          },
+          "algorithm_lineage_id": {
+            "type": "string",
+            "pattern": "^[a-z][a-z0-9_]+$"
+          },
+          "implementation_language": {
+            "enum": [
+              "cpp",
+              "lean",
+              "rust",
+              "unknown"
+            ]
+          },
+          "representation_family_id": {
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "parser_family_id": {
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "independence_class": {
+            "enum": [
+              "reference_kernel",
+              "derived_from_official",
+              "independent_implementation",
+              "verified_port_shared_algorithm",
+              "hardening_variant"
+            ]
+          },
+          "assurance_basis": {
+            "type": "string",
+            "minLength": 1
+          },
+          "revision_policy": {
+            "type": "string",
+            "minLength": 1
+          },
+          "evidence_refs": {
+            "type": "array",
+            "minItems": 1,
+            "items": {
+              "type": "string",
+              "format": "uri"
+            }
+          },
+          "residual_trust": {
+            "type": "array",
+            "minItems": 1,
+            "items": {
+              "type": "string",
+              "minLength": 1
+            }
+          }
+        }
+      }
+    },
+    "relationships": {
+      "type": "array",
+      "minItems": 15,
+      "maxItems": 15,
+      "items": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": [
+          "from",
+          "to",
+          "relation",
+          "scope",
+          "independence_effect",
+          "evidence_refs"
+        ],
+        "properties": {
+          "from": {
+            "type": "string",
+            "pattern": "^[a-z][a-z0-9_]+$"
+          },
+          "to": {
+            "type": "string",
+            "pattern": "^[a-z][a-z0-9_]+$"
+          },
+          "relation": {
+            "enum": [
+              "derived_from",
+              "hardened_build_of",
+              "verified_refinement_port_of",
+              "independent_implementation_of",
+              "shares_algorithm_lineage_with",
+              "unknown"
+            ]
+          },
+          "scope": {
+            "type": "string",
+            "minLength": 1
+          },
+          "independence_effect": {
+            "enum": [
+              "not_independent_algorithm_family",
+              "no_new_algorithm_family",
+              "implementation_and_runtime_diversity_not_algorithm_diversity",
+              "distinct_algorithm_lineage",
+              "distinct_implementation_lineage",
+              "unknown_not_counted"
+            ]
+          },
+          "evidence_refs": {
+            "type": "array",
+            "items": {
+              "type": "string",
+              "format": "uri"
+            }
+          }
+        }
+      }
+    },
+    "common_mode_domains": {
+      "type": "array",
+      "minItems": 1,
+      "items": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": [
+          "domain_id",
+          "scope",
+          "risk",
+          "mitigation"
+        ],
+        "properties": {
+          "domain_id": {
+            "type": "string",
+            "pattern": "^[a-z][a-z0-9_]+$"
+          },
+          "scope": {
+            "type": "string",
+            "minLength": 1
+          },
+          "risk": {
+            "type": "string",
+            "minLength": 1
+          },
+          "mitigation": {
+            "type": "string",
+            "minLength": 1
+          }
+        }
+      }
+    },
+    "diversity_dimensions": {
+      "type": "array",
+      "minItems": 1,
+      "uniqueItems": true,
+      "items": {
+        "type": "string",
+        "minLength": 1
+      }
+    },
+    "claim_ceiling": {
+      "type": "array",
+      "minItems": 1,
+      "items": {
+        "type": "string",
+        "minLength": 1
+      }
+    },
+    "scope": {
+      "const": "lake_comparator_paranoid_bundle_only"
+    },
+    "external_landscape": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "source_url",
+        "captured_date",
+        "snapshot_issue",
+        "visible_checker_count",
+        "reported_languages",
+        "downloadable_suite",
+        "round_status",
+        "note"
+      ],
+      "properties": {
+        "source_url": {
+          "type": "string",
+          "format": "uri"
+        },
+        "captured_date": {
+          "const": "2026-11-25"
+        },
+        "snapshot_issue": {
+          "type": "string",
+          "format": "uri"
+        },
+        "visible_checker_count": {
+          "const": 37
+        },
+        "reported_languages": {
+          "const": 15
+        },
+        "downloadable_suite": {
+          "type": "object",
+          "additionalProperties": false,
+          "required": [
+            "good_tests",
+            "bad_tests"
+          ],
+          "properties": {
+            "good_tests": {
+              "const": 138
+            },
+            "bad_tests": {
+              "const": 92
+            }
+          }
+        },
+        "round_status": {
+          "const": "mutable_current_round_not_archived"
+        },
+        "note": {
+          "type": "string",
+          "minLength": 1
+        }
+      }
+    }
+  }
+}

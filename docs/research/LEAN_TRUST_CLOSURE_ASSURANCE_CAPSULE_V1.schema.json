@@ -16,7 +16,8 @@
     "construction_provenance",
     "replays",
     "assurance_axes",
-    "claim_ceiling"
+    "claim_ceiling",
+    "checker_diversity"
   ],
   "properties": {
     "schema_version": {
@@ -1146,6 +1147,42 @@
       "items": {
         "type": "string",
         "minLength": 1
+      }
+    },
+    "checker_diversity": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "status",
+        "profile_id",
+        "registry_sha256",
+        "profile_sha256"
+      ],
+      "properties": {
+        "status": {
+          "enum": [
+            "not_assessed",
+            "synthetic_fixture_only",
+            "inconclusive",
+            "qualified_under_policy",
+            "rejected"
+          ]
+        },
+        "profile_id": {
+          "type": "string",
+          "minLength": 1
+        },
+        "registry_sha256": {
+          "type": "string",
+          "pattern": "^[a-f0-9]{64}$"
+        },
+        "profile_sha256": {
+          "type": [
+            "string",
+            "null"
+          ],
+          "pattern": "^[a-f0-9]{64}$"
+        }
       }
     }
   },
