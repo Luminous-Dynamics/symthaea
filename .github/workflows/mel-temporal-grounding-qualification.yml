@@ -92,7 +92,7 @@ jobs:
             and .summary.false_absence_claims == 1
             and .summary.ambiguous_reason_recall == 0.5
             and .summary.not_estimable_reason_recall == 0.5
-            and (.identifiability_basis_summaries | length) == 5
+            and (.identifiability_basis_summaries | length) == 6
             and ([.identifiability_basis_summaries[] | select(.basis == "AnnotatorDisagreement") | .cases] | add) == 1
             and ([.identifiability_basis_summaries[] | select(.basis == "UnsupportedQuery") | .cases] | add) == 1
             and .summary.answer_present_cases == 3
