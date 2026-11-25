@@ -51,3 +51,16 @@ Important distinction: the paper's `cartpole.swingup` result is an environment-e
 
 No DMC benchmark execution or Symthaea model-side result is claimed by the pilot contract.
 
+
+
+## Randomized-policy decision regret
+
+The evaluator-side module `src/randomized_decision_regret.rs` extends decision-observability evaluation to stochastic policies. The deterministic oracle remains the canonical validator and deterministic comparator; this module accepts one frozen action distribution for an otherwise identical candidate-visible information set.
+
+- Action probabilities are integer PPM and must sum exactly to 1,000,000.
+- Expected loss and per-world expected regret retain exact integer numerators; displayed PPM values round upward.
+- The certificate reports worst-case expected regret across hidden worlds, equal-world mean expected regret, and maximum regret among every action with nonzero support as separate values.
+- The deterministic minimax-regret score is only a comparator. It is not the optimal randomized-policy floor.
+- The module does not sample actions, calibrate a probability model, optimize a mixed policy, authenticate candidate execution, or establish safety.
+
+Nine unit tests cover a balanced mixture that halves worst-case expected regret relative to the deterministic comparator, support-risk separation, deterministic degeneration, exact probability mass, canonical action ordering, inadmissible actions, candidate-view identity, duplicate worlds, digest requirements and conservative rounding.
