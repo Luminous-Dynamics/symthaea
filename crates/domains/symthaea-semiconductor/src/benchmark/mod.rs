@@ -3,6 +3,7 @@
 pub mod binary_metrics;
 pub mod calibration_requalification;
 pub mod dtco_manifest;
+pub mod event_time_reconciliation;
 pub mod gated_streaming_adapter;
 pub mod label_consumption_guard;
 pub mod metrology_audit;
@@ -148,4 +149,14 @@ pub use gated_streaming_adapter::{
     StreamingPredictionReceiptV1, StreamingUpdateDispositionV1, StreamingUpdateReasonV1,
     StreamingUpdateReceiptV1, create_gated_streaming_adapter_engine_v1,
     deliver_qualified_stream_label_v1, predict_and_register_stream_sample_v1,
+};
+
+pub use event_time_reconciliation::{
+    EVENT_RECONSTRUCTION_SCHEMA_V1, RECONSTRUCTION_EVENT_ENVELOPE_SCHEMA_V1,
+    RECONSTRUCTION_REPORT_SCHEMA_V1, EventTimeReconstructionErrorV1,
+    EventTimeReconstructionInputV1, EventTimeReconstructionReportV1,
+    ReconstructionEventDispositionV1, ReconstructionEventEnvelopeV1,
+    ReconstructionEventReceiptV1, ReconstructionStatusV1,
+    StreamingReconstructionPayloadV1, reconstruct_streaming_adapter_event_time_v1,
+    seal_reconstruction_event_v1,
 };
