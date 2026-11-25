@@ -531,6 +531,28 @@ mod tests {
     }
 
     #[test]
+    fn incomplete_candidate_route_does_not_contaminate_primary_route() {
+        let mut value = plan_value();
+        value["alternatives"].as_array_mut().unwrap().push(serde_json::json!({
+            "id":"ALT_CANDIDATE",
+            "label":"unfinished candidate route",
+            "root_goal_id":"G_MAIN",
+            "node_ids":["G_MAIN","A_SPLIT_IFF","G_FORWARD","G_REVERSE"],
+            "status":"candidate"
+        }));
+        let report = analyzed(&value);
+        assert!(report.errors.is_empty(), "{:?}", report.errors);
+        let primary = report.alternatives.iter()
+            .find(|alternative| alternative.alternative_id == "ALT_PRIMARY")
+            .unwrap();
+        let candidate = report.alternatives.iter()
+            .find(|alternative| alternative.alternative_id == "ALT_CANDIDATE")
+            .unwrap();
+        assert!(primary.unresolved_goals.is_empty());
+        assert_eq!(candidate.unresolved_goals.len(), 2);
+    }
+
+    #[test]
     fn multiple_primary_alternatives_block_acceptance() {
         let mut value = plan_value();
         let mut second = value["alternatives"][0].clone();
