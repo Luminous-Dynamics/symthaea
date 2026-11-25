@@ -146,3 +146,31 @@ This is a decision-sufficient, evidence-carrying world model—not a claim that 
 - #8578: independent-cluster inference.
 
 The new module is an evaluator primitive, not a candidate trainer and not a second causal-pairing verifier. No DMC paper replication, trained HDC/CfC gain, randomized-policy optimality, closed-loop improvement, physical result, SOTA win or safety authorization is claimed.
+
+
+## 9. External evidence snapshot (checked 2026-11-25)
+
+These projects evaluate different capabilities and must remain distinct comparators:
+
+- **MRS.Q (ICML 2026):** search can reduce performance even with an accurate model; taking the minimum over an ensemble of value estimates is an effective control for search overestimation in the paper's benchmark domains. Compare search optimism and realized return at matched model-query and compute budgets. Source: https://proceedings.mlr.press/v306/chang26a.html
+- **World-In-World (ICLR 2026):** a closed-loop platform with Active Recognition, Active Embodied QA, Image-Goal Navigation and Robotic Manipulation. It standardizes a planner/action API and uses task success rather than video quality as its primary embodied utility signal. The authors also report that controllability, action-observation post-training and inference-time compute matter for task success. Source: https://proceedings.iclr.cc/paper_files/paper/2026/hash/5b4263be85820683d78675cc18d2efc7-Abstract-Conference.html
+- **MiraBench (May 2026):** action-conditioned reliability is decomposed into physics adherence, action-following fidelity and optimism-bias detection; the paper reports more than 16,000 human judgments across 12 model configurations. This directly motivates failure-inducing actions and explicit false-success prediction metrics in our protocol. Source: https://arxiv.org/abs/2605.29360
+- **Causal-JEPA (ICML 2026):** object-level latent masking improves counterfactual visual question answering and lets its planner use a much smaller latent input than patch-based world models in its tested settings. It is a relevant visual-representation comparator, not evidence that low-dimensional HDC/LTC or arbitrary counterfactual policies will win. Source: https://proceedings.mlr.press/v306/nam26c.html
+- **WorldArena 2.0 (IROS 2026 challenge):** its challenge separates video quality, world-model-as-online-RL-environment, and real-world manipulation tracks; the broader benchmark direction includes visuo-tactile evidence and simulated/real robot platforms. We should target its native task API and scorecards rather than translate its visual score into DMC regret. Source: https://iros2026challenge.world-arena.ai/
+- **World-model benchmark survey:** a separate 2018–2026 survey snapshot lists 130 benchmarks with 108 cross-category entries. Source: https://world-model-benchmarks.github.io/
+- **Prediction-to-action survey (30 August 2026):** a different survey's 160-benchmark corpus counts 11 explicit VLA-versus-world-model comparisons and four prediction-to-executed-action bridges. Source: https://arxiv.org/abs/2609.29669
+
+The two survey counts (130 and 160) use different corpora and coding schemes. They are not additive and should not be presented as a census contradiction. The common conclusion is that prediction, action selection, and closed-loop outcomes are still measured in fragmented ways.
+
+### Resulting benchmark additions
+
+Add these explicit tests to the Decision Advantage Protocol:
+
+1. **Action-following falsification:** hold the initial observation and action history fixed; propose actions that should produce visibly different outcomes; score whether the model predicts the correct direction and magnitude of the change.
+2. **Optimism traps:** include actions that are physically impossible, contact-unstable, out-of-support or known to fail. Report false-success rate, failure severity calibration, and whether search preferentially selects those errors.
+3. **Decision-rank stability:** correlate predicted action ranking with independently executed candidate outcomes at fixed action-bank and model-query budgets. Report top-1 regret, top-k regret and rank correlation separately.
+4. **Inference-time scaling:** measure whether extra imagination/search buys real held-out return, or only increases model-query count and optimism. Include direct policy and compute-matched controls.
+5. **Modality ablation:** on embodied tracks, compare vision-only and visuo-tactile models under the same action tape and sensor budget. Keep low-dimensional DMC separate.
+6. **Counterfactual observability:** vary which latent state features are available (e.g., position only, position + velocity, history probes) and test whether this changes individual-effect information and decision regret, not just reconstruction.
+
+The strongest Symthaea claim would not be "our model is more realistic." It would be: *under a frozen, matched budget, it retains more decision-relevant individual-effect information, chooses actions with lower held-out regret, detects when imagined futures are unreliable, and falls back before model exploitation causes a failure.* This is a falsifiable research hypothesis, not a current result.
