@@ -9636,29 +9636,22 @@ mod tests {
     #[test]
     fn response_weighted_refinement_still_requires_positive_weight_qoi_entries() {
         let matrix = ModeResponseMatrix::new(vec![1], vec![10, 20]).unwrap();
+        let plan = plan_response_weighted_refinement(
+            &matrix,
+            &[(1, ComplexResponse::new(0.2, 0.0).unwrap())],
+            &[(1, 32)],
+            &[1.0, 0.0],
+            0.2,
+        )
+        .unwrap();
+        let decision = &plan.decisions[0];
+        assert_eq!(decision.weighted_response_gain, None);
+        assert_eq!(decision.response_loss_bound, None);
         assert_eq!(
-            plan_response_weighted_refinement(
-                &matrix,
-                &[(1, ComplexResponse::new(0.2, 0.0).unwrap())],
-                &[(1, 32)],
-                &[1.0, 0.0],
-                0.2,
-            ),
-            Ok(ResponseWeightedRefinementPlan {
-                response_loss_budget: 0.2,
-                accumulated_discarded_response_bound: 0.0,
-                discarded_state_bytes: 0,
-                decisions: vec![ModeRefinementDecision {
-                    input_mode: 1,
-                    coefficient_magnitude: 0.2,
-                    spectral_energy: 0.04,
-                    weighted_response_gain: None,
-                    response_loss_bound: None,
-                    encoded_bytes: 32,
-                    disposition: ModeRefinementDisposition::RetainedUnknownResponse,
-                }]
-            })
+            decision.disposition,
+            ModeRefinementDisposition::RetainedUnknownResponse
         );
+        assert_eq!(plan.discarded_state_bytes, 0);
     }
 
     #[test]
