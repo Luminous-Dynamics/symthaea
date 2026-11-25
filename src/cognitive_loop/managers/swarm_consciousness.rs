@@ -91,11 +91,11 @@ impl SwarmConsciousness {
             // Blend: 30% collective cognitive estimate + 70% individual estimate.
             let alpha = 0.3;
             let blended = alpha * phi_swarm + (1.0 - alpha) * individual_phi;
-            let effective = blended.max(individual_phi);
+            let blended_cognitive_phi = blended.max(individual_phi);
             CollectiveCognitiveInfluence {
                 individual_phi,
                 collective_phi: phi_swarm,
-                blended_cognitive_phi: effective,
+                blended_cognitive_phi,
                 collective_influence_weight: alpha,
                 in_conscious_collective: true,
             }
@@ -192,7 +192,7 @@ mod tests {
         let coalition = make_coalition(vec!["self", "peer1", "peer2"], 0.4, 0.9);
         let sc = SwarmConsciousness::compute(&[coalition], 0.9, Some("self"));
 
-        // Individual Phi > swarm Phi — effective should stay at individual
+        // Individual Phi > swarm Phi — blended cognitive estimate should stay at the individual value
         assert!(sc.cognitive_influence.blended_cognitive_phi >= 0.9);
     }
 
