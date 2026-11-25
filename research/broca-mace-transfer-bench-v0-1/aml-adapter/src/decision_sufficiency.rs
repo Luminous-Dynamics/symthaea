@@ -772,3 +772,450 @@ fn hex_digest(bytes: &[u8]) -> String {
     }
     output
 }
+
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use ed25519_dalek::{Signer, SigningKey};
+
+    use crate::candidate_evidence::{
+        CandidateEvidenceV1, EvidenceModalityV1, encode_candidate_evidence_jsonl,
+    };
+    use crate::evidence_qualification_gate::{
+        EvidenceDispositionV1, EvidenceQualificationBindingV1,
+        EvidenceQualificationEntryV1, EvidenceQualificationReceiptV1,
+        EvidenceQualificationSignatureVerifierV1, VerifiedEvidenceQualificationV1,
+    };
+    use crate::qualified_candidate_evidence::{
+        CandidateEvidenceBatchExpectationV1, CandidateEvidenceProjectionV1,
+        project_qualified_candidate_evidence_v1,
+    };
+    use crate::qualification_dsse::{
+        encode_dsse_envelope_v1, dsse_pae_v1, in_toto_qualification_payload_v1,
+    };
+    use crate::qualification_trust::{
+        PinnedEd25519QualificationVerifierV1, QualificationKeyStatusV1,
+        QualificationTrustKeyV1, QualificationTrustProfileV1, qualification_key_id_v1,
+    };
+
+    const SCOPE: &str = "11";
+    const ENV: &str = "12";
+    const TOOL: &str = "13";
+    const QUERY: &str = "14";
+    const NEED: &str = "15";
+    const PURPOSE: &str = "16";
+    const QUAL_POLICY: &str = "17";
+    const LIFECYCLE: &str = "18";
+    const QUAL_PROFILE: &str = "19";
+    const SUFF_POLICY: &str = "1a";
+    const CALIBRATION: &str = "1b";
+
+    struct TestQualificationVerifier;
+
+    impl EvidenceQualificationSignatureVerifierV1 for TestQualificationVerifier {
+        fn verify_signature(
+            &self,
+            profile: &str,
+            key_id: &str,
+            payload_sha256: &str,
+            signature: &[u8],
+            _issued_at_unix: u64,
+            _now_unix: u64,
+        ) -> Result<(), crate::evidence_qualification_gate::EvidenceQualificationRejectV1> {
+            if valid_sha256(profile)
+                && valid_sha256(key_id)
+                && signature == payload_sha256.as_bytes()
+            {
+                Ok(())
+            } else {
+                Err(crate::evidence_qualification_gate::EvidenceQualificationRejectV1::SignatureRejected)
+            }
+        }
+    }
+
+    fn repeat(byte: char) -> String {
+        std::iter::repeat_n(byte, 64).collect()
+    }
+
+    fn candidate() -> CandidateEvidenceV1 {
+        CandidateEvidenceV1 {
+            run_id: "run-sufficiency".into(),
+            candidate_id: "candidate-sufficiency".into(),
+            backend_id: "bm25-test".into(),
+            backend_revision_sha256: repeat('3'),
+            query_scope: "tenant:scope-a".into(),
+            query_purpose: "decision:workflow".into(),
+            query_sha256: repeat('4'),
+            evidence_id: "evidence-1".into(),
+            source_id: "source-1".into(),
+            source_sha256: repeat('5'),
+            payload_sha256: repeat('6'),
+            payload_ref: "cas://fixture/evidence-1".into(),
+            modality: EvidenceModalityV1::Text,
+            retrieval_channel: "bm25".into(),
+            retrieval_rank: 1,
+            retrieval_score: Some(1.0),
+            parent_evidence_ids: Vec::new(),
+            derivation_receipt_sha256: None,
+        }
+    }
+
+    fn candidate_ids_digest(ids: &[String]) -> String {
+        let mut hasher = Sha256::new();
+        hasher.update(b"luminous:mace:candidate-evidence-ids:v1\0");
+        hasher.update((ids.len() as u64).to_be_bytes());
+        for id in ids {
+            hash_field(&mut hasher, id);
+        }
+        hex_digest(&hasher.finalize())
+    }
+
+    fn qualified_batch(
+        qualification_key_id: &str,
+    ) -> QualifiedCandidateEvidenceBatchV1 {
+        let candidate = candidate();
+        let batch = encode_candidate_evidence_jsonl(&[candidate.clone()])
+            .expect("canonical candidate batch");
+        let ids = vec![candidate.evidence_id.clone()];
+        let mut qualification = EvidenceQualificationReceiptV1 {
+            run_id: batch.run_id.clone(),
+            query_invocation_id: "invocation-sufficiency".into(),
+            domain_id: "web".into(),
+            subject_scope_sha256: repeat('1'),
+            environment_revision_sha256: repeat('2'),
+            tool_profile_sha256: repeat('3'),
+            query_sha256: batch.query_sha256.clone(),
+            candidate_set_sha256: batch.candidate_set_sha256.clone(),
+            candidate_evidence_ids_sha256: candidate_ids_digest(&ids),
+            decision_need_sha256: repeat('5'),
+            purpose_sha256: repeat('6'),
+            qualification_policy_sha256: repeat('7'),
+            lifecycle_snapshot_sha256: repeat('8'),
+            verifier_profile_sha256: repeat('9'),
+            key_id: qualification_key_id.to_owned(),
+            issued_at_unix: 100,
+            expires_at_unix: 250,
+            entries: vec![EvidenceQualificationEntryV1 {
+                evidence_id: ids[0].clone(),
+                disposition: EvidenceDispositionV1::Admissible,
+                basis_receipt_sha256: repeat('a'),
+            }],
+            signature: Vec::new(),
+        };
+        qualification.signature = qualification.signing_payload_sha256().into_bytes();
+
+        let binding = EvidenceQualificationBindingV1 {
+            run_id: &qualification.run_id,
+            query_invocation_id: &qualification.query_invocation_id,
+            domain_id: &qualification.domain_id,
+            subject_scope_sha256: &qualification.subject_scope_sha256,
+            environment_revision_sha256: &qualification.environment_revision_sha256,
+            tool_profile_sha256: &qualification.tool_profile_sha256,
+            query_sha256: &qualification.query_sha256,
+            candidate_set_sha256: &qualification.candidate_set_sha256,
+            candidate_evidence_ids: &ids,
+            decision_need_sha256: &qualification.decision_need_sha256,
+            purpose_sha256: &qualification.purpose_sha256,
+            qualification_policy_sha256: &qualification.qualification_policy_sha256,
+            lifecycle_snapshot_sha256: &qualification.lifecycle_snapshot_sha256,
+            verifier_profile_sha256: &qualification.verifier_profile_sha256,
+            now_unix: 150,
+        };
+        let verified = VerifiedEvidenceQualificationV1::verify_and_bind(
+            &qualification,
+            &binding,
+            &TestQualificationVerifier,
+        ).expect("qualification receipt verifies");
+
+        let expected = CandidateEvidenceBatchExpectationV1 {
+            candidate_id: &batch.candidate_id,
+            backend_id: &batch.backend_id,
+            backend_revision_sha256: &batch.backend_revision_sha256,
+            query_scope: &batch.query_scope,
+            query_purpose: &batch.query_purpose,
+        };
+        match project_qualified_candidate_evidence_v1(
+            &batch,
+            &verified,
+            &binding,
+            &expected,
+            &TestQualificationVerifier,
+        ).expect("qualified projection") {
+            CandidateEvidenceProjectionV1::Qualified(qualified) => qualified,
+            CandidateEvidenceProjectionV1::Abstained(_) => panic!("fixture should qualify"),
+        }
+    }
+
+    fn evaluator_profile(
+        signing_key: &SigningKey,
+        status: QualificationKeyStatusV1,
+        profile_version: u64,
+        verifier_id: &str,
+    ) -> PinnedEd25519QualificationVerifierV1 {
+        let public_key = signing_key.verifying_key().to_bytes();
+        let key = QualificationTrustKeyV1 {
+            key_id: qualification_key_id_v1(&public_key),
+            public_key,
+            status,
+            not_before_unix: 1,
+            not_after_unix: 1000,
+        };
+        let profile = QualificationTrustProfileV1 {
+            schema_version: 1,
+            verifier_id: verifier_id.to_owned(),
+            profile_version,
+            keys: vec![key],
+        };
+        let digest = profile.profile_sha256().unwrap();
+        PinnedEd25519QualificationVerifierV1::from_pinned_profile(
+            &profile,
+            &digest,
+            profile_version,
+        ).unwrap()
+    }
+
+    fn use_binding<'a>(
+        qualified: &'a QualifiedCandidateEvidenceBatchV1,
+        issuer_profile_sha256: &'a str,
+        now_unix: u64,
+    ) -> DecisionSufficiencyUseBindingV1<'a> {
+        DecisionSufficiencyUseBindingV1 {
+            run_id: qualified.run_id(),
+            query_invocation_id: qualified.query_invocation_id(),
+            domain_id: qualified.domain_id(),
+            subject_scope_sha256: qualified.subject_scope_sha256(),
+            environment_revision_sha256: qualified.environment_revision_sha256(),
+            tool_profile_sha256: qualified.tool_profile_sha256(),
+            query_sha256: qualified.batch().query_sha256.as_str(),
+            candidate_set_sha256: qualified.source_candidate_set_sha256(),
+            qualified_evidence_set_sha256: qualified.qualified_candidate_set_sha256(),
+            qualification_receipt_sha256: qualified.qualification_receipt_sha256(),
+            decision_need_sha256: qualified.decision_need_sha256(),
+            purpose_sha256: qualified.purpose_sha256(),
+            lifecycle_snapshot_sha256: qualified.lifecycle_snapshot_sha256(),
+            sufficiency_policy_sha256: &repeat('a'),
+            calibration_profile_sha256: &repeat('b'),
+            issuer_profile_sha256,
+            now_unix,
+        }
+    }
+
+    fn receipt(
+        qualified: &QualifiedCandidateEvidenceBatchV1,
+        binding: &DecisionSufficiencyUseBindingV1<'_>,
+        evaluator_key_id: &str,
+        status: DecisionSufficiencyStatusV1,
+        requirement_status: DecisionRequirementStatusV1,
+        risk_upper: Option<u32>,
+        risk_limit: Option<u32>,
+    ) -> DecisionSufficiencyReceiptV1 {
+        DecisionSufficiencyReceiptV1 {
+            run_id: qualified.run_id().into(),
+            query_invocation_id: qualified.query_invocation_id().into(),
+            domain_id: qualified.domain_id().into(),
+            subject_scope_sha256: qualified.subject_scope_sha256().into(),
+            environment_revision_sha256: qualified.environment_revision_sha256().into(),
+            tool_profile_sha256: qualified.tool_profile_sha256().into(),
+            query_sha256: qualified.batch().query_sha256.clone(),
+            candidate_set_sha256: qualified.source_candidate_set_sha256().into(),
+            qualified_evidence_set_sha256: qualified.qualified_candidate_set_sha256().into(),
+            qualification_receipt_sha256: qualified.qualification_receipt_sha256().into(),
+            decision_need_sha256: qualified.decision_need_sha256().into(),
+            purpose_sha256: qualified.purpose_sha256().into(),
+            sufficiency_policy_sha256: binding.sufficiency_policy_sha256.into(),
+            calibration_profile_sha256: binding.calibration_profile_sha256.into(),
+            status,
+            requirements: vec![DecisionSufficiencyRequirementV1 {
+                requirement_id: "minimum-independent-evidence".into(),
+                status: requirement_status,
+                basis_receipt_sha256: vec![repeat('c')],
+            }],
+            risk_upper_bound_ppm: risk_upper,
+            risk_limit_ppm: risk_limit,
+            confidence_level_ppm: (status == DecisionSufficiencyStatusV1::Sufficient).then_some(950_000),
+            calibration_receipt_sha256: (status == DecisionSufficiencyStatusV1::Sufficient)
+                .then(|| repeat('d')),
+            issued_at_unix: 150,
+            expires_at_unix: 200,
+            issuer_profile_sha256: binding.issuer_profile_sha256.into(),
+            key_id: evaluator_key_id.to_owned(),
+            signature: Vec::new(),
+        }
+    }
+
+    fn signed_envelope(
+        receipt: &DecisionSufficiencyReceiptV1,
+        signing_key: &SigningKey,
+    ) -> String {
+        let subject_name = format!(
+            "urn:luminous:mace:qualified-evidence-set:v1:{}",
+            receipt.qualified_evidence_set_sha256
+        );
+        let statement = json!({
+            "_type": IN_TOTO_STATEMENT_TYPE_V1,
+            "subject": [{
+                "name": subject_name,
+                "digest": {
+                    "sha256": receipt.qualified_evidence_set_sha256
+                }
+            }],
+            "predicateType": MACE_DECISION_SUFFICIENCY_PREDICATE_TYPE_V1,
+            "predicate": receipt.unsigned_predicate_value()
+        });
+        let payload = serde_json::to_vec(&statement).unwrap();
+        let pae = dsse_pae_v1(DSSE_PAYLOAD_TYPE_V1, &payload);
+        let signature = signing_key.sign(&pae).to_bytes();
+        encode_dsse_envelope_v1(&payload, &receipt.key_id, &signature).unwrap()
+    }
+
+    fn build_valid_assessment(
+        qualified: &QualifiedCandidateEvidenceBatchV1,
+        status: DecisionSufficiencyStatusV1,
+        requirement_status: DecisionRequirementStatusV1,
+        risk_upper: Option<u32>,
+        risk_limit: Option<u32>,
+    ) -> (
+        DecisionSufficiencyUseBindingV1<'static>,
+        PinnedEd25519QualificationVerifierV1,
+        String,
+    ) {
+        // This test helper owns its fixture strings for the lifetime of the
+        // binding, avoiding references to temporary digest values.
+        let signing_key = SigningKey::from_bytes(&[73; 32]);
+        let profile = evaluator_profile(
+            &signing_key,
+            QualificationKeyStatusV1::Active,
+            1,
+            DECISION_SUFFICIENCY_VERIFIER_ID_V1,
+        );
+        let profile_digest = profile.profile_sha256().to_owned();
+        let binding = use_binding(qualified, Box::leak(profile_digest.clone().into_boxed_str()), 160);
+        let evaluator_key_id = qualification_key_id_v1(&signing_key.verifying_key().to_bytes());
+        let mut assessment = receipt(
+            qualified, &binding, &evaluator_key_id, status, requirement_status,
+            risk_upper, risk_limit,
+        );
+        let envelope = signed_envelope(&assessment, &signing_key);
+        // The receipt signature field is reconstructed by the DSSE verifier;
+        // keep the unsigned typed receipt in the helper's returned envelope.
+        let _ = &mut assessment;
+        // The binding contains references into the qualified projection and
+        // leaked, immutable policy/calibration digests. The evaluator profile
+        // is returned so the caller can revalidate at use.
+        (binding, profile, envelope)
+    }
+
+    #[test]
+    fn independently_signed_sufficiency_is_bound_to_the_exact_qualified_set() {
+        let qualified = qualified_batch(&repeat('f'));
+        let (binding, profile, envelope) = build_valid_assessment(
+            &qualified,
+            DecisionSufficiencyStatusV1::Sufficient,
+            DecisionRequirementStatusV1::Met,
+            Some(1000),
+            Some(5000),
+        );
+        let verified = verify_decision_sufficiency_v1(
+            &qualified, &binding, &envelope, &profile,
+        ).expect("separately signed sufficient receipt");
+        assert!(verified.is_sufficient());
+        assert_eq!(verified.status(), DecisionSufficiencyStatusV1::Sufficient);
+        verified.validate_at_use(&qualified, &binding, &profile)
+            .expect("same DecisionNeed and current evaluator profile remain valid");
+    }
+
+    #[test]
+    fn insufficient_is_a_valid_assessment_but_never_a_sufficient_verdict() {
+        let qualified = qualified_batch(&repeat('f'));
+        let (binding, profile, envelope) = build_valid_assessment(
+            &qualified,
+            DecisionSufficiencyStatusV1::Insufficient,
+            DecisionRequirementStatusV1::Unmet,
+            Some(10_000),
+            Some(5000),
+        );
+        let verified = verify_decision_sufficiency_v1(
+            &qualified, &binding, &envelope, &profile,
+        ).expect("honest insufficient assessment");
+        assert!(!verified.is_sufficient());
+        assert_eq!(verified.status(), DecisionSufficiencyStatusV1::Insufficient);
+    }
+
+    #[test]
+    fn sufficient_receipt_with_unmet_requirement_is_rejected() {
+        let qualified = qualified_batch(&repeat('f'));
+        let (binding, profile, envelope) = build_valid_assessment(
+            &qualified,
+            DecisionSufficiencyStatusV1::Sufficient,
+            DecisionRequirementStatusV1::Unmet,
+            Some(1000),
+            Some(5000),
+        );
+        assert_eq!(
+            verify_decision_sufficiency_v1(&qualified, &binding, &envelope, &profile),
+            Err(DecisionSufficiencyRejectV1::SufficientRequirementsNotMet)
+        );
+    }
+
+    #[test]
+    fn sufficient_receipt_with_risk_bound_over_limit_is_rejected() {
+        let qualified = qualified_batch(&repeat('f'));
+        let (binding, profile, envelope) = build_valid_assessment(
+            &qualified,
+            DecisionSufficiencyStatusV1::Sufficient,
+            DecisionRequirementStatusV1::Met,
+            Some(6000),
+            Some(5000),
+        );
+        assert_eq!(
+            verify_decision_sufficiency_v1(&qualified, &binding, &envelope, &profile),
+            Err(DecisionSufficiencyRejectV1::SufficientRiskBoundInvalid)
+        );
+    }
+
+    #[test]
+    fn decision_sufficiency_cannot_reuse_qualification_signer() {
+        let signing_key = SigningKey::from_bytes(&[73; 32]);
+        let key_id = qualification_key_id_v1(&signing_key.verifying_key().to_bytes());
+        let qualified = qualified_batch(&key_id);
+        let (binding, profile, envelope) = build_valid_assessment(
+            &qualified,
+            DecisionSufficiencyStatusV1::Sufficient,
+            DecisionRequirementStatusV1::Met,
+            Some(1000),
+            Some(5000),
+        );
+        assert_eq!(
+            verify_decision_sufficiency_v1(&qualified, &binding, &envelope, &profile),
+            Err(DecisionSufficiencyRejectV1::SharedQualificationAuthority)
+        );
+    }
+
+    #[test]
+    fn rotated_or_revoked_evaluator_profile_invalidates_previous_sufficiency() {
+        let qualified = qualified_batch(&repeat('f'));
+        let (binding, active_profile, envelope) = build_valid_assessment(
+            &qualified,
+            DecisionSufficiencyStatusV1::Sufficient,
+            DecisionRequirementStatusV1::Met,
+            Some(1000),
+            Some(5000),
+        );
+        let verified = verify_decision_sufficiency_v1(
+            &qualified, &binding, &envelope, &active_profile,
+        ).unwrap();
+
+        let signing_key = SigningKey::from_bytes(&[73; 32]);
+        let revoked_profile = evaluator_profile(
+            &signing_key,
+            QualificationKeyStatusV1::Revoked,
+            2,
+            DECISION_SUFFICIENCY_VERIFIER_ID_V1,
+        );
+        assert_eq!(
+            verified.validate_at_use(&qualified, &binding, &revoked_profile),
+            Err(DecisionSufficiencyRejectV1::ProfileDigestMismatch)
+        );
+    }
+}
