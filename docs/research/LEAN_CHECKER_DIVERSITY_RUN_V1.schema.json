@@ -1,0 +1,361 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://luminousdynamics.io/schemas/LEAN_CHECKER_DIVERSITY_RUN_V1.schema.json",
+  "title": "LeanCheckerDiversityRunV1",
+  "type": "object",
+  "additionalProperties": false,
+  "required": [
+    "schema_version",
+    "artifact_id",
+    "profile_status",
+    "profile_id",
+    "registry_sha256",
+    "subject",
+    "orchestrator",
+    "policy",
+    "requested_checker_ids",
+    "checker_runs",
+    "diversity_requirements",
+    "diversity_summary",
+    "profile_disposition",
+    "claim_ceiling"
+  ],
+  "properties": {
+    "schema_version": {
+      "const": "1.0.0"
+    },
+    "artifact_id": {
+      "const": "LEAN-CHECKER-DIVERSITY-RUN-001"
+    },
+    "profile_status": {
+      "enum": [
+        "synthetic_fixture_not_execution",
+        "observed_exact_export_run"
+      ]
+    },
+    "profile_id": {
+      "type": "string",
+      "minLength": 1
+    },
+    "registry_sha256": {
+      "type": "string",
+      "pattern": "^[a-f0-9]{64}$"
+    },
+    "subject": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "export_sha256",
+        "export_format",
+        "lean_toolchain"
+      ],
+      "properties": {
+        "export_sha256": {
+          "type": "string",
+          "pattern": "^[a-f0-9]{64}$"
+        },
+        "export_format": {
+          "type": "string",
+          "minLength": 1
+        },
+        "lean_toolchain": {
+          "type": "string",
+          "minLength": 1
+        },
+        "challenge_sha256": {
+          "type": "string",
+          "pattern": "^[a-f0-9]{64}$"
+        },
+        "solution_source_sha256": {
+          "type": "string",
+          "pattern": "^[a-f0-9]{64}$"
+        }
+      }
+    },
+    "orchestrator": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "name",
+        "version",
+        "configuration_sha256",
+        "paranoid_mode",
+        "sandbox_profile_sha256",
+        "exit_status"
+      ],
+      "properties": {
+        "name": {
+          "type": "string",
+          "minLength": 1
+        },
+        "version": {
+          "type": "string",
+          "minLength": 1
+        },
+        "configuration_sha256": {
+          "type": "string",
+          "pattern": "^[a-f0-9]{64}$"
+        },
+        "paranoid_mode": {
+          "type": "boolean"
+        },
+        "sandbox_profile_sha256": {
+          "type": "string",
+          "pattern": "^[a-f0-9]{64}$"
+        },
+        "exit_status": {
+          "enum": [
+            "success",
+            "failure",
+            "not_run",
+            "unknown"
+          ]
+        },
+        "stdout_sha256": {
+          "type": "string",
+          "pattern": "^[a-f0-9]{64}$"
+        },
+        "stderr_sha256": {
+          "type": "string",
+          "pattern": "^[a-f0-9]{64}$"
+        }
+      }
+    },
+    "policy": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "policy_id",
+        "policy_sha256",
+        "permitted_axioms"
+      ],
+      "properties": {
+        "policy_id": {
+          "type": "string",
+          "minLength": 1
+        },
+        "policy_sha256": {
+          "type": "string",
+          "pattern": "^[a-f0-9]{64}$"
+        },
+        "permitted_axioms": {
+          "type": "array",
+          "items": {
+            "type": "string",
+            "minLength": 1
+          },
+          "uniqueItems": true
+        }
+      }
+    },
+    "requested_checker_ids": {
+      "type": "array",
+      "minItems": 1,
+      "uniqueItems": true,
+      "items": {
+        "type": "string",
+        "pattern": "^[a-z][a-z0-9_]+$"
+      }
+    },
+    "checker_runs": {
+      "type": "array",
+      "minItems": 1,
+      "items": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": [
+          "checker_id",
+          "checker_version",
+          "implementation_revision",
+          "binary_sha256",
+          "input_export_sha256",
+          "result",
+          "raw_receipt_sha256"
+        ],
+        "properties": {
+          "checker_id": {
+            "type": "string",
+            "pattern": "^[a-z][a-z0-9_]+$"
+          },
+          "checker_version": {
+            "type": "string",
+            "minLength": 1
+          },
+          "implementation_revision": {
+            "type": "string",
+            "minLength": 1
+          },
+          "binary_sha256": {
+            "type": "string",
+            "pattern": "^[a-f0-9]{64}$"
+          },
+          "input_export_sha256": {
+            "type": "string",
+            "pattern": "^[a-f0-9]{64}$"
+          },
+          "result": {
+            "enum": [
+              "accepted",
+              "rejected",
+              "declined",
+              "error",
+              "timeout",
+              "resource_exhausted",
+              "not_run"
+            ]
+          },
+          "exit_code": {
+            "type": "integer"
+          },
+          "raw_receipt_sha256": {
+            "type": "string",
+            "pattern": "^[a-f0-9]{64}$"
+          },
+          "raw_stdout_sha256": {
+            "type": "string",
+            "pattern": "^[a-f0-9]{64}$"
+          },
+          "raw_stderr_sha256": {
+            "type": "string",
+            "pattern": "^[a-f0-9]{64}$"
+          },
+          "environment_ref": {
+            "type": "string",
+            "minLength": 1
+          }
+        }
+      }
+    },
+    "diversity_requirements": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "minimum_algorithm_lineages",
+        "minimum_independent_external_algorithm_lineages",
+        "minimum_languages",
+        "minimum_implementation_families",
+        "require_all_requested_accept"
+      ],
+      "properties": {
+        "minimum_algorithm_lineages": {
+          "type": "integer",
+          "minimum": 1
+        },
+        "minimum_independent_external_algorithm_lineages": {
+          "type": "integer",
+          "minimum": 0
+        },
+        "minimum_languages": {
+          "type": "integer",
+          "minimum": 1
+        },
+        "minimum_implementation_families": {
+          "type": "integer",
+          "minimum": 1
+        },
+        "require_all_requested_accept": {
+          "const": true
+        }
+      }
+    },
+    "diversity_summary": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "requested_count",
+        "executed_count",
+        "accepted_count",
+        "rejected_count",
+        "declined_count",
+        "error_count",
+        "timeout_count",
+        "resource_exhausted_count",
+        "distinct_implementation_families",
+        "distinct_algorithm_lineages",
+        "distinct_languages",
+        "known_term_representation_families",
+        "known_parser_families",
+        "independent_external_algorithm_lineages",
+        "unknown_relationship_count"
+      ],
+      "properties": {
+        "requested_count": {
+          "type": "integer",
+          "minimum": 0
+        },
+        "executed_count": {
+          "type": "integer",
+          "minimum": 0
+        },
+        "accepted_count": {
+          "type": "integer",
+          "minimum": 0
+        },
+        "rejected_count": {
+          "type": "integer",
+          "minimum": 0
+        },
+        "declined_count": {
+          "type": "integer",
+          "minimum": 0
+        },
+        "error_count": {
+          "type": "integer",
+          "minimum": 0
+        },
+        "timeout_count": {
+          "type": "integer",
+          "minimum": 0
+        },
+        "resource_exhausted_count": {
+          "type": "integer",
+          "minimum": 0
+        },
+        "distinct_implementation_families": {
+          "type": "integer",
+          "minimum": 0
+        },
+        "distinct_algorithm_lineages": {
+          "type": "integer",
+          "minimum": 0
+        },
+        "distinct_languages": {
+          "type": "integer",
+          "minimum": 0
+        },
+        "known_term_representation_families": {
+          "type": "integer",
+          "minimum": 0
+        },
+        "known_parser_families": {
+          "type": "integer",
+          "minimum": 0
+        },
+        "independent_external_algorithm_lineages": {
+          "type": "integer",
+          "minimum": 0
+        },
+        "unknown_relationship_count": {
+          "type": "integer",
+          "minimum": 0
+        }
+      }
+    },
+    "profile_disposition": {
+      "enum": [
+        "draft",
+        "all_required_accepted",
+        "rejected",
+        "inconclusive"
+      ]
+    },
+    "claim_ceiling": {
+      "type": "array",
+      "minItems": 1,
+      "items": {
+        "type": "string",
+        "minLength": 1
+      }
+    }
+  }
+}
