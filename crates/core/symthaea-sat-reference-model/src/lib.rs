@@ -351,7 +351,6 @@ impl AuthorityLedger {
         request: &EffectRequest,
         now: u64,
     ) -> AuthorizationDecision {
-        let mut subject_match = false;
         let mut scope_match = false;
         let mut last_reason = DenialReason::NoMatchingGrant;
 
@@ -360,7 +359,6 @@ impl AuthorityLedger {
             .values()
             .filter(|grant| &grant.subject == subject)
         {
-            subject_match = true;
             let exact_identity_match = grant.effect_scope.iter().any(|scope| {
                 scope.action == request.action
                     && scope.resource == request.resource
@@ -373,26 +371,23 @@ impl AuthorityLedger {
             }
 
             scope_match = true;
-            if !grant.effect_scope.iter().any(|scope| scope.permits(request)) {
-                last_reason = DenialReason::PayloadLabelOutsideGrant;
+            if let Err(reason) = self.lineage_status(&grant.id, now) {
+                last_reason = reason;
                 continue;
             }
 
-            match self.lineage_status(&grant.id, now) {
-                Ok(()) => {
-                    return AuthorizationDecision::Allowed {
-                        grant_id: grant.id.clone(),
-                    };
-                }
-                Err(reason) => last_reason = reason,
+            if grant.effect_scope.iter().any(|scope| scope.permits(request)) {
+                return AuthorizationDecision::Allowed {
+                    grant_id: grant.id.clone(),
+                };
             }
+
+            last_reason = DenialReason::PayloadLabelOutsideGrant;
         }
 
         AuthorizationDecision::Denied {
             reason: if scope_match {
                 last_reason
-            } else if subject_match {
-                DenialReason::NoMatchingGrant
             } else {
                 DenialReason::NoMatchingGrant
             },
