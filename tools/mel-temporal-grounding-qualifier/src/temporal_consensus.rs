@@ -66,6 +66,11 @@ pub struct MultiAnnotatorGroundingSummaryV1 {
     pub panel_size: usize,
     pub minimum_annotator_count: u16,
     pub scored_annotators: usize,
+    pub abstained_predictions: usize,
+    pub parse_failure_predictions: usize,
+    pub prediction_coverage: Option<f64>,
+    pub present_prediction_coverage: Option<f64>,
+    pub absent_prediction_coverage: Option<f64>,
     pub present_annotators: usize,
     pub absent_annotators: usize,
     pub ambiguous_exclusions: usize,
@@ -113,6 +118,8 @@ pub struct MultiAnnotatorGroundingReportV1 {
     pub annotator_receipts_authenticated: bool,
     /// This adapter preserves disagreement; it does not calculate formal IAA.
     pub pairwise_inter_annotator_agreement_computed: bool,
+    /// Model confidence is not provided by this interval prediction schema.
+    pub model_confidence_calibration_computed: bool,
     /// No single merged or majority-voted interval reference is constructed.
     pub synthetic_consensus_ground_truth_created: bool,
     /// Small panels are descriptive. This is not population-level uncertainty.
@@ -239,6 +246,7 @@ pub fn audit_multi_annotator_case(
         annotation_manifest_authenticated: false,
         annotator_receipts_authenticated: false,
         pairwise_inter_annotator_agreement_computed: false,
+        model_confidence_calibration_computed: false,
         synthetic_consensus_ground_truth_created: false,
         population_confidence_interval_computed: false,
     })
@@ -316,6 +324,23 @@ fn summarize_results(
         .iter()
         .filter(|item| item.fully_correct_for_this_annotation == Some(true))
         .count();
+    let abstained_predictions = scored.iter().filter(|item| item.score.abstained).count();
+    let parse_failure_predictions = scored
+        .iter()
+        .filter(|item| item.score.parse_failure)
+        .count();
+    let covered = scored
+        .iter()
+        .filter(|item| !item.score.abstained && !item.score.parse_failure)
+        .count();
+    let present_covered = present
+        .iter()
+        .filter(|item| !item.score.abstained && !item.score.parse_failure)
+        .count();
+    let absent_covered = absent
+        .iter()
+        .filter(|item| !item.score.abstained && !item.score.parse_failure)
+        .count();
     let absent_correct_claims = absent
         .iter()
         .filter(|item| item.score.correct_absence_claim == Some(true))
@@ -330,6 +355,11 @@ fn summarize_results(
         panel_size: results.len(),
         minimum_annotator_count,
         scored_annotators: scored.len(),
+        abstained_predictions,
+        parse_failure_predictions,
+        prediction_coverage: rate(covered, scored.len()),
+        present_prediction_coverage: rate(present_covered, present.len()),
+        absent_prediction_coverage: rate(absent_covered, absent.len()),
         present_annotators: present.len(),
         absent_annotators: absent.len(),
         ambiguous_exclusions,
@@ -566,6 +596,56 @@ mod tests {
         assert_eq!(report.annotator_results[1].score.f1, Some(1.0));
         assert!(!report.synthetic_consensus_ground_truth_created);
         assert!(!report.pairwise_inter_annotator_agreement_computed);
+    }
+
+    #[test]
+    fn model_abstention_remains_in_the_eligible_panel_denominator() {
+        let intervals = vec![FrameIntervalV1 {
+            start_frame: 100,
+            end_frame: 200,
+        }];
+        let annotations = vec![
+            annotation('1', 'a', GroundTruthStateV1::Present, intervals.clone(), None),
+            annotation('2', 'b', GroundTruthStateV1::Present, intervals, None),
+        ];
+        let mut model_prediction = prediction(Vec::new());
+        model_prediction.state = GroundingPredictionStateV1::Ambiguous {
+            candidate_intervals: vec![FrameIntervalV1 {
+                start_frame: 90,
+                end_frame: 210,
+            }],
+            reason: "two plausible boundaries".into(),
+        };
+        let report = audit_multi_annotator_case(&case(annotations, model_prediction)).unwrap();
+        assert_eq!(report.summary.scored_annotators, 2);
+        assert_eq!(report.summary.abstained_predictions, 2);
+        assert_eq!(report.summary.prediction_coverage, Some(0.0));
+        assert_eq!(report.summary.present_prediction_coverage, Some(0.0));
+        assert_eq!(report.summary.fully_correct_annotators, 0);
+        assert_eq!(report.summary.unanimous_correct_across_scored_annotators, Some(false));
+        assert!(!report.model_confidence_calibration_computed);
+    }
+
+    #[test]
+    fn parse_failure_lowers_prediction_coverage_without_dropping_annotators() {
+        let intervals = vec![FrameIntervalV1 {
+            start_frame: 100,
+            end_frame: 200,
+        }];
+        let annotations = vec![
+            annotation('1', 'a', GroundTruthStateV1::Present, intervals.clone(), None),
+            annotation('2', 'b', GroundTruthStateV1::Present, intervals, None),
+        ];
+        let mut model_prediction = prediction(Vec::new());
+        model_prediction.state = GroundingPredictionStateV1::Unparseable {
+            raw_output_sha256: digest('e'),
+            reason: "malformed interval payload".into(),
+        };
+        let report = audit_multi_annotator_case(&case(annotations, model_prediction)).unwrap();
+        assert_eq!(report.summary.panel_size, 2);
+        assert_eq!(report.summary.parse_failure_predictions, 2);
+        assert_eq!(report.summary.prediction_coverage, Some(0.0));
+        assert_eq!(report.annotator_results.len(), 2);
     }
 
     #[test]
