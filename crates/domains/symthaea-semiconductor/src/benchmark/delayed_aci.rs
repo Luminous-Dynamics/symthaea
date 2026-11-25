@@ -524,6 +524,23 @@ pub fn issue_delayed_aci_prediction_v1(
     let round = engine.current_round.ok_or_else(|| {
         DelayedAciErrorV1("begin_delayed_aci_round_v1 must precede prediction".into())
     })?;
+    if engine
+        .pending_predictions
+        .values()
+        .any(|pending| pending.expected_delivery_round == round)
+    {
+        return Err(DelayedAciErrorV1(
+            "due fixed-delay feedback must be delivered, degenerate-resolved or explicitly forfeited before issuing this round".into(),
+        ));
+    }
+    if engine.pending_predictions.values().any(|pending| {
+        pending.sample_id == input.sample_id
+            || pending.measurement_event_id == input.measurement_event_id
+    }) {
+        return Err(DelayedAciErrorV1(
+            "sample or measurement event already has a pending ACI prediction".into(),
+        ));
+    }
     if input.round != round || engine.prediction_issued_this_round {
         return Err(DelayedAciErrorV1(
             "prediction round is not current or already used".into(),
@@ -609,6 +626,48 @@ fn make_update_receipt(
     };
     receipt.receipt_sha256 = update_digest(&receipt)?;
     Ok(receipt)
+}
+
+/// Explicitly forfeits a due physical-feedback outcome. This releases the
+/// pending slot so later predictions can continue, but permanently marks the
+/// reference fixed-delay complete-feedback assumption as violated.
+pub fn forfeit_due_delayed_aci_feedback_v1(
+    engine: &mut DelayedAciEngineV1,
+    sample_id: &str,
+) -> Result<AciMissingFeedbackRecordV1, DelayedAciErrorV1> {
+    validate_engine(engine)?;
+    require_text(sample_id, "sample_id")?;
+    let current_round = engine
+        .current_round
+        .ok_or_else(|| DelayedAciErrorV1("ACI round has not begun".into()))?;
+    let issued_round = engine
+        .pending_predictions
+        .iter()
+        .find(|(_, prediction)| prediction.sample_id == sample_id)
+        .map(|(round, _)| *round)
+        .ok_or_else(|| DelayedAciErrorV1("pending ACI prediction not found".into()))?;
+    let prediction = engine
+        .pending_predictions
+        .get(&issued_round)
+        .expect("pending prediction was located");
+    if prediction.expected_delivery_round != current_round {
+        return Err(DelayedAciErrorV1(
+            "feedback may only be forfeited in its exact due round".into(),
+        ));
+    }
+    let prediction = engine
+        .pending_predictions
+        .remove(&issued_round)
+        .expect("pending prediction was located");
+    let record = AciMissingFeedbackRecordV1 {
+        sample_id: prediction.sample_id,
+        measurement_event_id: prediction.measurement_event_id,
+        issued_round,
+        expected_delivery_round: prediction.expected_delivery_round,
+    };
+    engine.missing_feedback.push(record.clone());
+    engine.guarantee_state = AciGuaranteeStateV1::UncertifiedMissingOrInvalidFeedback;
+    Ok(record)
 }
 
 /// Resolves a full-real-line or empty prediction set at its exact due round.
@@ -974,7 +1033,9 @@ pub fn delayed_aci_finite_horizon_miscoverage_bound_v1(
     total_rounds: u64,
 ) -> Result<f64, DelayedAciErrorV1> {
     if initial_phase_alphas.is_empty()
-        || initial_phase_alphas.iter().any(|value| !value.is_finite())
+        || initial_phase_alphas
+            .iter()
+            .any(|value| !value.is_finite() || !(0.0..=1.0).contains(value))
         || !learning_rate.is_finite()
         || learning_rate <= 0.0
         || total_rounds == 0
@@ -1525,6 +1586,73 @@ mod tests {
         assert_eq!(delay_to_memory_ratio_v1(5.0, 20.0).unwrap(), 0.25);
         assert!(delay_to_memory_ratio_v1(1.0, 0.0).is_err());
         assert!(delay_to_memory_ratio_v1(-1.0, 2.0).is_err());
+    }
+
+    #[test]
+    fn due_feedback_must_be_resolved_before_next_same_phase_prediction() {
+        let mut engine = engine(2);
+        begin_and_issue(&mut engine, 0, AciPredictionIntervalV1::bounded(9.0, 11.0));
+        begin_and_issue(&mut engine, 1, AciPredictionIntervalV1::bounded(9.0, 11.0));
+        begin_delayed_aci_round_v1(&mut engine, 2).unwrap();
+
+        assert!(
+            issue_delayed_aci_prediction_v1(
+                &mut engine,
+                &prediction_input(
+                    "sample-2",
+                    "event-2",
+                    2,
+                    AciPredictionIntervalV1::bounded(9.0, 11.0),
+                )
+            )
+            .is_err()
+        );
+    }
+
+    #[test]
+    fn explicit_forfeit_releases_due_phase_but_revokes_reference_claim() {
+        let mut engine = engine(1);
+        begin_and_issue(&mut engine, 0, AciPredictionIntervalV1::bounded(9.0, 11.0));
+        begin_delayed_aci_round_v1(&mut engine, 1).unwrap();
+        let record = forfeit_due_delayed_aci_feedback_v1(&mut engine, "sample-0").unwrap();
+        assert_eq!(record.expected_delivery_round, 1);
+        assert_eq!(
+            engine.guarantee_state,
+            AciGuaranteeStateV1::UncertifiedMissingOrInvalidFeedback
+        );
+        assert!(engine.pending_predictions.is_empty());
+        begin_and_issue(&mut engine, 1, AciPredictionIntervalV1::bounded(9.0, 11.0));
+    }
+
+    #[test]
+    fn duplicate_pending_sample_or_event_is_rejected() {
+        let mut engine = engine(3);
+        begin_and_issue(&mut engine, 0, AciPredictionIntervalV1::bounded(9.0, 11.0));
+        begin_delayed_aci_round_v1(&mut engine, 1).unwrap();
+        let same_sample = prediction_input(
+            "sample-0",
+            "new-event",
+            1,
+            AciPredictionIntervalV1::bounded(9.0, 11.0),
+        );
+        assert!(issue_delayed_aci_prediction_v1(&mut engine, &same_sample).is_err());
+        let same_event = prediction_input(
+            "new-sample",
+            "event-0",
+            1,
+            AciPredictionIntervalV1::bounded(9.0, 11.0),
+        );
+        assert!(issue_delayed_aci_prediction_v1(&mut engine, &same_event).is_err());
+    }
+
+    #[test]
+    fn bound_helper_rejects_invalid_initial_phase_levels() {
+        assert!(
+            delayed_aci_finite_horizon_miscoverage_bound_v1(&[-0.1], 0.2, 100).is_err()
+        );
+        assert!(
+            delayed_aci_finite_horizon_miscoverage_bound_v1(&[1.1], 0.2, 100).is_err()
+        );
     }
 
     #[test]
