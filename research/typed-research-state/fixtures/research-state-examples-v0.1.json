@@ -75,7 +75,8 @@
             },
             "integrity_status": "UNKNOWN",
             "correction_status": "UNKNOWN",
-            "retrieval_state": "CAPTURED"
+            "retrieval_state": "CAPTURED",
+            "source_role": "UNKNOWN"
           }
         ]
       }
@@ -161,7 +162,8 @@
             },
             "integrity_status": "CLEAN",
             "correction_status": "NONE",
-            "retrieval_state": "CAPTURED"
+            "retrieval_state": "CAPTURED",
+            "source_role": "PRIMARY"
           }
         ]
       }
@@ -266,7 +268,8 @@
             },
             "integrity_status": "CLEAN",
             "correction_status": "NONE",
-            "retrieval_state": "CAPTURED"
+            "retrieval_state": "CAPTURED",
+            "source_role": "PRIMARY"
           },
           {
             "evidence_id": "ev-c2",
@@ -281,7 +284,8 @@
             },
             "integrity_status": "CLEAN",
             "correction_status": "NONE",
-            "retrieval_state": "CAPTURED"
+            "retrieval_state": "CAPTURED",
+            "source_role": "REGISTRY"
           }
         ]
       }
@@ -369,7 +373,8 @@
             },
             "integrity_status": "CLEAN",
             "correction_status": "SUPERSEDED",
-            "retrieval_state": "CAPTURED"
+            "retrieval_state": "CAPTURED",
+            "source_role": "PRIMARY"
           }
         ]
       }
