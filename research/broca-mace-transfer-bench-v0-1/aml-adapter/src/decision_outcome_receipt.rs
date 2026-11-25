@@ -813,14 +813,21 @@ mod tests {
         fixture.receipt.payload.causal.design = DecisionOutcomeCausalDesignV1::DescriptiveOnly;
         fixture.receipt.payload.causal.attribution = DecisionOutcomeAttributionV1::IdentifiedPositive;
         fixture.resign();
+        let mut expected = fixture.expected();
+        expected.causal_design = DecisionOutcomeCausalDesignV1::DescriptiveOnly;
         assert_eq!(
-            fixture.verify(250),
-            Err(DecisionOutcomeReceiptRejectV1::BindingMismatch)
+            validate_decision_outcome_receipt_v1(
+                &fixture.receipt,
+                &expected,
+                250,
+                &fixture.verifier,
+            ),
+            Err(DecisionOutcomeReceiptRejectV1::CausalClaimMismatch)
         );
     }
 
     #[test]
-    fn utility_cannot_offset_hard_constraint_violation() {
+    fn inconsistent_hard_constraint_violation_count_is_rejected() {
         let mut fixture = fixture();
         fixture.receipt.payload.hard_constraints.verdict =
             DecisionOutcomeHardConstraintVerdictV1::Violated;
@@ -831,6 +838,22 @@ mod tests {
             fixture.verify(250),
             Err(DecisionOutcomeReceiptRejectV1::HardConstraintVerdictMismatch)
         );
+    }
+
+    #[test]
+    fn positive_utility_does_not_erase_a_reported_hard_constraint_violation() {
+        let mut fixture = fixture();
+        fixture.receipt.payload.hard_constraints.verdict =
+            DecisionOutcomeHardConstraintVerdictV1::Violated;
+        fixture.receipt.payload.hard_constraints.violation_count = Some(1);
+        fixture.receipt.payload.hard_constraints.violation_report_sha256 = Some(digest('a'));
+        fixture.resign();
+        let verified = fixture.verify(250).unwrap();
+        assert_eq!(
+            verified.hard_constraint_verdict(),
+            DecisionOutcomeHardConstraintVerdictV1::Violated
+        );
+        assert!(verified.utility_delta_microunits() > 0);
     }
 
     #[test]
