@@ -91,5 +91,6 @@
     "lineage_evidence_refs": [
       "lineage-source-01"
     ]
-  }
+  },
+  "manifest_digest": "sha256:aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa"
 }
