@@ -288,10 +288,14 @@ jobs:
           assert cases["identical-predictions-zero-information"]["expected_information_gain_max_bits"] == 1e-12
           assert cases["phase-only-separation"]["expected_information_gain_min_bits"] > 0.9
           assert cases["high-noise-blurs-hypotheses"]["expected_information_gain_max_bits"] < 0.25
+          for case in fixture["cases"]:
+              assert all(h["branch_association_stable"] is True and h["response_branch_id"] for h in case["hypotheses"])
           portfolio = fixture["portfolios"][0]
           assert len(portfolio["candidate_designs"]) == 4
           assert portfolio["expected_pareto_front_ids"] == ["weak-low-cost", "strong-low-cost"]
           assert portfolio["expected_best_ratio_id"] == "strong-low-cost"
+          for candidate in portfolio["candidate_designs"]:
+              assert all(h["branch_association_stable"] is True and h["response_branch_id"] for h in candidate["hypotheses"])
           assert fixture["claim_boundary"]["no_kinetic_forward_model_evaluated"] is True
           print("kinetic_discrimination_eig_schema_validation=PASS")
           PY
