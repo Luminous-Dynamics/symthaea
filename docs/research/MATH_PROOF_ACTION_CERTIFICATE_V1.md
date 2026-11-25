@@ -199,3 +199,7 @@ The exact-head workflow must pass the subgoal omission rejection, wrong-proposit
 ### 12.4. Native axiom output is diagnostic-only
 
 The positive certificate workflow retains Lean `#print axioms` output and checks the expected native report, but that output is not the sole trust oracle. Upstream Lean issue [#15226](https://github.com/leanprover/lean4/issues/15226) documents imported-inductive under-reporting in affected toolchains. The pinned Symthaea toolchain is tested separately through the fresh per-root traversal in [the independent axiom audit protocol](LEAN_AXIOM_AUDIT_INDEPENDENCE_V1.md) and issue [#13575](https://github.com/Luminous-Dynamics/symthaea/issues/13575). Until the independent auditor has adequate adversarial coverage, no repository-wide axiom-free claim is justified.
+
+### 12.5. Fresh closure test now includes transitive controls
+
+The independent trust-audit fixture now imports the actual proof-action module and checks an expanded fifteen-root corpus. In addition to the `Classical.choice` imported-inductive roots and empty proof roots, it includes a direct custom axiom, a theorem that transitively references it, a downstream theorem that references that theorem, and mutually recursive `Even`/`Odd` inductives. Each root is audited twice in opposite orders, with exact expected sets. The run is still pending, and this larger corpus is not covered by the earlier action-certificate receipt.
