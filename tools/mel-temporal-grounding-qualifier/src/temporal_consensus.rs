@@ -78,7 +78,9 @@ pub struct MultiAnnotatorGroundingSummaryV1 {
     pub present_min_f1: Option<f64>,
     pub present_max_f1: Option<f64>,
     pub present_exact_count_accuracy: Option<f64>,
-    pub present_mean_count_gated_f1: Option<f64>,
+    /// The count-gated metric is defined only for annotations with >1 event.
+    pub one_to_many_annotators: usize,
+    pub one_to_many_mean_count_gated_f1: Option<f64>,
     pub present_count_error_min: Option<usize>,
     pub present_count_error_median: Option<f64>,
     pub present_count_error_max: Option<usize>,
@@ -275,7 +277,12 @@ fn summarize_results(
         .iter()
         .filter(|item| item.score.exact_occurrence_count == Some(true))
         .count();
-    let count_gated_f1: Vec<_> = present
+    let one_to_many: Vec<_> = present
+        .iter()
+        .copied()
+        .filter(|item| item.score.ground_truth_occurrences > 1)
+        .collect();
+    let count_gated_f1: Vec<_> = one_to_many
         .iter()
         .map(|item| {
             if item.score.exact_occurrence_count == Some(true) {
@@ -314,7 +321,7 @@ fn summarize_results(
         .filter(|item| item.score.correct_absence_claim == Some(true))
         .count();
 
-    let truth_counts: Vec<_> = scored
+    let truth_counts: Vec<_> = present
         .iter()
         .map(|item| item.score.ground_truth_occurrences)
         .collect();
@@ -336,7 +343,8 @@ fn summarize_results(
         present_min_f1: positive_f1.iter().copied().reduce(f64::min),
         present_max_f1: positive_f1.iter().copied().reduce(f64::max),
         present_exact_count_accuracy: rate(exact_count, present.len()),
-        present_mean_count_gated_f1: mean(&count_gated_f1),
+        one_to_many_annotators: one_to_many.len(),
+        one_to_many_mean_count_gated_f1: mean(&count_gated_f1),
         present_count_error_min: count_errors.iter().copied().min(),
         present_count_error_median: median_u64(&count_errors),
         present_count_error_max: count_errors.iter().copied().max(),
@@ -704,6 +712,8 @@ mod tests {
         let report = audit_multi_annotator_case(&input).unwrap();
         assert_eq!(report.summary.present_count_error_min, Some(0));
         assert_eq!(report.summary.present_count_error_max, Some(1));
+        assert_eq!(report.summary.one_to_many_annotators, 1);
+        assert_eq!(report.summary.one_to_many_mean_count_gated_f1, Some(0.0));
         assert_eq!(report.summary.annotated_occurrence_count_min, Some(1));
         assert_eq!(report.summary.annotated_occurrence_count_max, Some(2));
         assert_eq!(report.summary.present_exact_count_accuracy, Some(0.5));
