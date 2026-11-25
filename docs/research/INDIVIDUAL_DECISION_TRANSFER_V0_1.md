@@ -75,7 +75,73 @@ The unit suite covers:
 
 Falsify the hypothesis where rollout rankings match or outperform latent rankings across held-out individuals, especially under conditions where the latent estimator is above its floor. Also include null-effect and all-actions-epsilon-equivalent strata. A model that predicts the population-average action but fails individual-specific ranking must not pass as individualized decision competence.
 
-## 7. Benchmark design
+## 7. Paradigm hypothesis: decision-sufficient, intervention-preserving representations
+
+The architectural objective should not be to reconstruct every aspect of the observation equally well. It should preserve the distinctions that can alter a task-relevant decision, including small but material individual-specific effects. This is a research hypothesis, not a proven general property of HDC/CfC.
+
+For individual (i), frozen history (h_i), action set (mathcal A), and executed task utility (Q_i(a)), define the evaluator-side (epsilon)-good set:
+
+[
+mathcal A_epsilon(i,h_i)
+=
+{ainmathcal A:
+Q_i(a)ge max_{binmathcal A}Q_i(b)-epsilon}.
+]
+
+For representation (rin{\text{latent},\text{rollout}}), the candidate produces (widehat Q_i^r(a)) and selects
+[
+widehat a_i^r = argmax_{ainmathcal A}widehat Q_i^r(a).
+]
+The primary consequence is realized decision regret
+[
+R_i^r = max_{ainmathcal A}Q_i(a)-Q_i(widehat a_i^r),
+]
+not reconstruction error alone. The scorecard also reports whether (widehat a_i^r) is top-1 or belongs to the evaluator's (epsilon)-good set, and the full action-ranking tie structure.
+
+A candidate representation is decision-sufficient at tolerance (epsilon) on an evaluation cohort only when its emitted selection incurs at most (epsilon) realized regret for that cohort's declared task/action contract. This is an evaluator-side definition; the candidate never sees the hidden realized utilities used to calculate it. Report cohort proportions and independent-cluster uncertainty downstream rather than asserting a universal guarantee.
+
+### Candidate training objective to ablate
+
+A possible training objective separates rather than hides its terms:
+
+[
+mathcal L =
+lambda_{\mathrm{dyn}}mathcal L_{\mathrm{dyn}}
++lambda_{\mathrm{cf}}mathcal L_{\mathrm{cf}}
++lambda_{\mathrm{rank}}mathcal L_{\mathrm{rank}}
++lambda_{\mathrm{cal}}mathcal L_{\mathrm{cal}}.
+]
+
+- (mathcal L_{\mathrm{dyn}}): shared continuous-time transition / observation dynamics, evaluated under irregular time steps and held-out regimes.
+- (mathcal L_{\mathrm{cf}}): paired intervention-contrast prediction for the same individual and common exogenous realization. Normalize effect units and compare against the zero-effect baseline.
+- (mathcal L_{\mathrm{rank}}): margin-aware pairwise action ranking. For action pairs with a realized training margin larger than the preregistered (epsilon), use a pairwise logistic or hinge loss on the sign of (Q_i(a)-Q_i(b)). Treat near-ties as ties rather than manufacturing a ranking target from noise.
+- (mathcal L_{\mathrm{cal}}): proper probabilistic scoring/calibration for outcome and decision uncertainty. A confidence score without calibration is not sufficient.
+
+The coefficients and margins must be preregistered or selected on validation individuals, then frozen before confirmatory evaluation. Report each term, its validation behavior and downstream decision regret; do not select checkpoints by the weighted total alone. Compare reconstruction-only, contrast-only, rank-only, contrast+rank, and full multi-objective arms at matched parameter and compute budgets.
+
+### Architecture factorization to test
+
+Test, rather than assume, a factorized model of:
+1. stable individual-trait posterior (q(u_imid h_i)) (PCIR owner #13543/#13562);
+2. shared action-conditioned dynamics (F_	heta(z_t,a_t,Delta t,e_t)) (CfC/LTC path);
+3. individual/intervention residual or relational memory (G_psi(u_i,a,	ext{event-role})) (HDC path);
+4. decision head that predicts action utility differences and uncertainty, preserving (epsilon)-good membership.
+
+Do not simply add the residual as a scalar to every state coordinate. Compare a typed relational residual, a separate value/effect head, and a latent concatenation/binding ablation. Preserve the same full exogenous draw across sibling interventions; endogenous state may diverge after actions diverge.
+
+### Falsification and anti-shortcut controls
+
+- Reconstruction improves while per-individual regret or action-ranking agreement worsens.
+- Population-average utility is calibrated while individual action rankings fail.
+- All actions are within (epsilon): do not reward arbitrary rank order.
+- A tiny effect below the estimator floor must not create a false action distinction.
+- A large effect that flips the selected action must not be erased by population pooling.
+- A model obtains a low random-policy MSE but is exploited by the model optimizer; feed the optimizer-in-loop test to #9396.
+- A model gains by receiving more branches, labels, search queries or simulator interactions; match and report all of them.
+
+This is the intended paradigm shift: learn a compact causal state that preserves decision-relevant individual differences, while delegating additional sensing to #9563/#9666 and optimizer exploitability to #9396. It is not a claim that reconstruction should be discarded or that this objective will outperform existing methods without the ablations.
+
+## 8. Benchmark design
 
 Use whole-individual / physical-parameter-draw splits and separate intervention-pair holdouts. Sibling branches, posterior draws and action rows belonging to one individual remain in the same split and cluster.
 
@@ -100,7 +166,7 @@ Report three layers independently:
 
 The constant/population baseline must be frozen on training individuals, then evaluated on held-out individuals. Do not select its best common action using the confirmatory cohort. The paper's same-evaluation-cohort constant baseline is a historical metric definition; the preregistered holdout is a stricter deployment-oriented extension and must be labelled as such.
 
-## 8. Comparison strategy
+## 9. Comparison strategy
 
 - **TD-MPC2:** include a public frozen-checkpoint / matched-policy baseline wherever the selected DMControl task and interface overlap. Its official registry exposes 324 checkpoints: 312 single-task checkpoints for 104 tasks (including 39 DMControl tasks) and multi-task models from 1M to 317M parameters; the official site explicitly warns that scores across task sets are not comparable. Use exact supported task/checkpoint IDs and report parameter count, inference cost and evaluation configuration. It is a policy/return baseline unless its latent/rollout readouts are separately exposed; do not imply it supplies the individual-effect estimator. [Official checkpoint registry](https://www.tdmpc2.com/models), [datasets](https://www.tdmpc2.com/dataset).
 - **EAWM:** direct DMC model-based-RL comparison only under matched task, observation, update, interaction and compute protocols. It reports gains on DMC 500K and DMC-GB2 500K, but those scores are not individual-effect or decision-transfer scores. [ICLR 2026 paper](https://proceedings.iclr.cc/paper_files/paper/2026/hash/fc09b26b85ab3abb2832bd555a2e4215-Abstract-Conference.html).
@@ -111,13 +177,13 @@ The constant/population baseline must be frozen on training individuals, then ev
 
 No cross-benchmark scalar leaderboard is proposed. Report matched head-to-heads and their exact task, data, action, planner, compute and hardware conditions.
 
-## 9. Benchmark landscape and why the evidence ladder matters
+## 10. Benchmark landscape and why the evidence ladder matters
 
 The October 18, 2026 final manuscript snapshot of *A Survey of World Model Benchmarks* catalogs 130 representative benchmarks. In its coding, 6 of 74 control-fidelity tracks (8.1%) include closed-loop evaluation; for interventional action fidelity, 3 of 22 (13.6%) include closed-loop evaluation. Its functional-utility subset is more often closed-loop (13 of 15). These are counts within that survey's coded corpus, not a census of every benchmark, but they show why open-loop action metrics must not be mistaken for policy utility. [Benchmark survey](https://world-model-benchmarks.github.io/).
 
 The decision-centric position paper distinguishes L4 intervention fidelity, L5 outcome/value fidelity, L6 fixed-policy evaluation and L7 optimization utility; it explicitly cautions that these axes are not a single monotone scalar. It recommends separate policy sets for behavior, fixed anchors, distribution-shifted policies and optimizer-produced policies. It also says an adaptive planner may discover model-error regions missed by fixed-policy ranking. [Yu et al. (2026)](https://arxiv.org/abs/2606.15032).
 
-## 10. Decision-world-model evidence ladder
+## 11. Decision-world-model evidence ladder
 
 A June 2026 decision-making-centric position paper recommends reporting an L0–L7 profile rather than a single pooled world-model score. It explicitly warns that the levels span partly independent axes (observational/interventional, open-/closed-loop, fixed-policy/optimizer-induced), and that the ladder is not monotone in practice. [Yu et al. (2026)](https://arxiv.org/abs/2606.15032).
 
@@ -132,7 +198,7 @@ This scorecard is a **bounded L4 / per-decision outcome slice**, not a complete 
 
 A fixed policy set can miss narrow optimism pockets that an adaptive planner discovers. #9396 already specifies matched-global-MSE structured error families and search ladders over candidate count, search rounds and rollout horizon. Keep the random-action prediction error, optimizer-selected prediction error and realized selected-policy regret separate. Use #13652's per-individual scorecard as an action/effect diagnostic feeding the chain; do not duplicate the XGap owner.
 
-## 11. Prospective gates (targets, not results)
+## 12. Prospective gates (targets, not results)
 
 - positive held-out paired regret improvement with a 95% independent-cluster interval excluding zero;
 - stretch target of at least 10% relative regret reduction versus the strongest matched-cost baseline;
@@ -142,6 +208,6 @@ A fixed policy set can miss narrow optimism pockets that an adaptive planner dis
 
 These are preregistration targets. They are not current benchmark results.
 
-## 12. Execution and claim ceiling
+## 13. Execution and claim ceiling
 
 This PR adds only a finite evaluator primitive, tests and a semantic fixture. It does not authenticate receipts, establish causal identification, train HDC/CfC, reproduce the DMC paper, demonstrate model advantage, provide physical safety evidence, or establish SOTA.
