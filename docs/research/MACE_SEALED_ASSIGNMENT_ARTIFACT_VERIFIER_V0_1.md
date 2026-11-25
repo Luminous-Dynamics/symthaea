@@ -81,6 +81,20 @@ The manifest's \`candidate_readable_before_trace_seal\` field must be false and 
 
 This is a contract check, not an access-control implementation. A separate file, process, or directory under candidate credentials is not independent custody. Production still requires evaluator and witness principals, credentials, KMS keys, stores, ACLs, protected clocks and backup/restore domains to be independently administered. The concrete append-only log verifier must validate inclusion and consistency against a separately pinned checkpoint and detect forks or rollback.
 
+## Reuse the existing MON-005 witness protocol
+
+MACE should not create a second Merkle tree or quorum-witness protocol. The repository's [MON-005 issue #13515](https://github.com/Luminous-Dynamics/symthaea/issues/13515) and [implementation PR #13518](https://github.com/Luminous-Dynamics/symthaea/pull/13518) already provide the relevant prototype:
+
+- RFC 9162-shaped Merkle inclusion proofs and append-only consistency proofs;
+- domain-separated leaf/node hashing and 3-of-4 Ed25519 test-witness quorum;
+- challenge-bound exact retry, tenant binding, monotonic epochs and predecessor checkpoint linkage;
+- a SQLite reference backend for persisted per-tenant accepted heads and challenge/signature receipts;
+- recorded local results of 49/49 deterministic tests, 496 inclusion checks and 2,016 consistency-proof pairs.
+
+Those results are useful implementation evidence, not production independence. The current MON-005 implementation still uses same-host/same-process witness simulations, deterministic fixture keys and local SQLite files. It does not establish independent operators or failure domains, production KMS/HSM custody, cross-host CAS, trusted time, or a live Rekor/Tessera anchor.
+
+The next MACE witness increment should therefore be a **Rust adapter** behind `AppendOnlyManifestWitnessLogVerifierV1` that consumes the MON-005 receipt/proof semantics and the consumer-pinned checkpoint policy. It must preserve MACE's exact bindings for sealed-manifest digest, episode-set root, assignment root, preregistration root, artifact root and commit-before-access chronology. It must not duplicate the Merkle algorithm or treat the local SQLite fixture as an independent production witness. Keep the independent service, operator-diversity and external-anchor requirements as separate qualification gates.
+
 ## Tests authored
 
 The module includes negative and positive tests for:
