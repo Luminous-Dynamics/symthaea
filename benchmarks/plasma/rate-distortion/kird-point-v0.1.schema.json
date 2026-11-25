@@ -411,6 +411,53 @@
         "cover_radius_evidence_sha256": {
           "type": "string",
           "pattern": "^(?!0{64}$)[0-9a-f]{64}$"
+        },
+        "coverage_domain": {
+          "type": "object",
+          "additionalProperties": false,
+          "required": [
+            "metric_type",
+            "coordinate_id",
+            "minimum_tick",
+            "maximum_tick",
+            "tick_scale",
+            "radius_ticks",
+            "probe_centers_ticks"
+          ],
+          "properties": {
+            "metric_type": {
+              "const": "normalized_interval_abs"
+            },
+            "coordinate_id": {
+              "type": "string",
+              "minLength": 1
+            },
+            "minimum_tick": {
+              "type": "integer",
+              "minimum": 0
+            },
+            "maximum_tick": {
+              "type": "integer",
+              "minimum": 1
+            },
+            "tick_scale": {
+              "type": "integer",
+              "minimum": 1
+            },
+            "radius_ticks": {
+              "type": "integer",
+              "minimum": 0
+            },
+            "probe_centers_ticks": {
+              "type": "array",
+              "minItems": 1,
+              "items": {
+                "type": "integer",
+                "minimum": 0
+              },
+              "uniqueItems": true
+            }
+          }
         }
       }
     },
@@ -633,7 +680,8 @@
               "intervention_domain_sha256",
               "metric_definition_sha256",
               "compactness_evidence_sha256",
-              "cover_radius_evidence_sha256"
+              "cover_radius_evidence_sha256",
+              "coverage_domain"
             ],
             "properties": {
               "globally_bounded": {
@@ -671,6 +719,43 @@
             "properties": {
               "globally_bounded": {
                 "const": false
+              }
+            }
+          }
+        }
+      }
+    },
+    {
+      "if": {
+        "properties": {
+          "response_scope": {
+            "properties": {
+              "coverage_kind": {
+                "const": "certified_global"
+              }
+            },
+            "required": [
+              "coverage_kind"
+            ]
+          }
+        },
+        "required": [
+          "response_scope"
+        ]
+      },
+      "then": {
+        "properties": {
+          "response_scope": {
+            "properties": {
+              "coverage_domain": {
+                "properties": {
+                  "maximum_tick": {
+                    "minimum": 1
+                  },
+                  "tick_scale": {
+                    "minimum": 1
+                  }
+                }
               }
             }
           }
