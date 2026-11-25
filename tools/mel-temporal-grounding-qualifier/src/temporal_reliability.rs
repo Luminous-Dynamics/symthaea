@@ -831,6 +831,60 @@ mod tests {
     }
 
     #[test]
+    fn annotation_digest_reuse_across_items_is_rejected() {
+        let mut units = vec![
+            unit(
+                "item-1",
+                LINEAGE_A,
+                AUDIO_A,
+                vec![
+                    annotation('1', '1', GroundTruthStateV1::Present, vec![FrameIntervalV1 { start_frame: 100, end_frame: 200 }], None),
+                    annotation('2', '2', GroundTruthStateV1::Present, vec![FrameIntervalV1 { start_frame: 100, end_frame: 200 }], None),
+                ],
+            ),
+            unit(
+                "item-2",
+                LINEAGE_B,
+                AUDIO_B,
+                vec![
+                    annotation('1', '3', GroundTruthStateV1::Absent, Vec::new(), None),
+                    annotation('2', '4', GroundTruthStateV1::Absent, Vec::new(), None),
+                ],
+            ),
+        ];
+        units[1].annotations[1].annotation_sha256 =
+            units[0].annotations[0].annotation_sha256.clone();
+        assert!(audit_reliability_corpus(&corpus(units)).is_err());
+    }
+
+    #[test]
+    fn per_item_annotation_panel_is_bounded_before_pairwise_expansion() {
+        let mut annotations = vec![
+            annotation('1', '1', GroundTruthStateV1::Absent, Vec::new(), None),
+            annotation('2', '2', GroundTruthStateV1::Absent, Vec::new(), None),
+        ];
+        for index in 2..=MAX_ANNOTATIONS_PER_UNIT_V1 {
+            let mut entry = annotation('1', '1', GroundTruthStateV1::Absent, Vec::new(), None);
+            entry.annotator_id_sha256 = format!("{:064x}", index + 1);
+            entry.annotation_sha256 = format!("{:064x}", index + 10_000);
+            annotations.push(entry);
+        }
+        let units = vec![
+            unit("item-1", LINEAGE_A, AUDIO_A, annotations),
+            unit(
+                "item-2",
+                LINEAGE_B,
+                AUDIO_B,
+                vec![
+                    annotation('3', '3', GroundTruthStateV1::Absent, Vec::new(), None),
+                    annotation('4', '4', GroundTruthStateV1::Absent, Vec::new(), None),
+                ],
+            ),
+        ];
+        assert!(audit_reliability_corpus(&corpus(units)).is_err());
+    }
+
+    #[test]
     fn duplicate_unit_or_annotator_and_invalid_thresholds_are_rejected() {
         let good = vec![
             unit(
