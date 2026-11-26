@@ -140,21 +140,41 @@ pub struct IndividualDecisionTransferCertificate {
 #[derive(Clone, Debug, Eq, PartialEq)]
 pub enum DecisionTransferError {
     ZeroDecisionPointId,
-    EmptyDigest { field: &'static str },
-    NegativeEpsilon { epsilon_units: i64 },
+    EmptyDigest {
+        field: &'static str,
+    },
+    NegativeEpsilon {
+        epsilon_units: i64,
+    },
     EmptyExpectedActionSet,
-    TooManyActions { requested: usize, maximum: usize },
-    TooFewActions { requested: usize },
+    TooManyActions {
+        requested: usize,
+        maximum: usize,
+    },
+    TooFewActions {
+        requested: usize,
+    },
     EmptyActionId,
-    DuplicateExpectedActionId { action_id: String },
-    DuplicateActionId { action_id: String },
-    DuplicateRunId { run_id: u64 },
-    ZeroRunId { action_id: String },
+    DuplicateExpectedActionId {
+        action_id: String,
+    },
+    DuplicateActionId {
+        action_id: String,
+    },
+    DuplicateRunId {
+        run_id: u64,
+    },
+    ZeroRunId {
+        action_id: String,
+    },
     ActionSetMismatch {
         missing_action_ids: Vec<String>,
         unexpected_action_ids: Vec<String>,
     },
-    ProvenanceMismatch { action_id: String, field: &'static str },
+    ProvenanceMismatch {
+        action_id: String,
+        field: &'static str,
+    },
     ActionNotApplied {
         action_id: String,
         terminal_at_us: u64,
@@ -167,12 +187,22 @@ impl fmt::Display for DecisionTransferError {
     fn fmt(&self, formatter: &mut fmt::Formatter<'_>) -> fmt::Result {
         match self {
             Self::ZeroDecisionPointId => write!(formatter, "decision point ID must be nonzero"),
-            Self::EmptyDigest { field } => write!(formatter, "required provenance digest {field} is empty"),
-            Self::NegativeEpsilon { epsilon_units } => {
-                write!(formatter, "epsilon must be nonnegative, received {epsilon_units}")
+            Self::EmptyDigest { field } => {
+                write!(formatter, "required provenance digest {field} is empty")
             }
-            Self::EmptyExpectedActionSet => write!(formatter, "expected action set must not be empty"),
-            Self::TooFewActions { requested } => write!(formatter, "decision-transfer requires at least two actions, received {requested}"),
+            Self::NegativeEpsilon { epsilon_units } => {
+                write!(
+                    formatter,
+                    "epsilon must be nonnegative, received {epsilon_units}"
+                )
+            }
+            Self::EmptyExpectedActionSet => {
+                write!(formatter, "expected action set must not be empty")
+            }
+            Self::TooFewActions { requested } => write!(
+                formatter,
+                "decision-transfer requires at least two actions, received {requested}"
+            ),
             Self::TooManyActions { requested, maximum } => write!(
                 formatter,
                 "decision-transfer action count {requested} exceeds the bounded maximum {maximum}"
@@ -182,22 +212,41 @@ impl fmt::Display for DecisionTransferError {
                 write!(formatter, "expected action set repeats ID {action_id}")
             }
             Self::DuplicateActionId { action_id } => {
-                write!(formatter, "decision-transfer rows repeat action ID {action_id}")
+                write!(
+                    formatter,
+                    "decision-transfer rows repeat action ID {action_id}"
+                )
             }
-            Self::DuplicateRunId { run_id } => write!(formatter, "decision-transfer rows repeat run ID {run_id}"),
-            Self::ZeroRunId { action_id } => write!(formatter, "action {action_id} has zero run ID"),
-            Self::ActionSetMismatch { missing_action_ids, unexpected_action_ids } => write!(
+            Self::DuplicateRunId { run_id } => {
+                write!(formatter, "decision-transfer rows repeat run ID {run_id}")
+            }
+            Self::ZeroRunId { action_id } => {
+                write!(formatter, "action {action_id} has zero run ID")
+            }
+            Self::ActionSetMismatch {
+                missing_action_ids,
+                unexpected_action_ids,
+            } => write!(
                 formatter,
                 "action rows differ from the declared complete action set (missing: {missing_action_ids:?}; unexpected: {unexpected_action_ids:?})"
             ),
             Self::ProvenanceMismatch { action_id, field } => {
-                write!(formatter, "action {action_id} does not match frozen provenance field {field}")
+                write!(
+                    formatter,
+                    "action {action_id} does not match frozen provenance field {field}"
+                )
             }
-            Self::ActionNotApplied { action_id, terminal_at_us, reason } => write!(
+            Self::ActionNotApplied {
+                action_id,
+                terminal_at_us,
+                reason,
+            } => write!(
                 formatter,
                 "action {action_id} was not applied at terminal time {terminal_at_us}: {reason:?}"
             ),
-            Self::ArithmeticOverflow => write!(formatter, "decision-transfer arithmetic overflowed"),
+            Self::ArithmeticOverflow => {
+                write!(formatter, "decision-transfer arithmetic overflowed")
+            }
         }
     }
 }
@@ -208,10 +257,7 @@ fn digest_is_empty(digest: &[u8; 32]) -> bool {
     digest.iter().all(|byte| *byte == 0)
 }
 
-fn require_digest(
-    digest: &[u8; 32],
-    field: &'static str,
-) -> Result<(), DecisionTransferError> {
+fn require_digest(digest: &[u8; 32], field: &'static str) -> Result<(), DecisionTransferError> {
     if digest_is_empty(digest) {
         return Err(DecisionTransferError::EmptyDigest { field });
     }
@@ -225,18 +271,39 @@ fn validate_context(context: &DecisionTransferContext) -> Result<(), DecisionTra
     for (digest, field) in [
         (&context.individual_id_sha256, "individual_id_sha256"),
         (&context.factual_history_sha256, "factual_history_sha256"),
-        (&context.branch_point_snapshot_sha256, "branch_point_snapshot_sha256"),
-        (&context.exogenous_forcing_manifest_sha256, "exogenous_forcing_manifest_sha256"),
+        (
+            &context.branch_point_snapshot_sha256,
+            "branch_point_snapshot_sha256",
+        ),
+        (
+            &context.exogenous_forcing_manifest_sha256,
+            "exogenous_forcing_manifest_sha256",
+        ),
         (&context.task_sha256, "task_sha256"),
         (&context.loss_scale_sha256, "loss_scale_sha256"),
         (&context.evaluation_split_sha256, "evaluation_split_sha256"),
-        (&context.evaluator_profile_sha256, "evaluator_profile_sha256"),
-        (&context.model_configuration_sha256, "model_configuration_sha256"),
-        (&context.latent_representation_profile_sha256, "latent_representation_profile_sha256"),
+        (
+            &context.evaluator_profile_sha256,
+            "evaluator_profile_sha256",
+        ),
+        (
+            &context.model_configuration_sha256,
+            "model_configuration_sha256",
+        ),
+        (
+            &context.latent_representation_profile_sha256,
+            "latent_representation_profile_sha256",
+        ),
         (&context.latent_state_sha256, "latent_state_sha256"),
-        (&context.latent_readout_profile_sha256, "latent_readout_profile_sha256"),
+        (
+            &context.latent_readout_profile_sha256,
+            "latent_readout_profile_sha256",
+        ),
         (&context.rollout_profile_sha256, "rollout_profile_sha256"),
-        (&context.pairing_verifier_profile_sha256, "pairing_verifier_profile_sha256"),
+        (
+            &context.pairing_verifier_profile_sha256,
+            "pairing_verifier_profile_sha256",
+        ),
     ] {
         require_digest(digest, field)?;
     }
@@ -361,7 +428,9 @@ where
         for right_index in (left_index + 1)..actions.len() {
             let left = &actions[left_index];
             let right = &actions[right_index];
-            let realized_order = left.realized_utility_units.cmp(&right.realized_utility_units);
+            let realized_order = left
+                .realized_utility_units
+                .cmp(&right.realized_utility_units);
             let predicted_order = predicted_utility(left).cmp(&predicted_utility(right));
             let target = match (realized_order, predicted_order) {
                 (std::cmp::Ordering::Equal, std::cmp::Ordering::Equal) => {
@@ -428,7 +497,9 @@ pub fn evaluate_individual_decision_transfer(
     let mut action_results = Vec::with_capacity(actions.len());
 
     for action in &actions {
-        if action.action_id.trim().is_empty() || action.action_id.trim() != action.action_id.as_str() {
+        if action.action_id.trim().is_empty()
+            || action.action_id.trim() != action.action_id.as_str()
+        {
             return Err(DecisionTransferError::EmptyActionId);
         }
         if !observed.insert(action.action_id.clone()) {
@@ -485,8 +556,7 @@ pub fn evaluate_individual_decision_transfer(
             .ok_or(DecisionTransferError::ArithmeticOverflow)?;
         action.realized_regret_units = regret;
         action.is_realized_top1 = action.realized_utility_units == realized_best;
-        action.is_realized_epsilon_good =
-            regret <= i128::from(input.epsilon_units);
+        action.is_realized_epsilon_good = regret <= i128::from(input.epsilon_units);
         if action.is_realized_epsilon_good {
             realized_epsilon_good_action_ids.push(action.action_id.clone());
         }
@@ -510,14 +580,12 @@ pub fn evaluate_individual_decision_transfer(
         .checked_sub(latent_selection.realized_regret_units)
         .ok_or(DecisionTransferError::ArithmeticOverflow)?;
 
-    let latent_ranking = pairwise_ranking_counts(
-        &action_results,
-        |action| action.latent_predicted_utility_units,
-    )?;
-    let rollout_ranking = pairwise_ranking_counts(
-        &action_results,
-        |action| action.rollout_predicted_utility_units,
-    )?;
+    let latent_ranking = pairwise_ranking_counts(&action_results, |action| {
+        action.latent_predicted_utility_units
+    })?;
+    let rollout_ranking = pairwise_ranking_counts(&action_results, |action| {
+        action.rollout_predicted_utility_units
+    })?;
 
     let latent_selection = DecisionSelection {
         action_id: latent_selection.action_id,
@@ -735,10 +803,22 @@ mod tests {
             action("c", 3, 100, 100, 100),
         ]);
         let translated = evaluate_individual_decision_transfer(&translated_input).unwrap();
-        assert_eq!(original.latent_selection.action_id, translated.latent_selection.action_id);
-        assert_eq!(original.rollout_selection.action_id, translated.rollout_selection.action_id);
-        assert_eq!(original.latent_selection.realized_regret_units, translated.latent_selection.realized_regret_units);
-        assert_eq!(original.rollout_selection.realized_regret_units, translated.rollout_selection.realized_regret_units);
+        assert_eq!(
+            original.latent_selection.action_id,
+            translated.latent_selection.action_id
+        );
+        assert_eq!(
+            original.rollout_selection.action_id,
+            translated.rollout_selection.action_id
+        );
+        assert_eq!(
+            original.latent_selection.realized_regret_units,
+            translated.latent_selection.realized_regret_units
+        );
+        assert_eq!(
+            original.rollout_selection.realized_regret_units,
+            translated.rollout_selection.realized_regret_units
+        );
     }
 
     #[test]
@@ -777,10 +857,7 @@ mod tests {
 
     #[test]
     fn rejects_missing_or_unexpected_action_rows() {
-        let missing = input(vec![
-            action("a", 1, 10, 9, 1),
-            action("b", 2, 5, 1, 10),
-        ]);
+        let missing = input(vec![action("a", 1, 10, 9, 1), action("b", 2, 5, 1, 10)]);
         assert!(matches!(
             evaluate_individual_decision_transfer(&missing),
             Err(DecisionTransferError::ActionSetMismatch { .. })
@@ -884,10 +961,7 @@ mod tests {
             action("c", 3, 0, 0, 0),
         ]))
         .unwrap();
-        assert_eq!(
-            certificate.latent_selection.realized_regret_units,
-            0
-        );
+        assert_eq!(certificate.latent_selection.realized_regret_units, 0);
         assert_eq!(
             certificate.rollout_selection.realized_regret_units,
             i128::from(i64::MAX) - i128::from(i64::MIN)
