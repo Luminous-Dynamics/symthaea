@@ -139,7 +139,7 @@ impl WebResearcher {
                 let mut receipt = make_receipt(
                     query_rank,
                     None,
-                    AcquisitionStage::SearchProvider,
+                    AcquisitionStage::SearchQuery,
                     &search_query,
                     AcquisitionOutcome::BudgetExceeded,
                 );
