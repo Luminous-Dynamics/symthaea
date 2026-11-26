@@ -1,0 +1,95 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "SDCB_JOINT_BELIEF_TRANSITION_V1.schema.json",
+  "title": "SDCB evidence-gated joint scientific/instrument transition v1",
+  "description": "Proposal/receipt pair for a joint Bayesian update over scientific hypotheses and binary instrument states. Cross-field identities, likelihood shape, probability sums, calibration non-leakage, and atomicity are enforced by the Rust reference.",
+  "type": "object",
+  "additionalProperties": false,
+  "required": ["schema_version", "identity", "hypothesis_ids", "device_ids", "joint_prior", "budget_units", "proposal", "receipt"],
+  "properties": {
+    "schema_version": { "const": "1.0.0" },
+    "identity": { "$ref": "#/$defs/identity" },
+    "hypothesis_ids": {
+      "type": "array", "minItems": 2, "maxItems": 4,
+      "uniqueItems": true, "items": { "type": "string", "minLength": 1 }
+    },
+    "device_ids": {
+      "type": "array", "minItems": 1, "maxItems": 3,
+      "uniqueItems": true, "items": { "type": "string", "minLength": 1 }
+    },
+    "joint_prior": {
+      "type": "array", "minItems": 4, "maxItems": 32,
+      "items": { "type": "number", "minimum": 0, "maximum": 1 }
+    },
+    "budget_units": { "type": "integer", "minimum": 0 },
+    "proposal": {
+      "type": "object", "additionalProperties": false,
+      "required": [
+        "experiment_id", "proposal_digest", "prior_version", "hypothesis_ids", "device_ids",
+        "device_id", "device_evidence_version", "calibration_epoch", "calibration_context_digest",
+        "calibration_valid_from_ms", "calibration_valid_until_ms", "role", "cost_units",
+        "outcome_likelihoods"
+      ],
+      "properties": {
+        "experiment_id": { "type": "string", "minLength": 1 },
+        "proposal_digest": { "$ref": "#/$defs/digest" },
+        "prior_version": { "type": "integer", "minimum": 0 },
+        "hypothesis_ids": { "type": "array", "minItems": 2, "items": { "type": "string", "minLength": 1 } },
+        "device_ids": { "type": "array", "minItems": 1, "items": { "type": "string", "minLength": 1 } },
+        "device_id": { "type": "string", "minLength": 1 },
+        "device_evidence_version": { "type": "integer", "minimum": 0 },
+        "calibration_epoch": { "type": "integer", "minimum": 0 },
+        "calibration_context_digest": { "$ref": "#/$defs/digest" },
+        "calibration_valid_from_ms": { "type": "integer", "minimum": 0 },
+        "calibration_valid_until_ms": { "type": "integer", "minimum": 0 },
+        "role": { "enum": ["calibration", "science"] },
+        "cost_units": { "type": "integer", "minimum": 1 },
+        "outcome_likelihoods": {
+          "type": "array", "minItems": 4, "maxItems": 8,
+          "items": {
+            "type": "array", "minItems": 2,
+            "items": { "type": "number", "minimum": 0, "maximum": 1 }
+          }
+        }
+      }
+    },
+    "receipt": {
+      "type": "object", "additionalProperties": false,
+      "required": [
+        "experiment_id", "proposal_digest", "observation_digest", "verifier_id", "observed_outcome",
+        "cost_units", "device_id", "device_evidence_version", "calibration_epoch",
+        "calibration_context_digest", "capture_start_ms", "capture_end_ms", "independently_verified"
+      ],
+      "properties": {
+        "experiment_id": { "type": "string", "minLength": 1 },
+        "proposal_digest": { "$ref": "#/$defs/digest" },
+        "observation_digest": { "$ref": "#/$defs/digest" },
+        "verifier_id": { "type": "string", "minLength": 1 },
+        "observed_outcome": { "type": "integer", "minimum": 0 },
+        "cost_units": { "type": "integer", "minimum": 1 },
+        "device_id": { "type": "string", "minLength": 1 },
+        "device_evidence_version": { "type": "integer", "minimum": 0 },
+        "calibration_epoch": { "type": "integer", "minimum": 0 },
+        "calibration_context_digest": { "$ref": "#/$defs/digest" },
+        "capture_start_ms": { "type": "integer", "minimum": 0 },
+        "capture_end_ms": { "type": "integer", "minimum": 0 },
+        "independently_verified": { "type": "boolean" }
+      }
+    }
+  },
+  "$defs": {
+    "digest": { "type": "string", "pattern": "^[0-9a-f]{64}$" },
+    "identity": {
+      "type": "object", "additionalProperties": false,
+      "required": ["run_id", "task_id", "task_digest", "system_digest", "hypothesis_set_digest", "device_registry_digest"],
+      "properties": {
+        "run_id": { "type": "string", "minLength": 1 },
+        "task_id": { "type": "string", "minLength": 1 },
+        "task_digest": { "$ref": "#/$defs/digest" },
+        "system_digest": { "$ref": "#/$defs/digest" },
+        "hypothesis_set_digest": { "$ref": "#/$defs/digest" },
+        "device_registry_digest": { "$ref": "#/$defs/digest" }
+      }
+    }
+  }
+}

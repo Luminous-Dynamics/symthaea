@@ -1,0 +1,51 @@
+{
+  "schema_version": "1.0.0",
+  "identity": {
+    "run_id": "run-joint-001",
+    "task_id": "instrument-calibration-control",
+    "task_digest": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+    "system_digest": "bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb",
+    "hypothesis_set_digest": "cccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccc",
+    "device_registry_digest": "dddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddd"
+  },
+  "hypothesis_ids": ["h0", "h1"],
+  "device_ids": ["device-a", "device-b"],
+  "joint_prior": [0.225, 0.225, 0.025, 0.025, 0.225, 0.225, 0.025, 0.025],
+  "budget_units": 5,
+  "proposal": {
+    "experiment_id": "calibrate-a-001",
+    "proposal_digest": "eeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeee",
+    "prior_version": 0,
+    "hypothesis_ids": ["h0", "h1"],
+    "device_ids": ["device-a", "device-b"],
+    "device_id": "device-a",
+    "device_evidence_version": 0,
+    "calibration_epoch": 7,
+    "calibration_context_digest": "ffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffff",
+    "calibration_valid_from_ms": 1000,
+    "calibration_valid_until_ms": 2000,
+    "role": "calibration",
+    "cost_units": 1,
+    "outcome_likelihoods": [
+      [0.95, 0.05],
+      [0.05, 0.95],
+      [0.95, 0.05],
+      [0.05, 0.95]
+    ]
+  },
+  "receipt": {
+    "experiment_id": "calibrate-a-001",
+    "proposal_digest": "eeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeee",
+    "observation_digest": "9999999999999999999999999999999999999999999999999999999999999999",
+    "verifier_id": "independent-verifier-fixture",
+    "observed_outcome": 0,
+    "cost_units": 1,
+    "device_id": "device-a",
+    "device_evidence_version": 0,
+    "calibration_epoch": 7,
+    "calibration_context_digest": "ffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffff",
+    "capture_start_ms": 1200,
+    "capture_end_ms": 1300,
+    "independently_verified": true
+  }
+}

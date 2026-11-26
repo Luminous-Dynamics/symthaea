@@ -1,0 +1,36 @@
+{
+  "schema_version": "1.0.0",
+  "fixture_id": "joint-calibration-state-update-v1",
+  "execution_kind": "independent_exact_joint_bayes_update",
+  "rust_compiled_or_executed": false,
+  "accepted_transition": {
+    "from_version": 0,
+    "to_version": 1,
+    "device_id": "device-a",
+    "device_evidence_version_before": 0,
+    "device_evidence_version_after": 1,
+    "predictive_probability": 0.5,
+    "observed_outcome": 0,
+    "prior_joint": [0.225, 0.225, 0.025, 0.025, 0.225, 0.225, 0.025, 0.025],
+    "posterior_joint": [0.4275, 0.0225, 0.0475, 0.0025, 0.4275, 0.0225, 0.0475, 0.0025],
+    "scientific_marginal_before": [0.5, 0.5],
+    "scientific_marginal_after": [0.5, 0.5],
+    "device_a_marginal_before": [0.5, 0.5],
+    "device_a_marginal_after": [0.95, 0.05],
+    "device_b_marginal_after": [0.9, 0.1],
+    "budget_before": 5,
+    "budget_after": 4,
+    "capture_interval_ms": [1200, 1300]
+  },
+  "atomicity_controls": [
+    "wrong device receipt rejects without mutation",
+    "stale device evidence version rejects without mutation",
+    "expired calibration context rejects without mutation",
+    "unverified evidence rejects without mutation",
+    "hypothesis-leaking calibration likelihood rejects without mutation",
+    "calibration-context digest mismatch rejects without mutation",
+    "duplicate experiment rejects without mutation",
+    "over-budget receipt rejects without mutation"
+  ],
+  "trust_boundary": "Digest shape and verifier test seam only; no signature, custody, physical calibration, or scientific correctness proof."
+}
