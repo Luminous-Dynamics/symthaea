@@ -1,0 +1,95 @@
+{
+  "schema_version": "1.0.0",
+  "episode_id": "rpsd-brittle-vs-robust-probe-v1",
+  "prior": [
+    0.5,
+    0.5
+  ],
+  "action_ids": [
+    "act-a",
+    "act-b"
+  ],
+  "scenarios": [
+    {
+      "scenario_id": "nominal",
+      "utility_by_hypothesis": [
+        [
+          1,
+          0
+        ],
+        [
+          0,
+          1
+        ]
+      ]
+    },
+    {
+      "scenario_id": "alternative-likelihood",
+      "utility_by_hypothesis": [
+        [
+          1,
+          0
+        ],
+        [
+          0,
+          1
+        ]
+      ]
+    }
+  ],
+  "experiments": [
+    {
+      "experiment_id": "brittle",
+      "cost_units": 1,
+      "likelihoods_by_scenario": [
+        [
+          [
+            0.95,
+            0.05
+          ],
+          [
+            0.05,
+            0.95
+          ]
+        ],
+        [
+          [
+            0.05,
+            0.95
+          ],
+          [
+            0.95,
+            0.05
+          ]
+        ]
+      ]
+    },
+    {
+      "experiment_id": "robust-probe",
+      "cost_units": 1,
+      "likelihoods_by_scenario": [
+        [
+          [
+            0.7,
+            0.3
+          ],
+          [
+            0.3,
+            0.7
+          ]
+        ],
+        [
+          [
+            0.7,
+            0.3
+          ],
+          [
+            0.3,
+            0.7
+          ]
+        ]
+      ]
+    }
+  ],
+  "cost_rate_per_unit": 0.1
+}
