@@ -153,6 +153,9 @@ pub use gated_streaming_adapter::{
 
 pub use grape_adapter_parity::{
     GRAPE_ADAPTER_PARITY_SCHEMA_V1, GrapeAdapterKindV1, GrapeAdapterParityErrorV1,
-    GrapeAdapterPolicyV1, GrapeContextStatsV1, GrapeFeatureAdapterStateV1,
-    GrapeHierarchicalContextStateV1, GrapeTemporalResidualStateV1, create_grape_feature_adapter_v1,
+    GrapeAdapterPolicyV1, GrapeAdapterRuntimePolicyV1, GrapeAdapterRuntimeStateV1,
+    GrapeAdapterRuntimeV1, GrapeAdapterUpdateReceiptV1, GrapeContextStatsV1,
+    GrapeFeatureAdapterStateV1, GrapeHierarchicalContextStateV1,
+    GrapePredictionDecompositionV1, GrapeTemporalResidualStateV1,
+    create_grape_feature_adapter_v1, select_grape_adapter_features_v1,
 };
