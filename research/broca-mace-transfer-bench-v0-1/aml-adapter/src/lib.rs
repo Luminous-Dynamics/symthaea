@@ -24,6 +24,7 @@ pub mod qualification_dsse;
 pub mod independent_qualification_exchange;
 pub mod decision_sufficiency;
 pub mod source_lineage_receipt;
+pub mod source_lineage_graph;
 pub mod acquisition_receipt_v2;
 
 use std::collections::BTreeMap;
