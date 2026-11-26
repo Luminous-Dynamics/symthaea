@@ -622,17 +622,16 @@ mod tests {
     }
 
     #[test]
-    fn valid_domain_checkpoint_and_cluster_provenance_are_retained() {
+    fn same_domain_family_and_cluster_identity_passes_validation() {
         let contract = contract();
-        let mut left = record("state-a", "class-a", 0, 2);
+        let left = record("state-a", "class-a", 0, 2);
         let mut right = record("state-b", "class-b", 0, 2);
         right.environment_cluster_id = left.environment_cluster_id.clone();
         // States in one independent cluster may share a domain and family.
         right.environment_family_id = left.environment_family_id.clone();
-        let score = score_abstraction(&[left.clone(), right.clone()], &contract)
+        let score = score_abstraction(&[left, right], &contract)
             .expect("same checkpoint and cluster identity");
         assert_eq!(score.compared_pairs, 1);
-        left.domain_id = "rigid-object-v1".to_owned();
     }
 
     #[test]
