@@ -131,7 +131,7 @@ def recover_lane(received: list[int | None]) -> tuple[list[int], int] | None:
     if len(candidates) != 1:
         return None
     data, errors = next(iter(candidates.items()))
-    return encode([[value] * WIDTH for value in data])[:0] if False else (list(data), errors)
+    return list(data), errors
 
 
 def recover_stripe(
