@@ -403,6 +403,9 @@ fn validate_verifier_set(
         return Err(SourceOriginWitnessRejectV1::InvalidVerifierSet);
     }
     let mut profiles = BTreeSet::new();
+    let mut keys = graph.authority_key_ids().iter().cloned()
+        .collect::<BTreeSet<_>>();
+    keys.extend(origin.signer_key_ids());
     for operator in &policy.operators {
         if graph.authority_profile_sha256().contains(&operator.verifier_profile_sha256)
             || origin.origin_profile_sha256() == operator.verifier_profile_sha256
@@ -419,10 +422,17 @@ fn validate_verifier_set(
         if verifier.verifier.profile_sha256() != operator.verifier_profile_sha256 {
             return Err(SourceOriginWitnessRejectV1::ProfileMismatch);
         }
+        // Reject reused keys across *all* provisioned profiles, not only keys
+        // that happened to sign this run's observations.
+        for key_id in verifier.verifier.key_ids() {
+            if !keys.insert(key_id) {
+                return Err(SourceOriginWitnessRejectV1::SharedAuthority);
+            }
+        }
     }
-    let mut prior_profiles = graph.authority_profile_sha256().iter()
-        .cloned().collect::<BTreeSet<_>>();
-    prior_profiles.insert(origin.origin_profile_sha256().to_owned());
+    let prior_profiles = graph.authority_profile_sha256().iter()
+        .cloned().chain(std::iter::once(origin.origin_profile_sha256().to_owned()))
+        .collect::<BTreeSet<_>>();
     for profile in profiles {
         if prior_profiles.contains(profile) {
             return Err(SourceOriginWitnessRejectV1::SharedAuthority);
