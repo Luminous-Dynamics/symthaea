@@ -1,0 +1,215 @@
+{
+  "schema_version": "symthaea-safrb-evidence-acquisition-v0.1",
+  "fixture_id": "SYMTHAEA-SAFRB-PUMP-VOI-001",
+  "maturity": "synthetic_test_fixture",
+  "source_scenario": {
+    "case_id": "SAFRB-SHARED-PUMP-2ROUTE-001",
+    "scenario_sha256": "0a1c507d3bff9b3062e24ca8718e102244473d839c2a31c5ead31812ee249be2",
+    "certificate_ref": "https://github.com/Luminous-Dynamics/symtropy/pull/7543"
+  },
+  "decision": {
+    "beneficiary_floor": {
+      "quantity": 12,
+      "unit": "t"
+    },
+    "current_physical_bound": {
+      "lower": 8,
+      "upper": 14,
+      "unit": "t"
+    },
+    "current_disposition": "indeterminate_not_guaranteed",
+    "unresolved_obligations": [
+      "qualified-pump-throughput-lower-bound",
+      "owner-authorized-access-and-use"
+    ],
+    "explicit_non_goals": [
+      "recompute-network-flow",
+      "authorize-inspection",
+      "reserve-pump",
+      "dispatch-fuel",
+      "modify-inventory"
+    ],
+    "time_window_obligations": [
+      {
+        "window": "[1,2)",
+        "required": 6,
+        "lower_bound_delivered": 6,
+        "upper_bound_delivered": 6,
+        "disposition": "guaranteed_within_synthetic_fixture"
+      },
+      {
+        "window": "[2,3)",
+        "required": 6,
+        "lower_bound_delivered": 3,
+        "upper_bound_delivered": 6,
+        "disposition": "indeterminate_not_guaranteed"
+      }
+    ],
+    "lower_bound_horizon_flow": {
+      "quantity": 9,
+      "unit": "t"
+    },
+    "upper_bound_horizon_flow": {
+      "quantity": 12,
+      "unit": "t"
+    }
+  },
+  "admissible_model_family": [
+    {
+      "model_id": "pump-capacity-model-low",
+      "description": "true operation-window lower-bound throughput remains below 12 t",
+      "prior_weight": null
+    },
+    {
+      "model_id": "pump-capacity-model-high",
+      "description": "qualified operation-window lower-bound throughput may reach or exceed 12 t",
+      "prior_weight": null
+    }
+  ],
+  "candidate_investigations": [
+    {
+      "action_id": "independent-pump-throughput-test",
+      "targets": [
+        "qualified-pump-throughput-lower-bound"
+      ],
+      "measurement_origin": "independent_calibrated_test_rig",
+      "possible_outcomes": [
+        "qualified_lower_bound_gte_12_t",
+        "qualified_lower_bound_lt_12_t",
+        "inconclusive"
+      ],
+      "can_change_physical_deliverability_decision": true,
+      "cost_class": "medium",
+      "elapsed_time_class": "medium",
+      "downtime_class": "declared_before_request",
+      "permission": "asset_owner_required",
+      "authority_effect": "none",
+      "scenario_case_id": "SAFRB-SHARED-PUMP-2ROUTE-001"
+    },
+    {
+      "action_id": "second-scada-dashboard-read",
+      "targets": [
+        "pump-telemetry"
+      ],
+      "measurement_origin": "same_sensor_lineage_as_existing_report",
+      "possible_outcomes": [
+        "same_report_reformatted",
+        "source_conflict"
+      ],
+      "can_change_physical_deliverability_decision": false,
+      "cost_class": "low",
+      "elapsed_time_class": "low",
+      "downtime_class": "none",
+      "permission": "data_owner_required",
+      "authority_effect": "none",
+      "scenario_case_id": "SAFRB-SHARED-PUMP-2ROUTE-001"
+    },
+    {
+      "action_id": "independent-tank-gauge",
+      "targets": [
+        "terminal-stock-quantity"
+      ],
+      "measurement_origin": "independent_gauge",
+      "possible_outcomes": [
+        "stock_sufficient",
+        "stock_insufficient",
+        "inconclusive"
+      ],
+      "can_change_current_pump_bottleneck_decision": false,
+      "cost_class": "medium",
+      "elapsed_time_class": "medium",
+      "downtime_class": "none",
+      "permission": "asset_owner_required",
+      "authority_effect": "none",
+      "scenario_case_id": "SAFRB-SHARED-PUMP-2ROUTE-001"
+    },
+    {
+      "action_id": "title-custody-contract-review",
+      "targets": [
+        "owner-authorized-access-and-use"
+      ],
+      "measurement_origin": "owner_and_jurisdiction_records",
+      "possible_outcomes": [
+        "access_established_for_scope",
+        "access_denied",
+        "conflicting_or_unavailable"
+      ],
+      "can_change_access_eligibility": true,
+      "cost_class": "medium",
+      "elapsed_time_class": "medium",
+      "downtime_class": "none",
+      "permission": "rights_holder_and_local_review_required",
+      "authority_effect": "no_dispatch_authority",
+      "scenario_case_id": "both"
+    },
+    {
+      "action_id": "operation-window-two-independent-throughput-test",
+      "targets": [
+        "pump-throughput-lower-bound-window-2"
+      ],
+      "measurement_origin": "independent_calibrated_reference",
+      "possible_outcomes": [
+        "qualified_lower_bound_gte_6_t",
+        "qualified_lower_bound_lt_6_t",
+        "inconclusive"
+      ],
+      "can_change_physical_deliverability_decision": true,
+      "cost_class": "medium",
+      "elapsed_time_class": "before-window-2-decision-deadline",
+      "downtime_class": "must-be-declared",
+      "permission": "asset_owner_required",
+      "authority_effect": "none",
+      "scenario_case_id": "SAFRB-TWO-WINDOW-SHARED-PUMP-001"
+    }
+  ],
+  "required_policy_baselines": [
+    "no-additional-investigation",
+    "fixed-checklist",
+    "maximum-information-gain",
+    "greedy-information-gain",
+    "decision-theoretic-evsi-voi",
+    "model-robust-dependency-aware-proof-obligation-policy",
+    "human-operator-under-identical-budget"
+  ],
+  "hard_gates": [
+    "zero-unauthorized-requests-or-operational-effects",
+    "unknown-measurement-dependence-is-not-independence",
+    "no-unweighted-model-averaging",
+    "out-of-model-observation-triggers-model-adequacy-failure",
+    "investigation-result-does-not-auto-admit-evidence",
+    "a-pump-test-does-not-establish-title-custody-or-contract-access",
+    "do-not-aggregate-horizon-flow-to-hide-a-time-window-service-floor-breach",
+    "do-not-allow-later-window-observations-to-backdate-earlier-service"
+  ],
+  "metrics": [
+    "decision-regret",
+    "false-safe-rate",
+    "justified-action-coverage",
+    "acquisition-cost",
+    "elapsed-time",
+    "downtime",
+    "dependency-aware-corroboration",
+    "unsupported-model-rate",
+    "abstention-quality",
+    "human-review-effort",
+    "per-window-decision-regret",
+    "time-to-evidence-before-service-deadline"
+  ],
+  "prospective_target": {
+    "decision_regret_reduction_vs_best_matched_baseline": 0.2,
+    "false_safe_rate_increase": 0,
+    "claim": "research target only; not a result"
+  },
+  "source_scenarios": [
+    {
+      "case_id": "SAFRB-SHARED-PUMP-2ROUTE-001",
+      "scenario_sha256": "0a1c507d3bff9b3062e24ca8718e102244473d839c2a31c5ead31812ee249be2",
+      "certificate_ref": "https://github.com/Luminous-Dynamics/symtropy/pull/7543"
+    },
+    {
+      "case_id": "SAFRB-TWO-WINDOW-SHARED-PUMP-001",
+      "scenario_sha256": "edfd1c2a5a3eb52a0026a0e63abb38ab2ca8109c4de3d96fbff1215ad78f0308",
+      "certificate_ref": "https://github.com/Luminous-Dynamics/symtropy/pull/7543"
+    }
+  ]
+}

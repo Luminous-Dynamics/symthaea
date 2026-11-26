@@ -1,0 +1,31 @@
+name: SAFRB evidence-acquisition reference
+
+on:
+  push:
+    branches:
+      - research/safrb-shared-pump-investigation-v0.1
+    paths:
+      - "research/safrb-shared-pump-v0.1/**"
+      - ".github/workflows/safrb-evidence-acquisition-reference.yml"
+  pull_request:
+    paths:
+      - "research/safrb-shared-pump-v0.1/**"
+      - ".github/workflows/safrb-evidence-acquisition-reference.yml"
+
+permissions:
+  contents: read
+
+concurrency:
+  group: safrb-evidence-acquisition-reference-${{ github.event.pull_request.number || github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  independent-decision-fixture:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Check out exact revision
+        uses: actions/checkout@v4
+      - name: Validate fixture JSON syntax
+        run: python3 -m json.tool research/safrb-shared-pump-v0.1/evidence-acquisition-known-answer.json > /dev/null
+      - name: Run independent fixture checks
+        run: python3 research/safrb-shared-pump-v0.1/verify_evidence_acquisition.py research/safrb-shared-pump-v0.1/evidence-acquisition-known-answer.json
