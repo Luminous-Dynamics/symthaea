@@ -1,0 +1,29 @@
+name: NixWard typed transition episode qualification
+
+on:
+  pull_request:
+    paths:
+      - "crates/core/nixward/src/mind/world_model.rs"
+      - "crates/core/nixward/src/mind/mod.rs"
+      - "research/nixward/NIXWARD_TRANSITION_EPISODE_V0_1.md"
+      - ".github/workflows/nixward-transition-episode.yml"
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  transition-episode:
+    runs-on: ubuntu-latest
+    timeout-minutes: 40
+    steps:
+      - uses: actions/checkout@v4
+      - uses: dtolnay/rust-toolchain@1.96.0
+        with:
+          components: rustfmt, clippy
+      - name: Check changed Rust formatting
+        run: rustfmt +1.96.0 --check --edition 2024 crates/core/nixward/src/mind/world_model.rs crates/core/nixward/src/mind/mod.rs
+      - name: Run NixWard world-model tests
+        run: cargo +1.96.0 test -p nixward --lib "mind::world_model"
+      - name: Run strict NixWard library Clippy
+        run: cargo +1.96.0 clippy -p nixward --lib -- -D warnings
