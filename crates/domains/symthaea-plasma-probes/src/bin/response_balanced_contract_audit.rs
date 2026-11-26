@@ -296,6 +296,17 @@ fn audit(fixture: &Value) -> Result<(), String> {
     }
 
     let comparators = string_array(fixture, "comparators")?;
+    let adjacent_methods = string_array(fixture, "adjacent_methods")?;
+    for method in [
+        "adaptive_opinf_port",
+        "adaptive_nitrom_port",
+        "adaptive_opinf_nitrom_hybrid_port",
+        "symmetry_augmented_kinetic_closure",
+    ] {
+        if !adjacent_methods.iter().any(|value| value == method) {
+            return Err(format!("adjacent method {method} is not registered"));
+        }
+    }
     for comparator in [
         "snapshot_pod",
         "padovan_nonintrusive_balancing",
