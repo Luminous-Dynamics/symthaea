@@ -1231,13 +1231,9 @@ mod tests {
                 let candidate = &candidates[candidate_id];
                 let min_distance = selected
                     .iter()
-                    .map(|selected_id| {
-                        distance_oracle(candidate, &candidates[selected_id], policy)
-                    })
+                    .map(|selected_id| distance_oracle(candidate, &candidates[selected_id], policy))
                     .fold(f64::INFINITY, f64::min);
-                if !selected.is_empty()
-                    && min_distance < policy.minimum_recipe_diversity_distance
-                {
+                if !selected.is_empty() && min_distance < policy.minimum_recipe_diversity_distance {
                     continue;
                 }
                 let diversity_bonus = if selected.is_empty() {
@@ -1324,7 +1320,9 @@ mod tests {
             .map(|evaluation| {
                 (
                     evaluation.candidate_id.clone(),
-                    evaluation.base_score.expect("all fixture candidates are feasible"),
+                    evaluation
+                        .base_score
+                        .expect("all fixture candidates are feasible"),
                 )
             })
             .collect();
