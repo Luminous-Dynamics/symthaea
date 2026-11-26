@@ -283,7 +283,7 @@ fn hdc_store_at_rest_integrity_baseline_t1_to_t10() {
         },
         detection_point: "read",
         reason: "C3_verified_middle_live_marker_removed_header_left_unchanged",
-        edit_landed: true,
+        edit_landed: Some(true),
     });
 
     // T4 is not applicable: HdcStore has no semantic record-order field.
@@ -292,7 +292,7 @@ fn hdc_store_at_rest_integrity_baseline_t1_to_t10() {
         verdict: "NOT_APPLICABLE",
         detection_point: "read",
         reason: "unordered_ID_keyed_store_has_no_semantic_record_order",
-        edit_landed: true,
+        edit_landed: None,
     });
 
     // T5: insert a valid-format entry and valid local CRC64 headers.
@@ -379,7 +379,7 @@ fn hdc_store_at_rest_integrity_baseline_t1_to_t10() {
         verdict: "NOT_APPLICABLE",
         detection_point: "read",
         reason: "entry_schema_lacks_owner_role_source_and_timestamp",
-        edit_landed: true,
+        edit_landed: None,
     });
 
     // T9: restore the complete data-bearing store family after a genuine write.
