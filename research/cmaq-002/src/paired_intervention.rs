@@ -248,6 +248,8 @@ pub struct PairedInterventionFamilySummary {
     pub invalid_count: u64,
     pub abstained_count: u64,
     pub completed_cluster_count: u64,
+    pub minimum_independent_clusters_required: u64,
+    pub cluster_floor_met: bool,
     pub assigned_penalty_sum_ppm: u128,
     /// Task-pair-weighted diagnostic; not the primary family estimate.
     pub task_weighted_mean_contrast_error_micro: Option<u128>,
@@ -283,6 +285,7 @@ pub struct PairedInterventionCertificate {
     pub total_measured_energy_uj: Option<u128>,
     pub all_expected_pairs_present: bool,
     pub all_required_families_present: bool,
+    pub all_family_cluster_floors_met: bool,
 }
 
 #[derive(Clone, Debug, Eq, PartialEq)]
@@ -297,11 +300,6 @@ pub enum PairedInterventionError {
         maximum: usize,
     },
     ZeroMinimumIndependentClusters,
-    TooFewIndependentClusters {
-        family: InterventionFamily,
-        observed: u64,
-        required: u64,
-    },
     MissingPairs {
         pair_ids: Vec<String>,
     },
@@ -387,6 +385,10 @@ pub enum PairedInterventionError {
     BranchDispositionMismatch {
         pair_id: String,
     },
+    PenaltyOutOfRange {
+        pair_id: String,
+        penalty_ppm: u32,
+    },
     BranchOutcomeMissing {
         pair_id: String,
         branch_id: String,
@@ -437,15 +439,6 @@ impl fmt::Display for PairedInterventionError {
                     "minimum independent cluster count must be nonzero"
                 )
             }
-            Self::TooFewIndependentClusters {
-                family,
-                observed,
-                required,
-            } => write!(
-                formatter,
-                "intervention family {} has {observed} completed clusters; {required} required",
-                family.as_str()
-            ),
             Self::MissingPairs { pair_ids } => write!(
                 formatter,
                 "paired-intervention campaign is missing expected pairs {pair_ids:?}"
@@ -564,6 +557,10 @@ impl fmt::Display for PairedInterventionError {
                 formatter,
                 "pair {pair_id} disposition does not agree with its control/treatment branch dispositions"
             ),
+            Self::PenaltyOutOfRange { pair_id, penalty_ppm } => write!(
+                formatter,
+                "pair {pair_id} has disposition penalty {penalty_ppm} above {PAIRED_INTERVENTION_SCORE_PPM}"
+            ),
             Self::BranchOutcomeMissing { pair_id, branch_id } => write!(
                 formatter,
                 "completed branch {branch_id} in pair {pair_id} is missing a truth or prediction outcome"
@@ -623,9 +620,6 @@ impl DispositionCounts {
             PairDisposition::Invalid { penalty_ppm } => (&mut self.invalid, penalty_ppm),
             PairDisposition::Abstained { penalty_ppm } => (&mut self.abstained, penalty_ppm),
         };
-        if penalty > PAIRED_INTERVENTION_SCORE_PPM {
-            return Err(PairedInterventionError::ArithmeticOverflow);
-        }
         *counter = counter
             .checked_add(1)
             .ok_or(PairedInterventionError::ArithmeticOverflow)?;
@@ -1053,7 +1047,10 @@ pub fn evaluate_paired_interventions(
         | PairDisposition::Abstained { penalty_ppm } = pair.disposition
         {
             if penalty_ppm > PAIRED_INTERVENTION_SCORE_PPM {
-                return Err(PairedInterventionError::ArithmeticOverflow);
+                return Err(PairedInterventionError::PenaltyOutOfRange {
+                    pair_id: pair.pair_id.clone(),
+                    penalty_ppm,
+                });
             }
         }
 
@@ -1303,13 +1300,8 @@ pub fn evaluate_paired_interventions(
             .count();
         let completed_cluster_count = u64::try_from(completed_clusters)
             .map_err(|_| PairedInterventionError::ArithmeticOverflow)?;
-        if completed_cluster_count < context.minimum_independent_clusters_per_family {
-            return Err(PairedInterventionError::TooFewIndependentClusters {
-                family,
-                observed: completed_cluster_count,
-                required: context.minimum_independent_clusters_per_family,
-            });
-        }
+        let cluster_floor_met =
+            completed_cluster_count >= context.minimum_independent_clusters_per_family;
 
         let mut cluster_error_means = Vec::new();
         let mut cluster_sign_rates = Vec::new();
@@ -1401,6 +1393,8 @@ pub fn evaluate_paired_interventions(
             invalid_count: accumulator.dispositions.invalid,
             abstained_count: accumulator.dispositions.abstained,
             completed_cluster_count,
+            minimum_independent_clusters_required: context.minimum_independent_clusters_per_family,
+            cluster_floor_met,
             assigned_penalty_sum_ppm: accumulator.dispositions.penalty_sum_ppm,
             task_weighted_mean_contrast_error_micro: task_weighted_mean,
             cluster_balanced_mean_contrast_error_micro: balanced_mean,
@@ -1458,7 +1452,12 @@ pub fn evaluate_paired_interventions(
         total_elapsed_us,
         total_measured_energy_uj: total_energy_uj,
         all_expected_pairs_present: true,
-        all_required_families_present: true,
+        all_required_families_present: family_summaries
+            .iter()
+            .all(|summary| summary.pair_count > 0),
+        all_family_cluster_floors_met: family_summaries
+            .iter()
+            .all(|summary| summary.cluster_floor_met),
     })
 }
 
@@ -1763,7 +1762,6 @@ mod tests {
     #[test]
     fn failed_pair_is_retained_with_penalty_and_in_original_denominator() {
         let mut input = base_input();
-        input.context.minimum_independent_clusters_per_family = 1;
         let row = input
             .pairs
             .iter_mut()
@@ -1786,13 +1784,14 @@ mod tests {
         assert_eq!(directional.failed_count, 1);
         assert_eq!(directional.completed_count, 1);
         assert_eq!(directional.completed_cluster_count, 1);
+        assert!(!directional.cluster_floor_met);
+        assert!(!result.all_family_cluster_floors_met);
         assert_eq!(directional.assigned_penalty_sum_ppm, 0);
     }
 
     #[test]
     fn abstention_before_execution_is_retained_and_costs_zero() {
         let mut input = base_input();
-        input.context.minimum_independent_clusters_per_family = 1;
         let row = input
             .pairs
             .iter_mut()
@@ -1828,6 +1827,33 @@ mod tests {
         assert_eq!(parameter.pair_count, 2);
         assert_eq!(parameter.abstained_count, 1);
         assert_eq!(parameter.assigned_penalty_sum_ppm, 100_000);
+    }
+
+    #[test]
+    fn family_with_only_failed_pairs_is_preserved_as_underpowered() {
+        let mut input = base_input();
+        for row in &mut input.pairs {
+            if row.family == InterventionFamily::RegimeShift {
+                row.control.disposition = BranchDisposition::Failed;
+                row.treatment.disposition = BranchDisposition::Failed;
+                row.disposition = PairDisposition::Failed { penalty_ppm: 0 };
+                row.predicted_effect_interval = None;
+                row.invariant_variables.clear();
+            }
+        }
+        let result = evaluate_paired_interventions(&input).unwrap();
+        let family = result
+            .family_summaries
+            .iter()
+            .find(|row| row.family == InterventionFamily::RegimeShift)
+            .unwrap();
+        assert_eq!(family.pair_count, 2);
+        assert_eq!(family.failed_count, 2);
+        assert_eq!(family.completed_cluster_count, 0);
+        assert!(!family.cluster_floor_met);
+        assert_eq!(family.cluster_balanced_mean_contrast_error_micro, None);
+        assert_eq!(family.task_weighted_mean_contrast_error_micro, None);
+        assert!(!result.all_family_cluster_floors_met);
     }
 
     #[test]
