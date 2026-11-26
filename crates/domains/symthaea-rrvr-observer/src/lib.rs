@@ -858,6 +858,27 @@ mod tests {
     }
 
     #[test]
+    fn unknown_episode_fields_are_rejected() {
+        let mut value = serde_json::to_value(fixture()).expect("serialize snapshot");
+        value["unexpected"] = serde_json::json!(true);
+        assert!(serde_json::from_value::<EpisodeSnapshot>(value).is_err());
+    }
+
+    #[test]
+    fn unknown_observation_fields_are_rejected() {
+        let mut value = serde_json::to_value(fixture()).expect("serialize snapshot");
+        value["observations"][0]["unexpected"] = serde_json::json!(true);
+        assert!(serde_json::from_value::<EpisodeSnapshot>(value).is_err());
+    }
+
+    #[test]
+    fn unknown_nested_manipulator_state_fields_are_rejected() {
+        let mut value = serde_json::to_value(fixture()).expect("serialize snapshot");
+        value["observations"][0]["state"]["unexpected_channel"] = serde_json::json!(0.0);
+        assert!(serde_json::from_value::<EpisodeSnapshot>(value).is_err());
+    }
+
+    #[test]
     fn post_cut_observation_is_rejected() {
         let mut snapshot = fixture();
         snapshot.decision_cut_sequence = 15;
