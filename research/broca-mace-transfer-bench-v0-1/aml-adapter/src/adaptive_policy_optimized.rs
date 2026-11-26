@@ -21,6 +21,7 @@ use crate::adaptive_policy_reference::{
 };
 
 const MAX_MEMOIZED_STATES: usize = 50_000;
+const MAX_MEMOIZED_CALLS: usize = 250_000;
 
 #[derive(Clone, Copy, Debug, Eq, Hash, PartialEq)]
 struct StateKeyV1 {
@@ -72,6 +73,8 @@ impl SpentV1 {
 #[derive(Clone, Debug, Eq, PartialEq)]
 pub struct MemoizedSearchStatsV1 {
     /// Number of distinct subproblems actually expanded.
+    pub recursive_calls: usize,
+    /// Number of distinct subproblems actually expanded.
     pub expanded_states: usize,
     /// Number of recursive calls satisfied from the memo table.
     pub cache_hits: usize,
@@ -113,6 +116,7 @@ struct RobustCandidateV1 {
 
 #[derive(Default)]
 struct SearchStatsV1 {
+    recursive_calls: usize,
     expanded_states: usize,
     cache_hits: usize,
     cache_misses: usize,
@@ -121,10 +125,20 @@ struct SearchStatsV1 {
 impl SearchStatsV1 {
     fn snapshot(&self) -> MemoizedSearchStatsV1 {
         MemoizedSearchStatsV1 {
+            recursive_calls: self.recursive_calls,
             expanded_states: self.expanded_states,
             cache_hits: self.cache_hits,
             cache_misses: self.cache_misses,
         }
+    }
+
+    fn call(&mut self) -> Result<(), ReferenceRejectV1> {
+        self.recursive_calls = self.recursive_calls.checked_add(1)
+            .ok_or(ReferenceRejectV1::ArithmeticOverflow)?;
+        if self.recursive_calls > MAX_MEMOIZED_CALLS {
+            return Err(ReferenceRejectV1::SearchLimitExceeded);
+        }
+        Ok(())
     }
 
     fn expand(&mut self) -> Result<(), ReferenceRejectV1> {
@@ -219,6 +233,7 @@ fn search_expected_state(
     worlds: u64,
     queried: u16,
 ) -> Result<Option<ExpectedCandidateV1>, ReferenceRejectV1> {
+    stats.call()?;
     let key = StateKeyV1 { possible_worlds: worlds, queried };
     if let Some(cached) = memo.get(&key) {
         stats.cache_hits += 1;
@@ -434,7 +449,7 @@ pub fn evaluate_expected_memoized_v1(
             expected_cost_numerator_ppm: best.cost_numerator_ppm,
             expected_net_utility_numerator_ppm: best.net(),
             policy: best.policy,
-            explored_histories: stats.expanded_states,
+            explored_histories: stats.recursive_calls,
         },
         stats: stats.snapshot(),
     })
@@ -583,8 +598,8 @@ mod tests {
             let reference = evaluate_expected_reference_v1(&input).unwrap();
             let optimized = evaluate_expected_memoized_v1(&input).unwrap();
             assert_expected_equal(&reference, &optimized.reference_result);
-            assert_eq!(optimized.reference_result.explored_histories, optimized.stats.expanded_states);
             assert_eq!(optimized.stats.cache_misses, optimized.stats.expanded_states);
+            assert_eq!(optimized.stats.recursive_calls, optimized.stats.expanded_states + optimized.stats.cache_hits);
         }
     }
 
