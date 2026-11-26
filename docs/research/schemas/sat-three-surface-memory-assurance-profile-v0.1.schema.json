@@ -293,7 +293,8 @@
             "data_deletion_completeness",
             "memory_lifecycle_poisoning_and_repair",
             "clean_memory_utility",
-            "external_effect_consequence"
+            "external_effect_consequence",
+            "witness_survivability"
           ]
         },
         "measurement_state": {
