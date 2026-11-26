@@ -150,6 +150,9 @@ pub struct StreamingSessionMutationReceiptV1 {
     pub visible_event_ids: Vec<String>,
     /// Previously visible event IDs no longer visible after this transition.
     pub invalidated_event_ids: Vec<String>,
+    /// Source event identities targeted by this invalidating mutation, even if
+    /// they were already hidden by an earlier quarantine transition.
+    pub affected_event_ids: Vec<String>,
     /// Why the active-view dependencies became invalid. None for non-invalidating events.
     pub invalidation_cause: Option<StreamingInvalidationCauseV1>,
     pub receipt_sha256: String,
@@ -170,6 +173,7 @@ impl StreamingSessionMutationReceiptV1 {
             &self.resulting_state_sha256,
             &self.visible_event_ids,
             &self.invalidated_event_ids,
+            &self.affected_event_ids,
             self.invalidation_cause,
         )
     }
@@ -315,6 +319,15 @@ impl StreamingSessionLedgerV1 {
             StreamingMutationKindV1::ErasureRequest { .. } => Some(StreamingInvalidationCauseV1::RightsErasure),
             StreamingMutationKindV1::Append { .. } | StreamingMutationKindV1::Revalidate { .. } => None,
         };
+        let affected_event_ids = match &mutation.kind {
+            StreamingMutationKindV1::Correct { target_event_id, .. }
+            | StreamingMutationKindV1::Quarantine { target_event_id, .. }
+            | StreamingMutationKindV1::Revoke { target_event_id, .. }
+            | StreamingMutationKindV1::ErasureRequest { target_event_id, .. } => {
+                vec![target_event_id.clone()]
+            }
+            StreamingMutationKindV1::Append { .. } | StreamingMutationKindV1::Revalidate { .. } => Vec::new(),
+        };
         let event_id = mutation.event_id.clone();
         let sequence = mutation.sequence;
         let effective_at_ms = mutation.effective_at_ms;
@@ -443,6 +456,7 @@ impl StreamingSessionLedgerV1 {
             &resulting_state_sha256,
             &visible_event_ids,
             &invalidated_event_ids,
+            &affected_event_ids,
             invalidation_cause,
         );
         let receipt = StreamingSessionMutationReceiptV1 {
@@ -457,6 +471,7 @@ impl StreamingSessionLedgerV1 {
             resulting_state_sha256,
             visible_event_ids,
             invalidated_event_ids,
+            affected_event_ids,
             invalidation_cause,
             receipt_sha256,
         };
@@ -746,6 +761,7 @@ fn receipt_digest(
     resulting_state_sha256: &str,
     visible_event_ids: &[String],
     invalidated_event_ids: &[String],
+    affected_event_ids: &[String],
     invalidation_cause: Option<StreamingInvalidationCauseV1>,
 ) -> String {
     let mut h = Sha256::new();
@@ -763,6 +779,8 @@ fn receipt_digest(
     for id in visible_event_ids { hash_field(&mut h, id); }
     h.update((invalidated_event_ids.len() as u64).to_be_bytes());
     for id in invalidated_event_ids { hash_field(&mut h, id); }
+    h.update((affected_event_ids.len() as u64).to_be_bytes());
+    for id in affected_event_ids { hash_field(&mut h, id); }
     h.update([invalidation_cause.map_or(0, StreamingInvalidationCauseV1::tag)]);
     hex_digest(&h.finalize())
 }
