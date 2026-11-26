@@ -18,7 +18,7 @@ fn main() {
     let program = args.first().map(String::as_str).unwrap_or("sat-evidence-graph-verify");
     let (print_root, path) = match args.as_slice() {
         [_, path] => (false, path.as_str()),
-        [_, flag, path] if flag == "--print-root" => (true, path.as_str()),
+        [_, flag, path] if flag.as_str() == "--print-root" => (true, path.as_str()),
         _ => usage(program),
     };
 
