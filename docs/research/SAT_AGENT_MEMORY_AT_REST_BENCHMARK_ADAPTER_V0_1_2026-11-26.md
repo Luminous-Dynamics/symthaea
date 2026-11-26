@@ -29,6 +29,24 @@ The personalized-memory scenario makes Memory Poisoning Defense, Cross-User/Cros
 If the evaluation tests only a memory component rather than a composite full agent, the report MUST say it is a partial component result and MUST NOT present it as a full personalized-memory agent evaluation. Record the profile manifest digest/reference on every per-case result so that results are comparable only when both infrastructure profiles and their configurations match.
 
 
+## 1.1 Declare the companion IETF evaluation profile
+
+A campaign using the **Personalized Long-Term Memory Agent** scenario MUST declare the companion profile draft `draft-hcf-bpm-agent-security-benchmark-profiles-00` alongside this at-rest test method. That scenario names all four infrastructure profiles:
+- `foundation_model`;
+- `interaction_access_layer`;
+- `execution_and_scheduling`;
+- `underlying_infrastructure`.
+
+The scenario is `personalized_long_term_memory_agent`. The SUT boundary for T1–T10 is the **store boundary**: it includes the agent/read path and backing store, and the evaluator holds direct write access to the backing store. An agent-boundary-only test, or a run that cannot apply direct store edits, is not evaluable for the at-rest memory-integrity metric.
+
+A campaign-level profile manifest MUST disclose each of the four component groups and the scenario's required memory configuration: store technology and location, memory subsystem and backend versions, retention/deletion mechanism, isolation partition keys, sharing with other agents/services, session boundary, initial memory state, record trust-marker/signature presence, and at-rest encryption, record-signing and integrity-audit settings (including whether each is disabled by default and the audit interval).
+
+The profile draft makes Memory Poisoning Defense, Cross-User/Cross-Session Memory Isolation, Data Deletion/Right to Be Forgotten, and Protection of Memory Data Integrity applicable in this scenario; these metrics MUST NOT be marked not applicable. **This adapter measures only Protection of Memory Data Integrity.** The other three remain applicable but unmeasured by this adapter and require separate campaigns. T6 cross-context replay and T10 erasure resurrection contribute useful evidence but do not replace full cross-user isolation or data-deletion evaluation.
+
+If the test targets only a memory component and not the composite agent/read path, report a partial component result; do not present it as a full personalized-memory agent evaluation. Every per-case result references the exact campaign profile manifest digest and reference. Results are directly comparable only when infrastructure profiles, scenario profile, boundary and declared configurations match.
+
+A synthetic example is provided at `examples/sat-agent-memory-profile-manifest-example-v0.1.json`. Its values are placeholders, not a measured Symthaea deployment.
+
 ## 2. Three separate memory threat surfaces
 
 1. Write-path poisoning: an attacker uses the SUT's own memory interface to plant content or forged source labels.
@@ -114,8 +132,8 @@ A case may be not_applicable only when the storage architecture genuinely cannot
 ## 7. SAT evidence-custody envelope
 
 For each case record:
-- frozen run/evaluator identity and method revision;
-- SUT, memory component, backend, runtime and configuration digests;
+- frozen run/evaluator identity, method revision and digest/reference of the IETF profile manifest;
+- SUT, memory component, backend, runtime and configuration digests, plus the declared infrastructure/scenario profiles and store-boundary composition;
 - adversary capability profile;
 - pre-edit and post-edit store snapshot digests and custody references;
 - edit tool/script digest and execution receipt;
@@ -159,7 +177,7 @@ Set latency/capacity thresholds only after measurement on frozen hardware and a 
 
 ## 10. Execution plan
 
-1. Validate the schema, 13 public contract fixtures and control preconditions.
+1. Validate the case/result/profile-manifest schemas, the 13 public contract fixtures and control preconditions; check the synthetic profile-manifest example.
 2. Implement a backend-neutral harness for stop, snapshot, mutate, verify-edit-landed, restart, read and audit.
 3. Add isolated local file/SQLite emulators: one deliberately vulnerable and one protected reference store.
 4. Reproduce C1/C2/C3 and T1–T10 on those emulators while preserving native scoring.
