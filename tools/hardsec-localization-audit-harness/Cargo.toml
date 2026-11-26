@@ -1,0 +1,25 @@
+[package]
+name = "hardsec-localization-audit-harness"
+version = "0.1.0"
+edition = "2024"
+publish = false
+autobins = false
+autotests = false
+autoexamples = false
+
+# Isolated nested workspace compiles the exact tracked example without
+# triggering unrelated/incomplete root workspace member globs.
+[workspace]
+
+[features]
+default = []
+hardsec-localization-audit = []
+
+[dependencies]
+serde_json = "=1.0.150"
+sha2 = "=0.10.9"
+
+[[example]]
+name = "hardsec_localization_audit"
+path = "../../examples/hardsec_localization_audit.rs"
+required-features = ["hardsec-localization-audit"]

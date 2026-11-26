@@ -1,0 +1,23 @@
+{
+  "schema_version": "hardsec-source-graph-v1",
+  "nodes": [
+    "g17",
+    "g18",
+    "g20",
+    "g99",
+    "g100"
+  ],
+  "edges": [
+    {
+      "edge_id": "e17-18",
+      "source": "g17",
+      "target": "g18"
+    },
+    {
+      "edge_id": "e99-100",
+      "source": "g99",
+      "target": "g100"
+    }
+  ],
+  "source_artifact_sha256": "9999999999999999999999999999999999999999999999999999999999999999"
+}

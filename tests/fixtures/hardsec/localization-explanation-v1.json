@@ -1,0 +1,103 @@
+{
+  "schema_version": "hardsec-localization-explanation-v1",
+  "explanation_id": "fixture-hs013-001",
+  "evidence_domain": "synthetic_fixture",
+  "dataset_role": "reference_fixture_only",
+  "grouping": {
+    "dataset_id": "hs013-known-answer-v1",
+    "split_protocol": "not_applicable",
+    "split": "not_applicable",
+    "host_family_id": "host-alpha",
+    "design_id": "design-alpha-01",
+    "insertion_source_id": "fixture-author-v1",
+    "trojan_family_id": "synthetic-family-a",
+    "synthesis_toolchain_id": "fixture-netlist-v1",
+    "cell_library_id": "fixture-cells-v1"
+  },
+  "source": {
+    "artifact_id": "fixture-netlist-001",
+    "source_path": "fixtures/design-alpha.net.tsv",
+    "source_sha256": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+    "node_edge_map_sha256": "bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb"
+  },
+  "model": {
+    "model_id": "fixture-ranker",
+    "model_sha256": "cccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccc",
+    "config_sha256": "dddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddd",
+    "training_lineage_sha256": "eeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeee"
+  },
+  "explainer": {
+    "explainer_id": "fixture-domain-property",
+    "method": "domain_property",
+    "version": "0.1.0",
+    "config_sha256": "ffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffff"
+  },
+  "decision": {
+    "disposition": "suspect",
+    "score": 0.87,
+    "threshold_profile_sha256": "1111111111111111111111111111111111111111111111111111111111111111"
+  },
+  "review_budget": {
+    "unit": "regions",
+    "limit": 3
+  },
+  "candidate_regions": [
+    {
+      "region_id": "region-r1",
+      "rank": 1,
+      "score": 0.87,
+      "node_ids": [
+        "g17",
+        "g18"
+      ],
+      "edge_ids": [
+        "e17-18"
+      ],
+      "support_claim_ids": [
+        "claim-fanin-output-proximity"
+      ]
+    }
+  ],
+  "paths": [
+    {
+      "path_id": "path-trigger-observe-01",
+      "status": "retained",
+      "source_sha256": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+      "edge_ids": [
+        "e17-18"
+      ],
+      "reason": "Fixture path retained in source and represented graph"
+    }
+  ],
+  "counterevidence": [
+    {
+      "counterevidence_id": "control-equivalent-01",
+      "kind": "benign_equivalent_control",
+      "description": "Paired clean rewrite preserves the declared Boolean function",
+      "evidence_sha256": "2222222222222222222222222222222222222222222222222222222222222222"
+    }
+  ],
+  "uncertainty": {
+    "ood_status": "unknown",
+    "calibration_status": "not_applicable",
+    "abstention_reason": null
+  },
+  "review_effort": {
+    "measurement_kind": "proxy",
+    "value": 2,
+    "unit": "regions"
+  },
+  "path_coverage": {
+    "status": "partial",
+    "oracle_id": null,
+    "certificate_sha256": null
+  },
+  "claim_limits": {
+    "claims_mechanism": false,
+    "claims_causal_localization": false,
+    "unsupported_claims": [
+      "Synthetic fixture only",
+      "Insertion-footprint label is not causal proof"
+    ]
+  }
+}
