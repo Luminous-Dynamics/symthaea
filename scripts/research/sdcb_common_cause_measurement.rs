@@ -455,6 +455,26 @@ mod tests {
         tensor
     }
 
+    fn best_terminal_value(
+        model: &Model,
+        candidates: &[Candidate],
+        scenario: usize,
+        first: usize,
+        second: [usize; OUTCOMES],
+    ) -> f64 {
+        let mut best = f64::NEG_INFINITY;
+        for mut code in 0..2usize.pow(LEAVES as u32) {
+            let mut actions = [0usize; LEAVES];
+            for action in &mut actions {
+                *action = code % 2;
+                code /= 2;
+            }
+            let value = evaluate_fixed_policy(model, candidates, scenario, first, second, actions).unwrap();
+            best = best.max(value);
+        }
+        best
+    }
+
     fn fixture() -> (Model, Vec<Candidate>) {
         let devices = vec![
             String::from("science-a"),
@@ -548,21 +568,19 @@ mod tests {
     #[test]
     fn same_device_repeat_does_not_resolve_shared_common_cause() {
         let (model, candidates) = fixture();
-        let actions = [0usize, 1usize, 1usize, 0usize];
         let first = 1usize;
         for scenario in 0..2 {
-            let value = evaluate_fixed_policy(&model, &candidates, scenario, first, [1, 1], actions).unwrap();
-            assert!((value - 0.5).abs() < 1e-12);
+            let best = best_terminal_value(&model, &candidates, scenario, first, [1, 1]);
+            assert!((best - 0.5).abs() < 1e-12);
         }
     }
 
     #[test]
     fn cross_device_agreement_does_not_resolve_a_shared_common_cause() {
         let (model, candidates) = fixture();
-        let actions = [0usize, 1usize, 1usize, 0usize];
         for scenario in 0..2 {
-            let value = evaluate_fixed_policy(&model, &candidates, scenario, 1, [1, 2], actions).unwrap();
-            assert!((value - 0.5).abs() < 1e-12);
+            let best = best_terminal_value(&model, &candidates, scenario, 1, [1, 2]);
+            assert!((best - 0.5).abs() < 1e-12);
         }
     }
 
