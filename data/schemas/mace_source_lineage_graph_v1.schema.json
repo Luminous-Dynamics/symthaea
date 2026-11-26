@@ -1,0 +1,68 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://luminousdynamics.io/schemas/mace_source_lineage_graph_v1.schema.json",
+  "title": "MACE Source Lineage Graph V1",
+  "description": "Canonical source/derivation graph manifest replayed against qualified candidate evidence and a consumer-owned DecisionNeed.",
+  "type": "object",
+  "additionalProperties": false,
+  "required": [
+    "schema_version",
+    "qualified_evidence_set_sha256",
+    "decision_need_sha256",
+    "nodes"
+  ],
+  "properties": {
+    "schema_version": { "const": "mace_source_lineage_graph_v1" },
+    "qualified_evidence_set_sha256": { "type": "string", "pattern": "^[0-9a-f]{64}$" },
+    "decision_need_sha256": { "type": "string", "pattern": "^[0-9a-f]{64}$" },
+    "nodes": {
+      "type": "array",
+      "minItems": 1,
+      "maxItems": 100000,
+      "items": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": [
+          "evidence_id",
+          "source_id",
+          "source_sha256",
+          "payload_sha256",
+          "evidence_class_sha256",
+          "satisfies_requirement_ids",
+          "parent_evidence_ids",
+          "derivation_receipt_sha256",
+          "common_cause_group_sha256"
+        ],
+        "properties": {
+          "evidence_id": { "type": "string", "minLength": 1, "maxLength": 512 },
+          "source_id": { "type": "string", "minLength": 1, "maxLength": 1024 },
+          "source_sha256": { "type": "string", "pattern": "^[0-9a-f]{64}$" },
+          "payload_sha256": { "type": "string", "pattern": "^[0-9a-f]{64}$" },
+          "evidence_class_sha256": { "type": "string", "pattern": "^[0-9a-f]{64}$" },
+          "satisfies_requirement_ids": {
+            "type": "array",
+            "maxItems": 1024,
+            "items": { "type": "string", "minLength": 1, "maxLength": 256 }
+          },
+          "parent_evidence_ids": {
+            "type": "array",
+            "maxItems": 1024,
+            "items": { "type": "string", "minLength": 1, "maxLength": 512 }
+          },
+          "derivation_receipt_sha256": {
+            "oneOf": [
+              { "type": "string", "pattern": "^[0-9a-f]{64}$" },
+              { "type": "null" }
+            ]
+          },
+          "common_cause_group_sha256": {
+            "type": "array",
+            "maxItems": 1024,
+            "items": { "type": "string", "pattern": "^[0-9a-f]{64}$" }
+          }
+        }
+      }
+    }
+  },
+  "$comment": "Runtime additionally enforces lexicographic ordering and uniqueness of nodes, requirement IDs, parent IDs and common-cause IDs; root nodes have no derivation receipt, non-root nodes require one; every parent must exist; cycles and candidate parent-lineage rebinding are rejected. Exact graph SHA-256 is over the supplied UTF-8 JSON bytes, not a reserialized object. Source-origin authentication and completeness of disclosed ancestry remain separate proof obligations."
+}

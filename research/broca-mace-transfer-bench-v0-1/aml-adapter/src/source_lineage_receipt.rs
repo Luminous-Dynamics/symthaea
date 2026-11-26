@@ -55,6 +55,17 @@ pub enum SourceLineageRejectV1 {
     UnexpectedReceipt,
     DuplicateReceipt,
     BindingMismatch,
+    InvalidGraph,
+    NotSufficient,
+    GraphDigestMismatch,
+    GraphStatisticsMismatch,
+    GraphCycle,
+    DanglingParent,
+    CandidateLineageMismatch,
+    EvidenceClassMismatch,
+    MissingRequirementEvidence,
+    RootFamilyMismatch,
+    ClosureDigestMismatch,
     NotYetValid,
     Expired,
     InvalidSignature,
@@ -103,6 +114,16 @@ struct VerifiedSourceLineageReceiptV1 {
 }
 
 #[derive(Clone, Debug, Eq, PartialEq)]
+pub struct SourceLineageReplayCommitmentV1 {
+    pub requirement_id: String,
+    pub root_family_sha256: String,
+    pub source_graph_sha256: String,
+    pub lineage_closure_sha256: String,
+    pub source_node_count: u64,
+    pub dependency_edge_count: u64,
+}
+
+#[derive(Clone, Debug, Eq, PartialEq)]
 pub struct VerifiedSourceLineageSetV1 {
     receipts: Vec<VerifiedSourceLineageReceiptV1>,
     sufficiency_receipt_sha256: String,
@@ -122,6 +143,18 @@ impl VerifiedSourceLineageSetV1 {
 
     pub fn lineage_profile_sha256(&self) -> &str {
         &self.lineage_profile_sha256
+    }
+
+    /// Immutable commitments exposed for an independent graph replay step.
+    pub fn replay_commitments(&self) -> Vec<SourceLineageReplayCommitmentV1> {
+        self.receipts.iter().map(|item| SourceLineageReplayCommitmentV1 {
+            requirement_id: item.receipt.requirement_id.clone(),
+            root_family_sha256: item.receipt.root_family_sha256.clone(),
+            source_graph_sha256: item.receipt.source_graph_sha256.clone(),
+            lineage_closure_sha256: item.receipt.lineage_closure_sha256.clone(),
+            source_node_count: item.receipt.source_node_count,
+            dependency_edge_count: item.receipt.dependency_edge_count,
+        }).collect()
     }
 
     /// Recheck every lineage receipt using the currently pinned resolver profile.
@@ -148,6 +181,9 @@ impl VerifiedSourceLineageSetV1 {
             sufficiency_binding,
             current_evaluator_profile,
         ).map_err(SourceLineageRejectV1::Sufficiency)?;
+        if !sufficiency.is_sufficient() {
+            return Err(SourceLineageRejectV1::NotSufficient);
+        }
         let now_unix = sufficiency_binding.now_unix;
         let sufficiency_receipt = sufficiency.receipt();
         let need_digest = decision_need.digest()
@@ -257,6 +293,9 @@ pub fn verify_source_lineage_receipts_v1(
         sufficiency_binding,
         current_evaluator_profile,
     ).map_err(SourceLineageRejectV1::Sufficiency)?;
+    if !sufficiency.is_sufficient() {
+        return Err(SourceLineageRejectV1::NotSufficient);
+    }
     let now_unix = sufficiency_binding.now_unix;
     if sufficiency_binding.decision_need.digest()
         .map_err(SourceLineageRejectV1::Sufficiency)? != decision_need.digest()
@@ -526,7 +565,7 @@ fn parse_lineage_predicate(value: &Value) -> Result<SourceLineageReceiptV1, Sour
         || receipt.requirement_id.len() > 256
         || receipt.issued_at_unix >= receipt.expires_at_unix
         || receipt.source_node_count == 0
-        || receipt.source_node_count > 10_000_000
+        || receipt.source_node_count > 100_000
         || receipt.dependency_edge_count > 100_000_000
         || receipt.unresolved_ancestor_count != 0
     {

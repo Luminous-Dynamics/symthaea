@@ -6,32 +6,100 @@
   "type": "object",
   "additionalProperties": false,
   "required": [
-    "schema_version", "run_id", "query_invocation_id",
-    "qualified_evidence_set_sha256", "decision_need_sha256",
-    "requirement_id", "evidence_class_sha256", "root_family_sha256",
-    "source_graph_sha256", "lineage_closure_sha256", "source_node_count",
-    "dependency_edge_count", "unresolved_ancestor_count", "status",
-    "issued_at_unix", "expires_at_unix", "issuer_profile_sha256", "key_id"
+    "schema_version",
+    "run_id",
+    "query_invocation_id",
+    "qualified_evidence_set_sha256",
+    "decision_need_sha256",
+    "requirement_id",
+    "evidence_class_sha256",
+    "root_family_sha256",
+    "source_graph_sha256",
+    "lineage_closure_sha256",
+    "source_node_count",
+    "dependency_edge_count",
+    "unresolved_ancestor_count",
+    "status",
+    "issued_at_unix",
+    "expires_at_unix",
+    "issuer_profile_sha256",
+    "key_id"
   ],
   "properties": {
-    "schema_version": { "const": "mace_source_lineage_receipt_v1" },
-    "run_id": { "type": "string", "minLength": 1, "maxLength": 256 },
-    "query_invocation_id": { "type": "string", "minLength": 1, "maxLength": 256 },
-    "qualified_evidence_set_sha256": { "type": "string", "pattern": "^[0-9a-f]{64}$" },
-    "decision_need_sha256": { "type": "string", "pattern": "^[0-9a-f]{64}$" },
-    "requirement_id": { "type": "string", "minLength": 1, "maxLength": 256 },
-    "evidence_class_sha256": { "type": "string", "pattern": "^[0-9a-f]{64}$" },
-    "root_family_sha256": { "type": "string", "pattern": "^[0-9a-f]{64}$" },
-    "source_graph_sha256": { "type": "string", "pattern": "^[0-9a-f]{64}$" },
-    "lineage_closure_sha256": { "type": "string", "pattern": "^[0-9a-f]{64}$" },
-    "source_node_count": { "type": "integer", "minimum": 1, "maximum": 10000000 },
-    "dependency_edge_count": { "type": "integer", "minimum": 0, "maximum": 100000000 },
-    "unresolved_ancestor_count": { "const": 0 },
-    "status": { "const": "independent" },
-    "issued_at_unix": { "type": "integer", "minimum": 0 },
-    "expires_at_unix": { "type": "integer", "minimum": 1 },
-    "issuer_profile_sha256": { "type": "string", "pattern": "^[0-9a-f]{64}$" },
-    "key_id": { "type": "string", "pattern": "^[0-9a-f]{64}$" }
+    "schema_version": {
+      "const": "mace_source_lineage_receipt_v1"
+    },
+    "run_id": {
+      "type": "string",
+      "minLength": 1,
+      "maxLength": 256
+    },
+    "query_invocation_id": {
+      "type": "string",
+      "minLength": 1,
+      "maxLength": 256
+    },
+    "qualified_evidence_set_sha256": {
+      "type": "string",
+      "pattern": "^[0-9a-f]{64}$"
+    },
+    "decision_need_sha256": {
+      "type": "string",
+      "pattern": "^[0-9a-f]{64}$"
+    },
+    "requirement_id": {
+      "type": "string",
+      "minLength": 1,
+      "maxLength": 256
+    },
+    "evidence_class_sha256": {
+      "type": "string",
+      "pattern": "^[0-9a-f]{64}$"
+    },
+    "root_family_sha256": {
+      "type": "string",
+      "pattern": "^[0-9a-f]{64}$"
+    },
+    "source_graph_sha256": {
+      "type": "string",
+      "pattern": "^[0-9a-f]{64}$"
+    },
+    "lineage_closure_sha256": {
+      "type": "string",
+      "pattern": "^[0-9a-f]{64}$"
+    },
+    "source_node_count": {
+      "type": "integer",
+      "minimum": 1,
+      "maximum": 100000
+    },
+    "dependency_edge_count": {
+      "type": "integer",
+      "minimum": 0,
+      "maximum": 100000000
+    },
+    "unresolved_ancestor_count": {
+      "const": 0
+    },
+    "status": {
+      "const": "independent"
+    },
+    "issued_at_unix": {
+      "type": "integer",
+      "minimum": 0
+    },
+    "expires_at_unix": {
+      "type": "integer",
+      "minimum": 1
+    },
+    "issuer_profile_sha256": {
+      "type": "string",
+      "pattern": "^[0-9a-f]{64}$"
+    },
+    "key_id": {
+      "type": "string",
+      "pattern": "^[0-9a-f]{64}$"
+    }
   },
   "allOf": [
     {
