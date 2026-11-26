@@ -431,7 +431,7 @@ mod tests {
             &history(), &target(), &extrapolating_candidate(), &config()
         ).unwrap();
         assert!(score.mmd_after > score.mmd_before);
-        assert!(score.representative_informative < score.expected_information_gain_fallback());
+        assert!(score.representative_informative < 1.2); // raw EIG of this candidate
     }
 
     #[test]
