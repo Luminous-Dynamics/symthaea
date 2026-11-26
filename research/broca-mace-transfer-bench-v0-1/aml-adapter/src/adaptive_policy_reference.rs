@@ -750,12 +750,13 @@ mod tests {
     }
 
     #[test]
-    fn policy_node_cap_can_force_a_safe_terminal_policy() {
+    fn policy_node_cap_rejects_an_oversized_oracle_result() {
         let mut scenario = adaptive_scenario();
         scenario.maximum_policy_nodes = 1;
-        let result = evaluate_expected_reference_v1(&scenario).unwrap();
-        assert_eq!(result.policy.node_count(), 1);
-        assert!(matches!(result.policy, ReferencePolicyNodeV1::Terminal { .. }));
+        assert_eq!(
+            evaluate_expected_reference_v1(&scenario),
+            Err(ReferenceRejectV1::PolicyTooLarge),
+        );
     }
 
     #[test]
