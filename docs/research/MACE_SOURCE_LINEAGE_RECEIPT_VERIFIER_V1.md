@@ -71,15 +71,16 @@ It establishes that:
 - the resolver's signed claim concerns the exact requirement, evidence class and root-family identity;
 - the three cryptographic authorities are separated by pinned profile digest and signer key ID.
 
-It does **not** establish that:
+The new `source_lineage_graph` module now replays the disclosed graph's exact manifest digest, candidate-parent bindings, DAG structure, root-family partitions and deterministic closure commitments against the resolver's signed receipts. It rejects dangling parents, cycles, unknown requirement IDs and evidence-class mismatches. This is structural replay, not proof that the graph is complete.
+
+It still does **not** establish that:
 - the resolver actually fetched the source bytes named by its graph;
-- the source graph is complete or acyclic;
-- every derivation parent and common-cause edge was found;
+- every derivation parent and common-cause edge was disclosed;
 - two sources are genuinely independent in the real world;
-- the source graph or closure digest corresponds to a correctly computed graph;
+- source-origin metadata and ancestor payload digests are authentic;
 - the resolver is organizationally independent from the evaluator or qualifier.
 
-These require an independently deployed source resolver and a separate graph replay verifier that fetches content-addressed source nodes and edge receipts, validates every digest, detects cycles/dangling/unknown ancestors, recomputes root-family partitions and common-cause collapse, and compares its result with the resolver receipt. That work remains future production scope.
+Those require immutable content retrieval, source-origin receipts, independently acquired upstream metadata and a verifier that checks every ancestor payload and derivation statement rather than trusting the resolver's graph declaration.
 
 ## 6. Tests and adversarial requirements
 
@@ -107,3 +108,8 @@ The module is not ready for consequential use until the raw source graph replay 
 - `data/schemas/mace_source_lineage_statement_v1.schema.json`
 
 The schemas describe the predicate and in-toto statement. Runtime code enforces exact field sets, digest and timestamp semantics, profile and signer verification, and DecisionNeed-specific bindings. JSON syntax parsing is not a substitute for a draft-2020-12 schema validator.
+
+
+## 8. Structural graph replay extension
+
+The companion `MACE_SOURCE_LINEAGE_GRAPH_REPLAY_V1.md` and `source_lineage_graph.rs` module now define a canonical graph manifest. The replay step recomputes root identities, groups roots linked by declared common-cause commitments, calculates family and closure hashes, and compares those values against the third authority's signed receipt. It also revalidates qualification, sufficiency and lineage with current trust profiles immediately before graph replay. The remaining limitation is completeness/authenticity of the disclosed graph: a self-consistent manifest can still omit a real parent or common cause unless source-origin attestations independently establish the edges.
