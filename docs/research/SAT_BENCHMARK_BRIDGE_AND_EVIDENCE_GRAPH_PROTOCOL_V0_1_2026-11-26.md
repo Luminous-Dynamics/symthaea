@@ -68,6 +68,8 @@ Represent qualification as a typed directed acyclic graph (DAG), not a weighted 
 
 No implicit support edges are permitted. A digest establishes byte identity, not truth, authority, freshness, independence or semantic correctness.
 
+For claim edges, `from_claim_id` and `to_claim_id` have fixed direction: `depends_on` means the source/from claim depends on the target/to premise; `supports` or `refutes` means the source/from claim is the explicit argument that supports or refutes the target/to claim; `supersedes` points from the new claim to the historical claim; `invalidated_by` points from the invalidating claim/change record to the affected claim. Every `evidence_refs` entry must resolve to exactly one observation ID in the same augmentation record. Evidence references are not prose labels. A semantic validator must reject dangling references, duplicate IDs, unknown edge endpoints and cycles in the dependency subgraph.
+
 ### Claim states
 
 Use orthogonal fields rather than a single `verified` boolean:
@@ -79,7 +81,7 @@ Use orthogonal fields rather than a single `verified` boolean:
 - `invalid_evidence`: custody, identity, format or verifier integrity is broken.
 - `withdrawn`: the issuer/evaluator explicitly withdraws the claim or source.
 
-A claim may be supported at time t for a bounded scope and stale at t+1. Historical reports remain immutable; new reports supersede them.
+A claim may be supported at time t for a bounded scope and stale at t+1. A supported claim also requires admissible evidence under its declared trust policy; an observation with unknown authenticity cannot silently support a critical claim. Historical reports remain immutable; new reports supersede them.
 
 ### Provenance closure
 
@@ -164,7 +166,7 @@ SAT MUST NOT:
 
 ### 6.2 Adapter envelope
 
-The SAT augmentation record references the native receipt by immutable ID and digest. It adds:
+The SAT augmentation record references the native receipt by immutable ID and digest. Its `claims` array is the claim-node set, `observations` are evidence/observation nodes, and `claim_edges` are typed graph links. The schema checks local shape; a semantic graph validator must enforce global uniqueness, endpoint resolution, evidence-reference closure, cycle detection, pinned graph-root recomputation and policy-specific claim/evidence sufficiency. It adds:
 - frozen SAT evaluation policy and threat model;
 - exact subject component digests and execution environment;
 - SAT trace and checkpoint references;
