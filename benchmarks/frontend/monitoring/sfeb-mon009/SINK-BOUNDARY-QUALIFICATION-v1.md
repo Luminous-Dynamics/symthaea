@@ -75,7 +75,7 @@ Every mutation is bound to:
 - expected prior resource revision;
 - operation profile version.
 
-The same operation ID with the same immutable binding is a retry of the same operation. The same operation ID with any changed binding is a conflict and must not mutate state.
+The operation ID is unique within the destination idempotency namespace, not merely per tenant. The same operation ID with the same immutable binding is a retry of the same operation. The same operation ID with any changed tenant, principal, resource, digest, authority or fence is a conflict and must not mutate state.
 
 ### 4.2 Atomic destination semantics
 
