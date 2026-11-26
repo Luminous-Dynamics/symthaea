@@ -7,7 +7,7 @@
 
 use base64::engine::general_purpose::STANDARD as BASE64_STANDARD;
 use base64::Engine;
-use ed25519_dalek::{Signature, Verifier, VerifyingKey};
+use ed25519_dalek::{Signature, VerifyingKey};
 use serde::{Deserialize, Serialize};
 use sha2::{Digest, Sha256};
 use std::collections::BTreeSet;
@@ -493,7 +493,7 @@ fn verify_observer_signature(
     let signature = Signature::from_slice(&decoded)
         .map_err(|_| MaceContextExposureRejectV1::InvalidSignatureEncoding)?;
     let digest = exposure_signature_digest_v1(receipt)?;
-    key.verify(&digest, &signature)
+    key.verify_strict(&digest, &signature)
         .map_err(|_| MaceContextExposureRejectV1::SignatureMismatch)
 }
 
