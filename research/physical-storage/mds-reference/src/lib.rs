@@ -1,8 +1,9 @@
 //! Deterministic physical-storage reference with spatially interleaved MDS(6,4) stripes.
 //!
 //! This is an algorithmic channel fixture, not a physical optical, magnetic, NAND,
-//! or tape model. Erasures are known to the decoder; unflagged substitutions are
-//! detected by the final SHA-256 integrity check but are not corrected here.
+//! or tape model. The bounded hard-decision decoder corrects one unknown byte-symbol
+//! error or two known erasures per byte lane. Whole-payload SHA-256 remains the final
+//! exact-recovery gate and is not a source-authentication mechanism.
 
 use std::fmt;
 
@@ -11,6 +12,7 @@ pub const STRIPE_COUNT: usize = 7;
 pub const DATA_SHARDS: usize = 4;
 pub const PARITY_SHARDS: usize = 2;
 pub const SHARDS_PER_STRIPE: usize = DATA_SHARDS + PARITY_SHARDS;
+pub const MINIMUM_DISTANCE: usize = PARITY_SHARDS + 1;
 pub const BLOCK_BYTES: usize = 8;
 pub const PAYLOAD_BYTES: usize = STRIPE_COUNT * DATA_SHARDS * BLOCK_BYTES;
 pub const EXPECTED_PAYLOAD_SHA256: &str =
@@ -28,6 +30,7 @@ pub enum StorageError {
     TileOutOfRange(usize),
     TileUnavailable(usize),
     TooManyErasures,
+    UncorrectableErrorsOrErasures { erasures: usize },
     SingularGeneratorMatrix,
 }
 
@@ -40,6 +43,10 @@ impl fmt::Display for StorageError {
             Self::TileOutOfRange(tile) => write!(f, "tile index out of range: {tile}"),
             Self::TileUnavailable(tile) => write!(f, "tile is unavailable: {tile}"),
             Self::TooManyErasures => write!(f, "more than two shards erased in a stripe"),
+            Self::UncorrectableErrorsOrErasures { erasures } => write!(
+                f,
+                "no unique codeword inside the bounded error/erasure radius ({erasures} known erasures)"
+            ),
             Self::SingularGeneratorMatrix => write!(f, "singular recovery matrix"),
         }
     }
@@ -120,6 +127,8 @@ pub struct RecoveryReceipt {
     pub control_metadata_available: bool,
     pub recovered_payload_bytes: usize,
     pub recovered_stripes: usize,
+    /// Number of corrected byte-symbol disagreements across all decoded lanes.
+    pub corrected_symbols: usize,
     pub uncorrectable_stripes: Vec<usize>,
     pub payload_sha256: String,
     pub expected_sha256: String,
@@ -136,12 +145,13 @@ impl RecoveryReceipt {
                 .join(",")
         );
         format!(
-            "{{\"exact_recovery\":{},\"digest_matches\":{},\"control_metadata_available\":{},\"recovered_payload_bytes\":{},\"recovered_stripes\":{},\"uncorrectable_stripes\":{},\"payload_sha256\":\"{}\",\"expected_sha256\":\"{}\"}}",
+            "{{\"exact_recovery\":{},\"digest_matches\":{},\"control_metadata_available\":{},\"recovered_payload_bytes\":{},\"recovered_stripes\":{},\"corrected_symbols\":{},\"uncorrectable_stripes\":{},\"payload_sha256\":\"{}\",\"expected_sha256\":\"{}\"}}",
             self.exact_recovery,
             self.digest_matches,
             self.control_metadata_available,
             self.recovered_payload_bytes,
             self.recovered_stripes,
+            self.corrected_symbols,
             stripes,
             self.payload_sha256,
             self.expected_sha256
@@ -198,8 +208,9 @@ impl MediaImage {
         Ok(())
     }
 
-    /// Apply an unflagged byte substitution. The current reference decoder
-    /// does not correct unknown errors; payload hashing must reject the result.
+    /// Apply an unflagged byte substitution. The bounded decoder can correct one
+    /// erroneous symbol at this byte offset in each stripe; the external payload
+    /// digest still decides whether the complete reconstruction is accepted.
     pub fn corrupt_byte(
         &mut self,
         tile: usize,
@@ -229,6 +240,7 @@ impl MediaImage {
         let mut payload = vec![0u8; PAYLOAD_BYTES];
         let mut recovered_payload_bytes = 0usize;
         let mut recovered_stripes = 0usize;
+        let mut corrected_symbols = 0usize;
         let mut uncorrectable_stripes = Vec::new();
 
         for stripe in 0..STRIPE_COUNT {
@@ -238,8 +250,9 @@ impl MediaImage {
                     self.cells[tile]
                 });
 
-            match mds_recover(shards) {
-                Ok(recovered) => {
+            match mds_recover_errors_and_erasures(shards) {
+                Ok((recovered, corrected)) => {
+                    corrected_symbols += corrected;
                     for data_shard in 0..DATA_SHARDS {
                         let offset = (stripe * DATA_SHARDS + data_shard) * BLOCK_BYTES;
                         payload[offset..offset + BLOCK_BYTES]
@@ -265,6 +278,7 @@ impl MediaImage {
             control_metadata_available,
             recovered_payload_bytes,
             recovered_stripes,
+            corrected_symbols,
             uncorrectable_stripes,
             payload_sha256,
             expected_sha256,
@@ -274,8 +288,8 @@ impl MediaImage {
 
 /// Systematic [6,4,3] MDS array code over GF(256), using polynomial 0x11d.
 /// Each shard is eight bytes. Any four of six shard rows recover the data.
-/// This is an erasure-only decoder: unknown substitutions are rejected by
-/// the end-to-end digest and are not corrected here.
+/// This function is the erasure-only baseline; the bounded hard-decision
+/// error/erasure decoder is provided separately below.
 pub fn mds_encode(data: [[u8; BLOCK_BYTES]; DATA_SHARDS])
     -> [[u8; BLOCK_BYTES]; SHARDS_PER_STRIPE]
 {
@@ -328,6 +342,113 @@ pub fn mds_recover(
     }
 
     Ok(mds_encode(data))
+}
+
+/// Recover a stripe with bounded unknown byte-symbol errors and known erasures.
+///
+/// The six shard bytes at each byte offset form an independent [6,4,3] MDS
+/// codeword. For each offset this reference enumerates all four-shard subsets,
+/// reconstructs data, re-encodes all six symbols, and counts disagreements.
+/// It accepts only a unique codeword satisfying 2*errors + erasures < d.
+///
+/// The returned correction count is a count of byte-symbol disagreements summed
+/// over all byte offsets, not a count of physical tiles. In particular, one
+/// complete eight-byte tile substitution is eight correctable symbols when no
+/// other errors/erasures occur in those lanes. This deliberately small exhaustive
+/// decoder is a correctness reference, not a throughput-optimized implementation.
+pub fn mds_recover_errors_and_erasures(
+    shards: [Option<[u8; BLOCK_BYTES]>; SHARDS_PER_STRIPE],
+) -> Result<([[u8; BLOCK_BYTES]; SHARDS_PER_STRIPE], usize), StorageError> {
+    let present: Vec<usize> = (0..SHARDS_PER_STRIPE)
+        .filter(|&index| shards[index].is_some())
+        .collect();
+    let erasures = SHARDS_PER_STRIPE - present.len();
+
+    if present.len() < DATA_SHARDS {
+        return Err(StorageError::UncorrectableErrorsOrErasures { erasures });
+    }
+
+    let mut data = [[0u8; BLOCK_BYTES]; DATA_SHARDS];
+    let mut corrected_symbols = 0usize;
+
+    for byte_offset in 0..BLOCK_BYTES {
+        let mut accepted_data: Option<[u8; DATA_SHARDS]> = None;
+        let mut accepted_errors = 0usize;
+
+        for a in 0..present.len() {
+            for b in a + 1..present.len() {
+                for c in b + 1..present.len() {
+                    for d in c + 1..present.len() {
+                        let selected = [present[a], present[b], present[c], present[d]];
+                        let mut augmented = [[0u8; DATA_SHARDS * 2]; DATA_SHARDS];
+
+                        for row in 0..DATA_SHARDS {
+                            augmented[row][..DATA_SHARDS]
+                                .copy_from_slice(&generator_row(selected[row]));
+                            augmented[row][DATA_SHARDS + row] = 1;
+                        }
+                        invert_matrix(&mut augmented)?;
+
+                        let mut candidate_data = [0u8; DATA_SHARDS];
+                        for data_shard in 0..DATA_SHARDS {
+                            let mut value = 0u8;
+                            for equation in 0..DATA_SHARDS {
+                                let observed = shards[selected[equation]]
+                                    .as_ref()
+                                    .expect("selected shard is present")[byte_offset];
+                                value ^= gf_mul(
+                                    augmented[data_shard][DATA_SHARDS + equation],
+                                    observed,
+                                );
+                            }
+                            candidate_data[data_shard] = value;
+                        }
+
+                        let mut candidate_codeword = [0u8; SHARDS_PER_STRIPE];
+                        for shard in 0..SHARDS_PER_STRIPE {
+                            let row = generator_row(shard);
+                            for data_shard in 0..DATA_SHARDS {
+                                candidate_codeword[shard] ^=
+                                    gf_mul(row[data_shard], candidate_data[data_shard]);
+                            }
+                        }
+
+                        let errors = present
+                            .iter()
+                            .filter(|&&shard| {
+                                shards[shard].expect("present shard")[byte_offset]
+                                    != candidate_codeword[shard]
+                            })
+                            .count();
+
+                        if 2 * errors + erasures >= MINIMUM_DISTANCE {
+                            continue;
+                        }
+
+                        if let Some(previous) = accepted_data {
+                            if previous != candidate_data {
+                                return Err(StorageError::UncorrectableErrorsOrErasures {
+                                    erasures,
+                                });
+                            }
+                        } else {
+                            accepted_data = Some(candidate_data);
+                            accepted_errors = errors;
+                        }
+                    }
+                }
+            }
+        }
+
+        let recovered_data = accepted_data
+            .ok_or(StorageError::UncorrectableErrorsOrErasures { erasures })?;
+        for data_shard in 0..DATA_SHARDS {
+            data[data_shard][byte_offset] = recovered_data[data_shard];
+        }
+        corrected_symbols += accepted_errors;
+    }
+
+    Ok((mds_encode(data), corrected_symbols))
 }
 
 fn generator_row(shard: usize) -> [u8; DATA_SHARDS] {
@@ -636,15 +757,16 @@ mod tests {
     }
 
     #[test]
-    fn unflagged_byte_substitution_is_detected_not_silently_accepted() {
+    fn unflagged_byte_substitution_is_corrected_and_digest_verified() {
         let layout = PhysicalLayout::new();
         let payload = reference_payload();
         let mut image = MediaImage::write_reference(&payload, &layout).unwrap();
         let tile = layout.shard_tile(0, 0).unwrap();
         image.corrupt_byte(tile, 3, 0x80).unwrap();
         let receipt = image.read_and_recover(&layout);
-        assert!(!receipt.digest_matches);
-        assert!(!receipt.exact_recovery);
+        assert!(receipt.digest_matches, "{}", receipt.to_json());
+        assert!(receipt.exact_recovery, "{}", receipt.to_json());
+        assert_eq!(receipt.corrected_symbols, 1);
     }
 
     #[test]
