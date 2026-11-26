@@ -1659,17 +1659,33 @@ mod tests {
         assert!(report.probability_audit.len() >= 2);
         assert!(report.probability_audit.len() <= 3);
         for item in &report.probability_audit {
+            let (expected_source_probability, expected_source_count) =
+                match item.source_stratum_id.as_str() {
+                    "stratum-a" => (
+                        ProbabilityFractionV1 {
+                            numerator: 1,
+                            denominator: 2,
+                        },
+                        2,
+                    ),
+                    "stratum-b" => (
+                        ProbabilityFractionV1 {
+                            numerator: 1,
+                            denominator: 3,
+                        },
+                        3,
+                    ),
+                    other => panic!("unexpected audit stratum: {other}"),
+                };
+            let source_probability = item.source_work_inclusion_probability.unwrap();
+            assert_eq!(source_probability, expected_source_probability);
             assert_eq!(
-                item.source_work_inclusion_probability.unwrap(),
-                ProbabilityFractionV1 {
-                    numerator: 1,
-                    denominator: 2,
-                }
+                item.eligible_source_works_in_stratum,
+                Some(expected_source_count)
             );
-            assert_eq!(item.eligible_source_works_in_stratum, Some(2));
             assert_eq!(item.selected_source_works_in_stratum, Some(1));
             let conditional = item.item_given_source_work_probability.unwrap();
-            let expected =
+            let expected_conditional =
                 if item.source_work_id_sha256 == dataset.candidates[5].source_work_id_sha256 {
                     assert_eq!(item.eligible_items_in_source_work, Some(3));
                     assert_eq!(item.selected_items_in_source_work, Some(2));
@@ -1685,19 +1701,13 @@ mod tests {
                         denominator: 1,
                     }
                 };
-            assert_eq!(conditional, expected);
+            assert_eq!(conditional, expected_conditional);
             let item_probability = item.item_inclusion_probability.unwrap();
-            let expected_item_probability = if expected.denominator == 3 {
-                ProbabilityFractionV1 {
-                    numerator: 1,
-                    denominator: 3,
-                }
-            } else {
-                ProbabilityFractionV1 {
-                    numerator: 1,
-                    denominator: 2,
-                }
-            };
+            let expected_item_probability = reduced_probability_fraction(
+                source_probability.numerator * conditional.numerator,
+                source_probability.denominator * conditional.denominator,
+            )
+            .unwrap();
             assert_eq!(item_probability, expected_item_probability);
         }
     }
