@@ -775,6 +775,8 @@ jobs:
           assert cohort["spatial_domain"]["maximum"] > cohort["spatial_domain"]["minimum"]
           assert cohort["velocity_domain"]["maximum"] > cohort["velocity_domain"]["minimum"]
           assert horizon["start_time"] == checkpoint["time"]
+          assert checkpoint["first_pulse_not_yet_applied"] is True
+          assert checkpoint["second_pulse_not_yet_applied"] is True
           assert horizon["end_time"] <= cohort["maximum_time"]
           assert pulse_family["maximum_application_time"] <= cohort["maximum_time"]
 
@@ -797,6 +799,7 @@ jobs:
                       assert pulse_family["allowed_kick_amplitude"]["minimum"] <= pulse["kick_amplitude"] <= pulse_family["allowed_kick_amplitude"]["maximum"]
                       assert pulse_family["allowed_phase_rad"]["minimum"] <= pulse["phase_rad"] <= pulse_family["allowed_phase_rad"]["maximum"]
                       assert pulse["application_time"] <= pulse_family["maximum_application_time"]
+                      assert pulse["application_time"] > checkpoint["time"]
                       assert pulse["application_time"] < horizon["end_time"]
 
           assert len(all_trial_ids) == len(set(all_trial_ids)), "trial ids leak or duplicate across splits"
