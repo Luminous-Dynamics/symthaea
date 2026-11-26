@@ -13,6 +13,10 @@ use crate::temporal_consensus::{
     audit_multi_annotator_case, MultiAnnotatorGroundingReportV1,
     MultiAnnotatorTemporalCaseV1,
 };
+use crate::temporal_grounding::{
+    score_temporal_grounding, GroundTruthStateV1, GroundingPredictionStateV1,
+    TemporalGroundTruthV1, TemporalGroundingPredictionV1, TEMPORAL_GROUNDING_SCHEMA_V1,
+};
 
 const INPUT_SCHEMA_V1: &str = "mel-temporal-annotation-marginal-value-v1";
 const REPORT_SCHEMA_V1: &str = "mel-temporal-annotation-marginal-value-report-v1";
@@ -87,7 +91,9 @@ pub struct PanelInformationSnapshotV1 {
     pub not_estimable_annotations: usize,
     pub disposition_entropy_bits: Option<f64>,
     pub present_occurrence_count_entropy_bits: Option<f64>,
+    pub pairwise_disposition_pairs: usize,
     pub pairwise_disposition_agreement_rate: Option<f64>,
+    pub pairwise_present_pairs: usize,
     pub pairwise_present_symmetric_event_f1: Option<f64>,
     pub pairwise_present_mean_matched_iou: Option<f64>,
     pub pairwise_present_exact_count_agreement: Option<f64>,
@@ -141,6 +147,9 @@ pub struct AnnotationMarginalValueReportV1 {
     pub model_fully_correct_rate_delta_against_panel: Option<f64>,
     pub annotation_record_count_delta: usize,
     /// The active stream is adaptive; its results are descriptive only.
+    /// True only when this single paired item was drawn from the planner's probability-audit stream.
+    pub selected_item_is_probability_audit_draw: bool,
+    /// The active refinement stream itself is never a probability sample.
     pub active_stream_is_probability_sample: bool,
     /// This item-level paired adapter does not compute population estimates.
     pub population_estimate_computed: bool,
@@ -169,8 +178,8 @@ pub fn audit_annotation_marginal_value(
     let after_report = audit_multi_annotator_case(&input.after_panel)
         .map_err(|error| format!("after annotation panel failed validation: {error}"))?;
 
-    let before = snapshot(&before_report, &input.decision_profile)?;
-    let after = snapshot(&after_report, &input.decision_profile)?;
+    let before = snapshot(&input.before_panel, &before_report, &input.decision_profile)?;
+    let after = snapshot(&input.after_panel, &after_report, &input.decision_profile)?;
 
     let disposition_entropy_delta_bits = delta(
         before.disposition_entropy_bits,
@@ -259,9 +268,8 @@ pub fn audit_annotation_marginal_value(
         pairwise_present_count_agreement_delta,
         maximum_event_boundary_spread_delta_ms,
         decision_transition: decision_transition(
-            before_report.summary.panel_size,
-            after_report.summary.panel_size,
-            &input.decision_profile,
+            before.frozen_decision_state,
+            after.frozen_decision_state,
         ),
         effort: input.effort.clone(),
         active_listening_minutes,
@@ -270,6 +278,8 @@ pub fn audit_annotation_marginal_value(
         per_minute_deltas,
         model_fully_correct_rate_delta_against_panel,
         annotation_record_count_delta: 1,
+        selected_item_is_probability_audit_draw:
+            input.selection_stream == AnnotationSelectionStreamV1::ProbabilityAudit,
         active_stream_is_probability_sample: false,
         population_estimate_computed: false,
         selection_receipt_authenticated: false,
@@ -371,35 +381,29 @@ fn validate_effort(effort: &AnnotationEffortReceiptV1) -> Result<(), String> {
 }
 
 fn snapshot(
+    case: &MultiAnnotatorTemporalCaseV1,
     report: &MultiAnnotatorGroundingReportV1,
     profile: &FrozenPanelDecisionProfileV1,
 ) -> Result<PanelInformationSnapshotV1, String> {
-    let states: Vec<_> = report.annotator_results.iter().map(|item| item.state).collect();
+    let states: Vec<_> = case.annotations.iter().map(|item| item.state).collect();
     let state_entropy = categorical_entropy(states.iter().map(|state| match state {
-        crate::temporal_grounding::GroundTruthStateV1::Present => 0,
-        crate::temporal_grounding::GroundTruthStateV1::Absent => 1,
-        crate::temporal_grounding::GroundTruthStateV1::Ambiguous => 2,
-        crate::temporal_grounding::GroundTruthStateV1::NotEstimable => 3,
+        GroundTruthStateV1::Present => 0,
+        GroundTruthStateV1::Absent => 1,
+        GroundTruthStateV1::Ambiguous => 2,
+        GroundTruthStateV1::NotEstimable => 3,
     }));
-
-    let present_counts: Vec<_> = report
-        .annotator_results
-        .iter()
-        .filter(|item| item.state == crate::temporal_grounding::GroundTruthStateV1::Present)
+    let present_counts: Vec<_> = case.annotations.iter()
+        .filter(|item| item.state == GroundTruthStateV1::Present)
         .map(|item| item.intervals.len())
         .collect();
     let count_entropy = categorical_entropy(present_counts.iter().copied());
-
+    let pairwise = pairwise_annotation_metrics(case)?;
     let summary = &report.summary;
-    let boundary_spread = report
-        .event_reference_boundary_distributions
-        .iter()
+    let boundary_spread = report.event_reference_boundary_distributions.iter()
         .map(|item| item.start_spread_frames.max(item.end_spread_frames))
         .max()
         .map(|frames| frames as f64 * 1_000.0 / report.prediction.artifact.sample_rate_hz as f64);
-
-    let decision = decide_panel_state(report, profile, boundary_spread);
-
+    let decision = decide_panel_state(summary, &pairwise, profile, boundary_spread);
     Ok(PanelInformationSnapshotV1 {
         annotations: summary.panel_size,
         eligible_present_absent_annotations: summary.present_annotators + summary.absent_annotators,
@@ -409,24 +413,137 @@ fn snapshot(
         not_estimable_annotations: summary.not_estimable_exclusions,
         disposition_entropy_bits: state_entropy,
         present_occurrence_count_entropy_bits: count_entropy,
-        pairwise_disposition_agreement_rate: summary.pairwise_disposition_agreement_rate,
-        pairwise_present_symmetric_event_f1: summary.pairwise_present_symmetric_event_f1,
-        pairwise_present_mean_matched_iou: summary.pairwise_present_mean_matched_iou,
-        pairwise_present_exact_count_agreement: summary.pairwise_present_exact_count_agreement,
+        pairwise_disposition_pairs: pairwise.disposition_pairs,
+        pairwise_disposition_agreement_rate: pairwise.disposition_agreement_rate,
+        pairwise_present_pairs: pairwise.present_pairs,
+        pairwise_present_symmetric_event_f1: pairwise.present_symmetric_event_f1,
+        pairwise_present_mean_matched_iou: pairwise.present_mean_matched_iou,
+        pairwise_present_exact_count_agreement: pairwise.present_exact_count_agreement,
         maximum_event_boundary_spread_ms: boundary_spread,
         model_fully_correct_rate_against_panel: summary.fully_correct_rate,
         frozen_decision_state: decision,
     })
 }
 
+#[derive(Debug, Clone, Copy)]
+struct PairwiseAnnotationMetricsV1 {
+    disposition_pairs: usize,
+    disposition_agreement_rate: Option<f64>,
+    present_pairs: usize,
+    present_symmetric_event_f1: Option<f64>,
+    present_mean_matched_iou: Option<f64>,
+    present_exact_count_agreement: Option<f64>,
+}
+
+fn pairwise_annotation_metrics(
+    case: &MultiAnnotatorTemporalCaseV1,
+) -> Result<PairwiseAnnotationMetricsV1, String> {
+    let mut disposition_pairs = 0_usize;
+    let mut disposition_agreements = 0_usize;
+    let mut present_pairs = 0_usize;
+    let mut symmetric_f1 = Vec::new();
+    let mut matched_iou = Vec::new();
+    let mut exact_count = 0_usize;
+    for left_index in 0..case.annotations.len() {
+        for right_index in (left_index + 1)..case.annotations.len() {
+            let left = &case.annotations[left_index];
+            let right = &case.annotations[right_index];
+            disposition_pairs += 1;
+            if left.state == right.state {
+                disposition_agreements += 1;
+            }
+            if left.state != GroundTruthStateV1::Present
+                || right.state != GroundTruthStateV1::Present
+            {
+                continue;
+            }
+            let left_truth = annotation_truth(case, left);
+            let right_truth = annotation_truth(case, right);
+            let left_prediction = annotation_prediction(case, left);
+            let right_prediction = annotation_prediction(case, right);
+            let left_score = score_temporal_grounding(&left_truth, &right_prediction, &case.plan)
+                .map_err(|issues| format!("left-to-right pairwise annotation scoring failed: {issues:?}"))?;
+            let right_score = score_temporal_grounding(&right_truth, &left_prediction, &case.plan)
+                .map_err(|issues| format!("right-to-left pairwise annotation scoring failed: {issues:?}"))?;
+            present_pairs += 1;
+            if left_score.predicted_occurrences == left_score.ground_truth_occurrences
+                && right_score.predicted_occurrences == right_score.ground_truth_occurrences
+            {
+                exact_count += 1;
+            }
+            if let (Some(left_f1), Some(right_f1)) = (left_score.f1, right_score.f1) {
+                symmetric_f1.push((left_f1 + right_f1) / 2.0);
+            }
+            if let (Some(left_iou), Some(right_iou)) = (
+                left_score.matched_interval_iou_mean,
+                right_score.matched_interval_iou_mean,
+            ) {
+                matched_iou.push((left_iou + right_iou) / 2.0);
+            }
+        }
+    }
+    Ok(PairwiseAnnotationMetricsV1 {
+        disposition_pairs,
+        disposition_agreement_rate: (disposition_pairs > 0)
+            .then(|| disposition_agreements as f64 / disposition_pairs as f64),
+        present_pairs,
+        present_symmetric_event_f1: mean(&symmetric_f1),
+        present_mean_matched_iou: mean(&matched_iou),
+        present_exact_count_agreement: (present_pairs > 0)
+            .then(|| exact_count as f64 / present_pairs as f64),
+    })
+}
+
+fn annotation_truth(
+    case: &MultiAnnotatorTemporalCaseV1,
+    annotation: &crate::temporal_consensus::IndependentTemporalAnnotationV1,
+) -> TemporalGroundTruthV1 {
+    TemporalGroundTruthV1 {
+        schema_version: TEMPORAL_GROUNDING_SCHEMA_V1.into(),
+        query_id: case.query_id.clone(),
+        query_text: case.query_text.clone(),
+        artifact: case.artifact.clone(),
+        annotation_policy_version: case.annotation_policy_version.clone(),
+        annotation_set_sha256: annotation.annotation_sha256.clone(),
+        annotator_count: 1,
+        state: annotation.state,
+        intervals: annotation.intervals.clone(),
+        status_reason: annotation.status_reason.clone(),
+    }
+}
+
+fn annotation_prediction(
+    case: &MultiAnnotatorTemporalCaseV1,
+    annotation: &crate::temporal_consensus::IndependentTemporalAnnotationV1,
+) -> TemporalGroundingPredictionV1 {
+    TemporalGroundingPredictionV1 {
+        schema_version: TEMPORAL_GROUNDING_SCHEMA_V1.into(),
+        query_id: case.query_id.clone(),
+        artifact: case.artifact.clone(),
+        state: match annotation.state {
+            GroundTruthStateV1::Present => GroundingPredictionStateV1::Occurrences {
+                intervals: annotation.intervals.clone(),
+            },
+            GroundTruthStateV1::Absent => GroundingPredictionStateV1::QueryAbsent,
+            GroundTruthStateV1::Ambiguous => GroundingPredictionStateV1::Ambiguous {
+                candidate_intervals: annotation.intervals.clone(),
+                reason: annotation.status_reason.clone().unwrap_or_else(|| "ambiguous".into()),
+            },
+            GroundTruthStateV1::NotEstimable => GroundingPredictionStateV1::NotEstimable {
+                reason: annotation.status_reason.clone().unwrap_or_else(|| "not estimable".into()),
+            },
+        },
+    }
+}
+
 fn decide_panel_state(
-    report: &MultiAnnotatorGroundingReportV1,
+    summary: &crate::temporal_consensus::MultiAnnotatorGroundingSummaryV1,
+    pairwise: &PairwiseAnnotationMetricsV1,
     profile: &FrozenPanelDecisionProfileV1,
     boundary_spread_ms: Option<f64>,
 ) -> PanelDecisionStateV1 {
-    let summary = &report.summary;
     let eligible = summary.present_annotators + summary.absent_annotators;
-    if eligible < profile.minimum_eligible_annotators as usize || report.summary.panel_size == 0 {
+    if eligible < profile.minimum_eligible_annotators as usize || summary.panel_size == 0 {
         return PanelDecisionStateV1::NeedsReview;
     }
     let ambiguous_share = (summary.ambiguous_exclusions + summary.not_estimable_exclusions) as f64
@@ -434,19 +551,19 @@ fn decide_panel_state(
     if ambiguous_share > profile.maximum_ambiguous_not_estimable_share_ppm as f64 / PPM_SCALE {
         return PanelDecisionStateV1::NeedsReview;
     }
-
     let present_support = summary.present_annotators as f64 / eligible as f64;
     let absent_support = summary.absent_annotators as f64 / eligible as f64;
-
     if summary.present_annotators > 0
         && present_support >= profile.minimum_present_support_ppm as f64 / PPM_SCALE
-        && summary.pairwise_present_symmetric_event_f1.is_some_and(|value| {
+        && pairwise.present_symmetric_event_f1.is_some_and(|value| {
             value >= profile.minimum_pairwise_present_event_f1_ppm as f64 / PPM_SCALE
         })
-        && summary.pairwise_present_exact_count_agreement.is_some_and(|value| {
+        && pairwise.present_exact_count_agreement.is_some_and(|value| {
             value >= profile.minimum_pairwise_present_count_agreement_ppm as f64 / PPM_SCALE
         })
-        && boundary_spread_ms.is_some_and(|value| value <= profile.maximum_event_boundary_spread_ms as f64)
+        && boundary_spread_ms.is_some_and(|value| {
+            value <= profile.maximum_event_boundary_spread_ms as f64
+        })
     {
         return PanelDecisionStateV1::SufficientlySupportedPresent;
     }
@@ -480,8 +597,11 @@ fn categorical_entropy(values: impl Iterator<Item = usize>) -> Option<f64> {
     )
 }
 
-fn decision_transition(before_count: usize, after_count: usize, _profile: &FrozenPanelDecisionProfileV1) -> String {
-    format!("panel_size:{before_count}->{after_count}")
+fn decision_transition(
+    before: PanelDecisionStateV1,
+    after: PanelDecisionStateV1,
+) -> String {
+    format!("{before:?}->{after:?}")
 }
 
 fn delta(before: Option<f64>, after: Option<f64>) -> Option<f64> {
