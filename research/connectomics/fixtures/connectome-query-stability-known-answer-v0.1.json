@@ -1,0 +1,88 @@
+{
+  "schema_version": "0.1",
+  "query_id": "synthetic-target-path-strength",
+  "query_definition_sha256": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+  "analysis_code_sha256": "bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb",
+  "uncertainty_set_sha256": "cccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccc",
+  "source_volume_id": "synthetic-volume-001",
+  "metric_tolerances": [
+    {
+      "metric_id": "global_motif_count",
+      "absolute_tolerance": 0.05,
+      "unit_id": "count"
+    },
+    {
+      "metric_id": "target_path_strength",
+      "absolute_tolerance": 0.02,
+      "unit_id": "normalized_strength"
+    }
+  ],
+  "checkpoints": [
+    {
+      "checkpoint_id": "synthetic-cp-001",
+      "source_volume_id": "synthetic-volume-001",
+      "cumulative_edit_count": 10,
+      "graph_snapshot_sha256": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+      "parent_graph_snapshot_sha256": null,
+      "edit_history_manifest_sha256": "cccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccc",
+      "graph_builder_config_sha256": "dddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddd",
+      "structural_uncertainty_manifest_sha256": "bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb",
+      "scenario_results": [
+        {
+          "scenario_id": "h1",
+          "metric_intervals": [
+            {
+              "metric_id": "global_motif_count",
+              "unit_id": "count",
+              "bounds": {
+                "lower": 10,
+                "upper": 10.01
+              }
+            },
+            {
+              "metric_id": "target_path_strength",
+              "unit_id": "normalized_strength",
+              "bounds": {
+                "lower": 0.2,
+                "upper": 0.21
+              }
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "checkpoint_id": "synthetic-cp-002",
+      "source_volume_id": "synthetic-volume-001",
+      "cumulative_edit_count": 20,
+      "graph_snapshot_sha256": "bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb",
+      "parent_graph_snapshot_sha256": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+      "edit_history_manifest_sha256": "cccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccc",
+      "graph_builder_config_sha256": "dddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddd",
+      "structural_uncertainty_manifest_sha256": "bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb",
+      "scenario_results": [
+        {
+          "scenario_id": "h1",
+          "metric_intervals": [
+            {
+              "metric_id": "global_motif_count",
+              "unit_id": "count",
+              "bounds": {
+                "lower": 10,
+                "upper": 10.01
+              }
+            },
+            {
+              "metric_id": "target_path_strength",
+              "unit_id": "normalized_strength",
+              "bounds": {
+                "lower": 0.8,
+                "upper": 0.81
+              }
+            }
+          ]
+        }
+      ]
+    }
+  ]
+}

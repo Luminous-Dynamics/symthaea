@@ -1,0 +1,11 @@
+[package]
+name = "connectome-query-stability"
+version = "0.1.0"
+edition = "2024"
+license = "AGPL-3.0-only"
+description = "Provenance-linked, query-specific connectome stability auditing"
+
+[lib]
+path = "src/lib.rs"
+
+[workspace]

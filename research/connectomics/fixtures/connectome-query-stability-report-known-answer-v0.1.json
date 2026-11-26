@@ -1,0 +1,65 @@
+{
+  "report_version": "0.1",
+  "query_id": "synthetic-target-path-strength",
+  "query_definition_sha256": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+  "analysis_code_sha256": "bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb",
+  "uncertainty_set_sha256": "cccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccc",
+  "source_volume_id": "synthetic-volume-001",
+  "first_checkpoint_id": "cp-1",
+  "latest_checkpoint_id": "cp-2",
+  "first_graph_snapshot_sha256": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+  "latest_graph_snapshot_sha256": "bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb",
+  "latest_edit_history_manifest_sha256": "cccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccc",
+  "graph_builder_config_sha256": "dddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddd",
+  "structural_uncertainty_manifest_sha256": "bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb",
+  "first_edit_count": 10,
+  "latest_edit_count": 20,
+  "checkpoint_count": 2,
+  "status": "UnstableOverObservedWindow",
+  "metrics": [
+    {
+      "metric_id": "global_motif_count",
+      "unit_id": "count",
+      "absolute_tolerance": 0.05,
+      "latest_identified_set_hull": {
+        "lower": 10,
+        "upper": 10.01
+      },
+      "latest_identified_set_width": 0.01,
+      "latest_scenario_bounds": [
+        {
+          "scenario_id": "h1",
+          "bounds": {
+            "lower": 10,
+            "upper": 10.01
+          }
+        }
+      ],
+      "worst_observed_temporal_drift_upper": 0.01,
+      "stable_over_observed_window": true
+    },
+    {
+      "metric_id": "target_path_strength",
+      "unit_id": "normalized_strength",
+      "absolute_tolerance": 0.02,
+      "latest_identified_set_hull": {
+        "lower": 0.8,
+        "upper": 0.81
+      },
+      "latest_identified_set_width": 0.01,
+      "latest_scenario_bounds": [
+        {
+          "scenario_id": "h1",
+          "bounds": {
+            "lower": 0.8,
+            "upper": 0.81
+          }
+        }
+      ],
+      "worst_observed_temporal_drift_upper": 0.61,
+      "stable_over_observed_window": false
+    }
+  ],
+  "future_stability_certified": false,
+  "universal_connectome_completeness_claimed": false
+}
