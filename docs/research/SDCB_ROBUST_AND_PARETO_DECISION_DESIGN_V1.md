@@ -98,6 +98,8 @@ The fast action has expected safety margin -1.5, which is above a declared avera
 
 The remaining Pareto options are balanced (8,-1) and safe (6,0). An uninformative two-outcome experiment can induce the intermediate vector (7,-0.5) by assigning different actions to its two outcomes. But because the outcome is independent of the hypothesis, the same action lottery can be executed without measuring anything. The implementation explicitly adds this zero-cost `NO_EXPERIMENT_LOTTERY` baseline; the paid uninformative measurement is dominated and is not presented as an information gain. A genuinely informative probe can remain on the frontier when its outcome/action correlation improves objective values beyond the corresponding free lottery.
 
+A separate informative two-hypothesis fixture makes the distinction concrete: the experiment yields (8.1, 8.1) expected objectives, while the same marginal action lottery without observing the experiment yields (4.5, 4.5), before charging the experiment's one cost unit. The expected values are recorded in the Pareto fixture result file.
+
 ## 6. Reference implementation
 
 The standard-library-only Rust reference implements:
