@@ -12,6 +12,10 @@ Scoring separates correctness, method rigor, and efficiency. It also audits p-ha
 
 ## 2. Important interpretation safeguards
 
+The working-draft table reports an adaptive reference with curated test values at 92.2 overall and a curated OFAT reference at 90.8. The six model means span 57.3–61.7 in that sweep; the highest reported solve rate is 50%. However, the same report's blind-value OFAT ablation falls to 40.5–47.7 across three independent test-value draws (mean 45.2). The report explicitly retracts an earlier statement that value knowledge did not account for most of the reference gap: the ablation shows that informative intervention values are a dominant contribution. This is a material qualification, not a footnote.
+
+## 3. Important interpretation safeguards
+
 The report is explicitly a working draft (v0.5), not an established universal leaderboard. Its own revisions include an explicit retraction in Section 7.2. The reference solver with curated informative test values scored far above evaluated models, but its blind-value ablation sharply reduced the score; the report states that informative intervention values are a dominant contributor to the reference advantage. Do not present the curated-reference gap as a clean measure of model capability or claim that a generic OFAT algorithm beats frontier science agents.
 
 Other limitations disclosed by the report:
@@ -25,7 +29,7 @@ Other limitations disclosed by the report:
 
 These are productive benchmark design lessons, not reasons to ignore the benchmark.
 
-## 3. What SDCB should reuse
+## 4. What SDCB should reuse
 
 Subject to license and API review, implement a read-only evaluation adapter that:
 
@@ -37,7 +41,7 @@ Subject to license and API review, implement a read-only evaluation adapter that
 
 Do not re-host or relabel a Petri leaderboard as an SDCB result. Prefer upstream-run artifacts and cite the exact report snapshot.
 
-## 4. Proposed SDCB extensions
+## 5. Proposed SDCB extensions
 
 Petri-bench already tests controlled experiments and method integrity. SDCB should extend it along dimensions that are not the centre of the current v0.5 tasks:
 
@@ -53,7 +57,7 @@ Petri-bench already tests controlled experiments and method integrity. SDCB shou
 | Sequential adaptive policies | Exact finite-horizon oracle on small worlds, policy regret on larger worlds | Tests whether the system can plan follow-up experiments conditionally |
 | Evidence provenance | Bind task/run/system/experiment/observation/verification digests through EGBT | Tests whether conclusions are supported by the exact experiments performed |
 
-## 5. Benchmark priority
+## 6. Benchmark priority
 
 Suggested order:
 
@@ -66,7 +70,7 @@ Suggested order:
 
 Use exact versions and upstream task rules. For all of them, run baselines under the same evidence access, prior, action set, utility schedule, experiment budget, tool permissions and stop rules. Report model-only and agent-scaffold results separately.
 
-## 6. Competitive claims we can defend
+## 7. Competitive claims we can defend
 
 A useful result would not be a single combined SOTA score. A stronger claim would be:
 
@@ -83,7 +87,7 @@ To support that claim, require:
 - zero hard safety-constraint violations in the frozen negative controls;
 - external reproduction of the result.
 
-## 7. External source snapshot
+## 8. External source snapshot
 
 petri-bench portal: https://petri-labs.org/bench/
 
