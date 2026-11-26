@@ -1094,6 +1094,41 @@ mod tests {
     }
 
     #[test]
+    fn accepts_recomputed_allowlisted_numeric_and_boolean_parameters() {
+        let (mut receipt, key, _) = fixture();
+        let body = br#"{"model":"model-pinned-1","messages":[{"role":"user","content":"context"}],"stream":true,"temperature":0.2}"#;
+        let mut parameters = BTreeMap::new();
+        parameters.insert("stream".to_owned(), serde_json::Value::Bool(true));
+        parameters.insert("temperature".to_owned(), serde_json::json!(0.2));
+        let profile = hash(&serde_json::to_vec(&parameters).unwrap());
+        receipt.provider_parameter_profile_sha256 = profile.clone();
+        refresh_body_binding(&mut receipt, body, &key);
+        let base = expected();
+        let bound = MaceExpectedExposureBindingV1 {
+            provider_parameter_profile_sha256: &profile,
+            ..base
+        };
+        assert!(
+            verify_fixture(&receipt, body.to_vec(), &key, &bound, &AcceptEvidence).is_ok()
+        );
+    }
+
+    #[test]
+    fn verifies_escaped_unicode_content_offsets_against_raw_request() {
+        let (mut receipt, key, _) = fixture();
+        let body = br#"{"model":"model-pinned-1","messages":[{"role":"user","content":"prefix 😀 \"quoted\" line\ncontext"}]}"#;
+        let needle = b"context";
+        let start = body.windows(needle.len()).position(|window| window == needle).unwrap() as u64;
+        receipt.exposures[0].span_start_byte = start;
+        receipt.exposures[0].span_end_byte = start + needle.len() as u64;
+        receipt.exposures[0].exposed_span_sha256 = hash(needle);
+        refresh_body_binding(&mut receipt, body, &key);
+        assert!(
+            verify_fixture(&receipt, body.to_vec(), &key, &expected(), &AcceptEvidence).is_ok()
+        );
+    }
+
+    #[test]
     fn rejects_duplicate_provider_parameter_members() {
         let (mut receipt, key, _) = fixture();
         let body = br#"{"model":"model-pinned-1","messages":[{"role":"user","content":"context"}],"temperature":0.2,"temperature":0.9}"#;
