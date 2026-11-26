@@ -723,14 +723,17 @@ mod tests {
 
     #[test]
     fn source_attestation_cannot_be_replayed_across_attempts() {
-        let replayed = RECEIPT.replace(
-            "\"attempt_id\": \"00000000-0000-4000-8000-000000000101\"",
-            "\"attempt_id\": \"00000000-0000-4000-8000-000000000102\"",
+        let marker = r#""attestation_id": "att-connector-001""#;
+        let (prefix, source_tail) = RECEIPT.split_once(marker).unwrap();
+        let source_tail = source_tail.replacen(
+            r#""attempt_id": "00000000-0000-4000-8000-000000000101""#,
+            r#""attempt_id": "00000000-0000-4000-8000-000000000102""#,
+            1,
         );
+        let replayed = format!("{prefix}{marker}{source_tail}");
         assert!(matches!(
             verify_effect_receipt(ATTEMPT, &replayed, &expected_context()),
-            Err(EffectReceiptError::AttemptBindingMismatch("attempt_id"))
-                | Err(EffectReceiptError::SourceBindingMismatch { field: "attempt_id", .. })
+            Err(EffectReceiptError::SourceBindingMismatch { field: "attempt_id", .. })
         ));
     }
 
