@@ -943,6 +943,14 @@ jobs:
               lambda value: value["linearization_contract"].__setitem__("pulse_map_parameter_jacobian_required", False),
           )
           expect_rejection(
+              "coordinate-identity-missing",
+              lambda value: value["cohort"].__setitem__("state_coordinate_id", ""),
+          )
+          expect_rejection(
+              "future-pulse-response-bypass",
+              lambda value: value["response_qualification"].__setitem__("future_pulse_injection_residual_required", False),
+          )
+          expect_rejection(
               "split-id-duplication",
               lambda value: value["split"]["held_out"][0].__setitem__("trial_id", value["split"]["training"][0]["trial_id"]),
           )
