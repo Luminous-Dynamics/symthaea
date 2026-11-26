@@ -3,9 +3,10 @@ use std::collections::{BTreeMap, BTreeSet};
 pub mod failure_fidelity;
 
 pub use failure_fidelity::{
-    BoundaryRateClusterCounts, BoundaryRateFidelityScore, BoundaryRatePair, BoundarySide,
-    FailureClusterCounts, FailureFidelityContract, FailureFidelityScore, FailureSignature,
-    FailureTraceRecord, OutcomeLabel, score_boundary_rate_pairs, score_failure_fidelity,
+    BoundaryRateClusterCounts, BoundaryRateFidelityScore, BoundaryRatePair,
+    BoundaryRatePairMeasurement, BoundarySide, FailureClusterCounts, FailureFidelityContract,
+    FailureFidelityScore, FailureSignature, FailureTraceRecord, OutcomeLabel,
+    score_boundary_rate_pairs, score_failure_fidelity,
 };
 
 #[derive(Clone, Debug, Eq, Ord, PartialEq, PartialOrd)]
