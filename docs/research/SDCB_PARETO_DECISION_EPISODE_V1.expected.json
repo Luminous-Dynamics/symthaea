@@ -70,5 +70,36 @@
     }
   ],
   "claim_ceiling": "finite_pareto_and_hard_constraint_fixture_only",
-  "note": "The experiment outcomes are independent of the hypothesis, so any outcome-contingent action allocation is exactly reproducible as a free lottery. The Pareto oracle includes that no-experiment lottery baseline; the paid uninformative measurement is dominated and does not appear on the frontier."
+  "note": "The experiment outcomes are independent of the hypothesis, so any outcome-contingent action allocation is exactly reproducible as a free lottery. The Pareto oracle includes that no-experiment lottery baseline; the paid uninformative measurement is dominated and does not appear on the frontier.",
+  "informative_probe_control": {
+    "fixture": "two-hypothesis-two-objective-diagnostic",
+    "prior": [
+      0.5,
+      0.5
+    ],
+    "outcome_likelihoods": [
+      [
+        0.9,
+        0.1
+      ],
+      [
+        0.1,
+        0.9
+      ]
+    ],
+    "policy_actions_by_outcome": [
+      "choose-h1",
+      "choose-h2"
+    ],
+    "experiment_expected_objectives": [
+      8.1,
+      8.1
+    ],
+    "same_marginal_no_experiment_lottery": [
+      4.5,
+      4.5
+    ],
+    "cost_units": 1,
+    "interpretation": "An informative outcome lets the action depend on the hypothesis; the same marginal randomization without observing the experiment is materially worse."
+  }
 }
