@@ -135,6 +135,20 @@ jobs:
           cp tools/mel-temporal-grounding-qualifier/Cargo.toml "$evidence/harness-Cargo.toml"
           cp tools/mel-temporal-grounding-qualifier/Cargo.lock "$evidence/harness-Cargo.lock"
           cp tools/mel-temporal-grounding-qualifier/src/lib.rs "$evidence/harness-lib.rs"
+          if [[ -f tools/mel-temporal-grounding-qualifier/src/audio_evidence_window.rs ]]; then
+            cp tools/mel-temporal-grounding-qualifier/src/audio_evidence_window.rs "$evidence/"
+            cp tools/mel-temporal-grounding-qualifier/src/bin/mel-audio-evidence-window-audit.rs "$evidence/"
+            cp tools/mel-temporal-grounding-qualifier/schemas/mel-audio-evidence-window-v1.schema.json "$evidence/"
+            cp tools/mel-temporal-grounding-qualifier/fixtures/mel-audio-evidence-window.synthetic.json "$evidence/"
+            cp tools/mel-temporal-grounding-qualifier/fixtures/mel-audio-evidence-source.synthetic.bin "$evidence/"
+            cp tools/mel-temporal-grounding-qualifier/fixtures/mel-audio-evidence-pcm.synthetic.hex "$evidence/"
+            if [[ -f "$RUNNER_TEMP/audio-evidence-window-report.json" ]]; then
+              cp "$RUNNER_TEMP/audio-evidence-window-report.json" "$evidence/"
+            fi
+          fi
+          if [[ -f tools/mel-temporal-grounding-qualifier/src/audio_revision_binding.rs ]]; then
+            cp tools/mel-temporal-grounding-qualifier/src/audio_revision_binding.rs "$evidence/"
+          fi
           cp tools/mel-temporal-grounding-qualifier/src/temporal_revision.rs "$evidence/"
           cp tools/mel-temporal-grounding-qualifier/src/bin/mel-temporal-revision-audit.rs "$evidence/"
           cp tools/mel-temporal-grounding-qualifier/fixtures/mel-temporal-revision-triplet.synthetic.json "$evidence/"
