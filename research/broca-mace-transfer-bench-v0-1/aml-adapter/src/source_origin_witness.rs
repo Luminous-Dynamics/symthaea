@@ -876,11 +876,6 @@ mod tests {
                     failure_domain_sha256: "b".repeat(64),
                     verifier_profile_sha256: "d".repeat(64),
                 },
-                SourceOriginWitnessOperatorV1 {
-                    operator_id: "publisher-c".into(),
-                    failure_domain_sha256: "f".repeat(64),
-                    verifier_profile_sha256: "1".repeat(64),
-                },
             ],
         };
         assert_eq!(policy.validate(), Err(SourceOriginWitnessRejectV1::InvalidPolicy));
@@ -945,12 +940,12 @@ mod tests {
     }
 
     #[test]
-    fn policy_digest_binds_thresholds_and_failure_domains() {
-        let make = |minimum_domains| SourceOriginWitnessPolicyV1 {
+    fn policy_digest_binds_quorum_thresholds_and_failure_domains() {
+        let make = |minimum_operators| SourceOriginWitnessPolicyV1 {
             schema_version: SOURCE_ORIGIN_WITNESS_POLICY_SCHEMA_V1.to_owned(),
             graph_sha256: "a".repeat(64),
-            minimum_operators: 2,
-            minimum_failure_domains: minimum_domains,
+            minimum_operators,
+            minimum_failure_domains: 2,
             maximum_observation_age_secs: 600,
             operators: vec![
                 SourceOriginWitnessOperatorV1 {
@@ -963,10 +958,13 @@ mod tests {
                     failure_domain_sha256: "d".repeat(64),
                     verifier_profile_sha256: "e".repeat(64),
                 },
+                SourceOriginWitnessOperatorV1 {
+                    operator_id: "publisher-c".into(),
+                    failure_domain_sha256: "f".repeat(64),
+                    verifier_profile_sha256: "1".repeat(64),
+                },
             ],
         };
-        let mut stricter = make(2);
-        stricter.maximum_observation_age_secs = 300;
-        assert_ne!(make(2).digest().unwrap(), stricter.digest().unwrap());
+        assert_ne!(make(2).digest().unwrap(), make(3).digest().unwrap());
     }
 }
