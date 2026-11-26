@@ -393,6 +393,14 @@ mod tests {
         );
         assert_eq!(statement["predicate"]["target_audio_bytes_recomputed"], true);
         assert_eq!(statement["predicate"]["source_audio_bytes_recomputed"], true);
+        assert_eq!(statement["predicate"]["sample_rate_hz"], 48_000);
+        assert_eq!(statement["predicate"]["channels"], 2);
+        assert_eq!(statement["predicate"]["total_frames"], 8);
+        assert_eq!(statement["predicate"]["sample_format"], "S16Le");
+        assert_eq!(statement["predicate"]["max_output_tokens"], 512);
+        assert_eq!(statement["predicate"]["actual_output_tokens"], 128);
+        assert_eq!(statement["predicate"]["max_wall_time_ms"], 30_000);
+        assert_eq!(statement["predicate"]["elapsed_wall_time_ms"], 4_000);
         assert_eq!(statement["predicate"]["window_payloads_recomputed"], true);
         assert_eq!(statement["predicate"]["rights_scope_authenticated"], false);
         assert_eq!(statement["predicate"]["runner_receipt_verified"], false);
