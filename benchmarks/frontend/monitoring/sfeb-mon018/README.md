@@ -13,6 +13,7 @@ Can an independent MON verifier establish that the exact principal, delegation, 
 - [AUTHORITY-EVIDENCE-CONTRACT-v1.md](./AUTHORITY-EVIDENCE-CONTRACT-v1.md) — architecture, trust boundaries, semantics, adapter contract, qualification plan and benchmark design.
 - [SCENARIOS-v1.json](./SCENARIOS-v1.json) — finite known-answer adversarial seed corpus.
 - [SCENARIOS-v1.schema.json](./SCENARIOS-v1.schema.json) — strict JSON Schema for the corpus.
+- [authority-join/](./authority-join/) — standard-library Go semantic reference and adversarial tests for a deliberately narrow v0.1 profile.
 
 ## Existing systems reused
 
