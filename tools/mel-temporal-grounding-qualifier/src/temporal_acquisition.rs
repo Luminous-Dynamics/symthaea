@@ -1322,7 +1322,7 @@ mod tests {
     use super::*;
 
     fn digest(byte: char) -> String {
-        byte.to_string().repeat(64)
+        format!("{:064x}", byte as u32)
     }
 
     fn config() -> AnnotationAcquisitionConfigV1 {
