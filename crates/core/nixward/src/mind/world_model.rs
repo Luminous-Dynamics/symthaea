@@ -265,6 +265,39 @@ struct DeltaEntry {
     delta: ContinuousHV,
     /// Number of observations used to learn this delta.
     observation_count: usize,
+    /// Number of prequential residual observations (first sample has no prior predictor).
+    residual_observation_count: usize,
+    /// Number of prequential residuals rejected because their norm was non-finite.
+    non_finite_prequential_residual_count: usize,
+    /// Mean squared L2 residual against the mean delta before each update.
+    mean_squared_prequential_delta_error: f64,
+}
+
+
+/// Evidence support for a transition forecast.
+///
+/// The three-observation boundary mirrors the existing `has_learned`
+/// heuristic; it is a count threshold, not calibrated confidence.
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub enum TransitionSupport {
+    NoExamples,
+    FewerThanThreeExamples,
+    AtLeastThreeExamples,
+}
+
+/// A transition forecast plus descriptive support/error diagnostics.
+///
+/// The residual is the mean squared prequential error of observed action
+/// deltas against the running mean *before* each update. It is not a calibrated
+/// predictive variance or probability of correctness.
+#[derive(Debug, Clone)]
+pub struct TransitionPredictionDiagnostics {
+    pub predicted_state: ContinuousHV,
+    pub support: TransitionSupport,
+    pub observation_count: usize,
+    pub residual_observation_count: usize,
+    pub non_finite_prequential_residual_count: usize,
+    pub mean_squared_prequential_delta_error: Option<f64>,
 }
 
 /// The NixOS world model.
@@ -316,11 +349,40 @@ impl NixWorldModel {
     ///
     /// Uses delta vectors: `predicted_next ≈ current_state + delta[action]`
     pub fn predict_state(&self, action: &ActionCategory) -> ContinuousHV {
-        if let Some(entry) = self.delta_vectors.get(action) {
-            self.system_state.add(&entry.delta)
-        } else {
-            // Unknown action → predict no change
-            self.system_state.clone()
+        self.predict_state_with_diagnostics(action).predicted_state
+    }
+
+    /// Predict a state while exposing whether the action category has evidence.
+    ///
+    /// For compatibility, an unseen action still returns the current state as
+    /// the numeric prediction. Its `NoExamples` status makes clear that this
+    /// identity vector is a placeholder, not an evidence-supported no-op model.
+    pub fn predict_state_with_diagnostics(
+        &self,
+        action: &ActionCategory,
+    ) -> TransitionPredictionDiagnostics {
+        match self.delta_vectors.get(action) {
+            Some(entry) => TransitionPredictionDiagnostics {
+                predicted_state: self.system_state.add(&entry.delta),
+                support: if entry.observation_count >= 3 {
+                    TransitionSupport::AtLeastThreeExamples
+                } else {
+                    TransitionSupport::FewerThanThreeExamples
+                },
+                observation_count: entry.observation_count,
+                residual_observation_count: entry.residual_observation_count,
+                non_finite_prequential_residual_count: entry.non_finite_prequential_residual_count,
+                mean_squared_prequential_delta_error: (entry.residual_observation_count > 0)
+                    .then_some(entry.mean_squared_prequential_delta_error),
+            },
+            None => TransitionPredictionDiagnostics {
+                predicted_state: self.system_state.clone(),
+                support: TransitionSupport::NoExamples,
+                observation_count: 0,
+                residual_observation_count: 0,
+                non_finite_prequential_residual_count: 0,
+                mean_squared_prequential_delta_error: None,
+            },
         }
     }
 
@@ -358,7 +420,23 @@ impl NixWorldModel {
             .or_insert_with(|| DeltaEntry {
                 delta: ContinuousHV::zero(self.dim),
                 observation_count: 0,
+                residual_observation_count: 0,
+                non_finite_prequential_residual_count: 0,
+                mean_squared_prequential_delta_error: 0.0,
             });
+
+        if entry.observation_count > 0 {
+            let residual = observed_delta.subtract(&entry.delta);
+            let squared_error = f64::from(residual.norm()).powi(2);
+            if squared_error.is_finite() {
+                entry.residual_observation_count += 1;
+                let residual_count = entry.residual_observation_count as f64;
+                entry.mean_squared_prequential_delta_error +=
+                    (squared_error - entry.mean_squared_prequential_delta_error) / residual_count;
+            } else {
+                entry.non_finite_prequential_residual_count += 1;
+            }
+        }
 
         entry.observation_count += 1;
         let n = entry.observation_count as f32;
@@ -635,6 +713,110 @@ mod tests {
             1_800_000_000_000,
             Some("b".repeat(64)),
         ).is_err());
+    }
+
+
+    #[test]
+    fn unknown_action_is_explicitly_distinguished_from_learned_no_change() {
+        let dim = 512;
+        let mut wm = NixWorldModel::new(dim);
+        let current = ContinuousHV::random(dim, 91);
+        wm.observe(current.clone());
+
+        let diagnostics = wm.predict_state_with_diagnostics(&ActionCategory::Rollback);
+        assert_eq!(diagnostics.support, TransitionSupport::NoExamples);
+        assert_eq!(diagnostics.observation_count, 0);
+        assert_eq!(diagnostics.residual_observation_count, 0);
+        assert!(diagnostics.mean_squared_prequential_delta_error.is_none());
+        assert!((diagnostics.predicted_state.similarity(&current) - 1.0).abs() < 1e-5);
+        assert!((wm.predict_state(&ActionCategory::Rollback).similarity(&current) - 1.0).abs() < 1e-5);
+    }
+
+    #[test]
+    fn support_diagnostic_tracks_sparse_and_legacy_three_sample_threshold() {
+        let dim = 512;
+        let mut wm = NixWorldModel::new(dim);
+        let action = ActionCategory::Install;
+        let before = ContinuousHV::random(dim, 92);
+        let after = ContinuousHV::random(dim, 93);
+
+        for (index, expected_support) in [
+            TransitionSupport::FewerThanThreeExamples,
+            TransitionSupport::FewerThanThreeExamples,
+            TransitionSupport::AtLeastThreeExamples,
+        ]
+        .into_iter()
+        .enumerate()
+        {
+            wm.learn_transition(&before, action.clone(), &after);
+            let diagnostics = wm.predict_state_with_diagnostics(&action);
+            assert_eq!(diagnostics.observation_count, index + 1);
+            assert_eq!(diagnostics.support, expected_support);
+            assert_eq!(wm.has_learned(&action), index + 1 >= 3);
+        }
+    }
+
+    #[test]
+    fn prequential_delta_error_is_missing_for_first_sample_and_zero_for_repeat() {
+        let dim = 512;
+        let mut wm = NixWorldModel::new(dim);
+        let action = ActionCategory::Install;
+        let before = ContinuousHV::random(dim, 94);
+        let after = ContinuousHV::random(dim, 95);
+
+        wm.learn_transition(&before, action.clone(), &after);
+        let first = wm.predict_state_with_diagnostics(&action);
+        assert_eq!(first.residual_observation_count, 0);
+        assert!(first.mean_squared_prequential_delta_error.is_none());
+
+        wm.learn_transition(&before, action.clone(), &after);
+        let second = wm.predict_state_with_diagnostics(&action);
+        assert_eq!(second.residual_observation_count, 1);
+        assert!(second.mean_squared_prequential_delta_error.is_some_and(|error| error < 1e-10));
+    }
+
+
+    #[test]
+    fn non_finite_prequential_residual_is_counted_not_folded_into_mean() {
+        let dim = 128;
+        let mut wm = NixWorldModel::new(dim);
+        let action = ActionCategory::Install;
+        let before = ContinuousHV::random(dim, 101);
+        let mut invalid_values = vec![0.5_f32; dim];
+        invalid_values[7] = f32::NAN;
+        let invalid_after = ContinuousHV::from_vec(invalid_values);
+
+        wm.learn_transition(&before, action.clone(), &invalid_after);
+        wm.learn_transition(&before, action.clone(), &invalid_after);
+        let diagnostics = wm.predict_state_with_diagnostics(&action);
+        assert_eq!(diagnostics.residual_observation_count, 0);
+        assert_eq!(diagnostics.non_finite_prequential_residual_count, 1);
+        assert!(diagnostics.mean_squared_prequential_delta_error.is_none());
+    }
+
+    #[test]
+    fn contradictory_transition_increases_prequential_error_diagnostic() {
+        let dim = 512;
+        let mut wm = NixWorldModel::new(dim);
+        let action = ActionCategory::Install;
+        let before = ContinuousHV::random(dim, 96);
+        let after_a = ContinuousHV::random(dim, 97);
+        let after_b = ContinuousHV::random(dim, 98);
+
+        wm.learn_transition(&before, action.clone(), &after_a);
+        wm.learn_transition(&before, action.clone(), &after_a);
+        let stable_error = wm
+            .predict_state_with_diagnostics(&action)
+            .mean_squared_prequential_delta_error
+            .expect("second sample provides one prequential residual");
+
+        wm.learn_transition(&before, action.clone(), &after_b);
+        let contradictory_error = wm
+            .predict_state_with_diagnostics(&action)
+            .mean_squared_prequential_delta_error
+            .expect("third sample updates prequential residual");
+        assert!(contradictory_error > stable_error);
+        assert!(contradictory_error.is_finite());
     }
 
     #[test]

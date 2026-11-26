@@ -1,0 +1,37 @@
+name: NixWard transition support diagnostics
+
+on:
+  pull_request:
+    paths:
+      - "crates/core/nixward/src/mind/world_model.rs"
+      - "crates/core/nixward/src/mind/mod.rs"
+      - "crates/core/nixward/TRANSITION_SUPPORT_DIAGNOSTICS_V1.md"
+      - ".github/workflows/nixward-transition-support.yml"
+  push:
+    branches:
+      - main
+    paths:
+      - "crates/core/nixward/src/mind/world_model.rs"
+      - "crates/core/nixward/src/mind/mod.rs"
+      - "crates/core/nixward/TRANSITION_SUPPORT_DIAGNOSTICS_V1.md"
+      - ".github/workflows/nixward-transition-support.yml"
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  transition-support:
+    runs-on: ubuntu-latest
+    timeout-minutes: 25
+    steps:
+      - uses: actions/checkout@v4
+      - uses: dtolnay/rust-toolchain@1.100.0
+        with:
+          components: rustfmt, clippy
+      - name: Format changed Rust modules
+        run: rustfmt +1.100.0 --check --edition 2024 crates/core/nixward/src/mind/world_model.rs crates/core/nixward/src/mind/mod.rs
+      - name: Run NixWard world-model tests
+        run: cargo +1.100.0 test --locked -p nixward --lib mind::world_model::tests
+      - name: Strict Clippy for NixWard library
+        run: cargo +1.100.0 clippy --locked -p nixward --lib --all-targets -- -D warnings

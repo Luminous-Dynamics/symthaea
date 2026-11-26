@@ -43,5 +43,5 @@ pub use predictive_hierarchy::{PredictionLevel, PredictiveHierarchy};
 pub use working_memory::{MemoryItem, MemorySource, SavedWorkingMemory, WorkingMemory};
 pub use world_model::{
     ActionCategory, NixWorldModel, TransitionEpisodeV1, TransitionOutcome,
-    continuous_hv_blake3,
+    TransitionPredictionDiagnostics, TransitionSupport, continuous_hv_blake3,
 };
