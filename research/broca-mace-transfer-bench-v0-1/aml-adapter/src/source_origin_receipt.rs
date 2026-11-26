@@ -142,6 +142,15 @@ impl VerifiedSourceOriginSetV1 {
         self.receipts.iter().map(|item| item.receipt.key_id.clone()).collect()
     }
 
+    /// Exact envelope digests for the complete origin bundle, in evidence-id order.
+    pub(crate) fn envelope_sha256s(&self) -> Vec<String> {
+        let mut digests = self.receipts.iter()
+            .map(|item| item.envelope_sha256.clone())
+            .collect::<Vec<_>>();
+        digests.sort();
+        digests
+    }
+
     /// Exact receipt-envelope digest for one graph node, used to bind separate
     /// acquisition witnesses to the four-authority source-origin result.
     pub(crate) fn envelope_sha256_for(&self, evidence_id: &str) -> Option<&str> {
