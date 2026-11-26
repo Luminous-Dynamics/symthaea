@@ -116,8 +116,29 @@ struct StoredSessionEventV1 {
     transition_receipt_sha256: Option<String>,
 }
 
+#[derive(Clone, Copy, Debug, Eq, PartialEq)]
+pub enum StreamingInvalidationCauseV1 {
+    Correction,
+    Quarantine,
+    Revocation,
+    RightsErasure,
+}
+
+impl StreamingInvalidationCauseV1 {
+    pub(crate) fn tag(self) -> u8 {
+        match self {
+            Self::Correction => 1,
+            Self::Quarantine => 2,
+            Self::Revocation => 3,
+            Self::RightsErasure => 4,
+        }
+    }
+}
+
 #[derive(Clone, Debug, Eq, PartialEq)]
 pub struct StreamingSessionMutationReceiptV1 {
+    pub user_id: String,
+    pub session_id: String,
     pub event_id: String,
     pub sequence: u64,
     pub effective_at_ms: i64,
@@ -127,7 +148,35 @@ pub struct StreamingSessionMutationReceiptV1 {
     pub resulting_state_sha256: String,
     /// Ordered by valid timestamp, then original ingestion sequence.
     pub visible_event_ids: Vec<String>,
+    /// Previously visible event IDs no longer visible after this transition.
+    pub invalidated_event_ids: Vec<String>,
+    /// Source event identities targeted by this invalidating mutation, even if
+    /// they were already hidden by an earlier quarantine transition.
+    pub affected_event_ids: Vec<String>,
+    /// Why the active-view dependencies became invalid. None for non-invalidating events.
+    pub invalidation_cause: Option<StreamingInvalidationCauseV1>,
     pub receipt_sha256: String,
+}
+
+impl StreamingSessionMutationReceiptV1 {
+    /// Verify this transition's exact deterministic commitment.
+    pub fn verify_integrity(&self) -> bool {
+        self.receipt_sha256 == receipt_digest(
+            &self.user_id,
+            &self.session_id,
+            &self.event_id,
+            self.sequence,
+            self.effective_at_ms,
+            self.observed_at_ms,
+            &self.mutation_sha256,
+            &self.previous_state_sha256,
+            &self.resulting_state_sha256,
+            &self.visible_event_ids,
+            &self.invalidated_event_ids,
+            &self.affected_event_ids,
+            self.invalidation_cause,
+        )
+    }
 }
 
 #[derive(Clone, Copy, Debug, Eq, PartialEq)]
@@ -199,6 +248,16 @@ impl StreamingSessionLedgerV1 {
     pub fn session_id(&self) -> &str { &self.session_id }
     pub fn last_sequence(&self) -> u64 { self.last_sequence }
 
+    /// Confirm that this exact integrity-checked receipt was emitted and retained
+    /// by this ledger instance. A self-consistent unkeyed digest alone is not
+    /// accepted as proof that a transition was actually applied to this session.
+    pub fn verify_recorded_receipt(&self, receipt: &StreamingSessionMutationReceiptV1) -> bool {
+        self.user_id == receipt.user_id
+            && self.session_id == receipt.session_id
+            && receipt.verify_integrity()
+            && self.receipts.get(&receipt.event_id) == Some(receipt)
+    }
+
     pub fn mutation_receipts(&self) -> impl Iterator<Item = &StreamingSessionMutationReceiptV1> {
         self.events.iter().filter_map(|event| self.receipts.get(&event.event_id))
     }
@@ -262,6 +321,23 @@ impl StreamingSessionLedgerV1 {
         observed_at_ms: u64,
     ) -> Result<StreamingSessionMutationReceiptV1, StreamingSessionRejectV1> {
         let previous_state_sha256 = self.state_sha256();
+        let previous_visible_event_ids = self.visible_event_ids();
+        let invalidation_cause = match &mutation.kind {
+            StreamingMutationKindV1::Correct { .. } => Some(StreamingInvalidationCauseV1::Correction),
+            StreamingMutationKindV1::Quarantine { .. } => Some(StreamingInvalidationCauseV1::Quarantine),
+            StreamingMutationKindV1::Revoke { .. } => Some(StreamingInvalidationCauseV1::Revocation),
+            StreamingMutationKindV1::ErasureRequest { .. } => Some(StreamingInvalidationCauseV1::RightsErasure),
+            StreamingMutationKindV1::Append { .. } | StreamingMutationKindV1::Revalidate { .. } => None,
+        };
+        let affected_event_ids = match &mutation.kind {
+            StreamingMutationKindV1::Correct { target_event_id, .. }
+            | StreamingMutationKindV1::Quarantine { target_event_id, .. }
+            | StreamingMutationKindV1::Revoke { target_event_id, .. }
+            | StreamingMutationKindV1::ErasureRequest { target_event_id, .. } => {
+                vec![target_event_id.clone()]
+            }
+            StreamingMutationKindV1::Append { .. } | StreamingMutationKindV1::Revalidate { .. } => Vec::new(),
+        };
         let event_id = mutation.event_id.clone();
         let sequence = mutation.sequence;
         let effective_at_ms = mutation.effective_at_ms;
@@ -374,7 +450,13 @@ impl StreamingSessionLedgerV1 {
 
         let resulting_state_sha256 = self.state_sha256();
         let visible_event_ids = self.visible_event_ids();
+        let visible_after = visible_event_ids.iter().collect::<BTreeSet<_>>();
+        let invalidated_event_ids = previous_visible_event_ids.into_iter()
+            .filter(|id| !visible_after.contains(id))
+            .collect::<Vec<_>>();
         let receipt_sha256 = receipt_digest(
+            &self.user_id,
+            &self.session_id,
             &event_id,
             sequence,
             effective_at_ms,
@@ -383,8 +465,13 @@ impl StreamingSessionLedgerV1 {
             &previous_state_sha256,
             &resulting_state_sha256,
             &visible_event_ids,
+            &invalidated_event_ids,
+            &affected_event_ids,
+            invalidation_cause,
         );
         let receipt = StreamingSessionMutationReceiptV1 {
+            user_id: self.user_id.clone(),
+            session_id: self.session_id.clone(),
             event_id: event_id.clone(),
             sequence,
             effective_at_ms,
@@ -393,6 +480,9 @@ impl StreamingSessionLedgerV1 {
             previous_state_sha256,
             resulting_state_sha256,
             visible_event_ids,
+            invalidated_event_ids,
+            affected_event_ids,
+            invalidation_cause,
             receipt_sha256,
         };
         self.receipts.insert(event_id, receipt.clone());
@@ -670,6 +760,8 @@ fn snapshot_digest(
 }
 
 fn receipt_digest(
+    user_id: &str,
+    session_id: &str,
     event_id: &str,
     sequence: u64,
     effective_at_ms: i64,
@@ -678,9 +770,14 @@ fn receipt_digest(
     previous_state_sha256: &str,
     resulting_state_sha256: &str,
     visible_event_ids: &[String],
+    invalidated_event_ids: &[String],
+    affected_event_ids: &[String],
+    invalidation_cause: Option<StreamingInvalidationCauseV1>,
 ) -> String {
     let mut h = Sha256::new();
     h.update(b"luminous:mace:streaming-session-receipt:v1\0");
+    hash_field(&mut h, user_id);
+    hash_field(&mut h, session_id);
     hash_field(&mut h, event_id);
     h.update(sequence.to_be_bytes());
     h.update(effective_at_ms.to_be_bytes());
@@ -690,6 +787,11 @@ fn receipt_digest(
     hash_field(&mut h, resulting_state_sha256);
     h.update((visible_event_ids.len() as u64).to_be_bytes());
     for id in visible_event_ids { hash_field(&mut h, id); }
+    h.update((invalidated_event_ids.len() as u64).to_be_bytes());
+    for id in invalidated_event_ids { hash_field(&mut h, id); }
+    h.update((affected_event_ids.len() as u64).to_be_bytes());
+    for id in affected_event_ids { hash_field(&mut h, id); }
+    h.update([invalidation_cause.map_or(0, StreamingInvalidationCauseV1::tag)]);
     hex_digest(&h.finalize())
 }
 
@@ -803,6 +905,91 @@ mod tests {
             Err(StreamingSessionRejectV1::ClockRollback)
         );
         assert_eq!(ledger.last_sequence(), 1);
+    }
+
+    #[test]
+    fn transition_receipt_scope_and_invalidation_cause_are_committed() {
+        let mut ledger = ledger();
+        let append = ledger.apply(append("event-1", 1, 100, "fact"), 1_000).unwrap();
+        assert!(append.receipt.verify_integrity());
+        assert_eq!(append.receipt.user_id, "user-1");
+        assert_eq!(append.receipt.session_id, "session-1");
+        assert_eq!(append.receipt.invalidation_cause, None);
+        let quarantine = StreamingSessionMutationV1 {
+            event_id: "event-2".into(),
+            sequence: 2,
+            effective_at_ms: 200,
+            kind: StreamingMutationKindV1::Quarantine {
+                target_event_id: "event-1".into(),
+                reason_sha256: "b".repeat(64),
+            },
+        };
+        let receipt = ledger.apply(quarantine, 1_100).unwrap().receipt;
+        assert!(receipt.verify_integrity());
+        assert_eq!(receipt.invalidation_cause, Some(StreamingInvalidationCauseV1::Quarantine));
+        let mut altered = receipt.clone();
+        altered.session_id = "different-session".into();
+        assert!(!altered.verify_integrity());
+        altered = receipt.clone();
+        altered.invalidation_cause = Some(StreamingInvalidationCauseV1::Revocation);
+        assert!(!altered.verify_integrity());
+    }
+
+    #[test]
+    fn correction_receipt_names_the_event_removed_from_the_active_projection() {
+        let mut ledger = ledger();
+        ledger.apply(append("event-1", 1, 100, "old fact"), 1_000).unwrap();
+        let correction = StreamingSessionMutationV1 {
+            event_id: "event-2".into(),
+            sequence: 2,
+            effective_at_ms: 100,
+            kind: StreamingMutationKindV1::Correct {
+                target_event_id: "event-1".into(),
+                message: message("turn-1", 100, "corrected fact"),
+            },
+        };
+        let receipt = ledger.apply(correction, 1_100).unwrap().receipt;
+        assert_eq!(receipt.visible_event_ids, vec!["event-2"]);
+        assert_eq!(receipt.invalidated_event_ids, vec!["event-1"]);
+    }
+
+    #[test]
+    fn quarantine_and_revocation_receipts_report_newly_hidden_events() {
+        let mut ledger = ledger();
+        ledger.apply(append("event-1", 1, 100, "fact"), 1_000).unwrap();
+        let quarantine = StreamingSessionMutationV1 {
+            event_id: "event-2".into(),
+            sequence: 2,
+            effective_at_ms: 200,
+            kind: StreamingMutationKindV1::Quarantine {
+                target_event_id: "event-1".into(),
+                reason_sha256: "b".repeat(64),
+            },
+        };
+        let receipt = ledger.apply(quarantine, 1_100).unwrap().receipt;
+        assert_eq!(receipt.invalidated_event_ids, vec!["event-1"]);
+        let revalidate = StreamingSessionMutationV1 {
+            event_id: "event-3".into(),
+            sequence: 3,
+            effective_at_ms: 300,
+            kind: StreamingMutationKindV1::Revalidate {
+                target_event_id: "event-1".into(),
+                validation_receipt_sha256: "c".repeat(64),
+            },
+        };
+        let receipt = ledger.apply(revalidate, 1_200).unwrap().receipt;
+        assert!(receipt.invalidated_event_ids.is_empty());
+        let revoke = StreamingSessionMutationV1 {
+            event_id: "event-4".into(),
+            sequence: 4,
+            effective_at_ms: 400,
+            kind: StreamingMutationKindV1::Revoke {
+                target_event_id: "event-1".into(),
+                revocation_receipt_sha256: "d".repeat(64),
+            },
+        };
+        let receipt = ledger.apply(revoke, 1_300).unwrap().receipt;
+        assert_eq!(receipt.invalidated_event_ids, vec!["event-1"]);
     }
 
     #[test]

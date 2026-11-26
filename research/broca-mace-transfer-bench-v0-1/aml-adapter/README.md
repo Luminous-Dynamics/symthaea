@@ -131,4 +131,31 @@ The snapshot exposes only active messages, ordered by valid timestamp and then o
 
 This is not yet a hosted AML Add/Search service, durable append-only database, distributed CAS writer, or complete rights-erasure implementation. The erasure request removes payload from this in-memory projection, but message-derived mutation commitments remain; production must separately erase derived indexes, caches, replicas and backups and verify deletion receipts. Raw JSONL bytes and publisher/source authenticity remain the responsibility of the upstream ingestion/qualification boundaries.
 
-Protocol and benchmark: [MACE Streaming Temporal Session Ledger V1](../../../docs/research/MACE_STREAMING_TEMPORAL_SESSION_LEDGER_V1.md). Eleven deterministic test functions are authored; they have not been executed.
+Protocol and benchmark: [MACE Streaming Temporal Session Ledger V1](../../../docs/research/MACE_STREAMING_TEMPORAL_SESSION_LEDGER_V1.md). Fourteen deterministic test functions are authored in the latest streaming-ledger increment; they have not been executed.
+
+
+## Dependency-aware derived-memory invalidation
+
+The `temporal_projection` module tracks summaries, embeddings, preference models, plans, fact indexes and answer caches as versioned derived projections with exact source-event and parent-projection dependencies. It consumes the streaming ledger's hash-committed invalidation receipts and propagates correction, quarantine, revocation and rights-erasure states through all descendants. A revalidated source does **not** automatically reactivate old summaries or plans; a fresh projection must be built with a new ID, current dependencies and a new derivation receipt.
+
+The index rejects registration against stale source events or non-current parent projections, applies transitions in contiguous sequence order, and produces deterministic invalidation receipts. It is an in-memory reference, not a durable registry or a distributed invalidation service. The erasure acknowledgement clears the in-memory projection commitments only; external index/cache/replica/backup deletion must be separately executed and verified.
+
+Protocol: [MACE Derived-Memory Invalidation V1](../../../docs/research/MACE_DERIVED_MEMORY_INVALIDATION_V1.md). Tests are authored but not executed.
+
+
+## Derived projection invalidation and rebuilds
+
+The `temporal_projection` module consumes the streaming ledger's scoped transition receipts and invalidates all derived projections that depended on affected source events. Invalidation cascades through parent-projection edges so a source correction can stale a summary and every plan/cache downstream of that summary. Quarantine, revocation and rights-erasure requests use progressively stronger non-current states; a later source revalidation does not reactivate an old derived artifact.
+
+New projections must be built under a new ID against current source events and current parent projections. The old projection is linked to its replacement using a separate derivation/rebuild receipt commitment. An erasure acknowledgement clears the content and dependency commitments in this in-memory index only; the external deletion receipt must be independently verified by the caller.
+
+Protocol: [MACE Derived-Memory Invalidation V1](../../../docs/research/MACE_DERIVED_MEMORY_INVALIDATION_V1.md). This is an in-memory reference index, not a durable dependency database or distributed invalidation service.
+
+
+## Transitive derived-memory invalidation
+
+The `temporal_projection` module is exported alongside the streaming ledger. It registers derived summaries, embeddings, preference models, plans, fact indexes and answer caches with exact source-event and parent-projection dependencies. A transition receipt carries both the events newly removed from the active view and the source IDs targeted by correction/quarantine/revocation/erasure, so later lifecycle escalation still reaches dependent projections even when the source had already been hidden.
+
+The index propagates invalidation through all descendants, emits a self-committing projection-invalidation receipt, refuses new projections built from non-current parents, and supports rebuilds under new IDs. Source revalidation does not revive old projections. Rights-erasure acknowledgements clear the in-memory projection content/dependency commitments but do not prove deletion from external stores.
+
+Protocol: [MACE Derived-Memory Invalidation V1](../../../docs/research/MACE_DERIVED_MEMORY_INVALIDATION_V1.md). Twelve deterministic projection-index tests are authored; none have been executed.

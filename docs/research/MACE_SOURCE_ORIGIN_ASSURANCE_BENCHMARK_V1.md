@@ -238,3 +238,24 @@ Proposed initial targets:
 - report p50/p95/p99 append-ack, durable-commit and Search-visible latency separately.
 
 The current Rust module is an in-memory reference and does not yet meet durability, secure-erasure or hosted streaming SLOs. The production acceptance gate must require durable commit before acknowledgement, immediate Search visibility, transactionally allocated sequence numbers, idempotent replay after crashes, and independent deletion receipts from all derived stores.
+
+
+## 11. Derived projection invalidation
+
+The [MACE Derived-Memory Invalidation V1](MACE_DERIVED_MEMORY_INVALIDATION_V1.md) follow-on adds a projection-dependency graph for summaries, embeddings, preferences, plans, fact indexes and answer caches. Extend the benchmark from raw event lifecycle to transitive derivation lifecycle:
+
+- direct and transitive invalidation after correction/supersession;
+- quarantine and later revalidation without automatic revival of old projections;
+- revocation and rights-erasure escalation after evidence was already quarantined;
+- unrelated-source isolation, including shared and diamond-shaped dependency graphs;
+- rebuild receipts bound to a new projection ID, current source events and current parent projections;
+- erasure acknowledgements across every derived store and external storage domain.
+
+Proposed targets are 100% direct and transitive invalidation on exhaustive fixtures, zero stale projection acceptance, zero unrelated false invalidation, zero old-projection resurrection after source revalidation, and complete downstream erasure receipts before any erasure-complete claim. Report false invalidation and rebuild cost alongside stale-use; indiscriminately invalidating every memory is not an acceptable way to obtain zero stale-use.
+
+
+## 12. Derived projection closure and invalidation
+
+The [MACE Derived-Memory Invalidation V1](MACE_DERIVED_MEMORY_INVALIDATION_V1.md) reference models derived memory as a dependency graph. Extend the benchmark to test the **complete downstream closure** after source corrections, quarantine, revocation and rights erasure. A memory system must not simply update the raw conversation while leaving stale summaries, embeddings, preferences, plans or answer caches available.
+
+Add pairwise and transitive graph fixtures, diamond dependencies and shared projection parents. Require all descendants to transition out of Current, preserve unrelated projections, and prevent automatic resurrection after source revalidation. New versions must bind current source-event IDs, current parent projection IDs and independent derivation receipts. Report false invalidation, rebuild latency, rebuild tokens and update cost as well as stale-use rate.

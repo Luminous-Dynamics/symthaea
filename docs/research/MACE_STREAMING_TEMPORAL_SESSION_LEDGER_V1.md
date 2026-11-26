@@ -20,7 +20,7 @@ MACE now models two times:
 
 The distinction matters for late-arriving information. A report received on November 26 may correct a fact that was effective on November 20. The system must not pretend the correction was known on November 20.
 
-The event sequence is a consumer-controlled contiguous ordering, distinct from event time. This permits effective-time reordering without allowing event replay, gaps or clock rollback to rewrite the ingestion history.
+The event sequence is a consumer-controlled contiguous ordering, distinct from event time. This permits effective-time reordering without allowing event replay, gaps or clock rollback to rewrite the ingestion history. Transition receipts also name both the event IDs removed from the active view and the source IDs targeted by an invalidating lifecycle mutation, so revocation or erasure can propagate even when a source was already hidden by quarantine.
 
 ## 3. New Rust reference module
 
@@ -82,7 +82,7 @@ The reference uses public typed structs and assumes the caller has already parse
 
 ## 6. Deterministic regression fixtures
 
-Ten test functions are authored:
+Fourteen test functions are authored:
 1. append visibility and before/after receipt binding;
 2. exact idempotent replay;
 3. event-ID content conflict rejection;
@@ -179,3 +179,12 @@ The current branch delivers the typed in-memory state machine and its tests. It 
 - [MEMORA-Bench](https://aclanthology.org/2026.findings-emnlp.1211/) — 45-hour egocentric video embodied-memory suite for retrospective faithfulness and prospective planning.
 - [LongMemEval-V2](https://github.com/xiaowu0162/LongMemEval-V2) — 451 questions, five memory abilities, up to 115M-token haystacks.
 - [MEMOBench](https://aclanthology.org/2026.findings-emnlp.333/) — process-level Storage, Update and Compression checkpoints for history-dependent manipulation (30 tasks, 1,500 demonstrations, 4,200 executable checkpoints; strongest reported memory-module baseline 31.9% average task success).
+
+
+## 10. Derived-memory invalidation
+
+The streaming ledger is paired with [MACE Derived-Memory Invalidation V1](MACE_DERIVED_MEMORY_INVALIDATION_V1.md). Its `temporal_projection` module treats summaries, embeddings, preference models, plans, fact indexes and answer caches as versioned projections with explicit source-event and parent-projection dependencies.
+
+When a transition receipt reports a correction, quarantine, revocation or rights-erasure target, all directly dependent projections and every transitive descendant are marked non-current. Revalidation of the original message does not restore them. A caller must create a new projection ID from the active source set, verify its derivation receipt, and link it as the replacement for an old stale/quarantined artifact.
+
+The index is in-memory and the derivation/rebuild/deletion receipt digests are commitments supplied by the caller. It does not independently verify the derivation signer, persist invalidation across process restart, or delete external caches/embeddings/backups. Production requires a durable projection registry, signed rebuild/erasure services, and distributed invalidation across every store.
