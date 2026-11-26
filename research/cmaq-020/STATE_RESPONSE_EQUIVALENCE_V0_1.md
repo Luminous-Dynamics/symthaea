@@ -40,16 +40,32 @@ The initial slice is intentionally independent of HDC/CfC model internals. Subse
 
 The evaluator now supports a deterministic, cost-aware next-counterexample selector over the candidate's *currently merged* state pairs.
 
-- An invariant mismatch is surfaced as an immediate, zero-acquisition-cost witness.
+- A structural invariant mismatch is surfaced as a metadata witness, not as a numeric or categorical invariant value. No intervention-query cost is assigned to this witness; verification and source-reconstruction work must still be separately charged in the run manifest.
 - Otherwise the evaluator selects the cheapest registered intervention × query × horizon key that distinguishes the pair; ties are resolved deterministically.
 - Only the two opaque state IDs, contract ID, separating dimension and relative probe cost are returned.
 - The hidden response values, invariant values and evaluator reference labels are not returned.
-- The candidate must perform the permitted query/interaction and submit a revised abstraction on a subsequent evaluation. The evaluator does not auto-split the candidate's partition.
+- The candidate must perform the permitted query/interaction or source-evidence verification and submit a revised abstraction on a subsequent evaluation. The evaluator does not auto-split the candidate's partition.
 - If a candidate refines one false merge but leaves another, the next call selects a remaining counterexample. When no candidate-merged pair remains distinguishable within the finite contract, the selector returns no counterexample.
 
 This makes refinement cost observable instead of granting free access to the oracle's entire response table. The relative probe costs are contract inputs and must be frozen before held-out evaluation; they are not a dynamic estimate derived from the hidden response. The counterexample selector is a finite diagnostic tool, not a proof that all possible future interventions have been covered.
 
 Added deterministic tests cover: lowest-cost separating query selection, no disclosure of response values, invariant mismatch handling, ignored already-separated pairs, deterministic selection under input reordering, sequential refinement of multiple false merges, and missing/zero probe-cost rejection.
+
+
+## External reliability anchors added to the evaluation matrix
+
+CMAQ-020's next adapter layer should include distinct diagnostics inspired by current benchmarks. They are not pooled into one result:
+
+- **ScratchWorld — changed-consequence correctness:** include a no-change/copy baseline and score only the value and identity of fields that actually changed under a replayed action. High unchanged-field overlap must not hide failure to predict action consequences.
+- **MiraBench — action-following and optimism bias:** include actions that should fail, no-contact and partial-execution controls, and report false-success predictions separately from generic state error.
+- **ContactWorld — representation compatibility:** where contact-rich robotics is evaluated, compare spatial geometry and tactile-force representations under the same model/planner budget. Do not assume that adding a modality helps without checking cross-modal compatibility and long-horizon task success.
+- **Closed-loop advantage track:** compare the same downstream controller with and without the world model, plus a direct policy/VLA baseline. Measure executed success, recovery and cost; do not treat open-loop accuracy as proof of planner benefit.
+
+Relevant references:
+- ScratchWorld: https://arxiv.org/abs/2606.31689
+- MiraBench: https://arxiv.org/abs/2605.29360
+- ContactWorld: https://contact-world.github.io/
+- World-model benchmark taxonomy: https://world-model-benchmarks.github.io/World-Model-Benchmarks/
 
 ## Next experimental matrix
 
