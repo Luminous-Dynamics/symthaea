@@ -1,0 +1,41 @@
+{
+  "schema_version": "worldfailbench-boundary-rate-pair-v0.1",
+  "fixture_status": "synthetic_mapping_example",
+  "dataset_release": {
+    "dataset_id": "ACERobotics/WorldFailBench",
+    "revision": "NOT_ADMITTED_SYNTHETIC_EXAMPLE",
+    "archive_sha256": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+    "license": "Apache-2.0"
+  },
+  "platform": "RoboTwin",
+  "task_id": "adjust_bottle",
+  "policy_configuration_id": "pi05-data-50",
+  "reference_policy_checkpoint_sha256": "bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb",
+  "candidate_checkpoint_sha256": "cccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccc",
+  "domain_id": "robot-manipulation-v1",
+  "environment_family_id": "robotwin-adjust-bottle",
+  "environment_cluster_id": "base-scene-cluster-0001",
+  "pair": {
+    "pair_id": "pair-001",
+    "pair_source_manifest_sha256": "dddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddd",
+    "perturbation_dimension_id": "position",
+    "success_side_perturbation_units": 0,
+    "failure_side_perturbation_units": 10
+  },
+  "scene_sides": {
+    "success_side": {
+      "scene_sha256": "eeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeee",
+      "reference_successes": 9,
+      "reference_trials": 10,
+      "candidate_predicted_successes": 8,
+      "candidate_predicted_trials": 10
+    },
+    "failure_side": {
+      "scene_sha256": "ffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffff",
+      "reference_successes": 2,
+      "reference_trials": 10,
+      "candidate_predicted_successes": 4,
+      "candidate_predicted_trials": 10
+    }
+  }
+}
