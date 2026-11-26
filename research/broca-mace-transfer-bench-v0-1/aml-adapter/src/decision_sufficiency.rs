@@ -1,5 +1,7 @@
 // SPDX-License-Identifier: AGPL-3.0-or-later
 
+use std::collections::BTreeSet;
+
 //! Consumer-side verification of independently issued DecisionSufficiency
 //! attestations. Qualification answers whether evidence may be considered;
 //! sufficiency answers whether the qualified set supports one exact decision.
@@ -856,6 +858,12 @@ impl DecisionSufficiencyReceiptV1 {
                 || requirement.requirement_id.len() > 256
             {
                 return Err(DecisionSufficiencyRejectV1::InvalidIdentifier);
+            }
+            let mut lineage_receipts = BTreeSet::new();
+            if requirement.independent_root_families.iter()
+                .any(|family| !lineage_receipts.insert(family.provenance_receipt_sha256.as_str()))
+            {
+                return Err(DecisionSufficiencyRejectV1::InvalidReceipt);
             }
             if requirement.basis_receipt_sha256.len() > 256 {
                 return Err(DecisionSufficiencyRejectV1::InvalidReceipt);
