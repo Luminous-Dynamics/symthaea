@@ -43,7 +43,7 @@ def main():
         ("substitution", reference, "ACGTTCGT", (1, 1, 0, 0)),
         ("insertion", reference, "ACGTTACGT", (1, 0, 1, 0)),
         ("deletion", reference, "ACGACGT", (1, 0, 0, 1)),
-        ("mixed", "ACGTACGT", "ATGTCGT", (2, 0, 0, 2)),
+        ("mixed", "ACGTACGT", "ATGTCGT", (2, 1, 0, 1)),
     ]
     measured = []
     for name, source, read, expected in cases:
