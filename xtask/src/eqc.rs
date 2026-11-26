@@ -92,6 +92,7 @@ struct Request {
     action: String,
     resource_id: String,
     subject_id: String,
+    evaluated_at: String,
     #[serde(default)]
     challenge_id: Option<String>,
     #[serde(default)]
@@ -292,6 +293,12 @@ fn validate_task(task: &Task, repository_root: &Path) -> anyhow::Result<()> {
     if !is_canonical_utc(&task.authority_snapshot.observed_at) {
         bail!("{}: observed_at must be canonical UTC RFC3339", task.task_id);
     }
+    if !is_canonical_utc(&task.request.evaluated_at) {
+        bail!("{}: evaluated_at must be canonical UTC RFC3339", task.task_id);
+    }
+    if task.authority_snapshot.observed_at > task.request.evaluated_at {
+        bail!("{}: authority snapshot cannot be observed after the request evaluation time", task.task_id);
+    }
     if let Some(valid_until) = task.authority_snapshot.valid_until.as_deref() {
         if !is_canonical_utc(valid_until) {
             bail!("{}: valid_until must be canonical UTC RFC3339", task.task_id);
@@ -381,7 +388,7 @@ fn reference_disposition(task: &Task) -> &'static str {
     let Some(valid_until) = authority.valid_until.as_deref() else {
         return "deny";
     };
-    if valid_until <= authority.observed_at.as_str() {
+    if valid_until <= request.evaluated_at.as_str() {
         return "deny";
     }
 
@@ -504,6 +511,13 @@ mod tests {
     fn malformed_timestamps_are_rejected_before_decision() {
         let mut task = seed_corpus().tasks.remove(0);
         task.authority_snapshot.observed_at = "not-a-date".into();
+        assert!(validate_task(&task, &repository_root()).is_err());
+    }
+
+    #[test]
+    fn future_authority_snapshot_is_not_used_for_an_earlier_request() {
+        let mut task = seed_corpus().tasks.remove(0);
+        task.authority_snapshot.observed_at = "2026-11-26T02:00:00Z".into();
         assert!(validate_task(&task, &repository_root()).is_err());
     }
 
