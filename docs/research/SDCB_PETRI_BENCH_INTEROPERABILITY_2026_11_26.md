@@ -10,6 +10,8 @@ For the current portal snapshot, GPT-5.6-Sol has 73/90 episodes and a 34% solved
 
 The v0.5 report's 540-episode results remain useful as a fully described archived evaluation: six frontier models × 30 tasks × three episodes. Its blind-value ablation and retraction must stay attached to those numbers.
 
+On the current v2 portal, the complete model rows include Claude Haiku 4.5 at 60.7 overall and Gemini 3.1 Pro at 58.0 overall (both 90 episodes); the other listed model rows remain partial with overall pending. The table is sorted by L1, not overall. The curated adaptive/OFAT reference values are separate reference conditions, and the blind-value OFAT ablation remains a critical caveat.
+
 ## 2. Why petri-bench changes our evaluation strategy
 
 petri-bench directly evaluates the scientific method of an agent rather than only rediscovery of a published result. Its working draft v0.5 describes procedural mystery worlds generated from deterministic simulation engines, a blind budgeted experiment interface, and an objective score computed from episode logs without an LLM judge in the headline metric.
