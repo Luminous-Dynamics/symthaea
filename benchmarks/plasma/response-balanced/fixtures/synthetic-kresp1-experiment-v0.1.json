@@ -18,7 +18,8 @@
     },
     "time_unit": "omega_pe^-1",
     "maximum_time": 30,
-    "state_metric_id": "nondimensionalized-phase-space-v1"
+    "state_metric_id": "nondimensionalized-phase-space-v1",
+    "state_coordinate_id": "vlasov-1d1v-phase-space-layout-v1"
   },
   "frozen_checkpoint": {
     "checkpoint_id": "synthetic-phase-mixed-checkpoint",
