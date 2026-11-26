@@ -17,7 +17,8 @@
       "velocity_unit": "v_th"
     },
     "time_unit": "omega_pe^-1",
-    "maximum_time": 30
+    "maximum_time": 30,
+    "state_metric_id": "nondimensionalized-phase-space-v1"
   },
   "frozen_checkpoint": {
     "checkpoint_id": "synthetic-phase-mixed-checkpoint",
@@ -306,5 +307,15 @@
     "adaptive_nitrom_port",
     "adaptive_opinf_nitrom_hybrid_port",
     "symmetry_augmented_kinetic_closure"
-  ]
+  ],
+  "linearization_contract": {
+    "status": "synthetic_derivatives_not_computed",
+    "derivative_source": "not_computed_synthetic",
+    "future_solver_transition_jacobians_required": true,
+    "pulse_map_state_jacobian_required": true,
+    "pulse_map_parameter_jacobian_required": true,
+    "split_solver_composition_order_required": true,
+    "independent_finite_difference_cross_check_required": true,
+    "branch_change_disposition": "UNKNOWN_OR_HANDOFF"
+  }
 }
