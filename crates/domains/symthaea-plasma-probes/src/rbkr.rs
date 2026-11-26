@@ -218,7 +218,7 @@ impl ResponseBalancedBasis {
 
         let (rotated_cross, right_vectors) =
             one_sided_jacobi_svd(cross, config.maximum_jacobi_sweeps, config.jacobi_tolerance)?;
-        let mut unsorted_singular_values = (0..reach_count)
+        let unsorted_singular_values = (0..reach_count)
             .map(|index| column_squared_norm(&rotated_cross, index).map(f64::sqrt))
             .collect::<Result<Vec<_>, _>>()?;
         if unsorted_singular_values
