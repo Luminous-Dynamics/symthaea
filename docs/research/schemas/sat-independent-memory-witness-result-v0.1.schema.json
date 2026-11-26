@@ -1,0 +1,177 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://luminousdynamics.io/schemas/sat-independent-memory-witness-result-v0.1.schema.json",
+  "title": "SAT Independent Memory Witness Result v0.1",
+  "type": "object",
+  "additionalProperties": false,
+  "required": [
+    "schema_version",
+    "run_id",
+    "case_id",
+    "sut_digest",
+    "memory_profile_digest",
+    "witness_profile_digest",
+    "quorum_size",
+    "required_quorum",
+    "independent_operator_count",
+    "state_id_digest",
+    "generation_before",
+    "generation_after",
+    "stale_state_served",
+    "conflicting_successor_committed",
+    "operation_outcome",
+    "reconciliation_state",
+    "witness_receipts",
+    "evidence_refs"
+  ],
+  "properties": {
+    "schema_version": {
+      "const": "sat-independent-memory-witness-result/v0.1"
+    },
+    "run_id": {
+      "type": "string",
+      "minLength": 1
+    },
+    "case_id": {
+      "type": "string",
+      "pattern": "^MW-[A-Z0-9-]+$"
+    },
+    "sut_digest": {
+      "type": "string",
+      "pattern": "^sha256:[a-f0-9]{64}$"
+    },
+    "memory_profile_digest": {
+      "type": "string",
+      "pattern": "^sha256:[a-f0-9]{64}$"
+    },
+    "witness_profile_digest": {
+      "type": "string",
+      "pattern": "^sha256:[a-f0-9]{64}$"
+    },
+    "quorum_size": {
+      "type": "integer",
+      "minimum": 1,
+      "maximum": 4
+    },
+    "required_quorum": {
+      "const": 3
+    },
+    "independent_operator_count": {
+      "type": "integer",
+      "minimum": 0,
+      "maximum": 4
+    },
+    "state_id_digest": {
+      "type": "string",
+      "pattern": "^sha256:[a-f0-9]{64}$"
+    },
+    "generation_before": {
+      "type": "integer",
+      "minimum": 0
+    },
+    "generation_after": {
+      "type": "integer",
+      "minimum": 0
+    },
+    "stale_state_served": {
+      "type": "boolean"
+    },
+    "conflicting_successor_committed": {
+      "type": "boolean"
+    },
+    "erased_record_served": {
+      "type": "boolean"
+    },
+    "operation_outcome": {
+      "enum": [
+        "committed",
+        "rejected",
+        "held",
+        "reconciled",
+        "ambiguous",
+        "not_evaluable"
+      ]
+    },
+    "reconciliation_state": {
+      "enum": [
+        "not_required",
+        "completed_to_witness",
+        "held_for_operator",
+        "failed"
+      ]
+    },
+    "witness_receipts": {
+      "type": "array",
+      "items": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": [
+          "operator_id",
+          "organization_id",
+          "generation",
+          "transition_digest",
+          "signature_verified"
+        ],
+        "properties": {
+          "operator_id": {
+            "type": "string",
+            "minLength": 1
+          },
+          "organization_id": {
+            "type": "string",
+            "minLength": 1
+          },
+          "generation": {
+            "type": "integer",
+            "minimum": 0
+          },
+          "transition_digest": {
+            "type": "string",
+            "pattern": "^sha256:[a-f0-9]{64}$"
+          },
+          "signature_verified": {
+            "type": "boolean"
+          }
+        }
+      }
+    },
+    "evidence_refs": {
+      "type": "array",
+      "minItems": 1,
+      "items": {
+        "type": "string",
+        "minLength": 1
+      }
+    },
+    "notes": {
+      "type": "array",
+      "items": {
+        "type": "string"
+      }
+    }
+  },
+  "allOf": [
+    {
+      "if": {
+        "properties": {
+          "operation_outcome": {
+            "const": "committed"
+          }
+        },
+        "required": [
+          "operation_outcome"
+        ]
+      },
+      "then": {
+        "properties": {
+          "quorum_size": {
+            "minimum": 3
+          },
+          "independent_operator_count": {
+            "minimum": 3
+          }
+        }
+      }
+    }
+  ]
+}
