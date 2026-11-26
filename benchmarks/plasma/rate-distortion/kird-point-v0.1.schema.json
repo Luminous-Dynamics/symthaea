@@ -1,0 +1,505 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://github.com/Luminous-Dynamics/symthaea/blob/main/benchmarks/plasma/rate-distortion/kird-point-v0.1.schema.json",
+  "title": "Kinetic Intervention Rate-Distortion point v0.1",
+  "description": "One candidate representation checkpoint measured against a declared kinetic intervention/QoI/horizon contract. This schema validates wire shape only; it does not establish physical convergence or a continuous worst-case response bound.",
+  "type": "object",
+  "additionalProperties": false,
+  "required": [
+    "schema_version",
+    "record_id",
+    "record_status",
+    "cohort",
+    "task_contract",
+    "candidate",
+    "storage",
+    "cost",
+    "distortion",
+    "physical_gates",
+    "response_scope",
+    "provenance"
+  ],
+  "properties": {
+    "schema_version": {
+      "const": "0.1"
+    },
+    "record_id": {
+      "type": "string",
+      "pattern": "^KIRD-[A-Z0-9][A-Z0-9._-]{0,58}$"
+    },
+    "record_status": {
+      "enum": [
+        "synthetic_fixture_only",
+        "physical_measurement"
+      ]
+    },
+    "cohort": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "equation",
+        "dimensions",
+        "normalization_id",
+        "boundary_id",
+        "initial_state_sha256",
+        "reference_solver_revision"
+      ],
+      "properties": {
+        "equation": {
+          "type": "string",
+          "minLength": 1
+        },
+        "dimensions": {
+          "type": "array",
+          "items": {
+            "type": "integer",
+            "minimum": 1
+          },
+          "minItems": 1,
+          "maxItems": 3
+        },
+        "normalization_id": {
+          "type": "string",
+          "minLength": 1
+        },
+        "boundary_id": {
+          "type": "string",
+          "minLength": 1
+        },
+        "initial_state_sha256": {
+          "type": "string",
+          "pattern": "^[0-9a-f]{64}$"
+        },
+        "reference_solver_revision": {
+          "type": "string",
+          "minLength": 1
+        }
+      }
+    },
+    "task_contract": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "contract_id",
+        "intervention_family_sha256",
+        "qoi_registry_sha256",
+        "horizon",
+        "time_unit",
+        "split_role",
+        "acquisition_allowed"
+      ],
+      "properties": {
+        "contract_id": {
+          "type": "string",
+          "minLength": 1
+        },
+        "intervention_family_sha256": {
+          "type": "string",
+          "pattern": "^[0-9a-f]{64}$"
+        },
+        "qoi_registry_sha256": {
+          "type": "string",
+          "pattern": "^[0-9a-f]{64}$"
+        },
+        "horizon": {
+          "type": "number",
+          "exclusiveMinimum": 0
+        },
+        "time_unit": {
+          "type": "string",
+          "minLength": 1
+        },
+        "split_role": {
+          "enum": [
+            "discovery",
+            "development",
+            "calibration",
+            "confirmation",
+            "sealed_test"
+          ]
+        },
+        "acquisition_allowed": {
+          "type": "boolean"
+        }
+      }
+    },
+    "candidate": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "representation_family",
+        "representation_revision",
+        "configuration_sha256"
+      ],
+      "properties": {
+        "representation_family": {
+          "type": "string",
+          "minLength": 1
+        },
+        "representation_revision": {
+          "type": "string",
+          "minLength": 1
+        },
+        "configuration_sha256": {
+          "type": "string",
+          "pattern": "^[0-9a-f]{64}$"
+        }
+      }
+    },
+    "storage": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "state_payload_bytes",
+        "basis_codec_metadata_bytes",
+        "coordinate_normalization_bytes",
+        "component_lineage_bytes",
+        "residual_memory_bytes",
+        "uncertainty_validity_bytes",
+        "provenance_contract_bytes",
+        "model_asset_bytes",
+        "decoder_asset_bytes",
+        "amortization_rollouts",
+        "peak_working_set_bytes"
+      ],
+      "properties": {
+        "state_payload_bytes": {
+          "type": "integer",
+          "minimum": 0
+        },
+        "basis_codec_metadata_bytes": {
+          "type": "integer",
+          "minimum": 0
+        },
+        "coordinate_normalization_bytes": {
+          "type": "integer",
+          "minimum": 0
+        },
+        "component_lineage_bytes": {
+          "type": "integer",
+          "minimum": 0
+        },
+        "residual_memory_bytes": {
+          "type": "integer",
+          "minimum": 0
+        },
+        "uncertainty_validity_bytes": {
+          "type": "integer",
+          "minimum": 0
+        },
+        "provenance_contract_bytes": {
+          "type": "integer",
+          "minimum": 0
+        },
+        "model_asset_bytes": {
+          "type": "integer",
+          "minimum": 0
+        },
+        "decoder_asset_bytes": {
+          "type": "integer",
+          "minimum": 0
+        },
+        "amortization_rollouts": {
+          "type": "integer",
+          "minimum": 1
+        },
+        "peak_working_set_bytes": {
+          "type": "integer",
+          "minimum": 0
+        }
+      }
+    },
+    "cost": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "encode_seconds",
+        "decode_seconds",
+        "advance_seconds",
+        "observe_seconds",
+        "transition_seconds",
+        "fallback_seconds",
+        "training_seconds",
+        "measured_rollouts"
+      ],
+      "properties": {
+        "encode_seconds": {
+          "type": "number",
+          "minimum": 0
+        },
+        "decode_seconds": {
+          "type": "number",
+          "minimum": 0
+        },
+        "advance_seconds": {
+          "type": "number",
+          "minimum": 0
+        },
+        "observe_seconds": {
+          "type": "number",
+          "minimum": 0
+        },
+        "transition_seconds": {
+          "type": "number",
+          "minimum": 0
+        },
+        "fallback_seconds": {
+          "type": "number",
+          "minimum": 0
+        },
+        "training_seconds": {
+          "type": "number",
+          "minimum": 0
+        },
+        "energy_joules": {
+          "type": "number",
+          "minimum": 0
+        },
+        "measured_rollouts": {
+          "type": "integer",
+          "minimum": 1
+        }
+      }
+    },
+    "distortion": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "microscopic",
+        "weak_observable",
+        "macroscopic_qoi",
+        "intervention_response",
+        "sensitivity"
+      ],
+      "properties": {
+        "microscopic": {
+          "$ref": "#/$defs/tier"
+        },
+        "weak_observable": {
+          "$ref": "#/$defs/tier"
+        },
+        "macroscopic_qoi": {
+          "$ref": "#/$defs/tier"
+        },
+        "intervention_response": {
+          "$ref": "#/$defs/response_tier"
+        },
+        "sensitivity": {
+          "$ref": "#/$defs/tier"
+        }
+      }
+    },
+    "physical_gates": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "status",
+        "gate_results"
+      ],
+      "properties": {
+        "status": {
+          "enum": [
+            "PASS",
+            "FAIL",
+            "UNKNOWN",
+            "UNSUPPORTED"
+          ]
+        },
+        "gate_results": {
+          "type": "array",
+          "items": {
+            "$ref": "#/$defs/gate"
+          }
+        }
+      }
+    },
+    "response_scope": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "coverage_kind",
+        "registered_probe_count",
+        "confirmed_probe_count",
+        "globally_bounded"
+      ],
+      "properties": {
+        "coverage_kind": {
+          "enum": [
+            "none",
+            "finite_empirical",
+            "certified_global"
+          ]
+        },
+        "registered_probe_count": {
+          "type": "integer",
+          "minimum": 0
+        },
+        "confirmed_probe_count": {
+          "type": "integer",
+          "minimum": 0
+        },
+        "globally_bounded": {
+          "type": "boolean"
+        },
+        "bound_method": {
+          "type": "string",
+          "minLength": 1
+        },
+        "bound_evidence_sha256": {
+          "type": "string",
+          "pattern": "^[0-9a-f]{64}$"
+        }
+      }
+    },
+    "provenance": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "candidate_output_sha256",
+        "run_receipt_sha256",
+        "analysis_revision",
+        "physical_execution_authorized"
+      ],
+      "properties": {
+        "candidate_output_sha256": {
+          "type": "string",
+          "pattern": "^[0-9a-f]{64}$"
+        },
+        "run_receipt_sha256": {
+          "type": "string",
+          "pattern": "^[0-9a-f]{64}$"
+        },
+        "analysis_revision": {
+          "type": "string",
+          "minLength": 1
+        },
+        "reference_bundle_sha256": {
+          "type": "string",
+          "pattern": "^[0-9a-f]{64}$"
+        },
+        "physical_execution_authorized": {
+          "type": "boolean"
+        }
+      }
+    }
+  },
+  "$defs": {
+    "tier": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "status"
+      ],
+      "properties": {
+        "status": {
+          "enum": [
+            "PASS",
+            "FAIL",
+            "UNKNOWN",
+            "UNSUPPORTED"
+          ]
+        },
+        "metric_id": {
+          "type": "string",
+          "minLength": 1
+        },
+        "observed_error": {
+          "type": "number",
+          "minimum": 0
+        },
+        "tolerance": {
+          "type": "number",
+          "exclusiveMinimum": 0
+        },
+        "normalized_error": {
+          "type": "number",
+          "minimum": 0
+        },
+        "evidence_sha256": {
+          "type": "string",
+          "pattern": "^[0-9a-f]{64}$"
+        }
+      }
+    },
+    "response_tier": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "status",
+        "missing_branch_count",
+        "misassociated_branch_count"
+      ],
+      "properties": {
+        "status": {
+          "enum": [
+            "PASS",
+            "FAIL",
+            "UNKNOWN",
+            "UNSUPPORTED"
+          ]
+        },
+        "worst_confirmed_normalized_error": {
+          "type": "number",
+          "minimum": 0
+        },
+        "complex_amplitude_error": {
+          "type": "number",
+          "minimum": 0
+        },
+        "wrapped_phase_error_rad": {
+          "type": "number",
+          "minimum": 0
+        },
+        "waveform_error": {
+          "type": "number",
+          "minimum": 0
+        },
+        "missing_branch_count": {
+          "type": "integer",
+          "minimum": 0
+        },
+        "misassociated_branch_count": {
+          "type": "integer",
+          "minimum": 0
+        },
+        "evidence_sha256": {
+          "type": "string",
+          "pattern": "^[0-9a-f]{64}$"
+        }
+      }
+    },
+    "gate": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "gate_id",
+        "status"
+      ],
+      "properties": {
+        "gate_id": {
+          "type": "string",
+          "minLength": 1
+        },
+        "status": {
+          "enum": [
+            "PASS",
+            "FAIL",
+            "UNKNOWN",
+            "UNSUPPORTED"
+          ]
+        },
+        "observed_value": {
+          "type": "number"
+        },
+        "tolerance": {
+          "type": "number",
+          "minimum": 0
+        },
+        "evidence_sha256": {
+          "type": "string",
+          "pattern": "^[0-9a-f]{64}$"
+        }
+      }
+    }
+  }
+}
