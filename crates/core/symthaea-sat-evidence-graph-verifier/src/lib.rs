@@ -1109,6 +1109,65 @@ mod tests {
     }
 
     #[test]
+    fn utf16_code_unit_order_controls_observation_sorting() {
+        let mut value = base();
+        value["observations"].as_array_mut().unwrap().push(json!({
+            "observation_id": "\u{e000}", "kind": "other", "artifact_ref": "artifact:test:e000",
+            "artifact_digest": format!("sha256:{}", "b".repeat(64)), "source_id": "source-e000",
+            "source_role": "other", "observed_at": "2026-11-26T12:00:00Z", "scope_ref": "scope:test",
+            "authenticity_state": "verified", "independence_state": "satisfied", "limitations": []
+        }));
+        value["observations"].as_array_mut().unwrap().push(json!({
+            "observation_id": "\u{10000}", "kind": "other", "artifact_ref": "artifact:test:10000",
+            "artifact_digest": format!("sha256:{}", "c".repeat(64)), "source_id": "source-10000",
+            "source_role": "other", "observed_at": "2026-11-26T12:00:00Z", "scope_ref": "scope:test",
+            "authenticity_state": "verified", "independence_state": "satisfied", "limitations": []
+        }));
+        let input = serde_json::to_string(&value).unwrap();
+        let raw = parse_strict_json(&input).unwrap();
+        let mut normalization_issues = Vec::new();
+        let graph = normalize_graph_payload(&raw, &mut normalization_issues).unwrap();
+        assert!(normalization_issues.is_empty());
+        let ids: Vec<_> = graph
+            .get("observations")
+            .unwrap()
+            .array()
+            .unwrap()
+            .iter()
+            .map(|item| field_string(item, "observation_id").unwrap().to_owned())
+            .collect();
+        assert_eq!(ids[0], "\u{10000}");
+        assert_eq!(ids[1], "\u{e000}");
+    }
+
+    #[test]
+    fn more_than_one_dependency_edge_for_same_pair_is_rejected() {
+        let mut value = base();
+        value["claims"].as_array_mut().unwrap().push(json!({
+            "claim_id": "claim-2", "claim_type": "other", "proposition": "Dependent claim",
+            "scope_ref": "scope:test", "status": "supported", "evidence_refs": ["obs-1"],
+            "depends_on": ["claim-1"], "validity_state": "current", "consequence_if_false": "low"
+        }));
+        value["claim_edges"] = json!([
+            {"from_claim_id":"claim-2","to_claim_id":"claim-1","relation":"depends_on","rule_ref":"rule:a"},
+            {"from_claim_id":"claim-2","to_claim_id":"claim-1","relation":"depends_on","rule_ref":"rule:b"}
+        ]);
+        seal(&mut value);
+        let report = verify_augmentation(&serde_json::to_string(&value).unwrap()).unwrap();
+        assert!(has_issue(&report, "duplicate_dependency_edge"));
+    }
+
+    #[test]
+    fn effect_claim_requires_independent_sink_readback() {
+        let mut value = base();
+        value["claims"][0]["claim_type"] = json!("effect_correspondence");
+        seal(&mut value);
+        let report = verify_augmentation(&serde_json::to_string(&value).unwrap()).unwrap();
+        assert!(has_issue(&report, "missing_claim_type_evidence"));
+        assert!(has_issue(&report, "effect_claim_without_independent_sink"));
+    }
+
+    #[test]
     fn recorded_root_mutation_is_detected() {
         let mut value = base();
         seal(&mut value);
