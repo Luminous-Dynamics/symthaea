@@ -141,3 +141,12 @@ The `temporal_projection` module tracks summaries, embeddings, preference models
 The index rejects registration against stale source events or non-current parent projections, applies transitions in contiguous sequence order, and produces deterministic invalidation receipts. It is an in-memory reference, not a durable registry or a distributed invalidation service. The erasure acknowledgement clears the in-memory projection commitments only; external index/cache/replica/backup deletion must be separately executed and verified.
 
 Protocol: [MACE Derived-Memory Invalidation V1](../../../docs/research/MACE_DERIVED_MEMORY_INVALIDATION_V1.md). Tests are authored but not executed.
+
+
+## Derived projection invalidation and rebuilds
+
+The `temporal_projection` module consumes the streaming ledger's scoped transition receipts and invalidates all derived projections that depended on affected source events. Invalidation cascades through parent-projection edges so a source correction can stale a summary and every plan/cache downstream of that summary. Quarantine, revocation and rights-erasure requests use progressively stronger non-current states; a later source revalidation does not reactivate an old derived artifact.
+
+New projections must be built under a new ID against current source events and current parent projections. The old projection is linked to its replacement using a separate derivation/rebuild receipt commitment. An erasure acknowledgement clears the content and dependency commitments in this in-memory index only; the external deletion receipt must be independently verified by the caller.
+
+Protocol: [MACE Derived-Memory Invalidation V1](../../../docs/research/MACE_DERIVED_MEMORY_INVALIDATION_V1.md). This is an in-memory reference index, not a durable dependency database or distributed invalidation service.
