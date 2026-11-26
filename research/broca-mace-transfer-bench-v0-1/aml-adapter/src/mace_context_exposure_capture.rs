@@ -865,6 +865,58 @@ mod tests {
     }
 
     #[test]
+    fn rejects_unclassified_provider_parameter_names() {
+        let mut request_parameters = BTreeMap::new();
+        request_parameters.insert(
+            "instructions".to_owned(),
+            MaceProviderStaticParameterV1::Bool(true),
+        );
+        let request = MaceProviderNeutralRequestV1 {
+            model: "test-model".to_owned(),
+            request_parameters,
+            messages: vec![MaceRequestMessageV1 {
+                role: MaceContextRoleV1::User,
+                segments: vec![MaceRequestSegmentV1 {
+                    text: "plain".to_owned(),
+                    origin: MaceRequestSegmentOriginV1::NonMemory,
+                }],
+            }],
+        };
+        assert_eq!(
+            serialize_mace_provider_request_with_exposure_map_v1(
+                &request, MaceMemoryArmV1::ConventionalRetrieval
+            ).unwrap_err(),
+            MaceExposureCaptureRejectV1::UnclassifiedProviderParameterKey
+        );
+    }
+
+    #[test]
+    fn rejects_provider_parameter_type_mismatch() {
+        let mut request_parameters = BTreeMap::new();
+        request_parameters.insert(
+            "stream".to_owned(),
+            MaceProviderStaticParameterV1::Number(serde_json::Number::from(1)),
+        );
+        let request = MaceProviderNeutralRequestV1 {
+            model: "test-model".to_owned(),
+            request_parameters,
+            messages: vec![MaceRequestMessageV1 {
+                role: MaceContextRoleV1::User,
+                segments: vec![MaceRequestSegmentV1 {
+                    text: "plain".to_owned(),
+                    origin: MaceRequestSegmentOriginV1::NonMemory,
+                }],
+            }],
+        };
+        assert_eq!(
+            serialize_mace_provider_request_with_exposure_map_v1(
+                &request, MaceMemoryArmV1::ConventionalRetrieval
+            ).unwrap_err(),
+            MaceExposureCaptureRejectV1::ProviderParameterTypeMismatch
+        );
+    }
+
+    #[test]
     fn artifact_profile_mismatch_is_rejected_before_transport() {
         struct WrongArtifactStore;
         impl MaceRequestBodyArtifactWriterV1 for WrongArtifactStore {
