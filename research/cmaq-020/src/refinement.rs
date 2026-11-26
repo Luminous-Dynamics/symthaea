@@ -643,6 +643,28 @@ mod tests {
             response_key: ResponseKey::new("probe_fast", "displacement", 1),
         };
         let mut ledger = ProbeBudgetLedger::new(&contract, 0).expect("valid zero budget");
+        let unregistered = BlindProbeRequest {
+            response_key: ResponseKey::new("probe_unregistered", "displacement", 1),
+            ..request.clone()
+        };
+        let unregistered_receipt = receipt(
+            "a",
+            "b",
+            unregistered.response_key.clone(),
+            0,
+            0,
+        );
+        assert!(
+            ledger
+                .charge_blind_probe(
+                    &current,
+                    &contract,
+                    &unregistered,
+                    &unregistered_receipt,
+                )
+                .is_err()
+        );
+        assert_eq!(ledger.spent_units(), 0);
         let bad_receipt = receipt("a", "b", request.response_key.clone(), 0, 1);
         assert!(
             ledger
