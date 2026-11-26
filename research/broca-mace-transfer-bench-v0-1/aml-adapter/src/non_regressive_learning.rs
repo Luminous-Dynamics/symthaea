@@ -147,15 +147,20 @@ pub enum LearningGateRejectV1 {
 pub struct LearningGateAssessmentV1 {
     pub disposition: LearningGateDispositionV1,
     /// Sum(after scores) - sum(before scores), in basis-point units.
-    /// Divide by the corresponding task count to obtain mean per-task change.
     pub stable_delta_sum_basis_points: Option<i128>,
     pub stable_task_count: u64,
     pub adaptation_delta_sum_basis_points: Option<i128>,
     pub adaptation_task_count: u64,
     pub maximum_stable_regression_basis_points: u16,
     pub minimum_adaptation_gain_basis_points: u16,
-    /// Verifier receipts in stable-before, stable-after, adaptation-before,
-    /// adaptation-after order. Empty for an inconclusive/unverified gate.
+    /// Exact four runs in stable-before, stable-after, adaptation-before,
+    /// adaptation-after order.
+    pub run_ids: Vec<String>,
+    pub run_receipt_sha256: Vec<String>,
+    pub task_set_sha256: Vec<String>,
+    pub candidate_state_sha256: Vec<String>,
+    /// Independent verification receipts in the same four-run order.
+    /// Empty only when the gate is inconclusive.
     pub verifier_ids: Vec<String>,
     pub verification_receipt_sha256: Vec<String>,
     pub assessment_sha256: String,
@@ -163,17 +168,42 @@ pub struct LearningGateAssessmentV1 {
 
 impl LearningGateAssessmentV1 {
     pub fn verify_integrity(&self) -> bool {
-        self.assessment_sha256 == assessment_digest(
-            self.disposition,
-            self.stable_delta_sum_basis_points,
-            self.stable_task_count,
-            self.adaptation_delta_sum_basis_points,
-            self.adaptation_task_count,
-            self.maximum_stable_regression_basis_points,
-            self.minimum_adaptation_gain_basis_points,
-            &self.verifier_ids,
-            &self.verification_receipt_sha256,
-        )
+        let run_vectors_valid = self.run_ids.len() == 4
+            && self.run_receipt_sha256.len() == 4
+            && self.task_set_sha256.len() == 4
+            && self.candidate_state_sha256.len() == 4
+            && self.run_ids.iter().all(|id| valid_atom(id, 512))
+            && self.run_ids.iter().collect::<std::collections::BTreeSet<_>>().len() == 4
+            && self.run_receipt_sha256.iter().all(|digest| validate_digest(digest).is_ok())
+            && self.task_set_sha256.iter().all(|digest| validate_digest(digest).is_ok())
+            && self.candidate_state_sha256.iter().all(|digest| validate_digest(digest).is_ok());
+        let verifier_vectors_valid =
+            if self.disposition == LearningGateDispositionV1::InconclusiveUnverifiedRun {
+                self.verifier_ids.is_empty() && self.verification_receipt_sha256.is_empty()
+            } else {
+                self.verifier_ids.len() == 4
+                    && self.verification_receipt_sha256.len() == 4
+                    && self.verifier_ids.iter().all(|id| valid_atom(id, 512))
+                    && self.verification_receipt_sha256.iter()
+                        .all(|digest| validate_digest(digest).is_ok())
+            };
+        run_vectors_valid
+            && verifier_vectors_valid
+            && self.assessment_sha256 == assessment_digest(
+                self.disposition,
+                self.stable_delta_sum_basis_points,
+                self.stable_task_count,
+                self.adaptation_delta_sum_basis_points,
+                self.adaptation_task_count,
+                self.maximum_stable_regression_basis_points,
+                self.minimum_adaptation_gain_basis_points,
+                &self.run_ids,
+                &self.run_receipt_sha256,
+                &self.task_set_sha256,
+                &self.candidate_state_sha256,
+                &self.verifier_ids,
+                &self.verification_receipt_sha256,
+            )
     }
 
     pub fn admits_learning_update(&self) -> bool {
@@ -237,15 +267,15 @@ pub fn evaluate_non_regressive_learning_v1(
     validate_task_pair(stable_before, stable_after)?;
     validate_task_pair(adaptation_before, adaptation_after)?;
 
-    let Some(verifier) = verifier else {
-        return Ok(inconclusive_assessment(policy));
-    };
     let runs = [stable_before, stable_after, adaptation_before, adaptation_after];
+    let Some(verifier) = verifier else {
+        return Ok(inconclusive_assessment(policy, &runs));
+    };
     let mut verifier_ids = Vec::with_capacity(4);
     let mut verification_digests = Vec::with_capacity(4);
     for run in runs {
         let Some(receipt) = verifier.verify_run(run) else {
-            return Ok(inconclusive_assessment(policy));
+            return Ok(inconclusive_assessment(policy, &runs));
         };
         if !valid_atom(&receipt.verifier_id, 512) {
             return Err(LearningGateRejectV1::InvalidVerifierReceipt);
@@ -287,6 +317,7 @@ pub fn evaluate_non_regressive_learning_v1(
         Some(adaptation_delta),
         adaptation_count,
         policy,
+        &runs,
         verifier_ids,
         verification_digests,
     ))
@@ -394,7 +425,10 @@ fn validate_policy(policy: LearningRetentionPolicyV1) -> Result<(), LearningGate
     Ok(())
 }
 
-fn inconclusive_assessment(policy: LearningRetentionPolicyV1) -> LearningGateAssessmentV1 {
+fn inconclusive_assessment(
+    policy: LearningRetentionPolicyV1,
+    runs: &[&LearningRunSnapshotV1; 4],
+) -> LearningGateAssessmentV1 {
     build_assessment(
         LearningGateDispositionV1::InconclusiveUnverifiedRun,
         None,
@@ -402,6 +436,7 @@ fn inconclusive_assessment(policy: LearningRetentionPolicyV1) -> LearningGateAss
         None,
         0,
         policy,
+        runs,
         Vec::new(),
         Vec::new(),
     )
@@ -414,9 +449,17 @@ fn build_assessment(
     adaptation_delta: Option<i128>,
     adaptation_count: u64,
     policy: LearningRetentionPolicyV1,
+    runs: &[&LearningRunSnapshotV1; 4],
     verifier_ids: Vec<String>,
     verification_digests: Vec<String>,
 ) -> LearningGateAssessmentV1 {
+    let run_ids = runs.iter().map(|run| run.run_id.clone()).collect::<Vec<_>>();
+    let run_receipt_sha256 = runs.iter()
+        .map(|run| run.run_receipt_sha256.clone()).collect::<Vec<_>>();
+    let task_set_sha256 = runs.iter()
+        .map(|run| run.task_set_sha256.clone()).collect::<Vec<_>>();
+    let candidate_state_sha256 = runs.iter()
+        .map(|run| run.candidate_state_sha256.clone()).collect::<Vec<_>>();
     let assessment_sha256 = assessment_digest(
         disposition,
         stable_delta,
@@ -424,6 +467,10 @@ fn build_assessment(
         adaptation_delta,
         adaptation_count,
         policy,
+        &run_ids,
+        &run_receipt_sha256,
+        &task_set_sha256,
+        &candidate_state_sha256,
         &verifier_ids,
         &verification_digests,
     );
@@ -435,6 +482,10 @@ fn build_assessment(
         adaptation_task_count: adaptation_count,
         maximum_stable_regression_basis_points: policy.maximum_stable_regression_basis_points,
         minimum_adaptation_gain_basis_points: policy.minimum_adaptation_gain_basis_points,
+        run_ids,
+        run_receipt_sha256,
+        task_set_sha256,
+        candidate_state_sha256,
         verifier_ids,
         verification_receipt_sha256: verification_digests,
         assessment_sha256,
@@ -458,6 +509,10 @@ fn assessment_digest(
     adaptation_delta: Option<i128>,
     adaptation_count: u64,
     policy: LearningRetentionPolicyV1,
+    run_ids: &[String],
+    run_receipt_sha256: &[String],
+    task_set_sha256: &[String],
+    candidate_state_sha256: &[String],
     verifier_ids: &[String],
     verification_digests: &[String],
 ) -> String {
@@ -470,6 +525,10 @@ fn assessment_digest(
     hasher.update(adaptation_count.to_be_bytes());
     hasher.update(policy.maximum_stable_regression_basis_points.to_be_bytes());
     hasher.update(policy.minimum_adaptation_gain_basis_points.to_be_bytes());
+    hash_strings(&mut hasher, run_ids);
+    hash_strings(&mut hasher, run_receipt_sha256);
+    hash_strings(&mut hasher, task_set_sha256);
+    hash_strings(&mut hasher, candidate_state_sha256);
     hash_strings(&mut hasher, verifier_ids);
     hash_strings(&mut hasher, verification_digests);
     hex_digest(hasher.finalize().as_slice())
