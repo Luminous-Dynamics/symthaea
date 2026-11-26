@@ -57,6 +57,9 @@ pub enum ObservationQuality {
 pub struct ObservationRecord {
     pub observation_id: String,
     pub source_id: String,
+    /// Monotonic sequence assigned by this source when the state was captured.
+    /// It may arrive out of order relative to receiver ingest_sequence.
+    pub source_sequence: u64,
     pub ingest_sequence: u64,
     pub event_time: ClockStamp,
     pub acquired_time: ClockStamp,
@@ -180,6 +183,8 @@ pub enum ObserverError {
     ClockDomainMissing,
     AcquisitionBeforeEvent,
     SourceClockRegression,
+    DuplicateSourceSequence,
+    MixedObservationSources,
     StateProfileMismatch,
     NonFiniteState,
     InvalidConfiguration,
@@ -265,6 +270,7 @@ pub struct Abstention {
 
 #[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
 pub struct AdjacentSimilarity {
+    pub source_id: String,
     pub earlier_observation_id: String,
     pub later_observation_id: String,
     pub cosine_similarity: f32,
@@ -275,6 +281,7 @@ pub struct AdjacentSimilarity {
 #[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
 pub struct EncodedStateDigest {
     pub observation_id: String,
+    pub source_sequence: u64,
     pub hdc_vector_sha256: String,
 }
 
@@ -318,6 +325,7 @@ pub struct ObserverReport {
     pub observer_profile_sha256: String,
     pub scheduled_observation_n: usize,
     pub admitted_observation_n: usize,
+    pub ingest_order_reversal_n: usize,
     pub stale_observation_n: usize,
     pub unknown_observation_n: usize,
     pub disputed_observation_n: usize,
@@ -353,6 +361,11 @@ pub fn observe(
         .observations
         .iter()
         .filter(|row| row.quality == ObservationQuality::Disputed)
+        .count();
+    let ingest_order_reversal_n = snapshot
+        .observations
+        .windows(2)
+        .filter(|pair| pair[1].source_sequence < pair[0].source_sequence)
         .count();
     let admitted_n = snapshot
         .observations
@@ -399,6 +412,7 @@ pub fn observe(
             observer_profile_sha256: observer_profile_sha256.clone(),
             scheduled_observation_n: snapshot.observations.len(),
             admitted_observation_n: admitted_n,
+            ingest_order_reversal_n,
             stale_observation_n: stale_n,
             unknown_observation_n: unknown_n,
             disputed_observation_n: disputed_n,
@@ -421,9 +435,11 @@ pub fn observe(
 
     let genesis = GenesisSeed::from_phrase(GENESIS_PHRASE);
     let mut encoder = ManipulatorHdcEncoder::new(&genesis, config.hdc_levels);
-    let mut encoded = Vec::with_capacity(snapshot.observations.len());
-    let mut encoded_state_digests = Vec::with_capacity(snapshot.observations.len());
-    for row in &snapshot.observations {
+    let mut source_order = snapshot.observations.iter().collect::<Vec<_>>();
+    source_order.sort_by_key(|row| row.source_sequence);
+    let mut encoded = Vec::with_capacity(source_order.len());
+    let mut encoded_state_digests = Vec::with_capacity(source_order.len());
+    for row in &source_order {
         let vector = encoder.encode(&row.state);
         let mut vector_bytes = Vec::with_capacity(vector.as_slice().len() * 4);
         for value in vector.as_slice() {
@@ -431,6 +447,7 @@ pub fn observe(
         }
         encoded_state_digests.push(EncodedStateDigest {
             observation_id: row.observation_id.clone(),
+            source_sequence: row.source_sequence,
             hdc_vector_sha256: sha256_hex(&vector_bytes),
         });
         encoded.push(vector);
@@ -439,10 +456,11 @@ pub fn observe(
     let mut adjacent = Vec::with_capacity(encoded.len().saturating_sub(1));
     for index in 1..encoded.len() {
         adjacent.push(AdjacentSimilarity {
-            earlier_observation_id: snapshot.observations[index - 1]
+            source_id: source_order[index].source_id.clone(),
+            earlier_observation_id: source_order[index - 1]
                 .observation_id
                 .clone(),
-            later_observation_id: snapshot.observations[index].observation_id.clone(),
+            later_observation_id: source_order[index].observation_id.clone(),
             cosine_similarity: encoded[index - 1].similarity(&encoded[index]),
         });
     }
@@ -465,9 +483,9 @@ pub fn observe(
         mean_adjacent_similarity: mean_similarity,
     };
 
-    let last = snapshot
-        .observations
+    let last = source_order
         .last()
+        .copied()
         .ok_or(ObserverError::EmptyObservationSet)?;
     let horizon_ns =
         i64::try_from(config.forecast_horizon_ns).map_err(|_| ObserverError::ForecastHorizonOverflow)?;
@@ -543,15 +561,19 @@ fn validate_snapshot(snapshot: &EpisodeSnapshot) -> Result<(), ObserverError> {
     }
 
     let mut observation_ids = BTreeSet::new();
+    let mut source_sequences = BTreeSet::new();
     let mut previous_ingest_sequence = None;
-    let mut last_event_by_clock: BTreeMap<&str, i64> = BTreeMap::new();
-    let mut last_acquisition_by_clock: BTreeMap<&str, i64> = BTreeMap::new();
+    let mut source_ids = BTreeSet::new();
     for row in &snapshot.observations {
         if row.observation_id.trim().is_empty()
             || row.source_id.trim().is_empty()
             || !observation_ids.insert(row.observation_id.as_str())
         {
             return Err(ObserverError::DuplicateObservationId);
+        }
+        source_ids.insert(row.source_id.as_str());
+        if !source_sequences.insert(row.source_sequence) {
+            return Err(ObserverError::DuplicateSourceSequence);
         }
         if row.ingest_sequence > snapshot.decision_cut_sequence {
             return Err(ObserverError::ObservationBeyondDecisionCut);
@@ -572,6 +594,27 @@ fn validate_snapshot(snapshot: &EpisodeSnapshot) -> Result<(), ObserverError> {
         {
             return Err(ObserverError::AcquisitionBeforeEvent);
         }
+        if row.state_profile_id != MANIPULATOR_STATE_PROFILE_ID
+            || row.units_profile_id != MANIPULATOR_UNITS_PROFILE_ID
+            || row.coordinate_frame_id.trim().is_empty()
+        {
+            return Err(ObserverError::StateProfileMismatch);
+        }
+        if !row.state.is_finite() {
+            return Err(ObserverError::NonFiniteState);
+        }
+    }
+    if source_ids.len() != 1 {
+        return Err(ObserverError::MixedObservationSources);
+    }
+
+    // A late-arriving record is not a clock failure. Validate timestamp
+    // monotonicity in source-capture order, not receiver-ingest order.
+    let mut source_order = snapshot.observations.iter().collect::<Vec<_>>();
+    source_order.sort_by_key(|row| row.source_sequence);
+    let mut last_event_by_clock: BTreeMap<&str, i64> = BTreeMap::new();
+    let mut last_acquisition_by_clock: BTreeMap<&str, i64> = BTreeMap::new();
+    for row in source_order {
         if let Some(previous) = last_event_by_clock.insert(
             row.event_time.clock_domain_id.as_str(),
             row.event_time.ticks_ns,
@@ -587,15 +630,6 @@ fn validate_snapshot(snapshot: &EpisodeSnapshot) -> Result<(), ObserverError> {
             if row.acquired_time.ticks_ns < previous {
                 return Err(ObserverError::SourceClockRegression);
             }
-        }
-        if row.state_profile_id != MANIPULATOR_STATE_PROFILE_ID
-            || row.units_profile_id != MANIPULATOR_UNITS_PROFILE_ID
-            || row.coordinate_frame_id.trim().is_empty()
-        {
-            return Err(ObserverError::StateProfileMismatch);
-        }
-        if !row.state.is_finite() {
-            return Err(ObserverError::NonFiniteState);
         }
     }
 
@@ -622,6 +656,7 @@ mod tests {
         ObservationRecord {
             observation_id: id.to_owned(),
             source_id: "simulator-sensor-0".to_owned(),
+            source_sequence: ingest_sequence,
             ingest_sequence,
             event_time: ClockStamp {
                 clock_domain_id: "robot-clock".to_owned(),
