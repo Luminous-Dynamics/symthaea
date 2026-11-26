@@ -8,6 +8,7 @@
     "schema_version",
     "campaign_id",
     "benchmark_method_revision",
+    "evaluation_scope",
     "profile_document_revision",
     "infrastructure_profiles",
     "scenario_profiles",
@@ -344,6 +345,9 @@
           }
         }
       }
+    },
+    "evaluation_scope": {
+      "const": "metric_specific_partial"
     }
   },
   "$defs": {
