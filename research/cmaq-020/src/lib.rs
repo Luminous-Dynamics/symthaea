@@ -48,7 +48,9 @@ impl StateResponseContract {
         if self.contract_id.trim().is_empty() {
             return Err("contract_id must be non-empty".to_owned());
         }
-        if self.intervention_ids.is_empty() || self.intervention_ids.iter().any(|id| id.trim().is_empty()) {
+        if self.intervention_ids.is_empty()
+            || self.intervention_ids.iter().any(|id| id.trim().is_empty())
+        {
             return Err("intervention set must be non-empty with non-empty IDs".to_owned());
         }
         if self.query_ids.is_empty() || self.query_ids.iter().any(|id| id.trim().is_empty()) {
@@ -64,9 +66,16 @@ impl StateResponseContract {
         let expected = self.expected_keys();
         let supplied: BTreeSet<_> = self.tolerance_units.keys().cloned().collect();
         if supplied != expected {
-            return Err("tolerance keys must exactly cover the intervention × query × horizon contract".to_owned());
+            return Err(
+                "tolerance keys must exactly cover the intervention × query × horizon contract"
+                    .to_owned(),
+            );
         }
-        if self.tolerance_units.values().any(|tolerance| *tolerance == 0) {
+        if self
+            .tolerance_units
+            .values()
+            .any(|tolerance| *tolerance == 0)
+        {
             return Err("response tolerances must be positive".to_owned());
         }
         Ok(())
@@ -91,11 +100,17 @@ impl StateResponseRecord {
         }
         let supplied_invariants: BTreeSet<_> = self.invariant_signature.keys().cloned().collect();
         if supplied_invariants != contract.invariant_ids {
-            return Err(format!("state {} has incomplete or unexpected invariant fields", self.state_id));
+            return Err(format!(
+                "state {} has incomplete or unexpected invariant fields",
+                self.state_id
+            ));
         }
         let supplied_responses: BTreeSet<_> = self.responses.keys().cloned().collect();
         if supplied_responses != contract.expected_keys() {
-            return Err(format!("state {} has incomplete or out-of-contract response coverage", self.state_id));
+            return Err(format!(
+                "state {} has incomplete or out-of-contract response coverage",
+                self.state_id
+            ));
         }
         Ok(())
     }
@@ -265,9 +280,15 @@ mod tests {
         let contract = contract();
         let left = record("raw-a", "compressed-1", 0, 2);
         let right = record("raw-b", "compressed-1", 0, 2);
-        assert!(assess_pair(&left, &right, &contract).expect("valid pair").exact_equivalent);
+        assert!(
+            assess_pair(&left, &right, &contract)
+                .expect("valid pair")
+                .exact_equivalent
+        );
         assert_eq!(
-            score_abstraction(&[left, right], &contract).expect("valid fixture").false_merges,
+            score_abstraction(&[left, right], &contract)
+                .expect("valid fixture")
+                .false_merges,
             0
         );
     }
@@ -296,7 +317,11 @@ mod tests {
         let contract = contract();
         let left = record("raw-a", "same-compressed-state", 0, 2);
         let right = record("raw-b", "same-compressed-state", 0, 3);
-        assert!(!assess_pair(&left, &right, &contract).expect("valid pair").exact_equivalent);
+        assert!(
+            !assess_pair(&left, &right, &contract)
+                .expect("valid pair")
+                .exact_equivalent
+        );
         assert_eq!(
             score_abstraction(&[left, right], &contract).expect("valid fixture").false_merges,
             1
@@ -311,7 +336,9 @@ mod tests {
         let c = record("c", "c", 16, 2);
         assert!(approximate_response_equivalent(&a, &b, &contract, 1.0).expect("valid comparison"));
         assert!(approximate_response_equivalent(&b, &c, &contract, 1.0).expect("valid comparison"));
-        assert!(!approximate_response_equivalent(&a, &c, &contract, 1.0).expect("valid comparison"));
+        assert!(
+            !approximate_response_equivalent(&a, &c, &contract, 1.0).expect("valid comparison")
+        );
     }
 
     #[test]
@@ -322,14 +349,20 @@ mod tests {
         assert!(missing.validate_against(&contract).is_err());
 
         let mut extra = record("raw-b", "state-b", 0, 2);
-        extra.responses.insert(ResponseKey::new("unknown", "displacement", 1), 0);
+        extra
+            .responses
+            .insert(ResponseKey::new("unknown", "displacement", 1), 0);
         assert!(extra.validate_against(&contract).is_err());
     }
 
     #[test]
     fn contract_rejects_zero_tolerance_and_incomplete_grid() {
         let mut invalid = contract();
-        let key = invalid.expected_keys().into_iter().next().expect("nonempty");
+        let key = invalid
+            .expected_keys()
+            .into_iter()
+            .next()
+            .expect("nonempty");
         invalid.tolerance_units.insert(key, 0);
         assert!(invalid.validate().is_err());
 
