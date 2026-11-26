@@ -235,7 +235,7 @@ pub struct VerificationReport {
     pub recorded_graph_root_digest: String,
     pub graph_root_matches: bool,
     pub semantic_valid: bool,
-    pub verified: bool,
+    pub graph_integrity_passed: bool,
     /// Always false: graph verification is not system qualification.
     pub qualification_assessed: bool,
     pub qualification_boundary: String,
@@ -479,6 +479,10 @@ pub fn compute_evidence_graph_root(input: &str) -> Result<String, String> {
     let mut canonical = String::new();
     canonical_json(&graph_payload, &mut canonical);
     Ok(sha256_domain(GRAPH_DOMAIN, &canonical))
+}
+
+fn is_one_of(value: &str, allowed: &[&str]) -> bool {
+    allowed.contains(&value)
 }
 
 fn valid_sha256(value: &str) -> bool {
@@ -742,6 +746,58 @@ pub fn verify_augmentation(input: &str) -> Result<VerificationReport, String> {
                 format!("duplicate observation ID {}", observation.observation_id),
             );
         }
+        if !is_one_of(
+            &observation.kind,
+            &[
+                "native_trace", "authority_decision", "disclosure_decision",
+                "external_effect_readback", "source_attestation", "transparency_receipt",
+                "checkpoint", "witness_attestation", "auditor_finding",
+                "human_adjudication", "other",
+            ],
+        ) {
+            issue(
+                &mut issues,
+                "unknown_observation_kind",
+                format!("observations[{index}].kind"),
+                "observation kind is outside the SAT v0.1 vocabulary",
+            );
+        }
+        if !is_one_of(
+            &observation.source_role,
+            &[
+                "subject", "benchmark_harness", "native_grader", "independent_sink",
+                "independent_witness", "evaluator", "human_adjudicator", "other",
+            ],
+        ) {
+            issue(
+                &mut issues,
+                "unknown_observation_source_role",
+                format!("observations[{index}].source_role"),
+                "source role is outside the SAT v0.1 vocabulary",
+            );
+        }
+        if !is_one_of(
+            &observation.authenticity_state,
+            &["verified", "invalid", "unknown", "not_applicable"],
+        ) {
+            issue(
+                &mut issues,
+                "unknown_authenticity_state",
+                format!("observations[{index}].authenticity_state"),
+                "authenticity state is outside the SAT v0.1 vocabulary",
+            );
+        }
+        if !is_one_of(
+            &observation.independence_state,
+            &["satisfied", "not_satisfied", "unverified", "not_applicable"],
+        ) {
+            issue(
+                &mut issues,
+                "unknown_independence_state",
+                format!("observations[{index}].independence_state"),
+                "independence state is outside the SAT v0.1 vocabulary",
+            );
+        }
         if !valid_sha256(&observation.artifact_digest) {
             issue(
                 &mut issues,
@@ -773,6 +829,52 @@ pub fn verify_augmentation(input: &str) -> Result<VerificationReport, String> {
             );
         }
         claim_ids.insert(claim.claim_id.clone());
+
+        if !is_one_of(
+            &claim.claim_type,
+            &[
+                "native_task_outcome", "authority", "disclosure", "effect_correspondence",
+                "evidence_authenticity", "transparency_continuity", "witness_independence",
+                "isolation", "auditor_finding", "change_continuity", "human_agency", "other",
+            ],
+        ) {
+            issue(
+                &mut issues,
+                "unknown_claim_type",
+                format!("claims[{index}].claim_type"),
+                "claim type is outside the SAT v0.1 vocabulary",
+            );
+        }
+        if !is_one_of(
+            &claim.status,
+            &["supported", "refuted", "inconclusive", "invalid_evidence", "withdrawn"],
+        ) {
+            issue(
+                &mut issues,
+                "unknown_claim_status",
+                format!("claims[{index}].status"),
+                "claim status is outside the SAT v0.1 vocabulary",
+            );
+        }
+        if !is_one_of(&claim.validity_state, &["current", "stale", "expired", "unknown"]) {
+            issue(
+                &mut issues,
+                "unknown_claim_validity_state",
+                format!("claims[{index}].validity_state"),
+                "claim validity state is outside the SAT v0.1 vocabulary",
+            );
+        }
+        if !is_one_of(
+            &claim.consequence_if_false,
+            &["critical", "high", "medium", "low", "informational"],
+        ) {
+            issue(
+                &mut issues,
+                "unknown_claim_consequence",
+                format!("claims[{index}].consequence_if_false"),
+                "claim consequence is outside the SAT v0.1 vocabulary",
+            );
+        }
 
         for (field, values) in [
             ("evidence_refs", &claim.evidence_refs),
@@ -841,6 +943,25 @@ pub fn verify_augmentation(input: &str) -> Result<VerificationReport, String> {
                 "unknown_edge_target",
                 format!("claim_edges[{index}].to_claim_id"),
                 format!("claim {} does not exist", edge.to_claim_id),
+            );
+        }
+        if !is_one_of(
+            &edge.relation,
+            &["depends_on", "supports", "refutes", "supersedes", "invalidated_by"],
+        ) {
+            issue(
+                &mut issues,
+                "unknown_edge_relation",
+                format!("claim_edges[{index}].relation"),
+                "edge relation is outside the SAT v0.1 vocabulary",
+            );
+        }
+        if edge.rule_ref.as_ref().is_some_and(String::is_empty) {
+            issue(
+                &mut issues,
+                "empty_edge_rule_reference",
+                format!("claim_edges[{index}].rule_ref"),
+                "rule_ref must be non-empty when present",
             );
         }
         let key = (
@@ -935,7 +1056,7 @@ pub fn verify_augmentation(input: &str) -> Result<VerificationReport, String> {
     let semantic_valid = issues
         .iter()
         .all(|entry| entry.code != "graph_root_mismatch");
-    let verified = semantic_valid && graph_root_matches && valid_sha256(&augmentation.evidence_graph_root_digest);
+    let graph_integrity_passed = semantic_valid && graph_root_matches && valid_sha256(&augmentation.evidence_graph_root_digest);
     let _top_level_metadata = (
         &augmentation.created_at,
         &augmentation.native_benchmark,
@@ -964,7 +1085,7 @@ pub fn verify_augmentation(input: &str) -> Result<VerificationReport, String> {
         recorded_graph_root_digest: augmentation.evidence_graph_root_digest,
         graph_root_matches,
         semantic_valid,
-        verified,
+        graph_integrity_passed,
         qualification_assessed: false,
         qualification_boundary: "Graph structure and restricted root commitment only; not cryptographic authenticity, independence proof, effect truth or system qualification.".to_owned(),
         issues,
@@ -1032,7 +1153,7 @@ mod tests {
         let mut value = base();
         seal(&mut value);
         let report = verify_augmentation(&serde_json::to_string(&value).unwrap()).unwrap();
-        assert!(report.verified, "{:?}", report.issues);
+        assert!(report.graph_integrity_passed, "{:?}", report.issues);
         assert_eq!(report.supported_claim_count, 1);
         assert_eq!(report.admissible_supported_claim_count, 1);
         assert_eq!(
@@ -1075,7 +1196,7 @@ mod tests {
         value["claims"][0]["evidence_refs"] = json!(["obs-missing"]);
         seal(&mut value);
         let report = verify_augmentation(&serde_json::to_string(&value).unwrap()).unwrap();
-        assert!(!report.verified);
+        assert!(!report.graph_integrity_passed);
         assert!(has_issue(&report, "dangling_evidence_reference"));
     }
 
