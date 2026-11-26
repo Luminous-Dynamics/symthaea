@@ -4,6 +4,7 @@ use sha2::{Digest, Sha256};
 use std::collections::HashSet;
 use std::fs;
 use std::path::{Component, Path};
+use serde_json::Value;
 
 const CORPUS_SCHEMA: &str = "luminous.eqc.seed-corpus.v0.1";
 const TASK_SCHEMA: &str = "luminous.eqc.task.v0.1";
@@ -40,7 +41,6 @@ struct Task {
     statement: String,
     actor: Actor,
     subject: Subject,
-    #[serde(default)]
     input_refs: Vec<InputRef>,
     authority_snapshot: AuthoritySnapshot,
     request: Request,
@@ -328,6 +328,9 @@ fn validate_task(task: &Task, repository_root: &Path) -> anyhow::Result<()> {
     if task.expected.state_mutation_count != 0 || !task.expected.state_must_remain_unchanged {
         bail!("{}: public authorization seed must assert zero state mutations", task.task_id);
     }
+    if task.input_refs.is_empty() {
+        bail!("{}: every EQC task must bind at least one input artifact", task.task_id);
+    }
     if task.expected.disposition == "deny" && task.negative_controls.is_empty() {
         bail!("{}: denied task must name a negative control", task.task_id);
     }
@@ -373,11 +376,115 @@ fn validate_task(task: &Task, repository_root: &Path) -> anyhow::Result<()> {
         if observed_digest != input.sha256 {
             bail!("{}: SHA-256 mismatch for input '{}'", task.task_id, input.input_id);
         }
+        validate_synthetic_input(task, input, &input_bytes)?;
     }
     if task.request.action == "challenge.consume"
         && (task.request.challenge_id.is_none() || task.request.challenge_state.is_none())
     {
         bail!("{}: challenge consumption needs challenge id and state", task.task_id);
+    }
+    Ok(())
+}
+
+fn validate_synthetic_input(
+    task: &Task,
+    input: &InputRef,
+    bytes: &[u8],
+) -> anyhow::Result<()> {
+    let artifact: Value = serde_json::from_slice(bytes)
+        .with_context(|| format!("{}: parse synthetic input '{}'", task.task_id, input.input_id))?;
+
+    let get = |field: &str| -> anyhow::Result<&str> {
+        artifact
+            .get(field)
+            .and_then(Value::as_str)
+            .with_context(|| {
+                format!(
+                    "{}: synthetic input '{}' is missing string field '{}'",
+                    task.task_id, input.input_id, field
+                )
+            })
+    };
+
+    match input.input_id.as_str() {
+        "synthetic-consent-001" | "synthetic-consent-revoked-001" => {
+            if get("schema")? != "luminous.eqc.synthetic-consent.v0.1"
+                || get("consent_id")? != input.input_id
+                || Some(get("principal_id")?) != task.authority_snapshot.principal_id.as_deref()
+                || Some(get("subject_id")?) != task.authority_snapshot.subject_id.as_deref()
+                || get("status")? != task.authority_snapshot.status
+            {
+                bail!(
+                    "{}: consent fixture '{}' does not match the authority snapshot",
+                    task.task_id, input.input_id
+                );
+            }
+
+            let fixture_scopes = artifact
+                .get("scopes")
+                .and_then(Value::as_array)
+                .with_context(|| {
+                    format!("{}: consent fixture '{}' has no scopes array", task.task_id, input.input_id)
+                })?
+                .iter()
+                .map(|scope| {
+                    scope.as_str().map(str::to_owned).with_context(|| {
+                        format!("{}: consent fixture scopes must be strings", task.task_id)
+                    })
+                })
+                .collect::<anyhow::Result<Vec<_>>>()?;
+
+            if fixture_scopes != task.authority_snapshot.scopes
+                || Some(get("valid_until")?) != task.authority_snapshot.valid_until.as_deref()
+                || get("valid_from")? > task.request.evaluated_at.as_str()
+            {
+                bail!(
+                    "{}: consent fixture '{}' disagrees with scopes or temporal bounds",
+                    task.task_id, input.input_id
+                );
+            }
+
+            match task.authority_snapshot.status.as_str() {
+                "active" if artifact.get("revoked_at").is_none() => {}
+                "revoked" => {
+                    let revoked_at = get("revoked_at")?;
+                    if !is_canonical_utc(revoked_at) || revoked_at > task.request.evaluated_at {
+                        bail!(
+                            "{}: revoked consent fixture '{}' has invalid revocation time",
+                            task.task_id, input.input_id
+                        );
+                    }
+                }
+                _ => bail!(
+                    "{}: consent fixture '{}' uses an unsupported authority state",
+                    task.task_id, input.input_id
+                ),
+            }
+        }
+        "synthetic-challenge-001" => {
+            if get("schema")? != "luminous.eqc.synthetic-challenge.v0.1"
+                || Some(get("challenge_id")?) != task.request.challenge_id.as_deref()
+                || get("issuer_id")? != task.actor.actor_id
+                || get("subject_id")? != task.subject.subject_id
+                || get("state")? != task.request.challenge_state.as_deref().unwrap_or("")
+            {
+                bail!(
+                    "{}: challenge fixture '{}' does not match the request",
+                    task.task_id, input.input_id
+                );
+            }
+            let consumed_at = get("consumed_at")?;
+            if !is_canonical_utc(consumed_at) || consumed_at > task.request.evaluated_at {
+                bail!(
+                    "{}: consumed challenge fixture '{}' has invalid consumption time",
+                    task.task_id, input.input_id
+                );
+            }
+        }
+        other => bail!(
+            "{}: unsupported synthetic input identifier '{}'",
+            task.task_id, other
+        ),
     }
     Ok(())
 }
