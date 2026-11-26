@@ -10,6 +10,11 @@
     "case_id",
     "benchmark_method_revision",
     "sut_digest",
+    "boundary_kind",
+    "scenario_profiles",
+    "infrastructure_profiles",
+    "profile_manifest_ref",
+    "profile_manifest_digest",
     "memory_component_digest",
     "runtime_digest",
     "store_backend_digest",
@@ -160,6 +165,29 @@
       "items": {
         "type": "string"
       }
+    },
+    "profile_manifest_digest": {
+      "$ref": "#/$defs/digest"
+    },
+    "profile_manifest_ref": {
+      "type": "string",
+      "minLength": 1
+    },
+    "infrastructure_profiles": {
+      "const": [
+        "foundation_model",
+        "interaction_access_layer",
+        "execution_and_scheduling",
+        "underlying_infrastructure"
+      ]
+    },
+    "scenario_profiles": {
+      "const": [
+        "personalized_long_term_memory_agent"
+      ]
+    },
+    "boundary_kind": {
+      "const": "store_boundary"
     }
   },
   "$defs": {
