@@ -32,7 +32,7 @@ Each evaluator-owned record binds:
 - candidate-predicted outcome;
 - optional boundary pair identity, lower/upper side and preregistered perturbation value.
 
-A failure signature contains a stable reason ID, stage ID and zero-based stage index. Stage IDs and reason IDs are vocabulary entries fixed by the task contract before evaluation. Candidate predictions are stored separately from reference labels at the runner boundary; the candidate must never receive evaluator truth.
+A failure signature carries an optional reason ID, optional stage ID and optional zero-based stage index. A missing reason represents WorldFailBench's Unjudgable / indeterminate category; a missing stage ID and index together represent an unknown decisive stage. These observations remain in the reference-failure denominator. Known reason/stage IDs are vocabulary entries fixed by the task contract before evaluation. Candidate predictions are stored separately from reference labels at the runner boundary; the candidate must never receive evaluator truth.
 
 A boundary pair contains exactly two records: lower and upper perturbation of the same initial state and same realized action in the same environment family, domain and independent cluster. The candidate checkpoint must be identical. The lower perturbation value must be strictly less than the upper value.
 
@@ -46,8 +46,8 @@ Let the evaluator reference be y and candidate prediction be y-hat.
 - False success: reference is a failure but candidate predicts success.
 - Failure capture recall: candidate predicts failure on reference-failure cases / reference-failure cases.
 - False-success rate: false successes / reference-failure cases.
-- Reason accuracy: exact reason match / reference-failure cases. A predicted success on a reference failure scores as incorrect.
-- Stage accuracy: exact stage ID and stage index match / reference-failure cases. A predicted success on a reference failure scores as incorrect.
+- Reason accuracy: exact known/unknown reason match / reference-failure cases. Unjudgable is not dropped or coerced into a known class. A candidate inventing a reason for an indeterminate reference, or abstaining on a known reason, is scored as a mismatch; predicted success is also incorrect.
+- Stage accuracy: exact known/unknown stage ID and index match / reference-failure cases. Unknown reference stages remain in the denominator; a candidate guessing a specific stage where the reference is unknown (or abstaining where it is known) is a mismatch.
 - Reference success count and false failure: candidate predicts failure where the reference succeeded.
 - False-failure rate: false failures / reference-success cases.
 - Boundary flip accuracy: fraction of boundary pairs where candidate correctly predicts whether crossing the preregistered perturbation interval changes success to failure or vice versa.
@@ -100,11 +100,20 @@ The current API still does not reproduce the original WorldFailBench boundary sc
 
 ## WorldFailBench
 
-WorldFailBench asks whether world models reproduce the observable reason a robot policy fails, the execution stage at which it fails, and the conditions under which a controlled scene change turns success into failure. It evaluates manipulation in LIBERO and RoboTwin and includes real-world G1 manipulation. Its paper reports substantial failure-fidelity gaps across seven tested world models.
+WorldFailBench asks whether world models reproduce the observable reason a robot policy fails, the execution stage at which it fails, and the conditions under which a controlled scene change turns success into failure. Its paper scope covers seven world models, 32 tasks and 6,900 reference rollouts across LIBERO, RoboTwin and physical G1 manipulation.
 
-CMAQ-020 uses these dimensions as a scorecard shape, while requiring a separately pinned adapter, action interface, task split, reference execution and cluster manifest before any WorldFailBench comparison. We do not copy or pool its published scores.
+The documented public simulator release lists 5,000 RoboTwin and 1,500 LIBERO episodes (6,500). A separate boundary set lists 120 pairs and 2,400 rollouts (10 rollouts per side). The additional 400 G1 reference rollouts in paper scope are not part of those documented public simulator counts. The dataset's failure taxonomy includes Task Planning Failure, Action Execution Failure and Indeterminate/Unjudgable; stage annotations can be unknown.
 
-Primary reference: https://arxiv.org/abs/2610.33565
+The linked Hugging Face dataset card and DAXIAORobotics/WorldFailBench dataset repository declare Apache-2.0. The separate tangxiaoyang18/WorldFailBench public project-site README says the evaluation code is not yet released. The open dataset documentation is therefore not the original executable scorer. Before dataset admission, pin the exact archive revision, compute SHA-256, inventory all files, check the license for all referenced assets and record policy/checkpoint provenance.
+
+The website's published RoboTwin score table gives its Ref–Ref diagnostic TFE 0.061, SFE 0.094, TPC 0.814 and SPC 0.903. Across the seven world-model rows, DW05 has the lowest listed TFE (0.159) and highest listed TPC (0.402); Ctrl has the highest listed world-model SPC (0.095). TFE/SFE are lower-is-better and TPC/SPC higher-is-better. These metrics are not combined into one score, and the public results site does not publish a single pooled boundary score. This is a benchmark-reported snapshot, not a Symthaea comparison.
+
+Primary references:
+- Paper: https://arxiv.org/abs/2610.33565
+- Dataset card: https://huggingface.co/datasets/ACERobotics/WorldFailBench
+- Dataset docs and Apache-2.0 license: https://github.com/DAXIAORobotics/WorldFailBench
+- Public results / code status: https://github.com/tangxiaoyang18/WorldFailBench
+- RoboTwin results table: https://tangxiaoyang18.github.io/WorldFailBench/
 
 ## MiraBench
 
@@ -120,11 +129,16 @@ This is a single task/model/policy setup, not a general benchmark ranking. Its m
 
 Reference: https://www.amd.com/en/developer/resources/technical-articles/2026/rl-inside-world-models.html
 
-## Recovery benchmark
+## LIBERO-RECOVER
 
-LIBERO-RECOVER moves beyond task completion into retry, action adaptation, object-state recovery and environmental recovery. It is a complementary downstream capability test, not a failure-prediction test: a world model may faithfully predict a failure without knowing how to recover, and a policy may recover despite imperfect predicted details. Keep the two claims separate.
+The current project page advertises 2,178 recovery scenarios, 130 subtasks across four suites and 3,184 human demonstrations, and marks the submission under review / paper forthcoming. The GitHub README for the data release instead advertises 4,803 annotated failure scenes (including 465 constructed L4 scenes) and 1,446 raw rollouts. These figures may describe different snapshots/subsets/denominators; they are not reconciled by one immutable manifest in the checked sources and must not be collapsed into one benchmark size.
 
-Reference: https://arxiv.org/abs/2609.05178
+Its four levels are action retry, action adaptation, object-state recovery and environmental recovery. This is a downstream recovery-policy capability test, not a failure-prediction test.
+
+References:
+- Paper/preprint: https://arxiv.org/abs/2609.05178
+- Current project page: https://liulin815.github.io/LIBERO-Recovery/
+- Dataset and code README: https://github.com/liulin815/LIBERO-Recovery
 
 ## Required controls
 
