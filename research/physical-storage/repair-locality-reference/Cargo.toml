@@ -1,0 +1,12 @@
+[package]
+name = "physical-storage-repair-locality"
+version = "0.1.0"
+edition = "2024"
+rust-version = "1.85"
+license = "MIT"
+description = "Deterministic repair-access scoring and a small local-repair code reference"
+
+[lib]
+path = "src/lib.rs"
+
+[dependencies]
