@@ -118,6 +118,25 @@ W_c=\sum_s p_sW_{c,s},\qquad W_o=\sum_s p_sW_{o,s},
 \]
 in factor form. Every scenario carries a unique scenario ID and immutable SHA-256 trajectory digest; duplicate IDs/digests are rejected so repeated trajectories cannot silently bias the family average. Weight normalization is max-scaled before summation, avoiding overflow when individually valid weights are near the floating-point limit. The API refuses mixed checkpoint, task-contract, or state-metric IDs, rejects positive-weight scenarios missing either Gramian, and checks peak live factor storage including both input and newly allocated aggregate factors. K-RESP-1 builds the basis from training paths only; validation selects hyperparameters / qualification thresholds, and held-out paths remain blind challenges. Do not feed held-out response data into the balancing factors. The scenario average is not a worst-case guarantee: keep adversarial pulse paths outside the average and report their individual worst-case response errors and UNKNOWN cases.
 
+### Per-scenario response residual and robust-tail qualification
+
+For a frozen scenario with factor matrices (X_s) and (Y_s), evaluate the transfer residual left by the reduced oblique projector (P=VW^T):
+[
+ho_s =
+\frac{\|Y_s^T(I-P)X_s\|_F}
+     {\|Y_s^TX_s\|_F}.
+]
+The Rust API `linearized_response_residual` computes this quantity without forming dense Gramians. `evaluate_response_scenario_residuals` reports the individual scenario residuals, normalized weighted mean, worst-case value, and upper-tail CVaR at a registered level (alpha).
+
+This metric is a **finite-horizon linearized input–output residual proxy** for the supplied discrete sensitivities. It is not a nonlinear echo error bound, does not account for branch changes that invalidate the local derivative, and cannot replace held-out full-order pulse experiments. It is useful because it exposes whether a scenario-average balanced basis hides a poorly represented low-probability direction. The manufactured 51/49 fixture demonstrates that failure mode: a rank-one average basis retains the dominant scenario but loses the other scenario's response entirely, producing a weighted mean residual of 0.49 while both worst-case and 90%-CVaR residuals are 1.0.
+
+Use three separate qualification views:
+- the training-weighted mean for average-case efficiency;
+- CVaR / worst-case residuals for the registered challenge family;
+- individual held-out physical response errors for actual nonlinear qualification.
+
+Do not optimize only CVaR and then report it as a certificate. A finite scenario set only supports claims about that set unless a separate coverage or Lipschitz argument covers the admissible intervention domain.
+
 ### Status of the third object: representation / reconstruction contract
 
 The v0.1 routine is deliberately a two-Gramian implementation. The current finite-horizon (A/B/C) path is **intrusive/discrete-tangent**: the caller supplies exact discrete derivatives or labelled finite-difference estimates. It is not the same as Padovan's fully non-intrusive projected empirical-observability construction, which reuses forward-trajectory checkpoints and can avoid additional adjoint integrations under its stated approximation. That method is a required comparator; our builder is a separate path for cases where exact discrete solver derivatives are available. For black-box plasma solvers without tangent/adjoint access, a future non-intrusive response-factor acquisition path must be implemented and validated independently. It does not yet instantiate the programme's third object: representation and reconstruction information. Avoid calling that third object a third Gramian by default. It is a rate–distortion contract, and may contain several things: a declared reconstruction metric, a decoder/representation family, a byte budget, residual coding policy, and structural constraints. Also avoid a notation collision: in standard balanced projection, \(W_r\) denotes the reduced test basis; call the third programme object \(\mathcal R_r\).
@@ -255,6 +274,8 @@ Report independent metric planes; do not hide trade-offs in one weighted score.
 **Physics and representation:** distribution-space weighted L2/L1, common-projection error, density/current/field QoI error, Poisson residual, applicable mass/momentum/energy/Casimir or entropy constraints, positivity/realizability, and numerical convergence.
 
 **Future response:** complex amplitude error, wrapped phase error, waveform error, echo timing/width error, first-/second-order response error, branch false/miss/association rate, and held-out intervention response coverage.
+
+**Linearized response robustness:** per-scenario transfer residual, weighted mean, worst-case and registered CVaR; report training, validation and held-out residuals separately. These diagnostics do not replace nonlinear physical response measurements.
 
 **Reduction and system cost:** retained rank and bytes, factor bytes, construction/adjoint/finite-difference cost, projection/reconstruction/transition cost, diagnostic cost, total wall time, peak working memory including temporary buffers, data movement, and energy-to-solution.
 
