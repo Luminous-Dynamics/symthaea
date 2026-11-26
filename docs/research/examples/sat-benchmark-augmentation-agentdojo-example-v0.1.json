@@ -195,6 +195,18 @@
       "to_claim_id": "claim-effect",
       "relation": "supports",
       "rule_ref": "rule:authenticated-readback"
+    },
+    {
+      "from_claim_id": "claim-authority",
+      "to_claim_id": "claim-native-task",
+      "relation": "depends_on",
+      "rule_ref": "rule:native-task-prerequisite"
+    },
+    {
+      "from_claim_id": "claim-disclosure",
+      "to_claim_id": "claim-authority",
+      "relation": "depends_on",
+      "rule_ref": "rule:exact-authority-prerequisite"
     }
   ],
   "evidence_graph_root_digest": "sha256:1111111111111111111111111111111111111111111111111111111111111111",
