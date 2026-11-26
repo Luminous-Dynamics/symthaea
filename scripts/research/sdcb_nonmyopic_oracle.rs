@@ -444,6 +444,16 @@ mod tests {
     }
 
     #[test]
+    fn selector_rejects_horizon_above_reference_bound() {
+        let candidates = (0..MAX_EXACT_HORIZON + 1)
+            .map(|index| { let mut e = screen_a(); e.experiment_id = format!("probe-{index}"); e })
+            .collect::<Vec<_>>();
+        assert_eq!(
+            choose_non_myopic_first_experiment(&[0.4, 0.4, 0.2], &model(), &candidates, 8, MAX_EXACT_HORIZON + 1, 0.0),
+            Err(DecisionError::InvalidExperiment)
+        );
+    }
+    #[test]
     fn exact_oracle_rejects_outcome_branching_above_reference_bound() {
         let mut e = screen_a();
         e.outcome_likelihoods = vec![vec![0.2; 5], vec![0.2; 5], vec![0.2; 5]];
