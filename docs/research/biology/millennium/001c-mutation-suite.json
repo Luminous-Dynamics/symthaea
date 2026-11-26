@@ -1,0 +1,47 @@
+{
+  "schema": "symthaea.research.millennium_biology.contract_oracle_mutations",
+  "schema_version": "1.0.0",
+  "oracle_generation": "BIO-MILLENNIUM-001C-2026-09-28-01",
+  "cases": [
+    {
+      "id": "M01",
+      "mutation": "one challenge ID",
+      "expected_code": "CHALLENGE_ID_ORDER_MISMATCH"
+    },
+    {
+      "id": "M02",
+      "mutation": "challenge order",
+      "expected_code": "CHALLENGE_ID_ORDER_MISMATCH"
+    },
+    {
+      "id": "M03",
+      "mutation": "official criteria generation",
+      "expected_code": "CRITERIA_GENERATION_INVALID"
+    },
+    {
+      "id": "M04",
+      "mutation": "evidence ceiling",
+      "expected_code": "EVIDENCE_CEILING_VIOLATION"
+    },
+    {
+      "id": "M05",
+      "mutation": "non-promotion fixture",
+      "expected_code": "NON_PROMOTION_FIXTURE_MISSING"
+    },
+    {
+      "id": "M06",
+      "mutation": "duplicate challenge ID",
+      "expected_code": "CHALLENGE_ID_ORDER_MISMATCH"
+    },
+    {
+      "id": "M07",
+      "mutation": "simulation promoted to completion",
+      "expected_code": "EVIDENCE_CEILING_VIOLATION"
+    },
+    {
+      "id": "M08",
+      "mutation": "prospective prediction mutated after commitment",
+      "expected_code": "IMMUTABLE_EVENT_MUTATION"
+    }
+  ]
+}\n
