@@ -136,19 +136,12 @@ func edgeTypeValid(e Edge, nodes map[string]Node) bool {
 	default: return false
 	}
 }
-func verifyNode(n Node, reports []VerifierReport, pins map[string]VerifierPin, observedAt int64) (Decision,string) {
+func verifyNode(n Node, reports map[string]VerifierReport, conflicts map[string]bool, pins map[string]VerifierPin, observedAt int64) (Decision,string) {
 	if !n.RequiresVerification { return Qualified,"" }
 	if n.Digest==nil || !n.Digest.Valid() { return Indeterminate,"required evidence digest missing: "+n.ID }
-	var found *VerifierReport
-	for i:=range reports {
-		r:=&reports[i]
-		if r.SubjectID==n.ID {
-			if found!=nil && *found!=*r { return Divergent,"conflicting verifier reports: "+n.ID }
-			found=r
-		}
-	}
-	if found==nil { return Indeterminate,"required verifier report missing: "+n.ID }
-	r:=*found
+	if conflicts[n.ID] { return Divergent,"conflicting verifier reports: "+n.ID }
+	r,found:=reports[n.ID]
+	if !found { return Indeterminate,"required verifier report missing: "+n.ID }
 	if r.Status=="invalid" { return Denied,"source evidence signature/profile rejected: "+n.ID }
 	if r.Status!="verified" { return Indeterminate,"source evidence not cryptographically verified: "+n.ID }
 	p,ok:=pins[r.VerifierID]
@@ -261,13 +254,18 @@ func Evaluate(g Graph,pins map[string]VerifierPin) Result {
 	checked=append(checked,"bounded-independent-activity-manifests","declared-observed-graph-input-equality")
 	observedAt:=int64(0)
 	for _,m:=range g.Manifests { if m.ObservedAt>observedAt { observedAt=m.ObservedAt } }
+	reportIndex:=map[string]VerifierReport{}
+	reportConflicts:=map[string]bool{}
+	for _,r:=range g.Reports {
+		if prior,ok:=reportIndex[r.SubjectID];ok && prior!=r { reportConflicts[r.SubjectID]=true } else if !ok { reportIndex[r.SubjectID]=r }
+	}
 	for _,n:=range g.Nodes {
-		d,why:=verifyNode(n,g.Reports,pins,observedAt)
+		d,why:=verifyNode(n,reportIndex,reportConflicts,pins,observedAt)
 		if d!=Qualified { return result(d,why,checked...) }
 	}
 	for _,m:=range g.Manifests {
 		fake:=Node{ID:"manifest:"+m.ActivityID,Kind:Entity,Digest:&m.Digest,RequiresVerification:true}
-		d,why:=verifyNode(fake,g.Reports,pins,observedAt)
+		d,why:=verifyNode(fake,reportIndex,reportConflicts,pins,observedAt)
 		if d!=Qualified { return result(d,"capture manifest "+m.ActivityID+": "+why,checked...) }
 	}
 	checked=append(checked,"capture-manifest-verifier-reports")
