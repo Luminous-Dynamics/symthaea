@@ -128,6 +128,23 @@ The report gives per-candidate:
 
 The fractions are **descriptive stress-scenario frequencies, not probabilities or confidence levels** unless the scenario generator is separately calibrated and justified. The evaluator never changes a recipe, relaxes constraints or infers probability from an unweighted scenario list.
 
+## Scenario robustness and rank stability
+
+The companion `inverse_vm_shortlist_stability` evaluator replays the same candidate IDs and recipe vectors across declared stress scenarios for sensor dropout, reference drift, forward-interval widening, evidence delay and historical-support sparsification.
+
+Each scenario preserves the baseline process snapshot, decision timestamp, clock domain/mapping, target band, hard constraints, support policy and ranking policy. It may change the forward prediction intervals, model-evidence state/receipt availability, support neighbour set/distance or evidence availability, but each altered claim must be resealed with the matching forward/support receipt.
+
+Per candidate, the audit reports:
+- feasible scenario count/fraction;
+- top-K selected scenario count/fraction;
+- selected rank min/max/median and rank spread;
+- whether the candidate remains feasible and selected in every scenario;
+- per-scenario state and selected rank.
+
+It rejects scenarios that change candidate identity, recipe vector, decision context or hard policy. It never relaxes constraints to preserve a ranking.
+
+**Interpretation boundary:** these are descriptive frequencies over the declared stress suite, not probabilities or confidence levels. Only a separately calibrated and justified scenario generator could support probabilistic interpretation. Report scenario families and exact perturbation-profile digests; do not describe an unweighted scenario frequency as probability of recommendation stability.
+
 ## Benchmark programme
 
 ### Faithful paper reproduction
