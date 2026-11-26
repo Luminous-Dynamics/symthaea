@@ -158,6 +158,13 @@ impl VerifiedSourceLineageSetV1 {
         if current_lineage_profile.profile_sha256() != self.lineage_profile_sha256 {
             return Err(SourceLineageRejectV1::ProfileMismatch);
         }
+        if current_lineage_profile.profile_sha256()
+            == qualified.qualification_verifier_profile_sha256()
+            || current_lineage_profile.profile_sha256()
+                == sufficiency_receipt_profile(sufficiency)
+        {
+            return Err(SourceLineageRejectV1::SharedAuthority);
+        }
         if sufficiency.receipt_sha256() != self.sufficiency_receipt_sha256
             || qualified.qualified_candidate_set_sha256() != self.qualified_evidence_set_sha256
             || sufficiency_receipt.qualified_evidence_set_sha256 != self.qualified_evidence_set_sha256
@@ -299,7 +306,8 @@ pub fn verify_source_lineage_receipts_v1(
             return Err(SourceLineageRejectV1::DuplicateReceipt);
         }
         let expected_item = expected.iter().find(|(requirement_id, root, _)| {
-            requirement_id == input.requirement_id && root == input.root_family_sha256
+            requirement_id.as_str() == input.requirement_id
+                && root.as_str() == input.root_family_sha256
         }).ok_or(SourceLineageRejectV1::UnexpectedReceipt)?;
         if sha256_hex(input.envelope_json.as_bytes()) != expected_item.2 {
             return Err(SourceLineageRejectV1::PayloadBindingMismatch);
@@ -342,6 +350,10 @@ pub fn verify_source_lineage_receipts_v1(
         decision_need_sha256: need_digest,
         lineage_profile_sha256: expected_lineage_profile_sha256.to_owned(),
     })
+}
+
+fn sufficiency_receipt_profile(sufficiency: &VerifiedDecisionSufficiencyV1) -> &str {
+    sufficiency.receipt().issuer_profile_sha256.as_str()
 }
 
 fn expected_lineage_pairs(
@@ -514,6 +526,8 @@ fn parse_lineage_predicate(value: &Value) -> Result<SourceLineageReceiptV1, Sour
         || receipt.requirement_id.len() > 256
         || receipt.issued_at_unix >= receipt.expires_at_unix
         || receipt.source_node_count == 0
+        || receipt.source_node_count > 10_000_000
+        || receipt.dependency_edge_count > 100_000_000
         || receipt.unresolved_ancestor_count != 0
     {
         return Err(SourceLineageRejectV1::InvalidReceipt);
