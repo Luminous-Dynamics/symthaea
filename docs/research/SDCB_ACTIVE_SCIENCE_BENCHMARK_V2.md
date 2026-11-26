@@ -30,7 +30,7 @@ The Rust reference has no third-party dependencies. It defines:
 - deterministic simulation with bounded observation noise;
 - pairwise separation margin over the full candidate set;
 - exact one-probe maximin selection plus a non-dominated margin/resource Pareto frontier, componentwise budget admission, deterministic tie-breaking and abstention;
-- bounded-noise candidate consistency sets;
+- bounded-noise candidate consistency sets with three explicit outcomes: unique candidate, multiple compatible candidates, or no candidate fits (requiring abstention/model revision);
 - observability and controllability rank controls;
 - fail-closed checks for duplicate IDs, malformed dimensions, non-finite inputs, budget violations, unknown probes, unknown evaluator truth and stale/misbound receipts.
 
@@ -43,7 +43,7 @@ The committed known-answer fixture contains two candidate mechanisms with the sa
 
 The candidate episode now includes the passive observation itself, not only the passive input schedule. Both hypotheses remain compatible with that baseline observation. The selector rejects the no-op probe, exposes the low-margin/low-measurement-cost versus high-margin/higher-cost trade-off on the Pareto frontier, and abstains when experiment budget is unavailable. A deterministic 2–4-state shift-system family tests the same equivalence/intervention behavior at each dimension; separate rank controls verify full-rank observability and controllability where constructed. The evaluator-only simulation then emits a bounded-noise receipt; the candidate consistency set must retain the true model and exclude the other model in this fixture.
 
-**Authored coverage:** 23 Rust test functions, including 128 deterministic noise-seed checks. Rust formatting, compilation, tests and Clippy have not been run on this commit. The traces and margins above are hand-derived from the committed matrices, not CI or model results.
+**Authored coverage:** 26 Rust test functions, including 128 deterministic noise-seed checks. Rust formatting, compilation, tests and Clippy have not been run on this commit. The traces and margins above are hand-derived from the committed matrices, not CI or model results.
 
 ## 3. Important limits
 
