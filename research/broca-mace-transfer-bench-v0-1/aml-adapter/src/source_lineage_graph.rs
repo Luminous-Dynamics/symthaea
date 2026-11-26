@@ -178,6 +178,15 @@ pub fn replay_source_lineage_graph_v1(
     validate_graph_acyclic(&nodes)?;
 
     let expected_commitments = lineage.replay_commitments();
+    let edge_count = nodes.values().try_fold(0u64, |total, node| {
+        total.checked_add(node.parent_evidence_ids.len() as u64)
+    }).ok_or(SourceLineageRejectV1::InvalidGraph)?;
+    if expected_commitments.iter().any(|item| {
+        item.source_node_count != nodes.len() as u64
+            || item.dependency_edge_count != edge_count
+    }) {
+        return Err(SourceLineageRejectV1::GraphStatisticsMismatch);
+    }
     let mut replayed = Vec::new();
     for requirement in &decision_need.requirements {
         let terminals = qualified.evidence().iter()
