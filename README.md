@@ -135,7 +135,7 @@ cargo run --manifest-path crates/hdc-zkp-bench/Cargo.toml --release
 cargo run --features psych_bench --example run_all_benchmarks
 ```
 
-The paper-level [`reproduce.sh`](papers/theory-foundations/binius-hdc/reproduce.sh) is a historical multi-backend script. It currently refers to `crates/mycelix-zkp-core` and `mycelix-health/crates/health-zkp` sibling paths that are not present in this standalone public repository. It therefore does **not** reproduce the complete historical table from a clean standalone clone. The direct manifest command above is the supported way to run the public Binius benchmark package.
+The paper-level [`reproduce.sh`](papers/theory-foundations/binius-hdc/reproduce.sh) is scoped to the standalone Binius benchmark package in this repository. It runs a real Binius prover/verifier and prints the benchmark's analytical prime-field comparator; it does **not** run a Winterfell prover, the historical health-attestation pipeline, or reproduce the complete historical multi-backend paper table. The direct manifest command above is equivalent when you only need to run the public Binius benchmark.
 ## Rust Workflow
 
 Use the flake shell for day-to-day development:
