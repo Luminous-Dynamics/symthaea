@@ -159,10 +159,19 @@ pub struct RevisionReportV1 {
 }
 
 /// Paired evidence-ablation result for one frozen query/model unit.
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize)]
+pub enum EvidenceBindingStatusV1 {
+    DeclaredOnly,
+    MaterializedAndContextBound,
+}
+
 #[derive(Debug, Clone, PartialEq, Serialize)]
 pub struct MatchedEvidenceContrastV1 {
     pub experiment_unit_id: String,
     pub source_lineage_id: String,
+    pub evidence_binding_status: EvidenceBindingStatusV1,
+    /// Remains false until an authenticated provider/runtime receipt is verified.
+    pub model_input_attested: bool,
     pub no_evidence_case_id: String,
     pub local_evidence_case_id: String,
     pub yoked_evidence_case_id: String,
@@ -193,6 +202,9 @@ pub struct MatchedEvidenceBootstrapV1 {
     pub schema: &'static str,
     pub experiment_units: usize,
     pub source_work_clusters: usize,
+    pub verified_evidence_binding_units: usize,
+    pub declared_only_evidence_binding_units: usize,
+    pub all_evidence_bindings_verified: bool,
     pub one_to_many_source_work_clusters: usize,
     pub bootstrap_replicates: usize,
     pub seed: u64,
@@ -332,6 +344,8 @@ pub fn compare_matched_evidence_arms(
         results.push(MatchedEvidenceContrastV1 {
             experiment_unit_id: unit_id.to_owned(),
             source_lineage_id: no_evidence.source_lineage_id.clone(),
+            evidence_binding_status: EvidenceBindingStatusV1::DeclaredOnly,
+            model_input_attested: false,
             no_evidence_case_id: no_evidence.case_id.clone(),
             local_evidence_case_id: local.case_id.clone(),
             yoked_evidence_case_id: yoked.case_id.clone(),
@@ -471,6 +485,22 @@ pub fn bootstrap_matched_evidence_contrasts(
         schema: "mel-matched-evidence-bootstrap-v1",
         experiment_units: contrasts.len(),
         source_work_clusters: by_lineage.len(),
+        verified_evidence_binding_units: contrasts
+            .iter()
+            .filter(|contrast| {
+                contrast.evidence_binding_status
+                    == EvidenceBindingStatusV1::MaterializedAndContextBound
+            })
+            .count(),
+        declared_only_evidence_binding_units: contrasts
+            .iter()
+            .filter(|contrast| {
+                contrast.evidence_binding_status == EvidenceBindingStatusV1::DeclaredOnly
+            })
+            .count(),
+        all_evidence_bindings_verified: contrasts.iter().all(|contrast| {
+            contrast.evidence_binding_status == EvidenceBindingStatusV1::MaterializedAndContextBound
+        }),
         one_to_many_source_work_clusters: lineage_count.len(),
         bootstrap_replicates,
         seed,
@@ -1518,6 +1548,9 @@ mod tests {
         assert_eq!(first_run.experiment_units, 2);
         assert_eq!(first_run.source_work_clusters, 2);
         assert_eq!(first_run.one_to_many_source_work_clusters, 2);
+        assert_eq!(first_run.verified_evidence_binding_units, 0);
+        assert_eq!(first_run.declared_only_evidence_binding_units, 2);
+        assert!(!first_run.all_evidence_bindings_verified);
         assert_eq!(first_run.recommended_confirmatory_cluster_floor, 30);
         assert!(!first_run.confirmatory_source_cluster_floor_met);
         assert!(!first_run.confirmatory_one_to_many_cluster_floor_met);
