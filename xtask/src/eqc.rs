@@ -511,14 +511,14 @@ mod tests {
     fn non_synthetic_inputs_are_rejected_from_public_seed() {
         let mut task = seed_corpus().tasks.remove(0);
         task.input_refs[0].classification = "restricted".into();
-        assert!(validate_task(&task).is_err());
+        assert!(validate_task(&task, &repository_root()).is_err());
     }
 
     #[test]
     fn denial_tasks_require_zero_mutations() {
         let mut task = seed_corpus().tasks.into_iter().find(|task| task.expected.disposition == "deny").unwrap();
         task.expected.state_mutation_count = 1;
-        assert!(validate_task(&task).is_err());
+        assert!(validate_task(&task, &repository_root()).is_err());
     }
 
     #[test]
