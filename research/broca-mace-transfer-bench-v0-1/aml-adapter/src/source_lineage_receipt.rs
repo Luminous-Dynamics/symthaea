@@ -287,6 +287,9 @@ pub fn verify_source_lineage_receipts_v1(
         sufficiency_binding,
         current_evaluator_profile,
     ).map_err(SourceLineageRejectV1::Sufficiency)?;
+    if !sufficiency.is_sufficient() {
+        return Err(SourceLineageRejectV1::NotSufficient);
+    }
     let now_unix = sufficiency_binding.now_unix;
     if sufficiency_binding.decision_need.digest()
         .map_err(SourceLineageRejectV1::Sufficiency)? != decision_need.digest()
