@@ -22,6 +22,8 @@ pub enum RbkrError {
     EmptyGramian,
     #[error("cross-Gramian factor-pair budget exceeded")]
     CrossGramianBudgetExceeded,
+    #[error("cross-Gramian scalar-operation budget exceeded")]
+    CrossGramianWorkBudgetExceeded,
     #[error("factor-space SVD storage budget exceeded")]
     SvdStorageBudgetExceeded,
     #[error("Jacobi SVD work budget exceeded")]
@@ -56,6 +58,7 @@ pub struct RbkrConfig {
     pub jacobi_tolerance: f64,
     pub maximum_jacobi_sweeps: usize,
     pub maximum_cross_gramian_entries: usize,
+    pub maximum_cross_gramian_scalar_operations: usize,
     pub maximum_svd_storage_entries: usize,
     pub maximum_jacobi_scalar_operations: usize,
     pub maximum_basis_scalars: usize,
@@ -71,6 +74,7 @@ impl RbkrConfig {
             jacobi_tolerance: 1.0e-12,
             maximum_jacobi_sweeps: 64,
             maximum_cross_gramian_entries: 1_000_000,
+            maximum_cross_gramian_scalar_operations: 100_000_000,
             maximum_svd_storage_entries: 2_000_000,
             maximum_jacobi_scalar_operations: 100_000_000,
             maximum_basis_scalars: 8_000_000,
@@ -88,6 +92,7 @@ impl RbkrConfig {
             || self.jacobi_tolerance >= 1.0
             || self.maximum_jacobi_sweeps == 0
             || self.maximum_cross_gramian_entries == 0
+            || self.maximum_cross_gramian_scalar_operations == 0
             || self.maximum_svd_storage_entries == 0
             || self.maximum_jacobi_scalar_operations == 0
             || self.maximum_basis_scalars == 0
@@ -151,6 +156,12 @@ impl ResponseBalancedBasis {
             .ok_or(RbkrError::CrossGramianBudgetExceeded)?;
         if cross_entries > config.maximum_cross_gramian_entries {
             return Err(RbkrError::CrossGramianBudgetExceeded);
+        }
+        let cross_work = cross_entries
+            .checked_mul(dimension)
+            .ok_or(RbkrError::CrossGramianWorkBudgetExceeded)?;
+        if cross_work > config.maximum_cross_gramian_scalar_operations {
+            return Err(RbkrError::CrossGramianWorkBudgetExceeded);
         }
         let right_entries = reach_count
             .checked_mul(reach_count)
@@ -677,10 +688,10 @@ mod tests {
         );
 
         let mut config = RbkrConfig::new(1);
-        config.maximum_cross_gramian_entries = 0;
+        config.maximum_cross_gramian_scalar_operations = 1;
         assert_eq!(
             ResponseBalancedBasis::from_empirical_gramians(&reach, &observe, config),
-            Err(RbkrError::InvalidConfiguration)
+            Err(RbkrError::CrossGramianWorkBudgetExceeded)
         );
     }
 
