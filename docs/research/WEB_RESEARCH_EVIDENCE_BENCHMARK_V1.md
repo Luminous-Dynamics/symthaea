@@ -210,7 +210,11 @@ These are project targets, not achieved results or external standards.
 | Contradiction handling | 100% preservation of opposing accepted relations; no majority-vote collapse |
 | Correction/retraction propagation | 100% invalidation/supersession of affected current evidence links |
 | Acquisition transparency | 100% attempted query/fetch outcomes accounted for |
-| External DRB II | Reproduce native scores first; then target ≥70% total rubric pass on the same task/judge snapshot, reporting InfoRecall, Analysis and Presentation separately |
+| External DRB II | Reproduce native scores first; then target ≥70% total rubric pass on the same frozen task/judge version, reporting InfoRecall, Analysis and Presentation separately |
+| ASI-Bench | Stretch target ≥70/100 on the exact 60-task release and same B1–B4 guidance protocol; obtain/pin the exact scored task-set ID before a leaderboard comparison |
+| TruthInsightBench | Stretch target ≥70/100 on the same 40 blind tasks; publish all six evidence-maturity dimensions, artifact-grounded items and task-clustered confidence intervals |
+| Autonomous Science Bench 0.1 | Stretch target ≥80% full-system resolution on the same six pilot workflows, with total campaign cost and agent time each no higher than the current published leader; this is a pilot-sized target, not a general-lab claim |
+| Scientist–auditor collaboration | Demonstrate positive paired gain in valid errors found per human-review hour over manual-only review; require independent replay and expert-adjudicated precision/recall (see [#13818](https://github.com/Luminous-Dynamics/symthaea/issues/13818)) |
 | Citation integrity | Target ≥95% citation accuracy on a frozen gold subset; effective-citation count alone is not sufficient |
 | Resource quality | Report cost and latency Pareto fronts; no unqualified composite score |
 
@@ -224,6 +228,8 @@ A ≥70% DeepResearch Bench II target is only meaningful on the same frozen task
 - [Issue #13792](https://github.com/Luminous-Dynamics/symthaea/issues/13792): claim-specific source graph edges and evidence versions.
 - [Issue #13794](https://github.com/Luminous-Dynamics/symthaea/issues/13794): complete acquisition receipts and bounded concurrency.
 - [Issue #13800](https://github.com/Luminous-Dynamics/symthaea/issues/13800): prevent public convenience constructors from minting unprovenanced `HighConfidence` claims.
+- [Issue #13818](https://github.com/Luminous-Dynamics/symthaea/issues/13818): scientist-steerable, checkpointed research with independently replayable audit agents.
+- [Issue #8771](https://github.com/Luminous-Dynamics/symthaea/issues/8771): immutable benchmark anchors and sealed, adaptive scientific-task refreshes.
 - [PR #13665](https://github.com/Luminous-Dynamics/symthaea/pull/13665): typed public ResearchState evidence relation boundary.
 - [PR #13668](https://github.com/Luminous-Dynamics/symthaea/pull/13668): candidate-facing StateGuard B0 baseline.
 - [Issue #11171](https://github.com/Luminous-Dynamics/symthaea/issues/11171): actual production researcher integration and evaluator isolation.
