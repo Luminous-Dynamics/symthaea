@@ -664,3 +664,60 @@ Add pose-graph cycle residuals, transform/uncertainty coverage, false loop-closu
 LongSpace-Bench is a relevant method comparator because LongSpace injects frozen 3D geometric cues into early decoder layers and uses sensory/working/long hierarchical KV memory for query-guided recall. Its EMNLP protocol is room-tour long-video reasoning, not OVO-S causal streaming. Compare the representation/hierarchy as a baseline, but keep protocol access and temporal horizon explicit. Official paper: https://aclanthology.org/2026.emnlp-main.227/.
 
 The contribution hypothesis is not “HDC replaces SLAM” or “a constraint graph beats all VLMs”. It is that multimodal models, HDC/CfC state, explicit geometric/topological constraints and independent decision evaluation can be composed so that every map claim is grounded, revisable and no more specific than its evidence permits.
+
+
+## 14. Classical geometric validation: separate semantic spatial reasoning from SLAM
+
+VIS-012 now composes the native OVO-S semantic/allocentric question benchmark with classical geometric datasets. This is necessary because correct long-horizon spatial answers do not prove metrically consistent pose/map reconstruction, and low trajectory error does not prove semantic scene understanding.
+
+### 14.1 Dataset lanes
+
+| Dataset | Qualified research lane | Native metric/contract | Critical limitation |
+|---|---|---|---|
+| TUM RGB-D | RGB-D visual odometry and SLAM | official trajectory evaluation; ATE/RPE under documented alignment | 39 sequences; Kinect RGB/depth 640×480 at 30 Hz; motion capture trajectory at 100 Hz; calibration and association matter |
+| EuRoC MAV | stereo-inertial VIO/SLAM | pose/trajectory error with camera/IMU calibration and timestamps | 2×20 FPS stereo, 200 Hz IMU; Vicon room and Leica machine-hall ground truth differ; the dataset documents time synchronization limitations |
+| KITTI Odometry | monocular/stereo visual odometry; separate LiDAR/multimodal track | official subsequence translation error (%) and rotation error (deg/m) | sequences 00–10 have training GT; 11–21 are hidden-test; never mix monocular, stereo, LiDAR or visual-LiDAR scores as a common method class |
+| OpenLORIS-Scene | lifelong/multi-session SLAM | repeated trajectory consistency, relocalization and map-change handling | multiple visits, dynamic humans and day/night; GT is OptiTrack in office and offline LiDAR-SLAM for other scenes, so GT provenance differs by scene |
+
+Sources:
+- TUM RGB-D paper / dataset: https://cvg.cit.tum.de/_media/spezial/bib/sturm12iros.pdf ; https://vision.in.tum.de/data/datasets/rgbd-dataset
+- EuRoC MAV: https://projects.asl.ethz.ch/datasets/euroc-mav/
+- KITTI Odometry: https://www.cvlibs.net/datasets/kitti/eval_odometry.php
+- OpenLORIS-Scene: https://lifelong-robotic-vision.github.io/dataset/scene
+
+### 14.2 Metric and protocol discipline
+
+- ATE is reported only after the official alignment; explicitly state rigid SE(3) versus Sim(3) alignment. Do not erase monocular scale ambiguity by silently scaling an unobservable result.
+- RPE uses frozen time/distance intervals.
+- KITTI's translation (%) and rotation (deg/m) are computed over official subsequence lengths; these are not ATE.
+- Pose-graph cycle residual, loop-closure precision/recall, reprojection or point-cloud alignment are separate diagnostics with declared calibration and input geometry.
+- OpenLORIS map-change/false-deletion metrics must be reported per scene and per GT source class.
+- Every run pins sensor modality, camera/IMU rate, calibration, dataset revision, trajectory alignment, hardware, runtime, memory and compute budget.
+- Do not pool TUM, EuRoC, KITTI and OpenLORIS into one scalar or compare LiDAR methods to camera-only systems without explicit track separation.
+
+### 14.3 Required factorial and negative controls
+
+- RGB-only, RGB-D, stereo, stereo+IMU, and LiDAR only where actually supported.
+- Camera-intrinsics and camera–IMU-extrinsic perturbations.
+- Timestamp offset, drift, reset and sensor-specific clock confusion.
+- Wrong transform direction/frame identity and cycle-inconsistent pose graph.
+- Dynamic object motion versus camera ego-motion.
+- False loop closure from visually similar locations.
+- Revisit after illumination, furniture, scene and people changes.
+- Stale/missing depth and IMU gaps.
+- Shuffled or reversed trajectories.
+- Metric-scale ambiguity and unsupported world-coordinate claims.
+
+### 14.4 Composition with ErgoStream
+
+Keep the lanes independent:
+- **OVO-S:** semantic spatial question answering from causal prefixes.
+- **TUM / EuRoC / KITTI:** metric pose and geometric trajectory qualification.
+- **OpenLORIS:** long-term/lifelong map maintenance and relocalization.
+- **DCASE Task 3:** spatial acoustic-field estimation.
+- **4DMemoryBench / EgoMemReason / LongSpace:** long-horizon, multi-history memory and spatial recall.
+- **Symtropy #6184:** deterministic paired counterfactuals for frame, topology, false-loop, contradiction and DecisionNeed errors.
+
+VIS-012 #13855 owns the candidate projection and controlled adapter. Vision Mind #3934 owns persistent belief/geometry integration. HDC/dense/hybrid representation comparisons remain in #8152. Symtropy retains hidden truth and independent scoring. No second SLAM backend, map store, sensor service or scheduler is introduced by the benchmark protocol.
+
+The target is a joint Pareto frontier over semantic spatial reasoning, geometric accuracy, topological correctness, long-term map revision, uncertainty calibration and measured resource cost—not a pooled leaderboard.
