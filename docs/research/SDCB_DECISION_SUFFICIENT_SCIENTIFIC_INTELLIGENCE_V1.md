@@ -131,7 +131,7 @@ The standalone Rust reference implements:
 
 The separate finite-horizon oracle in scripts/research/sdcb_nonmyopic_oracle.rs performs adaptive Bellman recursion for small finite experiment sets. It supports optional stopping, budget constraints, consume-once experiment IDs, outcome-contingent follow-ups, and explicit per-experiment cost. It is bounded to eight candidates, four experiments per policy, and four outcomes per experiment.
 
-The one-step source has 15 authored Rust tests and the finite-horizon source has 10 authored Rust tests and uses only the Rust standard library. It has not been compiled or executed in this environment because rustc/cargo are unavailable. The checked-in Draft 2020-12 episode schema passed meta-schema validation, and the example episode passed schema validation plus independent semantic checks for prior normalization, utility dimensions, unique hypothesis IDs, likelihood dimensions, and likelihood row sums. A separate numerical reference calculation was used to check the frozen three-hypothesis example; this is not Rust execution.
+Both sources use only the Rust standard library: 15 one-step tests and 10 additional finite-horizon tests are authored. Neither source has been compiled or executed in this environment because rustc/cargo are unavailable. Both checked-in Draft 2020-12 episode schemas passed meta-schema validation, and both example episodes passed schema validation plus independent semantic checks for prior normalization, utility dimensions, unique IDs, likelihood dimensions, and likelihood row sums. Separate numerical references matched the EIG-versus-EVSI fixture and the two-step adaptive Bellman fixture; these are not Rust executions.
 
 ## 7. Benchmark strategy and comparison
 
