@@ -579,7 +579,7 @@ mod tests {
             -> Result<VerifyingKey, MaceContextExposureRejectV1> {
             if profile != self.profile || key_id != ed25519_spki_key_id_v1(&self.key) {
                 Err(MaceContextExposureRejectV1::UnknownObserverKey)
-            } else { Ok(self.key) }
+            } else { Ok(self.key.clone()) }
         }
     }
     struct AcceptEvidence;
