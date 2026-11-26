@@ -290,7 +290,7 @@ impl JointBeliefLedger {
                 for hypothesis in 1..self.hypothesis_ids.len() {
                     if proposal.outcome_likelihoods[hypothesis * STATES + state]
                         .iter().zip(reference.iter())
-                        .any(|(a, b)| (a - b).abs() > PROB_TOL)
+                        .any(|(a, b)| (*a - *b).abs() > PROB_TOL)
                     {
                         return Err(Error::CalibrationLeaksHypothesis);
                     }

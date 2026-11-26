@@ -60,6 +60,7 @@
       "type": "object",
       "additionalProperties": false,
       "required": [
+        "identity",
         "experiment_id",
         "proposal_digest",
         "prior_version",
@@ -150,6 +151,9 @@
             },
             "maxItems": 4
           }
+        },
+        "identity": {
+          "$ref": "#/$defs/identity"
         }
       }
     },
@@ -157,6 +161,7 @@
       "type": "object",
       "additionalProperties": false,
       "required": [
+        "identity",
         "experiment_id",
         "proposal_digest",
         "observation_digest",
@@ -220,6 +225,9 @@
         },
         "independently_verified": {
           "type": "boolean"
+        },
+        "identity": {
+          "$ref": "#/$defs/identity"
         }
       }
     }
