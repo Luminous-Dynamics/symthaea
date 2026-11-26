@@ -1,0 +1,453 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://github.com/Luminous-Dynamics/symthaea/blob/main/docs/neuroscience/CONNECTOME_INTERVENTION_BENCHMARK_SCORECARD.schema.json",
+  "title": "Connectome intervention benchmark scorecard (vector results)",
+  "type": "object",
+  "additionalProperties": false,
+  "required": [
+    "schema_version",
+    "scorecard_id",
+    "status",
+    "evidence_tier",
+    "claim_ceiling",
+    "run_manifest_sha256",
+    "dataset_manifest_sha256",
+    "predictions_sha256",
+    "evaluator_sha256",
+    "predictions_frozen_before_unblind",
+    "baseline_matrix_complete",
+    "metric_results",
+    "pairwise_comparisons",
+    "abstention",
+    "negative_controls_passed"
+  ],
+  "properties": {
+    "schema_version": {
+      "const": "1.0.0"
+    },
+    "scorecard_id": {
+      "type": "string",
+      "minLength": 3
+    },
+    "status": {
+      "enum": [
+        "NOT_EVALUABLE",
+        "SCORED"
+      ]
+    },
+    "evidence_tier": {
+      "enum": [
+        "T0_SYNTHETIC",
+        "T1_OBSERVATIONAL",
+        "T2_IN_SILICO_INTERVENTION",
+        "T3_MEASURED_BIOLOGICAL_INTERVENTION",
+        "T4_PROSPECTIVE_EXPERIMENT_SELECTION"
+      ]
+    },
+    "claim_ceiling": {
+      "enum": [
+        "SYNTHETIC_ONLY",
+        "OBSERVATIONAL_PREDICTION_ONLY",
+        "MODEL_INTERVENTION_ONLY",
+        "BIOLOGICAL_INTERVENTION_PREDICTION",
+        "PROSPECTIVE_EXPERIMENTAL_VALIDATION"
+      ]
+    },
+    "run_manifest_sha256": {
+      "$ref": "#/$defs/sha256"
+    },
+    "dataset_manifest_sha256": {
+      "$ref": "#/$defs/sha256"
+    },
+    "predictions_sha256": {
+      "$ref": "#/$defs/sha256"
+    },
+    "evaluator_sha256": {
+      "$ref": "#/$defs/sha256"
+    },
+    "predictions_frozen_before_unblind": {
+      "const": true
+    },
+    "baseline_matrix_complete": {
+      "type": "boolean"
+    },
+    "negative_controls_passed": {
+      "type": [
+        "boolean",
+        "null"
+      ]
+    },
+    "metric_results": {
+      "type": "array",
+      "items": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": [
+          "metric_id",
+          "model_id",
+          "split_id",
+          "estimate",
+          "direction",
+          "unit",
+          "confidence_interval",
+          "independent_units"
+        ],
+        "properties": {
+          "metric_id": {
+            "enum": [
+              "trajectory_rmse",
+              "trajectory_mae",
+              "trajectory_crps",
+              "predictive_log_score",
+              "treatment_control_effect_rmse",
+              "response_sign_accuracy",
+              "false_response_rate",
+              "onset_latency_error",
+              "peak_amplitude_error",
+              "recovery_time_error",
+              "interaction_trace_error",
+              "mechanism_macro_f1",
+              "mechanism_abstention_rate",
+              "interval_coverage_50",
+              "interval_coverage_80",
+              "interval_coverage_95",
+              "interval_width",
+              "anatomy_incremental_gain",
+              "eig_per_experiment",
+              "decision_regret",
+              "sample_efficiency",
+              "missingness_degradation",
+              "inference_latency",
+              "training_wall_time",
+              "peak_memory"
+            ]
+          },
+          "model_id": {
+            "type": "string",
+            "minLength": 1
+          },
+          "split_id": {
+            "type": "string",
+            "minLength": 1
+          },
+          "estimate": {
+            "type": "number"
+          },
+          "direction": {
+            "enum": [
+              "minimize",
+              "maximize",
+              "target"
+            ]
+          },
+          "unit": {
+            "type": "string",
+            "minLength": 1
+          },
+          "confidence_interval": {
+            "type": "array",
+            "items": {
+              "type": "number"
+            },
+            "minItems": 2,
+            "maxItems": 2
+          },
+          "independent_units": {
+            "type": "integer",
+            "minimum": 1
+          },
+          "nominal_coverage": {
+            "type": "number",
+            "minimum": 0,
+            "maximum": 1
+          },
+          "observed_coverage": {
+            "type": "number",
+            "minimum": 0,
+            "maximum": 1
+          },
+          "mean_interval_width": {
+            "type": "number",
+            "minimum": 0
+          },
+          "notes": {
+            "type": "string"
+          }
+        }
+      }
+    },
+    "pairwise_comparisons": {
+      "type": "array",
+      "items": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": [
+          "candidate_model_id",
+          "comparator_model_id",
+          "metric_id",
+          "relative_improvement",
+          "confidence_interval",
+          "paired_independent_units"
+        ],
+        "properties": {
+          "candidate_model_id": {
+            "type": "string"
+          },
+          "comparator_model_id": {
+            "type": "string"
+          },
+          "metric_id": {
+            "type": "string"
+          },
+          "relative_improvement": {
+            "type": "number"
+          },
+          "confidence_interval": {
+            "type": "array",
+            "items": {
+              "type": "number"
+            },
+            "minItems": 2,
+            "maxItems": 2
+          },
+          "paired_independent_units": {
+            "type": "integer",
+            "minimum": 1
+          },
+          "adjusted_p_value": {
+            "type": [
+              "number",
+              "null"
+            ],
+            "minimum": 0,
+            "maximum": 1
+          },
+          "notes": {
+            "type": "string"
+          }
+        }
+      }
+    },
+    "abstention": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "eligible_predictions",
+        "abstained_predictions",
+        "abstention_rate"
+      ],
+      "properties": {
+        "eligible_predictions": {
+          "type": "integer",
+          "minimum": 0
+        },
+        "abstained_predictions": {
+          "type": "integer",
+          "minimum": 0
+        },
+        "abstention_rate": {
+          "type": "number",
+          "minimum": 0,
+          "maximum": 1
+        },
+        "error_on_non_abstained": {
+          "type": [
+            "number",
+            "null"
+          ],
+          "minimum": 0
+        }
+      }
+    },
+    "experiment_selection": {
+      "type": [
+        "object",
+        "null"
+      ],
+      "additionalProperties": false,
+      "required": [
+        "budget",
+        "policy_id",
+        "eig_per_experiment",
+        "decision_regret",
+        "comparator_policies",
+        "prospective"
+      ],
+      "properties": {
+        "budget": {
+          "type": "integer",
+          "minimum": 1
+        },
+        "policy_id": {
+          "type": "string"
+        },
+        "eig_per_experiment": {
+          "type": "number",
+          "minimum": 0
+        },
+        "decision_regret": {
+          "type": "number",
+          "minimum": 0
+        },
+        "comparator_policies": {
+          "type": "array",
+          "minItems": 1,
+          "items": {
+            "enum": [
+              "uniform_random",
+              "degree",
+              "betweenness_centrality",
+              "largest_predicted_response",
+              "expert_prior",
+              "other"
+            ]
+          }
+        },
+        "prospective": {
+          "type": "boolean"
+        },
+        "notes": {
+          "type": "string"
+        }
+      }
+    },
+    "overall_rank": {
+      "type": "null",
+      "description": "Composite rankings are prohibited in v1; publish the metric vector instead."
+    },
+    "notes": {
+      "type": "string"
+    }
+  },
+  "$defs": {
+    "sha256": {
+      "type": "string",
+      "pattern": "^[a-f0-9]{64}$"
+    }
+  },
+  "allOf": [
+    {
+      "if": {
+        "properties": {
+          "evidence_tier": {
+            "const": "T0_SYNTHETIC"
+          }
+        },
+        "required": [
+          "evidence_tier"
+        ]
+      },
+      "then": {
+        "properties": {
+          "claim_ceiling": {
+            "const": "SYNTHETIC_ONLY"
+          }
+        }
+      }
+    },
+    {
+      "if": {
+        "properties": {
+          "evidence_tier": {
+            "const": "T1_OBSERVATIONAL"
+          }
+        },
+        "required": [
+          "evidence_tier"
+        ]
+      },
+      "then": {
+        "properties": {
+          "claim_ceiling": {
+            "const": "OBSERVATIONAL_PREDICTION_ONLY"
+          }
+        }
+      }
+    },
+    {
+      "if": {
+        "properties": {
+          "evidence_tier": {
+            "const": "T2_IN_SILICO_INTERVENTION"
+          }
+        },
+        "required": [
+          "evidence_tier"
+        ]
+      },
+      "then": {
+        "properties": {
+          "claim_ceiling": {
+            "const": "MODEL_INTERVENTION_ONLY"
+          }
+        }
+      }
+    },
+    {
+      "if": {
+        "properties": {
+          "evidence_tier": {
+            "const": "T3_MEASURED_BIOLOGICAL_INTERVENTION"
+          }
+        },
+        "required": [
+          "evidence_tier"
+        ]
+      },
+      "then": {
+        "properties": {
+          "claim_ceiling": {
+            "const": "BIOLOGICAL_INTERVENTION_PREDICTION"
+          }
+        }
+      }
+    },
+    {
+      "if": {
+        "properties": {
+          "evidence_tier": {
+            "const": "T4_PROSPECTIVE_EXPERIMENT_SELECTION"
+          }
+        },
+        "required": [
+          "evidence_tier"
+        ]
+      },
+      "then": {
+        "properties": {
+          "claim_ceiling": {
+            "const": "PROSPECTIVE_EXPERIMENTAL_VALIDATION"
+          }
+        }
+      }
+    },
+    {
+      "if": {
+        "properties": {
+          "status": {
+            "const": "SCORED"
+          }
+        },
+        "required": [
+          "status"
+        ]
+      },
+      "then": {
+        "properties": {
+          "baseline_matrix_complete": {
+            "const": true
+          },
+          "negative_controls_passed": {
+            "const": true
+          },
+          "metric_results": {
+            "minItems": 1
+          },
+          "pairwise_comparisons": {
+            "minItems": 1
+          }
+        }
+      }
+    }
+  ]
+}

@@ -1,0 +1,339 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://luminousdynamics.io/schemas/connectome-benchmark-environment-registry-v1.schema.json",
+  "title": "Versioned causal benchmark environment registry",
+  "type": "object",
+  "additionalProperties": false,
+  "required": [
+    "schema_version",
+    "benchmark_id",
+    "release_id",
+    "created_at",
+    "pools",
+    "rotation_policy",
+    "evaluation_protocol"
+  ],
+  "properties": {
+    "schema_version": {
+      "const": "connectome-benchmark-environment-registry-v1"
+    },
+    "benchmark_id": {
+      "type": "string",
+      "minLength": 1
+    },
+    "release_id": {
+      "type": "string",
+      "minLength": 1
+    },
+    "created_at": {
+      "type": "string",
+      "format": "date-time"
+    },
+    "pools": {
+      "type": "array",
+      "minItems": 1,
+      "items": {
+        "$ref": "#/$defs/pool"
+      }
+    },
+    "rotation_policy": {
+      "$ref": "#/$defs/rotation_policy"
+    },
+    "evaluation_protocol": {
+      "$ref": "#/$defs/evaluation_protocol"
+    }
+  },
+  "$defs": {
+    "pool": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "pool_id",
+        "pool_version",
+        "status",
+        "split",
+        "source_kind",
+        "mechanism_family_id",
+        "noise_family_id",
+        "observation_model_id",
+        "intervention_family_id",
+        "context_family_id",
+        "outcome_family_id",
+        "item_count",
+        "manifest_digest",
+        "visibility",
+        "pretraining_allowed",
+        "ground_truth_access",
+        "generator"
+      ],
+      "properties": {
+        "pool_id": {
+          "type": "string",
+          "minLength": 1
+        },
+        "pool_version": {
+          "type": "string",
+          "minLength": 1
+        },
+        "status": {
+          "enum": [
+            "planned",
+            "registered",
+            "qualified",
+            "retired"
+          ]
+        },
+        "split": {
+          "enum": [
+            "train",
+            "public_validation",
+            "reserved_validation",
+            "sealed_evaluation",
+            "retired"
+          ]
+        },
+        "source_kind": {
+          "enum": [
+            "synthetic_scm",
+            "semantic_operational",
+            "formula_grounded",
+            "biological_recording"
+          ]
+        },
+        "mechanism_family_id": {
+          "type": "string",
+          "minLength": 1
+        },
+        "noise_family_id": {
+          "type": "string",
+          "minLength": 1
+        },
+        "observation_model_id": {
+          "type": "string",
+          "minLength": 1
+        },
+        "intervention_family_id": {
+          "type": "string",
+          "minLength": 1
+        },
+        "context_family_id": {
+          "type": "string",
+          "minLength": 1
+        },
+        "outcome_family_id": {
+          "type": "string",
+          "minLength": 1
+        },
+        "item_count": {
+          "type": "integer",
+          "minimum": 0
+        },
+        "manifest_digest": {
+          "$ref": "#/$defs/sha256"
+        },
+        "visibility": {
+          "enum": [
+            "public",
+            "reserved",
+            "restricted"
+          ]
+        },
+        "pretraining_allowed": {
+          "type": "boolean"
+        },
+        "ground_truth_access": {
+          "enum": [
+            "public",
+            "restricted",
+            "sealed"
+          ]
+        },
+        "generator": {
+          "$ref": "#/$defs/generator"
+        },
+        "source_version": {
+          "type": [
+            "string",
+            "null"
+          ]
+        },
+        "source_uri": {
+          "type": [
+            "string",
+            "null"
+          ],
+          "format": "uri"
+        },
+        "license": {
+          "type": [
+            "string",
+            "null"
+          ]
+        },
+        "notes": {
+          "type": "string"
+        }
+      },
+      "allOf": [
+        {
+          "if": {
+            "properties": {
+              "split": {
+                "enum": [
+                  "reserved_validation",
+                  "sealed_evaluation"
+                ]
+              }
+            },
+            "required": [
+              "split"
+            ]
+          },
+          "then": {
+            "properties": {
+              "visibility": {
+                "enum": [
+                  "reserved",
+                  "restricted"
+                ]
+              },
+              "pretraining_allowed": {
+                "const": false
+              },
+              "ground_truth_access": {
+                "enum": [
+                  "restricted",
+                  "sealed"
+                ]
+              }
+            }
+          }
+        },
+        {
+          "if": {
+            "properties": {
+              "status": {
+                "const": "planned"
+              }
+            },
+            "required": [
+              "status"
+            ]
+          },
+          "then": {
+            "properties": {
+              "item_count": {
+                "const": 0
+              }
+            }
+          }
+        }
+      ]
+    },
+    "generator": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "name",
+        "config_digest",
+        "code_commit_sha",
+        "seed_commitment_digest"
+      ],
+      "properties": {
+        "name": {
+          "type": "string",
+          "minLength": 1
+        },
+        "config_digest": {
+          "$ref": "#/$defs/sha256"
+        },
+        "code_commit_sha": {
+          "type": [
+            "string",
+            "null"
+          ],
+          "pattern": "^[0-9a-f]{40}$"
+        },
+        "seed_commitment_digest": {
+          "anyOf": [
+            {
+              "$ref": "#/$defs/sha256"
+            },
+            {
+              "type": "null"
+            }
+          ]
+        }
+      }
+    },
+    "rotation_policy": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "refresh_interval_days",
+        "maximum_public_validation_age_days",
+        "retire_after_public_exposure",
+        "minimum_reserved_fraction",
+        "pretraining_disclosure_required"
+      ],
+      "properties": {
+        "refresh_interval_days": {
+          "type": "integer",
+          "minimum": 1
+        },
+        "maximum_public_validation_age_days": {
+          "type": "integer",
+          "minimum": 1
+        },
+        "retire_after_public_exposure": {
+          "type": "boolean"
+        },
+        "minimum_reserved_fraction": {
+          "type": "number",
+          "minimum": 0,
+          "maximum": 1
+        },
+        "pretraining_disclosure_required": {
+          "type": "boolean"
+        }
+      }
+    },
+    "evaluation_protocol": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "evaluator_version",
+        "evaluator_digest",
+        "blind_mode",
+        "reveal_truth_after_submission",
+        "prediction_manifest_digest_required"
+      ],
+      "properties": {
+        "evaluator_version": {
+          "type": "string",
+          "minLength": 1
+        },
+        "evaluator_digest": {
+          "$ref": "#/$defs/sha256"
+        },
+        "blind_mode": {
+          "enum": [
+            "none",
+            "partial",
+            "full"
+          ]
+        },
+        "reveal_truth_after_submission": {
+          "type": "boolean"
+        },
+        "prediction_manifest_digest_required": {
+          "type": "boolean"
+        }
+      }
+    },
+    "sha256": {
+      "type": "string",
+      "pattern": "^sha256:[0-9a-f]{64}$"
+    }
+  }
+}
