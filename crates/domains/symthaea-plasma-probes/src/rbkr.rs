@@ -10,6 +10,7 @@
 //! nonlinear echo preservation.
 
 use super::EmpiricalGramian;
+use std::collections::HashSet;
 use thiserror::Error;
 
 #[derive(Clone, Debug, Error, PartialEq, Eq)]
@@ -99,6 +100,9 @@ pub enum FiniteHorizonGramianError {
 /// registered intervention family.
 #[derive(Clone, Copy, Debug)]
 pub struct ResponseGramianScenario<'a> {
+    pub scenario_id: &'a str,
+    /// SHA-256 of the frozen full-order trajectory and pulse path.
+    pub trajectory_sha256: &'a str,
     pub task_contract_id: &'a str,
     pub checkpoint_id: &'a str,
     pub state_metric_id: &'a str,
@@ -160,10 +164,23 @@ pub fn aggregate_response_gramians(
         return Err(RbkrError::StateDimensionMismatch);
     }
 
-    let mut total_weight = 0.0_f64;
+    let mut scenario_ids = HashSet::with_capacity(scenarios.len());
+    let mut trajectory_digests = HashSet::with_capacity(scenarios.len());
+    let mut maximum_weight = 0.0_f64;
+    let mut scaled_weight_sum = 0.0_f64;
     let mut reach_factor_count = 0_usize;
     let mut observe_factor_count = 0_usize;
     for scenario in scenarios {
+        if scenario.scenario_id.trim().is_empty()
+            || !scenario_ids.insert(scenario.scenario_id)
+        {
+            return Err(RbkrError::InvalidScenarioSet);
+        }
+        if !is_sha256_hex(scenario.trajectory_sha256)
+            || !trajectory_digests.insert(scenario.trajectory_sha256)
+        {
+            return Err(RbkrError::InvalidScenarioSet);
+        }
         if scenario.task_contract_id != first.task_contract_id {
             return Err(RbkrError::MixedScenarioContract);
         }
@@ -181,10 +198,7 @@ pub fn aggregate_response_gramians(
         if !scenario.scenario_weight.is_finite() || scenario.scenario_weight < 0.0 {
             return Err(RbkrError::InvalidScenarioWeight);
         }
-        total_weight += scenario.scenario_weight;
-        if !total_weight.is_finite() {
-            return Err(RbkrError::InvalidScenarioWeight);
-        }
+        maximum_weight = maximum_weight.max(scenario.scenario_weight);
         if scenario.scenario_weight == 0.0 {
             continue;
         }
@@ -200,7 +214,15 @@ pub fn aggregate_response_gramians(
             .checked_add(scenario.observability.weighted_factors.len())
             .ok_or(RbkrError::ScenarioFactorStorageBudgetExceeded)?;
     }
-    if total_weight <= 0.0 {
+    if maximum_weight <= 0.0 || !maximum_weight.is_finite() {
+        return Err(RbkrError::InvalidScenarioWeight);
+    }
+    // Scale before summation to avoid overflow when individually valid
+    // scenario weights are near f64::MAX.
+    for scenario in scenarios {
+        scaled_weight_sum += scenario.scenario_weight / maximum_weight;
+    }
+    if !scaled_weight_sum.is_finite() || scaled_weight_sum <= 0.0 {
         return Err(RbkrError::InvalidScenarioWeight);
     }
 
@@ -225,7 +247,7 @@ pub fn aggregate_response_gramians(
         if scenario.scenario_weight == 0.0 {
             continue;
         }
-        let normalized_weight = scenario.scenario_weight / total_weight;
+        let normalized_weight = (scenario.scenario_weight / maximum_weight) / scaled_weight_sum;
         for factor in &scenario.reachability.weighted_factors {
             validate_factor(factor, dimension)?;
             reachability
@@ -863,6 +885,13 @@ pub struct ReducedLinearSystem {
     pub c: Vec<Vec<f64>>,
 }
 
+fn is_sha256_hex(value: &str) -> bool {
+    value.len() == 64
+        && value
+            .bytes()
+            .all(|byte| byte.is_ascii_digit() || (b'a'..=b'f').contains(&byte))
+}
+
 fn validate_factor(factor: &[f64], dimension: usize) -> Result<(), RbkrError> {
     if factor.len() != dimension {
         return Err(RbkrError::StateDimensionMismatch);
@@ -1153,6 +1182,8 @@ mod tests {
         let observe_b = gramian(2, &[vec![0.0, 2.0]]);
         let scenarios = [
             ResponseGramianScenario {
+                scenario_id: "scenario-a",
+                trajectory_sha256: "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
                 task_contract_id: "kresp1-contract-v1",
                 checkpoint_id: "checkpoint-sha256-abc",
                 state_metric_id: "nondimensional-state-metric-v1",
@@ -1161,6 +1192,8 @@ mod tests {
                 scenario_weight: 0.25,
             },
             ResponseGramianScenario {
+                scenario_id: "scenario-b",
+                trajectory_sha256: "bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb",
                 task_contract_id: "kresp1-contract-v1",
                 checkpoint_id: "checkpoint-sha256-abc",
                 state_metric_id: "nondimensional-state-metric-v1",
@@ -1201,6 +1234,8 @@ mod tests {
         let empty_reach = EmpiricalGramian::new(2).unwrap();
         let observe = gramian(2, &[vec![1.0, 0.0]]);
         let scenario = ResponseGramianScenario {
+            scenario_id: "scenario-empty",
+            trajectory_sha256: "dddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddd",
             task_contract_id: "kresp1-contract-v1",
             checkpoint_id: "checkpoint-a",
             state_metric_id: "metric-v1",
@@ -1219,6 +1254,8 @@ mod tests {
         let reach = gramian(2, &[vec![1.0, 0.0]]);
         let observe = gramian(2, &[vec![1.0, 0.0]]);
         let base = ResponseGramianScenario {
+            scenario_id: "scenario-base",
+            trajectory_sha256: "cccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccc",
             task_contract_id: "kresp1-contract-v1",
             checkpoint_id: "checkpoint-a",
             state_metric_id: "metric-v1",
