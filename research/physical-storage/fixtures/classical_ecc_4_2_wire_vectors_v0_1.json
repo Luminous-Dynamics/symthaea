@@ -1,0 +1,330 @@
+{
+  "schema_version": "classical-ecc-4-2-wire-vectors-v0.1",
+  "fixture_id": "CLASSICAL-ECC-4-2-WIRE-VECTORS-V0.1",
+  "evidence_class": "independent_mathematical_oracle",
+  "field": {
+    "name": "GF(2^8)",
+    "primitive_polynomial_hex": "0x11d",
+    "primitive_element_hex": "0x02"
+  },
+  "payload": {
+    "data_shards_ascii": [
+      "alpha",
+      "bravo",
+      "charl",
+      "delta"
+    ],
+    "data_shards_hex": [
+      "616c706861",
+      "627261766f",
+      "636861726c",
+      "64656c7461"
+    ],
+    "concatenated_payload_sha256": "d9e7a8a28af922df41b6d9dacc24a041f9fe9b9bdd476ccd58718057e0e89dfb"
+  },
+  "recovery_cases": [
+    {
+      "present": [
+        0,
+        1,
+        2,
+        3
+      ],
+      "erased": [
+        4,
+        5
+      ]
+    },
+    {
+      "present": [
+        0,
+        1,
+        2,
+        4
+      ],
+      "erased": [
+        3,
+        5
+      ]
+    },
+    {
+      "present": [
+        0,
+        1,
+        2,
+        5
+      ],
+      "erased": [
+        3,
+        4
+      ]
+    },
+    {
+      "present": [
+        0,
+        1,
+        3,
+        4
+      ],
+      "erased": [
+        2,
+        5
+      ]
+    },
+    {
+      "present": [
+        0,
+        1,
+        3,
+        5
+      ],
+      "erased": [
+        2,
+        4
+      ]
+    },
+    {
+      "present": [
+        0,
+        1,
+        4,
+        5
+      ],
+      "erased": [
+        2,
+        3
+      ]
+    },
+    {
+      "present": [
+        0,
+        2,
+        3,
+        4
+      ],
+      "erased": [
+        1,
+        5
+      ]
+    },
+    {
+      "present": [
+        0,
+        2,
+        3,
+        5
+      ],
+      "erased": [
+        1,
+        4
+      ]
+    },
+    {
+      "present": [
+        0,
+        2,
+        4,
+        5
+      ],
+      "erased": [
+        1,
+        3
+      ]
+    },
+    {
+      "present": [
+        0,
+        3,
+        4,
+        5
+      ],
+      "erased": [
+        1,
+        2
+      ]
+    },
+    {
+      "present": [
+        1,
+        2,
+        3,
+        4
+      ],
+      "erased": [
+        0,
+        5
+      ]
+    },
+    {
+      "present": [
+        1,
+        2,
+        3,
+        5
+      ],
+      "erased": [
+        0,
+        4
+      ]
+    },
+    {
+      "present": [
+        1,
+        2,
+        4,
+        5
+      ],
+      "erased": [
+        0,
+        3
+      ]
+    },
+    {
+      "present": [
+        1,
+        3,
+        4,
+        5
+      ],
+      "erased": [
+        0,
+        2
+      ]
+    },
+    {
+      "present": [
+        2,
+        3,
+        4,
+        5
+      ],
+      "erased": [
+        0,
+        1
+      ]
+    }
+  ],
+  "formats": [
+    {
+      "format_id": "SYMTHAEA-CUSTOM-MDS-6-4-3",
+      "code_parameters": {
+        "data_shards": 4,
+        "parity_shards": 2,
+        "total_shards": 6,
+        "code_rate": 0.6666666667,
+        "minimum_distance": 3
+      },
+      "generator_matrix_rows": [
+        [
+          1,
+          0,
+          0,
+          0
+        ],
+        [
+          0,
+          1,
+          0,
+          0
+        ],
+        [
+          0,
+          0,
+          1,
+          0
+        ],
+        [
+          0,
+          0,
+          0,
+          1
+        ],
+        [
+          1,
+          1,
+          1,
+          1
+        ],
+        [
+          1,
+          2,
+          3,
+          4
+        ]
+      ],
+      "parity_shards_hex": [
+        "04131c1803",
+        "8db9bcdf92"
+      ],
+      "all_four_of_six_recovery_cases_pass": true,
+      "verified_case_count": 15
+    },
+    {
+      "format_id": "REED-SOLOMON-ENGINE-0.2.0",
+      "code_parameters": {
+        "data_shards": 4,
+        "parity_shards": 2,
+        "total_shards": 6,
+        "code_rate": 0.6666666667,
+        "minimum_distance": 3
+      },
+      "generator_matrix_rows": [
+        [
+          1,
+          0,
+          0,
+          0
+        ],
+        [
+          0,
+          1,
+          0,
+          0
+        ],
+        [
+          0,
+          0,
+          1,
+          0
+        ],
+        [
+          0,
+          0,
+          0,
+          1
+        ],
+        [
+          27,
+          28,
+          18,
+          20
+        ],
+        [
+          28,
+          27,
+          20,
+          18
+        ]
+      ],
+      "parity_shards_hex": [
+        "25e5333903",
+        "3e916a7707"
+      ],
+      "all_four_of_six_recovery_cases_pass": true,
+      "verified_case_count": 15
+    }
+  ],
+  "oracle_method": {
+    "implementation": "independent standard-library Python analysis implementation",
+    "finite_field_multiplication": "polynomial reduction over 0x11d",
+    "matrix_solver": "GF(256) Gaussian elimination",
+    "comparison": "all 15 four-of-six surviving-shard subsets independently reconstructed four original data shards",
+    "caveat": "This fixture is not a Cargo run, upstream crate execution, or performance benchmark. The engine parity matrix is reconstructed from its published wire-format definition and must be checked against the exact crate implementation and upstream KATs."
+  },
+  "compatibility_finding": {
+    "same_field_polynomial": true,
+    "same_shard_geometry": true,
+    "parity_bytes_identical": false,
+    "implication": "The two formats require explicit versioned identification; a field polynomial and k/m pair alone do not define a byte-compatible code."
+  }
+}
