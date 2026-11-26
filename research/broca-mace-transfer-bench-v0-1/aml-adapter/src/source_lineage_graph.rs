@@ -212,20 +212,26 @@ pub fn replay_source_lineage_graph_v1(
         let mut root_paths = BTreeMap::<String, BTreeSet<String>>::new();
         for terminal in terminals {
             let mut stack = vec![terminal];
-            let mut seen = BTreeSet::new();
+            let mut closure_nodes = BTreeSet::new();
+            let mut terminal_roots = BTreeSet::new();
             while let Some(id) = stack.pop() {
-                if !seen.insert(id.clone()) {
+                if !closure_nodes.insert(id.clone()) {
                     continue;
                 }
                 let node = nodes.get(&id).ok_or(SourceLineageRejectV1::DanglingParent)?;
                 if node.parent_evidence_ids.is_empty() {
-                    let root_digest = source_root_identity_sha256(&node.source_id, &node.source_sha256);
-                    root_paths.entry(root_digest).or_default().insert(id);
+                    terminal_roots.insert(source_root_identity_sha256(
+                        &node.source_id, &node.source_sha256,
+                    ));
                 } else {
                     for parent in &node.parent_evidence_ids {
                         stack.push(parent.clone());
                     }
                 }
+            }
+            for root_digest in terminal_roots {
+                root_paths.entry(root_digest).or_default()
+                    .extend(closure_nodes.iter().cloned());
             }
         }
         if root_paths.is_empty() {
