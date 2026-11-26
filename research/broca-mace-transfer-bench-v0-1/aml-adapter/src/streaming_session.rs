@@ -749,7 +749,7 @@ fn receipt_digest(
     invalidation_cause: Option<StreamingInvalidationCauseV1>,
 ) -> String {
     let mut h = Sha256::new();
-    h.update(b"luminous:mace:streaming-session-receipt:v1\\0");
+    h.update(b"luminous:mace:streaming-session-receipt:v1\0");
     hash_field(&mut h, user_id);
     hash_field(&mut h, session_id);
     hash_field(&mut h, event_id);
