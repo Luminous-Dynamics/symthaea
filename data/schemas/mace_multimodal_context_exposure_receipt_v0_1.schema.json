@@ -1,0 +1,409 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://github.com/Luminous-Dynamics/symthaea/blob/main/data/schemas/mace_multimodal_context_exposure_receipt_v0_1.schema.json",
+  "title": "MACE multimodal context exposure receipt v0.1",
+  "description": "Signed client-boundary evidence for multimodal memory payloads, references and separately uploaded assets. It does not prove provider decoding, model attention or causal influence.",
+  "type": "object",
+  "additionalProperties": false,
+  "required": [
+    "schema_version",
+    "record_type",
+    "receipt_id",
+    "run_id",
+    "pair_block_id",
+    "world_cluster_id",
+    "query_id",
+    "arm",
+    "invocation_sequence",
+    "model_revision",
+    "request_capture",
+    "media_exposures",
+    "asset_transfer_receipts",
+    "no_memory_guard",
+    "renderer_profile_sha256",
+    "transport_adapter_profile_sha256",
+    "observer_profile_sha256",
+    "captured_at_monotonic_ns",
+    "signature"
+  ],
+  "properties": {
+    "schema_version": { "const": "mace_multimodal_context_exposure_receipt_v0_1" },
+    "record_type": { "const": "multimodal_model_context_exposure" },
+    "receipt_id": { "$ref": "#/$defs/id" },
+    "run_id": { "$ref": "#/$defs/id" },
+    "pair_block_id": { "$ref": "#/$defs/id" },
+    "world_cluster_id": { "$ref": "#/$defs/id" },
+    "query_id": { "$ref": "#/$defs/id" },
+    "arm": { "$ref": "#/$defs/arm" },
+    "invocation_sequence": { "type": "integer", "minimum": 0 },
+    "model_revision": { "type": "string", "minLength": 1, "maxLength": 512 },
+    "request_capture": { "$ref": "#/$defs/request_capture" },
+    "media_exposures": {
+      "type": "array",
+      "maxItems": 10000,
+      "items": { "$ref": "#/$defs/media_exposure" }
+    },
+    "asset_transfer_receipts": {
+      "type": "array",
+      "maxItems": 10000,
+      "items": { "$ref": "#/$defs/asset_transfer_receipt" }
+    },
+    "no_memory_guard": { "$ref": "#/$defs/no_memory_guard" },
+    "renderer_profile_sha256": { "$ref": "#/$defs/sha256" },
+    "transport_adapter_profile_sha256": { "$ref": "#/$defs/sha256" },
+    "observer_profile_sha256": { "$ref": "#/$defs/sha256" },
+    "captured_at_monotonic_ns": { "type": "integer", "minimum": 0 },
+    "signature": { "$ref": "#/$defs/signature" }
+  },
+  "allOf": [
+    {
+      "if": { "properties": { "arm": { "const": "no_memory" } }, "required": ["arm"] },
+      "then": {
+        "properties": {
+          "media_exposures": { "maxItems": 0 },
+          "asset_transfer_receipts": { "maxItems": 0 },
+          "no_memory_guard": {
+            "properties": {
+              "memory_derived_media_part_count": { "const": 0 },
+              "memory_derived_asset_reference_count": { "const": 0 },
+              "memory_derived_upload_count": { "const": 0 }
+            }
+          }
+        }
+      }
+    }
+  ],
+  "$defs": {
+    "sha256": {
+      "type": "string",
+      "pattern": "^[a-f0-9]{64}$"
+    },
+    "id": {
+      "type": "string",
+      "minLength": 1,
+      "maxLength": 256
+    },
+    "arm": {
+      "type": "string",
+      "enum": [
+        "no_memory",
+        "exact_scope_scan",
+        "conventional_retrieval",
+        "static_hdc",
+        "hdc_ltc",
+        "semantic_placebo",
+        "pre_correction_snapshot",
+        "post_correction_snapshot"
+      ]
+    },
+    "signature": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["algorithm", "key_id", "signature_base64"],
+      "properties": {
+        "algorithm": { "const": "Ed25519" },
+        "key_id": { "$ref": "#/$defs/id" },
+        "signature_base64": {
+          "type": "string",
+          "pattern": "^[A-Za-z0-9+/]{86}==$"
+        }
+      }
+    },
+    "artifact": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "artifact_id",
+        "plaintext_sha256",
+        "ciphertext_sha256",
+        "plaintext_bytes",
+        "storage_profile_sha256",
+        "encryption_profile_sha256",
+        "access_policy_sha256",
+        "retention_policy_sha256",
+        "custody_receipt_sha256",
+        "immutable_object"
+      ],
+      "properties": {
+        "artifact_id": { "$ref": "#/$defs/id" },
+        "plaintext_sha256": { "$ref": "#/$defs/sha256" },
+        "ciphertext_sha256": { "$ref": "#/$defs/sha256" },
+        "plaintext_bytes": { "type": "integer", "minimum": 1 },
+        "storage_profile_sha256": { "$ref": "#/$defs/sha256" },
+        "encryption_profile_sha256": { "$ref": "#/$defs/sha256" },
+        "access_policy_sha256": { "$ref": "#/$defs/sha256" },
+        "retention_policy_sha256": { "$ref": "#/$defs/sha256" },
+        "custody_receipt_sha256": { "$ref": "#/$defs/sha256" },
+        "immutable_object": { "const": true }
+      }
+    },
+    "request_capture": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "capture_point",
+        "request_media_type",
+        "provider_request_body_sha256",
+        "provider_request_body_bytes",
+        "complete_provider_request_body",
+        "request_body_artifact"
+      ],
+      "properties": {
+        "capture_point": { "const": "serialized_request_before_network_send" },
+        "request_media_type": { "type": "string", "minLength": 1, "maxLength": 128 },
+        "provider_request_body_sha256": { "$ref": "#/$defs/sha256" },
+        "provider_request_body_bytes": { "type": "integer", "minimum": 1 },
+        "complete_provider_request_body": { "const": true },
+        "request_body_artifact": { "$ref": "#/$defs/artifact" }
+      }
+    },
+    "request_span": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["start_byte", "end_byte", "span_sha256"],
+      "properties": {
+        "start_byte": { "type": "integer", "minimum": 0 },
+        "end_byte": { "type": "integer", "minimum": 1 },
+        "span_sha256": { "$ref": "#/$defs/sha256" }
+      }
+    },
+    "lineage": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "parent_event_ids",
+        "dependency_closure_sha256",
+        "transformation_receipt_sha256",
+        "source_receipt_sha256",
+        "authority_receipt_sha256",
+        "admissibility_receipt_sha256",
+        "lifecycle_revalidation_receipt_sha256"
+      ],
+      "properties": {
+        "parent_event_ids": {
+          "type": "array",
+          "items": { "$ref": "#/$defs/id" },
+          "uniqueItems": true
+        },
+        "dependency_closure_sha256": { "$ref": "#/$defs/sha256" },
+        "transformation_receipt_sha256": { "$ref": "#/$defs/sha256" },
+        "source_receipt_sha256": { "$ref": "#/$defs/sha256" },
+        "authority_receipt_sha256": { "$ref": "#/$defs/sha256" },
+        "admissibility_receipt_sha256": { "$ref": "#/$defs/sha256" },
+        "lifecycle_revalidation_receipt_sha256": { "$ref": "#/$defs/sha256" }
+      }
+    },
+    "region": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["coordinate_space", "x", "y", "width", "height"],
+      "properties": {
+        "coordinate_space": { "enum": ["source_pixels", "normalized_0_to_1"] },
+        "x": { "type": "number", "minimum": 0 },
+        "y": { "type": "number", "minimum": 0 },
+        "width": { "type": "number", "exclusiveMinimum": 0 },
+        "height": { "type": "number", "exclusiveMinimum": 0 }
+      }
+    },
+    "media_exposure": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "exposure_id",
+        "evidence_id",
+        "modality",
+        "media_type",
+        "media_payload_sha256",
+        "media_payload_bytes",
+        "context_role",
+        "message_index",
+        "part_index",
+        "content_path",
+        "transfer_mode",
+        "provider_ingress_status",
+        "request_span",
+        "lineage",
+        "media_details"
+      ],
+      "properties": {
+        "exposure_id": { "$ref": "#/$defs/id" },
+        "evidence_id": { "$ref": "#/$defs/id" },
+        "modality": { "enum": ["image", "video_frame", "audio_segment", "derived_text"] },
+        "media_type": { "type": "string", "minLength": 1, "maxLength": 128 },
+        "media_payload_sha256": { "$ref": "#/$defs/sha256" },
+        "media_payload_bytes": { "type": "integer", "minimum": 0 },
+        "context_role": { "enum": ["system", "developer", "user", "assistant", "tool"] },
+        "message_index": { "type": "integer", "minimum": 0 },
+        "part_index": { "type": "integer", "minimum": 0 },
+        "content_path": {
+          "type": "string",
+          "minLength": 1,
+          "maxLength": 2048,
+          "description": "Exact RFC 6901 JSON Pointer into the captured request body; verifier must resolve it and bind it to request_span."
+        },
+        "transfer_mode": { "enum": ["inline_request_body", "provider_asset_reference"] },
+        "provider_ingress_status": {
+          "enum": ["not_independently_observed", "upload_acknowledged", "provider_ingress_attested"]
+        },
+        "request_span": { "$ref": "#/$defs/request_span" },
+        "asset_transfer_id": { "$ref": "#/$defs/id" },
+        "provider_asset_id_sha256": { "$ref": "#/$defs/sha256" },
+        "provider_ingress_attestation_sha256": { "$ref": "#/$defs/sha256" },
+        "lineage": { "$ref": "#/$defs/lineage" },
+        "media_details": {
+          "oneOf": [
+            { "$ref": "#/$defs/image_details" },
+            { "$ref": "#/$defs/video_frame_details" },
+            { "$ref": "#/$defs/audio_segment_details" },
+            { "$ref": "#/$defs/derived_text_details" }
+          ]
+        }
+      },
+      "allOf": [
+        {
+          "if": { "properties": { "transfer_mode": { "const": "provider_asset_reference" } }, "required": ["transfer_mode"] },
+          "then": { "required": ["asset_transfer_id", "provider_asset_id_sha256"] }
+        },
+        {
+          "if": { "properties": { "provider_ingress_status": { "const": "provider_ingress_attested" } }, "required": ["provider_ingress_status"] },
+          "then": { "required": ["provider_ingress_attestation_sha256"] }
+        },
+        {
+          "if": { "properties": { "provider_ingress_status": { "const": "upload_acknowledged" } }, "required": ["provider_ingress_status"] },
+          "then": { "required": ["asset_transfer_id"] }
+        },
+        {
+          "if": { "properties": { "transfer_mode": { "const": "inline_request_body" } }, "required": ["transfer_mode"] },
+          "then": { "properties": { "provider_ingress_status": { "const": "not_independently_observed" } } }
+        }
+      ]
+    },
+    "image_details": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["kind", "width_px", "height_px"],
+      "properties": {
+        "kind": { "const": "image" },
+        "width_px": { "type": "integer", "minimum": 1 },
+        "height_px": { "type": "integer", "minimum": 1 },
+        "region": { "$ref": "#/$defs/region" },
+        "orientation_normalized": { "type": "boolean" }
+      }
+    },
+    "video_frame_details": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "kind",
+        "source_video_evidence_id",
+        "frame_index",
+        "pts_ticks",
+        "timebase_numerator",
+        "timebase_denominator",
+        "width_px",
+        "height_px"
+      ],
+      "properties": {
+        "kind": { "const": "video_frame" },
+        "source_video_evidence_id": { "$ref": "#/$defs/id" },
+        "frame_index": { "type": "integer", "minimum": 0 },
+        "pts_ticks": { "type": "integer", "minimum": 0 },
+        "timebase_numerator": { "type": "integer", "minimum": 1 },
+        "timebase_denominator": { "type": "integer", "minimum": 1 },
+        "width_px": { "type": "integer", "minimum": 1 },
+        "height_px": { "type": "integer", "minimum": 1 },
+        "region": { "$ref": "#/$defs/region" }
+      }
+    },
+    "audio_segment_details": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "kind",
+        "sample_rate_hz",
+        "channels",
+        "start_sample_frame",
+        "end_sample_frame_exclusive"
+      ],
+      "properties": {
+        "kind": { "const": "audio_segment" },
+        "sample_rate_hz": { "type": "integer", "minimum": 1 },
+        "channels": { "type": "integer", "minimum": 1 },
+        "start_sample_frame": { "type": "integer", "minimum": 0 },
+        "end_sample_frame_exclusive": { "type": "integer", "minimum": 1 },
+        "codec": { "type": "string", "minLength": 1, "maxLength": 128 },
+        "channel_layout": { "type": "string", "minLength": 1, "maxLength": 128 }
+      }
+    },
+    "derived_text_details": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["kind", "derivative_kind", "text_payload_sha256", "text_payload_bytes", "parent_media_evidence_ids"],
+      "properties": {
+        "kind": { "const": "derived_text" },
+        "derivative_kind": { "enum": ["ocr", "transcript", "caption", "description", "subtitle", "other"] },
+        "text_payload_sha256": { "$ref": "#/$defs/sha256" },
+        "text_payload_bytes": { "type": "integer", "minimum": 0 },
+        "parent_media_evidence_ids": {
+          "type": "array",
+          "minItems": 1,
+          "items": { "$ref": "#/$defs/id" },
+          "uniqueItems": true
+        }
+      }
+    },
+    "asset_transfer_receipt": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "transfer_id",
+        "evidence_id",
+        "media_payload_sha256",
+        "media_payload_bytes",
+        "upload_request_body_sha256",
+        "upload_request_body_bytes",
+        "upload_request_body_artifact",
+        "provider_response_id",
+        "provider_response_body_sha256",
+        "provider_asset_id_sha256",
+        "upload_acknowledged",
+        "captured_at_monotonic_ns",
+        "observer_profile_sha256",
+        "signature"
+      ],
+      "properties": {
+        "transfer_id": { "$ref": "#/$defs/id" },
+        "evidence_id": { "$ref": "#/$defs/id" },
+        "media_payload_sha256": { "$ref": "#/$defs/sha256" },
+        "media_payload_bytes": { "type": "integer", "minimum": 0 },
+        "upload_request_body_sha256": { "$ref": "#/$defs/sha256" },
+        "upload_request_body_bytes": { "type": "integer", "minimum": 1 },
+        "upload_request_body_artifact": { "$ref": "#/$defs/artifact" },
+        "provider_response_id": { "$ref": "#/$defs/id" },
+        "provider_response_body_sha256": { "$ref": "#/$defs/sha256" },
+        "provider_asset_id_sha256": { "$ref": "#/$defs/sha256" },
+        "upload_acknowledged": { "const": true },
+        "provider_ingress_attestation_sha256": { "$ref": "#/$defs/sha256" },
+        "captured_at_monotonic_ns": { "type": "integer", "minimum": 0 },
+        "observer_profile_sha256": { "$ref": "#/$defs/sha256" },
+        "signature": { "$ref": "#/$defs/signature" }
+      }
+    },
+    "no_memory_guard": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "evaluated",
+        "memory_derived_media_part_count",
+        "memory_derived_asset_reference_count",
+        "memory_derived_upload_count"
+      ],
+      "properties": {
+        "evaluated": { "const": true },
+        "memory_derived_media_part_count": { "type": "integer", "minimum": 0 },
+        "memory_derived_asset_reference_count": { "type": "integer", "minimum": 0 },
+        "memory_derived_upload_count": { "type": "integer", "minimum": 0 }
+      }
+    }
+  }
+}
