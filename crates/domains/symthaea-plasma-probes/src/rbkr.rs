@@ -181,8 +181,18 @@ impl ResponseBalancedBasis {
             .checked_mul(reach_count.saturating_sub(1))
             .and_then(|value| value.checked_div(2))
             .ok_or(RbkrError::JacobiWorkBudgetExceeded)?;
+        // Per column-pair sweep: norms and inner product (up to 6m
+        // operations), matrix rotations (up to 6m), right-vector rotations
+        // (up to 6n), plus scalar rotation setup. The padded 16m + 8n + 64
+        // estimate is intentionally conservative for m observation factors
+        // and n reachability factors.
+        let per_pair_work = observe_count
+            .checked_mul(16)
+            .and_then(|value| reach_count.checked_mul(8).and_then(|right| value.checked_add(right)))
+            .and_then(|value| value.checked_add(64))
+            .ok_or(RbkrError::JacobiWorkBudgetExceeded)?;
         let jacobi_work = pairs
-            .checked_mul(observe_count)
+            .checked_mul(per_pair_work)
             .and_then(|value| value.checked_mul(config.maximum_jacobi_sweeps))
             .ok_or(RbkrError::JacobiWorkBudgetExceeded)?;
         if jacobi_work > config.maximum_jacobi_scalar_operations {
@@ -730,6 +740,18 @@ mod tests {
         assert_eq!(
             ResponseBalancedBasis::from_empirical_gramians(&populated, &wrong, RbkrConfig::new(1),),
             Err(RbkrError::StateDimensionMismatch)
+        );
+    }
+
+    #[test]
+    fn jacobi_svd_work_budget_is_checked_before_factor_rotations() {
+        let reach = gramian(2, &[vec![1.0, 0.0], vec![0.0, 1.0]]);
+        let observe = gramian(2, &[vec![0.5, 0.0], vec![0.0, 0.5]]);
+        let mut config = RbkrConfig::new(1);
+        config.maximum_jacobi_scalar_operations = 1;
+        assert_eq!(
+            ResponseBalancedBasis::from_empirical_gramians(&reach, &observe, config),
+            Err(RbkrError::JacobiWorkBudgetExceeded)
         );
     }
 
