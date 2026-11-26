@@ -15,6 +15,7 @@ pub enum QueryRegimeV1 {
     CurrentState,
     HistoricalAsKnown,
     MultiHopCausal,
+    TemporalTrajectory,
     SequentialAction,
     BroadRecall,
 }
@@ -32,7 +33,9 @@ pub enum SubstrateKindV1 {
     DependencyGraph,
     SparseLexical,
     DenseSemantic,
+    EventIdHdc,
     TypedHdc,
+    TemporalHdcLtc,
     HierarchicalSummary,
     ProceduralSkill,
     LiveObservation,
@@ -46,6 +49,7 @@ pub enum RouteActionV1 {
     ExpandVerifiedParentClosure,
     SemanticCandidateLookup,
     AssociativeCandidateLookup,
+    TemporalPatternLookup,
     ReadQualifiedSummary,
     ReadRawSource,
     ReobserveMutableSource,
@@ -354,6 +358,29 @@ pub fn route_mace_query_v1(
                 &mut steps,
             )?;
         }
+        QueryRegimeV1::TemporalTrajectory => {
+            add_step(
+                SubstrateKindV1::TemporalHdcLtc,
+                RouteActionV1::TemporalPatternLookup,
+                profiles,
+                &mut selected,
+                &mut steps,
+            )?;
+            add_step(
+                SubstrateKindV1::DependencyGraph,
+                RouteActionV1::ExpandVerifiedParentClosure,
+                profiles,
+                &mut selected,
+                &mut steps,
+            )?;
+            add_step(
+                SubstrateKindV1::RawTimeline,
+                RouteActionV1::ReadRawSource,
+                profiles,
+                &mut selected,
+                &mut steps,
+            )?;
+        }
         QueryRegimeV1::SequentialAction => {
             add_step(
                 SubstrateKindV1::BitemporalLedger,
@@ -392,7 +419,9 @@ pub fn route_mace_query_v1(
             let candidates = if request.structured_content_query {
                 [
                     SubstrateKindV1::TypedHdc,
+                    SubstrateKindV1::TemporalHdcLtc,
                     SubstrateKindV1::DenseSemantic,
+                    SubstrateKindV1::EventIdHdc,
                     SubstrateKindV1::SparseLexical,
                     SubstrateKindV1::HierarchicalSummary,
                     SubstrateKindV1::RawTimeline,
@@ -401,6 +430,8 @@ pub fn route_mace_query_v1(
                 [
                     SubstrateKindV1::DenseSemantic,
                     SubstrateKindV1::TypedHdc,
+                    SubstrateKindV1::TemporalHdcLtc,
+                    SubstrateKindV1::EventIdHdc,
                     SubstrateKindV1::SparseLexical,
                     SubstrateKindV1::HierarchicalSummary,
                     SubstrateKindV1::RawTimeline,
@@ -408,7 +439,10 @@ pub fn route_mace_query_v1(
             };
             let chosen = first_available(&candidates, profiles)?;
             let action = match chosen {
-                SubstrateKindV1::TypedHdc => RouteActionV1::AssociativeCandidateLookup,
+                SubstrateKindV1::TypedHdc | SubstrateKindV1::EventIdHdc => {
+                    RouteActionV1::AssociativeCandidateLookup
+                }
+                SubstrateKindV1::TemporalHdcLtc => RouteActionV1::TemporalPatternLookup,
                 SubstrateKindV1::DenseSemantic => RouteActionV1::SemanticCandidateLookup,
                 SubstrateKindV1::SparseLexical => RouteActionV1::ExactCandidateLookup,
                 SubstrateKindV1::HierarchicalSummary => RouteActionV1::ReadQualifiedSummary,
@@ -626,6 +660,44 @@ mod tests {
         assert!(plan.steps.iter().any(|step| {
             step.action == RouteActionV1::CheckProcedurePreconditions
         }));
+    }
+
+    #[test]
+    fn temporal_trajectory_uses_hdc_ltc_with_verified_parent_closure() {
+        let req = request(QueryRegimeV1::TemporalTrajectory);
+        let profiles = [
+            profile(SubstrateKindV1::TemporalHdcLtc, cost(100, 1, 0)),
+            profile(SubstrateKindV1::DependencyGraph, cost(50, 0, 1)),
+            profile(SubstrateKindV1::RawTimeline, cost(100, 0, 0)),
+        ];
+        let plan = route_mace_query_v1(&req, &profiles).unwrap();
+        assert_eq!(
+            plan.selected_substrates.iter().map(|x| x.kind).collect::<Vec<_>>(),
+            vec![
+                SubstrateKindV1::TemporalHdcLtc,
+                SubstrateKindV1::DependencyGraph,
+                SubstrateKindV1::RawTimeline,
+            ]
+        );
+        assert!(plan.steps.iter().any(|step| {
+            step.action == RouteActionV1::TemporalPatternLookup
+        }));
+        assert!(plan.steps.iter().any(|step| {
+            step.action == RouteActionV1::ExpandVerifiedParentClosure
+        }));
+    }
+
+    #[test]
+    fn temporal_trajectory_fails_closed_without_hdc_ltc() {
+        let req = request(QueryRegimeV1::TemporalTrajectory);
+        let profiles = [
+            profile(SubstrateKindV1::DependencyGraph, cost(50, 0, 1)),
+            profile(SubstrateKindV1::RawTimeline, cost(100, 0, 0)),
+        ];
+        assert_eq!(
+            route_mace_query_v1(&req, &profiles),
+            Err(RouteRejectV1::RequiredSubstrateUnavailable)
+        );
     }
 
     #[test]
