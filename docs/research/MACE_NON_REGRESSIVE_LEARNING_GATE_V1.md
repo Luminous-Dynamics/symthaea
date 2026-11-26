@@ -101,7 +101,9 @@ Nine authored tests cover:
 4. missing verifier produces an inconclusive result;
 5. changed task populations cannot be compared as paired learning;
 6. protocol/grader drift is rejected;
-7. duplicate run IDs and out-of-range task scores are rejected;\n8. one verification receipt cannot be reused to attest all four runs;\n9. one raw run receipt cannot be replayed across run IDs.
+7. duplicate run IDs and out-of-range task scores are rejected;
+8. one verification receipt cannot be reused to attest all four runs;
+9. one raw run receipt cannot be replayed across run IDs.
 
 These tests are authored but not compiled or executed in this environment.
 
