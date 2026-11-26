@@ -432,15 +432,17 @@ fn verify_one_source_origin_receipt_v1(
         return Err(SourceOriginRejectV1::SubjectMismatch);
     }
     let subject = subjects[0].as_object().ok_or(SourceOriginRejectV1::InvalidJson)?;
+    let subject_digest = subject.get("digest").and_then(Value::as_object)
+        .ok_or(SourceOriginRejectV1::SubjectMismatch)?;
     let expected_subject_name = format!(
         "urn:luminous:mace:source-origin-node:v1:{}",
         binding.node.evidence_id,
     );
     if subject.len() != 2
+        || subject_digest.len() != 1
         || subject.get("name").and_then(Value::as_str) != Some(expected_subject_name.as_str())
-        || subject.get("digest").and_then(Value::as_object)
-            .and_then(|digest| digest.get("sha256"))
-            .and_then(Value::as_str) != Some(binding.node.source_sha256.as_str())
+        || subject_digest.get("sha256").and_then(Value::as_str)
+            != Some(binding.node.source_sha256.as_str())
     {
         return Err(SourceOriginRejectV1::SubjectMismatch);
     }
