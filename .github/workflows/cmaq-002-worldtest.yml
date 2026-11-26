@@ -16,12 +16,16 @@ on:
     types: [opened, synchronize, reopened, ready_for_review]
     branches:
       - research/cmaq-002-safe-decision-value-allocation-2026-10-31
-      - research/cmaq-018-mechanism-transfer-v0-1-20261126
+      - research/cmaq-002-worldtest-adapter-v0-6-20261125
     paths:
-      - "research/cmaq-002/**"
       - "research/cmaq-002/src/worldtest_exploration.rs"
       - "research/cmaq-002/src/worldtest_phase_contract.rs"
+      - "research/cmaq-002/src/worldtest_query_portfolio.rs"
+      - "research/cmaq-002/src/worldtest_mechanism_transfer.rs"
+      - "research/cmaq-002/src/main.rs"
+      - "research/cmaq-002/WORLDTEST_MECHANISM_TRANSFER_V0_1.md"
       - "research/cmaq-002/worldtest-*"
+      - "research/cmaq-002/WORLDTEST_QUERY_PORTFOLIO_V0_1.md"
       - "research/cmaq-002/fixtures/worldtest-*"
       - "research/cmaq-002/WORLDTEST_ADAPTER_V0_1.md"
       - ".github/workflows/cmaq-002-worldtest.yml"
@@ -48,14 +52,12 @@ jobs:
             research/cmaq-002/src/worldtest_exploration.rs
             research/cmaq-002/src/worldtest_phase_contract.rs
           )
-          for file in \
-            research/cmaq-002/src/worldtest_query_portfolio.rs \
-            research/cmaq-002/src/worldtest_mechanism_transfer.rs \
-            research/cmaq-002/src/paired_intervention.rs; do
-            if [[ -f "$file" ]]; then
-              files+=("$file")
-            fi
-          done
+          if [[ -f research/cmaq-002/src/worldtest_query_portfolio.rs ]]; then
+            files+=(research/cmaq-002/src/worldtest_query_portfolio.rs)
+          fi
+          if [[ -f research/cmaq-002/src/worldtest_mechanism_transfer.rs ]]; then
+            files+=(research/cmaq-002/src/worldtest_mechanism_transfer.rs)
+          fi
           rustfmt --check --edition 2024 "${files[@]}"
 
       - name: Run CMAQ-002 evaluator tests
