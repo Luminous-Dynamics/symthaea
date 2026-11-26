@@ -286,7 +286,7 @@ No later phase is implied by completing an earlier phase.
 
 ## 10. Adversarial qualification corpus
 
-The companion corpus begins with 44 synthetic cases across identity, scope, delegation, temporal validity, revocation, history integrity, cryptographic verification, source availability, independence, and operation replay.
+The companion corpus begins with 48 synthetic cases across identity, scope, delegation, temporal validity, revocation, history integrity, cryptographic verification, source availability, independence, and operation replay.
 
 It includes positive controls as well as attacks. Expected dispositions are finite known-answer classifications, not statistical security estimates.
 
