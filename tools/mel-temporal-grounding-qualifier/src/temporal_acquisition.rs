@@ -957,16 +957,18 @@ fn select_probability_audit(
                         let candidate = &candidates[item_index];
                         selections.push(selection_record(
                             candidate,
-                            SelectionStreamV1::ProbabilityAudit,
-                            None,
-                            SelectionReasonV1::UniformSourceWorkProbabilityDraw,
-                            Some(source_probability),
-                            Some(conditional_probability),
-                            Some(inclusion_probability),
-                            Some(eligible_sources),
-                            Some(selected_sources),
-                            Some(eligible_items_in_source_work),
-                            Some(selected_items_in_source_work),
+                            SelectionRecordMetadataV1 {
+                                stream: SelectionStreamV1::ProbabilityAudit,
+                                priority_band: None,
+                                reason: SelectionReasonV1::UniformSourceWorkProbabilityDraw,
+                                source_work_probability: Some(source_probability),
+                                item_given_source_probability: Some(conditional_probability),
+                                item_probability: Some(inclusion_probability),
+                                eligible_source_works_in_stratum: Some(eligible_sources),
+                                selected_source_works_in_stratum: Some(selected_sources),
+                                eligible_items_in_source_work: Some(eligible_items_in_source_work),
+                                selected_items_in_source_work: Some(selected_items_in_source_work),
+                            },
                         ));
                         spent = spent
                             .checked_add(candidate.annotation_cost_units)
@@ -1227,16 +1229,18 @@ fn add_active_selection(
         .or_default() += 1;
     selections.push(selection_record(
         candidate,
-        SelectionStreamV1::ActiveRefinement,
-        Some(band),
-        reason,
-        None,
-        None,
-        None,
-        None,
-        None,
-        None,
-        None,
+        SelectionRecordMetadataV1 {
+            stream: SelectionStreamV1::ActiveRefinement,
+            priority_band: Some(band),
+            reason,
+            source_work_probability: None,
+            item_given_source_probability: None,
+            item_probability: None,
+            eligible_source_works_in_stratum: None,
+            selected_source_works_in_stratum: None,
+            eligible_items_in_source_work: None,
+            selected_items_in_source_work: None,
+        },
     ));
     Ok(())
 }
@@ -1285,16 +1289,7 @@ fn active_candidate_cmp(
 
 fn selection_record(
     candidate: &AnnotationAcquisitionCandidateV1,
-    stream: SelectionStreamV1,
-    priority_band: Option<ActivePriorityBandV1>,
-    reason: SelectionReasonV1,
-    source_work_probability: Option<ProbabilityFractionV1>,
-    item_given_source_probability: Option<ProbabilityFractionV1>,
-    item_probability: Option<ProbabilityFractionV1>,
-    eligible_source_works_in_stratum: Option<usize>,
-    selected_source_works_in_stratum: Option<usize>,
-    eligible_items_in_source_work: Option<usize>,
-    selected_items_in_source_work: Option<usize>,
+    metadata: SelectionRecordMetadataV1,
 ) -> AnnotationSelectionRecordV1 {
     AnnotationSelectionRecordV1 {
         item_id: candidate.item_id.clone(),
@@ -1303,22 +1298,22 @@ fn selection_record(
         source_stratum_id: candidate.source_stratum_id.clone(),
         task_family: candidate.task_family.clone(),
         purpose_scope: candidate.purpose_scope.clone(),
-        stream,
+        stream: metadata.stream,
         annotation_cost_units: candidate.annotation_cost_units,
-        priority_band,
-        reason,
+        priority_band: metadata.priority_band,
+        reason: metadata.reason,
         model_error_ppm: candidate.model_error_ppm,
         human_disagreement_ppm: candidate.human_disagreement_ppm,
         occurrence_count_disagreement_ppm: candidate.occurrence_count_disagreement_ppm,
         prediction_coverage_ppm: candidate.prediction_coverage_ppm,
         boundary_dispersion_ms: candidate.boundary_dispersion_ms,
-        source_work_inclusion_probability: source_work_probability,
-        item_given_source_work_probability: item_given_source_probability,
-        item_inclusion_probability: item_probability,
-        eligible_source_works_in_stratum,
-        selected_source_works_in_stratum,
-        eligible_items_in_source_work,
-        selected_items_in_source_work,
+        source_work_inclusion_probability: metadata.source_work_probability,
+        item_given_source_work_probability: metadata.item_given_source_probability,
+        item_inclusion_probability: metadata.item_probability,
+        eligible_source_works_in_stratum: metadata.eligible_source_works_in_stratum,
+        selected_source_works_in_stratum: metadata.selected_source_works_in_stratum,
+        eligible_items_in_source_work: metadata.eligible_items_in_source_work,
+        selected_items_in_source_work: metadata.selected_items_in_source_work,
     }
 }
 
