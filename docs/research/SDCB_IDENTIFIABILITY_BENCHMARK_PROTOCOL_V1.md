@@ -112,7 +112,7 @@ Paper: https://arxiv.org/abs/2610.11236
 
 ### UCI Gas Sensor Array Drift
 
-Use the chronological batches for drift/channel robustness. Its 16 channels are a single sensor array, not 16 independent deployed instruments. The dataset terms are research-only and exclude commercial use; do not mirror or use commercially without permission.
+Use the chronological batches for drift/channel robustness. Its 16 channels are a single sensor array, not 16 independent deployed instruments. The live UCI records contain an internal licence conflict. The narrative dataset-information text says the data are research-only and excludes commercial use (dataset 224 and the concentration extension 270), while each record's structured License field reports CC BY 4.0 and says reuse/adaptation for any purpose is permitted with attribution. Treat the licence as unresolved until UCI/the dataset steward clarifies which statement governs the downloaded release. Preserve the exact dataset ID, download date, page snapshot, and written clarification. Until then, do not make a commercial-use or redistribution claim; keep the work in research-only handling as the conservative operational choice.
 
 ### Additional field-study comparator
 
