@@ -419,7 +419,7 @@ fn validate_synthetic_input(
                     != task.authority_snapshot.principal_id.as_deref()
                 || Some(json_string(&artifact, "subject_id", task, input)?)
                     != task.authority_snapshot.subject_id.as_deref()
-                || json_string(&artifact, "status", task, input)? != task.authority_snapshot.status
+                || json_string(&artifact, "status", task, input)? != task.authority_snapshot.status.as_str()
             {
                 bail!(
                     "{}: consent fixture '{}' does not match the authority snapshot",
@@ -478,7 +478,7 @@ fn validate_synthetic_input(
                 != "luminous.eqc.synthetic-challenge.v0.1"
                 || Some(json_string(&artifact, "challenge_id", task, input)?)
                     != task.request.challenge_id.as_deref()
-                || json_string(&artifact, "issuer_id", task, input)? != task.actor.actor_id
+                || json_string(&artifact, "issuer_id", task, input)? != task.actor.actor_id.as_str()
                 || json_string(&artifact, "subject_id", task, input)? != task.subject.subject_id
                 || json_string(&artifact, "state", task, input)?
                     != task.request.challenge_state.as_deref().unwrap_or("")
@@ -555,21 +555,58 @@ fn is_sha256(value: &str) -> bool {
             .all(|byte| byte.is_ascii_hexdigit() && !byte.is_ascii_uppercase())
 }
 
+fn parse_decimal(bytes: &[u8]) -> Option<u32> {
+    std::str::from_utf8(bytes).ok()?.parse().ok()
+}
+
 fn is_canonical_utc(value: &str) -> bool {
     let bytes = value.as_bytes();
-    bytes.len() == 20
-        && bytes[4] == b'-'
-        && bytes[7] == b'-'
-        && bytes[10] == b'T'
-        && bytes[13] == b':'
-        && bytes[16] == b':'
-        && bytes[19] == b'Z'
-        && bytes
-            .iter()
-            .enumerate()
-            .all(|(index, byte)| {
-                matches!(index, 4 | 7 | 10 | 13 | 16 | 19) || byte.is_ascii_digit()
-            })
+    if bytes.len() != 20
+        || bytes[4] != b'-'
+        || bytes[7] != b'-'
+        || bytes[10] != b'T'
+        || bytes[13] != b':'
+        || bytes[16] != b':'
+        || bytes[19] != b'Z'
+    {
+        return false;
+    }
+
+    let year = match parse_decimal(&bytes[0..4]) {
+        Some(value) if value > 0 => value,
+        _ => return false,
+    };
+    let month = match parse_decimal(&bytes[5..7]) {
+        Some(value @ 1..=12) => value,
+        _ => return false,
+    };
+    let day = match parse_decimal(&bytes[8..10]) {
+        Some(value) => value,
+        None => return false,
+    };
+    let hour = match parse_decimal(&bytes[11..13]) {
+        Some(value @ 0..=23) => value,
+        _ => return false,
+    };
+    let minute = match parse_decimal(&bytes[14..16]) {
+        Some(value @ 0..=59) => value,
+        _ => return false,
+    };
+    let second = match parse_decimal(&bytes[17..19]) {
+        Some(value @ 0..=59) => value,
+        _ => return false,
+    };
+    let _ = (hour, minute, second);
+
+    let leap_year = year % 4 == 0 && (year % 100 != 0 || year % 400 == 0);
+    let maximum_day = match month {
+        1 | 3 | 5 | 7 | 8 | 10 | 12 => 31,
+        4 | 6 | 9 | 11 => 30,
+        2 if leap_year => 29,
+        2 => 28,
+        _ => return false,
+    };
+    (1..=maximum_day).contains(&day)
 }
 
 #[cfg(test)]
