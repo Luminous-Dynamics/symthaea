@@ -36,18 +36,30 @@ impl FailureFidelityContract {
 
 #[derive(Clone, Debug, Eq, PartialEq)]
 pub struct FailureSignature {
-    pub reason_id: String,
-    pub stage_id: String,
-    pub stage_index: u32,
+    /// None explicitly means the failure reason was indeterminate/unjudgable.
+    pub reason_id: Option<String>,
+    /// None explicitly means the decisive execution stage could not be judged.
+    pub stage_id: Option<String>,
+    pub stage_index: Option<u32>,
 }
 
 impl FailureSignature {
     fn validate(&self, stage_count: u32) -> Result<(), String> {
-        if self.reason_id.trim().is_empty() || self.stage_id.trim().is_empty() {
-            return Err("failure reason and stage IDs must be non-empty".to_owned());
+        if self.reason_id.as_ref().is_some_and(|reason| reason.trim().is_empty()) {
+            return Err("known failure reason IDs must be non-empty".to_owned());
         }
-        if self.stage_index >= stage_count {
-            return Err("failure stage index is outside the frozen stage contract".to_owned());
+        if self.stage_id.as_ref().is_some_and(|stage| stage.trim().is_empty()) {
+            return Err("known failure stage IDs must be non-empty".to_owned());
+        }
+        match (&self.stage_id, self.stage_index) {
+            (None, None) => {}
+            (Some(_), Some(index)) if index < stage_count => {}
+            (Some(_), Some(_)) => {
+                return Err("failure stage index is outside the frozen stage contract".to_owned());
+            }
+            _ => {
+                return Err("unknown stage ID and stage index must both be absent".to_owned());
+            }
         }
         Ok(())
     }
@@ -329,9 +341,9 @@ mod tests {
 
     fn failure(reason: &str, stage: &str, stage_index: u32) -> OutcomeLabel {
         OutcomeLabel::Failure(FailureSignature {
-            reason_id: reason.to_owned(),
-            stage_id: stage.to_owned(),
-            stage_index,
+            reason_id: Some(reason.to_owned()),
+            stage_id: Some(stage.to_owned()),
+            stage_index: Some(stage_index),
         })
     }
 
@@ -355,6 +367,40 @@ mod tests {
             reference,
             predicted,
         }
+    }
+
+
+
+    fn indeterminate_failure() -> OutcomeLabel {
+        OutcomeLabel::Failure(FailureSignature {
+            reason_id: None,
+            stage_id: None,
+            stage_index: None,
+        })
+    }
+
+    #[test]
+    fn unjudgable_failure_labels_remain_explicit_and_are_not_forced_into_known_classes() {
+        let records = vec![
+            record(
+                "reference-unjudgable",
+                "cluster-1",
+                indeterminate_failure(),
+                indeterminate_failure(),
+            ),
+            record(
+                "candidate-abstains-on-known-failure",
+                "cluster-2",
+                failure("missed_contact", "grasp", 1),
+                indeterminate_failure(),
+            ),
+        ];
+        let score = score_failure_fidelity(&records, &contract()).expect("valid records");
+        assert_eq!(score.reference_failures, 2);
+        assert_eq!(score.false_successes, 0);
+        assert_eq!(score.failure_capture_recall, Some(1.0));
+        assert_eq!(score.reason_accuracy, Some(0.5));
+        assert_eq!(score.stage_accuracy, Some(0.5));
     }
 
     #[test]
