@@ -274,7 +274,7 @@ A scenario contains:
 - query source-root IDs and per-query tool, latency, token, byte and utility-cost units;
 - finite horizon and per-path budgets.
 
-The joint-world table is the important independence boundary. Two queries over mirrored pages can have different query IDs but the same root IDs and the same observation mapping across worlds. Their outcomes remain correlated. The evaluator does not multiply marginal query likelihoods under a false conditional-independence assumption. Stochastic observations can be represented by multiple latent worlds with the same decision state and different observation assignments.
+The joint-world table is the important independence boundary. Two queries over mirrored pages can have different query IDs but the same root IDs and correlated observation assignments across worlds. Their dependence is represented in the complete joint outcome table; the evaluator does not multiply marginal query likelihoods under a false conditional-independence assumption. Stochastic observations can be represented by multiple latent worlds with the same decision state and different observation assignments. The evaluator does not infer or prove causal dependence from root IDs on its own: the scenario builder must provide a defensible joint-world table and independently grounded root-family labels.
 
 ### Expected-value objective
 
@@ -288,7 +288,7 @@ where (h_w) is the observation history for world (w), and (C_pi(w)) is the accum
 
 ### Probability-free robust objective
 
-Robust mode ignores all probability fields and evaluates the conservative possible-world support:
+Robust mode ignores all probability fields and evaluates the consumer-declared conservative possible-world support. If that support omits a real state or outcome, the minimax guarantee does not apply:
 
 [
 J_R(pi)=max_{w in W_{possible}}
@@ -310,7 +310,7 @@ The search rejects scenarios exceeding the fixed small-world limits (8 states, 6
 
 The evaluator's portable input contract is [mace_adaptive_reference_scenario_v1.schema.json](../../data/schemas/mace_adaptive_reference_scenario_v1.schema.json), with a worked [finite joint-world example](../../data/fixtures/mace_adaptive_reference_scenario_v1.example.json). The schema validates JSON shape and primitive bounds; the Rust validator additionally enforces cross-table key coverage, uniqueness and probability-mass invariants. The example contains no production trust material or signatures.
 
-The Rust module currently authors fixtures for:
+The Rust module currently authors 15 deterministic test functions covering:
 - conditional routing to different follow-up queries;
 - exact EVSI and robust evaluation over joint worlds;
 - duplicate source roots with mirrored observations;
