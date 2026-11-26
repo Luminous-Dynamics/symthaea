@@ -218,7 +218,7 @@ pub enum MaceContextExposureRejectV1 {
     InvalidAdmissionStatus, DuplicateDeniedEvidence, DeniedEvidenceExposed,
     InvalidResponseBinding, InvalidSignatureAlgorithm, InvalidSignatureEncoding,
     InvalidObserverKeyId, UnknownObserverKey, SignatureMismatch,
-    InvalidRequestBody, ProviderParameterNotScalar, UnclassifiedProviderParameterKey,
+    InvalidRequestBody, UnclassifiedProviderParameterKey,
     ProviderParameterTypeMismatch, ExposureOutsideMessageContent,
     ExposureRoleMismatch,
     EvidenceAdmissionRejected, MemoryExposureInNoMemoryArm,
@@ -1036,7 +1036,18 @@ mod tests {
     #[test]
     fn rejects_nested_request_parameter_objects() {
         let (mut receipt, key, _) = fixture();
-        let body = br#"{"model":"model-pinned-1","messages":[{"role":"user","content":"context"}],"tools":{"description":"hidden dynamic text"}}"#;
+        let body = br#"{"model":"model-pinned-1","messages":[{"role":"user","content":"context"}],"temperature":{"nested":"hidden dynamic text"}}"#;
+        refresh_body_binding(&mut receipt, body, &key);
+        assert_eq!(
+            verify_fixture(&receipt, body.to_vec(), &key, &expected(), &AcceptEvidence).unwrap_err(),
+            MaceContextExposureRejectV1::ProviderParameterTypeMismatch
+        );
+    }
+
+    #[test]
+    fn rejects_unclassified_provider_parameter_names() {
+        let (mut receipt, key, _) = fixture();
+        let body = br#"{"model":"model-pinned-1","messages":[{"role":"user","content":"context"}],"instructions":true}"#;
         refresh_body_binding(&mut receipt, body, &key);
         assert_eq!(
             verify_fixture(&receipt, body.to_vec(), &key, &expected(), &AcceptEvidence).unwrap_err(),
