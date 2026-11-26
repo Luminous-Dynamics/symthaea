@@ -221,6 +221,7 @@ pub struct ContextualPrediction {
 
 #[derive(Debug, Clone)]
 struct ContextDeltaEntry {
+    environment_family_id: String,
     context: ContinuousHV,
     delta: ContinuousHV,
     observation_count: usize,
@@ -392,6 +393,7 @@ impl NixWorldModel {
         let best_match = entries
             .iter()
             .enumerate()
+            .filter(|(_, entry)| entry.environment_family_id == episode.environment_family_id)
             .map(|(index, entry)| (index, entry.context.similarity(&episode.context)))
             .filter(|(_, similarity)| similarity.is_finite())
             .max_by(|left, right| left.1.total_cmp(&right.1));
@@ -423,6 +425,7 @@ impl NixWorldModel {
             let mut independent_cluster_ids = HashSet::new();
             independent_cluster_ids.insert(episode.independent_cluster_id.clone());
             entries.push(ContextDeltaEntry {
+                environment_family_id: episode.environment_family_id.clone(),
                 context: episode.context.clone(),
                 delta: observed_delta,
                 observation_count: 1,
@@ -445,6 +448,7 @@ impl NixWorldModel {
         &self,
         state: &ContinuousHV,
         action: &ActionCategory,
+        environment_family_id: &str,
         context: &ContinuousHV,
     ) -> Result<ContextualPrediction, String> {
         if state.as_slice().len() != self.dim
@@ -459,6 +463,7 @@ impl NixWorldModel {
             entries
                 .iter()
                 .enumerate()
+                .filter(|(_, entry)| entry.environment_family_id == environment_family_id)
                 .map(|(index, entry)| (index, entry.context.similarity(context)))
                 .filter(|(_, similarity)| similarity.is_finite())
                 .max_by(|left, right| left.1.total_cmp(&right.1))
@@ -1131,6 +1136,7 @@ mod tests {
         let learned = wm.predict_state_with_context(
             &before,
             &ActionCategory::Rollback,
+            "nix-build-family",
             &context,
         ).expect("valid contextual prediction");
         assert_eq!(learned.source, ContextualPredictionSource::ContextualDelta);
@@ -1139,6 +1145,7 @@ mod tests {
         let not_learned = wm.predict_state_with_context(
             &before,
             &ActionCategory::Install,
+            "nix-build-family",
             &context,
         ).expect("valid fallback prediction");
         assert_eq!(
@@ -1169,6 +1176,7 @@ mod tests {
         let prediction = wm.predict_state_with_context(
             &before,
             &ActionCategory::Rebuild,
+            "nix-build-family",
             &context,
         ).expect("valid prediction");
         assert_eq!(prediction.source, ContextualPredictionSource::ContextualDelta);
@@ -1239,11 +1247,13 @@ mod tests {
         let prediction_a = wm.predict_state_with_context(
             &state,
             &ActionCategory::Install,
+            "nix-build-family",
             &context_a,
         ).expect("context a prediction");
         let prediction_b = wm.predict_state_with_context(
             &state,
             &ActionCategory::Install,
+            "nix-build-family",
             &context_b,
         ).expect("context b prediction");
 
@@ -1290,6 +1300,7 @@ mod tests {
         let prediction = wm.predict_state_with_context(
             &state,
             &ActionCategory::Update,
+            "nix-build-family",
             &context,
         ).expect("valid prediction");
         assert_eq!(prediction.observation_count, 2);
@@ -1322,6 +1333,47 @@ mod tests {
         assert_eq!(wm.total_observations(), 1);
     }
 
+
+
+    #[test]
+    fn contextual_deltas_do_not_cross_environment_family_boundaries() {
+        let dim = 256;
+        let mut wm = NixWorldModel::new(dim);
+        let state = ContinuousHV::random(dim, 60);
+        let context = ContinuousHV::random(dim, 61);
+        let after = ContinuousHV::random(dim, 62);
+        let mut episode = transition_episode(
+            "family-a",
+            ActionCategory::Install,
+            ActionCategory::Install,
+            state.clone(),
+            context.clone(),
+            after,
+            TransitionOutcomeClass::Success,
+            "cluster-a",
+        );
+        wm.learn_episode(&episode).expect("family a episode");
+        episode.episode_id = "family-b".to_owned();
+        episode.environment_family_id = "different-mechanism".to_owned();
+        episode.independent_cluster_id = "cluster-b".to_owned();
+        episode.execution = TransitionExecution::Executed {
+            realized_action: ActionCategory::Install,
+            outcome: TransitionOutcomeClass::Failure,
+            state_after: ContinuousHV::random(dim, 63),
+            state_after_sha256: "e".repeat(64),
+        };
+        wm.learn_episode(&episode).expect("family b episode");
+
+        let prediction = wm.predict_state_with_context(
+            &state,
+            &ActionCategory::Install,
+            "nix-build-family",
+            &context,
+        ).expect("family-scoped prediction");
+        assert_eq!(prediction.source, ContextualPredictionSource::ContextualDelta);
+        assert_eq!(prediction.independent_cluster_count, 1);
+    }
+
     #[test]
     fn contextual_prediction_falls_back_visibly_when_context_is_unseen() {
         let dim = 256;
@@ -1344,6 +1396,7 @@ mod tests {
         let prediction = wm.predict_state_with_context(
             &state,
             &ActionCategory::Install,
+            "nix-build-family",
             &context_b,
         ).expect("fallback prediction");
         assert_eq!(
@@ -1364,16 +1417,13 @@ mod tests {
             &ContinuousHV::zero(dim),
         ).is_err());
 
-        let mut invalid_context = ContinuousHV::zero(dim);
-        // A finite-vector validation path is exercised without mutating the model.
-        let prediction = wm.predict_state_with_context(
+        let invalid_context = ContinuousHV::from_vec(vec![f32::NAN; dim]);
+        assert!(wm.predict_state_with_context(
             &ContinuousHV::zero(dim),
             &ActionCategory::Install,
+            "nix-build-family",
             &invalid_context,
-        );
-        assert!(prediction.is_ok());
-        invalid_context = ContinuousHV::zero(dim);
-        assert_eq!(invalid_context.as_slice().len(), dim);
+        ).is_err());
     }
 
 }
