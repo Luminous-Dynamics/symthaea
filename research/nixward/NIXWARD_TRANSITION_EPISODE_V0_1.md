@@ -90,7 +90,8 @@ This is a retrieval-and-abstention policy, not a causal mechanism identifier. If
 
 - family-label-free context retrieval across known buckets;
 - UNKNOWN when equally matched family buckets imply conflicting deltas;
-- global-delta fallback for an unseen context under the family-label-free API;
+- global-delta fallback for an unseen context and identity fallback for an unknown action under the family-label-free API;
+- order-invariant aggregation for equivalent cross-family buckets and deduplication of repeated independent-cluster IDs;
 
 ## Research matrix and next tests
 
