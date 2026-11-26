@@ -17,6 +17,7 @@ pub mod sealed_evaluation_manifest;
 pub mod rfc9162_proofs;
 pub mod mace_evaluation_anchor_payload;
 pub mod mon005_record_adapter;
+pub mod mace_context_exposure_receipt;
 
 // Copyright (C) 2026 Luminous Dynamics
 // SPDX-License-Identifier: AGPL-3.0-or-later
