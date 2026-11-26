@@ -1,0 +1,51 @@
+{
+  "@context": {
+    "prov": "http://www.w3.org/ns/prov#",
+    "mace": "https://luminousdynamics.io/ns/mace#",
+    "wasDerivedFrom": {
+      "@id": "prov:wasDerivedFrom",
+      "@type": "@id",
+      "@container": "@set"
+    },
+    "wasGeneratedBy": {
+      "@id": "prov:wasGeneratedBy",
+      "@type": "@id"
+    },
+    "used": {
+      "@id": "prov:used",
+      "@type": "@id",
+      "@container": "@set"
+    },
+    "wasAssociatedWith": {
+      "@id": "prov:wasAssociatedWith",
+      "@type": "@id",
+      "@container": "@set"
+    },
+    "wasAttributedTo": {
+      "@id": "prov:wasAttributedTo",
+      "@type": "@id",
+      "@container": "@set"
+    },
+    "sha256": "mace:sha256",
+    "payloadSha256": "mace:payloadSha256",
+    "evidenceClassSha256": "mace:evidenceClassSha256",
+    "decisionNeedSha256": "mace:decisionNeedSha256",
+    "derivationReceiptSha256": "mace:derivationReceiptSha256",
+    "commonCauseGroupSha256": {
+      "@id": "mace:commonCauseGroupSha256",
+      "@container": "@set"
+    },
+    "operatorId": "mace:operatorId",
+    "failureDomainSha256": "mace:failureDomainSha256",
+    "publisherIdentitySha256": "mace:publisherIdentitySha256",
+    "acquisitionRecordSha256": "mace:acquisitionRecordSha256",
+    "sourceRevisionSha256": "mace:sourceRevisionSha256",
+    "sourceOriginReceiptSha256": "mace:sourceOriginReceiptSha256",
+    "witnessPolicySha256": "mace:witnessPolicySha256",
+    "observedAt": {
+      "@id": "mace:observedAt",
+      "@type": "http://www.w3.org/2001/XMLSchema#dateTime"
+    },
+    "activityKind": "mace:activityKind"
+  }
+}
