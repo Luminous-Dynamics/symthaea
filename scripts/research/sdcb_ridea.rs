@@ -5,13 +5,16 @@
 //!   rustc --edition=2024 --test scripts/research/sdcb_ridea.rs -o /tmp/sdcb-ridea
 //!
 //! The equations follow Tang, Sloman & Kaski (AISTATS 2026), Section 4:
-//! R-I = EIG * (1 - lambda * MMD(history + candidate, target) /
-//!                    MMD(history, target))
+//! The paper displays an MMD ratio, but the pinned released implementation
+//! returns biased empirical MMD^2 from compute_mmd/compute_mmd_dispersion and
+//! uses the squared values directly:
+//! R-I_code = EIG * (1 - lambda * MMD2(history + candidate, target) /
+//!                         MMD2(history, target)).
 //! DeA = sigmoid((abs(f_hat(candidate) - g(candidate)) - tau) / kappa)
 //! R-IDeA = R-I * DeA
 //!
-//! This reference uses the paper's biased empirical MMD^2 estimator with an
-//! RBF kernel (fixed sigma is caller-supplied), then its square root as MMD.
+//! This reference matches the released code's biased empirical MMD^2 ratio.
+//! A separate mmd_rbf helper returns sqrt(MMD2), but it is not used in R-I.
 //! It accepts a proxy prediction g from an external proxy model: it does not
 //! train that proxy. Cost-per-unit ranking is reported as a separate project
 //! extension and is NOT part of the original R-IDeA acquisition equation.
