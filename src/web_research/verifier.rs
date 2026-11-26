@@ -422,7 +422,7 @@ mod tests {
         let verifier = EpistemicVerifier::new();
         let sources = (0..3)
             .map(|index| SourceEvidence {
-                url: format!("https://trusted{index}.example/evidence"),
+                url: format!("https://rust-lang.org/evidence/{index}"),
                 domain: "rust-lang.org".to_string(),
                 source_type: ResearchSource::Documentation,
                 relevant_text: "Highly relevant retrieval text, but no adjudicated relation".to_string(),
@@ -450,7 +450,7 @@ mod tests {
         let results = (0..3)
             .map(|index| WebResearchResult {
                 title: format!("Retrieved document {index}"),
-                url: format!("https://trusted{index}.example/document"),
+                url: format!("https://doc.rust-lang.org/document/{index}"),
                 content: "Page content not adjudicated against the claim".to_string(),
                 summary: "High-relevance page summary".to_string(),
                 source_type: ResearchSource::Documentation,
