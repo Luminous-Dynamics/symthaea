@@ -1,0 +1,69 @@
+{
+  "schema": "symthaea.formal.sym-fv-xenia-001.v1",
+  "issue": 6141,
+  "evidence_class": "AbstractFormalTheorem",
+  "status_at_source_creation": "source-implemented-not-yet-executed-qualified",
+  "exact_parent": {
+    "branch": "main",
+    "commit": "fbd7a754ea8389ca93f7680d93ed8b48553e6376"
+  },
+  "cross_repository_design_target": {
+    "repository": "Luminous-Dynamics/xenia-wire",
+    "issue": 78,
+    "profile": "XEN-WIRE-V2-001",
+    "relationship": "future-profile-design-target-no-production-source-refinement-yet"
+  },
+  "theorem_file": {
+    "path": "formal/lean/security/XeniaV2Nonce.lean",
+    "blob": "423b1e7865b107f6e9321f7bbcdd662353979d2d",
+    "requires_mathlib": false,
+    "requires_user_axioms": false,
+    "required_theorems": [
+      "xor_fixed_injective",
+      "pad64_injective",
+      "xor_nonce_fixed_injective",
+      "nonce_from_sequence_injective",
+      "distinct_sequences_distinct_nonces"
+    ],
+    "proof_holes_permitted": false,
+    "axiom_census": "Lean #print axioms output retained by qualification run"
+  },
+  "abstract_subject": {
+    "sequence_width_bits": 64,
+    "nonce_width_bits": 96,
+    "padding": "zero32 || sequence64",
+    "nonce_function": "fixed_iv XOR pad64(sequence)",
+    "iv_scope": "one exact fixed-IV traffic context"
+  },
+  "proved_if_qualified": [
+    "zero-prefix 64-to-96 padding is injective",
+    "XOR by one fixed 96-bit IV is injective",
+    "equal nonces under one fixed IV imply equal sequence values",
+    "distinct sequence values produce distinct nonces under one fixed IV"
+  ],
+  "hostile_controls": [
+    "constant-or-bit-dropping-padding-must-not-be-accepted-as-injective",
+    "partial-XOR-transform-that-discards-input-bits-must-not-be-accepted-as-injective",
+    "generic-known-bad-Lean-subject-must-return-nonzero",
+    "claim-escalation-to-KDF-output-distinctness-must-be-rejected-by-contract"
+  ],
+  "future_refinement_obligations": [
+    "u64/network-byte-order encoding to abstract 64-bit sequence",
+    "12-byte nonce serialization to abstract Nonce96",
+    "successful-seal allocator monotonicity and no-wrap refusal",
+    "key-IV install/reset lifecycle",
+    "exclusive sender ownership",
+    "direction-lane-generation KDF assurance",
+    "AEAD usage-limit policy"
+  ],
+  "nonclaims": [
+    "not-proof-hkdf-outputs-differ",
+    "not-byte-order-or-serialization-refinement",
+    "not-allocator-no-wrap-proof",
+    "not-exclusive-sender-ownership-proof",
+    "not-reset-or-recovery-safety-proof",
+    "not-aead-primitive-security-proof",
+    "not-aead-usage-limit-analysis",
+    "not-production-xenia-v2-qualification"
+  ]
+}
