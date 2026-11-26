@@ -650,6 +650,28 @@ fn nominal_alpha_for_units(units: &[&TemporalReliabilityUnitV1]) -> Result<Optio
     Ok(Some(1.0 - observed / expected))
 }
 
+fn bootstrap_cluster_means(
+    cluster_values: &[f64],
+    replicates: usize,
+    state: &mut u64,
+) -> Vec<f64> {
+    let cluster_count = cluster_values.len();
+    if cluster_count == 0 || replicates == 0 {
+        return Vec::new();
+    }
+
+    (0..replicates)
+        .map(|_| {
+            let mut sum = 0.0;
+            for _ in 0..cluster_count {
+                let index = unbiased_index(state, cluster_count);
+                sum += cluster_values[index];
+            }
+            sum / cluster_count as f64
+        })
+        .collect()
+}
+
 fn next_splitmix64(state: &mut u64) -> u64 {
     *state = state.wrapping_add(0x9E37_79B9_7F4A_7C15);
     let mut value = *state;
@@ -1071,6 +1093,21 @@ mod tests {
             interval_iou_thresholds: vec![0.25, 0.5, 0.75, 0.9],
             units,
         }
+    }
+
+    #[test]
+    fn source_work_cluster_bootstrap_is_deterministic_and_resamples_clusters() {
+        let values = [0.0, 0.5, 1.0];
+        let mut first_state = 0x2026_1125;
+        let mut second_state = 0x2026_1125;
+        let first = bootstrap_cluster_means(&values, 2_000, &mut first_state);
+        let second = bootstrap_cluster_means(&values, 2_000, &mut second_state);
+        assert_eq!(first, second);
+        assert_eq!(first.len(), 2_000);
+        assert!(first.iter().all(|value| (0.0..=1.0).contains(value)));
+        let mut empty_state = 1;
+        assert!(bootstrap_cluster_means(&[], 1_000, &mut empty_state).is_empty());
+        assert!(bootstrap_cluster_means(&values, 0, &mut empty_state).is_empty());
     }
 
     #[test]
