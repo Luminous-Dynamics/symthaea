@@ -15,3 +15,5 @@ pub mod temporal_revision;
 pub mod audio_evidence_window;
 
 pub mod audio_revision_binding;
+
+pub mod audio_evidence_in_toto;
