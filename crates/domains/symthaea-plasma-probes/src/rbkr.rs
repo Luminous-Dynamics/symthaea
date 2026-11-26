@@ -188,7 +188,11 @@ impl ResponseBalancedBasis {
         // and n reachability factors.
         let per_pair_work = observe_count
             .checked_mul(16)
-            .and_then(|value| reach_count.checked_mul(8).and_then(|right| value.checked_add(right)))
+            .and_then(|value| {
+                reach_count
+                    .checked_mul(8)
+                    .and_then(|right| value.checked_add(right))
+            })
             .and_then(|value| value.checked_add(64))
             .ok_or(RbkrError::JacobiWorkBudgetExceeded)?;
         let jacobi_work = pairs
