@@ -22,6 +22,22 @@ const REPORT_SCHEMA_V1: &str = "mel-temporal-annotation-reliability-report-v1";
 const RELIABILITY_EVALUATOR_V1: &str = "mel-temporal-annotation-reliability-v1";
 const MAX_ANNOTATIONS_PER_UNIT_V1: usize = 256;
 
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize, PartialOrd, Ord)]
+pub enum AnnotationNonresponseReasonV1 {
+    NotReturned,
+    Declined,
+    Withdrawn,
+    TechnicalFailure,
+    Incomplete,
+}
+
+#[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
+#[serde(deny_unknown_fields)]
+pub struct AnnotationNonresponseV1 {
+    pub annotator_id_sha256: String,
+    pub reason: AnnotationNonresponseReasonV1,
+}
+
 #[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
 #[serde(deny_unknown_fields)]
 pub struct TemporalReliabilityUnitV1 {
@@ -33,7 +49,11 @@ pub struct TemporalReliabilityUnitV1 {
     pub query_text: String,
     pub artifact: AudioArtifactClockV1,
     pub annotation_manifest_sha256: String,
+    /// Frozen per-item assigned rater roster, using opaque identity commitments.
+    pub assigned_annotator_ids_sha256: Vec<String>,
     pub annotations: Vec<IndependentTemporalAnnotationV1>,
+    /// Every assigned rater without a returned annotation must be represented here.
+    pub nonresponses: Vec<AnnotationNonresponseV1>,
 }
 
 #[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
@@ -123,7 +143,15 @@ pub struct SourceWorkTemporalThresholdBootstrapV1 {
 pub struct TemporalReliabilityUnitSummaryV1 {
     pub unit_id: String,
     pub source_lineage_sha256: String,
+    pub assigned_annotator_ids_sha256: Vec<String>,
+    pub assigned_annotator_count: usize,
     pub annotation_count: usize,
+    pub nonresponse_count: usize,
+    pub nonresponse_reason_counts: BTreeMap<String, usize>,
+    /// Raw independent label records are retained in the report.
+    pub annotations: Vec<IndependentTemporalAnnotationV1>,
+    /// Raw nonresponse records remain distinct from Ambiguous/NotEstimable labels.
+    pub nonresponses: Vec<AnnotationNonresponseV1>,
     pub disposition_pair_count: usize,
     pub disposition_agreement_rate: Option<f64>,
     pub pairwise_by_iou_threshold: Vec<TemporalPairwiseReliabilityV1>,
@@ -138,7 +166,17 @@ pub struct TemporalReliabilityReportV1 {
     pub source_work_clusters: usize,
     pub total_annotation_records: usize,
     pub minimum_annotations_per_unit: u16,
-    /// Formal alpha applies only to the nominal four-state disposition.
+    pub assigned_rater_item_assignments: usize,
+    pub returned_rater_item_annotations: usize,
+    pub missing_rater_item_assignments: usize,
+    pub overall_annotation_coverage: Option<f64>,
+    pub complete_items: usize,
+    pub items_with_nonresponse: usize,
+    pub missing_reason_counts: BTreeMap<String, usize>,
+    pub annotator_coverage: Vec<AnnotatorCoverageV1>,
+    /// Source-work bootstrap treats the observed annotator panel as fixed.
+    pub source_work_bootstrap_rater_panel_fixed: bool,
+    /// Formal alpha applies only to returned nominal disposition ratings.
     pub disposition_alpha: NominalKrippendorffAlphaV1,
     pub disposition_alpha_source_work_bootstrap: Option<SourceWorkAlphaBootstrapV1>,
     pub pairwise_temporal_source_work_bootstrap: Vec<SourceWorkTemporalThresholdBootstrapV1>,
@@ -153,12 +191,45 @@ pub struct TemporalReliabilityReportV1 {
     pub source_work_bootstrap_computed: bool,
 }
 
+#[derive(Debug, Clone, PartialEq, Serialize)]
+pub struct AnnotatorCoverageV1 {
+    pub annotator_id_sha256: String,
+    pub assigned_items: usize,
+    pub returned_annotations: usize,
+    pub missing_annotations: usize,
+    pub coverage_rate: Option<f64>,
+    pub missing_reason_counts: BTreeMap<String, usize>,
+}
+
 #[derive(Debug, Clone, Copy, Default)]
 struct CategoryCounts {
     present: usize,
     absent: usize,
     ambiguous: usize,
     not_estimable: usize,
+}
+
+fn nonresponse_reason_key(reason: AnnotationNonresponseReasonV1) -> &'static str {
+    match reason {
+        AnnotationNonresponseReasonV1::NotReturned => "NotReturned",
+        AnnotationNonresponseReasonV1::Declined => "Declined",
+        AnnotationNonresponseReasonV1::Withdrawn => "Withdrawn",
+        AnnotationNonresponseReasonV1::TechnicalFailure => "TechnicalFailure",
+        AnnotationNonresponseReasonV1::Incomplete => "Incomplete",
+    }
+}
+
+fn empty_missing_reason_counts() -> BTreeMap<String, usize> {
+    [
+        AnnotationNonresponseReasonV1::NotReturned,
+        AnnotationNonresponseReasonV1::Declined,
+        AnnotationNonresponseReasonV1::Withdrawn,
+        AnnotationNonresponseReasonV1::TechnicalFailure,
+        AnnotationNonresponseReasonV1::Incomplete,
+    ]
+    .into_iter()
+    .map(|reason| (nonresponse_reason_key(reason).to_owned(), 0))
+    .collect()
 }
 
 impl CategoryCounts {
