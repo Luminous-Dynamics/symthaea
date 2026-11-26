@@ -66,9 +66,15 @@ impl std::fmt::Display for ValidityHorizonError {
             Self::NonFiniteInput => write!(f, "validity-horizon inputs must be finite"),
             Self::NegativeErrorOrGrowth => write!(f, "error and growth rates must be non-negative"),
             Self::InvalidTolerance => write!(f, "tolerance must be finite and positive"),
-            Self::InvalidContractHorizon => write!(f, "remaining contract horizon must be finite and positive"),
-            Self::InvalidHandoffLeadTime => write!(f, "handoff lead time must be finite and non-negative"),
-            Self::EvidenceRateMismatch => write!(f, "growth-rate evidence and supplied rate are inconsistent"),
+            Self::InvalidContractHorizon => {
+                write!(f, "remaining contract horizon must be finite and positive")
+            }
+            Self::InvalidHandoffLeadTime => {
+                write!(f, "handoff lead time must be finite and non-negative")
+            }
+            Self::EvidenceRateMismatch => {
+                write!(f, "growth-rate evidence and supplied rate are inconsistent")
+            }
             Self::ArithmeticOverflow => write!(f, "validity-horizon arithmetic overflowed"),
         }
     }
@@ -187,9 +193,7 @@ pub fn assess_validity_horizon(
     let disposition = match input.evidence {
         ValidityEvidence::Missing => HandoffDisposition::Unknown,
         ValidityEvidence::EmpiricalTrend => {
-            if within_handoff_window
-                || projected_error_at_handoff_completion >= input.tolerance
-            {
+            if within_handoff_window || projected_error_at_handoff_completion >= input.tolerance {
                 HandoffDisposition::PrepareHandoff
             } else {
                 HandoffDisposition::Unknown
@@ -325,7 +329,10 @@ mod tests {
         let report = assess_validity_horizon(input).unwrap();
         assert_eq!(report.disposition, HandoffDisposition::StayQualified);
         assert_eq!(report.time_to_threshold, None);
-        assert_eq!(report.next_recheck_after, Some(input.remaining_contract_horizon));
+        assert_eq!(
+            report.next_recheck_after,
+            Some(input.remaining_contract_horizon)
+        );
     }
 
     #[test]
@@ -359,13 +366,22 @@ mod tests {
     fn rejects_invalid_horizon_tolerance_and_lead_time() {
         let mut input = verified_input();
         input.tolerance = 0.0;
-        assert_eq!(assess_validity_horizon(input), Err(ValidityHorizonError::InvalidTolerance));
+        assert_eq!(
+            assess_validity_horizon(input),
+            Err(ValidityHorizonError::InvalidTolerance)
+        );
         let mut input = verified_input();
         input.remaining_contract_horizon = 0.0;
-        assert_eq!(assess_validity_horizon(input), Err(ValidityHorizonError::InvalidContractHorizon));
+        assert_eq!(
+            assess_validity_horizon(input),
+            Err(ValidityHorizonError::InvalidContractHorizon)
+        );
         let mut input = verified_input();
         input.handoff_lead_time = -1.0;
-        assert_eq!(assess_validity_horizon(input), Err(ValidityHorizonError::InvalidHandoffLeadTime));
+        assert_eq!(
+            assess_validity_horizon(input),
+            Err(ValidityHorizonError::InvalidHandoffLeadTime)
+        );
     }
 
     #[test]
@@ -373,7 +389,10 @@ mod tests {
         let mut input = verified_input();
         input.error_growth_rate_per_time = Some(f64::MAX);
         input.uncertainty_growth_rate_per_time = f64::MAX;
-        assert_eq!(assess_validity_horizon(input), Err(ValidityHorizonError::ArithmeticOverflow));
+        assert_eq!(
+            assess_validity_horizon(input),
+            Err(ValidityHorizonError::ArithmeticOverflow)
+        );
     }
 
     #[test]
