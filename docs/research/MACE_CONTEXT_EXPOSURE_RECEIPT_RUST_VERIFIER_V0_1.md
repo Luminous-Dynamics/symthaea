@@ -10,10 +10,16 @@ Export: `aml_adapter::mace_context_exposure_receipt`
 
 The module consumes the receipt contract proposed in [PR #13709](https://github.com/Luminous-Dynamics/symthaea/pull/13709) and the MON-005 adapter crate dependency set. It uses the existing serde, serde_json, serde_json_canonicalizer, sha2, base64 and ed25519-dalek dependencies.
 
+## Provider parameter profile binding
+
+The verifier binds `provider_parameter_profile_sha256` from the signed receipt to the independent run manifest. The value is the SHA-256 commitment to the canonical JSON serialization of the deterministic, lexicographically ordered provider parameter map. The capture adapter limits generic parameters to scalar strings, numbers and booleans; nested objects/arrays are not accepted through this untyped path.
+
+This closes a request-construction gap in which memory-derived instructions, metadata or tool definitions could be inserted through arbitrary JSON outside the message source map. Structured provider fields require a provider-specific typed adapter that source-maps every dynamic text/media leaf. The static profile must be frozen before the run and reused unchanged by all randomized arms, including true no-memory.
+
 ### Responsibilities implemented
 
 - Strict typed parsing with unknown-field and duplicate-field rejection.
-- Binding to independently supplied run, pair block, world cluster, query, arm, invocation, DecisionNeed, policy, source registry, lineage/lifecycle, renderer, transport, model, clock and observer profile digests.
+- Binding to independently supplied run, pair block, world cluster, query, arm, invocation, DecisionNeed, policy, source registry, lineage/lifecycle, renderer, transport, provider-parameter profile, model, clock and observer profile digests.
 - Encrypted immutable request-body artifact profile binding, including storage, encryption, access, retention and custody digests.
 - Request-body resolution through an explicit artifact resolver interface; the resolver owns ciphertext, custody and decryption verification.
 - Exact plaintext byte-length and SHA-256 verification against both receipt and artifact commitments.
@@ -39,7 +45,7 @@ These are deliberate interfaces to existing owners or separate deployment qualif
 
 ## Deterministic tests authored (not executed)
 
-Fourteen Rust unit tests cover:
+Fifteen Rust unit tests cover:
 1. valid signed receipt, body, span and evidence binding;
 2. wrong run binding;
 3. changed request-body rejection;
@@ -52,7 +58,10 @@ Fourteen Rust unit tests cover:
 10. request-artifact storage-profile substitution;
 11. unavailable request-body artifact;
 12. memory contamination of the no-memory arm;
-13. duplicate and unknown JSON member rejection.
+13. duplicate and unknown JSON member rejection;
+14. provider-parameter profile substitution rejection.
+
+(The list is numbered by category; the exact source-level test count should be reconfirmed after any later test additions.)
 
 These are authored tests only. They have not been compiled or executed. No passing test, Rust validation, CI, provider interception, security qualification or benchmark score is claimed.
 
