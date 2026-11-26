@@ -1228,6 +1228,31 @@ mod tests {
     }
 
     #[test]
+    fn condition_profile_binds_exact_target_environment_family_id() {
+        let mut input = base_input();
+        input.context.condition_profiles[3].target_environment_family_id =
+            "some-other-composition-family".to_owned();
+        assert!(matches!(
+            evaluate_mechanism_transfer(&input),
+            Err(MechanismTransferError::ConditionProfileRelationMismatch {
+                condition: MechanismTransferCondition::CompositionalShift
+            })
+        ));
+    }
+
+    #[test]
+    fn empty_target_environment_family_id_is_rejected() {
+        let mut input = base_input();
+        input.context.condition_profiles[4].target_environment_family_id = " ".to_owned();
+        assert!(matches!(
+            evaluate_mechanism_transfer(&input),
+            Err(MechanismTransferError::EmptyTargetEnvironmentFamilyId {
+                condition: MechanismTransferCondition::StructuralShift
+            })
+        ));
+    }
+
+    #[test]
     fn condition_profile_digest_must_be_nonempty() {
         let mut input = base_input();
         input.context.condition_profiles[2].profile_manifest_sha256 = [0; 32];
