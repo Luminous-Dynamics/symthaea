@@ -137,6 +137,19 @@ impl VerifiedSourceOriginSetV1 {
     pub fn graph_sha256(&self) -> &str { &self.graph_sha256 }
     pub fn origin_profile_sha256(&self) -> &str { &self.origin_profile_sha256 }
 
+    /// Signer identities retained from the independently verified per-node origin receipts.
+    pub(crate) fn signer_key_ids(&self) -> Vec<String> {
+        self.receipts.iter().map(|item| item.receipt.key_id.clone()).collect()
+    }
+
+    /// Exact receipt-envelope digest for one graph node, used to bind separate
+    /// acquisition witnesses to the four-authority source-origin result.
+    pub(crate) fn envelope_sha256_for(&self, evidence_id: &str) -> Option<&str> {
+        self.receipts.iter()
+            .find(|item| item.receipt.evidence_id == evidence_id)
+            .map(|item| item.envelope_sha256.as_str())
+    }
+
     /// Recheck exact source/payload/derivation bytes and every DSSE signature
     /// against the current pinned source-origin profile. Call this after
     /// replaying the graph and revalidating the other three authorities at the
