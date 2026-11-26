@@ -490,10 +490,9 @@ fn select_probe(
                     .then_with(|| right.cmp(left))
             })?;
             let gain = expected_value_of_probe(worlds, posterior, best);
-            let allocator_cost = available_count as f64 * allocator_cost_per_work_unit;
-            if gain * costs.decision_horizon as f64
-                > costs.probe_cost + costs.allocator_cost_per_work_unit * available_count as f64
-            {
+            let allocator_cost =
+                available_count as f64 * costs.allocator_cost_per_work_unit;
+            if gain * costs.decision_horizon as f64 > costs.probe_cost + allocator_cost {
                 Some(best)
             } else {
                 None
@@ -1055,10 +1054,28 @@ mod tests {
         let used = BTreeSet::new();
         let cost = max_gain * 2.0;
         let one_shot = select_probe(
-            Strategy::Evoi, &worlds, &posterior, &used, &mut rng, 1, cost, 0.0
+            Strategy::Evoi,
+            &worlds,
+            &posterior,
+            &used,
+            &mut rng,
+            ProbeSelectionCosts {
+                decision_horizon: 1,
+                probe_cost: cost,
+                allocator_cost_per_work_unit: 0.0,
+            },
         );
         let reused = select_probe(
-            Strategy::Evoi, &worlds, &posterior, &used, &mut rng, 3, cost, 0.0
+            Strategy::Evoi,
+            &worlds,
+            &posterior,
+            &used,
+            &mut rng,
+            ProbeSelectionCosts {
+                decision_horizon: 3,
+                probe_cost: cost,
+                allocator_cost_per_work_unit: 0.0,
+            },
         );
         assert!(one_shot.is_none(), "one decision does not repay twice the maximum per-decision value");
         assert!(reused.is_some(), "three downstream decisions can repay the same probe");
