@@ -187,6 +187,50 @@ jobs:
             and .model_invoked_by_evaluator == false
           ' "$RUNNER_TEMP/music-listen-bench-report.json" > /dev/null
 
+      - name: Replay MusicListenBench CLEAN-FLIP-STAY triads when module is present
+        if: hashFiles('tools/mel-temporal-grounding-qualifier/src/music_listen_bench.rs') != ''
+        shell: bash
+        run: |
+          set -euo pipefail
+          cargo +1.96.0 run --locked --manifest-path tools/mel-temporal-grounding-qualifier/Cargo.toml --bin mel-music-listen-bench-audit -- tools/mel-temporal-grounding-qualifier/fixtures/mel-music-listen-bench.synthetic.json > "$RUNNER_TEMP/music-listen-bench-report.json"
+          jq -e '
+            .schema == "mel-music-listen-bench-report-v1"
+            and .benchmark_id == "MusicListenBench"
+            and .benchmark_version == "1.0"
+            and (.dataset_revision_sha256 | length) == 64
+            and (.official_scorer_revision_sha256 | length) == 64
+            and .overall.triads == 4
+            and .overall.clean.accuracy == 0.75
+            and .overall.flip.accuracy == 0.75
+            and .overall.stay.accuracy == 1.0
+            and .overall.clean.incorrect == 1
+            and .overall.clean.choice_a == 3
+            and .overall.clean.choice_b == 1
+            and .overall.clean.choice_a_rate_among_answered == 0.75
+            and .overall.flip.choice_a == 1
+            and .overall.flip.choice_b == 2
+            and .overall.flip.choice_a_rate_among_answered > 0.33
+            and .overall.flip.choice_a_rate_among_answered < 0.34
+            and .overall.stay.choice_a_rate_among_answered == 1.0
+            and .overall.flip.unparseable == 1
+            and .overall.flip_miss_rate == 0.25
+            and .overall.stay_false_flip_rate == 0.0
+            and .overall.clean_correct_triads == 3
+            and .overall.conditional_flip_miss_rate > 0.333
+            and .overall.conditional_flip_miss_rate < 0.334
+            and .overall.conditional_stay_false_flip_rate == 0.0
+            and .overall.accuracy_flip_stay == 0.875
+            and .overall.joint_clean_flip_stay_exact_rate == 0.5
+            and (.by_task | length) == 4
+            and (.by_flip_factor | length) == 4
+            and (.by_stay_factor | length) == 4
+            and .source_lineage_count == 2
+            and .confirmatory_lineage_floor_met == false
+            and .audio_bytes_recomputed == false
+            and .transformations_authenticated == false
+            and .model_invoked_by_evaluator == false
+          ' "$RUNNER_TEMP/music-listen-bench-report.json" > /dev/null
+
       - name: Replay corrected multi-rater unitizing alpha-u corpus when module is present
         if: hashFiles('tools/mel-temporal-grounding-qualifier/src/temporal_unitizing.rs') != ''
         shell: bash
