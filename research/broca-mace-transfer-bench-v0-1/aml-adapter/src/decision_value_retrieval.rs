@@ -193,6 +193,7 @@ pub trait DecisionResourceReceiptVerifierV1 {
         estimated_context_tokens: u64,
         estimated_inspected_bytes: u64,
         acquisition_cost_utility_units: u64,
+        resource_valid_until_unix: u64,
         now_unix: u64,
     ) -> Result<(), DecisionResourceReceiptRejectV1>;
 }
@@ -673,6 +674,7 @@ fn verify_resource_receipt(
         option.estimated_context_tokens,
         option.estimated_inspected_bytes,
         option.acquisition_cost_utility_units,
+        option.resource_valid_until_unix,
         now_unix,
     ).map_err(|_| DecisionValueRejectV1::ResourceReceiptRejected)
 }
@@ -824,6 +826,7 @@ mod tests {
             _estimated_context_tokens: u64,
             _estimated_inspected_bytes: u64,
             _acquisition_cost_utility_units: u64,
+            _resource_valid_until_unix: u64,
             _now_unix: u64,
         ) -> Result<(), DecisionResourceReceiptRejectV1> {
             Ok(())
@@ -970,7 +973,7 @@ mod tests {
         let model_sha256 = probability_model_sha256(&policy, &prior, &option);
         let verifier = PinnedModelCalibration { expected_model_sha256: model_sha256 };
         assert!(evaluate_expected_value_v1(
-            &policy, &prior, &option, 10, &verifier,
+            &policy, &prior, &option, 10, &verifier, &AcceptPinnedResource,
         ).is_ok());
         let mut altered_option = option.clone();
         altered_option.likelihood_ppm_by_state = vec![
@@ -979,7 +982,7 @@ mod tests {
         ];
         assert_eq!(
             evaluate_expected_value_v1(
-                &policy, &prior, &altered_option, 10, &verifier,
+                &policy, &prior, &altered_option, 10, &verifier, &AcceptPinnedResource,
             ),
             Err(DecisionValueRejectV1::CalibrationReceiptRejected)
         );
@@ -1044,6 +1047,7 @@ mod tests {
         assert_eq!(
             evaluate_expected_value_v1(
                 &policy(), &prior(), &informative_option(), 10, &RejectCalibration,
+                &AcceptPinnedResource,
             ),
             Err(DecisionValueRejectV1::CalibrationReceiptRejected)
         );
@@ -1125,7 +1129,10 @@ mod tests {
     fn robust_regret_uses_only_permitted_actions_as_state_oracles() {
         let mut policy = policy();
         policy.action_allowed_by_state[0][1] = false;
-        let assessment = evaluate_robust_value_v1(&policy, &informative_option()).unwrap();
+        policy.utility_profile_sha256 = policy.calculated_utility_profile_sha256();
+        let assessment = evaluate_robust_value_v1(
+            &policy, &informative_option(), 10, &AcceptPinnedResource,
+        ).unwrap();
         assert_eq!(assessment.baseline_minimax_regret_utility_units, 100);
         assert_eq!(assessment.post_query_worst_case_regret_utility_units, 0);
         assert_eq!(assessment.robust_net_value_utility_units, 95);
