@@ -178,7 +178,7 @@ pub fn choose_non_myopic_first_experiment(
     cost_rate_per_unit: f64,
 ) -> Result<Option<NonMyopicChoice>, DecisionError> {
     validate_candidates(posterior, model, candidates, cost_rate_per_unit)?;
-    if max_experiments > candidates.len() {
+    if max_experiments > candidates.len() || max_experiments > MAX_EXACT_HORIZON {
         return Err(DecisionError::InvalidExperiment);
     }
 
