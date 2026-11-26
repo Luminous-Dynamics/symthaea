@@ -759,6 +759,26 @@ fn active_priority(
     None
 }
 
+fn reduced_probability_fraction(
+    numerator: u64,
+    denominator: u64,
+) -> Result<ProbabilityFractionV1, String> {
+    if denominator == 0 || numerator == 0 || numerator > denominator {
+        return Err("probability fraction must satisfy 0 < numerator <= denominator".into());
+    }
+    let mut left = numerator;
+    let mut right = denominator;
+    while right != 0 {
+        let remainder = left % right;
+        left = right;
+        right = remainder;
+    }
+    Ok(ProbabilityFractionV1 {
+        numerator: numerator / left,
+        denominator: denominator / left,
+    })
+}
+
 fn select_probability_audit(
     candidates: &[AnnotationAcquisitionCandidateV1],
     eligible: &[usize],
@@ -883,24 +903,24 @@ fn select_probability_audit(
                         item_indices.swap(index, selected);
                     }
 
-                    let source_probability = ProbabilityFractionV1 {
-                        numerator: selected_sources as u64,
-                        denominator: eligible_sources as u64,
-                    };
-                    let conditional_probability = ProbabilityFractionV1 {
-                        numerator: selected_items_in_source_work as u64,
-                        denominator: eligible_items_in_source_work as u64,
-                    };
+                    let source_probability = reduced_probability_fraction(
+                        selected_sources as u64,
+                        eligible_sources as u64,
+                    )?;
+                    let conditional_probability = reduced_probability_fraction(
+                        selected_items_in_source_work as u64,
+                        eligible_items_in_source_work as u64,
+                    )?;
                     let inclusion_numerator = (selected_sources as u64)
                         .checked_mul(selected_items_in_source_work as u64)
                         .ok_or_else(|| "audit item inclusion numerator overflow".to_string())?;
                     let inclusion_denominator = (eligible_sources as u64)
                         .checked_mul(eligible_items_in_source_work as u64)
                         .ok_or_else(|| "audit item inclusion denominator overflow".to_string())?;
-                    let inclusion_probability = ProbabilityFractionV1 {
-                        numerator: inclusion_numerator,
-                        denominator: inclusion_denominator,
-                    };
+                    let inclusion_probability = reduced_probability_fraction(
+                        inclusion_numerator,
+                        inclusion_denominator,
+                    )?;
 
                     for item_index in item_indices.into_iter().take(selected_items_in_source_work) {
                         let candidate = &candidates[item_index];
