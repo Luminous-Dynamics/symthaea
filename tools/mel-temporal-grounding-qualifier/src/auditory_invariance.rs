@@ -121,6 +121,8 @@ pub struct VariantOutcomeV1 {
     pub variant_id: String,
     pub audio_sha256: String,
     pub question_sha256: String,
+    pub option_a_relation: MusicalRelationV1,
+    pub option_b_relation: MusicalRelationV1,
     pub expected_relation: MusicalRelationV1,
     pub predicted_relation: Option<MusicalRelationV1>,
     pub model_answer: ModelAnswerV1,
@@ -172,6 +174,12 @@ pub struct AuditoryMetricSummaryV1 {
     pub abstain_count: usize,
     pub parsed_answer_rate: Option<f64>,
     pub answer_a_rate: Option<f64>,
+    pub always_a_miss_rate: Option<f64>,
+    pub always_a_false_flip_rate: Option<f64>,
+    pub always_a_accuracy_flip_stay: Option<f64>,
+    pub always_b_miss_rate: Option<f64>,
+    pub always_b_false_flip_rate: Option<f64>,
+    pub always_b_accuracy_flip_stay: Option<f64>,
 }
 
 #[derive(Debug, Clone, PartialEq, Serialize)]
@@ -471,6 +479,8 @@ fn score_variant(variant: &AuditoryVariantV1) -> VariantOutcomeV1 {
         variant_id: variant.variant_id.clone(),
         audio_sha256: variant.audio_sha256.clone(),
         question_sha256: variant.question_sha256.clone(),
+        option_a_relation: variant.option_a_relation,
+        option_b_relation: variant.option_b_relation,
         expected_relation: variant.expected_relation,
         predicted_relation,
         model_answer: variant.model_answer,
@@ -525,6 +535,27 @@ fn summarize(results: &[AuditoryPairResultV1]) -> AuditoryMetricSummaryV1 {
 
     let miss_rate = rate(flip_miss_count, pairs);
     let false_flip_rate = rate(stay_false_flip_count, pairs);
+    let always_a_misses = results
+        .iter()
+        .filter(|result| result.flip.option_a_relation != result.flip.expected_relation)
+        .count();
+    let always_a_false_flips = results
+        .iter()
+        .filter(|result| result.stay.option_a_relation != result.stay.expected_relation)
+        .count();
+    let always_b_misses = results
+        .iter()
+        .filter(|result| result.flip.option_b_relation != result.flip.expected_relation)
+        .count();
+    let always_b_false_flips = results
+        .iter()
+        .filter(|result| result.stay.option_b_relation != result.stay.expected_relation)
+        .count();
+    let always_a_miss_rate = rate(always_a_misses, pairs);
+    let always_a_false_flip_rate = rate(always_a_false_flips, pairs);
+    let always_b_miss_rate = rate(always_b_misses, pairs);
+    let always_b_false_flip_rate = rate(always_b_false_flips, pairs);
+
     AuditoryMetricSummaryV1 {
         pairs,
         clean_items: pairs,
@@ -556,6 +587,24 @@ fn summarize(results: &[AuditoryPairResultV1]) -> AuditoryMetricSummaryV1 {
         abstain_count,
         parsed_answer_rate: rate(parsed_count, answer_count),
         answer_a_rate: rate(answer_a_count, parsed_count),
+        always_a_miss_rate,
+        always_a_false_flip_rate,
+        always_a_accuracy_flip_stay: match (
+            always_a_miss_rate,
+            always_a_false_flip_rate,
+        ) {
+            (Some(mr), Some(ffr)) => Some(1.0 - (mr + ffr) / 2.0),
+            _ => None,
+        },
+        always_b_miss_rate,
+        always_b_false_flip_rate,
+        always_b_accuracy_flip_stay: match (
+            always_b_miss_rate,
+            always_b_false_flip_rate,
+        ) {
+            (Some(mr), Some(ffr)) => Some(1.0 - (mr + ffr) / 2.0),
+            _ => None,
+        },
     }
 }
 
@@ -688,6 +737,17 @@ mod tests {
         assert_eq!(report.overall.miss_rate, Some(1.0));
         assert_eq!(report.overall.false_flip_rate, Some(0.0));
         assert_eq!(report.overall.accuracy_flip_stay, Some(0.5));
+    }
+
+    #[test]
+    fn reports_actual_constant_letter_baselines_under_question_specific_mapping() {
+        let report = audit_auditory_invariance(&run(vec![pair("letter-bias")])).unwrap();
+        assert_eq!(report.overall.always_a_miss_rate, Some(1.0));
+        assert_eq!(report.overall.always_a_false_flip_rate, Some(0.0));
+        assert_eq!(report.overall.always_a_accuracy_flip_stay, Some(0.5));
+        assert_eq!(report.overall.always_b_miss_rate, Some(0.0));
+        assert_eq!(report.overall.always_b_false_flip_rate, Some(1.0));
+        assert_eq!(report.overall.always_b_accuracy_flip_stay, Some(0.5));
     }
 
     #[test]
