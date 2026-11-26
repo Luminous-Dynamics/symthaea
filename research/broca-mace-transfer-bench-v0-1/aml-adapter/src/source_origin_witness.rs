@@ -1117,6 +1117,97 @@ mod tests {
         );
     }
 
+    fn valid_witness_predicate() -> Value {
+        serde_json::json!({
+            "schema_version": SOURCE_ORIGIN_WITNESS_RECEIPT_SCHEMA_V1,
+            "run_id": "run-1",
+            "query_invocation_id": "invocation-1",
+            "graph_sha256": "a".repeat(64),
+            "source_origin_receipt_sha256": "b".repeat(64),
+            "operator_id": "archive-a",
+            "failure_domain_sha256": "c".repeat(64),
+            "evidence_id": "evidence-1",
+            "source_id": "source-1",
+            "source_sha256": "d".repeat(64),
+            "payload_sha256": "e".repeat(64),
+            "evidence_class_sha256": "f".repeat(64),
+            "observed_parent_evidence_ids": [],
+            "derivation_receipt_sha256": null,
+            "common_cause_group_sha256": [],
+            "publisher_identity_sha256": "1".repeat(64),
+            "acquisition_record_sha256": "2".repeat(64),
+            "source_revision_sha256": "3".repeat(64),
+            "observed_at_unix": 10,
+            "issued_at_unix": 11,
+            "expires_at_unix": 30,
+            "status": "observed_consistent",
+            "issuer_profile_sha256": "4".repeat(64),
+            "key_id": "5".repeat(64)
+        })
+    }
+
+    #[test]
+    fn witness_predicate_parser_enforces_closed_receipt_shape() {
+        let value = valid_witness_predicate();
+        let receipt = parse_witness_predicate(&value).expect("valid witness receipt");
+        assert_eq!(receipt.operator_id, "archive-a");
+        assert_eq!(receipt.observed_parent_evidence_ids, Vec::<String>::new());
+        let mut extended = value;
+        extended.as_object_mut().unwrap()
+            .insert("uncommitted_extra".into(), serde_json::json!(true));
+        assert_eq!(
+            parse_witness_predicate(&extended),
+            Err(SourceOriginWitnessRejectV1::InvalidJson)
+        );
+    }
+
+    #[test]
+    fn witness_predicate_parser_rejects_unsorted_ancestry() {
+        let mut value = valid_witness_predicate();
+        value.as_object_mut().unwrap().insert(
+            "observed_parent_evidence_ids".into(),
+            serde_json::json!(["parent-z", "parent-a"]),
+        );
+        assert_eq!(
+            parse_witness_predicate(&value),
+            Err(SourceOriginWitnessRejectV1::InvalidReceipt)
+        );
+    }
+
+    #[test]
+    fn witness_observation_freshness_has_an_exact_staleness_boundary() {
+        let receipt = parse_witness_predicate(&valid_witness_predicate())
+            .expect("valid witness receipt");
+        let policy = SourceOriginWitnessPolicyV1 {
+            schema_version: SOURCE_ORIGIN_WITNESS_POLICY_SCHEMA_V1.to_owned(),
+            graph_sha256: "a".repeat(64),
+            minimum_operators: 2,
+            minimum_failure_domains: 2,
+            maximum_observation_age_secs: 10,
+            operators: vec![
+                SourceOriginWitnessOperatorV1 {
+                    operator_id: "archive-a".into(),
+                    failure_domain_sha256: "b".repeat(64),
+                    verifier_profile_sha256: "c".repeat(64),
+                },
+                SourceOriginWitnessOperatorV1 {
+                    operator_id: "archive-b".into(),
+                    failure_domain_sha256: "d".repeat(64),
+                    verifier_profile_sha256: "e".repeat(64),
+                },
+            ],
+        };
+        assert_eq!(validate_witness_time(&receipt, &policy, 20), Ok(()));
+        assert_eq!(
+            validate_witness_time(&receipt, &policy, 21),
+            Err(SourceOriginWitnessRejectV1::ObservationStale)
+        );
+        assert_eq!(
+            validate_witness_time(&receipt, &policy, 9),
+            Err(SourceOriginWitnessRejectV1::ObservationFromFuture)
+        );
+    }
+
     #[test]
     fn same_operator_cannot_supply_duplicate_node_observations() {
         let mut seen = BTreeSet::new();
