@@ -15,6 +15,7 @@
 use std::collections::BTreeSet;
 
 use serde::{Deserialize, Serialize};
+use sha2::{Digest, Sha256};
 use symthaea_core::hdc::semantic_encoder::{CharNgramEncoder, SemanticEncoder};
 use symthaea_core::hdc::unified_hv::HDC_DIMENSION;
 
@@ -36,7 +37,7 @@ pub struct HdcMemoryRecord {
 #[derive(Clone, Debug, Eq, PartialEq, Serialize, Deserialize)]
 pub struct HdcRetrievalHit {
     pub memory_id: String,
-    pub content_digest_blake3: String,
+    pub content_digest_sha256: String,
     /// Cosine similarity × 1,000,000, rounded to the nearest integer.
     pub similarity_micros: i64,
 }
@@ -160,9 +161,7 @@ impl SymthaeaHdcMcsfAdapter {
                 similarity,
                 HdcRetrievalHit {
                     memory_id: record.memory_id.clone(),
-                    content_digest_blake3: blake3::hash(record.content.as_bytes())
-                        .to_hex()
-                        .to_string(),
+                    content_digest_sha256: sha256_hex(record.content.as_bytes()),
                     similarity_micros: scaled as i64,
                 },
             ));
@@ -176,6 +175,16 @@ impl SymthaeaHdcMcsfAdapter {
         hits.truncate(top_k);
         Ok(hits.into_iter().map(|(_, hit)| hit).collect())
     }
+}
+
+fn sha256_hex(value: &[u8]) -> String {
+    let digest = Sha256::digest(value);
+    let mut output = String::with_capacity(64);
+    for byte in digest {
+        use std::fmt::Write;
+        let _ = write!(&mut output, "{byte:02x}");
+    }
+    output
 }
 
 fn validate_hypervector(values: &[f32], label: &str) -> Result<(), String> {
@@ -224,7 +233,7 @@ mod tests {
         assert_eq!(hits[0].similarity_micros, 1_000_000);
         assert_eq!(
             hits[0].content_digest_blake3,
-            blake3::hash(records[0].content.as_bytes()).to_hex().to_string()
+            sha256_hex(records[0].content.as_bytes())
         );
     }
 
