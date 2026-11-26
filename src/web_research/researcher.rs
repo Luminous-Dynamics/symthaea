@@ -33,6 +33,13 @@ struct SearchQueryAcquisition {
     had_failure: bool,
 }
 
+#[derive(Debug)]
+struct SourcePlanningResult {
+    candidates: Vec<PageCandidate>,
+    receipts: Vec<AcquisitionReceipt>,
+    acquisition_incomplete: bool,
+}
+
 #[derive(Debug, Clone)]
 struct PageCandidate {
     query_rank: usize,
@@ -208,62 +215,15 @@ impl WebResearcher {
         .await;
         search_results.sort_by_key(|(query_rank, _)| *query_rank);
 
-        let mut source_candidates = Vec::new();
-        let mut seen_urls = HashSet::new();
-        let mut acquisition_incomplete = acquisition_receipts
+        let prior_acquisition_incomplete = acquisition_receipts
             .iter()
             .any(|receipt: &AcquisitionReceipt| receipt.outcome.is_incomplete());
-
-        for (query_rank, search_result) in search_results {
-            acquisition_incomplete |= search_result.had_failure;
-            acquisition_receipts.extend(search_result.receipts);
-
-            for (source_rank, url) in search_result.urls.into_iter().enumerate() {
-                if !seen_urls.insert(url.clone()) {
-                    let mut receipt = make_receipt(
-                        query_rank,
-                        Some(source_rank),
-                        AcquisitionStage::PageFetch,
-                        &search_result.query,
-                        AcquisitionOutcome::DuplicateSuppressed,
-                    );
-                    receipt.requested_url = Some(url);
-                    receipt.reason_code = Some("DUPLICATE_SOURCE_URL".to_string());
-                    receipt.reason = Some(
-                        "the same URL was already scheduled from an earlier planned query"
-                            .to_string(),
-                    );
-                    acquisition_receipts.push(receipt);
-                    continue;
-                }
-
-                if source_candidates.len() >= self.config.max_sources_per_research {
-                    let mut receipt = make_receipt(
-                        query_rank,
-                        Some(source_rank),
-                        AcquisitionStage::PageFetch,
-                        &search_result.query,
-                        AcquisitionOutcome::BudgetExceeded,
-                    );
-                    receipt.requested_url = Some(url);
-                    receipt.reason_code = Some("MAX_SOURCES_PER_RESEARCH".to_string());
-                    receipt.reason = Some(format!(
-                        "source cap of {} was reached before this URL was fetched",
-                        self.config.max_sources_per_research
-                    ));
-                    acquisition_receipts.push(receipt);
-                    acquisition_incomplete = true;
-                    continue;
-                }
-
-                source_candidates.push(PageCandidate {
-                    query_rank,
-                    source_rank,
-                    query: search_result.query.clone(),
-                    url,
-                });
-            }
-        }
+        let source_plan =
+            plan_page_candidates(search_results, self.config.max_sources_per_research);
+        acquisition_receipts.extend(source_plan.receipts);
+        let acquisition_incomplete =
+            prior_acquisition_incomplete || source_plan.acquisition_incomplete;
+        let source_candidates = source_plan.candidates;
 
         // Page retrieval is globally bounded for this phase. The mapper
         // restores query/source rank after unordered completion.
@@ -1568,6 +1528,72 @@ fn elapsed_ms(started: Instant) -> u64 {
 
 fn sha256_hex(bytes: &[u8]) -> String {
     format!("{:x}", Sha256::digest(bytes))
+}
+
+fn plan_page_candidates(
+    search_results: Vec<(usize, SearchQueryAcquisition)>,
+    max_sources: usize,
+) -> SourcePlanningResult {
+    let mut candidates = Vec::new();
+    let mut receipts = Vec::new();
+    let mut seen_urls = HashSet::new();
+    let mut acquisition_incomplete = false;
+
+    for (query_rank, search_result) in search_results {
+        acquisition_incomplete |= search_result.had_failure;
+        receipts.extend(search_result.receipts);
+
+        for (source_rank, url) in search_result.urls.into_iter().enumerate() {
+            if !seen_urls.insert(url.clone()) {
+                let mut receipt = make_receipt(
+                    query_rank,
+                    Some(source_rank),
+                    AcquisitionStage::PageFetch,
+                    &search_result.query,
+                    AcquisitionOutcome::DuplicateSuppressed,
+                );
+                receipt.requested_url = Some(url);
+                receipt.reason_code = Some("DUPLICATE_SOURCE_URL".to_string());
+                receipt.reason = Some(
+                    "the same URL was already scheduled by an earlier provider or query"
+                        .to_string(),
+                );
+                receipts.push(receipt);
+                continue;
+            }
+
+            if candidates.len() >= max_sources {
+                let mut receipt = make_receipt(
+                    query_rank,
+                    Some(source_rank),
+                    AcquisitionStage::PageFetch,
+                    &search_result.query,
+                    AcquisitionOutcome::BudgetExceeded,
+                );
+                receipt.requested_url = Some(url);
+                receipt.reason_code = Some("MAX_SOURCES_PER_RESEARCH".to_string());
+                receipt.reason = Some(format!(
+                    "source cap of {max_sources} was reached before this URL was fetched"
+                ));
+                receipts.push(receipt);
+                acquisition_incomplete = true;
+                continue;
+            }
+
+            candidates.push(PageCandidate {
+                query_rank,
+                source_rank,
+                query: search_result.query.clone(),
+                url,
+            });
+        }
+    }
+
+    SourcePlanningResult {
+        candidates,
+        receipts,
+        acquisition_incomplete,
+    }
 }
 
 fn http_status_from_error(error: &anyhow::Error) -> Option<u16> {
