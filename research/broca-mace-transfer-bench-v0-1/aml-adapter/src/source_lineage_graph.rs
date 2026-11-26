@@ -553,6 +553,10 @@ fn lineage_closure_sha256(
         hash_field(&mut hasher, &node.source_sha256);
         hash_field(&mut hasher, &node.payload_sha256);
         hash_field(&mut hasher, &node.evidence_class_sha256);
+        hasher.update((node.satisfies_requirement_ids.len() as u64).to_be_bytes());
+        for requirement_id in &node.satisfies_requirement_ids {
+            hash_field(&mut hasher, requirement_id);
+        }
         match &node.derivation_receipt_sha256 {
             Some(digest) => {
                 hasher.update([1]);
