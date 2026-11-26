@@ -61,6 +61,6 @@ func TestCaptureManifestSignatureMissing(t *testing.T){g,p:=base();g.Reports=g.R
 func TestCaptureManifestDigestMismatch(t *testing.T){g,p:=base();g.Reports[2].InputDigest.Value="tampered";check(t,g,p,Denied)}
 func TestEdgeEvidenceNotVerified(t *testing.T){g,p:=base();g.Nodes[1].RequiresVerification=false;check(t,g,p,Indeterminate)}
 func TestTraceIdAloneCannotProveCompleteness(t *testing.T){g,p:=base();g.Manifests[0].CollectorID="";check(t,g,p,Indeterminate)}
-func TestCaptureCollectorIdentityMissing(t *testing.T){g,p:=base();for i,n:=range g.Nodes{if n.ID=="collector"{g.Nodes=append(g.Nodes[:i],g.Nodes[i+1:]...);break}};check(t,g,p,Indeterminate)}
+func TestCaptureCollectorIdentityUnverified(t *testing.T){g,p:=base();for i,r:=range g.Reports{if r.SubjectID=="collector"{g.Reports=append(g.Reports[:i],g.Reports[i+1:]...);break}};check(t,g,p,Indeterminate)}
 func TestCaptureSourceIdentityUnverified(t *testing.T){g,p:=base();for i:=range g.Reports{if g.Reports[i].SubjectID=="source-a"{g.Reports[i].Status="unverified"}};check(t,g,p,Indeterminate)}
 func FuzzDigestProfileIsolation(f *testing.F){f.Add("response","decision","value");f.Fuzz(func(t *testing.T,a,b,v string){if a==b{return};x:=digest("s",v,a);y:=digest("s",v,b);eq,cmp:=x.Equal(y);if eq||cmp{t.Fatal("different digest purposes compared")}})}
