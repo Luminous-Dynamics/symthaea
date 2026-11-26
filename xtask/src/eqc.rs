@@ -1,10 +1,10 @@
 use anyhow::{Context, bail};
 use serde::{Deserialize, Serialize};
+use serde_json::Value;
 use sha2::{Digest, Sha256};
 use std::collections::HashSet;
 use std::fs;
 use std::path::{Component, Path};
-use serde_json::Value;
 
 const CORPUS_SCHEMA: &str = "luminous.eqc.seed-corpus.v0.1";
 const TASK_SCHEMA: &str = "luminous.eqc.task.v0.1";
@@ -281,7 +281,10 @@ fn validate_task(task: &Task, repository_root: &Path) -> anyhow::Result<()> {
         bail!("{}: unsupported EQC domain '{}'", task.task_id, task.domain);
     }
     if task.split != "public_seed" {
-        bail!("{}: v0.1 seed validator only accepts public_seed tasks", task.task_id);
+        bail!(
+            "{}: v0.1 seed validator only accepts public_seed tasks",
+            task.task_id
+        );
     }
     if task.actor.actor_id.is_empty()
         || task.actor.roles.is_empty()
@@ -291,13 +294,22 @@ fn validate_task(task: &Task, repository_root: &Path) -> anyhow::Result<()> {
         || task.request.action.is_empty()
         || task.request.subject_id.is_empty()
     {
-        bail!("{}: actor, subject, and request fields must be non-empty", task.task_id);
+        bail!(
+            "{}: actor, subject, and request fields must be non-empty",
+            task.task_id
+        );
     }
     if !is_canonical_utc(&task.authority_snapshot.observed_at) {
-        bail!("{}: observed_at must be canonical UTC RFC3339", task.task_id);
+        bail!(
+            "{}: observed_at must be canonical UTC RFC3339",
+            task.task_id
+        );
     }
     if !is_canonical_utc(&task.request.evaluated_at) {
-        bail!("{}: evaluated_at must be canonical UTC RFC3339", task.task_id);
+        bail!(
+            "{}: evaluated_at must be canonical UTC RFC3339",
+            task.task_id
+        );
     }
     if task.authority_snapshot.observed_at > task.request.evaluated_at {
         bail!(
@@ -307,7 +319,10 @@ fn validate_task(task: &Task, repository_root: &Path) -> anyhow::Result<()> {
     }
     if let Some(valid_until) = task.authority_snapshot.valid_until.as_deref() {
         if !is_canonical_utc(valid_until) {
-            bail!("{}: valid_until must be canonical UTC RFC3339", task.task_id);
+            bail!(
+                "{}: valid_until must be canonical UTC RFC3339",
+                task.task_id
+            );
         }
     }
     if task.authority_snapshot.snapshot_id.is_empty() {
@@ -319,26 +334,47 @@ fn validate_task(task: &Task, repository_root: &Path) -> anyhow::Result<()> {
         || task.resource_budget.cpu_seconds == Some(0)
         || task.resource_budget.memory_mib == Some(0)
     {
-        bail!("{}: public synthetic seed must have positive budgets and no network", task.task_id);
+        bail!(
+            "{}: public synthetic seed must have positive budgets and no network",
+            task.task_id
+        );
     }
     if !matches!(task.expected.disposition.as_str(), "allow" | "deny") {
-        bail!("{}: v0.1 reference evaluator supports allow/deny expected outcomes", task.task_id);
+        bail!(
+            "{}: v0.1 reference evaluator supports allow/deny expected outcomes",
+            task.task_id
+        );
     }
     if task.expected.state_mutation_count != 0 || !task.expected.state_must_remain_unchanged {
-        bail!("{}: public authorization seed must assert zero state mutations", task.task_id);
+        bail!(
+            "{}: public authorization seed must assert zero state mutations",
+            task.task_id
+        );
     }
     if task.input_refs.is_empty() {
-        bail!("{}: every EQC task must bind at least one input artifact", task.task_id);
+        bail!(
+            "{}: every EQC task must bind at least one input artifact",
+            task.task_id
+        );
     }
     if task.expected.disposition == "deny" && task.negative_controls.is_empty() {
         bail!("{}: denied task must name a negative control", task.task_id);
     }
-    if task.expected.reason_code.as_deref().is_some_and(str::is_empty) {
+    if task
+        .expected
+        .reason_code
+        .as_deref()
+        .is_some_and(str::is_empty)
+    {
         bail!("{}: reason_code cannot be empty when present", task.task_id);
     }
     for required in REQUIRED_PROVENANCE {
         if !task.required_provenance.iter().any(|item| item == required) {
-            bail!("{}: required provenance field '{}' is missing", task.task_id, required);
+            bail!(
+                "{}: required provenance field '{}' is missing",
+                task.task_id,
+                required
+            );
         }
     }
     for input in &task.input_refs {
@@ -356,31 +392,55 @@ fn validate_task(task: &Task, repository_root: &Path) -> anyhow::Result<()> {
             })
             || input.classification != "synthetic"
         {
-            bail!("{}: seed inputs must be repository-local synthetic artifacts", task.task_id);
+            bail!(
+                "{}: seed inputs must be repository-local synthetic artifacts",
+                task.task_id
+            );
         }
         if !is_sha256(&input.sha256) {
-            bail!("{}: input '{}' has malformed SHA-256", task.task_id, input.input_id);
+            bail!(
+                "{}: input '{}' has malformed SHA-256",
+                task.task_id,
+                input.input_id
+            );
         }
         let unresolved_path = repository_root.join(relative_path);
         let resolved_path = unresolved_path.canonicalize().with_context(|| {
-            format!("{}: resolve synthetic input '{}'", task.task_id, input.input_id)
+            format!(
+                "{}: resolve synthetic input '{}'",
+                task.task_id, input.input_id
+            )
         })?;
         if !resolved_path.starts_with(repository_root) {
-            bail!("{}: input '{}' escapes the repository root", task.task_id, input.input_id);
+            bail!(
+                "{}: input '{}' escapes the repository root",
+                task.task_id,
+                input.input_id
+            );
         }
         let input_bytes = fs::read(&resolved_path).with_context(|| {
-            format!("{}: read synthetic input '{}'", task.task_id, input.input_id)
+            format!(
+                "{}: read synthetic input '{}'",
+                task.task_id, input.input_id
+            )
         })?;
         let observed_digest = format!("{:x}", Sha256::digest(&input_bytes));
         if observed_digest != input.sha256 {
-            bail!("{}: SHA-256 mismatch for input '{}'", task.task_id, input.input_id);
+            bail!(
+                "{}: SHA-256 mismatch for input '{}'",
+                task.task_id,
+                input.input_id
+            );
         }
         validate_synthetic_input(task, input, &input_bytes)?;
     }
     if task.request.action == "challenge.consume"
         && (task.request.challenge_id.is_none() || task.request.challenge_state.is_none())
     {
-        bail!("{}: challenge consumption needs challenge id and state", task.task_id);
+        bail!(
+            "{}: challenge consumption needs challenge id and state",
+            task.task_id
+        );
     }
     Ok(())
 }
@@ -402,13 +462,13 @@ fn json_string<'a>(
         })
 }
 
-fn validate_synthetic_input(
-    task: &Task,
-    input: &InputRef,
-    bytes: &[u8],
-) -> anyhow::Result<()> {
-    let artifact: Value = serde_json::from_slice(bytes)
-        .with_context(|| format!("{}: parse synthetic input '{}'", task.task_id, input.input_id))?;
+fn validate_synthetic_input(task: &Task, input: &InputRef, bytes: &[u8]) -> anyhow::Result<()> {
+    let artifact: Value = serde_json::from_slice(bytes).with_context(|| {
+        format!(
+            "{}: parse synthetic input '{}'",
+            task.task_id, input.input_id
+        )
+    })?;
 
     match input.input_id.as_str() {
         "synthetic-consent-001" | "synthetic-consent-revoked-001" => {
@@ -424,7 +484,8 @@ fn validate_synthetic_input(
             {
                 bail!(
                     "{}: consent fixture '{}' does not match the authority snapshot",
-                    task.task_id, input.input_id
+                    task.task_id,
+                    input.input_id
                 );
             }
 
@@ -440,7 +501,10 @@ fn validate_synthetic_input(
                 .iter()
                 .map(|scope| {
                     scope.as_str().map(str::to_owned).with_context(|| {
-                        format!("{}: consent fixture scopes must be strings", task.task_id)
+                        format!(
+                        "{}: consent fixture scopes must be strings",
+                        task.task_id
+                    )
                     })
                 })
                 .collect::<anyhow::Result<Vec<_>>>()?;
@@ -453,7 +517,8 @@ fn validate_synthetic_input(
             {
                 bail!(
                     "{}: consent fixture '{}' disagrees with scopes or temporal bounds",
-                    task.task_id, input.input_id
+                    task.task_id,
+                    input.input_id
                 );
             }
 
@@ -464,7 +529,8 @@ fn validate_synthetic_input(
                     if !is_canonical_utc(revoked_at) || revoked_at > task.request.evaluated_at {
                         bail!(
                             "{}: revoked consent fixture '{}' has invalid revocation time",
-                            task.task_id, input.input_id
+                            task.task_id,
+                            input.input_id
                         );
                     }
                 }
@@ -479,21 +545,27 @@ fn validate_synthetic_input(
                 != "luminous.eqc.synthetic-challenge.v0.1"
                 || Some(json_string(&artifact, "challenge_id", task, input)?)
                     != task.request.challenge_id.as_deref()
-                || json_string(&artifact, "issuer_id", task, input)? != task.actor.actor_id.as_str()
-                || json_string(&artifact, "subject_id", task, input)? != task.subject.subject_id
+                || json_string(&artifact, "issuer_id", task, input)?
+                    != task.actor.actor_id.as_str()
+                || json_string(&artifact, "subject_id", task, input)?
+                    != task.subject.subject_id
                 || json_string(&artifact, "state", task, input)?
                     != task.request.challenge_state.as_deref().unwrap_or("")
             {
                 bail!(
                     "{}: challenge fixture '{}' does not match the request",
-                    task.task_id, input.input_id
+                    task.task_id,
+                    input.input_id
                 );
             }
             let consumed_at = json_string(&artifact, "consumed_at", task, input)?;
-            if !is_canonical_utc(consumed_at) || consumed_at > task.request.evaluated_at {
+            if !is_canonical_utc(consumed_at)
+                || consumed_at > task.request.evaluated_at
+            {
                 bail!(
                     "{}: consumed challenge fixture '{}' has invalid consumption time",
-                    task.task_id, input.input_id
+                    task.task_id,
+                    input.input_id
                 );
             }
         }
@@ -615,8 +687,10 @@ mod tests {
     use super::*;
 
     fn seed_corpus() -> Corpus {
-        serde_json::from_str(include_str!("../../docs/research/eqc-seed-corpus-v0.1.json"))
-            .expect("EQC public seed parses")
+        serde_json::from_str(include_str!(
+            "../../docs/research/eqc-seed-corpus-v0.1.json"
+        ))
+        .expect("EQC public seed parses")
     }
 
     fn repository_root() -> std::path::PathBuf {
@@ -631,8 +705,11 @@ mod tests {
     fn public_seed_reference_passes_and_baselines_fail_their_controls() {
         let root = repository_root();
         let report =
-            validate_corpus_file(&root.join("docs/research/eqc-seed-corpus-v0.1.json"), &root)
-                .expect("seed validates");
+            validate_corpus_file(
+                &root.join("docs/research/eqc-seed-corpus-v0.1.json"),
+                &root,
+            )
+            .expect("seed validates");
         assert_eq!(report.task_count, 4);
         assert_eq!(report.reference_pass_count, 4);
         assert!(report.no_op_fails_positive_controls);
