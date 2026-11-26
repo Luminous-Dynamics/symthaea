@@ -1,0 +1,73 @@
+name: HdcStore At-Rest Integrity Benchmark
+
+on:
+  push:
+    branches: [main, research/hdc-store-at-rest-benchmark-v0-1-2026-11-26]
+    paths:
+      - "crates/domains/symthaea-hdc-store/**"
+      - "docs/research/HDC_STORE_AT_REST_INTEGRITY_BENCHMARK_V0_1.md"
+      - ".github/workflows/hdc-store-at-rest-integrity.yml"
+  pull_request:
+    paths:
+      - "crates/domains/symthaea-hdc-store/**"
+      - "docs/research/HDC_STORE_AT_REST_INTEGRITY_BENCHMARK_V0_1.md"
+      - ".github/workflows/hdc-store-at-rest-integrity.yml"
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: hdc-store-at-rest-integrity-${{ github.event.pull_request.head.sha || github.sha }}
+  cancel-in-progress: true
+
+jobs:
+  baseline:
+    name: T1-T10 baseline, C1-C3 controls
+    runs-on: ubuntu-24.04
+    timeout-minutes: 20
+    steps:
+      - name: Checkout exact triggering revision
+        uses: actions/checkout@v4
+        with:
+          ref: ${{ github.event.pull_request.head.sha || github.sha }}
+          persist-credentials: false
+          fetch-depth: 1
+
+      - name: Install pinned Rust toolchain
+        uses: dtolnay/rust-toolchain@1.96.0
+        with:
+          components: rustfmt
+
+      - name: Format storage package
+        run: cargo fmt --manifest-path crates/domains/symthaea-hdc-store/Cargo.toml -- --check
+
+      - name: Run baseline at-rest integrity campaign
+        env:
+          SOURCE_HEAD: ${{ github.event.pull_request.head.sha || github.sha }}
+        run: |
+          set -euo pipefail
+          mkdir -p "$RUNNER_TEMP/hdc-store-integrity"
+          {
+            echo "source_head=$SOURCE_HEAD"
+            echo "rustc=$(rustc --version)"
+            echo "cargo=$(cargo --version)"
+            echo "benchmark=v0.1"
+            echo "sut=symthaea-hdc-store"
+          } | tee "$RUNNER_TEMP/hdc-store-integrity/run-metadata.txt"
+
+          cargo test --locked -p symthaea-hdc-store --test at_rest_integrity -- --nocapture \
+            2>&1 | tee "$RUNNER_TEMP/hdc-store-integrity/campaign.log"
+
+          sha256sum \
+            crates/domains/symthaea-hdc-store/tests/at_rest_integrity.rs \
+            docs/research/HDC_STORE_AT_REST_INTEGRITY_BENCHMARK_V0_1.md \
+            | tee "$RUNNER_TEMP/hdc-store-integrity/source-digests.txt"
+
+      - name: Preserve benchmark evidence
+        uses: actions/upload-artifact@v4
+        with:
+          name: hdc-store-at-rest-integrity-${{ github.event.pull_request.head.sha || github.sha }}
+          path: ${{ runner.temp }}/hdc-store-integrity/
+          if-no-files-found: error
+          retention-days: 90
