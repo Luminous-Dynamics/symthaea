@@ -96,5 +96,6 @@
       "applicability": "applicable",
       "measured_by_this_adapter": true
     }
-  }
+  },
+  "evaluation_scope": "metric_specific_partial"
 }
