@@ -9745,8 +9745,8 @@ mod tests {
         let mut right_input = KineticResponseSignatureInput {
             contract_id: "contract".to_owned(),
             structure_class_id: "class".to_owned(),
-            intervention_ids: vec!["pulse".to_owned()],
-            qoi_ids: vec!["field".to_owned()],
+            intervention_ids: vec!["pulse-mode-2-phase-0.3".to_owned()],
+            qoi_ids: vec!["electric-field-mode-2".to_owned()],
             qoi_scales: vec![1.0],
             time_samples: (0..10).map(f64::from).collect(),
             responses: (0..10)
@@ -9804,8 +9804,8 @@ mod tests {
         let incomplete = KineticResponseSignatureInput {
             contract_id: "contract".to_owned(),
             structure_class_id: "class".to_owned(),
-            intervention_ids: vec!["pulse".to_owned()],
-            qoi_ids: vec!["field".to_owned()],
+            intervention_ids: vec!["pulse-mode-2-phase-0.3".to_owned()],
+            qoi_ids: vec!["electric-field-mode-2".to_owned()],
             qoi_scales: vec![1.0],
             time_samples: vec![0.0, 0.5],
             responses: vec![None, None],
