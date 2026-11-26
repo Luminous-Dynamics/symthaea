@@ -130,25 +130,6 @@
           }
         }
       }
-    },
-    {
-      "if": {
-        "properties": {
-          "surfaced_as_trusted": {
-            "const": false
-          }
-        },
-        "required": [
-          "surfaced_as_trusted"
-        ]
-      },
-      "then": {
-        "properties": {
-          "surfaced_to_context": {
-            "const": true
-          }
-        }
-      }
     }
   ]
 }
