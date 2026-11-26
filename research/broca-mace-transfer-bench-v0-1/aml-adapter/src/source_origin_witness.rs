@@ -886,6 +886,11 @@ mod tests {
                     failure_domain_sha256: "d".repeat(64),
                     verifier_profile_sha256: "e".repeat(64),
                 },
+                SourceOriginWitnessOperatorV1 {
+                    operator_id: "publisher-c".into(),
+                    failure_domain_sha256: "f".repeat(64),
+                    verifier_profile_sha256: "1".repeat(64),
+                },
             ],
         };
         assert!(policy.digest().is_ok());
