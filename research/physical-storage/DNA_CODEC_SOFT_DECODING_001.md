@@ -117,16 +117,25 @@ This branch adds a zero-dependency Rust sequence-channel utility with:
 
 It does not implement DNA-Aeon, DNA Fountain, HEDGES, Polus/SeqFormer, synthesis, basecalling, clustering or physical sequencing. The reference exists to test metrics and acceptance contracts. Its inputs are synthetic and not physical error probabilities.
 
-## 8. Run commands
+## 8. Machine-readable artifacts and run commands
 
-cargo fmt --manifest-path research/physical-storage/dna-channel-benchmark/Cargo.toml -- --check
+- dna-channel-benchmark/dna_codec_baselines_v0_1.json: source/commit/data-accession ledger for the six-codec tournament and Polus/SeqFormer.
+- dna-channel-benchmark/fixtures/dna_sequence_channel_cases_v0_1.schema.json: scorer-side known-answer fixture schema.
+- dna-channel-benchmark/fixtures/dna_sequence_channel_cases_v0_1.json: uniform read records and separate scorer-only labels.
+- dna-channel-benchmark/oracle/verify_dna_metrics.py: independent deterministic alignment / erasure-order oracle.
 
-cargo clippy --manifest-path research/physical-storage/dna-channel-benchmark/Cargo.toml --all-targets -- -D warnings
+Run the JSON syntax checks and research oracle:
 
-cargo test --manifest-path research/physical-storage/dna-channel-benchmark/Cargo.toml --all-targets
+    python3 -m json.tool research/physical-storage/dna-channel-benchmark/dna_codec_baselines_v0_1.json
+    python3 -m json.tool research/physical-storage/dna-channel-benchmark/fixtures/dna_sequence_channel_cases_v0_1.schema.json
+    python3 -m json.tool research/physical-storage/dna-channel-benchmark/fixtures/dna_sequence_channel_cases_v0_1.json
+    python3 research/physical-storage/dna-channel-benchmark/oracle/verify_dna_metrics.py
 
-cargo run --manifest-path research/physical-storage/dna-channel-benchmark/Cargo.toml
+Run the Rust commands when an exact-head Rust toolchain is available:
 
-python3 research/physical-storage/dna-channel-benchmark/fixtures/dna_sequence_channel_cases_v0_1.schema.json and scorer fixture, plus research/physical-storage/dna-channel-benchmark/oracle/verify_dna_metrics.py
+    cargo fmt --manifest-path research/physical-storage/dna-channel-benchmark/Cargo.toml -- --check
+    cargo clippy --manifest-path research/physical-storage/dna-channel-benchmark/Cargo.toml --all-targets -- -D warnings
+    cargo test --manifest-path research/physical-storage/dna-channel-benchmark/Cargo.toml --all-targets
+    cargo run --manifest-path research/physical-storage/dna-channel-benchmark/Cargo.toml
 
-No Rust toolchain pass is claimed until exact-head commands run. The independent Python oracle validates only deterministic metrics and ranking logic.
+No Rust toolchain pass or full JSON Schema validator pass is claimed until the exact-head commands run. The independent Python oracle validates only deterministic metrics and ranking logic.
