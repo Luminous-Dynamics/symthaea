@@ -93,7 +93,8 @@
               "independence",
               "operation",
               "availability",
-              "completeness"
+              "completeness",
+              "policy_evaluation"
             ]
           },
           "description": {
