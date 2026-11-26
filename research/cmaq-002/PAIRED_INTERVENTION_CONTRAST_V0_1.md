@@ -1,6 +1,6 @@
 # Paired Intervention Contrast Evaluator v0.1
 
-**Status:** Rust evaluator and 20 deterministic tests authored; exact-head Rust 1.100.0 qualification pending.  
+**Status:** Rust evaluator and 21 deterministic tests authored; exact-head Rust 1.100.0 qualification pending.  
 **Research owner:** [#13720 — CMAQ-019](https://github.com/Luminous-Dynamics/symthaea/issues/13720).  
 **Transfer context:** [#13719 — frozen mechanism transfer](https://github.com/Luminous-Dynamics/symthaea/pull/13719).  
 **Statistical inference:** #8578.  
@@ -81,7 +81,7 @@ For each intervention family:
 
 A task-pair-weighted error mean is retained as a diagnostic only. Family summaries preserve pair counts, completed/failed/timed-out/invalid/abstained counts, completed-cluster counts, sign accuracy, interval coverage, invariant observations and false changes.
 
-A minimum number of independent completed clusters per family is preregistered and enforced. The Rust evaluator preserves the cluster deltas needed by #8578; it does not calculate confidence intervals or infer superiority.
+A minimum number of independent completed clusters per family is preregistered and reported. The evaluator does **not** discard an entire campaign when one family falls below its floor: it preserves every pair, failure, timeout, invalid outcome and abstention, reports `cluster_floor_met=false`, and leaves unsupported completed-outcome estimates as `None`. The certificate separately reports whether all eight families are represented and whether every family met its completed-cluster floor. This prevents underpowered evidence from disappearing while ensuring it cannot be mistaken for confirmatory evidence. The Rust evaluator preserves the cluster deltas needed by #8578; it does not calculate confidence intervals or infer superiority.
 
 ## Resource/provenance contract
 
@@ -118,6 +118,8 @@ The 19 deterministic Rust tests cover:
 - **Active Causal Discovery Benchmark (arXiv:2609.31675):** skeleton/DAG recovery and hard-intervention efficiency as a distinct SCM track. Treat its early v0 baseline caveats explicitly.
 - **CausalWorld:** later robotic parameter-intervention track. Simulated and physical trials remain separate.
 - **WorldArena 2.0:** later visuo-tactile paired intervention / robotic execution track.
+
+- A family with only failed pairs remains in the certificate with its original pair denominator, zero completed clusters, `None` outcome estimates and an unmet cluster floor.
 
 ## Claim ceiling
 
