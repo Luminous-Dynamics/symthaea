@@ -1035,6 +1035,70 @@ impl ResponseBalancedBasis {
         })
     }
 
+    /// Measure the response lost from a future discrete pulse injection.
+    ///
+    /// pulse_directions are columns of the derivative of the exact discrete
+    /// pulse map with respect to its pulse parameters, evaluated at the pulse
+    /// application state. post_pulse_observability contains QoI sensitivities
+    /// pulled back to that same post-pulse state. The reported quantity is
+    ///
+    /// ||Y_p^T (I - V W^T) B_p||_F / ||Y_p^T B_p||_F.
+    ///
+    /// This is a fixed-basis, local linearized control-to-output diagnostic.
+    /// A time-varying atlas must instead use the stage-local basis and qualify
+    /// the inter-basis transfer separately.
+    pub fn linearized_pulse_response_residual(
+        &self,
+        pulse_directions: &[Vec<f64>],
+        post_pulse_observability: &EmpiricalGramian,
+    ) -> Result<f64, RbkrError> {
+        if post_pulse_observability.dimension != self.state_dimension {
+            return Err(RbkrError::StateDimensionMismatch);
+        }
+        if pulse_directions.is_empty() || post_pulse_observability.weighted_factors.is_empty() {
+            return Err(RbkrError::EmptyGramian);
+        }
+
+        let mut residual_norm = 0.0_f64;
+        let mut reference_norm = 0.0_f64;
+        for direction in pulse_directions {
+            validate_factor(direction, self.state_dimension)?;
+            let reduced = self.reduce_state(direction)?;
+            let projected = self.reconstruct_state(&reduced)?;
+            let residual = direction
+                .iter()
+                .zip(&projected)
+                .map(|(full, retained)| {
+                    let value = full - retained;
+                    if value.is_finite() {
+                        Ok(value)
+                    } else {
+                        Err(RbkrError::NonFiniteArithmetic)
+                    }
+                })
+                .collect::<Result<Vec<_>, _>>()?;
+
+            for output_factor in &post_pulse_observability.weighted_factors {
+                validate_factor(output_factor, self.state_dimension)?;
+                let reference = checked_dot(output_factor, direction)?;
+                let lost = checked_dot(output_factor, &residual)?;
+                reference_norm = reference_norm.hypot(reference);
+                residual_norm = residual_norm.hypot(lost);
+                if !reference_norm.is_finite() || !residual_norm.is_finite() {
+                    return Err(RbkrError::NonFiniteArithmetic);
+                }
+            }
+        }
+        if reference_norm == 0.0 {
+            return Err(RbkrError::NoReferenceResponse);
+        }
+        let ratio = residual_norm / reference_norm;
+        if !ratio.is_finite() {
+            return Err(RbkrError::NonFiniteArithmetic);
+        }
+        Ok(ratio)
+    }
+
     /// Measure the local linearized input-to-output response lost by this
     /// oblique projection for one frozen scenario.
     ///
@@ -1393,6 +1457,35 @@ mod tests {
             ),
             Err(FiniteHorizonGramianError::FactorStorageBudgetExceeded)
         );
+    }
+
+    #[test]
+    fn pulse_injection_response_is_measured_separately_from_checkpoint_state_response() {
+        let reach = gramian(2, &[vec![1.0, 0.0]]);
+        let checkpoint_observe = gramian(2, &[vec![1.0, 0.0]]);
+        let basis = ResponseBalancedBasis::from_empirical_gramians(
+            &reach,
+            &checkpoint_observe,
+            RbkrConfig::new(1),
+        )
+        .unwrap();
+        let post_pulse_observe = gramian(2, &[vec![0.0, 1.0]]);
+
+        let preserved = basis
+            .linearized_pulse_response_residual(
+                &[vec![1.0, 0.0]],
+                &checkpoint_observe,
+            )
+            .unwrap();
+        let lost = basis
+            .linearized_pulse_response_residual(
+                &[vec![0.0, 1.0]],
+                &post_pulse_observe,
+            )
+            .unwrap();
+
+        assert!(preserved < 1.0e-12);
+        assert!((lost - 1.0).abs() < 1.0e-12);
     }
 
     #[test]
