@@ -24,7 +24,7 @@
         "channels": 2,
         "total_frames": 2880000
       },
-      "annotation_manifest_sha256": "hhhhhhhhhhhhhhhhhhhhhhhhhhhhhhhhhhhhhhhhhhhhhhhhhhhhhhhhhhhhhhhh",
+      "annotation_manifest_sha256": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
       "annotations": [
         {
           "annotator_id_sha256": "1111111111111111111111111111111111111111111111111111111111111111",
@@ -75,7 +75,7 @@
         "channels": 2,
         "total_frames": 2880000
       },
-      "annotation_manifest_sha256": "iiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiii",
+      "annotation_manifest_sha256": "bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb",
       "annotations": [
         {
           "annotator_id_sha256": "1111111111111111111111111111111111111111111111111111111111111111",
@@ -113,7 +113,7 @@
         "channels": 2,
         "total_frames": 2880000
       },
-      "annotation_manifest_sha256": "jjjjjjjjjjjjjjjjjjjjjjjjjjjjjjjjjjjjjjjjjjjjjjjjjjjjjjjjjjjjjjjj",
+      "annotation_manifest_sha256": "cccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccc",
       "annotations": [
         {
           "annotator_id_sha256": "1111111111111111111111111111111111111111111111111111111111111111",
@@ -133,7 +133,7 @@
     },
     {
       "unit_id": "item-4",
-      "source_lineage_sha256": "gggggggggggggggggggggggggggggggggggggggggggggggggggggggggggggggg",
+      "source_lineage_sha256": "dddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddd",
       "query_id": "query-item-4",
       "query_text": "Every piano entrance",
       "artifact": {
@@ -142,7 +142,7 @@
         "channels": 2,
         "total_frames": 2880000
       },
-      "annotation_manifest_sha256": "kkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkk",
+      "annotation_manifest_sha256": "dddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddd",
       "annotations": [
         {
           "annotator_id_sha256": "1111111111111111111111111111111111111111111111111111111111111111",
