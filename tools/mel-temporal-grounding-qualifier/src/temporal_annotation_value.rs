@@ -268,8 +268,7 @@ pub fn audit_annotation_marginal_value(
         maximum_event_boundary_spread_delta_ms,
         decision_transition: format!(
             "{:?}->{:?}",
-            before.frozen_decision_state,
-            after.frozen_decision_state
+            before.frozen_decision_state, after.frozen_decision_state
         ),
         effort: input.effort.clone(),
         active_listening_minutes,
