@@ -971,7 +971,6 @@ mod tests {
     }
 
     #[test]
-    #[test]
     fn preregistered_minimum_cluster_count_is_reported_without_discarding_cell() {
         let mut input = base_input();
         let omitted = input
