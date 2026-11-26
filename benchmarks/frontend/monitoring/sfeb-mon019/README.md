@@ -13,6 +13,7 @@ Can an independent evaluator reconstruct the declared causal dependencies of a c
 - [CAUSAL-PROVENANCE-CONTRACT-v1.md](./CAUSAL-PROVENANCE-CONTRACT-v1.md) — architecture, graph model, claim semantics, completeness, threat model and benchmarks.
 - [SCENARIOS-v1.json](./SCENARIOS-v1.json) — synthetic known-answer scenario seed corpus.
 - [SCENARIOS-v1.schema.json](./SCENARIOS-v1.schema.json) — strict JSON Schema.
+- [causal-graph/](./causal-graph/) — standard-library Go graph-structure and bounded-manifest reference.
 
 ## Standards and prior art
 
@@ -24,6 +25,10 @@ Can an independent evaluator reconstruct the declared causal dependencies of a c
 - [C2PA Content Credentials](https://spec.c2pa.org/).
 - [SCITT RFC 9943](https://www.rfc-editor.org/rfc/rfc9943).
 - [Agent Action Capsule -06](https://datatracker.ietf.org/doc/html/draft-mih-scitt-agent-action-capsule-06).
+
+## Local reference preflight
+
+The `causal-graph/` package has 29 named adversarial tests and one fuzz target. Local draft-package checks: race tests ×5, `go vet`, statement coverage 90.8%, and a 2-second digest-profile isolation fuzz run with 54,635 executions. These were run on a local reconstructed/gofmt'd copy of the source; the remote GitHub branch was not cloned/replayed in this environment, so this is not an exact-head hosted or checkout qualification.
 
 ## Claim ceiling
 
