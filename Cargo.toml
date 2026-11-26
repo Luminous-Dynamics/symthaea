@@ -26,6 +26,8 @@ exclude = [
     "crates/core/symthaea-observation-attestation",
     # Loose example placeholder, not a crate; the actual symthaea package is the workspace root.
     "crates/core/symthaea",
+    # README-only evidence verifier; package recovery/deferment is tracked in #10791/#13758/#13834.
+    "crates/domains/symthaea-rea-evidence-verifier",
     "crates/domains/symthaea-spore/fuzz",
     "crates/domains/spark-engine",
     "crates/domains/symthaea-lab",
