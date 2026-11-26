@@ -29,4 +29,4 @@ History {0,3}, target {0,1,2,3}. The planner chooses cover-a (x=1), reducing MMD
 
 ## Validation boundary
 
-12 Rust tests are authored but not compiled/executed in this environment. The JSON fixture was independently recalculated in JavaScript. No model or physical experiment was run.
+14 Rust tests are authored but not compiled/executed in this environment. The JSON fixture was independently recalculated in JavaScript. No model or physical experiment was run.
