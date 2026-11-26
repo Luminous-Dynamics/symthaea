@@ -288,100 +288,316 @@ pub struct PairedInterventionCertificate {
 #[derive(Clone, Debug, Eq, PartialEq)]
 pub enum PairedInterventionError {
     ZeroCampaignId,
-    EmptyDigest { field: &'static str },
+    EmptyDigest {
+        field: &'static str,
+    },
     EmptyExpectedPairSet,
-    TooManyPairs { requested: usize, maximum: usize },
+    TooManyPairs {
+        requested: usize,
+        maximum: usize,
+    },
     ZeroMinimumIndependentClusters,
-    TooFewIndependentClusters { family: InterventionFamily, observed: u64, required: u64 },
-    MissingPairs { pair_ids: Vec<String> },
-    UnexpectedPair { pair_id: String },
-    DuplicateExpectedPairId { pair_id: String },
-    DuplicatePairId { pair_id: String },
-    DuplicateRunId { run_id: u64 },
-    ZeroRunId { pair_id: String },
+    TooFewIndependentClusters {
+        family: InterventionFamily,
+        observed: u64,
+        required: u64,
+    },
+    MissingPairs {
+        pair_ids: Vec<String>,
+    },
+    UnexpectedPair {
+        pair_id: String,
+    },
+    DuplicateExpectedPairId {
+        pair_id: String,
+    },
+    DuplicatePairId {
+        pair_id: String,
+    },
+    DuplicateRunId {
+        run_id: u64,
+    },
+    ZeroRunId {
+        pair_id: String,
+    },
     EmptyPairId,
-    EmptyEnvironmentFamilyId { pair_id: String },
-    EmptyEnvironmentClusterId { pair_id: String },
-    EnvironmentClusterFamilyMismatch { cluster_id: String },
-    EmptyBranchId { pair_id: String },
-    DuplicateBranchId { branch_id: String },
-    EmptyTargetVariableId { pair_id: String },
-    TargetVariableDeclaredInvariant { pair_id: String },
-    TargetValueUnchanged { pair_id: String },
-    EmptyInvariantVariableId { pair_id: String },
-    DuplicateInvariantVariableId { pair_id: String, variable_id: String },
-    InvariantSetMismatch { pair_id: String },
-    EmptyProfileDigest { family: InterventionFamily },
-    MissingFamilyProfile { family: InterventionFamily },
-    DuplicateFamilyProfile { family: InterventionFamily },
-    PairProfileMismatch { pair_id: String, family: InterventionFamily },
-    EmptyInterventionRecordDigest { pair_id: String },
-    EmptySourceStateDigest { pair_id: String },
-    EmptyExogenousForcingDigest { pair_id: String },
-    EmptyBranchManifestDigest { pair_id: String },
-    BranchCheckpointMismatch { pair_id: String, branch_id: String },
-    BranchDispositionMismatch { pair_id: String },
-    BranchOutcomeMissing { pair_id: String, branch_id: String },
-    NotExecutedBranchHasOutputOrCost { pair_id: String, branch_id: String },
-    PairIntervalMissing { pair_id: String },
-    PairIntervalInvalid { pair_id: String },
-    InvariantTruthViolation { pair_id: String, variable_id: String },
-    ResourceBudgetExceeded { field: &'static str },
-    MissingRequiredEnergyMeasurement { branch_id: String },
+    EmptyEnvironmentFamilyId {
+        pair_id: String,
+    },
+    EmptyEnvironmentClusterId {
+        pair_id: String,
+    },
+    EnvironmentClusterFamilyMismatch {
+        cluster_id: String,
+    },
+    EmptyBranchId {
+        pair_id: String,
+    },
+    DuplicateBranchId {
+        branch_id: String,
+    },
+    EmptyTargetVariableId {
+        pair_id: String,
+    },
+    TargetVariableDeclaredInvariant {
+        pair_id: String,
+    },
+    TargetValueUnchanged {
+        pair_id: String,
+    },
+    EmptyInvariantVariableId {
+        pair_id: String,
+    },
+    DuplicateInvariantVariableId {
+        pair_id: String,
+        variable_id: String,
+    },
+    InvariantSetMismatch {
+        pair_id: String,
+    },
+    EmptyProfileDigest {
+        family: InterventionFamily,
+    },
+    MissingFamilyProfile {
+        family: InterventionFamily,
+    },
+    DuplicateFamilyProfile {
+        family: InterventionFamily,
+    },
+    PairProfileMismatch {
+        pair_id: String,
+        family: InterventionFamily,
+    },
+    EmptyInterventionRecordDigest {
+        pair_id: String,
+    },
+    EmptySourceStateDigest {
+        pair_id: String,
+    },
+    EmptyExogenousForcingDigest {
+        pair_id: String,
+    },
+    EmptyBranchManifestDigest {
+        pair_id: String,
+    },
+    BranchCheckpointMismatch {
+        pair_id: String,
+        branch_id: String,
+    },
+    BranchDispositionMismatch {
+        pair_id: String,
+    },
+    BranchOutcomeMissing {
+        pair_id: String,
+        branch_id: String,
+    },
+    NotExecutedBranchHasOutputOrCost {
+        pair_id: String,
+        branch_id: String,
+    },
+    PairIntervalMissing {
+        pair_id: String,
+    },
+    PairIntervalInvalid {
+        pair_id: String,
+    },
+    InvariantTruthViolation {
+        pair_id: String,
+        variable_id: String,
+    },
+    ResourceBudgetExceeded {
+        field: &'static str,
+    },
+    MissingRequiredEnergyMeasurement {
+        branch_id: String,
+    },
     ArithmeticOverflow,
 }
 
 impl fmt::Display for PairedInterventionError {
     fn fmt(&self, formatter: &mut fmt::Formatter<'_>) -> fmt::Result {
         match self {
-            Self::ZeroCampaignId => write!(formatter, "paired-intervention campaign ID must be nonzero"),
-            Self::EmptyDigest { field } => write!(formatter, "required provenance digest {field} is empty"),
-            Self::EmptyExpectedPairSet => write!(formatter, "paired-intervention expected pair set must not be empty"),
-            Self::TooManyPairs { requested, maximum } => write!(formatter, "paired-intervention pair count {requested} exceeds maximum {maximum}"),
-            Self::ZeroMinimumIndependentClusters => {
-                write!(formatter, "minimum independent cluster count must be nonzero")
+            Self::ZeroCampaignId => {
+                write!(formatter, "paired-intervention campaign ID must be nonzero")
             }
-            Self::TooFewIndependentClusters { family, observed, required } => write!(
+            Self::EmptyDigest { field } => {
+                write!(formatter, "required provenance digest {field} is empty")
+            }
+            Self::EmptyExpectedPairSet => write!(
+                formatter,
+                "paired-intervention expected pair set must not be empty"
+            ),
+            Self::TooManyPairs { requested, maximum } => write!(
+                formatter,
+                "paired-intervention pair count {requested} exceeds maximum {maximum}"
+            ),
+            Self::ZeroMinimumIndependentClusters => {
+                write!(
+                    formatter,
+                    "minimum independent cluster count must be nonzero"
+                )
+            }
+            Self::TooFewIndependentClusters {
+                family,
+                observed,
+                required,
+            } => write!(
                 formatter,
                 "intervention family {} has {observed} completed clusters; {required} required",
                 family.as_str()
             ),
-            Self::MissingPairs { pair_ids } => write!(formatter, "paired-intervention campaign is missing expected pairs {pair_ids:?}"),
-            Self::UnexpectedPair { pair_id } => write!(formatter, "paired-intervention campaign contains unexpected pair {pair_id}"),
-            Self::DuplicateExpectedPairId { pair_id } => write!(formatter, "expected pair set repeats ID {pair_id}"),
-            Self::DuplicatePairId { pair_id } => write!(formatter, "paired-intervention campaign repeats pair ID {pair_id}"),
-            Self::DuplicateRunId { run_id } => write!(formatter, "paired-intervention campaign repeats run ID {run_id}"),
-            Self::ZeroRunId { pair_id } => write!(formatter, "paired intervention pair {pair_id} has zero run ID"),
-            Self::EmptyPairId => write!(formatter, "paired intervention pair IDs must be nonempty and trimmed"),
-            Self::EmptyEnvironmentFamilyId { pair_id } => write!(formatter, "pair {pair_id} has an empty or untrimmed environment family ID"),
-            Self::EmptyEnvironmentClusterId { pair_id } => write!(formatter, "pair {pair_id} has an empty or untrimmed environment cluster ID"),
-            Self::EnvironmentClusterFamilyMismatch { cluster_id } => write!(formatter, "environment cluster {cluster_id} is assigned to multiple environment families"),
-            Self::EmptyBranchId { pair_id } => write!(formatter, "pair {pair_id} has an empty or untrimmed branch ID"),
-            Self::DuplicateBranchId { branch_id } => write!(formatter, "paired-intervention campaign repeats branch ID {branch_id}"),
-            Self::EmptyTargetVariableId { pair_id } => write!(formatter, "pair {pair_id} has an empty or untrimmed target variable ID"),
-            Self::TargetVariableDeclaredInvariant { pair_id } => write!(formatter, "pair {pair_id} intervention target is also declared invariant"),
-            Self::TargetValueUnchanged { pair_id } => write!(formatter, "pair {pair_id} does not change its declared intervention target"),
-            Self::EmptyInvariantVariableId { pair_id } => write!(formatter, "pair {pair_id} has an empty or untrimmed invariant variable ID"),
-            Self::DuplicateInvariantVariableId { pair_id, variable_id } => write!(formatter, "pair {pair_id} repeats invariant variable {variable_id}"),
-            Self::InvariantSetMismatch { pair_id } => write!(formatter, "pair {pair_id} invariant variable set differs from the frozen expected set"),
-            Self::EmptyProfileDigest { family } => write!(formatter, "intervention profile digest is empty for {}", family.as_str()),
-            Self::MissingFamilyProfile { family } => write!(formatter, "paired-intervention campaign is missing profile for {}", family.as_str()),
-            Self::DuplicateFamilyProfile { family } => write!(formatter, "paired-intervention campaign repeats profile for {}", family.as_str()),
-            Self::PairProfileMismatch { pair_id, family } => write!(formatter, "pair {pair_id} does not use the frozen profile for {}", family.as_str()),
-            Self::EmptyInterventionRecordDigest { pair_id } => write!(formatter, "pair {pair_id} has an empty intervention record digest"),
-            Self::EmptySourceStateDigest { pair_id } => write!(formatter, "pair {pair_id} has an empty source-state snapshot digest"),
-            Self::EmptyExogenousForcingDigest { pair_id } => write!(formatter, "pair {pair_id} has an empty exogenous-forcing digest"),
-            Self::EmptyBranchManifestDigest { pair_id } => write!(formatter, "pair {pair_id} has an empty branch manifest digest"),
-            Self::BranchCheckpointMismatch { pair_id, branch_id } => write!(formatter, "pair {pair_id} branch {branch_id} uses a different source checkpoint"),
-            Self::BranchDispositionMismatch { pair_id } => write!(formatter, "pair {pair_id} disposition does not agree with its control/treatment branch dispositions"),
-            Self::BranchOutcomeMissing { pair_id, branch_id } => write!(formatter, "completed branch {branch_id} in pair {pair_id} is missing a truth or prediction outcome"),
-            Self::NotExecutedBranchHasOutputOrCost { pair_id, branch_id } => write!(formatter, "not-executed branch {branch_id} in pair {pair_id} carries output or nonzero cost"),
-            Self::PairIntervalMissing { pair_id } => write!(formatter, "completed pair {pair_id} is missing a predicted effect interval"),
-            Self::PairIntervalInvalid { pair_id } => write!(formatter, "pair {pair_id} predicted effect interval has lower bound above upper bound"),
-            Self::InvariantTruthViolation { pair_id, variable_id } => write!(formatter, "pair {pair_id} evaluator truth contradicts declared invariance for variable {variable_id}"),
-            Self::ResourceBudgetExceeded { field } => write!(formatter, "paired-intervention campaign exceeded declared budget {field}"),
-            Self::MissingRequiredEnergyMeasurement { branch_id } => write!(formatter, "energy budget is declared but branch {branch_id} has no energy measurement"),
-            Self::ArithmeticOverflow => write!(formatter, "paired-intervention arithmetic overflowed"),
+            Self::MissingPairs { pair_ids } => write!(
+                formatter,
+                "paired-intervention campaign is missing expected pairs {pair_ids:?}"
+            ),
+            Self::UnexpectedPair { pair_id } => write!(
+                formatter,
+                "paired-intervention campaign contains unexpected pair {pair_id}"
+            ),
+            Self::DuplicateExpectedPairId { pair_id } => {
+                write!(formatter, "expected pair set repeats ID {pair_id}")
+            }
+            Self::DuplicatePairId { pair_id } => write!(
+                formatter,
+                "paired-intervention campaign repeats pair ID {pair_id}"
+            ),
+            Self::DuplicateRunId { run_id } => write!(
+                formatter,
+                "paired-intervention campaign repeats run ID {run_id}"
+            ),
+            Self::ZeroRunId { pair_id } => write!(
+                formatter,
+                "paired intervention pair {pair_id} has zero run ID"
+            ),
+            Self::EmptyPairId => write!(
+                formatter,
+                "paired intervention pair IDs must be nonempty and trimmed"
+            ),
+            Self::EmptyEnvironmentFamilyId { pair_id } => write!(
+                formatter,
+                "pair {pair_id} has an empty or untrimmed environment family ID"
+            ),
+            Self::EmptyEnvironmentClusterId { pair_id } => write!(
+                formatter,
+                "pair {pair_id} has an empty or untrimmed environment cluster ID"
+            ),
+            Self::EnvironmentClusterFamilyMismatch { cluster_id } => write!(
+                formatter,
+                "environment cluster {cluster_id} is assigned to multiple environment families"
+            ),
+            Self::EmptyBranchId { pair_id } => write!(
+                formatter,
+                "pair {pair_id} has an empty or untrimmed branch ID"
+            ),
+            Self::DuplicateBranchId { branch_id } => write!(
+                formatter,
+                "paired-intervention campaign repeats branch ID {branch_id}"
+            ),
+            Self::EmptyTargetVariableId { pair_id } => write!(
+                formatter,
+                "pair {pair_id} has an empty or untrimmed target variable ID"
+            ),
+            Self::TargetVariableDeclaredInvariant { pair_id } => write!(
+                formatter,
+                "pair {pair_id} intervention target is also declared invariant"
+            ),
+            Self::TargetValueUnchanged { pair_id } => write!(
+                formatter,
+                "pair {pair_id} does not change its declared intervention target"
+            ),
+            Self::EmptyInvariantVariableId { pair_id } => write!(
+                formatter,
+                "pair {pair_id} has an empty or untrimmed invariant variable ID"
+            ),
+            Self::DuplicateInvariantVariableId {
+                pair_id,
+                variable_id,
+            } => write!(
+                formatter,
+                "pair {pair_id} repeats invariant variable {variable_id}"
+            ),
+            Self::InvariantSetMismatch { pair_id } => write!(
+                formatter,
+                "pair {pair_id} invariant variable set differs from the frozen expected set"
+            ),
+            Self::EmptyProfileDigest { family } => write!(
+                formatter,
+                "intervention profile digest is empty for {}",
+                family.as_str()
+            ),
+            Self::MissingFamilyProfile { family } => write!(
+                formatter,
+                "paired-intervention campaign is missing profile for {}",
+                family.as_str()
+            ),
+            Self::DuplicateFamilyProfile { family } => write!(
+                formatter,
+                "paired-intervention campaign repeats profile for {}",
+                family.as_str()
+            ),
+            Self::PairProfileMismatch { pair_id, family } => write!(
+                formatter,
+                "pair {pair_id} does not use the frozen profile for {}",
+                family.as_str()
+            ),
+            Self::EmptyInterventionRecordDigest { pair_id } => write!(
+                formatter,
+                "pair {pair_id} has an empty intervention record digest"
+            ),
+            Self::EmptySourceStateDigest { pair_id } => write!(
+                formatter,
+                "pair {pair_id} has an empty source-state snapshot digest"
+            ),
+            Self::EmptyExogenousForcingDigest { pair_id } => write!(
+                formatter,
+                "pair {pair_id} has an empty exogenous-forcing digest"
+            ),
+            Self::EmptyBranchManifestDigest { pair_id } => write!(
+                formatter,
+                "pair {pair_id} has an empty branch manifest digest"
+            ),
+            Self::BranchCheckpointMismatch { pair_id, branch_id } => write!(
+                formatter,
+                "pair {pair_id} branch {branch_id} uses a different source checkpoint"
+            ),
+            Self::BranchDispositionMismatch { pair_id } => write!(
+                formatter,
+                "pair {pair_id} disposition does not agree with its control/treatment branch dispositions"
+            ),
+            Self::BranchOutcomeMissing { pair_id, branch_id } => write!(
+                formatter,
+                "completed branch {branch_id} in pair {pair_id} is missing a truth or prediction outcome"
+            ),
+            Self::NotExecutedBranchHasOutputOrCost { pair_id, branch_id } => write!(
+                formatter,
+                "not-executed branch {branch_id} in pair {pair_id} carries output or nonzero cost"
+            ),
+            Self::PairIntervalMissing { pair_id } => write!(
+                formatter,
+                "completed pair {pair_id} is missing a predicted effect interval"
+            ),
+            Self::PairIntervalInvalid { pair_id } => write!(
+                formatter,
+                "pair {pair_id} predicted effect interval has lower bound above upper bound"
+            ),
+            Self::InvariantTruthViolation {
+                pair_id,
+                variable_id,
+            } => write!(
+                formatter,
+                "pair {pair_id} evaluator truth contradicts declared invariance for variable {variable_id}"
+            ),
+            Self::ResourceBudgetExceeded { field } => write!(
+                formatter,
+                "paired-intervention campaign exceeded declared budget {field}"
+            ),
+            Self::MissingRequiredEnergyMeasurement { branch_id } => write!(
+                formatter,
+                "energy budget is declared but branch {branch_id} has no energy measurement"
+            ),
+            Self::ArithmeticOverflow => {
+                write!(formatter, "paired-intervention arithmetic overflowed")
+            }
         }
     }
 }
@@ -410,8 +626,11 @@ impl DispositionCounts {
         if penalty > PAIRED_INTERVENTION_SCORE_PPM {
             return Err(PairedInterventionError::ArithmeticOverflow);
         }
-        *counter = counter.checked_add(1).ok_or(PairedInterventionError::ArithmeticOverflow)?;
-        self.penalty_sum_ppm = self.penalty_sum_ppm
+        *counter = counter
+            .checked_add(1)
+            .ok_or(PairedInterventionError::ArithmeticOverflow)?;
+        self.penalty_sum_ppm = self
+            .penalty_sum_ppm
             .checked_add(u128::from(penalty))
             .ok_or(PairedInterventionError::ArithmeticOverflow)?;
         Ok(())
@@ -476,24 +695,40 @@ fn pair_disposition_from_branches(
         PairDisposition::TimedOut { penalty_ppm: 0 }
     } else if control == BranchDisposition::Invalid || treatment == BranchDisposition::Invalid {
         PairDisposition::Invalid { penalty_ppm: 0 }
-    } else if control == BranchDisposition::NotExecuted || treatment == BranchDisposition::NotExecuted {
+    } else if control == BranchDisposition::NotExecuted
+        || treatment == BranchDisposition::NotExecuted
+    {
         PairDisposition::Abstained { penalty_ppm: 0 }
     } else {
         PairDisposition::Completed
     }
 }
 
-fn validate_context(context: &PairedInterventionContext) -> Result<BTreeMap<InterventionFamily, [u8; 32]>, PairedInterventionError> {
+fn validate_context(
+    context: &PairedInterventionContext,
+) -> Result<BTreeMap<InterventionFamily, [u8; 32]>, PairedInterventionError> {
     if context.campaign_id == 0 {
         return Err(PairedInterventionError::ZeroCampaignId);
     }
     for (digest, field) in [
-        (&context.candidate_artifact_sha256, "candidate_artifact_sha256"),
+        (
+            &context.candidate_artifact_sha256,
+            "candidate_artifact_sha256",
+        ),
         (&context.model_checkpoint_sha256, "model_checkpoint_sha256"),
         (&context.source_history_sha256, "source_history_sha256"),
-        (&context.environment_generator_sha256, "environment_generator_sha256"),
-        (&context.intervention_design_sha256, "intervention_design_sha256"),
-        (&context.evaluator_profile_sha256, "evaluator_profile_sha256"),
+        (
+            &context.environment_generator_sha256,
+            "environment_generator_sha256",
+        ),
+        (
+            &context.intervention_design_sha256,
+            "intervention_design_sha256",
+        ),
+        (
+            &context.evaluator_profile_sha256,
+            "evaluator_profile_sha256",
+        ),
         (&context.seed_manifest_sha256, "seed_manifest_sha256"),
         (&context.evaluation_split_sha256, "evaluation_split_sha256"),
     ] {
@@ -532,7 +767,10 @@ fn validate_context(context: &PairedInterventionContext) -> Result<BTreeMap<Inte
                 family: profile.family,
             });
         }
-        if profiles.insert(profile.family, profile.profile_manifest_sha256).is_some() {
+        if profiles
+            .insert(profile.family, profile.profile_manifest_sha256)
+            .is_some()
+        {
             return Err(PairedInterventionError::DuplicateFamilyProfile {
                 family: profile.family,
             });
@@ -581,7 +819,10 @@ fn validate_branch(
             || branch.resources.interaction_count != 0
             || branch.resources.model_query_count != 0
             || branch.resources.elapsed_us != 0
-            || branch.resources.measured_energy_uj.is_some_and(|energy| energy != 0))
+            || branch
+                .resources
+                .measured_energy_uj
+                .is_some_and(|energy| energy != 0))
     {
         return Err(PairedInterventionError::NotExecutedBranchHasOutputOrCost {
             pair_id: pair_id.to_owned(),
@@ -592,12 +833,16 @@ fn validate_branch(
 }
 
 fn increment(target: &mut u64) -> Result<(), PairedInterventionError> {
-    *target = target.checked_add(1).ok_or(PairedInterventionError::ArithmeticOverflow)?;
+    *target = target
+        .checked_add(1)
+        .ok_or(PairedInterventionError::ArithmeticOverflow)?;
     Ok(())
 }
 
 fn add_u64(target: &mut u64, value: u64) -> Result<(), PairedInterventionError> {
-    *target = target.checked_add(value).ok_or(PairedInterventionError::ArithmeticOverflow)?;
+    *target = target
+        .checked_add(value)
+        .ok_or(PairedInterventionError::ArithmeticOverflow)?;
     Ok(())
 }
 
@@ -606,7 +851,9 @@ fn add_energy(
     measurement: Option<u64>,
 ) -> Result<(), PairedInterventionError> {
     if let (Some(sum), Some(value)) = (total.as_mut(), measurement) {
-        *sum = sum.checked_add(u128::from(value)).ok_or(PairedInterventionError::ArithmeticOverflow)?;
+        *sum = sum
+            .checked_add(u128::from(value))
+            .ok_or(PairedInterventionError::ArithmeticOverflow)?;
     }
     Ok(())
 }
@@ -644,7 +891,8 @@ pub fn evaluate_paired_interventions(
     let mut run_ids = BTreeSet::new();
     let mut branch_ids = BTreeSet::new();
     let mut cluster_families = BTreeMap::<String, String>::new();
-    let mut families = InterventionFamily::ALL.into_iter()
+    let mut families = InterventionFamily::ALL
+        .into_iter()
         .map(|family| (family, FamilyAccumulator::default()))
         .collect::<BTreeMap<_, _>>();
     let mut results = Vec::with_capacity(input.pairs.len());
@@ -674,7 +922,9 @@ pub fn evaluate_paired_interventions(
             });
         }
         if !run_ids.insert(pair.run_id) {
-            return Err(PairedInterventionError::DuplicateRunId { run_id: pair.run_id });
+            return Err(PairedInterventionError::DuplicateRunId {
+                run_id: pair.run_id,
+            });
         }
         if !trimmed_nonempty(&pair.environment_family_id) {
             return Err(PairedInterventionError::EmptyEnvironmentFamilyId {
@@ -701,7 +951,10 @@ pub fn evaluate_paired_interventions(
                 pair_id: pair.pair_id.clone(),
             });
         }
-        if context.expected_invariant_variable_ids.contains(&pair.target_variable_id) {
+        if context
+            .expected_invariant_variable_ids
+            .contains(&pair.target_variable_id)
+        {
             return Err(PairedInterventionError::TargetVariableDeclaredInvariant {
                 pair_id: pair.pair_id.clone(),
             });
@@ -711,8 +964,12 @@ pub fn evaluate_paired_interventions(
                 pair_id: pair.pair_id.clone(),
             });
         }
-        let expected_profile = profiles.get(&pair.family)
-            .ok_or(PairedInterventionError::MissingFamilyProfile { family: pair.family })?;
+        let expected_profile =
+            profiles
+                .get(&pair.family)
+                .ok_or(PairedInterventionError::MissingFamilyProfile {
+                    family: pair.family,
+                })?;
         if expected_profile != &pair.intervention_profile_sha256 {
             return Err(PairedInterventionError::PairProfileMismatch {
                 pair_id: pair.pair_id.clone(),
@@ -720,17 +977,40 @@ pub fn evaluate_paired_interventions(
             });
         }
         for (digest, error) in [
-            (&pair.intervention_record_sha256, PairedInterventionError::EmptyInterventionRecordDigest { pair_id: pair.pair_id.clone() }),
-            (&pair.source_state_snapshot_sha256, PairedInterventionError::EmptySourceStateDigest { pair_id: pair.pair_id.clone() }),
-            (&pair.exogenous_forcing_sha256, PairedInterventionError::EmptyExogenousForcingDigest { pair_id: pair.pair_id.clone() }),
+            (
+                &pair.intervention_record_sha256,
+                PairedInterventionError::EmptyInterventionRecordDigest {
+                    pair_id: pair.pair_id.clone(),
+                },
+            ),
+            (
+                &pair.source_state_snapshot_sha256,
+                PairedInterventionError::EmptySourceStateDigest {
+                    pair_id: pair.pair_id.clone(),
+                },
+            ),
+            (
+                &pair.exogenous_forcing_sha256,
+                PairedInterventionError::EmptyExogenousForcingDigest {
+                    pair_id: pair.pair_id.clone(),
+                },
+            ),
         ] {
             if digest_is_empty(digest) {
                 return Err(error);
             }
         }
 
-        validate_branch(&pair.control, &pair.pair_id, &context.model_checkpoint_sha256)?;
-        validate_branch(&pair.treatment, &pair.pair_id, &context.model_checkpoint_sha256)?;
+        validate_branch(
+            &pair.control,
+            &pair.pair_id,
+            &context.model_checkpoint_sha256,
+        )?;
+        validate_branch(
+            &pair.treatment,
+            &pair.pair_id,
+            &context.model_checkpoint_sha256,
+        )?;
         if pair.control.branch_id == pair.treatment.branch_id
             || !branch_ids.insert(pair.control.branch_id.clone())
             || !branch_ids.insert(pair.treatment.branch_id.clone())
@@ -739,10 +1019,8 @@ pub fn evaluate_paired_interventions(
                 branch_id: pair.control.branch_id.clone(),
             });
         }
-        let expected_disposition = pair_disposition_from_branches(
-            pair.control.disposition,
-            pair.treatment.disposition,
-        );
+        let expected_disposition =
+            pair_disposition_from_branches(pair.control.disposition, pair.treatment.disposition);
         let disposition_matches = match (expected_disposition, pair.disposition) {
             (PairDisposition::Completed, PairDisposition::Completed) => true,
             (PairDisposition::Failed { .. }, PairDisposition::Failed { .. }) => true,
@@ -825,12 +1103,13 @@ pub fn evaluate_paired_interventions(
                     branch_id: pair.control.branch_id.clone(),
                 },
             )?);
-            let treatment_predicted = i128::from(pair.treatment.predicted_outcome_mean_micro.ok_or(
-                PairedInterventionError::BranchOutcomeMissing {
-                    pair_id: pair.pair_id.clone(),
-                    branch_id: pair.treatment.branch_id.clone(),
-                },
-            )?);
+            let treatment_predicted =
+                i128::from(pair.treatment.predicted_outcome_mean_micro.ok_or(
+                    PairedInterventionError::BranchOutcomeMissing {
+                        pair_id: pair.pair_id.clone(),
+                        branch_id: pair.treatment.branch_id.clone(),
+                    },
+                )?);
             let true_effect = treatment_true - control_true;
             let predicted_effect = treatment_predicted - control_predicted;
             let error = abs_i128(predicted_effect - true_effect);
@@ -844,13 +1123,16 @@ pub fn evaluate_paired_interventions(
                     pair_id: pair.pair_id.clone(),
                 });
             }
-            let sign_eligible = abs_i128(true_effect)
-                > u128::from(context.effect_resolution_floor_micro);
-            let sign_correct = sign_eligible.then(|| effect_sign(predicted_effect) == effect_sign(true_effect));
+            let sign_eligible =
+                abs_i128(true_effect) > u128::from(context.effect_resolution_floor_micro);
+            let sign_correct =
+                sign_eligible.then(|| effect_sign(predicted_effect) == effect_sign(true_effect));
             let covered = true_effect >= i128::from(interval.lower_micro)
                 && true_effect <= i128::from(interval.upper_micro);
 
-            let expected_invariant_ids = context.expected_invariant_variable_ids.iter()
+            let expected_invariant_ids = context
+                .expected_invariant_variable_ids
+                .iter()
                 .cloned()
                 .collect::<BTreeSet<_>>();
             for invariant in &pair.invariant_variables {
@@ -875,7 +1157,9 @@ pub fn evaluate_paired_interventions(
                 }
                 let predicted_delta = i128::from(invariant.treatment_predicted_micro)
                     - i128::from(invariant.control_predicted_micro);
-                if abs_i128(predicted_delta) > u128::from(context.predicted_invariance_tolerance_micro) {
+                if abs_i128(predicted_delta)
+                    > u128::from(context.predicted_invariance_tolerance_micro)
+                {
                     increment(&mut invariant_false_change_count)?;
                 }
             }
@@ -891,8 +1175,8 @@ pub fn evaluate_paired_interventions(
             pair_result.sign_eligible = sign_eligible;
             pair_result.sign_correct = sign_correct;
             pair_result.predicted_interval_covered = Some(covered);
-            pair_result.invariant_observation_count =
-                u64::try_from(pair.invariant_variables.len()).map_err(|_| PairedInterventionError::ArithmeticOverflow)?;
+            pair_result.invariant_observation_count = u64::try_from(pair.invariant_variables.len())
+                .map_err(|_| PairedInterventionError::ArithmeticOverflow)?;
             pair_result.invariant_false_change_count = invariant_false_change_count;
         } else {
             if !pair.invariant_variables.is_empty() || pair.predicted_effect_interval.is_some() {
@@ -902,16 +1186,25 @@ pub fn evaluate_paired_interventions(
             }
         }
 
-        let family = families.get_mut(&pair.family)
-            .ok_or(PairedInterventionError::MissingFamilyProfile { family: pair.family })?;
+        let family = families.get_mut(&pair.family).ok_or(
+            PairedInterventionError::MissingFamilyProfile {
+                family: pair.family,
+            },
+        )?;
         increment(&mut family.pair_count)?;
         family.dispositions.add(pair.disposition)?;
-        let cluster = family.clusters.entry(pair.environment_cluster_id.clone()).or_default();
+        let cluster = family
+            .clusters
+            .entry(pair.environment_cluster_id.clone())
+            .or_default();
         increment(&mut cluster.pair_count)?;
         cluster.dispositions.add(pair.disposition)?;
 
         if let Some(error) = pair_result.absolute_contrast_error_micro {
-            add_u64(&mut family.sign_eligible_count, u64::from(pair_result.sign_eligible))?;
+            add_u64(
+                &mut family.sign_eligible_count,
+                u64::from(pair_result.sign_eligible),
+            )?;
             if pair_result.sign_correct == Some(true) {
                 increment(&mut family.sign_correct_count)?;
             }
@@ -919,15 +1212,28 @@ pub fn evaluate_paired_interventions(
                 increment(&mut family.interval_covered_count)?;
             }
             increment(&mut family.interval_count)?;
-            family.task_contrast_error_sum_micro = family.task_contrast_error_sum_micro
-                .checked_add(error).ok_or(PairedInterventionError::ArithmeticOverflow)?;
-            add_u64(&mut family.invariant_observation_count, pair_result.invariant_observation_count)?;
-            add_u64(&mut family.invariant_false_change_count, pair_result.invariant_false_change_count)?;
+            family.task_contrast_error_sum_micro = family
+                .task_contrast_error_sum_micro
+                .checked_add(error)
+                .ok_or(PairedInterventionError::ArithmeticOverflow)?;
+            add_u64(
+                &mut family.invariant_observation_count,
+                pair_result.invariant_observation_count,
+            )?;
+            add_u64(
+                &mut family.invariant_false_change_count,
+                pair_result.invariant_false_change_count,
+            )?;
 
             increment(&mut cluster.completed_count)?;
-            cluster.contrast_error_sum_micro = cluster.contrast_error_sum_micro
-                .checked_add(error).ok_or(PairedInterventionError::ArithmeticOverflow)?;
-            add_u64(&mut cluster.sign_eligible_count, u64::from(pair_result.sign_eligible))?;
+            cluster.contrast_error_sum_micro = cluster
+                .contrast_error_sum_micro
+                .checked_add(error)
+                .ok_or(PairedInterventionError::ArithmeticOverflow)?;
+            add_u64(
+                &mut cluster.sign_eligible_count,
+                u64::from(pair_result.sign_eligible),
+            )?;
             if pair_result.sign_correct == Some(true) {
                 increment(&mut cluster.sign_correct_count)?;
             }
@@ -935,12 +1241,21 @@ pub fn evaluate_paired_interventions(
             if pair_result.predicted_interval_covered == Some(true) {
                 increment(&mut cluster.interval_covered_count)?;
             }
-            add_u64(&mut cluster.invariant_observation_count, pair_result.invariant_observation_count)?;
-            add_u64(&mut cluster.invariant_false_change_count, pair_result.invariant_false_change_count)?;
+            add_u64(
+                &mut cluster.invariant_observation_count,
+                pair_result.invariant_observation_count,
+            )?;
+            add_u64(
+                &mut cluster.invariant_false_change_count,
+                pair_result.invariant_false_change_count,
+            )?;
         }
 
         for branch in [&pair.control, &pair.treatment] {
-            add_u64(&mut total_branch_interactions, branch.resources.interaction_count)?;
+            add_u64(
+                &mut total_branch_interactions,
+                branch.resources.interaction_count,
+            )?;
             add_u64(&mut total_model_queries, branch.resources.model_query_count)?;
             add_u64(&mut total_elapsed_us, branch.resources.elapsed_us)?;
             if let Some(energy) = branch.resources.measured_energy_uj {
@@ -954,7 +1269,10 @@ pub fn evaluate_paired_interventions(
         results.push(pair_result);
     }
 
-    let missing = expected_ids.difference(&pair_ids).cloned().collect::<Vec<_>>();
+    let missing = expected_ids
+        .difference(&pair_ids)
+        .cloned()
+        .collect::<Vec<_>>();
     if !missing.is_empty() {
         return Err(PairedInterventionError::MissingPairs { pair_ids: missing });
     }
@@ -962,9 +1280,12 @@ pub fn evaluate_paired_interventions(
     let mut family_summaries = Vec::with_capacity(PAIRED_INTERVENTION_FAMILY_COUNT);
     let mut cluster_summaries = Vec::new();
     for family in InterventionFamily::ALL {
-        let accumulator = families.get(&family)
+        let accumulator = families
+            .get(&family)
             .ok_or(PairedInterventionError::MissingFamilyProfile { family })?;
-        let completed_clusters = accumulator.clusters.values()
+        let completed_clusters = accumulator
+            .clusters
+            .values()
             .filter(|cluster| cluster.completed_count > 0)
             .count();
         let completed_cluster_count = u64::try_from(completed_clusters)
@@ -991,20 +1312,23 @@ pub fn evaluate_paired_interventions(
             };
             if cluster.sign_eligible_count > 0 {
                 cluster_sign_rates.push(
-                    u128::from(cluster.sign_correct_count) * u128::from(PAIRED_INTERVENTION_SCORE_PPM)
-                        / u128::from(cluster.sign_eligible_count)
+                    u128::from(cluster.sign_correct_count)
+                        * u128::from(PAIRED_INTERVENTION_SCORE_PPM)
+                        / u128::from(cluster.sign_eligible_count),
                 );
             }
             if cluster.interval_count > 0 {
                 cluster_interval_rates.push(
-                    u128::from(cluster.interval_covered_count) * u128::from(PAIRED_INTERVENTION_SCORE_PPM)
-                        / u128::from(cluster.interval_count)
+                    u128::from(cluster.interval_covered_count)
+                        * u128::from(PAIRED_INTERVENTION_SCORE_PPM)
+                        / u128::from(cluster.interval_count),
                 );
             }
             if cluster.invariant_observation_count > 0 {
                 cluster_false_change_rates.push(
-                    u128::from(cluster.invariant_false_change_count) * u128::from(PAIRED_INTERVENTION_SCORE_PPM)
-                        / u128::from(cluster.invariant_observation_count)
+                    u128::from(cluster.invariant_false_change_count)
+                        * u128::from(PAIRED_INTERVENTION_SCORE_PPM)
+                        / u128::from(cluster.invariant_observation_count),
                 );
             }
             cluster_summaries.push(PairedInterventionClusterSummary {
@@ -1034,7 +1358,10 @@ pub fn evaluate_paired_interventions(
             Some(cluster_error_means.iter().sum::<u128>() / cluster_error_means.len() as u128)
         };
         let task_weighted_mean = if accumulator.dispositions.completed > 0 {
-            Some(accumulator.task_contrast_error_sum_micro / u128::from(accumulator.dispositions.completed))
+            Some(
+                accumulator.task_contrast_error_sum_micro
+                    / u128::from(accumulator.dispositions.completed),
+            )
         } else {
             None
         };
@@ -1043,9 +1370,12 @@ pub fn evaluate_paired_interventions(
                 Ok(None)
             } else {
                 let sum = values.iter().try_fold(0_u128, |acc, value| {
-                    acc.checked_add(*value).ok_or(PairedInterventionError::ArithmeticOverflow)
+                    acc.checked_add(*value)
+                        .ok_or(PairedInterventionError::ArithmeticOverflow)
                 })?;
-                Ok(Some(u32::try_from(sum / values.len() as u128).map_err(|_| PairedInterventionError::ArithmeticOverflow)?))
+                Ok(Some(u32::try_from(sum / values.len() as u128).map_err(
+                    |_| PairedInterventionError::ArithmeticOverflow,
+                )?))
             }
         };
 
@@ -1105,7 +1435,8 @@ pub fn evaluate_paired_interventions(
     results.sort_by(|left, right| left.pair_id.cmp(&right.pair_id));
     Ok(PairedInterventionCertificate {
         context: context.clone(),
-        pair_count: u64::try_from(results.len()).map_err(|_| PairedInterventionError::ArithmeticOverflow)?,
+        pair_count: u64::try_from(results.len())
+            .map_err(|_| PairedInterventionError::ArithmeticOverflow)?,
         pair_results: results,
         cluster_summaries,
         family_summaries,
@@ -1149,11 +1480,14 @@ mod tests {
                 max_total_elapsed_us: 10_000,
                 max_total_energy_uj: Some(10_000),
             },
-            family_profiles: InterventionFamily::ALL.into_iter().enumerate()
+            family_profiles: InterventionFamily::ALL
+                .into_iter()
+                .enumerate()
                 .map(|(index, family)| InterventionFamilyProfile {
                     family,
                     profile_manifest_sha256: digest(20 + index as u8),
-                }).collect(),
+                })
+                .collect(),
         }
     }
 
@@ -1173,7 +1507,12 @@ mod tests {
             family,
             environment_family_id: "world-generator-v1".to_owned(),
             environment_cluster_id: format!("{}-cluster-{cluster_number}", family.as_str()),
-            intervention_profile_sha256: digest(20 + InterventionFamily::ALL.iter().position(|x| *x == family).unwrap() as u8),
+            intervention_profile_sha256: digest(
+                20 + InterventionFamily::ALL
+                    .iter()
+                    .position(|x| *x == family)
+                    .unwrap() as u8,
+            ),
             intervention_record_sha256: digest(40 + pair_number as u8),
             source_state_snapshot_sha256: digest(5 + cluster_number),
             exogenous_forcing_sha256: digest(70 + cluster_number),
@@ -1229,7 +1568,11 @@ mod tests {
         let mut run_id = 1_u64;
         for family in InterventionFamily::ALL {
             for cluster in 1..=2 {
-                let effect = if family == InterventionFamily::NullInvariance { 0 } else { 1_000 };
+                let effect = if family == InterventionFamily::NullInvariance {
+                    0
+                } else {
+                    1_000
+                };
                 let row = pair(run_id, family, cluster, effect);
                 expected_pair_ids.push(row.pair_id.clone());
                 pairs.push(row);
@@ -1246,7 +1589,10 @@ mod tests {
     #[test]
     fn emits_eight_family_summaries_with_paired_contrast_metrics() {
         let result = evaluate_paired_interventions(&base_input()).unwrap();
-        assert_eq!(result.family_summaries.len(), PAIRED_INTERVENTION_FAMILY_COUNT);
+        assert_eq!(
+            result.family_summaries.len(),
+            PAIRED_INTERVENTION_FAMILY_COUNT
+        );
         assert_eq!(result.pair_count, 16);
         assert!(result.all_expected_pairs_present);
         assert!(result.all_required_families_present);
@@ -1255,11 +1601,17 @@ mod tests {
             assert_eq!(summary.completed_count, 2);
             assert_eq!(summary.completed_cluster_count, 2);
             assert_eq!(summary.cluster_balanced_mean_contrast_error_micro, Some(0));
-            assert_eq!(summary.cluster_balanced_interval_coverage_ppm, Some(1_000_000));
+            assert_eq!(
+                summary.cluster_balanced_interval_coverage_ppm,
+                Some(1_000_000)
+            );
             assert_eq!(summary.cluster_balanced_false_change_rate_ppm, Some(0));
         }
-        let null = result.family_summaries.iter()
-            .find(|row| row.family == InterventionFamily::NullInvariance).unwrap();
+        let null = result
+            .family_summaries
+            .iter()
+            .find(|row| row.family == InterventionFamily::NullInvariance)
+            .unwrap();
         assert_eq!(null.sign_eligible_pair_count, 0);
         assert_eq!(null.cluster_balanced_sign_accuracy_ppm, None);
         assert_eq!(result.total_branch_interaction_count, 32);
@@ -1269,13 +1621,26 @@ mod tests {
     #[test]
     fn paired_contrast_exposes_prediction_error_hidden_by_plausible_branches() {
         let mut input = base_input();
-        let row = input.pairs.iter_mut().find(|row| row.family == InterventionFamily::Directional).unwrap();
+        let row = input
+            .pairs
+            .iter_mut()
+            .find(|row| row.family == InterventionFamily::Directional)
+            .unwrap();
         row.treatment.predicted_outcome_mean_micro = Some(10_500);
         let result = evaluate_paired_interventions(&input).unwrap();
-        let directional = result.family_summaries.iter()
-            .find(|row| row.family == InterventionFamily::Directional).unwrap();
-        assert_eq!(directional.task_weighted_mean_contrast_error_micro, Some(250));
-        assert_eq!(directional.cluster_balanced_mean_contrast_error_micro, Some(250));
+        let directional = result
+            .family_summaries
+            .iter()
+            .find(|row| row.family == InterventionFamily::Directional)
+            .unwrap();
+        assert_eq!(
+            directional.task_weighted_mean_contrast_error_micro,
+            Some(250)
+        );
+        assert_eq!(
+            directional.cluster_balanced_mean_contrast_error_micro,
+            Some(250)
+        );
     }
 
     #[test]
@@ -1287,8 +1652,11 @@ mod tests {
             }
         }
         let result = evaluate_paired_interventions(&input).unwrap();
-        let directional = result.family_summaries.iter()
-            .find(|row| row.family == InterventionFamily::Directional).unwrap();
+        let directional = result
+            .family_summaries
+            .iter()
+            .find(|row| row.family == InterventionFamily::Directional)
+            .unwrap();
         assert_eq!(directional.sign_eligible_pair_count, 2);
         assert_eq!(directional.sign_correct_pair_count, 0);
         assert_eq!(directional.cluster_balanced_sign_accuracy_ppm, Some(0));
@@ -1297,8 +1665,11 @@ mod tests {
     #[test]
     fn null_intervention_is_not_counted_as_sign_correctness() {
         let result = evaluate_paired_interventions(&base_input()).unwrap();
-        let null = result.family_summaries.iter()
-            .find(|row| row.family == InterventionFamily::NullInvariance).unwrap();
+        let null = result
+            .family_summaries
+            .iter()
+            .find(|row| row.family == InterventionFamily::NullInvariance)
+            .unwrap();
         assert_eq!(null.sign_eligible_pair_count, 0);
         assert_eq!(null.cluster_balanced_sign_accuracy_ppm, None);
     }
@@ -1306,14 +1677,24 @@ mod tests {
     #[test]
     fn invariant_variable_false_change_is_reported() {
         let mut input = base_input();
-        let row = input.pairs.iter_mut().find(|row| row.family == InterventionFamily::Temporal).unwrap();
+        let row = input
+            .pairs
+            .iter_mut()
+            .find(|row| row.family == InterventionFamily::Temporal)
+            .unwrap();
         row.treatment.invariant_variables[0].treatment_predicted_micro = 50;
         let result = evaluate_paired_interventions(&input).unwrap();
-        let temporal = result.family_summaries.iter()
-            .find(|row| row.family == InterventionFamily::Temporal).unwrap();
+        let temporal = result
+            .family_summaries
+            .iter()
+            .find(|row| row.family == InterventionFamily::Temporal)
+            .unwrap();
         assert_eq!(temporal.invariant_observation_count, 2);
         assert_eq!(temporal.invariant_false_change_count, 1);
-        assert_eq!(temporal.cluster_balanced_false_change_rate_ppm, Some(500_000));
+        assert_eq!(
+            temporal.cluster_balanced_false_change_rate_ppm,
+            Some(500_000)
+        );
     }
 
     #[test]
@@ -1370,16 +1751,24 @@ mod tests {
     fn failed_pair_is_retained_with_penalty_and_in_original_denominator() {
         let mut input = base_input();
         input.context.minimum_independent_clusters_per_family = 1;
-        let row = input.pairs.iter_mut()
-            .find(|row| row.family == InterventionFamily::Directional && row.environment_cluster_id.ends_with("cluster-1"))
+        let row = input
+            .pairs
+            .iter_mut()
+            .find(|row| {
+                row.family == InterventionFamily::Directional
+                    && row.environment_cluster_id.ends_with("cluster-1")
+            })
             .unwrap();
         row.treatment.disposition = BranchDisposition::Failed;
         row.disposition = PairDisposition::Failed { penalty_ppm: 0 };
         row.predicted_effect_interval = None;
         row.invariant_variables.clear();
         let result = evaluate_paired_interventions(&input).unwrap();
-        let directional = result.family_summaries.iter()
-            .find(|row| row.family == InterventionFamily::Directional).unwrap();
+        let directional = result
+            .family_summaries
+            .iter()
+            .find(|row| row.family == InterventionFamily::Directional)
+            .unwrap();
         assert_eq!(directional.pair_count, 2);
         assert_eq!(directional.failed_count, 1);
         assert_eq!(directional.completed_count, 1);
@@ -1391,8 +1780,13 @@ mod tests {
     fn abstention_before_execution_is_retained_and_costs_zero() {
         let mut input = base_input();
         input.context.minimum_independent_clusters_per_family = 1;
-        let row = input.pairs.iter_mut()
-            .find(|row| row.family == InterventionFamily::Parameter && row.environment_cluster_id.ends_with("cluster-1"))
+        let row = input
+            .pairs
+            .iter_mut()
+            .find(|row| {
+                row.family == InterventionFamily::Parameter
+                    && row.environment_cluster_id.ends_with("cluster-1")
+            })
             .unwrap();
         row.control.disposition = BranchDisposition::NotExecuted;
         row.control.true_outcome_micro = None;
@@ -1407,12 +1801,17 @@ mod tests {
         row.treatment.true_outcome_micro = None;
         row.treatment.predicted_outcome_mean_micro = None;
         row.treatment.resources = row.control.resources;
-        row.disposition = PairDisposition::Abstained { penalty_ppm: 100_000 };
+        row.disposition = PairDisposition::Abstained {
+            penalty_ppm: 100_000,
+        };
         row.predicted_effect_interval = None;
         row.invariant_variables.clear();
         let result = evaluate_paired_interventions(&input).unwrap();
-        let parameter = result.family_summaries.iter()
-            .find(|row| row.family == InterventionFamily::Parameter).unwrap();
+        let parameter = result
+            .family_summaries
+            .iter()
+            .find(|row| row.family == InterventionFamily::Parameter)
+            .unwrap();
         assert_eq!(parameter.pair_count, 2);
         assert_eq!(parameter.abstained_count, 1);
         assert_eq!(parameter.assigned_penalty_sum_ppm, 100_000);
@@ -1446,7 +1845,15 @@ mod tests {
             upper_micro: 1_200,
         });
         let result = evaluate_paired_interventions(&input).unwrap();
-        assert!(!result.pair_results.iter().find(|row| row.pair_id == input.pairs[0].pair_id).unwrap().predicted_interval_covered.unwrap());
+        assert!(
+            !result
+                .pair_results
+                .iter()
+                .find(|row| row.pair_id == input.pairs[0].pair_id)
+                .unwrap()
+                .predicted_interval_covered
+                .unwrap()
+        );
     }
 
     #[test]
@@ -1458,7 +1865,10 @@ mod tests {
             Err(PairedInterventionError::InvariantSetMismatch { .. })
         ));
         let mut input = base_input();
-        input.context.expected_invariant_variable_ids.push("color".to_owned());
+        input
+            .context
+            .expected_invariant_variable_ids
+            .push("color".to_owned());
         assert!(matches!(
             evaluate_paired_interventions(&input),
             Err(PairedInterventionError::DuplicateInvariantVariableId { .. })
@@ -1476,8 +1886,11 @@ mod tests {
         input.expected_pair_ids.push(repeated.pair_id.clone());
         input.pairs.push(repeated);
         let result = evaluate_paired_interventions(&input).unwrap();
-        let directional = result.family_summaries.iter()
-            .find(|row| row.family == InterventionFamily::Directional).unwrap();
+        let directional = result
+            .family_summaries
+            .iter()
+            .find(|row| row.family == InterventionFamily::Directional)
+            .unwrap();
         assert_eq!(directional.pair_count, 3);
         assert_eq!(directional.completed_cluster_count, 2);
     }
