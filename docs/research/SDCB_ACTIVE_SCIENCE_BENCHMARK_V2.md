@@ -43,7 +43,7 @@ The committed known-answer fixture contains two candidate mechanisms with the sa
 
 The selector must reject the no-op probe, select the separating probe, and abstain when experiment budget is unavailable. The evaluator-only simulation then emits a bounded-noise receipt; the candidate consistency set must retain the true model and exclude the other model in this fixture.
 
-**Authored coverage:** 17 Rust test functions, including 128 deterministic noise-seed checks. Rust formatting, compilation, tests and Clippy have not been run on this commit. The traces and margins above are hand-derived from the committed matrices, not CI or model results.
+**Authored coverage:** 18 Rust test functions, including 128 deterministic noise-seed checks. Rust formatting, compilation, tests and Clippy have not been run on this commit. The traces and margins above are hand-derived from the committed matrices, not CI or model results.
 
 ## 3. Important limits
 
