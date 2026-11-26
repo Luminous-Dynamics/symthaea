@@ -9,7 +9,6 @@
 //! integration boundary rather than only testing module-internal functions.
 
 use symthaea_plasma_probes::{
-    EmpiricalGramian,
     rbkr::{
         FiniteHorizonGramianConfig, RbkrConfig, ResponseBalancedBasis,
         ResponseGramianAggregationConfig, ResponseGramianScenario,
