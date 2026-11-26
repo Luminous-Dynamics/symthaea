@@ -66,7 +66,7 @@ Rights erasure is separate from ordinary staleness. After an erasure request, th
 
 ## 5. Deterministic tests
 
-The module currently includes eleven authored test functions for:
+The module currently includes twelve authored test functions for:
 1. source correction invalidating a dependent summary and downstream plan;
 2. unrelated source events not invalidating an unrelated projection;
 3. quarantine followed by revalidation not silently restoring an old derived artifact;
@@ -77,7 +77,8 @@ The module currently includes eleven authored test functions for:
 8. exact invalidation receipt replay and conflict handling;
 9. contiguous projection index sequence enforcement;
 10. invalidation receipt self-integrity;
-11. diamond-shaped projection dependencies invalidated exactly once.
+11. diamond-shaped projection dependencies invalidated exactly once;
+12. rejection of a self-consistent transition receipt not retained by the exact source ledger.
 
 The streaming ledger also carries its own event/correction/quarantine/revocation/erasure tests. These are authored tests; Rust compilation, test execution, rustfmt, Clippy and hosted CI have not been completed here.
 
