@@ -182,6 +182,29 @@ Proposed gates are research targets, not measured achievements or IETF threshold
 
 Do not claim zero risk from zero observed failures. Report independent scenario/context clusters, not just repeated mutations of one seeded store.
 
+## 8.1 Current at-rest comparison baseline and the next assurance level
+
+The November 2026 at-rest Internet-Draft publishes informative results for 31 released subsystem/configuration rows (measured 8–19 October 2026). Thirteen rows make no integrity claim and eighteen do. These results are not a randomized industry survey and are not normative, but they are an unusually useful concrete comparison set:
+
+- T9 applies to 29 rows: 21 ACCEPTED the restored older store, 6 REPORTED only at audit, and 2 REJECTED on the read path.
+- T10 was measured on only 7 rows because the SUT's own erasure adapter was available for those rows: 6 ACCEPTED the resurrected record and 1 REJECTED it on read.
+- The draft identifies two L4 implementations that reject T1–T9 on read. Of the two, only `recallspection-exact+anchor` also rejects T10 in the seven measured rows.
+- The draft's informative ladder defines L1 bytes-bound, L2 sequence-bound, L3 context-bound, and L4 whole-store head anchored off the store. Its next level—third-party verification without the store's cooperation—is explicitly proposed, not yet established.
+
+These are the draft's published illustrative cells and must not be presented as SAT results, universal attack prevalence, or a full survey of the industry. The sample has duplicated configurations to vary head location/adversary custody; T10 coverage is incomplete. Source: https://datatracker.ietf.org/doc/html/draft-khandelwal-bpm-agent-memory-integrity-00, §§11–12.
+
+### SAT's research extension: independently verifiable currentness
+
+SAT should operationalize the draft's proposed third-party level as a separate extension, not silently rename it as an IETF-defined level:
+
+- **L4 replication:** exact read-time rejection of T9 whole-store rollback with the integrity head outside the declared store rollback domain.
+- **L5-SAT research extension:** an unrelated verifier, without relying on the subject's read path or local receipt cache, can verify the exact run, complete store root, current witnessed generation, signed quorum receipts, transparency inclusion and consistency proofs, and a freshness statement tied to an independently declared trust/freshness anchor.
+- **Split-view resistance:** two unrelated clients/monitors comparing the same state cannot be shown conflicting current checkpoints without an alarm.
+- **Lifecycle currentness:** the verifier confirms the latest witnessed correction/revocation/erasure transition and can show that a T10-restored record is absent from the current accepted state.
+- **Reproducible regrading:** a second implementation recomputes the result from raw snapshots, receipts, event traces and a closed digest manifest without trusting the SUT's summary score.
+
+L5-SAT is a proposed research gate, not an IETF level and not a production security claim. It should not be counted as achieved by RFC 9162 inclusion alone, a signed checkpoint alone, or an anchor in a different directory. Freshness, witness independence, split-view detection, and complete state binding are separate prerequisites.
+
 ## 9. Execution order
 
 1. Keep the T1-T10 adapter and synthetic lab as a separate, metric-specific lane; compile and run them on an exact-head Rust runner when available.
