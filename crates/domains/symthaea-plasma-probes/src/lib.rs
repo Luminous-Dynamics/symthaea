@@ -152,7 +152,9 @@ pub enum ContractError {
     IncomparableDiscriminationDesigns,
     #[error("kinetic discrimination portfolio contains duplicate intervention IDs")]
     DuplicateDiscriminationIntervention,
-    #[error("kinetic discrimination requires a stable, identified response branch for every hypothesis")]
+    #[error(
+        "kinetic discrimination requires a stable, identified response branch for every hypothesis"
+    )]
     InvalidDiscriminationResponseBranch,
     #[error("kinetic discrimination noise envelope must be finite, positive and ordered")]
     InvalidDiscriminationNoiseEnvelope,
@@ -1124,7 +1126,9 @@ pub fn plan_response_weighted_refinement(
     if !response_loss_budget.is_finite()
         || response_loss_budget < 0.0
         || output_weights.len() != response.output_modes().len()
-        || output_weights.iter().any(|weight| !weight.is_finite() || *weight < 0.0)
+        || output_weights
+            .iter()
+            .any(|weight| !weight.is_finite() || *weight < 0.0)
         || !output_weights.iter().any(|weight| *weight > 0.0)
         || coefficients.len() != response.input_modes().len()
         || encoded_bytes.len() != response.input_modes().len()
@@ -1148,7 +1152,11 @@ pub fn plan_response_weighted_refinement(
             return Err(ContractError::InvalidResponseRefinementInput);
         }
     }
-    let expected_ids = response.input_modes().iter().copied().collect::<BTreeSet<_>>();
+    let expected_ids = response
+        .input_modes()
+        .iter()
+        .copied()
+        .collect::<BTreeSet<_>>();
     if coefficient_ids != expected_ids || byte_ids != expected_ids {
         return Err(ContractError::InvalidResponseRefinementInput);
     }
@@ -1491,21 +1499,23 @@ pub fn evaluate_kinetic_discrimination_portfolio(
     let mut pareto_front_indices = Vec::new();
     for candidate_index in 0..candidate_reports.len() {
         let candidate = &candidate_reports[candidate_index].report;
-        let dominated = candidate_reports.iter().enumerate().any(|(other_index, other)| {
-            if other_index == candidate_index {
-                return false;
-            }
-            let no_worse_information =
-                other.report.expected_information_gain_bits
+        let dominated = candidate_reports
+            .iter()
+            .enumerate()
+            .any(|(other_index, other)| {
+                if other_index == candidate_index {
+                    return false;
+                }
+                let no_worse_information = other.report.expected_information_gain_bits
                     >= candidate.expected_information_gain_bits;
-            let no_worse_cost = other.report.estimated_evaluation_cost_seconds
-                <= candidate.estimated_evaluation_cost_seconds;
-            let strictly_better = other.report.expected_information_gain_bits
-                > candidate.expected_information_gain_bits
-                || other.report.estimated_evaluation_cost_seconds
-                    < candidate.estimated_evaluation_cost_seconds;
-            no_worse_information && no_worse_cost && strictly_better
-        });
+                let no_worse_cost = other.report.estimated_evaluation_cost_seconds
+                    <= candidate.estimated_evaluation_cost_seconds;
+                let strictly_better = other.report.expected_information_gain_bits
+                    > candidate.expected_information_gain_bits
+                    || other.report.estimated_evaluation_cost_seconds
+                        < candidate.estimated_evaluation_cost_seconds;
+                no_worse_information && no_worse_cost && strictly_better
+            });
         if !dominated {
             pareto_front_indices.push(candidate_index);
         }
@@ -1648,8 +1658,7 @@ pub fn evaluate_kinetic_discrimination_design(
         {
             return Err(ContractError::NonFiniteResponseValue);
         }
-        if hypothesis.response_branch_id.trim().is_empty()
-            || !hypothesis.branch_association_stable
+        if hypothesis.response_branch_id.trim().is_empty() || !hypothesis.branch_association_stable
         {
             return Err(ContractError::InvalidDiscriminationResponseBranch);
         }
@@ -1687,9 +1696,8 @@ pub fn evaluate_kinetic_discrimination_design(
     for (true_index, true_hypothesis) in design.hypotheses.iter().enumerate() {
         let true_prior = probabilities[true_index];
         for real_index in 0..GAUSS_HERMITE_9_NODES.len() {
-            let real_noise = std::f64::consts::SQRT_2
-                * GAUSS_HERMITE_9_NODES[real_index]
-                * standard_deviation;
+            let real_noise =
+                std::f64::consts::SQRT_2 * GAUSS_HERMITE_9_NODES[real_index] * standard_deviation;
             let real_weight = GAUSS_HERMITE_9_WEIGHTS[real_index] / weight_normalizer;
             for imag_index in 0..GAUSS_HERMITE_9_NODES.len() {
                 let imag_noise = std::f64::consts::SQRT_2
@@ -1710,13 +1718,12 @@ pub fn evaluate_kinetic_discrimination_design(
                     let normalized_distance = delta_real.hypot(delta_imag) / standard_deviation;
                     // Very remote hypotheses can underflow to effectively zero likelihood;
                     // clamp the log likelihood to retain stable log-sum-exp arithmetic.
-                    let log_likelihood = if normalized_distance.is_finite()
-                        && normalized_distance < 1.0e150
-                    {
-                        -0.5 * normalized_distance * normalized_distance
-                    } else {
-                        -1.0e300
-                    };
+                    let log_likelihood =
+                        if normalized_distance.is_finite() && normalized_distance < 1.0e150 {
+                            -0.5 * normalized_distance * normalized_distance
+                        } else {
+                            -1.0e300
+                        };
                     log_joint.push(probabilities[hypothesis_index].ln() + log_likelihood);
                 }
 
@@ -1731,13 +1738,13 @@ pub fn evaluate_kinetic_discrimination_design(
                 let true_delta_imag = observation_imag - true_hypothesis.predicted_response.imag;
                 let true_normalized_distance =
                     true_delta_real.hypot(true_delta_imag) / standard_deviation;
-                let true_log_likelihood = -0.5 * true_normalized_distance * true_normalized_distance;
+                let true_log_likelihood =
+                    -0.5 * true_normalized_distance * true_normalized_distance;
                 let information_nats = true_log_likelihood - log_mixture;
                 if !information_nats.is_finite() || !quadrature_weight.is_finite() {
                     return Err(ContractError::InvalidDiscriminationArithmetic);
                 }
-                expected_information_nats +=
-                    true_prior * quadrature_weight * information_nats;
+                expected_information_nats += true_prior * quadrature_weight * information_nats;
             }
         }
     }
@@ -1995,10 +2002,9 @@ impl KineticResponseSignature {
                         return Err(ContractError::InvalidGramianArithmetic);
                     }
                     maximum_normalized_entry_error = Some(
-                        maximum_normalized_entry_error
-                            .map_or(normalized_entry_error, |current| {
-                                current.max(normalized_entry_error)
-                            }),
+                        maximum_normalized_entry_error.map_or(normalized_entry_error, |current| {
+                            current.max(normalized_entry_error)
+                        }),
                     );
                     squared_error += squared_delta;
                     squared_normalized_error += squared_delta / (scale * scale);
@@ -2668,7 +2674,9 @@ impl KineticOperationLedger {
             }
 
             if event.declared_reversible
-                && event.discarded_effect_measure.is_some_and(|measure| measure > 0.0)
+                && event
+                    .discarded_effect_measure
+                    .is_some_and(|measure| measure > 0.0)
             {
                 return Err(ContractError::InvalidKineticOperationLedger(
                     "a reversible operation cannot report a positive discarded-effect measure",
@@ -2776,10 +2784,7 @@ impl KineticPulseSequence {
 
         let mut hasher = blake3::Hasher::new();
         hasher.update(b"symthaea.kinetic-pulse-sequence.v0.1\0");
-        update_length_prefixed(
-            &mut hasher,
-            contract.family_fingerprint().as_bytes(),
-        );
+        update_length_prefixed(&mut hasher, contract.family_fingerprint().as_bytes());
         update_f64(&mut hasher, observation_end_time);
         hasher.update(&(physical_pulses.len() as u64).to_le_bytes());
         for pulse in &physical_pulses {
@@ -2862,9 +2867,11 @@ impl KineticPulsePathResponseSignature {
             .pulses
             .last()
             .map_or(0.0, |pulse| pulse.application_time);
-        if response_signature.time_samples.iter().any(|time| {
-            *time < observation_start || *time > sequence.observation_end_time
-        }) {
+        if response_signature
+            .time_samples
+            .iter()
+            .any(|time| *time < observation_start || *time > sequence.observation_end_time)
+        {
             return Err(ContractError::InvalidKineticPathResponseSignature(
                 "response samples must lie within the post-sequence observation window",
             ));
@@ -2885,19 +2892,22 @@ impl KineticPulsePathResponseSignature {
 
     /// True only when every response entry has a branch association.
     pub fn has_complete_branch_association(&self) -> bool {
-        self.response_signature.branch_ids.iter().all(Option::is_some)
+        self.response_signature
+            .branch_ids
+            .iter()
+            .all(Option::is_some)
     }
 
     /// True only when every response entry has a measured complex value.
     pub fn has_complete_response_coverage(&self) -> bool {
-        self.response_signature.responses.iter().all(Option::is_some)
+        self.response_signature
+            .responses
+            .iter()
+            .all(Option::is_some)
     }
 
     /// Compare two candidate/reference responses for the same immutable path.
-    pub fn compare(
-        &self,
-        other: &Self,
-    ) -> Result<ResponseSignatureComparison, ContractError> {
+    pub fn compare(&self, other: &Self) -> Result<ResponseSignatureComparison, ContractError> {
         if self.sequence_digest != other.sequence_digest {
             return Err(ContractError::InvalidKineticPathResponseSignature(
                 "cannot compare response signatures from different pulse paths",
@@ -3203,8 +3213,7 @@ impl WeightedEmpiricalMeasure1D {
             .zip(weights)
             .filter_map(|(position, weight)| {
                 let normalized_weight = (weight / maximum_weight) / scaled_total;
-                (normalized_weight > 0.0)
-                    .then_some((canonical_zero(*position), normalized_weight))
+                (normalized_weight > 0.0).then_some((canonical_zero(*position), normalized_weight))
             })
             .collect::<Vec<_>>();
         if sorted.is_empty() {
@@ -3239,7 +3248,10 @@ impl WeightedEmpiricalMeasure1D {
             .into_iter()
             .map(|(position, weight, _)| (position, weight / aggregate_total))
             .collect::<Vec<_>>();
-        if atoms.iter().any(|(_, weight)| !weight.is_finite() || *weight < 0.0) {
+        if atoms
+            .iter()
+            .any(|(_, weight)| !weight.is_finite() || *weight < 0.0)
+        {
             return Err(ContractError::InvalidParticleMeasureWeights);
         }
 
@@ -3270,14 +3282,8 @@ impl WeightedEmpiricalMeasure1D {
         let mut compensation = 0.0;
 
         while left_index < self.atoms.len() || right_index < other.atoms.len() {
-            let next_left = self
-                .atoms
-                .get(left_index)
-                .map(|(position, _)| *position);
-            let next_right = other
-                .atoms
-                .get(right_index)
-                .map(|(position, _)| *position);
+            let next_left = self.atoms.get(left_index).map(|(position, _)| *position);
+            let next_right = other.atoms.get(right_index).map(|(position, _)| *position);
             let next_position = match (next_left, next_right) {
                 (Some(left), Some(right)) => left.min(right),
                 (Some(left), None) => left,
@@ -3429,11 +3435,7 @@ impl WeightedEmpiricalMeasure1D {
             if !area.is_finite() {
                 return Err(ContractError::InvalidWassersteinArithmetic);
             }
-            kahan_add(
-                area,
-                &mut normalized_distance,
-                &mut distance_compensation,
-            );
+            kahan_add(area, &mut normalized_distance, &mut distance_compensation);
         }
 
         let physical_distance = normalized_distance * domain_length;
@@ -5865,9 +5867,7 @@ pub fn solve_small_positive_mass_response_qp(
             return Err(ContractError::PositivityProjectionArithmeticOverflow);
         }
         let (lambda_0, lambda_1) =
-            if determinant_scale > 0.0
-                && determinant.abs() > 1.0e-12 * determinant_scale
-            {
+            if determinant_scale > 0.0 && determinant.abs() > 1.0e-12 * determinant_scale {
                 let lambda_0_numerator = rhs_0.mul_add(gram_11, -(gram_01 * rhs_1));
                 let lambda_1_numerator = gram_00.mul_add(rhs_1, -(gram_01 * rhs_0));
                 if !lambda_0_numerator.is_finite() || !lambda_1_numerator.is_finite() {
@@ -5892,25 +5892,21 @@ pub fn solve_small_positive_mass_response_qp(
                 let Some(reference_index) = first_free else {
                     continue;
                 };
-                let alpha = response_coefficients[reference_index]
-                    / cell_volumes[reference_index];
+                let alpha = response_coefficients[reference_index] / cell_volumes[reference_index];
                 let ratio_scale = alpha.abs().max(1.0e-300);
                 let proportional = (0..cell_count).all(|index| {
                     if (mask & (1_u32 << index)) == 0 {
                         true
                     } else {
-                        let ratio =
-                            response_coefficients[index] / cell_volumes[index];
-                        (ratio - alpha).abs()
-                            <= 1.0e-12 * ratio_scale.max(ratio.abs())
+                        let ratio = response_coefficients[index] / cell_volumes[index];
+                        (ratio - alpha).abs() <= 1.0e-12 * ratio_scale.max(ratio.abs())
                     }
                 });
                 if !proportional {
                     continue;
                 }
                 let response_consistency = alpha * target_mass - target_response;
-                let response_tolerance =
-                    1.0e-10_f64.max(target_response.abs() * 1.0e-9);
+                let response_tolerance = 1.0e-10_f64.max(target_response.abs() * 1.0e-9);
                 if !response_consistency.is_finite() {
                     return Err(ContractError::PositivityProjectionArithmeticOverflow);
                 }
@@ -5952,17 +5948,13 @@ pub fn solve_small_positive_mass_response_qp(
                 if !dual_interval_feasible || lower_lambda > upper_lambda {
                     continue;
                 }
-                let selected_lambda_1 = match (
-                    lower_lambda.is_finite(),
-                    upper_lambda.is_finite(),
-                ) {
+                let selected_lambda_1 = match (lower_lambda.is_finite(), upper_lambda.is_finite()) {
                     (true, true) => 0.5 * lower_lambda + 0.5 * upper_lambda,
                     (true, false) => lower_lambda,
                     (false, true) => upper_lambda,
                     (false, false) => 0.0,
                 };
-                let selected_lambda_0 =
-                    effective_lambda - selected_lambda_1 * alpha;
+                let selected_lambda_0 = effective_lambda - selected_lambda_1 * alpha;
                 (selected_lambda_0, selected_lambda_1)
             };
         if !lambda_0.is_finite() || !lambda_1.is_finite() {
@@ -6006,8 +5998,7 @@ pub fn solve_small_positive_mass_response_qp(
                 if !stationarity.is_finite() {
                     return Err(ContractError::PositivityProjectionArithmeticOverflow);
                 }
-                max_stationarity_residual =
-                    max_stationarity_residual.max(stationarity.abs());
+                max_stationarity_residual = max_stationarity_residual.max(stationarity.abs());
             } else {
                 let dual_multiplier =
                     volume * (lambda_0 - input_values[index]) + lambda_1 * response;
@@ -6018,8 +6009,7 @@ pub fn solve_small_positive_mass_response_qp(
                 if !complementarity.is_finite() {
                     return Err(ContractError::PositivityProjectionArithmeticOverflow);
                 }
-                max_dual_violation =
-                    max_dual_violation.max((-dual_multiplier).max(0.0));
+                max_dual_violation = max_dual_violation.max((-dual_multiplier).max(0.0));
                 max_complementarity_residual =
                     max_complementarity_residual.max(complementarity.abs());
                 if dual_multiplier < -1.0e-10 {
@@ -6030,8 +6020,7 @@ pub fn solve_small_positive_mass_response_qp(
             achieved_mass = volume.mul_add(value, achieved_mass);
             achieved_response = response.mul_add(value, achieved_response);
             let correction = value - input_values[index];
-            correction_squared =
-                volume.mul_add(correction * correction, correction_squared);
+            correction_squared = volume.mul_add(correction * correction, correction_squared);
             objective_value += 0.5 * volume * correction * correction;
             if [
                 achieved_mass,
@@ -6049,8 +6038,7 @@ pub fn solve_small_positive_mass_response_qp(
         let mass_residual = achieved_mass - target_mass;
         let response_residual = achieved_response - target_response;
         let equality_tolerance_mass = 1.0e-10_f64.max(target_mass.abs() * 1.0e-9);
-        let equality_tolerance_response =
-            1.0e-10_f64.max(target_response.abs() * 1.0e-9);
+        let equality_tolerance_response = 1.0e-10_f64.max(target_response.abs() * 1.0e-9);
         if mass_residual.abs() > equality_tolerance_mass
             || response_residual.abs() > equality_tolerance_response
         {
@@ -6155,10 +6143,8 @@ pub fn solve_two_cell_positive_mass_response_projection(
         response_coefficients[1],
         -(cell_volumes[1] * target_response),
     );
-    let numerator_second = cell_volumes[0].mul_add(
-        target_response,
-        -(response_coefficients[0] * target_mass),
-    );
+    let numerator_second =
+        cell_volumes[0].mul_add(target_response, -(response_coefficients[0] * target_mass));
     if !numerator_first.is_finite() || !numerator_second.is_finite() {
         return Err(ContractError::PositivityProjectionArithmeticOverflow);
     }
@@ -6171,14 +6157,10 @@ pub fn solve_two_cell_positive_mass_response_projection(
         return Err(ContractError::InfeasibleTwoCellResponseProjection);
     }
 
-    let achieved_mass = cell_volumes[0].mul_add(
-        projected_first,
-        cell_volumes[1] * projected_second,
-    );
-    let achieved_response = response_coefficients[0].mul_add(
-        projected_first,
-        response_coefficients[1] * projected_second,
-    );
+    let achieved_mass =
+        cell_volumes[0].mul_add(projected_first, cell_volumes[1] * projected_second);
+    let achieved_response = response_coefficients[0]
+        .mul_add(projected_first, response_coefficients[1] * projected_second);
     let mass_residual = achieved_mass - target_mass;
     let response_residual = achieved_response - target_response;
     let correction_first = projected_first - input_values[0];
@@ -6206,9 +6188,7 @@ pub fn solve_two_cell_positive_mass_response_projection(
 
     let mass_tolerance = 1.0e-12_f64.max(target_mass.abs() * 1.0e-10);
     let response_tolerance = 1.0e-12_f64.max(target_response.abs() * 1.0e-10);
-    if mass_residual.abs() > mass_tolerance
-        || response_residual.abs() > response_tolerance
-    {
+    if mass_residual.abs() > mass_tolerance || response_residual.abs() > response_tolerance {
         return Err(ContractError::InfeasibleTwoCellResponseProjection);
     }
 
@@ -6317,10 +6297,7 @@ pub fn project_nonnegative_preserving_mass(
     let mut correction_squared = 0.0_f64;
     let mut active_positive_cell_count = 0_usize;
     let mut minimum_projected_value = f64::INFINITY;
-    for ((input, projected), volume) in input_values
-        .iter()
-        .zip(&projected_values)
-        .zip(cell_volumes)
+    for ((input, projected), volume) in input_values.iter().zip(&projected_values).zip(cell_volumes)
     {
         achieved_mass = volume.mul_add(*projected, achieved_mass);
         let correction = projected - input;
@@ -7607,8 +7584,7 @@ mod tests {
 
     #[test]
     fn kird_audit_rejects_unsupported_schema_version() {
-        let mut value: serde_json::Value =
-            serde_json::from_str(KIRD_SYNTHETIC_FIXTURE).unwrap();
+        let mut value: serde_json::Value = serde_json::from_str(KIRD_SYNTHETIC_FIXTURE).unwrap();
         value["schema_version"] = serde_json::json!("0.2");
         assert!(matches!(
             validate_kird_record_value(&value),
@@ -7747,8 +7723,7 @@ mod tests {
     #[test]
     fn kird_audit_rejects_probe_centers_outside_the_compact_domain() {
         let mut value = certified_kird_value();
-        value["response_scope"]["coverage_domain"]["probe_centers_ticks"] =
-            serde_json::json!([11]);
+        value["response_scope"]["coverage_domain"]["probe_centers_ticks"] = serde_json::json!([11]);
         assert!(matches!(
             validate_kird_record_value(&value),
             Err(ContractError::InvalidKirdField {
@@ -8076,8 +8051,7 @@ mod tests {
 
     #[test]
     fn wasserstein_measure_fixture_matches_all_declared_known_answers() {
-        let fixture: serde_json::Value =
-            serde_json::from_str(PARTICLE_MEASURE_W1_FIXTURE).unwrap();
+        let fixture: serde_json::Value = serde_json::from_str(PARTICLE_MEASURE_W1_FIXTURE).unwrap();
         let minimum = fixture["domain"]["minimum"].as_f64().unwrap();
         let maximum = fixture["domain"]["maximum"].as_f64().unwrap();
         let cases = fixture["cases"].as_array().unwrap();
@@ -8108,20 +8082,12 @@ mod tests {
                 .map(|value| value.as_f64().unwrap())
                 .collect::<Vec<_>>();
             let expected = case["expected_w1"].as_f64().unwrap();
-            let left = WeightedEmpiricalMeasure1D::new(
-                &left_positions,
-                &left_weights,
-                minimum,
-                maximum,
-            )
-            .unwrap();
-            let right = WeightedEmpiricalMeasure1D::new(
-                &right_positions,
-                &right_weights,
-                minimum,
-                maximum,
-            )
-            .unwrap();
+            let left =
+                WeightedEmpiricalMeasure1D::new(&left_positions, &left_weights, minimum, maximum)
+                    .unwrap();
+            let right =
+                WeightedEmpiricalMeasure1D::new(&right_positions, &right_weights, minimum, maximum)
+                    .unwrap();
             assert!(
                 (left.wasserstein1(&right).unwrap() - expected).abs() < 1.0e-14,
                 "known-answer case {}",
@@ -8132,82 +8098,44 @@ mod tests {
 
     #[test]
     fn wasserstein_measure_is_invariant_to_particle_permutation() {
-        let forward = WeightedEmpiricalMeasure1D::new(
-            &[0.1, 0.4, 0.8],
-            &[0.2, 0.3, 0.5],
-            0.0,
-            1.0,
-        )
-        .unwrap();
-        let shuffled = WeightedEmpiricalMeasure1D::new(
-            &[0.8, 0.1, 0.4],
-            &[0.5, 0.2, 0.3],
-            0.0,
-            1.0,
-        )
-        .unwrap();
+        let forward =
+            WeightedEmpiricalMeasure1D::new(&[0.1, 0.4, 0.8], &[0.2, 0.3, 0.5], 0.0, 1.0).unwrap();
+        let shuffled =
+            WeightedEmpiricalMeasure1D::new(&[0.8, 0.1, 0.4], &[0.5, 0.2, 0.3], 0.0, 1.0).unwrap();
         assert_eq!(forward.atoms(), shuffled.atoms());
         assert_eq!(forward.wasserstein1(&shuffled), Ok(0.0));
     }
 
     #[test]
     fn wasserstein_measure_is_invariant_to_exact_colocated_split_and_merge() {
-        let merged = WeightedEmpiricalMeasure1D::new(
-            &[0.2, 0.8],
-            &[0.4, 0.6],
-            0.0,
-            1.0,
-        )
-        .unwrap();
-        let split = WeightedEmpiricalMeasure1D::new(
-            &[0.2, 0.2, 0.8, 0.8],
-            &[0.1, 0.3, 0.2, 0.4],
-            0.0,
-            1.0,
-        )
-        .unwrap();
+        let merged = WeightedEmpiricalMeasure1D::new(&[0.2, 0.8], &[0.4, 0.6], 0.0, 1.0).unwrap();
+        let split =
+            WeightedEmpiricalMeasure1D::new(&[0.2, 0.2, 0.8, 0.8], &[0.1, 0.3, 0.2, 0.4], 0.0, 1.0)
+                .unwrap();
         assert_eq!(merged.atoms(), split.atoms());
         assert_eq!(merged.wasserstein1(&split), Ok(0.0));
     }
 
     #[test]
     fn wasserstein_measure_matches_known_single_atom_displacement() {
-        let left =
-            WeightedEmpiricalMeasure1D::new(&[0.2], &[1.0], 0.0, 1.0).unwrap();
-        let right =
-            WeightedEmpiricalMeasure1D::new(&[0.7], &[1.0], 0.0, 1.0).unwrap();
+        let left = WeightedEmpiricalMeasure1D::new(&[0.2], &[1.0], 0.0, 1.0).unwrap();
+        let right = WeightedEmpiricalMeasure1D::new(&[0.7], &[1.0], 0.0, 1.0).unwrap();
         assert!((left.wasserstein1(&right).unwrap() - 0.5).abs() < 1.0e-15);
         assert!((right.wasserstein1(&left).unwrap() - 0.5).abs() < 1.0e-15);
     }
 
     #[test]
     fn wasserstein_measure_scales_with_moved_probability_mass() {
-        let base = WeightedEmpiricalMeasure1D::new(
-            &[0.2, 0.8],
-            &[0.25, 0.75],
-            0.0,
-            1.0,
-        )
-        .unwrap();
-        let shifted = WeightedEmpiricalMeasure1D::new(
-            &[0.3, 0.8],
-            &[0.25, 0.75],
-            0.0,
-            1.0,
-        )
-        .unwrap();
+        let base = WeightedEmpiricalMeasure1D::new(&[0.2, 0.8], &[0.25, 0.75], 0.0, 1.0).unwrap();
+        let shifted =
+            WeightedEmpiricalMeasure1D::new(&[0.3, 0.8], &[0.25, 0.75], 0.0, 1.0).unwrap();
         assert!((base.wasserstein1(&shifted).unwrap() - 0.025).abs() < 1.0e-15);
     }
 
     #[test]
     fn wasserstein_measure_is_particle_count_invariant_for_identical_measure() {
-        let coarse = WeightedEmpiricalMeasure1D::new(
-            &[0.1, 0.5, 0.9],
-            &[0.2, 0.5, 0.3],
-            0.0,
-            1.0,
-        )
-        .unwrap();
+        let coarse =
+            WeightedEmpiricalMeasure1D::new(&[0.1, 0.5, 0.9], &[0.2, 0.5, 0.3], 0.0, 1.0).unwrap();
         let fine = WeightedEmpiricalMeasure1D::new(
             &[0.1, 0.1, 0.5, 0.9, 0.9],
             &[0.05, 0.15, 0.5, 0.1, 0.2],
@@ -8250,13 +8178,7 @@ mod tests {
                     .iter()
                     .map(|item| item.as_f64().unwrap())
                     .collect::<Vec<_>>();
-                WeightedEmpiricalMeasure1D::new(
-                    &positions,
-                    &weights,
-                    minimum,
-                    maximum,
-                )
-                .unwrap()
+                WeightedEmpiricalMeasure1D::new(&positions, &weights, minimum, maximum).unwrap()
             };
             let left = parse_measure(&case["left"]);
             let right = parse_measure(&case["right"]);
@@ -8270,12 +8192,15 @@ mod tests {
             if let (Some(translated_left), Some(translated_right), Some(translated_expected)) = (
                 case.get("translated_left"),
                 case.get("translated_right"),
-                case.get("translated_expected_w1").and_then(serde_json::Value::as_f64),
+                case.get("translated_expected_w1")
+                    .and_then(serde_json::Value::as_f64),
             ) {
                 let translated_left = parse_measure(translated_left);
                 let translated_right = parse_measure(translated_right);
                 assert!(
-                    (translated_left.wasserstein1_periodic(&translated_right).unwrap()
+                    (translated_left
+                        .wasserstein1_periodic(&translated_right)
+                        .unwrap()
                         - translated_expected)
                         .abs()
                         < 1.0e-13
@@ -8286,54 +8211,32 @@ mod tests {
 
     #[test]
     fn periodic_wasserstein_identifies_the_two_interval_endpoints() {
-        let at_lower =
-            WeightedEmpiricalMeasure1D::new(&[0.0], &[1.0], 0.0, 1.0).unwrap();
-        let at_upper =
-            WeightedEmpiricalMeasure1D::new(&[1.0], &[1.0], 0.0, 1.0).unwrap();
+        let at_lower = WeightedEmpiricalMeasure1D::new(&[0.0], &[1.0], 0.0, 1.0).unwrap();
+        let at_upper = WeightedEmpiricalMeasure1D::new(&[1.0], &[1.0], 0.0, 1.0).unwrap();
         assert!((at_lower.wasserstein1(&at_upper).unwrap() - 1.0).abs() < 1.0e-15);
         assert_eq!(at_lower.wasserstein1_periodic(&at_upper), Ok(0.0));
     }
 
     #[test]
     fn periodic_wasserstein_uses_shortest_arc_across_the_seam() {
-        let left =
-            WeightedEmpiricalMeasure1D::new(&[0.95], &[1.0], 0.0, 1.0).unwrap();
-        let right =
-            WeightedEmpiricalMeasure1D::new(&[0.05], &[1.0], 0.0, 1.0).unwrap();
+        let left = WeightedEmpiricalMeasure1D::new(&[0.95], &[1.0], 0.0, 1.0).unwrap();
+        let right = WeightedEmpiricalMeasure1D::new(&[0.05], &[1.0], 0.0, 1.0).unwrap();
         assert!((left.wasserstein1(&right).unwrap() - 0.9).abs() < 1.0e-15);
         assert!((left.wasserstein1_periodic(&right).unwrap() - 0.1).abs() < 1.0e-15);
     }
 
     #[test]
     fn periodic_wasserstein_is_invariant_to_common_global_translation() {
-        let left = WeightedEmpiricalMeasure1D::new(
-            &[0.1, 0.4, 0.8],
-            &[0.2, 0.3, 0.5],
-            0.0,
-            1.0,
-        )
-        .unwrap();
-        let right = WeightedEmpiricalMeasure1D::new(
-            &[0.2, 0.5, 0.9],
-            &[0.2, 0.3, 0.5],
-            0.0,
-            1.0,
-        )
-        .unwrap();
-        let shift_left = WeightedEmpiricalMeasure1D::new(
-            &[0.37, 0.67, 0.07],
-            &[0.2, 0.3, 0.5],
-            0.0,
-            1.0,
-        )
-        .unwrap();
-        let shift_right = WeightedEmpiricalMeasure1D::new(
-            &[0.47, 0.77, 0.17],
-            &[0.2, 0.3, 0.5],
-            0.0,
-            1.0,
-        )
-        .unwrap();
+        let left =
+            WeightedEmpiricalMeasure1D::new(&[0.1, 0.4, 0.8], &[0.2, 0.3, 0.5], 0.0, 1.0).unwrap();
+        let right =
+            WeightedEmpiricalMeasure1D::new(&[0.2, 0.5, 0.9], &[0.2, 0.3, 0.5], 0.0, 1.0).unwrap();
+        let shift_left =
+            WeightedEmpiricalMeasure1D::new(&[0.37, 0.67, 0.07], &[0.2, 0.3, 0.5], 0.0, 1.0)
+                .unwrap();
+        let shift_right =
+            WeightedEmpiricalMeasure1D::new(&[0.47, 0.77, 0.17], &[0.2, 0.3, 0.5], 0.0, 1.0)
+                .unwrap();
         let original = left.wasserstein1_periodic(&right).unwrap();
         let translated = shift_left.wasserstein1_periodic(&shift_right).unwrap();
         assert!((original - 0.1).abs() < 1.0e-14);
@@ -8342,19 +8245,15 @@ mod tests {
 
     #[test]
     fn periodic_wasserstein_scales_with_physical_domain_length() {
-        let left =
-            WeightedEmpiricalMeasure1D::new(&[0.95], &[1.0], -2.0, 3.0).unwrap();
-        let right =
-            WeightedEmpiricalMeasure1D::new(&[2.45], &[1.0], -2.0, 3.0).unwrap();
+        let left = WeightedEmpiricalMeasure1D::new(&[0.95], &[1.0], -2.0, 3.0).unwrap();
+        let right = WeightedEmpiricalMeasure1D::new(&[2.45], &[1.0], -2.0, 3.0).unwrap();
         assert!((left.wasserstein1_periodic(&right).unwrap() - 1.5).abs() < 1.0e-14);
     }
 
     #[test]
     fn wasserstein_measure_rejects_domain_mismatch_and_out_of_domain_positions() {
-        let first =
-            WeightedEmpiricalMeasure1D::new(&[0.2], &[1.0], 0.0, 1.0).unwrap();
-        let second =
-            WeightedEmpiricalMeasure1D::new(&[0.2], &[1.0], -1.0, 1.0).unwrap();
+        let first = WeightedEmpiricalMeasure1D::new(&[0.2], &[1.0], 0.0, 1.0).unwrap();
+        let second = WeightedEmpiricalMeasure1D::new(&[0.2], &[1.0], -1.0, 1.0).unwrap();
         assert_eq!(
             first.wasserstein1(&second),
             Err(ContractError::ParticleMeasureDomainMismatch)
@@ -8391,20 +8290,10 @@ mod tests {
 
     #[test]
     fn wasserstein_measure_renormalizes_mass_and_ignores_zero_mass_atoms() {
-        let unnormalized = WeightedEmpiricalMeasure1D::new(
-            &[0.2, 0.5, 0.8],
-            &[2.0, 0.0, 6.0],
-            0.0,
-            1.0,
-        )
-        .unwrap();
-        let probability = WeightedEmpiricalMeasure1D::new(
-            &[0.2, 0.8],
-            &[0.25, 0.75],
-            0.0,
-            1.0,
-        )
-        .unwrap();
+        let unnormalized =
+            WeightedEmpiricalMeasure1D::new(&[0.2, 0.5, 0.8], &[2.0, 0.0, 6.0], 0.0, 1.0).unwrap();
+        let probability =
+            WeightedEmpiricalMeasure1D::new(&[0.2, 0.8], &[0.25, 0.75], 0.0, 1.0).unwrap();
         assert_eq!(unnormalized.atoms(), probability.atoms());
         assert_eq!(unnormalized.wasserstein1(&probability), Ok(0.0));
     }
@@ -8424,20 +8313,10 @@ mod tests {
 
     #[test]
     fn wasserstein_measure_handles_weight_scale_without_overflow() {
-        let ordinary = WeightedEmpiricalMeasure1D::new(
-            &[0.2, 0.8],
-            &[1.0, 3.0],
-            0.0,
-            1.0,
-        )
-        .unwrap();
-        let huge = WeightedEmpiricalMeasure1D::new(
-            &[0.2, 0.8],
-            &[f64::MAX, 0.75 * f64::MAX],
-            0.0,
-            1.0,
-        )
-        .unwrap();
+        let ordinary = WeightedEmpiricalMeasure1D::new(&[0.2, 0.8], &[1.0, 3.0], 0.0, 1.0).unwrap();
+        let huge =
+            WeightedEmpiricalMeasure1D::new(&[0.2, 0.8], &[f64::MAX, 0.75 * f64::MAX], 0.0, 1.0)
+                .unwrap();
         assert_eq!(ordinary.atoms(), huge.atoms());
         assert_eq!(ordinary.wasserstein1(&huge), Ok(0.0));
     }
@@ -9863,16 +9742,14 @@ mod tests {
         let state_b =
             make_kinetic_response_signature(0.75, "contract-a", "class-a", Some("branch"));
         let state_c = make_kinetic_response_signature(1.5, "contract-a", "class-a", Some("branch"));
-        assert!(KineticResponseSignature::pairwise_compatible(
-            state_a.compare(&state_b).unwrap(),
-            1.0
-        )
-        .unwrap());
-        assert!(KineticResponseSignature::pairwise_compatible(
-            state_b.compare(&state_c).unwrap(),
-            1.0
-        )
-        .unwrap());
+        assert!(
+            KineticResponseSignature::pairwise_compatible(state_a.compare(&state_b).unwrap(), 1.0)
+                .unwrap()
+        );
+        assert!(
+            KineticResponseSignature::pairwise_compatible(state_b.compare(&state_c).unwrap(), 1.0)
+                .unwrap()
+        );
         let audit = audit_response_signature_cluster(&[state_a, state_b, state_c], 1.0).unwrap();
         assert_eq!(audit.member_count, 3);
         assert_eq!(audit.compared_pair_count, 3);
@@ -9959,8 +9836,7 @@ mod tests {
                     .unwrap(),
             };
             let report = evaluate_kinetic_discrimination_design(&design).unwrap();
-            let expected_prior_entropy =
-                case["expected_prior_entropy_bits"].as_f64().unwrap();
+            let expected_prior_entropy = case["expected_prior_entropy_bits"].as_f64().unwrap();
             let minimum_eig = case["expected_information_gain_min_bits"].as_f64().unwrap();
             let maximum_eig = case["expected_information_gain_max_bits"].as_f64().unwrap();
             assert!(
@@ -10016,20 +9892,11 @@ mod tests {
                         .unwrap()
                         .iter()
                         .map(|hypothesis| KineticDiscriminationHypothesis {
-                            hypothesis_id: hypothesis["hypothesis_id"]
-                                .as_str()
-                                .unwrap()
-                                .to_owned(),
-                            prior_probability: hypothesis["prior_probability"]
-                                .as_f64()
-                                .unwrap(),
+                            hypothesis_id: hypothesis["hypothesis_id"].as_str().unwrap().to_owned(),
+                            prior_probability: hypothesis["prior_probability"].as_f64().unwrap(),
                             predicted_response: ComplexResponse::new(
-                                hypothesis["predicted_response"]["real"]
-                                    .as_f64()
-                                    .unwrap(),
-                                hypothesis["predicted_response"]["imag"]
-                                    .as_f64()
-                                    .unwrap(),
+                                hypothesis["predicted_response"]["real"].as_f64().unwrap(),
+                                hypothesis["predicted_response"]["imag"].as_f64().unwrap(),
                             )
                             .unwrap(),
                             response_branch_id: hypothesis["response_branch_id"]
@@ -10042,19 +9909,15 @@ mod tests {
                         })
                         .collect();
                     KineticDiscriminationDesign {
-                        intervention_id: candidate["intervention_id"]
-                            .as_str()
-                            .unwrap()
-                            .to_owned(),
+                        intervention_id: candidate["intervention_id"].as_str().unwrap().to_owned(),
                         hypotheses,
-                        noise_variance_per_quadrature: candidate
-                            ["noise_variance_per_quadrature"]
+                        noise_variance_per_quadrature: candidate["noise_variance_per_quadrature"]
                             .as_f64()
                             .unwrap(),
-                        estimated_evaluation_cost_seconds: candidate
-                            ["estimated_evaluation_cost_seconds"]
-                            .as_f64()
-                            .unwrap(),
+                        estimated_evaluation_cost_seconds:
+                            candidate["estimated_evaluation_cost_seconds"]
+                                .as_f64()
+                                .unwrap(),
                     }
                 })
                 .collect::<Vec<_>>();
@@ -10092,13 +9955,15 @@ mod tests {
                 .iter()
                 .zip(priors)
                 .enumerate()
-                .map(|(index, ((real, imag), prior))| KineticDiscriminationHypothesis {
-                    hypothesis_id: format!("state-{index}"),
-                    prior_probability: *prior,
-                    predicted_response: ComplexResponse::new(*real, *imag).unwrap(),
-                    response_branch_id: format!("branch-{index}"),
-                    branch_association_stable: true,
-                })
+                .map(
+                    |(index, ((real, imag), prior))| KineticDiscriminationHypothesis {
+                        hypothesis_id: format!("state-{index}"),
+                        prior_probability: *prior,
+                        predicted_response: ComplexResponse::new(*real, *imag).unwrap(),
+                        response_branch_id: format!("branch-{index}"),
+                        branch_association_stable: true,
+                    },
+                )
                 .collect(),
             noise_variance_per_quadrature: variance,
             estimated_evaluation_cost_seconds: cost_seconds,
@@ -10107,35 +9972,32 @@ mod tests {
 
     #[test]
     fn kinetic_discrimination_noise_envelope_reports_worst_and_best_endpoints() {
-        let design = gaussian_discrimination_design(
-            &[(-1.0, 0.25), (1.0, -0.25)],
-            &[0.5, 0.5],
-            0.1,
-            2.0,
+        let design =
+            gaussian_discrimination_design(&[(-1.0, 0.25), (1.0, -0.25)], &[0.5, 0.5], 0.1, 2.0);
+        let report = evaluate_kinetic_discrimination_noise_envelope(&design, 0.02, 4.0).unwrap();
+        assert!(
+            report.best_case_endpoint_information_gain_bits
+                > report.worst_case_endpoint_information_gain_bits
         );
-        let report =
-            evaluate_kinetic_discrimination_noise_envelope(&design, 0.02, 4.0).unwrap();
-        assert!(report.best_case_endpoint_information_gain_bits
-            > report.worst_case_endpoint_information_gain_bits);
-        assert!((report.best_case_endpoint_information_gain_bits_per_cost_second
-            - report.best_case_endpoint_information_gain_bits / 2.0)
-            .abs()
-            < 1.0e-12);
-        assert!((report.worst_case_endpoint_information_gain_bits_per_cost_second
-            - report.worst_case_endpoint_information_gain_bits / 2.0)
-            .abs()
-            < 1.0e-12);
+        assert!(
+            (report.best_case_endpoint_information_gain_bits_per_cost_second
+                - report.best_case_endpoint_information_gain_bits / 2.0)
+                .abs()
+                < 1.0e-12
+        );
+        assert!(
+            (report.worst_case_endpoint_information_gain_bits_per_cost_second
+                - report.worst_case_endpoint_information_gain_bits / 2.0)
+                .abs()
+                < 1.0e-12
+        );
         assert!(report.monotone_noise_degradation_check);
     }
 
     #[test]
     fn kinetic_discrimination_noise_envelope_rejects_invalid_ranges() {
-        let design = gaussian_discrimination_design(
-            &[(-1.0, 0.0), (1.0, 0.0)],
-            &[0.5, 0.5],
-            0.1,
-            1.0,
-        );
+        let design =
+            gaussian_discrimination_design(&[(-1.0, 0.0), (1.0, 0.0)], &[0.5, 0.5], 0.1, 1.0);
         assert_eq!(
             evaluate_kinetic_discrimination_noise_envelope(&design, 0.0, 1.0),
             Err(ContractError::InvalidDiscriminationNoiseEnvelope)
@@ -10153,30 +10015,13 @@ mod tests {
     #[test]
     fn kinetic_discrimination_portfolio_returns_pareto_front_and_best_ratio() {
         let priors = [0.5, 0.5];
-        let weak = gaussian_discrimination_design(
-            &[(0.0, 0.0), (0.2, 0.0)],
-            &priors,
-            0.5,
-            1.0,
-        );
-        let strong_expensive = gaussian_discrimination_design(
-            &[(-2.0, 0.0), (2.0, 0.0)],
-            &priors,
-            0.5,
-            10.0,
-        );
-        let dominated = gaussian_discrimination_design(
-            &[(0.0, 0.0), (0.1, 0.0)],
-            &priors,
-            0.5,
-            2.0,
-        );
-        let strong_cheap = gaussian_discrimination_design(
-            &[(-2.0, 0.0), (2.0, 0.0)],
-            &priors,
-            0.5,
-            2.0,
-        );
+        let weak = gaussian_discrimination_design(&[(0.0, 0.0), (0.2, 0.0)], &priors, 0.5, 1.0);
+        let strong_expensive =
+            gaussian_discrimination_design(&[(-2.0, 0.0), (2.0, 0.0)], &priors, 0.5, 10.0);
+        let dominated =
+            gaussian_discrimination_design(&[(0.0, 0.0), (0.1, 0.0)], &priors, 0.5, 2.0);
+        let strong_cheap =
+            gaussian_discrimination_design(&[(-2.0, 0.0), (2.0, 0.0)], &priors, 0.5, 2.0);
         let mut designs = vec![weak, strong_expensive, dominated, strong_cheap];
         for (index, design) in designs.iter_mut().enumerate() {
             design.intervention_id = format!("pulse-{index}");
@@ -10191,8 +10036,7 @@ mod tests {
     #[test]
     fn kinetic_discrimination_portfolio_rejects_changed_hypothesis_priors_or_noise() {
         let priors = [0.5, 0.5];
-        let first =
-            gaussian_discrimination_design(&[(-1.0, 0.0), (1.0, 0.0)], &priors, 0.1, 1.0);
+        let first = gaussian_discrimination_design(&[(-1.0, 0.0), (1.0, 0.0)], &priors, 0.1, 1.0);
         let mut changed_prior =
             gaussian_discrimination_design(&[(-0.5, 0.0), (0.5, 0.0)], &[0.9, 0.1], 0.1, 1.0);
         changed_prior.intervention_id = "different-prior".to_owned();
@@ -10211,12 +10055,8 @@ mod tests {
 
     #[test]
     fn kinetic_discrimination_portfolio_rejects_duplicates_and_empty_sets() {
-        let design = gaussian_discrimination_design(
-            &[(-1.0, 0.0), (1.0, 0.0)],
-            &[0.5, 0.5],
-            0.1,
-            1.0,
-        );
+        let design =
+            gaussian_discrimination_design(&[(-1.0, 0.0), (1.0, 0.0)], &[0.5, 0.5], 0.1, 1.0);
         assert_eq!(
             evaluate_kinetic_discrimination_portfolio(&[]),
             Err(ContractError::EmptyDiscriminationPortfolio)
@@ -10237,17 +10077,15 @@ mod tests {
         );
         let report = evaluate_kinetic_discrimination_design(&design).unwrap();
         assert!(report.expected_information_gain_bits.abs() < 1.0e-12);
-        assert!((report.expected_posterior_entropy_bits - report.prior_entropy_bits).abs() < 1.0e-12);
+        assert!(
+            (report.expected_posterior_entropy_bits - report.prior_entropy_bits).abs() < 1.0e-12
+        );
     }
 
     #[test]
     fn kinetic_discrimination_eig_detects_phase_only_response_differences() {
-        let design = gaussian_discrimination_design(
-            &[(1.0, 0.0), (0.0, 1.0)],
-            &[0.5, 0.5],
-            0.02,
-            1.0,
-        );
+        let design =
+            gaussian_discrimination_design(&[(1.0, 0.0), (0.0, 1.0)], &[0.5, 0.5], 0.02, 1.0);
         let report = evaluate_kinetic_discrimination_design(&design).unwrap();
         assert!(report.expected_information_gain_bits > 0.95);
         assert!(report.expected_information_gain_bits <= report.prior_entropy_bits + 1.0e-12);
@@ -10258,15 +10096,17 @@ mod tests {
     fn kinetic_discrimination_eig_decreases_as_observation_noise_increases() {
         let responses = [(-1.0, 0.25), (1.0, -0.25)];
         let priors = [0.5, 0.5];
-        let low_noise = evaluate_kinetic_discrimination_design(
-            &gaussian_discrimination_design(&responses, &priors, 0.02, 1.0),
-        )
+        let low_noise = evaluate_kinetic_discrimination_design(&gaussian_discrimination_design(
+            &responses, &priors, 0.02, 1.0,
+        ))
         .unwrap();
-        let high_noise = evaluate_kinetic_discrimination_design(
-            &gaussian_discrimination_design(&responses, &priors, 4.0, 1.0),
-        )
+        let high_noise = evaluate_kinetic_discrimination_design(&gaussian_discrimination_design(
+            &responses, &priors, 4.0, 1.0,
+        ))
         .unwrap();
-        assert!(low_noise.expected_information_gain_bits > high_noise.expected_information_gain_bits);
+        assert!(
+            low_noise.expected_information_gain_bits > high_noise.expected_information_gain_bits
+        );
         assert!(high_noise.expected_information_gain_bits < 0.2);
     }
 
@@ -10297,21 +10137,22 @@ mod tests {
             &responses, &priors, 0.1, 8.0,
         ))
         .unwrap();
-        assert!((cheap.expected_information_gain_bits - expensive.expected_information_gain_bits).abs() < 1.0e-12);
-        assert!((cheap.information_gain_bits_per_cost_second
-            - 4.0 * expensive.information_gain_bits_per_cost_second)
-            .abs()
-            < 1.0e-12);
+        assert!(
+            (cheap.expected_information_gain_bits - expensive.expected_information_gain_bits).abs()
+                < 1.0e-12
+        );
+        assert!(
+            (cheap.information_gain_bits_per_cost_second
+                - 4.0 * expensive.information_gain_bits_per_cost_second)
+                .abs()
+                < 1.0e-12
+        );
     }
 
     #[test]
     fn kinetic_discrimination_rejects_unstable_or_unidentified_response_branches() {
-        let mut design = gaussian_discrimination_design(
-            &[(-1.0, 0.0), (1.0, 0.0)],
-            &[0.5, 0.5],
-            0.1,
-            1.0,
-        );
+        let mut design =
+            gaussian_discrimination_design(&[(-1.0, 0.0), (1.0, 0.0)], &[0.5, 0.5], 0.1, 1.0);
         design.hypotheses[0].branch_association_stable = false;
         assert_eq!(
             evaluate_kinetic_discrimination_design(&design),
@@ -10339,12 +10180,8 @@ mod tests {
 
     #[test]
     fn kinetic_discrimination_rejects_invalid_designs_and_bounded_work_overflow() {
-        let mut design = gaussian_discrimination_design(
-            &[(-1.0, 0.0), (1.0, 0.0)],
-            &[0.5, 0.5],
-            0.1,
-            1.0,
-        );
+        let mut design =
+            gaussian_discrimination_design(&[(-1.0, 0.0), (1.0, 0.0)], &[0.5, 0.5], 0.1, 1.0);
         design.intervention_id.clear();
         assert_eq!(
             evaluate_kinetic_discrimination_design(&design),
@@ -10403,7 +10240,12 @@ mod tests {
             audit_response_signature_cluster(&signatures, 1.0),
             Err(ContractError::ResponseSignatureClusterWorkBudgetExceeded)
         );
-        let one = [make_kinetic_response_signature(0.0, "contract", "class", Some("branch"))];
+        let one = [make_kinetic_response_signature(
+            0.0,
+            "contract",
+            "class",
+            Some("branch"),
+        )];
         assert!(audit_response_signature_cluster(&one, f64::NAN).is_err());
     }
 
@@ -11108,7 +10950,9 @@ mod tests {
         .unwrap();
         assert_eq!(
             plan.discarded_state_bytes,
-            fixture["expected"]["discarded_state_bytes"].as_u64().unwrap()
+            fixture["expected"]["discarded_state_bytes"]
+                .as_u64()
+                .unwrap()
         );
         assert!(
             (plan.accumulated_discarded_response_bound
@@ -11139,9 +10983,7 @@ mod tests {
             let actual_disposition = match decision.disposition {
                 ModeRefinementDisposition::DiscardedWithinBudget => "discarded_within_budget",
                 ModeRefinementDisposition::RetainedBudgetExceeded => "retained_budget_exceeded",
-                ModeRefinementDisposition::RetainedUnknownResponse => {
-                    "retained_unknown_response"
-                }
+                ModeRefinementDisposition::RetainedUnknownResponse => "retained_unknown_response",
             };
             assert_eq!(actual_disposition, expected_disposition);
         }
@@ -11150,8 +10992,12 @@ mod tests {
     #[test]
     fn response_weighted_refinement_retains_low_energy_future_critical_mode() {
         let mut matrix = ModeResponseMatrix::new(vec![1, 2], vec![10]).unwrap();
-        matrix.set(1, 10, ComplexResponse::new(0.01, 0.0).unwrap()).unwrap();
-        matrix.set(2, 10, ComplexResponse::new(100.0, 0.0).unwrap()).unwrap();
+        matrix
+            .set(1, 10, ComplexResponse::new(0.01, 0.0).unwrap())
+            .unwrap();
+        matrix
+            .set(2, 10, ComplexResponse::new(100.0, 0.0).unwrap())
+            .unwrap();
         let plan = plan_response_weighted_refinement(
             &matrix,
             &[
@@ -11163,11 +11009,25 @@ mod tests {
             0.02,
         )
         .unwrap();
-        let mode_one = plan.decisions.iter().find(|item| item.input_mode == 1).unwrap();
-        let mode_two = plan.decisions.iter().find(|item| item.input_mode == 2).unwrap();
+        let mode_one = plan
+            .decisions
+            .iter()
+            .find(|item| item.input_mode == 1)
+            .unwrap();
+        let mode_two = plan
+            .decisions
+            .iter()
+            .find(|item| item.input_mode == 2)
+            .unwrap();
         assert!(mode_two.spectral_energy < mode_one.spectral_energy);
-        assert_eq!(mode_one.disposition, ModeRefinementDisposition::DiscardedWithinBudget);
-        assert_eq!(mode_two.disposition, ModeRefinementDisposition::RetainedBudgetExceeded);
+        assert_eq!(
+            mode_one.disposition,
+            ModeRefinementDisposition::DiscardedWithinBudget
+        );
+        assert_eq!(
+            mode_two.disposition,
+            ModeRefinementDisposition::RetainedBudgetExceeded
+        );
         assert!((plan.accumulated_discarded_response_bound - 0.01).abs() < 1.0e-12);
         assert_eq!(plan.discarded_state_bytes, 100);
     }
@@ -11175,7 +11035,9 @@ mod tests {
     #[test]
     fn response_weighted_refinement_retains_modes_with_missing_response_entries() {
         let mut matrix = ModeResponseMatrix::new(vec![1, 2], vec![10]).unwrap();
-        matrix.set(1, 10, ComplexResponse::new(0.1, 0.0).unwrap()).unwrap();
+        matrix
+            .set(1, 10, ComplexResponse::new(0.1, 0.0).unwrap())
+            .unwrap();
         let plan = plan_response_weighted_refinement(
             &matrix,
             &[
@@ -11187,16 +11049,25 @@ mod tests {
             1.0,
         )
         .unwrap();
-        let missing = plan.decisions.iter().find(|item| item.input_mode == 2).unwrap();
+        let missing = plan
+            .decisions
+            .iter()
+            .find(|item| item.input_mode == 2)
+            .unwrap();
         assert_eq!(missing.weighted_response_gain, None);
         assert_eq!(missing.response_loss_bound, None);
-        assert_eq!(missing.disposition, ModeRefinementDisposition::RetainedUnknownResponse);
+        assert_eq!(
+            missing.disposition,
+            ModeRefinementDisposition::RetainedUnknownResponse
+        );
     }
 
     #[test]
     fn response_weighted_refinement_ignores_missing_zero_weight_qoi_entries() {
         let mut matrix = ModeResponseMatrix::new(vec![1], vec![10, 20]).unwrap();
-        matrix.set(1, 10, ComplexResponse::new(0.5, 0.0).unwrap()).unwrap();
+        matrix
+            .set(1, 10, ComplexResponse::new(0.5, 0.0).unwrap())
+            .unwrap();
         let plan = plan_response_weighted_refinement(
             &matrix,
             &[(1, ComplexResponse::new(0.2, 0.0).unwrap())],
@@ -11298,10 +11169,7 @@ mod tests {
             (report.achieved_mass, "achieved_mass"),
             (report.mass_residual, "mass_residual"),
             (report.lagrange_multiplier, "lagrange_multiplier"),
-            (
-                report.weighted_correction_norm,
-                "weighted_correction_norm",
-            ),
+            (report.weighted_correction_norm, "weighted_correction_norm"),
             (report.minimum_projected_value, "minimum_projected_value"),
         ] {
             assert!((actual - expected[key].as_f64().unwrap()).abs() < 1.0e-12);
@@ -11310,7 +11178,11 @@ mod tests {
             report.active_positive_cell_count,
             expected["active_positive_cell_count"].as_u64().unwrap() as usize
         );
-        assert!(fixture["claim_boundary"]["mass_constraint_only"].as_bool().unwrap());
+        assert!(
+            fixture["claim_boundary"]["mass_constraint_only"]
+                .as_bool()
+                .unwrap()
+        );
         assert!(
             fixture["claim_boundary"]["does_not_claim_momentum_or_energy"]
                 .as_bool()
@@ -11505,8 +11377,7 @@ mod tests {
 
     #[test]
     fn positivity_projection_removes_negative_overshoot_and_preserves_mass() {
-        let report =
-            project_nonnegative_preserving_mass(&[-0.1, 1.1], &[1.0, 1.0], 1.0).unwrap();
+        let report = project_nonnegative_preserving_mass(&[-0.1, 1.1], &[1.0, 1.0], 1.0).unwrap();
         assert_eq!(report.projected_values, vec![0.0, 1.0]);
         assert_eq!(report.target_mass, 1.0);
         assert!((report.achieved_mass - 1.0).abs() < 1.0e-12);
@@ -11519,8 +11390,7 @@ mod tests {
 
     #[test]
     fn positivity_projection_respects_nonuniform_cell_volumes() {
-        let report =
-            project_nonnegative_preserving_mass(&[-1.0, 2.0], &[1.0, 2.0], 2.5).unwrap();
+        let report = project_nonnegative_preserving_mass(&[-1.0, 2.0], &[1.0, 2.0], 2.5).unwrap();
         assert_eq!(report.projected_values[0], 0.0);
         assert!((report.projected_values[1] - 1.25).abs() < 1.0e-12);
         assert!((report.achieved_mass - 2.5).abs() < 1.0e-12);
@@ -11531,12 +11401,9 @@ mod tests {
     fn positivity_projection_satisfies_active_set_kkt_conditions() {
         let input = [-0.2, 0.4, 1.3];
         let volumes = [0.5, 2.0, 1.0];
-        let report =
-            project_nonnegative_preserving_mass(&input, &volumes, 1.5).unwrap();
-        for ((input_value, projected), _) in input
-            .iter()
-            .zip(&report.projected_values)
-            .zip(&volumes)
+        let report = project_nonnegative_preserving_mass(&input, &volumes, 1.5).unwrap();
+        for ((input_value, projected), _) in
+            input.iter().zip(&report.projected_values).zip(&volumes)
         {
             if *projected > 0.0 {
                 assert!((*projected - (*input_value - report.lagrange_multiplier)).abs() < 1.0e-12);
@@ -11550,18 +11417,10 @@ mod tests {
 
     #[test]
     fn positivity_projection_is_invariant_to_cell_permutation() {
-        let original = project_nonnegative_preserving_mass(
-            &[-0.2, 0.4, 1.3],
-            &[0.5, 2.0, 1.0],
-            1.5,
-        )
-        .unwrap();
-        let permuted = project_nonnegative_preserving_mass(
-            &[1.3, -0.2, 0.4],
-            &[1.0, 0.5, 2.0],
-            1.5,
-        )
-        .unwrap();
+        let original =
+            project_nonnegative_preserving_mass(&[-0.2, 0.4, 1.3], &[0.5, 2.0, 1.0], 1.5).unwrap();
+        let permuted =
+            project_nonnegative_preserving_mass(&[1.3, -0.2, 0.4], &[1.0, 0.5, 2.0], 1.5).unwrap();
         let reordered = [
             permuted.projected_values[1],
             permuted.projected_values[2],
@@ -11571,7 +11430,9 @@ mod tests {
             assert!((left - right).abs() < 1.0e-12);
         }
         assert!((original.lagrange_multiplier - permuted.lagrange_multiplier).abs() < 1.0e-12);
-        assert!((original.weighted_correction_norm - permuted.weighted_correction_norm).abs() < 1.0e-12);
+        assert!(
+            (original.weighted_correction_norm - permuted.weighted_correction_norm).abs() < 1.0e-12
+        );
     }
 
     #[test]
@@ -11594,8 +11455,7 @@ mod tests {
     #[test]
     fn positivity_projection_handles_zero_target_mass() {
         let report =
-            project_nonnegative_preserving_mass(&[-0.2, 1.2, 0.4], &[1.0, 2.0, 0.5], 0.0)
-                .unwrap();
+            project_nonnegative_preserving_mass(&[-0.2, 1.2, 0.4], &[1.0, 2.0, 0.5], 0.0).unwrap();
         assert_eq!(report.projected_values, vec![0.0, 0.0, 0.0]);
         assert_eq!(report.achieved_mass, 0.0);
         assert_eq!(report.active_positive_cell_count, 0);
@@ -11918,9 +11778,7 @@ mod tests {
                 report.unresolved_branch_count,
                 case["expected_unresolved_branch_count"].as_u64().unwrap() as usize
             );
-            let expected_error = case["expected_maximum_normalized_error"]
-                .as_f64()
-                .unwrap();
+            let expected_error = case["expected_maximum_normalized_error"].as_f64().unwrap();
             let observed_error = report.maximum_normalized_entry_error.unwrap();
             assert!(
                 (observed_error - expected_error).abs() < 1.0e-12,
@@ -12030,12 +11888,8 @@ mod tests {
     #[test]
     fn kinetic_path_response_signature_preserves_missing_values_and_unknown_branches() {
         let family = contract();
-        let sequence = KineticPulseSequence::new(
-            &family,
-            &[candidate(1, 0.2, 0.01, 1.0)],
-            6.0,
-        )
-        .unwrap();
+        let sequence =
+            KineticPulseSequence::new(&family, &[candidate(1, 0.2, 0.01, 1.0)], 6.0).unwrap();
         let response = synthetic_path_response_signature(
             &sequence,
             "reference",
@@ -12051,12 +11905,8 @@ mod tests {
     #[test]
     fn kinetic_path_response_qualification_passes_complete_matching_signature() {
         let family = contract();
-        let sequence = KineticPulseSequence::new(
-            &family,
-            &[candidate(1, 0.2, 0.01, 1.0)],
-            6.0,
-        )
-        .unwrap();
+        let sequence =
+            KineticPulseSequence::new(&family, &[candidate(1, 0.2, 0.01, 1.0)], 6.0).unwrap();
         let reference = synthetic_path_response_signature(
             &sequence,
             "same-structure",
@@ -12089,12 +11939,8 @@ mod tests {
     #[test]
     fn kinetic_path_response_qualification_marks_missingness_unknown() {
         let family = contract();
-        let sequence = KineticPulseSequence::new(
-            &family,
-            &[candidate(1, 0.2, 0.01, 1.0)],
-            6.0,
-        )
-        .unwrap();
+        let sequence =
+            KineticPulseSequence::new(&family, &[candidate(1, 0.2, 0.01, 1.0)], 6.0).unwrap();
         let reference = synthetic_path_response_signature(
             &sequence,
             "same-structure",
@@ -12123,12 +11969,8 @@ mod tests {
     #[test]
     fn kinetic_path_response_qualification_fails_on_branch_mismatch_or_excess_error() {
         let family = contract();
-        let sequence = KineticPulseSequence::new(
-            &family,
-            &[candidate(1, 0.2, 0.01, 1.0)],
-            6.0,
-        )
-        .unwrap();
+        let sequence =
+            KineticPulseSequence::new(&family, &[candidate(1, 0.2, 0.01, 1.0)], 6.0).unwrap();
         let reference = synthetic_path_response_signature(
             &sequence,
             "same-structure",
@@ -12179,12 +12021,8 @@ mod tests {
     #[test]
     fn kinetic_path_response_qualification_marks_structure_mismatch_unsupported() {
         let family = contract();
-        let sequence = KineticPulseSequence::new(
-            &family,
-            &[candidate(1, 0.2, 0.01, 1.0)],
-            6.0,
-        )
-        .unwrap();
+        let sequence =
+            KineticPulseSequence::new(&family, &[candidate(1, 0.2, 0.01, 1.0)], 6.0).unwrap();
         let reference = synthetic_path_response_signature(
             &sequence,
             "reference-structure",
@@ -12212,18 +12050,10 @@ mod tests {
     #[test]
     fn kinetic_path_response_comparison_requires_the_same_sequence_digest() {
         let family = contract();
-        let first_sequence = KineticPulseSequence::new(
-            &family,
-            &[candidate(1, 0.2, 0.01, 1.0)],
-            6.0,
-        )
-        .unwrap();
-        let second_sequence = KineticPulseSequence::new(
-            &family,
-            &[candidate(2, 0.2, 0.01, 1.0)],
-            6.0,
-        )
-        .unwrap();
+        let first_sequence =
+            KineticPulseSequence::new(&family, &[candidate(1, 0.2, 0.01, 1.0)], 6.0).unwrap();
+        let second_sequence =
+            KineticPulseSequence::new(&family, &[candidate(2, 0.2, 0.01, 1.0)], 6.0).unwrap();
         let first = synthetic_path_response_signature(
             &first_sequence,
             "reference",
@@ -12260,8 +12090,7 @@ mod tests {
 
     #[test]
     fn kinetic_pulse_sequence_fixture_builds_baseline_echo_and_cascade_paths() {
-        let fixture: serde_json::Value =
-            serde_json::from_str(KIRR_PULSE_GRAPH_FIXTURE).unwrap();
+        let fixture: serde_json::Value = serde_json::from_str(KIRR_PULSE_GRAPH_FIXTURE).unwrap();
         let family = contract();
         let paths = fixture["paths"].as_array().unwrap();
         assert_eq!(paths.len(), 3);
@@ -12330,9 +12159,13 @@ mod tests {
                 .map(serde_json::from_value::<KineticOperationRecord>)
                 .collect::<Result<Vec<_>, _>>()
                 .unwrap();
-            let ledger =
-                KineticOperationLedger::new(physical_model, maximum_time, events).unwrap();
-            assert!(ledger.events().iter().all(|event| event.application_time <= maximum_time));
+            let ledger = KineticOperationLedger::new(physical_model, maximum_time, events).unwrap();
+            assert!(
+                ledger
+                    .events()
+                    .iter()
+                    .all(|event| event.application_time <= maximum_time)
+            );
             match physical_model {
                 KineticPhysicalModelKind::CollisionlessVlasov => {
                     assert_eq!(ledger.physical_collision_count(), 0);
@@ -12368,8 +12201,10 @@ mod tests {
             operation_id: format!("{operation_class:?}"),
             application_time,
             operation_class,
-            state_before_sha256: "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa".to_owned(),
-            state_after_sha256: "bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb".to_owned(),
+            state_before_sha256: "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa"
+                .to_owned(),
+            state_after_sha256: "bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb"
+                .to_owned(),
             discarded_effect_metric_id: None,
             discarded_effect_measure: None,
             physical_entropy_measure_id: None,
@@ -12402,12 +12237,16 @@ mod tests {
             ledger.total_discarded_effect_for_metric("hermitian-modal-l2-squared"),
             Some(0.025)
         );
-        assert_eq!(ledger.total_discarded_effect_for_metric("other-metric"), None);
+        assert_eq!(
+            ledger.total_discarded_effect_for_metric("other-metric"),
+            None
+        );
     }
 
     #[test]
     fn kinetic_operation_ledger_accepts_physical_collision_only_for_collisional_models() {
-        let mut collision = ledger_event("collision-1", 1.0, KineticOperationClass::PhysicalCollision);
+        let mut collision =
+            ledger_event("collision-1", 1.0, KineticOperationClass::PhysicalCollision);
         collision.physical_entropy_measure_id = Some("boltzmann-h-theorem-production".to_owned());
         collision.physical_entropy_sign_convention =
             Some(KineticPhysicalEntropySignConvention::BoltzmannEntropyIncrease);
@@ -12424,7 +12263,8 @@ mod tests {
 
     #[test]
     fn kinetic_operation_ledger_rejects_physical_collisions_in_collisionless_vlasov() {
-        let mut collision = ledger_event("collision-1", 1.0, KineticOperationClass::PhysicalCollision);
+        let mut collision =
+            ledger_event("collision-1", 1.0, KineticOperationClass::PhysicalCollision);
         collision.physical_entropy_measure_id = Some("boltzmann-h-theorem-production".to_owned());
         collision.physical_entropy_sign_convention =
             Some(KineticPhysicalEntropySignConvention::BoltzmannEntropyIncrease);
@@ -12471,7 +12311,8 @@ mod tests {
 
     #[test]
     fn kinetic_operation_ledger_rejects_reversible_events_with_nonzero_loss() {
-        let mut transition = ledger_event("transition-1", 1.0, KineticOperationClass::BasisTransition);
+        let mut transition =
+            ledger_event("transition-1", 1.0, KineticOperationClass::BasisTransition);
         transition.discarded_effect_metric_id = Some("phase-space-l2".to_owned());
         transition.discarded_effect_measure = Some(0.02);
         transition.declared_reversible = true;
@@ -12531,10 +12372,7 @@ mod tests {
         let b = KineticPulseSequence::new(&family, &[first, second], 5.0).unwrap();
         let reordered = KineticPulseSequence::new(
             &family,
-            &[
-                candidate(2, 0.4, 0.02, 1.0),
-                candidate(1, 0.2, 0.01, 2.0),
-            ],
+            &[candidate(2, 0.4, 0.02, 1.0), candidate(1, 0.2, 0.01, 2.0)],
             5.0,
         )
         .unwrap();
@@ -12568,20 +12406,16 @@ mod tests {
         let family = contract();
         let error = KineticPulseSequence::new(
             &family,
-            &[
-                candidate(1, 0.0, 0.01, 2.0),
-                candidate(2, 0.0, 0.01, 1.0),
-            ],
+            &[candidate(1, 0.0, 0.01, 2.0), candidate(2, 0.0, 0.01, 1.0)],
             5.0,
         );
         assert_eq!(error, Err(ContractError::NonMonotonicKineticPulseSequence));
 
-        let late = KineticPulseSequence::new(
-            &family,
-            &[candidate(1, 0.0, 0.01, 5.0)],
-            5.0,
+        let late = KineticPulseSequence::new(&family, &[candidate(1, 0.0, 0.01, 5.0)], 5.0);
+        assert_eq!(
+            late,
+            Err(ContractError::InvalidPulseSequenceObservationHorizon)
         );
-        assert_eq!(late, Err(ContractError::InvalidPulseSequenceObservationHorizon));
     }
 
     #[test]
