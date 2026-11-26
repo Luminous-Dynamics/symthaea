@@ -450,24 +450,30 @@ impl DerivedProjectionIndexV1 {
 
         let mut entries = BTreeMap::<String, ProjectionInvalidationEntryV1>::new();
         while let Some((projection_id, incoming_cause)) = pending.pop_front() {
-            let projection = self.projections.get_mut(&projection_id)
-                .ok_or(TemporalProjectionRejectV1::UnknownProjection)?;
             let desired_status = status_for_cause(incoming_cause);
-            if projection.status == DerivedProjectionStatusV1::Current
-                || desired_status.severity() > projection.status.severity()
-            {
-                let previous_status = projection.status;
-                projection.status = desired_status;
-                projection.invalidated_by_event_id = Some(transition.event_id.clone());
-                projection.invalidated_at_sequence = Some(transition.sequence);
-                projection.invalidation_receipt_sha256 = Some(transition.receipt_sha256.clone());
-                entries.insert(projection_id.clone(), ProjectionInvalidationEntryV1 {
-                    projection_id: projection_id.clone(),
-                    previous_status,
-                    resulting_status: desired_status,
-                    cause: incoming_cause,
-                });
-
+            let changed = {
+                let projection = self.projections.get_mut(&projection_id)
+                    .ok_or(TemporalProjectionRejectV1::UnknownProjection)?;
+                if projection.status == DerivedProjectionStatusV1::Current
+                    || desired_status.severity() > projection.status.severity()
+                {
+                    let previous_status = projection.status;
+                    projection.status = desired_status;
+                    projection.invalidated_by_event_id = Some(transition.event_id.clone());
+                    projection.invalidated_at_sequence = Some(transition.sequence);
+                    projection.invalidation_receipt_sha256 = Some(transition.receipt_sha256.clone());
+                    entries.insert(projection_id.clone(), ProjectionInvalidationEntryV1 {
+                        projection_id: projection_id.clone(),
+                        previous_status,
+                        resulting_status: desired_status,
+                        cause: incoming_cause,
+                    });
+                    true
+                } else {
+                    false
+                }
+            };
+            if changed {
                 let descendants = self.projections.values()
                     .filter(|child| child.parent_projection_ids.contains(&projection_id))
                     .map(|child| child.projection_id.clone())
