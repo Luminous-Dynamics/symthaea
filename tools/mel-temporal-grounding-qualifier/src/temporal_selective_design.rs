@@ -230,8 +230,8 @@ pub fn audit_selective_design_risk(
     let mut report_digests = BTreeSet::new();
     for outcome in &input.observed_probability_audit_outcomes {
         validate_outcome_identity(input, outcome)?;
-        let expected_false_absence = outcome.decision == SelectiveDecisionV1::ClaimAbsent
-            && !outcome.decision_correct;
+        let expected_false_absence =
+            outcome.decision == SelectiveDecisionV1::ClaimAbsent && !outcome.decision_correct;
         if outcome.false_absence_claim != expected_false_absence {
             return Err(format!(
                 "item {} false-absence flag does not match its ClaimAbsent decision and correctness",
@@ -285,7 +285,12 @@ pub fn audit_selective_design_risk(
             .candidates
             .iter()
             .find(|candidate| candidate.item_id == selection.item_id)
-            .ok_or_else(|| format!("selected item {} is absent from the candidate manifest", selection.item_id))?;
+            .ok_or_else(|| {
+                format!(
+                    "selected item {} is absent from the candidate manifest",
+                    selection.item_id
+                )
+            })?;
         if outcome.query_id != selection.query_id
             || outcome.source_work_id_sha256 != selection.source_work_id_sha256
             || outcome.recording_sha256 != candidate.recording_sha256
