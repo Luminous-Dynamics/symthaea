@@ -683,6 +683,206 @@
           }
         }
       }
+    },
+    {
+      "if": {
+        "properties": {
+          "qualification_stage": {
+            "const": "capsule_structure_passed"
+          }
+        },
+        "required": [
+          "qualification_stage"
+        ]
+      },
+      "then": {
+        "properties": {
+          "package_validation": {
+            "properties": {
+              "payload_manifest_result": {
+                "const": "passed"
+              },
+              "tag_manifest_result": {
+                "const": "passed"
+              },
+              "descriptor_schema_result": {
+                "const": "passed"
+              },
+              "path_safety_result": {
+                "const": "passed"
+              }
+            }
+          }
+        }
+      }
+    },
+    {
+      "if": {
+        "properties": {
+          "qualification_stage": {
+            "const": "digital_decoder_passed"
+          }
+        },
+        "required": [
+          "qualification_stage"
+        ]
+      },
+      "then": {
+        "properties": {
+          "scorer_reference": {
+            "properties": {
+              "expected_byte_length": {
+                "type": "integer"
+              },
+              "expected_payload_digest": {
+                "type": "string"
+              }
+            },
+            "required": [
+              "expected_byte_length",
+              "expected_payload_digest"
+            ]
+          },
+          "decoder_runs": {
+            "items": {
+              "properties": {
+                "execution_status": {
+                  "const": "executed"
+                },
+                "network_disabled": {
+                  "const": true
+                },
+                "vendor_runtime_withheld": {
+                  "const": true
+                },
+                "output_byte_length": {
+                  "type": "integer"
+                },
+                "output_sha256": {
+                  "type": "string"
+                }
+              }
+            }
+          },
+          "output_comparison": {
+            "properties": {
+              "decoder_outputs_byte_identical": {
+                "const": true
+              },
+              "all_outputs_match_expected_digest": {
+                "const": true
+              },
+              "exact_payload_match": {
+                "const": true
+              },
+              "independent_digest_recomputed": {
+                "const": true
+              }
+            }
+          },
+          "independence_assessment": {
+            "properties": {
+              "status": {
+                "const": "qualified"
+              },
+              "source_lineage_reviewed": {
+                "const": true
+              },
+              "common_code_reviewed": {
+                "const": true
+              }
+            }
+          }
+        }
+      }
+    },
+    {
+      "if": {
+        "properties": {
+          "qualification_stage": {
+            "const": "fixture_only"
+          }
+        },
+        "required": [
+          "qualification_stage"
+        ]
+      },
+      "then": {
+        "properties": {
+          "evidence_class": {
+            "const": "synthetic_fixture"
+          },
+          "decoder_runs": {
+            "items": {
+              "properties": {
+                "execution_status": {
+                  "const": "not_run"
+                },
+                "output_byte_length": {
+                  "type": "null"
+                },
+                "output_sha256": {
+                  "type": "null"
+                }
+              }
+            }
+          },
+          "output_comparison": {
+            "properties": {
+              "decoder_outputs_byte_identical": {
+                "type": "null"
+              },
+              "all_outputs_match_expected_digest": {
+                "type": "null"
+              },
+              "exact_payload_match": {
+                "type": "null"
+              }
+            }
+          },
+          "independence_assessment": {
+            "properties": {
+              "status": {
+                "const": "unassessed"
+              }
+            }
+          }
+        }
+      }
+    },
+    {
+      "if": {
+        "properties": {
+          "scorer_reference": {
+            "properties": {
+              "expected_digest_algorithm": {
+                "const": "sha256"
+              }
+            },
+            "required": [
+              "expected_digest_algorithm"
+            ]
+          }
+        },
+        "required": [
+          "scorer_reference"
+        ]
+      },
+      "then": {
+        "properties": {
+          "scorer_reference": {
+            "properties": {
+              "expected_payload_digest": {
+                "type": [
+                  "string",
+                  "null"
+                ],
+                "pattern": "^[a-fA-F0-9]{64}$"
+              }
+            }
+          }
+        }
+      }
     }
   ]
 }
