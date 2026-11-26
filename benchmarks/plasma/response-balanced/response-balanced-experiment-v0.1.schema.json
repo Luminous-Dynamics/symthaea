@@ -116,7 +116,8 @@
         "state_sha256",
         "phase_mixing_complete",
         "second_pulse_not_yet_applied",
-        "solver_revision"
+        "solver_revision",
+        "first_pulse_not_yet_applied"
       ],
       "properties": {
         "checkpoint_id": {
@@ -144,6 +145,9 @@
         "solver_revision": {
           "type": "string",
           "minLength": 1
+        },
+        "first_pulse_not_yet_applied": {
+          "const": true
         }
       }
     },
