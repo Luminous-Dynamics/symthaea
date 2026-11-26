@@ -22,12 +22,12 @@
   "frozen_checkpoint": {
     "checkpoint_id": "synthetic-phase-mixed-checkpoint",
     "step": 0,
-    "time": 3.5,
+    "time": 6,
     "state_sha256": "0000000000000000000000000000000000000000000000000000000000000000",
     "phase_mixing_complete": true,
     "second_pulse_not_yet_applied": true,
     "solver_revision": "synthetic-no-solver-run",
-    "first_pulse_not_yet_applied": true
+    "first_pulse_applied": true
   },
   "pulse_family": {
     "operator_id": "sinusoidal_velocity_kick_v1",
@@ -53,12 +53,11 @@
       "pulse_phase",
       "kick_amplitude",
       "spatial_mode",
-      "pulse_separation",
-      "pulse_order"
+      "pulse_separation"
     ],
     "training": [
       {
-        "trial_id": "train-mode2-pair",
+        "trial_id": "train-second-mode2-late",
         "pulses": [
           {
             "pulse_id": "tr-a1",
@@ -77,13 +76,13 @@
         ]
       },
       {
-        "trial_id": "train-mode1-to2",
+        "trial_id": "train-second-mode2-near",
         "pulses": [
           {
             "pulse_id": "tr-b1",
-            "spatial_mode": 1,
+            "spatial_mode": 2,
             "kick_amplitude": 0.01,
-            "phase_rad": 0.5,
+            "phase_rad": 0.3,
             "application_time": 4
           },
           {
@@ -98,13 +97,13 @@
     ],
     "validation": [
       {
-        "trial_id": "validation-nearby-phase",
+        "trial_id": "validation-second-nearby-phase",
         "pulses": [
           {
             "pulse_id": "va-c1",
             "spatial_mode": 2,
-            "kick_amplitude": 0.009,
-            "phase_rad": 0.8,
+            "kick_amplitude": 0.01,
+            "phase_rad": 0.3,
             "application_time": 4
           },
           {
@@ -119,13 +118,13 @@
     ],
     "held_out": [
       {
-        "trial_id": "heldout-phase",
+        "trial_id": "heldout-second-phase",
         "pulses": [
           {
             "pulse_id": "ho-p1",
             "spatial_mode": 2,
             "kick_amplitude": 0.01,
-            "phase_rad": 1.7,
+            "phase_rad": 0.3,
             "application_time": 4
           },
           {
@@ -138,12 +137,12 @@
         ]
       },
       {
-        "trial_id": "heldout-amplitude",
+        "trial_id": "heldout-second-amplitude",
         "pulses": [
           {
             "pulse_id": "ho-a1",
             "spatial_mode": 2,
-            "kick_amplitude": 0.018,
+            "kick_amplitude": 0.01,
             "phase_rad": 0.3,
             "application_time": 4
           },
@@ -157,11 +156,11 @@
         ]
       },
       {
-        "trial_id": "heldout-mode",
+        "trial_id": "heldout-second-mode",
         "pulses": [
           {
             "pulse_id": "ho-m1",
-            "spatial_mode": 4,
+            "spatial_mode": 2,
             "kick_amplitude": 0.01,
             "phase_rad": 0.3,
             "application_time": 4
@@ -176,7 +175,7 @@
         ]
       },
       {
-        "trial_id": "heldout-separation",
+        "trial_id": "heldout-second-separation",
         "pulses": [
           {
             "pulse_id": "ho-d1",
@@ -195,21 +194,21 @@
         ]
       },
       {
-        "trial_id": "heldout-order",
+        "trial_id": "heldout-second-combination",
         "pulses": [
           {
-            "pulse_id": "ho-o1",
+            "pulse_id": "ho-c1",
             "spatial_mode": 2,
             "kick_amplitude": 0.01,
-            "phase_rad": -0.4,
+            "phase_rad": 0.3,
             "application_time": 4
           },
           {
-            "pulse_id": "ho-o2",
-            "spatial_mode": 1,
-            "kick_amplitude": 0.01,
-            "phase_rad": 0.3,
-            "application_time": 10
+            "pulse_id": "ho-c2",
+            "spatial_mode": 3,
+            "kick_amplitude": 0.015,
+            "phase_rad": 1.2,
+            "application_time": 12
           }
         ]
       }
@@ -246,7 +245,7 @@
     }
   ],
   "prediction_horizon": {
-    "start_time": 3.5,
+    "start_time": 6,
     "end_time": 30,
     "unit": "omega_pe^-1"
   },
