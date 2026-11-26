@@ -35,7 +35,7 @@ Root families are connected components of root identities joined by any shared c
 
 For each DecisionNeed requirement, the replay starts from qualified candidate nodes explicitly tagged as satisfying that requirement, walks all parent paths, and collects the reachable source roots. The lineage closure digest is domain-separated with `luminous:mace:lineage-closure:v1\\0` and commits the requirement ID, root-family digest, and sorted closure nodes, including source identity, payload, evidence class, derivation receipt, parent IDs and common-cause groups.
 
-The replay result must match the source resolver's signed `source_graph_sha256`, `root_family_sha256` and `lineage_closure_sha256` commitments exactly. The graph's raw envelope-independent digest is taken over the exact UTF-8 graph manifest bytes—not a parsed and reserialized representation.
+The replay result must match the source resolver's signed `source_graph_sha256`, `root_family_sha256` and `lineage_closure_sha256` commitments exactly. It also reconciles `source_node_count` and `dependency_edge_count` in every signed lineage receipt against the graph's actual node and parent-edge totals. The graph's raw envelope-independent digest is taken over the exact UTF-8 graph manifest bytes—not a parsed and reserialized representation.
 
 ## 4. Consumer use
 
