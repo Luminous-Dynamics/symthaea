@@ -1,0 +1,36 @@
+name: Active Scientific Intelligence v2 Reference
+
+on:
+  push:
+    branches: [main]
+    paths:
+      - "scripts/research/sdcb_active_science_v2.rs"
+      - "docs/research/SDCB_ACTIVE_SCIENCE_BENCHMARK_V2.md"
+      - ".github/workflows/active-science-v2-reference.yml"
+  pull_request:
+    types: [opened, synchronize, reopened, ready_for_review]
+    paths:
+      - "scripts/research/sdcb_active_science_v2.rs"
+      - "docs/research/SDCB_ACTIVE_SCIENCE_BENCHMARK_V2.md"
+      - ".github/workflows/active-science-v2-reference.yml"
+
+permissions:
+  contents: read
+
+jobs:
+  qualify:
+    name: Rust 1.96 active-science reference tests
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - name: Set up Rust
+        uses: dtolnay/rust-toolchain@stable
+        with:
+          toolchain: "1.96.0"
+          components: rustfmt
+      - name: Check formatting
+        run: rustfmt +1.96.0 --edition 2024 --check scripts/research/sdcb_active_science_v2.rs
+      - name: Compile with warnings denied
+        run: rustc +1.96.0 --edition=2024 --deny warnings --test scripts/research/sdcb_active_science_v2.rs -o /tmp/sdcb-active-science-v2
+      - name: Run deterministic reference tests
+        run: /tmp/sdcb-active-science-v2
