@@ -290,7 +290,7 @@ fn audit(fixture: &Value) -> Result<(), String> {
         return Err("reference convergence requirements cannot be disabled".to_owned());
     }
     for qoi in string_array(convergence, "convergence_observables")? {
-        if !qoi_ids.contains(qoi) {
+        if !qoi_ids.contains(&qoi) {
             return Err(format!("convergence observable {qoi} is not a registered QoI"));
         }
     }
