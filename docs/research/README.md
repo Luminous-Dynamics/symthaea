@@ -415,3 +415,13 @@ A falsifiable programme for spectral statistics, RH/prime-structure controls, ne
 - [Reference harness README](../../scripts/research/SDCB_BELIEF_TRANSITION_README.md): independent compile/run instructions and trust boundaries.
 
 **Evidence boundary:** 23 Rust unit tests are authored; compilation and execution have not been performed in this environment. The reference code does not authenticate signatures, source custody, or physical sensors.
+
+### Decision-Sufficient Scientific Intelligence
+
+- [Decision-Sufficient Scientific Intelligence v1](SDCB_DECISION_SUFFICIENT_SCIENTIFIC_INTELLIGENCE_V1.md): task-relative decision sufficiency, EVSI, counterexample, benchmark protocol and research targets.
+- [Decision-value episode schema](SDCB_DECISION_VALUE_EPISODE_V1.schema.json): machine-readable finite decision/experiment episode contract.
+- [EIG-versus-EVSI example](SDCB_DECISION_VALUE_EPISODE_V1.example.json): frozen three-hypothesis counterexample.
+- [Decision-value Rust reference](../../scripts/research/sdcb_decision_value.rs): Bayes action, decision-equivalence partition, expected information gain, EVSI and net-EVSI selection.
+- [Decision-value harness README](../../scripts/research/SDCB_DECISION_VALUE_README.md): compile instructions, example, coverage and limits.
+
+**Evidence boundary:** 15 Rust unit tests are authored but not compiled/executed in this environment. The reference is one-step, finite, and assumes supplied likelihoods and utilities. It is not a Symthaea model result or an SOTA comparison.
