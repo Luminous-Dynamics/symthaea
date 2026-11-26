@@ -467,3 +467,83 @@ First implementation slice:
 4. Publish the cost–regret curve and failure strata before connecting the candidate to #6675's sequential acquisition policy.
 
 Do not create a parallel production memory store, evidence ledger, spatial map owner, sensor scheduler or conversational turn controller. The intended contribution is a shared, independently evaluated **decision-preserving state contract** across streaming perception and long-horizon memory.
+
+
+## 10. Spatial audio fields: DCASE 2026 Task 3 as a complementary anchor
+
+OVO-S-Bench evaluates spatial reasoning from streaming visual prefixes; DCASE 2026 Task 3 evaluates reconstruction of a spatial acoustic scene. They should remain separate native benchmark lanes, but together motivate a stronger cross-modal research direction: **maintain a coherent allocentric scene state from visual geometry and spatial acoustic fields without treating either modality's model output as ground truth**.
+
+### 10.1 Native DCASE task contract
+
+DCASE 2026 Task 3, *Semantic Acoustic Imaging for Sound Event Localization and Detection from Spatial Audio and Audiovisual Scenes*, is completed and publishes its baseline, development data, evaluation data and results.
+
+- Development provides 32-channel Eigenmike recordings and high-definition acoustic maps.
+- Evaluation provides only four-channel spatial audio (tetrahedral and/or first-order ambisonics), with video available for the audiovisual track.
+- Output is a dynamic semantic acoustic image: per-frame class masks/energy points on a 360×180 equirectangular field at 10 FPS.
+- Evaluation includes mask mAP over COCO IoU thresholds, Pearson correlation and relative distance error; source matching uses a 20° great-circle threshold and Hungarian assignment.
+- The challenge reports 29 submissions from eight teams for Task 3: 14 audio-only and 15 audiovisual.
+
+Official references:
+- Task description, data, protocol and results: https://dcase.community/challenge2026/task-semantic-acoustic-imaging-for-sound-event-localization-and-detection-from-spatial-audio-and-audiovisual-scenes
+- DCASE 2026 challenge index/results: https://dcase.community/challenge2026/
+
+### 10.2 Published results and interpretation
+
+The published best-per-team table reports the following leading entries:
+
+| Track | Submission | Macro Mask mAP | Macro Pearson r |
+|---|---|---:|---:|
+| Audio-only | Kong_CUHK_task3a_2 | 0.1080 | 0.3962 |
+| Audio-only | Jeong_Medisensing_task3a_4 | 0.0662 | 0.2765 |
+| Audiovisual | Yang_WHUiasp_task3b_2 | 0.0131 | 0.4002 |
+| Audiovisual | Kim_SAMSUNG_task3b_4 | 0.0218 | 0.2420 |
+
+**Important scoring nuance:** the audiovisual rank-1 entry does not have the highest Mask mAP in the displayed best-per-team table. The challenge ranks by cumulative rank across its metrics, with Mask mAP used as a tie-breaker. Therefore, do not call the rank-1 audiovisual entry the best mAP system or collapse the metrics into one interpreted capability. Report every native metric and ranking rule separately.
+
+The unexpectedly low audiovisual Mask mAP relative to the audio-only leaders is not evidence that video hurts in general: the tracks, submissions and methods differ. It is a reason to reproduce the exact official pipeline and matched audio-only versus audiovisual ablations before inferring modality benefit.
+
+### 10.3 Symthaea research hypothesis
+
+DCASE Task 3 adds a field-valued spatial audio representation to the existing OVO-S global visual map question. The experiment should test:
+
+1. **Acoustic-field continuity:** source extent and energy maps remain temporally consistent across motion, overlap and partial occlusion.
+2. **Cross-modal source association:** sound-field regions associate with visual entities only when timing, geometry and source evidence support the join.
+3. **Allocentric consistency:** acoustic bearings and visual landmarks map into a common world frame only when camera pose, array pose and cross-clock transform are qualified.
+4. **Uncertainty preservation:** diffuse, overlapping, low-SNR or geometrically ambiguous sources produce broad/set-valued support or abstention rather than fabricated point estimates.
+5. **Decision value:** an acoustic map is useful only when it improves a downstream task—e.g. finding an off-screen source, choosing a safe direction, distinguishing two visually similar events, or deciding whether another view is worth acquiring.
+
+Keep the official DCASE output and scoring unchanged. Add separate ErgoStream diagnostics for source-event lineage, cross-modal association, clock/pose uncertainty, map persistence and downstream decision regret. A dense acoustic image is a prediction, not an authenticated physical field.
+
+### 10.4 DCASE extensions and execution sequence
+
+Use the completed 2026 results as a reproducibility target rather than inventing a new pooled benchmark:
+
+- First reproduce Task 3 audio-only and audiovisual tracks separately, with the exact 4-channel evaluation input contract and official scoring.
+- Compare a qualified audio-only SELD/acoustic-imaging pipeline, audiovisual fusion, and the same audiovisual system with video removed. Keep audio/video training data access explicit.
+- Use the 32-channel development recordings only under the official data terms and train/evaluation split; do not allow unavailable 32-channel data or labels into evaluation-time inference.
+- Add Task 4 spatial semantic segmentation, Task 5 audio-dependent QA and Task 6 long-audio moment retrieval as separate follow-on lanes, not one composite score.
+- Join only timestamp/pose-qualified acoustic and visual claims into the #12837 event/world-state adapter; preserve independent modality receipts and source roots.
+
+DCASE's 2026 challenge ran 1 April–15 June 2026 and the 2026 workshop took place 27–29 October 2026. The results are therefore a completed comparison, not an upcoming submission opportunity.
+
+### 10.5 OVO-S human-anchor protocol correction
+
+The OVO-S project repository's displayed leaderboard explicitly distinguishes **Human (streaming) = 86.6** from **Human (offline) = 92.2**, while Gemini-3.1-Pro is 59.2 overall and 54.9 on L4. The EMNLP abstract text describes the 92.2 human figure as being evaluated under the same prefix-access protocol, which is inconsistent with the project leaderboard's streaming/offline labels.
+
+For current comparisons, use the official project leaderboard's labelled table as the operational protocol reference: compare streaming systems to 86.6 human streaming, and report 92.2 as human offline. Flag the paper-abstract discrepancy in any report rather than silently selecting the larger human number. Do not use either human figure as a deployable model target; use them as separate reference anchors.
+
+Sources:
+- OVO-S official leaderboard/protocol: https://github.com/InternLM/OVO-S-Bench
+- EMNLP 2026 paper abstract: https://aclanthology.org/2026.emnlp-main.2374/
+
+### 10.6 Revised multi-modal spatial benchmark ladder
+
+| Lane | Official baseline anchor | First target | Stretch target | Required comparison |
+|---|---|---|---|---|
+| OVO-S streaming spatial | Gemini-3.1-Pro 59.2; Human streaming 86.6 | ≥62 overall | ≥65 overall | Prefix-only; report L1–L4; preserve streaming/offline human distinction |
+| OVO-S L4 allocentric map | Gemini-3.1-Pro 54.9 | ≥55 | ≥60 | No material L1–L3 regression; evidence-span and map consistency |
+| DCASE Task 3 audio-only | Best listed Mask mAP 0.1080 | Reproduce official top system | Paired improvement over reproduced leader | Four-channel evaluation input; exact map rendering and official scorer |
+| DCASE Task 3 audiovisual | Rank-1 cumulative entry 0.0131 Mask mAP / 0.4002 Pearson r | Reproduce official rank and all metrics | Improve both native quality and matched modality ablation | Do not infer superiority from cumulative rank alone |
+| Cross-modal spatial decision | No shared official score | Zero false source joins on deterministic negative fixtures | Lower decision regret at lower acquisition cost | Hidden paired worlds; independent audio/video evidence and qualified transforms |
+
+These are research gates, not achieved Symthaea results. DCASE-native reproduction, OVO-S-native reproduction and internal cross-modal decision evaluation must be reported separately.
