@@ -9,7 +9,7 @@ rustc --edition=2024 --test scripts/research/sdcb_ridea.rs -o /tmp/sdcb-ridea
 /tmp/sdcb-ridea
 ```
 
-The source uses only the Rust standard library.
+The source uses only the Rust standard library. The R-I multiplier is matched to the pinned released implementation (commit e011b448e5707930a83f18e891760c4d7f530960): raw biased empirical MMD² is used directly in the ratio. See the protocol for source links and the paper-notation distinction.
 
 ## Implemented
 
