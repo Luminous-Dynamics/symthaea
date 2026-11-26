@@ -147,6 +147,7 @@ The new module includes fixtures for:
 15. rejected resource receipt in both expected and robust modes;
 16. robust regret computed only against permitted actions.
 17. resource-receipt verifier rejects a changed validity-expiry timestamp.
+18. equal-value EVSI and robust selection is invariant to candidate input order.
 
 These test functions are authored but not executed. Cargo check/test, rustfmt and Clippy are not claimed.
 
