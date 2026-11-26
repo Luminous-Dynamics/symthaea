@@ -1,7 +1,6 @@
 package causalgraph
 
 import (
-	"fmt"
 	"reflect"
 	"sort"
 	"strings"
@@ -244,6 +243,11 @@ func Evaluate(g Graph,pins map[string]VerifierPin) Result {
 		if !ok { return result(Indeterminate,"activity has no independent capture manifest: "+id,checked...) }
 		if !nonempty(m.CollectorID,m.SourceID,m.SnapshotID,m.QueryID,m.StartCursor,m.EndCursor,m.TerminalWatermark) || !m.Digest.Valid() || m.ObservedAt<=0 {
 			return result(Indeterminate,"activity capture boundary is incomplete: "+id,checked...)
+		}
+		collector,collectorOK:=nodes[m.CollectorID]
+		source,sourceOK:=nodes[m.SourceID]
+		if !collectorOK || collector.Kind!=Agent || !collector.RequiresVerification || !sourceOK || source.Kind!=Agent || !source.RequiresVerification {
+			return result(Indeterminate,"capture collector/source identity is not independently verified: "+id,checked...)
 		}
 		if !m.Complete || len(m.Gaps)>0 { return result(Indeterminate,"activity input capture is incomplete: "+id,checked...) }
 		if !equalSet(n.DeclaredInputs,m.ObservedInputs) || !equalSet(m.ObservedInputs,incomingUsed[id]) {
