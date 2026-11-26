@@ -37,6 +37,20 @@ pub struct ProbeObservationReceiptV1 {
     pub receipt_sha256: String,
 }
 
+/// Candidate-originated request for the oracle-blind acquisition track.
+///
+/// The candidate selects both a currently merged state pair and a registered
+/// response key. Unlike `CounterexampleProbe`, this request is not selected
+/// or ranked using evaluator response values.
+#[derive(Clone, Debug, Eq, PartialEq)]
+pub struct BlindProbeRequest {
+    pub contract_id: String,
+    /// Canonical ordering is required: left_state_id must sort before right_state_id.
+    pub left_state_id: String,
+    pub right_state_id: String,
+    pub response_key: ResponseKey,
+}
+
 /// Auditable charge for one successfully admitted probe observation.
 #[derive(Clone, Copy, Debug, Eq, PartialEq)]
 pub struct ProbeCharge {
@@ -194,6 +208,112 @@ impl ProbeBudgetLedger {
             .insert(receipt.receipt_sha256.clone());
         Ok(ProbeCharge {
             cost_units: contract_cost,
+            cumulative_cost_units: next_spent,
+            remaining_budget_units: self.remaining_budget_units(),
+        })
+    }
+
+    /// Admit a candidate-chosen probe without consulting the evaluator's
+    /// counterexample selector. Non-separating observations are valid and
+    /// consume the same frozen budget as useful probes: blind acquisition must
+    /// pay for uninformative experiments too.
+    ///
+    /// The request must name a canonical pair that is still merged in the
+    /// candidate's current partition and a response key in the frozen contract.
+    /// Receipt syntax and values are checked here; independent byte hashing and
+    /// environment authentication remain runner responsibilities.
+    pub fn charge_blind_probe(
+        &mut self,
+        current_records: &[StateResponseRecord],
+        contract: &StateResponseContract,
+        request: &BlindProbeRequest,
+        receipt: &ProbeObservationReceiptV1,
+    ) -> Result<ProbeCharge, String> {
+        validate_record_set(current_records, contract)?;
+        if self.contract_id != contract.contract_id
+            || self.contract_sha256 != contract.contract_sha256
+            || self.source_manifest_sha256 != contract.source_manifest_sha256
+        {
+            return Err(
+                "budget ledger belongs to a different frozen contract or source manifest"
+                    .to_owned(),
+            );
+        }
+        if request.contract_id != contract.contract_id {
+            return Err("blind probe request belongs to a different contract".to_owned());
+        }
+        if request.left_state_id >= request.right_state_id {
+            return Err(
+                "blind probe state IDs must be distinct and canonically ordered".to_owned(),
+            );
+        }
+
+        let registered_cost = contract
+            .probe_cost_units
+            .get(&request.response_key)
+            .copied()
+            .ok_or_else(|| "blind probe response key is outside the frozen contract".to_owned())?;
+        let by_id: BTreeMap<_, _> = current_records
+            .iter()
+            .map(|record| (record.state_id.as_str(), record))
+            .collect();
+        let left = by_id
+            .get(request.left_state_id.as_str())
+            .ok_or_else(|| "blind probe references an unknown left state".to_owned())?;
+        let right = by_id
+            .get(request.right_state_id.as_str())
+            .ok_or_else(|| "blind probe references an unknown right state".to_owned())?;
+        if left.abstract_state_id != right.abstract_state_id {
+            return Err("blind probe pair must still be merged by the candidate".to_owned());
+        }
+
+        if receipt.contract_id != request.contract_id
+            || receipt.left_state_id != request.left_state_id
+            || receipt.right_state_id != request.right_state_id
+            || receipt.response_key != request.response_key
+        {
+            return Err("blind probe receipt identity does not match the candidate request".to_owned());
+        }
+        if receipt.source_manifest_sha256 != contract.source_manifest_sha256 {
+            return Err("blind probe receipt source manifest differs from the frozen contract".to_owned());
+        }
+        if !is_sha256(&receipt.receipt_sha256) {
+            return Err("blind probe receipt digest must be a 64-character SHA-256 hex value".to_owned());
+        }
+        if self
+            .accepted_receipt_sha256
+            .contains(&receipt.receipt_sha256)
+        {
+            return Err("blind probe receipt replay detected".to_owned());
+        }
+
+        let expected_left = left.responses[&request.response_key];
+        let expected_right = right.responses[&request.response_key];
+        if receipt.left_observed_value != expected_left
+            || receipt.right_observed_value != expected_right
+        {
+            return Err(
+                "blind probe observations do not match the deterministic environment result"
+                    .to_owned(),
+            );
+        }
+
+        // Intentionally do not require unequal observations: a candidate-chosen
+        // non-separating probe is still an executed, paid experiment.
+
+        let next_spent = self
+            .spent_units
+            .checked_add(registered_cost)
+            .ok_or_else(|| "cumulative blind probe cost overflow".to_owned())?;
+        if next_spent > self.budget_limit_units {
+            return Err("blind probe would exceed the remaining budget".to_owned());
+        }
+
+        self.spent_units = next_spent;
+        self.accepted_receipt_sha256
+            .insert(receipt.receipt_sha256.clone());
+        Ok(ProbeCharge {
+            cost_units: registered_cost,
             cumulative_cost_units: next_spent,
             remaining_budget_units: self.remaining_budget_units(),
         })
@@ -424,6 +544,150 @@ mod tests {
             source_manifest_sha256: "b".repeat(64),
             receipt_sha256: "f".repeat(64),
         }
+    }
+
+    #[test]
+    fn blind_probe_accepts_candidate_chosen_nonseparating_query_and_charges_it() {
+        let contract = contract();
+        let current = vec![
+            record("a", "merged", 0, 0, &"c".repeat(64), '1'),
+            record("b", "merged", 0, 10, &"c".repeat(64), '2'),
+        ];
+
+        // The evaluator's cheapest separating witness is probe_slow (cost 4).
+        // The candidate independently chooses probe_fast (cost 1), which is
+        // registered but non-separating. Blind acquisition must charge it
+        // rather than substitute the oracle-selected query.
+        let hinted = select_counterexample_probe(&current, &contract)
+            .expect("valid contract")
+            .expect("a separating probe exists");
+        assert_eq!(
+            hinted.dimension,
+            CounterexampleDimension::Response {
+                key: ResponseKey::new("probe_slow", "displacement", 1),
+            }
+        );
+
+        let request = BlindProbeRequest {
+            contract_id: contract.contract_id.clone(),
+            left_state_id: "a".to_owned(),
+            right_state_id: "b".to_owned(),
+            response_key: ResponseKey::new("probe_fast", "displacement", 1),
+        };
+        let observation = receipt("a", "b", request.response_key.clone(), 0, 0);
+        let mut ledger = ProbeBudgetLedger::new(&contract, 1).expect("valid budget");
+        let charge = ledger
+            .charge_blind_probe(&current, &contract, &request, &observation)
+            .expect("candidate-chosen non-separating probe is still valid");
+
+        assert_eq!(charge.cost_units, 1);
+        assert_eq!(charge.cumulative_cost_units, 1);
+        assert_eq!(charge.remaining_budget_units, 0);
+        assert_eq!(ledger.spent_units(), 1);
+        assert_eq!(ledger.accepted_receipt_count(), 1);
+    }
+
+    #[test]
+    fn blind_probe_rejects_unmerged_or_noncanonical_pairs_without_charging() {
+        let contract = contract();
+        let unmerged_current = vec![
+            record("a", "class-a", 0, 0, &"c".repeat(64), '1'),
+            record("b", "class-b", 0, 10, &"c".repeat(64), '2'),
+        ];
+        let key = ResponseKey::new("probe_fast", "displacement", 1);
+        let mut ledger = ProbeBudgetLedger::new(&contract, 10).expect("valid budget");
+        let unmerged = BlindProbeRequest {
+            contract_id: contract.contract_id.clone(),
+            left_state_id: "a".to_owned(),
+            right_state_id: "b".to_owned(),
+            response_key: key.clone(),
+        };
+        let unmerged_receipt = receipt("a", "b", key.clone(), 0, 0);
+        assert!(
+            ledger
+                .charge_blind_probe(&unmerged_current, &contract, &unmerged, &unmerged_receipt)
+                .is_err()
+        );
+
+        let merged_current = vec![
+            record("a", "merged", 0, 0, &"c".repeat(64), '1'),
+            record("b", "merged", 0, 10, &"c".repeat(64), '2'),
+        ];
+        let reversed = BlindProbeRequest {
+            contract_id: contract.contract_id.clone(),
+            left_state_id: "b".to_owned(),
+            right_state_id: "a".to_owned(),
+            response_key: key.clone(),
+        };
+        let reversed_receipt = receipt("b", "a", key, 0, 0);
+        assert!(
+            ledger
+                .charge_blind_probe(&merged_current, &contract, &reversed, &reversed_receipt)
+                .is_err()
+        );
+        assert_eq!(ledger.spent_units(), 0);
+        assert_eq!(ledger.accepted_receipt_count(), 0);
+    }
+
+    #[test]
+    fn blind_probe_rejects_wrong_values_and_budget_exhaustion_without_mutation() {
+        let contract = contract();
+        let current = vec![
+            record("a", "merged", 0, 0, &"c".repeat(64), '1'),
+            record("b", "merged", 0, 10, &"c".repeat(64), '2'),
+        ];
+        let request = BlindProbeRequest {
+            contract_id: contract.contract_id.clone(),
+            left_state_id: "a".to_owned(),
+            right_state_id: "b".to_owned(),
+            response_key: ResponseKey::new("probe_fast", "displacement", 1),
+        };
+        let mut ledger = ProbeBudgetLedger::new(&contract, 0).expect("valid zero budget");
+        let bad_receipt = receipt("a", "b", request.response_key.clone(), 0, 1);
+        assert!(
+            ledger
+                .charge_blind_probe(&current, &contract, &request, &bad_receipt)
+                .is_err()
+        );
+        assert_eq!(ledger.spent_units(), 0);
+
+        let good_receipt = receipt("a", "b", request.response_key.clone(), 0, 0);
+        assert!(
+            ledger
+                .charge_blind_probe(&current, &contract, &request, &good_receipt)
+                .is_err()
+        );
+        assert_eq!(ledger.spent_units(), 0);
+        assert_eq!(ledger.accepted_receipt_count(), 0);
+    }
+
+    #[test]
+    fn blind_probe_receipt_replay_is_rejected_without_double_charging() {
+        let contract = contract();
+        let current = vec![
+            record("a", "merged", 0, 0, &"c".repeat(64), '1'),
+            record("b", "merged", 0, 10, &"c".repeat(64), '2'),
+        ];
+        let request = BlindProbeRequest {
+            contract_id: contract.contract_id.clone(),
+            left_state_id: "a".to_owned(),
+            right_state_id: "b".to_owned(),
+            response_key: ResponseKey::new("probe_fast", "displacement", 1),
+        };
+        let observation = receipt("a", "b", request.response_key.clone(), 0, 0);
+        let mut ledger = ProbeBudgetLedger::new(&contract, 2).expect("valid budget");
+        assert!(
+            ledger
+                .charge_blind_probe(&current, &contract, &request, &observation)
+                .is_ok()
+        );
+        assert!(
+            ledger
+                .charge_blind_probe(&current, &contract, &request, &observation)
+                .is_err()
+        );
+        assert_eq!(ledger.spent_units(), 1);
+        assert_eq!(ledger.accepted_receipt_count(), 1);
     }
 
     #[test]
