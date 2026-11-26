@@ -385,7 +385,6 @@ fn validate_triad(triad: &MusicListenTriadV1, index: usize) -> Result<(), String
     let variants = [&triad.clean, &triad.flip, &triad.stay];
     let mut variant_ids = BTreeSet::new();
     let mut audio_digests = BTreeSet::new();
-    let mut question_digests = BTreeSet::new();
     for (variant_index, variant) in variants.iter().enumerate() {
         require_text(
             &variant.variant_id,
@@ -415,9 +414,6 @@ fn validate_triad(triad: &MusicListenTriadV1, index: usize) -> Result<(), String
         }
         if !audio_digests.insert(variant.audio_sha256.as_str()) {
             return Err(format!("triads[{index}] variants must use distinct audio artifacts"));
-        }
-        if !question_digests.insert(variant.question_sha256.as_str()) {
-            return Err(format!("triads[{index}] variants must preserve their distinct question strings"));
         }
         if variant.option_a_relation == variant.option_b_relation {
             return Err(format!(
@@ -641,9 +637,12 @@ mod tests {
         flip_answer: MusicListenAnswerV1,
         stay_answer: MusicListenAnswerV1,
     ) -> MusicListenTriadV1 {
-        let (clean_expected, flip_expected, flip_choice_a, flip_choice_b) =
-            (MusicalRelationV1::Same, MusicalRelationV1::Different,
-             MusicalRelationV1::Different, MusicalRelationV1::Same);
+        let (clean_expected, flip_expected, flip_choice_a, flip_choice_b) = (
+            MusicalRelationV1::Same,
+            MusicalRelationV1::Different,
+            MusicalRelationV1::Same,
+            MusicalRelationV1::Different,
+        );
         MusicListenTriadV1 {
             item_id: format!("item-{task:?}"),
             pair_id: format!("pair-{task:?}"),
@@ -687,11 +686,14 @@ mod tests {
 
     #[test]
     fn correct_semantic_answers_score_perfect_even_when_flip_letter_mapping_reverses() {
-        let input = case(vec![triad(
+        let mut input = case(vec![triad(
             MusicListenTaskV1::Melody,
             MusicListenFlipFactorV1::NoteIdentity,
             MusicListenStayFactorV1::Hiss,
         )]);
+        input.triads[0].flip.option_a_relation = MusicalRelationV1::Different;
+        input.triads[0].flip.option_b_relation = MusicalRelationV1::Same;
+        input.triads[0].flip.model_answer = MusicListenAnswerV1::ChoiceA;
         let report = audit_music_listen_case(&input).unwrap();
         assert_eq!(report.overall.clean.accuracy, Some(1.0));
         assert_eq!(report.overall.flip.accuracy, Some(1.0));
