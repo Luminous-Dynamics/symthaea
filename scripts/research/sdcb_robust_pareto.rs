@@ -304,7 +304,7 @@ pub fn evaluate_robust_experiment(
         let replace = match &best_policy {
             None => true,
             Some(old) if worst > best_worst + EPS => true,
-            Some(old) if (worst - best_worst).abs() <= EPS => policy < *old,
+            Some(old) if (worst - best_worst).abs() <= EPS => policy.as_slice() < old.as_slice(),
             _ => false,
         };
         if replace {
@@ -578,7 +578,7 @@ pub fn pareto_experiment_policies(
         for policy in policies {
             let mut feasible = true;
             for (outcome, action) in policy.iter().enumerate() {
-                if outcome_mass[outcome] > EPS
+                if outcome_mass[outcome] > 0.0
                     && !action_is_feasible(model, *action, posterior)
                 {
                     feasible = false;
@@ -590,6 +590,16 @@ pub fn pareto_experiment_policies(
             }
 
             let mut expected = vec![0.0; model.objective_ids.len()];
+            let mut no_experiment_lottery = vec![0.0; model.objective_ids.len()];
+            for outcome in 0..outcomes {
+                let q = outcome_mass[outcome];
+                let action = policy[outcome];
+                let unconditional_action_value =
+                    expected_action_objectives(posterior, model, action);
+                for objective in 0..model.objective_ids.len() {
+                    no_experiment_lottery[objective] += q * unconditional_action_value[objective];
+                }
+            }
             for (h, probability) in posterior.iter().enumerate() {
                 for outcome in 0..outcomes {
                     let likelihood = candidate.outcome_likelihoods[h][outcome];
@@ -600,6 +610,16 @@ pub fn pareto_experiment_policies(
                     }
                 }
             }
+            // The outcome distribution itself can act as a randomizer. Add
+            // the same action lottery without observing the experiment, at
+            // zero experiment cost, so randomization is not miscredited as
+            // information gained from a measurement.
+            all.push(ParetoExperimentPolicy {
+                experiment_id: "NO_EXPERIMENT_LOTTERY".into(),
+                actions_by_outcome: policy.iter().map(|a| model.action_ids[*a].clone()).collect(),
+                expected_objectives: no_experiment_lottery,
+                cost_units: 0,
+            });
             all.push(ParetoExperimentPolicy {
                 experiment_id: candidate.experiment_id.clone(),
                 actions_by_outcome: policy.iter().map(|a| model.action_ids[*a].clone()).collect(),
@@ -815,9 +835,10 @@ mod tests {
             &[candidate],
         ).unwrap();
         assert!(frontier.iter().all(|policy| !policy.actions_by_outcome.iter().any(|a| a == "fast")));
-        assert!(frontier.iter().any(|p| p.expected_objectives == vec![8.0, -1.0]));
-        assert!(frontier.iter().any(|p| p.expected_objectives == vec![7.0, -0.5]));
-        assert!(frontier.iter().any(|p| p.expected_objectives == vec![6.0, 0.0]));
+        assert!(frontier.iter().all(|policy| policy.experiment_id == "NO_EXPERIMENT_LOTTERY"));
+        assert!(frontier.iter().any(|p| p.expected_objectives == vec![8.0, -1.0] && p.cost_units == 0));
+        assert!(frontier.iter().any(|p| p.expected_objectives == vec![7.0, -0.5] && p.cost_units == 0));
+        assert!(frontier.iter().any(|p| p.expected_objectives == vec![6.0, 0.0] && p.cost_units == 0));
     }
 
     #[test]
@@ -839,6 +860,26 @@ mod tests {
         assert_eq!(mixed[0].actions_by_outcome, vec!["balanced", "safe"]);
     }
 
+    #[test]
+    fn informative_observation_can_dominate_same_marginal_no_experiment_lottery() {
+        let model = MultiObjectiveModel {
+            action_ids: vec!["choose-h1".into(), "choose-h2".into()],
+            objective_ids: vec!["performance-1".into(), "performance-2".into()],
+            utility_by_hypothesis: vec![
+                vec![vec![10.0, 0.0], vec![0.0, 10.0]],
+                vec![vec![0.0, 10.0], vec![10.0, 0.0]],
+            ],
+            minimum_by_objective: vec![None, None],
+        };
+        let candidate = ParetoExperimentCandidate {
+            experiment_id: "diagnostic-probe".into(),
+            cost_units: 1,
+            outcome_likelihoods: vec![vec![0.9, 0.1], vec![0.1, 0.9]],
+        };
+        let frontier = pareto_experiment_policies(&[0.5, 0.5], &model, &[candidate]).unwrap();
+        assert!(frontier.iter().any(|p| p.experiment_id == "diagnostic-probe" && p.expected_objectives == vec![9.0, 9.0]));
+        assert!(frontier.iter().any(|p| p.experiment_id == "NO_EXPERIMENT_LOTTERY" && p.expected_objectives == vec![5.0, 5.0]));
+    }
     #[test]
     fn invalid_multiobjective_dimensions_are_rejected() {
         let mut model = pareto_model(true);
