@@ -1,0 +1,15 @@
+[package]
+name = "mace-substrate-router-v0-1"
+version = "0.1.0"
+edition = "2024"
+publish = false
+license = "AGPL-3.0-or-later"
+description = "Research-only deterministic regime-aware memory substrate router for MACE"
+
+[lib]
+path = "src/lib.rs"
+
+[workspace]
+
+[dependencies]
+
