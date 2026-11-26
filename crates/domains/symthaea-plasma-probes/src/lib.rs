@@ -3226,14 +3226,14 @@ impl WeightedEmpiricalMeasure1D {
 
         let mut aggregated: Vec<(f64, f64, f64)> = Vec::with_capacity(sorted.len());
         for (position, weight) in sorted {
-            if let Some((last_position, total, compensation)) = aggregated.last_mut() {
-                if *last_position == position {
-                    kahan_add(weight, total, compensation);
-                    if !total.is_finite() || *total < 0.0 {
-                        return Err(ContractError::InvalidParticleMeasureWeights);
-                    }
-                    continue;
+            if let Some((last_position, total, compensation)) = aggregated.last_mut()
+                && *last_position == position
+            {
+                kahan_add(weight, total, compensation);
+                if !total.is_finite() || *total < 0.0 {
+                    return Err(ContractError::InvalidParticleMeasureWeights);
                 }
+                continue;
             }
             aggregated.push((position, weight, 0.0));
         }
