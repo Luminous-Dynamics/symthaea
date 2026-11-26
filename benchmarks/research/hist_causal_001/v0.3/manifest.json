@@ -1,0 +1,28 @@
+{
+  "benchmark": "HIST-CAUSAL-001",
+  "version": "0.3",
+  "status": "synthetic_sensitivity_only",
+  "posterior_confidence_threshold": "0.95",
+  "minimum_correct_confident_probability": "0.90",
+  "maximum_wrong_confident_probability": "0.01",
+  "audit_models": {
+    "high": {"sensitivity": "19/20", "false_positive_rate": "1/100"},
+    "moderate": {"sensitivity": "4/5", "false_positive_rate": "1/20"},
+    "weak": {"sensitivity": "7/10", "false_positive_rate": "1/10"},
+    "poor": {"sensitivity": "3/5", "false_positive_rate": "1/5"}
+  },
+  "prior_leak_probabilities": ["1/10", "1/2", "9/10"],
+  "minimum_independent_units": {
+    "high": {"rare_leak": 2, "balanced": 2, "common_leak": 3},
+    "moderate": {"rare_leak": 5, "balanced": 5, "common_leak": 7},
+    "weak": {"rare_leak": 11, "balanced": 9, "common_leak": 11},
+    "poor": {"rare_leak": 30, "balanced": 23, "common_leak": 31}
+  },
+  "assumptions": [
+    "Bernoulli audit outcomes independent across experimental units",
+    "Sensitivity and false-positive rate known and fixed",
+    "Prior odds fixed and correctly specified",
+    "Exact rational binomial likelihoods"
+  ],
+  "claim_ceiling": "mathematical sample-sensitivity for two toy Bernoulli hypotheses only; not an empirical sample-size recommendation"
+}

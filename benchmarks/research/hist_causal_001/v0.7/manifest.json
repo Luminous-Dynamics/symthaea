@@ -1,0 +1,18 @@
+{
+  "benchmark": "HIST-CAUSAL-001",
+  "version": "0.7",
+  "status": "finite_sample_ood_pairwise_sensitivity",
+  "method": "oracle likelihood-ratio test with known out-of-family mixture and nearest in-family candidate",
+  "seed_count": 20,
+  "replicates_per_seed_per_truth_per_n": 250,
+  "samples_per_probe": [1, 2, 5, 10, 20, 50],
+  "probe_count": 6,
+  "equal_prior_posterior_confidence_threshold": "0.95",
+  "likelihood_ratio_threshold": 19,
+  "mean_nearest_pair_js_nats": 0.030297033469569978,
+  "nearest_candidate_counts": {
+    "actuator_noncompliance": 18,
+    "primary_sensor_artefact": 2
+  },
+  "claim_ceiling": "optimistic pairwise upper-bound reference; exact likelihoods known; not an agent performance result"
+}

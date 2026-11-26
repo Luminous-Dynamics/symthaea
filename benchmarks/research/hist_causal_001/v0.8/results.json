@@ -1,0 +1,19 @@
+{
+  "benchmark": "HIST-CAUSAL-001",
+  "version": "0.8",
+  "method": "least-favourable parametric-bootstrap catalogue adequacy; known candidate likelihoods, unknown OOD likelihood",
+  "seed_count": 12,
+  "calibration_reps_per_model": 200,
+  "evaluation_reps_per_truth_per_model": 200,
+  "alpha_target": 0.05,
+  "samples_per_probe": [1,2,5,10,20],
+  "probe_count": 6,
+  "aggregate": {
+    "1": {"ood_detection_rate":0.07791666666666668,"in_family_false_ood_rate_pooled":0.005486111111111111,"in_family_false_ood_rate_by_model":{"genuine_mechanism":0.0,"latent_common_cause":0.0,"primary_sensor_artefact":0.0,"actuator_noncompliance":0.03291666666666667,"common_mode_reference_artefact":0.0,"null_effect":0.0}},
+    "2": {"ood_detection_rate":0.2775,"in_family_false_ood_rate_pooled":0.014791666666666667,"in_family_false_ood_rate_by_model":{"genuine_mechanism":0.0075,"latent_common_cause":0.008333333333333333,"primary_sensor_artefact":0.01875,"actuator_noncompliance":0.03791666666666667,"common_mode_reference_artefact":0.005416666666666667,"null_effect":0.010833333333333334}},
+    "5": {"ood_detection_rate":0.6358333333333334,"in_family_false_ood_rate_pooled":0.014375,"in_family_false_ood_rate_by_model":{"genuine_mechanism":0.00125,"latent_common_cause":0.0025,"primary_sensor_artefact":0.012916666666666667,"actuator_noncompliance":0.06583333333333334,"common_mode_reference_artefact":0.00125,"null_effect":0.0025}},
+    "10": {"ood_detection_rate":0.8875000000000001,"in_family_false_ood_rate_pooled":0.00986111111111111,"in_family_false_ood_rate_by_model":{"genuine_mechanism":0.0,"latent_common_cause":0.0,"primary_sensor_artefact":0.004166666666666667,"actuator_noncompliance":0.05333333333333334,"common_mode_reference_artefact":0.0,"null_effect":0.0016666666666666668}},
+    "20": {"ood_detection_rate":0.9954166666666667,"in_family_false_ood_rate_pooled":0.008958333333333334,"in_family_false_ood_rate_by_model":{"genuine_mechanism":0.0004166666666666667,"latent_common_cause":0.0,"primary_sensor_artefact":0.0004166666666666667,"actuator_noncompliance":0.051666666666666666,"common_mode_reference_artefact":0.0,"null_effect":0.00125}}
+  },
+  "claim_ceiling": "finite known-parameter catalogue adequacy baseline; calibration uncertainty remains; not general open-world detection"
+}

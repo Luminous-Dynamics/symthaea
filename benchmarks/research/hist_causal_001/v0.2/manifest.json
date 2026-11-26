@@ -1,0 +1,53 @@
+{
+  "benchmark": "HIST-CAUSAL-001",
+  "version": "0.2",
+  "status": "research_reference_only",
+  "exact_arithmetic": "rational",
+  "models": [
+    "common_cause",
+    "open_transfer",
+    "sealed_history",
+    "sealed_leak",
+    "null",
+    "local_memory"
+  ],
+  "contexts": [
+    "observational",
+    "do_open_0",
+    "do_open_1",
+    "do_sealed_0",
+    "do_sealed_1",
+    "sealed_audit_0",
+    "sealed_audit_1",
+    "same_person_memory_0",
+    "same_person_memory_1",
+    "future_exposure_0",
+    "future_exposure_1"
+  ],
+  "audit": {
+    "sensitivity": "19/20",
+    "false_positive_probability": "1/100"
+  },
+  "results": {
+    "observational_only": {"separated_pairs": 8, "total_pairs": 15},
+    "interventions_without_audit": {"separated_pairs": 13, "total_pairs": 15},
+    "full_suite_with_audit_and_local_memory_probe": {"separated_pairs": 15, "total_pairs": 15},
+    "minimum_cost_identification": {
+      "contexts": [
+        "observational",
+        "do_open_0",
+        "sealed_audit_0",
+        "same_person_memory_0"
+      ],
+      "cost": "9/2",
+      "cost_unit": "arbitrary_synthetic_units"
+    }
+  },
+  "claim_ceiling": "exact identifiability within the six declared toy models and finite probe menu; no physical mechanism evidence",
+  "implementation": {
+    "reference_language": "Python",
+    "reference_only": true,
+    "production_target": "Rust",
+    "rust_build_status": "not_run_toolchain_unavailable"
+  }
+}

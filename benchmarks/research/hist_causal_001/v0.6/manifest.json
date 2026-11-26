@@ -1,0 +1,18 @@
+{
+  "benchmark": "HIST-CAUSAL-001",
+  "version": "0.6",
+  "status": "out_of_family_model_misspecification_challenge",
+  "reference": "exact rational mixture of two declared mechanisms",
+  "mixture": {
+    "components": ["primary_sensor_artefact", "actuator_noncompliance"],
+    "weight": "1/2",
+    "latent_regime_scope": "redrawn per independent probe trial/experimental unit"
+  },
+  "candidate_catalogue_size": 6,
+  "development_seeds_validated": 100,
+  "all_ood_signatures_differ_from_all_candidates": true,
+  "minimum_nearest_candidate_average_total_variation": "689/6480",
+  "mean_nearest_candidate_average_total_variation": "28060229/246758400",
+  "solver_allowed_outputs": ["claim_model", "equivalence_class", "model_misspecified", "abstain"],
+  "claim_ceiling": "exact out-of-family distinction over six probe marginals; finite-sample detection power not established"
+}

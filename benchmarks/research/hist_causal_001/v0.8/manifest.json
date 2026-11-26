@@ -1,0 +1,37 @@
+{
+  "benchmark": "HIST-CAUSAL-001",
+  "version": "0.8",
+  "status": "candidate_catalogue_adequacy_bootstrap",
+  "method": "least-favourable parametric-bootstrap threshold on the maximum candidate log likelihood",
+  "candidate_likelihoods_known": true,
+  "ood_likelihood_known_to_detector": false,
+  "recipe_parameters_known": true,
+  "alpha_target": 0.05,
+  "seed_count": 12,
+  "calibration_replicates_per_candidate_per_seed_per_n": 200,
+  "evaluation_replicates_per_truth_per_candidate_per_seed_per_n": 200,
+  "samples_per_probe": [1, 2, 5, 10, 20],
+  "probe_count": 6,
+  "ood_detection_rate": {
+    "1": 0.07791666666666668,
+    "2": 0.2775,
+    "5": 0.6358333333333334,
+    "10": 0.8875000000000001,
+    "20": 0.9954166666666667
+  },
+  "pooled_in_family_false_ood_rate": {
+    "1": 0.005486111111111111,
+    "2": 0.014791666666666667,
+    "5": 0.014375,
+    "10": 0.00986111111111111,
+    "20": 0.008958333333333334
+  },
+  "worst_observed_candidate_false_ood_rate": {
+    "1": 0.03291666666666667,
+    "2": 0.03791666666666667,
+    "5": 0.06583333333333334,
+    "10": 0.05333333333333334,
+    "20": 0.051666666666666666
+  },
+  "claim_ceiling": "finite known-parameter adequacy baseline only; bootstrap calibration uncertainty remains; not a general OOD guarantee"
+}
