@@ -182,6 +182,7 @@ struct SourceAttestation {
     signed_at: String,
     observed_at: String,
     outcome: EffectOutcome,
+    #[serde(deserialize_with = "deserialize_required_nullable_string")]
     projection_digest: Option<String>,
     signature_envelope: SignatureEnvelope,
     key_status_evidence_ref: String,
@@ -401,6 +402,25 @@ pub fn verify_effect_receipt(
     })
 }
 
+fn deserialize_required_nullable_string<'de, D>(
+    deserializer: D,
+) -> Result<Option<String>, D::Error>
+where
+    D: serde::Deserializer<'de>,
+{
+    Option::<String>::deserialize(deserializer)
+}
+
+fn validate_timestamp(value: &str, field: &'static str) -> Result<(), EffectReceiptError> {
+    if super::parse_timestamp(value).is_some() {
+        Ok(())
+    } else {
+        Err(EffectReceiptError::InvalidShape(format!(
+            "{field} must be RFC 3339"
+        )))
+    }
+}
+
 fn map_json_error(error: serde_json::Error) -> EffectReceiptError {
     let message = error.to_string();
     if let Some(key) = message.split("duplicate JSON key: ").nth(1) {
@@ -408,6 +428,18 @@ fn map_json_error(error: serde_json::Error) -> EffectReceiptError {
     } else {
         EffectReceiptError::InvalidJson(message)
     }
+}
+
+fn is_canonical_uuid(value: &str) -> bool {
+    let bytes = value.as_bytes();
+    bytes.len() == 36
+        && bytes[8] == b'-'
+        && bytes[13] == b'-'
+        && bytes[18] == b'-'
+        && bytes[23] == b'-'
+        && bytes.iter().enumerate().all(|(index, byte)| {
+            matches!(index, 8 | 13 | 18 | 23) || byte.is_ascii_hexdigit()
+        })
 }
 
 fn validate_digest(value: &str, field: &'static str) -> Result<(), EffectReceiptError> {
@@ -424,6 +456,15 @@ fn validate_digest(value: &str, field: &'static str) -> Result<(), EffectReceipt
 fn validate_attempt_shape(attempt: &EffectAttempt) -> Result<(), EffectReceiptError> {
     if attempt.schema_version != "sat-effect-attempt/v0.1" {
         return Err(EffectReceiptError::InvalidShape("unsupported attempt schema_version".to_owned()));
+    }
+    if !is_canonical_uuid(&attempt.run_id) || !is_canonical_uuid(&attempt.attempt_id) {
+        return Err(EffectReceiptError::InvalidShape("attempt run_id and attempt_id must be UUIDs".to_owned()));
+    }
+    if attempt.idempotency_key.len() < 8 || attempt.idempotency_key.len() > 256 {
+        return Err(EffectReceiptError::InvalidShape("attempt idempotency_key length is invalid".to_owned()));
+    }
+    if let Some(submitted_at) = &attempt.submitted_at {
+        validate_timestamp(submitted_at, "attempt.submitted_at")?;
     }
     for (value, field) in [
         (attempt.manifest_digest.as_str(), "attempt.manifest_digest"),
@@ -443,6 +484,13 @@ fn validate_receipt_shape(receipt: &EffectReceipt) -> Result<(), EffectReceiptEr
     if receipt.schema_version != "sat-effect-receipt/v0.1" {
         return Err(EffectReceiptError::InvalidShape("unsupported receipt schema_version".to_owned()));
     }
+    if !is_canonical_uuid(&receipt.run_id) || !is_canonical_uuid(&receipt.attempt_id) {
+        return Err(EffectReceiptError::InvalidShape("receipt run_id and attempt_id must be UUIDs".to_owned()));
+    }
+    if receipt.idempotency_key.len() < 8 || receipt.idempotency_key.len() > 256 {
+        return Err(EffectReceiptError::InvalidShape("receipt idempotency_key length is invalid".to_owned()));
+    }
+    validate_timestamp(&receipt.issued_at, "receipt.issued_at")?;
     for (value, field) in [
         (receipt.manifest_digest.as_str(), "receipt.manifest_digest"),
         (receipt.intent_digest.as_str(), "receipt.intent_digest"),
@@ -500,6 +548,14 @@ fn bind_source_to_attempt(
 }
 
 fn validate_source_shape(source: &SourceAttestation) -> Result<(), EffectReceiptError> {
+    if !is_canonical_uuid(&source.run_id) || !is_canonical_uuid(&source.attempt_id) {
+        return Err(EffectReceiptError::InvalidShape("source run_id and attempt_id must be UUIDs".to_owned()));
+    }
+    if source.idempotency_key.len() < 8 || source.idempotency_key.len() > 256 {
+        return Err(EffectReceiptError::InvalidShape("source idempotency_key length is invalid".to_owned()));
+    }
+    validate_timestamp(&source.signed_at, "source.signed_at")?;
+    validate_timestamp(&source.observed_at, "source.observed_at")?;
     for (value, field) in [
         (source.manifest_digest.as_str(), "source.manifest_digest"),
         (source.intent_digest.as_str(), "source.intent_digest"),
