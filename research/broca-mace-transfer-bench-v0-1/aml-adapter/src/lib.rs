@@ -29,6 +29,7 @@ pub mod source_origin_receipt;
 pub mod source_origin_witness;
 pub mod streaming_session;
 pub mod temporal_projection;
+pub mod claim_relative_invalidation;
 pub mod acquisition_receipt_v2;
 
 use std::collections::BTreeMap;
