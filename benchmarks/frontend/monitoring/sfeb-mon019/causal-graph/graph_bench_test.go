@@ -8,8 +8,16 @@ import (
 
 func benchmarkGraph(inputCount int) (Graph,map[string]VerifierPin) {
 	g,p:=base()
-	activity:=&g.Nodes[2]
-	activity.DeclaredInputs=make([]string,0,inputCount)
+	nodes:=g.Nodes[:0]
+	for _,n:=range g.Nodes { if n.ID!="source-input" { nodes=append(nodes,n) } }
+	g.Nodes=nodes
+	edges:=g.Edges[:0]
+	for _,e:=range g.Edges { if e.ID!="use-1" { edges=append(edges,e) } }
+	g.Edges=edges
+	reports:=g.Reports[:0]
+	for _,r:=range g.Reports { if r.SubjectID!="source-input" { reports=append(reports,r) } }
+	g.Reports=reports
+	declaredInputs:=make([]string,0,inputCount)
 	m:=&g.Manifests[0]
 	m.ObservedInputs=make([]string,0,inputCount)
 	mk:=func(id string,d DigestRef)VerifierReport{
@@ -20,10 +28,11 @@ func benchmarkGraph(inputCount int) (Graph,map[string]VerifierPin) {
 		d:=digest(id,fmt.Sprintf("value-%08d",i),"source-response")
 		g.Nodes=append(g.Nodes,Node{ID:id,Kind:Entity,Digest:&d,ExternalRoot:true,RequiresVerification:true})
 		g.Edges=append(g.Edges,Edge{ID:fmt.Sprintf("use-%08d",i),Kind:Used,From:id,To:"tool-call",EvidenceID:"invocation-record"})
-		activity.DeclaredInputs=append(activity.DeclaredInputs,id)
+		declaredInputs=append(declaredInputs,id)
 		m.ObservedInputs=append(m.ObservedInputs,id)
 		g.Reports=append(g.Reports,mk(id,d))
 	}
+	for i:=range g.Nodes { if g.Nodes[i].ID=="tool-call" { g.Nodes[i].DeclaredInputs=declaredInputs; break } }
 	return g,p
 }
 
