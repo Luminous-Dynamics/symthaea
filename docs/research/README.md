@@ -461,3 +461,10 @@ A falsifiable programme for spectral statistics, RH/prime-structure controls, ne
 ### Acquisition comparison bake-off
 
 - [SDCB acquisition comparison bake-off v1](SDCB_ACQUISITION_COMPARISON_BAKEOFF_V1.md): preregistered adapters and matched evaluation across fixed/OFAT/space-filling/random, prediction disagreement, Spark EIG, R-I/R-IDeA, EVSI, exact non-myopic, robust maximin and Pareto/MOBO methods.
+### Robust multi-fidelity decision design
+
+- [Robust multi-fidelity protocol](SDCB_ROBUST_MULTIFIDELITY_DECISION_DESIGN_V1.md): scenario-specific fidelity likelihoods, maximin decision value and componentwise resource Pareto frontiers.
+- [Multi-fidelity episode schema](SDCB_MULTIFIDELITY_EPISODE_V1.schema.json), [example](SDCB_MULTIFIDELITY_EPISODE_V1.example.json), and [expected result](SDCB_MULTIFIDELITY_EPISODE_V1.expected.json).
+- [Rust exact reference](../../scripts/research/sdcb_multifidelity.rs) and [README](../../scripts/research/SDCB_MULTIFIDELITY_README.md): reuses RPSD's robust finite decision oracle rather than duplicating it.
+
+**Evidence boundary:** 13 tests authored, not compiled/executed. All fidelity likelihood matrices in this reference are supplied fixture assumptions; no real source calibration or external MFBO comparison has been run.

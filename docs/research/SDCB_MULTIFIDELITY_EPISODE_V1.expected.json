@@ -1,0 +1,110 @@
+{
+  "schema_version": "1.0.0",
+  "fixture_id": "robust-multifidelity-fidelity-shift-v1",
+  "execution_kind": "independent_finite_maximin_and_componentwise_pareto_calculation",
+  "rust_compiled_or_executed": false,
+  "baseline": {
+    "action_id": "choose-h1",
+    "scenario_values": [
+      0.5,
+      0.5
+    ],
+    "worst_case_value": 0.5
+  },
+  "assessments": [
+    {
+      "fidelity_id": "low",
+      "scenario_policy_values": [
+        0.5,
+        0.5
+      ],
+      "policy_actions_by_outcome": [
+        "choose-h1",
+        "choose-h1"
+      ],
+      "robust_post_value": 0.5,
+      "robust_gain": 0,
+      "resource_cost": {
+        "money_units": 1,
+        "instrument_minutes": 2,
+        "compute_seconds": 0.1,
+        "energy_watt_hours": 0.01
+      }
+    },
+    {
+      "fidelity_id": "medium",
+      "scenario_policy_values": [
+        0.75,
+        0.7
+      ],
+      "policy_actions_by_outcome": [
+        "choose-h1",
+        "choose-h2"
+      ],
+      "robust_post_value": 0.7,
+      "robust_gain": 0.2,
+      "resource_cost": {
+        "money_units": 2,
+        "instrument_minutes": 5,
+        "compute_seconds": 0.5,
+        "energy_watt_hours": 0.1
+      }
+    },
+    {
+      "fidelity_id": "high",
+      "scenario_policy_values": [
+        0.9,
+        0.85
+      ],
+      "policy_actions_by_outcome": [
+        "choose-h1",
+        "choose-h2"
+      ],
+      "robust_post_value": 0.85,
+      "robust_gain": 0.35,
+      "resource_cost": {
+        "money_units": 6,
+        "instrument_minutes": 20,
+        "compute_seconds": 2,
+        "energy_watt_hours": 0.5
+      }
+    },
+    {
+      "fidelity_id": "medium-expensive-duplicate",
+      "scenario_policy_values": [
+        0.75,
+        0.7
+      ],
+      "policy_actions_by_outcome": [
+        "choose-h1",
+        "choose-h2"
+      ],
+      "robust_post_value": 0.7,
+      "robust_gain": 0.2,
+      "resource_cost": {
+        "money_units": 4,
+        "instrument_minutes": 8,
+        "compute_seconds": 1,
+        "energy_watt_hours": 0.2
+      }
+    }
+  ],
+  "pareto_frontier": [
+    "high",
+    "low",
+    "medium"
+  ],
+  "budget": {
+    "money_units": 3,
+    "instrument_minutes": 8,
+    "compute_seconds": 1,
+    "energy_watt_hours": 0.2
+  },
+  "feasible_frontier": [
+    "low",
+    "medium"
+  ],
+  "selected_under_budget": "medium",
+  "claim_ceiling": "finite_one_step_robust_decision_and_resource_pareto_fixture_only",
+  "note": "The low-fidelity observation channel reverses under the second plausible scenario. A nominal-only acquisition would overstate its value. Likelihoods are supplied exact scenario inputs; no physical fidelity calibration is measured."
+}
