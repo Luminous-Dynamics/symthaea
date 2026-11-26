@@ -1149,7 +1149,7 @@ fn select_active(
                 source_stratum_id: quota.source_stratum_id.clone(),
                 stream: QuotaStreamV1::ActiveRefinement,
                 requested: quota.active_minimum_items,
-                state.selected: selected_count,
+                selected: selected_count,
             })
         })
         .collect();
