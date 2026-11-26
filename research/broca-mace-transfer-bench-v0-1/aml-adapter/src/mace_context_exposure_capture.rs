@@ -31,6 +31,8 @@ use crate::mace_context_exposure_receipt::{
     MaceExposureReceiptSignerV1,
     MACE_CONTEXT_EXPOSURE_MAX_BODY_BYTES_V1,
     MACE_CONTEXT_EXPOSURE_MAX_SPANS_V1,
+    MACE_STATIC_PROVIDER_NUMBER_PARAMETER_KEYS_V1,
+    MACE_STATIC_PROVIDER_BOOLEAN_PARAMETER_KEYS_V1,
 };
 
 pub const MACE_CONTEXT_EXPOSURE_CAPTURE_MAX_MESSAGES_V1: usize = 10_000;
@@ -74,7 +76,6 @@ pub struct MaceRequestMessageV1 {
 #[derive(Clone, Debug, Eq, PartialEq, serde::Serialize)]
 #[serde(untagged)]
 pub enum MaceProviderStaticParameterV1 {
-    String(String),
     Number(serde_json::Number),
     Bool(bool),
 }
@@ -114,6 +115,8 @@ pub enum MaceExposureCaptureRejectV1 {
     InvalidDigest,
     ModelRevisionMismatch,
     RequestParameterProfileMismatch,
+    UnclassifiedProviderParameterKey,
+    ProviderParameterTypeMismatch,
     EmptyMessages,
     TooManyMessages,
     EmptySegmentList,
@@ -430,10 +433,18 @@ fn append_json_string_content(output: &mut Vec<u8>, value: &str) {
 fn provider_parameter_profile_sha256(
     parameters: &BTreeMap<String, MaceProviderStaticParameterV1>,
 ) -> Result<String, MaceExposureCaptureRejectV1> {
-    for key in parameters.keys() {
+    for (key, value) in parameters {
         validate_identifier(key)?;
-        if key == "model" || key == "messages" {
-            return Err(MaceExposureCaptureRejectV1::InvalidIdentifier);
+        if MACE_STATIC_PROVIDER_NUMBER_PARAMETER_KEYS_V1.contains(&key.as_str()) {
+            if !matches!(value, MaceProviderStaticParameterV1::Number(_)) {
+                return Err(MaceExposureCaptureRejectV1::ProviderParameterTypeMismatch);
+            }
+        } else if MACE_STATIC_PROVIDER_BOOLEAN_PARAMETER_KEYS_V1.contains(&key.as_str()) {
+            if !matches!(value, MaceProviderStaticParameterV1::Bool(_)) {
+                return Err(MaceExposureCaptureRejectV1::ProviderParameterTypeMismatch);
+            }
+        } else {
+            return Err(MaceExposureCaptureRejectV1::UnclassifiedProviderParameterKey);
         }
     }
     let canonical = serde_json::to_vec(parameters)
@@ -775,8 +786,8 @@ mod tests {
     fn rejects_unpinned_provider_parameter_profile_before_artifact_or_transport() {
         let mut request_parameters = BTreeMap::new();
         request_parameters.insert(
-            "instructions".to_owned(),
-            MaceProviderStaticParameterV1::String("unexpected dynamic instruction".to_owned()),
+            "temperature".to_owned(),
+            MaceProviderStaticParameterV1::Number(serde_json::Number::from(8)),
         );
         let request = MaceProviderNeutralRequestV1 {
             model: "test-model".to_owned(),
@@ -850,6 +861,58 @@ mod tests {
                 &request, MaceMemoryArmV1::NoMemory
             ).unwrap_err(),
             MaceExposureCaptureRejectV1::MemoryInNoMemoryArm
+        );
+    }
+
+    #[test]
+    fn rejects_unclassified_provider_parameter_names() {
+        let mut request_parameters = BTreeMap::new();
+        request_parameters.insert(
+            "instructions".to_owned(),
+            MaceProviderStaticParameterV1::Bool(true),
+        );
+        let request = MaceProviderNeutralRequestV1 {
+            model: "test-model".to_owned(),
+            request_parameters,
+            messages: vec![MaceRequestMessageV1 {
+                role: MaceContextRoleV1::User,
+                segments: vec![MaceRequestSegmentV1 {
+                    text: "plain".to_owned(),
+                    origin: MaceRequestSegmentOriginV1::NonMemory,
+                }],
+            }],
+        };
+        assert_eq!(
+            serialize_mace_provider_request_with_exposure_map_v1(
+                &request, MaceMemoryArmV1::ConventionalRetrieval
+            ).unwrap_err(),
+            MaceExposureCaptureRejectV1::UnclassifiedProviderParameterKey
+        );
+    }
+
+    #[test]
+    fn rejects_provider_parameter_type_mismatch() {
+        let mut request_parameters = BTreeMap::new();
+        request_parameters.insert(
+            "stream".to_owned(),
+            MaceProviderStaticParameterV1::Number(serde_json::Number::from(1)),
+        );
+        let request = MaceProviderNeutralRequestV1 {
+            model: "test-model".to_owned(),
+            request_parameters,
+            messages: vec![MaceRequestMessageV1 {
+                role: MaceContextRoleV1::User,
+                segments: vec![MaceRequestSegmentV1 {
+                    text: "plain".to_owned(),
+                    origin: MaceRequestSegmentOriginV1::NonMemory,
+                }],
+            }],
+        };
+        assert_eq!(
+            serialize_mace_provider_request_with_exposure_map_v1(
+                &request, MaceMemoryArmV1::ConventionalRetrieval
+            ).unwrap_err(),
+            MaceExposureCaptureRejectV1::ProviderParameterTypeMismatch
         );
     }
 

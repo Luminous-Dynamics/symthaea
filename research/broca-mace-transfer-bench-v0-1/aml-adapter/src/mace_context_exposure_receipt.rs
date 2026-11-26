@@ -8,15 +8,38 @@
 use base64::engine::general_purpose::STANDARD as BASE64_STANDARD;
 use base64::Engine;
 use ed25519_dalek::{Signature, VerifyingKey};
-use serde::{Deserialize, Serialize};
+use serde::de::{self, MapAccess, Visitor};
+use serde::{Deserialize, Deserializer, Serialize};
+use std::fmt;
+use serde_json::value::RawValue;
 use sha2::{Digest, Sha256};
-use std::collections::BTreeSet;
+use std::collections::{BTreeMap, BTreeSet};
 
 pub const MACE_CONTEXT_EXPOSURE_SCHEMA_V1: &str = "mace_context_exposure_receipt_v0_1";
 pub const MACE_CONTEXT_EXPOSURE_DOMAIN_V1: &[u8] = b"MACE-CONTEXT-EXPOSURE-V1\0";
 pub const MACE_CONTEXT_EXPOSURE_MAX_RECEIPT_BYTES_V1: usize = 4 * 1024 * 1024;
 pub const MACE_CONTEXT_EXPOSURE_MAX_BODY_BYTES_V1: usize = 32 * 1024 * 1024;
 pub const MACE_CONTEXT_EXPOSURE_MAX_SPANS_V1: usize = 100_000;
+
+/// Generic provider parameters are deliberately limited to static numeric
+/// decoding/budget controls and boolean switches. Content-bearing or
+/// provider-specific structured fields require a typed adapter.
+pub const MACE_STATIC_PROVIDER_NUMBER_PARAMETER_KEYS_V1: &[&str] = &[
+    "temperature",
+    "top_p",
+    "frequency_penalty",
+    "presence_penalty",
+    "max_tokens",
+    "max_completion_tokens",
+    "seed",
+    "n",
+    "top_logprobs",
+];
+pub const MACE_STATIC_PROVIDER_BOOLEAN_PARAMETER_KEYS_V1: &[&str] = &[
+    "stream",
+    "logprobs",
+    "parallel_tool_calls",
+];
 
 #[derive(Clone, Copy, Debug, Eq, PartialEq, Serialize, Deserialize)]
 #[serde(rename_all = "snake_case")]
@@ -197,6 +220,9 @@ pub enum MaceContextExposureRejectV1 {
     InvalidAdmissionStatus, DuplicateDeniedEvidence, DeniedEvidenceExposed,
     InvalidResponseBinding, InvalidSignatureAlgorithm, InvalidSignatureEncoding,
     InvalidObserverKeyId, UnknownObserverKey, SignatureMismatch,
+    InvalidRequestBody, UnclassifiedProviderParameterKey,
+    ProviderParameterTypeMismatch, InvalidSpanEncoding, ExposureOutsideMessageContent,
+    ExposureRoleMismatch,
     EvidenceAdmissionRejected, MemoryExposureInNoMemoryArm,
     ObserverSigningFailed, CanonicalizationFailed,
 }
@@ -296,12 +322,166 @@ pub fn parse_and_verify_mace_context_exposure_receipt_v1(
         return Err(MaceContextExposureRejectV1::BodyDigestMismatch);
     }
 
+    verify_provider_request_contract(&receipt, &body, expected)?;
     verify_span_coverage(&receipt, &body)?;
     for exposure in &receipt.exposures {
         admission_verifier.verify_admitted_exposure(exposure, expected)
             .map_err(|_| MaceContextExposureRejectV1::EvidenceAdmissionRejected)?;
     }
     Ok(VerifiedMaceContextExposureReceiptV1 { receipt })
+}
+
+
+#[derive(Deserialize)]
+struct CapturedProviderRequestV1<'a> {
+    #[serde(borrow)]
+    model: &'a str,
+    #[serde(borrow)]
+    messages: Vec<CapturedProviderMessageV1<'a>>,
+    #[serde(flatten)]
+    parameters: CapturedProviderParametersV1,
+}
+
+struct CapturedProviderParametersV1(BTreeMap<String, serde_json::Value>);
+
+impl<'de> Deserialize<'de> for CapturedProviderParametersV1 {
+    fn deserialize<D>(deserializer: D) -> Result<Self, D::Error>
+    where
+        D: Deserializer<'de>,
+    {
+        struct ParametersVisitor;
+
+        impl<'de> Visitor<'de> for ParametersVisitor {
+            type Value = CapturedProviderParametersV1;
+
+            fn expecting(&self, formatter: &mut fmt::Formatter<'_>) -> fmt::Result {
+                formatter.write_str("a provider parameter object with unique keys")
+            }
+
+            fn visit_map<M>(self, mut map: M) -> Result<Self::Value, M::Error>
+            where
+                M: MapAccess<'de>,
+            {
+                let mut parameters = BTreeMap::new();
+                while let Some((key, value)) = map.next_entry::<String, serde_json::Value>()? {
+                    if parameters.contains_key(&key) {
+                        return Err(de::Error::custom("duplicate provider parameter key"));
+                    }
+                    parameters.insert(key, value);
+                }
+                Ok(CapturedProviderParametersV1(parameters))
+            }
+        }
+
+        deserializer.deserialize_map(ParametersVisitor)
+    }
+}
+
+#[derive(Deserialize)]
+#[serde(deny_unknown_fields)]
+struct CapturedProviderMessageV1<'a> {
+    #[serde(borrow)]
+    role: &'a str,
+    #[serde(borrow)]
+    content: &'a RawValue,
+}
+
+fn context_role_name_v1(role: MaceContextRoleV1) -> &'static str {
+    match role {
+        MaceContextRoleV1::System => "system",
+        MaceContextRoleV1::Developer => "developer",
+        MaceContextRoleV1::User => "user",
+        MaceContextRoleV1::Assistant => "assistant",
+        MaceContextRoleV1::Tool => "tool",
+    }
+}
+
+/// Independently parses the captured provider request. It recomputes the
+/// provider-parameter profile from the exact body and proves each claimed
+/// exposure range lies inside the indexed message's serialized content string.
+fn verify_provider_request_contract(
+    receipt: &MaceContextExposureReceiptV1,
+    body: &[u8],
+    expected: &MaceExpectedExposureBindingV1<'_>,
+) -> Result<(), MaceContextExposureRejectV1> {
+    let request: CapturedProviderRequestV1<'_> =
+        serde_json::from_slice(body).map_err(|_| MaceContextExposureRejectV1::InvalidRequestBody)?;
+
+    if request.model != expected.model_revision {
+        return Err(MaceContextExposureRejectV1::WrongModelRevision);
+    }
+
+    for (key, value) in &request.parameters.0 {
+        if MACE_STATIC_PROVIDER_NUMBER_PARAMETER_KEYS_V1.contains(&key.as_str()) {
+            if !value.is_number() {
+                return Err(MaceContextExposureRejectV1::ProviderParameterTypeMismatch);
+            }
+        } else if MACE_STATIC_PROVIDER_BOOLEAN_PARAMETER_KEYS_V1.contains(&key.as_str()) {
+            if !value.is_boolean() {
+                return Err(MaceContextExposureRejectV1::ProviderParameterTypeMismatch);
+            }
+        } else {
+            return Err(MaceContextExposureRejectV1::UnclassifiedProviderParameterKey);
+        }
+    }
+    let parameter_bytes = serde_json::to_vec(&request.parameters.0)
+        .map_err(|_| MaceContextExposureRejectV1::InvalidRequestBody)?;
+    let parameter_profile = sha256_hex(&parameter_bytes);
+    if parameter_profile != expected.provider_parameter_profile_sha256
+        || parameter_profile != receipt.provider_parameter_profile_sha256
+    {
+        return Err(MaceContextExposureRejectV1::WrongProviderParameterProfile);
+    }
+
+    if request.messages.is_empty() {
+        return Err(MaceContextExposureRejectV1::InvalidRequestBody);
+    }
+    let mut content_ranges = Vec::with_capacity(request.messages.len());
+    for message in &request.messages {
+        if !matches!(message.role, "system" | "developer" | "user" | "assistant" | "tool") {
+            return Err(MaceContextExposureRejectV1::InvalidRequestBody);
+        }
+        let _: String = serde_json::from_str(message.content.get())
+            .map_err(|_| MaceContextExposureRejectV1::InvalidRequestBody)?;
+        let raw = message.content.get().as_bytes();
+        if raw.len() < 2 || raw.first() != Some(&b'"') || raw.last() != Some(&b'"') {
+            return Err(MaceContextExposureRejectV1::InvalidRequestBody);
+        }
+        let body_base = body.as_ptr() as usize;
+        let raw_base = raw.as_ptr() as usize;
+        let raw_offset = raw_base
+            .checked_sub(body_base)
+            .ok_or(MaceContextExposureRejectV1::InvalidRequestBody)?;
+        let content_start = raw_offset
+            .checked_add(1)
+            .ok_or(MaceContextExposureRejectV1::InvalidRequestBody)?;
+        let content_end = raw_offset
+            .checked_add(raw.len() - 1)
+            .ok_or(MaceContextExposureRejectV1::InvalidRequestBody)?;
+        if content_end > body.len() || content_start > content_end {
+            return Err(MaceContextExposureRejectV1::InvalidRequestBody);
+        }
+        content_ranges.push((content_start as u64, content_end as u64, message.role));
+    }
+
+    for exposure in &receipt.exposures {
+        let index = usize::try_from(exposure.message_index)
+            .map_err(|_| MaceContextExposureRejectV1::InvalidRequestBody)?;
+        let (content_start, content_end, actual_role) = content_ranges
+            .get(index)
+            .copied()
+            .ok_or(MaceContextExposureRejectV1::ExposureOutsideMessageContent)?;
+        if actual_role != context_role_name_v1(exposure.context_role) {
+            return Err(MaceContextExposureRejectV1::ExposureRoleMismatch);
+        }
+        if exposure.span_start_byte < content_start
+            || exposure.span_end_byte > content_end
+            || exposure.span_start_byte >= exposure.span_end_byte
+        {
+            return Err(MaceContextExposureRejectV1::ExposureOutsideMessageContent);
+        }
+    }
+    Ok(())
 }
 
 fn verify_receipt_bindings(
@@ -474,6 +654,15 @@ fn verify_span_coverage(
         if sha256_hex(&body[start..end]) != span.exposed_span_sha256 {
             return Err(MaceContextExposureRejectV1::SpanDigestMismatch);
         }
+        // A valid memory span must begin and end at complete UTF-8 / JSON
+        // string-content boundaries. A digest over half of an escape sequence
+        // or a partial multi-byte scalar is not a valid exposed text segment.
+        let mut quoted_fragment = Vec::with_capacity(end - start + 2);
+        quoted_fragment.push(b'"');
+        quoted_fragment.extend_from_slice(&body[start..end]);
+        quoted_fragment.push(b'"');
+        serde_json::from_slice::<String>(&quoted_fragment)
+            .map_err(|_| MaceContextExposureRejectV1::InvalidSpanEncoding)?;
     }
     Ok(())
 }
@@ -589,7 +778,7 @@ mod tests {
     use super::*;
     use ed25519_dalek::{Signer, SigningKey};
 
-    const BODY: &[u8] = br#"{"messages":[{"role":"user","content":"context"}]}"#;
+    const BODY: &[u8] = br#"{"model":"model-pinned-1","messages":[{"role":"user","content":"context"}]}"#;
     const D1: &str = "1111111111111111111111111111111111111111111111111111111111111111";
     const D2: &str = "2222222222222222222222222222222222222222222222222222222222222222";
     const D3: &str = "3333333333333333333333333333333333333333333333333333333333333333";
@@ -640,17 +829,39 @@ mod tests {
     }
     fn hash(bytes: &[u8]) -> String { sha256_hex(bytes) }
 
+    fn refresh_body_binding(
+        receipt: &mut MaceContextExposureReceiptV1,
+        body: &[u8],
+        key: &SigningKey,
+    ) {
+        receipt.capture.provider_request_body_sha256 = hash(body);
+        receipt.capture.provider_request_body_bytes = body.len() as u64;
+        receipt.capture.request_body_artifact.plaintext_sha256 = hash(body);
+        receipt.capture.request_body_artifact.plaintext_bytes = body.len() as u64;
+        let digest = exposure_signature_digest_v1(receipt).unwrap();
+        receipt.signature.signature_base64 = BASE64_STANDARD.encode(key.sign(&digest).to_bytes());
+    }
+
     fn expected() -> MaceExpectedExposureBindingV1<'static> {
+        expected_with_parameter_profile(
+            "44136fa355b3678a1146ad16f7e8649e94fb4fc21fe77e8310c060f61caaff8a"
+        )
+    }
+
+    fn expected_with_parameter_profile(
+        profile: &str,
+    ) -> MaceExpectedExposureBindingV1<'_> {
         MaceExpectedExposureBindingV1 {
             run_id: "run-1", pair_block_id: "pair-1", world_cluster_id: "cluster-1",
             query_id: "query-1", arm: MaceMemoryArmV1::ConventionalRetrieval,
             invocation_sequence: 0, decision_need_sha256: D1, candidate_policy_sha256: D2,
             source_registry_root_sha256: D3, lineage_profile_sha256: D4,
             lifecycle_profile_sha256: D5, renderer_profile_sha256: D6,
-            transport_adapter_profile_sha256: D7, provider_parameter_profile_sha256: "44136fa355b3678a1146ad16f7e8649e94fb4fc21fe77e8310c060f61caaff8a", model_revision: "model-pinned-1",
-            clock_profile_sha256: D8, observer_profile_sha256: D9,
-            storage_profile_sha256: D1, encryption_profile_sha256: D2,
-            access_policy_sha256: D3, retention_policy_sha256: D4,
+            transport_adapter_profile_sha256: D7, provider_parameter_profile_sha256: profile,
+            model_revision: "model-pinned-1", clock_profile_sha256: D8,
+            observer_profile_sha256: D9, storage_profile_sha256: D1,
+            encryption_profile_sha256: D2, access_policy_sha256: D3,
+            retention_policy_sha256: D4,
         }
     }
     fn fixture() -> (MaceContextExposureReceiptV1, SigningKey, Vec<u8>) {
@@ -853,6 +1064,196 @@ mod tests {
         assert_eq!(
             verify_fixture(&receipt, body, &key, &expected(), &AcceptEvidence).unwrap_err(),
             MaceContextExposureRejectV1::WrongProviderParameterProfile
+        );
+    }
+
+    #[test]
+    fn recomputes_parameter_profile_from_exact_request_body() {
+        let (mut receipt, key, _) = fixture();
+        let body = br#"{"model":"model-pinned-1","messages":[{"role":"user","content":"context"}],"temperature":0.7}"#;
+        refresh_body_binding(&mut receipt, body, &key);
+        assert_eq!(
+            verify_fixture(&receipt, body.to_vec(), &key, &expected(), &AcceptEvidence).unwrap_err(),
+            MaceContextExposureRejectV1::WrongProviderParameterProfile
+        );
+    }
+
+    #[test]
+    fn rejects_free_form_string_request_parameters() {
+        let (mut receipt, key, _) = fixture();
+        let body = br#"{"model":"model-pinned-1","messages":[{"role":"user","content":"context"}],"temperature":"hidden memory text"}"#;
+        refresh_body_binding(&mut receipt, body, &key);
+        assert_eq!(
+            verify_fixture(&receipt, body.to_vec(), &key, &expected(), &AcceptEvidence).unwrap_err(),
+            MaceContextExposureRejectV1::ProviderParameterTypeMismatch
+        );
+    }
+
+    #[test]
+    fn rejects_nested_request_parameter_objects() {
+        let (mut receipt, key, _) = fixture();
+        let body = br#"{"model":"model-pinned-1","messages":[{"role":"user","content":"context"}],"temperature":{"nested":"hidden dynamic text"}}"#;
+        refresh_body_binding(&mut receipt, body, &key);
+        assert_eq!(
+            verify_fixture(&receipt, body.to_vec(), &key, &expected(), &AcceptEvidence).unwrap_err(),
+            MaceContextExposureRejectV1::ProviderParameterTypeMismatch
+        );
+    }
+
+    #[test]
+    fn rejects_unclassified_provider_parameter_names() {
+        let (mut receipt, key, _) = fixture();
+        let body = br#"{"model":"model-pinned-1","messages":[{"role":"user","content":"context"}],"instructions":true}"#;
+        refresh_body_binding(&mut receipt, body, &key);
+        assert_eq!(
+            verify_fixture(&receipt, body.to_vec(), &key, &expected(), &AcceptEvidence).unwrap_err(),
+            MaceContextExposureRejectV1::UnclassifiedProviderParameterKey
+        );
+    }
+
+    #[test]
+    fn accepts_recomputed_allowlisted_numeric_and_boolean_parameters() {
+        let (mut receipt, key, _) = fixture();
+        let body = br#"{"model":"model-pinned-1","messages":[{"role":"user","content":"context"}],"stream":true,"temperature":0.2}"#;
+        let mut parameters = BTreeMap::new();
+        parameters.insert("stream".to_owned(), serde_json::Value::Bool(true));
+        parameters.insert("temperature".to_owned(), serde_json::json!(0.2));
+        let profile = hash(&serde_json::to_vec(&parameters).unwrap());
+        receipt.provider_parameter_profile_sha256 = profile.clone();
+        refresh_body_binding(&mut receipt, body, &key);
+        let bound = expected_with_parameter_profile(&profile);
+        assert!(
+            verify_fixture(&receipt, body.to_vec(), &key, &bound, &AcceptEvidence).is_ok()
+        );
+    }
+
+    #[test]
+    fn verifies_escaped_unicode_content_offsets_against_raw_request() {
+        let (mut receipt, key, _) = fixture();
+        let body = br#"{"model":"model-pinned-1","messages":[{"role":"user","content":"prefix 😀 \"quoted\" line\ncontext"}]}"#;
+        let needle = b"context";
+        let start = body.windows(needle.len()).position(|window| window == needle).unwrap() as u64;
+        receipt.exposures[0].span_start_byte = start;
+        receipt.exposures[0].span_end_byte = start + needle.len() as u64;
+        receipt.exposures[0].exposed_span_sha256 = hash(needle);
+        refresh_body_binding(&mut receipt, body, &key);
+        assert!(
+            verify_fixture(&receipt, body.to_vec(), &key, &expected(), &AcceptEvidence).is_ok()
+        );
+    }
+
+    #[test]
+    fn rejects_span_that_splits_a_json_escape_sequence() {
+        let (mut receipt, key, _) = fixture();
+        let body = br#"{"model":"model-pinned-1","messages":[{"role":"user","content":"prefix\ncontext"}]}"#;
+        let escape_start = body.windows(2).position(|window| window == b"\\n").unwrap() as u64;
+        receipt.exposures[0].span_start_byte = escape_start;
+        receipt.exposures[0].span_end_byte = escape_start + 1;
+        receipt.exposures[0].exposed_span_sha256 = hash(b"\\");
+        refresh_body_binding(&mut receipt, body, &key);
+        assert_eq!(
+            verify_fixture(&receipt, body.to_vec(), &key, &expected(), &AcceptEvidence).unwrap_err(),
+            MaceContextExposureRejectV1::InvalidSpanEncoding
+        );
+    }
+
+    #[test]
+    fn rejects_span_that_splits_a_utf8_scalar() {
+        let (mut receipt, key, _) = fixture();
+        let body = br#"{"model":"model-pinned-1","messages":[{"role":"user","content":"prefix 😀 context"}]}"#;
+        let emoji_start = body.windows(4).position(|window| window == "😀".as_bytes()).unwrap() as u64;
+        receipt.exposures[0].span_start_byte = emoji_start + 1;
+        receipt.exposures[0].span_end_byte = emoji_start + 2;
+        receipt.exposures[0].exposed_span_sha256 =
+            hash(&body[(emoji_start + 1) as usize..(emoji_start + 2) as usize]);
+        refresh_body_binding(&mut receipt, body, &key);
+        assert_eq!(
+            verify_fixture(&receipt, body.to_vec(), &key, &expected(), &AcceptEvidence).unwrap_err(),
+            MaceContextExposureRejectV1::InvalidSpanEncoding
+        );
+    }
+
+    #[test]
+    fn rejects_duplicate_top_level_model_members() {
+        let (mut receipt, key, _) = fixture();
+        let body = br#"{"model":"model-pinned-1","model":"model-pinned-1","messages":[{"role":"user","content":"context"}]}"#;
+        refresh_body_binding(&mut receipt, body, &key);
+        assert_eq!(
+            verify_fixture(&receipt, body.to_vec(), &key, &expected(), &AcceptEvidence).unwrap_err(),
+            MaceContextExposureRejectV1::InvalidRequestBody
+        );
+    }
+
+    #[test]
+    fn rejects_duplicate_top_level_message_members() {
+        let (mut receipt, key, _) = fixture();
+        let body = br#"{"model":"model-pinned-1","messages":[{"role":"user","content":"context"}],"messages":[{"role":"user","content":"other"}]}"#;
+        refresh_body_binding(&mut receipt, body, &key);
+        assert_eq!(
+            verify_fixture(&receipt, body.to_vec(), &key, &expected(), &AcceptEvidence).unwrap_err(),
+            MaceContextExposureRejectV1::InvalidRequestBody
+        );
+    }
+
+    #[test]
+    fn rejects_duplicate_provider_parameter_members() {
+        let (mut receipt, key, _) = fixture();
+        let body = br#"{"model":"model-pinned-1","messages":[{"role":"user","content":"context"}],"temperature":0.2,"temperature":0.9}"#;
+        refresh_body_binding(&mut receipt, body, &key);
+        assert_eq!(
+            verify_fixture(&receipt, body.to_vec(), &key, &expected(), &AcceptEvidence).unwrap_err(),
+            MaceContextExposureRejectV1::InvalidRequestBody
+        );
+    }
+
+    #[test]
+    fn rejects_untracked_message_fields() {
+        let (mut receipt, key, _) = fixture();
+        let body = br#"{"model":"model-pinned-1","messages":[{"role":"user","content":"context","metadata":"hidden"}]}"#;
+        refresh_body_binding(&mut receipt, body, &key);
+        assert_eq!(
+            verify_fixture(&receipt, body.to_vec(), &key, &expected(), &AcceptEvidence).unwrap_err(),
+            MaceContextExposureRejectV1::InvalidRequestBody
+        );
+    }
+
+    #[test]
+    fn rejects_model_selector_in_body_that_differs_from_pinned_revision() {
+        let (mut receipt, key, _) = fixture();
+        let body = br#"{"model":"model-pinned-2","messages":[{"role":"user","content":"context"}]}"#;
+        refresh_body_binding(&mut receipt, body, &key);
+        assert_eq!(
+            verify_fixture(&receipt, body.to_vec(), &key, &expected(), &AcceptEvidence).unwrap_err(),
+            MaceContextExposureRejectV1::WrongModelRevision
+        );
+    }
+
+    #[test]
+    fn rejects_exposure_span_outside_the_indexed_message_content() {
+        let (mut receipt, key, body) = fixture();
+        let needle = b"model-pi";
+        let start = body.windows(needle.len()).position(|w| w == needle).unwrap() as u64;
+        receipt.exposures[0].span_start_byte = start;
+        receipt.exposures[0].span_end_byte = start + needle.len() as u64;
+        receipt.exposures[0].exposed_span_sha256 =
+            hash(&body[start as usize..(start as usize + needle.len())]);
+        let digest = exposure_signature_digest_v1(&receipt).unwrap();
+        receipt.signature.signature_base64 = BASE64_STANDARD.encode(key.sign(&digest).to_bytes());
+        assert_eq!(
+            verify_fixture(&receipt, body, &key, &expected(), &AcceptEvidence).unwrap_err(),
+            MaceContextExposureRejectV1::ExposureOutsideMessageContent
+        );
+    }
+
+    #[test]
+    fn rejects_exposure_role_mismatch_with_request_message() {
+        let (mut receipt, key, body) = fixture();
+        receipt.exposures[0].context_role = MaceContextRoleV1::Developer;
+        let digest = exposure_signature_digest_v1(&receipt).unwrap();
+        receipt.signature.signature_base64 = BASE64_STANDARD.encode(key.sign(&digest).to_bytes());
+        assert_eq!(
+            verify_fixture(&receipt, body, &key, &expected(), &AcceptEvidence).unwrap_err(),
+            MaceContextExposureRejectV1::ExposureRoleMismatch
         );
     }
 

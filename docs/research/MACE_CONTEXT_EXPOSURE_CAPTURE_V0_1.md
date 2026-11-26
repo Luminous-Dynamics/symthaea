@@ -14,7 +14,7 @@ Crate export:
 
 ## What is implemented
 
-- A provider-neutral request model with a pinned model selector, deterministic static provider parameters, ordered messages and typed content segments. Provider parameters are restricted to scalar strings, numbers and booleans; nested objects/arrays are rejected until provider-specific leaf source maps exist. The exact sorted parameter map is hashed and compared with an independently pinned run-manifest profile before artifact storage or transport.
+- A provider-neutral request model with a pinned model selector, deterministic static provider parameters, ordered messages and typed content segments. The generic parameter map permits only a fixed field/type allowlist: numeric `temperature`, `top_p`, `frequency_penalty`, `presence_penalty`, `max_tokens`, `max_completion_tokens`, `seed`, `n`, `top_logprobs`; boolean `stream`, `logprobs`, `parallel_tool_calls`. Unknown keys, wrong types, free-form strings, nested objects and arrays are rejected. The exact sorted parameter map is hashed and compared with an independently pinned run-manifest profile before artifact storage or transport.
 - Each segment is either non-memory content or memory content with canonical evidence identity, payload digest, exposure kind, parent IDs, dependency closure, transformation, source, authority, admissibility and current-lifecycle commitments.
 - A deterministic JSON serializer that writes the request exactly once.
 - UTF-8 byte offsets are captured while serializing each typed memory-origin segment. It does not search the final prompt for repeated strings or use pre-serialization character offsets.
@@ -29,7 +29,7 @@ The returned request body is sent through the transport without a second seriali
 
 ## Authored tests (not executed)
 
-Eight deterministic tests cover:
+Ten deterministic tests cover:
 1. UTF-8/Unicode plus quote, backslash and newline escaping with exact offsets.
 2. Repeated identical memory strings from distinct evidence IDs retaining distinct offsets.
 3. Full fake-transport → artifact commitment → observer signing → consumer verifier round trip, including same-request-byte digest binding.
@@ -43,9 +43,9 @@ Tests use a fake artifact writer whose ciphertext digest is a test commitment ov
 
 ## Provider parameter boundary
 
-The generic request model no longer accepts arbitrary `serde_json::Value` trees. Its provider parameter map is a typed scalar-only map (`String`, `Number`, `Bool`) so nested metadata, instruction objects, tool descriptions/schemas and opaque dynamic payloads cannot bypass the message source map. Provider adapters that need structured fields must expose source-aware typed leaves rather than reintroducing an unclassified JSON passthrough.
+The generic request model no longer accepts arbitrary `serde_json::Value` trees. Its provider parameter map is a typed numeric/boolean-only map with explicit field/type allowlisting so nested metadata, instruction objects, tool descriptions/schemas and opaque dynamic payloads cannot bypass the message source map. Provider adapters that need structured fields must expose source-aware typed leaves rather than reintroducing an unclassified JSON passthrough.
 
-The canonical JSON encoding of the sorted scalar map is hashed as `provider_parameter_profile_sha256`. The digest is pinned independently in the run manifest, included in the signed receipt and checked by the consumer verifier. Any parameter changes during a run—including the no-memory arm—make the invocation non-qualifiable.
+The canonical JSON encoding of the sorted numeric/boolean map is hashed as `provider_parameter_profile_sha256`. The digest is pinned independently in the run manifest, included in the signed receipt and checked by the consumer verifier. Any parameter changes during a run—including the no-memory arm—make the invocation non-qualifiable.
 
 This profile is a fixed-configuration commitment, not proof of source authority. Values must be declared static non-memory experiment configuration before the run. Dynamic session, user, tool, cached or memory-derived content must be expressed through the typed source-aware content path, never stored in this static profile. If that invariant cannot be established by the renderer/provider adapter, qualification must fail closed.
 
