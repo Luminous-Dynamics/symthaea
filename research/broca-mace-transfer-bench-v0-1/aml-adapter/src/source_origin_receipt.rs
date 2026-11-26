@@ -157,6 +157,11 @@ impl VerifiedSourceOriginSetV1 {
             return Err(SourceOriginRejectV1::MissingReceipt);
         }
         for item in &self.receipts {
+            if graph.authority_key_ids().iter()
+                .any(|key| key == &item.receipt.key_id)
+            {
+                return Err(SourceOriginRejectV1::SharedAuthority);
+            }
             let node = graph.node_bindings().iter()
                 .find(|node| node.evidence_id == item.receipt.evidence_id)
                 .ok_or(SourceOriginRejectV1::UnexpectedReceipt)?;
@@ -228,7 +233,7 @@ pub fn verify_source_origin_bundle_v1(
         verified.push(item);
     }
 
-    if by_id.keys().any(|id| !graph.node_bindings().iter().any(|node| node.evidence_id == **id)) {
+    if by_id.keys().any(|id| !graph.node_bindings().iter().any(|node| node.evidence_id.as_str() == *id)) {
         return Err(SourceOriginRejectV1::UnexpectedReceipt);
     }
     verified.sort_by(|a, b| a.receipt.evidence_id.cmp(&b.receipt.evidence_id));
