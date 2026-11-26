@@ -565,7 +565,7 @@ fn parse_lineage_predicate(value: &Value) -> Result<SourceLineageReceiptV1, Sour
         || receipt.requirement_id.len() > 256
         || receipt.issued_at_unix >= receipt.expires_at_unix
         || receipt.source_node_count == 0
-        || receipt.source_node_count > 10_000_000
+        || receipt.source_node_count > 100_000
         || receipt.dependency_edge_count > 100_000_000
         || receipt.unresolved_ancestor_count != 0
     {
