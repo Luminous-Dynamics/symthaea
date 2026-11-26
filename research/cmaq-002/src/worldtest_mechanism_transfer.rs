@@ -17,7 +17,7 @@ use std::fmt;
 use super::worldtest_query_portfolio::{
     QueryFamily, TaskDisposition, WorldTestPortfolioContext, WorldTestPortfolioError,
     WorldTestPortfolioInput, WorldTestQueryPortfolioCertificate, WorldTestQueryTask,
-    evaluate_worldtest_query_portfolio,
+    WORLDTEST_PORTFOLIO_QUERY_FAMILY_COUNT, evaluate_worldtest_query_portfolio,
 };
 
 pub const WORLDTEST_MECHANISM_CONDITION_COUNT: usize = 5;
