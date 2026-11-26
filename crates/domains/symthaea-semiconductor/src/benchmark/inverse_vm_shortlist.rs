@@ -57,6 +57,7 @@ pub enum CandidateScreenReasonV1 {
     HistoricalSupportDistanceNonFinite,
     HistoricalSupportOutsideEnvelope,
     DuplicateSupportNeighbour,
+    InvalidSupportNeighbourId,
     ForwardModelDigestMismatch,
     ForwardEvidenceUnknown,
     ForwardEvidenceRejected,
@@ -465,6 +466,10 @@ fn screen_candidate(
                 reasons.push(CandidateScreenReasonV1::DuplicateSupportNeighbour);
                 state = CandidateScreenStateV1::Rejected;
             }
+            if support.neighbour_ids.iter().any(|neighbour_id| neighbour_id.trim().is_empty()) {
+                reasons.push(CandidateScreenReasonV1::InvalidSupportNeighbourId);
+                state = CandidateScreenStateV1::Rejected;
+            }
             if support.neighbour_ids.len() < policy.minimum_support_neighbours {
                 reasons.push(CandidateScreenReasonV1::HistoricalSupportCountInsufficient);
                 if state != CandidateScreenStateV1::Rejected {
@@ -653,8 +658,11 @@ fn build_shortlist(
             };
             let selected_score = base_score - diversity_bonus;
             let replace = best.as_ref().is_none_or(|(best_id, best_score)| {
-                selected_score < *best_score
-                    || (selected_score == *best_score && candidate_id < best_id)
+                match selected_score.total_cmp(best_score) {
+                    std::cmp::Ordering::Less => true,
+                    std::cmp::Ordering::Equal => candidate_id < best_id,
+                    std::cmp::Ordering::Greater => false,
+                }
             });
             if replace {
                 best = Some((candidate_id.clone(), selected_score));
@@ -733,16 +741,16 @@ pub fn evaluate_inverse_vm_shortlist_v1(
     }
     validate_policy(&input.policy)?;
 
-    if !input.policy.recipe_constraints_complete || !input.policy.side_constraints_complete {
-        return unknown_report(input, CandidateScreenReasonV1::ConstraintSourceUnavailable);
-    }
-
     let mut candidate_ids = BTreeSet::new();
     for candidate in &input.candidates {
         require_text(&candidate.candidate_id, "candidate.candidate_id")?;
         if !candidate_ids.insert(candidate.candidate_id.as_str()) {
             return Err(InverseVmShortlistErrorV1("duplicate candidate ID".into()));
         }
+    }
+
+    if !input.policy.recipe_constraints_complete || !input.policy.side_constraints_complete {
+        return unknown_report(input, CandidateScreenReasonV1::ConstraintSourceUnavailable);
     }
 
     let knob_constraints: BTreeMap<String, RecipeKnobConstraintV1> = input
@@ -966,7 +974,7 @@ mod tests {
 
     #[test]
     fn uncertainty_interval_crossing_target_or_side_constraint_is_rejected() {
-        let mut wide_target = candidate("wide", 200.0, 50.0, (97.0, 101.0), 0.2);
+        let wide_target = candidate("wide", 200.0, 50.0, (97.0, 101.0), 0.2);
         wide_target.candidate_evidence_sha256 = candidate_digest(&wide_target).unwrap();
         let input = input(vec![wide_target]);
         let report = evaluate_inverse_vm_shortlist_v1(&input).unwrap();
@@ -994,6 +1002,20 @@ mod tests {
         let report = evaluate_inverse_vm_shortlist_v1(&input(vec![candidate])).unwrap();
         assert_eq!(report.evaluations[0].state, CandidateScreenStateV1::Unknown);
         assert!(report.top_k_candidate_ids.is_empty());
+    }
+
+    #[test]
+    fn malformed_support_neighbour_id_is_rejected() {
+        let mut candidate = candidate("bad-support-id", 200.0, 50.0, (99.0, 101.0), 0.2);
+        candidate.historical_support.as_mut().unwrap().neighbour_ids[0] = " ".into();
+        candidate.candidate_evidence_sha256 = candidate_digest(&candidate).unwrap();
+        let report = evaluate_inverse_vm_shortlist_v1(&input(vec![candidate])).unwrap();
+        assert_eq!(report.evaluations[0].state, CandidateScreenStateV1::Rejected);
+        assert!(
+            report.evaluations[0]
+                .reasons
+                .contains(&CandidateScreenReasonV1::InvalidSupportNeighbourId)
+        );
     }
 
     #[test]
