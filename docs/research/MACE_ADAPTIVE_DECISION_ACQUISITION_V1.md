@@ -206,6 +206,22 @@ Run external suites unchanged as complementary evaluation:
 - [MEMORA-Bench](https://aclanthology.org/2026.findings-emnlp.1211/) for embodied memory and prospective planning from egocentric video.
 - [MEMOBench](https://aclanthology.org/2026.findings-emnlp.333/) for process-level storage, update and compression during robotic manipulation.
 
+### AML parity ladder for MACE (targets, not results)
+
+The latest official Cycle 2 results published on November 19, 2026 report these track leaders:
+
+| Track | Open-source leader | Commercial leader | Stage 1: open-source leader +5 points | Stretch: commercial leader +1 point |
+|---|---:|---:|---:|---:|
+| Textual | Resurface 61.22 | MemoraX 69.26 | ≥66.22 | ≥70.26 |
+| Multimodal | Khipu 43.26 | MemoraX 53.68 | ≥48.26 | ≥54.68 |
+| Coding | InsightMem 63.33% | MemoraX 68.00% | ≥68.33% | ≥69.00% |
+
+For Coding, the margins are percentage points. Keep each track's official denominator, grader, model, API limits, and cost reporting unchanged. The stretch goal is deliberately beyond the current commercial leader, but must be reached in a fresh official evaluation rather than inferred from the paper's internal benchmark.
+
+For the textual capability sub-scores, MACE should first target parity with the commercial leader on Streaming (63.11), Temporal & Event Sequencing (67.05), Personalization & Care (54.70), and Epistemic Safety & Privacy (81.98). A stretch gate is at least +1 point over each of those values under the official harness. Also track governance, explicit fact recall, relational reasoning and in-context workflow execution; improving one capability must not conceal regression in another.
+
+MACE has no published AML score yet. These are a staged target ladder, not a claim of parity or superiority. If the official Cycle 3 schedule is not yet published, use the public Cycle 2 harness for reproducible development runs and wait for an official announcement before promising a Cycle 3 submission.
+
 These suites measure different capabilities. Publish one scorecard per official benchmark and a separate adaptive-decision-assurance scorecard. Do not average their scores or claim that a high recall score establishes decision quality, provenance integrity or action safety.
 
 ## 8. Research hypotheses and ablations
