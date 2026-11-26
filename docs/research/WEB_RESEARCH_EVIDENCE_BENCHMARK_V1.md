@@ -44,6 +44,7 @@ The following are reference points from their benchmark owners or published sour
 - AI Index 2026 AstaBench summary: https://hai.stanford.edu/assets/files/ai_index_report_2026_chapter_5_science.pdf
 - ScienceAgentBench: https://hal.cs.princeton.edu/scienceagentbench
 - Autonomous Science Bench: https://asb.open-ssi.org/about
+- FrontierPhysics paper and current monitored scoreboard: https://arxiv.org/abs/2611.06910 and https://www.mypriors.com/benchmarks/frontierphysics
 
 ## 2A. November 2026 research-agent benchmark refresh
 
@@ -57,6 +58,7 @@ The broader field has moved beyond report generation and code execution. The add
 | AutoSciBench | Generated tasks reduced mean solver accuracy by 22.4 percentage points in computational biology and 25.5 points in materials science relative to the starting human-curated benchmarks | Demonstrates a practical route to adversarially harden task recipes as agents learn shortcuts; benchmark maintenance itself becomes an adaptive process | Generator/judge quality and leakage controls still need independent audit; never let the candidate see the hidden recipe or gold answer |
 | benchmarks.bio | V1 snapshot updated 25 Nov 2026: 13 capability benchmarks and 23 separate leaderboards; top listed aggregate configuration is Claude Opus 5.5 with Pi at 58.0% and $4.82/run | Offers a focused life-science execution/cost comparison beyond one general scientific-agent score | V1 scoring is explicitly not directly comparable with historical V0; the aggregate omits some missing scores and is domain-specific |
 | Autonomous Science Bench 0.1 | Six live-lab workflow tasks; current public pilot board lists GPT-6 Astra/Codex at 72.2%, $190.23 and 557 agent minutes | Remains the physical execution track: campaign design, measurement feedback and final held-out ranking must all succeed | Six tasks are a pilot; totals are for the configuration, not cost/time per task |
+| FrontierPhysics | 56 end-to-end physics tasks from 42 physicists across nine domains; current monitored board snapshot lists Pass@1 up to 33.3% and Pass@3 up to 44.6% | Measures complete physics research: literature, planning, computational/experimental work and a manuscript, using deterministic verifiers plus mandatory rubric items | Keep Pass@1, Pass@3, verifier-only pass and rubric score separate; never mix leaderboard/harness snapshots |
 
 Primary sources:
 - ASI-Bench task set and leaderboard snapshot: https://asibench.apexin.ai/
@@ -214,11 +216,12 @@ These are project targets, not achieved results or external standards.
 | ASI-Bench | Stretch target ≥70/100 on the exact 60-task release and same B1–B4 guidance protocol; obtain/pin the exact scored task-set ID before a leaderboard comparison |
 | TruthInsightBench | Stretch target ≥70/100 on the same 40 blind tasks; publish all six evidence-maturity dimensions, artifact-grounded items and task-clustered confidence intervals |
 | Autonomous Science Bench 0.1 | Stretch target ≥80% full-system resolution on the same six pilot workflows, with total campaign cost and agent time each no higher than the current published leader; this is a pilot-sized target, not a general-lab claim |
+| FrontierPhysics | Stretch target ≥40% Pass@1 and ≥55% Pass@3 on the same frozen task/harness version; report verifier-only pass and weighted rubric score separately |
 | Scientist–auditor collaboration | Demonstrate positive paired gain in valid errors found per human-review hour over manual-only review; require independent replay and expert-adjudicated precision/recall (see [#13818](https://github.com/Luminous-Dynamics/symthaea/issues/13818)) |
 | Citation integrity | Target ≥95% citation accuracy on a frozen gold subset; effective-citation count alone is not sufficient |
 | Resource quality | Report cost and latency Pareto fronts; no unqualified composite score |
 
-A ≥70% DeepResearch Bench II target is only meaningful on the same frozen task set and judge version. The page currently states the judge changed to GPT-5.5 and the leaderboard migrated, so do not compare an old-page 64.38 directly with a new-jury score without a controlled bridge evaluation.
+ASI-Bench advertises a public 60-task seed42 catalog, but its leaderboard methodology says the scored task-set identifier was not supplied; require that exact identifier or label a public-catalog run exploratory. FrontierPhysics targets are stretch targets above current monitored scores and must be evaluated on the exact same task/harness snapshot. A ≥70% DeepResearch Bench II target is only meaningful on the same frozen task set and judge version. The page currently states the judge changed to GPT-5.5 and the leaderboard migrated, so do not compare an old-page 64.38 directly with a new-jury score without a controlled bridge evaluation.
 
 ## 7. Composition with existing Symthaea work
 
