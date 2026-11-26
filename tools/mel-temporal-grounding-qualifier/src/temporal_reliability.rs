@@ -1529,9 +1529,11 @@ mod tests {
         assert_eq!(pair.exact_occurrence_count_agreement, Some(true));
         assert_eq!(pair.interval_f1_symmetric, Some(1.0));
         assert!(pair.matched_iou_symmetric.unwrap() < 1.0);
-        // The symmetric MAE pools both directional comparisons: one side
-        // contributes 25 ms and the reverse side contributes 0 ms.
-        assert_eq!(pair.start_boundary_abs_errors_ms, vec![0.0, 25.0]);
+        // Each direction emits one error per reference interval: two
+        // non-matching boundaries at 25 ms and two exact boundaries at 0 ms.
+        let mut errors = pair.start_boundary_abs_errors_ms.clone();
+        errors.sort_by(f64::total_cmp);
+        assert_eq!(errors, vec![0.0, 0.0, 25.0, 25.0]);
         assert_eq!(pair.start_boundary_mae_ms, Some(12.5));
     }
 
