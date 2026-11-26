@@ -168,3 +168,10 @@ The `decision_value_retrieval` module scores candidate evidence-gathering operat
 The selector chooses the highest positive net-value option; when no option has positive value it returns no query (stop/abstain). The result is not an action permit and does not promote a retrieval strategy. The existing retrieval-policy promotion path still requires independently qualified outcome evidence and held-out counterfactual qualification.
 
 Protocol: [MACE Decision-Value Retrieval V1](../../../docs/research/MACE_DECISION_VALUE_RETRIEVAL_V1.md). The calibration/resource verifier traits are interfaces; no issuer or resource-meter service is deployed. Tests are authored but not executed.
+
+
+## Adaptive decision acquisition research
+
+The next research proposal defines a bounded, history-conditioned policy DAG for multi-step evidence acquisition. Unlike the current one-query EVSI/robust evaluator, an adaptive policy can choose a follow-up source based on the previous observation, preserve contradictory evidence, account for shared source roots, and stop or defer under explicit budget and lifecycle constraints. The policy contract is a research schema; this crate does not yet execute adaptive policies.
+
+Protocol: [MACE Adaptive Decision Acquisition V1](../../../docs/research/MACE_ADAPTIVE_DECISION_ACQUISITION_V1.md). Schema: [mace_adaptive_decision_policy_v1.schema.json](../../../data/schemas/mace_adaptive_decision_policy_v1.schema.json).
