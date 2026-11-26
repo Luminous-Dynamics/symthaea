@@ -1,0 +1,54 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "title": "Symthaea Scientific Discovery Prediction Compiler",
+  "type": "object",
+  "required": [
+    "schema",
+    "schema_version",
+    "authority",
+    "non_equivalences",
+    "compilation_invariants"
+  ],
+  "properties": {
+    "schema": {
+      "const": "symthaea.scientific_discovery.prediction_compiler"
+    },
+    "schema_version": {
+      "const": "1.0.0"
+    },
+    "authority": {
+      "const": "prospective_planning_only"
+    },
+    "non_equivalences": {
+      "type": "array",
+      "items": {
+        "type": "string"
+      }
+    },
+    "compilation_invariants": {
+      "type": "array",
+      "items": {
+        "type": "string"
+      }
+    }
+  },
+  "additionalProperties": false,
+  "authority": "prospective_planning_only",
+  "non_equivalences": [
+    "prediction declaration is not an observation",
+    "outcome predicate is not an observed outcome",
+    "prospective commitment is not experimental validation",
+    "falsifier linkage must be explicit; it is never inferred",
+    "model agreement is not independent corroboration",
+    "compiler output cannot satisfy an official challenge criterion"
+  ],
+  "compilation_invariants": [
+    "source payload identity is preserved",
+    "prediction identity is deterministically bound to claim, prediction, falsifier, predicates, mechanism and provenance",
+    "knowledge and exposure cutoffs are paired and exposure cannot precede knowledge",
+    "duplicate prediction identities are rejected",
+    "duplicate falsifier bindings are rejected",
+    "unknown falsifiers are rejected",
+    "no observation, replication, or official-criterion evidence type is constructible by this module"
+  ]
+}
