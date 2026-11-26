@@ -2,7 +2,7 @@
 
 A read-only Rust semantic verifier for SAT benchmark-augmentation evidence graphs.
 
-This crate is deliberately narrower than a full SAT qualifier. It verifies:
+This crate is deliberately narrower than a full SAT qualifier. Its report exposes `graph_integrity_passed`; this is not a generic system-verification or safety verdict. It verifies:
 - strict restricted-JSON parsing (duplicate keys, floats and unsafe integers rejected);
 - unique observation and claim identities;
 - evidence-reference closure;
@@ -10,7 +10,8 @@ This crate is deliberately narrower than a full SAT qualifier. It verifies:
 - agreement between each claim's `depends_on` set and its typed `depends_on` edges;
 - acyclicity of the dependency subgraph;
 - conservative admissibility requirements for claims marked `supported`;
-- deterministic graph normalization and the domain-separated evidence-graph root.
+- deterministic graph normalization and the domain-separated evidence-graph root;
+- the v0.1 vocabularies for observation kinds, source roles, claim types/states and edge relations.
 
 It does **not** perform complete JSON Schema Draft 2020-12 validation, verify signatures, fetch evidence artifacts, authenticate issuers, prove witness independence, validate external sink truth, or qualify a system. Those remain separate controls.
 
@@ -50,7 +51,7 @@ Observations and claims are sorted by their IDs using UTF-16 code-unit ordering.
 
 Input is capped at 32 MiB, 100,000 observations, 100,000 claims and 250,000 claim edges; dependency cycles use iterative topological processing rather than recursive traversal. Full JSON Schema validation must be performed separately before semantic verification.
 
-These checks are conservative graph semantics, not universal truth conditions. Adapter-specific policies may impose stronger requirements. The verifier reports `qualification_assessed=false` unconditionally.
+These checks are conservative graph semantics, not universal truth conditions. Adapter-specific policies may impose stronger requirements. The verifier reports `json_schema_validation_performed=false` and `qualification_assessed=false` unconditionally. Validate the pinned JSON Schema separately before relying on the graph result.
 
 ## Exit codes
 
