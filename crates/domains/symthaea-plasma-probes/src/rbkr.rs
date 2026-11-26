@@ -1980,6 +1980,9 @@ mod tests {
             .enrich_from_worst_scenario(&scenarios, RbkrConfig::new(2))
             .unwrap();
         assert_eq!(receipt.scenario_id, "rare-response");
+        assert_eq!(receipt.checkpoint_sha256, "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa");
+        assert_eq!(receipt.state_coordinate_id, "vlasov-1d1v-layout-v1");
+        assert_eq!(receipt.state_metric_id, "metric-v1");
         assert_eq!(receipt.previous_order, 1);
         assert_eq!(receipt.new_order, 2);
         assert!((receipt.pre_response_residual - 1.0).abs() < 1.0e-10);
