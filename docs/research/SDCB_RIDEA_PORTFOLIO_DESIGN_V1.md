@@ -92,9 +92,9 @@ These are project targets, not achieved results:
 
 ## 7. Implementation limits
 
-The Rust reference uses the upstream-source-faithful MMD² implementation from `sdcb_ridea.rs`. It has a 64-candidate pool limit and inherits the sibling R-IDeA limits of 512 design samples and 64 dimensions.
+The Rust reference uses the upstream-source-faithful MMD² implementation from `sdcb_ridea.rs`. It has a 16-candidate pool limit, 16-step limit, 128-sample history/target bounds and 64 design dimensions.
 
-12 Rust tests are authored but not compiled or executed in this environment. The frozen fixture was independently recalculated in JavaScript; that is not a Rust run.
+14 Rust tests are authored but not compiled or executed in this environment. The frozen fixture was independently recalculated in JavaScript; that is not a Rust run.
 
 ## 8. References
 
