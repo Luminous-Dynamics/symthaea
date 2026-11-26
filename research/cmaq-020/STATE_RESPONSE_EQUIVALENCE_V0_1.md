@@ -15,6 +15,31 @@ For each evaluator-owned raw state and every key in `U × Q × T`, the evaluator
 
 The first Rust implementation deliberately uses canonical integer response units and exact finite coverage. It does not accept a candidate-supplied oracle response, discover the partition, or infer global equivalence from a finite probe set.
 
+
+## Provenance and domain qualification
+
+The executable contract now binds:
+- a validated SHA-256 for the canonical contract payload;
+- a validated SHA-256 for the source dataset/generator manifest;
+- an explicit allow-list of domain IDs.
+
+Every state record binds:
+- its domain ID;
+- environment/mechanism family ID;
+- independent environment-cluster ID;
+- exact source-state snapshot SHA-256;
+- frozen candidate checkpoint SHA-256.
+
+The record-set validator rejects:
+- a domain outside the frozen contract;
+- malformed source-state or candidate-checkpoint digests;
+- mixed candidate checkpoints in one evaluation;
+- reuse of one environment-cluster ID across different domain/family identities.
+
+The cluster ID is carried through to support #8578's cluster-level inference. A task/state row is not thereby declared an independent sample. State records from the same environment cluster may be compared descriptively, but the inferential unit remains the independently generated cluster.
+
+These fields establish identity and custody only. A SHA-256 digest does not authenticate the source publisher, prove the source data are true, or establish independent generation. Source authenticity, evaluator isolation and signed receipts remain separate gates (#9437).
+
 ## Approximate response
 
 For key `k`, normalize the absolute response difference by the contract's positive tolerance `tau_k`. Pairwise approximate equivalence is:
@@ -30,7 +55,7 @@ This relation may be non-transitive. The fixture `a=0, b=8, c=16` with tolerance
 - Candidate-assigned abstract labels.
 - False-merge and false-split counts.
 - Worst-case normalized pair distortion.
-- Strict rejection of missing/extra response cells, missing invariant fields, duplicate state IDs, invalid contracts, zero tolerances and invalid epsilon.
+- Strict rejection of missing/extra response cells, missing invariant fields, duplicate state IDs, out-of-contract domains, malformed digests, mixed candidate checkpoints, cluster/domain/family aliasing, invalid contracts, zero tolerances and invalid epsilon.
 - Deterministic test fixtures for true merges, false merges, false splits, invariant mismatch and non-transitive tolerance.
 
 The initial slice is intentionally independent of HDC/CfC model internals. Subsequent adapters will consume actual Symthaea checkpoint/state fingerprints and evaluator-side response records only after the interface and custody contract are qualified.
@@ -49,7 +74,7 @@ The evaluator now supports a deterministic, cost-aware next-counterexample selec
 
 This makes refinement cost observable instead of granting free access to the oracle's entire response table. The relative probe costs are contract inputs and must be frozen before held-out evaluation; they are not a dynamic estimate derived from the hidden response. The counterexample selector is a finite diagnostic tool, not a proof that all possible future interventions have been covered.
 
-Added deterministic tests cover: lowest-cost separating query selection, no disclosure of response values, invariant mismatch handling, ignored already-separated pairs, deterministic selection under input reordering, sequential refinement of multiple false merges, and missing/zero probe-cost rejection.
+Added deterministic tests cover: lowest-cost separating query selection, no disclosure of response values, invariant mismatch handling, ignored already-separated pairs, deterministic selection under input reordering, sequential refinement of multiple false merges, missing/zero probe-cost rejection, domain and digest validation, single-checkpoint enforcement and cluster/family consistency.
 
 
 ## External reliability anchors added to the evaluation matrix
