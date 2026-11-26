@@ -4,6 +4,7 @@ pub mod binary_metrics;
 pub mod calibration_requalification;
 pub mod dtco_manifest;
 pub mod gated_streaming_adapter;
+pub mod grape_adapter_parity;
 pub mod label_consumption_guard;
 pub mod metrology_audit;
 pub mod metrology_qualification_gate;
@@ -148,4 +149,13 @@ pub use gated_streaming_adapter::{
     StreamingPredictionReceiptV1, StreamingUpdateDispositionV1, StreamingUpdateReasonV1,
     StreamingUpdateReceiptV1, create_gated_streaming_adapter_engine_v1,
     deliver_qualified_stream_label_v1, predict_and_register_stream_sample_v1,
+};
+
+pub use grape_adapter_parity::{
+    GRAPE_ADAPTER_PARITY_SCHEMA_V1, GrapeAdapterKindV1, GrapeAdapterParityErrorV1,
+    GrapeAdapterPolicyV1, GrapeAdapterRuntimePolicyV1, GrapeAdapterRuntimeStateV1,
+    GrapeAdapterRuntimeV1, GrapeAdapterUpdateReceiptV1, GrapeContextStatsV1,
+    GrapeFeatureAdapterStateV1, GrapeHierarchicalContextStateV1,
+    GrapePredictionDecompositionV1, GrapeTemporalResidualStateV1,
+    create_grape_feature_adapter_v1, select_grape_adapter_features_v1,
 };
