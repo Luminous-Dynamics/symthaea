@@ -227,8 +227,8 @@ pub fn build_finite_horizon_gramians(
     for (step, (matrix, costs)) in past_b.iter().zip(input_costs).enumerate() {
         for input in 0..costs.len() {
             let mut direction = matrix.iter().map(|row| row[input]).collect::<Vec<_>>();
-            for transition in (step + 1)..past_a.len() {
-                direction = matrix_vector(&past_a[transition], &direction)?;
+            for transition in past_a.iter().skip(step + 1) {
+                direction = matrix_vector(transition, &direction)?;
             }
             reachability
                 .add_direction(&direction, 1.0 / costs[input])
@@ -661,16 +661,15 @@ impl ResponseBalancedBasis {
             }
         }
         let mut reduced_a = vec![vec![0.0; order]; order];
-        for (row, test) in self.test_basis.iter().enumerate() {
-            for reduced_column in 0..order {
-                reduced_a[row][reduced_column] =
-                    checked_dot(test, &matrix_column(&a_trial, reduced_column))?;
+        for (test, output_row) in self.test_basis.iter().zip(reduced_a.iter_mut()) {
+            for (reduced_column, output) in output_row.iter_mut().enumerate() {
+                *output = checked_dot(test, &matrix_column(&a_trial, reduced_column))?;
             }
         }
         let mut reduced_b = vec![vec![0.0; input_count]; order];
-        for (row, test) in self.test_basis.iter().enumerate() {
-            for input_index in 0..input_count {
-                reduced_b[row][input_index] = checked_dot(test, &matrix_column(b, input_index))?;
+        for (test, output_row) in self.test_basis.iter().zip(reduced_b.iter_mut()) {
+            for (input_index, output) in output_row.iter_mut().enumerate() {
+                *output = checked_dot(test, &matrix_column(b, input_index))?;
             }
         }
         let mut reduced_c = vec![vec![0.0; order]; output_count];
@@ -760,19 +759,21 @@ fn column_inner_product(matrix: &[Vec<f64>], left: usize, right: usize) -> Resul
 
 /// One-sided Jacobi SVD: columns of the returned matrix are orthogonal and
 /// right_vectors contains the matching right singular vectors.
+type JacobiSvdResult = (Vec<Vec<f64>>, Vec<Vec<f64>>);
+
 fn one_sided_jacobi_svd(
     mut matrix: Vec<Vec<f64>>,
     maximum_sweeps: usize,
     tolerance: f64,
-) -> Result<(Vec<Vec<f64>>, Vec<Vec<f64>>), RbkrError> {
+) -> Result<JacobiSvdResult, RbkrError> {
     let rows = matrix.len();
     let columns = matrix.first().map(Vec::len).unwrap_or(0);
     if rows == 0 || columns == 0 || matrix.iter().any(|row| row.len() != columns) {
         return Err(RbkrError::EmptyGramian);
     }
     let mut right_vectors = vec![vec![0.0; columns]; columns];
-    for index in 0..columns {
-        right_vectors[index][index] = 1.0;
+    for (index, row) in right_vectors.iter_mut().enumerate() {
+        row[index] = 1.0;
     }
 
     let mut converged = columns <= 1;
@@ -938,8 +939,8 @@ mod tests {
         let output = vec![vec![1.0, 0.0]];
         assert_eq!(
             build_finite_horizon_gramians(
-                &[identity.clone()],
-                &[input.clone()],
+                std::slice::from_ref(&identity),
+                std::slice::from_ref(&input),
                 &[vec![1.0]],
                 &[],
                 &[],
@@ -950,11 +951,11 @@ mod tests {
         );
         assert_eq!(
             build_finite_horizon_gramians(
-                &[identity.clone()],
-                &[input.clone()],
+                std::slice::from_ref(&identity),
+                std::slice::from_ref(&input),
                 &[vec![0.0]],
                 &[],
-                &[output.clone()],
+                std::slice::from_ref(&output),
                 &[vec![1.0]],
                 FiniteHorizonGramianConfig::default(),
             ),
