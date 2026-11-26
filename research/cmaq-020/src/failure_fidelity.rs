@@ -127,14 +127,9 @@ impl FailureTraceRecord {
         if !contract.domain_ids.contains(&self.domain_id) {
             return Err("failure record domain is outside the frozen contract".to_owned());
         }
-        if self.reference_policy_id.trim().is_empty() {
-            return Err("reference policy ID must be non-empty".to_owned());
-        }
         for (name, digest) in [
-            ("pair_source_manifest_sha256", &self.pair_source_manifest_sha256),
-            ("success_side_scene_sha256", &self.success_side_scene_sha256),
-            ("failure_side_scene_sha256", &self.failure_side_scene_sha256),
-            ("reference_policy_checkpoint_sha256", &self.reference_policy_checkpoint_sha256),
+            ("initial_state_sha256", &self.initial_state_sha256),
+            ("realized_action_sha256", &self.realized_action_sha256),
             ("candidate_checkpoint_sha256", &self.candidate_checkpoint_sha256),
         ] {
             if !is_sha256(digest) {
@@ -209,7 +204,6 @@ pub fn score_failure_fidelity(
 
     let mut record_ids = BTreeSet::new();
     let mut frozen_checkpoint: Option<&str> = None;
-    let mut frozen_reference_policy: Option<(&str, &str)> = None;
     let mut cluster_metadata: BTreeMap<&str, (&str, &str)> = BTreeMap::new();
     let mut boundary_groups: BTreeMap<&str, Vec<&FailureTraceRecord>> = BTreeMap::new();
     let mut score = FailureFidelityScore {
@@ -389,16 +383,20 @@ impl BoundaryRatePair {
         if self.success_side_perturbation_units == self.failure_side_perturbation_units {
             return Err("success-side and failure-side perturbations must differ".to_owned());
         }
+        if self.reference_policy_id.trim().is_empty() {
+            return Err("reference policy ID must be non-empty".to_owned());
+        }
         for (name, digest) in [
-            ("initial_state_sha256", &self.initial_state_sha256),
-            ("realized_action_sha256", &self.realized_action_sha256),
+            ("pair_source_manifest_sha256", &self.pair_source_manifest_sha256),
+            ("success_side_scene_sha256", &self.success_side_scene_sha256),
+            ("failure_side_scene_sha256", &self.failure_side_scene_sha256),
+            ("reference_policy_checkpoint_sha256", &self.reference_policy_checkpoint_sha256),
             ("candidate_checkpoint_sha256", &self.candidate_checkpoint_sha256),
         ] {
             if !is_sha256(digest) {
                 return Err(format!("{name} must be a 64-character hexadecimal digest"));
             }
         }
-
         if self.success_side_scene_sha256 == self.failure_side_scene_sha256 {
             return Err("success-side and failure-side scene digests must differ".to_owned());
         }
@@ -467,6 +465,7 @@ pub fn score_boundary_rate_pairs(
 
     let mut pair_ids = BTreeSet::new();
     let mut frozen_checkpoint: Option<&str> = None;
+    let mut frozen_reference_policy: Option<(&str, &str)> = None;
     let mut cluster_metadata: BTreeMap<&str, (&str, &str)> = BTreeMap::new();
     let threshold = contract.minimum_boundary_gap_basis_points as f64;
     let mut score = BoundaryRateFidelityScore {
@@ -611,11 +610,8 @@ mod tests {
             domain_id: "robot-manipulation-v1".to_owned(),
             environment_family_id: "contact-rich-pick-place".to_owned(),
             environment_cluster_id: cluster.to_owned(),
-            pair_source_manifest_sha256: "b".repeat(64),
-            success_side_scene_sha256: "c".repeat(64),
-            failure_side_scene_sha256: "d".repeat(64),
-            reference_policy_id: "pi05-data-50".to_owned(),
-            reference_policy_checkpoint_sha256: "f".repeat(64),
+            initial_state_sha256: "c".repeat(64),
+            realized_action_sha256: "d".repeat(64),
             candidate_checkpoint_sha256: "e".repeat(64),
             boundary_pair_id: None,
             boundary_side: None,
@@ -643,11 +639,14 @@ mod tests {
             domain_id: "robot-manipulation-v1".to_owned(),
             environment_family_id: "contact-rich-pick-place".to_owned(),
             environment_cluster_id: cluster.to_owned(),
-            perturbation_dimension_id: "position-x".to_owned(),
+            perturbation_dimension_id: "position".to_owned(),
             success_side_perturbation_units: 0,
             failure_side_perturbation_units: 2,
-            initial_state_sha256: "c".repeat(64),
-            realized_action_sha256: "d".repeat(64),
+            pair_source_manifest_sha256: "b".repeat(64),
+            success_side_scene_sha256: "c".repeat(64),
+            failure_side_scene_sha256: "d".repeat(64),
+            reference_policy_id: "pi05-data-50".to_owned(),
+            reference_policy_checkpoint_sha256: "f".repeat(64),
             candidate_checkpoint_sha256: "e".repeat(64),
             reference_success_side_successes: 10,
             reference_success_side_trials: 10,
