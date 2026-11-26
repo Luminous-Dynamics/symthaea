@@ -69,8 +69,21 @@ pub fn audit_revision_with_audio_evidence(
     if evidence_manifest.experiment_unit_id != revision_case.experiment_unit_id {
         return Err("audio evidence experiment unit differs from revision case".into());
     }
-    if evidence_manifest.source_lineage_id != revision_case.source_lineage_id {
-        return Err("audio evidence source lineage differs from revision case".into());
+    if evidence_manifest.target_source_lineage_id != revision_case.source_lineage_id {
+        return Err("audio evidence target source lineage differs from revision case".into());
+    }
+    match expected_audio_condition {
+        AudioEvidenceConditionV1::LocalRetrieved
+            if evidence_manifest.source_lineage_id != revision_case.source_lineage_id =>
+        {
+            return Err("local evidence source lineage differs from target source lineage".into());
+        }
+        AudioEvidenceConditionV1::YokedRetrieved
+            if evidence_manifest.source_lineage_id == revision_case.source_lineage_id =>
+        {
+            return Err("yoked evidence must come from a distinct source-work lineage".into());
+        }
+        _ => {}
     }
     if evidence_manifest.query_id != revision_case.truth.query_id
         || evidence_manifest.query_text != revision_case.truth.query_text
@@ -265,6 +278,7 @@ mod tests {
         manifest.evidence_condition = AudioEvidenceConditionV1::YokedRetrieved;
         manifest.source_audio.audio_sha256 = yoked_digest.clone();
         manifest.source_audio.byte_length = yoked_source.len() as u64;
+        manifest.source_lineage_id = "synthetic-yoked-source-lineage-001".into();
         manifest.context.context_manifest_sha256 =
             recompute_audio_context_manifest_sha256(&manifest).unwrap();
         case.evidence.as_mut().unwrap().source_audio_sha256 = yoked_digest;
@@ -280,6 +294,10 @@ mod tests {
         assert_ne!(
             report.audio_evidence_report.source_audio_sha256,
             report.audio_evidence_report.target_audio_sha256
+        );
+        assert_ne!(
+            report.audio_evidence_report.source_lineage_id,
+            report.audio_evidence_report.target_source_lineage_id
         );
         assert!(report.materialized_audio_bytes_bound_to_revision_case);
         assert!(!report.model_input_attested);
