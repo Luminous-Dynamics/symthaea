@@ -27,6 +27,16 @@ This is a narrow protocol seam that composes with, and does not replace:
 
 No new memory store, evidence registry, source authority, lifecycle controller, evaluator, witness service, or action authorization system is introduced.
 
+## Provider parameter origin and configuration binding
+
+The serialized request also contains provider-specific fields outside the ordinary message content (for example decoding controls, response-format selectors and tool configuration). These fields must not become an unobserved dynamic-memory channel.
+
+For v0.1, the generic parameter map is restricted to a fixed key/type allowlist: numeric `temperature`, `top_p`, `frequency_penalty`, `presence_penalty`, `max_tokens`, `max_completion_tokens`, `seed`, `n`, `top_logprobs`; boolean `stream`, `logprobs`, `parallel_tool_calls`. Unknown keys, wrong types, free-form strings, nulls, arrays and nested objects are rejected; provider-specific text-bearing or structured fields require a typed source-mapped adapter.
+
+The exact allowlisted numeric/boolean parameter map is serialized deterministically with lexicographically ordered keys. Its SHA-256 digest is recorded as `provider_parameter_profile_sha256` in the signed receipt and independently pinned in the run manifest. Capture and verification reject a mismatch. This makes request configuration immutable within a run and prevents a candidate from inserting per-invocation instructions, metadata, tool descriptions or other untracked values after the manifest is frozen.
+
+The parameter profile is a configuration commitment, not source authentication. Its values must be declared static non-memory configuration before the run. Any content derived from memory, user/session context, tool output or prior model output must use a typed source-aware content path; it must not be laundered into a static parameter map. The true no-memory arm uses the same independently pinned parameter profile and still requires zero memory-origin content in every dynamic field.
+
 ## Receipt semantics
 
 One receipt covers one model invocation. A multi-call agent trajectory emits one receipt per invocation, ordered by `invocation_sequence`, with every receipt bound to the same run, pair block, world cluster and query as appropriate.

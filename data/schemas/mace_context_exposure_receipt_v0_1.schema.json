@@ -22,6 +22,7 @@
     "lifecycle_profile_sha256",
     "renderer_profile_sha256",
     "transport_adapter_profile_sha256",
+    "provider_parameter_profile_sha256",
     "model_revision",
     "capture",
     "exposures",
@@ -80,6 +81,9 @@
       "$ref": "#/$defs/sha256"
     },
     "transport_adapter_profile_sha256": {
+      "$ref": "#/$defs/sha256"
+    },
+    "provider_parameter_profile_sha256": {
       "$ref": "#/$defs/sha256"
     },
     "model_revision": {
