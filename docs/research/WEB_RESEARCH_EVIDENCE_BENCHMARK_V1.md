@@ -184,6 +184,7 @@ A ≥70% DeepResearch Bench II target is only meaningful on the same frozen task
 - [Issue #13791](https://github.com/Luminous-Dynamics/symthaea/issues/13791): independent outcome labels; no confidence-as-correctness loop.
 - [Issue #13792](https://github.com/Luminous-Dynamics/symthaea/issues/13792): claim-specific source graph edges and evidence versions.
 - [Issue #13794](https://github.com/Luminous-Dynamics/symthaea/issues/13794): complete acquisition receipts and bounded concurrency.
+- [Issue #13800](https://github.com/Luminous-Dynamics/symthaea/issues/13800): prevent public convenience constructors from minting unprovenanced `HighConfidence` claims.
 - [PR #13665](https://github.com/Luminous-Dynamics/symthaea/pull/13665): typed public ResearchState evidence relation boundary.
 - [PR #13668](https://github.com/Luminous-Dynamics/symthaea/pull/13668): candidate-facing StateGuard B0 baseline.
 - [Issue #11171](https://github.com/Luminous-Dynamics/symthaea/issues/11171): actual production researcher integration and evaluator isolation.
