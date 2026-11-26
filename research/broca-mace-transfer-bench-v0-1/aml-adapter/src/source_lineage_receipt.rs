@@ -706,18 +706,11 @@ mod tests {
         let expected = binding(&digest);
         let envelope = signed_lineage_envelope(&expected, &signing_key);
         assert_eq!(
-            verify_source_lineage_receipts_v1(
-                panic!("qualified evidence fixture supplied by adapter tests"),
-                panic!("verified sufficiency fixture supplied by adapter tests"),
-                panic!("DecisionNeed fixture supplied by adapter tests"),
-                &[],
-                &digest,
-                &profile,
-                200,
-            ).err(),
-            Some(SourceLineageRejectV1::WrongVerifierRole)
+            verify_one_source_lineage_receipt_v1(
+                &envelope, &expected, &profile, 200,
+            ),
+            Err(SourceLineageRejectV1::WrongVerifierRole)
         );
-        let _ = envelope;
     }
 
     #[test]
