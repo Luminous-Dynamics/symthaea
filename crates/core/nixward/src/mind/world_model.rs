@@ -975,7 +975,7 @@ mod tests {
     use cmaq_020_state_response::{
         score_abstraction, ResponseKey, StateResponseContract, StateResponseRecord,
     };
-    use std::collections::{BTreeMap, BTreeSet};
+    use std::collections::BTreeMap;
 
     #[test]
     fn test_learn_and_predict() {
@@ -2377,6 +2377,9 @@ mod tests {
         let mut global_records = Vec::new();
         let mut identity_records = Vec::new();
         let mut full_state_records = Vec::new();
+        let mut hdc_exact_response_count = 0usize;
+        let mut global_exact_response_count = 0usize;
+        let mut identity_exact_response_count = 0usize;
 
         // Candidate prediction and abstraction-label construction happen before
         // evaluator-only response values are attached to the records below.
@@ -2397,10 +2400,9 @@ mod tests {
                 "the toy fixture should produce an unambiguous contextual prediction"
             );
 
-            let hdc_label = format!(
-                "coordinate_0:{}",
-                quantize_query(&hdc_prediction.predicted_state)
-            );
+            let hdc_response = quantize_query(&hdc_prediction.predicted_state);
+            hdc_exact_response_count += usize::from(hdc_response == *reference_response);
+            let hdc_label = format!("coordinate_0:{hdc_response}");
             let full_state_label = hdc_prediction
                 .predicted_state
                 .as_slice()
@@ -2411,12 +2413,14 @@ mod tests {
 
             world_model.observe(before.clone());
             let global_prediction = world_model.predict_state(&ActionCategory::Install);
-            let global_label = format!(
-                "coordinate_0:{}",
-                quantize_query(&global_prediction)
-            );
-            let identity_label =
-                format!("coordinate_0:{}", quantize_query(before));
+            let global_response = quantize_query(&global_prediction);
+            global_exact_response_count +=
+                usize::from(global_response == *reference_response);
+            let global_label = format!("coordinate_0:{global_response}");
+            let identity_response = quantize_query(before);
+            identity_exact_response_count +=
+                usize::from(identity_response == *reference_response);
+            let identity_label = format!("coordinate_0:{identity_response}");
 
             let build_record = |abstract_state_id: String| StateResponseRecord {
                 state_id: (*state_id).to_owned(),
@@ -2452,6 +2456,10 @@ mod tests {
         // The HDC candidate merges nuisance-only variants while separating the
         // two distinct future intervention responses. Full-state memorization
         // over-splits; pooled global delta and identity/no-op both under-split.
+        assert_eq!(hdc_exact_response_count, 4);
+        assert_eq!(global_exact_response_count, 0);
+        assert_eq!(identity_exact_response_count, 0);
+
         assert_eq!(hdc_score.false_merges, 0);
         assert_eq!(hdc_score.false_splits, 0);
         assert_eq!(hdc_score.candidate_class_count, 2);
@@ -2459,6 +2467,7 @@ mod tests {
         assert_eq!(global_score.false_merges, 4);
         assert_eq!(identity_score.false_merges, 4);
         assert_eq!(full_state_score.false_splits, 2);
+        assert_eq!(full_state_score.candidate_class_count, 4);
 
         assert!(hdc_score.false_merges < global_score.false_merges);
         assert!(hdc_score.false_merges < identity_score.false_merges);
