@@ -351,6 +351,12 @@ pub fn verify_effect_receipt(
         &attempt.submitted_at,
         &attempt.attempt_context_ref,
         &attempt.limitations,
+        &attempt.effect_binding.labels,
+        receipt.observed_effect.as_ref().map(|observed| (
+            &observed.projection_schema,
+            &observed.external_effect_id_digest,
+            &observed.external_version,
+        )),
         receipt.source_attestations.iter().map(|source| (
             &source.source_id,
             &source.source_version,
