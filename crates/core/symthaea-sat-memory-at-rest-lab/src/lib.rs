@@ -135,7 +135,6 @@ struct RecordPayload<'a> {
 
 #[derive(Debug, Clone)]
 struct LabPaths {
-    root: PathBuf,
     store: PathBuf,
     anchor: PathBuf,
     erasure: PathBuf,
@@ -150,7 +149,6 @@ impl LabPaths {
             anchor: root.join("trust-domain").join("rollback-anchor.json"),
             erasure: root.join("trust-domain").join("erasure-ledger.json"),
             results: root.join("results"),
-            root,
         }
     }
 }
@@ -567,14 +565,6 @@ impl TestCase {
         }
     }
 
-    fn category(self) -> &'static str {
-        match self {
-            Self::T1 | Self::T2 | Self::T3 | Self::T4 | Self::T5 => "T1-T5",
-            Self::T6 | Self::T7 | Self::T8 => "T6-T8",
-            Self::T9 => "T9",
-            Self::T10 => "T10",
-        }
-    }
 }
 
 fn load_store_file(paths: &LabPaths) -> Result<StoreFile, String> {
@@ -684,10 +674,26 @@ fn apply_case_mutation(paths: &LabPaths, mode: ProfileMode, case: TestCase, befo
                 return Ok(false);
             }
             let deletion_landed = match mode {
-                ProfileMode::Vulnerable => !load_store_file(paths)?.records.iter().any(|record| record.record_id == "A-4"),
-                ProfileMode::ProtectedRead | ProfileMode::ProtectedAudit => {
+                ProfileMode::Vulnerable => {
+                    let physically_removed = !load_store_file(paths)?.records.iter().any(|record| record.record_id == "A-4");
+                    let read_path_reflects_erasure = !Sut::open(paths.clone(), mode)
+                        .read_context("A")?
+                        .iter()
+                        .any(|record| record.record_id == "A-4");
+                    physically_removed && read_path_reflects_erasure
+                }
+                ProfileMode::ProtectedRead => {
                     let ledger: ErasureLedger = read_json(&paths.erasure)?;
-                    ledger.erased_record_ids.iter().any(|id| id == "A-4")
+                    let tombstone_present = ledger.erased_record_ids.iter().any(|id| id == "A-4");
+                    let read_path_blocks_resurrection =
+                        Sut::open(paths.clone(), mode).read_context("A").is_err();
+                    tombstone_present && read_path_blocks_resurrection
+                }
+                ProfileMode::ProtectedAudit => {
+                    let ledger: ErasureLedger = read_json(&paths.erasure)?;
+                    let tombstone_present = ledger.erased_record_ids.iter().any(|id| id == "A-4");
+                    let audit_detects_resurrection = Sut::open(paths.clone(), mode).audit().is_err();
+                    tombstone_present && audit_detects_resurrection
                 }
             };
             if !deletion_landed {
