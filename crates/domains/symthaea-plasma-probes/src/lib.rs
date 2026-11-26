@@ -8121,7 +8121,7 @@ mod tests {
             merged.atoms().iter().zip(split.atoms().iter())
         {
             assert_eq!(left_position, right_position);
-            assert!((left_weight - right_weight).abs() < 1.0e-15);
+            assert!((*left_weight - *right_weight).abs() < 1.0e-15);
         }
         assert!(merged.wasserstein1(&split).unwrap() < 1.0e-15);
     }
@@ -8158,7 +8158,7 @@ mod tests {
             coarse.atoms().iter().zip(fine.atoms().iter())
         {
             assert_eq!(left_position, right_position);
-            assert!((left_weight - right_weight).abs() < 1.0e-15);
+            assert!((*left_weight - *right_weight).abs() < 1.0e-15);
         }
         assert!(coarse.wasserstein1(&fine).unwrap() < 1.0e-15);
     }
