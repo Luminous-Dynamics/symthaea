@@ -84,12 +84,13 @@
         "XI-AGENT-ATTACK",
         "XI-GROUP-ATTACK",
         "XI-NAMESPACE-ATTACK",
-        "T6"
+        "XI-PLACEMENT-T6-ATTACK"
       ],
       "notes": [
         "Six unauthorized front-door boundary cases and seven authorized-read controls are in the public development fixture set.",
         "The placement lane reuses the native at-rest T6 operation and is scored separately only when the complete placement method is satisfied.",
-        "Case contracts and fixtures are authored but not executed against a SUT."
+        "Case contracts and fixtures are authored but not executed against a SUT.",
+        "The separate XI-PLACEMENT-T6-ATTACK fixture reuses native at-rest T6 store placement but retains its own isolation result row; native metrics do not share denominators."
       ]
     },
     {
