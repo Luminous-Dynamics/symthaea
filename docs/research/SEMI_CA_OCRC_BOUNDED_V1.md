@@ -61,7 +61,7 @@ operatorname{RiskGap}(T)le
 qquad h(x)=x-1-ln x.
 ]
 
-This field is an assumption-conditional paper bound expression, not a measured fab risk guarantee. The caller-supplied delay-contract digest identifies the declared bound contract; the code cannot independently prove that all physical feedback delays obey it.
+This field is an assumption-conditional paper bound expression, not a measured fab risk guarantee. The caller-supplied delay-contract digest identifies a declared delay-bound contract; the code cannot independently prove that all physical feedback delays obey it. The boolean field records declaration, not source-authenticated attestation.
 
 The optional optimizer searches the paper's one-dimensional Bernoulli proxy family: P(dbar=-1)=1-p*, P(dbar=d_max)=p*, with p* minimizing the arbitrary-delay objective on its valid interval. The implementation includes a golden-section search; an independent dense-grid oracle cross-checks its output.
 
@@ -114,9 +114,13 @@ The module currently includes tests for:
 13. report-attested revision/payload/event/value binding;
 14. proxy overload is rejected;
 15. underload and paper-bound diagnostics are explicit;
-16. deterministic replay of injected proxy draws and feedback sequence.
+16. deterministic replay of injected proxy draws and feedback sequence;
+17. labels available before prediction are rejected without threshold mutation;
+18. non-monotonic wall-clock rounds are rejected transactionally.
 
 ### Independent integration oracle
+
+Three integration tests use a separate PMF sampler, strict-expiry map and scalar update recurrence. They cross-check a four-round schedule, survival/load values, and the golden-section optimizer against an independent dense-grid search.
 
 A separate, intentionally slow test file reconstructs the tracking set with its own PMF sampler, strict-expiry map, actual-delay calculations and scalar threshold update. It verifies a four-round known-answer stream with zero-delay and delayed feedback, multiple survival weights, tracking occupancy, final thresholds and optimizer output against an independent grid search.
 
