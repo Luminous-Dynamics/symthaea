@@ -152,7 +152,8 @@
         "provider_request_body_bytes",
         "complete_provider_request_body",
         "complete_memory_origin_enumeration",
-        "untracked_memory_origin_span_count"
+        "untracked_memory_origin_span_count",
+        "request_body_artifact"
       ],
       "properties": {
         "capture_point": {
@@ -181,6 +182,9 @@
         },
         "provider_request_id": {
           "$ref": "#/$defs/id"
+        },
+        "request_body_artifact": {
+          "$ref": "#/$defs/request_body_artifact"
         }
       }
     },
@@ -360,6 +364,55 @@
         "signature_base64": {
           "type": "string",
           "pattern": "^[A-Za-z0-9+/]{86}==$"
+        }
+      }
+    },
+    "request_body_artifact": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "artifact_id",
+        "plaintext_sha256",
+        "ciphertext_sha256",
+        "plaintext_bytes",
+        "storage_profile_sha256",
+        "encryption_profile_sha256",
+        "access_policy_sha256",
+        "retention_policy_sha256",
+        "custody_receipt_sha256",
+        "immutable_object"
+      ],
+      "properties": {
+        "artifact_id": {
+          "$ref": "#/$defs/id"
+        },
+        "plaintext_sha256": {
+          "$ref": "#/$defs/sha256"
+        },
+        "ciphertext_sha256": {
+          "$ref": "#/$defs/sha256"
+        },
+        "plaintext_bytes": {
+          "type": "integer",
+          "minimum": 1
+        },
+        "storage_profile_sha256": {
+          "$ref": "#/$defs/sha256"
+        },
+        "encryption_profile_sha256": {
+          "$ref": "#/$defs/sha256"
+        },
+        "access_policy_sha256": {
+          "$ref": "#/$defs/sha256"
+        },
+        "retention_policy_sha256": {
+          "$ref": "#/$defs/sha256"
+        },
+        "custody_receipt_sha256": {
+          "$ref": "#/$defs/sha256"
+        },
+        "immutable_object": {
+          "const": true
         }
       }
     }
