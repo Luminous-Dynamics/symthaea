@@ -1,0 +1,250 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://luminousdynamics.io/schemas/symthaea/rrvr-episode-snapshot-v0.1.schema.json",
+  "title": "RRVR Symthaea Observer Episode Snapshot v0.1",
+  "type": "object",
+  "additionalProperties": false,
+  "required": [
+    "schema_version",
+    "snapshot_id",
+    "benchmark_id",
+    "scenario_id",
+    "task_id",
+    "attempt_id",
+    "trajectory_cluster_id",
+    "evidence_domain",
+    "decision_cut_sequence",
+    "ledger_frontier_sequence",
+    "admission_receipt",
+    "observations"
+  ],
+  "properties": {
+    "schema_version": {
+      "const": "0.1"
+    },
+    "snapshot_id": {
+      "type": "string",
+      "minLength": 1
+    },
+    "benchmark_id": {
+      "type": "string",
+      "minLength": 1
+    },
+    "scenario_id": {
+      "type": "string",
+      "minLength": 1
+    },
+    "task_id": {
+      "type": "string",
+      "minLength": 1
+    },
+    "attempt_id": {
+      "type": "string",
+      "minLength": 1
+    },
+    "trajectory_cluster_id": {
+      "type": "string",
+      "minLength": 1
+    },
+    "evidence_domain": {
+      "enum": [
+        "process_model",
+        "simulator",
+        "hardware_in_loop",
+        "physical"
+      ]
+    },
+    "decision_cut_sequence": {
+      "type": "integer",
+      "minimum": 0
+    },
+    "ledger_frontier_sequence": {
+      "type": "integer",
+      "minimum": 0
+    },
+    "admission_receipt": {
+      "$ref": "#/$defs/admission_receipt"
+    },
+    "observations": {
+      "type": "array",
+      "minItems": 1,
+      "items": {
+        "$ref": "#/$defs/observation"
+      }
+    }
+  },
+  "$defs": {
+    "sha256": {
+      "type": "string",
+      "pattern": "^[a-f0-9]{64}$"
+    },
+    "clock_stamp": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "clock_domain_id",
+        "ticks_ns",
+        "uncertainty_ns"
+      ],
+      "properties": {
+        "clock_domain_id": {
+          "type": "string",
+          "minLength": 1
+        },
+        "ticks_ns": {
+          "type": "integer"
+        },
+        "uncertainty_ns": {
+          "type": "integer",
+          "minimum": 0
+        }
+      }
+    },
+    "admission_receipt": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "receipt_id",
+        "issuer_id",
+        "evidence_ledger_id",
+        "frontier_sequence",
+        "snapshot_sha256",
+        "receipt_artifact_sha256"
+      ],
+      "properties": {
+        "receipt_id": {
+          "type": "string",
+          "minLength": 1
+        },
+        "issuer_id": {
+          "type": "string",
+          "minLength": 1
+        },
+        "evidence_ledger_id": {
+          "type": "string",
+          "minLength": 1
+        },
+        "frontier_sequence": {
+          "type": "integer",
+          "minimum": 0
+        },
+        "snapshot_sha256": {
+          "$ref": "#/$defs/sha256"
+        },
+        "receipt_artifact_sha256": {
+          "$ref": "#/$defs/sha256"
+        }
+      }
+    },
+    "manipulator_state": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "joint_angles",
+        "joint_velocities",
+        "end_effector_position",
+        "end_effector_force",
+        "gripper_opening"
+      ],
+      "properties": {
+        "joint_angles": {
+          "type": "array",
+          "minItems": 7,
+          "maxItems": 7,
+          "items": {
+            "type": "number"
+          }
+        },
+        "joint_velocities": {
+          "type": "array",
+          "minItems": 7,
+          "maxItems": 7,
+          "items": {
+            "type": "number"
+          }
+        },
+        "end_effector_position": {
+          "type": "array",
+          "minItems": 3,
+          "maxItems": 3,
+          "items": {
+            "type": "number"
+          }
+        },
+        "end_effector_force": {
+          "type": "array",
+          "minItems": 3,
+          "maxItems": 3,
+          "items": {
+            "type": "number"
+          }
+        },
+        "gripper_opening": {
+          "type": "number"
+        }
+      }
+    },
+    "observation": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "observation_id",
+        "source_id",
+        "source_sequence",
+        "ingest_sequence",
+        "event_time",
+        "acquired_time",
+        "state_profile_id",
+        "units_profile_id",
+        "coordinate_frame_id",
+        "quality",
+        "state"
+      ],
+      "properties": {
+        "observation_id": {
+          "type": "string",
+          "minLength": 1
+        },
+        "source_id": {
+          "type": "string",
+          "minLength": 1
+        },
+        "source_sequence": {
+          "type": "integer",
+          "minimum": 0
+        },
+        "ingest_sequence": {
+          "type": "integer",
+          "minimum": 0
+        },
+        "event_time": {
+          "$ref": "#/$defs/clock_stamp"
+        },
+        "acquired_time": {
+          "$ref": "#/$defs/clock_stamp"
+        },
+        "state_profile_id": {
+          "const": "manipulator-state-21d-si-v1"
+        },
+        "units_profile_id": {
+          "const": "manipulator-si-units-v1"
+        },
+        "coordinate_frame_id": {
+          "type": "string",
+          "minLength": 1
+        },
+        "quality": {
+          "enum": [
+            "admitted",
+            "stale",
+            "unknown",
+            "disputed"
+          ]
+        },
+        "state": {
+          "$ref": "#/$defs/manipulator_state"
+        }
+      }
+    }
+  }
+}

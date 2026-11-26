@@ -1,0 +1,38 @@
+name: Format Symthaea RRVR Shadow Observer
+
+on:
+  push:
+    branches:
+      - research/rrvr-observer-executable-v0-1
+    paths:
+      - "crates/domains/symthaea-rrvr-observer/**"
+      - ".github/workflows/rrvr-symthaea-shadow-observer-format.yml"
+
+permissions:
+  contents: write
+
+jobs:
+  format:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Install pinned Rust toolchain
+        uses: dtolnay/rust-toolchain@1.96.0
+        with:
+          components: rustfmt
+
+      - name: Format only the observer package
+        run: cargo fmt --manifest-path Cargo.toml -p symthaea-rrvr-observer
+
+      - name: Commit formatting-only changes
+        shell: bash
+        run: |
+          set -euo pipefail
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git add crates/domains/symthaea-rrvr-observer
+          if ! git diff --cached --quiet; then
+            git commit -m "style(rrvr): format shadow observer crate"
+            git push origin "HEAD:$GITHUB_REF_NAME"
+          fi
