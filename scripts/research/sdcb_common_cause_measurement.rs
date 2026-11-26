@@ -252,7 +252,7 @@ fn baseline(model: &Model) -> Result<(usize, f64), Error> {
         let worst = model.scenarios.iter().map(|scenario| {
             model.joint_prior.iter().enumerate().map(|(index, p)| {
                 let h = index / states;
-                p * scenario.utility_by_hypothesis[h][action]
+                *p * scenario.utility_by_hypothesis[h][action]
             }).sum::<f64>()
         }).fold(f64::INFINITY, f64::min);
         let replace = match best {
@@ -484,7 +484,7 @@ mod tests {
             },
         ];
 
-        let likelihood = |role: Role, device: usize, accuracy: f64| {
+        let likelihood = |role: Role, accuracy: f64| {
             let mut rows = vec![[0.0; OUTCOMES]; 2 * 4];
             for h in 0..2 {
                 for g in 0..2 {
@@ -499,7 +499,6 @@ mod tests {
                     }
                 }
             }
-            let _ = device; // device identity selects which local-state bit is indexed by the evaluator
             rows
         };
         let make_candidate = |id: &str, device: &str, role: Role| Candidate {
@@ -508,8 +507,8 @@ mod tests {
             role,
             cost_units: 1,
             likelihoods_by_scenario: vec![
-                likelihood(role, 0, 0.95),
-                likelihood(role, 0, 0.95),
+                likelihood(role, 0.95),
+                likelihood(role, 0.95),
             ],
         };
         let candidates = vec![
