@@ -128,7 +128,8 @@ func edgeTypeValid(e Edge, nodes map[string]Node) bool {
 	a,okA:=nodes[e.From]; b,okB:=nodes[e.To]
 	if !okA||!okB { return false }
 	switch e.Kind {
-	case Used,ObservedBy: return a.Kind==Entity && b.Kind==Activity
+	case Used: return a.Kind==Entity && b.Kind==Activity
+	case ObservedBy: return a.Kind==Entity && b.Kind==Agent
 	case Generated: return a.Kind==Activity && b.Kind==Entity
 	case DerivedFrom,Supersedes: return a.Kind==Entity && b.Kind==Entity
 	case AuthorizedBy: return a.Kind==Entity && b.Kind==Activity
@@ -186,6 +187,7 @@ func Evaluate(g Graph,pins map[string]VerifierPin) Result {
 	adj:=map[string][]string{}
 	incomingUsed:=map[string][]string{}
 	generatedBy:=map[string]int{}
+	usedFrom:=map[string]bool{}
 	for _,e:=range g.Edges {
 		if !nonempty(e.ID,e.From,e.To,e.EvidenceID) { return result(Indeterminate,"edge missing identity, endpoint or evidence reference",checked...) }
 		if old,ok:=edges[e.ID];ok {
@@ -197,8 +199,8 @@ func Evaluate(g Graph,pins map[string]VerifierPin) Result {
 		if !ok || ev.Kind!=Entity { return result(Indeterminate,"edge evidence entity missing: "+e.ID,checked...) }
 		if !ev.RequiresVerification { return result(Indeterminate,"edge evidence lacks a required authenticated source-verifier claim: "+e.ID,checked...) }
 		edges[e.ID]=e
-		if e.Kind!=Supersedes && e.Kind!=AttributedTo { adj[e.From]=append(adj[e.From],e.To) }
-		if e.Kind==Used { incomingUsed[e.To]=append(incomingUsed[e.To],e.From) }
+		switch e.Kind { case Used,Generated,DerivedFrom,InformedBy,Precedes: adj[e.From]=append(adj[e.From],e.To) }
+		if e.Kind==Used { incomingUsed[e.To]=append(incomingUsed[e.To],e.From); usedFrom[e.From]=true }
 		if e.Kind==Generated { generatedBy[e.To]++ }
 	}
 	checked=append(checked,"edge-endpoints","edge-evidence-references")
@@ -222,9 +224,7 @@ func Evaluate(g Graph,pins map[string]VerifierPin) Result {
 				}
 			}
 			if generatedBy[id]==0 && !n.ExternalRoot {
-				used:=false
-				for _,e:=range g.Edges { if e.Kind==Used&&e.From==id { used=true;break } }
-				if used { return result(Indeterminate,"used entity has no generation event or declared external origin: "+id,checked...) }
+				if usedFrom[id] { return result(Indeterminate,"used entity has no generation event or declared external origin: "+id,checked...) }
 			}
 		}
 	}
