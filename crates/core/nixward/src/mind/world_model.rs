@@ -816,14 +816,18 @@ impl NixWorldModel {
             let entry = &entries[*index];
             observation_count = observation_count.saturating_add(entry.observation_count);
             independent_cluster_ids.extend(entry.independent_cluster_ids.iter().cloned());
-            outcome_counts.success =
-                outcome_counts.success.saturating_add(entry.outcome_counts.success);
-            outcome_counts.failure =
-                outcome_counts.failure.saturating_add(entry.outcome_counts.failure);
-            outcome_counts.partial =
-                outcome_counts.partial.saturating_add(entry.outcome_counts.partial);
-            outcome_counts.rolled_back =
-                outcome_counts.rolled_back.saturating_add(entry.outcome_counts.rolled_back);
+            outcome_counts.success = outcome_counts
+                .success
+                .saturating_add(entry.outcome_counts.success);
+            outcome_counts.failure = outcome_counts
+                .failure
+                .saturating_add(entry.outcome_counts.failure);
+            outcome_counts.partial = outcome_counts
+                .partial
+                .saturating_add(entry.outcome_counts.partial);
+            outcome_counts.rolled_back = outcome_counts
+                .rolled_back
+                .saturating_add(entry.outcome_counts.rolled_back);
 
             if entry.residual_count > 0 {
                 residual_squared_error += entry.residual_mse * entry.residual_count as f64;
@@ -973,7 +977,7 @@ impl Default for NixWorldModel {
 mod tests {
     use super::*;
     use cmaq_020_state_response::{
-        score_abstraction, ResponseKey, StateResponseContract, StateResponseRecord,
+        ResponseKey, StateResponseContract, StateResponseRecord, score_abstraction,
     };
     use sha2::{Digest, Sha256};
     use std::collections::BTreeMap;
@@ -2024,7 +2028,10 @@ mod tests {
             mean_squared_error(&global, &after_a).expect("same-dimensional global prediction");
         let contextual_error = mean_squared_error(&contextual.predicted_state, &after_a)
             .expect("same-dimensional context prediction");
-        assert_eq!(contextual.source, ContextualPredictionSource::ContextualDelta);
+        assert_eq!(
+            contextual.source,
+            ContextualPredictionSource::ContextualDelta
+        );
         assert_eq!(contextual.independent_cluster_count, 4);
         assert!(contextual.context_similarity > 0.99);
         assert!(contextual.action_parameter_similarity > 0.99);
@@ -2108,8 +2115,7 @@ mod tests {
             TransitionOutcomeClass::Success,
             "unseen-context-cluster",
         );
-        wm.learn_episode(&episode)
-            .expect("training episode");
+        wm.learn_episode(&episode).expect("training episode");
 
         let prediction = wm
             .predict_state_without_family_label(
@@ -2371,9 +2377,8 @@ mod tests {
         contract.probe_cost_units.insert(key.clone(), 1);
         contract.validate().expect("frozen CMAQ response contract");
 
-        let quantize_query = |state: &ContinuousHV| {
-            (state.as_slice()[0] as f64 * 1000.0).round() as i64
-        };
+        let quantize_query =
+            |state: &ContinuousHV| (state.as_slice()[0] as f64 * 1000.0).round() as i64;
         let mut hdc_records = Vec::new();
         let mut global_records = Vec::new();
         let mut identity_records = Vec::new();
@@ -2384,9 +2389,7 @@ mod tests {
 
         // Candidate prediction and abstraction-label construction happen before
         // evaluator-only response values are attached to the records below.
-        for (state_id, family, cluster, before, context, reference_response) in
-            &evaluation_states
-        {
+        for (state_id, family, cluster, before, context, reference_response) in &evaluation_states {
             let hdc_prediction = world_model
                 .predict_state_without_family_label(
                     before,
@@ -2415,12 +2418,10 @@ mod tests {
             world_model.observe(before.clone());
             let global_prediction = world_model.predict_state(&ActionCategory::Install);
             let global_response = quantize_query(&global_prediction);
-            global_exact_response_count +=
-                usize::from(global_response == *reference_response);
+            global_exact_response_count += usize::from(global_response == *reference_response);
             let global_label = format!("coordinate_0:{global_response}");
             let identity_response = quantize_query(before);
-            identity_exact_response_count +=
-                usize::from(identity_response == *reference_response);
+            identity_exact_response_count += usize::from(identity_response == *reference_response);
             let identity_label = format!("coordinate_0:{identity_response}");
 
             let build_record = |abstract_state_id: String| StateResponseRecord {
@@ -2431,9 +2432,7 @@ mod tests {
                 source_state_sha256: format!("{:x}", Sha256::digest(state_id.as_bytes())),
                 candidate_checkpoint_sha256: "c".repeat(64),
                 abstract_state_id,
-                invariant_signature: [("constant-invariant".to_owned(), 1)]
-                    .into_iter()
-                    .collect(),
+                invariant_signature: [("constant-invariant".to_owned(), 1)].into_iter().collect(),
                 // This is evaluator-only reference information; it is never
                 // passed into NixWorldModel or used to create candidate labels.
                 responses: [(key.clone(), *reference_response)].into_iter().collect(),
@@ -2474,5 +2473,4 @@ mod tests {
         assert!(hdc_score.false_merges < identity_score.false_merges);
         assert!(hdc_score.false_splits < full_state_score.false_splits);
     }
-
 }
