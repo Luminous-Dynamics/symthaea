@@ -58,15 +58,15 @@ jobs:
           if [[ -f research/cmaq-002/src/worldtest_mechanism_transfer.rs ]]; then
             files+=(research/cmaq-002/src/worldtest_mechanism_transfer.rs)
           fi
-          rustfmt --check --edition 2024 "${files[@]}"
+          rustfmt +1.100.0 --check --edition 2024 "${files[@]}"
 
       - name: Run CMAQ-002 evaluator tests
         working-directory: research/cmaq-002
-        run: cargo test --locked
+        run: cargo +1.100.0 test --locked
 
       - name: Run strict Clippy
         working-directory: research/cmaq-002
-        run: cargo clippy --locked --all-targets -- -D warnings
+        run: cargo +1.100.0 clippy --locked --all-targets -- -D warnings
 
       - name: Install pinned JSON Schema validator
         run: python3 -m pip install --disable-pip-version-check "jsonschema==4.25.1"
