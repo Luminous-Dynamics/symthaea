@@ -599,6 +599,7 @@ fn validate_outcome_identity(
     require_text(&outcome.evaluator_version, "outcome.evaluator_version")?;
     for (value, label) in [
         (&outcome.source_work_id_sha256, "source_work_id_sha256"),
+        (&outcome.recording_sha256, "recording_sha256"),
         (&outcome.selective_report_sha256, "selective_report_sha256"),
         (
             &outcome.adjudication_profile_sha256,
@@ -1080,6 +1081,45 @@ mod tests {
         let mut input = base_input(dataset(9, 3, 2));
         input.threshold_plan.thresholds_ppm.reverse();
         assert!(audit_selective_design_risk(&input).is_err());
+    }
+
+    #[test]
+    fn recording_substitution_is_rejected_even_when_source_work_matches() {
+        let mut input = base_input(dataset(10, 3, 2));
+        input.observed_probability_audit_outcomes[0].recording_sha256 = digest('f');
+        assert!(audit_selective_design_risk(&input).is_err());
+    }
+
+    #[test]
+    fn false_absence_flag_must_exactly_match_claim_absent_and_incorrect() {
+        let mut input = base_input(dataset(12, 3, 2));
+        let outcome = &mut input.observed_probability_audit_outcomes[0];
+        outcome.decision = SelectiveDecisionV1::ClaimAbsent;
+        outcome.decision_correct = false;
+        outcome.false_absence_claim = false;
+        assert!(audit_selective_design_risk(&input).is_err());
+
+        let mut input = base_input(dataset(12, 3, 2));
+        let outcome = &mut input.observed_probability_audit_outcomes[0];
+        outcome.decision = SelectiveDecisionV1::Answer;
+        outcome.decision_correct = false;
+        outcome.false_absence_claim = true;
+        assert!(audit_selective_design_risk(&input).is_err());
+    }
+
+    #[test]
+    fn synthetic_demonstration_must_not_claim_a_verified_selection_receipt() {
+        let mut input = base_input(dataset(13, 3, 2));
+        input.synthetic_demonstration = true;
+        assert!(audit_selective_design_risk(&input).is_err());
+
+        let mut input = base_input(dataset(13, 3, 2));
+        input.synthetic_demonstration = true;
+        input.expected_selection_receipt_sha256 = None;
+        let report = audit_selective_design_risk(&input).unwrap();
+        assert!(report.synthetic_demonstration);
+        assert!(!report.expected_selection_receipt_supplied);
+        assert!(!report.selection_receipt_match_verified);
     }
 
     #[test]
