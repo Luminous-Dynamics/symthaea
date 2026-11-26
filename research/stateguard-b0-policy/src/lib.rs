@@ -433,6 +433,13 @@ fn select_offer(
 /// This is a deterministic baseline. It never executes the selected action and
 /// never creates a new permission or tool offer.
 pub fn decide(input: &PolicyInput) -> Result<PolicyDecision, Vec<PolicyIssue>> {
+    decide_inner(input, false)
+}
+
+fn decide_inner(
+    input: &PolicyInput,
+    allow_synthetic_fixtures: bool,
+) -> Result<PolicyDecision, Vec<PolicyIssue>> {
     let validation = validate_state(&input.research_state_json).map_err(|issues| {
         issues
             .into_iter()
@@ -448,6 +455,14 @@ pub fn decide(input: &PolicyInput) -> Result<PolicyDecision, Vec<PolicyIssue>> {
             message: format!("invalid ResearchState JSON: {error}"),
         }]
     })?;
+    let state_origin = get_str(&state, "status").unwrap_or("UNKNOWN");
+    if state_origin != "PRODUCTION_PUBLIC_STATE" && !allow_synthetic_fixtures {
+        return Err(vec![PolicyIssue {
+            path: "research_state_json.status".to_owned(),
+            message: "synthetic ResearchState is not admissible at the production policy entrypoint"
+                .to_owned(),
+        }]);
+    }
     let evidence_prefix_sha256 = get_str(
         state.get("evidence_prefix").unwrap_or(&Value::Null),
         "prefix_sha256",
@@ -650,6 +665,53 @@ mod tests {
         }
     }
 
+
+    #[test]
+    fn production_entrypoint_rejects_synthetic_conformance_fixture() {
+        let input: PolicyInput = serde_json::from_str(include_str!(
+            "../fixtures/policy-input-synthetic-example-v0.1.json"
+        ))
+        .unwrap();
+        let errors = decide(&input).unwrap_err();
+        assert!(errors.iter().any(|error| {
+            error.path == "research_state_json.status"
+                && error.message.contains("synthetic ResearchState")
+        }));
+    }
+
+    #[test]
+    fn production_entrypoint_accepts_explicit_production_state_and_selects_permitted_offer() {
+        let mut input: PolicyInput = serde_json::from_str(include_str!(
+            "../fixtures/policy-input-synthetic-example-v0.1.json"
+        ))
+        .unwrap();
+        let mut state: Value = serde_json::from_str(&input.research_state_json).unwrap();
+        state["status"] = Value::String("PRODUCTION_PUBLIC_STATE".to_owned());
+        input.research_state_json = state.to_string();
+
+        let decision = decide(&input).unwrap();
+        assert_eq!(decision.disposition, DecisionDisposition::Selected);
+        assert_eq!(
+            decision.selected_offer_id.as_deref(),
+            Some("classify-claim-a-ev-a1")
+        );
+        assert_eq!(decision.selected_action_kind, Some(ActionKind::ClassifyClaimSource));
+    }
+
+    #[test]
+    fn internal_synthetic_fixture_path_preserves_known_answer_policy_replay() {
+        let input: PolicyInput = serde_json::from_str(include_str!(
+            "../fixtures/policy-input-synthetic-example-v0.1.json"
+        ))
+        .unwrap();
+        let decision = decide_inner(&input, true).unwrap();
+        assert_eq!(decision.disposition, DecisionDisposition::Selected);
+        assert_eq!(
+            decision.selected_offer_id.as_deref(),
+            Some("classify-claim-a-ev-a1")
+        );
+    }
+
     #[test]
     fn unclassified_retrieval_selects_only_an_offered_classifier_action() {
         let input = input(
@@ -662,7 +724,7 @@ mod tests {
                 &[("query_units", 1), ("experiment_units", 0), ("review_minutes", 1)],
             )],
         );
-        let decision = decide(&input).unwrap();
+        let decision = decide_inner(&input, true).unwrap();
         assert_eq!(decision.disposition, DecisionDisposition::Selected);
         assert_eq!(decision.selected_offer_id.as_deref(), Some("classify-claim-a"));
         assert_eq!(decision.selected_action_kind, Some(ActionKind::ClassifyClaimSource));
@@ -672,7 +734,7 @@ mod tests {
     fn unknown_resource_dimensions_fail_closed() {
         let mut input = input(sample_state(0), vec![]);
         input.remaining_budget.insert(String::new(), 1);
-        assert!(decide(&input).is_err());
+        assert!(decide_inner(&input, true).is_err());
     }
 
     #[test]
@@ -696,7 +758,7 @@ mod tests {
                 ),
             ],
         );
-        let decision = decide(&input).unwrap();
+        let decision = decide_inner(&input, true).unwrap();
         assert_eq!(decision.selected_offer_id.as_deref(), Some("verify-artifact"));
         assert_eq!(
             decision.reason_codes,
@@ -718,7 +780,7 @@ mod tests {
                 &[("query_units", 0), ("experiment_units", 0), ("review_minutes", 1)],
             )],
         );
-        let decision = decide(&input).unwrap();
+        let decision = decide_inner(&input, true).unwrap();
         assert_eq!(decision.selected_offer_id.as_deref(), Some("check-source-corrections"));
         assert_eq!(
             decision.reason_codes,
@@ -755,7 +817,7 @@ mod tests {
                 &[("query_units", 0), ("experiment_units", 0), ("review_minutes", 1)],
             )],
         );
-        let decision = decide(&input).unwrap();
+        let decision = decide_inner(&input, true).unwrap();
         assert_eq!(decision.selected_offer_id.as_deref(), Some("verify-before-use"));
     }
 
@@ -771,8 +833,8 @@ mod tests {
                 &[("query_units", 1), ("experiment_units", 0), ("review_minutes", 1)],
             )],
         );
-        let first = decide(&input).unwrap();
-        let second = decide(&input).unwrap();
+        let first = decide_inner(&input, true).unwrap();
+        let second = decide_inner(&input, true).unwrap();
         assert_eq!(first, second);
     }
 
@@ -788,7 +850,7 @@ mod tests {
                 &[("query_units", 1), ("experiment_units", 0)],
             )],
         );
-        assert!(decide(&input).is_err());
+        assert!(decide_inner(&input, true).is_err());
     }
 
     #[test]
@@ -841,7 +903,7 @@ mod tests {
                 &[("query_units", 1), ("experiment_units", 0), ("review_minutes", 0)],
             )],
         );
-        let decision = decide(&input).unwrap();
+        let decision = decide_inner(&input, true).unwrap();
         assert_eq!(decision.selected_offer_id.as_deref(), Some("refresh-retracted"));
         assert_eq!(
             decision.reason_codes,
@@ -870,7 +932,7 @@ mod tests {
                 &[("query_units", 0), ("experiment_units", 2), ("review_minutes", 0)],
             )],
         );
-        let decision = decide(&input).unwrap();
+        let decision = decide_inner(&input, true).unwrap();
         assert_eq!(decision.selected_action_kind, Some(ActionKind::RequestDiscriminatingExperiment));
     }
 
@@ -886,7 +948,7 @@ mod tests {
                 &[("query_units", 0), ("experiment_units", 0), ("review_minutes", 1)],
             )],
         );
-        let decision = decide(&input).unwrap();
+        let decision = decide_inner(&input, true).unwrap();
         assert_eq!(decision.selected_offer_id.as_deref(), Some("escalate-episode"));
     }
 
@@ -902,7 +964,7 @@ mod tests {
                 &[("query_units", 0), ("experiment_units", 2), ("review_minutes", 0)],
             )],
         );
-        let decision = decide(&input).unwrap();
+        let decision = decide_inner(&input, true).unwrap();
         assert_eq!(decision.selected_offer_id.as_deref(), Some("probe-conflict"));
         assert_eq!(decision.selected_action_kind, Some(ActionKind::RequestDiscriminatingExperiment));
     }
@@ -919,7 +981,7 @@ mod tests {
                 &[("query_units", 1), ("experiment_units", 0), ("review_minutes", 0)],
             )],
         );
-        let decision = decide(&input).unwrap();
+        let decision = decide_inner(&input, true).unwrap();
         assert_eq!(decision.disposition, DecisionDisposition::Selected);
         assert_eq!(decision.selected_offer_id.as_deref(), Some("refresh-policy"));
     }
@@ -938,7 +1000,7 @@ mod tests {
                 &[("query_units", 0), ("experiment_units", 0), ("review_minutes", 2)],
             )],
         );
-        let decision = decide(&input).unwrap();
+        let decision = decide_inner(&input, true).unwrap();
         assert_eq!(decision.selected_action_kind, Some(ActionKind::RequestIndependentAdjudication));
     }
 
@@ -951,7 +1013,7 @@ mod tests {
             None,
             &[("query_units", 1), ("experiment_units", 0), ("review_minutes", 0)],
         )]);
-        let decision = decide(&input).unwrap();
+        let decision = decide_inner(&input, true).unwrap();
         assert_eq!(decision.disposition, DecisionDisposition::Selected);
         assert_eq!(decision.selected_offer_id.as_deref(), Some("only-search"));
         assert_ne!(decision.selected_action_kind, Some(ActionKind::ClassifyClaimSource));
@@ -970,7 +1032,7 @@ mod tests {
             )],
         );
         input.remaining_budget.insert("query_units".to_owned(), 10);
-        let decision = decide(&input).unwrap();
+        let decision = decide_inner(&input, true).unwrap();
         assert_eq!(decision.disposition, DecisionDisposition::Abstain);
     }
 
@@ -985,7 +1047,7 @@ mod tests {
                     &[("query_units", 1), ("experiment_units", 0), ("review_minutes", 2)]),
             ],
         );
-        let decision = decide(&input).unwrap();
+        let decision = decide_inner(&input, true).unwrap();
         assert_eq!(decision.disposition, DecisionDisposition::Abstain);
         assert_eq!(decision.reason_codes, vec!["PARETO_INCOMPARABLE_PERMITTED_OFFERS"]);
     }
@@ -1001,7 +1063,7 @@ mod tests {
                     &[("query_units", 1), ("experiment_units", 0), ("review_minutes", 1)]),
             ],
         );
-        let decision = decide(&input).unwrap();
+        let decision = decide_inner(&input, true).unwrap();
         assert_eq!(decision.selected_offer_id.as_deref(), Some("offer-b"));
     }
 
@@ -1017,7 +1079,7 @@ mod tests {
                 &[("query_units", 1), ("experiment_units", 0), ("review_minutes", 1)],
             )],
         );
-        let decision = decide(&input).unwrap();
+        let decision = decide_inner(&input, true).unwrap();
         assert_eq!(decision.research_state_sha256.len(), 64);
         assert_eq!(decision.evidence_prefix_sha256.len(), 64);
         assert_eq!(decision.action_offers_sha256.len(), 64);
@@ -1037,7 +1099,7 @@ mod tests {
         // Moderate risk: a supported claim can be decision-sufficient under
         // the declared policy; the candidate still does not create the label.
         let input = input(state.to_string(), vec![]);
-        let decision = decide(&input).unwrap();
+        let decision = decide_inner(&input, true).unwrap();
         assert_eq!(decision.disposition, DecisionDisposition::Stop);
     }
 }
