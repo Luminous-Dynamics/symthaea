@@ -31,6 +31,18 @@ exclude = [
     # live modules. Excluded so the workspace stops compiling a dead island;
     # the adopt path (foveation RealVentralPipeline) still works via path dep.
     "crates/domains/symthaea-perception",
+    # Source-only / test-only staging directories are not Cargo packages yet.
+    # Keep them out of the wildcard member set until they have complete,
+    # independently buildable Cargo.toml manifests.
+    "crates/core/symthaea",
+    "crates/core/symthaea-iit",
+    "crates/core/symthaea-observation-attestation",
+    "crates/domains/symthaea-architecture-engineering",
+    "crates/domains/symthaea-dishwasher-design",
+    "crates/domains/symthaea-experiment-design",
+    "crates/domains/symthaea-marine-geometry",
+    "crates/domains/symthaea-rea-compat",
+    "crates/domains/symthaea-rea-evidence-verifier",
 ]
 default-members = [
     "xtask",
