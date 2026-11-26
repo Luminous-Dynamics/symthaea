@@ -731,7 +731,9 @@ mod tests {
     #[test]
     fn adaptive_evsi_uses_the_joint_world_to_choose_conditional_followups() {
         let result = evaluate_expected_reference_v1(&adaptive_scenario()).unwrap();
-        assert!(result.expected_net_utility_numerator_ppm > 0);
+        assert_eq!(result.expected_utility_numerator_ppm, 10_000_000);
+        assert_eq!(result.expected_cost_numerator_ppm, 1_000_000);
+        assert_eq!(result.expected_net_utility_numerator_ppm, 9_000_000);
         assert!(matches!(result.policy, ReferencePolicyNodeV1::Query { .. }));
         assert!(result.explored_histories > 1);
     }
@@ -766,7 +768,8 @@ mod tests {
             world.probability_ppm = None;
         }
         let result = evaluate_robust_reference_v1(&scenario).unwrap();
-        assert!(result.worst_case_regret_utility_units >= 0);
+        assert_eq!(result.worst_case_regret_utility_units, 1);
+        assert_eq!(result.worst_case_acquisition_cost_utility_units, 1);
         assert!(matches!(result.policy, ReferencePolicyNodeV1::Query { .. }));
     }
 
