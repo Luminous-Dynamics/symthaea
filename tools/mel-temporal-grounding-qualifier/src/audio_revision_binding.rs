@@ -303,6 +303,8 @@ mod tests {
         16, 17, 18, 19, 20, 21, 22, 23, 24, 25, 26, 27, 28, 29, 30, 31,
     ];
 
+    const REQUEST_BODY: &[u8] = br#"{\"schema\":\"mel-client-model-request-v1\",\"experiment_unit_id\":\"mel-grounding-evidence-window-fixture-001\",\"query_id\":\"piano-entry-query-001\",\"query_text_sha256\":\"8faaeb1470e86800e5d84b45b7f311a7f1554eaad46c77b45bd3210d289c1cc2\",\"target_audio_sha256\":\"b12dbd7c993ac1f0ddf6c0cef16c605ce48da060738b83837e39bdadf9df83ef\",\"model_identity_sha256\":\"7777777777777777777777777777777777777777777777777777777777777777\",\"runtime_identity_sha256\":\"8888888888888888888888888888888888888888888888888888888888888888\",\"decoding_config_sha256\":\"9999999999999999999999999999999999999999999999999999999999999999\",\"prompt_sha256\":\"3333333333333333333333333333333333333333333333333333333333333333\",\"adapter_sha256\":\"4444444444444444444444444444444444444444444444444444444444444444\",\"retrieval_policy_sha256\":\"5555555555555555555555555555555555555555555555555555555555555555\",\"audio_windows\":[{\"window_id\":\"window-001\",\"start_frame\":1,\"end_frame\":3,\"sha256\":\"3fc77626f4c70d9e28aa4c1cd901fcf28a7a6a690788342dcb45884f5dc3acb0\"},{\"window_id\":\"window-002\",\"start_frame\":5,\"end_frame\":8,\"sha256\":\"74cac05eac42e84ae16f372efbe5354a1fa5e03b39ae90df4a9dcd81a59fb792\"}]}"#;
+
     fn revision_case() -> RevisionCaseV2 {
         let audio = AudioArtifactClockV1 {
             audio_sha256: "b12dbd7c993ac1f0ddf6c0cef16c605ce48da060738b83837e39bdadf9df83ef".into(),
