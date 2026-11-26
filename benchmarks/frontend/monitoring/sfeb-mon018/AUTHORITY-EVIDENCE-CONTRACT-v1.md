@@ -286,7 +286,7 @@ No later phase is implied by completing an earlier phase.
 
 ## 10. Adversarial qualification corpus
 
-The companion corpus begins with 48 synthetic cases across identity, scope, delegation, temporal validity, revocation, history integrity, cryptographic verification, source availability, independence, and operation replay.
+The companion corpus begins with 50 synthetic cases across identity, scope, delegation, temporal validity, revocation, history integrity, cryptographic verification, source availability, independence, and operation replay.
 
 It includes positive controls as well as attacks. Expected dispositions are finite known-answer classifications, not statistical security estimates.
 
@@ -365,6 +365,27 @@ Maximize:
 **Qualified effects / (compute + storage + network + cryptography + capture + independent verification + recovery/operator cost)**
 
 Report the assurance-cost frontier rather than selecting a single impressive throughput point. Faster execution cannot compensate for an unauthorized effect, duplicate mutation, false-complete claim, false independence claim or discarded unknown outcome.
+
+### 11.5 Read the comparator semantics precisely
+
+- **OPA decision logs:** OPA supports drop rules and rate/buffer limits; its documentation explicitly says decisions may be dropped when a configured maximum decision rate or buffer limit is exceeded. Therefore an absent OPA decision log is not proof that no policy decision or downstream action occurred. MON should ingest OPA's dropped-event counters and upload status as capture-health evidence, not merely consume whatever events arrived.
+- **Cedar:** Cedar returns a decision with diagnostics, but its documented algorithm skips a policy whose evaluation returns an error. This is an intentional policy-engine design choice. A MON deployment that marks a particular guardrail as mandatory must treat an error in that guardrail as incomplete assurance even when a separate permit policy matches; it must not silently promote the final Allow to complete authority evidence.
+- **Zanzibar-style systems:** their important comparison is consistent authorization data and causal ordering of access-control changes. They are not a proof that an arbitrary destination committed a downstream effect.
+- **Temporal:** Activity execution may happen more than once after a worker performs an external effect but fails before reporting completion. Its recommendation to use idempotency at the called service supports receiver-enforced operation identity; MON should measure the full destination contract rather than claim that orchestration retries are themselves exactly-once effects.
+- **DBOS:** its October 2026 vendor report describes sharded PostgreSQL workflow throughput above one million workflows per second. This is a useful W0 orchestration scaling reference, not a comparable W2/W3 assurance benchmark unless the same durable workflow, effect, observer and evidence workload is used.
+- **SCITT:** RFC 9943 provides signed-statement provenance and transparency proofs, but explicitly does not guarantee that an issuer submitted every statement or that a registered statement is accurate. MON-016/017 must continue to qualify bounded source enumeration and corroboration separately.
+- **Agent Action Capsule:** draft revision -06 is an active individual Internet-Draft, not an IETF-endorsed standard. Its document revision must not be confused with the payload's spec_version value: revision -06 defines a wire profile that emits spec_version draft-mih-scitt-agent-action-capsule-05. Pin both the document revision and the encoded profile value in conformance records. The draft also explicitly leaves upstream input integrity outside its profile: a producer can bind a spoofed response it received, so MON needs an independently verifiable source-input chain rather than treating a confirmed capsule as proof that the external world changed.
+- **PostgreSQL logical decoding:** PostgreSQL 18 documents failover-slot synchronization and the need for compatible retained WAL and catalog history on the standby. A CDC adapter must therefore qualify slot identity, output plugin, source timeline, snapshot, failover lineage, WAL retention and terminal LSN; receiving a stream without these continuity facts is not a complete capture proof.
+
+### 11.6 Research opportunity: causal input-to-effect provenance
+
+The most important adjacent gap is the integrity of information entering an agent before it acts. MON should build a causal evidence graph, not just a post-action log:
+
+**authenticated source input → exact request/intent → authority decision → dispatch → destination commit → independent observation → later correction or physical outcome.**
+
+Every edge should identify the exact parent evidence, actor, source profile, causal/operation identity, typed digest, effective time, recorded time and verification result. Timestamps alone are not causal links. A source response digest supplied by the same producer is not independent source authentication.
+
+This becomes the proposed MON-019 research line. It should bind independently authenticated tool responses, upstream event receipts, source snapshot/capture evidence and destination effects into one reproducible causal chain. It should also preserve the distinction between a source being authentic, a source being complete within a boundary, and a source being true.
 
 ## 12. Relationship to existing MON increments
 
