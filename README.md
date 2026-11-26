@@ -135,7 +135,7 @@ cargo run --manifest-path crates/hdc-zkp-bench/Cargo.toml --release
 cargo run --features psych_bench --example run_all_benchmarks
 ```
 
-The paper-level [`reproduce.sh`](papers/theory-foundations/binius-hdc/reproduce.sh) is scoped to the standalone Binius benchmark package in this repository. It runs a real Binius prover/verifier and prints the benchmark's analytical prime-field comparator; it does **not** run a Winterfell prover, the historical health-attestation pipeline, or reproduce the complete historical multi-backend paper table. The direct manifest command above is equivalent when you only need to run the public Binius benchmark.
+On current `main`, the paper-level [`reproduce.sh`](papers/theory-foundations/binius-hdc/reproduce.sh) is still a historical multi-backend script that refers to sibling crates not present in this standalone public checkout; it does **not** reproduce the complete historical paper table from a clean clone. A corrected standalone runner is proposed in [PR #13753](https://github.com/Luminous-Dynamics/symthaea/pull/13753). Until that change is integrated, use the direct manifest command above to run the public Binius benchmark. That package executes a real Binius prover and verifier; its prime-field comparator is analytical, not a measured Winterfell prover.
 ## Rust Workflow
 
 Use the flake shell for day-to-day development:
