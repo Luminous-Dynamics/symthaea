@@ -1,0 +1,32 @@
+{
+  "schema_version": "1.0.0",
+  "fixture_id": "sdcb-identifiability-observational-equivalence-v1",
+  "world_a_id": "science-present-common-offset-zero",
+  "world_b_id": "science-absent-common-offset-one",
+  "prior_world_a": 0.5,
+  "abstain_utility": 0.6,
+  "budget_units": 2,
+  "actions": [
+    {
+      "id": "science-device-a",
+      "kind": "observation",
+      "cost_units": 1,
+      "likelihood_world_a": [0.95, 0.05],
+      "likelihood_world_b": [0.95, 0.05]
+    },
+    {
+      "id": "science-device-b",
+      "kind": "observation",
+      "cost_units": 1,
+      "likelihood_world_a": [0.8, 0.2],
+      "likelihood_world_b": [0.8, 0.2]
+    },
+    {
+      "id": "isolate-common-cause-then-repeat-science",
+      "kind": "intervention",
+      "cost_units": 2,
+      "likelihood_world_a": [0.95, 0.05],
+      "likelihood_world_b": [0.05, 0.95]
+    }
+  ]
+}
