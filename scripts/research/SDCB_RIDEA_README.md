@@ -21,7 +21,7 @@ The source uses only the Rust standard library. The R-I multiplier is matched to
 
 ## Not implemented
 
-- The proxy model g training objective from the paper is not trained here.
+- The R-IDeA score module takes proxy predictions as inputs. A separate [linear proxy-training reference](sdcb_ridea_proxy.rs) now implements the MSE + hinge-margin + L2 objective with caller-supplied features; it is not the original Pyro/model-specific trainer.
 - EIG is a caller-supplied input; this code does not compute Bayesian posteriors or likelihoods.
 - No model misspecification or covariate shift is measured from real data.
 - No decision value, EVSI, robustness guarantee, or safety guarantee is implied by a high R-IDeA score.
@@ -32,4 +32,4 @@ Target support {0,1,2}, history {0,2}, RBF sigma 1.0. Baseline biased MMD² is 0
 
 ## Validation boundary
 
-18 Rust test functions are authored. They have not been compiled or executed in the current environment. JSON schemas/examples are parsed and semantically checked separately; that is not a Rust test pass or full benchmark reproduction.
+18 R-I/R-IDeA scoring tests and 13 linear-proxy training tests (31 total across the two modules) are authored. They have not been compiled or executed in the current environment. JSON schemas/examples are parsed and semantically checked separately; that is not a Rust test pass or full benchmark reproduction.
