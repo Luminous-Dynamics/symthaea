@@ -183,9 +183,15 @@ pub struct ModelGroundingItemReliabilityV1 {
 pub struct ModelGroundingDatasetSummaryV1 {
     pub query_items: usize,
     pub source_work_clusters: usize,
+    /// Backwards-compatible alias: items containing at least one Present annotation.
     pub present_items: usize,
     pub one_to_many_items: usize,
+    /// Backwards-compatible alias: items containing at least one Absent annotation.
     pub absent_items: usize,
+    pub items_with_present_annotations: usize,
+    pub items_with_absent_annotations: usize,
+    /// Items that contain both Present and Absent annotations.
+    pub mixed_present_absent_items: usize,
     pub source_work_macro_present_mean_f1: Option<f64>,
     pub source_work_macro_present_exact_count_accuracy: Option<f64>,
     pub source_work_macro_one_to_many_count_gated_f1: Option<f64>,
@@ -609,12 +615,19 @@ fn summarize_model_grounding(
         .iter()
         .filter(|item| item.summary.absent_annotators > 0)
         .count();
+    let mixed_present_absent_items = items
+        .iter()
+        .filter(|item| item.summary.present_annotators > 0 && item.summary.absent_annotators > 0)
+        .count();
     ModelGroundingDatasetSummaryV1 {
         query_items: items.len(),
         source_work_clusters: clusters.len(),
         present_items,
         one_to_many_items,
         absent_items,
+        items_with_present_annotations: present_items,
+        items_with_absent_annotations: absent_items,
+        mixed_present_absent_items,
         source_work_macro_present_mean_f1: mean_item_metric(items, |summary| {
             summary.present_mean_f1
         }),
