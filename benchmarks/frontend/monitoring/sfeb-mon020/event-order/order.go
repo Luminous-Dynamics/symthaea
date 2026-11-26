@@ -43,9 +43,13 @@ func (d DigestRef) Equal(x DigestRef) (bool,bool) {
 	return d.Value==x.Value,true
 }
 type Source struct {
+	// ID identifies one monotonic sequence domain/incarnation, not merely a service name.
 	ID string
 	ControlRoot string
 	IdentityDigest DigestRef
+	// ControlRootDigest is an independently verified registry/credential statement
+	// binding this sequence-domain identity to its administrative control root.
+	ControlRootDigest DigestRef
 }
 type Event struct {
 	ID string
@@ -214,7 +218,10 @@ func Evaluate(in Input,pins map[string]VerifierPin) Result {
 	sourceInput:=append([]Source(nil),in.Sources...)
 	sort.Slice(sourceInput,func(i,j int)bool{return sourceInput[i].ID<sourceInput[j].ID})
 	for _,s:=range sourceInput {
-		if !nonempty(s.ID,s.ControlRoot)||!s.IdentityDigest.Valid() || s.IdentityDigest.Subject!=s.ID || s.IdentityDigest.Purpose!="source-identity" { return finish(Indeterminate,"source identity incomplete",0,0,checked...) }
+		if !nonempty(s.ID,s.ControlRoot)||!s.IdentityDigest.Valid() || s.IdentityDigest.Subject!=s.ID || s.IdentityDigest.Purpose!="source-identity" ||
+			!s.ControlRootDigest.Valid() || s.ControlRootDigest.Subject!=s.ID || s.ControlRootDigest.Purpose!="control-root-membership" {
+			return finish(Indeterminate,"source identity/control-root binding incomplete",0,0,checked...)
+		}
 		if _,ok:=sources[s.ID];ok { return finish(Divergent,"duplicate source ID: "+s.ID,0,0,checked...) }
 		sources[s.ID]=s
 		d,why:=reportFor("source:"+s.ID,s.IdentityDigest,reports,conflicts,pins,in.EvaluationAt)
