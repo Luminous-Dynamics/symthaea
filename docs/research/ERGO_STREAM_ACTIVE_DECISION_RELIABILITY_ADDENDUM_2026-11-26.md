@@ -342,3 +342,101 @@ A target crossing one leaderboard score is not enough. Require paired source/vid
 - OVO-S-Bench official implementation, benchmark protocol and leaderboard: https://github.com/InternLM/OVO-S-Bench
 - SPOT-Bench official project and leaderboard: https://dibschat.github.io/SPOT-Bench/
 - DIVE: https://arxiv.org/abs/2610.28405
+
+
+## 9. Cross-programme synthesis: decision-preserving memory for streaming spatial state
+
+A repository ownership audit found that the next memory-related increment already has a natural owner: **MACE #13284** formalizes decision-sufficient memory under resource/evidence constraints, while **MACE #13261** owns reproduction of strong retrieval and state-first baselines. ErgoStream should supply the streaming/spatial task distribution to those evaluators rather than create a second memory engine.
+
+### 9.1 The paradigm shift
+
+The optimization target is not maximum recall, maximum retained frames, or minimum embedding distortion. It is the **smallest admissible state that preserves the distinctions needed for a declared downstream decision**.
+
+For a query/DecisionNeed (q), evidence prefix (E_{\leq t}), retained memory state (S), frozen policy \(\pi\), evaluator truth \(y\), and task utility \(U_y\):
+
+- Absolute regret: \(R_y(S)=\max_a U_y(a)-U_y(\pi(q,S))\).
+- Compression regret gap: \(G_y(S)=R_y(S)-R_y(E_{\leq t})\).
+
+The full-prefix reference is an information baseline, not a claim that the prefix is complete or physically true. Preserve absolute regret against evaluator optimum as well as compression regret gap. A compressed state qualifies only when its preregistered regret margin passes **and** every hard evidence constraint passes.
+
+Hard constraints are not soft penalties:
+- each claim must resolve to original observation IDs, source intervals and content/revision digests;
+- measurement time and known-at time remain distinct;
+- scope, permission, source rights, supersession and revocation are checked at use;
+- common-cause evidence is not counted as independent corroboration;
+- unresolved identity, geometry, clock alignment or source disagreement remains explicit;
+- derived summaries are retrieval/decision aids, never replacement observations.
+
+This makes memory quality a cost–regret frontier under an evidence contract, not a similarity-retrieval score.
+
+### 9.2 Streaming-spatial adaptation
+
+Run the frontier over OVO-S-Bench's prefix-only queries, preserving its native protocol and level partitions. The official project leaderboard distinguishes human streaming (86.6 overall) from human offline (92.2); these are different access conditions and must not be conflated. Gemini-3.1-Pro's reported 59.2 is the strongest listed model overall, with L4 allocentric mapping at 54.9. The key comparison is not simply whether the memory retrieves the annotated evidence interval, but whether the retained state supports the correct spatial decision and map consistency at the query prefix.
+
+Add paired counterfactual strata:
+1. Same scene statistics, different object identity or route topology.
+2. Identical visible endpoint, different hidden path/history.
+3. Occlusion and reappearance with a plausible identity swap.
+4. Camera ego-motion versus independently moving objects.
+5. Late evidence that corrects an earlier position, event order or entity association.
+6. Clock drift, reordered chunks and missing observations.
+7. Misleading but semantically similar retrieved episodes.
+8. Ambiguous or unobservable cases where the correct output is a set, a query, or abstention.
+
+For every query, freeze the candidate-visible prefix and memory snapshot before opening evaluator truth. Hidden scenario state, future frames, answer text, target map and response-window labels remain evaluator-only.
+
+### 9.3 Matched memory arms
+
+Use the baseline ownership and source pins from #13261. Keep the following arms distinct and matched on backbone, input prefix, total context and all-in resource budget:
+
+- Full-prefix/full-context reference and no-memory baseline.
+- Verbatim-only event/frame retention (a strong control, not a strawman).
+- Uniform/fixed-rate sampling and query-independent top-k.
+- OASIS-style hierarchical event memory with intent-conditioned retrieval.
+- BM25, dense, hybrid RRF, entity/date/literal and neighboring-context retrieval.
+- State-first/supersession memory and causal-graph retrieval.
+- Typed-content HDC and event-ID HDC as separate arms.
+- Explicit spatial/topological graph plus dense visual features.
+- HDC-disabled, map-disabled, hierarchy-disabled and compression-disabled ablations.
+
+The SEW-Bench/ASP paper's negative result is a required falsification control: its access-structured method improves the fixed-budget comparison over query-independent sampling, but does not beat verbatim-only on any evaluated backbone, and its compressed state was not independently useful in that setting. Conversely, OASIS reports gains from on-demand hierarchical event retrieval, and HERMES/StreamScout provide additional memory and active-access comparators. Reproduce each on its own task protocol before adapting it; do not transplant leaderboard numbers between tasks.
+
+### 9.4 Scorecard and proposed gates
+
+Report a frontier, not a single composite score:
+
+| Dimension | Required result |
+|---|---|
+| Task outcome | Native OVO-S L1–L4 accuracy and query-level decision/action correctness |
+| Regret | Absolute regret, compression regret gap, tail/CVaR and worst-family result |
+| Evidence fidelity | Exact source-span coverage, provenance completeness, stale/retracted/unauthorized-use rate |
+| Spatial consistency | Entity identity continuity, map/topology error, route/trajectory consistency and uncertainty coverage |
+| Epistemic behavior | False-unique rate, unsupported-claim rate, set-valued correctness and justified abstention |
+| Revision | Correction propagation, supersession latency and contradiction recovery |
+| Resource | Stored bytes plus sidecars, tokens/context, indexing/update/replay work, calls, peak memory, wall-time p50/p95/p99 and measured energy where available |
+
+Prospective research gates (not achieved results):
+- compression-induced task-success loss no greater than 1 absolute percentage point at the selected operating point;
+- worst-family regression no greater than 2 points;
+- at least 25% lower **all-in** memory/resource cost at matched task quality, including provenance sidecars, updates, replay and verification;
+- zero use of known retracted, revoked, wrong-scope or unauthorized evidence in deterministic adversarial fixtures;
+- no regression in false-unique, unsupported-spatial-claim or false-persistence rates.
+
+These targets align with MACE #13284's proposed qualification gates. They must be calibrated on development data and frozen before confirmatory evaluation. Use paired source/video-level clusters, not independent crops, for uncertainty estimates. Preserve every failed/invalid attempt and per-stratum denominator.
+
+### 9.5 Owner composition and first implementation slice
+
+- **MACE #13284:** cost–decision-regret frontier, epsilon-sufficiency and active evidence acquisition.
+- **MACE #13261:** strong raw-trajectory and industry memory baseline reproduction.
+- **AV-STREAM #12837:** prefix-only OVO-S/OmniInteract adapters and multimodal receipts.
+- **Symtropy #6675:** sequential acquire/wait/repeat/stop/answer/abstain policy tournament and finite-horizon oracle.
+- **Symtropy #7577:** evaluator-side qualification of decision-sufficiency and probe claims; not the memory engine or episode custodian.
+- **Vision Mind #3934, temporal retrieval #10644, bitemporal lifecycle #9075, proof-aware context #9177:** existing world-state, source-time and evidence-packet owners.
+
+First implementation slice:
+1. Freeze an OVO-S query receipt schema: dataset/query ID, prefix cutoff, model/backbone/config digest, memory snapshot digest, answer/action, source evidence IDs/spans, unsupported/abstained state, native score, latency and resource receipt.
+2. Add a small deterministic paired-world pilot that tests map/identity preservation and correction-at-use without public raw media.
+3. Run the strongest available verbatim-only, OASIS-like/hierarchical, dense/hybrid and state-first baselines under matched caps.
+4. Publish the cost–regret curve and failure strata before connecting the candidate to #6675's sequential acquisition policy.
+
+Do not create a parallel production memory store, evidence ledger, spatial map owner, sensor scheduler or conversational turn controller. The intended contribution is a shared, independently evaluated **decision-preserving state contract** across streaming perception and long-horizon memory.
