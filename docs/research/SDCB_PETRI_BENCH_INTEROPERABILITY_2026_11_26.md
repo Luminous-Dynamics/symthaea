@@ -18,13 +18,9 @@ The report's current standardized sweep is six frontier models × 30 tasks × th
 
 Scoring separates correctness, method rigor, and efficiency. It also audits p-hacking, redundant tests that survive only without family-wise correction, and probe-only output-matching. This is highly aligned with SDCB's insistence on evidence-supported conclusions.
 
-## 5. Important interpretation safeguards
-
-The working-draft table reports an adaptive reference with curated test values at 92.2 overall and a curated OFAT reference at 90.8. The six model means span 57.3–61.7 in that sweep; the highest reported solve rate is 50%. However, the same report's blind-value OFAT ablation falls to 40.5–47.7 across three independent test-value draws (mean 45.2). The report explicitly retracts an earlier statement that value knowledge did not account for most of the reference gap: the ablation shows that informative intervention values are a dominant contribution. This is a material qualification, not a footnote.
-
 ## 3. Important interpretation safeguards
 
-The report is explicitly a working draft (v0.5), not an established universal leaderboard. Its own revisions include an explicit retraction in Section 7.2. The reference solver with curated informative test values scored far above evaluated models, but its blind-value ablation sharply reduced the score; the report states that informative intervention values are a dominant contributor to the reference advantage. Do not present the curated-reference gap as a clean measure of model capability or claim that a generic OFAT algorithm beats frontier science agents.
+The working-draft table reports an adaptive reference with curated test values at 92.2 overall and a curated OFAT reference at 90.8. The six model means span 57.3–61.7 in that sweep; the highest reported solve rate is 50%. However, the same report's blind-value OFAT ablation falls to 40.5–47.7 across three independent test-value draws (mean 45.2). The report explicitly retracts an earlier statement that value knowledge did not account for most of the reference gap: the ablation shows that informative intervention values are a dominant contribution. This is a material qualification, not a footnote.
 
 Other limitations disclosed by the report:
 
@@ -36,6 +32,8 @@ Other limitations disclosed by the report:
 - the report's single-metric tasks and probe interface can permit output-matching; full-metric-vector and blind-target tasks are planned.
 
 These are productive benchmark design lessons, not reasons to ignore the benchmark.
+
+
 
 ## 4. What SDCB should reuse
 
