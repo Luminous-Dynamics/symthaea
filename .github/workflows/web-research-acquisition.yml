@@ -1,0 +1,30 @@
+name: WebResearch Bounded Acquisition and Receipts
+
+on:
+  pull_request:
+    types: [opened, synchronize, reopened, ready_for_review]
+    paths:
+      - "Cargo.toml"
+      - "src/web_research/researcher.rs"
+      - "src/web_research/types.rs"
+      - "src/web_research/mod.rs"
+      - ".github/workflows/web-research-acquisition.yml"
+
+permissions:
+  contents: read
+
+jobs:
+  qualify:
+    name: Rust 1.96 bounded acquisition regression tests
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - name: Set up Rust
+        uses: dtolnay/rust-toolchain@stable
+        with:
+          toolchain: "1.96.0"
+          components: rustfmt
+      - name: Check touched Rust files
+        run: rustfmt +1.96.0 --edition 2024 --check src/web_research/researcher.rs src/web_research/types.rs src/web_research/mod.rs
+      - name: Run focused acquisition and receipt tests
+        run: cargo test --manifest-path Cargo.toml --locked --no-default-features --features web_research_module --lib web_research::researcher::tests
