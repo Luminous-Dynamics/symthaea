@@ -1,5 +1,7 @@
 pub mod worldtest_exploration;
 pub mod worldtest_phase_contract;
+// Query portfolios preserve the environment-generation cluster as the inferential unit.
+pub mod worldtest_query_portfolio;
 
 use std::collections::{BTreeMap, BTreeSet};
 use std::env;
