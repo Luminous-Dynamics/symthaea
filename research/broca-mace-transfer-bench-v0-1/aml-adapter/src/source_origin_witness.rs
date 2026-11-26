@@ -585,13 +585,21 @@ fn validate_witness_binding(
     {
         return Err(SourceOriginWitnessRejectV1::ObservedSourceMismatch);
     }
+    validate_observed_ancestry(receipt, node)?;
+    validate_witness_time(receipt, policy, now_unix)
+}
+
+fn validate_observed_ancestry(
+    receipt: &SourceOriginWitnessReceiptV1,
+    node: &VerifiedSourceLineageNodeBindingV1,
+) -> Result<(), SourceOriginWitnessRejectV1> {
     if receipt.observed_parent_evidence_ids != node.parent_evidence_ids
         || receipt.derivation_receipt_sha256 != node.derivation_receipt_sha256
         || receipt.common_cause_group_sha256 != node.common_cause_group_sha256
     {
         return Err(SourceOriginWitnessRejectV1::AncestryDisagreement);
     }
-    validate_witness_time(receipt, policy, now_unix)
+    Ok(())
 }
 
 fn validate_witness_time(
@@ -876,6 +884,57 @@ mod tests {
             ],
         };
         assert_eq!(policy.validate(), Err(SourceOriginWitnessRejectV1::InvalidPolicy));
+    }
+
+    #[test]
+    fn hidden_parent_or_common_cause_disagreement_is_never_majority_voted_away() {
+        let node = VerifiedSourceLineageNodeBindingV1 {
+            evidence_id: "evidence-1".into(),
+            source_id: "source-1".into(),
+            source_sha256: "a".repeat(64),
+            payload_sha256: "b".repeat(64),
+            evidence_class_sha256: "c".repeat(64),
+            parent_evidence_ids: vec!["parent-known".into()],
+            derivation_receipt_sha256: Some("d".repeat(64)),
+            common_cause_group_sha256: vec!["e".repeat(64)],
+        };
+        let mut receipt = SourceOriginWitnessReceiptV1 {
+            run_id: "run-1".into(),
+            query_invocation_id: "invocation-1".into(),
+            graph_sha256: "f".repeat(64),
+            source_origin_receipt_sha256: "1".repeat(64),
+            operator_id: "archive-a".into(),
+            failure_domain_sha256: "2".repeat(64),
+            evidence_id: "evidence-1".into(),
+            source_id: "source-1".into(),
+            source_sha256: "a".repeat(64),
+            payload_sha256: "b".repeat(64),
+            evidence_class_sha256: "c".repeat(64),
+            observed_parent_evidence_ids: vec!["parent-known".into()],
+            derivation_receipt_sha256: Some("d".repeat(64)),
+            common_cause_group_sha256: vec!["e".repeat(64)],
+            publisher_identity_sha256: "3".repeat(64),
+            acquisition_record_sha256: "4".repeat(64),
+            source_revision_sha256: "5".repeat(64),
+            observed_at_unix: 1,
+            issued_at_unix: 2,
+            expires_at_unix: 3,
+            status: "observed_consistent".into(),
+            issuer_profile_sha256: "6".repeat(64),
+            key_id: "7".repeat(64),
+        };
+        assert_eq!(validate_observed_ancestry(&receipt, &node), Ok(()));
+        receipt.observed_parent_evidence_ids.push("hidden-parent".into());
+        assert_eq!(
+            validate_observed_ancestry(&receipt, &node),
+            Err(SourceOriginWitnessRejectV1::AncestryDisagreement)
+        );
+        receipt.observed_parent_evidence_ids = node.parent_evidence_ids.clone();
+        receipt.common_cause_group_sha256.clear();
+        assert_eq!(
+            validate_observed_ancestry(&receipt, &node),
+            Err(SourceOriginWitnessRejectV1::AncestryDisagreement)
+        );
     }
 
     #[test]
