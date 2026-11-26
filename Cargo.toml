@@ -22,6 +22,10 @@ exclude = [
     "crates/core/nixward-web",
     "crates/core/symthaea-zkproof/methods",
     "crates/core/symthaea-zkproof/host",
+    # Incomplete source-only adapter; recovery and manifest ownership remain tracked in #9361/#7291.
+    "crates/core/symthaea-observation-attestation",
+    # Loose example placeholder, not a crate; the actual symthaea package is the workspace root.
+    "crates/core/symthaea",
     "crates/domains/symthaea-spore/fuzz",
     "crates/domains/spark-engine",
     "crates/domains/symthaea-lab",
