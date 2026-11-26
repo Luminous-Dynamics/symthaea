@@ -1,6 +1,6 @@
 # WorldTest Frozen Mechanism-Transfer Evaluator v0.1
 
-**Status:** Rust evaluator and 19 new deterministic tests authored; Rust 1.96 qualification passed at `86b9d7981637917d3060dd65514f130209d920ae`. CMAQ-002 is now pinned to Rust 1.100.0; exact-head Rust 1.100.0 qualification for this revision is pending.  
+**Status:** Rust evaluator and 19 new deterministic tests authored; exact-head Rust 1.100.0 formatting, 87-test crate suite, strict Clippy, custody and MARA phase/reward qualification passed at `6343c8d626ce29923928cc8adf6deab40b5d9a62` (26 November 2026). Rust 1.96.0 compatibility was previously qualified on the earlier 17-test revision.  
 **Research owner:** [#13707 — CMAQ-018](https://github.com/Luminous-Dynamics/symthaea/issues/13707).  
 **Base evaluator:** [#13711 — cluster-aware query portfolio](https://github.com/Luminous-Dynamics/symthaea/pull/13711).  
 **Parent protocol:** [#13688 — WorldTest / AutumnBench adapter](https://github.com/Luminous-Dynamics/symthaea/pull/13688).
