@@ -132,6 +132,9 @@ pub struct SubstrateProfileV1 {
     /// Digest assigned by the independently pinned substrate catalogue.
     pub profile_sha256: [u8; 32],
     pub enabled: bool,
+    /// Number of scored queries over which construction and maintenance costs
+    /// are amortized. Zero is an invalid cost profile.
+    pub amortization_query_count: u64,
     /// Estimated amortized cost by lifecycle phase, not measured receipts.
     pub estimated_phase_costs: PhaseCostBreakdownV1,
 }
@@ -158,6 +161,7 @@ pub struct RouteStepV1 {
 pub struct SubstrateBindingV1 {
     pub kind: SubstrateKindV1,
     pub profile_sha256: [u8; 32],
+    pub amortization_query_count: u64,
 }
 
 #[derive(Clone, Copy, Debug, Eq, PartialEq)]
@@ -185,6 +189,7 @@ pub struct RoutePlanV1 {
 #[derive(Clone, Copy, Debug, Eq, PartialEq)]
 pub enum RouteRejectV1 {
     DuplicateSubstrateProfile,
+    InvalidCostProfile,
     RequiredSubstrateUnavailable,
     TooManySubstrates,
     ResourceCostOverflow,
@@ -204,6 +209,9 @@ fn profile_for(
     if !first.enabled {
         return Err(RouteRejectV1::RequiredSubstrateUnavailable);
     }
+    if first.amortization_query_count == 0 {
+        return Err(RouteRejectV1::InvalidCostProfile);
+    }
     Ok(first)
 }
 
@@ -222,6 +230,7 @@ fn add_step(
         selected.push(SubstrateBindingV1 {
             kind,
             profile_sha256: profile.profile_sha256,
+            amortization_query_count: profile.amortization_query_count,
         });
     }
     steps.push(RouteStepV1 {
@@ -432,7 +441,9 @@ pub fn route_mace_query_v1(
     let mut estimated_phase_costs = PhaseCostBreakdownV1::default();
     for binding in &selected {
         let profile = profile_for(binding.kind, profiles)?;
-        if profile.profile_sha256 != binding.profile_sha256 {
+        if profile.profile_sha256 != binding.profile_sha256
+            || profile.amortization_query_count != binding.amortization_query_count
+        {
             return Err(RouteRejectV1::RequiredSubstrateUnavailable);
         }
         estimated_phase_costs = estimated_phase_costs
@@ -489,6 +500,7 @@ mod tests {
             kind,
             profile_sha256: PROFILE_DIGEST,
             enabled: true,
+            amortization_query_count: 100,
             estimated_phase_costs: PhaseCostBreakdownV1 {
                 retrieval: retrieval_cost,
                 ..PhaseCostBreakdownV1::default()
@@ -504,6 +516,7 @@ mod tests {
             kind,
             profile_sha256: PROFILE_DIGEST,
             enabled: true,
+            amortization_query_count: 100,
             estimated_phase_costs,
         }
     }
@@ -749,6 +762,19 @@ mod tests {
         assert_eq!(plan.estimated_cost.model_calls, 2);
         assert_eq!(plan.estimated_cost.tool_calls, 1);
         assert_eq!(plan.estimated_cost.verification_ops, 5);
+    }
+
+    #[test]
+    fn zero_amortization_basis_fails_closed() {
+        let mut p = profile(
+            SubstrateKindV1::DenseSemantic,
+            cost(100, 1, 0),
+        );
+        p.amortization_query_count = 0;
+        assert_eq!(
+            route_mace_query_v1(&request(QueryRegimeV1::BroadRecall), &[p]),
+            Err(RouteRejectV1::InvalidCostProfile)
+        );
     }
 
     #[test]
