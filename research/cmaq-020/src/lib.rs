@@ -192,6 +192,15 @@ pub fn assess_pair(
     contract.validate()?;
     left.validate_against(contract)?;
     right.validate_against(contract)?;
+    if left.candidate_checkpoint_sha256 != right.candidate_checkpoint_sha256 {
+        return Err("pair assessment cannot mix candidate checkpoints".to_owned());
+    }
+    if left.environment_cluster_id == right.environment_cluster_id
+        && (left.domain_id != right.domain_id
+            || left.environment_family_id != right.environment_family_id)
+    {
+        return Err("one environment cluster cannot alias multiple domain/family identities".to_owned());
+    }
     let mut maximum = 0.0_f64;
     for (key, left_value) in &left.responses {
         let right_value = right.responses[key];
