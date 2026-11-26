@@ -959,6 +959,7 @@ pub fn evaluate_inverse_vm_shortlist_v1(
         schema: INVERSE_VM_SHORTLIST_REPORT_SCHEMA_V1.into(),
         input_id: input.input_id.clone(),
         process_snapshot_sha256: input.process_snapshot_sha256.clone(),
+        decision_at_unix_seconds: input.decision_at_unix_seconds,
         policy_sha256: policy_digest(&input.policy)?,
         constraint_source_sha256: input.policy.recipe_constraint_source_sha256.clone(),
         state: ShortlistEvaluationStateV1::Complete,
@@ -971,6 +972,7 @@ pub fn evaluate_inverse_vm_shortlist_v1(
         recipe_write_executed: false,
         physical_experiment_authorized: false,
         equipment_control_authority: false,
+        forward_evaluation_receipt_authenticity_proven: false,
         report_sha256: String::new(),
     };
     report.report_sha256 = report_digest(&report)?;
@@ -1237,6 +1239,19 @@ mod tests {
     }
 
     #[test]
+    fn report_binds_decision_frontier_and_disclaims_forward_issuer_authenticity() {
+        let mut input = input(vec![candidate("one", 200.0, 50.0, (99.0, 101.0), 0.2)]);
+        input.decision_at_unix_seconds = 2_001;
+        let report = evaluate_inverse_vm_shortlist_v1(&input).unwrap();
+        assert_eq!(report.decision_at_unix_seconds, 2_001);
+        assert!(!report.forward_evaluation_receipt_authenticity_proven);
+        assert!(verify_inverse_vm_shortlist_v1(&input, &report).unwrap());
+        let mut changed = input;
+        changed.decision_at_unix_seconds = 2_002;
+        assert!(!verify_inverse_vm_shortlist_v1(&changed, &report).unwrap());
+    }
+
+    #[test]
     fn feasible_candidates_are_ranked_and_replayed() {
         let input = input(vec![
             candidate("c", 200.0, 50.0, (99.0, 101.0), 0.30),
@@ -1343,6 +1358,9 @@ mod tests {
     fn unknown_forward_evidence_never_becomes_a_recommendation() {
         let mut candidate = candidate("unknown-forward", 200.0, 50.0, (99.0, 101.0), 0.2);
         candidate.forward_evidence_state = ForwardEvidenceStateV1::Unknown;
+        let receipt = candidate.forward_evaluation_receipt.as_mut().unwrap();
+        receipt.evidence_state = ForwardEvidenceStateV1::Unknown;
+        receipt.receipt_sha256 = forward_receipt_digest(receipt).unwrap();
         candidate.candidate_evidence_sha256 = candidate_digest(&candidate).unwrap();
         let report = evaluate_inverse_vm_shortlist_v1(&input(vec![candidate])).unwrap();
         assert_eq!(report.evaluations[0].state, CandidateScreenStateV1::Unknown);
