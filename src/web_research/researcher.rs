@@ -387,21 +387,30 @@ impl WebResearcher {
             let requested_url = self.search_provider_endpoint();
             match self.search_with_provider(query).await {
                 Ok(found) => {
+                    let normalized_provider = provider.trim().to_lowercase();
                     let supported = matches!(
-                        provider.trim().to_lowercase().as_str(),
+                        normalized_provider.as_str(),
                         "serper" | "brave" | "searxng" | "searx"
                     );
-                    let outcome = if !supported {
+                    let missing_api_key = matches!(normalized_provider.as_str(), "serper" | "brave")
+                        && self
+                            .config
+                            .search_api_key
+                            .as_deref()
+                            .is_none_or(|key| key.trim().is_empty());
+                    let outcome = if !supported || missing_api_key {
                         AcquisitionOutcome::ProviderFailed
                     } else if found.is_empty() {
                         AcquisitionOutcome::NoResults
                     } else {
                         AcquisitionOutcome::ResultsFound
                     };
-                    let reason = if supported {
-                        None
-                    } else {
+                    let reason = if !supported {
                         Some(format!("unsupported configured search provider: {provider}"))
+                    } else if missing_api_key {
+                        Some(format!("configured provider {provider} requires an API key"))
+                    } else {
+                        None
                     };
                     let payload = serde_json::to_vec(&found).unwrap_or_default();
                     let mut receipt = make_receipt(
@@ -415,10 +424,12 @@ impl WebResearcher {
                     receipt.requested_url = requested_url;
                     receipt.captured_bytes = payload.len();
                     receipt.content_sha256 = Some(sha256_hex(&payload));
-                    receipt.reason_code = if supported {
-                        None
-                    } else {
+                    receipt.reason_code = if !supported {
                         Some("UNSUPPORTED_SEARCH_PROVIDER".to_string())
+                    } else if missing_api_key {
+                        Some("SEARCH_PROVIDER_API_KEY_MISSING".to_string())
+                    } else {
+                        None
                     };
                     receipt.reason = reason;
                     receipt.elapsed_ms = elapsed_ms(started);
@@ -722,7 +733,6 @@ impl WebResearcher {
                                             }
                                         }
                                     }
-                                    let payload = serde_json::to_vec(&found).unwrap_or_default();
                                     let mut receipt = make_receipt(
                                         query_rank,
                                         None,
@@ -747,10 +757,6 @@ impl WebResearcher {
                                         None
                                     };
                                     receipt.elapsed_ms = elapsed_ms(started);
-                                    // The canonical URL-list digest is useful for replaying the
-                                    // parsed result; raw HTML digest is already captured above
-                                    // only when no parsed list is emitted. Keep the raw body digest.
-                                    let _ = payload;
                                     receipts.push(receipt);
                                     urls.extend(found);
                                 }
