@@ -1,9 +1,9 @@
 # SDCB observational-equivalence and intervention-separation oracle v1
 
 **Status:** bounded exact reference; eight Rust tests authored, not yet compiled or executed in this environment.  
-**Implementation:** `scripts/research/sdcb_identifiability_oracle.rs`  
-**Fixture:** `SDCB_IDENTIFIABILITY_ORACLE_V1.example.json`  
-**Expected result:** `SDCB_IDENTIFIABILITY_ORACLE_V1.expected.json`
+**Implementation:** \`scripts/research/sdcb_identifiability_oracle.rs\`  
+**Fixture:** \`SDCB_IDENTIFIABILITY_ORACLE_V1.example.json\`  
+**Expected result:** \`SDCB_IDENTIFIABILITY_ORACLE_V1.expected.json\`
 
 ## 1. Why this increment exists
 
@@ -17,54 +17,54 @@ This is not a claim that identifiability analysis or intervention design is new.
 
 ## 2. Exact paired-world definition
 
-Let (W_A) and (W_B) be two fully specified candidate worlds. For each candidate action (a), each world supplies a categorical outcome distribution:
+Let \(W_A\) and \(W_B\) be two fully specified candidate worlds. For each candidate action \(a\), each world supplies a categorical outcome distribution:
 
-[
-P_A(ymid a),qquad P_B(ymid a).
-]
+\[
+P_A(y\mid a),\qquad P_B(y\mid a).
+\]
 
 The total-variation separation is:
 
-[
-operatorname{TV}(a;W_A,W_B)
-=rac12sum_y|P_A(ymid a)-P_B(ymid a)|.
-]
+\[
+\operatorname{TV}(a;W_A,W_B)
+=\frac12\sum_y|P_A(y\mid a)-P_B(y\mid a)|.
+\]
 
-For the declared observational action set (mathcal O), the two worlds are observationally equivalent when:
+For the declared observational action set \(\mathcal O\), the two worlds are observationally equivalent when:
 
-[
-max_{ainmathcal O}operatorname{TV}(a;W_A,W_B)
-le epsilon_{mathrm{id}}.
-]
+\[
+\max_{a\in\mathcal O}\operatorname{TV}(a;W_A,W_B)
+\le \epsilon_{\mathrm{id}}.
+\]
 
-An intervention (iinmathcal I) breaks this equivalence in the supplied candidate set when:
+An intervention \(i\in\mathcal I\) breaks this equivalence in the supplied candidate set when:
 
-[
-max_{iinmathcal I}operatorname{TV}(i;W_A,W_B)
-> epsilon_{mathrm{id}}.
-]
+\[
+\max_{i\in\mathcal I}\operatorname{TV}(i;W_A,W_B)
+> \epsilon_{\mathrm{id}}.
+\]
 
 The result is deliberately scoped to the declared world pair, outcome model, and candidate action set. It is not a proof that no unlisted observation can ever distinguish the worlds.
 
 ## 3. Decision value and abstention
 
-Let (pi=P(W_A)), and let (u_ot) be the declared utility for abstaining. For action (a), the exact Bayes-optimal expected utility is:
+Let \(\pi=P(W_A)\), and let \(u_\bot\) be the declared utility for abstaining. For action \(a\), the exact Bayes-optimal expected utility is:
 
-[
-V(a)=sum_ymaxleft{
-pi P_A(ymid a),
-(1-pi)P_B(ymid a),
-u_otleft[pi P_A(ymid a)+(1-pi)P_B(ymid a)ight]
-ight}.
-]
+\[
+V(a)=\sum_y\max\left\{
+\pi P_A(y\mid a),
+(1-\pi)P_B(y\mid a),
+u_\bot\left[\pi P_A(y\mid a)+(1-\pi)P_B(y\mid a)\right]
+\right\}.
+\]
 
 The no-experiment baseline is:
 
-[
-V_0=max{pi,1-pi,u_ot}.
-]
+\[
+V_0=\max\{\pi,1-\pi,u_\bot\}.
+\]
 
-The oracle selects an action only when its cost is within the hard budget and its expected utility strictly exceeds (V_0). It reports structural intervention separation independently of affordability. Thus:
+The oracle selects an action only when its cost is within the hard budget and its expected utility strictly exceeds \(V_0\). It reports structural intervention separation independently of affordability. Thus:
 - *identifiable in principle* does not imply *affordable*;
 - *affordable* does not imply *physically valid*;
 - *a verified intervention receipt* does not prove that the declared likelihood model is scientifically adequate.
@@ -73,12 +73,12 @@ The oracle selects an action only when its cost is within the hard budget and it
 
 The example has two observationally equivalent explanations:
 
-- (W_A): scientific effect present, shared offset zero;
-- (W_B): scientific effect absent, shared offset one.
+- \(W_A\): scientific effect present, shared offset zero;
+- \(W_B\): scientific effect absent, shared offset one.
 
 Two differently named science devices have the same outcome distributions under both worlds. Their total-variation separation is zero. With equal world priors and abstention utility 0.60, the best action is to abstain, utility 0.60.
 
-A candidate intervention isolates/resets the declared common cause and then repeats the science measurement. Its likelihood rows are ([0.95,0.05]) in (W_A) and ([0.05,0.95]) in (W_B). The exact results are:
+A candidate intervention isolates/resets the declared common cause and then repeats the science measurement. Its likelihood rows are \([0.95,0.05]\) in \(W_A\) and \([0.05,0.95]\) in \(W_B\). The exact results are:
 - intervention total variation: 0.90;
 - forced binary Bayes accuracy: 0.95;
 - optimal expected utility with abstention: 0.95;
