@@ -116,3 +116,8 @@ The verifier also requires normalized publisher identity and source revision to 
 Policy: [mace_source_origin_witness_policy_v1.schema.json](../../../data/schemas/mace_source_origin_witness_policy_v1.schema.json). Receipt: [mace_source_origin_witness_receipt_v1.schema.json](../../../data/schemas/mace_source_origin_witness_receipt_v1.schema.json). Protocol: [MACE Source-Origin Witness Quorum V1](../../../docs/research/MACE_SOURCE_ORIGIN_WITNESS_QUORUM_V1.md).
 
 This proves consistency with independently signed observations under the consumer's trust assumptions. It does not prove that operator identities or declared failure domains are truly independent, or that any observer discovered every upstream dependency. The operator registry, independent fetch adapters, publisher metadata validation and transparency-service integration remain deployment work. Tests are authored but have not been executed.
+
+
+## Provenance interoperability
+
+The companion [MACE W3C PROV and SCITT Interoperability V1](../../../docs/research/MACE_PROV_SCITT_INTEROP_V1.md) document defines a JSON-LD context for mapping MACE source/evidence nodes and acquisition/transformation activities to W3C PROV entities, activities and agents. It also specifies a future per-issuer SCITT transparency integration. The JSON-LD context is published at [mace_prov_jsonld_context_v1.jsonld](../../../data/schemas/mace_prov_jsonld_context_v1.jsonld). An executable exporter and SCITT client are not yet implemented.
