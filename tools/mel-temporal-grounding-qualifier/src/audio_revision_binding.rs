@@ -27,6 +27,7 @@ pub struct AudioEvidenceRevisionArmInput<'a> {
     pub evidence_manifest: Option<&'a AudioEvidenceWindowManifestV1>,
     pub source_audio_bytes: Option<&'a [u8]>,
     pub decoded_pcm_bytes: Option<&'a [u8]>,
+    pub request_body_bytes: Option<&'a [u8]>,
 }
 
 #[derive(Debug, Clone, PartialEq, Serialize)]
@@ -73,6 +74,7 @@ pub fn audit_verified_audio_evidence_triplet(
         || no_evidence.evidence_manifest.is_some()
         || no_evidence.source_audio_bytes.is_some()
         || no_evidence.decoded_pcm_bytes.is_some()
+        || no_evidence.request_body_bytes.is_some()
     {
         return Err("NoEvidence arm must not include evidence references, manifests or bytes".into());
     }
@@ -88,11 +90,19 @@ pub fn audit_verified_audio_evidence_triplet(
     let local_pcm = local
         .decoded_pcm_bytes
         .ok_or_else(|| "LocalRetrieved arm requires raw decoded PCM bytes".to_string())?;
+    let local_request = local
+        .request_body_bytes
+        .ok_or_else(|| "LocalRetrieved arm requires raw client request-body bytes".to_string())?;
     if local_case.evidence_condition != RevisionEvidenceConditionV1::LocalRetrieved {
         return Err("local arm revision condition must be LocalRetrieved".into());
     }
-    let local_audio_bound_report =
-        audit_revision_with_audio_evidence(local_case, local_manifest, local_source, local_pcm)?;
+    let local_audio_bound_report = audit_revision_with_audio_evidence(
+        local_case,
+        local_manifest,
+        local_source,
+        local_pcm,
+        local_request,
+    )?;
 
     let yoked_case = yoked.revision_case;
     let yoked_manifest = yoked
@@ -104,11 +114,19 @@ pub fn audit_verified_audio_evidence_triplet(
     let yoked_pcm = yoked
         .decoded_pcm_bytes
         .ok_or_else(|| "YokedRetrieved arm requires raw decoded PCM bytes".to_string())?;
+    let yoked_request = yoked
+        .request_body_bytes
+        .ok_or_else(|| "YokedRetrieved arm requires raw client request-body bytes".to_string())?;
     if yoked_case.evidence_condition != RevisionEvidenceConditionV1::YokedRetrieved {
         return Err("yoked arm revision condition must be YokedRetrieved".into());
     }
-    let yoked_audio_bound_report =
-        audit_revision_with_audio_evidence(yoked_case, yoked_manifest, yoked_source, yoked_pcm)?;
+    let yoked_audio_bound_report = audit_revision_with_audio_evidence(
+        yoked_case,
+        yoked_manifest,
+        yoked_source,
+        yoked_pcm,
+        yoked_request,
+    )?;
 
     let contrast_reports = compare_matched_evidence_arms(&[
         (*no_case).clone(),
@@ -142,6 +160,7 @@ pub fn audit_revision_with_audio_evidence(
     evidence_manifest: &AudioEvidenceWindowManifestV1,
     source_audio_bytes: &[u8],
     decoded_pcm_bytes: &[u8],
+    request_body_bytes: &[u8],
 ) -> Result<AudioBoundRevisionAuditV1, String> {
     let revision_report = audit_revision_v2(revision_case)?;
     let evidence = revision_case
@@ -164,6 +183,7 @@ pub fn audit_revision_with_audio_evidence(
         evidence_manifest,
         source_audio_bytes,
         decoded_pcm_bytes,
+        request_body_bytes,
     )?;
 
     if evidence_manifest.experiment_unit_id != revision_case.experiment_unit_id {
