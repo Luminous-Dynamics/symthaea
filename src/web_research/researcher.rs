@@ -13,7 +13,7 @@ use serde_json::Value;
 use sha2::{Digest, Sha256};
 use std::collections::HashSet;
 use std::future::Future;
-use std::sync::atomic::{AtomicU64, Ordering};
+use std::sync::Mutex;
 use std::time::{Duration, Instant, SystemTime, UNIX_EPOCH};
 
 use super::extractor::{ContentExtractor, ContentType, ExtractedContent};
@@ -1552,7 +1552,7 @@ impl WebResearcher {
     }
 }
 
-static NEXT_ACQUISITION_ATTEMPT_ID: AtomicU64 = AtomicU64::new(1);
+static NEXT_ACQUISITION_ATTEMPT_ID: Mutex<u64> = Mutex::new(1);
 
 fn now_unix_ms() -> u64 {
     SystemTime::now()
@@ -1640,7 +1640,14 @@ fn make_receipt(
         .map(|rank| rank.to_string())
         .unwrap_or_else(|| "query".to_string());
     let captured_at_unix_ms = now_unix_ms();
-    let sequence = NEXT_ACQUISITION_ATTEMPT_ID.fetch_add(1, Ordering::Relaxed);
+    let sequence = {
+        let mut next = NEXT_ACQUISITION_ATTEMPT_ID
+            .lock()
+            .unwrap_or_else(std::sync::PoisonError::into_inner);
+        let sequence = *next;
+        *next = (*next).saturating_add(1);
+        sequence
+    };
     AcquisitionReceipt {
         attempt_id: format!(
             "a{captured_at_unix_ms}-{sequence}-q{query_rank}-{stage_id}-{rank_id}"
