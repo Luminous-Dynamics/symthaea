@@ -7,7 +7,7 @@
 
 use std::collections::{BTreeMap, BTreeSet};
 
-use serde::{Deserialize, Serialize};
+use serde::{Deserialize, Deserializer, Serialize};
 use sha2::{Digest, Sha256};
 use symthaea_core::genesis::GenesisSeed;
 use symthaea_core::hdc::HDC_DIMENSION;
@@ -35,6 +35,7 @@ pub enum EvidenceDomain {
 /// An explicitly named clock. Raw ticks from different clock domains are
 /// intentionally incomparable.
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
+#[serde(deny_unknown_fields)]
 pub struct ClockStamp {
     pub clock_domain_id: String,
     pub ticks_ns: i64,
@@ -53,7 +54,7 @@ pub enum ObservationQuality {
 
 /// One typed manipulator observation. Ingest sequence is the decision-cut
 /// ordering key; event/acquisition timestamps retain their source clocks.
-#[derive(Debug, Clone, Serialize, Deserialize)]
+#[derive(Debug, Clone, Serialize)]
 pub struct ObservationRecord {
     pub observation_id: String,
     pub source_id: String,
@@ -70,10 +71,65 @@ pub struct ObservationRecord {
     pub state: ManipulatorState,
 }
 
+#[derive(Debug, Deserialize)]
+#[serde(deny_unknown_fields)]
+struct ManipulatorStateWire {
+    joint_angles: [f64; 7],
+    joint_velocities: [f64; 7],
+    end_effector_position: [f64; 3],
+    end_effector_force: [f64; 3],
+    gripper_opening: f64,
+}
+
+#[derive(Debug, Deserialize)]
+#[serde(deny_unknown_fields)]
+struct ObservationRecordWire {
+    observation_id: String,
+    source_id: String,
+    source_sequence: u64,
+    ingest_sequence: u64,
+    event_time: ClockStamp,
+    acquired_time: ClockStamp,
+    state_profile_id: String,
+    units_profile_id: String,
+    coordinate_frame_id: String,
+    quality: ObservationQuality,
+    state: ManipulatorStateWire,
+}
+
+impl<'de> Deserialize<'de> for ObservationRecord {
+    fn deserialize<D>(deserializer: D) -> Result<Self, D::Error>
+    where
+        D: Deserializer<'de>,
+    {
+        let wire = ObservationRecordWire::deserialize(deserializer)?;
+        Ok(Self {
+            observation_id: wire.observation_id,
+            source_id: wire.source_id,
+            source_sequence: wire.source_sequence,
+            ingest_sequence: wire.ingest_sequence,
+            event_time: wire.event_time,
+            acquired_time: wire.acquired_time,
+            state_profile_id: wire.state_profile_id,
+            units_profile_id: wire.units_profile_id,
+            coordinate_frame_id: wire.coordinate_frame_id,
+            quality: wire.quality,
+            state: ManipulatorState {
+                joint_angles: wire.state.joint_angles,
+                joint_velocities: wire.state.joint_velocities,
+                end_effector_position: wire.state.end_effector_position,
+                end_effector_force: wire.state.end_effector_force,
+                gripper_opening: wire.state.gripper_opening,
+            },
+        })
+    }
+}
+
 /// Receipt metadata supplied by the upstream evidence adapter. This crate
 /// checks digest syntax, scope and content binding, but does not verify a
 /// signature or decide whether the issuer is trusted.
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
+#[serde(deny_unknown_fields)]
 pub struct AdmissionReceipt {
     pub receipt_id: String,
     pub issuer_id: String,
@@ -85,6 +141,7 @@ pub struct AdmissionReceipt {
 
 /// Immutable episode snapshot at one declared receiver-ingest frontier.
 #[derive(Debug, Clone, Serialize, Deserialize)]
+#[serde(deny_unknown_fields)]
 pub struct EpisodeSnapshot {
     pub schema_version: String,
     pub snapshot_id: String,
