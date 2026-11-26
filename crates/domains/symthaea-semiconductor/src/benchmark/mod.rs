@@ -1,9 +1,9 @@
 //! Versioned benchmark protocols and independent scoring primitives.
 
 pub mod binary_metrics;
+pub mod ca_ocrc_bounded;
 pub mod calibration_requalification;
 pub mod delayed_aci_controller;
-pub mod ca_ocrc_bounded;
 pub mod dtco_manifest;
 pub mod gated_streaming_adapter;
 pub mod label_consumption_guard;
