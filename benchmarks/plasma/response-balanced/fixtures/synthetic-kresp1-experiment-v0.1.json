@@ -21,7 +21,7 @@
   "frozen_checkpoint": {
     "checkpoint_id": "synthetic-phase-mixed-checkpoint",
     "step": 0,
-    "time": 4,
+    "time": 6,
     "state_sha256": "0000000000000000000000000000000000000000000000000000000000000000",
     "phase_mixing_complete": true,
     "second_pulse_not_yet_applied": true,
@@ -244,7 +244,7 @@
     }
   ],
   "prediction_horizon": {
-    "start_time": 4,
+    "start_time": 6,
     "end_time": 30,
     "unit": "omega_pe^-1"
   },
