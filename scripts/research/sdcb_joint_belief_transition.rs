@@ -90,7 +90,7 @@ impl EpisodeIdentity {
             &self.system_digest,
             &self.hypothesis_set_digest,
             &self.device_registry_digest,
-        ].iter().any(|d| !valid_digest(d))
+        ].iter().any(|d| !valid_digest(d.as_str()))
         {
             return Err(Error::InvalidDigest);
         }
@@ -241,7 +241,7 @@ impl JointBeliefLedger {
         let states = 1usize << self.device_ids.len();
         let mut marginal = vec![0.0; self.hypothesis_ids.len()];
         for (index, p) in self.posterior_joint.iter().enumerate() {
-            marginal[index / states] += p;
+            marginal[index / states] += *p;
         }
         marginal
     }
@@ -253,7 +253,7 @@ impl JointBeliefLedger {
         let mut marginal = vec![0.0; STATES];
         for (index, p) in self.posterior_joint.iter().enumerate() {
             let code = index % states;
-            marginal[(code >> device) & 1] += p;
+            marginal[(code >> device) & 1] += *p;
         }
         Ok(marginal)
     }
@@ -302,7 +302,7 @@ impl JointBeliefLedger {
             let code = joint_index % state_count;
             let device_state = (code >> device_index) & 1;
             let likelihood = proposal.outcome_likelihoods[hypothesis * STATES + device_state][outcome];
-            weighted[joint_index] = prior * likelihood;
+            weighted[joint_index] = *prior * likelihood;
             predictive += weighted[joint_index];
         }
         if !predictive.is_finite() || predictive <= 0.0 {
@@ -406,9 +406,9 @@ impl JointBeliefLedger {
         let mut scientific_after = vec![0.0; self.hypothesis_ids.len()];
         let mut device_after = vec![0.0; STATES];
         for (joint_index, p) in next_joint.iter().enumerate() {
-            scientific_after[joint_index / state_count] += p;
+            scientific_after[joint_index / state_count] += *p;
             let code = joint_index % state_count;
-            device_after[(code >> device_index) & 1] += p;
+            device_after[(code >> device_index) & 1] += *p;
         }
 
         let transition = JointBeliefTransition {
