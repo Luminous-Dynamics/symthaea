@@ -1165,8 +1165,6 @@ mod tests {
         assert_eq!(score.false_success_rate, Some(0.5));
     }
 
-
-
     #[test]
     fn reason_and_stage_errors_are_independent_dimensions() {
         let records = vec![
