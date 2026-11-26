@@ -840,7 +840,9 @@ impl WebResearcher {
             .json(&body)
             .send()
             .await
-            .context("Serper search request failed")?;
+            .context("Serper search request failed")?
+            .error_for_status()
+            .context("Serper search returned a non-success HTTP status")?;
 
         let json: Value = response.json().await.context("Serper JSON parse failed")?;
         Ok(extract_links(&json, &["organic"], "link"))
@@ -866,7 +868,9 @@ impl WebResearcher {
             .header("User-Agent", "Mozilla/5.0 (X11; Linux x86_64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36")
             .send()
             .await
-            .context("Brave search request failed")?;
+            .context("Brave search request failed")?
+            .error_for_status()
+            .context("Brave search returned a non-success HTTP status")?;
 
         let json: Value = response.json().await.context("Brave JSON parse failed")?;
         Ok(extract_links(&json, &["web", "results"], "url"))
@@ -892,7 +896,9 @@ impl WebResearcher {
             .header("User-Agent", "Mozilla/5.0 (X11; Linux x86_64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36")
             .send()
             .await
-            .context("SearXNG search request failed")?;
+            .context("SearXNG search request failed")?
+            .error_for_status()
+            .context("SearXNG search returned a non-success HTTP status")?;
 
         let json: Value = response.json().await.context("SearXNG JSON parse failed")?;
         Ok(extract_links(&json, &["results"], "url"))
@@ -927,7 +933,9 @@ impl WebResearcher {
             .get(url)
             .send()
             .await
-            .context("arXiv API request failed")?;
+            .context("arXiv API request failed")?
+            .error_for_status()
+            .context("arXiv API returned a non-success HTTP status")?;
 
         let body = response.text().await.context("arXiv API read failed")?;
         Ok(extract_arxiv_ids(&body))
@@ -944,7 +952,12 @@ impl WebResearcher {
             request = request.header("Cookie", format!("openreview.accessToken={token}"));
         }
 
-        let response = request.send().await.context("OpenReview search failed")?;
+        let response = request
+            .send()
+            .await
+            .context("OpenReview search failed")?
+            .error_for_status()
+            .context("OpenReview search returned a non-success HTTP status")?;
         let json: Value = response
             .json()
             .await
