@@ -3,6 +3,7 @@
 pub mod binary_metrics;
 pub mod calibration_requalification;
 pub mod dtco_manifest;
+pub mod inverse_vm_shortlist;
 pub mod label_consumption_guard;
 pub mod metrology_audit;
 pub mod metrology_qualification_gate;
@@ -136,4 +137,16 @@ pub use vm_snapshot_dependency_impact::{
     VmSnapshotDependencyGraphV1, VmSnapshotImpactEntryV1, VmSnapshotImpactStateV1,
     compute_vm_snapshot_impact_closure_v1, seal_vm_snapshot_dependency_edge_v1,
     seal_vm_snapshot_dependency_graph_v1,
+};
+
+pub use inverse_vm_shortlist::{
+    INVERSE_VM_SHORTLIST_INPUT_SCHEMA_V1, INVERSE_VM_SHORTLIST_POLICY_SCHEMA_V1,
+    INVERSE_VM_SHORTLIST_REPORT_SCHEMA_V1, CandidateScreenReasonV1, CandidateScreenStateV1,
+    ForwardEvidenceStateV1, HistoricalSupportEvidenceV1, InverseVmCandidateEvaluationV1,
+    InverseVmCandidateV1, InverseVmShortlistErrorV1, InverseVmShortlistInputV1,
+    InverseVmShortlistPolicyV1, InverseVmShortlistReportV1, MetrologyTargetV1,
+    NumericRangeV1, PredictedMetricIntervalV1, RecipeKnobConstraintV1, RecipeSettingV1,
+    ShortlistEvaluationStateV1, SideConstraintV1, evaluate_inverse_vm_shortlist_v1,
+    seal_inverse_vm_candidate_v1, seal_inverse_vm_shortlist_policy_v1,
+    verify_inverse_vm_shortlist_v1,
 };
