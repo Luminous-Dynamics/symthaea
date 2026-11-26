@@ -175,3 +175,20 @@ This turns provenance from a self-reported graph into an adversarially testable 
 - Distinguish authored tests, locally executed tests, hosted CI, matched benchmark runs, independent replication and field validation.
 
 This protocol is designed to make false independence and false completeness measurable, rather than allowing a signed, self-consistent lineage graph to be mistaken for verified provenance.
+
+
+## 9. Multi-operator origin corroboration
+
+The follow-on [MACE Source-Origin Witness Quorum V1](MACE_SOURCE_ORIGIN_WITNESS_QUORUM_V1.md) adds a policy-configurable per-node operator and failure-domain quorum over the fourth-authority source-origin result.
+
+Add these metrics:
+- **Per-node quorum coverage:** fraction of graph nodes with at least the required independently pinned operators and acquisition failure domains.
+- **Shared-observation acceptance:** cases where two operator receipts reuse the same acquisition-record digest.
+- **Source metadata disagreement:** witness disagreements over publisher identity or source revision.
+- **Ancestry disagreement detection:** any signed witness parent, derivation or common-cause set that differs from the graph.
+- **Majority-laundering rate:** cases in which the verifier accepts despite one valid signed witness reporting a known graph omission.
+- **Authority key/profile reuse:** reused keys across the qualifier, sufficiency evaluator, lineage resolver, source-origin authority and witness operators.
+
+Proposed targets are zero accepted shared acquisition records, zero accepted key/profile reuse, zero majority-laundered ancestry mismatches, and 100% per-node quorum coverage on supported cases. The system must abstain or return insufficient evidence when the minimum operator or failure-domain count is not met. A valid signed disagreement must remain visible and cannot be discarded as an outlier without a separately governed adjudication process.
+
+The 2-of-3 policy is not a universal truth oracle: operator identity, failure-domain independence, publisher metadata and source completeness remain explicit trust assumptions. The external acquisition operator registry and fetch adapters must be independently audited and tested.
