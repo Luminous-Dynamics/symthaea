@@ -1,9 +1,17 @@
+pub mod canonical_identity;
+pub mod evidence_view;
+pub mod retrieval;
 pub mod epistemic_watchdog;
 pub mod formal_watchdog;
 pub mod global_ledger;
 pub mod memory_projection;
+pub mod typed_refs;
 
+pub use canonical_identity::*;
+pub use evidence_view::*;
+pub use retrieval::*;
 pub use epistemic_watchdog::*;
 pub use formal_watchdog::*;
 pub use global_ledger::*;
 pub use memory_projection::*;
+pub use typed_refs::*;
