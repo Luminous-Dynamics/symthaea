@@ -12,7 +12,7 @@ The module consumes the receipt contract proposed in [PR #13709](https://github.
 
 ## Provider parameter profile binding
 
-The verifier binds `provider_parameter_profile_sha256` from the signed receipt to the independent run manifest. The value is the SHA-256 commitment to the canonical JSON serialization of the deterministic, lexicographically ordered provider parameter map. The capture adapter limits generic parameters to scalar strings, numbers and booleans; nested objects/arrays are not accepted through this untyped path.
+The verifier binds `provider_parameter_profile_sha256` from the signed receipt to the independent run manifest. The value is the SHA-256 commitment to the canonical JSON serialization of the deterministic, lexicographically ordered provider parameter map. The capture adapter limits generic parameters to numbers and booleans; free-form strings, nested objects and arrays are not accepted through this untyped path.
 
 This closes a request-construction gap in which memory-derived instructions, metadata or tool definitions could be inserted through arbitrary JSON outside the message source map. Structured provider fields require a provider-specific typed adapter that source-maps every dynamic text/media leaf. The static profile must be frozen before the run and reused unchanged by all randomized arms, including true no-memory.
 
