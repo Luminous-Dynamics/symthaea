@@ -597,7 +597,7 @@ mod tests {
     }
 
     #[test]
-    fn several_plan_preserving_returns_are_generated_and_ranked() {
+    fn weakened_sonata_return_abstains_when_every_alternative_fails_hard_gates() {
         let intent = MusicalIntent {
             seed: 41,
             bars: 4,
@@ -622,19 +622,28 @@ mod tests {
         let trace = return_trace(&realization);
         let batch = generate_and_rank_sonata_return(&realization, &trace).unwrap();
         assert_eq!(batch.candidates.len(), 5);
-        let selected = batch.selection.recommended_id.as_deref().unwrap();
-        let selected = batch
-            .candidates
-            .iter()
-            .find(|candidate| candidate.alternative_id == selected)
-            .unwrap();
-        assert!(selected.hard_constraints_valid());
-        assert!(selected.preserved_invariants);
-        assert!(selected.motif_return.overall_similarity >= 0.95);
-        assert!(selected.verification.iter().any(|evidence| {
-            evidence.obligation_id == trace.proposal.driving_obligation_id.unwrap()
-                && evidence.verified
-        }));
+        assert!(
+            batch.selection.recommended_id.is_none(),
+            "the known weakened-return fixture has no candidate that passes both hard gates: {:#?}",
+            batch.selection.assessments
+        );
+        assert!(
+            batch.selection.assessments.iter().all(|assessment| !assessment.eligible),
+            "an abstention is valid only when every candidate is ineligible"
+        );
+        assert!(
+            batch.selection.rationale.iter().any(|reason| {
+                reason.contains("no candidate passed canonical theory and Preserve-contract checks")
+            }),
+            "abstention reason must be explicit: {:?}",
+            batch.selection.rationale
+        );
+        assert!(
+            batch.selection.assessments.iter().any(|assessment| {
+                !assessment.theory_validation.valid || !assessment.preserved_invariants
+            }),
+            "the refusal must be backed by inspectable validation/preservation evidence"
+        );
     }
 
     #[test]
