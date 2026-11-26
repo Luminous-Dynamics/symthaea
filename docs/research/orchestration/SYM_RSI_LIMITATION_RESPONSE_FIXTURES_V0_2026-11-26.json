@@ -1,0 +1,277 @@
+{
+  "schema_version": "symthaea-limitation-response-fixtures-v0",
+  "status": "SYNTHETIC_POLICY_CONTRACT_EXAMPLES_NOT_BENCHMARK_RESULTS",
+  "schema_ref": "SYM_RSI_LIMITATION_RESPONSE_TRACE_SCHEMA_V0_2026-11-26.json",
+  "cases": [
+    {
+      "schema_version": "symthaea-limitation-response-trace-v0",
+      "obligation_id": "lim-open-low-power",
+      "status": "OPEN",
+      "detected_at": "2026-11-26T21:00:00Z",
+      "detected_by": "DOMAIN_EXPERT",
+      "state_binding": {
+        "research_state_sha256": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+        "evidence_prefix_sha256": "bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb",
+        "decision_id": "decision-001",
+        "claim_scope_sha256": "cccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccc"
+      },
+      "limitation": {
+        "class": "LOW_POWER",
+        "description": "Synthetic lifecycle fixture; not a real scientific observation.",
+        "affected_claim_ids": [
+          "claim-001"
+        ],
+        "affected_evidence_ids": [
+          "evidence-001"
+        ]
+      },
+      "impact": {
+        "severity": "MODERATE",
+        "consequence": "Synthetic test of method-response obligation semantics.",
+        "affected_outputs": [
+          "effect-estimate"
+        ]
+      },
+      "required_response": "REPLICATE",
+      "prospective_plan": {
+        "permitted_action_offer_id": null,
+        "rationale": "The response is required by the synthetic policy case.",
+        "predicted_outcome": "The stated action will generate a discriminating observation.",
+        "decision_consequence": "The outcome will determine whether the scoped claim is retained or revised.",
+        "success_condition": "The resulting receipt and post-state match the frozen response predicate.",
+        "reversal_condition": "A contradictory or invalid control restores the obligation to unresolved."
+      },
+      "execution": {
+        "status": "NOT_STARTED",
+        "action_receipt_ref": null,
+        "post_state_sha256": null,
+        "post_evidence_prefix_sha256": null,
+        "method_changed": null,
+        "observed_effect": null
+      },
+      "adjudication": {
+        "status": "PENDING",
+        "authority_ref": null,
+        "reviewed_at": null,
+        "evidence_ref": null,
+        "disposition": "Await independent adjudication; candidate cannot self-close."
+      }
+    },
+    {
+      "schema_version": "symthaea-limitation-response-trace-v0",
+      "obligation_id": "lim-planned-confound",
+      "status": "RESPONSE_PLANNED",
+      "detected_at": "2026-11-26T21:00:00Z",
+      "detected_by": "DOMAIN_EXPERT",
+      "state_binding": {
+        "research_state_sha256": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+        "evidence_prefix_sha256": "bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb",
+        "decision_id": "decision-001",
+        "claim_scope_sha256": "cccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccc"
+      },
+      "limitation": {
+        "class": "CONFOUNDING",
+        "description": "Synthetic lifecycle fixture; not a real scientific observation.",
+        "affected_claim_ids": [
+          "claim-001"
+        ],
+        "affected_evidence_ids": [
+          "evidence-001"
+        ]
+      },
+      "impact": {
+        "severity": "MODERATE",
+        "consequence": "Synthetic test of method-response obligation semantics.",
+        "affected_outputs": [
+          "effect-estimate"
+        ]
+      },
+      "required_response": "SENSITIVITY_ANALYSIS",
+      "prospective_plan": {
+        "permitted_action_offer_id": "offer-sensitivity-01",
+        "rationale": "The response is required by the synthetic policy case.",
+        "predicted_outcome": "The stated action will generate a discriminating observation.",
+        "decision_consequence": "The outcome will determine whether the scoped claim is retained or revised.",
+        "success_condition": "The resulting receipt and post-state match the frozen response predicate.",
+        "reversal_condition": "A contradictory or invalid control restores the obligation to unresolved."
+      },
+      "execution": {
+        "status": "NOT_STARTED",
+        "action_receipt_ref": null,
+        "post_state_sha256": null,
+        "post_evidence_prefix_sha256": null,
+        "method_changed": null,
+        "observed_effect": null
+      },
+      "adjudication": {
+        "status": "PENDING",
+        "authority_ref": null,
+        "reviewed_at": null,
+        "evidence_ref": null,
+        "disposition": "Await independent adjudication; candidate cannot self-close."
+      }
+    },
+    {
+      "schema_version": "symthaea-limitation-response-trace-v0",
+      "obligation_id": "lim-executed-scope",
+      "status": "EXECUTED",
+      "detected_at": "2026-11-26T21:00:00Z",
+      "detected_by": "DOMAIN_EXPERT",
+      "state_binding": {
+        "research_state_sha256": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+        "evidence_prefix_sha256": "bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb",
+        "decision_id": "decision-001",
+        "claim_scope_sha256": "cccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccc"
+      },
+      "limitation": {
+        "class": "SCOPE_MISMATCH",
+        "description": "Synthetic lifecycle fixture; not a real scientific observation.",
+        "affected_claim_ids": [
+          "claim-001"
+        ],
+        "affected_evidence_ids": [
+          "evidence-001"
+        ]
+      },
+      "impact": {
+        "severity": "MODERATE",
+        "consequence": "Synthetic test of method-response obligation semantics.",
+        "affected_outputs": [
+          "effect-estimate"
+        ]
+      },
+      "required_response": "REVISE_SCOPE",
+      "prospective_plan": {
+        "permitted_action_offer_id": "offer-scope-01",
+        "rationale": "The response is required by the synthetic policy case.",
+        "predicted_outcome": "The stated action will generate a discriminating observation.",
+        "decision_consequence": "The outcome will determine whether the scoped claim is retained or revised.",
+        "success_condition": "The resulting receipt and post-state match the frozen response predicate.",
+        "reversal_condition": "A contradictory or invalid control restores the obligation to unresolved."
+      },
+      "execution": {
+        "status": "COMPLETED",
+        "action_receipt_ref": "receipt://executor/0003",
+        "post_state_sha256": "bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb",
+        "post_evidence_prefix_sha256": "cccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccc",
+        "method_changed": true,
+        "observed_effect": "The claim scope was narrowed to the measured population."
+      },
+      "adjudication": {
+        "status": "PENDING",
+        "authority_ref": null,
+        "reviewed_at": null,
+        "evidence_ref": null,
+        "disposition": "Await independent adjudication; candidate cannot self-close."
+      }
+    },
+    {
+      "schema_version": "symthaea-limitation-response-trace-v0",
+      "obligation_id": "lim-adjudicated-control",
+      "status": "ADJUDICATED",
+      "detected_at": "2026-11-26T21:00:00Z",
+      "detected_by": "DOMAIN_EXPERT",
+      "state_binding": {
+        "research_state_sha256": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+        "evidence_prefix_sha256": "bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb",
+        "decision_id": "decision-001",
+        "claim_scope_sha256": "cccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccc"
+      },
+      "limitation": {
+        "class": "DATA_INTEGRITY",
+        "description": "Synthetic lifecycle fixture; not a real scientific observation.",
+        "affected_claim_ids": [
+          "claim-001"
+        ],
+        "affected_evidence_ids": [
+          "evidence-001"
+        ]
+      },
+      "impact": {
+        "severity": "MODERATE",
+        "consequence": "Synthetic test of method-response obligation semantics.",
+        "affected_outputs": [
+          "effect-estimate"
+        ]
+      },
+      "required_response": "REANALYZE",
+      "prospective_plan": {
+        "permitted_action_offer_id": "offer-reanalysis-01",
+        "rationale": "The response is required by the synthetic policy case.",
+        "predicted_outcome": "The stated action will generate a discriminating observation.",
+        "decision_consequence": "The outcome will determine whether the scoped claim is retained or revised.",
+        "success_condition": "The resulting receipt and post-state match the frozen response predicate.",
+        "reversal_condition": "A contradictory or invalid control restores the obligation to unresolved."
+      },
+      "execution": {
+        "status": "COMPLETED",
+        "action_receipt_ref": "receipt://executor/0004",
+        "post_state_sha256": "bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb",
+        "post_evidence_prefix_sha256": "cccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccc",
+        "method_changed": true,
+        "observed_effect": "The corrected input was reanalysed and the result reproduced."
+      },
+      "adjudication": {
+        "status": "RESOLVED",
+        "authority_ref": "adjudicator://independent-review/17",
+        "reviewed_at": "2026-11-26T21:00:00Z",
+        "evidence_ref": "artifact://review/17",
+        "disposition": "Independent review confirmed the correction and the revised result."
+      }
+    },
+    {
+      "schema_version": "symthaea-limitation-response-trace-v0",
+      "obligation_id": "lim-waived-nonmaterial",
+      "status": "WAIVED_WITH_REASON",
+      "detected_at": "2026-11-26T21:00:00Z",
+      "detected_by": "DOMAIN_EXPERT",
+      "state_binding": {
+        "research_state_sha256": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+        "evidence_prefix_sha256": "bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb",
+        "decision_id": "decision-001",
+        "claim_scope_sha256": "cccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccc"
+      },
+      "limitation": {
+        "class": "OTHER",
+        "description": "Synthetic lifecycle fixture; not a real scientific observation.",
+        "affected_claim_ids": [
+          "claim-001"
+        ],
+        "affected_evidence_ids": [
+          "evidence-001"
+        ]
+      },
+      "impact": {
+        "severity": "MODERATE",
+        "consequence": "Synthetic test of method-response obligation semantics.",
+        "affected_outputs": [
+          "effect-estimate"
+        ]
+      },
+      "required_response": "JUSTIFIED_NO_CHANGE",
+      "prospective_plan": {
+        "permitted_action_offer_id": null,
+        "rationale": "The response is required by the synthetic policy case.",
+        "predicted_outcome": "The stated action will generate a discriminating observation.",
+        "decision_consequence": "The outcome will determine whether the scoped claim is retained or revised.",
+        "success_condition": "The resulting receipt and post-state match the frozen response predicate.",
+        "reversal_condition": "A contradictory or invalid control restores the obligation to unresolved."
+      },
+      "execution": {
+        "status": "NOT_REQUIRED",
+        "action_receipt_ref": null,
+        "post_state_sha256": null,
+        "post_evidence_prefix_sha256": null,
+        "method_changed": false,
+        "observed_effect": "The limitation was assessed as non-material for the scoped decision."
+      },
+      "adjudication": {
+        "status": "WAIVED",
+        "authority_ref": "expert://domain-review/4",
+        "reviewed_at": "2026-11-26T21:00:00Z",
+        "evidence_ref": "artifact://review/4",
+        "disposition": "Independent reviewer justified no method change; estimated decision consequence is unchanged."
+      }
+    }
+  ]
+}
