@@ -39,7 +39,7 @@ The replay result must match the source resolver's signed `source_graph_sha256`,
 
 ## 4. Consumer use
 
-The entry point is `replay_source_lineage_graph_v1(graph_json, qualified, decision_need, verified_lineage)`.
+The entry point is `replay_source_lineage_graph_v1(graph_json, qualified, qualification_binding, current_qualifier_verifier, verified_sufficiency, sufficiency_use_binding, current_evaluator_profile, decision_need, verified_lineage, current_lineage_profile)`. It calls the lineage set's use-time validation itself, so graph replay cannot rely on a stale verified token. All three authorities are checked against one trusted time value before the graph is processed.
 
 Before accepting the graph, the caller must first verify the source-lineage envelopes under #13700, which itself revalidates qualification and sufficiency at the same trusted use-time. Replay then requires:
 - matching qualified-set and DecisionNeed digests;
