@@ -835,7 +835,7 @@ mod tests {
         };
         assert_eq!(
             validate_node_artifact_bytes(&node, &wrong_derivation, &measured),
-            Err(SourceOriginRejectV1::BindingMismatch)
+            Err(SourceOriginRejectV1::DerivationReceiptMismatch)
         );
     }
 
