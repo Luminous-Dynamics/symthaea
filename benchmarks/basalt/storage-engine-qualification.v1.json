@@ -1,0 +1,444 @@
+{
+  "suite_id": "basalt-storage-engine-qualification-v1",
+  "benchmark_version": 1,
+  "title": "BASALT local durability and remote authority engine qualification",
+  "implementation_status": "specification_only",
+  "claim_ceiling": "Versioned candidate matrix and adversarial test plan only. No engine has been independently qualified by this suite.",
+  "arms": [
+    {
+      "id": "sqlite_wal_full",
+      "engine": "sqlite",
+      "role": "local_relational",
+      "client": "rusqlite 0.37 bundled SQLite",
+      "topology": "single-host local file; one or more processes on same host",
+      "durability_profile": "WAL; synchronous=FULL; BEGIN IMMEDIATE; busy_timeout=5000ms"
+    },
+    {
+      "id": "turso_full",
+      "engine": "turso",
+      "role": "local_relational",
+      "client": "Rust Turso binding pinned to exact release/commit (initial candidate 0.8.0)",
+      "topology": "in-process local file; multi-connection; no multi-process assumption",
+      "durability_profile": "WAL-compatible mode; PRAGMA synchronous=FULL; explicit checkpoint policy"
+    },
+    {
+      "id": "postgres18_local",
+      "engine": "postgresql",
+      "role": "local_relational",
+      "client": "SQLx Rust PostgreSQL driver",
+      "topology": "PostgreSQL 18 server on same host; local client",
+      "durability_profile": "fsync=on; synchronous_commit=on; full_page_writes=on; primary reads"
+    },
+    {
+      "id": "postgres18_remote",
+      "engine": "postgresql",
+      "role": "remote_relational_authority",
+      "client": "SQLx Rust PostgreSQL driver",
+      "topology": "PostgreSQL 18 primary over pinned regional network; no synchronous standby",
+      "durability_profile": "fsync=on; synchronous_commit=on; full_page_writes=on; primary-only authoritative reads"
+    },
+    {
+      "id": "postgres18_sync_standby",
+      "engine": "postgresql",
+      "role": "remote_relational_authority",
+      "client": "SQLx Rust PostgreSQL driver",
+      "topology": "PostgreSQL 18 primary plus explicitly provisioned synchronous standbys",
+      "durability_profile": "fsync=on; synchronous_commit=on or remote_flush; synchronous_standby_names pinned; failover policy recorded"
+    },
+    {
+      "id": "etcd3",
+      "engine": "etcd",
+      "role": "remote_coordination_authority",
+      "client": "etcd v3 Rust client",
+      "topology": "three-member cluster across declared failure domains",
+      "durability_profile": "linearizable reads; atomic scoped compare-and-advance; quorum commit"
+    },
+    {
+      "id": "etcd5",
+      "engine": "etcd",
+      "role": "remote_coordination_authority",
+      "client": "etcd v3 Rust client",
+      "topology": "five-member cluster across declared failure domains",
+      "durability_profile": "linearizable reads; atomic scoped compare-and-advance; quorum commit"
+    },
+    {
+      "id": "redb_kv",
+      "engine": "redb",
+      "role": "local_kv",
+      "client": "redb Rust API",
+      "topology": "single-host embedded key-value store",
+      "durability_profile": "ACID transactions; reference KV control only; no relational parity claim"
+    }
+  ],
+  "scenarios": [
+    {
+      "id": "STO-001",
+      "class": "durability",
+      "mutation": "Fresh local database; first small transaction on first connection; acknowledge COMMIT; power-loss model immediately afterward",
+      "expected": "survive",
+      "safety_gate": true
+    },
+    {
+      "id": "STO-002",
+      "class": "durability",
+      "mutation": "New connection to an existing local database; first small non-spilling transaction; acknowledge COMMIT; power-loss model immediately afterward",
+      "expected": "survive",
+      "safety_gate": true
+    },
+    {
+      "id": "STO-003",
+      "class": "durability",
+      "mutation": "Commit immediately after WAL checkpoint/truncate or WAL-generation reset",
+      "expected": "survive",
+      "safety_gate": true
+    },
+    {
+      "id": "STO-004",
+      "class": "durability",
+      "mutation": "Large/spilling transaction whose pages are appended through alternate WAL paths",
+      "expected": "survive",
+      "safety_gate": true
+    },
+    {
+      "id": "STO-005",
+      "class": "durability",
+      "mutation": "Several commits on one connection followed by power loss immediately after an acknowledged commit",
+      "expected": "survive",
+      "safety_gate": true
+    },
+    {
+      "id": "STO-006",
+      "class": "durability",
+      "mutation": "Crash occurs while the sync call is in flight or returns an I/O error",
+      "expected": "atomic_abort",
+      "safety_gate": true
+    },
+    {
+      "id": "STO-007",
+      "class": "durability",
+      "mutation": "Distinguish process SIGKILL from OS/power loss using the same acknowledged-commit protocol",
+      "expected": "measure_only",
+      "safety_gate": true
+    },
+    {
+      "id": "STO-008",
+      "class": "durability",
+      "mutation": "Short write, disk full, fsync failure, or storage device I/O error during the four-record transition",
+      "expected": "atomic_abort",
+      "safety_gate": true
+    },
+    {
+      "id": "STO-009",
+      "class": "atomicity",
+      "mutation": "Inject process crash/failure after each individual receipt/source/log/policy write before transaction commit",
+      "expected": "atomic_abort",
+      "safety_gate": true
+    },
+    {
+      "id": "STO-010",
+      "class": "atomicity",
+      "mutation": "Crash after durable commit but before client receives the response",
+      "expected": "original_receipt_and_current_revision",
+      "safety_gate": true
+    },
+    {
+      "id": "STO-011",
+      "class": "idempotency",
+      "mutation": "Retry receipt A after receipt B and unrelated state changes have advanced the current store revision",
+      "expected": "original_receipt_and_current_revision",
+      "safety_gate": true
+    },
+    {
+      "id": "STO-012",
+      "class": "concurrency",
+      "mutation": "Two writers from the same source/generation and predecessor submit different receipt digests",
+      "expected": "single_commit",
+      "safety_gate": true
+    },
+    {
+      "id": "STO-013",
+      "class": "concurrency",
+      "mutation": "Two independent source lineages with independent log origins advance from a common snapshot",
+      "expected": "single_commit",
+      "safety_gate": true
+    },
+    {
+      "id": "STO-014",
+      "class": "concurrency",
+      "mutation": "Two distinct sources contend on one shared log checkpoint cursor",
+      "expected": "conflict_then_reverify",
+      "safety_gate": true
+    },
+    {
+      "id": "STO-015",
+      "class": "concurrency",
+      "mutation": "Policy or witness pointer changes after proof verification but before CAS/commit",
+      "expected": "conflict_then_reverify",
+      "safety_gate": true
+    },
+    {
+      "id": "STO-016",
+      "class": "freshness",
+      "mutation": "Serializable PostgreSQL transaction fails with SQLSTATE 40001; retry only the final statement as an intentionally bad control",
+      "expected": "conflict_then_reverify",
+      "safety_gate": true
+    },
+    {
+      "id": "STO-017",
+      "class": "freshness",
+      "mutation": "PostgreSQL SERIALIZABLE transaction fails with SQLSTATE 40001; retry the whole transaction including logic derived from reads",
+      "expected": "conflict_then_reverify",
+      "safety_gate": true
+    },
+    {
+      "id": "STO-018",
+      "class": "freshness",
+      "mutation": "Supply stale replica, member-local serializable etcd read, or cache read as authority freshness evidence",
+      "expected": "unknown_or_reject",
+      "safety_gate": true
+    },
+    {
+      "id": "STO-019",
+      "class": "restore",
+      "mutation": "Restore SQLite, Turso or PostgreSQL from an internally consistent older backup while keeping an old trusted authority identity",
+      "expected": "no_false_freshness",
+      "safety_gate": true
+    },
+    {
+      "id": "STO-020",
+      "class": "restore",
+      "mutation": "PostgreSQL point-in-time recovery creates a new timeline from an older target; external witness records the latest accepted-state commitment",
+      "expected": "no_false_freshness",
+      "safety_gate": true
+    },
+    {
+      "id": "STO-021",
+      "class": "restore",
+      "mutation": "Restore etcd snapshot without revision bump or mark-compacted",
+      "expected": "unknown_or_reject",
+      "safety_gate": true
+    },
+    {
+      "id": "STO-022",
+      "class": "restore",
+      "mutation": "Restore etcd snapshot with --bump-revision and --mark-compacted",
+      "expected": "no_false_freshness",
+      "safety_gate": true
+    },
+    {
+      "id": "STO-023",
+      "class": "restore",
+      "mutation": "Restore a valid database snapshot but change authority incarnation identity or omit externally witnessed predecessor commitment",
+      "expected": "unknown_or_reject",
+      "safety_gate": true
+    },
+    {
+      "id": "STO-024",
+      "class": "restore",
+      "mutation": "Witness/monitor is unavailable or disagrees with restored authority state",
+      "expected": "unknown_or_reject",
+      "safety_gate": true
+    },
+    {
+      "id": "STO-025",
+      "class": "operational",
+      "mutation": "Delete local SQLite/Turso cache and rebuild it exclusively from remote immutable accepted receipt records",
+      "expected": "survive",
+      "safety_gate": true
+    },
+    {
+      "id": "STO-026",
+      "class": "operational",
+      "mutation": "Fail over PostgreSQL with synchronous standbys and verify commit acknowledgment policy and promoted node history",
+      "expected": "measure_only",
+      "safety_gate": true
+    },
+    {
+      "id": "STO-027",
+      "class": "control",
+      "mutation": "Run the same four-record state transition and receipt bytes on every relational/coordination arm",
+      "expected": "measure_only",
+      "safety_gate": false
+    },
+    {
+      "id": "STO-028",
+      "class": "control",
+      "mutation": "redb handles the same narrow key/value data but is not compared on joins or relational query capabilities",
+      "expected": "measure_only",
+      "safety_gate": false
+    }
+  ],
+  "metrics": [
+    {
+      "id": "acknowledged_commit_loss_after_power_cut",
+      "class": "safety",
+      "unit": "count",
+      "target": "0 for all qualified local durability arms"
+    },
+    {
+      "id": "partial_four_record_transition",
+      "class": "safety",
+      "unit": "count",
+      "target": "0"
+    },
+    {
+      "id": "wrong_receipt_retry_identity",
+      "class": "safety",
+      "unit": "count",
+      "target": "0"
+    },
+    {
+      "id": "generation_equivocation_acceptance",
+      "class": "safety",
+      "unit": "count",
+      "target": "0"
+    },
+    {
+      "id": "stale_policy_commit",
+      "class": "safety",
+      "unit": "count",
+      "target": "0"
+    },
+    {
+      "id": "stale_read_freshness_promotion",
+      "class": "safety",
+      "unit": "count",
+      "target": "0"
+    },
+    {
+      "id": "restore_false_freshness",
+      "class": "safety",
+      "unit": "count",
+      "target": "0"
+    },
+    {
+      "id": "seeded_fault_detection",
+      "class": "safety",
+      "unit": "percent",
+      "target": "100% within declared supported fault model"
+    },
+    {
+      "id": "commit_latency_p50_p95_p99",
+      "class": "performance",
+      "unit": "milliseconds",
+      "target": "measure by local versus remote operation class"
+    },
+    {
+      "id": "accepted_transactions_per_second",
+      "class": "performance",
+      "unit": "transactions_per_second",
+      "target": "measure at 1/2/8/16/32/64/128 clients"
+    },
+    {
+      "id": "sync_count_and_latency",
+      "class": "performance",
+      "unit": "count and milliseconds",
+      "target": "measure per commit and checkpoint"
+    },
+    {
+      "id": "bytes_written_per_receipt",
+      "class": "resource",
+      "unit": "bytes",
+      "target": "measure WAL/WAL+DB/remote network bytes separately"
+    },
+    {
+      "id": "compare_conflict_rate_by_scope",
+      "class": "performance",
+      "unit": "percent",
+      "target": "measure source, log, policy and global-counter conflicts"
+    },
+    {
+      "id": "retries_per_successful_commit",
+      "class": "performance",
+      "unit": "count",
+      "target": "measure by concurrency and conflict profile"
+    },
+    {
+      "id": "cpu_memory_disk_network",
+      "class": "resource",
+      "unit": "normalized resource vector",
+      "target": "publish raw measurements and hardware"
+    },
+    {
+      "id": "reopen_and_recovery_time",
+      "class": "operations",
+      "unit": "milliseconds",
+      "target": "measure p50/p95/p99"
+    },
+    {
+      "id": "cache_rebuild_time",
+      "class": "operations",
+      "unit": "milliseconds",
+      "target": "measure with 1k/10k/100k accepted receipts"
+    },
+    {
+      "id": "backup_restore_operational_complexity",
+      "class": "operations",
+      "unit": "reviewed checklist and operator-hours",
+      "target": "record steps, failure modes and runbook ambiguity"
+    },
+    {
+      "id": "authority_incarnation_restore_detection",
+      "class": "safety",
+      "unit": "percent",
+      "target": "100% of seeded normal and revision-bumped restores detected or unknown"
+    }
+  ],
+  "workload_matrix": {
+    "clients": [
+      1,
+      2,
+      8,
+      16,
+      32,
+      64,
+      128
+    ],
+    "receipts": [
+      1000,
+      10000,
+      100000
+    ],
+    "source_lineages": [
+      1,
+      10,
+      100,
+      1000
+    ],
+    "log_origins": [
+      1,
+      10,
+      100
+    ],
+    "distributions": [
+      "uniform",
+      "one-hot-source",
+      "one-hot-log",
+      "high-fanout"
+    ],
+    "fault_modes": [
+      "process-crash",
+      "power-loss-model",
+      "sync-error",
+      "disk-full",
+      "network-partition",
+      "leader-change",
+      "snapshot-restore",
+      "revision-bumped-restore"
+    ]
+  },
+  "fault_model": {
+    "process_crash_distinct_from_power_loss": true,
+    "power_loss_discards_unsynced_writes": true,
+    "tested_store_is_not_its_own_external_witness": true,
+    "remote_and_local_latencies_separated": true
+  },
+  "benchmark_rules": {
+    "safety_before_efficiency": true,
+    "no_composite_score_offsets_safety": true,
+    "pin_engine_and_client_versions": true,
+    "publish_raw_fault_schedule_and_durable_image": true,
+    "external_witness_required_for_rollback_claim": true,
+    "no_migration_until_safety_gates_pass": true
+  }
+}
