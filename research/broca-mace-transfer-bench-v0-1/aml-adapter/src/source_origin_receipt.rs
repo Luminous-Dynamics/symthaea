@@ -66,7 +66,7 @@ pub enum SourceOriginRejectV1 {
     AggregateBudgetExceeded,
 }
 
-#[derive(Clone, Debug, Eq, PartialEq)]
+#[derive(Clone, Copy, Debug, Eq, PartialEq)]
 pub struct SourceOriginArtifactInputV1<'a> {
     /// Exact graph-node identifier. Inputs must cover every node, not only
     /// candidate nodes that satisfy a DecisionNeed requirement.
@@ -680,8 +680,8 @@ mod tests {
             "status": "origin_verified",
             "issued_at_unix": 10,
             "expires_at_unix": 50,
-            "issuer_profile_sha256": profile_sha256,
-            "key_id": key_id
+            "issuer_profile_sha256": profile_sha256.clone(),
+            "key_id": key_id.clone()
         });
         let statement = serde_json::json!({
             "_type": IN_TOTO_STATEMENT_TYPE_V1,
