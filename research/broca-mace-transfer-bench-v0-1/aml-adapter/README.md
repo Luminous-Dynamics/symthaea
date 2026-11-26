@@ -182,3 +182,10 @@ Protocol: [MACE Adaptive Decision Acquisition V1](../../../docs/research/MACE_AD
 The `adaptive_policy_reference` module is an independent finite-world oracle for bounded sequential acquisition policies. It evaluates exact fixed-point expected net utility and a separate probability-free worst-case regret objective over shared latent worlds. It preserves query dependence, rejects prohibited terminal actions, enforces per-path budgets and returns a deterministic policy tree. It is deliberately bounded to small scenarios and is not a production executor or learned policy.
 
 Protocol: [MACE Adaptive Decision Acquisition V1](../../../docs/research/MACE_ADAPTIVE_DECISION_ACQUISITION_V1.md). Portable inputs: [reference scenario schema](../../../data/schemas/mace_adaptive_reference_scenario_v1.schema.json) and [example joint world](../../../data/fixtures/mace_adaptive_reference_scenario_v1.example.json). Fifteen deterministic adversarial test functions are authored; they have not been compiled or run.
+
+
+## Benchmark result evidence capsules
+
+MACE benchmark runs should be published as evidence capsules, not isolated scores. The capsule pins the exact benchmark/harness/split, candidate commit/configuration/build, model and grader, resource budgets, task denominator, safety counts, uncertainty method and verification level.
+
+Protocol: [MACE Benchmark Result Capsule V1](../../../docs/research/MACE_BENCHMARK_RESULT_CAPSULE_V1.md). Schema: [mace_benchmark_result_capsule_v1.schema.json](../../../data/schemas/mace_benchmark_result_capsule_v1.schema.json). The schema is a manifest contract, not a signature verifier or an executed benchmark result.
