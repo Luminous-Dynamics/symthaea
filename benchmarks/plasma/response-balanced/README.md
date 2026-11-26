@@ -141,6 +141,16 @@ For a frozen scenario with factor matrices (X_s) and (Y_s), evaluate the transfe
 ]
 The Rust API `linearized_response_residual` computes this quantity without forming dense Gramians. `evaluate_response_scenario_residuals` reports the individual scenario residuals, normalized weighted mean, worst-case value, and upper-tail CVaR at a registered level (alpha).
 
+Checkpoint-state and future-pulse channels are now measured separately. The additional `linearized_pulse_response_residual` takes the pulse-map parameter derivative (B_p=\partial J_p/\partial u_p) and the future QoI sensitivities pulled back to the post-pulse state, (Y_p), and computes
+\[
+\rho_{p} =
+\frac{\|Y_p^T(I-P)B_p\|_F}
+     {\|Y_p^TB_p\|_F}.
+\]
+This catches a failure mode the checkpoint-state residual cannot: a basis can preserve the response of the current checkpoint perturbations yet entirely discard the state direction injected by a future pulse. The new manufactured test builds a rank-one basis retaining (e_1), then verifies a pulse in (e_1) has near-zero residual while an equally observable pulse in (e_2) has residual one.
+
+This pulse residual assumes the basis is applied in the same state coordinates at the pulse application state. For a genuinely time-varying atlas, evaluate the pulse against the stage-local basis and include the explicit transfer map between the checkpoint basis and that pulse-time basis. The pulse derivative must be the derivative of the exact discrete kick map, not a continuous-time approximation.
+
 This metric is a **finite-horizon linearized input–output residual proxy** for the supplied discrete sensitivities. It is not a nonlinear echo error bound, does not account for branch changes that invalidate the local derivative, and cannot replace held-out full-order pulse experiments. It is useful because it exposes whether a scenario-average balanced basis hides a poorly represented low-probability direction. The manufactured 51/49 fixture demonstrates that failure mode: a rank-one average basis retains the dominant scenario but loses the other scenario's response entirely, producing a weighted mean residual of 0.49 while both worst-case and 90%-CVaR residuals are 1.0.
 
 Use three separate qualification views:
