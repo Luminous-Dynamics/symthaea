@@ -97,6 +97,7 @@ pub struct EvidenceContextV1 {
 pub struct AudioEvidenceWindowManifestV1 {
     pub schema: String,
     pub experiment_unit_id: String,
+    pub source_lineage_id: String,
     pub query_id: String,
     pub query_text: String,
     pub query_text_sha256: String,
@@ -161,6 +162,7 @@ pub struct AudioEvidenceVerificationReportV1 {
 struct EvidenceContextDigestPayloadV1<'a> {
     schema: &'static str,
     experiment_unit_id: &'a str,
+    source_lineage_id: &'a str,
     query_id: &'a str,
     query_text_sha256: &'a str,
     evidence_condition: EvidenceConditionV1,
@@ -205,6 +207,7 @@ pub fn verify_audio_evidence_manifest(
         return Err(format!("unsupported audio evidence schema: {}", manifest.schema));
     }
     require_text(&manifest.experiment_unit_id, "experiment_unit_id")?;
+    require_text(&manifest.source_lineage_id, "source_lineage_id")?;
     require_text(&manifest.query_id, "query_id")?;
     require_text(&manifest.query_text, "query_text")?;
     validate_digest(&manifest.target_audio_sha256, "target_audio_sha256")?;
@@ -432,6 +435,7 @@ fn context_digest(manifest: &AudioEvidenceWindowManifestV1) -> Result<String, St
     let payload = EvidenceContextDigestPayloadV1 {
         schema: "mel-audio-evidence-context-v1",
         experiment_unit_id: &manifest.experiment_unit_id,
+        source_lineage_id: &manifest.source_lineage_id,
         query_id: &manifest.query_id,
         query_text_sha256: &manifest.query_text_sha256,
         evidence_condition: manifest.evidence_condition,
@@ -507,6 +511,7 @@ mod tests {
         let mut manifest = AudioEvidenceWindowManifestV1 {
             schema: MANIFEST_SCHEMA_V1.into(),
             experiment_unit_id: "mel-grounding-evidence-window-fixture-001".into(),
+            source_lineage_id: "synthetic-source-lineage-001".into(),
             query_id: "piano-entry-query-001".into(),
             query_text: "Identify every piano entrance in the supplied recording.".into(),
             query_text_sha256: sha256_hex(b"Identify every piano entrance in the supplied recording."),
