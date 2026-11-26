@@ -22,6 +22,13 @@ Symthaea is not just software - it's a research platform exploring fundamental q
 
 ---
 
+## Active Scientific Intelligence
+
+- [Active Scientific Intelligence v2 — Identifiability, Intervention and Evidence](SDCB_ACTIVE_SCIENCE_BENCHMARK_V2.md) — bounded 2–4 state linear-system reference, observational-equivalence controls, intervention selection, evidence boundary and matched benchmark targets.
+- [Decision-Sufficient Scientific Intelligence v1](SDCB_DECISION_SUFFICIENT_SCIENTIFIC_INTELLIGENCE_V1.md) — EIG versus EVSI and exact finite-horizon Bayesian decision value.
+- [Robust and Pareto-Aware Scientific Decision Design v1](SDCB_ROBUST_AND_PARETO_DECISION_DESIGN_V1.md) — ambiguity-set robust EVSI, Pareto policies and hard constraints.
+- [Evidence-Gated Belief Transitions v1](SDCB_EVIDENCE_GATED_BELIEF_TRANSITION_V1.md) — verified observations as atomic model-state transitions.
+
 ## Theoretical Foundations
 
 ### Integrated Information Theory (IIT)
