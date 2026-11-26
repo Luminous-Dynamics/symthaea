@@ -279,21 +279,29 @@ mod tests {
         let mut case = revision_case();
         case.evidence_condition = RevisionEvidenceConditionV1::YokedRetrieved;
         let mut manifest = evidence_manifest();
-        let yoked_source = b"MEL-GROUND-009 synthetic yoked source audio v1\n";
+        let yoked_source = b"MEL-GROUND-009 synthetic yoked source audio v1\\n";
+        let yoked_pcm: Vec<u8> = PCM.iter().map(|sample| sample ^ 0x5a).collect();
         let yoked_digest = sha256_hex(yoked_source);
         manifest.evidence_condition = AudioEvidenceConditionV1::YokedRetrieved;
         manifest.source_audio.audio_sha256 = yoked_digest.clone();
         manifest.source_audio.byte_length = yoked_source.len() as u64;
         manifest.source_lineage_id = "synthetic-yoked-source-lineage-001".into();
+        manifest.decoded_pcm.pcm_sha256 = sha256_hex(&yoked_pcm);
+        manifest.windows[0].window_pcm_sha256 = sha256_hex(&yoked_pcm[4..12]);
+        manifest.windows[1].window_pcm_sha256 = sha256_hex(&yoked_pcm[20..32]);
+        manifest.context.items[0].payload_sha256 = manifest.windows[0].window_pcm_sha256.clone();
+        manifest.context.items[1].payload_sha256 = manifest.windows[1].window_pcm_sha256.clone();
+        case.evidence.as_mut().unwrap().source_audio_sha256 = yoked_digest;
+        case.evidence.as_mut().unwrap().evidence_payload_sha256 =
+            manifest.windows[0].window_pcm_sha256.clone();
         manifest.context.context_manifest_sha256 =
             recompute_audio_context_manifest_sha256(&manifest).unwrap();
-        case.evidence.as_mut().unwrap().source_audio_sha256 = yoked_digest;
 
         let report = audit_revision_with_audio_evidence(
             &case,
             &manifest,
             yoked_source,
-            PCM,
+            &yoked_pcm,
         )
         .unwrap();
         assert_eq!(report.audio_evidence_report.evidence_condition, AudioEvidenceConditionV1::YokedRetrieved);
