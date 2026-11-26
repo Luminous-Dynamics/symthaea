@@ -742,10 +742,18 @@ mod tests {
         let report = audit_annotation_marginal_value(&input(before, after, 120)).unwrap();
         assert_eq!(report.before.frozen_decision_state, PanelDecisionStateV1::NeedsReview);
         assert_eq!(report.after.frozen_decision_state, PanelDecisionStateV1::SufficientlySupportedPresent);
+        assert_eq!(
+            report.decision_transition,
+            "NeedsReview->SufficientlySupportedPresent"
+        );
         assert_eq!(report.annotation_record_count_delta, 1);
         assert_eq!(report.active_review_minutes, 2.0);
-        assert_eq!(report.effort.active_listening_seconds, 60);
+        assert_eq!(report.active_listening_minutes, 1.0);
+        assert_eq!(report.elapsed_wall_minutes, 2.5);
+        assert_eq!(report.effort.active_listening_seconds, 120);
         assert_eq!(report.disposition_entropy_delta_bits, Some(0.0));
+        assert_eq!(report.after.pairwise_present_symmetric_event_f1, Some(1.0));
+        assert_eq!(report.after.pairwise_present_exact_count_agreement, Some(1.0));
         assert!(!report.single_marginal_value_score_created);
     }
 
