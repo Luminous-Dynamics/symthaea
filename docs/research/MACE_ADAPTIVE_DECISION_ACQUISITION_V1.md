@@ -308,6 +308,8 @@ The search rejects scenarios exceeding the fixed small-world limits (8 states, 6
 
 ### Deterministic adversarial fixtures
 
+The evaluator's portable input contract is [mace_adaptive_reference_scenario_v1.schema.json](../../data/schemas/mace_adaptive_reference_scenario_v1.schema.json), with a worked [finite joint-world example](../../data/fixtures/mace_adaptive_reference_scenario_v1.example.json). The schema validates JSON shape and primitive bounds; the Rust validator additionally enforces cross-table key coverage, uniqueness and probability-mass invariants. The example contains no production trust material or signatures.
+
 The Rust module currently authors fixtures for:
 - conditional routing to different follow-up queries;
 - exact EVSI and robust evaluation over joint worlds;
