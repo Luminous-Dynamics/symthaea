@@ -1,0 +1,326 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://luminousdynamics.io/sat/schemas/adversarial-assurance-case/0.1",
+  "title": "SAT Adversarial Assurance Challenge Case v0.1",
+  "type": "object",
+  "additionalProperties": false,
+  "required": [
+    "schema_version",
+    "case_id",
+    "pair_id",
+    "family",
+    "case_role",
+    "description",
+    "base_state_ref",
+    "attack_plan",
+    "attacker_capabilities",
+    "expected",
+    "severity",
+    "split",
+    "rationale"
+  ],
+  "properties": {
+    "schema_version": {
+      "const": "sat-adversarial-assurance-case/v0.1"
+    },
+    "case_id": {
+      "type": "string",
+      "pattern": "^SAT-AAC-[0-9]{3}$"
+    },
+    "pair_id": {
+      "type": "string",
+      "pattern": "^SAT-AAC-P[0-9]{2}$"
+    },
+    "family": {
+      "type": "string",
+      "enum": [
+        "graph_integrity",
+        "attempt_effect_binding",
+        "authority_disclosure",
+        "witness_independence",
+        "temporal_continuity",
+        "evaluator_integrity",
+        "adaptive_attack",
+        "calibration_utility",
+        "privacy_minimization"
+      ]
+    },
+    "case_role": {
+      "type": "string",
+      "enum": [
+        "adversarial",
+        "benign_control"
+      ]
+    },
+    "description": {
+      "type": "string",
+      "minLength": 12,
+      "maxLength": 500
+    },
+    "base_state_ref": {
+      "type": "string",
+      "minLength": 1,
+      "maxLength": 256
+    },
+    "attack_plan": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "strategy",
+        "steps"
+      ],
+      "properties": {
+        "strategy": {
+          "type": "string",
+          "enum": [
+            "none",
+            "single_step",
+            "compound",
+            "adaptive"
+          ]
+        },
+        "steps": {
+          "type": "array",
+          "minItems": 1,
+          "maxItems": 12,
+          "items": {
+            "type": "object",
+            "additionalProperties": false,
+            "required": [
+              "step_id",
+              "operation",
+              "target",
+              "value"
+            ],
+            "properties": {
+              "step_id": {
+                "type": "string",
+                "minLength": 1,
+                "maxLength": 32
+              },
+              "operation": {
+                "type": "string",
+                "enum": [
+                  "no_op",
+                  "remove",
+                  "substitute",
+                  "add",
+                  "replay",
+                  "rollback",
+                  "fork",
+                  "contradict",
+                  "revoke",
+                  "delay",
+                  "collude",
+                  "expand_scope",
+                  "rewrite_policy",
+                  "adaptive_pivot",
+                  "exfiltrate",
+                  "reorder",
+                  "change_component",
+                  "reuse_identity",
+                  "withhold"
+                ]
+              },
+              "target": {
+                "type": "string",
+                "minLength": 1,
+                "maxLength": 256
+              },
+              "value": {},
+              "round": {
+                "type": "integer",
+                "minimum": 1,
+                "maximum": 100
+              },
+              "precondition_ref": {
+                "type": "string",
+                "minLength": 1
+              }
+            }
+          }
+        }
+      }
+    },
+    "attacker_capabilities": {
+      "type": "array",
+      "uniqueItems": true,
+      "items": {
+        "type": "string",
+        "enum": [
+          "none",
+          "observe_public_fixtures",
+          "observe_prior_responses",
+          "modify_subject_evidence",
+          "modify_subject_record",
+          "replay_old_receipts",
+          "control_one_source",
+          "control_shared_identity_provider",
+          "control_clock",
+          "control_signing_key",
+          "tamper_evaluator_input",
+          "modify_report",
+          "inject_untrusted_content",
+          "change_system_component",
+          "expand_tool_scope",
+          "attempt_data_exfiltration"
+        ]
+      }
+    },
+    "expected": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "claim_state",
+        "qualification_disposition",
+        "critical_gate",
+        "operational_outcome",
+        "invariant"
+      ],
+      "properties": {
+        "claim_state": {
+          "type": "string",
+          "enum": [
+            "supported",
+            "refuted",
+            "inconclusive",
+            "stale",
+            "invalid_evidence"
+          ]
+        },
+        "qualification_disposition": {
+          "type": "string",
+          "enum": [
+            "qualified",
+            "hold",
+            "not_qualified",
+            "new_run_required"
+          ]
+        },
+        "critical_gate": {
+          "type": "string",
+          "enum": [
+            "pass",
+            "hold",
+            "fail",
+            "not_applicable"
+          ]
+        },
+        "operational_outcome": {
+          "type": "string",
+          "enum": [
+            "allow",
+            "block",
+            "reconcile",
+            "not_applicable"
+          ]
+        },
+        "invariant": {
+          "type": "string",
+          "enum": [
+            "graph_closure",
+            "pinned_attempt_identity",
+            "exact_effect_correspondence",
+            "least_authority",
+            "disclosure_minimization",
+            "independence_evidence",
+            "monotonic_time_and_revocation",
+            "evaluator_separation",
+            "adaptive_resilience",
+            "benign_utility",
+            "privacy_preservation"
+          ]
+        }
+      }
+    },
+    "severity": {
+      "type": "string",
+      "enum": [
+        "critical",
+        "high",
+        "medium",
+        "low"
+      ]
+    },
+    "split": {
+      "const": "public_development"
+    },
+    "rationale": {
+      "type": "array",
+      "minItems": 1,
+      "items": {
+        "type": "string",
+        "minLength": 1
+      }
+    }
+  },
+  "allOf": [
+    {
+      "if": {
+        "properties": {
+          "case_role": {
+            "const": "benign_control"
+          }
+        },
+        "required": [
+          "case_role"
+        ]
+      },
+      "then": {
+        "properties": {
+          "attack_plan": {
+            "properties": {
+              "strategy": {
+                "const": "none"
+              }
+            }
+          },
+          "attacker_capabilities": {
+            "const": [
+              "none"
+            ]
+          },
+          "expected": {
+            "properties": {
+              "claim_state": {
+                "const": "supported"
+              },
+              "qualification_disposition": {
+                "const": "qualified"
+              },
+              "critical_gate": {
+                "const": "pass"
+              },
+              "operational_outcome": {
+                "const": "allow"
+              }
+            }
+          }
+        }
+      }
+    },
+    {
+      "if": {
+        "properties": {
+          "case_role": {
+            "const": "adversarial"
+          }
+        },
+        "required": [
+          "case_role"
+        ]
+      },
+      "then": {
+        "properties": {
+          "attacker_capabilities": {
+            "not": {
+              "contains": {
+                "const": "none"
+              }
+            }
+          }
+        }
+      }
+    }
+  ]
+}
