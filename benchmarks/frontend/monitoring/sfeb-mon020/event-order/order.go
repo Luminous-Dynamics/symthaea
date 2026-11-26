@@ -139,6 +139,12 @@ func hasPath(adj map[string][]string,start,target string) bool {
 	}
 	return false
 }
+func sortedKeys[V any](m map[string]V) []string {
+	keys:=make([]string,0,len(m))
+	for k:=range m { keys=append(keys,k) }
+	sort.Strings(keys)
+	return keys
+}
 func requiredPairs(events []Event) ([]pair,error) {
 	byEntity:=map[string][]Event{}
 	byActivity:=map[string][]Event{}
@@ -162,7 +168,8 @@ func requiredPairs(events []Event) ([]pair,error) {
 		}
 	}
 	pairs:=[]pair{}
-	for entity,es:=range byEntity {
+	for _,entity:=range sortedKeys(byEntity) {
+		es:=byEntity[entity]
 		var gens,invalids,uses []Event
 		for _,e:=range es {
 			switch e.Kind { case EntityGenerated: gens=append(gens,e);case EntityUsed:uses=append(uses,e);case EntityInvalidated:invalids=append(invalids,e) }
@@ -177,16 +184,17 @@ func requiredPairs(events []Event) ([]pair,error) {
 			for _,u:=range uses { pairs=append(pairs,pair{u.ID,invalids[0].ID}) }
 		}
 	}
-	for activity,internal:=range byActivity {
+	activities:=map[string]bool{}
+	for a:=range byActivity { activities[a]=true }
+	for a:=range starts { activities[a]=true }
+	for a:=range ends { activities[a]=true }
+	for _,activity:=range sortedKeys(activities) {
 		ss,ee:=starts[activity],ends[activity]
 		if len(ss)!=1||len(ee)!=1 { return nil,fmt.Errorf("activity requires exactly one start and end event: %s",activity) }
 		pairs=append(pairs,pair{ss[0].ID,ee[0].ID})
-		for _,e:=range internal {
-			pairs=append(pairs,pair{ss[0].ID,e.ID},pair{e.ID,ee[0].ID})
-		}
+		for _,e:=range byActivity[activity] { pairs=append(pairs,pair{ss[0].ID,e.ID},pair{e.ID,ee[0].ID}) }
 	}
-	for a,ss:=range starts { if _,ok:=byActivity[a];!ok && len(ends[a])==0 && len(ss)==1 { pairs=append(pairs,pair{ss[0].ID,ss[0].ID}) } }
-	for a,ee:=range ends { if _,ok:=byActivity[a];!ok && len(starts[a])==0 && len(ee)==1 { pairs=append(pairs,pair{ee[0].ID,ee[0].ID}) } }
+	sort.Slice(pairs,func(i,j int)bool{if pairs[i].before==pairs[j].before{return pairs[i].after<pairs[j].after};return pairs[i].before<pairs[j].before})
 	return pairs,nil
 }
 
@@ -197,21 +205,25 @@ func requiredPairs(events []Event) ([]pair,error) {
 func Evaluate(in Input,pins map[string]VerifierPin) Result {
 	checked:=[]string{"source-local-sequence-domains","exact-event-records"}
 	if in.EvaluationAt<=0 { return finish(Indeterminate,"evaluation time missing",0,0,checked...) }
+	reports:=reportsIndex(in.Reports)
+	conflicts:=reportConflicts(in.Reports)
 	sources:=map[string]Source{}
-	for _,s:=range in.Sources {
+	sourceInput:=append([]Source(nil),in.Sources...)
+	sort.Slice(sourceInput,func(i,j int)bool{return sourceInput[i].ID<sourceInput[j].ID})
+	for _,s:=range sourceInput {
 		if !nonempty(s.ID,s.ControlRoot)||!s.IdentityDigest.Valid() { return finish(Indeterminate,"source identity incomplete",0,0,checked...) }
 		if _,ok:=sources[s.ID];ok { return finish(Divergent,"duplicate source ID: "+s.ID,0,0,checked...) }
 		sources[s.ID]=s
-		d,why:=reportFor("source:"+s.ID,s.IdentityDigest,reportsIndex(in.Reports),reportConflicts(in.Reports),pins,in.EvaluationAt)
+		d,why:=reportFor("source:"+s.ID,s.IdentityDigest,reports,conflicts,pins,in.EvaluationAt)
 		if d!=Qualified { return finish(d,why,0,0,checked...) }
 	}
 	if len(sources)==0||len(in.Events)==0 { return finish(Indeterminate,"sources or events missing",0,0,checked...) }
-	reports:=reportsIndex(in.Reports)
-	conflicts:=reportConflicts(in.Reports)
 	events:=map[string]Event{}
 	seqOwner:=map[string]string{}
 	bySource:=map[string][]Event{}
-	for _,e:=range in.Events {
+	eventInput:=append([]Event(nil),in.Events...)
+	sort.Slice(eventInput,func(i,j int)bool{return eventInput[i].ID<eventInput[j].ID})
+	for _,e:=range eventInput {
 		if !nonempty(e.ID,e.SubjectID,e.SourceID)||e.Sequence==0||!e.RecordDigest.Valid() { return finish(Indeterminate,"event identity/source/sequence/digest incomplete",0,0,checked...) }
 		if _,ok:=events[e.ID];ok { return finish(Divergent,"duplicate event ID: "+e.ID,0,0,checked...) }
 		if _,ok:=sources[e.SourceID];!ok { return finish(Indeterminate,"event source is not in the verified source set: "+e.ID,0,0,checked...) }
@@ -227,22 +239,28 @@ func Evaluate(in Input,pins map[string]VerifierPin) Result {
 	adj:=map[string][]string{}
 	indegree:=map[string]int{}
 	for id:=range events { indegree[id]=0 }
-	for _,es:=range bySource {
+	for _,sourceID:=range sortedKeys(bySource) {
+		es:=bySource[sourceID]
 		sort.Slice(es,func(i,j int)bool{return es[i].Sequence<es[j].Sequence})
 		for i:=1;i<len(es);i++ { addEdge(adj,indegree,es[i-1].ID,es[i].ID) }
 	}
+	witnessInput:=append([]OrderWitness(nil),in.Witnesses...)
+	sort.Slice(witnessInput,func(i,j int)bool{return witnessInput[i].ID<witnessInput[j].ID})
 	witnessIDs:=map[string]bool{}
-	for _,w:=range in.Witnesses {
+	for _,w:=range witnessInput {
 		if !nonempty(w.ID,w.BeforeEventID,w.AfterEventID,w.WitnessSourceID)||!w.EvidenceDigest.Valid() { return finish(Indeterminate,"order witness incomplete",0,0,checked...) }
 		if witnessIDs[w.ID] { return finish(Divergent,"duplicate order witness ID: "+w.ID,0,0,checked...) }
 		witnessIDs[w.ID]=true
 		before,bok:=events[w.BeforeEventID];after,aok:=events[w.AfterEventID];ws,wok:=sources[w.WitnessSourceID]
 		if !bok||!aok||!wok { return finish(Indeterminate,"order witness references missing event/source: "+w.ID,0,0,checked...) }
 		bs,as:=sources[before.SourceID],sources[after.SourceID]
-		if before.SourceID==after.SourceID { return finish(Indeterminate,"same-source ordering must use source sequence, not an external witness: "+w.ID,0,0,checked...) }
-		if ws.ControlRoot==bs.ControlRoot||ws.ControlRoot==as.ControlRoot { return finish(Indeterminate,"cross-source order witness shares an endpoint control root: "+w.ID,0,0,checked...) }
 		d,why:=reportFor("witness:"+w.ID,w.EvidenceDigest,reports,conflicts,pins,in.EvaluationAt)
 		if d!=Qualified { return finish(d,why,0,0,checked...) }
+		if before.SourceID==after.SourceID {
+			if before.Sequence<after.Sequence { continue }
+			return finish(Divergent,"order witness contradicts authenticated same-source sequence: "+w.ID,0,0,checked...)
+		}
+		if ws.ControlRoot==bs.ControlRoot||ws.ControlRoot==as.ControlRoot { return finish(Indeterminate,"cross-source order witness shares an endpoint control root: "+w.ID,0,0,checked...) }
 		addEdge(adj,indegree,w.BeforeEventID,w.AfterEventID)
 	}
 	checked=append(checked,"independent-cross-source-witnesses")
