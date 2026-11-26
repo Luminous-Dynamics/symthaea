@@ -43,6 +43,8 @@ pub enum DecisionValueRejectV1 {
     InvalidCalibration,
     PolicyDigestMismatch,
     CalibrationReceiptRejected,
+    InvalidResourceReceipt,
+    ResourceReceiptRejected,
     ArithmeticOverflow,
 }
 
@@ -164,6 +166,37 @@ pub trait DecisionCalibrationReceiptVerifierV1 {
     ) -> Result<(), CalibrationReceiptRejectV1>;
 }
 
+#[derive(Clone, Copy, Debug, Eq, PartialEq)]
+pub enum DecisionResourceReceiptRejectV1 {
+    InvalidSignature,
+    ProfileMismatch,
+    DecisionNeedMismatch,
+    QueryBindingMismatch,
+    ResourceMeasurementMismatch,
+    Expired,
+    Revoked,
+}
+
+pub trait DecisionResourceReceiptVerifierV1 {
+    /// Must verify an independently issued resource-profile receipt binding
+    /// the exact query, template, tool count, predicted latency, token/byte
+    /// estimates and acquisition cost used by the evaluator.
+    fn verify(
+        &self,
+        decision_need_sha256: &str,
+        query_option_id: &str,
+        action_template_sha256: &str,
+        resource_profile_sha256: &str,
+        resource_receipt_sha256: &str,
+        tool_calls: u32,
+        estimated_latency_ns: u64,
+        estimated_context_tokens: u64,
+        estimated_inspected_bytes: u64,
+        acquisition_cost_utility_units: u64,
+        now_unix: u64,
+    ) -> Result<(), DecisionResourceReceiptRejectV1>;
+}
+
 /// One candidate retrieval/verification operation, not a retrieved fact.
 /// Likelihood probabilities are used only by EVSI. The separate Boolean
 /// support matrix drives robust minimax evaluation and must be derived from
@@ -180,6 +213,10 @@ pub struct DecisionRetrievalOptionV1 {
     pub calibration_profile_sha256: Option<String>,
     pub calibration_receipt_sha256: Option<String>,
     pub calibration_valid_until_unix: Option<u64>,
+    /// Independently provisioned resource-estimation profile and receipt.
+    pub resource_profile_sha256: String,
+    pub resource_receipt_sha256: String,
+    pub resource_valid_until_unix: u64,
     /// P(observation | state, this query) in parts per million.
     /// One row per state, one column per observation; each row sums to scale.
     pub likelihood_ppm_by_state: Vec<Vec<u32>>,
@@ -205,6 +242,11 @@ impl DecisionRetrievalOptionV1 {
             || !valid_sha256(&self.action_template_sha256)
         {
             return Err(DecisionValueRejectV1::InvalidIdentifier);
+        }
+        if !valid_sha256(&self.resource_profile_sha256)
+            || !valid_sha256(&self.resource_receipt_sha256)
+        {
+            return Err(DecisionValueRejectV1::InvalidResourceReceipt);
         }
         if require_calibrated_likelihoods
             && (!self.calibration_profile_sha256.as_deref().is_some_and(valid_sha256)
@@ -330,9 +372,11 @@ pub fn evaluate_expected_value_v1(
     option: &DecisionRetrievalOptionV1,
     now_unix: u64,
     calibration_verifier: &impl DecisionCalibrationReceiptVerifierV1,
+    resource_verifier: &impl DecisionResourceReceiptVerifierV1,
 ) -> Result<ExpectedValueAssessmentV1, DecisionValueRejectV1> {
     policy.validate()?;
     option.validate(policy, true)?;
+    verify_resource_receipt(policy, option, now_unix, resource_verifier)?;
     if option.calibration_valid_until_unix.is_none_or(|expires| expires <= now_unix)
         || prior.probability_ppm_by_state.len() != policy.state_ids.len()
     {
@@ -420,6 +464,7 @@ pub fn choose_expected_value_query_v1(
     options: &[DecisionRetrievalOptionV1],
     now_unix: u64,
     calibration_verifier: &impl DecisionCalibrationReceiptVerifierV1,
+    resource_verifier: &impl DecisionResourceReceiptVerifierV1,
 ) -> Result<Option<ExpectedValueSelectionV1>, DecisionValueRejectV1> {
     if options.len() > MAX_QUERY_OPTIONS {
         return Err(DecisionValueRejectV1::TooManyOptions);
@@ -431,7 +476,7 @@ pub fn choose_expected_value_query_v1(
             return Err(DecisionValueRejectV1::DuplicateOption);
         }
         let assessment = match evaluate_expected_value_v1(
-            policy, prior, option, now_unix, calibration_verifier,
+            policy, prior, option, now_unix, calibration_verifier, resource_verifier,
         ) {
             Ok(assessment) => assessment,
             Err(DecisionValueRejectV1::BudgetExceeded) => continue,
@@ -461,9 +506,12 @@ pub fn choose_expected_value_query_v1(
 pub fn evaluate_robust_value_v1(
     policy: &DecisionValuePolicyV1,
     option: &DecisionRetrievalOptionV1,
+    now_unix: u64,
+    resource_verifier: &impl DecisionResourceReceiptVerifierV1,
 ) -> Result<RobustValueAssessmentV1, DecisionValueRejectV1> {
     policy.validate()?;
     option.validate(policy, false)?;
+    verify_resource_receipt(policy, option, now_unix, resource_verifier)?;
 
     let best_utility_by_state = policy.utility_by_state_action.iter()
         .zip(policy.action_allowed_by_state.iter())
@@ -571,6 +619,8 @@ pub fn evaluate_robust_value_v1(
 pub fn choose_robust_value_query_v1(
     policy: &DecisionValuePolicyV1,
     options: &[DecisionRetrievalOptionV1],
+    now_unix: u64,
+    resource_verifier: &impl DecisionResourceReceiptVerifierV1,
 ) -> Result<Option<RobustValueSelectionV1>, DecisionValueRejectV1> {
     if options.len() > MAX_QUERY_OPTIONS {
         return Err(DecisionValueRejectV1::TooManyOptions);
@@ -581,7 +631,7 @@ pub fn choose_robust_value_query_v1(
         if !seen_options.insert(option.query_option_id.as_str()) {
             return Err(DecisionValueRejectV1::DuplicateOption);
         }
-        let assessment = match evaluate_robust_value_v1(policy, option) {
+        let assessment = match evaluate_robust_value_v1(policy, option, now_unix, resource_verifier) {
             Ok(assessment) => assessment,
             Err(DecisionValueRejectV1::BudgetExceeded) => continue,
             Err(error) => return Err(error),
@@ -601,6 +651,30 @@ pub fn choose_robust_value_query_v1(
         }
     }
     Ok(best)
+}
+
+fn verify_resource_receipt(
+    policy: &DecisionValuePolicyV1,
+    option: &DecisionRetrievalOptionV1,
+    now_unix: u64,
+    verifier: &impl DecisionResourceReceiptVerifierV1,
+) -> Result<(), DecisionValueRejectV1> {
+    if option.resource_valid_until_unix <= now_unix {
+        return Err(DecisionValueRejectV1::InvalidResourceReceipt);
+    }
+    verifier.verify(
+        &policy.decision_need_sha256,
+        &option.query_option_id,
+        &option.action_template_sha256,
+        &option.resource_profile_sha256,
+        &option.resource_receipt_sha256,
+        option.tool_calls,
+        option.estimated_latency_ns,
+        option.estimated_context_tokens,
+        option.estimated_inspected_bytes,
+        option.acquisition_cost_utility_units,
+        now_unix,
+    ).map_err(|_| DecisionValueRejectV1::ResourceReceiptRejected)
 }
 
 fn probability_model_sha256(
