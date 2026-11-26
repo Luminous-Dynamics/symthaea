@@ -60,6 +60,21 @@ A clock-based validity window is therefore a safety constraint, not proof that a
 
 This direction connects to Bayesian adaptive calibration and optimal design, which jointly estimates calibration uncertainty and chooses subsequent experiments, and to recent Bayesian design work for calibrating model discrepancy. References are listed in Section 9.
 
+
+
+### 4.8 From synthetic-only assurance to real sensor calibration
+
+A real-data evaluation path is now specified in [SDCB Real-Sensor Calibration and Drift Benchmark Plan v1](SDCB_REAL_SENSOR_BENCHMARK_PLAN_V1.md).
+
+Two complementary public datasets have different roles:
+
+- **Inha Indoor-Sensor-Calibration-Dataset (2026):** paired low-cost/reference indoor-air measurements across five locations over six months, five variables, minute-level resampling, and door/window/occupancy/business-hours context. Its four author-defined scenarios are reference efficiency, location transfer, long-term drift, and event-conditioned calibration. Use it as the primary active reference-allocation and cross-location/drift benchmark. A single five-location university-lab dataset is not evidence of broad cross-building generalization.
+- **UCI Gas Sensor Array Drift:** 13,910 measurements from a 16-channel chemical sensor array across six gases and 36 months, arranged into ten chronological batches. Use it for forward-only channel drift and concentration/classification transfer. The 16 channels form one array; they must not be represented as 16 independent deployed devices. UCI marks the dataset research-only and excludes commercial use.
+
+The 2026 LiteSensor-Net/KD-DM study is a useful edge-classification comparator on the UCI drift task, reporting 92.63 ± 2.02% accuracy and macro-F1 0.898 for its base model, plus a chronological KD-DM gain over its uncompensated reference. Those are classifier/edge-deployment metrics, not experiment-selection or decision-value scores. Preserve the task boundary and use the published results only when the exact chronological protocol, implementation and split can be reproduced.
+
+The common-cause SDCB subtrack remains separate: the real datasets do not fully label shared reference-chain/power/firmware/environment errors. Use paired hidden perturbations with known common and local causes for those controls, and never mix counterfactual scores with the unmodified real-data calibration metrics.
+
 ## 5. SDCB's competitive positioning
 
 Do not claim to beat all scientific agents on a single number. Aim to establish a distinctive, defensible result:
@@ -85,6 +100,7 @@ That claim requires at least five separately reported result families:
 | Fresh hidden evaluations | AutoSciBench-style generator | locked baselines and adaptive candidate | transfer to unseen mechanisms, shortcut resistance, task validity |
 | Measurement assurance / traceability (guidance, not a leaderboard) | NIST calibration and metrological-traceability guidance | control-standard checks, cross-device comparisons, calibration-state-aware likelihoods, joint EGBT instrument-state updates | traceability chain and uncertainty, drift detection, calibration false acceptance, device identity binding, measurement assurance quality |
 | Common-cause measurement assurance (research subtrack, not an upstream leaderboard) | NIST MAP practices; sensor-network calibration and correlation datasets | i.i.d. negative control, random-effects/hierarchical calibration, co-calibration, reference-first, robust common-state policy | false independent-confirmation rate, common/local state recovery, residual-correlation error, decision regret, measurement assurance and evidence integrity |
+| Real sensor calibration and drift | Inha 2026 indoor calibration dataset; UCI Gas Sensor Array Drift | published calibration models, static/affine/hierarchical calibration, fixed/random/EIG/EVSI/R-IDeA/SDCB reference selection | physical-unit RMSE/MAE, reference queries, leave-location-out transfer, forward drift, event calibration, resource cost |
 
 For every track, use matched task seeds, experiment and tool budgets, evidence access, action set and stop rules. Use task-family clustered bootstrap intervals and paired tests. Publish failures and consumed resources. Five seeds is the first minimum for synthetic families; real-lab workflows should use enough repeated campaigns to estimate variance, which may be substantially more than five.
 
@@ -136,6 +152,11 @@ All current additions have authored Rust tests, but the toolchain is unavailable
 - Modelling calibration uncertainty in networks of environmental sensors, Journal of the Royal Statistical Society Series C: https://academic.oup.com/jrsssc/article/72/5/1187/7250331
 - Modelling and determining correlations in sensor networks: https://doi.org/10.1016/j.measen.2024.101793
 - Automation in sensor network metrology: https://doi.org/10.1016/j.measen.2024.101799
+- Inha 2026 indoor sensor calibration dataset: https://github.com/inhaKDD/Indoor-Sensor-Calibration-Dataset
+- Yun et al., Low-Cost Sensor Calibration for Indoor Air Quality Monitoring (arXiv:2610.11236): https://arxiv.org/abs/2610.11236
+- UCI Gas Sensor Array Drift Dataset: https://archive.ics.uci.edu/dataset/224/gas%2Bsensor%2Barray%2Bdrift%2Bdataset
+- UCI Gas Sensor Array Drift at Different Concentrations: https://archive.ics.uci.edu/dataset/270/gas%2Bsensor%2Barray%2Bdrift%2Bdataset%2Bat%2Bdifferent%2Bconcentrations
+- Kim et al., Drift-Robust Lightweight Deep Learning on Open Gas Sensor Benchmarks, Molecules (2026): https://doi.org/10.3390/molecules31111884
 - Bayesian Adaptive Calibration and Optimal Design, NeurIPS 2024: https://papers.neurips.cc/paper_files/paper/2024/hash/673b9f8cba4ee9f15b88656a69761631-Abstract-Conference.html
 - Bayesian experimental design for model-discrepancy calibration, Journal of Computational Physics (2026): https://doi.org/10.1016/j.jcp.2025.11446
 
@@ -161,6 +182,6 @@ The next research extension should distinguish genuine correlation in the measur
 
 Authenticating a measurement receipt and updating a scientific posterior are not enough when measurement errors have shared structure. The belief service must retain the common cause and each device's local state, or later observations can be interpreted against an obsolete or collapsed measurement model.
 
-The new common-cause EGBT reference extends the existing receipt-bound joint ledger from (p(h,c_1,ldots,c_D)) to (p(h,g,c_1,ldots,c_D)). Accepted observations bind the common-cause registry/ID/version as well as the device registry/ID/version, calibration context, capture interval, proposal, and global belief version. A reference-calibration receipt updates the shared state (g) while preserving scientific marginal belief when the prior warrants that; a subsequent science receipt updates (h) through the shared measurement state.
+The new common-cause EGBT reference extends the existing receipt-bound joint ledger from (p(h,c_1,\\ldots,c_D)) to (p(h,g,c_1,\\ldots,c_D)). Accepted observations bind the common-cause registry/ID/version as well as the device registry/ID/version, calibration context, capture interval, proposal, and global belief version. A reference-calibration receipt updates the shared state (g) while preserving scientific marginal belief when the prior warrants that; a subsequent science receipt updates (h) through the shared measurement state.
 
-This should remain a separate research reference until independent attestation, traceability, Markov state propagation, append-only event storage, and independent replay are qualified. Digest shape and a verifier boolean are not production cryptographic evidence.9
+This should remain a separate research reference until independent attestation, traceability, Markov state propagation, append-only event storage, and independent replay are qualified. Digest shape and a verifier boolean are not production cryptographic evidence.
