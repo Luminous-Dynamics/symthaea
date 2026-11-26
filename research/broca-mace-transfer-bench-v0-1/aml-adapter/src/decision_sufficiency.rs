@@ -1,11 +1,11 @@
 // SPDX-License-Identifier: AGPL-3.0-or-later
 
-use std::collections::BTreeSet;
-
 //! Consumer-side verification of independently issued DecisionSufficiency
 //! attestations. Qualification answers whether evidence may be considered;
 //! sufficiency answers whether the qualified set supports one exact decision.
 //! Neither receipt authorizes an action.
+
+use std::collections::BTreeSet;
 
 use serde_json::{Value, json};
 use sha2::{Digest, Sha256};
