@@ -46,7 +46,7 @@ fn main() {
     match verify_augmentation(&input) {
         Ok(report) => {
             println!("{}", serde_json::to_string_pretty(&report).expect("report serialization cannot fail"));
-            if report.verified {
+            if report.graph_integrity_passed {
                 process::exit(0);
             }
             if !report.semantic_valid {
