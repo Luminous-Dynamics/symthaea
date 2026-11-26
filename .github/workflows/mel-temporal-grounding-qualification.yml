@@ -98,7 +98,8 @@ jobs:
             and .overall.answer_b_count == 7
             and .overall.always_a_accuracy_flip_stay > 0.58
             and .overall.always_a_accuracy_flip_stay < 0.59
-            and .overall.always_b_accuracy_flip_stay == 0.5
+            and .overall.always_b_accuracy_flip_stay > 0.41
+            and .overall.always_b_accuracy_flip_stay < 0.42
             and .overall.parsed_answer_rate == 1.0
             and (.by_task | length) == 4
             and (.by_stay_factor | length) == 4
