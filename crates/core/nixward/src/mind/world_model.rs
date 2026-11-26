@@ -95,6 +95,26 @@ pub enum TransitionOutcomeClass {
     RolledBack,
 }
 
+/// Counts of observed execution outcomes; repeated episodes are not independent samples.
+#[derive(Debug, Clone, Copy, Default, PartialEq, Eq)]
+pub struct TransitionOutcomeCounts {
+    pub success: usize,
+    pub failure: usize,
+    pub partial: usize,
+    pub rolled_back: usize,
+}
+
+impl TransitionOutcomeCounts {
+    fn record(&mut self, outcome: TransitionOutcomeClass) {
+        match outcome {
+            TransitionOutcomeClass::Success => self.success += 1,
+            TransitionOutcomeClass::Failure => self.failure += 1,
+            TransitionOutcomeClass::Partial => self.partial += 1,
+            TransitionOutcomeClass::RolledBack => self.rolled_back += 1,
+        }
+    }
+}
+
 /// Execution status is distinct from the action that was merely assigned.
 #[derive(Debug, Clone)]
 pub enum TransitionExecution {
@@ -150,9 +170,9 @@ impl TransitionEpisodeV1 {
             .as_slice()
             .iter()
             .chain(self.context.as_slice())
-            .any(|value| !value.is_finite())
+            .any(|value| !value.is_finite() || value.abs() > 1.0)
         {
-            return Err("state_before and context must contain only finite values".to_owned());
+            return Err("state_before and context must contain finite HDC values in [-1, 1]".to_owned());
         }
         if self.episode_id.trim().is_empty()
             || self.environment_id.trim().is_empty()
@@ -181,7 +201,10 @@ impl TransitionEpisodeV1 {
         } = &self.execution
         {
             if state_after.as_slice().len() != dimension
-                || state_after.as_slice().iter().any(|value| !value.is_finite())
+                || state_after
+                    .as_slice()
+                    .iter()
+                    .any(|value| !value.is_finite() || value.abs() > 1.0)
             {
                 return Err("executed state_after must match the HDC dimension and be finite".to_owned());
             }
@@ -217,6 +240,8 @@ pub struct ContextualPrediction {
     pub observation_count: usize,
     pub independent_cluster_count: usize,
     pub training_residual_mse: Option<f64>,
+    /// Outcome counts from the selected context bucket or global fallback.
+    pub outcome_counts: TransitionOutcomeCounts,
 }
 
 #[derive(Debug, Clone)]
@@ -227,6 +252,7 @@ struct ContextDeltaEntry {
     observation_count: usize,
     residual_count: usize,
     residual_mse: f64,
+    outcome_counts: TransitionOutcomeCounts,
     independent_cluster_ids: std::collections::HashSet<String>,
 }
 
@@ -402,16 +428,20 @@ impl NixWorldModel {
             best_match.filter(|(_, similarity)| *similarity >= CONTEXT_MATCH_THRESHOLD)
         {
             let entry = &mut entries[index];
-            let residual_mse = mean_squared_error(&entry.delta, &observed_delta);
-            entry.residual_count += 1;
-            let residual_n = entry.residual_count as f64;
-            entry.residual_mse += (residual_mse - entry.residual_mse) / residual_n;
+            if let Some(residual_mse) = mean_squared_error(&entry.delta, &observed_delta) {
+                entry.residual_count += 1;
+                let residual_n = entry.residual_count as f64;
+                entry.residual_mse += (residual_mse - entry.residual_mse) / residual_n;
+            }
 
             entry.observation_count += 1;
             let n = entry.observation_count as f32;
             let refs = [&entry.delta, &observed_delta];
             let weights = [(n - 1.0) / n, 1.0 / n];
             entry.delta = ContinuousHV::weighted_bundle(&refs, &weights);
+            if let TransitionExecution::Executed { outcome, .. } = &episode.execution {
+                entry.outcome_counts.record(*outcome);
+            }
             entry
                 .independent_cluster_ids
                 .insert(episode.independent_cluster_id.clone());
@@ -431,6 +461,14 @@ impl NixWorldModel {
                 observation_count: 1,
                 residual_count: 0,
                 residual_mse: 0.0,
+                outcome_counts: match &episode.execution {
+                    TransitionExecution::Executed { outcome, .. } => {
+                        let mut counts = TransitionOutcomeCounts::default();
+                        counts.record(*outcome);
+                        counts
+                    }
+                    _ => TransitionOutcomeCounts::default(),
+                },
                 independent_cluster_ids,
             });
         }
@@ -480,6 +518,7 @@ impl NixWorldModel {
                 observation_count: entry.observation_count,
                 independent_cluster_count: entry.independent_cluster_ids.len(),
                 training_residual_mse: (entry.residual_count > 0).then_some(entry.residual_mse),
+                outcome_counts: entry.outcome_counts,
             });
         }
 
@@ -498,6 +537,19 @@ impl NixWorldModel {
                         .len()
                 })
                 .unwrap_or(0);
+            let outcome_counts = self
+                .contextual_delta_vectors
+                .get(action)
+                .map(|entries| {
+                    entries.iter().fold(TransitionOutcomeCounts::default(), |mut total, entry| {
+                        total.success += entry.outcome_counts.success;
+                        total.failure += entry.outcome_counts.failure;
+                        total.partial += entry.outcome_counts.partial;
+                        total.rolled_back += entry.outcome_counts.rolled_back;
+                        total
+                    })
+                })
+                .unwrap_or_default();
             return Ok(ContextualPrediction {
                 predicted_state: state.add(&entry.delta),
                 source: ContextualPredictionSource::GlobalActionDeltaFallback,
@@ -505,6 +557,7 @@ impl NixWorldModel {
                 observation_count: entry.observation_count,
                 independent_cluster_count,
                 training_residual_mse: None,
+                outcome_counts,
             });
         }
 
@@ -515,6 +568,7 @@ impl NixWorldModel {
             observation_count: 0,
             independent_cluster_count: 0,
             training_residual_mse: None,
+            outcome_counts: TransitionOutcomeCounts::default(),
         })
     }
 
@@ -603,11 +657,11 @@ impl NixWorldModel {
 }
 
 
-fn mean_squared_error(left: &ContinuousHV, right: &ContinuousHV) -> f64 {
+fn mean_squared_error(left: &ContinuousHV, right: &ContinuousHV) -> Option<f64> {
     if left.as_slice().len() != right.as_slice().len() || left.as_slice().is_empty() {
-        return f64::NAN;
+        return None;
     }
-    left.as_slice()
+    Some(left.as_slice()
         .iter()
         .zip(right.as_slice())
         .map(|(left_value, right_value)| {
@@ -615,7 +669,7 @@ fn mean_squared_error(left: &ContinuousHV, right: &ContinuousHV) -> f64 {
             difference * difference
         })
         .sum::<f64>()
-        / left.as_slice().len() as f64
+        / left.as_slice().len() as f64)
 }
 
 impl Default for NixWorldModel {
@@ -1140,6 +1194,7 @@ mod tests {
             &context,
         ).expect("valid contextual prediction");
         assert_eq!(learned.source, ContextualPredictionSource::ContextualDelta);
+        assert_eq!(learned.outcome_counts.rolled_back, 1);
         assert!((learned.predicted_state.similarity(&after) - 1.0).abs() < 1e-5);
 
         let not_learned = wm.predict_state_with_context(
@@ -1180,6 +1235,7 @@ mod tests {
             &context,
         ).expect("valid prediction");
         assert_eq!(prediction.source, ContextualPredictionSource::ContextualDelta);
+        assert_eq!(prediction.outcome_counts.failure, 1);
         assert!((prediction.predicted_state.similarity(&after) - 1.0).abs() < 1e-5);
     }
 
@@ -1305,6 +1361,8 @@ mod tests {
         ).expect("valid prediction");
         assert_eq!(prediction.observation_count, 2);
         assert_eq!(prediction.independent_cluster_count, 1);
+        assert_eq!(prediction.outcome_counts.success, 1);
+        assert_eq!(prediction.outcome_counts.partial, 1);
         assert!(prediction.training_residual_mse.is_some());
     }
 
