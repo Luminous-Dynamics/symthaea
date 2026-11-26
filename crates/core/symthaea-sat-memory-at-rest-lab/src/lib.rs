@@ -155,6 +155,31 @@ impl LabPaths {
 }
 
 #[derive(Debug)]
+// Captures the complete locally co-located rollback domain. This is separate
+// from the native IETF procedure, which restores the store while the external
+// anchor/tombstone remain outside the adversary-controlled store bundle.
+#[derive(Debug, Clone)]
+struct FullRollbackSnapshot {
+    store: Vec<u8>,
+    anchor: Vec<u8>,
+    erasure: Vec<u8>,
+}
+
+fn snapshot_full_local_domain(paths: &LabPaths) -> Result<FullRollbackSnapshot, String> {
+    Ok(FullRollbackSnapshot {
+        store: store_bytes(paths)?,
+        anchor: fs::read(&paths.anchor).map_err(|error| format!("read local anchor: {error}"))?,
+        erasure: fs::read(&paths.erasure).map_err(|error| format!("read local erasure ledger: {error}"))?,
+    })
+}
+
+fn restore_full_local_domain(paths: &LabPaths, snapshot: &FullRollbackSnapshot) -> Result<(), String> {
+    restore_store_bytes(paths, &snapshot.store)?;
+    fs::write(&paths.anchor, &snapshot.anchor).map_err(|error| format!("restore local anchor: {error}"))?;
+    fs::write(&paths.erasure, &snapshot.erasure).map_err(|error| format!("restore local erasure ledger: {error}"))?;
+    Ok(())
+}
+
 struct Sut {
     paths: LabPaths,
     mode: ProfileMode,
@@ -1009,6 +1034,8 @@ pub fn run_campaign(output_root: impl Into<PathBuf>, mode: ProfileMode) -> Resul
             "The protected profile illustrates record HMAC, an external rollback anchor and an external erasure tombstone; it is not a production key-management design.".to_owned(),
             "The native score applies only to this deterministic synthetic emulator and must not be presented as an upstream benchmark result.".to_owned(),
             "No independently operated evaluator, sealed holdout, host-level attacker or physical storage system was used.".to_owned(),
+            "The native T9/T10 procedures restore the store while the example trust-domain files remain outside that store bundle. Dedicated regression tests also restore the complete local store-plus-trust-domain snapshot and demonstrate that a co-located anchor and tombstone can be rolled back together; this extension is not included in the native score.".to_owned(),
+            "Resistance to an attacker who can roll back the complete local trust domain requires an independently administered remote witness or hardware-backed monotonic facility; the local reference files do not provide that guarantee.".to_owned(),
         ],
     };
 
@@ -1158,5 +1185,55 @@ mod tests {
             }
             let _ = fs::remove_dir_all(root);
         }
+    }
+
+    #[test]
+    fn complete_local_domain_rollback_defeats_the_example_t9_anchor() {
+        let root = fresh_temp_dir("t9-full-domain").unwrap();
+        let paths = LabPaths::new(&root);
+        Sut::initialize(&paths, ProfileMode::ProtectedRead).unwrap();
+        Sut::open(paths.clone(), ProfileMode::ProtectedRead).seed().unwrap();
+        let snapshot = snapshot_full_local_domain(&paths).unwrap();
+
+        Sut::open(paths.clone(), ProfileMode::ProtectedRead)
+            .write_record("A", "A-POST-ROLLBACK", "user-A", "GENUINE-POST-SNAPSHOT-WRITE")
+            .unwrap();
+        assert!(Sut::open(paths.clone(), ProfileMode::ProtectedRead)
+            .read_context("A")
+            .unwrap()
+            .iter()
+            .any(|record| record.record_id == "A-POST-ROLLBACK"));
+
+        restore_full_local_domain(&paths, &snapshot).unwrap();
+        let restarted = Sut::open(paths.clone(), ProfileMode::ProtectedRead);
+        let served = restarted.read_context("A").unwrap();
+        assert!(!served.iter().any(|record| record.record_id == "A-POST-ROLLBACK"));
+        assert!(restarted.audit().is_ok());
+        let _ = fs::remove_dir_all(root);
+    }
+
+    #[test]
+    fn complete_local_domain_rollback_resurrects_erased_memory() {
+        let root = fresh_temp_dir("t10-full-domain").unwrap();
+        let paths = LabPaths::new(&root);
+        Sut::initialize(&paths, ProfileMode::ProtectedRead).unwrap();
+        Sut::open(paths.clone(), ProfileMode::ProtectedRead).seed().unwrap();
+        let snapshot = snapshot_full_local_domain(&paths).unwrap();
+
+        assert!(Sut::open(paths.clone(), ProfileMode::ProtectedRead)
+            .erase_record("A-4")
+            .unwrap());
+        assert!(Sut::open(paths.clone(), ProfileMode::ProtectedRead)
+            .read_context("A")
+            .unwrap()
+            .iter()
+            .all(|record| record.record_id != "A-4"));
+
+        restore_full_local_domain(&paths, &snapshot).unwrap();
+        let restarted = Sut::open(paths.clone(), ProfileMode::ProtectedRead);
+        let served = restarted.read_context("A").unwrap();
+        assert!(served.iter().any(|record| record.record_id == "A-4"));
+        assert!(restarted.audit().is_ok());
+        let _ = fs::remove_dir_all(root);
     }
 }
