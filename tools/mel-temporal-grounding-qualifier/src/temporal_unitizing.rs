@@ -172,7 +172,6 @@ struct UnitSegmentV1 {
 struct DisagreementPairV1 {
     observed: f64,
     expected: f64,
-    alpha: Option<f64>,
 }
 
 pub fn audit_unitizing_corpus_json(input: &str) -> Result<UnitizingCorpusReportV1, String> {
@@ -652,13 +651,13 @@ fn compute_unitizing_profile(
     let observer_count = partitions.len();
 
     let mut observed = vec![vec![0.0_f64; category_count]; category_count];
-    for left_observer in 0..observer_count {
-        for right_observer in 0..observer_count {
-            if left_observer == right_observer {
+    for (left_index, left_partition) in partitions.iter().enumerate() {
+        for (right_index, right_partition) in partitions.iter().enumerate() {
+            if left_index == right_index {
                 continue;
             }
-            for left_segment in &partitions[left_observer] {
-                for right_segment in &partitions[right_observer] {
+            for left_segment in left_partition {
+                for right_segment in right_partition {
                     let overlap_start =
                         left_segment.start_frame.max(right_segment.start_frame);
                     let overlap_end = left_segment.end_frame.min(right_segment.end_frame);
@@ -690,9 +689,12 @@ fn compute_unitizing_profile(
     }
 
     let observed_row: Vec<f64> = observed.iter().map(|row| row.iter().sum()).collect();
-    let observed_column: Vec<f64> = (0..category_count)
-        .map(|column| observed.iter().map(|row| row[column]).sum())
-        .collect();
+    let mut observed_column = vec![0.0_f64; category_count];
+    for row in &observed {
+        for (column, value) in row.iter().enumerate() {
+            observed_column[column] += value;
+        }
+    }
 
     let mut correction_by_category = vec![0.0_f64; category_count];
     for partition in partitions {
@@ -775,29 +777,33 @@ fn expected_matrix(
     }
     let categories = row_margins.len();
     let mut expected = vec![vec![0.0_f64; categories]; categories];
-    for row in 0..categories {
-        for column in 0..categories {
-            let mut numerator = row_margins[row] * column_margins[column];
-            if row == column {
-                numerator -= correction_by_category[row];
+    for (row_index, (row_margin, correction)) in row_margins
+        .iter()
+        .zip(correction_by_category)
+        .enumerate()
+    {
+        for (column_index, column_margin) in column_margins.iter().enumerate() {
+            let mut numerator = row_margin * column_margin;
+            if row_index == column_index {
+                numerator -= correction;
             }
-            expected[row][column] = numerator / denominator;
-            if !expected[row][column].is_finite() {
+            let value = numerator / denominator;
+            if !value.is_finite() {
                 return Err("expected coincidence is non-finite".into());
             }
+            expected[row_index][column_index] = value;
         }
     }
     Ok(expected)
 }
 
 fn collapse_binary_matrix(matrix: &[Vec<f64>], gap_index: usize) -> Vec<Vec<f64>> {
-    let category_count = matrix.len();
     let mut binary = vec![vec![0.0_f64; 2]; 2];
-    for row in 0..category_count {
-        for column in 0..category_count {
-            let row_class = usize::from(row != gap_index);
-            let column_class = usize::from(column != gap_index);
-            binary[row_class][column_class] += matrix[row][column];
+    for (row_index, row) in matrix.iter().enumerate() {
+        for (column_index, value) in row.iter().enumerate() {
+            let row_class = usize::from(row_index != gap_index);
+            let column_class = usize::from(column_index != gap_index);
+            binary[row_class][column_class] += value;
         }
     }
     binary
@@ -811,14 +817,18 @@ fn disagreement_pair(
     let mut expected_total = 0.0_f64;
     let mut observed_diagonal = 0.0_f64;
     let mut expected_diagonal = 0.0_f64;
-    for row in 0..observed.len() {
-        for column in 0..observed.len() {
-            if row == column {
-                observed_diagonal += observed[row][column];
-                expected_diagonal += expected[row][column];
+    for (row_index, (observed_row, expected_row)) in
+        observed.iter().zip(expected.iter()).enumerate()
+    {
+        for (column_index, (observed_value, expected_value)) in
+            observed_row.iter().zip(expected_row.iter()).enumerate()
+        {
+            if row_index == column_index {
+                observed_diagonal += observed_value;
+                expected_diagonal += expected_value;
             }
-            observed_total += observed[row][column];
-            expected_total += expected[row][column];
+            observed_total += observed_value;
+            expected_total += expected_value;
         }
     }
     let observed_disagreement = observed_total - observed_diagonal;
@@ -826,7 +836,6 @@ fn disagreement_pair(
     DisagreementPairV1 {
         observed: observed_disagreement,
         expected: expected_disagreement,
-        alpha: alpha_from_disagreements(observed_disagreement, expected_disagreement),
     }
 }
 
@@ -854,10 +863,10 @@ fn conditional_coding_profile(
 ) -> Result<(Option<DisagreementPairV1>, Vec<UnitizingPerValueAlphaV1>), String> {
     let size = non_gap_indices.len();
     let mut observed = vec![vec![0.0_f64; size]; size];
-    for row in 0..size {
-        for column in 0..size {
-            observed[row][column] =
-                observed_full[non_gap_indices[row]][non_gap_indices[column]];
+    for (row_index, full_row_index) in non_gap_indices.iter().enumerate() {
+        for (column_index, full_column_index) in non_gap_indices.iter().enumerate() {
+            observed[row_index][column_index] =
+                observed_full[*full_row_index][*full_column_index];
         }
     }
     let observed_total: f64 = observed.iter().flatten().sum();
@@ -894,11 +903,12 @@ fn conditional_coding_profile(
         }
     }
 
-    let mut row_margins = vec![0.0_f64; size];
+    let row_margins: Vec<f64> = observed.iter().map(|row| row.iter().sum()).collect();
     let mut column_margins = vec![0.0_f64; size];
-    for row in 0..size {
-        row_margins[row] = observed[row].iter().sum();
-        column_margins[row] = (0..size).map(|column| observed[column][row]).sum();
+    for row in &observed {
+        for (column, value) in row.iter().enumerate() {
+            column_margins[column] += value;
+        }
     }
     let expected = expected_matrix(
         &observed,
@@ -909,7 +919,7 @@ fn conditional_coding_profile(
     let disagreement = disagreement_pair(&observed, &expected);
 
     let mut per_value = Vec::with_capacity(size);
-    for value_index in 0..size {
+    for (value_index, _) in non_gap_indices.iter().enumerate() {
         let observed_pairable_column = column_margins[value_index];
         let observed_same_value = observed[value_index][value_index];
         let expected_column: f64 = expected
