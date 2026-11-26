@@ -113,13 +113,19 @@ pub fn audit_revision_with_audio_evidence(
         return Err("revision evidence source identity or sample rate differs from verified bytes".into());
     }
 
-    let selected_window_matches = evidence_manifest.windows.iter().any(|window| {
-        window.start_frame == evidence.start_frame
-            && window.end_frame == evidence.end_frame
-            && window.window_pcm_sha256 == evidence.evidence_payload_sha256
-    });
-    if !selected_window_matches {
-        return Err("revision evidence window does not match any recomputed manifest window".into());
+    let selected_window_match_count = evidence_manifest
+        .windows
+        .iter()
+        .filter(|window| {
+            window.start_frame == evidence.start_frame
+                && window.end_frame == evidence.end_frame
+                && window.window_pcm_sha256 == evidence.evidence_payload_sha256
+        })
+        .count();
+    if selected_window_match_count != 1 {
+        return Err(
+            "revision evidence window must match exactly one recomputed manifest window".into(),
+        );
     }
 
     match expected_audio_condition {
@@ -346,6 +352,25 @@ mod tests {
                 PCM,
             )
             .is_err()
+        );
+    }
+
+    #[test]
+    fn duplicate_matching_window_references_are_rejected_as_ambiguous() {
+        let case = revision_case();
+        let mut manifest = evidence_manifest();
+        let mut duplicate = manifest.windows[0].clone();
+        duplicate.window_id = "window-duplicate".into();
+        manifest.windows.push(duplicate);
+        manifest.context.items.push(crate::audio_evidence_window::EvidenceContextItemV1 {
+            position: 2,
+            window_id: "window-duplicate".into(),
+            payload_sha256: manifest.windows[2].window_pcm_sha256.clone(),
+        });
+        manifest.context.context_manifest_sha256 =
+            recompute_audio_context_manifest_sha256(&manifest).unwrap();
+        assert!(
+            audit_revision_with_audio_evidence(&case, &manifest, SOURCE_AUDIO, PCM).is_err()
         );
     }
 
