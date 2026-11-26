@@ -2,7 +2,7 @@
 
 MON-009 qualifies sink-side commits and independent readback. MON-010 qualifies source/claim lineage and decisions. Those pieces can each be locally valid while still being incorrectly joined: a decision can cite the wrong source digest, an intent can change the approved principal or operation, a sink event can bind a different request, or a readback can refer to a different revision.
 
-MON-011 qualifies the joins *between* those layers.
+MON-011 qualifies the joins *between* those layers. It now includes a byte-exact composed trace across the source/claim/decision/action/effect chain, plus explicit interoperability mappings for OAR and SCITT transparency receipts.
 
 ## Chain
 
@@ -38,6 +38,17 @@ Go 1.23.2 / linux/amd64:
 - 93.4% statement coverage.
 
 These results cover a synthetic normalized-evidence preflight only.
+
+## Composed byte-exact trace
+
+See [composed-e2e/README.md](composed-e2e/README.md). This second preflight joins the MON-010 source assertion, typed claim, transformation and independent replay to the exact decision, approval/display commitment, request bytes, MON-009 commit-time authority check, sink commit and independent readback. The current local run has 30 tests, five race-enabled runs passed, `go vet` passed and 67.9% statement coverage.
+
+It explicitly separates correction valid-time from when the verifier learned about it. A retroactive correction can challenge the decision basis while preserving the fact that the destination effect was committed and independently read back. A later-effective correction raises a separate current-risk review. A correction not yet recorded by the as-of cutoff does not leak into that view.
+
+## Interoperability
+
+- [OAR-INTEROP-v1.md](OAR-INTEROP-v1.md) maps MON to OAR decision, approval, authority re-check, execution commitments and outcome classes. MON does not define a competing action receipt.
+- [TRANSPARENCY-PROFILE-QUALIFICATION-v1.md](../sfeb-mon009/TRANSPARENCY-PROFILE-QUALIFICATION-v1.md) distinguishes RFC9162_SHA256 from the SCITT MMR profile and defines receipt-position/consistency tests.
 
 ## Matched industry benchmark
 
