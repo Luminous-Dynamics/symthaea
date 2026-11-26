@@ -171,6 +171,7 @@ impl WebResearcher {
             |query_rank, search_query| {
                 let deadline = deadline.clone();
                 async move {
+                    let attempt_started = Instant::now();
                     match tokio::time::timeout_at(
                         deadline,
                         self.fetch_search_results_with_receipts(&search_query, query_rank),
@@ -188,6 +189,7 @@ impl WebResearcher {
                             );
                             receipt.reason_code =
                                 Some("TOTAL_RESEARCH_DEADLINE_EXCEEDED".to_string());
+                            receipt.elapsed_ms = elapsed_ms(attempt_started);
                             receipt.reason = Some(
                                 "the end-to-end acquisition deadline expired during query search"
                                     .to_string(),
@@ -275,6 +277,7 @@ impl WebResearcher {
                 let deadline = deadline.clone();
                 let candidate_for_timeout = candidate.clone();
                 async move {
+                    let attempt_started = Instant::now();
                     match tokio::time::timeout_at(
                         deadline,
                         self.fetch_and_extract_with_receipt(candidate),
@@ -293,6 +296,7 @@ impl WebResearcher {
                             receipt.requested_url = Some(candidate_for_timeout.url.clone());
                             receipt.reason_code =
                                 Some("TOTAL_RESEARCH_DEADLINE_EXCEEDED".to_string());
+                            receipt.elapsed_ms = elapsed_ms(attempt_started);
                             receipt.reason = Some(
                                 "the end-to-end acquisition deadline expired during page fetch"
                                     .to_string(),
