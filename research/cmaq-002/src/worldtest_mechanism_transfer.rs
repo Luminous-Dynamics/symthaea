@@ -15,9 +15,9 @@ use std::collections::{BTreeMap, BTreeSet};
 use std::fmt;
 
 use super::worldtest_query_portfolio::{
-    evaluate_worldtest_query_portfolio, QueryFamily, TaskDisposition,
-    WorldTestPortfolioContext, WorldTestPortfolioError, WorldTestPortfolioInput,
-    WorldTestQueryPortfolioCertificate, WorldTestQueryTask,
+    QueryFamily, TaskDisposition, WorldTestPortfolioContext, WorldTestPortfolioError,
+    WorldTestPortfolioInput, WorldTestQueryPortfolioCertificate, WorldTestQueryTask,
+    evaluate_worldtest_query_portfolio,
 };
 
 pub const WORLDTEST_MECHANISM_CONDITION_COUNT: usize = 5;
@@ -51,7 +51,6 @@ impl MechanismTransferCondition {
             Self::StructuralShift => "structural_shift",
         }
     }
-
 }
 
 #[derive(Clone, Copy, Debug, Eq, PartialEq)]
@@ -184,18 +183,33 @@ pub enum MechanismTransferError {
     EmptySourceGeneratorManifestDigest,
     EmptyTransferDesignManifestDigest,
     ZeroMinimumIndependentClusters,
-    TooManyTasks { requested: usize, maximum: usize },
-    MissingConditionProfile { condition: MechanismTransferCondition },
-    DuplicateConditionProfile { condition: MechanismTransferCondition },
-    EmptyConditionProfileDigest { condition: MechanismTransferCondition },
-    ConditionProfileRelationMismatch { condition: MechanismTransferCondition },
+    TooManyTasks {
+        requested: usize,
+        maximum: usize,
+    },
+    MissingConditionProfile {
+        condition: MechanismTransferCondition,
+    },
+    DuplicateConditionProfile {
+        condition: MechanismTransferCondition,
+    },
+    EmptyConditionProfileDigest {
+        condition: MechanismTransferCondition,
+    },
+    ConditionProfileRelationMismatch {
+        condition: MechanismTransferCondition,
+    },
     TargetEnvironmentFamilyMismatch {
         condition: MechanismTransferCondition,
         source_family_id: String,
         target_family_id: String,
     },
-    TaskUsesUndeclaredCondition { condition: MechanismTransferCondition },
-    ClusterSpansMechanismConditions { cluster_id: String },
+    TaskUsesUndeclaredCondition {
+        condition: MechanismTransferCondition,
+    },
+    ClusterSpansMechanismConditions {
+        cluster_id: String,
+    },
     MissingCell {
         condition: MechanismTransferCondition,
         query_family: QueryFamily,
@@ -214,7 +228,10 @@ impl fmt::Display for MechanismTransferError {
         match self {
             Self::Base(error) => write!(formatter, "base WorldTest portfolio rejected: {error}"),
             Self::EmptySourceEnvironmentFamilyId => {
-                write!(formatter, "source environment family ID is empty or untrimmed")
+                write!(
+                    formatter,
+                    "source environment family ID is empty or untrimmed"
+                )
             }
             Self::EmptySourceGeneratorManifestDigest => {
                 write!(formatter, "source generator manifest digest is empty")
@@ -223,7 +240,10 @@ impl fmt::Display for MechanismTransferError {
                 write!(formatter, "transfer design manifest digest is empty")
             }
             Self::ZeroMinimumIndependentClusters => {
-                write!(formatter, "minimum independent clusters per cell must be nonzero")
+                write!(
+                    formatter,
+                    "minimum independent clusters per cell must be nonzero"
+                )
             }
             Self::TooManyTasks { requested, maximum } => write!(
                 formatter,
@@ -376,11 +396,7 @@ struct CellAccumulator {
 
 fn expected_relations(
     condition: MechanismTransferCondition,
-) -> (
-    MechanismRelation,
-    ObservationRelation,
-    TargetFamilyRelation,
-) {
+) -> (MechanismRelation, ObservationRelation, TargetFamilyRelation) {
     match condition {
         MechanismTransferCondition::SameFamilyHoldout => (
             MechanismRelation::Invariant,
@@ -491,23 +507,13 @@ pub fn evaluate_mechanism_transfer(
     let base_input = WorldTestPortfolioInput {
         context: input.context.portfolio.clone(),
         expected_task_ids: input.expected_task_ids.clone(),
-        tasks: input
-            .tasks
-            .iter()
-            .map(|row| row.task.clone())
-            .collect(),
+        tasks: input.tasks.iter().map(|row| row.task.clone()).collect(),
     };
     let base_portfolio = evaluate_worldtest_query_portfolio(&base_input)?;
 
     let mut cluster_condition = BTreeMap::<String, MechanismTransferCondition>::new();
-    let mut clusters = BTreeMap::<
-        (MechanismTransferCondition, String),
-        ClusterAccumulator,
-    >::new();
-    let mut cells = BTreeMap::<
-        (MechanismTransferCondition, QueryFamily),
-        CellAccumulator,
-    >::new();
+    let mut clusters = BTreeMap::<(MechanismTransferCondition, String), ClusterAccumulator>::new();
+    let mut cells = BTreeMap::<(MechanismTransferCondition, QueryFamily), CellAccumulator>::new();
 
     for row in &input.tasks {
         if !declared_conditions.contains(&row.condition) {
@@ -539,10 +545,9 @@ pub fn evaluate_mechanism_transfer(
                 target_family_id: task.environment_family_id.clone(),
             });
         }
-        if let Some(existing) = cluster_condition.insert(
-            task.environment_cluster_id.clone(),
-            row.condition,
-        ) {
+        if let Some(existing) =
+            cluster_condition.insert(task.environment_cluster_id.clone(), row.condition)
+        {
             if existing != row.condition {
                 return Err(MechanismTransferError::ClusterSpansMechanismConditions {
                     cluster_id: task.environment_cluster_id.clone(),
@@ -551,13 +556,15 @@ pub fn evaluate_mechanism_transfer(
         }
 
         let cluster_key = (row.condition, task.environment_cluster_id.clone());
-        let cluster = clusters.entry(cluster_key).or_insert_with(|| ClusterAccumulator {
-            condition: row.condition,
-            environment_family_id: task.environment_family_id.clone(),
-            environment_cluster_id: task.environment_cluster_id.clone(),
-            task_count: 0,
-            query_families: BTreeMap::new(),
-        });
+        let cluster = clusters
+            .entry(cluster_key)
+            .or_insert_with(|| ClusterAccumulator {
+                condition: row.condition,
+                environment_family_id: task.environment_family_id.clone(),
+                environment_cluster_id: task.environment_cluster_id.clone(),
+                task_count: 0,
+                query_families: BTreeMap::new(),
+            });
         cluster.task_count = cluster
             .task_count
             .checked_add(1)
@@ -583,12 +590,12 @@ pub fn evaluate_mechanism_transfer(
     // Each cluster contributes at most one mean to each query-family cell.
     for cluster in clusters.values() {
         for (family, family_accumulator) in &cluster.query_families {
-            let cell = cells
-                .get_mut(&(cluster.condition, *family))
-                .ok_or(MechanismTransferError::MissingCell {
+            let cell = cells.get_mut(&(cluster.condition, *family)).ok_or(
+                MechanismTransferError::MissingCell {
                     condition: cluster.condition,
                     query_family: *family,
-                })?;
+                },
+            )?;
             cell.cluster_means_ppm.insert(
                 cluster.environment_cluster_id.clone(),
                 family_accumulator.mean_score_ppm()?,
@@ -599,12 +606,12 @@ pub fn evaluate_mechanism_transfer(
     let mut cell_summaries = Vec::with_capacity(WORLDTEST_MECHANISM_TRANSFER_CELL_COUNT);
     for condition in MechanismTransferCondition::ALL {
         for query_family in QueryFamily::ALL {
-            let cell = cells
-                .get(&(condition, query_family))
-                .ok_or(MechanismTransferError::MissingCell {
+            let cell = cells.get(&(condition, query_family)).ok_or(
+                MechanismTransferError::MissingCell {
                     condition,
                     query_family,
-                })?;
+                },
+            )?;
             let cluster_count = u64::try_from(cell.cluster_means_ppm.len())
                 .map_err(|_| MechanismTransferError::ArithmeticOverflow)?;
             if cluster_count < input.context.minimum_independent_clusters_per_cell {
@@ -615,39 +622,32 @@ pub fn evaluate_mechanism_transfer(
                     required: input.context.minimum_independent_clusters_per_cell,
                 });
             }
-            let cluster_score_sum_ppm = cell
-                .cluster_means_ppm
-                .values()
-                .try_fold(0_u128, |sum, score| {
-                    sum.checked_add(u128::from(*score))
-                        .ok_or(MechanismTransferError::ArithmeticOverflow)
-                })?;
-            let mean_score_ppm = u32::try_from(
-                cluster_score_sum_ppm / u128::from(cluster_count),
-            )
-            .map_err(|_| MechanismTransferError::ArithmeticOverflow)?;
-            let minimum_cluster_mean_score_ppm = cell
-                .cluster_means_ppm
-                .values()
-                .copied()
-                .min()
-                .ok_or(MechanismTransferError::MissingCell {
-                    condition,
-                    query_family,
-                })?;
-            let maximum_cluster_mean_score_ppm = cell
-                .cluster_means_ppm
-                .values()
-                .copied()
-                .max()
-                .ok_or(MechanismTransferError::MissingCell {
-                    condition,
-                    query_family,
-                })?;
-            let task_weighted_mean_score_ppm = u32::try_from(
-                cell.task_score_sum_ppm / u128::from(cell.task_count),
-            )
-            .map_err(|_| MechanismTransferError::ArithmeticOverflow)?;
+            let cluster_score_sum_ppm =
+                cell.cluster_means_ppm
+                    .values()
+                    .try_fold(0_u128, |sum, score| {
+                        sum.checked_add(u128::from(*score))
+                            .ok_or(MechanismTransferError::ArithmeticOverflow)
+                    })?;
+            let mean_score_ppm = u32::try_from(cluster_score_sum_ppm / u128::from(cluster_count))
+                .map_err(|_| MechanismTransferError::ArithmeticOverflow)?;
+            let minimum_cluster_mean_score_ppm =
+                cell.cluster_means_ppm.values().copied().min().ok_or(
+                    MechanismTransferError::MissingCell {
+                        condition,
+                        query_family,
+                    },
+                )?;
+            let maximum_cluster_mean_score_ppm =
+                cell.cluster_means_ppm.values().copied().max().ok_or(
+                    MechanismTransferError::MissingCell {
+                        condition,
+                        query_family,
+                    },
+                )?;
+            let task_weighted_mean_score_ppm =
+                u32::try_from(cell.task_score_sum_ppm / u128::from(cell.task_count))
+                    .map_err(|_| MechanismTransferError::ArithmeticOverflow)?;
 
             cell_summaries.push(MechanismTransferCellSummary {
                 condition,
@@ -799,11 +799,8 @@ mod tests {
             .into_iter()
             .enumerate()
             .map(|(index, condition)| {
-                let (
-                    mechanism_relation,
-                    observation_relation,
-                    target_family_relation,
-                ) = expected_relations(condition);
+                let (mechanism_relation, observation_relation, target_family_relation) =
+                    expected_relations(condition);
                 MechanismConditionProfile {
                     condition,
                     mechanism_relation,
@@ -881,13 +878,7 @@ mod tests {
         for condition in MechanismTransferCondition::ALL {
             for cluster_number in 1..=2 {
                 for query_family in QueryFamily::ALL {
-                    let row = task(
-                        run_id,
-                        condition,
-                        query_family,
-                        cluster_number,
-                        800_000,
-                    );
+                    let row = task(run_id, condition, query_family, cluster_number, 800_000);
                     expected_task_ids.push(row.task.task_id.clone());
                     tasks.push(row);
                     run_id += 1;
@@ -904,7 +895,10 @@ mod tests {
     #[test]
     fn emits_complete_fifteen_cell_matrix_and_cluster_balanced_scores() {
         let result = evaluate_mechanism_transfer(&base_input()).unwrap();
-        assert_eq!(result.cell_summaries.len(), WORLDTEST_MECHANISM_TRANSFER_CELL_COUNT);
+        assert_eq!(
+            result.cell_summaries.len(),
+            WORLDTEST_MECHANISM_TRANSFER_CELL_COUNT
+        );
         assert_eq!(result.cluster_summaries.len(), 10);
         assert!(result.all_required_cells_present);
         assert!(result.cell_summaries.iter().all(|cell| {
@@ -943,15 +937,21 @@ mod tests {
     #[test]
     fn missing_mechanism_query_cell_is_rejected() {
         let mut input = base_input();
-        let removed_ids = input.tasks.iter()
+        let removed_ids = input
+            .tasks
+            .iter()
             .filter(|row| {
                 row.condition == MechanismTransferCondition::StructuralShift
                     && row.task.query_family == QueryFamily::Planning
             })
             .map(|row| row.task.task_id.clone())
             .collect::<BTreeSet<_>>();
-        input.tasks.retain(|row| !removed_ids.contains(&row.task.task_id));
-        input.expected_task_ids.retain(|id| !removed_ids.contains(id));
+        input
+            .tasks
+            .retain(|row| !removed_ids.contains(&row.task.task_id));
+        input
+            .expected_task_ids
+            .retain(|id| !removed_ids.contains(id));
         assert!(matches!(
             evaluate_mechanism_transfer(&input),
             Err(MechanismTransferError::MissingCell {
@@ -964,13 +964,19 @@ mod tests {
     #[test]
     fn preregistered_minimum_cluster_count_is_enforced_per_cell() {
         let mut input = base_input();
-        let omitted = input.tasks.iter().position(|row| {
-            row.condition == MechanismTransferCondition::NuisanceShift
-                && row.task.query_family == QueryFamily::ChangeDetection
-                && row.task.environment_cluster_id.ends_with("cluster-2")
-        }).unwrap();
+        let omitted = input
+            .tasks
+            .iter()
+            .position(|row| {
+                row.condition == MechanismTransferCondition::NuisanceShift
+                    && row.task.query_family == QueryFamily::ChangeDetection
+                    && row.task.environment_cluster_id.ends_with("cluster-2")
+            })
+            .unwrap();
         let removed = input.tasks.remove(omitted);
-        input.expected_task_ids.retain(|id| id != &removed.task.task_id);
+        input
+            .expected_task_ids
+            .retain(|id| id != &removed.task.task_id);
         assert!(matches!(
             evaluate_mechanism_transfer(&input),
             Err(MechanismTransferError::TooFewIndependentClusters {
@@ -993,10 +999,13 @@ mod tests {
         input.expected_task_ids.push(repeated.task.task_id.clone());
         input.tasks.push(repeated);
         let result = evaluate_mechanism_transfer(&input).unwrap();
-        let cell = result.cell_summaries.iter().find(|cell| {
-            cell.condition == first.condition
-                && cell.query_family == first.task.query_family
-        }).unwrap();
+        let cell = result
+            .cell_summaries
+            .iter()
+            .find(|cell| {
+                cell.condition == first.condition && cell.query_family == first.task.query_family
+            })
+            .unwrap();
         assert_eq!(cell.task_count, 3);
         assert_eq!(cell.independent_cluster_count, 2);
         assert_eq!(cell.task_weighted_mean_score_ppm, 733_333);
@@ -1007,11 +1016,15 @@ mod tests {
     fn cluster_id_cannot_be_reused_across_mechanism_conditions() {
         let mut input = base_input();
         let source_cluster = input.tasks[0].task.environment_cluster_id.clone();
-        let target = input.tasks.iter_mut().find(|row| {
-            row.condition == MechanismTransferCondition::NuisanceShift
-                && row.task.query_family == QueryFamily::MaskedFramePrediction
-                && row.task.environment_cluster_id.ends_with("cluster-1")
-        }).unwrap();
+        let target = input
+            .tasks
+            .iter_mut()
+            .find(|row| {
+                row.condition == MechanismTransferCondition::NuisanceShift
+                    && row.task.query_family == QueryFamily::MaskedFramePrediction
+                    && row.task.environment_cluster_id.ends_with("cluster-1")
+            })
+            .unwrap();
         target.task.environment_cluster_id = source_cluster.clone();
         target.task.environment_family_id = "source-family-v1".to_owned();
         assert!(matches!(
@@ -1024,10 +1037,14 @@ mod tests {
     #[test]
     fn cluster_can_span_query_families_within_one_condition() {
         let result = evaluate_mechanism_transfer(&base_input()).unwrap();
-        let cluster = result.cluster_summaries.iter().find(|cluster| {
-            cluster.condition == MechanismTransferCondition::SameFamilyHoldout
-                && cluster.environment_cluster_id.ends_with("cluster-1")
-        }).unwrap();
+        let cluster = result
+            .cluster_summaries
+            .iter()
+            .find(|cluster| {
+                cluster.condition == MechanismTransferCondition::SameFamilyHoldout
+                    && cluster.environment_cluster_id.ends_with("cluster-1")
+            })
+            .unwrap();
         assert_eq!(cluster.task_count, 3);
         assert_eq!(cluster.query_family_summaries.len(), 3);
     }
@@ -1047,25 +1064,41 @@ mod tests {
     #[test]
     fn failed_and_abstained_tasks_remain_in_cluster_and_cell_denominators() {
         let mut input = base_input();
-        let row = input.tasks.iter_mut().find(|row| {
-            row.condition == MechanismTransferCondition::ParameterShift
-                && row.task.query_family == QueryFamily::Planning
-                && row.task.environment_cluster_id.ends_with("cluster-1")
-        }).unwrap();
+        let row = input
+            .tasks
+            .iter_mut()
+            .find(|row| {
+                row.condition == MechanismTransferCondition::ParameterShift
+                    && row.task.query_family == QueryFamily::Planning
+                    && row.task.environment_cluster_id.ends_with("cluster-1")
+            })
+            .unwrap();
         row.task.disposition = TaskDisposition::Failed { score_ppm: 0 };
         let result = evaluate_mechanism_transfer(&input).unwrap();
-        let cell = result.cell_summaries.iter().find(|cell| {
-            cell.condition == MechanismTransferCondition::ParameterShift
-                && cell.query_family == QueryFamily::Planning
-        }).unwrap();
+        let cell = result
+            .cell_summaries
+            .iter()
+            .find(|cell| {
+                cell.condition == MechanismTransferCondition::ParameterShift
+                    && cell.query_family == QueryFamily::Planning
+            })
+            .unwrap();
         assert_eq!(cell.task_count, 2);
         assert_eq!(cell.failed_count, 1);
         assert_eq!(cell.mean_score_ppm, 400_000);
-        let cluster = result.cluster_summaries.iter().find(|cluster| {
-            cluster.condition == MechanismTransferCondition::ParameterShift
-                && cluster.environment_cluster_id.ends_with("cluster-1")
-        }).unwrap();
-        let planning = cluster.query_family_summaries.iter().find(|row| row.query_family == QueryFamily::Planning).unwrap();
+        let cluster = result
+            .cluster_summaries
+            .iter()
+            .find(|cluster| {
+                cluster.condition == MechanismTransferCondition::ParameterShift
+                    && cluster.environment_cluster_id.ends_with("cluster-1")
+            })
+            .unwrap();
+        let planning = cluster
+            .query_family_summaries
+            .iter()
+            .find(|row| row.query_family == QueryFamily::Planning)
+            .unwrap();
         assert_eq!(planning.failed_count, 1);
         assert_eq!(planning.mean_score_ppm, 0);
     }
@@ -1105,9 +1138,10 @@ mod tests {
             Err(MechanismTransferError::MissingConditionProfile { .. })
         ));
         let mut duplicate = base_input();
-        duplicate.context.condition_profiles.push(
-            duplicate.context.condition_profiles[0].clone()
-        );
+        duplicate
+            .context
+            .condition_profiles
+            .push(duplicate.context.condition_profiles[0].clone());
         assert!(matches!(
             evaluate_mechanism_transfer(&duplicate),
             Err(MechanismTransferError::DuplicateConditionProfile { .. })
@@ -1174,7 +1208,10 @@ mod tests {
     #[test]
     fn shared_exploration_cost_is_charged_once_not_per_matrix_cell() {
         let result = evaluate_mechanism_transfer(&base_input()).unwrap();
-        assert_eq!(result.base_portfolio.exploration_total_charged_interactions, 9);
+        assert_eq!(
+            result.base_portfolio.exploration_total_charged_interactions,
+            9
+        );
         assert_eq!(result.base_portfolio.total_test_interaction_count, 30);
         assert_eq!(result.base_portfolio.task_count, 30);
     }
