@@ -953,46 +953,208 @@ impl WebResearcher {
         Ok(extract_openreview_ids(&json))
     }
 
-    /// Fetch and extract content from a URL
-    async fn fetch_and_extract(&self, url: &str) -> Result<super::extractor::ExtractedContent> {
-        let response = self
-            .client
-            .get(url)
-            .send()
-            .await
-            .context("Failed to fetch URL")?;
+    /// Fetch, capture and extract a page while preserving a complete attempt receipt.
+    async fn fetch_and_extract_with_receipt(
+        &self,
+        candidate: PageCandidate,
+    ) -> PageAcquisition {
+        let started = Instant::now();
+        let response = self.client.get(&candidate.url).send().await;
+        let mut response = match response {
+            Ok(response) => response,
+            Err(error) => {
+                let outcome = if error.is_timeout() {
+                    AcquisitionOutcome::Timeout
+                } else {
+                    AcquisitionOutcome::ReadFailed
+                };
+                let mut receipt = make_receipt(
+                    candidate.query_rank,
+                    Some(candidate.source_rank),
+                    AcquisitionStage::PageFetch,
+                    &candidate.query,
+                    outcome,
+                );
+                receipt.requested_url = Some(candidate.url.clone());
+                receipt.reason_code = Some(if error.is_timeout() {
+                    "PAGE_FETCH_TIMEOUT".to_string()
+                } else {
+                    "PAGE_FETCH_REQUEST_FAILED".to_string()
+                });
+                receipt.reason = Some(error.to_string());
+                receipt.elapsed_ms = elapsed_ms(started);
+                return PageAcquisition {
+                    candidate,
+                    receipt,
+                    extraction: None,
+                };
+            }
+        };
 
-        if !response.status().is_success() {
-            anyhow::bail!("HTTP error: {}", response.status());
+        let status = response.status();
+        let final_url = response.url().to_string();
+        let content_type = response
+            .headers()
+            .get(reqwest::header::CONTENT_TYPE)
+            .and_then(|value| value.to_str().ok())
+            .map(str::to_string);
+
+        if !status.is_success() {
+            let mut receipt = make_receipt(
+                candidate.query_rank,
+                Some(candidate.source_rank),
+                AcquisitionStage::PageFetch,
+                &candidate.query,
+                AcquisitionOutcome::HttpError,
+            );
+            receipt.requested_url = Some(candidate.url.clone());
+            receipt.final_url = Some(final_url);
+            receipt.http_status = Some(status.as_u16());
+            receipt.content_type = content_type;
+            receipt.reason_code = Some("PAGE_HTTP_ERROR".to_string());
+            receipt.reason = Some(format!("page fetch returned HTTP {status}"));
+            receipt.elapsed_ms = elapsed_ms(started);
+            return PageAcquisition {
+                candidate,
+                receipt,
+                extraction: None,
+            };
         }
 
-        // Prevent ingestion of binary document frameworks (PDFs, archives, applications)
-        if let Some(content_type) = response.headers().get("content-type") {
-            if let Ok(ct_str) = content_type.to_str() {
-                let ct_lower = ct_str.to_lowercase();
-                if ct_lower.contains("pdf")
-                    || ct_lower.contains("octet-stream")
-                    || ct_lower.contains("zip")
-                {
-                    anyhow::bail!("Aborting ingestion of binary non-text asset: {}", ct_str);
+        if let Some(content_type_value) = content_type.as_deref() {
+            let lower = content_type_value.to_lowercase();
+            if lower.contains("pdf")
+                || lower.contains("octet-stream")
+                || lower.contains("zip")
+            {
+                let mut receipt = make_receipt(
+                    candidate.query_rank,
+                    Some(candidate.source_rank),
+                    AcquisitionStage::PageFetch,
+                    &candidate.query,
+                    AcquisitionOutcome::UnsupportedMedia,
+                );
+                receipt.requested_url = Some(candidate.url.clone());
+                receipt.final_url = Some(final_url);
+                receipt.http_status = Some(status.as_u16());
+                receipt.content_type = content_type;
+                receipt.reason_code = Some("UNSUPPORTED_MEDIA_TYPE".to_string());
+                receipt.reason = Some(format!(
+                    "binary/non-text media is not admitted by the HTML extractor: {content_type_value}"
+                ));
+                receipt.elapsed_ms = elapsed_ms(started);
+                return PageAcquisition {
+                    candidate,
+                    receipt,
+                    extraction: None,
+                };
+            }
+        }
+
+        // Stream only up to the configured per-page byte budget. The total
+        // captured HTML is bounded by max_sources_per_research × max_content_length.
+        let mut body = Vec::new();
+        let mut truncated = false;
+        loop {
+            match response.chunk().await {
+                Ok(Some(chunk)) => {
+                    let remaining = self.config.max_content_length.saturating_sub(body.len());
+                    let take = remaining.min(chunk.len());
+                    body.extend_from_slice(&chunk[..take]);
+                    if take < chunk.len() {
+                        truncated = true;
+                        break;
+                    }
+                }
+                Ok(None) => break,
+                Err(error) => {
+                    let mut receipt = make_receipt(
+                        candidate.query_rank,
+                        Some(candidate.source_rank),
+                        AcquisitionStage::PageFetch,
+                        &candidate.query,
+                        AcquisitionOutcome::ReadFailed,
+                    );
+                    receipt.requested_url = Some(candidate.url.clone());
+                    receipt.final_url = Some(final_url);
+                    receipt.http_status = Some(status.as_u16());
+                    receipt.content_type = content_type;
+                    receipt.captured_bytes = body.len();
+                    receipt.content_sha256 = Some(sha256_hex(&body));
+                    receipt.reason_code = Some("PAGE_BODY_READ_FAILED".to_string());
+                    receipt.reason = Some(error.to_string());
+                    receipt.elapsed_ms = elapsed_ms(started);
+                    return PageAcquisition {
+                        candidate,
+                        receipt,
+                        extraction: None,
+                    };
                 }
             }
         }
 
-        let html = response
-            .text()
-            .await
-            .context("Failed to read response body")?;
-
-        // Limit content size safely using character boundaries (Rust 1.76+)
-        let html = if html.len() > self.config.max_content_length {
-            let safe_limit = html.floor_char_boundary(self.config.max_content_length);
-            html[..safe_limit].to_string()
-        } else {
-            html
-        };
-
-        self.extractor.extract(&html, url)
+        let content_sha256 = sha256_hex(&body);
+        let html = String::from_utf8_lossy(&body).into_owned();
+        match self.extractor.extract(&html, &final_url) {
+            Ok(extraction) => {
+                let outcome = if truncated {
+                    AcquisitionOutcome::FetchedTruncated
+                } else {
+                    AcquisitionOutcome::Fetched
+                };
+                let mut receipt = make_receipt(
+                    candidate.query_rank,
+                    Some(candidate.source_rank),
+                    AcquisitionStage::PageFetch,
+                    &candidate.query,
+                    outcome,
+                );
+                receipt.requested_url = Some(candidate.url.clone());
+                receipt.final_url = Some(final_url);
+                receipt.http_status = Some(status.as_u16());
+                receipt.content_type = content_type;
+                receipt.captured_bytes = body.len();
+                receipt.content_sha256 = Some(content_sha256);
+                receipt.extractor_version = Some(EXTRACTOR_VERSION.to_string());
+                receipt.elapsed_ms = elapsed_ms(started);
+                if truncated {
+                    receipt.reason_code = Some("PAGE_BODY_TRUNCATED_AT_BUDGET".to_string());
+                    receipt.reason = Some(format!(
+                        "captured the first {} bytes; per-page content budget was reached",
+                        self.config.max_content_length
+                    ));
+                }
+                PageAcquisition {
+                    candidate,
+                    receipt,
+                    extraction: Some(extraction),
+                }
+            }
+            Err(error) => {
+                let mut receipt = make_receipt(
+                    candidate.query_rank,
+                    Some(candidate.source_rank),
+                    AcquisitionStage::PageFetch,
+                    &candidate.query,
+                    AcquisitionOutcome::ExtractionFailed,
+                );
+                receipt.requested_url = Some(candidate.url.clone());
+                receipt.final_url = Some(final_url);
+                receipt.http_status = Some(status.as_u16());
+                receipt.content_type = content_type;
+                receipt.captured_bytes = body.len();
+                receipt.content_sha256 = Some(content_sha256);
+                receipt.extractor_version = Some(EXTRACTOR_VERSION.to_string());
+                receipt.reason_code = Some("HTML_EXTRACTION_FAILED".to_string());
+                receipt.reason = Some(format!("{error:#}"));
+                receipt.elapsed_ms = elapsed_ms(started);
+                PageAcquisition {
+                    candidate,
+                    receipt,
+                    extraction: None,
+                }
+            }
+        }
     }
 
     /// Extract domain from URL
