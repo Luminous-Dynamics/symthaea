@@ -1,12 +1,13 @@
 {
   "$schema": "https://json-schema.org/draft/2020-12/schema",
   "$id": "https://luminousdynamics.io/schemas/mel-selective-design-risk-input-v1.schema.json",
-  "title": "MEL design-weighted selective risk/coverage input v1",
+  "title": "MEL design-weighted selective risk and coverage input v1",
   "type": "object",
   "additionalProperties": false,
   "required": [
     "schema",
     "dataset",
+    "synthetic_demonstration",
     "expected_selection_receipt_sha256",
     "model_identity_sha256",
     "runtime_identity_sha256",
@@ -23,7 +24,10 @@
       "const": "mel-selective-design-risk-input-v1"
     },
     "dataset": {
-      "$ref": "./mel-annotation-acquisition-plan-v1.schema.json"
+      "$ref": "mel-annotation-acquisition-plan-v1.schema.json"
+    },
+    "synthetic_demonstration": {
+      "type": "boolean"
     },
     "expected_selection_receipt_sha256": {
       "oneOf": [
@@ -55,25 +59,6 @@
       "$ref": "#/$defs/digest"
     },
     "threshold_plan": {
-      "$ref": "#/$defs/thresholdPlan"
-    },
-    "threshold_plan_sha256": {
-      "$ref": "#/$defs/digest"
-    },
-    "observed_probability_audit_outcomes": {
-      "type": "array",
-      "minItems": 1,
-      "items": {
-        "$ref": "#/$defs/outcome"
-      }
-    }
-  },
-  "$defs": {
-    "digest": {
-      "type": "string",
-      "pattern": "^[0-9a-f]{64}$"
-    },
-    "thresholdPlan": {
       "type": "object",
       "additionalProperties": false,
       "required": [
@@ -89,115 +74,132 @@
           "type": "array",
           "minItems": 1,
           "maxItems": 101,
+          "uniqueItems": true,
           "items": {
             "type": "integer",
             "minimum": 0,
             "maximum": 1000000
-          },
-          "uniqueItems": true
+          }
         },
         "tie_rule": {
           "const": "greater_or_equal"
         }
       }
     },
-    "outcome": {
-      "type": "object",
-      "additionalProperties": false,
-      "required": [
-        "item_id",
-        "query_id",
-        "source_work_id_sha256",
-        "selective_report_sha256",
-        "adjudication_profile_sha256",
-        "model_identity_sha256",
-        "runtime_identity_sha256",
-        "decoding_config_sha256",
-        "hardware_identity_sha256",
-        "evaluator_version",
-        "scoring_plan_sha256",
-        "evidence_stratum",
-        "identifiability_basis",
-        "decision",
-        "decision_confidence_ppm",
-        "decision_correct",
-        "unconditional_answer_correct",
-        "false_absence_claim"
-      ],
-      "properties": {
-        "item_id": {
-          "type": "string",
-          "minLength": 1
-        },
-        "query_id": {
-          "type": "string",
-          "minLength": 1
-        },
-        "source_work_id_sha256": {
-          "$ref": "#/$defs/digest"
-        },
-        "selective_report_sha256": {
-          "$ref": "#/$defs/digest"
-        },
-        "adjudication_profile_sha256": {
-          "$ref": "#/$defs/digest"
-        },
-        "model_identity_sha256": {
-          "$ref": "#/$defs/digest"
-        },
-        "runtime_identity_sha256": {
-          "$ref": "#/$defs/digest"
-        },
-        "decoding_config_sha256": {
-          "$ref": "#/$defs/digest"
-        },
-        "hardware_identity_sha256": {
-          "$ref": "#/$defs/digest"
-        },
-        "evaluator_version": {
-          "type": "string",
-          "minLength": 1
-        },
-        "scoring_plan_sha256": {
-          "$ref": "#/$defs/digest"
-        },
-        "evidence_stratum": {
-          "type": "string",
-          "minLength": 1
-        },
-        "identifiability_basis": {
-          "enum": [
-            "ClearPositive",
-            "ClearAbsence",
-            "AnnotatorDisagreement",
-            "TaskAmbiguity",
-            "SignalInsufficient",
-            "UnsupportedQuery"
-          ]
-        },
-        "decision": {
-          "enum": [
-            "Answer",
-            "ClaimAbsent",
-            "AbstainAmbiguous",
-            "AbstainNotEstimable"
-          ]
-        },
-        "decision_confidence_ppm": {
-          "type": "integer",
-          "minimum": 0,
-          "maximum": 1000000
-        },
-        "decision_correct": {
-          "type": "boolean"
-        },
-        "unconditional_answer_correct": {
-          "type": "boolean"
-        },
-        "false_absence_claim": {
-          "type": "boolean"
+    "threshold_plan_sha256": {
+      "$ref": "#/$defs/digest"
+    },
+    "observed_probability_audit_outcomes": {
+      "type": "array",
+      "minItems": 1,
+      "items": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": [
+          "item_id",
+          "query_id",
+          "source_work_id_sha256",
+          "recording_sha256",
+          "selective_report_sha256",
+          "adjudication_profile_sha256",
+          "model_identity_sha256",
+          "runtime_identity_sha256",
+          "decoding_config_sha256",
+          "hardware_identity_sha256",
+          "evaluator_version",
+          "scoring_plan_sha256",
+          "evidence_stratum",
+          "identifiability_basis",
+          "decision",
+          "decision_confidence_ppm",
+          "decision_correct",
+          "unconditional_answer_correct",
+          "false_absence_claim"
+        ],
+        "properties": {
+          "item_id": {
+            "type": "string",
+            "minLength": 1
+          },
+          "query_id": {
+            "type": "string",
+            "minLength": 1
+          },
+          "source_work_id_sha256": {
+            "$ref": "#/$defs/digest"
+          },
+          "recording_sha256": {
+            "$ref": "#/$defs/digest"
+          },
+          "selective_report_sha256": {
+            "$ref": "#/$defs/digest"
+          },
+          "adjudication_profile_sha256": {
+            "$ref": "#/$defs/digest"
+          },
+          "model_identity_sha256": {
+            "$ref": "#/$defs/digest"
+          },
+          "runtime_identity_sha256": {
+            "$ref": "#/$defs/digest"
+          },
+          "decoding_config_sha256": {
+            "$ref": "#/$defs/digest"
+          },
+          "hardware_identity_sha256": {
+            "$ref": "#/$defs/digest"
+          },
+          "evaluator_version": {
+            "type": "string",
+            "minLength": 1
+          },
+          "scoring_plan_sha256": {
+            "$ref": "#/$defs/digest"
+          },
+          "evidence_stratum": {
+            "type": "string",
+            "minLength": 1
+          },
+          "identifiability_basis": {
+            "enum": [
+              "ClearPositive",
+              "ClearAbsence",
+              "AnnotatorDisagreement",
+              "TaskAmbiguity",
+              "SignalInsufficient",
+              "UnsupportedQuery"
+            ]
+          },
+          "decision": {
+            "enum": [
+              "Answer",
+              "ClaimAbsent",
+              "AbstainAmbiguous",
+              "AbstainNotEstimable"
+            ]
+          },
+          "decision_confidence_ppm": {
+            "type": "integer",
+            "minimum": 0,
+            "maximum": 1000000
+          },
+          "decision_correct": {
+            "type": "boolean"
+          },
+          "unconditional_answer_correct": {
+            "type": "boolean"
+          },
+          "false_absence_claim": {
+            "type": "boolean"
+          }
         }
       }
+    }
+  },
+  "$defs": {
+    "digest": {
+      "type": "string",
+      "pattern": "^[0-9a-f]{64}$"
     }
   }
 }
