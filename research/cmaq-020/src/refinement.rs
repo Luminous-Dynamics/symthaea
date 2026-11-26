@@ -712,6 +712,21 @@ mod tests {
         );
         assert_eq!(ledger.spent_units(), 0);
 
+        let mut wrong_receipt_checkpoint =
+            receipt("a", "b", request.response_key.clone(), 0, 0);
+        wrong_receipt_checkpoint.candidate_checkpoint_sha256 = "d".repeat(64);
+        assert!(
+            ledger
+                .charge_blind_probe(
+                    &current,
+                    &contract,
+                    &request,
+                    &wrong_receipt_checkpoint,
+                )
+                .is_err()
+        );
+        assert_eq!(ledger.spent_units(), 0);
+
         let bad_receipt = receipt("a", "b", request.response_key.clone(), 0, 1);
         assert!(
             ledger
