@@ -426,7 +426,7 @@ mod tests {
     use super::*;
 
     fn contract() -> StateResponseContract {
-        let intervention_ids = ["push_left", "push_right"]
+        let intervention_ids = ["no_op", "push_left", "push_right"]
             .into_iter()
             .map(str::to_owned)
             .collect();
@@ -598,6 +598,41 @@ mod tests {
 
 
 
+
+
+    #[test]
+    fn copy_no_op_response_does_not_hide_action_distinguishable_states() {
+        let mut contract = contract();
+        let separating_key = ResponseKey::new("push_right", "displacement", 1);
+        contract.probe_cost_units.insert(separating_key.clone(), 1);
+
+        let mut left = record("state-a", "copied-current-state", 0, 2);
+        let mut right = record("state-b", "copied-current-state", 1, 2);
+        let no_op_key = ResponseKey::new("no_op", "displacement", 1);
+        right
+            .responses
+            .insert(no_op_key.clone(), left.responses[&no_op_key]);
+
+        assert_eq!(left.responses[&no_op_key], right.responses[&no_op_key]);
+        assert_ne!(
+            left.responses[&separating_key],
+            right.responses[&separating_key]
+        );
+
+        let score = score_abstraction(&[left.clone(), right.clone()], &contract)
+            .expect("valid copy-control fixture");
+        assert_eq!(score.false_merges, 1);
+
+        let probe = select_counterexample_probe(&[left, right], &contract)
+            .expect("valid contract")
+            .expect("action consequence distinguishes the states");
+        assert_eq!(
+            probe.dimension,
+            CounterexampleDimension::Response {
+                key: separating_key
+            }
+        );
+    }
 
     #[test]
     fn domain_scope_and_source_digests_are_mandatory() {
