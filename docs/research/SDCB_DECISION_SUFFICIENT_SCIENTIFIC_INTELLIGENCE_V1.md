@@ -2,7 +2,7 @@
 
 **Status:** research protocol and analytic reference implementation
 **Parent:** SDCB evidence-gated belief transitions v1
-**Implementation:** [scripts/research/sdcb_decision_value.rs](../../scripts/research/sdcb_decision_value.rs)
+**Implementation:** [one-step decision value](../../scripts/research/sdcb_decision_value.rs) and [exact finite-horizon oracle](../../scripts/research/sdcb_nonmyopic_oracle.rs)
 **Design fixture:** [SDCB_DECISION_VALUE_EPISODE_V1.example.json](SDCB_DECISION_VALUE_EPISODE_V1.example.json)
 **Schema:** [SDCB_DECISION_VALUE_EPISODE_V1.schema.json](SDCB_DECISION_VALUE_EPISODE_V1.schema.json)
 
@@ -191,9 +191,34 @@ Do not claim superiority from the counterexample alone. A genuine advance requir
 - Use paired tasks and common seeds for baseline comparisons; report per-family confidence intervals and bootstrap at the task-family level.
 - Keep discovery, learning, decision quality, evidence integrity, and resource use as separate gates.
 
-## 11. Limitations and next extensions
+## 11. Exact non-myopic adaptive experiment oracle
 
-The v1 reference is one-step and finite. It assumes likelihoods are known and that utility values are supplied by the task designer. It does not learn likelihoods, model utility uncertainty, plan multi-stage experiments, solve continuous design problems, or authenticate evidence.
+One-step EVSI can still be myopic. An experiment may have zero immediate decision value but reveal which follow-up experiment is worth running. DSSI now includes a separate exact finite-horizon dynamic-programming oracle for small finite cases.
+
+For belief state p, remaining experiments E, budget b, and horizon k, the Bellman recurrence is:
+
+\[ V(p,E,b,k)=\max\left\{V_0(p),\max_{e\in E,\ c(e)\le b}\left[-\lambda c(e)+\sum_o P(o|p,e)V(p_{e,o},E\\setminus\\{e\},b-c(e),k-1)\right]\right\}. \]
+
+The policy is adaptive: after each outcome it can choose a different next experiment, or stop. Each candidate is used at most once. Costs are charged at every selected experiment node. The implementation rejects duplicate candidate IDs and caps the exact candidate set at 12 to keep the reference oracle bounded and auditable.
+
+### Sequential counterexample
+
+Use prior p = (0.4, 0.4, 0.2), with actions A and B. Hypotheses h1/h2 both assign utility (1,0), while h3 assigns (0,1). The current best value is 0.8.
+
+Two experiments:
+
+| Experiment | P(o1|h1) | P(o1|h2) | P(o1|h3) | Cost units |
+|---|---:|---:|---:|---:|
+| screen-a | 0.75 | 1.0 | 0.5 | 1 |
+| screen-b | 0.5 | 0.5 | 1.0 | 1 |
+
+Each experiment alone has zero myopic EVSI. A one-step EVSI planner therefore abstains. An exact two-step adaptive policy reaches expected terminal value 0.85, a gain of 0.05 over stopping. With budget one, the value remains 0.8. This fixture establishes why evaluation must include policy value over a sequence, not only the immediate score of the first experiment.
+
+The finite-horizon oracle is intentionally an exhaustive small-instance comparator. It is not a scalable general-purpose planner or an achieved Symthaea model capability. Its role is to give us an exact ground truth against which approximate HDC/CfC, Bayesian, or language-agent experiment policies can be evaluated.
+
+## 12. Limitations and next extensions
+
+The one-step decision-value module assumes supplied likelihoods and utilities. The exact non-myopic oracle handles only small finite candidate sets (at most 12) and is exponential in the horizon/outcome branching. Both assume a finite hypothesis set and known likelihoods; neither learns likelihoods or utility models, solves continuous design problems, models utility ambiguity, or authenticates evidence.
 
 Next research increments:
 
@@ -204,7 +229,7 @@ Next research increments:
 5. Utility elicitation and preference uncertainty with human/domain-owner provenance.
 6. Adapter evaluation inside Beyond Accuracy, ActiveSciBench, and ACDB, subject to licenses and available interfaces.
 
-## 12. References
+## 13. References
 
 1. Kuroki, Mansouri & Schwaller, Beyond Accuracy: A Diagnostic Benchmark for Hypothesis-Driven Experiment Planning in LLM Agents (22 Nov 2026), https://arxiv.org/abs/2611.29467 and https://schwallergroup.github.io/beyond-accuracy/.
 2. Kabra et al., LLM-AutoSciLab / ActiveSciBench (NeurIPS 2026), https://scientific-discovery.github.io/llm-autoscilab-project/.
@@ -212,6 +237,6 @@ Next research increments:
 4. Deb, Shah & Krishnan, Active Causal Discovery Benchmark (16 Sep 2026), https://arxiv.org/abs/2609.31675.
 5. Alexanderian, Optimal experimental design: Formulations and computations, Acta Numerica 33 (2024), https://doi.org/10.1017/S0962492924000023. The survey reviews Bayesian/decision-theoretic criteria and emerging non-myopic sequential design.
 
-## 13. Claim boundary
+## 14. Claim boundary
 
 This protocol and analytic code do not establish that Symthaea outperforms SOTA, makes real-world scientific discoveries, or improves physical outcomes. No external benchmark has been run. Utility-aware experiment selection is an established research area; the proposed contribution is the testable integration of task-relative decision sufficiency with SDCB's evidence-gated belief transitions.
