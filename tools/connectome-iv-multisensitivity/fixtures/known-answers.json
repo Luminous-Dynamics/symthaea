@@ -1,0 +1,222 @@
+{
+  "schema_version": "1.0.0",
+  "evidence_class": "synthetic_known_answer",
+  "claim_ceiling": "SYNTHETIC_ONLY",
+  "sampling_model": {
+    "conditional_gaussian": true,
+    "fixed_design": true,
+    "homoskedastic": true,
+    "independent_rows": true,
+    "intercept_only": true,
+    "instrument_count": 2,
+    "sample_size": 8,
+    "residual_degrees_of_freedom": 5,
+    "f_critical_f95_df2_df5": 5.786135043349963
+  },
+  "data_generating_process": {
+    "structural_effect": 3,
+    "first_stage_coefficients": [
+      2,
+      0.5
+    ],
+    "direct_effect_coefficients": [
+      0.6,
+      -0.4
+    ],
+    "residual_treatment_scale": 0.1,
+    "residual_outcome_scale": 0.2
+  },
+  "known_answers": [
+    {
+      "id": "two_instrument_diagnostics",
+      "instrument_gram": [
+        [
+          8,
+          0
+        ],
+        [
+          0,
+          8
+        ]
+      ],
+      "first_stage_coefficients": [
+        2,
+        0.5
+      ],
+      "first_stage_joint_f": 1062.5,
+      "reduced_form_coefficients": [
+        6.6,
+        1.1
+      ],
+      "two_stage_least_squares": 3.235294117647059
+    },
+    {
+      "id": "broad_rms_support",
+      "candidate_effect": 3,
+      "direct_effect_rms_bound": 0.8,
+      "implied_direct_effect_coefficients": [
+        0.6,
+        -0.4
+      ],
+      "implied_direct_effect_rms": 0.7211102550927979,
+      "exact_exclusion_ar_statistic": 65,
+      "profiled_ar_statistic": 0,
+      "profiled_ar_over_instruments": 0,
+      "accepted": true
+    },
+    {
+      "id": "intermediate_rms_support",
+      "candidate_effect": 3,
+      "direct_effect_rms_bound": 0.5,
+      "profiled_ar_statistic": 6.111218113400259,
+      "profiled_ar_over_instruments": 3.0556090567001295,
+      "f_critical_value": 5.786135043349963,
+      "accepted": true
+    },
+    {
+      "id": "tight_rms_support",
+      "candidate_effect": 3,
+      "direct_effect_rms_bound": 0.3,
+      "profiled_ar_statistic": 22.166730868040155,
+      "profiled_ar_over_instruments": 11.083365434020077,
+      "f_critical_value": 5.786135043349963,
+      "accepted": false
+    },
+    {
+      "id": "one_instrument_scalar_reduction",
+      "instrument_count": 1,
+      "sample_size": 20,
+      "first_stage_joint_f": 1210.3134479271994,
+      "candidate_effect": 3,
+      "direct_effect_rms_bound": 0.31,
+      "profiled_ar_statistic": 2.740946271084397,
+      "f_critical_value": 4.413873419170566,
+      "accepted": true
+    },
+    {
+      "id": "weak_joint_first_stage",
+      "first_stage_coefficients": [
+        0.05,
+        0.02
+      ],
+      "first_stage_joint_f": 0.725,
+      "notes": "Continuous weak-first-stage diagnostic; no universal threshold is applied."
+    }
+  ],
+  "notes": "All numerical results are synthetic and conditional on the stipulated design. No biological inference is claimed.",
+  "invariance_cases": [
+    {
+      "id": "correlated_instrument_basis",
+      "instrument_gram": [
+        [
+          8,
+          4
+        ],
+        [
+          4,
+          10
+        ]
+      ],
+      "first_stage_coefficients": [
+        1.75,
+        0.5
+      ],
+      "reduced_form_coefficients": [
+        6.05,
+        1.1
+      ],
+      "candidate_effect": 3,
+      "implied_direct_effect_coefficients": [
+        0.8,
+        -0.4
+      ],
+      "direct_effect_rms_bound": 0.5,
+      "implied_direct_effect_rms": 0.7211102550927979,
+      "expected_profiled_ar_statistic": 6.111218113400255,
+      "expected_profiled_ar_over_instruments": 3.0556090567001273,
+      "equivalence_to_orthogonal_instrument_basis": true
+    },
+    {
+      "id": "extreme_instrument_unit_change",
+      "column_scaling": [
+        1000000,
+        0.000001
+      ],
+      "expected_profiled_ar_statistic_same_as_unscaled": true,
+      "expected_sample_rms_same_as_unscaled": true
+    },
+    {
+      "id": "instrument_column_permutation",
+      "column_order": [
+        1,
+        0
+      ],
+      "expected_profiled_ar_statistic_same_as_original": true,
+      "expected_sample_rms_same_as_original": true
+    }
+  ],
+  "control_calibration": {
+    "id": "matched_opsin_free_light_on_control",
+    "evidence_class": "synthetic_known_answer",
+    "claim_ceiling": "SYNTHETIC_ONLY",
+    "control_count": 8,
+    "instrument_count": 2,
+    "residual_degrees_of_freedom": 5,
+    "normalized_gram": [
+      [
+        1,
+        0
+      ],
+      [
+        0,
+        1
+      ]
+    ],
+    "direct_effect_coefficients": [
+      0.6,
+      -0.4
+    ],
+    "residual_sigma": 0.2529822128134703,
+    "nominal_confidence_level": 0.95,
+    "f_critical_value": 5.786135043349963,
+    "center_rms": 0.7211102550927979,
+    "confidence_radius_rms": 0.30426659477109774,
+    "control_only_upper_bound_rms": 1.0253768498638955,
+    "transport_multiplier": 1,
+    "applied_sensitivity_bound_rms": 1.0253768498638955,
+    "transportability_proven": false
+  },
+  "control_calibration_transport_sensitivity": {
+    "id": "prespecified_transport_multiplier",
+    "control_only_upper_bound_rms": 1.0253768498638955,
+    "transport_multiplier": 1.5,
+    "expected_applied_sensitivity_bound_rms": 1.5380652747958434,
+    "transportability_proven": false
+  },
+  "sensitivity_ladder": {
+    "id": "candidate_effect_over_registered_g_ladder",
+    "evidence_class": "synthetic_known_answer",
+    "claim_ceiling": "SYNTHETIC_ONLY",
+    "candidate_effect": 3,
+    "direct_effect_rms_bounds": [
+      0,
+      0.3,
+      0.5,
+      0.8
+    ],
+    "f_critical_value": 5.786135043349963,
+    "expected_profiled_ar_over_instruments": [
+      32.5,
+      11.083365434020077,
+      3.0556090567001295,
+      0
+    ],
+    "expected_accepted": [
+      false,
+      false,
+      true,
+      true
+    ],
+    "expected_monotone_nonincreasing": true
+  }
+}

@@ -1,0 +1,11 @@
+[package]
+name = "connectome-iv-multisensitivity"
+version = "0.1.0"
+edition = "2024"
+license = "AGPL-3.0-only"
+description = "Multi-instrument sample-normalized profiled Anderson-Rubin reference"
+
+[lib]
+path = "src/lib.rs"
+
+[workspace]
