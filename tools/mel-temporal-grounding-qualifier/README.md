@@ -113,3 +113,14 @@ The `audio_evidence_in_toto` module emits a standard in-toto Statement v1 JSON p
 The payload type is `application/vnd.in-toto+json`; the function returns the exact statement JSON bytes and their SHA-256 so the existing #13254 DSSE signer/verifier can consume them. The target audio appears as a `target-audio-reference` subject because a yoked evidence run may not have supplied the target's raw bytes to this verifier.
 
 This module deliberately sets `dsse_envelope_created=false` and `signature_verified=false`. It does not implement DSSE, Sigstore, key distribution, trust roots, signer-role policy or transparency verification. A signed runner/provider receipt must be produced and verified by #13254 before any stronger execution or model-input claim is allowed.
+
+
+## Unsigned in-toto Statement payload
+
+Run the integrated byte-verification, temporal-revision join and in-toto Statement builder with:
+
+    cargo +1.96.0 run --locked --manifest-path tools/mel-temporal-grounding-qualifier/Cargo.toml --bin mel-audio-evidence-in-toto -- tools/mel-temporal-grounding-qualifier/fixtures/mel-audio-bound-revision.synthetic.json tools/mel-temporal-grounding-qualifier/fixtures/mel-audio-evidence-window.synthetic.json tools/mel-temporal-grounding-qualifier/fixtures/mel-audio-evidence-source.synthetic.bin tools/mel-temporal-grounding-qualifier/fixtures/mel-audio-evidence-pcm.synthetic.hex
+
+The CLI emits a wrapper containing the exact compact in-toto Statement v1 JSON bytes, payload type and payload SHA-256. Its subjects bind target-audio reference, source-audio bytes, decoded PCM, each window, context/full manifests, verification report and revision report. The predicate records `DigestLinked` evidence and keeps all trust/authentication flags false.
+
+This is unsigned payload material for #13254. It is not a DSSE envelope, it has no signature, and it must not be treated as authenticated provenance until the existing signer and independent verifier validate it under the configured trust-root/role policy.
