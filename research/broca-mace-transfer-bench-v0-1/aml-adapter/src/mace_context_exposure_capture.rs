@@ -74,7 +74,6 @@ pub struct MaceRequestMessageV1 {
 #[derive(Clone, Debug, Eq, PartialEq, serde::Serialize)]
 #[serde(untagged)]
 pub enum MaceProviderStaticParameterV1 {
-    String(String),
     Number(serde_json::Number),
     Bool(bool),
 }
@@ -775,8 +774,8 @@ mod tests {
     fn rejects_unpinned_provider_parameter_profile_before_artifact_or_transport() {
         let mut request_parameters = BTreeMap::new();
         request_parameters.insert(
-            "instructions".to_owned(),
-            MaceProviderStaticParameterV1::String("unexpected dynamic instruction".to_owned()),
+            "temperature".to_owned(),
+            MaceProviderStaticParameterV1::Number(serde_json::Number::from(8)),
         );
         let request = MaceProviderNeutralRequestV1 {
             model: "test-model".to_owned(),
