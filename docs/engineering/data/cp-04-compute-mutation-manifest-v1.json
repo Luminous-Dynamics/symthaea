@@ -1,0 +1,82 @@
+{
+  "schema": "cp-04-compute-mutation-manifest-v1",
+  "guard_registry": {
+    "CP-COMP-COVERAGE": "coverage",
+    "CP-COMP-AUTHORITY": "authority",
+    "CP-COMP-NEGATIVE": "negative-evidence",
+    "CP-COMP-DEPENDENCY": "dependency-boundary",
+    "CP-COMP-CURRENTNESS": "currentness",
+    "CP-COMP-HISTORICAL": "historical-identity",
+    "CP-COMP-INVARIANT": "invariant-integrity"
+  },
+  "mutations": [
+    {
+      "mutation_id": "remove-model-runtime-edge",
+      "guard_id": "CP-COMP-DEPENDENCY"
+    },
+    {
+      "mutation_id": "reverse-model-runtime-edge",
+      "guard_id": "CP-COMP-DEPENDENCY"
+    },
+    {
+      "mutation_id": "duplicate-model-runtime-edge",
+      "guard_id": "CP-COMP-DEPENDENCY"
+    },
+    {
+      "mutation_id": "add-graph-cycle",
+      "guard_id": "CP-COMP-DEPENDENCY"
+    },
+    {
+      "mutation_id": "rename-graph-node",
+      "guard_id": "CP-COMP-DEPENDENCY"
+    },
+    {
+      "mutation_id": "add-graph-field",
+      "guard_id": "CP-COMP-DEPENDENCY"
+    },
+    {
+      "mutation_id": "malformed-graph-edge",
+      "guard_id": "CP-COMP-DEPENDENCY"
+    },
+    {
+      "mutation_id": "duplicate-model-node",
+      "guard_id": "CP-COMP-DEPENDENCY"
+    },
+    {
+      "mutation_id": "dangling-graph-edge",
+      "guard_id": "CP-COMP-DEPENDENCY"
+    },
+    {
+      "mutation_id": "drop-C06",
+      "guard_id": "CP-COMP-COVERAGE"
+    },
+    {
+      "mutation_id": "promote-C17",
+      "guard_id": "CP-COMP-AUTHORITY"
+    },
+    {
+      "mutation_id": "rewrite-C16",
+      "guard_id": "CP-COMP-NEGATIVE"
+    },
+    {
+      "mutation_id": "collapse-C10",
+      "guard_id": "CP-COMP-DEPENDENCY"
+    },
+    {
+      "mutation_id": "change-C18",
+      "guard_id": "CP-COMP-CURRENTNESS"
+    },
+    {
+      "mutation_id": "erase-C05",
+      "guard_id": "CP-COMP-HISTORICAL"
+    },
+    {
+      "mutation_id": "mutate-C02-model-identity",
+      "guard_id": "CP-COMP-DEPENDENCY"
+    },
+    {
+      "mutation_id": "mutate-C02-model-identity",
+      "guard_id": "CP-COMP-DEPENDENCY"
+    }
+  ]
+}
