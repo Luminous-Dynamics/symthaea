@@ -83,7 +83,8 @@
       "elapsed_time_class": "medium",
       "downtime_class": "declared_before_request",
       "permission": "asset_owner_required",
-      "authority_effect": "none"
+      "authority_effect": "none",
+      "scenario_case_id": "SAFRB-SHARED-PUMP-2ROUTE-001"
     },
     {
       "action_id": "second-scada-dashboard-read",
@@ -100,7 +101,8 @@
       "elapsed_time_class": "low",
       "downtime_class": "none",
       "permission": "data_owner_required",
-      "authority_effect": "none"
+      "authority_effect": "none",
+      "scenario_case_id": "SAFRB-SHARED-PUMP-2ROUTE-001"
     },
     {
       "action_id": "independent-tank-gauge",
@@ -118,7 +120,8 @@
       "elapsed_time_class": "medium",
       "downtime_class": "none",
       "permission": "asset_owner_required",
-      "authority_effect": "none"
+      "authority_effect": "none",
+      "scenario_case_id": "SAFRB-SHARED-PUMP-2ROUTE-001"
     },
     {
       "action_id": "title-custody-contract-review",
@@ -136,7 +139,8 @@
       "elapsed_time_class": "medium",
       "downtime_class": "none",
       "permission": "rights_holder_and_local_review_required",
-      "authority_effect": "no_dispatch_authority"
+      "authority_effect": "no_dispatch_authority",
+      "scenario_case_id": "both"
     },
     {
       "action_id": "operation-window-two-independent-throughput-test",
@@ -154,7 +158,8 @@
       "elapsed_time_class": "before-window-2-decision-deadline",
       "downtime_class": "must-be-declared",
       "permission": "asset_owner_required",
-      "authority_effect": "none"
+      "authority_effect": "none",
+      "scenario_case_id": "SAFRB-TWO-WINDOW-SHARED-PUMP-001"
     }
   ],
   "required_policy_baselines": [
