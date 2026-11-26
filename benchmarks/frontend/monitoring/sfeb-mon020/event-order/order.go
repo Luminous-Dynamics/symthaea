@@ -75,8 +75,21 @@ type VerifierReport struct {
 	Version string
 	BuildDigest string
 	TrustStoreDigest string
+	ClaimsProfile string
 	VerifiedAt int64
 	FreshUntil int64
+	ClaimSourceID string
+	ClaimControlRoot string
+	ClaimEventID string
+	ClaimEventKind string
+	ClaimEventSubjectID string
+	ClaimEventActivityID string
+	ClaimEventSourceID string
+	ClaimEventSequence uint64
+	ClaimWitnessID string
+	ClaimWitnessBeforeEventID string
+	ClaimWitnessAfterEventID string
+	ClaimWitnessSourceID string
 }
 type VerifierPin struct {
 	ID string
@@ -113,6 +126,7 @@ func reportFor(subject string,digest DigestRef,reports map[string]VerifierReport
 	if !ok { return Indeterminate,"verifier report missing: "+subject }
 	if r.Status=="invalid" { return Denied,"signature/profile verification failed: "+subject }
 	if r.Status!="verified" { return Indeterminate,"cryptographic verification not established: "+subject }
+	if r.ClaimsProfile!="mon020-normalized-evidence-v1" { return Indeterminate,"normalized verifier claim profile is missing or unsupported: "+subject }
 	p,ok:=pins[r.VerifierID]
 	if !ok || p.ID!=r.VerifierID || p.Version!=r.Version || p.BuildDigest!=r.BuildDigest ||
 		p.TrustStoreDigest!=r.TrustStoreDigest || !nonempty(r.VerifierID,r.Version,r.BuildDigest,r.TrustStoreDigest) {
@@ -226,6 +240,12 @@ func Evaluate(in Input,pins map[string]VerifierPin) Result {
 		sources[s.ID]=s
 		d,why:=reportFor("source:"+s.ID,s.IdentityDigest,reports,conflicts,pins,in.EvaluationAt)
 		if d!=Qualified { return finish(d,why,0,0,checked...) }
+		sr:=reports["source:"+s.ID]
+		if sr.ClaimSourceID!=s.ID { return finish(Denied,"verified source identity claim does not match requested source ID",0,0,checked...) }
+		d,why=reportFor("control-root:"+s.ID,s.ControlRootDigest,reports,conflicts,pins,in.EvaluationAt)
+		if d!=Qualified { return finish(d,"control-root binding: "+why,0,0,checked...) }
+		cr:=reports["control-root:"+s.ID]
+		if cr.ClaimSourceID!=s.ID || cr.ClaimControlRoot!=s.ControlRoot { return finish(Denied,"verified control-root membership does not match source/control-root pair",0,0,checked...) }
 	}
 	if len(sources)==0||len(in.Events)==0 { return finish(Indeterminate,"sources or events missing",0,0,checked...) }
 	events:=map[string]Event{}
@@ -242,6 +262,11 @@ func Evaluate(in Input,pins map[string]VerifierPin) Result {
 		seqOwner[key]=e.ID
 		d,why:=reportFor("event:"+e.ID,e.RecordDigest,reports,conflicts,pins,in.EvaluationAt)
 		if d!=Qualified { return finish(d,why,0,0,checked...) }
+		er:=reports["event:"+e.ID]
+		if er.ClaimEventID!=e.ID || er.ClaimEventKind!=string(e.Kind) || er.ClaimEventSubjectID!=e.SubjectID ||
+			er.ClaimEventActivityID!=e.ActivityID || er.ClaimEventSourceID!=e.SourceID || er.ClaimEventSequence!=e.Sequence {
+			return finish(Denied,"verified event projection does not match exact event fields: "+e.ID,0,0,checked...)
+		}
 		events[e.ID]=e
 		bySource[e.SourceID]=append(bySource[e.SourceID],e)
 	}
@@ -266,6 +291,11 @@ func Evaluate(in Input,pins map[string]VerifierPin) Result {
 		bs,as:=sources[before.SourceID],sources[after.SourceID]
 		d,why:=reportFor("witness:"+w.ID,w.EvidenceDigest,reports,conflicts,pins,in.EvaluationAt)
 		if d!=Qualified { return finish(d,why,0,0,checked...) }
+		wr:=reports["witness:"+w.ID]
+		if wr.ClaimWitnessID!=w.ID || wr.ClaimWitnessBeforeEventID!=w.BeforeEventID ||
+			wr.ClaimWitnessAfterEventID!=w.AfterEventID || wr.ClaimWitnessSourceID!=w.WitnessSourceID {
+			return finish(Denied,"verified order witness projection does not match exact handoff fields: "+w.ID,0,0,checked...)
+		}
 		if before.SourceID==after.SourceID {
 			if before.Sequence<after.Sequence { continue }
 			return finish(Divergent,"order witness contradicts authenticated same-source sequence: "+w.ID,0,0,checked...)
