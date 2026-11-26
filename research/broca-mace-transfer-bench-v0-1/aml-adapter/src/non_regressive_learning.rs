@@ -241,6 +241,8 @@ impl LearningGateAssessmentV1 {
         run_vectors_valid
             && verifier_vectors_valid
             && disposition_consistent
+            && self.maximum_stable_regression_basis_points <= 10_000
+            && self.minimum_adaptation_gain_basis_points <= 10_000
             && self.assessment_sha256 == assessment_digest(
                 self.disposition,
                 self.stable_delta_sum_basis_points,
