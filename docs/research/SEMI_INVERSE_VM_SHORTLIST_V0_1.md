@@ -78,7 +78,7 @@ Candidates are sorted and tie-broken deterministically by candidate ID. Input ca
 
 ## Authored adversarial unit tests
 
-The current Rust module includes 15 tests for:
+The current Rust module includes 22 tests for:
 1. deterministic known-answer ranking and full replay;
 2. recipe hard-bound rejection;
 3. historical-support envelope rejection despite an attractive forward prediction;
@@ -96,7 +96,14 @@ The current Rust module includes 15 tests for:
 18. decision frontier and clock mapping are sealed in the output report;
 13. malformed/blank historical-support neighbour IDs are rejected;
 14. minimum recipe-diversity spacing is enforced as a hard top-K selection constraint;
-15. independent exhaustive enumeration of every admissible candidate sequence verifies the production greedy diversity order and per-rank selected scores on a four-candidate known-answer pool.
+15. independent exhaustive enumeration verifies the production greedy diversity order and per-rank selected scores;
+16. missing forward-evaluation receipt returns UNKNOWN;
+17. receipt after decision frontier returns UNKNOWN;
+18. recipe and prediction-interval mismatch are rejected;
+19. snapshot mismatch and receipt-digest tampering are rejected;
+20. QUALIFIED status requires a model-qualification report digest;
+21. clock-domain or mapping mismatch is rejected;
+22. decision frontier and clock mapping are sealed into the report digest.
 
 An additional independent exhaustive top-K oracle separately recomputes normalized recipe distances, enumerates all valid sequences under the minimum-diversity rule, and compares the lexicographically optimal greedy path and per-rank scores with the production result. Exact-head rustfmt, strict Clippy, crate tests and SEMI-BENCH-001 reference workflow remain mandatory before marking these tests as passed.
 
