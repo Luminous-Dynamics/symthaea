@@ -127,8 +127,8 @@ pub fn assess_pair(
     right.validate_against(contract)?;
     let mut maximum = 0.0_f64;
     for (key, left_value) in &left.responses {
-        let right_value = right.responses.get(key).copied().unwrap_or_default();
-        let tolerance = contract.tolerance_units.get(key).copied().unwrap_or(1);
+        let right_value = right.responses[key];
+        let tolerance = contract.tolerance_units[key];
         let distance = left_value.abs_diff(right_value) as f64 / tolerance as f64;
         maximum = maximum.max(distance);
     }
@@ -148,10 +148,9 @@ pub fn approximate_response_equivalent(
     if !epsilon.is_finite() || epsilon < 0.0 {
         return Err("epsilon must be finite and non-negative".to_owned());
     }
-    if left.invariant_signature != right.invariant_signature {
-        return Ok(false);
-    }
-    Ok(assess_pair(left, right, contract)?.normalized_worst_case_distortion <= epsilon)
+    let assessment = assess_pair(left, right, contract)?;
+    Ok(left.invariant_signature == right.invariant_signature
+        && assessment.normalized_worst_case_distortion <= epsilon)
 }
 
 /// Score the candidate's state partition against evaluator-owned response
