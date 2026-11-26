@@ -730,6 +730,28 @@ mod tests {
     }
 
     #[test]
+    fn lifecycle_phase_costs_are_added_and_reported_separately() {
+        let req = request(QueryRegimeV1::BroadRecall);
+        let phase_costs = PhaseCostBreakdownV1 {
+            construction: cost(1, 0, 0),
+            maintenance: cost(2, 0, 0),
+            retrieval: cost(3, 1, 0),
+            verification: cost(4, 0, 1),
+            generation: cost(5, 1, 0),
+        };
+        let profiles = [profile_with_phases(
+            SubstrateKindV1::DenseSemantic,
+            phase_costs,
+        )];
+        let plan = route_mace_query_v1(&req, &profiles).unwrap();
+        assert_eq!(plan.estimated_phase_costs, phase_costs);
+        assert_eq!(plan.estimated_cost.context_tokens, 15);
+        assert_eq!(plan.estimated_cost.model_calls, 2);
+        assert_eq!(plan.estimated_cost.tool_calls, 1);
+        assert_eq!(plan.estimated_cost.verification_ops, 5);
+    }
+
+    #[test]
     fn duplicate_profiles_are_rejected_even_when_unselected() {
         let req = request(QueryRegimeV1::BroadRecall);
         let profiles = [
@@ -746,14 +768,14 @@ mod tests {
     fn estimated_cost_overflow_fails_closed() {
         let req = request(QueryRegimeV1::HistoricalAsKnown);
         let profiles = [
-            profile(
+            profile_with_phases(
                 SubstrateKindV1::BitemporalLedger,
                 PhaseCostBreakdownV1 {
                     construction: ResourceVectorV1 { context_bytes: u64::MAX, ..ResourceVectorV1::default() },
                     ..PhaseCostBreakdownV1::default()
                 },
             ),
-            profile(
+            profile_with_phases(
                 SubstrateKindV1::RawTimeline,
                 PhaseCostBreakdownV1 {
                     retrieval: ResourceVectorV1 { context_bytes: 1, ..ResourceVectorV1::default() },
