@@ -22,7 +22,8 @@
     "operation_outcome",
     "reconciliation_state",
     "witness_receipts",
-    "evidence_refs"
+    "evidence_refs",
+    "third_party_verification"
   ],
   "properties": {
     "schema_version": {
@@ -148,6 +149,119 @@
       "items": {
         "type": "string"
       }
+    },
+    "third_party_verification": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "verification_status",
+        "decision",
+        "verifier_identity",
+        "verifier_build_digest",
+        "transparency_log_used",
+        "nonce_challenge_digest",
+        "response_set_digest",
+        "checks",
+        "evidence_refs"
+      ],
+      "properties": {
+        "verification_status": {
+          "enum": [
+            "not_performed",
+            "partial",
+            "complete"
+          ]
+        },
+        "decision": {
+          "enum": [
+            "not_assessed",
+            "qualified",
+            "rejected",
+            "inconclusive"
+          ]
+        },
+        "verifier_identity": {
+          "type": [
+            "string",
+            "null"
+          ]
+        },
+        "verifier_build_digest": {
+          "type": [
+            "string",
+            "null"
+          ],
+          "pattern": "^sha256:[a-f0-9]{64}$"
+        },
+        "transparency_log_used": {
+          "type": "boolean"
+        },
+        "nonce_challenge_digest": {
+          "type": [
+            "string",
+            "null"
+          ],
+          "pattern": "^sha256:[a-f0-9]{64}$"
+        },
+        "response_set_digest": {
+          "type": [
+            "string",
+            "null"
+          ],
+          "pattern": "^sha256:[a-f0-9]{64}$"
+        },
+        "checks": {
+          "type": "object",
+          "additionalProperties": false,
+          "required": [
+            "witness_signatures_verified",
+            "matching_quorum_verified",
+            "nonce_freshness_verified",
+            "transparency_inclusion_verified",
+            "transparency_consistency_verified",
+            "split_view_checked",
+            "operator_independence_reviewed",
+            "current_state_reconciled",
+            "t10_erasure_state_verified"
+          ],
+          "properties": {
+            "witness_signatures_verified": {
+              "type": "boolean"
+            },
+            "matching_quorum_verified": {
+              "type": "boolean"
+            },
+            "nonce_freshness_verified": {
+              "type": "boolean"
+            },
+            "transparency_inclusion_verified": {
+              "type": "boolean"
+            },
+            "transparency_consistency_verified": {
+              "type": "boolean"
+            },
+            "split_view_checked": {
+              "type": "boolean"
+            },
+            "operator_independence_reviewed": {
+              "type": "boolean"
+            },
+            "current_state_reconciled": {
+              "type": "boolean"
+            },
+            "t10_erasure_state_verified": {
+              "type": "boolean"
+            }
+          }
+        },
+        "evidence_refs": {
+          "type": "array",
+          "items": {
+            "type": "string",
+            "minLength": 1
+          }
+        }
+      }
     }
   },
   "allOf": [
@@ -169,6 +283,86 @@
           },
           "independent_operator_count": {
             "minimum": 3
+          }
+        }
+      }
+    },
+    {
+      "if": {
+        "properties": {
+          "third_party_verification": {
+            "properties": {
+              "decision": {
+                "const": "qualified"
+              }
+            },
+            "required": [
+              "decision"
+            ]
+          }
+        },
+        "required": [
+          "third_party_verification"
+        ]
+      },
+      "then": {
+        "properties": {
+          "third_party_verification": {
+            "properties": {
+              "verification_status": {
+                "const": "complete"
+              },
+              "verifier_identity": {
+                "type": "string",
+                "minLength": 1
+              },
+              "verifier_build_digest": {
+                "type": "string",
+                "pattern": "^sha256:[a-f0-9]{64}$"
+              },
+              "transparency_log_used": {
+                "const": true
+              },
+              "nonce_challenge_digest": {
+                "type": "string",
+                "pattern": "^sha256:[a-f0-9]{64}$"
+              },
+              "response_set_digest": {
+                "type": "string",
+                "pattern": "^sha256:[a-f0-9]{64}$"
+              },
+              "checks": {
+                "properties": {
+                  "witness_signatures_verified": {
+                    "const": true
+                  },
+                  "matching_quorum_verified": {
+                    "const": true
+                  },
+                  "nonce_freshness_verified": {
+                    "const": true
+                  },
+                  "transparency_inclusion_verified": {
+                    "const": true
+                  },
+                  "transparency_consistency_verified": {
+                    "const": true
+                  },
+                  "split_view_checked": {
+                    "const": true
+                  },
+                  "operator_independence_reviewed": {
+                    "const": true
+                  },
+                  "current_state_reconciled": {
+                    "const": true
+                  },
+                  "t10_erasure_state_verified": {
+                    "const": true
+                  }
+                }
+              }
+            }
           }
         }
       }
