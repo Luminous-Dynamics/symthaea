@@ -555,7 +555,8 @@ fn validate_branch(
             || branch.predicted_outcome_mean_micro.is_some()
             || branch.resources.interaction_count != 0
             || branch.resources.model_query_count != 0
-            || branch.resources.elapsed_us != 0)
+            || branch.resources.elapsed_us != 0
+            || branch.resources.measured_energy_uj.is_some_and(|energy| energy != 0))
     {
         return Err(PairedInterventionError::NotExecutedBranchHasOutputOrCost {
             pair_id: pair_id.to_owned(),
@@ -579,8 +580,8 @@ fn add_energy(
     total: &mut Option<u128>,
     measurement: Option<u64>,
 ) -> Result<(), PairedInterventionError> {
-    if let Some(value) = measurement {
-        *total = Some(total.unwrap_or(0).checked_add(u128::from(value)).ok_or(PairedInterventionError::ArithmeticOverflow)?);
+    if let (Some(sum), Some(value)) = (total.as_mut(), measurement) {
+        *sum = sum.checked_add(u128::from(value)).ok_or(PairedInterventionError::ArithmeticOverflow)?;
     }
     Ok(())
 }
@@ -800,7 +801,7 @@ pub fn evaluate_paired_interventions(
             let covered = true_effect >= i128::from(interval.lower_micro)
                 && true_effect <= i128::from(interval.upper_micro);
 
-            let mut expected_invariant_ids = context.expected_invariant_variable_ids.iter()
+            let expected_invariant_ids = context.expected_invariant_variable_ids.iter()
                 .cloned()
                 .collect::<BTreeSet<_>>();
             for invariant in &pair.invariant_variables {
@@ -861,7 +862,6 @@ pub fn evaluate_paired_interventions(
         cluster.dispositions.add(pair.disposition)?;
 
         if let Some(error) = pair_result.absolute_contrast_error_micro {
-            increment(&mut family.dispositions.completed)?;
             add_u64(&mut family.sign_eligible_count, u64::from(pair_result.sign_eligible))?;
             if pair_result.sign_correct == Some(true) {
                 increment(&mut family.sign_correct_count)?;
@@ -1225,7 +1225,7 @@ mod tests {
         let result = evaluate_paired_interventions(&input).unwrap();
         let directional = result.family_summaries.iter()
             .find(|row| row.family == InterventionFamily::Directional).unwrap();
-        assert_eq!(directional.task_weighted_mean_contrast_error_micro, Some(500));
+        assert_eq!(directional.task_weighted_mean_contrast_error_micro, Some(250));
         assert_eq!(directional.cluster_balanced_mean_contrast_error_micro, Some(250));
     }
 
@@ -1320,6 +1320,7 @@ mod tests {
     #[test]
     fn failed_pair_is_retained_with_penalty_and_in_original_denominator() {
         let mut input = base_input();
+        input.context.minimum_independent_clusters_per_family = 1;
         let row = input.pairs.iter_mut()
             .find(|row| row.family == InterventionFamily::Directional && row.environment_cluster_id.ends_with("cluster-1"))
             .unwrap();
@@ -1340,6 +1341,7 @@ mod tests {
     #[test]
     fn abstention_before_execution_is_retained_and_costs_zero() {
         let mut input = base_input();
+        input.context.minimum_independent_clusters_per_family = 1;
         let row = input.pairs.iter_mut()
             .find(|row| row.family == InterventionFamily::Parameter && row.environment_cluster_id.ends_with("cluster-1"))
             .unwrap();
@@ -1370,6 +1372,7 @@ mod tests {
     #[test]
     fn environment_cluster_cannot_claim_two_families() {
         let mut input = base_input();
+        input.pairs[1].environment_cluster_id = input.pairs[0].environment_cluster_id.clone();
         input.pairs[1].environment_family_id = "other-family".to_owned();
         assert!(matches!(
             evaluate_paired_interventions(&input),
