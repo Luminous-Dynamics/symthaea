@@ -61,6 +61,7 @@ pub enum SourceLineageRejectV1 {
     GraphCycle,
     DanglingParent,
     CandidateLineageMismatch,
+    EvidenceClassMismatch,
     MissingRequirementEvidence,
     RootFamilyMismatch,
     ClosureDigestMismatch,
