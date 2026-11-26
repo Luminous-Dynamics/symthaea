@@ -23,11 +23,19 @@ Let h_(t-1) be the selected design history and d_test the target/test design dis
 
 \[ R\text{-}I(\xi_t)=EIG(\xi_t)\left(1-\lambda\frac{MMD(h_{t-1}\cup\{\xi_t\},d_{test})}{MMD(h_{t-1},d_{test})}\right). \]
 
-The reference implementation uses empirical squared MMD with the Gaussian/RBF kernel described in the paper's numerical appendix, then takes its square root for the MMD ratio:
+The paper writes the acquisition multiplier using an MMD ratio. However, source inspection of the authors' released implementation at [robust-boed](https://github.com/TrbingWY/robust-boed) reveals an important executable detail: `compute_mmd` and `compute_mmd_dispersion` return the **biased empirical MMD² estimate**, and `boed_experiment.py` uses the post-design value divided by the pre-design value directly. It does not take the square root before forming the R-I ratio. This reference now matches that released code path rather than the square-root MMD convention.
+
+The underlying empirical estimator is:
 
 \[ k(x,y)=\exp\!\left(-\frac{\|x-y\|^2}{2\sigma^2}\right), \]
 
-\[ MMD^2(P,Q)=\frac{1}{m^2}\sum_{i,i'}k(p_i,p_{i'})+\frac{1}{n^2}\sum_{j,j'}k(q_j,q_{j'})-\frac{2}{mn}\sum_{i,j}k(p_i,q_j). \]
+\[ \widehat{MMD}^{2}(P,Q)=\frac{1}{m^2}\sum_{i,i'}k(p_i,p_{i'})+\frac{1}{n^2}\sum_{j,j'}k(q_j,q_{j'})-\frac{2}{mn}\sum_{i,j}k(p_i,q_j). \]
+
+The source-faithful acquisition multiplier used here is therefore:
+
+\[ R\text{-}I_{code}(\xi_t)=EIG(\xi_t)\left(1-\lambda\frac{\widehat{MMD}^{2}(h_{t-1}\cup\{\xi_t\},d_{test})}{\widehat{MMD}^{2}(h_{t-1},d_{test})}\right). \]
+
+We retain this distinction explicitly: the paper's displayed notation says MMD, while the released executable reference divides the returned squared estimator.
 
 R-IDeA multiplies R-I by a sigmoid de-amplification weight:
 
@@ -41,7 +49,7 @@ Here \hat f^(n) is the current fitted predictor and g is a proxy intended to app
 
 The Rust file implements the paper's scoring layer for a finite candidate pool:
 
-- biased empirical MMD² with an RBF kernel and caller-supplied bandwidth;
+- biased empirical MMD² with an RBF kernel and caller-supplied bandwidth, with the raw squared estimate used in the R-I ratio to match the released upstream code;
 - MMD before/after adding the candidate to selected-design history;
 - R-I robust ratio with caller-supplied EIG and lambda;
 - DeA sigmoid from supplied current-model and proxy predictions;
@@ -57,13 +65,15 @@ The reference does **not** train g, infer EIG, construct a posterior, or assess 
 1. **R-IDeA is not EVSI.** EIG measures information about a parameter/hypothesis. EVSI measures expected improvement in a declared decision. Report them separately; a high R-IDeA score does not prove an experiment changes the best action.
 2. **R-IDeA is not a finite ambiguity-set maximin guarantee.** RPSD evaluates the worst scenario in a declared finite set. R-IDeA targets generalization under design-distribution shift and model misspecification using a proxy model.
 3. **R-IDeA does not certify truth.** The proxy g can be wrong; the reference only calculates the prescribed acquisition score.
+4. **Paper notation vs released code.** The paper displays an MMD ratio, while the published `compute_mmd` helper returns the biased squared estimator and the acquisition code uses that directly. We pin this code-level choice in the reference and keep the sqrt-MMD utility distinct.
+5. **R-IDeA does not certify generalization.** The proxy g may be poorly trained or misspecified; only a held-out evaluation can show whether the acquisition actually improves target-distribution loss.
 4. **MMD denominator.** If baseline MMD(history, target) is zero, the ratio is undefined. The reference returns `ZeroBaselineMmd`; it does not silently fall back to EIG.
-5. **Kernel and hyperparameters.** RBF bandwidth, representativeness weight lambda, threshold tau and sigmoid scale kappa affect rankings. The code exposes them and does not claim a universally correct setting. It restricts lambda to [0,1] as a conservative reference configuration; this is an implementation guard, not a claim that the paper's equation mathematically requires that interval.
-6. **Cost.** The original R-I/R-IDeA formulas do not divide by cost. The reference additionally reports R-IDeA per cost unit as a separate project ranking view; raw R-IDeA remains available.
+6. **Kernel and hyperparameters.** RBF bandwidth, representativeness weight lambda, threshold tau and sigmoid scale kappa affect rankings. The code exposes them and does not claim a universally correct setting. It restricts lambda to [0,1] as a conservative reference configuration; this is an implementation guard, not a claim that the paper's equation mathematically requires that interval.
+7. **Cost.** The original R-I/R-IDeA formulas do not divide by cost. The reference additionally reports R-IDeA per cost unit as a separate project ranking view; raw R-IDeA remains available.
 
 ## 4. Frozen counterexample
 
-Target design samples are `{0, 1, 2}` and the existing history is `{0, 2}` in one dimension, with RBF sigma 1.0. Baseline MMD is 0.1984961019.
+Target design samples are `{0, 1, 2}` and the existing history is `{0, 2}` in one dimension, with RBF sigma 1.0. Baseline biased empirical MMD² is 0.0394007025 (its square root, 0.1984961019, is shown only to make the convention difference clear).
 
 Two candidate designs:
 
@@ -74,8 +84,8 @@ Two candidate designs:
 
 With lambda = 0.5, tau = 0.5 and kappa = 0.5:
 
-- Candidate 1 exactly closes the empirical MMD gap for this fixture: MMD after = 0; R-I = 0.8; DeA = 0.880797; R-IDeA = 0.704638.
-- Candidate 2 increases MMD to 0.468779; its robust ratio is −0.180826; R-I = −0.216991; DeA = 0.310026; R-IDeA = −0.067273.
+- Candidate 1 exactly closes the empirical MMD² gap for this fixture: MMD² after = 0; R-I = 0.8; DeA = 0.880797; R-IDeA = 0.704638.
+- Candidate 2 increases MMD² to 0.2197535563; its source-faithful robust ratio is −1.788701; R-I = −2.146441; DeA = 0.310026; R-IDeA = −0.665452.
 
 The first candidate wins despite the second having 50% higher raw EIG. This is a hand-checkable illustration of the published acquisition factors, not a scientific benchmark result or evidence that our proxy accurately identifies de-amplifying regions.
 
@@ -133,4 +143,4 @@ Treat these as orthogonal criteria first and publish their joint Pareto frontier
 
 ## 8. Claim boundary
 
-The Rust source contains 16 authored unit tests, but it has not been compiled or executed in this environment. Its proxy predictions and EIG are caller-supplied. It does not train models, run an upstream R-IDeA reproduction, test Symthaea HDC/CfC, authenticate physical observations, or demonstrate SOTA performance.
+The Rust source contains 18 authored unit tests, but it has not been compiled or executed in this environment. Its proxy predictions and EIG are caller-supplied. It does not train models, run an upstream R-IDeA reproduction, test Symthaea HDC/CfC, authenticate physical observations, or demonstrate SOTA performance.
