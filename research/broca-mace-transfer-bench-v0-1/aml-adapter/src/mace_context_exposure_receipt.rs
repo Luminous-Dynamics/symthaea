@@ -19,6 +19,26 @@ pub const MACE_CONTEXT_EXPOSURE_MAX_RECEIPT_BYTES_V1: usize = 4 * 1024 * 1024;
 pub const MACE_CONTEXT_EXPOSURE_MAX_BODY_BYTES_V1: usize = 32 * 1024 * 1024;
 pub const MACE_CONTEXT_EXPOSURE_MAX_SPANS_V1: usize = 100_000;
 
+/// Generic provider parameters are deliberately limited to static numeric
+/// decoding/budget controls and boolean switches. Content-bearing or
+/// provider-specific structured fields require a typed adapter.
+pub const MACE_STATIC_PROVIDER_NUMBER_PARAMETER_KEYS_V1: &[&str] = &[
+    "temperature",
+    "top_p",
+    "frequency_penalty",
+    "presence_penalty",
+    "max_tokens",
+    "max_completion_tokens",
+    "seed",
+    "n",
+    "top_logprobs",
+];
+pub const MACE_STATIC_PROVIDER_BOOLEAN_PARAMETER_KEYS_V1: &[&str] = &[
+    "stream",
+    "logprobs",
+    "parallel_tool_calls",
+];
+
 #[derive(Clone, Copy, Debug, Eq, PartialEq, Serialize, Deserialize)]
 #[serde(rename_all = "snake_case")]
 pub enum MaceMemoryArmV1 {
@@ -198,7 +218,8 @@ pub enum MaceContextExposureRejectV1 {
     InvalidAdmissionStatus, DuplicateDeniedEvidence, DeniedEvidenceExposed,
     InvalidResponseBinding, InvalidSignatureAlgorithm, InvalidSignatureEncoding,
     InvalidObserverKeyId, UnknownObserverKey, SignatureMismatch,
-    InvalidRequestBody, ProviderParameterNotScalar, ExposureOutsideMessageContent,
+    InvalidRequestBody, ProviderParameterNotScalar, UnclassifiedProviderParameterKey,
+    ProviderParameterTypeMismatch, ExposureOutsideMessageContent,
     ExposureRoleMismatch,
     EvidenceAdmissionRejected, MemoryExposureInNoMemoryArm,
     ObserverSigningFailed, CanonicalizationFailed,
@@ -352,13 +373,17 @@ fn verify_provider_request_contract(
         return Err(MaceContextExposureRejectV1::WrongModelRevision);
     }
 
-    for value in request.parameters.values() {
-        if !matches!(
-            value,
-            serde_json::Value::Number(_)
-                | serde_json::Value::Bool(_)
-        ) {
-            return Err(MaceContextExposureRejectV1::ProviderParameterNotScalar);
+    for (key, value) in &request.parameters {
+        if MACE_STATIC_PROVIDER_NUMBER_PARAMETER_KEYS_V1.contains(&key.as_str()) {
+            if !value.is_number() {
+                return Err(MaceContextExposureRejectV1::ProviderParameterTypeMismatch);
+            }
+        } else if MACE_STATIC_PROVIDER_BOOLEAN_PARAMETER_KEYS_V1.contains(&key.as_str()) {
+            if !value.is_boolean() {
+                return Err(MaceContextExposureRejectV1::ProviderParameterTypeMismatch);
+            }
+        } else {
+            return Err(MaceContextExposureRejectV1::UnclassifiedProviderParameterKey);
         }
     }
     let parameter_bytes = serde_json::to_vec(&request.parameters)
