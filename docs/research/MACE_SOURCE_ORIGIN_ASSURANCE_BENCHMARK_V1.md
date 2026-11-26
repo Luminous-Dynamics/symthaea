@@ -192,3 +192,8 @@ Add these metrics:
 Proposed targets are zero accepted shared acquisition records, zero accepted key/profile reuse, zero majority-laundered ancestry mismatches, and 100% per-node quorum coverage on supported cases. The system must abstain or return insufficient evidence when the minimum operator or failure-domain count is not met. A valid signed disagreement must remain visible and cannot be discarded as an outlier without a separately governed adjudication process.
 
 The 2-of-3 policy is not a universal truth oracle: operator identity, failure-domain independence, publisher metadata and source completeness remain explicit trust assumptions. The external acquisition operator registry and fetch adapters must be independently audited and tested.
+
+
+## External provenance interoperability
+
+The follow-on [MACE W3C PROV and SCITT Interoperability V1](MACE_PROV_SCITT_INTEROP_V1.md) defines a JSON-LD context and proposed mapping for interoperable graph export, plus a separate SCITT transparency integration path. This complements the source-origin assurance benchmark but does not change its ground-truth requirements: neither PROV representation nor transparency-log inclusion proves source truth or completeness.
