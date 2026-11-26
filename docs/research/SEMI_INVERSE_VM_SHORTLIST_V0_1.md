@@ -48,9 +48,11 @@ The input binds:
 - historical support manifest and support-policy digests;
 - minimum neighbour count and maximum normalized support distance;
 - uncertainty-width limit, score weights, diversity weight, minimum recipe diversity and top-K;
-- each candidate's recipe settings, historical neighbours/distance, forward-model identity, evidence state, predicted metric intervals and candidate evidence digest.
+- each candidate's recipe settings, historical neighbours/distance, forward-model identity, evidence state, predicted metric intervals, content-addressed forward-evaluation receipt and candidate evidence digest.
 
-Candidate payload and policy digests are canonicalized. These are content-integrity values, not issuer-authenticity proofs.
+Candidate payload and policy digests are canonicalized. Forward-evaluation receipts additionally bind evaluator ID, model artifact and model-qualification report digest, exact process-snapshot digest, canonical recipe-vector digest, canonical output-metric digest, evidence state, evaluation time, availability time, clock-domain ID and clock-mapping digest. The decision's Unix timestamp is tied to the same declared clock mapping. A receipt available after the decision frontier is UNKNOWN; a context, recipe, model, output, status, digest or clock mismatch is REJECTED.
+
+All these digests provide content integrity and replayable linkage only. The current report explicitly sets `forward_evaluation_receipt_authenticity_proven=false`: there is no trusted issuer signature or external fab authority registry in this version. A self-consistent receipt is not proof that the named evaluator actually ran.
 
 ## Admission semantics
 
@@ -62,7 +64,7 @@ A candidate is **FEASIBLE** only when all of the following hold:
 - the required target interval is present, unit-correct, narrow enough and entirely contained in the requested target band;
 - every side-constraint interval is present, unit-correct and entirely contained in the corresponding allowed range.
 
-Hard violations and out-of-support candidates are REJECTED. Missing support, insufficient support, unavailable forward evidence, missing forward metrics or incomplete authoritative constraint inventory are UNKNOWN. Neither UNKNOWN nor REJECTED candidates can enter top-K.
+Hard violations and out-of-support candidates are REJECTED. Missing support, insufficient support, missing forward-evaluation receipt, late/unavailable forward receipt, unavailable forward evidence, missing forward metrics or incomplete authoritative constraint inventory are UNKNOWN. Neither UNKNOWN nor REJECTED candidates can enter top-K.
 
 The target/side-constraint check is deliberately conservative: the entire declared forward interval must be inside the acceptable band. A future policy may support a different risk functional, but it must be separately versioned and benchmarked.
 
@@ -89,6 +91,9 @@ The current Rust module includes 15 tests for:
 10. policy/candidate input-order-invariant report digest;
 11. shortlist receipt tamper detection;
 12. diversity spacing applied only after feasibility and permitted to produce a shorter-than-K shortlist;
+16. missing, late, digest-tampered, snapshot/recipe/model/output-mismatched forward-evaluation receipts are not admitted;
+17. a qualification report digest is required for a forward receipt marked QUALIFIED;
+18. decision frontier and clock mapping are sealed in the output report;
 13. malformed/blank historical-support neighbour IDs are rejected;
 14. minimum recipe-diversity spacing is enforced as a hard top-K selection constraint;
 15. independent exhaustive enumeration of every admissible candidate sequence verifies the production greedy diversity order and per-rank selected scores on a four-candidate known-answer pool.
