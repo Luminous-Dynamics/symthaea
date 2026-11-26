@@ -13,8 +13,8 @@ func base() (Graph,map[string]VerifierPin) {
 	collectorKey:=digest("collector","collector-key","agent-identity")
 	activity:=Node{ID:"tool-call",Kind:Activity,DeclaredInputs:[]string{"source-input"}}
 	nodes:=[]Node{
-		{ID:"source-input",Kind:Entity,Digest:&in,ExternalRoot:true,RequiresVerification:true},
-		{ID:"invocation-record",Kind:Entity,Digest:&inv,ExternalRoot:true,RequiresVerification:true},
+		{ID:"source-input",Kind:Entity,Digest:&in,ExternalRoot:true,RequiresVerification:true,SourceID:"source-a"},
+		{ID:"invocation-record",Kind:Entity,Digest:&inv,ExternalRoot:true,RequiresVerification:true,SourceID:"collector"},
 		activity,
 		{ID:"output",Kind:Entity,Digest:ptrDigest(digest("output","out","derived-output"))},
 		{ID:"source-a",Kind:Agent,Digest:&sourceKey,ExternalRoot:true,RequiresVerification:true},
@@ -24,6 +24,8 @@ func base() (Graph,map[string]VerifierPin) {
 		{ID:"use-1",Kind:Used,From:"source-input",To:"tool-call",EvidenceID:"invocation-record"},
 		{ID:"gen-1",Kind:Generated,From:"tool-call",To:"output",EvidenceID:"invocation-record"},
 		{ID:"assoc-1",Kind:AssociatedWith,From:"tool-call",To:"collector",EvidenceID:"invocation-record"},
+		{ID:"attribute-input",Kind:AttributedTo,From:"source-input",To:"source-a",EvidenceID:"source-input"},
+		{ID:"attribute-invocation",Kind:AttributedTo,From:"invocation-record",To:"collector",EvidenceID:"invocation-record"},
 	}
 	m:=Manifest{ActivityID:"tool-call",CollectorID:"collector",SourceID:"source-a",SnapshotID:"s1",QueryID:"q1",StartCursor:"0",EndCursor:"1",TerminalWatermark:"1",ObservedInputs:[]string{"source-input"},Complete:true,Digest:md,ObservedAt:200}
 	mk:=func(id string,d DigestRef)VerifierReport{return VerifierReport{SubjectID:id,InputDigest:d,Status:"verified",VerifierID:"v1",Version:"1",BuildDigest:"b1",TrustStoreDigest:"t1",VerifiedAt:100,FreshUntil:500}}
@@ -54,6 +56,7 @@ func TestDigestProfileIncomparable(t *testing.T){g,p:=base();g.Reports[0].InputD
 func TestDuplicateNodeConflict(t *testing.T){g,p:=base();n:=g.Nodes[0];n.ID="source-input";n.Digest=ptrDigest(digest("source-input","other","source-response"));g.Nodes=append(g.Nodes,n);check(t,g,p,Divergent)}
 func TestDuplicateEdgeConflict(t *testing.T){g,p:=base();e:=g.Edges[0];e.To="output";g.Edges=append(g.Edges,e);check(t,g,p,Divergent)}
 func TestMissingExternalOrigin(t *testing.T){g,p:=base();g.Nodes[0].ExternalRoot=false;check(t,g,p,Indeterminate)}
+func TestExternalRootWithoutAttribution(t *testing.T){g,p:=base();for i,e:=range g.Edges{if e.Kind==AttributedTo && e.From=="source-input"{g.Edges=append(g.Edges[:i],g.Edges[i+1:]...);break}};check(t,g,p,Indeterminate)}
 func TestGeneratedThenConsumedPath(t *testing.T){g,p:=base();g.Nodes=append(g.Nodes,Node{ID:"decision",Kind:Activity,DeclaredInputs:[]string{"output"}});g.Edges=append(g.Edges,Edge{ID:"use-output",Kind:Used,From:"output",To:"decision",EvidenceID:"source-input"});g.Manifests=append(g.Manifests,Manifest{ActivityID:"decision",CollectorID:"collector",SourceID:"source-a",SnapshotID:"s2",QueryID:"q2",StartCursor:"1",EndCursor:"2",TerminalWatermark:"2",ObservedInputs:[]string{"output"},Complete:true,ObservedAt:220});check(t,g,p,Qualified)}
 func TestSupersessionNotInCausalDAG(t *testing.T){g,p:=base();g.Nodes=append(g.Nodes,Node{ID:"corrected",Kind:Entity,Digest:ptrDigest(digest("corrected","new","correction"))});g.Edges=append(g.Edges,Edge{ID:"supersedes-1",Kind:Supersedes,From:"corrected",To:"source-input",EvidenceID:"source-input"});check(t,g,p,Qualified)}
 func TestDuplicateActivityManifestDivergent(t *testing.T){g,p:=base();g.Manifests=append(g.Manifests,g.Manifests[0]);check(t,g,p,Divergent)}
