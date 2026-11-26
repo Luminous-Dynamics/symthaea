@@ -1,0 +1,189 @@
+{
+  "schema_version": "sat-independent-memory-witness-profile/v0.1",
+  "profile_id": "SAT-WITNESS-3OF4-SYNTHETIC-EXAMPLE",
+  "profile_status": "synthetic_example",
+  "state_namespace_digest": "sha256:aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+  "consensus_assumption": {
+    "witness_count": 4,
+    "quorum_size": 3,
+    "max_byzantine": 1,
+    "honest_witness_rule": "durable_single_successor_per_state_generation_predecessor"
+  },
+  "quorum_policy": {
+    "transition_digest_must_match": true,
+    "predecessor_digest_must_match": true,
+    "operation_id_is_idempotent": true,
+    "commit_requires_quorum": true,
+    "conflicting_successor_must_be_rejected": true
+  },
+  "freshness_policy": {
+    "mode": "fresh_quorum_required",
+    "max_checkpoint_age_seconds": null,
+    "trusted_time_profile_digest": null,
+    "offline_behavior": "hold_reads_and_writes"
+  },
+  "operators": [
+    {
+      "operator_id": "synthetic-operator-1",
+      "organization_id": "synthetic-organization-1",
+      "administrative_domain_id": "synthetic-admin-domain-1",
+      "identity_provider_domain_id": "synthetic-idp-domain-1",
+      "key_custody_domain_id": "synthetic-key-custody-1",
+      "backup_restore_domain_id": "synthetic-backup-domain-1",
+      "control_plane_domain_id": "synthetic-control-plane-1",
+      "deployment_region": "synthetic-region-1",
+      "endpoint_ref": null,
+      "witness_software_digest": "sha256:bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb",
+      "witness_policy_digest": "sha256:cccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccc",
+      "signing_key_profile": {
+        "key_id": "synthetic-key-1",
+        "algorithm": "ed25519",
+        "status": "test_only",
+        "public_key_fingerprint": "TEST-ONLY-NOT-A-REAL-KEY-1",
+        "valid_from": null,
+        "valid_until": null
+      },
+      "governance_evidence_ref": "synthetic-only://operator-1"
+    },
+    {
+      "operator_id": "synthetic-operator-2",
+      "organization_id": "synthetic-organization-2",
+      "administrative_domain_id": "synthetic-admin-domain-2",
+      "identity_provider_domain_id": "synthetic-idp-domain-2",
+      "key_custody_domain_id": "synthetic-key-custody-2",
+      "backup_restore_domain_id": "synthetic-backup-domain-2",
+      "control_plane_domain_id": "synthetic-control-plane-2",
+      "deployment_region": "synthetic-region-2",
+      "endpoint_ref": null,
+      "witness_software_digest": "sha256:bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb",
+      "witness_policy_digest": "sha256:cccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccc",
+      "signing_key_profile": {
+        "key_id": "synthetic-key-2",
+        "algorithm": "ed25519",
+        "status": "test_only",
+        "public_key_fingerprint": "TEST-ONLY-NOT-A-REAL-KEY-2",
+        "valid_from": null,
+        "valid_until": null
+      },
+      "governance_evidence_ref": "synthetic-only://operator-2"
+    },
+    {
+      "operator_id": "synthetic-operator-3",
+      "organization_id": "synthetic-organization-3",
+      "administrative_domain_id": "synthetic-admin-domain-3",
+      "identity_provider_domain_id": "synthetic-idp-domain-3",
+      "key_custody_domain_id": "synthetic-key-custody-3",
+      "backup_restore_domain_id": "synthetic-backup-domain-3",
+      "control_plane_domain_id": "synthetic-control-plane-3",
+      "deployment_region": "synthetic-region-3",
+      "endpoint_ref": null,
+      "witness_software_digest": "sha256:bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb",
+      "witness_policy_digest": "sha256:cccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccc",
+      "signing_key_profile": {
+        "key_id": "synthetic-key-3",
+        "algorithm": "ed25519",
+        "status": "test_only",
+        "public_key_fingerprint": "TEST-ONLY-NOT-A-REAL-KEY-3",
+        "valid_from": null,
+        "valid_until": null
+      },
+      "governance_evidence_ref": "synthetic-only://operator-3"
+    },
+    {
+      "operator_id": "synthetic-operator-4",
+      "organization_id": "synthetic-organization-4",
+      "administrative_domain_id": "synthetic-admin-domain-4",
+      "identity_provider_domain_id": "synthetic-idp-domain-4",
+      "key_custody_domain_id": "synthetic-key-custody-4",
+      "backup_restore_domain_id": "synthetic-backup-domain-4",
+      "control_plane_domain_id": "synthetic-control-plane-4",
+      "deployment_region": "synthetic-region-4",
+      "endpoint_ref": null,
+      "witness_software_digest": "sha256:bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb",
+      "witness_policy_digest": "sha256:cccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccc",
+      "signing_key_profile": {
+        "key_id": "synthetic-key-4",
+        "algorithm": "ed25519",
+        "status": "test_only",
+        "public_key_fingerprint": "TEST-ONLY-NOT-A-REAL-KEY-4",
+        "valid_from": null,
+        "valid_until": null
+      },
+      "governance_evidence_ref": "synthetic-only://operator-4"
+    }
+  ],
+  "independence_domains": {
+    "operator_ids": [
+      "synthetic-operator-1",
+      "synthetic-operator-2",
+      "synthetic-operator-3",
+      "synthetic-operator-4"
+    ],
+    "organization_ids": [
+      "synthetic-organization-1",
+      "synthetic-organization-2",
+      "synthetic-organization-3",
+      "synthetic-organization-4"
+    ],
+    "administrative_domain_ids": [
+      "synthetic-admin-domain-1",
+      "synthetic-admin-domain-2",
+      "synthetic-admin-domain-3",
+      "synthetic-admin-domain-4"
+    ],
+    "identity_provider_domain_ids": [
+      "synthetic-idp-domain-1",
+      "synthetic-idp-domain-2",
+      "synthetic-idp-domain-3",
+      "synthetic-idp-domain-4"
+    ],
+    "key_custody_domain_ids": [
+      "synthetic-key-custody-1",
+      "synthetic-key-custody-2",
+      "synthetic-key-custody-3",
+      "synthetic-key-custody-4"
+    ],
+    "backup_restore_domain_ids": [
+      "synthetic-backup-domain-1",
+      "synthetic-backup-domain-2",
+      "synthetic-backup-domain-3",
+      "synthetic-backup-domain-4"
+    ],
+    "control_plane_domain_ids": [
+      "synthetic-control-plane-1",
+      "synthetic-control-plane-2",
+      "synthetic-control-plane-3",
+      "synthetic-control-plane-4"
+    ],
+    "known_shared_dependencies": []
+  },
+  "independence_assessment": {
+    "status": "not_assessed",
+    "reviewer_identity": null,
+    "review_date": null,
+    "evidence_refs": [],
+    "common_cause_cut_sets_reported": false,
+    "decision_notes": [
+      "Synthetic placeholder only; distinct labels do not prove distinct administrators, operators, accounts, keys, or backup domains."
+    ]
+  },
+  "recovery_policy": {
+    "unknown_outcome_policy": "reconcile_same_operation_id_before_new_mutation",
+    "idempotency_conflict_policy": "reject_same_id_different_transition_digest",
+    "witness_unavailable_policy": "continue_with_quorum",
+    "stale_store_policy": "do_not_serve_until_reconciled",
+    "erasure_replay_policy": "apply_witnessed_erasure_or_hold"
+  },
+  "evidence_policy": {
+    "receipt_retention": "durable",
+    "witness_receipts_signed": true,
+    "checkpoint_verification": "inclusion_consistency_and_freshness",
+    "independent_replay_required": true,
+    "transparency_log_profile_digest": null
+  },
+  "notes": [
+    "Synthetic profile example only. No real operators, endpoints, credentials, keys, deployment regions, or security domains are represented.",
+    "The arrays of distinct domain labels are only declarations. A semantic verifier must compare them to the operator records, and an independent reviewer must inspect governance evidence and common-cause dependencies.",
+    "No BFT proof or production quorum operation is implemented by this schema."
+  ]
+}
