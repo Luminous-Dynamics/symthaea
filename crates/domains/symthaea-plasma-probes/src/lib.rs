@@ -3278,8 +3278,8 @@ impl WeightedEmpiricalMeasure1D {
 
         let mut left_index = 0;
         let mut right_index = 0;
-        let mut left_cdf = 0.0;
-        let mut right_cdf = 0.0;
+        let mut left_cdf = 0.0_f64;
+        let mut right_cdf = 0.0_f64;
         let mut previous_position = self.domain_minimum;
         let mut distance = 0.0;
         let mut compensation = 0.0;
@@ -6051,9 +6051,10 @@ pub fn solve_small_positive_mass_response_qp(
             continue;
         }
 
+        let positive_cell_count = projected.iter().filter(|value| **value > 0.0).count();
         let candidate = SmallPositiveResponseQpReport {
             projected_values: projected,
-            positive_cell_count: projected.iter().filter(|value| **value > 0.0).count(),
+            positive_cell_count,
             target_mass,
             achieved_mass,
             mass_residual,
