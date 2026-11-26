@@ -60,7 +60,7 @@
   "target_source_lineage_id": "synthetic-source-lineage-001",
   "request_body": {
     "body_sha256": "a93528c8fc47a15de50927eb61355ff89360b5698281de7dd9bc1b61104de616",
-    "byte_length": 1008,
+    "byte_length": 1136,
     "content_type": "application/json"
   }
 }
