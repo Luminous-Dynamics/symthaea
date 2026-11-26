@@ -148,3 +148,21 @@ The custody schema is intentionally separate from the finite-mechanism CMAQ-002 
 ### Ownership of the full visual adapter
 
 The full DEEP/ActiveArena visual perception adapter is owned by [VIS-DVPC issue #8156](https://github.com/Luminous-Dynamics/symthaea/issues/8156), which already distinguishes current-frame compute escalation from physically acquiring a new viewpoint. The ActiveArena source lock and observation-custody schema in this PR are reusable provenance/qualification inputs for #8156, not a duplicate visual benchmark. CMAQ-002 continues to own the finite-mechanism causal-intervention/EVoI benchmark; its synthetic probe allowlist is not a camera or robot-action authorization policy.
+
+
+## WorldTest / AutumnBench: environment-level queries
+
+A separate metadata-only extension now tracks [WorldTest / AutumnBench](https://proceedings.mlr.press/v306/warrier26a.html). Its two-phase protocol separates reward-free exploration in a base environment from a later query in a related but different challenge environment. Query families are masked-frame prediction, change detection and planning.
+
+- The paper reports 43 environments / 129 tasks. The PMLR-linked Zenodo v1 archive is identified (DOI 10.5281/zenodo.19498269; published MD5 shown on its landing page), while the 20 / 60 public-subset count and secondary CC-BY label remain unverified. MARAProtocol also has a Firebase manifest route; it has not been byte-matched to Zenodo. No dataset is downloaded; SHA-256 and per-file licensing remain unresolved.
+- Source commits for the Autumn.cpp interpreter and MARAProtocol are pinned separately, with unsigned-commit and external-runtime caveats.
+- `worldtest_exploration.rs` adds a bounded Rust trace diagnostic for reset share and adjacent-segment LCS replay. Reset events are charged interactions; reset count and replay similarity are explanatory descriptors, not rewarded objectives. The LCS normalization is Symthaea-defined and is not claimed as an exact reproduction of the paper's figure.
+- `worldtest-adapter-contract.schema.json` plus its fixture separate reward-free exploration, the related test environment, candidate-visible task prompt and evaluator-only answer/truth.
+- This is not the DEEP/ActiveArena camera-perception adapter in #8156, and it is not a completed AutumnBench run.
+
+Protocol: [WORLDTEST_ADAPTER_V0_1.md](WORLDTEST_ADAPTER_V0_1.md). Baseline lock: [worldtest-baseline.lock.json](worldtest-baseline.lock.json). Phase custody contract: [worldtest-adapter-contract.schema.json](worldtest-adapter-contract.schema.json).
+
+
+### MARA reward and phase-exit custody
+
+The MARA reference runner forwards a reward field during exploration, but the pinned interactive environment returns constant zero for normal exploration actions, reset and go-to-test. The field is present but carries no task reward signal. Any adapter must reject a nonzero exploration reward. The go-to-test action is a charged exploration interaction; the terminal BeginTest marker is added only by the trusted adapter after transition acceptance. See [WORLDTEST_MARA_RUNNER_AUDIT_V0_1.md](WORLDTEST_MARA_RUNNER_AUDIT_V0_1.md).

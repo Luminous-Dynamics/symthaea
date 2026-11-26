@@ -21,7 +21,7 @@ jobs:
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
-      - uses: dtolnay/rust-toolchain@1.96.0
+      - uses: dtolnay/rust-toolchain@1.100.0
       - name: Install pinned JSON Schema validator
         run: python3 -m pip install --disable-pip-version-check "jsonschema==4.25.1"
       - name: Unit tests
@@ -37,7 +37,7 @@ jobs:
           python3 - <<'PY'
           import json
           from pathlib import Path
-          from jsonschema import Draft202012Validator, validate
+          from jsonschema import Draft202012Validator, ValidationError, validate
 
           schema = json.loads(Path("report.schema.json").read_text())
           Draft202012Validator.check_schema(schema)

@@ -1,0 +1,546 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://luminousdynamics.io/schemas/cmaq-002-worldtest-baseline-v0.1.json",
+  "title": "CMAQ-002 WorldTest/AutumnBench baseline lock",
+  "type": "object",
+  "additionalProperties": false,
+  "required": [
+    "schema_version",
+    "status",
+    "benchmark",
+    "paper",
+    "sources",
+    "dataset",
+    "reset_behavior_reference",
+    "claim_ceiling"
+  ],
+  "properties": {
+    "schema_version": {
+      "const": "cmaq-002-worldtest-baseline-v0.1"
+    },
+    "status": {
+      "const": "metadata_only_not_downloaded"
+    },
+    "benchmark": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "name",
+        "protocol",
+        "paper_environment_count",
+        "paper_task_count",
+        "paper_query_families",
+        "grid_size_min",
+        "grid_size_max",
+        "stochastic_environment_count",
+        "reported_human_participants",
+        "reported_frontier_model_count",
+        "public_release_environment_count",
+        "public_release_task_count",
+        "public_release_count_basis",
+        "withheld_environment_count_inferred",
+        "withheld_task_count_inferred"
+      ],
+      "properties": {
+        "name": {
+          "const": "AutumnBench"
+        },
+        "protocol": {
+          "const": "WorldTest"
+        },
+        "paper_environment_count": {
+          "const": 43
+        },
+        "paper_task_count": {
+          "const": 129
+        },
+        "paper_query_families": {
+          "const": [
+            "masked_frame_prediction",
+            "change_detection",
+            "planning"
+          ]
+        },
+        "grid_size_min": {
+          "const": 3
+        },
+        "grid_size_max": {
+          "const": 25
+        },
+        "stochastic_environment_count": {
+          "const": 19
+        },
+        "reported_human_participants": {
+          "const": 517
+        },
+        "reported_frontier_model_count": {
+          "const": 5
+        },
+        "public_release_environment_count": {
+          "type": [
+            "integer",
+            "null"
+          ],
+          "minimum": 1
+        },
+        "public_release_task_count": {
+          "type": [
+            "integer",
+            "null"
+          ],
+          "minimum": 1
+        },
+        "public_release_count_basis": {
+          "type": "string",
+          "minLength": 40
+        },
+        "withheld_environment_count_inferred": {
+          "type": [
+            "integer",
+            "null"
+          ],
+          "minimum": 0
+        },
+        "withheld_task_count_inferred": {
+          "type": [
+            "integer",
+            "null"
+          ],
+          "minimum": 0
+        }
+      }
+    },
+    "paper": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "title",
+        "authors_first",
+        "venue",
+        "proceedings_url",
+        "openreview_url",
+        "arxiv_url"
+      ],
+      "properties": {
+        "title": {
+          "const": "Benchmarking World-Model Learning with Environment-Level Queries"
+        },
+        "authors_first": {
+          "const": "Archana Warrier"
+        },
+        "venue": {
+          "const": "ICML 2026"
+        },
+        "proceedings_url": {
+          "type": "string",
+          "format": "uri"
+        },
+        "openreview_url": {
+          "type": "string",
+          "format": "uri"
+        },
+        "arxiv_url": {
+          "type": "string",
+          "format": "uri"
+        }
+      }
+    },
+    "sources": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "autumn_interpreter",
+        "mara_protocol"
+      ],
+      "properties": {
+        "autumn_interpreter": {
+          "type": "object",
+          "additionalProperties": false,
+          "required": [
+            "repository",
+            "commit",
+            "commit_signature_status",
+            "repository_license",
+            "license_file_url",
+            "runtime_options",
+            "required_native_build"
+          ],
+          "properties": {
+            "repository": {
+              "type": "string",
+              "format": "uri"
+            },
+            "commit": {
+              "type": "string",
+              "pattern": "^[0-9a-f]{40}$"
+            },
+            "commit_signature_status": {
+              "const": "unsigned"
+            },
+            "repository_license": {
+              "const": "MIT"
+            },
+            "license_file_url": {
+              "type": "string",
+              "format": "uri"
+            },
+            "runtime_options": {
+              "const": [
+                "native_cpp_cli",
+                "wasm",
+                "python_binding",
+                "julia_binding"
+              ]
+            },
+            "required_native_build": {
+              "type": "string"
+            }
+          }
+        },
+        "mara_protocol": {
+          "type": "object",
+          "additionalProperties": false,
+          "required": [
+            "repository",
+            "commit",
+            "commit_signature_status",
+            "repository_license",
+            "license_file_url",
+            "runtime_requirements_in_reference_runner",
+            "protocol_files",
+            "reference_agents",
+            "task_names"
+          ],
+          "properties": {
+            "repository": {
+              "type": "string",
+              "format": "uri"
+            },
+            "commit": {
+              "type": "string",
+              "pattern": "^[0-9a-f]{40}$"
+            },
+            "commit_signature_status": {
+              "const": "unsigned"
+            },
+            "repository_license": {
+              "const": "MIT"
+            },
+            "license_file_url": {
+              "type": "string",
+              "format": "uri"
+            },
+            "runtime_requirements_in_reference_runner": {
+              "type": "array",
+              "items": {
+                "type": "string"
+              },
+              "minItems": 1
+            },
+            "protocol_files": {
+              "type": "object",
+              "additionalProperties": false,
+              "required": [
+                "agent",
+                "environment",
+                "evaluation"
+              ],
+              "properties": {
+                "agent": {
+                  "$ref": "#/$defs/proto"
+                },
+                "environment": {
+                  "$ref": "#/$defs/proto"
+                },
+                "evaluation": {
+                  "$ref": "#/$defs/proto"
+                }
+              }
+            },
+            "reference_agents": {
+              "type": "array",
+              "minItems": 3,
+              "items": {
+                "type": "string"
+              }
+            },
+            "task_names": {
+              "const": [
+                "mfp",
+                "cd",
+                "planning"
+              ]
+            }
+          }
+        }
+      }
+    },
+    "dataset": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "public_manifest_url",
+        "public_file_source_script",
+        "public_file_source_script_git_blob_sha",
+        "reported_public_data_license",
+        "license_status",
+        "immutable_manifest_sha256",
+        "immutable_dataset_revision",
+        "download_status",
+        "asset_or_weight_download_status",
+        "official_paper_linked_zenodo_record",
+        "mara_protocol_firebase_distribution",
+        "distribution_equivalence_status",
+        "secondary_catalogue_claims",
+        "license_review_status",
+        "archive_or_asset_download_status"
+      ],
+      "properties": {
+        "public_manifest_url": {
+          "type": "string",
+          "format": "uri"
+        },
+        "public_file_source_script": {
+          "type": "string",
+          "format": "uri"
+        },
+        "reported_public_data_license": {
+          "type": [
+            "string",
+            "null"
+          ]
+        },
+        "license_status": {
+          "const": "official_zenodo_license_value_not_visible; secondary_cc_by_claim_unverified"
+        },
+        "immutable_manifest_sha256": {
+          "type": [
+            "string",
+            "null"
+          ],
+          "pattern": "^[0-9a-f]{64}$"
+        },
+        "immutable_dataset_revision": {
+          "type": [
+            "string",
+            "null"
+          ]
+        },
+        "download_status": {
+          "const": "not_downloaded"
+        },
+        "asset_or_weight_download_status": {
+          "const": "not_applicable"
+        },
+        "public_file_source_script_git_blob_sha": {
+          "type": "string",
+          "pattern": "^[0-9a-f]{40}$"
+        },
+        "official_paper_linked_zenodo_record": {
+          "type": "object",
+          "additionalProperties": false,
+          "required": [
+            "url",
+            "doi",
+            "version",
+            "record_published_date",
+            "archive_filename",
+            "archive_size_label",
+            "published_md5",
+            "published_md5_locally_verified",
+            "archive_sha256",
+            "visible_license_value",
+            "license_status",
+            "archive_contents_described_by_record",
+            "record_data_volume_label"
+          ],
+          "properties": {
+            "url": {
+              "type": "string",
+              "format": "uri"
+            },
+            "doi": {
+              "const": "10.5281/zenodo.19498269"
+            },
+            "version": {
+              "const": "v1"
+            },
+            "record_published_date": {
+              "const": "2026-04-10"
+            },
+            "archive_filename": {
+              "const": "autumnbench_public.zip"
+            },
+            "archive_size_label": {
+              "const": "71.1 kB"
+            },
+            "published_md5": {
+              "const": "f276390c6ea102187c072a0fafda9888"
+            },
+            "published_md5_locally_verified": {
+              "const": false
+            },
+            "archive_sha256": {
+              "type": [
+                "string",
+                "null"
+              ],
+              "pattern": "^[0-9a-f]{64}$"
+            },
+            "visible_license_value": {
+              "type": [
+                "string",
+                "null"
+              ]
+            },
+            "license_status": {
+              "const": "no_license_value_visible_on_landing_page"
+            },
+            "archive_contents_described_by_record": {
+              "const": [
+                "prompts/",
+                "answers/",
+                "programs/",
+                "color_dict.yaml"
+              ]
+            },
+            "record_data_volume_label": {
+              "const": "12.9 MB"
+            }
+          }
+        },
+        "mara_protocol_firebase_distribution": {
+          "type": "object",
+          "additionalProperties": false,
+          "required": [
+            "manifest_url",
+            "source_repository_commit",
+            "source_script_git_blob_sha",
+            "manifest_sha256",
+            "manifest_downloaded"
+          ],
+          "properties": {
+            "manifest_url": {
+              "type": "string",
+              "format": "uri"
+            },
+            "source_repository_commit": {
+              "type": "string",
+              "pattern": "^[0-9a-f]{40}$"
+            },
+            "source_script_git_blob_sha": {
+              "type": "string",
+              "pattern": "^[0-9a-f]{40}$"
+            },
+            "manifest_sha256": {
+              "type": [
+                "string",
+                "null"
+              ],
+              "pattern": "^[0-9a-f]{64}$"
+            },
+            "manifest_downloaded": {
+              "const": false
+            }
+          }
+        },
+        "distribution_equivalence_status": {
+          "const": "zenodo_archive_and_mara_firebase_manifest_not_yet_byte_matched"
+        },
+        "secondary_catalogue_claims": {
+          "type": "object",
+          "additionalProperties": false,
+          "required": [
+            "public_environment_count",
+            "public_task_count",
+            "reported_license",
+            "verification_status"
+          ],
+          "properties": {
+            "public_environment_count": {
+              "const": 20
+            },
+            "public_task_count": {
+              "const": 60
+            },
+            "reported_license": {
+              "const": "CC-BY-4.0"
+            },
+            "verification_status": {
+              "const": "unverified_secondary_source_only"
+            }
+          }
+        },
+        "license_review_status": {
+          "const": "unresolved"
+        },
+        "archive_or_asset_download_status": {
+          "const": "not_applicable"
+        }
+      }
+    },
+    "reset_behavior_reference": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "source",
+        "human_reset_share_of_actions",
+        "human_at_least_one_reset_per_environment",
+        "frontier_model_reset_share_range",
+        "human_reset_replay_lcs_ratio_mean",
+        "human_reset_replay_lcs_ratio_median",
+        "metric_status"
+      ],
+      "properties": {
+        "source": {
+          "type": "string",
+          "format": "uri"
+        },
+        "human_reset_share_of_actions": {
+          "const": 0.125
+        },
+        "human_at_least_one_reset_per_environment": {
+          "const": true
+        },
+        "frontier_model_reset_share_range": {
+          "const": [
+            0.014,
+            0.071
+          ]
+        },
+        "human_reset_replay_lcs_ratio_mean": {
+          "const": 0.827
+        },
+        "human_reset_replay_lcs_ratio_median": {
+          "const": 0.9
+        },
+        "metric_status": {
+          "const": "descriptive_paper_presentation_values_not_symthaea_results"
+        }
+      }
+    },
+    "claim_ceiling": {
+      "const": "source and protocol metadata only; no AutumnBench adapter run, score reproduction, human comparison, SOTA claim, or Symthaea model result"
+    }
+  },
+  "$defs": {
+    "proto": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "path",
+        "git_blob_sha"
+      ],
+      "properties": {
+        "path": {
+          "type": "string",
+          "pattern": "^protocols/.+\\.proto$"
+        },
+        "git_blob_sha": {
+          "type": "string",
+          "pattern": "^[0-9a-f]{40}$"
+        }
+      }
+    }
+  }
+}

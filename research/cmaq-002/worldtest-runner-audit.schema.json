@@ -1,0 +1,150 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://luminousdynamics.io/schemas/cmaq-002-worldtest-runner-audit-v0.1.json",
+  "title": "MARA WorldTest reference runner source audit",
+  "type": "object",
+  "additionalProperties": false,
+  "required": [
+    "schema_version",
+    "status",
+    "repository",
+    "source_commit",
+    "source_blobs",
+    "observed_reference_behavior",
+    "adapter_requirements",
+    "claim_ceiling"
+  ],
+  "properties": {
+    "schema_version": {
+      "const": "cmaq-002-worldtest-runner-audit-v0.1"
+    },
+    "status": {
+      "const": "source_audit_only_no_runtime_execution"
+    },
+    "repository": {
+      "const": "BasisResearch/MARAProtocol"
+    },
+    "source_commit": {
+      "type": "string",
+      "pattern": "^[0-9a-f]{40}$"
+    },
+    "source_blobs": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "agent_proto",
+        "environment_service_proto",
+        "evaluation_controller_py",
+        "environment_interfaces_py",
+        "concrete_envs_py"
+      ],
+      "properties": {
+        "agent_proto": {
+          "type": "string",
+          "pattern": "^[0-9a-f]{40}$"
+        },
+        "environment_service_proto": {
+          "type": "string",
+          "pattern": "^[0-9a-f]{40}$"
+        },
+        "evaluation_controller_py": {
+          "type": "string",
+          "pattern": "^[0-9a-f]{40}$"
+        },
+        "environment_interfaces_py": {
+          "type": "string",
+          "pattern": "^[0-9a-f]{40}$"
+        },
+        "concrete_envs_py": {
+          "type": "string",
+          "pattern": "^[0-9a-f]{40}$"
+        }
+      }
+    },
+    "observed_reference_behavior": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "feedback_request_contains_reward_field",
+        "evaluation_controller_forwards_step_reward_on_each_feedback",
+        "exploration_environment",
+        "exploration_ordinary_action_reward",
+        "explicit_reset_reward",
+        "go_to_test_action",
+        "go_to_test_action_reward",
+        "go_to_test_is_candidate_issued_action",
+        "test_phase_scoring_environment",
+        "reward_semantics"
+      ],
+      "properties": {
+        "feedback_request_contains_reward_field": {
+          "const": true
+        },
+        "evaluation_controller_forwards_step_reward_on_each_feedback": {
+          "const": true
+        },
+        "exploration_environment": {
+          "const": "InteractiveEnvironment"
+        },
+        "exploration_ordinary_action_reward": {
+          "const": 0
+        },
+        "explicit_reset_reward": {
+          "const": 0
+        },
+        "go_to_test_action": {
+          "const": "go-to-test"
+        },
+        "go_to_test_action_reward": {
+          "const": 0
+        },
+        "go_to_test_is_candidate_issued_action": {
+          "const": true
+        },
+        "test_phase_scoring_environment": {
+          "type": "string",
+          "minLength": 10
+        },
+        "reward_semantics": {
+          "type": "string",
+          "minLength": 100
+        }
+      }
+    },
+    "adapter_requirements": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "candidate_reward_field_policy",
+        "reject_nonzero_exploration_reward",
+        "charge_reset_as_interaction",
+        "charge_go_to_test_as_exploration_interaction",
+        "append_terminal_test_phase_marker_after_go_to_test",
+        "never_promote_predicted_future_to_observation"
+      ],
+      "properties": {
+        "candidate_reward_field_policy": {
+          "const": "constant_zero_during_exploration"
+        },
+        "reject_nonzero_exploration_reward": {
+          "const": true
+        },
+        "charge_reset_as_interaction": {
+          "const": true
+        },
+        "charge_go_to_test_as_exploration_interaction": {
+          "const": true
+        },
+        "append_terminal_test_phase_marker_after_go_to_test": {
+          "const": true
+        },
+        "never_promote_predicted_future_to_observation": {
+          "const": true
+        }
+      }
+    },
+    "claim_ceiling": {
+      "const": "Pinned source audit only. No MARA runtime, Autumn interpreter, dataset or benchmark episode was executed."
+    }
+  }
+}
