@@ -149,6 +149,15 @@ jobs:
               and $statement.predicate.evidence_source_lineage_id == "synthetic-source-lineage-001"
               and $statement.predicate.target_audio_bytes_recomputed == true
               and $statement.predicate.source_audio_bytes_recomputed == true
+              and $statement.predicate.sample_rate_hz == 48000
+              and $statement.predicate.channels == 2
+              and $statement.predicate.total_frames == 8
+              and $statement.predicate.sample_format == "S16Le"
+              and ($statement.predicate.rights_scope_receipt_sha256 | length == 64)
+              and $statement.predicate.max_output_tokens == 512
+              and $statement.predicate.actual_output_tokens == 128
+              and $statement.predicate.max_wall_time_ms == 30000
+              and $statement.predicate.elapsed_wall_time_ms == 4000
               and $statement.predicate.runner_receipt_verified == false
               and $statement.predicate.model_input_attested == false)
           ' "$RUNNER_TEMP/audio-evidence-in-toto-payload.json" > /dev/null
