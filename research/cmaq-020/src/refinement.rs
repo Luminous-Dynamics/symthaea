@@ -13,7 +13,7 @@ use std::collections::{BTreeMap, BTreeSet};
 
 use crate::{
     AbstractionScore, CounterexampleDimension, CounterexampleProbe, ResponseKey,
-    StateResponseContract, StateResponseRecord, score_abstraction,
+    StateResponseContract, StateResponseRecord, assess_pair, score_abstraction,
     select_counterexample_probe, validate_record_set,
 };
 
@@ -274,13 +274,47 @@ pub fn score_refinement_transition(
 
     let before_score = score_abstraction(before_records, contract)?;
     let after_score = score_abstraction(after_records, contract)?;
+
+    // Count pair-level transitions rather than net aggregate score deltas.
+    // A lower global error count can otherwise conceal new errors on different
+    // pairs while incorrectly labelling those as "resolved".
+    let before_states: Vec<_> = before_by_id.values().copied().collect();
+    let after_states: Vec<_> = after_by_id.values().copied().collect();
+    let mut false_merges_resolved = 0;
+    let mut false_merges_added = 0;
+    let mut false_splits_resolved = 0;
+    let mut false_splits_added = 0;
+
+    for left_index in 0..before_states.len() {
+        for right_index in (left_index + 1)..before_states.len() {
+            let before_left = before_states[left_index];
+            let before_right = before_states[right_index];
+            let after_left = after_by_id[before_left.state_id.as_str()];
+            let after_right = after_by_id[before_right.state_id.as_str()];
+            let equivalent = assess_pair(before_left, before_right, contract)?.exact_equivalent;
+            let before_merged =
+                before_left.abstract_state_id == before_right.abstract_state_id;
+            let after_merged = after_left.abstract_state_id == after_right.abstract_state_id;
+
+            let before_false_merge = before_merged && !equivalent;
+            let after_false_merge = after_merged && !equivalent;
+            let before_false_split = !before_merged && equivalent;
+            let after_false_split = !after_merged && equivalent;
+
+            false_merges_resolved += usize::from(before_false_merge && !after_false_merge);
+            false_merges_added += usize::from(!before_false_merge && after_false_merge);
+            false_splits_resolved += usize::from(before_false_split && !after_false_split);
+            false_splits_added += usize::from(!before_false_split && after_false_split);
+        }
+    }
+
     Ok(RefinementEffectiveness {
         before: before_score,
         after: after_score,
-        false_merges_resolved: before_score.false_merges.saturating_sub(after_score.false_merges),
-        false_merges_added: after_score.false_merges.saturating_sub(before_score.false_merges),
-        false_splits_resolved: before_score.false_splits.saturating_sub(after_score.false_splits),
-        false_splits_added: after_score.false_splits.saturating_sub(before_score.false_splits),
+        false_merges_resolved,
+        false_merges_added,
+        false_splits_resolved,
+        false_splits_added,
         selected_pair_separated: selected_left.abstract_state_id
             != selected_right.abstract_state_id,
     })
