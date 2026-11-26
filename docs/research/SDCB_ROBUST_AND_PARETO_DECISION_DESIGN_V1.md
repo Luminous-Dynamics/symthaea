@@ -193,3 +193,6 @@ Project targets, not industry standards or achieved results:
 ## 11. Claim boundary
 
 This is an exact finite reference for a declared ambiguity set and finite objective model. It does not guarantee robustness to scenarios that were not included, prove physical safety, authenticate observations, or establish SOTA performance. No Rust compilation, model inference, external benchmark run, or physical experiment has been performed.
+### Multi-fidelity extension
+
+The [robust multi-fidelity decision design](SDCB_ROBUST_MULTIFIDELITY_DECISION_DESIGN_V1.md) composes this maximin oracle with fidelity-specific likelihoods and a componentwise resource vector. It is a one-step finite decision reference, not a replacement for MFBO. Its purpose is to evaluate whether each fidelity actually improves a decision under plausible shifts, rather than assuming lower-cost observations are informative.
