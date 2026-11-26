@@ -428,7 +428,7 @@ A falsifiable programme for spectral statistics, RH/prime-structure controls, ne
 **Evidence boundary:** 15 Rust unit tests are authored but not compiled/executed in this environment. The reference is one-step, finite, and assumes supplied likelihoods and utilities. It is not a Symthaea model result or an SOTA comparison.
 ### Non-myopic adaptive experiment oracle
 
-- [Non-myopic oracle source](../../scripts/research/sdcb_nonmyopic_oracle.rs): exact adaptive Bellman recursion for small finite experiment sets.
+- [Non-myopic oracle source](../../scripts/research/sdcb_nonmyopic_oracle.rs): exact adaptive Bellman recursion for small finite experiment sets (10 additional tests; the combined target includes 25).
 - [Non-myopic oracle README](../../scripts/research/SDCB_NONMYOPIC_ORACLE_README.md): compile instructions, exact-search limits and trust boundaries.
 - [Non-myopic episode schema](SDCB_NONMYOPIC_VALUE_EPISODE_V1.schema.json): constrained adaptive decision episode.
 - [Non-myopic example](SDCB_NONMYOPIC_VALUE_EPISODE_V1.example.json): two zero-myopic-EVSI probes with a positive two-step policy value.
