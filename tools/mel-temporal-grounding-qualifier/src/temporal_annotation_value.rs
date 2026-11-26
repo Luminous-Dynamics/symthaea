@@ -706,6 +706,11 @@ mod tests {
         record: char,
         state: crate::temporal_grounding::GroundTruthStateV1,
     ) -> IndependentTemporalAnnotationV1 {
+        let status_reason = match state {
+            GroundTruthStateV1::Ambiguous => Some("gradual entrance; human interpretation is uncertain"),
+            GroundTruthStateV1::NotEstimable => Some("audio masking prevents reliable judgement"),
+            GroundTruthStateV1::Present | GroundTruthStateV1::Absent => None,
+        };
         IndependentTemporalAnnotationV1 {
             annotator_id_sha256: digest(id),
             annotation_sha256: digest(record),
@@ -718,7 +723,7 @@ mod tests {
             } else {
                 Vec::new()
             },
-            status_reason: None,
+            status_reason: status_reason.map(str::to_owned),
         }
     }
 
@@ -813,7 +818,7 @@ mod tests {
         assert_eq!(report.active_review_minutes, 2.0);
         assert_eq!(report.active_listening_minutes, 1.0);
         assert_eq!(report.elapsed_wall_minutes, 2.5);
-        assert_eq!(report.effort.active_listening_seconds, 120);
+        assert_eq!(report.effort.active_listening_seconds, 60);
         assert_eq!(report.disposition_entropy_delta_bits, Some(0.0));
         assert_eq!(report.after.pairwise_present_symmetric_event_f1, Some(1.0));
         assert_eq!(
