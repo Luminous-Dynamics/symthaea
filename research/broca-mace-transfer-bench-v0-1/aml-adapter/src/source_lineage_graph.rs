@@ -62,10 +62,26 @@ pub struct ReplayedSourceRootFamilyV1 {
 }
 
 #[derive(Clone, Debug, Eq, PartialEq)]
+pub struct VerifiedSourceLineageNodeBindingV1 {
+    pub(crate) evidence_id: String,
+    pub(crate) source_id: String,
+    pub(crate) source_sha256: String,
+    pub(crate) payload_sha256: String,
+    pub(crate) evidence_class_sha256: String,
+    pub(crate) parent_evidence_ids: Vec<String>,
+    pub(crate) derivation_receipt_sha256: Option<String>,
+}
+
+#[derive(Clone, Debug, Eq, PartialEq)]
 pub struct VerifiedSourceLineageGraphV1 {
     graph_sha256: String,
     qualified_evidence_set_sha256: String,
     decision_need_sha256: String,
+    run_id: String,
+    query_invocation_id: String,
+    authority_profile_sha256: Vec<String>,
+    authority_key_ids: Vec<String>,
+    node_bindings: Vec<VerifiedSourceLineageNodeBindingV1>,
     families: Vec<ReplayedSourceRootFamilyV1>,
 }
 
@@ -84,6 +100,23 @@ impl VerifiedSourceLineageGraphV1 {
 
     pub fn families(&self) -> &[ReplayedSourceRootFamilyV1] {
         &self.families
+    }
+
+    /// Complete node projection retained from the graph that was replayed.
+    /// Includes ancestors that are not members of the qualified candidate set.
+    pub fn node_bindings(&self) -> &[VerifiedSourceLineageNodeBindingV1] {
+        &self.node_bindings
+    }
+
+    pub fn run_id(&self) -> &str { &self.run_id }
+    pub fn query_invocation_id(&self) -> &str { &self.query_invocation_id }
+
+    pub(crate) fn authority_profile_sha256(&self) -> &[String] {
+        &self.authority_profile_sha256
+    }
+
+    pub(crate) fn authority_key_ids(&self) -> &[String] {
+        &self.authority_key_ids
     }
 }
 
@@ -238,10 +271,36 @@ pub fn replay_source_lineage_graph_v1(
         return Err(SourceLineageRejectV1::ClosureDigestMismatch);
     }
 
+    let node_bindings = nodes.values().map(|node| VerifiedSourceLineageNodeBindingV1 {
+        evidence_id: node.evidence_id.clone(),
+        source_id: node.source_id.clone(),
+        source_sha256: node.source_sha256.clone(),
+        payload_sha256: node.payload_sha256.clone(),
+        evidence_class_sha256: node.evidence_class_sha256.clone(),
+        parent_evidence_ids: node.parent_evidence_ids.clone(),
+        derivation_receipt_sha256: node.derivation_receipt_sha256.clone(),
+    }).collect();
+
     Ok(VerifiedSourceLineageGraphV1 {
         graph_sha256,
         qualified_evidence_set_sha256: graph.qualified_evidence_set_sha256,
         decision_need_sha256: graph.decision_need_sha256,
+        run_id: qualified.run_id().to_owned(),
+        query_invocation_id: qualified.query_invocation_id().to_owned(),
+        authority_profile_sha256: vec![
+            qualified.qualification_verifier_profile_sha256().to_owned(),
+            sufficiency.receipt().issuer_profile_sha256.clone(),
+            current_lineage_profile.profile_sha256().to_owned(),
+        ],
+        authority_key_ids: {
+            let mut keys = vec![
+                qualified.qualification_signer_key_id().to_owned(),
+                sufficiency.receipt().key_id.clone(),
+            ];
+            keys.extend(lineage.signer_key_ids());
+            keys
+        },
+        node_bindings,
         families: replayed,
     })
 }
