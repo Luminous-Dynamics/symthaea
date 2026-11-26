@@ -5,7 +5,7 @@ A read-only, deterministic first slice of the RRVR-Symthaea integration.
 ## What it does
 
 - Validates a versioned manipulation-episode snapshot.
-- Preserves separate event, acquisition and ingest semantics.
+- Preserves separate event, acquisition, source-capture sequence and receiver-ingest semantics. Delayed arrivals are retained and counted; temporal features and the baseline forecast use source-capture order, not arrival order.
 - Enforces an immutable ingest-sequence decision cut and matching evidence-ledger frontier.
 - Binds the canonical snapshot content to the digest in an external admission receipt.
 - Abstains on stale, unknown or disputed observations rather than filtering them.
