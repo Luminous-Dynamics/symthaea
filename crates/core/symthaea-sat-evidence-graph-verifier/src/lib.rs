@@ -1020,7 +1020,22 @@ mod tests {
         assert!(report.verified, "{:?}", report.issues);
         assert_eq!(report.supported_claim_count, 1);
         assert_eq!(report.admissible_supported_claim_count, 1);
+        assert_eq!(
+            report.computed_graph_root_digest,
+            "sha256:e2b677dd4ad89972b5a306558a4f1fd32680749cfafd9aeb3a25102343851b82"
+        );
         assert!(!report.qualification_assessed);
+        assert!(!report.json_schema_validation_performed);
+    }
+
+    #[test]
+    fn omitted_optional_invalidation_set_equals_explicit_empty_set() {
+        let omitted = base();
+        let mut explicit = base();
+        explicit["claims"][0]["invalidation_triggers"] = json!([]);
+        let a = compute_evidence_graph_root(&serde_json::to_string(&omitted).unwrap()).unwrap();
+        let b = compute_evidence_graph_root(&serde_json::to_string(&explicit).unwrap()).unwrap();
+        assert_eq!(a, b);
     }
 
     #[test]
