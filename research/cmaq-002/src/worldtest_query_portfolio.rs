@@ -195,6 +195,10 @@ pub struct WorldTestEnvironmentClusterSummary {
     pub task_count: u64,
     /// Counts follow QueryFamily::ALL order.
     pub query_family_task_counts: [u64; WORLDTEST_PORTFOLIO_QUERY_FAMILY_COUNT],
+    /// Normalized integer score sums, indexed by QueryFamily::ALL.
+    pub query_family_score_sum_ppm: [u128; WORLDTEST_PORTFOLIO_QUERY_FAMILY_COUNT],
+    /// Mean score per family in this cluster; absent where this cluster had no tasks.
+    pub query_family_mean_score_ppm: [Option<u32>; WORLDTEST_PORTFOLIO_QUERY_FAMILY_COUNT],
 }
 
 #[derive(Clone, Debug, Eq, PartialEq)]
@@ -699,6 +703,8 @@ pub fn evaluate_worldtest_query_portfolio(
                 environment_family_id: task.environment_family_id.clone(),
                 task_count: 0,
                 query_family_task_counts: [0; WORLDTEST_PORTFOLIO_QUERY_FAMILY_COUNT],
+                query_family_score_sum_ppm: [0; WORLDTEST_PORTFOLIO_QUERY_FAMILY_COUNT],
+                query_family_mean_score_ppm: [None; WORLDTEST_PORTFOLIO_QUERY_FAMILY_COUNT],
             });
         if cluster.environment_family_id != task.environment_family_id {
             return Err(WorldTestPortfolioError::EnvironmentClusterFamilyMismatch {
@@ -768,6 +774,11 @@ pub fn evaluate_worldtest_query_portfolio(
                 score_ppm: score,
             });
         }
+        let family_index = task.query_family.index();
+        cluster.query_family_score_sum_ppm[family_index] = cluster.query_family_score_sum_ppm
+            [family_index]
+            .checked_add(u128::from(score))
+            .ok_or(WorldTestPortfolioError::ArithmeticOverflow)?;
 
         let summary = family_summaries.get_mut(&task.query_family).ok_or(
             WorldTestPortfolioError::MissingQueryFamily {
@@ -890,7 +901,21 @@ pub fn evaluate_worldtest_query_portfolio(
 
     let environment_family_count = u64::try_from(environment_family_ids.len())
         .map_err(|_| WorldTestPortfolioError::ArithmeticOverflow)?;
-    let environment_cluster_summaries = environment_clusters.into_values().collect::<Vec<_>>();
+    let mut environment_cluster_summaries = environment_clusters.into_values().collect::<Vec<_>>();
+    for cluster in &mut environment_cluster_summaries {
+        for family_index in 0..WORLDTEST_PORTFOLIO_QUERY_FAMILY_COUNT {
+            let family_task_count = cluster.query_family_task_counts[family_index];
+            if family_task_count > 0 {
+                cluster.query_family_mean_score_ppm[family_index] = Some(
+                    u32::try_from(
+                        cluster.query_family_score_sum_ppm[family_index]
+                            / u128::from(family_task_count),
+                    )
+                    .map_err(|_| WorldTestPortfolioError::ArithmeticOverflow)?,
+                );
+            }
+        }
+    }
     let independent_environment_cluster_count = u64::try_from(environment_cluster_summaries.len())
         .map_err(|_| WorldTestPortfolioError::ArithmeticOverflow)?;
 
@@ -1370,6 +1395,14 @@ mod tests {
         assert_eq!(
             result.environment_cluster_summaries[0].query_family_task_counts,
             [1, 1, 0]
+        );
+        assert_eq!(
+            result.environment_cluster_summaries[0].query_family_score_sum_ppm,
+            [900_000, 500_000, 0]
+        );
+        assert_eq!(
+            result.environment_cluster_summaries[0].query_family_mean_score_ppm,
+            [Some(900_000), Some(500_000), None]
         );
         assert_eq!(
             result.task_results[0].environment_cluster_id,
