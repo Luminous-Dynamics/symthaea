@@ -95,7 +95,8 @@
         "mode",
         "max_checkpoint_age_seconds",
         "trusted_time_profile_digest",
-        "offline_behavior"
+        "offline_behavior",
+        "freshness_mechanism"
       ],
       "properties": {
         "mode": {
@@ -125,6 +126,15 @@
             "allow_declared_low_risk_reads_only",
             "not_evaluable"
           ]
+        },
+        "freshness_mechanism": {
+          "enum": [
+            "nonce_bound_quorum_challenge",
+            "trusted_time_expiry",
+            "monotonic_client_checkpoint",
+            "combined",
+            "none"
+          ]
         }
       }
     },
@@ -148,7 +158,8 @@
           "witness_software_digest",
           "witness_policy_digest",
           "signing_key_profile",
-          "governance_evidence_ref"
+          "governance_evidence_ref",
+          "durability_profile"
         ],
         "properties": {
           "operator_id": {
@@ -250,6 +261,38 @@
           "governance_evidence_ref": {
             "type": "string",
             "minLength": 1
+          },
+          "durability_profile": {
+            "type": "object",
+            "additionalProperties": false,
+            "required": [
+              "commit_durable_before_receipt",
+              "anti_rollback_mechanism",
+              "witness_backup_policy_digest",
+              "rollback_detection_evidence_ref"
+            ],
+            "properties": {
+              "commit_durable_before_receipt": {
+                "const": true
+              },
+              "anti_rollback_mechanism": {
+                "enum": [
+                  "hardware_monotonic_counter",
+                  "remote_consensus_with_admin_isolation",
+                  "externally_monitored_append_only_log",
+                  "software_only",
+                  "unknown"
+                ]
+              },
+              "witness_backup_policy_digest": {
+                "type": "string",
+                "pattern": "^sha256:[a-f0-9]{64}$"
+              },
+              "rollback_detection_evidence_ref": {
+                "type": "string",
+                "minLength": 1
+              }
+            }
           }
         }
       }
@@ -559,6 +602,44 @@
                 "const": "not_assessed"
               }
             }
+          }
+        }
+      }
+    },
+    {
+      "if": {
+        "properties": {
+          "freshness_policy": {
+            "properties": {
+              "mode": {
+                "const": "fresh_quorum_required"
+              }
+            },
+            "required": [
+              "mode"
+            ]
+          }
+        },
+        "required": [
+          "freshness_policy"
+        ]
+      },
+      "then": {
+        "properties": {
+          "freshness_policy": {
+            "properties": {
+              "freshness_mechanism": {
+                "enum": [
+                  "nonce_bound_quorum_challenge",
+                  "trusted_time_expiry",
+                  "monotonic_client_checkpoint",
+                  "combined"
+                ]
+              }
+            },
+            "required": [
+              "freshness_mechanism"
+            ]
           }
         }
       }
