@@ -1,6 +1,6 @@
 # WorldTest Cross-Query Portfolio Evaluator v0.1
 
-**Status:** bounded Rust evaluator and 21 deterministic tests authored; exact-head Rust 1.96 qualification pending.  
+**Status:** bounded Rust evaluator and 25 deterministic tests authored; exact-head Rust 1.96 qualification pending.  
 **Issue:** #13689.  
 **Parent track:** WorldTest / AutumnBench adapter #13688.
 
@@ -24,7 +24,7 @@ A portfolio binds:
 - one frozen family-specific scoring/normalization profile per query family;
 - a complete expected task-ID set frozen before confirmatory results are opened.
 
-Each test row binds its task ID, unique run ID, query family, challenge-program digest, family metric-profile digest, candidate artifact, shared exploration trace, shared exploration checkpoint, evaluator-assigned normalized score/disposition, and test resource usage.
+Each test row binds its task ID, unique run ID, query family, evaluator-assigned `environment_family_id`, independent `environment_cluster_id`, challenge-program digest, family metric-profile digest, candidate artifact, shared exploration trace, shared exploration checkpoint, evaluator-assigned normalized score/disposition, and test resource usage. Multiple task rows from the same generated environment instance must reuse one cluster ID; they are not independent experimental subjects.
 
 A challenge program must differ from the exploration program. The three test tasks can share a program digest where the benchmark defines multiple queries against one challenge environment; program uniqueness is therefore not required across tasks. They must nevertheless remain separate task/run records.
 
@@ -39,6 +39,8 @@ S_f = \frac{1}{N_f}\sum_{j=1}^{N_f} s_{fj},
 ]
 
 using integer floor division. Failed, timed-out, invalid and abstained tasks require explicit evaluator-assigned scores and remain in (N_f). A missing task or family rejects the portfolio.
+
+The certificate preserves sorted per-task family/cluster identity, per-cluster task counts and per-query-family counts within each cluster, plus the total number of distinct environment families and independent clusters. It therefore retains a statistical grouping key for cluster-aware downstream analysis; it does not itself compute confidence intervals or infer statistical significance. A cluster ID may map to only one environment-family ID.
 
 The certificate reports the vector
 
@@ -68,6 +70,9 @@ The Rust suite includes:
 - shuffled task order yielding the same canonical certificate;
 - missing family/task and unexpected/duplicate task;
 - duplicate run IDs;
+- missing or untrimmed environment-family/cluster IDs;
+- multiple query-task rows sharing one independent cluster are counted once for cluster-level analysis;
+- one environment cluster assigned to conflicting environment families is rejected;
 - same exploration/challenge program rejection;
 - changed shared trace, checkpoint and candidate artifact rejection;
 - mismatched family metric profile rejection;
@@ -92,7 +97,7 @@ Use the same exploration budget to compare:
 
 For every shared-history arm, evaluate all three query families from the exact same frozen exploration checkpoint. Split by environment family and challenge-program family, not by task rows; keep each environment family intact across train/validation/test.
 
-The primary results are family-specific means, worst-family floor, family gap and paired environment-family uncertainty. Report exploration actions, resets, go-to-test, model queries, time, memory and energy alongside downstream score. Do not reward raw information gain or reset count unless it translates into better held-out query performance.
+The primary results are family-specific means, worst-family floor, family gap and paired environment-family uncertainty. The task evaluator now preserves `environment_family_id` and `environment_cluster_id`; inference must resample/aggregate at the independent environment-cluster level, keep whole environment families intact for splits, and avoid treating task rows as independent. Report cluster counts and per-cell denominators alongside uncertainty. Report exploration actions, resets, go-to-test, model queries, time, memory and energy alongside downstream score. Do not reward raw information gain or reset count unless it translates into better held-out query performance.
 
 ## Ownership and claim ceiling
 
