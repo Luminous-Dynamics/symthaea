@@ -125,8 +125,7 @@ pub fn replay_source_lineage_graph_v1(
         .map_err(SourceLineageRejectV1::Sufficiency)?;
     if qualified.decision_need_sha256() != decision_need_sha256.as_str()
         || qualified.qualified_candidate_set_sha256() != lineage.qualified_evidence_set_sha256()
-        || qualified.qualified_candidate_set_sha256() != lineage_graph_expected_set(lineage)
-        || decision_need_sha256 != lineage_graph_expected_need(lineage)
+        || decision_need_sha256.as_str() != lineage.decision_need_sha256()
     {
         return Err(SourceLineageRejectV1::BindingMismatch);
     }
@@ -210,7 +209,7 @@ pub fn replay_source_lineage_graph_v1(
     let actual_set = replayed.iter().map(|item| {
         (&item.requirement_id, &item.root_family_sha256, &item.lineage_closure_sha256)
     }).collect::<BTreeSet<_>>();
-    if expected_commitments.iter().any(|item| item.source_graph_sha256 != graph_sha256) {
+    if expected_commitments.iter().any(|item| item.source_graph_sha256 != graph_sha256.as_str()) {
         return Err(SourceLineageRejectV1::GraphDigestMismatch);
     }
     if expected_set.len() != expected_commitments.len() || actual_set.len() != replayed.len() {
@@ -233,14 +232,6 @@ pub fn replay_source_lineage_graph_v1(
         decision_need_sha256: graph.decision_need_sha256,
         families: replayed,
     })
-}
-
-fn lineage_graph_expected_set(lineage: &VerifiedSourceLineageSetV1) -> &str {
-    lineage.qualified_evidence_set_sha256()
-}
-
-fn lineage_graph_expected_need(lineage: &VerifiedSourceLineageSetV1) -> &str {
-    lineage.decision_need_sha256()
 }
 
 fn validate_graph_acyclic(
