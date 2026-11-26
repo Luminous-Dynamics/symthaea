@@ -124,7 +124,7 @@ impl ReferencePolicyNodeV1 {
         }
     }
 
-    fn canonical_key(&self) -> String {
+    pub(crate) fn canonical_key(&self) -> String {
         match self {
             Self::Terminal { action_id } => format!("0:T:{action_id}"),
             Self::Query { query_id, branches } => {
