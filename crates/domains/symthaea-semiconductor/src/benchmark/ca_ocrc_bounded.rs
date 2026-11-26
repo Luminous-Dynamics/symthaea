@@ -1605,11 +1605,21 @@ mod tests {
 
     #[test]
     fn feedback_after_proxy_expiry_is_not_used_online() {
-        let mut engine = engine(2, 2);
+        let mut configured = policy(2, 2);
+        configured.proxy_delay_pmf = vec![0.0, 0.5, 0.0, 0.5];
+        let mut engine = create_ca_ocrc_engine_v1(
+            "ca-ocrc-engine-001",
+            "fab-clock",
+            &digest('a'),
+            &digest('b'),
+            0.5,
+            configured,
+        )
+        .unwrap();
         step_ca_ocrc_round_v1(
             &mut engine,
             &input(
-                prediction(0, "s0", CaOcrcSetKindV1::Interval, true, Some(0.9)),
+                prediction(0, "s0", CaOcrcSetKindV1::Interval, true, Some(0.1)),
                 Vec::new(),
             ),
         )
@@ -1622,25 +1632,19 @@ mod tests {
             ),
         )
         .unwrap();
-        step_ca_ocrc_round_v1(
-            &mut engine,
-            &input(
-                prediction(2, "s2", CaOcrcSetKindV1::Interval, true, Some(0.9)),
-                Vec::new(),
-            ),
-        )
-        .unwrap();
-        let late = feedback(3, "s0", "l0", 1, LabelConsumptionEligibilityV1::EligibleUnderDeclaredPolicy);
+        let late = feedback(2, "s0", "l0", 1, LabelConsumptionEligibilityV1::EligibleUnderDeclaredPolicy);
         let report = step_ca_ocrc_round_v1(
             &mut engine,
             &input(
-                prediction(3, "s3", CaOcrcSetKindV1::Interval, true, Some(0.9)),
+                prediction(2, "s2", CaOcrcSetKindV1::Interval, true, Some(0.9)),
                 vec![late],
             ),
         )
         .unwrap();
         assert_eq!(report.feedback_results[0].disposition, CaOcrcFeedbackDispositionV1::NotTracked);
+        assert_eq!(report.feedback_results[0].actual_delay_steps, Some(2));
         assert_eq!(report.feedback_results[0].reasons, vec![CaOcrcReasonV1::PredictionNotTracked]);
+        assert!(report.theorem_assumptions_intact);
     }
 
     #[test]
