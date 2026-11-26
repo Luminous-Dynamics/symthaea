@@ -356,8 +356,9 @@ pub fn plan_annotation_acquisition(
     }
 
     let mut random_state = config.seed;
-    let (probability_audit, audit_unmet, audit_spent, audit_source_works, audit_design) =
+    let probability_result =
         select_probability_audit(&candidates, &eligible_audit, &config, &mut random_state)?;
+    let probability_audit = probability_result.selections;
 
     // Own the audit source IDs so the final disjointness assertion does not
     // keep a borrow into probability_audit alive across the report move.
@@ -367,11 +368,12 @@ pub fn plan_annotation_acquisition(
         .collect();
     let audit_source_set: BTreeSet<&str> = audit_source_ids.iter().map(String::as_str).collect();
 
-    let (active_refinement, active_unmet, active_spent, active_source_counts) =
+    let active_result =
         select_active(&candidates, &eligible_active, &config, &audit_source_set)?;
+    let active_refinement = active_result.selections;
 
-    let mut unmet_quotas = active_unmet;
-    unmet_quotas.extend(audit_unmet);
+    let mut unmet_quotas = active_result.unmet;
+    unmet_quotas.extend(probability_result.unmet);
     unmet_quotas.sort_by(|left, right| {
         left.source_stratum_id
             .cmp(&right.source_stratum_id)
@@ -422,8 +424,8 @@ pub fn plan_annotation_acquisition(
         });
     }
 
-    let total_spent = active_spent
-        .checked_add(audit_spent)
+    let total_spent = active_result.spent
+        .checked_add(probability_result.spent)
         .ok_or_else(|| "total annotation budget usage overflow".to_string())?;
     if total_spent > config.total_budget_units {
         return Err("planner exceeded the total annotation budget".into());
@@ -433,13 +435,13 @@ pub fn plan_annotation_acquisition(
         total_budget_units: config.total_budget_units,
         active_budget_units: config.active_budget_units,
         probability_audit_budget_units: config.probability_audit_budget_units,
-        active_spent_units: active_spent,
-        probability_audit_spent_units: audit_spent,
+        active_spent_units: active_result.spent,
+        probability_audit_spent_units: probability_result.spent,
         total_spent_units: total_spent,
         total_remaining_units: config.total_budget_units - total_spent,
         active_selected_items: active_refinement.len(),
         probability_audit_selected_items: probability_audit.len(),
-        probability_audit_selected_source_works: audit_source_works,
+        probability_audit_selected_source_works: probability_result.selected_source_count,
     };
 
     let payload = SelectionReceiptPayloadV1 {
@@ -469,7 +471,7 @@ pub fn plan_annotation_acquisition(
         normalized_config_sha256,
         active_refinement,
         probability_audit,
-        probability_audit_design: audit_design,
+        probability_audit_design: probability_result.design,
         rejected_candidates,
         eligible_but_unselected,
         unmet_quotas,
@@ -495,7 +497,7 @@ pub fn plan_annotation_acquisition(
 
     // Keep this local counter observable in the debug/test report path; it is
     // also useful for assertions that source-work caps were honored.
-    if active_source_counts
+    if active_result.source_counts
         .values()
         .any(|count| *count > config.maximum_active_items_per_source_work)
     {
@@ -759,6 +761,46 @@ fn active_priority(
     None
 }
 
+#[derive(Debug)]
+struct ProbabilityAuditSelectionResultV1 {
+    selections: Vec<AnnotationSelectionRecordV1>,
+    unmet: Vec<UnmetAnnotationQuotaV1>,
+    spent: u64,
+    selected_source_count: usize,
+    design: Vec<ProbabilityAuditStratumDesignV1>,
+}
+
+#[derive(Debug)]
+struct ActiveSelectionResultV1 {
+    selections: Vec<AnnotationSelectionRecordV1>,
+    unmet: Vec<UnmetAnnotationQuotaV1>,
+    spent: u64,
+    source_counts: BTreeMap<String, u32>,
+}
+
+#[derive(Debug, Default)]
+struct ActiveSelectionStateV1 {
+    selected: BTreeSet<usize>,
+    selections: Vec<AnnotationSelectionRecordV1>,
+    spent: u64,
+    source_counts: BTreeMap<String, u32>,
+    stratum_counts: BTreeMap<String, u32>,
+}
+
+#[derive(Debug, Clone, Copy)]
+struct SelectionRecordMetadataV1 {
+    stream: SelectionStreamV1,
+    priority_band: Option<ActivePriorityBandV1>,
+    reason: SelectionReasonV1,
+    source_work_probability: Option<ProbabilityFractionV1>,
+    item_given_source_probability: Option<ProbabilityFractionV1>,
+    item_probability: Option<ProbabilityFractionV1>,
+    eligible_source_works_in_stratum: Option<usize>,
+    selected_source_works_in_stratum: Option<usize>,
+    eligible_items_in_source_work: Option<usize>,
+    selected_items_in_source_work: Option<usize>,
+}
+
 fn reduced_probability_fraction(
     numerator: u64,
     denominator: u64,
@@ -784,16 +826,7 @@ fn select_probability_audit(
     eligible: &[usize],
     config: &AnnotationAcquisitionConfigV1,
     rng: &mut u64,
-) -> Result<
-    (
-        Vec<AnnotationSelectionRecordV1>,
-        Vec<UnmetAnnotationQuotaV1>,
-        u64,
-        usize,
-        Vec<ProbabilityAuditStratumDesignV1>,
-    ),
-    String,
-> {
+) -> Result<ProbabilityAuditSelectionResultV1, String> {
     let mut by_stratum: BTreeMap<&str, BTreeMap<&str, Vec<usize>>> = BTreeMap::new();
     for index in eligible {
         let candidate = &candidates[*index];
@@ -974,7 +1007,13 @@ fn select_probability_audit(
     }
     // Preserve randomized source-work and within-work draw order in the
     // replayable receipt.
-    Ok((selections, unmet, spent, selected_source_count, design))
+    Ok(ProbabilityAuditSelectionResultV1 {
+        selections,
+        unmet,
+        spent,
+        selected_source_count,
+        design,
+    })
 }
 
 fn select_active(
@@ -982,15 +1021,7 @@ fn select_active(
     eligible: &[usize],
     config: &AnnotationAcquisitionConfigV1,
     audit_sources: &BTreeSet<&str>,
-) -> Result<
-    (
-        Vec<AnnotationSelectionRecordV1>,
-        Vec<UnmetAnnotationQuotaV1>,
-        u64,
-        BTreeMap<String, u32>,
-    ),
-    String,
-> {
+) -> Result<ActiveSelectionResultV1, String> {
     let quotas: BTreeMap<&str, &AnnotationStratumQuotaV1> = config
         .stratum_quotas
         .iter()
