@@ -16,9 +16,10 @@ The consumer now parses the exact immutable request artifact independently of th
 
 - The request body's actual `model` selector equals the independently pinned model revision.
 - The request has at least one message, and every message has a recognized role and a JSON-string content field.
-- Every generic top-level provider parameter is a number or boolean. Free-form strings, nulls, arrays and nested objects fail closed; provider-specific dynamic fields require an adapter that source-maps their content.
+- Every generic top-level provider parameter must match the fixed field/type allowlist. Unknown keys, wrong types, free-form strings, nulls, arrays and nested objects fail closed; provider-specific dynamic fields require an adapter that source-maps their content.
 - The generic numeric/boolean parameter map is reserialized deterministically and its SHA-256 profile is recomputed from the exact captured body. This recomputed digest must equal both the receipt and independent run-manifest pin.
 - Every exposed span's `message_index` resolves to an actual message, its claimed role matches the parsed role, and its half-open byte interval is contained inside that message's exact serialized `content` string. The consumer uses the borrowed raw JSON string slice, not a search for matching text.
+- Duplicate provider parameter members and unrecognized message fields are rejected, preventing parser-differential or untracked message-surface ambiguity.
 
 This is intentionally stricter than checking the request-body digest and trusting producer-supplied profile/span metadata. JSON Schema cannot prove these relationships.
 
