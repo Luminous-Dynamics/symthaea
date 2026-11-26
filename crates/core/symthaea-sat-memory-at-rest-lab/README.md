@@ -35,11 +35,12 @@ The CLI writes per-case JSON receipts under results/, C1/C2 control receipts, an
 - C3 checks the exact post-mutation/restored file state. A failed edit-landed check is ERROR and excluded from the denominator.
 - T9 restores the pre-write store bundle while the protected rollback anchor remains outside it.
 - T10 first proves that the SUT erasure API physically removes exactly the named record while leaving all other records byte-for-byte unchanged; it then restores the pre-erasure store bundle while the protected erasure tombstone and whole-store anchor remain outside it.
+- Two additional shared-rollback-domain probes are deliberately outside the native denominator: they restore the store and both local trust-domain files together, demonstrating that a co-located anchor/tombstone cannot resist a full snapshot rollback.
 - The native metric is recomputed without modification: (REJECTED + read-time REPORTED + 0.5 * audit-time REPORTED) / N.
 - T1-T5, T6-T8, T9 and T10 category scores remain separately visible.
 
 ## Important limits
 
-This lab uses a synthetic JSON file store, a built-in test-only HMAC key, and a local external trust-domain directory. It does not exercise host-level attackers, a database engine's crash consistency, filesystem snapshots, cloud backups, hardware key stores, actual erasure/privacy compliance, production persistence, or any real agent. The protected design is pedagogical only.
+This lab uses a synthetic JSON file store, a built-in test-only HMAC key, and a local external trust-domain directory. It does not exercise host-level attackers beyond the explicit shared-domain probes, a database engine's crash consistency, production filesystem snapshots, cloud backups, hardware key stores, actual erasure/privacy compliance, production persistence, or any real agent. The shared-domain probes intentionally show that local trust-domain co-rollback defeats the example anchor and tombstone; resistance to that attacker requires an independently administered remote witness or hardware-backed monotonic facility. The protected design is pedagogical only.
 
 A passing protected-mode result is a self-test of this emulator's implementation and the scoring logic. It is not an upstream benchmark result, a certification, a Symthaea product claim or proof of production security. Run the exact upstream method against a real SUT with the declared profile manifest before making product or SOTA claims.
