@@ -125,6 +125,19 @@ pub fn replay_source_lineage_graph_v1(
         return Err(SourceLineageRejectV1::InvalidGraph);
     }
 
+    // Every requirement tag must exist in the consumer-owned manifest and
+    // the graph's evidence class must equal that requirement's exact class.
+    for node in nodes.values() {
+        for requirement_id in &node.satisfies_requirement_ids {
+            let requirement = decision_need.requirements.iter()
+                .find(|item| item.requirement_id == *requirement_id)
+                .ok_or(SourceLineageRejectV1::BindingMismatch)?;
+            if node.evidence_class_sha256 != requirement.evidence_class_sha256 {
+                return Err(SourceLineageRejectV1::EvidenceClassMismatch);
+            }
+        }
+    }
+
     // Candidate nodes are not free-form graph annotations: the graph must
     // exactly reproduce the source identities, payload commitments, parents
     // and derivation receipts that were in the qualified candidate records.
