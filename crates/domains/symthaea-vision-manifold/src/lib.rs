@@ -28,6 +28,7 @@
 //!   of unexpected change (active inference foraging).
 //! - **TemporalPredictor**: Implements the shared trait for cross-domain integration.
 
+pub mod action_conditioned;
 pub mod attention;
 pub mod bridge;
 pub mod camera;
@@ -39,6 +40,14 @@ pub mod spectrum;
 pub mod training;
 pub mod types;
 
+pub use action_conditioned::{
+    ACTION_CONDITIONED_PREDICTOR_STATE_SCHEMA_VERSION, ActionConditionedCandidateAction,
+    evaluate_action_response_set, ActionConditionedForecastReceipt,
+    ActionConditionedForecastScore, ActionConditionedObservedOutcome,
+    ActionResponseMetrics, ActionConditionedPredictorState,
+    ActionConditionedPredictorError, ActionConditionedVisualResidualPredictor,
+    PendingActionConditionedForecastState,
+};
 pub use attention::SurpriseMap;
 pub use bridge::{
     CROSS_MANIFOLD_PREDICTOR_STATE_SCHEMA_VERSION, CognitiveGoalSignal, CognitiveGoalSignalState,

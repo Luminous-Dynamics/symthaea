@@ -1863,6 +1863,38 @@ impl VisionManifold {
         1.0 - decay
     }
 
+    /// Return the autonomous CfC baseline forecast from the latest real frame.
+    ///
+    /// This method is read-only: it does not advance the manifold, write a
+    /// prediction into observation memory, or alter the delayed-horizon queue.
+    /// Callers may pass the returned baseline to an action-conditioned residual
+    /// predictor while retaining this autonomous forecast as the A1 control.
+    pub fn predict_autonomous_horizon_checked(
+        &self,
+        horizon: f32,
+    ) -> Result<ContinuousHV, String> {
+        if !horizon.is_finite() || horizon <= 0.0 {
+            return Err(format!(
+                "autonomous prediction horizon must be finite and > 0, got {horizon}"
+            ));
+        }
+        let current = self.last_frame_hv.as_ref()
+            .ok_or_else(|| "vision manifold has no real frame for prediction".to_string())?;
+        if !current.as_slice().iter().all(|value| value.is_finite()) {
+            return Err("latest real frame contains non-finite values".to_string());
+        }
+        let predicted = self.predict_horizon(current, horizon);
+        if !predicted.as_slice().iter().all(|value| value.is_finite()) {
+            return Err("autonomous horizon prediction produced non-finite values".to_string());
+        }
+        Ok(predicted)
+    }
+
+    /// Monotonic sequence of accepted real frames in this manifold.
+    pub fn observed_frame_sequence(&self) -> u64 {
+        self.frame_count
+    }
+
     /// Predict manifold state at a future horizon via O(1) closed-form jump.
     fn predict_horizon(&self, current_input: &ContinuousHV, horizon: f32) -> ContinuousHV {
         let x_inf = self.equilibrium(current_input);
@@ -10731,6 +10763,28 @@ mod tests {
             crate::checkpoint::CheckpointRecoveryAttemptOutcome::SemanticFailure(_)
         ));
         let _ = std::fs::remove_dir_all(directory);
+    }
+
+    #[test]
+    fn autonomous_horizon_prediction_is_read_only_and_requires_a_real_frame() {
+        let empty = VisionManifold::new(VisionConfig::default(), 32, 32);
+        assert!(empty.predict_autonomous_horizon_checked(0.1).is_err());
+        assert!(empty.predict_autonomous_horizon_checked(0.0).is_err());
+
+        let mut manifold = VisionManifold::new(VisionConfig::default(), 32, 32);
+        manifold
+            .observe_frame_checked(&vec![17; 32 * 32], 32, 32, 1, 0.033)
+            .unwrap();
+        let before = serde_json::to_vec(&manifold.save_state()).unwrap();
+        let frame_sequence = manifold.observed_frame_sequence();
+        let first = manifold.predict_autonomous_horizon_checked(0.1).unwrap();
+        let second = manifold.predict_autonomous_horizon_checked(0.1).unwrap();
+        let after = serde_json::to_vec(&manifold.save_state()).unwrap();
+
+        assert_eq!(first, second);
+        assert_eq!(first.dim(), manifold.state.dim());
+        assert_eq!(frame_sequence, manifold.observed_frame_sequence());
+        assert_eq!(before, after);
     }
 
     #[test]

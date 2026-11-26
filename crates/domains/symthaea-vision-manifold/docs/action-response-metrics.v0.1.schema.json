@@ -1,0 +1,63 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://luminousdynamics.io/schemas/vis005-action-response-metrics-v0.1.json",
+  "title": "VIS-005 same-history vector action-response metrics",
+  "description": "Compares predicted action-induced visual-state deltas to realized deltas relative to one explicit no-op branch. This is not CoCo ARC/Drift-Energy and not a physical safety certificate.",
+  "type": "object",
+  "additionalProperties": false,
+  "required": [
+    "action_count",
+    "zero_action_prediction_mse",
+    "mean_predicted_action_effect_norm",
+    "mean_observed_action_effect_norm",
+    "mean_action_effect_mse",
+    "mean_action_response_cosine",
+    "cosine_scored_action_count",
+    "missed_action_effect_count",
+    "false_positive_action_effect_count",
+    "both_null_action_effect_count"
+  ],
+  "properties": {
+    "action_count": {
+      "type": "integer",
+      "minimum": 1
+    },
+    "zero_action_prediction_mse": {
+      "type": "number",
+      "minimum": 0
+    },
+    "mean_predicted_action_effect_norm": {
+      "type": "number",
+      "minimum": 0
+    },
+    "mean_observed_action_effect_norm": {
+      "type": "number",
+      "minimum": 0
+    },
+    "mean_action_effect_mse": {
+      "type": "number",
+      "minimum": 0
+    },
+    "mean_action_response_cosine": {
+      "type": "number",
+      "minimum": -1,
+      "maximum": 1
+    },
+    "cosine_scored_action_count": {
+      "type": "integer",
+      "minimum": 0
+    },
+    "missed_action_effect_count": {
+      "type": "integer",
+      "minimum": 0
+    },
+    "false_positive_action_effect_count": {
+      "type": "integer",
+      "minimum": 0
+    },
+    "both_null_action_effect_count": {
+      "type": "integer",
+      "minimum": 0
+    }
+  }
+}
