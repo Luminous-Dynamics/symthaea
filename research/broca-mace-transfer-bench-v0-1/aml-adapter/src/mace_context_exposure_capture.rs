@@ -828,7 +828,7 @@ mod tests {
                 },
                 &TestArtifactStore, &TestTransport, &signer(),
             ).unwrap_err(),
-            MaceExposureCaptureRejectV1::EmptyModel
+            MaceExposureCaptureRejectV1::ModelRevisionMismatch
         );
     }
 
