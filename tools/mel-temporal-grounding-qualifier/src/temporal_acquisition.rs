@@ -359,10 +359,14 @@ pub fn plan_annotation_acquisition(
     let (probability_audit, audit_unmet, audit_spent, audit_source_works, audit_design) =
         select_probability_audit(&candidates, &eligible_audit, &config, &mut random_state)?;
 
-    let audit_source_set: BTreeSet<_> = probability_audit
+    // Own the audit source IDs so the final disjointness assertion does not
+    // keep a borrow into probability_audit alive across the report move.
+    let audit_source_ids: BTreeSet<String> = probability_audit
         .iter()
-        .map(|selection| selection.source_work_id_sha256.as_str())
+        .map(|selection| selection.source_work_id_sha256.clone())
         .collect();
+    let audit_source_set: BTreeSet<&str> =
+        audit_source_ids.iter().map(String::as_str).collect();
 
     let (active_refinement, active_unmet, active_spent, active_source_counts) =
         select_active(&candidates, &eligible_active, &config, &audit_source_set)?;
