@@ -387,8 +387,8 @@ pub fn proxy_survival_vector(policy: &CaOcrcPolicyV1) -> Result<Vec<f64>, CaOcrc
         return Err(CaOcrcErrorV1("proxy-delay PMF length is invalid".into()));
     }
     let mut survival = vec![0.0; d_max + 1];
-    for delay in 0..=d_max {
-        survival[delay] = policy.proxy_delay_pmf[delay + 1..].iter().sum();
+    for (delay, survival_at_delay) in survival.iter_mut().enumerate() {
+        *survival_at_delay = policy.proxy_delay_pmf[delay + 1..].iter().sum();
     }
     Ok(survival)
 }
@@ -641,17 +641,32 @@ fn mark_assumption_invalid(engine: &mut CaOcrcEngineV1, reason: &str) {
     engine.state.guarantee_invalid_reasons.insert(reason.into());
 }
 
-fn make_feedback_result(
-    feedback: &CaOcrcLabelFeedbackV1,
+#[derive(Clone, Debug)]
+struct CaOcrcFeedbackResultDetailsV1 {
     originating_round: Option<u64>,
     actual_delay_steps: Option<u64>,
     proxy_delay: Option<i64>,
     disposition: CaOcrcFeedbackDispositionV1,
-    mut reasons: Vec<CaOcrcReasonV1>,
+    reasons: Vec<CaOcrcReasonV1>,
     loss: Option<f64>,
     survival: Option<f64>,
     contribution: Option<f64>,
+}
+
+fn make_feedback_result(
+    feedback: &CaOcrcLabelFeedbackV1,
+    details: CaOcrcFeedbackResultDetailsV1,
 ) -> Result<CaOcrcFeedbackResultV1, CaOcrcErrorV1> {
+    let CaOcrcFeedbackResultDetailsV1 {
+        originating_round,
+        actual_delay_steps,
+        proxy_delay,
+        disposition,
+        mut reasons,
+        loss,
+        survival,
+        contribution,
+    } = details;
     reasons.sort();
     reasons.dedup();
     let mut result = CaOcrcFeedbackResultV1 {
@@ -981,14 +996,16 @@ pub fn step_ca_ocrc_round_v1(
         {
             let result = make_feedback_result(
                 feedback,
-                None,
-                None,
-                None,
-                CaOcrcFeedbackDispositionV1::Duplicate,
-                vec![CaOcrcReasonV1::DuplicateFeedbackAttempt],
-                None,
-                None,
-                None,
+                CaOcrcFeedbackResultDetailsV1 {
+                    originating_round: None,
+                    actual_delay_steps: None,
+                    proxy_delay: None,
+                    disposition: CaOcrcFeedbackDispositionV1::Duplicate,
+                    reasons: vec![CaOcrcReasonV1::DuplicateFeedbackAttempt],
+                    loss: None,
+                    survival: None,
+                    contribution: None,
+                },
             )?;
             feedback_results.push(result);
             continue;
@@ -996,14 +1013,16 @@ pub fn step_ca_ocrc_round_v1(
         let Some(origin_round) = candidate.sample_to_round.get(&feedback.sample_id).copied() else {
             let result = make_feedback_result(
                 feedback,
-                None,
-                None,
-                None,
-                CaOcrcFeedbackDispositionV1::Rejected,
-                vec![CaOcrcReasonV1::PredictionNotFound],
-                None,
-                None,
-                None,
+                CaOcrcFeedbackResultDetailsV1 {
+                    originating_round: None,
+                    actual_delay_steps: None,
+                    proxy_delay: None,
+                    disposition: CaOcrcFeedbackDispositionV1::Rejected,
+                    reasons: vec![CaOcrcReasonV1::PredictionNotFound],
+                    loss: None,
+                    survival: None,
+                    contribution: None,
+                },
             )?;
             feedback_results.push(result);
             continue;
@@ -1012,14 +1031,16 @@ pub fn step_ca_ocrc_round_v1(
         else {
             let result = make_feedback_result(
                 feedback,
-                Some(origin_round),
-                Some(prediction.round.saturating_sub(origin_round)),
-                None,
-                CaOcrcFeedbackDispositionV1::Rejected,
-                vec![CaOcrcReasonV1::PredictionNotFound],
-                None,
-                None,
-                None,
+                CaOcrcFeedbackResultDetailsV1 {
+                    originating_round: Some(origin_round),
+                    actual_delay_steps: Some(prediction.round.saturating_sub(origin_round)),
+                    proxy_delay: None,
+                    disposition: CaOcrcFeedbackDispositionV1::Rejected,
+                    reasons: vec![CaOcrcReasonV1::PredictionNotFound],
+                    loss: None,
+                    survival: None,
+                    contribution: None,
+                },
             )?;
             feedback_results.push(result);
             continue;
@@ -1034,14 +1055,16 @@ pub fn step_ca_ocrc_round_v1(
             }
             let result = make_feedback_result(
                 feedback,
-                Some(origin_round),
-                Some(actual_delay),
-                Some(prediction_receipt.sampled_proxy_delay),
-                CaOcrcFeedbackDispositionV1::NotTracked,
-                reasons,
-                None,
-                None,
-                None,
+                CaOcrcFeedbackResultDetailsV1 {
+                    originating_round: Some(origin_round),
+                    actual_delay_steps: Some(actual_delay),
+                    proxy_delay: Some(prediction_receipt.sampled_proxy_delay),
+                    disposition: CaOcrcFeedbackDispositionV1::NotTracked,
+                    reasons,
+                    loss: None,
+                    survival: None,
+                    contribution: None,
+                },
             )?;
             feedback_results.push(result);
             continue;
@@ -1050,14 +1073,16 @@ pub fn step_ca_ocrc_round_v1(
         if actual_delay > candidate.policy.maximum_actual_delay_steps {
             let result = make_feedback_result(
                 feedback,
-                Some(origin_round),
-                Some(actual_delay),
-                Some(tracked_entry.prediction_receipt.sampled_proxy_delay),
-                CaOcrcFeedbackDispositionV1::Rejected,
-                vec![CaOcrcReasonV1::ActualDelayOutOfBounds],
-                None,
-                None,
-                None,
+                CaOcrcFeedbackResultDetailsV1 {
+                    originating_round: Some(origin_round),
+                    actual_delay_steps: Some(actual_delay),
+                    proxy_delay: Some(tracked_entry.prediction_receipt.sampled_proxy_delay),
+                    disposition: CaOcrcFeedbackDispositionV1::Rejected,
+                    reasons: vec![CaOcrcReasonV1::ActualDelayOutOfBounds],
+                    loss: None,
+                    survival: None,
+                    contribution: None,
+                },
             )?;
             mark_assumption_invalid(&mut candidate, "actual_delay_out_of_bounds");
             feedback_results.push(result);
@@ -1094,14 +1119,16 @@ pub fn step_ca_ocrc_round_v1(
                 };
                 let result = make_feedback_result(
                     feedback,
-                    Some(origin_round),
-                    Some(actual_delay),
-                    Some(tracked_entry.prediction_receipt.sampled_proxy_delay),
-                    disposition,
-                    reasons,
-                    None,
-                    None,
-                    None,
+                    CaOcrcFeedbackResultDetailsV1 {
+                        originating_round: Some(origin_round),
+                        actual_delay_steps: Some(actual_delay),
+                        proxy_delay: Some(tracked_entry.prediction_receipt.sampled_proxy_delay),
+                        disposition,
+                        reasons,
+                        loss: None,
+                        survival: None,
+                        contribution: None,
+                    },
                 )?;
                 feedback_results.push(result);
                 continue;
@@ -1110,14 +1137,16 @@ pub fn step_ca_ocrc_round_v1(
         if actual_delay > tracked_entry.prediction_receipt.sampled_proxy_delay as u64 {
             let result = make_feedback_result(
                 feedback,
-                Some(origin_round),
-                Some(delay),
-                Some(tracked_entry.prediction_receipt.sampled_proxy_delay),
-                CaOcrcFeedbackDispositionV1::NotTracked,
-                vec![CaOcrcReasonV1::ProxyWindowExpired],
-                Some(loss),
-                None,
-                None,
+                CaOcrcFeedbackResultDetailsV1 {
+                    originating_round: Some(origin_round),
+                    actual_delay_steps: Some(delay),
+                    proxy_delay: Some(tracked_entry.prediction_receipt.sampled_proxy_delay),
+                    disposition: CaOcrcFeedbackDispositionV1::NotTracked,
+                    reasons: vec![CaOcrcReasonV1::ProxyWindowExpired],
+                    loss: Some(loss),
+                    survival: None,
+                    contribution: None,
+                },
             )?;
             feedback_results.push(result);
             continue;
@@ -1131,14 +1160,16 @@ pub fn step_ca_ocrc_round_v1(
         candidate.state.tracked.remove(&origin_round);
         let result = make_feedback_result(
             feedback,
-            Some(origin_round),
-            Some(delay),
-            Some(tracked_entry.prediction_receipt.sampled_proxy_delay),
-            CaOcrcFeedbackDispositionV1::Updated,
-            Vec::new(),
-            Some(loss),
-            Some(survival),
-            Some(contribution),
+            CaOcrcFeedbackResultDetailsV1 {
+                originating_round: Some(origin_round),
+                actual_delay_steps: Some(delay),
+                proxy_delay: Some(tracked_entry.prediction_receipt.sampled_proxy_delay),
+                disposition: CaOcrcFeedbackDispositionV1::Updated,
+                reasons: Vec::new(),
+                loss: Some(loss),
+                survival: Some(survival),
+                contribution: Some(contribution),
+            },
         )?;
         feedback_results.push(result);
     }
@@ -1988,7 +2019,7 @@ mod tests {
         )
         .unwrap();
         assert!((report.tracking_load_ell_f - 1.0).abs() < 1e-12);
-        assert_eq!(report.paper_risk_gap_bound.is_some(), true);
+        assert!(report.paper_risk_gap_bound.is_some());
     }
 
     #[test]
