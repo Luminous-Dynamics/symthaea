@@ -606,7 +606,7 @@ mod tests {
         let separating_key = ResponseKey::new("push_right", "displacement", 1);
         contract.probe_cost_units.insert(separating_key.clone(), 1);
 
-        let mut left = record("state-a", "copied-current-state", 0, 2);
+        let left = record("state-a", "copied-current-state", 0, 2);
         let mut right = record("state-b", "copied-current-state", 1, 2);
         let no_op_key = ResponseKey::new("no_op", "displacement", 1);
         right
