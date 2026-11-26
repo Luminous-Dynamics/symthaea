@@ -99,3 +99,6 @@ Run the aligned and ambiguity-revealing fixtures with:
     cargo +1.96.0 run --locked --manifest-path tools/mel-temporal-grounding-qualifier/Cargo.toml --bin mel-annotation-marginal-value-audit -- tools/mel-temporal-grounding-qualifier/fixtures/mel-annotation-marginal-value-ambiguous.synthetic.json
 
 Selection/session/annotation digests and effort telemetry remain unauthenticated metadata in this adapter. ActiveRefinement observations are descriptive; this item-level paired report does not make population claims or replace the separate ProbabilityAudit design.
+
+
+Input schema: `schemas/mel-temporal-annotation-marginal-value-v1.schema.json`. It references the existing multi-annotator schema for both before and after panels. The after-panel must preserve the before-panel records in order and append exactly one new independent annotation.
