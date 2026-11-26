@@ -3,7 +3,8 @@
 **Status:** executable reference contract / research prototype  
 **Parent:** [SDCB scientific-discovery interoperability v1](SDCB_SCIENTIFIC_DISCOVERY_INTEROPERABILITY_V1.md)  
 **Implementation:** [scripts/research/sdcb_belief_transition.rs](../../scripts/research/sdcb_belief_transition.rs)  
-**Wire contract:** [SDCB_EXPERIMENT_TRANSITION_V1.schema.json](SDCB_EXPERIMENT_TRANSITION_V1.schema.json)
+**Wire contract:** [SDCB_EXPERIMENT_TRANSITION_V1.schema.json](SDCB_EXPERIMENT_TRANSITION_V1.schema.json)  
+**Example fixture:** [SDCB_EXPERIMENT_TRANSITION_V1.example.json](SDCB_EXPERIMENT_TRANSITION_V1.example.json) (illustrative digests and verifier identity only)
 
 ## 1. Research thesis
 
