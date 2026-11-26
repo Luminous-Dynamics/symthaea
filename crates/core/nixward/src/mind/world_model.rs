@@ -1965,6 +1965,164 @@ mod tests {
     }
 
     #[test]
+    fn family_label_free_prediction_selects_distinct_observable_context() {
+        let dim = 256;
+        let mut wm = NixWorldModel::new(dim);
+        let before = ContinuousHV::random(dim, 400);
+        let after_a = ContinuousHV::random(dim, 401);
+        let after_b = ContinuousHV::random(dim, 402);
+        let context_a = ContinuousHV::random(dim, 403);
+        let context_b = ContinuousHV::random(dim, 404);
+
+        for index in 0..4 {
+            let mut episode_a = transition_episode(
+                &format!("observable-a-{index}"),
+                ActionCategory::Install,
+                ActionCategory::Install,
+                before.clone(),
+                context_a.clone(),
+                after_a.clone(),
+                TransitionOutcomeClass::Success,
+                &format!("observable-a-cluster-{index}"),
+            );
+            episode_a.environment_family_id = "training-family-a".to_owned();
+            wm.learn_episode(&episode_a)
+                .expect("family A training episode");
+
+            let mut episode_b = transition_episode(
+                &format!("observable-b-{index}"),
+                ActionCategory::Install,
+                ActionCategory::Install,
+                before.clone(),
+                context_b.clone(),
+                after_b.clone(),
+                TransitionOutcomeClass::Success,
+                &format!("observable-b-cluster-{index}"),
+            );
+            episode_b.environment_family_id = "training-family-b".to_owned();
+            wm.learn_episode(&episode_b)
+                .expect("family B training episode");
+        }
+
+        let global = wm.predict_state(&ActionCategory::Install);
+        let contextual = wm
+            .predict_state_without_family_label(
+                &before,
+                &ActionCategory::Install,
+                &ContinuousHV::random(dim, 90),
+                &context_a,
+            )
+            .expect("observable-context prediction");
+
+        let global_error =
+            mean_squared_error(&global, &after_a).expect("same-dimensional global prediction");
+        let contextual_error = mean_squared_error(&contextual.predicted_state, &after_a)
+            .expect("same-dimensional context prediction");
+        assert_eq!(contextual.source, ContextualPredictionSource::ContextualDelta);
+        assert_eq!(contextual.independent_cluster_count, 4);
+        assert!(contextual.context_similarity > 0.99);
+        assert!(contextual.action_parameter_similarity > 0.99);
+        assert!(
+            contextual_error + 1e-5 < global_error,
+            "context error {contextual_error} should beat pooled global error {global_error}"
+        );
+    }
+
+    #[test]
+    fn family_label_free_prediction_abstains_on_conflicting_equally_matched_deltas() {
+        let dim = 256;
+        let mut wm = NixWorldModel::new(dim);
+        let before = ContinuousHV::random(dim, 410);
+        let after_a = ContinuousHV::random(dim, 411);
+        let after_b = ContinuousHV::random(dim, 412);
+        let context = ContinuousHV::random(dim, 413);
+
+        let mut episode_a = transition_episode(
+            "ambiguous-family-a",
+            ActionCategory::Install,
+            ActionCategory::Install,
+            before.clone(),
+            context.clone(),
+            after_a,
+            TransitionOutcomeClass::Success,
+            "ambiguous-cluster-a",
+        );
+        episode_a.environment_family_id = "ambiguous-family-a".to_owned();
+        wm.learn_episode(&episode_a)
+            .expect("family A training episode");
+
+        let mut episode_b = transition_episode(
+            "ambiguous-family-b",
+            ActionCategory::Install,
+            ActionCategory::Install,
+            before.clone(),
+            context.clone(),
+            after_b,
+            TransitionOutcomeClass::Failure,
+            "ambiguous-cluster-b",
+        );
+        episode_b.environment_family_id = "ambiguous-family-b".to_owned();
+        wm.learn_episode(&episode_b)
+            .expect("family B training episode");
+
+        let prediction = wm
+            .predict_state_without_family_label(
+                &before,
+                &ActionCategory::Install,
+                &ContinuousHV::random(dim, 90),
+                &context,
+            )
+            .expect("ambiguous context is an explicit result");
+
+        assert_eq!(
+            prediction.source,
+            ContextualPredictionSource::AmbiguousContextUnknown
+        );
+        assert!((prediction.predicted_state.similarity(&before) - 1.0).abs() < 1e-5);
+        assert_eq!(prediction.observation_count, 2);
+        assert_eq!(prediction.independent_cluster_count, 2);
+        assert_eq!(prediction.training_residual_mse, None);
+    }
+
+    #[test]
+    fn family_label_free_prediction_uses_global_fallback_for_unseen_context() {
+        let dim = 256;
+        let mut wm = NixWorldModel::new(dim);
+        let before = ContinuousHV::random(dim, 420);
+        let after = ContinuousHV::random(dim, 421);
+        let training_context = ContinuousHV::random(dim, 422);
+        let unseen_context = ContinuousHV::random(dim, 423);
+        let episode = transition_episode(
+            "unseen-context-training",
+            ActionCategory::Install,
+            ActionCategory::Install,
+            before.clone(),
+            training_context,
+            after,
+            TransitionOutcomeClass::Success,
+            "unseen-context-cluster",
+        );
+        wm.learn_episode(&episode)
+            .expect("training episode");
+
+        let prediction = wm
+            .predict_state_without_family_label(
+                &before,
+                &ActionCategory::Install,
+                &ContinuousHV::random(dim, 90),
+                &unseen_context,
+            )
+            .expect("unseen context produces an explicit fallback");
+        assert_eq!(
+            prediction.source,
+            ContextualPredictionSource::GlobalActionDeltaFallback
+        );
+        assert!(prediction.context_similarity < 0.8);
+        assert!(prediction.action_parameter_similarity > 0.99);
+        assert_eq!(prediction.observation_count, 1);
+    }
+
+    #[test]
     fn contextual_prediction_rejects_wrong_dimensions_and_non_finite_values() {
         let dim = 256;
         let wm = NixWorldModel::new(dim);
