@@ -62,7 +62,7 @@ fn audit(fixture: &Value) -> Result<(), String> {
     let spatial = field(cohort, "spatial_domain")?;
     let velocity = field(cohort, "velocity_domain")?;
     let maximum_time = number(cohort, "maximum_time")?;
-    if string(cohort, "state_metric_id")?.trim().is_empty() != Some(false) {
+    if string(cohort, "state_metric_id")?.trim().is_empty() {
         return Err("cohort state metric identifier is empty".to_owned());
     }
     if maximum_time <= 0.0
