@@ -17,7 +17,8 @@
     "negative_controls",
     "expected",
     "resource_budget",
-    "required_provenance"
+    "required_provenance",
+    "input_refs"
   ],
   "properties": {
     "schema": {
@@ -119,7 +120,8 @@
             "pattern": "^[a-f0-9]{64}$"
           }
         }
-      }
+      },
+      "minItems": 1
     },
     "authority_snapshot": {
       "type": "object",
