@@ -24,7 +24,7 @@ The client observer cannot elevate a claim by signing its own assertion that the
 Each media exposure binds:
 
 - run, pair block, world cluster, query, arm, invocation sequence and pinned model revision;
-- exact request-body digest, byte length and immutable encrypted artifact;
+- exact request-body digest, byte length, immutable encrypted artifact and independently pinned static provider-parameter profile digest;
 - message role/index, content part index and RFC 6901 content path;
 - exact request-body byte span (inclusive start, exclusive end) and span digest;
 - canonical source evidence ID, media payload SHA-256 and payload byte length;
@@ -40,7 +40,7 @@ This extension inherits a known boundary issue in the current text producer: arb
 
 A qualified implementation must bind the provider-specific request-parameter profile to the independent run manifest, allowlist fields whose values are genuinely static configuration, and require every dynamic text/media-bearing field to use typed source mappings. Unknown or unclassified fields must make the invocation non-qualifiable. The true no-memory arm must inspect all serialized provider fields and upload/reference surfaces, not only the standard message content array.
 
-The request-body digest commits to all bytes, but a digest alone does not establish complete origin classification. Until this gap is closed, the receipt can prove exact body integrity while its origin coverage remains limited to explicitly instrumented content paths.
+The request-body digest commits to all bytes, but a digest alone does not establish complete origin classification. The multimodal receipt therefore requires `provider_parameter_profile_sha256`, paired with the scalar-only, manifest-pinned parameter contract in [#13770](https://github.com/Luminous-Dynamics/symthaea/pull/13770). Dynamic text/media fields must use typed source mappings. The profile is a frozen configuration commitment, not source authentication; it must be declared static and non-memory-derived before the run.
 
 ## Media-specific lineage
 
@@ -88,8 +88,9 @@ The schema includes explicit counts and a structural zero-item constraint for th
 6. Verify any provider-ingress attestation under a distinct, independently pinned provider key/profile; do not accept an observer's self-assertion as provider evidence.
 7. Verify modality/details consistency, image dimensions and region bounds, rational video timebase and frame ordering, audio sample-rate/channel declarations, non-empty half-open sample-frame ranges and media-part coverage.
 8. Verify all evidence IDs, source/authority/rights/scope/admissibility/currentness and transitive parent closure through existing MACE owners.
-9. Verify each derivative's transformation receipt and all required parent IDs; reject cycles, dangling edges, ambiguous aliases and revoked ancestry.
-10. Recompute the no-memory counts and reject any memory-derived content or reference in the true no-memory arm.
+9. Verify the exact static provider-parameter profile digest against the independent run manifest; unknown/untyped request fields make the invocation non-qualifiable.
+10. Verify each derivative's transformation receipt and all required parent IDs; reject cycles, dangling edges, ambiguous aliases and revoked ancestry.
+11. Recompute the no-memory counts and reject any memory-derived content or reference in the true no-memory arm.
 
 JSON Schema cannot establish these cross-record, cryptographic, media-decoding, lineage or lifecycle invariants by itself. It also cannot prove that a content path resolves to the declared span, that an audio end sample exceeds its start sample, or that a video frame belongs to the declared source; these are verifier and independent-fixture responsibilities.
 
