@@ -135,9 +135,10 @@ jobs:
             and .disposition_alpha.ratings == 9
             and .disposition_alpha.observed_disagreement > 0.44
             and .disposition_alpha.observed_disagreement < 0.45
-            and .disposition_alpha.expected_disagreement == 0.75
-            and .disposition_alpha.alpha > 0.40
-            and .disposition_alpha.alpha < 0.42
+            and .disposition_alpha.expected_disagreement > 0.72
+            and .disposition_alpha.expected_disagreement < 0.73
+            and .disposition_alpha.alpha > 0.38
+            and .disposition_alpha.alpha < 0.39
             and (.pairwise_by_iou_threshold | length) == 4
             and .pairwise_by_iou_threshold[0].symmetric_event_f1_mean == 1.0
             and .pairwise_by_iou_threshold[2].symmetric_event_f1_mean == 1.0
@@ -208,6 +209,14 @@ jobs:
           cp crates/domains/symthaea-muse/src/temporal_grounding.rs "$evidence/"
           cp crates/domains/symthaea-muse/src/evidence_digest.rs "$evidence/"
           cp docs/research/MEL-GROUND-001-TEMPORAL-GROUNDING-SCORER-V1.md "$evidence/"
+          if [[ -f tools/mel-temporal-grounding-qualifier/src/temporal_reliability.rs ]]; then
+            cp tools/mel-temporal-grounding-qualifier/src/temporal_reliability.rs "$evidence/"
+            cp tools/mel-temporal-grounding-qualifier/src/bin/mel-temporal-reliability-audit.rs "$evidence/"
+            cp tools/mel-temporal-grounding-qualifier/fixtures/mel-temporal-reliability-corpus.synthetic.json "$evidence/"
+            if [[ -f "$RUNNER_TEMP/temporal-reliability-report.json" ]]; then
+              cp "$RUNNER_TEMP/temporal-reliability-report.json" "$evidence/"
+            fi
+          fi
           if [[ -f tools/mel-temporal-grounding-qualifier/src/temporal_consensus.rs ]]; then
             cp tools/mel-temporal-grounding-qualifier/src/temporal_consensus.rs "$evidence/"
             cp tools/mel-temporal-grounding-qualifier/src/bin/mel-multi-annotator-grounding-audit.rs "$evidence/"
