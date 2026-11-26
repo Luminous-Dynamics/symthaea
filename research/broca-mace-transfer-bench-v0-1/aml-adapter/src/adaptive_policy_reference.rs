@@ -741,6 +741,28 @@ mod tests {
     }
 
     #[test]
+    fn adaptive_policy_routes_to_the_query_with_highest_conditional_value() {
+        let result = evaluate_expected_reference_v1(&adaptive_scenario()).unwrap();
+        let ReferencePolicyNodeV1::Query { query_id, branches } = result.policy else {
+            panic!("positive conditional information value should select a query");
+        };
+        assert_eq!(query_id, "route");
+        let route_a = branches.iter().find(|branch| branch.observation_id == "A").unwrap();
+        let route_b = branches.iter().find(|branch| branch.observation_id == "B").unwrap();
+        assert!(matches!(&*route_a.next, ReferencePolicyNodeV1::Query { query_id, .. } if query_id == "check-a"));
+        assert!(matches!(&*route_b.next, ReferencePolicyNodeV1::Query { query_id, .. } if query_id == "check-b"));
+    }
+
+    #[test]
+    fn policy_node_cap_can_force_a_safe_terminal_policy() {
+        let mut scenario = adaptive_scenario();
+        scenario.maximum_policy_nodes = 1;
+        let result = evaluate_expected_reference_v1(&scenario).unwrap();
+        assert_eq!(result.policy.node_count(), 1);
+        assert!(matches!(result.policy, ReferencePolicyNodeV1::Terminal { .. }));
+    }
+
+    #[test]
     fn robust_mode_does_not_require_or_use_probability_masses() {
         let mut scenario = adaptive_scenario();
         for world in &mut scenario.worlds {
