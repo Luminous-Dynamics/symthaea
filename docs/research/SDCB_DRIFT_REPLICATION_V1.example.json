@@ -1,0 +1,79 @@
+{
+  "schema_version": "1.0.0",
+  "fixture_id": "drift-aware-cross-device-replication-v1",
+  "description": "A calibration can become stale on device A; independent devices B and C have separate latent offsets and stable channels.",
+  "scientific_hypotheses": ["h0", "h1"],
+  "devices": ["instrument-a", "instrument-b", "instrument-c"],
+  "joint_prior_order": "hypothesis-major; joint_index = h * (2 ^ device_count) + sum(device_state[d] * 2^d)",
+  "joint_prior": [
+    0.2025, 0.2025, 0.0225, 0.0225, 0.0225, 0.0225, 0.0025, 0.0025,
+    0.2025, 0.2025, 0.0225, 0.0225, 0.0225, 0.0225, 0.0025, 0.0025
+  ],
+  "actions": ["choose-h0", "choose-h1", "abstain"],
+  "scenarios": [
+    {
+      "scenario_id": "nominal-low-drift",
+      "utility_by_hypothesis": [[1.0, 0.0, 0.6], [0.0, 1.0, 0.6]],
+      "transition_by_device": [
+        [[0.98, 0.02], [0.02, 0.98]],
+        [[1.0, 0.0], [0.0, 1.0]],
+        [[1.0, 0.0], [0.0, 1.0]]
+      ]
+    },
+    {
+      "scenario_id": "shifted-high-drift",
+      "utility_by_hypothesis": [[1.0, 0.0, 0.6], [0.0, 1.0, 0.6]],
+      "transition_by_device": [
+        [[0.75, 0.25], [0.25, 0.75]],
+        [[1.0, 0.0], [0.0, 1.0]],
+        [[1.0, 0.0], [0.0, 1.0]]
+      ]
+    }
+  ],
+  "candidates": [
+    {
+      "experiment_id": "calibrate-a",
+      "device_id": "instrument-a",
+      "role": "calibration",
+      "cost_units": 1,
+      "likelihoods_by_scenario": [
+        [[0.95, 0.05], [0.05, 0.95], [0.95, 0.05], [0.05, 0.95]],
+        [[0.95, 0.05], [0.05, 0.95], [0.95, 0.05], [0.05, 0.95]]
+      ]
+    },
+    {
+      "experiment_id": "science-a",
+      "device_id": "instrument-a",
+      "role": "science",
+      "cost_units": 1,
+      "likelihoods_by_scenario": [
+        [[0.95, 0.05], [0.05, 0.95], [0.05, 0.95], [0.95, 0.05]],
+        [[0.95, 0.05], [0.05, 0.95], [0.05, 0.95], [0.95, 0.05]]
+      ]
+    },
+    {
+      "experiment_id": "science-b",
+      "device_id": "instrument-b",
+      "role": "science",
+      "cost_units": 1,
+      "likelihoods_by_scenario": [
+        [[0.80, 0.20], [0.20, 0.80], [0.20, 0.80], [0.80, 0.20]],
+        [[0.80, 0.20], [0.20, 0.80], [0.20, 0.80], [0.80, 0.20]]
+      ]
+    },
+    {
+      "experiment_id": "science-c",
+      "device_id": "instrument-c",
+      "role": "science",
+      "cost_units": 1,
+      "likelihoods_by_scenario": [
+        [[0.80, 0.20], [0.20, 0.80], [0.20, 0.80], [0.80, 0.20]],
+        [[0.80, 0.20], [0.20, 0.80], [0.20, 0.80], [0.80, 0.20]]
+      ]
+    }
+  ],
+  "outcome_order": ["0", "1"],
+  "resource_budget_units": 2,
+  "transition_assumption": "One transition occurs between stages. Conditional on a complete scenario and each previous device state, device transitions are independent across devices; this v1 does not model common-cause transitions.",
+  "observation_assumption": "Observation noise is conditionally independent given scientific hypothesis, named device's current state, experiment, and scenario. The two instrument offsets are independent in this fixture."
+}
