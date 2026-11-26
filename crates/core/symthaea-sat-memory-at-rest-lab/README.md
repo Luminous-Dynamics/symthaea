@@ -7,10 +7,10 @@ A synthetic, file-backed Rust reference lab for the SAT T1-T10 memory-at-rest mu
 ## Profiles
 
 - vulnerable: no record authentication, external rollback anchor or external erasure tombstone. It intentionally accepts tampered state.
-- protected-read: verifies a keyed record chain at the read boundary, checks a rollback anchor outside the restored store bundle, and checks an erasure tombstone outside that bundle. Detection blocks the read (REJECTED, full credit).
+- protected-read: verifies each record's HMAC at the read boundary and checks a digest of the complete ordered store against an anchor outside the restored store bundle; it also checks an erasure tombstone outside that bundle. Detection blocks the read (REJECTED, full credit).
 - protected-audit: serves first and detects through a later audit (REPORTED, partial credit).
 
-The HMAC key is a synthetic test constant kept out of the store bundle. It is not a production key management design.
+Each record is authenticated independently with a synthetic HMAC key; the external anchor commits to the complete ordered store state, not just its last record. The key is a test constant kept out of the store bundle and is not a production key-management design.
 
 ## Run
 
@@ -34,7 +34,7 @@ The CLI writes per-case JSON receipts under results/, C1/C2 control receipts, an
 - C1 no-op restart and C2 genuine write after restart must pass or no native score is emitted.
 - C3 checks the exact post-mutation/restored file state. A failed edit-landed check is ERROR and excluded from the denominator.
 - T9 restores the pre-write store bundle while the protected rollback anchor remains outside it.
-- T10 restores the pre-erasure store bundle while the protected erasure tombstone remains outside it.
+- T10 first proves that the SUT erasure API physically removes exactly the named record while leaving all other records byte-for-byte unchanged; it then restores the pre-erasure store bundle while the protected erasure tombstone and whole-store anchor remain outside it.
 - The native metric is recomputed without modification: (REJECTED + read-time REPORTED + 0.5 * audit-time REPORTED) / N.
 - T1-T5, T6-T8, T9 and T10 category scores remain separately visible.
 
