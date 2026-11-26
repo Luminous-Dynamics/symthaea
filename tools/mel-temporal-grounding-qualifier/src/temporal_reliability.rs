@@ -330,10 +330,7 @@ fn validate_dataset(dataset: &MultiAnnotatorReliabilityDatasetV1) -> Result<(), 
         return Err("bootstrap seed must be nonzero".into());
     }
     if dataset.boundary_tolerances_ms.is_empty()
-        || dataset
-            .boundary_tolerances_ms
-            .iter()
-            .any(|value| *value == 0)
+        || dataset.boundary_tolerances_ms.contains(&0)
         || dataset
             .boundary_tolerances_ms
             .windows(2)
@@ -1176,10 +1173,6 @@ fn average_optional(left: Option<f64>, right: Option<f64>) -> Option<f64> {
 
 fn bool_to_f64(value: bool) -> f64 {
     if value { 1.0 } else { 0.0 }
-}
-
-fn rate(numerator: usize, denominator: usize) -> Option<f64> {
-    (denominator > 0).then(|| numerator as f64 / denominator as f64)
 }
 
 fn mean(values: &[f64]) -> Option<f64> {
