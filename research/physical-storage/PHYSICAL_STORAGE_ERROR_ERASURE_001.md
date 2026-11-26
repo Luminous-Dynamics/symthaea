@@ -114,3 +114,16 @@ This v0.1 increment establishes only a deterministic algorithmic property of the
 The code is not Reed–Solomon/GRS. Hashes are not signatures. Any future physical writing/reading experiment requires qualified laboratory operators, specialist instruments and their hardware safety interlocks.
 
 Rust formatting, strict Clippy, Cargo tests and executable runner output must be recorded against the exact branch head. They are not claimed by independent algebra checks.
+
+
+## 9. Independent research oracle
+
+A separate standard-library Python oracle is provided at `mds-reference/oracle/verify_error_erasure.py`. It independently implements GF(256) arithmetic, matrix inversion, candidate enumeration and an end-to-end spatial-tile reconstruction check. It is a research validation tool, not production decoder code or a dependency of the Rust crate.
+
+Run it with:
+
+```bash
+python3 research/physical-storage/mds-reference/oracle/verify_error_erasure.py
+```
+
+The expected deterministic checks are 15 nonsingular generator minors, 48/48 single-symbol correction cases, 15/15 two-erasure pairs, eight corrected symbols for one eight-byte tile substitution, rejection of the selected one-error-plus-one-erasure case, and digest rejection of an over-budget two-error miscorrection. The independent interactive algebra oracle has reproduced these outcomes; the committed script itself remains to be run in the exact repository environment and its emitted JSON retained as a receipt. No Python or Rust test pass is claimed for the committed branch at this point.
