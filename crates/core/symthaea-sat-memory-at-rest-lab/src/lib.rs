@@ -113,6 +113,7 @@ struct StoreFile {
 struct IntegrityAnchor {
     generation: u64,
     head_mac: String,
+    store_digest: String,
 }
 
 #[derive(Debug, Clone, Default, Serialize, Deserialize, PartialEq, Eq)]
@@ -214,7 +215,7 @@ enum IntegrityFailure {
     MissingAnchor,
     AnchorGenerationMismatch,
     AnchorHeadMismatch,
-    StoreGenerationMismatch,
+    StoreDigestMismatch,
     SequenceMismatch,
     PreviousMacMismatch,
     RecordMacMismatch,
@@ -228,8 +229,8 @@ impl std::fmt::Display for IntegrityFailure {
             Self::MissingAnchor => write!(f, "rollback anchor is missing"),
             Self::AnchorGenerationMismatch => write!(f, "store generation differs from external anchor"),
             Self::AnchorHeadMismatch => write!(f, "store head differs from external anchor"),
-            Self::StoreGenerationMismatch => write!(f, "store generation does not match record count"),
-            Self::SequenceMismatch => write!(f, "record sequence is not monotonic and contiguous"),
+            Self::StoreDigestMismatch => write!(f, "complete store state differs from external anchor"),
+            Self::SequenceMismatch => write!(f, "record sequence is zero, duplicated, or beyond the witnessed generation"),
             Self::PreviousMacMismatch => write!(f, "record previous-MAC link is inconsistent"),
             Self::RecordMacMismatch => write!(f, "record authentication code is invalid"),
             Self::DuplicateRecordId => write!(f, "record identifier is duplicated"),
@@ -245,6 +246,18 @@ fn sha256_hex(data: &[u8]) -> String {
         write!(&mut hex, "{byte:02x}").expect("writing to String cannot fail");
     }
     format!("sha256:{hex}")
+}
+
+// The externally anchored digest commits to the complete serialized store,
+// including its generation and record order. It is intentionally distinct
+// from each record's HMAC: per-record authentication alone cannot detect a
+// complete deletion, reorder, or restoration of an internally consistent old
+// snapshot.
+fn store_digest(store: &StoreFile) -> Result<String, String> {
+    const STORE_DOMAIN: &str = "SAT-MEMORY-STORE-v0.1\\n";
+    let mut bytes = STORE_DOMAIN.as_bytes().to_vec();
+    bytes.extend_from_slice(&serde_json::to_vec(store).map_err(|error| error.to_string())?);
+    Ok(sha256_hex(&bytes))
 }
 
 // HMAC-SHA256 is implemented here only to avoid adding a crypto dependency to
@@ -341,6 +354,7 @@ impl Sut {
                 &IntegrityAnchor {
                     generation: 0,
                     head_mac: GENESIS.to_owned(),
+                    store_digest: store_digest(&store)?,
                 },
             )?;
         }
@@ -397,6 +411,7 @@ impl Sut {
                 &IntegrityAnchor {
                     generation: store.generation,
                     head_mac,
+                    store_digest: store_digest(&store)?,
                 },
             )?;
         }
@@ -448,9 +463,6 @@ impl Sut {
         if anchor.generation != store.generation {
             return Err(IntegrityFailure::AnchorGenerationMismatch.to_string());
         }
-        if store.generation as usize != store.records.len() {
-            return Err(IntegrityFailure::StoreGenerationMismatch.to_string());
-        }
         let head_mac = store
             .records
             .last()
@@ -459,24 +471,29 @@ impl Sut {
         if anchor.head_mac != head_mac {
             return Err(IntegrityFailure::AnchorHeadMismatch.to_string());
         }
+        if anchor.store_digest != store_digest(&store)? {
+            return Err(IntegrityFailure::StoreDigestMismatch.to_string());
+        }
 
-        let mut previous_mac = GENESIS.to_owned();
+        // Record sequence numbers are monotonic allocation IDs, not array
+        // offsets. An authorized erasure can therefore remove one record
+        // without rewriting the authenticated bytes of every later record.
         let mut record_ids = HashSet::new();
-        for (index, record) in store.records.iter().enumerate() {
+        let mut sequence_numbers = HashSet::new();
+        for record in &store.records {
             if !record_ids.insert(record.record_id.as_str()) {
                 return Err(IntegrityFailure::DuplicateRecordId.to_string());
             }
-            if record.sequence != (index as u64) + 1 {
+            if record.sequence == 0
+                || record.sequence > store.generation
+                || !sequence_numbers.insert(record.sequence)
+            {
                 return Err(IntegrityFailure::SequenceMismatch.to_string());
-            }
-            if record.previous_mac != previous_mac {
-                return Err(IntegrityFailure::PreviousMacMismatch.to_string());
             }
             let expected_mac = record_mac(record)?;
             if record.record_mac != expected_mac {
                 return Err(IntegrityFailure::RecordMacMismatch.to_string());
             }
-            previous_mac = record.record_mac.clone();
         }
 
         let ledger: ErasureLedger = read_json(&self.paths.erasure)
@@ -496,18 +513,40 @@ impl Sut {
             return Ok(false);
         }
 
-        if self.mode == ProfileMode::Vulnerable {
-            store.records.retain(|record| record.record_id != record_id);
-            write_json_atomic(&self.paths.store, &store)?;
-        } else {
-            // This synthetic design models an erasure tombstone held outside
-            // the store-only rollback domain. A restored backup cannot delete it.
+        // The SUT's erasure interface must actually remove the record from the
+        // persisted store. A tombstone by itself is not deletion and must not
+        // satisfy C3. Protected profiles persist the tombstone outside the
+        // store-only rollback domain before publishing the new anchored state.
+        if self.mode != ProfileMode::Vulnerable {
             let mut ledger: ErasureLedger = read_json(&self.paths.erasure)?;
             if !ledger.erased_record_ids.iter().any(|id| id == record_id) {
                 ledger.erased_record_ids.push(record_id.to_owned());
                 ledger.erased_record_ids.sort();
             }
             write_json_atomic(&self.paths.erasure, &ledger)?;
+        }
+
+        store.records.retain(|record| record.record_id != record_id);
+        store.generation = store
+            .generation
+            .checked_add(1)
+            .ok_or_else(|| "store generation overflow during erasure".to_owned())?;
+        write_json_atomic(&self.paths.store, &store)?;
+
+        if self.mode != ProfileMode::Vulnerable {
+            let head_mac = store
+                .records
+                .last()
+                .map(|record| record.record_mac.clone())
+                .unwrap_or_else(|| GENESIS.to_owned());
+            write_json_atomic(
+                &self.paths.anchor,
+                &IntegrityAnchor {
+                    generation: store.generation,
+                    head_mac,
+                    store_digest: store_digest(&store)?,
+                },
+            )?;
         }
         Ok(true)
     }
@@ -661,7 +700,14 @@ fn apply_case_mutation(paths: &LabPaths, mode: ProfileMode, case: TestCase, befo
             let sut = Sut::open(paths.clone(), mode);
             sut.write_record("A", "A-POST-ROLLBACK", "user-A", "GENUINE-POST-SNAPSHOT-WRITE")?;
             let written = load_store_file(paths)?;
-            if written.generation != original.generation + 1 || written.records.len() != original.records.len() + 1 {
+            let exact_append = written.generation == original.generation + 1
+                && written.records.len() == original.records.len() + 1
+                && written.records[..original.records.len()] == original.records[..]
+                && written.records.last().is_some_and(|record| {
+                    record.record_id == "A-POST-ROLLBACK"
+                        && record.fact == "GENUINE-POST-SNAPSHOT-WRITE"
+                });
+            if !exact_append {
                 return Ok(false);
             }
             restore_store_bytes(paths, before)?;
@@ -673,32 +719,27 @@ fn apply_case_mutation(paths: &LabPaths, mode: ProfileMode, case: TestCase, befo
             if !erased {
                 return Ok(false);
             }
-            let deletion_landed = match mode {
-                ProfileMode::Vulnerable => {
-                    let physically_removed = !load_store_file(paths)?.records.iter().any(|record| record.record_id == "A-4");
-                    let read_path_reflects_erasure = !Sut::open(paths.clone(), mode)
-                        .read_context("A")?
-                        .iter()
-                        .any(|record| record.record_id == "A-4");
-                    physically_removed && read_path_reflects_erasure
-                }
-                ProfileMode::ProtectedRead => {
-                    let ledger: ErasureLedger = read_json(&paths.erasure)?;
-                    let tombstone_present = ledger.erased_record_ids.iter().any(|id| id == "A-4");
-                    let read_path_blocks_resurrection =
-                        Sut::open(paths.clone(), mode).read_context("A").is_err();
-                    tombstone_present && read_path_blocks_resurrection
-                }
-                ProfileMode::ProtectedAudit => {
-                    let ledger: ErasureLedger = read_json(&paths.erasure)?;
-                    let tombstone_present = ledger.erased_record_ids.iter().any(|id| id == "A-4");
-                    let audit_detects_resurrection = Sut::open(paths.clone(), mode).audit().is_err();
-                    tombstone_present && audit_detects_resurrection
-                }
-            };
+
+            // C3 must prove a real SUT-interface deletion before the stale
+            // backup is restored: exactly A-4 disappears, and every other
+            // record remains byte-for-byte identical.
+            let after_erasure = load_store_file(paths)?;
+            let expected_remaining: Vec<Record> = original
+                .records
+                .iter()
+                .filter(|record| record.record_id != "A-4")
+                .cloned()
+                .collect();
+            let deletion_landed = after_erasure.generation == original.generation + 1
+                && after_erasure.records == expected_remaining
+                && !after_erasure.records.iter().any(|record| record.record_id == "A-4");
             if !deletion_landed {
                 return Ok(false);
             }
+
+            // T10 then restores the complete pre-erasure store image. The
+            // protected read/audit path must detect this resurrection using
+            // state anchored outside the restored store bundle.
             restore_store_bytes(paths, before)?;
             Ok(store_bytes(paths)? == before)
         }
@@ -1064,5 +1105,60 @@ mod tests {
         let report = campaign(ProfileMode::ProtectedRead);
         assert_eq!(report.native_score.category_scores.get("T9"), Some(&Some(1.0)));
         assert_eq!(report.native_score.category_scores.get("T10"), Some(&Some(1.0)));
+    }
+
+    #[test]
+    fn t10_erasure_physically_removes_only_the_named_record_before_restore() {
+        let root = fresh_temp_dir("t10-c3").unwrap();
+        let paths = LabPaths::new(&root);
+        Sut::initialize(&paths, ProfileMode::ProtectedRead).unwrap();
+        let sut = Sut::open(paths.clone(), ProfileMode::ProtectedRead);
+        sut.seed().unwrap();
+        let before = load_store_file(&paths).unwrap();
+
+        assert!(sut.erase_record("A-4").unwrap());
+        let after = load_store_file(&paths).unwrap();
+        let expected: Vec<Record> = before
+            .records
+            .iter()
+            .filter(|record| record.record_id != "A-4")
+            .cloned()
+            .collect();
+        assert_eq!(after.records, expected);
+        assert_eq!(after.generation, before.generation + 1);
+        assert!(after.records.iter().all(|record| record.record_id != "A-4"));
+        assert!(Sut::open(paths.clone(), ProfileMode::ProtectedRead)
+            .read_context("A")
+            .unwrap()
+            .iter()
+            .all(|record| record.record_id != "A-4"));
+
+        let _ = fs::remove_dir_all(root);
+    }
+
+    #[test]
+    fn t10_restoring_pre_erasure_store_is_detected_after_a_real_delete() {
+        for mode in [ProfileMode::ProtectedRead, ProfileMode::ProtectedAudit] {
+            let root = fresh_temp_dir("t10-restore").unwrap();
+            let paths = LabPaths::new(&root);
+            Sut::initialize(&paths, mode).unwrap();
+            Sut::open(paths.clone(), mode).seed().unwrap();
+            let before = store_bytes(&paths).unwrap();
+
+            assert!(Sut::open(paths.clone(), mode).erase_record("A-4").unwrap());
+            let after_erasure = load_store_file(&paths).unwrap();
+            assert!(!after_erasure.records.iter().any(|record| record.record_id == "A-4"));
+            restore_store_bytes(&paths, &before).unwrap();
+            assert_eq!(store_bytes(&paths).unwrap(), before);
+
+            let restarted = Sut::open(paths.clone(), mode);
+            if mode == ProfileMode::ProtectedRead {
+                assert!(restarted.read_context("A").is_err());
+            } else {
+                assert!(restarted.read_context("A").is_ok());
+                assert!(restarted.audit().is_err());
+            }
+            let _ = fs::remove_dir_all(root);
+        }
     }
 }
