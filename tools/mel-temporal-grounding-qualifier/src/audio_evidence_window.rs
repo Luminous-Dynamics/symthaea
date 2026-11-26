@@ -97,6 +97,9 @@ pub struct EvidenceContextV1 {
 pub struct AudioEvidenceWindowManifestV1 {
     pub schema: String,
     pub experiment_unit_id: String,
+    /// Lineage of the target work being queried.
+    pub target_source_lineage_id: String,
+    /// Lineage of the recording from which evidence windows were materialized.
     pub source_lineage_id: String,
     pub query_id: String,
     pub query_text: String,
@@ -132,6 +135,7 @@ pub struct VerifiedWindowV1 {
 pub struct AudioEvidenceVerificationReportV1 {
     pub schema: &'static str,
     pub experiment_unit_id: String,
+    pub target_source_lineage_id: String,
     pub source_lineage_id: String,
     pub query_id: String,
     pub evidence_condition: EvidenceConditionV1,
@@ -163,6 +167,7 @@ pub struct AudioEvidenceVerificationReportV1 {
 struct EvidenceContextDigestPayloadV1<'a> {
     schema: &'static str,
     experiment_unit_id: &'a str,
+    target_source_lineage_id: &'a str,
     source_lineage_id: &'a str,
     query_id: &'a str,
     query_text_sha256: &'a str,
@@ -208,6 +213,7 @@ pub fn verify_audio_evidence_manifest(
         return Err(format!("unsupported audio evidence schema: {}", manifest.schema));
     }
     require_text(&manifest.experiment_unit_id, "experiment_unit_id")?;
+    require_text(&manifest.target_source_lineage_id, "target_source_lineage_id")?;
     require_text(&manifest.source_lineage_id, "source_lineage_id")?;
     require_text(&manifest.query_id, "query_id")?;
     require_text(&manifest.query_text, "query_text")?;
@@ -266,14 +272,16 @@ pub fn verify_audio_evidence_manifest(
 
     match manifest.evidence_condition {
         EvidenceConditionV1::LocalRetrieved
-            if manifest.source_audio.audio_sha256 != manifest.target_audio_sha256 =>
+            if manifest.source_audio.audio_sha256 != manifest.target_audio_sha256
+                || manifest.source_lineage_id != manifest.target_source_lineage_id =>
         {
-            return Err("local evidence must originate from the exact target audio digest".into());
+            return Err("local evidence must originate from the exact target audio and source lineage".into());
         }
         EvidenceConditionV1::YokedRetrieved
-            if manifest.source_audio.audio_sha256 == manifest.target_audio_sha256 =>
+            if manifest.source_audio.audio_sha256 == manifest.target_audio_sha256
+                || manifest.source_lineage_id == manifest.target_source_lineage_id =>
         {
-            return Err("yoked evidence must originate from a different audio digest".into());
+            return Err("yoked evidence must originate from a different audio digest and source lineage".into());
         }
         _ => {}
     }
@@ -371,6 +379,7 @@ pub fn verify_audio_evidence_manifest(
     Ok(AudioEvidenceVerificationReportV1 {
         schema: REPORT_SCHEMA_V1,
         experiment_unit_id: manifest.experiment_unit_id.clone(),
+        target_source_lineage_id: manifest.target_source_lineage_id.clone(),
         source_lineage_id: manifest.source_lineage_id.clone(),
         query_id: manifest.query_id.clone(),
         evidence_condition: manifest.evidence_condition,
@@ -445,6 +454,7 @@ fn context_digest(manifest: &AudioEvidenceWindowManifestV1) -> Result<String, St
     let payload = EvidenceContextDigestPayloadV1 {
         schema: "mel-audio-evidence-context-v1",
         experiment_unit_id: &manifest.experiment_unit_id,
+        target_source_lineage_id: &manifest.target_source_lineage_id,
         source_lineage_id: &manifest.source_lineage_id,
         query_id: &manifest.query_id,
         query_text_sha256: &manifest.query_text_sha256,
@@ -521,6 +531,7 @@ mod tests {
         let mut manifest = AudioEvidenceWindowManifestV1 {
             schema: MANIFEST_SCHEMA_V1.into(),
             experiment_unit_id: "mel-grounding-evidence-window-fixture-001".into(),
+            target_source_lineage_id: "synthetic-source-lineage-001".into(),
             source_lineage_id: "synthetic-source-lineage-001".into(),
             query_id: "piano-entry-query-001".into(),
             query_text: "Identify every piano entrance in the supplied recording.".into(),
