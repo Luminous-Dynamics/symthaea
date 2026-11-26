@@ -638,10 +638,6 @@ fn categorical_entropy(values: impl Iterator<Item = usize>) -> Option<f64> {
     )
 }
 
-fn decision_transition(before: PanelDecisionStateV1, after: PanelDecisionStateV1) -> String {
-    format!("{before:?}->{after:?}")
-}
-
 fn delta(before: Option<f64>, after: Option<f64>) -> Option<f64> {
     before.zip(after).map(|(before, after)| after - before)
 }
