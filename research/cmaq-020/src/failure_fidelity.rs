@@ -384,6 +384,9 @@ impl BoundaryRatePair {
         if !contract.domain_ids.contains(&self.domain_id) {
             return Err("boundary pair domain is outside the frozen contract".to_owned());
         }
+        if !["position", "orientation", "size"].contains(&self.perturbation_dimension_id.as_str()) {
+            return Err("WorldFailBench perturbation dimension must be position, orientation or size".to_owned());
+        }
         if self.success_side_perturbation_units == self.failure_side_perturbation_units {
             return Err("success-side and failure-side perturbations must differ".to_owned());
         }
@@ -411,6 +414,16 @@ impl BoundaryRatePair {
             if digest.as_ref().is_some_and(|value| !is_sha256(value)) {
                 return Err(format!("{name} must be a 64-character hexadecimal digest when supplied"));
             }
+        }
+        if self.reference_success_side_trials != self.predicted_success_side_trials
+            || self.reference_failure_side_trials != self.predicted_failure_side_trials
+        {
+            return Err("candidate predictions must use the exact reference rollout IDs and per-side denominators".to_owned());
+        }
+        if self.success_side_action_trace_sha256.is_some()
+            != self.failure_side_action_trace_sha256.is_some()
+        {
+            return Err("action trace provenance must be present for both sides or neither".to_owned());
         }
         for (label, successes, trials) in [
             ("reference success side", self.reference_success_side_successes, self.reference_success_side_trials),
@@ -838,6 +851,33 @@ mod tests {
         let mut invalid_action_trace = rate_pair("invalid-trace", "cluster-8");
         invalid_action_trace.success_side_action_trace_sha256 = Some("not-a-digest".to_owned());
         assert!(score_boundary_rate_pairs(&[invalid_action_trace], &contract()).is_err());
+    }
+
+
+
+    #[test]
+    fn rate_boundary_requires_predictions_on_the_same_rollout_denominators() {
+        let mut pair = rate_pair("mismatched-denominator", "cluster-1");
+        pair.predicted_success_side_trials = 9;
+        assert!(score_boundary_rate_pairs(&[pair], &contract()).is_err());
+
+        let mut pair = rate_pair("matched-denominator", "cluster-2");
+        pair.predicted_failure_side_trials = 9;
+        assert!(score_boundary_rate_pairs(&[pair], &contract()).is_err());
+    }
+
+    #[test]
+    fn rate_boundary_rejects_unregistered_perturbation_factors() {
+        let mut pair = rate_pair("unknown-factor", "cluster-1");
+        pair.perturbation_dimension_id = "lighting".to_owned();
+        assert!(score_boundary_rate_pairs(&[pair], &contract()).is_err());
+    }
+
+    #[test]
+    fn rate_boundary_requires_complete_pairwise_action_trace_provenance() {
+        let mut pair = rate_pair("one-sided-trace", "cluster-1");
+        pair.success_side_action_trace_sha256 = Some("1".repeat(64));
+        assert!(score_boundary_rate_pairs(&[pair], &contract()).is_err());
     }
 
     #[test]
