@@ -101,12 +101,16 @@ impl DecisionNeedV1 {
             || !(500_000..=999_999).contains(&self.minimum_confidence_level_ppm)
             || self.regret_tolerance_micros < 0
             || self.regret_tolerance_micros > 1_000_000_000_000
+            || self.maximum_cost_micros == 0
             || self.maximum_cost_micros > 1_000_000_000_000
             || self.maximum_evidence_age_seconds == 0
+            || self.maximum_evidence_age_seconds > 315_360_000
             || self.maximum_context_tokens == 0
+            || self.maximum_context_tokens > 1_000_000_000_000
             || self.maximum_tool_calls == 0
-            || self.maximum_cost_micros == 0
+            || self.maximum_tool_calls > 1_000_000
             || self.maximum_latency_ms == 0
+            || self.maximum_latency_ms > 86_400_000
             || self.requirements.is_empty()
             || self.requirements.len() > 1024
         {
@@ -122,7 +126,9 @@ impl DecisionNeedV1 {
                 || requirement.requirement_id.len() > 256
                 || !valid_sha256(&requirement.evidence_class_sha256)
                 || requirement.minimum_independent_root_families == 0
+                || requirement.minimum_independent_root_families > 10_000
                 || requirement.maximum_evidence_age_seconds == 0
+                || requirement.maximum_evidence_age_seconds > 315_360_000
                 || requirement.maximum_evidence_age_seconds > self.maximum_evidence_age_seconds
             {
                 return Err(DecisionSufficiencyRejectV1::InvalidDecisionNeed);
@@ -893,6 +899,10 @@ impl DecisionSufficiencyReceiptV1 {
         if self.regret_upper_bound_micros.is_some_and(|v| v > 1_000_000_000_000)
             || self.regret_limit_micros.is_some_and(|v| v > 1_000_000_000_000)
             || self.observed_cost_micros.is_some_and(|v| v > 1_000_000_000_000)
+            || self.observed_latency_ms.is_some_and(|v| v > 86_400_000)
+            || self.observed_context_tokens.is_some_and(|v| v > 1_000_000_000_000)
+            || self.observed_tool_calls.is_some_and(|v| v > 1_000_000)
+            || self.maximum_evidence_age_seconds.is_some_and(|v| v > 315_360_000)
         {
             return Err(DecisionSufficiencyRejectV1::InvalidReceipt);
         }
