@@ -15,8 +15,8 @@ use crate::audio_evidence_window::{
 use crate::evidence_digest::sha256_hex;
 use crate::temporal_revision::{
     audit_revision_v2, compare_matched_evidence_arms,
-    EvidenceConditionV1 as RevisionEvidenceConditionV1, MatchedEvidenceContrastV1,
-    RevisionCaseV2, RevisionReportV1,
+    EvidenceBindingStatusV1, EvidenceConditionV1 as RevisionEvidenceConditionV1,
+    MatchedEvidenceContrastV1, RevisionCaseV2, RevisionReportV1,
 };
 
 const REPORT_SCHEMA_V1: &str = "mel-audio-bound-revision-report-v1";
@@ -118,10 +118,12 @@ pub fn audit_verified_audio_evidence_triplet(
     if contrast_reports.len() != 1 {
         return Err("verified evidence triplet must produce exactly one matched contrast".into());
     }
-    let contrast = contrast_reports
+    let mut contrast = contrast_reports
         .into_iter()
         .next()
         .ok_or_else(|| "verified evidence contrast unexpectedly missing".to_string())?;
+    contrast.evidence_binding_status = EvidenceBindingStatusV1::MaterializedAndContextBound;
+    contrast.model_input_attested = false;
 
     Ok(VerifiedAudioEvidenceTripletReportV1 {
         contrast,
@@ -416,6 +418,11 @@ mod tests {
         assert!(result.local_evidence_bytes_verified);
         assert!(result.yoked_evidence_bytes_verified);
         assert!(!result.model_input_attested);
+        assert_eq!(
+            result.contrast.evidence_binding_status,
+            EvidenceBindingStatusV1::MaterializedAndContextBound
+        );
+        assert!(!result.contrast.model_input_attested);
         assert_eq!(result.contrast.local_minus_no_evidence_f1, Some(0.0));
         assert_eq!(result.contrast.local_minus_yoked_f1, Some(0.0));
         assert_eq!(result.contrast.local_beats_yoked, Some(false));
