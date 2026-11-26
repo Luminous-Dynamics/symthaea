@@ -5,14 +5,14 @@
 //! symmetric production-scorer F1 at frozen IoU thresholds. This module does
 //! not calculate unitizing alpha, build a consensus reference, or score a model.
 
-use std::collections::{BTreeMap, BTreeSet};
+use std::collections::BTreeSet;
 
 use serde::{Deserialize, Serialize};
 
 use crate::temporal_consensus::IndependentTemporalAnnotationV1;
 use crate::temporal_grounding::{
     score_temporal_grounding, validate_temporal_ground_truth, AudioArtifactClockV1,
-    FrameIntervalV1, GroundingPredictionStateV1, GroundTruthStateV1,
+    GroundingPredictionStateV1, GroundTruthStateV1,
     TemporalGroundTruthV1, TemporalGroundingPlanV1, TemporalGroundingPredictionV1,
     TEMPORAL_GROUNDING_EVALUATOR_V1, TEMPORAL_GROUNDING_SCHEMA_V1,
 };
@@ -447,6 +447,7 @@ fn mean(values: &[f64]) -> Option<f64> {
 #[cfg(test)]
 mod tests {
     use super::*;
+    use crate::temporal_grounding::FrameIntervalV1;
 
     fn digest(ch: char) -> String {
         ch.to_string().repeat(64)
