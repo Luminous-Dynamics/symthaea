@@ -20,6 +20,8 @@ The consumer now parses the exact immutable request artifact independently of th
 - The generic numeric/boolean parameter map is reserialized deterministically and its SHA-256 profile is recomputed from the exact captured body. This recomputed digest must equal both the receipt and independent run-manifest pin.
 - Every exposed span's `message_index` resolves to an actual message, its claimed role matches the parsed role, and its half-open byte interval is contained inside that message's exact serialized `content` string. The consumer uses the borrowed raw JSON string slice, not a search for matching text.
 - Duplicate provider parameter members and unrecognized message fields are rejected, preventing parser-differential or untracked message-surface ambiguity.
+- A positive allowlisted numeric/boolean parameter-profile fixture verifies successful independent recomputation.
+- An escaped Unicode request fixture verifies source-span byte offsets against the borrowed raw JSON content.
 
 This is intentionally stricter than checking the request-body digest and trusting producer-supplied profile/span metadata. JSON Schema cannot prove these relationships.
 
@@ -58,7 +60,7 @@ These are deliberate interfaces to existing owners or separate deployment qualif
 
 ## Deterministic tests authored (not executed)
 
-Twenty-two Rust unit tests cover:
+Twenty-six Rust unit tests cover:
 1. valid signed receipt, body, span and evidence binding;
 2. wrong run binding;
 3. changed request-body rejection;
