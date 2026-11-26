@@ -46,6 +46,11 @@
 //! and `SYMTHAEA_COGNITIVE_ARCHITECTURE_AUDIT_ADDENDUM_2026-07-28.md` (§0.1)
 //! at the monorepo root for the audit trail behind this crate.
 
+pub mod adversarial_trajectory;
+pub mod discovery_benchmark;
+pub mod discovery_graph;
+pub mod information_gain;
+pub mod prospective;
 pub mod seed_plan;
 pub mod task_validator;
 
