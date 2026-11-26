@@ -868,6 +868,176 @@ mod tests {
         assert_eq!(context, before);
     }
 
+    fn runtime_policy(kind: GrapeAdapterKindV1) -> GrapeRuntimePolicyV1 {
+        GrapeRuntimePolicyV1 {
+            adapter_policy: policy(kind),
+            adapter_feature_count: 2,
+            context_ema_alpha: 0.05,
+            context_minimum_support: 10,
+            temporal_ema_alpha: 0.5,
+            temporal_activation_percentile: 96.0,
+        }
+    }
+
+    fn runtime_training_data() -> (Vec<Vec<f64>>, Vec<f64>, Vec<f64>) {
+        (
+            vec![
+                vec![1.0, 1.0, 4.0],
+                vec![2.0, -1.0, 3.0],
+                vec![3.0, 1.0, 2.0],
+                vec![4.0, -1.0, 1.0],
+            ],
+            vec![1.0, 2.0, 3.0, 4.0],
+            vec![0.0, 0.0, 0.0, 0.0],
+        )
+    }
+
+    #[test]
+    fn residual_correlation_selection_matches_known_feature_order() {
+        let (features, targets, predictions) = runtime_training_data();
+        let residuals: Vec<f64> = targets.iter().zip(&predictions)
+            .map(|(target, prediction)| target - prediction)
+            .collect();
+        assert_eq!(
+            select_grape_adapter_features_v1(&features, &residuals, 2).unwrap(),
+            vec![0, 2]
+        );
+    }
+
+    #[test]
+    fn runtime_initialization_matches_training_bounds_and_temporal_percentile() {
+        let (features, targets, predictions) = runtime_training_data();
+        let runtime = GrapeAdapterRuntimeV1::initialize(
+            runtime_policy(GrapeAdapterKindV1::Nlms),
+            &features,
+            &targets,
+            &predictions,
+        )
+        .unwrap();
+        assert_eq!(runtime.selected_feature_indices, vec![0, 2]);
+        assert!((runtime.base_label_min - 0.03).abs() < 1.0e-12);
+        assert!((runtime.base_label_max - 4.97).abs() < 1.0e-12);
+        assert!((runtime.state.temporal.activation_threshold - 3.88).abs() < 1.0e-12);
+        assert!((runtime.label_min - (1.03 - 23.28)).abs() < 1.0e-12);
+        assert!((runtime.label_max - (3.97 + 23.28)).abs() < 1.0e-12);
+    }
+
+    #[test]
+    fn small_target_variance_applies_upstream_nlms_and_context_minimum_adjustments() {
+        let features = vec![
+            vec![0.0, 1.0],
+            vec![1.0, 0.0],
+            vec![0.5, 0.5],
+            vec![0.25, 0.75],
+        ];
+        let targets = vec![1.0, 1.1, 0.9, 1.05];
+        let predictions = vec![1.0, 1.0, 1.0, 1.0];
+        let runtime = GrapeAdapterRuntimeV1::initialize(
+            runtime_policy(GrapeAdapterKindV1::Nlms),
+            &features,
+            &targets,
+            &predictions,
+        )
+        .unwrap();
+        assert_eq!(runtime.policy.context_minimum_support, 25);
+        assert_eq!(runtime.state.context.minimum_support, 25);
+        assert_eq!(runtime.policy.adapter_policy.nlms_learning_rate, 0.02);
+    }
+
+    #[test]
+    fn runtime_prediction_matches_base_clipping_and_temporal_decomposition() {
+        let (features, targets, predictions) = runtime_training_data();
+        let mut runtime = GrapeAdapterRuntimeV1::initialize(
+            runtime_policy(GrapeAdapterKindV1::Nlms),
+            &features,
+            &targets,
+            &predictions,
+        )
+        .unwrap();
+        let prediction = runtime.predict(100.0, &[0.0, 0.0, 0.0], Some("eqpA_ch1")).unwrap();
+        assert!((prediction.unclipped_base_prediction - 100.0).abs() < 1.0e-12);
+        assert!((prediction.clipped_base_prediction - 4.97).abs() < 1.0e-12);
+        assert_eq!(prediction.temporal_correction, 0.0);
+        assert!((prediction.final_prediction - 4.97).abs() < 1.0e-12);
+        assert_eq!(runtime.state.accepted_update_count, 0);
+    }
+
+    #[test]
+    fn runtime_update_uses_grape_base_error_then_updates_context_residual() {
+        let (features, targets, predictions) = runtime_training_data();
+        let mut runtime = GrapeAdapterRuntimeV1::initialize(
+            runtime_policy(GrapeAdapterKindV1::Nlms),
+            &features,
+            &targets,
+            &predictions,
+        )
+        .unwrap();
+        let prediction = runtime.predict(2.0, &[1.0, 0.0, 0.0], Some("eqpA_ch1")).unwrap();
+        let update = runtime.update_from_prediction(&prediction, 3.0).unwrap();
+        assert_eq!(update.feature_error, 1.0);
+        assert_eq!(update.temporal_error, 1.0);
+        assert!(update.context_residual.is_some());
+        assert_eq!(update.accepted_update_count, 1);
+        assert!(update.state_mutated);
+        assert!((runtime.state.adapter.weights[0] - (0.01 / 1.001)).abs() < 1.0e-12);
+        assert_eq!(runtime.state.context.global_count, 1);
+        assert!((runtime.state.temporal.residual_ema - 0.5).abs() < 1.0e-12);
+    }
+
+    #[test]
+    fn no_context_key_does_not_update_hierarchical_context_but_updates_adapters() {
+        let (features, targets, predictions) = runtime_training_data();
+        let mut runtime = GrapeAdapterRuntimeV1::initialize(
+            runtime_policy(GrapeAdapterKindV1::Nlms),
+            &features,
+            &targets,
+            &predictions,
+        )
+        .unwrap();
+        let prediction = runtime.predict(2.0, &[1.0, 0.0, 0.0], None).unwrap();
+        let receipt = runtime.update_from_prediction(&prediction, 3.0).unwrap();
+        assert_eq!(receipt.context_residual, None);
+        assert_eq!(runtime.state.context.global_count, 0);
+        assert_eq!(runtime.state.accepted_update_count, 1);
+    }
+
+    #[test]
+    fn runtime_update_is_atomic_when_context_counter_overflows() {
+        let (features, targets, predictions) = runtime_training_data();
+        let mut runtime = GrapeAdapterRuntimeV1::initialize(
+            runtime_policy(GrapeAdapterKindV1::Nlms),
+            &features,
+            &targets,
+            &predictions,
+        )
+        .unwrap();
+        let prediction = runtime.predict(2.0, &[1.0, 0.0, 0.0], Some("eqpA_ch1")).unwrap();
+        runtime.state.context.global_count = u64::MAX;
+        let before = runtime.state.clone();
+        assert!(runtime.update_from_prediction(&prediction, 3.0).is_err());
+        assert_eq!(runtime.state, before);
+    }
+
+    #[test]
+    fn runtime_replay_is_deterministic_for_same_training_and_updates() {
+        fn run() -> String {
+            let (features, targets, predictions) = runtime_training_data();
+            let mut runtime = GrapeAdapterRuntimeV1::initialize(
+                runtime_policy(GrapeAdapterKindV1::Rls),
+                &features,
+                &targets,
+                &predictions,
+            )
+            .unwrap();
+            for target in [2.5, 1.5, 3.5] {
+                let prediction = runtime.predict(2.0, &[1.0, 0.0, 0.0], Some("eqpA_ch1")).unwrap();
+                runtime.update_from_prediction(&prediction, target).unwrap();
+            }
+            json_sha256(&runtime.state).unwrap()
+        }
+        assert_eq!(run(), run());
+    }
+
     #[test]
     fn temporal_threshold_uses_linear_percentile_and_ema_activation() {
         let mut temporal = GrapeTemporalResidualStateV1::new(0.5, 0.1).unwrap();
