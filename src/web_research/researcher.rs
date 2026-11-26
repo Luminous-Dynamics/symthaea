@@ -117,7 +117,7 @@ impl WebResearcher {
                 let mut receipt = make_receipt(
                     query_rank,
                     None,
-                    AcquisitionStage::SearchProvider,
+                    AcquisitionStage::SearchQuery,
                     &search_query,
                     AcquisitionOutcome::BudgetExceeded,
                 );
@@ -181,7 +181,7 @@ impl WebResearcher {
                             let mut receipt = make_receipt(
                                 query_rank,
                                 None,
-                                AcquisitionStage::SearchProvider,
+                                AcquisitionStage::SearchQuery,
                                 &search_query,
                                 AcquisitionOutcome::Timeout,
                             );
@@ -359,11 +359,7 @@ impl WebResearcher {
         }
 
         if all_sources.is_empty() {
-            let status = if acquisition_incomplete {
-                ResearchStatus::RetrievalIncomplete
-            } else {
-                ResearchStatus::NoResults
-            };
+            let status = status_without_usable_sources(&acquisition_receipts);
             return Ok(WebResearchReport {
                 result: WebResearchResult::with_status(status),
                 acquisition_receipts,
@@ -1533,6 +1529,25 @@ fn sha256_hex(bytes: &[u8]) -> String {
     format!("{:x}", Sha256::digest(bytes))
 }
 
+fn status_without_usable_sources(receipts: &[AcquisitionReceipt]) -> ResearchStatus {
+    let incomplete: Vec<AcquisitionOutcome> = receipts
+        .iter()
+        .map(|receipt| receipt.outcome)
+        .filter(AcquisitionOutcome::is_incomplete)
+        .collect();
+
+    if incomplete.is_empty() {
+        ResearchStatus::NoResults
+    } else if incomplete
+        .iter()
+        .all(|outcome| *outcome == AcquisitionOutcome::RateLimited)
+    {
+        ResearchStatus::RateLimited
+    } else {
+        ResearchStatus::RetrievalIncomplete
+    }
+}
+
 fn make_receipt(
     query_rank: usize,
     source_rank: Option<usize>,
@@ -1541,6 +1556,7 @@ fn make_receipt(
     outcome: AcquisitionOutcome,
 ) -> AcquisitionReceipt {
     let stage_id = match stage {
+        AcquisitionStage::SearchQuery => "search-query",
         AcquisitionStage::SearchProvider => "search-provider",
         AcquisitionStage::ArxivApi => "arxiv",
         AcquisitionStage::OpenReviewApi => "openreview",
