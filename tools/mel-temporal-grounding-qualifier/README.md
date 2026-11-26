@@ -53,3 +53,14 @@ Run the synthetic corpus with:
     cargo +1.96.0 run --locked --manifest-path tools/mel-temporal-grounding-qualifier/Cargo.toml --bin mel-temporal-reliability-audit -- tools/mel-temporal-grounding-qualifier/fixtures/mel-temporal-reliability-corpus.synthetic.json
 
 See docs/research/MEL-GROUND-007-CORPUS-ANNOTATION-RELIABILITY-V1.md for the mathematical definition and claim limits.
+
+
+## MusicListenBench paired CLEAN / FLIP / STAY adapter
+
+The music_listen_bench module imports no audio model. It validates a complete triad, recomputes the question SHA-256 over exact UTF-8 bytes, decodes variant-specific A/B choices into Same/Different musical relations, validates the expected CLEAN/STAY equality and FLIP opposition, and reports CLEAN accuracy, FLIP miss rate, STAY false-flip rate, CLEAN-correct-conditioned error rates, Acc_FS, joint exact rate, task slices and factor slices.
+
+The strict case schema is at schemas/mel-music-listen-bench-case-v1.schema.json. Run the synthetic four-task case with:
+
+    cargo +1.96.0 run --locked --manifest-path tools/mel-temporal-grounding-qualifier/Cargo.toml --bin mel-music-listen-bench-audit -- tools/mel-temporal-grounding-qualifier/fixtures/mel-music-listen-bench.synthetic.json
+
+The synthetic case deliberately includes one wrong CLEAN answer and one unparseable FLIP answer, uses a reversed A/B semantic mapping in one variant, and contains two source lineages. Its metrics are adapter-plumbing checks only. Audio bytes are not fetched or rehashed, model inference is not invoked, and transformation authenticity is not established.
