@@ -93,7 +93,17 @@ A_r=W_r^TAV_r,\qquad B_r=W_r^TB,\qquad C_r=CV_r.
 
 Here \(V_r^{(s)}\) and \(U_r^{(s)}\) are the retained right and left singular vectors of the factor-space matrix \(H\). The singular values rank directions by combined empirical reachability and observability, not by instantaneous energy alone.
 
-The first Rust implementation lives in `crates/domains/symthaea-plasma-probes/src/rbkr.rs`. It computes the factor-space SVD using a deterministic one-sided Jacobi method, checks resource budgets, constructs biorthogonal bases, maps states, reconstructs states, and projects a caller-supplied discrete A/B/C system.
+For the first time-varying checkpoint formulation, the past and future Gramians must share one checkpoint coordinate system. With transitions defined by \(x_{k+1}=A_kx_k+B_ku_k\), the reachability factor for a past input channel is
+\[
+X_{k,j}=\Phi(t_c,t_{k+1})B_{k,:,j}/\sqrt{R_{k,j}},
+\]
+and the future observability factor for QoI channel \(j\) at sample \(t_\ell\) is
+\[
+Y_{\ell,j}=\Phi(t_\ell,t_c)^TC_{\ell,j,:}^T\sqrt{Q_{\ell,j}}.
+\]
+The new `build_finite_horizon_gramians` primitive computes these factors without materializing dense state-by-state Gramians. It accepts varying input and QoI channel counts, validates matrix dimensions and finite weights, and has explicit factor-storage and propagation-work budgets. Its A/B/C sequences must be the exact discrete tangent/adjoint operators for the frozen solver (or explicitly labelled finite-difference estimates); it does not derive them. The orientation is deliberate: past intervention increments are propagated *forward* to the checkpoint, while future QoI sensitivities are pulled *backward* to it.
+
+The first Rust implementation lives in `crates/domains/symthaea-plasma-probes/src/rbkr.rs`. It computes the factor-space SVD using a deterministic one-sided Jacobi method, checks resource budgets, constructs biorthogonal bases, maps states, reconstructs states, projects a caller-supplied discrete A/B/C system, and builds finite-horizon checkpoint-centred Gramian factors.
 
 ### Status of the third object: representation / reconstruction contract
 
