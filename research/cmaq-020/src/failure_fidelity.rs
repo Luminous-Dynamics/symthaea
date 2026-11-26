@@ -512,10 +512,10 @@ pub fn score_boundary_rate_pairs(
         let detection_correct = reference_detected == predicted_detected;
         let direction_match = (reference_gap > 0.0) == (predicted_gap > 0.0);
 
-        score.detected_reference_boundaries += usize::from(reference_detected);
-        score.detected_predicted_boundaries += usize::from(predicted_detected);
-        score.correct_boundary_detection_pairs += usize::from(detection_correct);
-        direction_matches += usize::from(direction_match);
+        score.detected_reference_boundaries += reference_detected as usize;
+        score.detected_predicted_boundaries += predicted_detected as usize;
+        score.correct_boundary_detection_pairs += detection_correct as usize;
+        direction_matches += direction_match as usize;
         success_error_sum += (predicted_success_rate - reference_success_rate).abs();
         failure_error_sum += (predicted_failure_rate - reference_failure_rate).abs();
         gap_error_sum += (predicted_gap - reference_gap).abs();
@@ -527,10 +527,10 @@ pub fn score_boundary_rate_pairs(
             .entry(pair.environment_cluster_id.clone())
             .or_default();
         cluster.pairs += 1;
-        cluster.detected_reference_boundaries += usize::from(reference_detected);
-        cluster.detected_predicted_boundaries += usize::from(predicted_detected);
-        cluster.correctly_detected_boundaries += usize::from(detection_correct);
-        cluster.direction_matches += usize::from(direction_match);
+        cluster.detected_reference_boundaries += reference_detected as usize;
+        cluster.detected_predicted_boundaries += predicted_detected as usize;
+        cluster.correctly_detected_boundaries += detection_correct as usize;
+        cluster.direction_matches += direction_match as usize;
     }
 
     let denominator = pairs.len() as f64;
