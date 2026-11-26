@@ -90,3 +90,12 @@ Run:
 The decoded PCM fixture is stored as hexadecimal text and decoded to raw bytes by the CLI before hashing. The source-audio fixture is read byte-for-byte.
 
 This is a byte/coordinate verification layer only. The report explicitly keeps rights-scope authentication, decoder identity authentication, model/runtime identity authentication, runner-receipt verification, request-body recomputation and model-input attestation false. The digests are content commitments, not signatures. The receipt/authentication bridge remains owned by #13254; capture closure remains #13348/#13349.
+
+
+## Binding verified audio to revision trials
+
+The `audio_revision_binding` module provides `audit_revision_with_audio_evidence`. It invokes the raw-byte audio verifier and the production V2 temporal-revision scorer in one path, then joins experiment unit, source-work lineage, query text, target artifact, evidence condition, model/runtime/decoding configuration, prompt, adapter, retrieval policy and the exact selected window coordinates/payload digest.
+
+Local evidence must use the scored target's exact audio clock. Yoked evidence must remain a distinct source recording while retaining the same target query. A no-evidence revision case cannot be promoted by attaching an audio-window manifest. The resulting report says that materialized audio bytes are bound to the revision case but always keeps `model_input_attested=false`.
+
+This integration prevents a byte-valid manifest from being reused with a different query or revision arm. It remains a client-side evidence binding; provider/runtime input acceptance and internal model consumption require authenticated execution evidence from #13254.
