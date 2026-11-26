@@ -101,9 +101,6 @@ impl DecisionValuePolicyV1 {
 /// the complete prior must sum to 1,000,000 exactly.
 #[derive(Clone, Debug, Eq, PartialEq)]
 pub struct CalibratedDecisionPriorV1 {
-    pub calibration_profile_sha256: String,
-    pub calibration_receipt_sha256: String,
-    pub valid_until_unix: u64,
     pub probability_ppm_by_state: Vec<u32>,
 }
 
@@ -143,6 +140,11 @@ pub struct DecisionRetrievalOptionV1 {
     /// Strictly sorted observation/result classes. Include an explicit
     /// "unknown"/"unavailable" class whenever that result is possible.
     pub observation_ids: Vec<String>,
+    /// Exact query-specific calibration authority. Required by EVSI and
+    /// ignored by probability-free robust minimax evaluation.
+    pub calibration_profile_sha256: Option<String>,
+    pub calibration_receipt_sha256: Option<String>,
+    pub calibration_valid_until_unix: Option<u64>,
     /// P(observation | state, this query) in parts per million.
     /// One row per state, one column per observation; each row sums to scale.
     pub likelihood_ppm_by_state: Vec<Vec<u32>>,
@@ -166,6 +168,10 @@ impl DecisionRetrievalOptionV1 {
     ) -> Result<(), DecisionValueRejectV1> {
         if !valid_atom(&self.query_option_id, MAX_ID_BYTES)
             || !valid_sha256(&self.action_template_sha256)
+            || (require_calibrated_likelihoods
+                && (!self.calibration_profile_sha256.as_deref().is_some_and(valid_sha256)
+                    || !self.calibration_receipt_sha256.as_deref().is_some_and(valid_sha256)
+                    || self.calibration_valid_until_unix.is_none()))
         {
             return Err(DecisionValueRejectV1::InvalidIdentifier);
         }
@@ -285,9 +291,7 @@ pub fn evaluate_expected_value_v1(
 ) -> Result<ExpectedValueAssessmentV1, DecisionValueRejectV1> {
     policy.validate()?;
     option.validate(policy, true)?;
-    if !valid_sha256(&prior.calibration_profile_sha256)
-        || !valid_sha256(&prior.calibration_receipt_sha256)
-        || prior.valid_until_unix <= now_unix
+    if option.calibration_valid_until_unix.is_none_or(|expires| expires <= now_unix)
         || prior.probability_ppm_by_state.len() != policy.state_ids.len()
     {
         return Err(DecisionValueRejectV1::InvalidCalibration);
@@ -303,8 +307,10 @@ pub fn evaluate_expected_value_v1(
     let probability_model_sha256 = probability_model_sha256(policy, prior, option);
     calibration_verifier.verify(
         &policy.decision_need_sha256,
-        &prior.calibration_profile_sha256,
-        &prior.calibration_receipt_sha256,
+        option.calibration_profile_sha256.as_deref()
+            .ok_or(DecisionValueRejectV1::InvalidCalibration)?,
+        option.calibration_receipt_sha256.as_deref()
+            .ok_or(DecisionValueRejectV1::InvalidCalibration)?,
         &probability_model_sha256,
         now_unix,
     ).map_err(|_| DecisionValueRejectV1::CalibrationReceiptRejected)?;
@@ -533,8 +539,8 @@ fn probability_model_sha256(
     h.update(b"luminous:mace:retrieval-probability-model:v1\\0");
     hash_field(&mut h, &policy.decision_need_sha256);
     hash_field(&mut h, &policy.utility_profile_sha256);
-    hash_field(&mut h, &prior.calibration_profile_sha256);
-    h.update(prior.valid_until_unix.to_be_bytes());
+    hash_field(&mut h, option.calibration_profile_sha256.as_deref().unwrap_or(""));
+    h.update(option.calibration_valid_until_unix.unwrap_or(0).to_be_bytes());
     h.update((policy.state_ids.len() as u64).to_be_bytes());
     for state in &policy.state_ids { hash_field(&mut h, state); }
     h.update((policy.action_ids.len() as u64).to_be_bytes());
@@ -671,6 +677,9 @@ mod tests {
             query_option_id: "verify-source".into(),
             action_template_sha256: "c".repeat(64),
             observation_ids: vec!["risky".into(), "safe".into()],
+            calibration_profile_sha256: Some("d".repeat(64)),
+            calibration_receipt_sha256: Some("e".repeat(64)),
+            calibration_valid_until_unix: Some(100),
             likelihood_ppm_by_state: vec![
                 vec![1_000_000, 0],
                 vec![0, 1_000_000],
@@ -689,9 +698,6 @@ mod tests {
 
     fn prior() -> CalibratedDecisionPriorV1 {
         CalibratedDecisionPriorV1 {
-            calibration_profile_sha256: "d".repeat(64),
-            calibration_receipt_sha256: "e".repeat(64),
-            valid_until_unix: 100,
             probability_ppm_by_state: vec![500_000, 500_000],
         }
     }
