@@ -149,7 +149,7 @@ The standalone zero-dependency Rust crate is under `mds-reference/`. It implemen
 
 The synthetic 4 × 4 × 3 physical layout has 48 tiles: 28 data, 14 parity, four redundant control tiles and two spares. Seven six-shard stripes are spatially interleaved so every physical layer contains two shards from each stripe. Any two known erasures in a stripe can therefore be reconstructed; any one full layer loss removes exactly two shards per stripe.
 
-The reference includes checks for all 15 pairs of erased shards in one stripe; each of the three whole-layer dropouts; a localized 2 × 2 cluster; more than two erasures in one stripe (must fail closed); an unflagged byte substitution (must fail final SHA-256 integrity); arbitrary 224-byte payload round-trip against a per-payload out-of-band digest; and redundant header/calibration control loss. The layout-comparison test also exhaustively evaluates contiguous 2 × 2 × 1, 3 × 3 × 1, 2 × 2 × 2 and 3 × 3 × 2 boxes against a row-major placement.
+The reference includes checks for all 15 pairs of erased shards in one stripe; each of the three whole-layer dropouts; a localized 2 × 2 cluster; more than two erasures in one stripe (must fail closed); a bounded one-symbol error (must be corrected) and an over-budget two-error miscorrection (must fail final SHA-256 integrity); arbitrary 224-byte payload round-trip against a per-payload out-of-band digest; and redundant header/calibration control loss. The layout-comparison test also exhaustively evaluates contiguous 2 × 2 × 1, 3 × 3 × 1, 2 × 2 × 2 and 3 × 3 × 2 boxes against a row-major placement.
 
 An independent Python oracle verified the generator-matrix nonsingularity for all 15 four-row subsets, all three whole-layer recovery cases, the cluster case, the over-budget negative, the layout partition and the SHA-256 payload. The Rust reference now binds a per-payload expected digest representing an out-of-band manifest entry; that digest is not an authentication signature. These independent checks are **not Cargo tests**. No Rust compiler/Cargo is available in the current execution environment; rustfmt, strict Clippy, Cargo test and executable output remain pending.
 
@@ -190,3 +190,14 @@ The first tranche is an algorithmic benchmark over deterministic byte arrays and
 - LTO-10 native capacity and throughput: https://www.lto.org/lto-10/
 - Micron 6600 ION QLC SSD product information: https://www.micron.com/products/storage/ssd/data-center-ssd/6600-ion
 - Spin-current noise and skyrmion racetrack dynamics, *Physical Review B* 113, L180407 (2026): https://journals.aps.org/prb/abstract/10.1103/73z4-ymkp
+
+
+## 14. Bounded symbol-error correction follow-on
+
+The standalone reference now has a separate bounded hard-decision decoder in [PHYSICAL-STORAGE-ERROR-ERASURE-001 #13712](https://github.com/Luminous-Dynamics/symthaea/issues/13712), implemented by `mds_recover_errors_and_erasures`. The original `mds_recover` remains available as the erasure-only comparator.
+
+For each byte-offset lane, the [6,4,3] code guarantees decoding when `2e + s < 3`: one unknown erroneous byte symbol or up to two known erasures. The eight-byte tile consists of eight independent byte lanes; a full-tile substitution therefore represents one symbol error in each lane if there are no additional faults.
+
+The new receipt exposes `corrected_symbols`. The deterministic suite checks 48 single-error positions, all 15 two-erasure pairs, an eight-byte tile substitution, a selected one-error-plus-one-erasure out-of-radius case, and a two-error miscorrection caught by the external whole-payload SHA-256 digest.
+
+This closes an algorithmic gap in the synthetic decoder only. It is not a measured optical error model, does not add soft-decision information, and does not make the custom array code a standards Reed–Solomon implementation. Cargo/rustfmt/Clippy execution remains pending until the exact branch head is tested with a Rust toolchain.
