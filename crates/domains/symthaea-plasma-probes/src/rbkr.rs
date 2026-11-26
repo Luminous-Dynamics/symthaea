@@ -1230,6 +1230,55 @@ mod tests {
     }
 
     #[test]
+    fn response_scenario_aggregation_is_scale_safe_and_rejects_duplicate_digests() {
+        let reach_a = gramian(2, &[vec![1.0, 0.0]]);
+        let observe_a = gramian(2, &[vec![1.0, 0.0]]);
+        let reach_b = gramian(2, &[vec![0.0, 1.0]]);
+        let observe_b = gramian(2, &[vec![0.0, 1.0]]);
+        let scenarios = [
+            ResponseGramianScenario {
+                scenario_id: "large-weight-a",
+                trajectory_sha256: "eeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeee",
+                task_contract_id: "kresp1-contract-v1",
+                checkpoint_id: "checkpoint-a",
+                state_metric_id: "metric-v1",
+                reachability: &reach_a,
+                observability: &observe_a,
+                scenario_weight: 1.0e308,
+            },
+            ResponseGramianScenario {
+                scenario_id: "large-weight-b",
+                trajectory_sha256: "ffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffff",
+                task_contract_id: "kresp1-contract-v1",
+                checkpoint_id: "checkpoint-a",
+                state_metric_id: "metric-v1",
+                reachability: &reach_b,
+                observability: &observe_b,
+                scenario_weight: 1.0e308,
+            },
+        ];
+        let (reach, _) =
+            aggregate_response_gramians(&scenarios, ResponseGramianAggregationConfig::default())
+                .unwrap();
+        let e1 = checked_dot(&[1.0, 0.0], &reach.apply(&[1.0, 0.0]).unwrap()).unwrap();
+        let e2 = checked_dot(&[0.0, 1.0], &reach.apply(&[0.0, 1.0]).unwrap()).unwrap();
+        assert!((e1 - 0.5).abs() < 1.0e-12);
+        assert!((e2 - 0.5).abs() < 1.0e-12);
+
+        let duplicate_digest = ResponseGramianScenario {
+            trajectory_sha256: scenarios[0].trajectory_sha256,
+            ..scenarios[1]
+        };
+        assert_eq!(
+            aggregate_response_gramians(
+                &[scenarios[0], duplicate_digest],
+                ResponseGramianAggregationConfig::default(),
+            ),
+            Err(RbkrError::InvalidScenarioSet)
+        );
+    }
+
+    #[test]
     fn response_scenario_aggregation_rejects_missing_positive_weight_evidence() {
         let empty_reach = EmpiricalGramian::new(2).unwrap();
         let observe = gramian(2, &[vec![1.0, 0.0]]);
