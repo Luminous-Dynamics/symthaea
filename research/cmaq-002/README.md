@@ -166,3 +166,10 @@ Protocol: [WORLDTEST_ADAPTER_V0_1.md](WORLDTEST_ADAPTER_V0_1.md). Baseline lock:
 ### MARA reward and phase-exit custody
 
 The MARA reference runner forwards a reward field during exploration, but the pinned interactive environment returns constant zero for normal exploration actions, reset and go-to-test. The field is present but carries no task reward signal. Any adapter must reject a nonzero exploration reward. The go-to-test action is a charged exploration interaction; the terminal BeginTest marker is added only by the trusted adapter after transition acceptance. See [WORLDTEST_MARA_RUNNER_AUDIT_V0_1.md](WORLDTEST_MARA_RUNNER_AUDIT_V0_1.md).
+
+
+## Cross-query portfolio evaluator
+
+Issue [#13689](https://github.com/Luminous-Dynamics/symthaea/issues/13689) and the stacked implementation add a scorecard that tests one shared exploration trace/checkpoint against all three WorldTest query families. It reports a family-score vector and minimum-family robustness floor—not a grand mean that could hide query specialization. Failed, timed-out, invalid and abstained tasks keep explicit evaluator-assigned scores in the denominator. Shared exploration resources are charged once; test-query costs are accumulated separately.
+
+Protocol: [WORLDTEST_QUERY_PORTFOLIO_V0_1.md](WORLDTEST_QUERY_PORTFOLIO_V0_1.md). The scorecard is evaluator arithmetic only; no AutumnBench execution or model advantage is claimed.
