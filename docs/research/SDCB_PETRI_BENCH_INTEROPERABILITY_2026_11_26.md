@@ -2,7 +2,15 @@
 
 **Status:** external benchmark analysis and proposed adapter; no Petri task set has been run by Symthaea.
 
-## 1. Why petri-bench changes our evaluation strategy
+## 1. Current portal snapshot and report-version separation
+
+The live portal now presents **Sweep v2** and reports 699 published episode artifacts (579 model + 120 baseline), 30 tasks across five simulation worlds, nine model directories, and eight leaderboard rows. Some model runs are incomplete; the portal shows per-tier episode counts and only gives an overall score when all three tiers have completed their required runs. The report linked below is still the separate working draft v0.5 and documents the standardized v1 sweep. Do not merge v0.5 report statistics with the portal's v2 rows.
+
+For the current portal snapshot, GPT-5.6-Sol has 73/90 episodes and a 34% solved rate; GLM-5.1 has 81/90 and 48% solved; Gemini 3.1 Pro has 90/90 and an overall 58.0 in the current v2 table. These are harness-specific published results with partial rows and their confidence intervals; they are not a universal ranking of scientific ability.
+
+The v0.5 report's 540-episode results remain useful as a fully described archived evaluation: six frontier models × 30 tasks × three episodes. Its blind-value ablation and retraction must stay attached to those numbers.
+
+## 2. Why petri-bench changes our evaluation strategy
 
 petri-bench directly evaluates the scientific method of an agent rather than only rediscovery of a published result. Its working draft v0.5 describes procedural mystery worlds generated from deterministic simulation engines, a blind budgeted experiment interface, and an objective score computed from episode logs without an LLM judge in the headline metric.
 
@@ -10,13 +18,9 @@ The report's current standardized sweep is six frontier models × 30 tasks × th
 
 Scoring separates correctness, method rigor, and efficiency. It also audits p-hacking, redundant tests that survive only without family-wise correction, and probe-only output-matching. This is highly aligned with SDCB's insistence on evidence-supported conclusions.
 
-## 2. Important interpretation safeguards
-
-The working-draft table reports an adaptive reference with curated test values at 92.2 overall and a curated OFAT reference at 90.8. The six model means span 57.3–61.7 in that sweep; the highest reported solve rate is 50%. However, the same report's blind-value OFAT ablation falls to 40.5–47.7 across three independent test-value draws (mean 45.2). The report explicitly retracts an earlier statement that value knowledge did not account for most of the reference gap: the ablation shows that informative intervention values are a dominant contribution. This is a material qualification, not a footnote.
-
 ## 3. Important interpretation safeguards
 
-The report is explicitly a working draft (v0.5), not an established universal leaderboard. Its own revisions include an explicit retraction in Section 7.2. The reference solver with curated informative test values scored far above evaluated models, but its blind-value ablation sharply reduced the score; the report states that informative intervention values are a dominant contributor to the reference advantage. Do not present the curated-reference gap as a clean measure of model capability or claim that a generic OFAT algorithm beats frontier science agents.
+The working-draft table reports an adaptive reference with curated test values at 92.2 overall and a curated OFAT reference at 90.8. The six model means span 57.3–61.7 in that sweep; the highest reported solve rate is 50%. However, the same report's blind-value OFAT ablation falls to 40.5–47.7 across three independent test-value draws (mean 45.2). The report explicitly retracts an earlier statement that value knowledge did not account for most of the reference gap: the ablation shows that informative intervention values are a dominant contribution. This is a material qualification, not a footnote.
 
 Other limitations disclosed by the report:
 
@@ -28,6 +32,8 @@ Other limitations disclosed by the report:
 - the report's single-metric tasks and probe interface can permit output-matching; full-metric-vector and blind-target tasks are planned.
 
 These are productive benchmark design lessons, not reasons to ignore the benchmark.
+
+
 
 ## 4. What SDCB should reuse
 

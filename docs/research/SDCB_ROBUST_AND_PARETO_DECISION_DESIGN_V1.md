@@ -124,6 +124,8 @@ Do not claim robust or Pareto superiority from these analytic fixtures. Integrat
 | Benchmark / prior art | What it contributes | RPSD / SDCB addition |
 |---|---|---|
 | petri-bench (working draft v0.5, 2026) | Procedural mystery worlds, controlled experiments, inference, method-rigor scoring, call budgets, p-hacking/probe-only audits, no LLM judge in headline score | Add likelihood/utility misspecification, ambiguity-set robustness, decision regret and hard safety constraints; preserve its original score |
+| R-I / R-IDeA (AISTATS 2026) | Combines EIG with MMD representativeness and proxy-based de-amplification under model misspecification | Reproduce as a separate acquisition baseline; report EIG, R-I, R-IDeA, EVSI and robust gain independently |
+| Novelty-aware evolutionary MOBO (Digital Discovery 2026) | qLogNEHVI + U-NSGA-III hybrids improve Pareto coverage on hard many-objective synthetic tasks; >5× hypervolume on one five-objective DTLZ2 comparison | Include qLogNEHVI, qParEGO, and evolutionary-Bayesian hybrids as Pareto baselines; freeze objective scaling/reference point |
 | Beyond Accuracy (2026) | Decomposes belief updates, hypothesis discrimination, experiment planning and intervention prediction | Add robust values across alternative mechanism/observation models and decision outcomes |
 | ActiveSciBench / LLM-AutoSciLab | Budgeted mechanism discovery in kinetics and gene-regulatory networks | Evaluate robust experimental choices under outliers, alternative noise models and model misspecification |
 | Autonomous Science Bench | Real-lab design-build-test-learn campaigns; separate discovery and unmeasured-design learning | Add cost/safety Pareto fronts and source-bound evidence transitions |

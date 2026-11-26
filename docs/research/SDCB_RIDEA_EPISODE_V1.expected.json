@@ -1,0 +1,44 @@
+{
+  "schema_version": "1.0.0",
+  "fixture_id": "ridea-representativeness-and-deamplification-v1",
+  "execution_kind": "independent_upstream_mmd2_r_i_and_ridea_formula_calculation",
+  "rust_compiled_or_executed": false,
+  "config": {
+    "lambda": 0.5,
+    "tau": 0.5,
+    "kappa": 0.5,
+    "rbf_sigma": 1
+  },
+  "candidates": [
+    {
+      "id": "representative-informative-deamplifying",
+      "robust_ratio": 1,
+      "eig": 0.8,
+      "r_i": 0.8,
+      "deamplifying_weight": 0.8807970779778823,
+      "ridea": 0.7046376623823059,
+      "cost_units": 1,
+      "ridea_per_cost": 0.7046376623823059,
+      "mmd2_after": 0
+    },
+    {
+      "id": "high-eig-extrapolation",
+      "robust_ratio": -1.788700994799035,
+      "eig": 1.2,
+      "r_i": -2.146441193758842,
+      "deamplifying_weight": 0.31002551887238755,
+      "ridea": -0.6654515448241519,
+      "cost_units": 1,
+      "ridea_per_cost": -0.6654515448241519,
+      "mmd2_after": 0.21975355632483506
+    }
+  ],
+  "selections": {
+    "r_i": "representative-informative-deamplifying",
+    "ridea": "representative-informative-deamplifying"
+  },
+  "claim_ceiling": "analytic_acquisition_formula_fixture_only",
+  "note": "EIG and proxy predictions are fixture inputs. This result validates the score equations, not the proxy-training method or out-of-distribution generalization.",
+  "upstream_implementation_semantics": "The released robust-boed code returns biased empirical MMD^2 from compute_mmd/compute_mmd_dispersion and divides post-design MMD^2 by pre-design MMD^2 directly in the R-I acquisition multiplier; it does not take the square root.",
+  "baseline_mmd2": 0.039400702465893334
+}

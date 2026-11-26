@@ -229,7 +229,7 @@ The one-step decision-value module assumes supplied likelihoods and utilities. T
 Next research increments:
 
 1. Approximate or bounded-horizon policies that approach the exact small-instance oracle at larger candidate counts.
-2. Expand the finite ambiguity-set and Pareto references in [RPSD v1](SDCB_ROBUST_AND_PARETO_DECISION_DESIGN_V1.md) into robust generalized-Bayesian updates, distributional ambiguity sets, and multi-objective sequential policies.
+2. Compare against [R-I/R-IDeA](SDCB_RIDEA_ROBUST_ACQUISITION_V1.md) under model misspecification and covariate shift; expand the finite ambiguity-set and Pareto references in [RPSD v1](SDCB_ROBUST_AND_PARETO_DECISION_DESIGN_V1.md) into robust generalized-Bayesian updates, distributional ambiguity sets, and multi-objective sequential policies.
 3. Add safety-constrained experiment design with chance constraints, risk bounds, and explicit intervention authority.
 4. Utility elicitation and preference uncertainty with human/domain-owner provenance.
 5. Integrate the process-integrity dimensions of [petri-bench](SDCB_PETRI_BENCH_INTEROPERABILITY_2026_11_26.md), while preserving its upstream scoring and disclosed limitations.
