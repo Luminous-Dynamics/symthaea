@@ -11,8 +11,9 @@ pub use failure_fidelity::{
 };
 
 pub use refinement::{
-    BudgetedRefinementScore, ProbeBudgetLedger, ProbeCharge, ProbeObservationReceiptV1,
-    RefinementEffectiveness, score_budgeted_refinement_step, score_refinement_transition,
+    BlindProbeRequest, BudgetedRefinementScore, ProbeBudgetLedger, ProbeCharge,
+    ProbeObservationReceiptV1, RefinementEffectiveness, score_budgeted_refinement_step,
+    score_refinement_transition,
 };
 
 #[derive(Clone, Debug, Eq, Ord, PartialEq, PartialOrd)]
