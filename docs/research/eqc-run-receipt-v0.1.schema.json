@@ -332,7 +332,11 @@
               "independent": {
                 "const": true
               }
-            }
+            },
+            "required": [
+              "replay",
+              "independent"
+            ]
           }
         }
       }
