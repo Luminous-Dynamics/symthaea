@@ -175,6 +175,10 @@ pub struct AbstractionScore {
     pub candidate_separated_pairs: usize,
     pub false_merges: usize,
     pub false_splits: usize,
+    /// Number of candidate abstraction classes (a coarse compression proxy).
+    pub candidate_class_count: usize,
+    /// Number of singleton classes (one state retained per class).
+    pub singleton_class_count: usize,
     pub max_normalized_pair_distortion: f64,
 }
 
@@ -292,7 +296,16 @@ pub fn score_abstraction(
 ) -> Result<AbstractionScore, String> {
     validate_record_set(records, contract)?;
 
-    let mut score = AbstractionScore::default();
+    let mut class_sizes: BTreeMap<&str, usize> = BTreeMap::new();
+    for record in records {
+        *class_sizes.entry(record.abstract_state_id.as_str()).or_default() += 1;
+    }
+
+    let mut score = AbstractionScore {
+        candidate_class_count: class_sizes.len(),
+        singleton_class_count: class_sizes.values().filter(|size| **size == 1).count(),
+        ..AbstractionScore::default()
+    };
     for left_index in 0..records.len() {
         for right_index in (left_index + 1)..records.len() {
             let left = &records[left_index];
@@ -599,6 +612,20 @@ mod tests {
 
 
 
+
+
+    #[test]
+    fn abstraction_score_reports_partition_cardinality_and_singletons() {
+        let contract = contract();
+        let first = record("state-a", "class-shared", 0, 2);
+        let second = record("state-b", "class-shared", 0, 2);
+        let third = record("state-c", "class-singleton", 0, 2);
+        let score = score_abstraction(&[first, second, third], &contract)
+            .expect("valid partition");
+        assert_eq!(score.candidate_class_count, 2);
+        assert_eq!(score.singleton_class_count, 1);
+        assert_eq!(score.false_splits, 2);
+    }
 
     #[test]
     fn copy_no_op_response_does_not_hide_action_distinguishable_states() {
