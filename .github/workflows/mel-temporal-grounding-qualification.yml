@@ -158,6 +158,26 @@ jobs:
         run: |
           set -euo pipefail
           cargo +1.96.0 run --locked --manifest-path tools/mel-temporal-grounding-qualifier/Cargo.toml --bin mel-temporal-reliability-audit -- tools/mel-temporal-grounding-qualifier/fixtures/mel-temporal-reliability-six-items.synthetic.json > "$RUNNER_TEMP/temporal-reliability-report.json"
+          jq '{
+            summary: {
+              dataset_items: .summary.dataset_items,
+              source_work_clusters: .summary.source_work_clusters,
+              unique_annotator_identities: .summary.unique_annotator_identities,
+              nominal_state_agreement_pairs: .summary.nominal_state_agreement_pairs,
+              present_absent_disagreement_pairs: .summary.present_absent_disagreement_pairs,
+              present_present_interval_pairs: .summary.present_present_interval_pairs,
+              state_reliability: .summary.state_reliability,
+              boundary_tolerance_agreement: .summary.boundary_tolerance_agreement
+            },
+            model_grounding_summary: .model_grounding_summary,
+            pairwise_results: (.pairwise_results | length),
+            bootstrap: {
+              source_work_clusters: .bootstrap.source_work_clusters,
+              boundary_tolerance_agreement: .bootstrap.boundary_tolerance_agreement,
+              confirmatory_source_cluster_floor_met: .bootstrap.confirmatory_source_cluster_floor_met
+            },
+            population_confidence_claim_permitted: .population_confidence_claim_permitted
+          }' "$RUNNER_TEMP/temporal-reliability-report.json"
           jq -e '
             .schema == "mel-multi-annotator-reliability-report-v1"
             and .summary.dataset_items == 6
