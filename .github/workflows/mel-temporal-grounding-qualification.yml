@@ -101,7 +101,7 @@ jobs:
         run: cargo +1.96.0 clippy --locked --manifest-path tools/mel-temporal-grounding-qualifier/Cargo.toml --all-targets -- -D warnings
 
       - name: Replay design-weighted selective risk/coverage when module is present
-        if: hashFiles('tools/mel-temporal-grounding-qualifier/src/temporal_selective_design.rs') != ''
+        if: github.event_name == 'push' || hashFiles('tools/mel-temporal-grounding-qualifier/src/temporal_selective_design.rs') != ''
         shell: bash
         run: |
           set -euo pipefail
@@ -341,7 +341,9 @@ jobs:
             cp tools/mel-temporal-grounding-qualifier/src/bin/mel-two-stage-design-estimator.rs "$evidence/"
             cp tools/mel-temporal-grounding-qualifier/fixtures/mel-two-stage-design-estimator.synthetic.json "$evidence/"
             cp tools/mel-temporal-grounding-qualifier/schemas/mel-two-stage-design-estimator-input-v1.schema.json "$evidence/"
-            cp docs/research/MEL-GROUND-009-TWO-STAGE-DESIGN-BASED-ANNOTATION-ESTIMATOR-V1.md "$evidence/"
+            if [[ -f docs/research/MEL-GROUND-009-TWO-STAGE-DESIGN-BASED-ANNOTATION-ESTIMATOR-V1.md ]]; then
+              cp docs/research/MEL-GROUND-009-TWO-STAGE-DESIGN-BASED-ANNOTATION-ESTIMATOR-V1.md "$evidence/"
+            fi
             if [[ -f "$RUNNER_TEMP/two-stage-design-estimator-report.json" ]]; then
               cp "$RUNNER_TEMP/two-stage-design-estimator-report.json" "$evidence/"
             fi
