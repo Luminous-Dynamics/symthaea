@@ -451,7 +451,7 @@ A standard-library Go reference implementation now lives at `authority-join/`. I
 - typed digest comparability and exact request binding;
 - grant effective time, exclusive expiry and effective-time revocation evaluated against a supplied destination commit time;
 - source/profile/snapshot/query/cursor/terminal-watermark binding, with a source observation after the supplied commit time;
-- normalized principal, delegate, issuer and grant verifier reports bound to exact evidence bytes and matched against pinned verifier ID/version/build/trust-store metadata.
+- normalized principal, delegate, issuer and grant verifier reports bound to exact evidence bytes and matched against pinned verifier ID/version/build/trust-store metadata; a distinct revocation-event digest and verifier report are mandatory whenever a revocation timestamp is used.
 
 The v0.1 profile intentionally does not implement wildcard or numeric-range attenuation, multi-DNA reference resolution, source-independent corroboration, bitemporal event correction semantics, signed verifier-report transport, credential/COSE/AAC/OAR/SCITT cryptography, sink commit-time proof, or physical effect. The commit timestamp and bounded capture result must already have been qualified by separate MON source adapters. A `qualified` output advances only to the separate destination/effect assurance gate.
 
@@ -459,8 +459,8 @@ Local preflight performed on the source used to create the branch:
 
 - `go test -race -count=5 ./...`: PASS.
 - `go vet ./...`: PASS.
-- `go test -count=1 -cover ./...`: PASS, 85.0% statement coverage.
-- `go test -run=^$ -fuzz=FuzzDigestPurposeIsolation -fuzztime=2s`: PASS, 121,615 fuzz executions in the recorded run.
-- 25 named tests plus one fuzz target.
+- `go test -count=1 -cover ./...`: PASS, 85.8% statement coverage.
+- `go test -run=^$ -fuzz=FuzzDigestPurposeIsolation -fuzztime=2s`: PASS, 121,751 fuzz executions in the recorded run.
+- 26 named tests plus one fuzz target.
 
 These are local reference-package results, not hosted CI, upstream cryptographic conformance, Mycelix runtime, PostgreSQL integration or production qualification. Re-run against the committed branch head before treating repository state as independently reproduced.
