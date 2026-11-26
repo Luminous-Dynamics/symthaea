@@ -20,7 +20,7 @@ The module consumes the receipt contract proposed in [PR #13709](https://github.
 - Byte-range bounds, per-span SHA-256, duplicate exposure-ID, duplicate-parent and strict disjoint-span checks (v0.1 rejects all overlapping spans).
 - Rejection when evidence appears in both the admitted-exposure and admission-denial sets.
 - Delegated evidence identity, transitive lineage, source, authority, scope, estimand, rights and current-at-use checks through the existing canonical MACE owner interface.
-- Ed25519 signature verification over `SHA-256("MACE-CONTEXT-EXPOSURE-V1\\0" || JCS(receipt_without_signature))`.
+- Ed25519 signature verification and a KMS/HSM-capable signer interface over `SHA-256("MACE-CONTEXT-EXPOSURE-V1\\0" || JCS(receipt_without_signature))`.
 - Ed25519 key-ID derivation using the same SubjectPublicKeyInfo SHA-256 / first-16-byte convention used by MON-005.
 - Signature verification before artifact retrieval or evidence-registry calls, avoiding expensive trust-boundary operations on unauthenticated receipt content.
 - A strict no-memory-arm invariant: a `no_memory` invocation must have no memory exposures and no memory admission-denial records.
@@ -39,7 +39,7 @@ These are deliberate interfaces to existing owners or separate deployment qualif
 
 ## Deterministic tests authored (not executed)
 
-Thirteen Rust unit tests cover:
+Fourteen Rust unit tests cover:
 1. valid signed receipt, body, span and evidence binding;
 2. wrong run binding;
 3. changed request-body rejection;
