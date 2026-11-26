@@ -1,0 +1,373 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://github.com/Luminous-Dynamics/symthaea/blob/research/physical-storage-bootstrap-survivability-001/research/physical-storage/fixtures/bootstrap_codec_kat_v0_1.schema.json",
+  "title": "Physical storage bootstrap codec KAT v0.1",
+  "type": "object",
+  "required": [
+    "schema_version",
+    "corpus_id",
+    "evidence_class",
+    "field",
+    "code",
+    "parity_only_vector",
+    "bundle_vector",
+    "two_erasure_cases",
+    "negative_controls",
+    "independent_oracle"
+  ],
+  "properties": {
+    "schema_version": {
+      "const": "physical-storage-bootstrap-codec-kat-v0.1"
+    },
+    "corpus_id": {
+      "const": "PHYSICAL-STORAGE-BOOTSTRAP-CODEC-KAT-001"
+    },
+    "evidence_class": {
+      "const": "synthetic_known_answer_vector"
+    },
+    "implementation_status": {
+      "type": "string"
+    },
+    "field": {
+      "type": "object",
+      "required": [
+        "name",
+        "primitive_polynomial_hex",
+        "reduction_xor_after_shift_hex",
+        "symbol_order"
+      ],
+      "properties": {
+        "name": {
+          "const": "GF(2^8)"
+        },
+        "primitive_polynomial_hex": {
+          "const": "0x11d"
+        },
+        "reduction_xor_after_shift_hex": {
+          "const": "0x1d"
+        },
+        "symbol_order": {
+          "type": "string"
+        }
+      },
+      "additionalProperties": false
+    },
+    "code": {
+      "type": "object",
+      "required": [
+        "data_shards",
+        "parity_shards",
+        "total_shards",
+        "minimum_distance",
+        "rate",
+        "generator_matrix",
+        "recovery_contract",
+        "digest_authority"
+      ],
+      "properties": {
+        "data_shards": {
+          "const": 4
+        },
+        "parity_shards": {
+          "const": 2
+        },
+        "total_shards": {
+          "const": 6
+        },
+        "minimum_distance": {
+          "const": 3
+        },
+        "rate": {
+          "const": "4/6"
+        },
+        "generator_matrix": {
+          "const": [
+            [
+              1,
+              0,
+              0,
+              0
+            ],
+            [
+              0,
+              1,
+              0,
+              0
+            ],
+            [
+              0,
+              0,
+              1,
+              0
+            ],
+            [
+              0,
+              0,
+              0,
+              1
+            ],
+            [
+              1,
+              1,
+              1,
+              1
+            ],
+            [
+              1,
+              2,
+              3,
+              4
+            ]
+          ]
+        },
+        "recovery_contract": {
+          "type": "string"
+        },
+        "digest_authority": {
+          "type": "string"
+        }
+      },
+      "additionalProperties": false
+    },
+    "parity_only_vector": {
+      "type": "object",
+      "required": [
+        "data_shards_utf8",
+        "expected_parity_shard_4_hex",
+        "expected_parity_shard_5_hex"
+      ],
+      "properties": {
+        "data_shards_utf8": {
+          "type": "array",
+          "minItems": 4,
+          "maxItems": 4,
+          "items": {
+            "type": "string"
+          }
+        },
+        "expected_parity_shard_4_hex": {
+          "type": "string",
+          "pattern": "^(?:[0-9a-f]{2})+$"
+        },
+        "expected_parity_shard_5_hex": {
+          "type": "string",
+          "pattern": "^(?:[0-9a-f]{2})+$"
+        }
+      },
+      "additionalProperties": false
+    },
+    "bundle_vector": {
+      "type": "object",
+      "required": [
+        "object_records",
+        "canonical_manifest_byte_length",
+        "canonical_manifest_hex",
+        "framed_bundle_byte_length_after_padding",
+        "framed_bundle_hex",
+        "data_shard_byte_length",
+        "data_shards_hex",
+        "all_six_shards_hex",
+        "padding_byte_hex",
+        "expected_decode_object_exact"
+      ],
+      "properties": {
+        "object_records": {
+          "type": "array",
+          "items": {
+            "type": "object",
+            "required": [
+              "object_id",
+              "semantic_type",
+              "version",
+              "content_utf8",
+              "expected_content_sha256"
+            ],
+            "properties": {
+              "object_id": {
+                "type": "string"
+              },
+              "semantic_type": {
+                "type": "integer",
+                "minimum": 0,
+                "maximum": 255
+              },
+              "version": {
+                "type": "string"
+              },
+              "content_utf8": {
+                "type": "string"
+              },
+              "expected_content_sha256": {
+                "type": "string",
+                "pattern": "^[0-9a-f]{64}$"
+              }
+            },
+            "additionalProperties": false
+          }
+        },
+        "canonical_manifest_byte_length": {
+          "type": "integer",
+          "minimum": 0
+        },
+        "canonical_manifest_hex": {
+          "type": "string",
+          "pattern": "^(?:[0-9a-f]{2})+$"
+        },
+        "framed_bundle_byte_length_after_padding": {
+          "type": "integer",
+          "minimum": 0
+        },
+        "framed_bundle_hex": {
+          "type": "string",
+          "pattern": "^(?:[0-9a-f]{2})+$"
+        },
+        "data_shard_byte_length": {
+          "type": "integer",
+          "minimum": 0
+        },
+        "data_shards_hex": {
+          "type": "array",
+          "minItems": 4,
+          "maxItems": 4,
+          "items": {
+            "type": "string",
+            "pattern": "^(?:[0-9a-f]{2})+$"
+          }
+        },
+        "all_six_shards_hex": {
+          "type": "array",
+          "minItems": 6,
+          "maxItems": 6,
+          "items": {
+            "type": "string",
+            "pattern": "^(?:[0-9a-f]{2})+$"
+          }
+        },
+        "padding_byte_hex": {
+          "const": "00"
+        },
+        "expected_decode_object_exact": {
+          "type": "boolean"
+        }
+      },
+      "additionalProperties": false
+    },
+    "two_erasure_cases": {
+      "type": "array",
+      "minItems": 15,
+      "maxItems": 15,
+      "items": {
+        "type": "object",
+        "required": [
+          "erased_shards",
+          "expected",
+          "expected_recovered_indices"
+        ],
+        "properties": {
+          "erased_shards": {
+            "type": "array",
+            "minItems": 2,
+            "maxItems": 2,
+            "uniqueItems": true,
+            "items": {
+              "type": "integer",
+              "minimum": 0,
+              "maximum": 5
+            }
+          },
+          "expected": {
+            "const": "exact_reconstruction"
+          },
+          "expected_recovered_indices": {
+            "type": "array",
+            "minItems": 2,
+            "maxItems": 2,
+            "uniqueItems": true,
+            "items": {
+              "type": "integer",
+              "minimum": 0,
+              "maximum": 5
+            }
+          }
+        },
+        "additionalProperties": false
+      }
+    },
+    "negative_controls": {
+      "type": "array",
+      "minItems": 3,
+      "items": {
+        "type": "object",
+        "required": [
+          "case_id",
+          "expected"
+        ],
+        "properties": {
+          "case_id": {
+            "type": "string"
+          },
+          "erased_shards": {
+            "type": "array",
+            "items": {
+              "type": "integer",
+              "minimum": 0,
+              "maximum": 5
+            }
+          },
+          "corrupt_shard": {
+            "type": "integer",
+            "minimum": 0,
+            "maximum": 5
+          },
+          "corrupt_byte_offset": {
+            "type": "integer",
+            "minimum": 0
+          },
+          "xor_mask_hex": {
+            "type": "string",
+            "pattern": "^[0-9a-f]{2}$"
+          },
+          "available_shards": {
+            "type": "integer",
+            "minimum": 0,
+            "maximum": 6
+          },
+          "expected": {
+            "type": "string"
+          },
+          "expected_detected_shard": {
+            "type": "integer",
+            "minimum": 0,
+            "maximum": 5
+          }
+        },
+        "additionalProperties": false
+      }
+    },
+    "independent_oracle": {
+      "type": "object",
+      "required": [
+        "method",
+        "row_subset_checks",
+        "pair_recovery",
+        "limitation"
+      ],
+      "properties": {
+        "method": {
+          "type": "string"
+        },
+        "row_subset_checks": {
+          "type": "string"
+        },
+        "pair_recovery": {
+          "type": "string"
+        },
+        "limitation": {
+          "type": "string"
+        }
+      },
+      "additionalProperties": false
+    }
+  },
+  "additionalProperties": false
+}
