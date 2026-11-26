@@ -40,6 +40,14 @@ The independence manifest must disclose, for every witness:
 
 Four endpoints, four key IDs or four VM instances under one administrator do not establish four independent witnesses. Publish common-cause cut sets and the number of independent administrative domains.
 
+## 3.0 Quorum-intersection argument for the reference profile
+
+For any two 3-member quorums selected from four witnesses, the minimum intersection is `3 + 3 - 4 = 2`. Under the stated `f = 1` Byzantine bound, that intersection contains at least one honest witness. If every honest witness durably refuses to sign two different successors for the same `(state_id, generation, predecessor_digest)`, two conflicting 3-of-4 commit certificates cannot both exist: their common honest witness would have to sign both transitions.
+
+One unavailable or Byzantine witness still leaves three honest witnesses, so a quorum can be formed. Two unavailable witnesses leave only two responses, so no transition may commit. This is a quorum-intersection argument under explicit assumptions, not a complete asynchronous BFT protocol proof. It does not address implementation bugs, compromised trust anchors, correlated operators, key theft, network partitions, freshness or clients that accept stale quorums. Those remain separate benchmark dimensions.
+
+An authoring-time finite model check enumerated all four possible 3-of-4 quorums and exercised: the intersection bound; one-fault and two-unavailable thresholds; durable honest single-successor locking; same-operation idempotent retry versus payload substitution; timeout-after-append reconciliation to one generation; and T10 store-plus-local-cache rollback detection. All assertions passed in that small model. It was not a Rust test, networked witness experiment, cryptographic verification, or independent reproduction.
+
 ## 3.1 Frozen witness profile and independence evidence
 
 Every campaign MUST bind a separate witness-profile manifest. The manifest declares exactly four operator records for the 3-of-4 reference profile and separately inventories operator, organization, administrative, identity-provider, key-custody, backup/restore and control-plane domains. It also pins witness software/policy digests, key IDs and algorithms, key status, freshness mode, trusted time profile, offline behavior, recovery policy and evidence-retention policy.
