@@ -50,7 +50,7 @@ An authoring-time finite model check enumerated all four possible 3-of-4 quorums
 
 ## 3.1 Frozen witness profile and independence evidence
 
-Every campaign MUST bind a separate witness-profile manifest. The manifest declares exactly four operator records for the 3-of-4 reference profile and separately inventories operator, organization, administrative, identity-provider, key-custody, backup/restore and control-plane domains. It also pins witness software/policy digests, key IDs and algorithms, key status, freshness mode, trusted time profile, offline behavior, recovery policy and evidence-retention policy.
+Every campaign MUST bind a separate witness-profile manifest. The manifest declares exactly four operator records for the 3-of-4 reference profile and separately inventories operator, organization, administrative, identity-provider, key-custody, backup/restore and control-plane domains. It also pins witness software/policy digests, key IDs and algorithms, key status, each witness's own anti-rollback mechanism and backup policy, freshness mechanism (including nonce-bound quorum challenges, trusted-time expiry or monotonic client checkpoints), trusted time profile, offline behavior, recovery policy and evidence-retention policy.
 
 The JSON Schema can enforce list lengths and uniqueness within each declared domain list, but standard JSON Schema cannot prove that those lists are an exact projection of the corresponding fields in the four operator records. A semantic verifier MUST compare the sets bidirectionally, reject missing/extra/duplicate operators, check every declared dependency edge references known operators, and derive common-cause cut sets. A human/independent governance review must inspect the evidence behind each operator/organization/domain declaration. Unique strings or key IDs are not independence proof.
 
@@ -94,7 +94,8 @@ Unknown outcome means no new mutation until reconciliation. Never retry with a n
 ### 4.4 Read, restore and recovery
 
 On startup or before a consequential memory read:
-- obtain a current witness quorum view;
+- generate a fresh unpredictable client nonce and obtain a quorum response that signs/binds that nonce to the state ID, generation, predecessor digest, snapshot root and current checkpoint digest;
+- reject reused nonces, responses not bound to the current request, and checkpoint responses outside the declared freshness policy;
 - verify each witness identity and authorization;
 - verify matching state id, generation, predecessor and snapshot root;
 - verify the quorum signatures;
@@ -103,7 +104,7 @@ On startup or before a consequential memory read:
 
 If the witness is newer than the local store, reconcile from a retained committed journal/snapshot or apply witnessed revocation/erasure transitions, then verify exact root equality. If complete reconciliation is impossible, hold/deny the affected read and mutation. Never serve a store whose currentness cannot be established under the declared policy.
 
-A deployment may define a bounded-staleness mode for low-risk reads, but that is a downgraded assurance profile. It cannot be counted as a T9/T10 read-time pass or as current erasure protection.
+A deployment may define a bounded-staleness mode for low-risk reads, but that is a downgraded assurance profile. It cannot be counted as a T9/T10 read-time pass or as current erasure protection. A nonce stops an intermediary from replaying a previously captured response, but it does not protect against a witness operator whose own persistent state has been rolled back. Each witness must declare how it prevents or detects rollback of its own vote/checkpoint state (for example, a hardware monotonic facility, a separately administered consensus-backed state service, or an independently monitored append-only log), plus the witness's own backup/restore domain. Those mechanisms require their own fault-injection tests.
 
 ### 4.5 Erasure and T10
 
