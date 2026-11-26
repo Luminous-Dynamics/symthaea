@@ -437,6 +437,313 @@ pub fn create_grape_feature_adapter_v1(
     })
 }
 
+#[derive(Clone, Debug, PartialEq, Serialize, Deserialize)]
+pub struct GrapeRuntimePolicyV1 {
+    pub adapter_policy: GrapeAdapterPolicyV1,
+    pub adapter_feature_count: usize,
+    pub context_ema_alpha: f64,
+    pub context_minimum_support: u64,
+    pub temporal_ema_alpha: f64,
+    pub temporal_activation_percentile: f64,
+}
+
+#[derive(Clone, Debug, PartialEq, Serialize, Deserialize)]
+pub struct GrapePredictionDecompositionV1 {
+    pub global_model_prediction: f64,
+    pub selected_feature_values: Vec<f64>,
+    pub adapter_correction: f64,
+    pub context_correction: f64,
+    pub unclipped_base_prediction: f64,
+    pub clipped_base_prediction: f64,
+    pub temporal_correction: f64,
+    pub final_prediction: f64,
+    pub context_key: Option<String>,
+}
+
+#[derive(Clone, Debug, PartialEq, Serialize, Deserialize)]
+pub struct GrapeAdapterRuntimeStateV1 {
+    pub adapter: GrapeFeatureAdapterStateV1,
+    pub context: GrapeHierarchicalContextStateV1,
+    pub temporal: GrapeTemporalResidualStateV1,
+    pub accepted_update_count: u64,
+}
+
+#[derive(Clone, Debug, PartialEq, Serialize, Deserialize)]
+pub struct GrapeAdapterRuntimeV1 {
+    pub policy: GrapeRuntimePolicyV1,
+    pub selected_feature_indices: Vec<usize>,
+    pub base_label_min: f64,
+    pub base_label_max: f64,
+    pub label_min: f64,
+    pub label_max: f64,
+    pub state: GrapeAdapterRuntimeStateV1,
+}
+
+#[derive(Clone, Debug, PartialEq, Serialize, Deserialize)]
+pub struct GrapeAdapterUpdateReceiptV1 {
+    pub state_before_sha256: String,
+    pub state_after_sha256: String,
+    pub accepted_update_count: u64,
+    pub feature_error: f64,
+    pub temporal_error: f64,
+    pub context_residual: Option<f64>,
+    pub state_mutated: bool,
+}
+
+fn json_sha256<T: Serialize + ?Sized>(value: &T) -> Result<String, GrapeAdapterParityErrorV1> {
+    let bytes = serde_json::to_vec(value).map_err(|error| {
+        GrapeAdapterParityErrorV1(format!("canonical JSON serialization failed: {error}"))
+    })?;
+    Ok(format!("{:x}", Sha256::digest(bytes)))
+}
+
+fn percentile_linear(values: &[f64], percentile: f64) -> Result<f64, GrapeAdapterParityErrorV1> {
+    if values.is_empty() || !percentile.is_finite() || !(0.0..=100.0).contains(&percentile)
+        || values.iter().any(|value| !value.is_finite())
+    {
+        return Err(GrapeAdapterParityErrorV1("percentile input is invalid".into()));
+    }
+    let mut sorted = values.to_vec();
+    sorted.sort_by(f64::total_cmp);
+    let position = (sorted.len() - 1) as f64 * percentile / 100.0;
+    let lower = position.floor() as usize;
+    let upper = position.ceil() as usize;
+    let fraction = position - lower as f64;
+    Ok(sorted[lower] * (1.0 - fraction) + sorted[upper] * fraction)
+}
+
+/// Selects top adapter features by absolute Pearson correlation with training
+/// residuals. Ties are deterministically broken by ascending source index.
+pub fn select_grape_adapter_features_v1(
+    rows: &[Vec<f64>],
+    training_residuals: &[f64],
+    count: usize,
+) -> Result<Vec<usize>, GrapeAdapterParityErrorV1> {
+    if rows.is_empty() || rows.len() != training_residuals.len() || count == 0 {
+        return Err(GrapeAdapterParityErrorV1("feature selection shape or count is invalid".into()));
+    }
+    let dimension = rows[0].len();
+    if dimension == 0 || rows.iter().any(|row| row.len() != dimension
+        || row.iter().any(|value| !value.is_finite()))
+        || training_residuals.iter().any(|value| !value.is_finite())
+    {
+        return Err(GrapeAdapterParityErrorV1("feature selection contains invalid values".into()));
+    }
+    let take = count.min(dimension);
+    let residual_mean = training_residuals.iter().sum::<f64>() / training_residuals.len() as f64;
+    let residual_variance = training_residuals
+        .iter()
+        .map(|value| (value - residual_mean).powi(2))
+        .sum::<f64>() / training_residuals.len() as f64;
+    let residual_std = residual_variance.sqrt();
+    if residual_std < 1.0e-8 {
+        return Ok((0..take).collect());
+    }
+
+    let mut correlations = Vec::new();
+    for column in 0..dimension {
+        let mean = rows.iter().map(|row| row[column]).sum::<f64>() / rows.len() as f64;
+        let variance = rows.iter().map(|row| (row[column] - mean).powi(2)).sum::<f64>()
+            / rows.len() as f64;
+        let feature_std = variance.sqrt();
+        if feature_std <= 1.0e-8 {
+            continue;
+        }
+        let covariance = rows
+            .iter()
+            .zip(training_residuals)
+            .map(|(row, residual)| (row[column] - mean) * (residual - residual_mean))
+            .sum::<f64>() / rows.len() as f64;
+        correlations.push((column, (covariance / (feature_std * residual_std)).abs()));
+    }
+    if correlations.is_empty() {
+        return Ok((0..take).collect());
+    }
+    correlations.sort_by(|(left_index, left), (right_index, right)| {
+        right.total_cmp(left).then_with(|| left_index.cmp(right_index))
+    });
+    Ok(correlations.into_iter().take(take).map(|(index, _)| index).collect())
+}
+
+impl GrapeAdapterRuntimeV1 {
+    /// Initializes adapter metadata and clipping/temporal bounds from train-only
+    /// features, targets and predictions of the frozen global Ridge model.
+    pub fn initialize(
+        policy: GrapeRuntimePolicyV1,
+        training_features: &[Vec<f64>],
+        training_targets: &[f64],
+        global_training_predictions: &[f64],
+    ) -> Result<Self, GrapeAdapterParityErrorV1> {
+        validate_policy(&policy.adapter_policy)?;
+        if training_features.is_empty()
+            || training_features.len() != training_targets.len()
+            || training_features.len() != global_training_predictions.len()
+            || training_targets.iter().any(|value| !value.is_finite())
+            || global_training_predictions.iter().any(|value| !value.is_finite())
+        {
+            return Err(GrapeAdapterParityErrorV1("GRAPE training initialization shape is invalid".into()));
+        }
+        if !policy.context_ema_alpha.is_finite()
+            || !(0.0..=1.0).contains(&policy.context_ema_alpha)
+            || !policy.temporal_ema_alpha.is_finite()
+            || !(0.0..=1.0).contains(&policy.temporal_ema_alpha)
+            || !policy.temporal_activation_percentile.is_finite()
+            || !(0.0..=100.0).contains(&policy.temporal_activation_percentile)
+            || policy.adapter_feature_count == 0
+        {
+            return Err(GrapeAdapterParityErrorV1("GRAPE runtime policy is invalid".into()));
+        }
+
+        let residuals: Vec<f64> = training_targets.iter()
+            .zip(global_training_predictions)
+            .map(|(target, prediction)| target - prediction)
+            .collect();
+        let selected_feature_indices =
+            select_grape_adapter_features_v1(training_features, &residuals, policy.adapter_feature_count)?;
+        let mut adapter_policy = policy.adapter_policy.clone();
+        let target_mean = training_targets.iter().sum::<f64>() / training_targets.len() as f64;
+        let target_std = (training_targets.iter()
+            .map(|value| (value - target_mean).powi(2))
+            .sum::<f64>() / training_targets.len() as f64).sqrt();
+        let mut context_minimum_support = policy.context_minimum_support;
+        if target_std < 0.3 {
+            adapter_policy.nlms_learning_rate = adapter_policy.nlms_learning_rate.max(0.02);
+            context_minimum_support = context_minimum_support.max(25);
+        }
+
+        let low = percentile_linear(training_targets, 1.0)?;
+        let high = percentile_linear(training_targets, 99.0)?;
+        let base_label_min = low - 1.0;
+        let base_label_max = high + 1.0;
+        let absolute_residuals: Vec<f64> = residuals.iter().map(|value| value.abs()).collect();
+        let temporal_threshold = percentile_linear(
+            &absolute_residuals,
+            policy.temporal_activation_percentile,
+        )?.max(1.0e-6);
+        let temporal_pad = 2.0_f64.max(6.0 * temporal_threshold);
+        let label_min = low - temporal_pad;
+        let label_max = high + temporal_pad;
+
+        let adapter = create_grape_feature_adapter_v1(
+            adapter_policy.adapter_kind,
+            selected_feature_indices.len(),
+            &adapter_policy,
+        )?;
+        let context = GrapeHierarchicalContextStateV1::new(
+            policy.context_ema_alpha,
+            context_minimum_support,
+        )?;
+        let mut temporal = GrapeTemporalResidualStateV1::new(
+            policy.temporal_ema_alpha,
+            temporal_threshold,
+        )?;
+        temporal.calibrate(&residuals, policy.temporal_activation_percentile)?;
+
+        let mut effective_policy = policy;
+        effective_policy.adapter_policy = adapter_policy;
+        effective_policy.context_minimum_support = context_minimum_support;
+        Ok(Self {
+            policy: effective_policy,
+            selected_feature_indices,
+            base_label_min,
+            base_label_max,
+            label_min,
+            label_max,
+            state: GrapeAdapterRuntimeStateV1 {
+                adapter,
+                context,
+                temporal,
+                accepted_update_count: 0,
+            },
+        })
+    }
+
+    /// Makes a prediction from an externally supplied frozen global Ridge output.
+    /// This computes the exact GRAPE decomposition but does not mutate runtime state.
+    pub fn predict(
+        &self,
+        global_model_prediction: f64,
+        features: &[f64],
+        context_key: Option<&str>,
+    ) -> Result<GrapePredictionDecompositionV1, GrapeAdapterParityErrorV1> {
+        finite(global_model_prediction, "global model prediction")?;
+        if features.is_empty() || features.iter().any(|value| !value.is_finite())
+            || self.selected_feature_indices.iter().any(|index| *index >= features.len())
+        {
+            return Err(GrapeAdapterParityErrorV1("GRAPE prediction feature vector is invalid".into()));
+        }
+        let selected_feature_values: Vec<f64> = self.selected_feature_indices
+            .iter().map(|index| features[*index]).collect();
+        let adapter_correction = self.state.adapter.predict(&selected_feature_values)?;
+        let context_correction = self.state.context.correction(context_key)?;
+        let unclipped_base_prediction =
+            global_model_prediction + adapter_correction + context_correction;
+        let clipped_base_prediction =
+            unclipped_base_prediction.clamp(self.base_label_min, self.base_label_max);
+        let temporal_correction = self.state.temporal.correction();
+        let final_prediction =
+            (clipped_base_prediction + temporal_correction).clamp(self.label_min, self.label_max);
+        finite(final_prediction, "GRAPE final prediction")?;
+        Ok(GrapePredictionDecompositionV1 {
+            global_model_prediction,
+            selected_feature_values,
+            adapter_correction,
+            context_correction,
+            unclipped_base_prediction,
+            clipped_base_prediction,
+            temporal_correction,
+            final_prediction,
+            context_key: context_key.map(str::to_string),
+        })
+    }
+
+    /// Applies the pinned GRAPE update equations to a frozen prediction record.
+    /// Mutations are transactional; callers must separately apply K1 evidence
+    /// qualification before invoking this reference math primitive.
+    pub fn update_from_prediction(
+        &mut self,
+        prediction: &GrapePredictionDecompositionV1,
+        target: f64,
+    ) -> Result<GrapeAdapterUpdateReceiptV1, GrapeAdapterParityErrorV1> {
+        finite(target, "GRAPE target")?;
+        let before = json_sha256(&self.state)?;
+        let mut next = self.state.clone();
+        let temporal_target = target.clamp(self.label_min, self.label_max);
+        let base_target = temporal_target.clamp(self.base_label_min, self.base_label_max);
+        let temporal_error = temporal_target - prediction.clipped_base_prediction;
+        let feature_error = base_target - prediction.clipped_base_prediction;
+
+        next.temporal.update(temporal_error)?;
+        next.adapter.update(
+            &self.policy.adapter_policy,
+            &prediction.selected_feature_values,
+            feature_error,
+        )?;
+        let updated_adapter_correction =
+            next.adapter.predict(&prediction.selected_feature_values)?;
+        let context_residual = base_target - (
+            prediction.global_model_prediction + updated_adapter_correction
+        );
+        if prediction.context_key.is_some() {
+            next.context.update(prediction.context_key.as_deref(), context_residual)?;
+        }
+        next.accepted_update_count = next.accepted_update_count.checked_add(1)
+            .ok_or_else(|| GrapeAdapterParityErrorV1("GRAPE update counter overflow".into()))?;
+        let after = json_sha256(&next)?;
+        let receipt = GrapeAdapterUpdateReceiptV1 {
+            state_before_sha256: before,
+            state_after_sha256: after,
+            accepted_update_count: next.accepted_update_count,
+            feature_error,
+            temporal_error,
+            context_residual: prediction.context_key.as_ref().map(|_| context_residual),
+            state_mutated: true,
+        };
+        self.state = next;
+        Ok(receipt)
+    }
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
