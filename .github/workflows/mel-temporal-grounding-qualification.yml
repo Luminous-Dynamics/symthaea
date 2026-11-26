@@ -167,7 +167,7 @@ jobs:
             and .model_grounding_summary.present_items == 3
             and .model_grounding_summary.one_to_many_items == 3
             and .model_grounding_summary.absent_items == 3
-            and .model_grounding_summary.prediction_coverage == 1.0
+            and .model_grounding_summary.source_work_macro_prediction_coverage == 1.0
             and .model_grounding_summary.model_confidence_calibration_computed == false
             and (.model_grounding_by_item | length) == 6
             and .model_grounding_by_item[0].prediction.query_id == .model_grounding_by_item[0].query_id
