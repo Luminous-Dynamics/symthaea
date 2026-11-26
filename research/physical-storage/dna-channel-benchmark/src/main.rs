@@ -36,8 +36,8 @@ fn main() -> Result<(), Box<dyn Error>> {
     println!("  ],");
     println!("  \"ranked_soft_erasure_positions\": {:?},", ranked.iter().map(|item| item.position).collect::<Vec<_>>());
     println!("  \"progressive_erasure_trials\": {:?},", erasure_trials);
-    println!("  \"read_batch\": {{\"distinct_records\":{},\"molecule_observations\":{},\"duplicate_observations\":{}}},",
-        read_summary.distinct_read_records, read_summary.molecule_observations, read_summary.duplicate_observations);
+    println!("  \"read_batch\": {{\"distinct_records\":{},\"read_observations\":{},\"additional_read_copies\":{}}},",
+        read_summary.distinct_read_records, read_summary.read_observations, read_summary.additional_read_copies);
     println!("  \"sequence_constraints_pass\": {},", constraints_ok);
     println!("  \"exact_payload_match\": {}", exact_match);
     println!("}}");
