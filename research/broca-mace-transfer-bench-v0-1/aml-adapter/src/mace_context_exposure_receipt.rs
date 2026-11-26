@@ -72,7 +72,7 @@ pub struct MaceContextCaptureV1 {
     pub complete_memory_origin_enumeration: bool,
     pub untracked_memory_origin_span_count: u64,
     pub request_body_artifact: MaceRequestBodyArtifactV1,
-    #[serde(default)]
+    #[serde(default, skip_serializing_if = "Option::is_none")]
     pub provider_request_id: Option<String>,
 }
 
@@ -264,6 +264,9 @@ pub fn parse_and_verify_mace_context_exposure_receipt_v1(
 
     verify_receipt_bindings(&receipt, expected)?;
     verify_receipt_shapes(&receipt)?;
+    // Authenticate the signed envelope before touching artifact storage or
+    // invoking canonical evidence/authority lookups on attacker-supplied IDs.
+    verify_observer_signature(&receipt, expected, key_resolver)?;
 
     let artifact = &receipt.capture.request_body_artifact;
     if artifact.storage_profile_sha256 != expected.storage_profile_sha256
@@ -296,7 +299,6 @@ pub fn parse_and_verify_mace_context_exposure_receipt_v1(
         admission_verifier.verify_admitted_exposure(exposure, expected)
             .map_err(|_| MaceContextExposureRejectV1::EvidenceAdmissionRejected)?;
     }
-    verify_observer_signature(&receipt, expected, key_resolver)?;
     Ok(VerifiedMaceContextExposureReceiptV1 { receipt })
 }
 
@@ -313,12 +315,15 @@ fn verify_receipt_bindings(
     for value in [
         receipt.receipt_id.as_str(), receipt.run_id.as_str(),
         receipt.pair_block_id.as_str(), receipt.world_cluster_id.as_str(),
-        receipt.query_id.as_str(), receipt.model_revision.as_str(),
-        receipt.capture.request_media_type.as_str(),
-        receipt.capture.request_body_artifact.artifact_id.as_str(),
+        receipt.query_id.as_str(), receipt.capture.request_body_artifact.artifact_id.as_str(),
         receipt.response_binding.provider_response_id.as_str(),
     ] {
-        if value.trim().is_empty() { return Err(MaceContextExposureRejectV1::EmptyIdentifier); }
+        validate_identifier(value, 256)?;
+    }
+    validate_identifier(&receipt.model_revision, 512)?;
+    validate_identifier(&receipt.capture.request_media_type, 128)?;
+    if let Some(request_id) = receipt.capture.provider_request_id.as_deref() {
+        validate_identifier(request_id, 256)?;
     }
     if receipt.run_id != expected.run_id { return Err(MaceContextExposureRejectV1::WrongRun); }
     if receipt.pair_block_id != expected.pair_block_id { return Err(MaceContextExposureRejectV1::WrongPairBlock); }
@@ -388,11 +393,13 @@ fn verify_receipt_shapes(
     if receipt.exposures.len() > MACE_CONTEXT_EXPOSURE_MAX_SPANS_V1 {
         return Err(MaceContextExposureRejectV1::TooManySpans);
     }
+    if receipt.admission_denials.len() > MACE_CONTEXT_EXPOSURE_MAX_SPANS_V1 {
+        return Err(MaceContextExposureRejectV1::TooManySpans);
+    }
     let mut exposure_ids = BTreeSet::new();
     for span in &receipt.exposures {
-        if span.exposure_id.trim().is_empty() || span.evidence_id.trim().is_empty() {
-            return Err(MaceContextExposureRejectV1::EmptyIdentifier);
-        }
+        validate_identifier(&span.exposure_id, 256)?;
+        validate_identifier(&span.evidence_id, 256)?;
         if !exposure_ids.insert(span.exposure_id.as_str()) {
             return Err(MaceContextExposureRejectV1::DuplicateExposureId);
         }
@@ -401,7 +408,7 @@ fn verify_receipt_shapes(
         }
         let mut parents = BTreeSet::new();
         for parent in &span.parent_event_ids {
-            if parent.trim().is_empty() { return Err(MaceContextExposureRejectV1::EmptyIdentifier); }
+            validate_identifier(parent, 256)?;
             if !parents.insert(parent) { return Err(MaceContextExposureRejectV1::DuplicateParentId); }
         }
         for digest in [
@@ -417,7 +424,7 @@ fn verify_receipt_shapes(
 
     let mut denied = BTreeSet::new();
     for denial in &receipt.admission_denials {
-        if denial.evidence_id.trim().is_empty() { return Err(MaceContextExposureRejectV1::EmptyIdentifier); }
+        validate_identifier(&denial.evidence_id, 256)?;
         if !denied.insert(denial.evidence_id.as_str()) {
             return Err(MaceContextExposureRejectV1::DuplicateDeniedEvidence);
         }
@@ -429,16 +436,16 @@ fn verify_receipt_shapes(
 
     let mut model_support = BTreeSet::new();
     for id in &receipt.response_binding.model_declared_support_event_ids {
-        if id.trim().is_empty() || !model_support.insert(id) {
+        validate_identifier(id, 256)?;
+        if !model_support.insert(id) {
             return Err(MaceContextExposureRejectV1::InvalidResponseBinding);
         }
     }
     if receipt.signature.algorithm != "Ed25519" {
         return Err(MaceContextExposureRejectV1::InvalidSignatureAlgorithm);
     }
-    if receipt.signature.key_id.trim().is_empty() {
-        return Err(MaceContextExposureRejectV1::InvalidObserverKeyId);
-    }
+    validate_identifier(&receipt.signature.key_id, 256)
+        .map_err(|_| MaceContextExposureRejectV1::InvalidObserverKeyId)?;
     Ok(())
 }
 
@@ -516,6 +523,13 @@ pub fn exposure_signature_digest_v1(
     hasher.update(MACE_CONTEXT_EXPOSURE_DOMAIN_V1);
     hasher.update(canonical);
     Ok(hasher.finalize().into())
+}
+
+fn validate_identifier(value: &str, max_chars: usize) -> Result<(), MaceContextExposureRejectV1> {
+    if value.trim().is_empty() || value.trim() != value || value.chars().count() > max_chars {
+        return Err(MaceContextExposureRejectV1::EmptyIdentifier);
+    }
+    Ok(())
 }
 
 fn validate_sha256(value: &str) -> Result<(), MaceContextExposureRejectV1> {
