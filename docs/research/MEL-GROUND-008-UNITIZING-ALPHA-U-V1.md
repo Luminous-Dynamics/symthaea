@@ -152,3 +152,6 @@ No single coefficient is “the music annotation truth.” These are different r
 ## 8. Claim ceiling
 
 This implementation estimates annotation agreement under a specified one-category unitizing protocol. It does not establish that annotators are correct, culturally representative, equally expert or free of shared bias. It does not measure model accuracy, musical understanding, or musician agency. No SOTA or human-performance claim is made by passing synthetic equations and CLI fixtures.
+
+
+The per-item report preserves the original query text, audio digest/sample rate/channels, annotation policy, source-work lineage, every annotator digest/state, the original interval arrays and each status reason. Excluded Ambiguous and NotEstimable records remain recoverable with explicit exclusion reasons; they are not turned into gaps or negative labels.
