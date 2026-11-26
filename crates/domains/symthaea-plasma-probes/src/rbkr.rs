@@ -168,8 +168,8 @@ pub fn aggregate_response_gramians(
     let mut trajectory_digests = HashSet::with_capacity(scenarios.len());
     let mut maximum_weight = 0.0_f64;
     let mut scaled_weight_sum = 0.0_f64;
-    let mut reach_factor_count = 0_usize;
-    let mut observe_factor_count = 0_usize;
+    let mut input_factor_count = 0_usize;
+    let mut aggregate_factor_count = 0_usize;
     for scenario in scenarios {
         if scenario.scenario_id.trim().is_empty()
             || !scenario_ids.insert(scenario.scenario_id)
@@ -199,6 +199,15 @@ pub fn aggregate_response_gramians(
             return Err(RbkrError::InvalidScenarioWeight);
         }
         maximum_weight = maximum_weight.max(scenario.scenario_weight);
+        let scenario_factor_count = scenario
+            .reachability
+            .weighted_factors
+            .len()
+            .checked_add(scenario.observability.weighted_factors.len())
+            .ok_or(RbkrError::ScenarioFactorStorageBudgetExceeded)?;
+        input_factor_count = input_factor_count
+            .checked_add(scenario_factor_count)
+            .ok_or(RbkrError::ScenarioFactorStorageBudgetExceeded)?;
         if scenario.scenario_weight == 0.0 {
             continue;
         }
@@ -207,11 +216,8 @@ pub fn aggregate_response_gramians(
         {
             return Err(RbkrError::EmptyScenarioGramian);
         }
-        reach_factor_count = reach_factor_count
-            .checked_add(scenario.reachability.weighted_factors.len())
-            .ok_or(RbkrError::ScenarioFactorStorageBudgetExceeded)?;
-        observe_factor_count = observe_factor_count
-            .checked_add(scenario.observability.weighted_factors.len())
+        aggregate_factor_count = aggregate_factor_count
+            .checked_add(scenario_factor_count)
             .ok_or(RbkrError::ScenarioFactorStorageBudgetExceeded)?;
     }
     if maximum_weight <= 0.0 || !maximum_weight.is_finite() {
@@ -226,14 +232,11 @@ pub fn aggregate_response_gramians(
         return Err(RbkrError::InvalidScenarioWeight);
     }
 
-    let factor_scalars = reach_factor_count
-        .checked_add(observe_factor_count)
+    // All borrowed source factors remain resident, including zero-weight
+    // scenarios; only positive-weight factors are copied into the aggregate.
+    let peak_live_factor_scalars = input_factor_count
+        .checked_add(aggregate_factor_count)
         .and_then(|count| count.checked_mul(dimension))
-        .ok_or(RbkrError::ScenarioFactorStorageBudgetExceeded)?;
-    // Both the input scenarios and the returned aggregate factors remain live
-    // during the operation, so peak scalar storage is bounded at 2 * factors.
-    let peak_live_factor_scalars = factor_scalars
-        .checked_mul(2)
         .ok_or(RbkrError::ScenarioFactorStorageBudgetExceeded)?;
     if peak_live_factor_scalars > config.maximum_live_factor_scalars {
         return Err(RbkrError::ScenarioFactorStorageBudgetExceeded);
@@ -1227,6 +1230,48 @@ mod tests {
             ResponseBalancedBasis::from_empirical_gramians(&reach, &observe, RbkrConfig::new(1))
                 .unwrap();
         assert!(basis.biorthogonality_defect() < 1.0e-8);
+    }
+
+    #[test]
+    fn response_scenario_aggregation_counts_zero_weight_source_storage() {
+        let positive_reach = gramian(2, &[vec![1.0, 0.0]]);
+        let positive_observe = gramian(2, &[vec![1.0, 0.0]]);
+        let zero_weight_reach =
+            gramian(2, &[vec![1.0, 0.0], vec![0.0, 1.0]]);
+        let zero_weight_observe =
+            gramian(2, &[vec![1.0, 0.0], vec![0.0, 1.0]]);
+        let scenarios = [
+            ResponseGramianScenario {
+                scenario_id: "positive",
+                trajectory_sha256: "1111111111111111111111111111111111111111111111111111111111111111",
+                task_contract_id: "kresp1-contract-v1",
+                checkpoint_id: "checkpoint-a",
+                state_metric_id: "metric-v1",
+                reachability: &positive_reach,
+                observability: &positive_observe,
+                scenario_weight: 1.0,
+            },
+            ResponseGramianScenario {
+                scenario_id: "zero-weight",
+                trajectory_sha256: "2222222222222222222222222222222222222222222222222222222222222222",
+                task_contract_id: "kresp1-contract-v1",
+                checkpoint_id: "checkpoint-a",
+                state_metric_id: "metric-v1",
+                reachability: &zero_weight_reach,
+                observability: &zero_weight_observe,
+                scenario_weight: 0.0,
+            },
+        ];
+        // Source storage = 6 factors * 2 coordinates = 12 scalars;
+        // aggregate storage = 2 factors * 2 coordinates = 4 scalars.
+        // A budget of 12 must fail because peak live storage is 16.
+        assert_eq!(
+            aggregate_response_gramians(
+                &scenarios,
+                ResponseGramianAggregationConfig::new(12),
+            ),
+            Err(RbkrError::ScenarioFactorStorageBudgetExceeded)
+        );
     }
 
     #[test]
