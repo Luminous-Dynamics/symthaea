@@ -91,8 +91,7 @@
         "owner_tenant_id",
         "owner_session_id",
         "owner_agent_id",
-        "synthetic_marker",
-        "content_digest"
+        "synthetic_marker"
       ],
       "properties": {
         "record_id": {
@@ -118,10 +117,6 @@
         "synthetic_marker": {
           "type": "string",
           "pattern": "^SAT-MOCK-[A-Z0-9-]+$"
-        },
-        "content_digest": {
-          "type": "string",
-          "pattern": "^sha256:[a-f0-9]{64}$"
         },
         "deliberately_shared_group_id": {
           "type": [
