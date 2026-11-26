@@ -1,0 +1,252 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://github.com/Luminous-Dynamics/symthaea/blob/research/physical-storage-repair-locality-001/research/physical-storage/repair_locality_cases_v0_1.schema.json",
+  "title": "Physical Storage Repair Locality Cases v0.1",
+  "type": "object",
+  "additionalProperties": false,
+  "required": [
+    "schema_version",
+    "corpus_id",
+    "evidence_class",
+    "code_profiles",
+    "repair_cases"
+  ],
+  "properties": {
+    "schema_version": {
+      "const": "physical-storage-repair-locality-v0.1"
+    },
+    "corpus_id": {
+      "type": "string",
+      "pattern": "^[A-Z0-9][A-Z0-9._-]{2,127}$"
+    },
+    "evidence_class": {
+      "const": "synthetic_semantic_fixture"
+    },
+    "code_profiles": {
+      "type": "array",
+      "minItems": 2,
+      "items": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": [
+          "code_id",
+          "family",
+          "k",
+          "n",
+          "parity_symbols",
+          "redundancy_ratio",
+          "minimum_distance",
+          "field",
+          "primitive_polynomial_hex",
+          "generator_matrix",
+          "local_groups",
+          "max_guaranteed_erasures",
+          "source_status",
+          "notes"
+        ],
+        "properties": {
+          "code_id": {
+            "type": "string"
+          },
+          "family": {
+            "enum": [
+              "custom_mds_array",
+              "synthetic_locally_repairable"
+            ]
+          },
+          "k": {
+            "type": "integer",
+            "minimum": 1
+          },
+          "n": {
+            "type": "integer",
+            "minimum": 2
+          },
+          "parity_symbols": {
+            "type": "integer",
+            "minimum": 1
+          },
+          "redundancy_ratio": {
+            "type": "number",
+            "minimum": 0
+          },
+          "minimum_distance": {
+            "type": "integer",
+            "minimum": 2
+          },
+          "field": {
+            "const": "GF(2^8)"
+          },
+          "primitive_polynomial_hex": {
+            "const": "0x11d"
+          },
+          "generator_matrix": {
+            "type": "array",
+            "minItems": 2,
+            "items": {
+              "type": "array",
+              "minItems": 1,
+              "items": {
+                "type": "integer",
+                "minimum": 0,
+                "maximum": 255
+              }
+            }
+          },
+          "local_groups": {
+            "type": "array",
+            "items": {
+              "type": "array",
+              "minItems": 2,
+              "items": {
+                "type": "integer",
+                "minimum": 0
+              }
+            }
+          },
+          "max_guaranteed_erasures": {
+            "type": "integer",
+            "minimum": 1
+          },
+          "source_status": {
+            "enum": [
+              "in_repo_reference",
+              "synthetic_candidate"
+            ]
+          },
+          "notes": {
+            "type": "string"
+          }
+        }
+      }
+    },
+    "repair_cases": {
+      "type": "array",
+      "minItems": 8,
+      "items": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": [
+          "case_id",
+          "code_id",
+          "target_id",
+          "requested_bytes",
+          "helpers",
+          "independent_algebra_check",
+          "expected_sha256",
+          "observed_sha256",
+          "expected_disposition",
+          "expected_bytes_read",
+          "expected_read_operations",
+          "expected_unique_regions",
+          "expected_layer_transitions",
+          "expected_read_amplification_milli",
+          "rationale"
+        ],
+        "properties": {
+          "case_id": {
+            "type": "string"
+          },
+          "code_id": {
+            "type": "string"
+          },
+          "target_id": {
+            "type": "string"
+          },
+          "requested_bytes": {
+            "type": "integer",
+            "minimum": 1
+          },
+          "helpers": {
+            "type": "array",
+            "minItems": 1,
+            "items": {
+              "type": "object",
+              "additionalProperties": false,
+              "required": [
+                "source_id",
+                "region_id",
+                "layer",
+                "bytes_read",
+                "availability"
+              ],
+              "properties": {
+                "source_id": {
+                  "type": "string"
+                },
+                "region_id": {
+                  "type": "string"
+                },
+                "layer": {
+                  "type": "integer",
+                  "minimum": 0
+                },
+                "bytes_read": {
+                  "type": "integer",
+                  "minimum": 0
+                },
+                "availability": {
+                  "enum": [
+                    "available",
+                    "missing",
+                    "unknown"
+                  ]
+                }
+              }
+            }
+          },
+          "independent_algebra_check": {
+            "type": [
+              "boolean",
+              "null"
+            ]
+          },
+          "expected_sha256": {
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "observed_sha256": {
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "expected_disposition": {
+            "enum": [
+              "accepted",
+              "failed",
+              "incomplete",
+              "unverified"
+            ]
+          },
+          "expected_bytes_read": {
+            "type": "integer",
+            "minimum": 0
+          },
+          "expected_read_operations": {
+            "type": "integer",
+            "minimum": 0
+          },
+          "expected_unique_regions": {
+            "type": "integer",
+            "minimum": 0
+          },
+          "expected_layer_transitions": {
+            "type": "integer",
+            "minimum": 0
+          },
+          "expected_read_amplification_milli": {
+            "type": "integer",
+            "minimum": 0
+          },
+          "rationale": {
+            "type": "string",
+            "minLength": 1
+          }
+        }
+      }
+    }
+  }
+}
