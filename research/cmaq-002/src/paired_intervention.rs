@@ -1682,7 +1682,7 @@ mod tests {
             .iter_mut()
             .find(|row| row.family == InterventionFamily::Temporal)
             .unwrap();
-        row.treatment.invariant_variables[0].treatment_predicted_micro = 50;
+        row.invariant_variables[0].treatment_predicted_micro = 50;
         let result = evaluate_paired_interventions(&input).unwrap();
         let temporal = result
             .family_summaries
