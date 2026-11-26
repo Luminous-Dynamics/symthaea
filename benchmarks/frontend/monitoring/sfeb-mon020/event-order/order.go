@@ -277,6 +277,11 @@ func Evaluate(in Input,pins map[string]VerifierPin) Result {
 	if err!=nil { return finish(Indeterminate,err.Error(),0,0,checked...) }
 	proven:=0
 	for _,p:=range required {
+		before,after:=events[p.before],events[p.after]
+		if before.SourceID==after.SourceID {
+			if before.Sequence<after.Sequence { proven++;continue }
+			return finish(Denied,"required event order is reversed in one authenticated source sequence: "+p.before+" must precede "+p.after,len(required),proven,checked...)
+		}
 		if hasPath(adj,p.before,p.after) { proven++;continue }
 		if hasPath(adj,p.after,p.before) { return finish(Denied,"required event order is reversed: "+p.before+" must precede "+p.after,len(required),proven,checked...) }
 		return finish(Indeterminate,"required event order is not established: "+p.before+" -> "+p.after,len(required),proven,checked...)
