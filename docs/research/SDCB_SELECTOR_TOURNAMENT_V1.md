@@ -44,7 +44,7 @@ The following source files were fetched from main on 2026-11-26. The recorded SH
 
 ### Important distinctions
 
-1. **Prediction variance is not information gain.** The HDC selector measures scalar disagreement over the surviving hypothesis list; it has no calibrated noise/outcome model, prior, cost or downstream utility.
+1. **Prediction variance is not information gain.** A frozen three-hypothesis control also shows that population variance can be positive while two candidates remain identical; this is why aggregate disagreement and all-pairs identifiability must be reported independently.  The HDC selector measures scalar disagreement over the surviving hypothesis list; it has no calibrated noise/outcome model, prior, cost or downstream utility.
 2. **The Spark EIG approximation is not a full measurement model.** Its uniform likelihood for unpredicted hypotheses and deterministic classes for predicted hypotheses are assumptions. Report them as implemented; do not replace them with a calibrated likelihood during baseline runs.
 3. **Cell Foundry's FEP thresholds are triage, not probe selection.** Score campaign interventions separately; do not place it in the same top-1 experiment-ranking column.
 4. **Maximin separation is not EIG or EVSI.** It uses a bounded-noise deterministic trace envelope and no prior. Report its pairwise separation margin and resource Pareto frontier, not “information bits.”
@@ -71,6 +71,7 @@ Every selected probe is removed from the remaining offer set unless the episode 
 | Family | Construction | What it tests |
 |---|---|---|
 | Exact observational equivalence | Distinct mechanisms with exactly identical passive outputs under the frozen observation schedule; an allowed intervention separates them | False-unique claims and intervention value |
+| Partial disagreement / unresolved pair | Three hypotheses where two are identical under every offered probe and the third differs | Positive average variance must not be treated as full candidate identifiability; maximin all-pairs separation must retain unresolved pair or abstain |
 | Near equivalence | Parameter perturbations whose passive prediction distance is below/near the declared noise envelope | Calibration and selective risk near identifiability boundaries |
 | Sensor-limited | Some state dimensions unobservable under one sensor but observable under a permitted sensor set | Sensor choice, observability limits |
 | Excitation-limited | System is observable in theory but the actual passive input leaves discriminating modes unexcited | Distinguishes observability from experiment informativeness |
