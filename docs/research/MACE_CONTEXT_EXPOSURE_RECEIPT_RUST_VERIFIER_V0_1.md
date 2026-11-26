@@ -24,7 +24,7 @@ This is intentionally stricter than checking the request-body digest and trustin
 
 ## Provider parameter profile binding
 
-The verifier binds `provider_parameter_profile_sha256` from the signed receipt to the independent run manifest. The value is the SHA-256 commitment to the canonical JSON serialization of the deterministic, lexicographically ordered provider parameter map. The capture adapter limits generic parameters to numbers and booleans; free-form strings, nested objects and arrays are not accepted through this untyped path.
+The verifier binds `provider_parameter_profile_sha256` from the signed receipt to the independent run manifest. The value is the SHA-256 commitment to the canonical JSON serialization of the deterministic, lexicographically ordered provider parameter map. The capture adapter limits generic parameters to a fixed key/type allowlist: numeric `temperature`, `top_p`, `frequency_penalty`, `presence_penalty`, `max_tokens`, `max_completion_tokens`, `seed`, `n`, `top_logprobs`; boolean `stream`, `logprobs`, `parallel_tool_calls`. Unknown keys, wrong types, free-form strings, nulls, arrays and nested objects fail closed.
 
 This closes a request-construction gap in which memory-derived instructions, metadata or tool definitions could be inserted through arbitrary JSON outside the message source map. Structured provider fields require a provider-specific typed adapter that source-maps every dynamic text/media leaf. The static profile must be frozen before the run and reused unchanged by all randomized arms, including true no-memory.
 
@@ -57,7 +57,7 @@ These are deliberate interfaces to existing owners or separate deployment qualif
 
 ## Deterministic tests authored (not executed)
 
-Fifteen Rust unit tests cover:
+Twenty-two Rust unit tests cover:
 1. valid signed receipt, body, span and evidence binding;
 2. wrong run binding;
 3. changed request-body rejection;
