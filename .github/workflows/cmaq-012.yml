@@ -1,0 +1,119 @@
+name: CMAQ-012 joint decision-risk calibration benchmark
+
+on:
+  pull_request:
+    types: [opened, synchronize, reopened, ready_for_review]
+    paths:
+      - "research/cmaq-012/**"
+      - ".github/workflows/cmaq-012.yml"
+  push:
+    branches: [main]
+    paths:
+      - "research/cmaq-012/**"
+      - ".github/workflows/cmaq-012.yml"
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  joint-calibration:
+    runs-on: ubuntu-latest
+    if: github.event_name != 'pull_request' || github.event.pull_request.draft == false
+    steps:
+      - uses: actions/checkout@v4
+      - uses: dtolnay/rust-toolchain@1.96.0
+      - name: Rust unit tests
+        working-directory: research/cmaq-012
+        run: cargo test --locked
+      - name: Generate paired report and validate its contract
+        working-directory: research/cmaq-012
+        shell: bash
+        run: |
+          set -euo pipefail
+          cargo run --quiet --locked > /tmp/cmaq-012-report.json
+          python3 - <<'PY'
+          import json
+          from pathlib import Path
+
+          report = json.loads(Path("/tmp/cmaq-012-report.json").read_text())
+          assert report["schema_version"] == "cmaq-012-joint-decision-calibration-v0.1"
+          assert report["calibration_episode_count"] == 2048
+          assert report["qualification_episode_count"] == 2048
+          assert report["target_coverage"] == 0.90
+          assert report["calibration_seed_family"] != report["qualification_seed_family"]
+          assert report["candidate_counts"] == [8, 16, 32, 64]
+          assert report["scenarios"] == [
+              "in_distribution", "epistemic_scale_shift",
+              "aleatoric_noise_shift", "optimistic_failure_candidates"
+          ]
+          assert report["policies"] == [
+              "direct_fallback", "greedy_predicted_mean", "total_variance_lcb",
+              "pessimistic_ensemble_min_value", "marginal_conformal_lcb", "fixed_k8_joint_conformal_lcb",
+              "matched_k_joint_conformal_lcb", "oracle_action"
+          ]
+          rows = report["summary"]
+          assert len(rows) == 128
+          keys = {(row["scenario"], row["candidate_count"], row["policy"]) for row in rows}
+          assert len(keys) == len(rows)
+          expected = {
+              (scenario, count, policy)
+              for scenario in report["scenarios"]
+              for count in report["candidate_counts"]
+              for policy in report["policies"]
+          }
+          assert keys == expected
+
+          for row in rows:
+              for key in [
+                  "mean_decision_regret", "p95_decision_regret",
+                  "mean_realized_reward", "cvar05_realized_reward",
+                  "model_use_rate", "regret_delta_vs_greedy",
+                  "regret_delta_ci95_low", "regret_delta_ci95_high",
+                  "calibration_marginal_q", "calibration_joint_q", "fixed_k8_joint_q"
+              ]:
+                  assert isinstance(row[key], (int, float)) and abs(row[key]) < 1e6
+              assert row["mean_decision_regret"] >= -1e-8
+              assert row["p95_decision_regret"] >= 0.0
+              assert row["calibration_marginal_q"] > 0.0
+              assert row["calibration_joint_q"] > 0.0
+              assert row["fixed_k8_joint_q"] > 0.0
+              assert 0.0 <= row["model_use_rate"] <= 1.0
+              for key in ["joint_candidate_set_coverage", "selected_action_error_coverage"]:
+                  assert row[key] is None or 0.0 <= row[key] <= 1.0
+              assert row["regret_delta_ci95_low"] <= row["regret_delta_ci95_high"]
+
+          # Baseline and oracle contracts.
+          for scenario in report["scenarios"]:
+              for count in report["candidate_counts"]:
+                  fallback = next(r for r in rows if r["scenario"] == scenario and r["candidate_count"] == count and r["policy"] == "direct_fallback")
+                  oracle = next(r for r in rows if r["scenario"] == scenario and r["candidate_count"] == count and r["policy"] == "oracle_action")
+                  greedy = next(r for r in rows if r["scenario"] == scenario and r["candidate_count"] == count and r["policy"] == "greedy_predicted_mean")
+                  assert fallback["model_use_rate"] == 0.0
+                  assert oracle["model_use_rate"] == 1.0
+                  assert abs(oracle["mean_decision_regret"]) < 1e-8
+                  assert greedy["model_use_rate"] == 1.0
+
+          # Do not enforce desired performance as pass/fail. The measured target
+          # and shift misses are data; qualification targets remain preregistered.
+          for count in report["candidate_counts"]:
+              fixed = next(r for r in rows if r["scenario"] == "in_distribution" and r["candidate_count"] == count and r["policy"] == "fixed_k8_joint_conformal_lcb")
+              matched = next(r for r in rows if r["scenario"] == "in_distribution" and r["candidate_count"] == count and r["policy"] == "matched_k_joint_conformal_lcb")
+              print(f"K={count}: fixed-K8 coverage={fixed['joint_candidate_set_coverage']}, matched-K coverage={matched['joint_candidate_set_coverage']}")
+          print("CMAQ-012 report schema, split manifest, 112 scenario-count-policy rows, baseline/oracle controls validated")
+          print(json.dumps({
+              scenario: {
+                  str(count): {
+                      policy: {
+                          "regret": next(r for r in rows if r["scenario"] == scenario and r["candidate_count"] == count and r["policy"] == policy)["mean_decision_regret"],
+                          "joint_coverage": next(r for r in rows if r["scenario"] == scenario and r["candidate_count"] == count and r["policy"] == policy)["joint_candidate_set_coverage"],
+                          "selected_coverage": next(r for r in rows if r["scenario"] == scenario and r["candidate_count"] == count and r["policy"] == policy)["selected_action_error_coverage"],
+                          "model_use_rate": next(r for r in rows if r["scenario"] == scenario and r["candidate_count"] == count and r["policy"] == policy)["model_use_rate"]
+                      }
+                      for policy in ["greedy_predicted_mean", "pessimistic_ensemble_min_value", "marginal_conformal_lcb", "fixed_k8_joint_conformal_lcb", "matched_k_joint_conformal_lcb", "total_variance_lcb"]
+                  }
+                  for count in report["candidate_counts"]
+              }
+              for scenario in report["scenarios"]
+          }, sort_keys=True))
+          PY
