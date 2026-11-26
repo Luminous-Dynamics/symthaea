@@ -52,7 +52,7 @@ cargo build --release
 cargo nextest run --workspace --lib
 
 # Run the standalone Binius HDC benchmark
-cargo run --manifest-path crates/hdc-zkp-bench/Cargo.toml --release
+cargo run --locked --manifest-path crates/hdc-zkp-bench/Cargo.toml --release
 
 # Try the Spore kernel in browser
 open https://symthaea.luminousdynamics.io
