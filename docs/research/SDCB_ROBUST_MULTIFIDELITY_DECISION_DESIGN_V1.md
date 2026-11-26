@@ -99,7 +99,7 @@ Minimum comparator set for tasks that genuinely have multiple information fideli
 4. Cost-normalized EIG / mutual-information baseline.
 5. R-I and R-IDeA where a target design distribution and a trained proxy are available.
 6. Cost-aware MFBO / multi-fidelity entropy search, using an established implementation and pinned version.
-7. Multi-objective multi-fidelity optimization such as qMFMES or equivalent when the goal is a Pareto front rather than a single decision.
+7. Multi-objective multi-fidelity optimizers such as MF-OSEMO (output-space entropy search) and MF-JESMOC (joint entropy search with constraints and multiple fidelities) where the goal is a Pareto front rather than one downstream decision.
 8. DSSI EVSI and RPSD maximin as decision-focused exact finite comparators.
 
 Published guidance explicitly recommends checking the low/high fidelity cost ratio and informativeness before adopting MFBO; recent work does not support an assumption that MFBO always outperforms single-fidelity BO. For the materials/molecular track, use the published COF, molecular-polarizability and solvation-energy benchmarks with upstream code and splits. Keep application-specific tasks such as physical ISRU, cell-fabrication, nuclear measurement and chaotic-system control separate rather than pretending one dataset is universal.
@@ -156,9 +156,11 @@ These are proposed project targets, not published standards or achieved results:
 1. Sabanza-Gil et al. (2025), *Best practices for multi-fidelity Bayesian optimization in materials and molecular research*, Nature Computational Science 5, 572–581. https://www.nature.com/articles/s43588-025-00822-9
 2. Tang, Sloman & Kaski (2026), *Representative, Informative, and De-Amplifying: Requirements for Robust Bayesian Active Learning under Model Misspecification*, AISTATS 2026, PMLR 300, 3016–3024. https://proceedings.mlr.press/v300/tang26d.html
 3. McDonald et al. (2025), *Bayesian Optimization over Multiple Experimental Fidelities Accelerates Automated Discovery of Drug Molecules*, ACS Central Science 11, 346–356. https://pmc.ncbi.nlm.nih.gov/articles/PMC11869128/
-4. IJCAI 2026, *Adaptive Experimental Design to Accelerate Scientific Discovery and Engineering Design*. https://ijcai.org/proceedings/2026/904
-5. Atinary / EPFL / Cambridge MFBO implementation and datasets: https://github.com/atinary-technologies/chem-MFBO
-6. R-IDeA authors' released implementation: https://github.com/TrbingWY/robust-boed
+4. Belakaria, Deshwal & Doppa (2020), *Multi-Fidelity Multi-Objective Bayesian Optimization: An Output Space Entropy Search Approach*, AAAI. https://doi.org/10.1609/aaai.v34i06.6560
+5. *Joint entropy search for multi-objective Bayesian optimization with constraints and multiple fidelities*, Neurocomputing 657 (2025), 131674. https://doi.org/10.1016/j.neucom.2025.131674
+6. IJCAI 2026, *Adaptive Experimental Design to Accelerate Scientific Discovery and Engineering Design*. https://ijcai.org/proceedings/2026/904
+7. Atinary / EPFL / Cambridge MFBO implementation and datasets: https://github.com/atinary-technologies/chem-MFBO
+8. R-IDeA authors' released implementation: https://github.com/TrbingWY/robust-boed
 
 ## 11. Claim boundary
 
