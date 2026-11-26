@@ -1951,6 +1951,16 @@ mod tests {
         assert_eq!(missing_annotator.missing_annotations, 1);
         assert_eq!(missing_annotator.coverage_rate, Some(0.0));
         assert_eq!(missing_annotator.missing_reason_counts["TechnicalFailure"], 1);
+
+        let stable_rater = result
+            .annotator_coverage
+            .iter()
+            .find(|item| item.annotator_id_sha256 == digest('1'))
+            .unwrap();
+        assert_eq!(stable_rater.assigned_items, 2);
+        assert_eq!(stable_rater.returned_annotations, 2);
+        assert_eq!(stable_rater.missing_annotations, 0);
+        assert_eq!(stable_rater.coverage_rate, Some(1.0));
         assert!(result.source_work_bootstrap_rater_panel_fixed);
         assert!(result.unit_summaries[0].nonresponses.len() == 1);
         assert!(result.unit_summaries[0].annotations.len() == 2);
