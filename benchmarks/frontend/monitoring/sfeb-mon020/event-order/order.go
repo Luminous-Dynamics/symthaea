@@ -176,6 +176,9 @@ func requiredPairs(events []Event) ([]pair,error) {
 		}
 		if len(gens)>1 { return nil,fmt.Errorf("multiple generation events require an explicit simultaneous-generation profile: %s",entity) }
 		if len(invalids)>1 { return nil,fmt.Errorf("multiple invalidation events unsupported in v0.1: %s",entity) }
+		if (len(uses)>0 || len(invalids)>0) && len(gens)!=1 {
+			return nil,fmt.Errorf("entity use/invalidation has no unique authenticated generation event: %s",entity)
+		}
 		if len(gens)==1 {
 			for _,u:=range uses { pairs=append(pairs,pair{gens[0].ID,u.ID}) }
 			for _,inv:=range invalids { pairs=append(pairs,pair{gens[0].ID,inv.ID}) }
@@ -211,7 +214,7 @@ func Evaluate(in Input,pins map[string]VerifierPin) Result {
 	sourceInput:=append([]Source(nil),in.Sources...)
 	sort.Slice(sourceInput,func(i,j int)bool{return sourceInput[i].ID<sourceInput[j].ID})
 	for _,s:=range sourceInput {
-		if !nonempty(s.ID,s.ControlRoot)||!s.IdentityDigest.Valid() { return finish(Indeterminate,"source identity incomplete",0,0,checked...) }
+		if !nonempty(s.ID,s.ControlRoot)||!s.IdentityDigest.Valid() || s.IdentityDigest.Subject!=s.ID || s.IdentityDigest.Purpose!="source-identity" { return finish(Indeterminate,"source identity incomplete",0,0,checked...) }
 		if _,ok:=sources[s.ID];ok { return finish(Divergent,"duplicate source ID: "+s.ID,0,0,checked...) }
 		sources[s.ID]=s
 		d,why:=reportFor("source:"+s.ID,s.IdentityDigest,reports,conflicts,pins,in.EvaluationAt)
@@ -224,7 +227,7 @@ func Evaluate(in Input,pins map[string]VerifierPin) Result {
 	eventInput:=append([]Event(nil),in.Events...)
 	sort.Slice(eventInput,func(i,j int)bool{return eventInput[i].ID<eventInput[j].ID})
 	for _,e:=range eventInput {
-		if !nonempty(e.ID,e.SubjectID,e.SourceID)||e.Sequence==0||!e.RecordDigest.Valid() { return finish(Indeterminate,"event identity/source/sequence/digest incomplete",0,0,checked...) }
+		if !nonempty(e.ID,e.SubjectID,e.SourceID)||e.Sequence==0||!e.RecordDigest.Valid()||e.RecordDigest.Subject!=e.ID||e.RecordDigest.Purpose!="event" { return finish(Indeterminate,"event identity/source/sequence/digest incomplete",0,0,checked...) }
 		if _,ok:=events[e.ID];ok { return finish(Divergent,"duplicate event ID: "+e.ID,0,0,checked...) }
 		if _,ok:=sources[e.SourceID];!ok { return finish(Indeterminate,"event source is not in the verified source set: "+e.ID,0,0,checked...) }
 		key:=fmt.Sprintf("%s\x00%d",e.SourceID,e.Sequence)
@@ -248,7 +251,7 @@ func Evaluate(in Input,pins map[string]VerifierPin) Result {
 	sort.Slice(witnessInput,func(i,j int)bool{return witnessInput[i].ID<witnessInput[j].ID})
 	witnessIDs:=map[string]bool{}
 	for _,w:=range witnessInput {
-		if !nonempty(w.ID,w.BeforeEventID,w.AfterEventID,w.WitnessSourceID)||!w.EvidenceDigest.Valid() { return finish(Indeterminate,"order witness incomplete",0,0,checked...) }
+		if !nonempty(w.ID,w.BeforeEventID,w.AfterEventID,w.WitnessSourceID)||!w.EvidenceDigest.Valid()||w.EvidenceDigest.Subject!=w.ID||w.EvidenceDigest.Purpose!="order-witness" { return finish(Indeterminate,"order witness incomplete",0,0,checked...) }
 		if witnessIDs[w.ID] { return finish(Divergent,"duplicate order witness ID: "+w.ID,0,0,checked...) }
 		witnessIDs[w.ID]=true
 		before,bok:=events[w.BeforeEventID];after,aok:=events[w.AfterEventID];ws,wok:=sources[w.WitnessSourceID]
