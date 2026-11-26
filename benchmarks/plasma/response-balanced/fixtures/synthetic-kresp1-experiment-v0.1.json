@@ -307,7 +307,9 @@
     "adaptive_opinf_port",
     "adaptive_nitrom_port",
     "adaptive_opinf_nitrom_hybrid_port",
-    "symmetry_augmented_kinetic_closure"
+    "symmetry_augmented_kinetic_closure",
+    "entropy_based_vlasov_poisson_dougherty_moment_port",
+    "adaptive_symplectic_particle_vlasov_rom_port"
   ],
   "linearization_contract": {
     "status": "synthetic_derivatives_not_computed",
@@ -330,5 +332,9 @@
     "cvar_alpha": 0.9,
     "residual_threshold_status": "calibrate_on_independently_converged_physical_reference",
     "nonlinear_full_order_response_required": true
-  }
+  },
+  "methodological_prior_art": [
+    "semi_infinite_worst_case_scenario_generation",
+    "adaptive_symplectic_particle_vlasov_rom"
+  ]
 }
