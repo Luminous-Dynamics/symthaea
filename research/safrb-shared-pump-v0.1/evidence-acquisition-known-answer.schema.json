@@ -1,0 +1,128 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "title": "Symthaea SAFRB evidence-acquisition decision fixture v0.1",
+  "type": "object",
+  "additionalProperties": false,
+  "required": [
+    "schema_version",
+    "fixture_id",
+    "maturity",
+    "source_scenario",
+    "decision",
+    "admissible_model_family",
+    "candidate_investigations",
+    "required_policy_baselines",
+    "hard_gates",
+    "metrics",
+    "prospective_target",
+    "source_scenarios"
+  ],
+  "properties": {
+    "schema_version": {
+      "const": "symthaea-safrb-evidence-acquisition-v0.1"
+    },
+    "fixture_id": {
+      "const": "SYMTHAEA-SAFRB-PUMP-VOI-001"
+    },
+    "maturity": {
+      "const": "synthetic_test_fixture"
+    },
+    "source_scenario": {
+      "type": "object",
+      "required": [
+        "case_id",
+        "scenario_sha256",
+        "certificate_ref"
+      ]
+    },
+    "decision": {
+      "type": "object",
+      "required": [
+        "beneficiary_floor",
+        "current_physical_bound",
+        "current_disposition",
+        "unresolved_obligations",
+        "explicit_non_goals",
+        "time_window_obligations",
+        "lower_bound_horizon_flow",
+        "upper_bound_horizon_flow"
+      ]
+    },
+    "admissible_model_family": {
+      "type": "array",
+      "minItems": 2,
+      "items": {
+        "type": "object",
+        "required": [
+          "model_id",
+          "description",
+          "prior_weight"
+        ],
+        "properties": {
+          "prior_weight": {
+            "type": [
+              "number",
+              "null"
+            ]
+          }
+        }
+      }
+    },
+    "candidate_investigations": {
+      "type": "array",
+      "minItems": 4,
+      "items": {
+        "type": "object",
+        "required": [
+          "action_id",
+          "targets",
+          "measurement_origin",
+          "possible_outcomes",
+          "permission",
+          "authority_effect"
+        ]
+      }
+    },
+    "required_policy_baselines": {
+      "type": "array",
+      "minItems": 5,
+      "items": {
+        "type": "string"
+      }
+    },
+    "hard_gates": {
+      "type": "array",
+      "minItems": 1,
+      "items": {
+        "type": "string"
+      }
+    },
+    "metrics": {
+      "type": "array",
+      "minItems": 1,
+      "items": {
+        "type": "string"
+      }
+    },
+    "prospective_target": {
+      "type": "object",
+      "required": [
+        "decision_regret_reduction_vs_best_matched_baseline",
+        "false_safe_rate_increase",
+        "claim"
+      ]
+    },
+    "source_scenarios": {
+      "type": "array",
+      "minItems": 2,
+      "items": {
+        "type": "object",
+        "required": [
+          "case_id",
+          "scenario_sha256",
+          "certificate_ref"
+        ]
+      }
+    }
+  }
+}
