@@ -112,7 +112,7 @@ This branch adds a zero-dependency Rust sequence-channel utility with:
 - GC and maximum-homopolymer checks;
 - confidence-ranked soft-erasure candidates from externally calibrated probabilities;
 - progressive erasure-set generation;
-- read-record versus molecule multiplicity accounting;
+- read-record versus repeated read multiplicity accounting (distinct-molecule counts require UMIs or equivalent provenance);
 - byte-exact payload equality.
 
 It does not implement DNA-Aeon, DNA Fountain, HEDGES, Polus/SeqFormer, synthesis, basecalling, clustering or physical sequencing. The reference exists to test metrics and acceptance contracts. Its inputs are synthetic and not physical error probabilities.
