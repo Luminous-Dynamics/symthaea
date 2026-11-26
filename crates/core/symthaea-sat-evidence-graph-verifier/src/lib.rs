@@ -596,7 +596,7 @@ fn check_supported_claims(
                 admissible = false;
                 continue;
             };
-            observed_kinds.insert(observation.kind.as_str());
+            observed_kinds.insert(observation.kind.clone());
 
             let auth_ok = matches!(observation.authenticity_state.as_str(), "verified" | "not_applicable");
             let independence_ok = matches!(observation.independence_state.as_str(), "satisfied" | "not_applicable");
