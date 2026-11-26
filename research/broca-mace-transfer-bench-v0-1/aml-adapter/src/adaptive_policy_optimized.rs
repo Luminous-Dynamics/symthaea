@@ -72,7 +72,7 @@ impl SpentV1 {
 
 #[derive(Clone, Debug, Eq, PartialEq)]
 pub struct MemoizedSearchStatsV1 {
-    /// Number of distinct subproblems actually expanded.
+    /// Total recursive search calls, including calls satisfied from cache.
     pub recursive_calls: usize,
     /// Number of distinct subproblems actually expanded.
     pub expanded_states: usize,
@@ -516,9 +516,9 @@ mod tests {
                 probability_ppm: Some(weights[index]),
                 possible: true,
                 observation_by_query: BTreeMap::from([
-                    ("q-a".to_owned(), if index / 4 == 0 { "left" } else { "right" }.to_owned()),
-                    ("q-b".to_owned(), if (index / 2) % 2 == 0 { "low" } else { "high" }.to_owned()),
-                    ("q-c".to_owned(), if index % 2 == 0 { "even" } else { "odd" }.to_owned()),
+                    ("q-a".to_owned(), (if index / 4 == 0 { "left" } else { "right" }).to_owned()),
+                    ("q-b".to_owned(), (if (index / 2) % 2 == 0 { "low" } else { "high" }).to_owned()),
+                    ("q-c".to_owned(), (if index % 2 == 0 { "even" } else { "odd" }).to_owned()),
                 ]),
             }
         }).collect();

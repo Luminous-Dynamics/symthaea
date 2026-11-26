@@ -230,8 +230,8 @@ semantic judging. It must not be reported as a paper baseline, MACE benchmark
 score, or SOTA comparison. The authoritative TimlMemBench grader and label
 boundary remain controlled by the external benchmark repository.
 
-Six deterministic unit tests are authored for protocol round-trip, sample
-isolation, canonical-pool handling, gold-field rejection, duplicate lifecycle
-boundaries and deterministic lexical tie-breaking. They have not been run in
+Seven deterministic unit tests are authored for protocol round-trip, sample
+isolation, canonical-pool handling, gold-field rejection, duplicate-session
+rejection, close semantics and deterministic lexical tie-breaking. They have not been run in
 this environment.
 

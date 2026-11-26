@@ -463,4 +463,15 @@ mod tests {
         let hits = lexical_rank("tea preference", &docs);
         assert_eq!(hits[0].memory_id, "a");
     }
+
+    #[test]
+    fn duplicate_raw_session_id_is_rejected_within_the_active_sample() {
+        let mut adapter = TimlMemBenchLexicalAdapterV1::new();
+        reset(&mut adapter, "sample_001");
+        assert_eq!(adapter.handle(&session("sample_001", "first record"))["ok"], true);
+        let duplicate = adapter.handle(&session("sample_001", "duplicate record"));
+        assert!(duplicate["error"].as_str().unwrap().contains("duplicate session_id"));
+        assert_eq!(adapter.docs.len(), 1);
+    }
+
 }
