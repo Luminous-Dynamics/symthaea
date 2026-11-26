@@ -1,0 +1,437 @@
+{
+  "schema_version": "physical-storage-repair-locality-v0.1",
+  "corpus_id": "PHYSICAL-STORAGE-REPAIR-LOCALITY-CASES-V0.1",
+  "evidence_class": "synthetic_semantic_fixture",
+  "code_profiles": [
+    {
+      "code_id": "CUSTOM-MDS-6-4-3",
+      "family": "custom_mds_array",
+      "k": 4,
+      "n": 6,
+      "parity_symbols": 2,
+      "redundancy_ratio": 0.5,
+      "minimum_distance": 3,
+      "field": "GF(2^8)",
+      "primitive_polynomial_hex": "0x11d",
+      "generator_matrix": [
+        [
+          1,
+          0,
+          0,
+          0
+        ],
+        [
+          0,
+          1,
+          0,
+          0
+        ],
+        [
+          0,
+          0,
+          1,
+          0
+        ],
+        [
+          0,
+          0,
+          0,
+          1
+        ],
+        [
+          1,
+          1,
+          1,
+          1
+        ],
+        [
+          1,
+          2,
+          3,
+          4
+        ]
+      ],
+      "local_groups": [],
+      "max_guaranteed_erasures": 2,
+      "source_status": "in_repo_reference",
+      "notes": "Current custom MDS reference; single-erasure reconstruction uses four helpers in the conventional full-stripe baseline."
+    },
+    {
+      "code_id": "SYNTHETIC-LRC-7-4-3",
+      "family": "synthetic_locally_repairable",
+      "k": 4,
+      "n": 7,
+      "parity_symbols": 3,
+      "redundancy_ratio": 0.75,
+      "minimum_distance": 3,
+      "field": "GF(2^8)",
+      "primitive_polynomial_hex": "0x11d",
+      "generator_matrix": [
+        [
+          1,
+          0,
+          0,
+          0
+        ],
+        [
+          0,
+          1,
+          0,
+          0
+        ],
+        [
+          0,
+          0,
+          1,
+          0
+        ],
+        [
+          0,
+          0,
+          0,
+          1
+        ],
+        [
+          1,
+          1,
+          0,
+          0
+        ],
+        [
+          0,
+          0,
+          1,
+          1
+        ],
+        [
+          1,
+          2,
+          4,
+          8
+        ]
+      ],
+      "local_groups": [
+        [
+          0,
+          1,
+          4
+        ],
+        [
+          2,
+          3,
+          5
+        ]
+      ],
+      "max_guaranteed_erasures": 2,
+      "source_status": "synthetic_candidate",
+      "notes": "Synthetic 4-data/2-local-parity/1-global-parity profile. Independent GF(256) rank check verifies any two erasures; at least one three-erasure pattern is unrecoverable. Higher parity overhead than the 6,4 MDS reference."
+    }
+  ],
+  "repair_cases": [
+    {
+      "case_id": "MDS-SINGLE-D0-FULL-STRIPE",
+      "code_id": "CUSTOM-MDS-6-4-3",
+      "target_id": "D0",
+      "requested_bytes": 4096,
+      "helpers": [
+        {
+          "source_id": "S1",
+          "region_id": "region-1",
+          "layer": 0,
+          "bytes_read": 4096,
+          "availability": "available"
+        },
+        {
+          "source_id": "S2",
+          "region_id": "region-2",
+          "layer": 0,
+          "bytes_read": 4096,
+          "availability": "available"
+        },
+        {
+          "source_id": "S3",
+          "region_id": "region-3",
+          "layer": 1,
+          "bytes_read": 4096,
+          "availability": "available"
+        },
+        {
+          "source_id": "S4",
+          "region_id": "region-4",
+          "layer": 1,
+          "bytes_read": 4096,
+          "availability": "available"
+        }
+      ],
+      "independent_algebra_check": true,
+      "expected_sha256": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+      "observed_sha256": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+      "expected_disposition": "accepted",
+      "expected_bytes_read": 16384,
+      "expected_read_operations": 4,
+      "expected_unique_regions": 4,
+      "expected_layer_transitions": 1,
+      "expected_read_amplification_milli": 4000,
+      "rationale": "Conventional [6,4] full-stripe repair reads four surviving shard blocks to reconstruct one 4 KiB target block."
+    },
+    {
+      "case_id": "LRC-SINGLE-D0-LOCAL",
+      "code_id": "SYNTHETIC-LRC-7-4-3",
+      "target_id": "D0",
+      "requested_bytes": 4096,
+      "helpers": [
+        {
+          "source_id": "D1",
+          "region_id": "region-local-01",
+          "layer": 0,
+          "bytes_read": 4096,
+          "availability": "available"
+        },
+        {
+          "source_id": "P0",
+          "region_id": "region-local-01",
+          "layer": 0,
+          "bytes_read": 4096,
+          "availability": "available"
+        }
+      ],
+      "independent_algebra_check": true,
+      "expected_sha256": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+      "observed_sha256": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+      "expected_disposition": "accepted",
+      "expected_bytes_read": 8192,
+      "expected_read_operations": 2,
+      "expected_unique_regions": 1,
+      "expected_layer_transitions": 0,
+      "expected_read_amplification_milli": 2000,
+      "rationale": "D0 = P0 - D1 in this characteristic-two local group. Two helper blocks are sufficient for this single erasure; code recovery is independently marked verified in the fixture."
+    },
+    {
+      "case_id": "LRC-SINGLE-D2-LOCAL",
+      "code_id": "SYNTHETIC-LRC-7-4-3",
+      "target_id": "D2",
+      "requested_bytes": 4096,
+      "helpers": [
+        {
+          "source_id": "D3",
+          "region_id": "region-local-23",
+          "layer": 1,
+          "bytes_read": 4096,
+          "availability": "available"
+        },
+        {
+          "source_id": "P1",
+          "region_id": "region-local-23",
+          "layer": 1,
+          "bytes_read": 4096,
+          "availability": "available"
+        }
+      ],
+      "independent_algebra_check": true,
+      "expected_sha256": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+      "observed_sha256": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+      "expected_disposition": "accepted",
+      "expected_bytes_read": 8192,
+      "expected_read_operations": 2,
+      "expected_unique_regions": 1,
+      "expected_layer_transitions": 0,
+      "expected_read_amplification_milli": 2000,
+      "rationale": "D2 is locally reconstructed from its peer D3 and local parity P1."
+    },
+    {
+      "case_id": "LRC-TWO-D0-D1-SAME-GROUP",
+      "code_id": "SYNTHETIC-LRC-7-4-3",
+      "target_id": "D0+D1",
+      "requested_bytes": 8192,
+      "helpers": [
+        {
+          "source_id": "P0",
+          "region_id": "region-local-01",
+          "layer": 0,
+          "bytes_read": 4096,
+          "availability": "available"
+        },
+        {
+          "source_id": "G",
+          "region_id": "region-global",
+          "layer": 1,
+          "bytes_read": 4096,
+          "availability": "available"
+        },
+        {
+          "source_id": "D2",
+          "region_id": "region-data-2",
+          "layer": 1,
+          "bytes_read": 4096,
+          "availability": "available"
+        },
+        {
+          "source_id": "D3",
+          "region_id": "region-data-3",
+          "layer": 1,
+          "bytes_read": 4096,
+          "availability": "available"
+        }
+      ],
+      "independent_algebra_check": true,
+      "expected_sha256": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+      "observed_sha256": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+      "expected_disposition": "accepted",
+      "expected_bytes_read": 16384,
+      "expected_read_operations": 4,
+      "expected_unique_regions": 4,
+      "expected_layer_transitions": 1,
+      "expected_read_amplification_milli": 2000,
+      "rationale": "Both data symbols in one local group are missing. Local parity P0 and global parity G plus the intact other data pair provide two equations; this requires four helper blocks."
+    },
+    {
+      "case_id": "LRC-THREE-ERASURE-OUTSIDE-BOUND",
+      "code_id": "SYNTHETIC-LRC-7-4-3",
+      "target_id": "D0+D1+P0",
+      "requested_bytes": 12288,
+      "helpers": [
+        {
+          "source_id": "D2",
+          "region_id": "region-data-2",
+          "layer": 1,
+          "bytes_read": 4096,
+          "availability": "available"
+        },
+        {
+          "source_id": "D3",
+          "region_id": "region-data-3",
+          "layer": 1,
+          "bytes_read": 4096,
+          "availability": "available"
+        },
+        {
+          "source_id": "P1",
+          "region_id": "region-local-23",
+          "layer": 1,
+          "bytes_read": 4096,
+          "availability": "available"
+        }
+      ],
+      "independent_algebra_check": false,
+      "expected_sha256": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+      "observed_sha256": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+      "expected_disposition": "failed",
+      "expected_bytes_read": 12288,
+      "expected_read_operations": 3,
+      "expected_unique_regions": 3,
+      "expected_layer_transitions": 0,
+      "expected_read_amplification_milli": 1000,
+      "rationale": "Three erasures include D0,D1 and their local parity P0; only one global equation remains for two missing data symbols. The independent algebra check fails and the plan cannot be accepted."
+    },
+    {
+      "case_id": "MDS-UNKNOWN-HELPER",
+      "code_id": "CUSTOM-MDS-6-4-3",
+      "target_id": "D0",
+      "requested_bytes": 4096,
+      "helpers": [
+        {
+          "source_id": "S1",
+          "region_id": "region-1",
+          "layer": 0,
+          "bytes_read": 4096,
+          "availability": "available"
+        },
+        {
+          "source_id": "S2",
+          "region_id": "region-2",
+          "layer": 0,
+          "bytes_read": 4096,
+          "availability": "unknown"
+        },
+        {
+          "source_id": "S3",
+          "region_id": "region-3",
+          "layer": 1,
+          "bytes_read": 4096,
+          "availability": "available"
+        },
+        {
+          "source_id": "S4",
+          "region_id": "region-4",
+          "layer": 1,
+          "bytes_read": 4096,
+          "availability": "available"
+        }
+      ],
+      "independent_algebra_check": true,
+      "expected_sha256": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+      "observed_sha256": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+      "expected_disposition": "incomplete",
+      "expected_bytes_read": 16384,
+      "expected_read_operations": 4,
+      "expected_unique_regions": 4,
+      "expected_layer_transitions": 1,
+      "expected_read_amplification_milli": 4000,
+      "rationale": "Unknown helper availability must remain incomplete; the candidate cannot treat it as a successful read."
+    },
+    {
+      "case_id": "LRC-DIGEST-MISMATCH",
+      "code_id": "SYNTHETIC-LRC-7-4-3",
+      "target_id": "D0",
+      "requested_bytes": 4096,
+      "helpers": [
+        {
+          "source_id": "D1",
+          "region_id": "region-local-01",
+          "layer": 0,
+          "bytes_read": 4096,
+          "availability": "available"
+        },
+        {
+          "source_id": "P0",
+          "region_id": "region-local-01",
+          "layer": 0,
+          "bytes_read": 4096,
+          "availability": "available"
+        }
+      ],
+      "independent_algebra_check": true,
+      "expected_sha256": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+      "observed_sha256": "bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb",
+      "expected_disposition": "failed",
+      "expected_bytes_read": 8192,
+      "expected_read_operations": 2,
+      "expected_unique_regions": 1,
+      "expected_layer_transitions": 0,
+      "expected_read_amplification_milli": 2000,
+      "rationale": "The helper plan is algebraically valid but the reconstructed payload digest differs from the scorer-held expected digest."
+    },
+    {
+      "case_id": "LRC-ALGEBRA-UNVERIFIED",
+      "code_id": "SYNTHETIC-LRC-7-4-3",
+      "target_id": "D0",
+      "requested_bytes": 4096,
+      "helpers": [
+        {
+          "source_id": "D1",
+          "region_id": "region-local-01",
+          "layer": 0,
+          "bytes_read": 4096,
+          "availability": "available"
+        },
+        {
+          "source_id": "P0",
+          "region_id": "region-local-01",
+          "layer": 0,
+          "bytes_read": 4096,
+          "availability": "available"
+        }
+      ],
+      "independent_algebra_check": true,
+      "expected_sha256": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+      "observed_sha256": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+      "expected_disposition": "unverified",
+      "expected_bytes_read": 8192,
+      "expected_read_operations": 2,
+      "expected_unique_regions": 1,
+      "expected_layer_transitions": 0,
+      "expected_read_amplification_milli": 2000,
+      "rationale": "Candidate-reported local repair is not accepted until an independent code oracle verifies the selected helpers."
+    }
+  ]
+}
