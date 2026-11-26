@@ -36,7 +36,7 @@ jobs:
           lock=research/stateguard-b0-policy/Cargo.lock
           cp "$lock" /tmp/stateguard-committed.lock
           trap 'cp /tmp/stateguard-committed.lock "$lock"' EXIT
-          cargo generate-lockfile --manifest-path research/stateguard-b0-policy/Cargo.toml --offline
+          cargo generate-lockfile --manifest-path research/stateguard-b0-policy/Cargo.toml
           diff -u /tmp/stateguard-committed.lock "$lock" || true
       - name: Run locked policy tests
         run: cargo test --manifest-path research/stateguard-b0-policy/Cargo.toml --locked --all-targets
