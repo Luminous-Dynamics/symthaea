@@ -16,7 +16,9 @@ use decision::{
 };
 
 const EPS: f64 = 1e-12;
-const MAX_EXACT_CANDIDATES: usize = 12;
+const MAX_EXACT_CANDIDATES: usize = 8;
+const MAX_EXACT_HORIZON: usize = 4;
+const MAX_EXACT_OUTCOMES: usize = 4;
 
 #[derive(Debug, Clone, PartialEq)]
 pub struct NonMyopicChoice {
@@ -48,6 +50,9 @@ fn validate_candidates(
             return Err(DecisionError::DuplicateExperimentId);
         }
         evaluate_decision_experiment(posterior, model, candidate)?;
+        if candidate.outcome_likelihoods[0].len() > MAX_EXACT_OUTCOMES {
+            return Err(DecisionError::InvalidExperiment);
+        }
     }
     Ok(())
 }
@@ -147,7 +152,7 @@ pub fn finite_horizon_decision_value(
     cost_rate_per_unit: f64,
 ) -> Result<f64, DecisionError> {
     validate_candidates(posterior, model, candidates, cost_rate_per_unit)?;
-    if max_experiments > candidates.len() {
+    if max_experiments > candidates.len() || max_experiments > MAX_EXACT_HORIZON {
         return Err(DecisionError::InvalidExperiment);
     }
     let available = vec![true; candidates.len()];
@@ -371,8 +376,7 @@ mod tests {
             0.03,
         )
         .unwrap();
-        assert!(value < 0.85);
-        assert!(value >= 0.8);
+        assert!((value - 0.814).abs() < EPS);
     }
 
     #[test]
@@ -424,6 +428,27 @@ mod tests {
                 2,
                 0.0,
             ),
+            Err(DecisionError::InvalidExperiment)
+        );
+    }
+
+    #[test]
+    fn exact_oracle_rejects_horizon_above_reference_bound() {
+        let candidates = (0..MAX_EXACT_HORIZON + 1)
+            .map(|index| { let mut e = screen_a(); e.experiment_id = format!("probe-{index}"); e })
+            .collect::<Vec<_>>();
+        assert_eq!(
+            finite_horizon_decision_value(&[0.4, 0.4, 0.2], &model(), &candidates, 8, MAX_EXACT_HORIZON + 1, 0.0),
+            Err(DecisionError::InvalidExperiment)
+        );
+    }
+
+    #[test]
+    fn exact_oracle_rejects_outcome_branching_above_reference_bound() {
+        let mut e = screen_a();
+        e.outcome_likelihoods = vec![vec![0.2; 5], vec![0.2; 5], vec![0.2; 5]];
+        assert_eq!(
+            finite_horizon_decision_value(&[0.4, 0.4, 0.2], &model(), &[e], 1, 1, 0.0),
             Err(DecisionError::InvalidExperiment)
         );
     }
