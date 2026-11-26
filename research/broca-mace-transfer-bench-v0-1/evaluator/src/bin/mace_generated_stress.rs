@@ -55,6 +55,18 @@ fn fixture_root_digest(seed: u32) -> broca_mace_policy::SourceRootDigest {
     broca_mace_policy::SourceRootDigest::from_bytes(bytes)
 }
 
+/// Namespace source-root identities by generated world cluster. Event IDs in
+/// this fixture are cluster * 1_000 + an offset below 1_000. The high 16 bits
+/// therefore isolate clusters while the source-family value preserves
+/// intentional shared roots inside one cluster.
+fn fixture_source_root_id(event_id: u32, source_family: u16) -> u32 {
+    let cluster = event_id / 1_000;
+    cluster
+        .checked_mul(1 << 16)
+        .and_then(|namespace| namespace.checked_add(u32::from(source_family)))
+        .expect("generated source-root namespace fits u32")
+}
+
 fn fixture_semantic_estimand() -> broca_mace_policy::SemanticEstimandV1 {
     broca_mace_policy::SemanticEstimandV1::new(
         1,
@@ -97,8 +109,8 @@ fn exp(
     Experience {
         event_id: id,
         source_family: family,
-        source_root_id: u32::from(family),
-        source_root_digest: fixture_root_digest(u32::from(family)),
+        source_root_id: fixture_source_root_id(id, family),
+        source_root_digest: fixture_root_digest(fixture_source_root_id(id, family)),
         scope,
         action,
         observed_utility: utility,
@@ -427,9 +439,10 @@ pub(crate) fn generated_worlds(clusters: u64) -> Vec<Case> {
             0.96,
             0.65,
         );
+        let common_cause_root = fixture_source_root_id(id + 230, family + 15);
         for item in common_cause.iter_mut().filter(|item| item.action == Action::A) {
-            item.source_root_id = u32::from(family + 15);
-            item.source_root_digest = fixture_root_digest(u32::from(family + 15));
+            item.source_root_id = common_cause_root;
+            item.source_root_digest = fixture_root_digest(common_cause_root);
         }
         cases.push(case(
             cluster,
@@ -1129,6 +1142,26 @@ mod tests {
             first[0].memory[0].source_family,
             first[21].memory[0].source_family
         );
+    }
+
+    #[test]
+    fn source_root_identities_never_cross_generated_world_clusters() {
+        let cases = generated_worlds(32);
+        let mut root_owners = BTreeMap::<u32, u64>::new();
+        for case in &cases {
+            for item in &case.memory {
+                if let Some(previous_cluster) =
+                    root_owners.insert(item.source_root_id, case.cluster)
+                {
+                    assert_eq!(
+                        previous_cluster, case.cluster,
+                        "source root {} was reused across world clusters",
+                        item.source_root_id
+                    );
+                }
+            }
+        }
+        assert!(!root_owners.is_empty());
     }
 
     #[test]
