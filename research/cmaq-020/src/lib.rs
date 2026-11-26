@@ -36,7 +36,6 @@ pub struct StateResponseContract {
     pub probe_cost_units: BTreeMap<ResponseKey, u64>,
 }
 
-
 fn is_sha256(value: &str) -> bool {
     value.len() == 64 && value.bytes().all(|byte| byte.is_ascii_hexdigit())
 }
@@ -65,9 +64,16 @@ impl StateResponseContract {
             return Err("contract_sha256 must be a 64-character hexadecimal digest".to_owned());
         }
         if !is_sha256(&self.source_manifest_sha256) {
-            return Err("source_manifest_sha256 must be a 64-character hexadecimal digest".to_owned());
+            return Err(
+                "source_manifest_sha256 must be a 64-character hexadecimal digest".to_owned(),
+            );
         }
-        if self.domain_ids.is_empty() || self.domain_ids.iter().any(|domain| domain.trim().is_empty()) {
+        if self.domain_ids.is_empty()
+            || self
+                .domain_ids
+                .iter()
+                .any(|domain| domain.trim().is_empty())
+        {
             return Err("domain_ids must be non-empty and contain no empty IDs".to_owned());
         }
         if self.intervention_ids.is_empty()
@@ -102,7 +108,10 @@ impl StateResponseContract {
         }
         let supplied_probe_costs: BTreeSet<_> = self.probe_cost_units.keys().cloned().collect();
         if supplied_probe_costs != expected {
-            return Err("probe-cost keys must exactly cover the intervention × query × horizon contract".to_owned());
+            return Err(
+                "probe-cost keys must exactly cover the intervention × query × horizon contract"
+                    .to_owned(),
+            );
         }
         if self.probe_cost_units.values().any(|cost| *cost == 0) {
             return Err("response probe costs must be positive".to_owned());
@@ -139,16 +148,27 @@ impl StateResponseRecord {
             || self.environment_family_id.trim().is_empty()
             || self.environment_cluster_id.trim().is_empty()
         {
-            return Err("state, abstraction, domain, family and cluster IDs must be non-empty".to_owned());
+            return Err(
+                "state, abstraction, domain, family and cluster IDs must be non-empty".to_owned(),
+            );
         }
         if !contract.domain_ids.contains(&self.domain_id) {
-            return Err(format!("state {} uses a domain outside the frozen contract", self.state_id));
+            return Err(format!(
+                "state {} uses a domain outside the frozen contract",
+                self.state_id
+            ));
         }
         if !is_sha256(&self.source_state_sha256) {
-            return Err(format!("state {} has an invalid source-state digest", self.state_id));
+            return Err(format!(
+                "state {} has an invalid source-state digest",
+                self.state_id
+            ));
         }
         if !is_sha256(&self.candidate_checkpoint_sha256) {
-            return Err(format!("state {} has an invalid candidate-checkpoint digest", self.state_id));
+            return Err(format!(
+                "state {} has an invalid candidate-checkpoint digest",
+                self.state_id
+            ));
         }
         let supplied_invariants: BTreeSet<_> = self.invariant_signature.keys().cloned().collect();
         if supplied_invariants != contract.invariant_ids {
@@ -203,7 +223,9 @@ pub fn assess_pair(
         && (left.domain_id != right.domain_id
             || left.environment_family_id != right.environment_family_id)
     {
-        return Err("one environment cluster cannot alias multiple domain/family identities".to_owned());
+        return Err(
+            "one environment cluster cannot alias multiple domain/family identities".to_owned(),
+        );
     }
     Ok(assess_pair_validated(left, right, contract))
 }
@@ -241,7 +263,6 @@ pub fn approximate_response_equivalent(
         && assessment.normalized_worst_case_distortion <= epsilon)
 }
 
-
 fn validate_record_set(
     records: &[StateResponseRecord],
     contract: &StateResponseContract,
@@ -262,7 +283,9 @@ fn validate_record_set(
         }
         match frozen_checkpoint {
             Some(checkpoint) if checkpoint != record.candidate_checkpoint_sha256.as_str() => {
-                return Err("one evaluation must use exactly one frozen candidate checkpoint".to_owned());
+                return Err(
+                    "one evaluation must use exactly one frozen candidate checkpoint".to_owned(),
+                );
             }
             None => frozen_checkpoint = Some(&record.candidate_checkpoint_sha256),
             _ => {}
@@ -298,7 +321,9 @@ pub fn score_abstraction(
 
     let mut class_sizes: BTreeMap<&str, usize> = BTreeMap::new();
     for record in records {
-        *class_sizes.entry(record.abstract_state_id.as_str()).or_default() += 1;
+        *class_sizes
+            .entry(record.abstract_state_id.as_str())
+            .or_default() += 1;
     }
 
     let mut score = AbstractionScore {
@@ -332,7 +357,6 @@ pub fn score_abstraction(
     }
     Ok(score)
 }
-
 
 #[derive(Clone, Debug, Eq, Ord, PartialEq, PartialOrd)]
 pub enum CounterexampleDimension {
@@ -408,7 +432,9 @@ pub fn select_counterexample_probe(
                         Some((contract.probe_cost_units[key], key))
                     })
                     .min_by(|(left_cost, left_key), (right_cost, right_key)| {
-                        left_cost.cmp(right_cost).then_with(|| left_key.cmp(right_key))
+                        left_cost
+                            .cmp(right_cost)
+                            .then_with(|| left_key.cmp(right_key))
                     });
 
                 if let Some((cost, key)) = cheapest_witness {
@@ -609,12 +635,6 @@ mod tests {
         assert!(score_abstraction(&[left, right], &contract).is_err());
     }
 
-
-
-
-
-
-
     #[test]
     fn toy_world_exposes_copy_appearance_and_response_quotient_tradeoffs() {
         let contract = contract();
@@ -641,15 +661,13 @@ mod tests {
         for state in &mut copy_only {
             state.abstract_state_id = "copied-current-state".to_owned();
         }
-        let copy_score =
-            score_abstraction(&copy_only, &contract).expect("copy-only partition");
+        let copy_score = score_abstraction(&copy_only, &contract).expect("copy-only partition");
         assert_eq!(copy_score.candidate_class_count, 1);
         assert_eq!(copy_score.false_merges, 4);
 
         // Appearance grouping both merges different mechanisms and splits
         // same-mechanism states under an irrelevant nuisance change.
-        let appearance_score =
-            score_abstraction(&states, &contract).expect("appearance partition");
+        let appearance_score = score_abstraction(&states, &contract).expect("appearance partition");
         assert_eq!(appearance_score.candidate_class_count, 2);
         assert_eq!(appearance_score.false_merges, 2);
         assert_eq!(appearance_score.false_splits, 2);
@@ -674,8 +692,7 @@ mod tests {
         let first = record("state-a", "class-shared", 0, 2);
         let second = record("state-b", "class-shared", 0, 2);
         let third = record("state-c", "class-singleton", 0, 2);
-        let score = score_abstraction(&[first, second, third], &contract)
-            .expect("valid partition");
+        let score = score_abstraction(&[first, second, third], &contract).expect("valid partition");
         assert_eq!(score.candidate_class_count, 2);
         assert_eq!(score.singleton_class_count, 1);
         assert_eq!(score.false_splits, 2);
@@ -832,11 +849,9 @@ mod tests {
         let left = record("state-a", "same-class", 0, 2);
         let middle = record("state-b", "same-class", 1, 2);
         let right = record("state-c", "same-class", 2, 2);
-        let forward = select_counterexample_probe(
-            &[left.clone(), middle.clone(), right.clone()],
-            &contract,
-        )
-        .expect("valid contract");
+        let forward =
+            select_counterexample_probe(&[left.clone(), middle.clone(), right.clone()], &contract)
+                .expect("valid contract");
         let reverse =
             select_counterexample_probe(&[right, middle, left], &contract).expect("valid contract");
         assert_eq!(forward, reverse);
@@ -848,13 +863,14 @@ mod tests {
         let left = record("state-a", "class-0", 0, 2);
         let middle = record("state-b", "class-0", 1, 2);
         let right = record("state-c", "class-0", 2, 2);
-        let first = select_counterexample_probe(
-            &[left.clone(), middle.clone(), right.clone()],
-            &contract,
-        )
-        .expect("valid contract")
-        .expect("first counterexample");
-        assert_eq!((first.left_state_id.as_str(), first.right_state_id.as_str()), ("state-a", "state-b"));
+        let first =
+            select_counterexample_probe(&[left.clone(), middle.clone(), right.clone()], &contract)
+                .expect("valid contract")
+                .expect("first counterexample");
+        assert_eq!(
+            (first.left_state_id.as_str(), first.right_state_id.as_str()),
+            ("state-a", "state-b")
+        );
 
         let mut refined_middle = middle;
         refined_middle.abstract_state_id = "class-1".to_owned();
@@ -864,17 +880,20 @@ mod tests {
         )
         .expect("valid contract")
         .expect("remaining counterexample");
-        assert_eq!((second.left_state_id.as_str(), second.right_state_id.as_str()), ("state-a", "state-c"));
+        assert_eq!(
+            (
+                second.left_state_id.as_str(),
+                second.right_state_id.as_str()
+            ),
+            ("state-a", "state-c")
+        );
 
         let mut refined_right = right;
         refined_right.abstract_state_id = "class-2".to_owned();
         assert!(
-            select_counterexample_probe(
-                &[left, refined_middle, refined_right],
-                &contract
-            )
-            .expect("valid contract")
-            .is_none()
+            select_counterexample_probe(&[left, refined_middle, refined_right], &contract)
+                .expect("valid contract")
+                .is_none()
         );
     }
 
