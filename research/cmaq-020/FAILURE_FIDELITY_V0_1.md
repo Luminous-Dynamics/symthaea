@@ -69,7 +69,7 @@ Each pair binds:
 - reference success counts and trial counts for both the success-labelled and failure-labelled scene variants;
 - candidate-predicted success counts and trial counts for both variants.
 
-The counts preserve repeated rollouts; they do not turn them into independent environment samples. The independent unit remains the source cluster/pairing structure declared by the manifest.
+The counts preserve repeated rollouts; they do not turn them into independent environment samples. The independent unit remains the source cluster/pairing structure declared by the manifest. The two scenes share a source pair manifest and reference policy but need not share an exact initial scene or identical action trace: the reference policy can react differently to the changed scene. Thus this path measures boundary fidelity under a matched policy configuration, not an identical-action causal effect.
 
 For each side, the evaluator calculates success rate in basis points. It reports separately:
 - success-side rate MAE;
