@@ -27,6 +27,14 @@ The mandatory nearest comparator is:
 
 - Padovan (2026), *Non-Intrusive Balancing for Data-Driven Model Reduction with Oblique Projections*, arXiv:2610.15219. The paper combines empirical reachability and projected-observability Gramians using forward simulation data and reports up to two orders of magnitude lower forecast error than POD-based Operator Inference on its tested flow cases. Its method must be reproduced or compared on a technically matched cohort before claiming an advantage: https://arxiv.org/abs/2610.15219
 
+Relevant prior art means we cannot claim empirical/nonlinear balancing as a new invention:
+
+- Kawano & Scherpen (2021), *Empirical differential Gramians for nonlinear model reduction*, Automatica 127, 109534. Differential reachability and observability Gramians are defined along a fixed state/input trajectory and can be computed from variational-system responses: https://doi.org/10.1016/j.automatica.2021.109534
+- Kawano & Scherpen (2017), *Empirical Differential Balancing for Nonlinear Systems*, IFAC-PapersOnLine 50(1), 6326–6331. The prolonged system and its variational system permit trajectory-local empirical balancing without solving nonlinear Hamilton–Jacobi PDEs: https://doi.org/10.1016/j.ifacol.2017.08.920
+- The 2026 literature on bilinear-quadratic-output balanced truncation also makes clear that a state-dependent reduction need not preserve the original system structure automatically. RBKR must therefore impose positivity and the relevant kinetic structure as independent constraints, not infer them from biorthogonality: https://doi.org/10.1080/00207179.2026.2720284
+
+The candidate novelty is narrower and more defensible: a frozen, experiment-specific contract combining kinetic pulse families, future QoI response signatures, mixed finite-amplitude interactions, branch identity, explicit representation rate–distortion, and a conservative qualification/hand-off policy. The general notions of nonlinear balancing and input–output equivalence are not claimed as new.
+
 Other required baselines and adjacent methods:
 
 - Snapshot POD / SVD.
