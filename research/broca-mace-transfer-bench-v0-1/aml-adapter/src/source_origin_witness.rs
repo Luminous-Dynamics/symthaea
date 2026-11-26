@@ -250,7 +250,7 @@ impl VerifiedSourceOriginWitnessSetV1 {
         }
         origin.validate_at_use(graph, artifacts, current_origin_profile, now_unix)
             .map_err(SourceOriginWitnessRejectV1::Origin)?;
-        validate_verifier_set(graph, origin, policy, verifiers)?;
+        validate_verifier_set(graph, origin, current_origin_profile, policy, verifiers)?;
         let origin_bundle_sha256 = source_origin_bundle_sha256(origin);
         if origin_bundle_sha256 != self.source_origin_receipt_bundle_sha256 {
             return Err(SourceOriginWitnessRejectV1::OriginReceiptMismatch);
@@ -397,6 +397,7 @@ pub fn verify_source_origin_witnesses_v1(
 fn validate_verifier_set(
     graph: &VerifiedSourceLineageGraphV1,
     origin: &VerifiedSourceOriginSetV1,
+    current_origin_profile: &PinnedEd25519QualificationVerifierV1,
     policy: &SourceOriginWitnessPolicyV1,
     verifiers: &[SourceOriginWitnessVerifierV1<'_>],
 ) -> Result<(), SourceOriginWitnessRejectV1> {
@@ -404,9 +405,12 @@ fn validate_verifier_set(
         return Err(SourceOriginWitnessRejectV1::InvalidVerifierSet);
     }
     let mut profiles = BTreeSet::new();
+    if current_origin_profile.profile_sha256() != origin.origin_profile_sha256() {
+        return Err(SourceOriginWitnessRejectV1::ProfileMismatch);
+    }
     let mut keys = graph.authority_key_ids().iter().cloned()
         .collect::<BTreeSet<_>>();
-    keys.extend(origin.signer_key_ids());
+    keys.extend(current_origin_profile.key_ids());
     for operator in &policy.operators {
         if graph.authority_profile_sha256().contains(&operator.verifier_profile_sha256)
             || origin.origin_profile_sha256() == operator.verifier_profile_sha256
