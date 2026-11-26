@@ -33,6 +33,7 @@ impl Family {
         }
     }
 
+    #[cfg(test)]
     fn name(self) -> &'static str {
         match self {
             Self::Additive => "additive",
@@ -98,6 +99,7 @@ impl Mechanism {
         }
     }
 
+    #[cfg(test)]
     fn id(&self) -> String {
         format!("{}-v{}", self.family.name(), self.variant)
     }
@@ -437,15 +439,20 @@ impl Strategy {
     }
 }
 
+#[derive(Clone, Copy, Debug)]
+struct ProbeSelectionCosts {
+    decision_horizon: usize,
+    probe_cost: f64,
+    allocator_cost_per_work_unit: f64,
+}
+
 fn select_probe(
     strategy: Strategy,
     worlds: &[Mechanism],
     posterior: &[usize],
     used: &BTreeSet<Query>,
     rng: &mut SplitMix64,
-    decision_horizon: usize,
-    probe_cost: f64,
-    allocator_cost_per_work_unit: f64,
+    costs: ProbeSelectionCosts,
 ) -> Option<Query> {
     let (available, _, _) = available_probe_queries(worlds, posterior, used);
     if available.is_empty() || posterior.len() <= 1 {
@@ -484,7 +491,9 @@ fn select_probe(
             })?;
             let gain = expected_value_of_probe(worlds, posterior, best);
             let allocator_cost = available_count as f64 * allocator_cost_per_work_unit;
-            if gain * decision_horizon as f64 > probe_cost + allocator_cost {
+            if gain * costs.decision_horizon as f64
+                > costs.probe_cost + costs.allocator_cost_per_work_unit * available_count as f64
+            {
                 Some(best)
             } else {
                 None
@@ -624,9 +633,11 @@ fn evaluate_strategy(
                     &posterior,
                     &used,
                     &mut rng,
-                    decision_horizon,
-                    probe_cost,
-                    allocator_cost_per_work_unit,
+                    ProbeSelectionCosts {
+                        decision_horizon,
+                        probe_cost,
+                        allocator_cost_per_work_unit,
+                    },
                 ) else {
                     break;
                 };
@@ -740,7 +751,7 @@ fn parse_args() -> Result<(u64, usize, usize, f64, f64, bool), String> {
                 position += 1;
                 cost = args.get(position).ok_or("--probe-cost requires a value")?
                     .parse().map_err(|_| "--probe-cost must be a number".to_owned())?;
-                if !cost.is_finite() || cost < 0.0 || cost > 100.0 {
+                if !cost.is_finite() || !(0.0..=100.0).contains(&cost) {
                     return Err("--probe-cost must be finite and in 0..=100".to_owned());
                 }
             }
@@ -748,7 +759,7 @@ fn parse_args() -> Result<(u64, usize, usize, f64, f64, bool), String> {
                 position += 1;
                 allocator_cost = args.get(position).ok_or("--allocator-cost requires a value")?
                     .parse().map_err(|_| "--allocator-cost must be a number".to_owned())?;
-                if !allocator_cost.is_finite() || allocator_cost < 0.0 || allocator_cost > 100.0 {
+                if !allocator_cost.is_finite() || !(0.0..=100.0).contains(&allocator_cost) {
                     return Err("--allocator-cost must be finite and in 0..=100".to_owned());
                 }
             }
@@ -969,9 +980,11 @@ mod tests {
             &posterior,
             &used,
             &mut rng,
-            1,
-            0.0,
-            0.0,
+            ProbeSelectionCosts {
+                decision_horizon: 1,
+                probe_cost: 0.0,
+                allocator_cost_per_work_unit: 0.0,
+            },
         ).expect("at least one probe should have positive decision value");
         let chosen_gain = expected_value_of_probe(&worlds, &posterior, chosen);
         let (safe_queries, _, _) = available_probe_queries(&worlds, &posterior, &used);
@@ -985,16 +998,17 @@ mod tests {
             &[0],
             &used,
             &mut rng,
-            1,
-            0.0,
-            0.0,
+            ProbeSelectionCosts {
+                decision_horizon: 1,
+                probe_cost: 0.0,
+                allocator_cost_per_work_unit: 0.0,
+            },
         );
         assert!(stop.is_none());
     }
 
     #[test]
     fn robust_policy_never_selects_an_action_unsafe_in_the_true_hypothesis() {
-        let worlds = mechanisms();
         for strategy in Strategy::all() {
             let summary = evaluate_strategy(strategy, 4_242, 2, 1, 0.25, 0.0);
             assert_eq!(summary.unsafe_actions, 0, "strategy {}", strategy.name());
