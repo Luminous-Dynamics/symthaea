@@ -130,28 +130,27 @@ jobs:
           set -euo pipefail
           cargo +1.96.0 run --locked --manifest-path tools/mel-temporal-grounding-qualifier/Cargo.toml --bin mel-audio-evidence-in-toto -- tools/mel-temporal-grounding-qualifier/fixtures/mel-audio-bound-revision.synthetic.json tools/mel-temporal-grounding-qualifier/fixtures/mel-audio-evidence-window.synthetic.json tools/mel-temporal-grounding-qualifier/fixtures/mel-audio-evidence-source.synthetic.bin tools/mel-temporal-grounding-qualifier/fixtures/mel-audio-evidence-pcm.synthetic.hex > "$RUNNER_TEMP/audio-evidence-in-toto-payload.json"
           jq -e '
-            .payload_type == "application/vnd.in-toto+json"
-            and (.statement_payload_sha256 | length == 64)
-            and .dsse_envelope_created == false
-            and .signature_verified == false
-            and (
-              .statement_json | fromjson
-            ) as $statement
-            | $statement["_type"] == "https://in-toto.io/Statement/v1"
+            (.statement_json | fromjson) as $statement
+            | (.payload_type == "application/vnd.in-toto+json"
+              and (.statement_payload_sha256 | length == 64)
+              and .dsse_envelope_created == false
+              and .signature_verified == false
+              and $statement["_type"] == "https://in-toto.io/Statement/v1"
               and $statement.predicateType == "https://luminousdynamics.io/attestations/mel/audio-evidence-materialization/v1"
-              and ($statement.subject | map(.name) | any(startswith("source-audio/")))
-              and ($statement.subject | map(.name) | any(startswith("decoded-pcm/")))
-              and ($statement.subject | map(.name) | any(startswith("audio-window/")))
-              and ($statement.subject | map(.name) | any(startswith("audio-context-manifest/")))
-              and ($statement.subject | map(.name) | any(startswith("audio-evidence-manifest/")))
-              and ($statement.subject | map(.name) | any(startswith("temporal-revision-report/")))
+              and ($statement.subject | map(.name) | any(.[]; startswith("target-audio-reference/")))
+              and ($statement.subject | map(.name) | any(.[]; startswith("source-audio/")))
+              and ($statement.subject | map(.name) | any(.[]; startswith("decoded-pcm/")))
+              and ($statement.subject | map(.name) | any(.[]; startswith("audio-window/")))
+              and ($statement.subject | map(.name) | any(.[]; startswith("audio-context-manifest/")))
+              and ($statement.subject | map(.name) | any(.[]; startswith("audio-evidence-manifest/")))
+              and ($statement.subject | map(.name) | any(.[]; startswith("temporal-revision-report/")))
               and $statement.predicate.evidence_level == "DigestLinked"
               and $statement.predicate.target_source_lineage_id == "synthetic-source-lineage-001"
               and $statement.predicate.evidence_source_lineage_id == "synthetic-source-lineage-001"
               and $statement.predicate.target_audio_bytes_recomputed == true
               and $statement.predicate.source_audio_bytes_recomputed == true
               and $statement.predicate.runner_receipt_verified == false
-              and $statement.predicate.model_input_attested == false
+              and $statement.predicate.model_input_attested == false)
           ' "$RUNNER_TEMP/audio-evidence-in-toto-payload.json" > /dev/null
 
       - name: Assemble exact-head evidence
