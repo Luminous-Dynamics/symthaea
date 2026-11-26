@@ -987,10 +987,12 @@ impl ActiveSelectionState {
             .spent
             .checked_add(candidate.annotation_cost_units)
             .ok_or_else(|| "active budget usage overflow".to_string())?;
-        *self.source_counts
+        *self
+            .source_counts
             .entry(candidate.source_work_id_sha256.clone())
             .or_default() += 1;
-        *self.stratum_counts
+        *self
+            .stratum_counts
             .entry(candidate.source_stratum_id.clone())
             .or_default() += 1;
         self.selections.push(selection_record(
@@ -1020,7 +1022,8 @@ fn select_active(
     // First satisfy per-stratum minimums. Items without a model/disagreement
     // priority can enter only under an explicit minimum-coverage quota.
     for quota in &config.stratum_quotas {
-        while state.stratum_counts
+        while state
+            .stratum_counts
             .get(&quota.source_stratum_id)
             .copied()
             .unwrap_or(0)
@@ -1091,7 +1094,8 @@ fn select_active(
                     .get(stratum)
                     .copied()
                     .ok_or_else(|| "active candidate has no stratum quota".to_string())?;
-                if state.stratum_counts.get(*stratum).copied().unwrap_or(0) >= quota.active_maximum_items
+                if state.stratum_counts.get(*stratum).copied().unwrap_or(0)
+                    >= quota.active_maximum_items
                 {
                     continue;
                 }
@@ -1140,14 +1144,8 @@ fn select_active(
         })
         .collect();
 
-    Ok((
-        state.selections,
-        unmet,
-        state.spent,
-        state.source_counts,
-    ))
+    Ok((state.selections, unmet, state.spent, state.source_counts))
 }
-
 
 fn active_candidate_fits(
     index: usize,
