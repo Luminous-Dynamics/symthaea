@@ -216,6 +216,10 @@ L5-SAT is a proposed research gate, not an IETF level and not a production secur
 6. Add a separate evaluator replay and sealed holdout process.
 7. Compare clean utility on the Agent Memory Leaderboard's native tracks, and security on each native security benchmark; publish separate tables and Pareto frontiers.
 
+### Related assurance lane: witness survivability
+
+The current federation profile also references [#13847 — Independent memory witness survivability](https://github.com/Luminous-Dynamics/symthaea/pull/13847). Its 20 public development fixtures exercise rollback, receipt replay, equivocation, stale checkpoints, quorum loss, ambiguous commits, T10 recovery and common-cause operator dependencies. This remains `referenced_not_run`: no remote witness service or independently operated quorum has been evaluated. Witness survivability is reported separately from the three native memory-security metrics and never changes their denominators or score.
+
 ## 10. Existing implementation ownership and non-duplication
 
 - SAT at-rest adapter: [PR #13797](https://github.com/Luminous-Dynamics/symthaea/pull/13797).
