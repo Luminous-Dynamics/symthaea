@@ -7,13 +7,21 @@
 //! The world model can predict outcomes of actions (transition model) and
 //! generate expected observations from state (likelihood model).
 //!
-//! ## Transition Model (Hybrid HDC → CfC)
+//! ## Transition Model (current implementation)
 //!
-//! Phase 1: HDC delta vectors — each action type gets a learned delta.
-//!   Prediction: next_state ≈ current_state + action_delta
-//!   Composable: multi-step plans = sequential addition of deltas.
+//! The production `NixWorldModel` baseline is HDC per-action mean-delta
+//! averaging: `next_state ≈ current_state + mean_delta[action]`.
+//! Unknown action categories retain the historical identity-state fallback;
+//! callers can inspect `TransitionSupport::NoExamples` through diagnostics.
 //!
-//! Phase 2: CfC neural model (auto-activates after ~50 episodes).
+//! `ContextualDeltaBaselineV1` is a separate research candidate keyed by
+//! exact domain/context/family/action-profile/parameter identity. It abstains
+//! on unseen keys and is not wired into production action selection.
+//!
+//! CfC/HDC-LTC transition integration is not implemented in this module.
+//! Separate HDC-LTC components exist in `symthaea-core`, but this
+//! `NixWorldModel` has no CfC model field, activation threshold, training
+//! path, inference path or CfC checkpoint.
 
 use super::predictive_hierarchy::PredictiveHierarchy;
 use std::collections::HashMap;
