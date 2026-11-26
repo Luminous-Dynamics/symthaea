@@ -19108,6 +19108,7 @@ version = "0.2.0"
 dependencies = [
  "fs2",
  "memmap2",
+ "sha2 0.10.9",
  "symthaea-core",
  "tempfile",
  "thiserror 2.0.18",
