@@ -152,6 +152,15 @@ jobs:
             and .item_count == 4
             and .source_work_clusters == 3
             and .total_annotation_records == 9
+            and .assigned_rater_item_assignments == 10
+            and .returned_rater_item_annotations == 9
+            and .missing_rater_item_assignments == 1
+            and .overall_annotation_coverage == 0.9
+            and .complete_items == 3
+            and .items_with_nonresponse == 1
+            and .missing_reason_counts.TechnicalFailure == 1
+            and (.annotator_coverage | length) == 3
+            and .source_work_bootstrap_rater_panel_fixed == true
             and .disposition_alpha.ratings == 9
             and .disposition_alpha.observed_disagreement > 0.44
             and .disposition_alpha.observed_disagreement < 0.45
