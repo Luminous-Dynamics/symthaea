@@ -2294,9 +2294,6 @@ mod tests {
                 &format!("cmaq022-family-a-cluster-{index}"),
             );
             episode_a.environment_family_id = "mechanism-a".to_owned();
-            episode_a
-                .execution
-                .clone();
             world_model
                 .learn_episode(&episode_a)
                 .expect("family A executed episode must train the HDC model");
@@ -2426,7 +2423,7 @@ mod tests {
                 domain_id: "toy-nixos-domain".to_owned(),
                 environment_family_id: (*family).to_owned(),
                 environment_cluster_id: (*cluster).to_owned(),
-                source_state_sha256: format!("{:0<64}", state_id),
+                source_state_sha256: blake3::hash(state_id.as_bytes()).to_hex().to_string(),
                 candidate_checkpoint_sha256: "c".repeat(64),
                 abstract_state_id,
                 invariant_signature: [("constant-invariant".to_owned(), 1)]
