@@ -810,6 +810,46 @@ mod tests {
         }
     }
 
+    struct AcceptPinnedResource;
+    impl DecisionResourceReceiptVerifierV1 for AcceptPinnedResource {
+        fn verify(
+            &self,
+            _decision_need_sha256: &str,
+            _query_option_id: &str,
+            _action_template_sha256: &str,
+            _resource_profile_sha256: &str,
+            _resource_receipt_sha256: &str,
+            _tool_calls: u32,
+            _estimated_latency_ns: u64,
+            _estimated_context_tokens: u64,
+            _estimated_inspected_bytes: u64,
+            _acquisition_cost_utility_units: u64,
+            _now_unix: u64,
+        ) -> Result<(), DecisionResourceReceiptRejectV1> {
+            Ok(())
+        }
+    }
+
+    struct RejectResource;
+    impl DecisionResourceReceiptVerifierV1 for RejectResource {
+        fn verify(
+            &self,
+            _decision_need_sha256: &str,
+            _query_option_id: &str,
+            _action_template_sha256: &str,
+            _resource_profile_sha256: &str,
+            _resource_receipt_sha256: &str,
+            _tool_calls: u32,
+            _estimated_latency_ns: u64,
+            _estimated_context_tokens: u64,
+            _estimated_inspected_bytes: u64,
+            _acquisition_cost_utility_units: u64,
+            _now_unix: u64,
+        ) -> Result<(), DecisionResourceReceiptRejectV1> {
+            Err(DecisionResourceReceiptRejectV1::InvalidSignature)
+        }
+    }
+
     fn policy() -> DecisionValuePolicyV1 {
         let mut policy = DecisionValuePolicyV1 {
             decision_need_sha256: "a".repeat(64),
@@ -842,6 +882,9 @@ mod tests {
             calibration_profile_sha256: Some("d".repeat(64)),
             calibration_receipt_sha256: Some("e".repeat(64)),
             calibration_valid_until_unix: Some(100),
+            resource_profile_sha256: "f".repeat(64),
+            resource_receipt_sha256: "1".repeat(64),
+            resource_valid_until_unix: 100,
             likelihood_ppm_by_state: vec![
                 vec![1_000_000, 0],
                 vec![0, 1_000_000],
@@ -865,9 +908,27 @@ mod tests {
     }
 
     #[test]
+    fn a_rejected_resource_receipt_blocks_evsi_and_robust_scoring() {
+        let policy = policy();
+        let prior = prior();
+        let option = informative_option();
+        assert_eq!(
+            evaluate_expected_value_v1(
+                &policy, &prior, &option, 10,
+                &AcceptPinnedCalibration, &RejectResource,
+            ),
+            Err(DecisionValueRejectV1::ResourceReceiptRejected)
+        );
+        assert_eq!(
+            evaluate_robust_value_v1(&policy, &option, 10, &RejectResource),
+            Err(DecisionValueRejectV1::ResourceReceiptRejected)
+        );
+    }
+
+    #[test]
     fn informative_query_has_positive_evsi_after_cost() {
         let assessment = evaluate_expected_value_v1(
-            &policy(), &prior(), &informative_option(), 10, &AcceptPinnedCalibration,
+            &policy(), &prior(), &informative_option(), 10, &AcceptPinnedCalibration, &AcceptPinnedResource,
         ).unwrap();
         assert_eq!(assessment.baseline_action_id, "abstain");
         assert_eq!(assessment.gross_evsi_numerator_ppm2, 50_000_000_000_000);
@@ -936,7 +997,7 @@ mod tests {
             vec![true, true],
         ];
         let assessment = evaluate_expected_value_v1(
-            &policy(), &prior(), &option, 10, &AcceptPinnedCalibration,
+            &policy(), &prior(), &option, 10, &AcceptPinnedCalibration, &AcceptPinnedResource,
         ).unwrap();
         assert_eq!(assessment.gross_evsi_numerator_ppm2, 0);
         assert!(!assessment.worth_retrieving);
@@ -957,14 +1018,14 @@ mod tests {
         let informative = informative_option();
         let selected = choose_expected_value_query_v1(
             &policy(), &prior(), &[uninformative.clone(), informative.clone()],
-            10, &AcceptPinnedCalibration,
+            10, &AcceptPinnedCalibration, &AcceptPinnedResource,
         ).unwrap().expect("positive EVSI candidate");
         assert_eq!(selected.query_option_id, "verify-source");
         let mut expensive = informative;
         expensive.query_option_id = "too-expensive".into();
         expensive.acquisition_cost_utility_units = 100;
         let stopped = choose_expected_value_query_v1(
-            &policy(), &prior(), &[expensive], 10, &AcceptPinnedCalibration,
+            &policy(), &prior(), &[expensive], 10, &AcceptPinnedCalibration, &AcceptPinnedResource,
         ).unwrap();
         assert!(stopped.is_none());
     }
@@ -973,7 +1034,7 @@ mod tests {
     fn query_selector_rejects_duplicate_option_identities() {
         let option = informative_option();
         assert_eq!(
-            choose_robust_value_query_v1(&policy(), &[option.clone(), option]),
+            choose_robust_value_query_v1(&policy(), &[option.clone(), option], 10, &AcceptPinnedResource),
             Err(DecisionValueRejectV1::DuplicateOption)
         );
     }
@@ -994,7 +1055,7 @@ mod tests {
         prior.probability_ppm_by_state = vec![500_000, 400_000];
         assert_eq!(
             evaluate_expected_value_v1(
-                &policy(), &prior, &informative_option(), 10, &AcceptPinnedCalibration,
+                &policy(), &prior, &informative_option(), 10, &AcceptPinnedCalibration, &AcceptPinnedResource,
             ),
             Err(DecisionValueRejectV1::InvalidProbability)
         );
@@ -1002,7 +1063,7 @@ mod tests {
 
     #[test]
     fn robust_minimax_value_is_positive_without_any_probability_model() {
-        let assessment = evaluate_robust_value_v1(&policy(), &informative_option()).unwrap();
+        let assessment = evaluate_robust_value_v1(&policy(), &informative_option(), 10, &AcceptPinnedResource).unwrap();
         assert_eq!(assessment.baseline_minimax_regret_utility_units, 100);
         assert_eq!(assessment.post_query_worst_case_regret_utility_units, 0);
         assert_eq!(assessment.gross_regret_reduction_utility_units, 100);
@@ -1015,7 +1076,7 @@ mod tests {
     fn robust_evaluation_needs_no_calibrated_probability_matrix() {
         let mut option = informative_option();
         option.likelihood_ppm_by_state.clear();
-        let assessment = evaluate_robust_value_v1(&policy(), &option).unwrap();
+        let assessment = evaluate_robust_value_v1(&policy(), &option, 10, &AcceptPinnedResource).unwrap();
         assert_eq!(assessment.robust_net_value_utility_units, 95);
     }
 
@@ -1026,7 +1087,7 @@ mod tests {
             vec![true, true],
             vec![true, true],
         ];
-        let assessment = evaluate_robust_value_v1(&policy(), &option).unwrap();
+        let assessment = evaluate_robust_value_v1(&policy(), &option, 10, &AcceptPinnedResource).unwrap();
         assert_eq!(assessment.gross_regret_reduction_utility_units, 0);
         assert!(!assessment.worth_retrieving);
     }
@@ -1037,12 +1098,12 @@ mod tests {
         option.estimated_latency_ns = 20_000;
         assert_eq!(
             evaluate_expected_value_v1(
-                &policy(), &prior(), &option, 10, &AcceptPinnedCalibration,
+                &policy(), &prior(), &option, 10, &AcceptPinnedCalibration, &AcceptPinnedResource,
             ),
             Err(DecisionValueRejectV1::BudgetExceeded)
         );
         assert_eq!(
-            evaluate_robust_value_v1(&policy(), &option),
+            evaluate_robust_value_v1(&policy(), &option, 10, &AcceptPinnedResource),
             Err(DecisionValueRejectV1::BudgetExceeded)
         );
     }
@@ -1054,7 +1115,7 @@ mod tests {
         option.calibration_valid_until_unix = Some(10);
         assert_eq!(
             evaluate_expected_value_v1(
-                &policy(), &prior, &option, 10, &AcceptPinnedCalibration,
+                &policy(), &prior, &option, 10, &AcceptPinnedCalibration, &AcceptPinnedResource,
             ),
             Err(DecisionValueRejectV1::InvalidCalibration)
         );
@@ -1081,7 +1142,7 @@ mod tests {
         // its average utility could be made attractive by another state.
         policy.action_allowed_by_state[0][1] = false;
         let assessment = evaluate_expected_value_v1(
-            &policy, &prior(), &informative_option(), 10, &AcceptPinnedCalibration,
+            &policy, &prior(), &informative_option(), 10, &AcceptPinnedCalibration, &AcceptPinnedResource,
         ).unwrap();
         assert_eq!(
             assessment.selected_actions_by_observation[0].selected_action_id.as_deref(),
@@ -1099,7 +1160,7 @@ mod tests {
         policy.action_allowed_by_state[0] = vec![false, false];
         assert_eq!(
             evaluate_expected_value_v1(
-                &policy, &prior(), &informative_option(), 10, &AcceptPinnedCalibration,
+                &policy, &prior(), &informative_option(), 10, &AcceptPinnedCalibration, &AcceptPinnedResource,
             ),
             Err(DecisionValueRejectV1::NoPermittedAction)
         );
