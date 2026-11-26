@@ -82,6 +82,8 @@ pub struct MechanismConditionProfile {
     pub mechanism_relation: MechanismRelation,
     pub observation_relation: ObservationRelation,
     pub target_family_relation: TargetFamilyRelation,
+    /// Exact evaluator-assigned target family identity for this condition.
+    pub target_environment_family_id: String,
     pub profile_manifest_sha256: [u8; 32],
 }
 
@@ -199,10 +201,13 @@ pub enum MechanismTransferError {
     ConditionProfileRelationMismatch {
         condition: MechanismTransferCondition,
     },
+    EmptyTargetEnvironmentFamilyId {
+        condition: MechanismTransferCondition,
+    },
     TargetEnvironmentFamilyMismatch {
         condition: MechanismTransferCondition,
-        source_family_id: String,
-        target_family_id: String,
+        expected_family_id: String,
+        observed_family_id: String,
     },
     TaskUsesUndeclaredCondition {
         condition: MechanismTransferCondition,
@@ -269,13 +274,18 @@ impl fmt::Display for MechanismTransferError {
                 "mechanism and observation relations do not match declared condition {}",
                 condition.as_str()
             ),
+            Self::EmptyTargetEnvironmentFamilyId { condition } => write!(
+                formatter,
+                "target environment family ID is empty or untrimmed for {}",
+                condition.as_str()
+            ),
             Self::TargetEnvironmentFamilyMismatch {
                 condition,
-                source_family_id,
-                target_family_id,
+                expected_family_id,
+                observed_family_id,
             } => write!(
                 formatter,
-                "target environment family {target_family_id} does not satisfy the source-family relationship for {} (source {source_family_id})",
+                "task environment family {observed_family_id} does not match evaluator-declared family {expected_family_id} for {}",
                 condition.as_str()
             ),
             Self::TaskUsesUndeclaredCondition { condition } => write!(
@@ -430,6 +440,21 @@ fn digest_is_empty(digest: &[u8; 32]) -> bool {
     digest.iter().all(|byte| *byte == 0)
 }
 
+fn target_family_id(
+    source_family_id: &str,
+    condition: MechanismTransferCondition,
+) -> String {
+    match condition {
+        MechanismTransferCondition::SameFamilyHoldout
+        | MechanismTransferCondition::NuisanceShift
+        | MechanismTransferCondition::ParameterShift => source_family_id.to_owned(),
+        MechanismTransferCondition::CompositionalShift
+        | MechanismTransferCondition::StructuralShift => {
+            format!("target-{}", condition.as_str())
+        }
+    }
+}
+
 fn validate_context(context: &MechanismTransferContext) -> Result<(), MechanismTransferError> {
     if context.source_environment_family_id.trim().is_empty()
         || context.source_environment_family_id.trim()
@@ -454,6 +479,14 @@ fn validate_context(context: &MechanismTransferContext) -> Result<(), MechanismT
                 condition: profile.condition,
             });
         }
+        if profile.target_environment_family_id.trim().is_empty()
+            || profile.target_environment_family_id.trim()
+                != profile.target_environment_family_id.as_str()
+        {
+            return Err(MechanismTransferError::EmptyTargetEnvironmentFamilyId {
+                condition: profile.condition,
+            });
+        }
         let expected = expected_relations(profile.condition);
         if (
             profile.mechanism_relation,
@@ -461,6 +494,15 @@ fn validate_context(context: &MechanismTransferContext) -> Result<(), MechanismT
             profile.target_family_relation,
         ) != expected
         {
+            return Err(MechanismTransferError::ConditionProfileRelationMismatch {
+                condition: profile.condition,
+            });
+        }
+        let expected_family_id = target_family_id(
+            &context.source_environment_family_id,
+            profile.condition,
+        );
+        if profile.target_environment_family_id != expected_family_id {
             return Err(MechanismTransferError::ConditionProfileRelationMismatch {
                 condition: profile.condition,
             });
@@ -531,18 +573,11 @@ pub fn evaluate_mechanism_transfer(
             .ok_or(MechanismTransferError::TaskUsesUndeclaredCondition {
                 condition: row.condition,
             })?;
-        let same_source_family =
-            task.environment_family_id == input.context.source_environment_family_id;
-        let family_relation_valid = match profile.target_family_relation {
-            TargetFamilyRelation::SameAsSource => same_source_family,
-            TargetFamilyRelation::NewCompositionFamily
-            | TargetFamilyRelation::NewStructuralFamily => !same_source_family,
-        };
-        if !family_relation_valid {
+        if task.environment_family_id != profile.target_environment_family_id {
             return Err(MechanismTransferError::TargetEnvironmentFamilyMismatch {
                 condition: row.condition,
-                source_family_id: input.context.source_environment_family_id.clone(),
-                target_family_id: task.environment_family_id.clone(),
+                expected_family_id: profile.target_environment_family_id.clone(),
+                observed_family_id: task.environment_family_id.clone(),
             });
         }
         if cluster_condition
@@ -805,6 +840,10 @@ mod tests {
                     mechanism_relation,
                     observation_relation,
                     target_family_relation,
+                    target_environment_family_id: target_family_id(
+                        "source-family-v1",
+                        condition,
+                    ),
                     profile_manifest_sha256: digest(30 + index as u8),
                 }
             })
@@ -827,15 +866,7 @@ mod tests {
         cluster_number: u8,
         score_ppm: u32,
     ) -> MechanismTransferTask {
-        let family_id = match condition {
-            MechanismTransferCondition::SameFamilyHoldout
-            | MechanismTransferCondition::NuisanceShift
-            | MechanismTransferCondition::ParameterShift => "source-family-v1".to_owned(),
-            MechanismTransferCondition::CompositionalShift
-            | MechanismTransferCondition::StructuralShift => {
-                format!("target-{}", condition.as_str())
-            }
-        };
+        let family_id = target_family_id("source-family-v1", condition);
         let cluster_id = format!("{}-cluster-{cluster_number}", condition.as_str());
         let task_id = format!(
             "{}-{}-{}-{}",
