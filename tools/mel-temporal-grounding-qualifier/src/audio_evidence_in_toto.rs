@@ -111,7 +111,7 @@ pub fn build_audio_evidence_in_toto_statement(
     let mut subjects = Vec::with_capacity(6 + audit.audio_evidence_report.verified_windows.len());
     subjects.push(subject(
         format!(
-            "target-audio/{}",
+            "target-audio-reference/{}",
             audit.audio_evidence_report.target_audio_sha256
         ),
         audit.audio_evidence_report.target_audio_sha256.clone(),
