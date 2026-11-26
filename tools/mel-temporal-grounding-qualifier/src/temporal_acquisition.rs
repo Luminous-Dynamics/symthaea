@@ -647,13 +647,13 @@ fn validate_candidates(candidates: &[AnnotationAcquisitionCandidateV1]) -> Resul
                 ));
             }
         }
-        if let Some(receipt) = candidate.authorization_receipt_sha256.as_deref() {
-            if !is_digest(receipt) {
-                return Err(format!(
-                    "candidate {} has an invalid authorization receipt digest",
-                    candidate.item_id
-                ));
-            }
+        if let Some(receipt) = candidate.authorization_receipt_sha256.as_deref()
+            && !is_digest(receipt)
+        {
+            return Err(format!(
+                "candidate {} has an invalid authorization receipt digest",
+                candidate.item_id
+            ));
         }
         if let Some((role, stratum)) = source_metadata.get(candidate.source_work_id_sha256.as_str())
         {
