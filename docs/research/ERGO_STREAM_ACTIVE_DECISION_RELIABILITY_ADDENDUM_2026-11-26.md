@@ -640,3 +640,27 @@ Source: https://arxiv.org/abs/2610.32332
 
 Do not pool these into a single score. Keep their evidence access, model observer, temporal horizon, task semantics, judge and resource accounting explicit.
 
+
+
+## 13. Constraint-carrying allocentric state
+
+The new spatial-state programme [VIS-012](https://github.com/Luminous-Dynamics/symthaea/issues/13855) proposes a stronger world-model substrate than a single best-estimate map: a **versioned set of source-grounded spatial constraints and admissible map alternatives**.
+
+An observation should create claims/constraints with explicit provenance, frame, time, uncertainty and epistemic origin. The system should retain alternative identity associations, pose relations and topological edges when the observations do not uniquely determine them. A current DecisionNeed may use a decision-equivalent quotient without collapsing the underlying alternatives.
+
+### Candidate invariants
+
+- **Frame correctness:** image coordinates do not become world coordinates without admitted calibration/pose and a transform uncertainty envelope.
+- **Cycle consistency:** transform composition around a closed pose-graph cycle must agree with identity within a preregistered residual bound. A failed closure remains a rejected/alternative constraint rather than being silently optimized away.
+- **Topological validity:** direct adjacency requires an observation or typed inference rule; sequential visits alone do not establish a doorway/connection.
+- **Identity consistency:** repeated appearance is not sufficient for loop closure when trajectory or geometric constraints conflict.
+- **Temporal consistency:** a late correction updates current map belief while preserving earlier known-at state and audit history.
+- **Decision sufficiency:** resolve only the distinctions that change the exact current DecisionNeed's action; retain source-linked residuals for later queries.
+
+### Evaluation consequences
+
+Add pose-graph cycle residuals, transform/uncertainty coverage, false loop-closure rate, topological edge support class, false adjacency, map hypothesis count, contradiction localization and minimum affected-subgraph revision cost. Report map quality separately from answer accuracy and retrieval recall.
+
+LongSpace-Bench is a relevant method comparator because LongSpace injects frozen 3D geometric cues into early decoder layers and uses sensory/working/long hierarchical KV memory for query-guided recall. Its EMNLP protocol is room-tour long-video reasoning, not OVO-S causal streaming. Compare the representation/hierarchy as a baseline, but keep protocol access and temporal horizon explicit. Official paper: https://aclanthology.org/2026.emnlp-main.227/.
+
+The contribution hypothesis is not “HDC replaces SLAM” or “a constraint graph beats all VLMs”. It is that multimodal models, HDC/CfC state, explicit geometric/topological constraints and independent decision evaluation can be composed so that every map claim is grounded, revisable and no more specific than its evidence permits.
