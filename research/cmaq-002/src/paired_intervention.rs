@@ -1044,17 +1044,18 @@ pub fn evaluate_paired_interventions(
                 pair_id: pair.pair_id.clone(),
             });
         }
-        if let PairDisposition::Failed { penalty_ppm }
-        | PairDisposition::TimedOut { penalty_ppm }
-        | PairDisposition::Invalid { penalty_ppm }
-        | PairDisposition::Abstained { penalty_ppm } = pair.disposition
-        {
-            if penalty_ppm > PAIRED_INTERVENTION_SCORE_PPM {
-                return Err(PairedInterventionError::PenaltyOutOfRange {
-                    pair_id: pair.pair_id.clone(),
-                    penalty_ppm,
-                });
-            }
+        let penalty_ppm = match pair.disposition {
+            PairDisposition::Completed => 0,
+            PairDisposition::Failed { penalty_ppm }
+            | PairDisposition::TimedOut { penalty_ppm }
+            | PairDisposition::Invalid { penalty_ppm }
+            | PairDisposition::Abstained { penalty_ppm } => penalty_ppm,
+        };
+        if penalty_ppm > PAIRED_INTERVENTION_SCORE_PPM {
+            return Err(PairedInterventionError::PenaltyOutOfRange {
+                pair_id: pair.pair_id.clone(),
+                penalty_ppm,
+            });
         }
 
         let mut family_invariant_ids = BTreeSet::new();
