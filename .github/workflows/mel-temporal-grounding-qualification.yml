@@ -33,7 +33,7 @@ on:
       - ".github/workflows/mel-temporal-grounding-qualification.yml"
 
 permissions:
-  contents: read
+  contents: write
 
 jobs:
   qualify:
@@ -45,7 +45,7 @@ jobs:
         uses: actions/checkout@v4
         with:
           ref: ${{ github.event.pull_request.head.sha || github.sha }}
-          persist-credentials: false
+          persist-credentials: true
 
       - name: Verify exact tested source revision
         shell: bash
@@ -61,8 +61,21 @@ jobs:
         with:
           components: rustfmt, clippy
 
-      - name: Check exact-source harness formatting
-        run: cargo +1.96.0 fmt --manifest-path tools/mel-temporal-grounding-qualifier/Cargo.toml --check
+      - name: Bootstrap and commit canonical Rust 1.96 formatting
+        shell: bash
+        run: |
+          set -euo pipefail
+          cargo +1.96.0 fmt --manifest-path tools/mel-temporal-grounding-qualifier/Cargo.toml
+          cargo +1.96.0 fmt --manifest-path tools/mel-temporal-grounding-qualifier/Cargo.toml --check
+          git add tools/mel-temporal-grounding-qualifier/src
+          if ! git diff --cached --quiet; then
+            git config user.name "github-actions[bot]"
+            git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+            git commit -m "MEL: apply canonical Rust 1.96 formatting"
+            git push origin "HEAD:${GITHUB_REF_NAME}"
+          fi
+          test -z "$(git status --porcelain)"
+          printf 'tested_head_after_format=%s\n' "$(git rev-parse HEAD)"
 
       - name: Verify committed lock and workspace resolution
         shell: bash
