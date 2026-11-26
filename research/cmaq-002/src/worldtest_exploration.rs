@@ -86,7 +86,10 @@ impl fmt::Display for WorldTestExplorationError {
                 formatter,
                 "WorldTest trace event count {requested} exceeds the bounded maximum {maximum}"
             ),
-            Self::EmptyActionId => write!(formatter, "exploration action IDs must be nonempty and trimmed"),
+            Self::EmptyActionId => write!(
+                formatter,
+                "exploration action IDs must be nonempty and trimmed"
+            ),
             Self::ActionIdTooLong { bytes, maximum } => write!(
                 formatter,
                 "exploration action ID is {bytes} bytes; maximum is {maximum}"
@@ -95,13 +98,22 @@ impl fmt::Display for WorldTestExplorationError {
                 formatter,
                 "exploration segment contains {requested} actions; maximum is {maximum}"
             ),
-            Self::DuplicateTestTransition => write!(formatter, "WorldTest trace contains multiple test-phase transitions"),
-            Self::MissingTestTransition => write!(formatter, "WorldTest trace is missing its test-phase transition"),
+            Self::DuplicateTestTransition => write!(
+                formatter,
+                "WorldTest trace contains multiple test-phase transitions"
+            ),
+            Self::MissingTestTransition => write!(
+                formatter,
+                "WorldTest trace is missing its test-phase transition"
+            ),
             Self::EventAfterTestTransition { index } => write!(
                 formatter,
                 "exploration event at index {index} occurs after the test-phase transition"
             ),
-            Self::ArithmeticOverflow => write!(formatter, "WorldTest exploration score arithmetic overflowed"),
+            Self::ArithmeticOverflow => write!(
+                formatter,
+                "WorldTest exploration score arithmetic overflowed"
+            ),
         }
     }
 }
