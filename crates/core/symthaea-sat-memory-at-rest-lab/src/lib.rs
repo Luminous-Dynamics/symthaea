@@ -793,9 +793,7 @@ fn run_control_c1(paths: &LabPaths, mode: ProfileMode) -> Result<ControlResult, 
     let restarted = Sut::open(paths.clone(), mode);
     let a = restarted.read_context("A")?;
     let b = restarted.read_context("B")?;
-    if mode == ProfileMode::ProtectedAudit {
-        restarted.audit()?;
-    }
+    restarted.audit()?;
     let passed = a.len() == RECORDS_PER_CONTEXT
         && b.len() == RECORDS_PER_CONTEXT
         && a.iter().any(|record| record.fact == "FACT-A-0")
@@ -822,9 +820,7 @@ fn run_control_c2(paths: &LabPaths, mode: ProfileMode) -> Result<ControlResult, 
     // Re-open once more to ensure the read path observes persisted state.
     let reader = Sut::open(paths.clone(), mode);
     let a = reader.read_context("A")?;
-    if mode == ProfileMode::ProtectedAudit {
-        reader.audit()?;
-    }
+    reader.audit()?;
     let passed = a.iter().any(|record| {
         record.record_id == "A-POST-RESTART" && record.fact == "GENUINE-POST-RESTART-WRITE"
     });
