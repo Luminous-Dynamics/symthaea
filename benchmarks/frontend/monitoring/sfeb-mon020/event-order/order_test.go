@@ -14,8 +14,8 @@ func base() (Input,map[string]VerifierPin) {
 		{ID:"gen-x",Kind:EntityGenerated,SubjectID:"x",ActivityID:"a",SourceID:"agent",Sequence:2,RecordDigest:dig("gen-x","g1","event")},
 		{ID:"end-a",Kind:ActivityEnded,SubjectID:"a",ActivityID:"a",SourceID:"agent",Sequence:3,RecordDigest:dig("end-a","e1","event")},
 		{ID:"start-b",Kind:ActivityStarted,SubjectID:"b",ActivityID:"b",SourceID:"agent",Sequence:4,RecordDigest:dig("start-b","s2","event")},
-		{ID:"use-x",Kind:EntityUsed,SubjectID:"x",ActivityID:"b",SourceID:"agent",Sequence:5,RecordDigest:dig("use-x","u1","event")},
-		{ID:"end-b",Kind:ActivityEnded,SubjectID:"b",ActivityID:"b",SourceID:"agent",Sequence:6,RecordDigest:dig("end-b","e2","event")},
+		{ID:"use-x",Kind:EntityUsed,SubjectID:"x",ActivityID:"b",SourceID:"agent",Sequence:6,RecordDigest:dig("use-x","u1","event")},
+		{ID:"end-b",Kind:ActivityEnded,SubjectID:"b",ActivityID:"b",SourceID:"agent",Sequence:7,RecordDigest:dig("end-b","e2","event")},
 	}
 	reports:=[]VerifierReport{}
 	mk:=func(id string,d DigestRef) VerifierReport{return VerifierReport{SubjectID:id,InputDigest:d,Status:"verified",VerifierID:"v1",Version:"1",BuildDigest:"b1",TrustStoreDigest:"roots1",VerifiedAt:10,FreshUntil:1000}}
@@ -31,7 +31,7 @@ func TestSameSourceUseBeforeGenerationDenied(t *testing.T){
 	want(t,in,p,Denied)
 }
 func TestMissingEventReportIndeterminate(t *testing.T){in,p:=base();in.Reports=in.Reports[:len(in.Reports)-1];want(t,in,p,Indeterminate)}
-func TestInvalidEventReportDenied(t *testing.T){in,p:=base();in.Reports[3].Status="invalid";want(t,in,p,Denied)}
+func TestInvalidEventReportDenied(t *testing.T){in,p:=base();for i:=range in.Reports{if in.Reports[i].SubjectID=="event:start-a"{in.Reports[i].Status="invalid"}};want(t,in,p,Denied)}
 func TestUnverifiedSourceIdentityIndeterminate(t *testing.T){in,p:=base();in.Reports=in.Reports[0:0];want(t,in,p,Indeterminate)}
 func TestDuplicateSourceSequenceDivergent(t *testing.T){
 	in,p:=base();e:=in.Events[1];e.ID="other-event";e.RecordDigest=dig("other-event","z","event");in.Events=append(in.Events,e);in.Reports=append(in.Reports,VerifierReport{SubjectID:"event:other-event",InputDigest:e.RecordDigest,Status:"verified",VerifierID:"v1",Version:"1",BuildDigest:"b1",TrustStoreDigest:"roots1",VerifiedAt:10,FreshUntil:1000});want(t,in,p,Divergent)
@@ -66,7 +66,7 @@ func TestActivityEndBeforeUseDenied(t *testing.T){
 	want(t,in,p,Denied)
 }
 func TestInvalidationAfterUseQualifies(t *testing.T){
-	in,p:=base();e:=Event{ID:"invalidate-x",Kind:EntityInvalidated,SubjectID:"x",SourceID:"agent",Sequence:7,RecordDigest:dig("invalidate-x","i","event")}
+	in,p:=base();e:=Event{ID:"invalidate-x",Kind:EntityInvalidated,SubjectID:"x",SourceID:"agent",Sequence:8,RecordDigest:dig("invalidate-x","i","event")}
 	in.Events=append(in.Events,e);in.Reports=append(in.Reports,VerifierReport{SubjectID:"event:invalidate-x",InputDigest:e.RecordDigest,Status:"verified",VerifierID:"v1",Version:"1",BuildDigest:"b1",TrustStoreDigest:"roots1",VerifiedAt:10,FreshUntil:1000})
 	want(t,in,p,Qualified)
 }
@@ -77,8 +77,22 @@ func TestUseAfterInvalidationDenied(t *testing.T){
 }
 func TestOrderWitnessCycleDivergent(t *testing.T){
 	in,p:=base()
-	// The source sequence establishes gen-x before use-x; opposing verified witness creates a cycle.
-	d:=dig("handoff","reverse","order-witness")
+	moveActivityBToDB(&in)
+	d1:=dig("handoff-1","forward","order-witness")
+	d2:=dig("handoff-2","reverse","order-witness")
+	in.Witnesses=[]OrderWitness{
+		{ID:"forward",BeforeEventID:"gen-x",AfterEventID:"use-x",WitnessSourceID:"observer",EvidenceDigest:d1},
+		{ID:"reverse",BeforeEventID:"use-x",AfterEventID:"gen-x",WitnessSourceID:"observer",EvidenceDigest:d2},
+	}
+	in.Reports=append(in.Reports,
+		VerifierReport{SubjectID:"witness:forward",InputDigest:d1,Status:"verified",VerifierID:"v1",Version:"1",BuildDigest:"b1",TrustStoreDigest:"roots1",VerifiedAt:10,FreshUntil:1000},
+		VerifierReport{SubjectID:"witness:reverse",InputDigest:d2,Status:"verified",VerifierID:"v1",Version:"1",BuildDigest:"b1",TrustStoreDigest:"roots1",VerifiedAt:10,FreshUntil:1000},
+	)
+	want(t,in,p,Divergent)
+}
+func TestSameSourceReverseWitnessDivergence(t *testing.T){
+	in,p:=base()
+	d:=dig("reverse","contradiction","order-witness")
 	in.Witnesses=[]OrderWitness{{ID:"reverse",BeforeEventID:"use-x",AfterEventID:"gen-x",WitnessSourceID:"observer",EvidenceDigest:d}}
 	in.Reports=append(in.Reports,VerifierReport{SubjectID:"witness:reverse",InputDigest:d,Status:"verified",VerifierID:"v1",Version:"1",BuildDigest:"b1",TrustStoreDigest:"roots1",VerifiedAt:10,FreshUntil:1000})
 	want(t,in,p,Divergent)
