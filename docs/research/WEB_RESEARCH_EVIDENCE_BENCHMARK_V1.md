@@ -168,6 +168,30 @@ Measure:
 - calibrated confidence after independently adjudicated outcomes;
 - reproducible accepted/rejected transition records.
 
+**E. Evidence-to-decision response and scientific revision**
+
+A system must not receive full credit merely for naming a limitation, confound, or reviewer objection. It must carry that recognition into the next analysis, action, or claim revision.
+
+For every detected limitation or valid objection, bind:
+- the exact evidence prefix and affected claim/analysis;
+- the limitation/confound and the uncertainty it introduces;
+- the prospective method change, control, replication, exclusion, or abstention rule;
+- the result that would reverse or relax the limitation;
+- the next action's predicted outcomes and the decision each could change;
+- post-action replay, outcome adjudication, and accepted/rejected objection disposition.
+
+Measure:
+- clean-control acceptance and defective-input detection separately (misplaced caution is a failure in either direction);
+- issue recognition versus actual methodological response;
+- result calibration after a recognized limitation;
+- rate of invalid conclusions prevented by a method change;
+- counterfactual responsiveness to evidence that conflicts with an elicited prior;
+- hypothesis commitment, justified abstention, conditional novelty, and novelty yield separately;
+- adversarial-objection precision, independent reproduction, correction quality, and regression after revision;
+- discriminating value of proposed next experiments against plausible alternatives.
+
+A critique concession is not itself improvement. A revision earns credit only when it becomes more faithful to evidence or gives a justified reason to preserve the original claim. A recognized issue that has no downstream effect must remain visible as an unresolved failure, not be counted as solved.
+
 An LLM judge may grade report quality, but it must not be the sole oracle for source entailment or evidence integrity.
 
 ## 4. Required negative controls
@@ -226,10 +250,12 @@ These are project targets, not achieved results or external standards.
 | Autonomous Science Bench 0.1 | Stretch target ≥80% full-system resolution on the same six pilot workflows, with total campaign cost and agent time each no higher than the current published leader; this is a pilot-sized target, not a general-lab claim |
 | FrontierPhysics | Stretch target ≥40% Pass@1 and ≥55% Pass@3 on the same frozen task/harness version; report verifier-only pass and weighted rubric score separately |
 | Scientist–auditor collaboration | Demonstrate positive paired gain in valid errors found per human-review hour over manual-only review; require independent replay and expert-adjudicated precision/recall (see [#13818](https://github.com/Luminous-Dynamics/symthaea/issues/13818)) |
+| Evidence-to-decision response | ≥90% of expert-adjudicated valid limitations result in an appropriate method/action/claim change; ≥90% of clean controls accepted; report false alarms, missed defects and unjustified revisions separately |
+| Adversarial hypothesis revision | ≥85% evidence fidelity after three review rounds, with separate novelty/commitment/abstention and revision-vs-no-revision paired analysis |
 | Citation integrity | Target ≥95% citation accuracy on a frozen gold subset; effective-citation count alone is not sufficient |
 | Resource quality | Report cost and latency Pareto fronts; no unqualified composite score |
 
-ASI-Bench advertises a public 60-task seed42 catalog, but its leaderboard methodology says the scored task-set identifier was not supplied; require that exact identifier or label a public-catalog run exploratory. DISCERN's public reproducibility release is not a one-command arbitrary-model leaderboard: live runs need task-specific prior probes, three fixed reviewers, a separate judge, human adjudication, and the upstream sandbox/runtime requirements. Its physics extension must stay outside the core Overall score. Terminal-Bench Science vendor-reported 77.1%/75.3% entries are not yet official leaderboard results. FrontierPhysics targets are stretch targets above current monitored scores and must be evaluated on the exact same task/harness snapshot. A ≥70% DeepResearch Bench II target is only meaningful on the same frozen task set and judge version. The page currently states the judge changed to GPT-5.5 and the leaderboard migrated, so do not compare an old-page 64.38 directly with a new-jury score without a controlled bridge evaluation.
+ASI-Bench advertises a public 60-task seed42 catalog, but its leaderboard methodology says the scored task-set identifier was not supplied; require that exact identifier or label a public-catalog run exploratory. DISCERN's public reproducibility release is not a one-command arbitrary-model leaderboard: live runs need task-specific prior probes, three fixed reviewers, a separate judge, human adjudication, and the upstream sandbox/runtime requirements. Its L2 results specifically show that recognizing an issue is not enough: 29.6% of full-recognition challenged evaluations receive only half result-calibration credit. L3 revision must be judged by evidence-fidelity change, not reviewer-concession frequency. Its physics extension must stay outside the core Overall score. Terminal-Bench Science vendor-reported 77.1%/75.3% entries are not yet official leaderboard results. FrontierPhysics targets are stretch targets above current monitored scores and must be evaluated on the exact same task/harness snapshot. A ≥70% DeepResearch Bench II target is only meaningful on the same frozen task set and judge version. The page currently states the judge changed to GPT-5.5 and the leaderboard migrated, so do not compare an old-page 64.38 directly with a new-jury score without a controlled bridge evaluation.
 
 ## 7. Composition with existing Symthaea work
 
