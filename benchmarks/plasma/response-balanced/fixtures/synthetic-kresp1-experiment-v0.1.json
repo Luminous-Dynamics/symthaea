@@ -318,5 +318,17 @@
     "split_solver_composition_order_required": true,
     "independent_finite_difference_cross_check_required": true,
     "branch_change_disposition": "UNKNOWN_OR_HANDOFF"
+  },
+  "response_qualification": {
+    "checkpoint_state_residual_required": true,
+    "future_pulse_injection_residual_required": true,
+    "risk_summary_metrics": [
+      "weighted_mean",
+      "worst_case",
+      "cvar"
+    ],
+    "cvar_alpha": 0.9,
+    "residual_threshold_status": "calibrate_on_independently_converged_physical_reference",
+    "nonlinear_full_order_response_required": true
   }
 }
