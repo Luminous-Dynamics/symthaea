@@ -37,6 +37,7 @@ Every claim of superiority must pin and report:
 4. **Budget:** simulator interactions, real robot trials, model calls, search expansions, wall time, p50/p95/p99 latency, peak memory, CPU/GPU and measured energy.
 5. **Policy:** same downstream policy with and without the world model; direct policy/VLA; no-model, copy/no-change and oracle-only controls.
 6. **Statistics:** independent environment/mechanism clusters; paired cluster-level uncertainty; all failures, abstentions, timeouts and missing cells; simultaneous intervals for confirmatory families.
+7. **Authority/evidence:** model predictions and counterfactuals remain hypotheses. A separate policy/safety/authority layer decides whether an action may execute; only an independently observed execution result is promoted to outcome evidence. Unknown execution outcomes require reconciliation before any follow-on mutation.
 
 Do not pool LIBERO success, RoboCasa success, RoboArena Elo, ContactWorld planning rates, MiraBench reliability and CMAQ response-distortion metrics into one score.
 
