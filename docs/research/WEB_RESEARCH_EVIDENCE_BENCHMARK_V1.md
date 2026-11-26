@@ -45,6 +45,45 @@ The following are reference points from their benchmark owners or published sour
 - ScienceAgentBench: https://hal.cs.princeton.edu/scienceagentbench
 - Autonomous Science Bench: https://asb.open-ssi.org/about
 
+## 2A. November 2026 research-agent benchmark refresh
+
+The broader field has moved beyond report generation and code execution. The additional sources below identify the missing capabilities this project should measure; they are complementary tracks, not a single cross-benchmark ranking.
+
+| Benchmark / system | Public snapshot | Why it changes the research plan | Comparability boundary |
+|---|---|---|---|
+| ASI-Bench | 60 project-level tasks across 11 scientific domains; its 10 Nov 2026 leaderboard snapshot lists GPT-6.1 Sol at 63.90 and GPT-6 Astra at 62.23 | Tests end-to-end project research under B1–B4 guidance levels, execution and validation; use as a cross-domain project baseline | Freeze the exact seed/task set, track and harness; this score is not comparable with DRB II or lab resolution |
+| TruthInsightBench | 40 blind tasks from 40 peer-reviewed studies across 10 domains; four coding-agent configurations on one frozen model were reported in a 58.4–60.3/100 range without reliable pairwise separation | Directly tests whether an agent can determine what the data justify, not merely reproduce a known answer; its six evidence-maturity dimensions and 29 artifact-grounded items are highly relevant to claim integrity | The automated LLM judge is fixed and should be calibrated with human/expert audits; the paper reports no evidence that fluent output alone constitutes discovery |
+| DiscoveryAgent | A scientist-steerable agent with checkpointed audit records; its paper reports 14× more valid errors found when scientists collaborate with audit agents than during manual review | Supports a new interaction model: scientists can select/refine/replace hypotheses between rounds, while independent auditors trace claims and reproduce analyses from frozen checkpoints | Published results cover two predictive-modeling tasks and three expert-led case studies; the 14× figure is paper-reported, not a universal rate |
+| AutoSciBench | Generated tasks reduced mean solver accuracy by 22.4 percentage points in computational biology and 25.5 points in materials science relative to the starting human-curated benchmarks | Demonstrates a practical route to adversarially harden task recipes as agents learn shortcuts; benchmark maintenance itself becomes an adaptive process | Generator/judge quality and leakage controls still need independent audit; never let the candidate see the hidden recipe or gold answer |
+| benchmarks.bio | V1 snapshot updated 25 Nov 2026: 13 capability benchmarks and 23 separate leaderboards; top listed aggregate configuration is Claude Opus 5.5 with Pi at 58.0% and $4.82/run | Offers a focused life-science execution/cost comparison beyond one general scientific-agent score | V1 scoring is explicitly not directly comparable with historical V0; the aggregate omits some missing scores and is domain-specific |
+| Autonomous Science Bench 0.1 | Six live-lab workflow tasks; current public pilot board lists GPT-6 Astra/Codex at 72.2%, $190.23 and 557 agent minutes | Remains the physical execution track: campaign design, measurement feedback and final held-out ranking must all succeed | Six tasks are a pilot; totals are for the configuration, not cost/time per task |
+
+Primary sources:
+- ASI-Bench task set and leaderboard snapshot: https://asibench.apexin.ai/
+- TruthInsightBench paper and task/scoring code: https://arxiv.org/abs/2609.05079 and https://github.com/TruthInsight-stack/TruthInsightBench
+- DiscoveryAgent (16 Nov 2026): https://arxiv.org/abs/2611.21950
+- AutoSciBench: https://arxiv.org/abs/2610.05140
+- benchmarks.bio V1 leaderboard/methodology: https://benchmarks.bio/
+- Autonomous Science Bench live leaderboard: https://asb.open-ssi.org/leaderboard
+
+### Paradigm shift: evidence-checkpointed, scientist-steerable research
+
+Treat a research episode as an append-only sequence of typed checkpoints, not a long opaque agent transcript. A checkpoint should freeze the current hypothesis set, scope, evidence-prefix digest, analysis code/data/configuration, predicted outcomes, resource spend, unresolved objections and next-action offers. At a checkpoint boundary, a human scientist may select, refine or replace a hypothesis; the system must preserve the previous branch and explain what evidence motivated the change.
+
+A separate audit agent receives only the checkpointed candidate-visible record and authorized artifacts. It should reproduce selected analyses, trace each reported claim to exact inputs/spans, search for counterexamples and controls, and emit an independent objection list. It must not edit candidate evidence, supply hidden labels, or self-authorize promotion. The candidate then responds to the objections in a new checkpoint. This creates a measurable adversarial loop rather than treating self-review as independent verification.
+
+Measure:
+- valid errors found per audit-hour and per unit cost;
+- fraction of auditor objections reproduced by independent replay;
+- correction rate and regression rate after audit;
+- claim-to-artifact trace completeness;
+- scientist steering latency and frequency of meaningful hypothesis changes;
+- outcome quality with and without human steering and with/without the audit agent.
+
+### Paradigm shift: self-hardening benchmark, not self-scoring agent
+
+Use AutoSciBench-style task recipes to generate *new sealed variants* from vetted scientific concepts and data-generating procedures. An external evaluator may use observed failure modes to harden the next benchmark version, but candidate agents must never see the generator's hidden parameters, judge rubric, or per-task gold. Keep a frozen public anchor set for comparability and a rotating sealed challenge set for saturation resistance. Human experts audit generated task validity and distribution drift before promotion. Report anchor and challenge scores separately; never merge them into a single untraceable composite.
+
 ## 3. Benchmark architecture
 
 Each evaluated run freezes:
