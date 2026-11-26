@@ -70,6 +70,7 @@ pub struct VerifiedSourceLineageNodeBindingV1 {
     pub(crate) evidence_class_sha256: String,
     pub(crate) parent_evidence_ids: Vec<String>,
     pub(crate) derivation_receipt_sha256: Option<String>,
+    pub(crate) common_cause_group_sha256: Vec<String>,
 }
 
 #[derive(Clone, Debug, Eq, PartialEq)]
@@ -279,6 +280,7 @@ pub fn replay_source_lineage_graph_v1(
         evidence_class_sha256: node.evidence_class_sha256.clone(),
         parent_evidence_ids: node.parent_evidence_ids.clone(),
         derivation_receipt_sha256: node.derivation_receipt_sha256.clone(),
+        common_cause_group_sha256: node.common_cause_group_sha256.clone(),
     }).collect();
 
     Ok(VerifiedSourceLineageGraphV1 {
