@@ -848,6 +848,11 @@ jobs:
               "non_markovian_fno_closure", "full_order_reference"
           }
           assert required_comparators.issubset(set(fixture["comparators"]))
+          required_adjacent_methods = {
+              "adaptive_opinf_port", "adaptive_nitrom_port",
+              "adaptive_opinf_nitrom_hybrid_port", "symmetry_augmented_kinetic_closure"
+          }
+          assert required_adjacent_methods.issubset(set(fixture["adjacent_methods"]))
           assert set(fixture["resource_budget"]["comparison_modes"]) == {
               "equal_rank", "equal_stored_bytes", "equal_end_to_end_wall_time"
           }
