@@ -213,7 +213,7 @@ fn robust_baseline(model: &Model) -> Result<(usize, f64), Error> {
         let scenario_values: Vec<f64> = model.scenarios.iter().map(|scenario| {
             model.joint_prior.iter().enumerate().map(|(joint_index, p)| {
                 let hypothesis = joint_index / states;
-                p * scenario.utility_by_hypothesis[hypothesis][action]
+                *p * scenario.utility_by_hypothesis[hypothesis][action]
             }).sum()
         }).collect();
         let worst = scenario_values.iter().copied().fold(f64::INFINITY, f64::min);
@@ -290,7 +290,7 @@ fn scenario_policy_value(
                 for second_outcome in 0..OUTCOMES {
                     let p_second = second_matrix[hypothesis * STATES + second_state][second_outcome];
                     let action = actions_by_pair[first_outcome * OUTCOMES + second_outcome];
-                    total += prior * p_first * p_transition * p_second
+                    total += *prior * p_first * p_transition * p_second
                         * scenario.utility_by_hypothesis[hypothesis][action];
                 }
             }
@@ -312,7 +312,7 @@ fn first_outcome_probability(
         let hypothesis = joint_index / states;
         let code = joint_index % states;
         let device_state = (code >> device) & 1;
-        prior * matrix[hypothesis * STATES + device_state][outcome]
+        *prior * matrix[hypothesis * STATES + device_state][outcome]
     }).sum()
 }
 
