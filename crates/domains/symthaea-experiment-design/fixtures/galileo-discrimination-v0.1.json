@@ -1,0 +1,88 @@
+{
+  "schema_version": "physics-experiment-design-v0.1",
+  "target": "Discriminate ideal constant acceleration from constant velocity after a matched two-second observation",
+  "hypothesis_ids": [
+    "constant_acceleration",
+    "constant_velocity"
+  ],
+  "experiments": [
+    {
+      "experiment_id": "matched_at_two_seconds",
+      "cost_units": 1,
+      "duration_hours": 0.05,
+      "observables": [
+        {
+          "observable_id": "displacement_m",
+          "predictions": [
+            {
+              "hypothesis_id": "constant_acceleration",
+              "mean": 9.80665,
+              "standard_uncertainty": 0.05,
+              "model_descriptor": "symtropy-physics-atlas:galileo-constant-acceleration-v0.1:g=9.80665m_s2:theta=30deg:initial_velocity=0:displacement=0.5*g*sin(theta)*t^2",
+              "model_digest_sha256": "b02295905c78c69f1b65fbb26a18a9ca7be24b06815cd18400a412c04cf5c616",
+              "uncertainty_descriptor": "synthetic-fixture-sigma-0.05:gaussian-one-standard-deviation-independent-initial-models",
+              "uncertainty_digest_sha256": "502e18dadf54b096c3346b8440b92563212a5dce0c9555407ccde469e4f0705e"
+            },
+            {
+              "hypothesis_id": "constant_velocity",
+              "mean": 9.80665,
+              "standard_uncertainty": 0.05,
+              "model_descriptor": "symtropy-physics-atlas:galileo-matched-constant-velocity-v0.1:velocity=4.903325m_s:displacement=v*t",
+              "model_digest_sha256": "1f7929e277af91703c2b427a6ad6a6ead3cdb3fb12bc6b1cccbaaf72680326ac",
+              "uncertainty_descriptor": "synthetic-fixture-sigma-0.05:gaussian-one-standard-deviation-independent-initial-models",
+              "uncertainty_digest_sha256": "502e18dadf54b096c3346b8440b92563212a5dce0c9555407ccde469e4f0705e"
+            }
+          ],
+          "unit": "m"
+        }
+      ],
+      "description": "Measure displacement after two seconds; this control time makes the two idealized hypotheses predict the same result.",
+      "settings": [
+        {
+          "parameter_id": "observation_time",
+          "value": 2,
+          "unit": "s"
+        }
+      ]
+    },
+    {
+      "experiment_id": "observe_at_four_seconds",
+      "cost_units": 3,
+      "duration_hours": 0.2,
+      "observables": [
+        {
+          "observable_id": "displacement_m",
+          "predictions": [
+            {
+              "hypothesis_id": "constant_acceleration",
+              "mean": 39.2266,
+              "standard_uncertainty": 0.2,
+              "model_descriptor": "symtropy-physics-atlas:galileo-constant-acceleration-v0.1:g=9.80665m_s2:theta=30deg:initial_velocity=0:displacement=0.5*g*sin(theta)*t^2",
+              "model_digest_sha256": "b02295905c78c69f1b65fbb26a18a9ca7be24b06815cd18400a412c04cf5c616",
+              "uncertainty_descriptor": "synthetic-fixture-sigma-0.2:gaussian-one-standard-deviation-independent-initial-models",
+              "uncertainty_digest_sha256": "ec40a1de41e18d9b7772d3ade2aebf1ce3d91bc324db4341f80bd8410b86c01f"
+            },
+            {
+              "hypothesis_id": "constant_velocity",
+              "mean": 19.6133,
+              "standard_uncertainty": 0.2,
+              "model_descriptor": "symtropy-physics-atlas:galileo-matched-constant-velocity-v0.1:velocity=4.903325m_s:displacement=v*t",
+              "model_digest_sha256": "1f7929e277af91703c2b427a6ad6a6ead3cdb3fb12bc6b1cccbaaf72680326ac",
+              "uncertainty_descriptor": "synthetic-fixture-sigma-0.2:gaussian-one-standard-deviation-independent-initial-models",
+              "uncertainty_digest_sha256": "ec40a1de41e18d9b7772d3ade2aebf1ce3d91bc324db4341f80bd8410b86c01f"
+            }
+          ],
+          "unit": "m"
+        }
+      ],
+      "description": "Measure displacement after four seconds; the longer observation separates the constant-acceleration and constant-velocity predictions.",
+      "settings": [
+        {
+          "parameter_id": "observation_time",
+          "value": 4,
+          "unit": "s"
+        }
+      ]
+    }
+  ]
+}
