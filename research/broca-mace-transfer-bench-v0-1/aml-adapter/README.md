@@ -159,3 +159,12 @@ The `temporal_projection` module is exported alongside the streaming ledger. It 
 The index propagates invalidation through all descendants, emits a self-committing projection-invalidation receipt, refuses new projections built from non-current parents, and supports rebuilds under new IDs. Source revalidation does not revive old projections. Rights-erasure acknowledgements clear the in-memory projection content/dependency commitments but do not prove deletion from external stores.
 
 Protocol: [MACE Derived-Memory Invalidation V1](../../../docs/research/MACE_DERIVED_MEMORY_INVALIDATION_V1.md). Twelve deterministic projection-index tests are authored; none have been executed.
+
+
+## Decision-value retrieval: EVSI and robust minimax regret
+
+The `decision_value_retrieval` module scores candidate evidence-gathering operations by their expected or worst-case impact on a consumer-owned decision. EVSI uses fixed-point prior/observation probabilities and a per-query calibration receipt bound to the exact model digest. The probability-free robust mode uses a separate conservative observation-support matrix and computes minimax-regret reduction without assigning probabilities. Both modes enforce hard state/action admissibility and require a separately verified resource-profile receipt binding tool calls, latency, tokens, inspected bytes and acquisition cost.
+
+The selector chooses the highest positive net-value option; when no option has positive value it returns no query (stop/abstain). The result is not an action permit and does not promote a retrieval strategy. The existing retrieval-policy promotion path still requires independently qualified outcome evidence and held-out counterfactual qualification.
+
+Protocol: [MACE Decision-Value Retrieval V1](../../../docs/research/MACE_DECISION_VALUE_RETRIEVAL_V1.md). The calibration/resource verifier traits are interfaces; no issuer or resource-meter service is deployed. Tests are authored but not executed.
