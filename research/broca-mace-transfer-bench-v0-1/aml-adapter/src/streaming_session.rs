@@ -248,6 +248,16 @@ impl StreamingSessionLedgerV1 {
     pub fn session_id(&self) -> &str { &self.session_id }
     pub fn last_sequence(&self) -> u64 { self.last_sequence }
 
+    /// Confirm that this exact integrity-checked receipt was emitted and retained
+    /// by this ledger instance. A self-consistent unkeyed digest alone is not
+    /// accepted as proof that a transition was actually applied to this session.
+    pub fn verify_recorded_receipt(&self, receipt: &StreamingSessionMutationReceiptV1) -> bool {
+        self.user_id == receipt.user_id
+            && self.session_id == receipt.session_id
+            && receipt.verify_integrity()
+            && self.receipts.get(&receipt.event_id) == Some(receipt)
+    }
+
     pub fn mutation_receipts(&self) -> impl Iterator<Item = &StreamingSessionMutationReceiptV1> {
         self.events.iter().filter_map(|event| self.receipts.get(&event.event_id))
     }
