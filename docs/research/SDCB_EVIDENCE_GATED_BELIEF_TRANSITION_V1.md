@@ -190,6 +190,6 @@ The reference source is standard-library-only and independent of the production 
 - atomic rejection semantics;
 - unit tests for positive, negative, stale, duplicate, misbound, and impossible-observation cases.
 
-**Current source state:** 23 Rust unit tests are authored. The container used for this work has no rustc or cargo; compilation and execution have not been performed. JSON Schema validation has not been run. The existing SDCB reference receipt runner has not yet been extended to execute this new harness.
+**Current source state:** 23 Rust unit tests are authored. The container used for this work has no rustc or cargo; compilation and execution have not been performed. The Draft 2020-12 schema passed meta-schema validation; one valid receipt fixture passed, an invalid digest fixture was rejected, and posterior/version/budget cross-field checks passed in a separate reference script. The existing SDCB reference receipt runner has not yet been extended to execute this new harness.
 
 This prototype does not establish that Symthaea has active scientific intelligence, beats any SOTA system, or can verify physical evidence. It defines and tests a narrow contract once a Rust toolchain is available.
