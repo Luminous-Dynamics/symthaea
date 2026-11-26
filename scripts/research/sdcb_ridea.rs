@@ -69,8 +69,9 @@ pub struct RideaCandidate {
 #[derive(Debug, Clone, PartialEq)]
 pub struct RideaScore {
     pub candidate_id: String,
-    pub mmd_before: f64,
-    pub mmd_after: f64,
+    /// Raw biased empirical MMD^2, matching the released upstream code's compute_mmd return value.
+    pub mmd2_before: f64,
+    pub mmd2_after: f64,
     pub robust_ratio: f64,
     pub representative_informative: f64,
     pub deamplifying_weight: f64,
@@ -214,8 +215,8 @@ pub fn score_ridea_candidate(
     }
     validate_candidate(candidate, dimension)?;
 
-    let mmd_before = mmd_rbf(history, target_distribution, config.rbf_sigma)?;
-    if mmd_before <= EPS {
+    let mmd2_before = mmd_squared_rbf(history, target_distribution, config.rbf_sigma)?;
+    if mmd2_before <= EPS {
         return Err(RideaError::ZeroBaselineMmd);
     }
 
@@ -224,14 +225,14 @@ pub fn score_ridea_candidate(
     if augmented_history.len() > MAX_SAMPLES {
         return Err(RideaError::SearchSpaceTooLarge);
     }
-    let mmd_after = mmd_rbf(
+    let mmd2_after = mmd_squared_rbf(
         &augmented_history,
         target_distribution,
         config.rbf_sigma,
     )?;
 
     let robust_ratio =
-        1.0 - config.representativeness_weight * (mmd_after / mmd_before);
+        1.0 - config.representativeness_weight * (mmd2_after / mmd2_before);
     let representative_informative =
         candidate.expected_information_gain * robust_ratio;
 
@@ -243,8 +244,8 @@ pub fn score_ridea_candidate(
     let ridea_score = representative_informative * deamplifying_weight;
     let ridea_per_cost_unit = ridea_score / candidate.cost_units as f64;
 
-    if !mmd_before.is_finite()
-        || !mmd_after.is_finite()
+    if !mmd2_before.is_finite()
+        || !mmd2_after.is_finite()
         || !robust_ratio.is_finite()
         || !representative_informative.is_finite()
         || !deamplifying_weight.is_finite()
@@ -256,8 +257,8 @@ pub fn score_ridea_candidate(
 
     Ok(RideaScore {
         candidate_id: candidate.id.clone(),
-        mmd_before,
-        mmd_after,
+        mmd2_before,
+        mmd2_after,
         robust_ratio,
         representative_informative,
         deamplifying_weight,
@@ -378,6 +379,14 @@ mod tests {
     }
 
     #[test]
+    fn mmd_rbf_wrapper_is_the_square_root_of_upstream_mmd_squared() {
+        let squared = mmd_squared_rbf(&history(), &target(), 1.0).unwrap();
+        let mmd = mmd_rbf(&history(), &target(), 1.0).unwrap();
+        assert!((squared - 0.039400702465893334).abs() < 1e-12);
+        assert!((mmd * mmd - squared).abs() < 1e-12);
+    }
+
+    #[test]
     fn identical_empirical_distributions_have_zero_mmd() {
         let samples = vec![vec![0.0], vec![1.0], vec![2.0]];
         assert!(mmd_rbf(&samples, &samples, 1.0).unwrap().abs() < EPS);
@@ -398,8 +407,8 @@ mod tests {
         let score = score_ridea_candidate(
             &history(), &target(), &representative_candidate(), &config()
         ).unwrap();
-        assert!((score.mmd_before - 0.19849610189092715).abs() < 1e-12);
-        assert!(score.mmd_after.abs() < EPS);
+        assert!((score.mmd2_before - 0.039400702465893334).abs() < 1e-12);
+        assert!(score.mmd2_after.abs() < EPS);
         assert!((score.robust_ratio - 1.0).abs() < EPS);
         assert!((score.representative_informative - 0.8).abs() < EPS);
     }
@@ -442,8 +451,10 @@ mod tests {
         let score = score_ridea_candidate(
             &history(), &target(), &extrapolating_candidate(), &config()
         ).unwrap();
-        assert!(score.mmd_after > score.mmd_before);
-        assert!(score.representative_informative < 1.2); // raw EIG of this candidate
+        assert!(score.mmd2_after > score.mmd2_before);
+        assert!((score.robust_ratio - (-1.788700994799035)).abs() < 1e-12);
+        assert!((score.representative_informative - (-2.146441193758842)).abs() < 1e-12);
+        assert!((score.ridea_score - (-0.6654515448241519)).abs() < 1e-12);
     }
 
     #[test]
