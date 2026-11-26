@@ -836,7 +836,8 @@ jobs:
           assert len(qoi_ids) == len(fixture["observables"])
           assert set(fixture["reference_convergence"]["convergence_observables"]).issubset(qoi_ids)
           required_comparators = {
-              "snapshot_pod", "padovan_nonintrusive_balancing", "adaptive_hermite",
+              "snapshot_pod", "padovan_nonintrusive_balancing", "time_windowed_pod",
+              "energy_windowed_pod", "conservative_fluid_kinetic_rom", "adaptive_hermite",
               "adaptive_fourier", "tensor_network_vlasov_poisson",
               "non_markovian_fno_closure", "full_order_reference"
           }
