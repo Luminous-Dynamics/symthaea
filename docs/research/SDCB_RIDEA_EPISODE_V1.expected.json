@@ -30,8 +30,8 @@
       "r_i": -0.2169914312568392,
       "deamplifying_weight": 0.31002551887238755,
       "ridea": -0.06727288106626358,
-      "cost_units": 1.5,
-      "ridea_per_cost": -0.044848587377509054
+      "cost_units": 1,
+      "ridea_per_cost": -0.06727288106626358
     }
   ],
   "selections": {
