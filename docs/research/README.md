@@ -421,6 +421,7 @@ A falsifiable programme for spectral statistics, RH/prime-structure controls, ne
 - [Decision-Sufficient Scientific Intelligence v1](SDCB_DECISION_SUFFICIENT_SCIENTIFIC_INTELLIGENCE_V1.md): task-relative decision sufficiency, EVSI, counterexample, benchmark protocol and research targets.
 - [Decision-value episode schema](SDCB_DECISION_VALUE_EPISODE_V1.schema.json): machine-readable finite decision/experiment episode contract.
 - [EIG-versus-EVSI example](SDCB_DECISION_VALUE_EPISODE_V1.example.json): frozen three-hypothesis counterexample.
+- [Expected analytic result](SDCB_DECISION_VALUE_EPISODE_V1.expected.json): independent calculation with posteriors, EIG, EVSI, and cost-aware choices.
 - [Decision-value Rust reference](../../scripts/research/sdcb_decision_value.rs): Bayes action, decision-equivalence partition, expected information gain, EVSI and net-EVSI selection.
 - [Decision-value harness README](../../scripts/research/SDCB_DECISION_VALUE_README.md): compile instructions, example, coverage and limits.
 
