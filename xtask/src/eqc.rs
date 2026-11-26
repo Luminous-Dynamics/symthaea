@@ -501,10 +501,7 @@ fn validate_synthetic_input(task: &Task, input: &InputRef, bytes: &[u8]) -> anyh
                 .iter()
                 .map(|scope| {
                     scope.as_str().map(str::to_owned).with_context(|| {
-                        format!(
-                        "{}: consent fixture scopes must be strings",
-                        task.task_id
-                    )
+                        format!("{}: consent fixture scopes must be strings", task.task_id)
                     })
                 })
                 .collect::<anyhow::Result<Vec<_>>>()?;
@@ -536,7 +533,8 @@ fn validate_synthetic_input(task: &Task, input: &InputRef, bytes: &[u8]) -> anyh
                 }
                 _ => bail!(
                     "{}: consent fixture '{}' uses an unsupported authority state",
-                    task.task_id, input.input_id
+                    task.task_id,
+                    input.input_id
                 ),
             }
         }
