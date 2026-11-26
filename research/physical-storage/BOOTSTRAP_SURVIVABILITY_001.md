@@ -34,6 +34,25 @@ The source code treats the six reserved positions as reserved but does not assig
 
 The existing payload layout's deterministic cuboid denominators are [27, 12, 18, 8, 3]. The row-major contiguous versus shard-major interleaved comparison reports 50/68 versus 8/68 unrecoverable masks across the combined synthetic corpus. Those are payload-shard geometry results only.
 
+
+
+## 2a. Explicit synthetic bootstrap code profile
+
+The v0.1 fixture declares a separate metadata profile: systematic [6,4,3] over GF(2^8), polynomial 0x11d, with four equal-length data streams placed at tiles [0,15,16,31] and two parity streams at spare tiles [32,47]. Its generator rows are:
+
+```text
+[1,0,0,0]
+[0,1,0,0]
+[0,0,1,0]
+[0,0,0,1]
+[1,1,1,1]
+[1,2,3,4]
+```
+
+This profile inherits the finite algebraic guarantee of up to two known shard erasures; v0.1 makes **no unknown-error correction claim** for bootstrap metadata. The four in-media data streams contain the format identity, code definition, physical layout and reader calibration records. Index/address, known-answer vectors, reader bootstrap and capsule reference remain external-package records in this synthetic fixture.
+
+The canonical serialization, shard length, padding, per-object digest framing and exact reader-facing reconstruction procedure are still contract gaps to close before implementation. The fixture explicitly calls the 4-control/2-spare allocation a convention only; the source layout engine itself only knows that these six tile positions are reserved. Do not imply the current Rust layout-search crate already encodes bootstrap metadata.
+
 ## 3. Bootstrap record model
 
 A bootstrap object records:
