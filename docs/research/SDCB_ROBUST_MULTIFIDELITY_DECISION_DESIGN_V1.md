@@ -163,3 +163,6 @@ These are proposed project targets, not published standards or achieved results:
 ## 11. Claim boundary
 
 The Rust reference contains 13 authored tests, but has not been compiled or executed in this environment. Its per-fidelity likelihood matrices are supplied fixture inputs; it does not train a multi-fidelity surrogate, estimate calibration from real data, execute a laboratory measurement or benchmark against BoTorch/qMFMES. The result is an exact finite decision-oracle extension, not a claim of SOTA performance.
+### Safety boundary
+
+The finite multi-fidelity reference maximizes task utility across a finite ambiguity set; it does not itself encode non-compensatory safety constraints. Safety-critical tasks must apply the RPSD hard-constraint gate to the action/state set before evaluating options, and must report constraint violations independently. A high robust expected utility is not a physical safety certificate.
