@@ -1,6 +1,6 @@
 MON-018 authority-join semantic adapter
 
-A standard-library Go reference implementation for a narrow MON-018 v0.1 profile. It checks exact principal/delegate/action/resource/destination/tenant/mode/epoch binding; root-to-leaf delegation continuity; exact non-amplifying scope; typed digest comparability; commit-time grant validity, expiry and revocation; bounded source capture; and normalized identity/issuer/grant verifier reports against pinned verifier IDs, versions, builds and trust-store digests.
+A standard-library Go reference implementation for a narrow MON-018 v0.1 profile. It checks exact principal/delegate/action/resource/destination/tenant/mode/epoch binding; root-to-leaf delegation continuity; exact non-amplifying scope; typed digest comparability; commit-time grant validity, expiry and revocation; bounded source capture; and normalized identity/issuer/grant verifier reports against pinned verifier IDs, versions, builds and trust-store digests. Any effective revocation timestamp also requires a distinct revocation event ID, digest and verifier report; a timestamp without that event evidence remains indeterminate.
 
 The profile intentionally supports exact-match scopes only. Wildcards, numeric range delegation, cross-DNA resolution and multi-source joins are out of scope.
 
