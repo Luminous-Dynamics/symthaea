@@ -1,0 +1,82 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "SDCB_EXPERIMENT_TRANSITION_V1.schema.json",
+  "title": "SDCB evidence-gated belief transition v1",
+  "description": "Wire contract for an accepted scientific belief transition. Semantic posterior and cross-field checks are required in addition to JSON Schema validation.",
+  "type": "object",
+  "additionalProperties": false,
+  "required": [
+    "schema_version",
+    "record_type",
+    "run_id",
+    "task_id",
+    "task_digest",
+    "system_digest",
+    "hypothesis_set_digest",
+    "experiment_id",
+    "proposal_digest",
+    "prior_version",
+    "to_version",
+    "hypothesis_ids",
+    "prior_distribution",
+    "outcome_likelihoods",
+    "observed_outcome",
+    "posterior_distribution",
+    "predictive_probability",
+    "cost_units",
+    "budget_before",
+    "budget_after",
+    "observation_digest",
+    "verifier_id",
+    "verification_status"
+  ],
+  "properties": {
+    "schema_version": { "const": "1.0.0" },
+    "record_type": { "const": "sdcb_belief_transition_v1" },
+    "run_id": { "type": "string", "minLength": 1 },
+    "task_id": { "type": "string", "minLength": 1 },
+    "task_digest": { "$ref": "#/$defs/sha256" },
+    "system_digest": { "$ref": "#/$defs/sha256" },
+    "hypothesis_set_digest": { "$ref": "#/$defs/sha256" },
+    "experiment_id": { "type": "string", "minLength": 1 },
+    "proposal_digest": { "$ref": "#/$defs/sha256" },
+    "prior_version": { "type": "integer", "minimum": 0 },
+    "to_version": { "type": "integer", "minimum": 1 },
+    "hypothesis_ids": {
+      "type": "array",
+      "minItems": 2,
+      "uniqueItems": true,
+      "items": { "type": "string", "minLength": 1 }
+    },
+    "prior_distribution": { "$ref": "#/$defs/probabilityVector" },
+    "outcome_likelihoods": {
+      "type": "array",
+      "minItems": 2,
+      "items": { "$ref": "#/$defs/probabilityVector" }
+    },
+    "observed_outcome": { "type": "integer", "minimum": 0 },
+    "posterior_distribution": { "$ref": "#/$defs/probabilityVector" },
+    "predictive_probability": { "type": "number", "exclusiveMinimum": 0, "maximum": 1 },
+    "cost_units": { "type": "integer", "minimum": 1 },
+    "budget_before": { "type": "integer", "minimum": 0 },
+    "budget_after": { "type": "integer", "minimum": 0 },
+    "observation_digest": { "$ref": "#/$defs/sha256" },
+    "verifier_id": { "type": "string", "minLength": 1 },
+    "verification_status": { "const": "independently_verified" }
+  },
+  "$defs": {
+    "sha256": {
+      "type": "string",
+      "pattern": "^[0-9a-f]{64}$"
+    },
+    "probabilityVector": {
+      "type": "array",
+      "minItems": 2,
+      "items": {
+        "type": "number",
+        "minimum": 0,
+        "maximum": 1
+      }
+    }
+  }
+}
