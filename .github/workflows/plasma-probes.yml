@@ -90,6 +90,7 @@ jobs:
           mkdir -p "${tmp_root}/benchmarks/plasma/positivity-projection/fixtures"
           mkdir -p "${tmp_root}/benchmarks/plasma/measure-stability/fixtures"
           mkdir -p "${tmp_root}/benchmarks/plasma/kinetic-information-return/fixtures"
+          mkdir -p "${tmp_root}/benchmarks/plasma/response-balanced/fixtures"
           cp crates/domains/symthaea-plasma-probes/src/lib.rs "${crate_dir}/src/lib.rs"
           cp crates/domains/symthaea-plasma-probes/src/validity_horizon.rs "${crate_dir}/src/validity_horizon.rs"
           cp crates/domains/symthaea-plasma-probes/src/rbkr.rs "${crate_dir}/src/rbkr.rs"
@@ -182,6 +183,10 @@ jobs:
             "${tmp_root}/benchmarks/plasma/kinetic-information-return/"
           cp benchmarks/plasma/kinetic-information-return/fixtures/operation-ledger-known-answer-v0.1.json \
             "${tmp_root}/benchmarks/plasma/kinetic-information-return/fixtures/"
+          cp benchmarks/plasma/response-balanced/response-balanced-experiment-v0.1.schema.json \
+            "${tmp_root}/benchmarks/plasma/response-balanced/"
+          cp benchmarks/plasma/response-balanced/fixtures/synthetic-kresp1-experiment-v0.1.json \
+            "${tmp_root}/benchmarks/plasma/response-balanced/fixtures/"
           cat > "${crate_dir}/Cargo.toml" <<'EOF'
           [package]
           name = "symthaea-plasma-probes"
@@ -746,6 +751,107 @@ jobs:
           assert actuator["observable"] and not actuator["controllable"] and not actuator["authority_qualified"]
           assert fixture["claim_boundary"]["no_closed_loop_stability_claim"] is True
           print("coupled_mode_authority_schema_validation=PASS")
+          PY
+
+      - name: Validate response-balanced K-RESP-1 experiment contract
+        run: |
+          python3 - <<'PY'
+          import json
+          from pathlib import Path
+          from jsonschema import Draft202012Validator
+
+          root = Path("${{ runner.temp }}/plasma-probe-validation/benchmarks/plasma/response-balanced")
+          schema = json.loads((root / "response-balanced-experiment-v0.1.schema.json").read_text())
+          fixture = json.loads((root / "fixtures/synthetic-kresp1-experiment-v0.1.json").read_text())
+          Draft202012Validator.check_schema(schema)
+          validator = Draft202012Validator(schema)
+          validator.validate(fixture)
+
+          cohort = fixture["cohort"]
+          checkpoint = fixture["frozen_checkpoint"]
+          pulse_family = fixture["pulse_family"]
+          split = fixture["split"]
+          horizon = fixture["prediction_horizon"]
+          assert cohort["spatial_domain"]["maximum"] > cohort["spatial_domain"]["minimum"]
+          assert cohort["velocity_domain"]["maximum"] > cohort["velocity_domain"]["minimum"]
+          assert horizon["start_time"] == checkpoint["time"]
+          assert horizon["end_time"] <= cohort["maximum_time"]
+          assert pulse_family["maximum_application_time"] <= cohort["maximum_time"]
+
+          split_groups = {
+              "training": split["training"],
+              "validation": split["validation"],
+              "held_out": split["held_out"],
+          }
+          all_trial_ids = []
+          all_pulse_ids = []
+          for group_name, trials in split_groups.items():
+              for trial in trials:
+                  all_trial_ids.append(trial["trial_id"])
+                  times = [pulse["application_time"] for pulse in trial["pulses"]]
+                  assert times == sorted(times), f"{group_name}/{trial['trial_id']}: pulses must be time ordered"
+                  assert len({pulse["pulse_id"] for pulse in trial["pulses"]}) == len(trial["pulses"])
+                  for pulse in trial["pulses"]:
+                      all_pulse_ids.append(pulse["pulse_id"])
+                      assert pulse_family["allowed_spatial_mode"]["minimum"] <= pulse["spatial_mode"] <= pulse_family["allowed_spatial_mode"]["maximum"]
+                      assert pulse_family["allowed_kick_amplitude"]["minimum"] <= pulse["kick_amplitude"] <= pulse_family["allowed_kick_amplitude"]["maximum"]
+                      assert pulse_family["allowed_phase_rad"]["minimum"] <= pulse["phase_rad"] <= pulse_family["allowed_phase_rad"]["maximum"]
+                      assert pulse["application_time"] <= pulse_family["maximum_application_time"]
+                      assert pulse["application_time"] < horizon["end_time"]
+
+          assert len(all_trial_ids) == len(set(all_trial_ids)), "trial ids leak or duplicate across splits"
+          assert len(all_pulse_ids) == len(set(all_pulse_ids)), "pulse ids must be globally unique"
+
+          training_pulses = [pulse for trial in split["training"] for pulse in trial["pulses"]]
+          held_out_pulses = [pulse for trial in split["held_out"] for pulse in trial["pulses"]]
+          training_phases = {pulse["phase_rad"] for pulse in training_pulses}
+          training_amplitudes = {pulse["kick_amplitude"] for pulse in training_pulses}
+          training_modes = {pulse["spatial_mode"] for pulse in training_pulses}
+          training_separations = {
+              trial["pulses"][1]["application_time"] - trial["pulses"][0]["application_time"]
+              for trial in split["training"] if len(trial["pulses"]) == 2
+          }
+          training_orders = {
+              tuple(pulse["spatial_mode"] for pulse in trial["pulses"])
+              for trial in split["training"]
+          }
+          assert any(pulse["phase_rad"] not in training_phases for pulse in held_out_pulses)
+          assert any(pulse["kick_amplitude"] not in training_amplitudes for pulse in held_out_pulses)
+          assert any(pulse["spatial_mode"] not in training_modes for pulse in held_out_pulses)
+          held_out_separations = {
+              trial["pulses"][1]["application_time"] - trial["pulses"][0]["application_time"]
+              for trial in split["held_out"] if len(trial["pulses"]) == 2
+          }
+          assert any(separation not in training_separations for separation in held_out_separations)
+          held_out_orders = {
+              tuple(pulse["spatial_mode"] for pulse in trial["pulses"])
+              for trial in split["held_out"]
+          }
+          assert any(order not in training_orders for order in held_out_orders)
+
+          qoi_ids = {item["qoi_id"] for item in fixture["observables"]}
+          assert len(qoi_ids) == len(fixture["observables"])
+          assert set(fixture["reference_convergence"]["convergence_observables"]).issubset(qoi_ids)
+          required_comparators = {
+              "snapshot_pod", "padovan_nonintrusive_balancing", "adaptive_hermite",
+              "adaptive_fourier", "tensor_network_vlasov_poisson",
+              "non_markovian_fno_closure", "full_order_reference"
+          }
+          assert required_comparators.issubset(set(fixture["comparators"]))
+          assert set(fixture["resource_budget"]["comparison_modes"]) == {
+              "equal_rank", "equal_stored_bytes", "equal_end_to_end_wall_time"
+          }
+          assert fixture["success_targets"]["status"] == "prospective_only_not_achieved"
+          assert fixture["success_targets"]["all_targets_are_prospective"] is True
+          assert fixture["claim_boundary"] == {
+              "physical_solver_executed": False,
+              "physical_response_measured": False,
+              "competitive_ranking_claimed": False,
+              "independent_reference_converged": False
+          }
+          print("response_balanced_kresp1_schema_validation=PASS")
+          print("response_balanced_split_and_coverage_validation=PASS")
+          print("response_balanced_claim_boundary_validation=PASS")
           PY
 
       - name: Run strict Clippy
