@@ -1848,10 +1848,7 @@ mod tests {
             DECISION_SUFFICIENCY_VERIFIER_ID_V1,
         );
         let evaluator_profile_sha256 = evaluator_profile_value.profile_sha256().to_owned();
-        let evaluator_profile_pin = evaluator_profile_sha256.clone();
-        let evaluator_profile_pin: &'static str =
-            Box::leak(evaluator_profile_pin.into_boxed_str());
-        let binding = use_binding(&qualified, evaluator_profile_pin, 160);
+        let binding = use_binding(&qualified, &evaluator_profile_sha256, 160);
         let evaluator_key_id =
             qualification_key_id_v1(&evaluator_key.verifying_key().to_bytes());
         let mut assessment = receipt(
