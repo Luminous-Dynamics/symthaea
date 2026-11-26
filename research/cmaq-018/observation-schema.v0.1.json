@@ -1,0 +1,26 @@
+{
+  "schema_version": "cmaq-018-observation-schema-v0.1",
+  "candidate_input": {
+    "type": "object",
+    "required": [
+      "x",
+      "v"
+    ],
+    "properties": {
+      "x": {
+        "type": "number"
+      },
+      "v": {
+        "type": "number"
+      }
+    }
+  },
+  "prohibited_candidate_fields": [
+    "history_id",
+    "episode_seed",
+    "scenario",
+    "hidden_regime",
+    "common_disturbance",
+    "realized_branch_outcomes"
+  ]
+}

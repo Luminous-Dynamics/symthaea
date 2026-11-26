@@ -1,0 +1,42 @@
+{
+  "schema_version": "cmaq-018-action-schema-v0.1",
+  "actions": [
+    {
+      "id": 0,
+      "force_milli": 0,
+      "grip_milli": 0
+    },
+    {
+      "id": 1,
+      "force_milli": 250,
+      "grip_milli": 0
+    },
+    {
+      "id": 2,
+      "force_milli": 500,
+      "grip_milli": 0
+    },
+    {
+      "id": 3,
+      "force_milli": 750,
+      "grip_milli": 0
+    },
+    {
+      "id": 4,
+      "force_milli": 1000,
+      "grip_milli": 0
+    },
+    {
+      "id": 5,
+      "force_milli": 500,
+      "grip_milli": 1000
+    },
+    {
+      "id": 6,
+      "force_milli": 1000,
+      "grip_milli": 1000
+    }
+  ],
+  "action_id_is_canonical": true,
+  "action_order_does_not_change_identity": true
+}

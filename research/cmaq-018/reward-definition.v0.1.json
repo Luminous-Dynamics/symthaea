@@ -1,0 +1,9 @@
+{
+  "schema_version": "cmaq-018-reward-definition-v0.1",
+  "base_utility": "1 - 0.08*x^2 - 0.03*v^2",
+  "effect": "scenario-specific evaluator-owned action-effect function",
+  "disturbance": "one common per-episode evaluator draw",
+  "terminal_penalty": -2,
+  "terminal_condition": "termination_seam and force>=0.75 and grip>0.5",
+  "direction": "higher_is_better"
+}

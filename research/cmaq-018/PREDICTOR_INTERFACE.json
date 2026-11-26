@@ -1,0 +1,87 @@
+{
+  "schema_version": "cmaq-018-predictor-interface-v0.1",
+  "owner": "VIS-005",
+  "candidate_branch_predictor": {
+    "input": {
+      "observed_history": {
+        "fields": [
+          "x",
+          "v"
+        ],
+        "visibility": "candidate"
+      },
+      "hypothetical_action": {
+        "fields": [
+          "id",
+          "force",
+          "grip"
+        ],
+        "visibility": "candidate"
+      },
+      "forecast_kind": {
+        "enum": [
+          "predicted",
+          "counterfactual"
+        ],
+        "semantics": {
+          "predicted": "forecast for a policy action under consideration/committed by the controller",
+          "counterfactual": "forecast for a hypothetical alternative action from the same observed history"
+        }
+      }
+    },
+    "output": {
+      "type": "candidate_forecast_or_abstention",
+      "forecast_fields": [
+        "utility",
+        "next_x",
+        "next_v",
+        "terminal"
+      ],
+      "provenance_field": "forecast_kind",
+      "abstention": "None",
+      "requires_provenance_echo": true
+    },
+    "prohibited_inputs": [
+      "evaluator_history_id",
+      "episode_seed",
+      "scenario_label",
+      "hidden_regime",
+      "common_disturbance",
+      "realized_branch_outcomes",
+      "future_counterfactuals"
+    ],
+    "observation_memory_mutation_api": false
+  },
+  "candidate_effect_predictor": {
+    "input": [
+      "observed_history",
+      "left_action",
+      "right_action"
+    ],
+    "output": "pairwise_utility_delta_or_abstention",
+    "output_provenance": "counterfactual_by_definition"
+  },
+  "memory_boundary": {
+    "forecast_is_observation": false,
+    "may_write_observation_memory": false,
+    "promotion_requires_new_sensor_evidence": true
+  },
+  "evaluator_boundary": {
+    "owner": "Symtropy evaluator",
+    "hidden_truth_fields": [
+      "scenario",
+      "episode_history_id",
+      "hidden_regime",
+      "common_disturbance",
+      "realized_branch_outcomes"
+    ],
+    "candidate_visibility": false
+  },
+  "qualification_targets": {
+    "zero_hidden_truth_leaks": true,
+    "zero_prediction_to_observation_memory_promotions": true,
+    "horizon_stratified_calibration": true,
+    "action_conditioned_effect_and_ranking_metrics": true
+  },
+  "claim_ceiling": "Interface contract only; not an actual VIS-005 model adapter or performance result."
+}
