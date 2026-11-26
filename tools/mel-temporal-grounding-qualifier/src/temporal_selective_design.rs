@@ -957,11 +957,12 @@ mod tests {
         false_absence_claim: bool,
     ) -> SelectiveAuditOutcomeV1 {
         let work = digest(work);
+        let recording = digest(work.chars().next().unwrap().to_ascii_lowercase());
         SelectiveAuditOutcomeV1 {
             item_id: item_id.into(),
             query_id: format!("query-{item_id}"),
             source_work_id_sha256: work,
-            recording_sha256: digest(work.chars().next().unwrap().to_ascii_lowercase()),
+            recording_sha256: recording,
             selective_report_sha256: crate::evidence_digest::sha256_hex(item_id.as_bytes()),
             adjudication_profile_sha256: digest('3'),
             model_identity_sha256: digest('4'),
