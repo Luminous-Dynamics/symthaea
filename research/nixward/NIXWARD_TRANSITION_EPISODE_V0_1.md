@@ -68,6 +68,7 @@ Outcome counts are reported separately from transition-state prediction. A futur
 - unexecuted and outcome-unknown episodes are rejected without model mutation;
 - distinct environment contexts receive different contextual deltas;
 - distinct environment families do not share contextual buckets;
+- a deterministic two-mechanism fixture compares held-out family-A prediction against the pooled global action-delta baseline; the contextual prediction must have lower state MSE;
 - different action parameter signatures do not silently reuse a contextual delta;
 - unknown context/action parameters visibly fall back to the global baseline;
 - repeated rows in one environment cluster do not inflate distinct-cluster counts;
