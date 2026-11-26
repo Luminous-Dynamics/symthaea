@@ -1,0 +1,138 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "SDCB_RIDEA_PORTFOLIO_V1.schema.json",
+  "title": "SDCB greedy R-I/R-IDeA portfolio episode v1",
+  "type": "object",
+  "additionalProperties": false,
+  "required": [
+    "schema_version",
+    "episode_id",
+    "initial_history",
+    "target_distribution",
+    "candidates",
+    "config",
+    "acquisition_kind",
+    "budget_units",
+    "max_experiments"
+  ],
+  "properties": {
+    "schema_version": {
+      "const": "1.0.0"
+    },
+    "episode_id": {
+      "type": "string",
+      "minLength": 1
+    },
+    "initial_history": {
+      "type": "array",
+      "minItems": 1,
+      "maxItems": 512,
+      "items": {
+        "$ref": "#/$defs/design"
+      }
+    },
+    "target_distribution": {
+      "type": "array",
+      "minItems": 1,
+      "maxItems": 512,
+      "items": {
+        "$ref": "#/$defs/design"
+      }
+    },
+    "candidates": {
+      "type": "array",
+      "minItems": 1,
+      "maxItems": 64,
+      "items": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": [
+          "id",
+          "design",
+          "expected_information_gain",
+          "cost_units",
+          "current_prediction",
+          "proxy_prediction"
+        ],
+        "properties": {
+          "id": {
+            "type": "string",
+            "minLength": 1
+          },
+          "design": {
+            "$ref": "#/$defs/design"
+          },
+          "expected_information_gain": {
+            "type": "number",
+            "minimum": 0
+          },
+          "cost_units": {
+            "type": "integer",
+            "minimum": 1
+          },
+          "current_prediction": {
+            "type": "number"
+          },
+          "proxy_prediction": {
+            "type": "number"
+          }
+        }
+      }
+    },
+    "config": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "representativeness_weight",
+        "deamplification_threshold",
+        "sigmoid_scale",
+        "rbf_sigma"
+      ],
+      "properties": {
+        "representativeness_weight": {
+          "type": "number",
+          "minimum": 0,
+          "maximum": 1
+        },
+        "deamplification_threshold": {
+          "type": "number",
+          "minimum": 0
+        },
+        "sigmoid_scale": {
+          "type": "number",
+          "exclusiveMinimum": 0
+        },
+        "rbf_sigma": {
+          "type": "number",
+          "exclusiveMinimum": 0
+        }
+      }
+    },
+    "acquisition_kind": {
+      "enum": [
+        "representative_informative",
+        "representative_informative_de_amplifying"
+      ]
+    },
+    "budget_units": {
+      "type": "integer",
+      "minimum": 0
+    },
+    "max_experiments": {
+      "type": "integer",
+      "minimum": 0,
+      "maximum": 64
+    }
+  },
+  "$defs": {
+    "design": {
+      "type": "array",
+      "minItems": 1,
+      "maxItems": 64,
+      "items": {
+        "type": "number"
+      }
+    }
+  },
+  "$comment": "Semantic checks enforce one common design dimension across histories, target and candidates; finite values; unique candidate IDs; and non-zero initial empirical MMD^2 for any actual R-I score. A zero MMD^2 baseline ends selection as TargetDistributionMatched. EIG and current/proxy predictions are frozen candidate inputs and are not recomputed from observations."
+}
