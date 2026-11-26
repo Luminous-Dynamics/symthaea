@@ -172,5 +172,7 @@
         "model_answer": "ChoiceA"
       }
     }
-  ]
+  ],
+  "dataset_revision_sha256": "9999999999999999999999999999999999999999999999999999999999999999",
+  "official_scorer_revision_sha256": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa"
 }
