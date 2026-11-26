@@ -374,13 +374,18 @@ pub fn evaluate_regime_routing_v1(
             rejected = true;
             continue;
         }
-        let retrospective_target_feature = input.purpose == RegimeRoutingPurposeV1::RetrospectiveOracle
-            && feature.source_kind == RegimeFeatureSourceKindV1::TargetDerived;
-        if !allowed.contains(feature.feature_id.as_str()) && !retrospective_target_feature {
+        let retrospective_nonobservable_feature =
+            input.purpose == RegimeRoutingPurposeV1::RetrospectiveOracle
+                && matches!(
+                    feature.source_kind,
+                    RegimeFeatureSourceKindV1::TargetDerived
+                        | RegimeFeatureSourceKindV1::PostDecision
+                );
+        if !allowed.contains(feature.feature_id.as_str()) && !retrospective_nonobservable_feature {
             reasons.push(RegimeRoutingReasonV1::FeatureNotInTrainingAllowlist);
             rejected = true;
         }
-        if forbidden.contains(feature.feature_id.as_str()) && !retrospective_target_feature {
+        if forbidden.contains(feature.feature_id.as_str()) && !retrospective_nonobservable_feature {
             reasons.push(RegimeRoutingReasonV1::FeatureForbiddenByTrainingManifest);
             rejected = true;
         }
@@ -776,6 +781,19 @@ mod tests {
         let receipt = evaluate_regime_routing_v1(&input).unwrap();
         assert_eq!(receipt.state, RegimeRoutingStateV1::RetrospectiveOnly);
         assert!(!receipt.deployable_router_eligible);
+    }
+
+    #[test]
+    fn retrospective_post_decision_feature_is_never_deployable() {
+        let input = input(
+            RegimeRoutingPurposeV1::RetrospectiveOracle,
+            vec![feature("late_sensor", RegimeFeatureSourceKindV1::PostDecision, 101, 102)],
+        );
+        let receipt = evaluate_regime_routing_v1(&input).unwrap();
+        assert_eq!(receipt.state, RegimeRoutingStateV1::RetrospectiveOnly);
+        assert!(receipt.retrospective_oracle_only);
+        assert!(!receipt.deployable_router_eligible);
+        assert!(receipt.reasons.contains(&RegimeRoutingReasonV1::RetrospectivePostDecisionFeatureUsed));
     }
 
     #[test]
