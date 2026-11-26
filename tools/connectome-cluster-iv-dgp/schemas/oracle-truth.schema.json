@@ -1,0 +1,286 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://github.com/Luminous-Dynamics/symthaea/blob/main/tools/connectome-cluster-iv-dgp/schemas/oracle-truth.schema.json",
+  "title": "Restricted known-truth artifact for clustered-IV DGP",
+  "type": "object",
+  "additionalProperties": false,
+  "required": [
+    "schema_version",
+    "scenario_id",
+    "generator_algorithm",
+    "seed",
+    "structural_beta",
+    "first_stage_coefficients",
+    "direct_effect_coefficients",
+    "registered_direct_effect_rms_bound",
+    "cluster_sizes",
+    "instrument_assignment_level",
+    "first_stage_cluster_multipliers",
+    "direct_effect_cluster_multipliers",
+    "cluster_noise_multipliers",
+    "instrument_equicorrelation",
+    "cluster_shock_sd",
+    "idiosyncratic_shock_sd",
+    "cluster_endogeneity_correlation",
+    "idiosyncratic_endogeneity_correlation",
+    "summary",
+    "cluster_truth",
+    "row_truth",
+    "row_order",
+    "hashing_note"
+  ],
+  "properties": {
+    "schema_version": {
+      "const": "1.0.0"
+    },
+    "scenario_id": {
+      "type": "string",
+      "minLength": 1
+    },
+    "generator_algorithm": {
+      "const": "splitmix64-box-muller-cos-open01-v2"
+    },
+    "seed": {
+      "type": "integer",
+      "minimum": 0
+    },
+    "structural_beta": {
+      "type": "number"
+    },
+    "first_stage_coefficients": {
+      "type": "array",
+      "minItems": 1,
+      "items": {
+        "type": "number"
+      }
+    },
+    "direct_effect_coefficients": {
+      "type": "array",
+      "minItems": 1,
+      "items": {
+        "type": "number"
+      }
+    },
+    "registered_direct_effect_rms_bound": {
+      "type": [
+        "number",
+        "null"
+      ],
+      "minimum": 0
+    },
+    "cluster_sizes": {
+      "type": "array",
+      "minItems": 2,
+      "items": {
+        "type": "integer",
+        "minimum": 1
+      }
+    },
+    "instrument_assignment_level": {
+      "enum": [
+        "within_cluster",
+        "cluster_level"
+      ]
+    },
+    "first_stage_cluster_multipliers": {
+      "type": "array",
+      "items": {
+        "type": "number",
+        "minimum": 0
+      }
+    },
+    "direct_effect_cluster_multipliers": {
+      "type": "array",
+      "items": {
+        "type": "number",
+        "minimum": 0
+      }
+    },
+    "cluster_noise_multipliers": {
+      "type": "array",
+      "items": {
+        "type": "number",
+        "minimum": 0
+      }
+    },
+    "instrument_equicorrelation": {
+      "type": "number",
+      "minimum": 0,
+      "exclusiveMaximum": 1
+    },
+    "cluster_shock_sd": {
+      "type": "number",
+      "minimum": 0
+    },
+    "idiosyncratic_shock_sd": {
+      "type": "number",
+      "minimum": 0
+    },
+    "cluster_endogeneity_correlation": {
+      "type": "number",
+      "minimum": -1,
+      "maximum": 1
+    },
+    "idiosyncratic_endogeneity_correlation": {
+      "type": "number",
+      "minimum": -1,
+      "maximum": 1
+    },
+    "summary": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "observation_count",
+        "cluster_count",
+        "instrument_count",
+        "direct_effect_sample_rms",
+        "registered_direct_effect_rms_bound",
+        "direct_effect_support_status",
+        "instrument_second_moment"
+      ],
+      "properties": {
+        "observation_count": {
+          "type": "integer",
+          "minimum": 3
+        },
+        "cluster_count": {
+          "type": "integer",
+          "minimum": 2
+        },
+        "instrument_count": {
+          "type": "integer",
+          "minimum": 1
+        },
+        "direct_effect_sample_rms": {
+          "type": "number",
+          "minimum": 0
+        },
+        "registered_direct_effect_rms_bound": {
+          "type": [
+            "number",
+            "null"
+          ],
+          "minimum": 0
+        },
+        "direct_effect_support_status": {
+          "enum": [
+            "UNREGISTERED",
+            "IN_BOUND",
+            "OUT_OF_BOUND"
+          ]
+        },
+        "instrument_second_moment": {
+          "type": "number",
+          "minimum": 0
+        }
+      }
+    },
+    "cluster_truth": {
+      "type": "array",
+      "minItems": 2,
+      "items": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": [
+          "cluster_id",
+          "row_count",
+          "first_stage_coefficients",
+          "direct_effect_coefficients",
+          "treatment_cluster_shock",
+          "outcome_cluster_shock",
+          "cluster_noise_multiplier"
+        ],
+        "properties": {
+          "cluster_id": {
+            "type": "string",
+            "minLength": 1
+          },
+          "row_count": {
+            "type": "integer",
+            "minimum": 1
+          },
+          "first_stage_coefficients": {
+            "type": "array",
+            "minItems": 1,
+            "items": {
+              "type": "number"
+            }
+          },
+          "direct_effect_coefficients": {
+            "type": "array",
+            "minItems": 1,
+            "items": {
+              "type": "number"
+            }
+          },
+          "treatment_cluster_shock": {
+            "type": "number"
+          },
+          "outcome_cluster_shock": {
+            "type": "number"
+          },
+          "cluster_noise_multiplier": {
+            "type": "number",
+            "minimum": 0
+          }
+        }
+      }
+    },
+    "row_truth": {
+      "type": "array",
+      "minItems": 3,
+      "items": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": [
+          "unit_id",
+          "first_stage_instrument_component",
+          "direct_effect_component",
+          "treatment_disturbance",
+          "structural_error",
+          "first_stage_cluster_multiplier",
+          "direct_effect_cluster_multiplier",
+          "cluster_noise_multiplier"
+        ],
+        "properties": {
+          "unit_id": {
+            "type": "string",
+            "minLength": 1
+          },
+          "first_stage_instrument_component": {
+            "type": "number"
+          },
+          "direct_effect_component": {
+            "type": "number"
+          },
+          "treatment_disturbance": {
+            "type": "number"
+          },
+          "structural_error": {
+            "type": "number"
+          },
+          "first_stage_cluster_multiplier": {
+            "type": "number",
+            "minimum": 0
+          },
+          "direct_effect_cluster_multiplier": {
+            "type": "number",
+            "minimum": 0
+          },
+          "cluster_noise_multiplier": {
+            "type": "number",
+            "minimum": 0
+          }
+        }
+      }
+    },
+    "row_order": {
+      "const": "cluster-major then ascending unit index"
+    },
+    "hashing_note": {
+      "type": "string",
+      "minLength": 1
+    }
+  },
+  "$comment": "Restricted evaluator artifact. Matching first-stage/direct-effect vector lengths, multiplier lengths, and row/cluster totals require cross-field semantic checks in addition to JSON Schema. Never pass this artifact to a model or baseline before prediction freeze."
+}
