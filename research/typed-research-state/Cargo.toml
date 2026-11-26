@@ -12,4 +12,4 @@ description = "Conformance validator for typed public research state"
 [dependencies]
 serde = { version = "=1.0.228", features = ["derive"] }
 serde_json = { version = "=1.0.150", features = ["preserve_order"] }
-sha2 = { version = "=0.10.9", features = ["oid"] }
+sha2 = "=0.10.9"
