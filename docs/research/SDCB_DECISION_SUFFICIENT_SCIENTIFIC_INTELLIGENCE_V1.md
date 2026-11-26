@@ -125,7 +125,7 @@ The standalone Rust reference implements:
 - abstention when all experiments have zero or negative net decision value;
 - negative controls for high information with no decision value, cost overruns, malformed probabilities, and duplicate candidate IDs.
 
-The source has 15 authored Rust tests and uses only the Rust standard library. It has not been compiled or executed in this environment because rustc/cargo are unavailable. A separate numerical reference calculation was used to check the frozen three-hypothesis example; this is not Rust execution.
+The source has 15 authored Rust tests and uses only the Rust standard library. It has not been compiled or executed in this environment because rustc/cargo are unavailable. The checked-in Draft 2020-12 episode schema passed meta-schema validation, and the example episode passed schema validation plus independent semantic checks for prior normalization, utility dimensions, unique hypothesis IDs, likelihood dimensions, and likelihood row sums. A separate numerical reference calculation was used to check the frozen three-hypothesis example; this is not Rust execution.
 
 ## 7. Benchmark strategy and comparison
 
