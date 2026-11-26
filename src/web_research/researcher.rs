@@ -149,6 +149,7 @@ impl WebResearcher {
                 );
                 acquisition_receipts.push(receipt);
             }
+            sort_acquisition_receipts(&mut acquisition_receipts);
             return Ok(WebResearchReport {
                 result: WebResearchResult::with_status(ResearchStatus::RetrievalIncomplete),
                 acquisition_receipts,
@@ -360,6 +361,7 @@ impl WebResearcher {
 
         if all_sources.is_empty() {
             let status = status_without_usable_sources(&acquisition_receipts);
+            sort_acquisition_receipts(&mut acquisition_receipts);
             return Ok(WebResearchReport {
                 result: WebResearchResult::with_status(status),
                 acquisition_receipts,
@@ -429,6 +431,7 @@ impl WebResearcher {
             claims: verified_claims,
         };
 
+        sort_acquisition_receipts(&mut acquisition_receipts);
         Ok(WebResearchReport {
             result,
             acquisition_receipts,
@@ -1570,6 +1573,28 @@ fn http_status_from_error(error: &anyhow::Error) -> Option<u16> {
             .and_then(reqwest::Error::status)
             .map(|status| status.as_u16())
     })
+}
+
+fn acquisition_stage_order(stage: AcquisitionStage) -> u8 {
+    match stage {
+        AcquisitionStage::SearchQuery => 0,
+        AcquisitionStage::SearchProvider => 1,
+        AcquisitionStage::ArxivApi => 2,
+        AcquisitionStage::OpenReviewApi => 3,
+        AcquisitionStage::DuckDuckGo => 4,
+        AcquisitionStage::HeuristicSeeds => 5,
+        AcquisitionStage::PageFetch => 6,
+    }
+}
+
+fn sort_acquisition_receipts(receipts: &mut [AcquisitionReceipt]) {
+    receipts.sort_by_key(|receipt| {
+        (
+            receipt.query_rank,
+            acquisition_stage_order(receipt.stage),
+            receipt.source_rank.unwrap_or(usize::MAX),
+        )
+    });
 }
 
 fn status_without_usable_sources(receipts: &[AcquisitionReceipt]) -> ResearchStatus {
