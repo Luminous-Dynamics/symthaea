@@ -49,6 +49,8 @@ pub struct ProbeCharge {
 #[derive(Clone, Debug)]
 pub struct ProbeBudgetLedger {
     contract_id: String,
+    contract_sha256: String,
+    source_manifest_sha256: String,
     budget_limit_units: u64,
     spent_units: u64,
     accepted_receipt_sha256: BTreeSet<String>,
@@ -62,6 +64,8 @@ impl ProbeBudgetLedger {
         contract.validate()?;
         Ok(Self {
             contract_id: contract.contract_id.clone(),
+            contract_sha256: contract.contract_sha256.clone(),
+            source_manifest_sha256: contract.source_manifest_sha256.clone(),
             budget_limit_units,
             spent_units: 0,
             accepted_receipt_sha256: BTreeSet::new(),
@@ -95,8 +99,14 @@ impl ProbeBudgetLedger {
         receipt: &ProbeObservationReceiptV1,
     ) -> Result<ProbeCharge, String> {
         validate_record_set(current_records, contract)?;
-        if self.contract_id != contract.contract_id {
-            return Err("budget ledger belongs to a different contract".to_owned());
+        if self.contract_id != contract.contract_id
+            || self.contract_sha256 != contract.contract_sha256
+            || self.source_manifest_sha256 != contract.source_manifest_sha256
+        {
+            return Err(
+                "budget ledger belongs to a different frozen contract or source manifest"
+                    .to_owned(),
+            );
         }
 
         let selected = select_counterexample_probe(current_records, contract)?
@@ -594,6 +604,54 @@ mod tests {
         );
         assert_eq!(ledger.spent_units(), 1);
         assert_eq!(ledger.accepted_receipt_count(), 1);
+    }
+
+    #[test]
+    fn budget_ledger_rejects_same_id_contract_or_manifest_substitution() {
+        let original = contract();
+        let before = vec![
+            record("a", "merged", 0, 0, &"c".repeat(64), '1'),
+            record("b", "merged", 10, 10, &"c".repeat(64), '2'),
+        ];
+        let probe = select_counterexample_probe(&before, &original)
+            .expect("valid contract")
+            .expect("counterexample exists");
+        let observation = receipt(
+            "a",
+            "b",
+            ResponseKey::new("probe_fast", "displacement", 1),
+            0,
+            10,
+        );
+
+        let mut ledger = ProbeBudgetLedger::new(&original, 5).expect("valid budget");
+        let mut changed_contract_digest = original.clone();
+        changed_contract_digest.contract_sha256 = "c".repeat(64);
+        assert!(
+            ledger
+                .charge_probe(
+                    &before,
+                    &changed_contract_digest,
+                    &probe,
+                    &observation,
+                )
+                .is_err()
+        );
+
+        let mut changed_source_manifest = original.clone();
+        changed_source_manifest.source_manifest_sha256 = "d".repeat(64);
+        assert!(
+            ledger
+                .charge_probe(
+                    &before,
+                    &changed_source_manifest,
+                    &probe,
+                    &observation,
+                )
+                .is_err()
+        );
+        assert_eq!(ledger.spent_units(), 0);
+        assert_eq!(ledger.accepted_receipt_count(), 0);
     }
 
     #[test]
