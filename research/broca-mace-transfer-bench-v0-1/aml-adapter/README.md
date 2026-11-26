@@ -189,3 +189,17 @@ Protocol: [MACE Adaptive Decision Acquisition V1](../../../docs/research/MACE_AD
 MACE benchmark runs should be published as evidence capsules, not isolated scores. The capsule pins the exact benchmark/harness/split, candidate commit/configuration/build, model and grader, resource budgets, task denominator, safety counts, uncertainty method and verification level.
 
 Protocol: [MACE Benchmark Result Capsule V1](../../../docs/research/MACE_BENCHMARK_RESULT_CAPSULE_V1.md). Schema: [mace_benchmark_result_capsule_v1.schema.json](../../../data/schemas/mace_benchmark_result_capsule_v1.schema.json). The schema is a manifest contract, not a signature verifier or an executed benchmark result.
+
+## Adaptive policy reference and memoized solver
+
+The adapter now includes two distinct adaptive-policy implementations:
+
+- `adaptive_policy_reference`: the exhaustive finite-joint-world reference oracle.
+- `adaptive_policy_optimized`: an exact memoized solver for the same V1 contract, with separate expected-value and probability-free robust objectives.
+
+The memoized solver keys each subproblem by the bitset of still-possible worlds and the set of queries already used. This is exact for V1 because queries are single-use and have fixed, additive resource costs; cumulative spend and depth are derivable from the used-query set. The key is not sufficient for future contracts with history-dependent costs, changing permissions, expiry, dynamic rights, or calibration updates. Such state must be included before memoization is reused.
+
+The optimized solver exposes expanded-state, cache-hit, cache-miss, and recursive-call counters and fails closed at bounded search limits. It preserves the exhaustive solver's hard action permissions, resource budgets, policy-node limit and canonical tie-breaking. Deterministic differential tests compare exact policy trees and objective numerators against the exhaustive oracle for expected-value and robust modes, including zero-probability possible worlds and query-order permutations.
+
+The optimized solver is a candidate implementation, not a production executor. Its tests are authored but have not been compiled or run in this environment. No speedup or benchmark score is claimed.
+
