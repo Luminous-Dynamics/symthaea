@@ -64,3 +64,14 @@ V2 reports an observed edit class and a scorer-derived edit delta (predicted-cou
 - Other remains unclassified rather than being treated as verified.
 
 These checks reuse the production scorer's existing matches and TP/FP/FN; they do not introduce a second interval matcher. They assess whether the declared action is consistent with the observed change, not whether the model's internal reasoning was authentic or whether the named sub-action (for example, split vs add) is causally correct.
+
+
+## Exact audio evidence-window verifier
+
+The audio_evidence_window module recomputes SHA-256 over the exact source-audio bytes, decoded PCM bytes, each selected half-open PCM frame window, the ordered context manifest, and the full evidence manifest. Frame-to-byte offsets use checked integer arithmetic over channels × bytes-per-sample. The context digest binds the query-text digest, target/source audio, rights-scope receipt reference, PCM sample clock and format, decoder/profile identity, window coordinates, model/runtime/decoding identity, prompt/adapter/retrieval policy and exact context order.
+
+Run the synthetic CLI replay with:
+
+    cargo +1.96.0 run --locked --manifest-path tools/mel-temporal-grounding-qualifier/Cargo.toml --bin mel-audio-evidence-window-audit -- tools/mel-temporal-grounding-qualifier/fixtures/mel-audio-evidence-window.synthetic.json tools/mel-temporal-grounding-qualifier/fixtures/mel-audio-evidence-source.synthetic.bin tools/mel-temporal-grounding-qualifier/fixtures/mel-audio-evidence-pcm.synthetic.hex
+
+The decoded PCM fixture is stored as hexadecimal text and decoded to raw bytes by the CLI before hashing. The source-audio fixture is read byte-for-byte. The report marks rights, decoder, model/runtime and runner receipt authentication false; request-body recomputation and model-internal input attestation also remain false. A digest reference is not legal authority, a signed execution receipt or proof of internal model consumption. Those stages must compose with #13254 and the selected backend's attestation capability.
