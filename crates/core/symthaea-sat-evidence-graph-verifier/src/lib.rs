@@ -689,6 +689,9 @@ fn check_supported_claims(
 
 pub fn verify_augmentation(input: &str) -> Result<VerificationReport, String> {
     let raw = parse_strict_json(input)?;
+    let augmentation: Augmentation =
+        serde_json::from_str(input).map_err(|error| format!("augmentation shape: {error}"))?;
+
     if augmentation.observations.len() > MAX_OBSERVATIONS
         || augmentation.claims.len() > MAX_CLAIMS
         || augmentation.claim_edges.len() > MAX_CLAIM_EDGES
@@ -700,9 +703,6 @@ pub fn verify_augmentation(input: &str) -> Result<VerificationReport, String> {
             augmentation.claim_edges.len()
         ));
     }
-
-    let augmentation: Augmentation =
-        serde_json::from_str(input).map_err(|error| format!("augmentation shape: {error}"))?;
 
     let mut issues = Vec::new();
     if augmentation.schema_version != GRAPH_SCHEMA_VERSION {
