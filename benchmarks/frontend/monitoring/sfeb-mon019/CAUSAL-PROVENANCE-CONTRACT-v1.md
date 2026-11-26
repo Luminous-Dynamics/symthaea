@@ -330,3 +330,18 @@ MON-019 should consume standard representations and verified outputs; it must no
 - Do not infer physical-world completion from a digital service response.
 
 This profile is a research framework, not a legal admissibility standard, regulatory certification, safety case or universal trust score.
+
+
+### 13.1 Executable causal-graph reference
+
+A standard-library Go reference package lives in `causal-graph/`. It checks typed Entity/Activity/Agent relationships, unique node/edge identities, evidence references, causal DAG acyclicity, generated/external-root semantics, per-activity capture manifests, equality among declared inputs, independently observed inputs and graph-linked `used` edges, verifier-backed collector/source identities, verifier-backed capture-manifest digests, and source/edge evidence against pinned verifier ID/version/build/trust-store metadata.
+
+Local draft-package preflight (source reconstructed from the committed implementation and gofmt'd locally; not an exact remote-head clone/replay):
+
+- `go test -race -count=5 ./...` — PASS.
+- `go vet ./...` — PASS.
+- `go test -count=1 -cover ./...` — PASS, 90.8% statement coverage.
+- `go test -run=^$ -fuzz=FuzzDigestProfileIsolation -fuzztime=2s` — PASS, 54,635 executions in the recorded run.
+- 29 named tests plus one fuzz target.
+
+This remains a semantic prototype. It does not authenticate verifier-report transport, run cryptography, deploy an egress collector, establish global completeness, assess factual truth, authorize actions, or prove destination/physical effects. A string identifying a collector is not itself an independently trusted collector; collector identity, capture-manifest signature and source identity are represented as separate verifier-qualified evidence.
