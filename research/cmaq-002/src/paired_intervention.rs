@@ -1025,10 +1025,22 @@ pub fn evaluate_paired_interventions(
         let disposition_matches = matches!(
             (expected_disposition, pair.disposition),
             (PairDisposition::Completed, PairDisposition::Completed)
-                | (PairDisposition::Failed { .. }, PairDisposition::Failed { .. })
-                | (PairDisposition::TimedOut { .. }, PairDisposition::TimedOut { .. })
-                | (PairDisposition::Invalid { .. }, PairDisposition::Invalid { .. })
-                | (PairDisposition::Abstained { .. }, PairDisposition::Abstained { .. })
+                | (
+                    PairDisposition::Failed { .. },
+                    PairDisposition::Failed { .. },
+                )
+                | (
+                    PairDisposition::TimedOut { .. },
+                    PairDisposition::TimedOut { .. },
+                )
+                | (
+                    PairDisposition::Invalid { .. },
+                    PairDisposition::Invalid { .. },
+                )
+                | (
+                    PairDisposition::Abstained { .. },
+                    PairDisposition::Abstained { .. },
+                )
         );
         if !disposition_matches {
             return Err(PairedInterventionError::BranchDispositionMismatch {
