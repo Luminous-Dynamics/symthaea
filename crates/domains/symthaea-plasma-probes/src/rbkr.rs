@@ -869,7 +869,7 @@ mod tests {
     fn finite_horizon_ltv_gramians_pull_future_qoi_to_shared_checkpoint() {
         let identity = vec![vec![1.0, 0.0], vec![0.0, 1.0]];
         let future_transition = vec![vec![1.0, 0.0], vec![0.0, 10.0]];
-        let past_b = vec![vec![1.0, 0.0], vec![0.0, 0.1]];
+        let past_b = vec![vec![1.0, 0.0], vec![0.0, 0.01]];
         let output_at_checkpoint = vec![vec![1.0, 0.0]];
         let output_at_horizon = vec![vec![0.0, 1.0]];
 
