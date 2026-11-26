@@ -1,0 +1,481 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://luminousdynamics.io/schemas/connectome-mc-scorecard-v1.schema.json",
+  "title": "Connectome Monte Carlo method scorecards",
+  "type": "object",
+  "additionalProperties": false,
+  "required": [
+    "schema_version",
+    "alpha",
+    "wilson_z_critical",
+    "scorecards"
+  ],
+  "properties": {
+    "schema_version": {
+      "const": "connectome-mc-scorecard-v1"
+    },
+    "alpha": {
+      "type": "number",
+      "exclusiveMinimum": 0,
+      "exclusiveMaximum": 1
+    },
+    "wilson_z_critical": {
+      "type": "number",
+      "exclusiveMinimum": 0
+    },
+    "scorecards": {
+      "type": "array",
+      "items": {
+        "$ref": "#/$defs/scorecard"
+      }
+    }
+  },
+  "$defs": {
+    "rate": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "successes",
+        "trials",
+        "estimate",
+        "wilson_interval"
+      ],
+      "properties": {
+        "successes": {
+          "type": "integer",
+          "minimum": 0
+        },
+        "trials": {
+          "type": "integer",
+          "minimum": 1
+        },
+        "estimate": {
+          "type": "number",
+          "minimum": 0,
+          "maximum": 1
+        },
+        "wilson_interval": {
+          "type": "object",
+          "additionalProperties": false,
+          "required": [
+            "lower",
+            "upper"
+          ],
+          "properties": {
+            "lower": {
+              "type": "number",
+              "minimum": 0,
+              "maximum": 1
+            },
+            "upper": {
+              "type": "number",
+              "minimum": 0,
+              "maximum": 1
+            }
+          }
+        }
+      }
+    },
+    "scorecard": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "scenario_id",
+        "method_id",
+        "structural_beta",
+        "null_is_true",
+        "alpha",
+        "wilson_z_critical",
+        "records",
+        "empirical_size",
+        "empirical_power",
+        "conservative_size_upper_bound",
+        "conservative_power_lower_bound",
+        "p_values_under_null",
+        "confidence_sets",
+        "estimates",
+        "resources"
+      ],
+      "properties": {
+        "scenario_id": {
+          "type": "string",
+          "minLength": 1
+        },
+        "method_id": {
+          "type": "string",
+          "minLength": 1
+        },
+        "structural_beta": {
+          "type": "number"
+        },
+        "null_is_true": {
+          "type": "boolean"
+        },
+        "alpha": {
+          "type": "number",
+          "exclusiveMinimum": 0,
+          "exclusiveMaximum": 1
+        },
+        "wilson_z_critical": {
+          "type": "number",
+          "exclusiveMinimum": 0
+        },
+        "records": {
+          "type": "object",
+          "additionalProperties": false,
+          "required": [
+            "attempted",
+            "completed",
+            "failed",
+            "not_applicable",
+            "failure_rate",
+            "not_applicable_rate"
+          ],
+          "properties": {
+            "attempted": {
+              "type": "integer",
+              "minimum": 1
+            },
+            "completed": {
+              "type": "integer",
+              "minimum": 0
+            },
+            "failed": {
+              "type": "integer",
+              "minimum": 0
+            },
+            "not_applicable": {
+              "type": "integer",
+              "minimum": 0
+            },
+            "failure_rate": {
+              "type": "number",
+              "minimum": 0,
+              "maximum": 1
+            },
+            "not_applicable_rate": {
+              "type": "number",
+              "minimum": 0,
+              "maximum": 1
+            }
+          }
+        },
+        "empirical_size": {
+          "anyOf": [
+            {
+              "$ref": "#/$defs/rate"
+            },
+            {
+              "type": "null"
+            }
+          ]
+        },
+        "empirical_power": {
+          "anyOf": [
+            {
+              "$ref": "#/$defs/rate"
+            },
+            {
+              "type": "null"
+            }
+          ]
+        },
+        "conservative_size_upper_bound": {
+          "type": [
+            "number",
+            "null"
+          ],
+          "minimum": 0,
+          "maximum": 1
+        },
+        "conservative_power_lower_bound": {
+          "type": [
+            "number",
+            "null"
+          ],
+          "minimum": 0,
+          "maximum": 1
+        },
+        "p_values_under_null": {
+          "anyOf": [
+            {
+              "type": "object",
+              "additionalProperties": false,
+              "required": [
+                "count",
+                "histogram_deciles",
+                "p10",
+                "p50",
+                "p90"
+              ],
+              "properties": {
+                "count": {
+                  "type": "integer",
+                  "minimum": 1
+                },
+                "histogram_deciles": {
+                  "type": "array",
+                  "minItems": 10,
+                  "maxItems": 10,
+                  "items": {
+                    "type": "integer",
+                    "minimum": 0
+                  }
+                },
+                "p10": {
+                  "type": "number",
+                  "minimum": 0,
+                  "maximum": 1
+                },
+                "p50": {
+                  "type": "number",
+                  "minimum": 0,
+                  "maximum": 1
+                },
+                "p90": {
+                  "type": "number",
+                  "minimum": 0,
+                  "maximum": 1
+                }
+              }
+            },
+            {
+              "type": "null"
+            }
+          ]
+        },
+        "confidence_sets": {
+          "type": "object",
+          "additionalProperties": false,
+          "required": [
+            "available",
+            "missing",
+            "covered",
+            "observed_coverage",
+            "conservative_coverage_lower_bound",
+            "conservative_coverage_upper_bound",
+            "topology_counts",
+            "unbounded_count",
+            "unbounded_rate",
+            "finite_noncovering_set_count",
+            "finite_noncovering_set_rate",
+            "finite_width_count",
+            "finite_width_median",
+            "finite_width_p90"
+          ],
+          "properties": {
+            "available": {
+              "type": "integer",
+              "minimum": 0
+            },
+            "missing": {
+              "type": "integer",
+              "minimum": 0
+            },
+            "covered": {
+              "type": "integer",
+              "minimum": 0
+            },
+            "observed_coverage": {
+              "anyOf": [
+                {
+                  "$ref": "#/$defs/rate"
+                },
+                {
+                  "type": "null"
+                }
+              ]
+            },
+            "conservative_coverage_lower_bound": {
+              "type": [
+                "number",
+                "null"
+              ],
+              "minimum": 0,
+              "maximum": 1
+            },
+            "conservative_coverage_upper_bound": {
+              "type": [
+                "number",
+                "null"
+              ],
+              "minimum": 0,
+              "maximum": 1
+            },
+            "topology_counts": {
+              "type": "object",
+              "additionalProperties": false,
+              "required": [
+                "empty",
+                "finite_bounded",
+                "left_ray",
+                "right_ray",
+                "two_rays",
+                "disconnected_multi_component",
+                "whole_line"
+              ],
+              "properties": {
+                "empty": {
+                  "type": "integer",
+                  "minimum": 0
+                },
+                "finite_bounded": {
+                  "type": "integer",
+                  "minimum": 0
+                },
+                "left_ray": {
+                  "type": "integer",
+                  "minimum": 0
+                },
+                "right_ray": {
+                  "type": "integer",
+                  "minimum": 0
+                },
+                "two_rays": {
+                  "type": "integer",
+                  "minimum": 0
+                },
+                "disconnected_multi_component": {
+                  "type": "integer",
+                  "minimum": 0
+                },
+                "whole_line": {
+                  "type": "integer",
+                  "minimum": 0
+                }
+              }
+            },
+            "unbounded_count": {
+              "type": "integer",
+              "minimum": 0
+            },
+            "unbounded_rate": {
+              "type": [
+                "number",
+                "null"
+              ],
+              "minimum": 0,
+              "maximum": 1
+            },
+            "finite_width_count": {
+              "type": "integer",
+              "minimum": 0
+            },
+            "finite_width_median": {
+              "type": [
+                "number",
+                "null"
+              ],
+              "minimum": 0
+            },
+            "finite_width_p90": {
+              "type": [
+                "number",
+                "null"
+              ],
+              "minimum": 0
+            },
+            "finite_noncovering_set_count": {
+              "type": "integer",
+              "minimum": 0
+            },
+            "finite_noncovering_set_rate": {
+              "type": [
+                "number",
+                "null"
+              ],
+              "minimum": 0,
+              "maximum": 1
+            }
+          }
+        },
+        "estimates": {
+          "type": "object",
+          "additionalProperties": false,
+          "required": [
+            "count",
+            "mean_signed_bias",
+            "rmse"
+          ],
+          "properties": {
+            "count": {
+              "type": "integer",
+              "minimum": 0
+            },
+            "mean_signed_bias": {
+              "type": [
+                "number",
+                "null"
+              ]
+            },
+            "rmse": {
+              "type": [
+                "number",
+                "null"
+              ],
+              "minimum": 0
+            }
+          }
+        },
+        "resources": {
+          "type": "object",
+          "additionalProperties": false,
+          "required": [
+            "runtime_complete",
+            "runtime_count",
+            "runtime_p50_seconds",
+            "runtime_p95_seconds",
+            "memory_complete",
+            "memory_count",
+            "peak_memory_p50_bytes",
+            "peak_memory_p95_bytes"
+          ],
+          "properties": {
+            "runtime_complete": {
+              "type": "boolean"
+            },
+            "runtime_count": {
+              "type": "integer",
+              "minimum": 0
+            },
+            "runtime_p50_seconds": {
+              "type": [
+                "number",
+                "null"
+              ],
+              "minimum": 0
+            },
+            "runtime_p95_seconds": {
+              "type": [
+                "number",
+                "null"
+              ],
+              "minimum": 0
+            },
+            "memory_complete": {
+              "type": "boolean"
+            },
+            "memory_count": {
+              "type": "integer",
+              "minimum": 0
+            },
+            "peak_memory_p50_bytes": {
+              "type": [
+                "number",
+                "null"
+              ],
+              "minimum": 0
+            },
+            "peak_memory_p95_bytes": {
+              "type": [
+                "number",
+                "null"
+              ],
+              "minimum": 0
+            }
+          }
+        }
+      }
+    }
+  }
+}

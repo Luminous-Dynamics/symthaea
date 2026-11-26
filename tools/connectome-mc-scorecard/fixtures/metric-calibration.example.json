@@ -1,0 +1,494 @@
+{
+  "metric_id": "calibrated-score",
+  "direction": "HigherIsBetter",
+  "config": {
+    "minimum_effect_magnitude": 1,
+    "minimum_detection_probability": 0.8,
+    "maximum_null_false_positive_probability": 0.2,
+    "tie_tolerance": 1e-12,
+    "monotonicity_tolerance": 1e-9,
+    "wilson_z_critical": 1.6448536269514722
+  },
+  "observations": [
+    {
+      "effect_magnitude": 0,
+      "replicate_id": "null-000",
+      "seed": 1,
+      "uninformative_metric_value": 0,
+      "positive_control_metric_value": 0,
+      "perfect_metric_value": 1
+    },
+    {
+      "effect_magnitude": 0,
+      "replicate_id": "null-001",
+      "seed": 2,
+      "uninformative_metric_value": 0,
+      "positive_control_metric_value": 0,
+      "perfect_metric_value": 1
+    },
+    {
+      "effect_magnitude": 0,
+      "replicate_id": "null-002",
+      "seed": 3,
+      "uninformative_metric_value": 0,
+      "positive_control_metric_value": 0,
+      "perfect_metric_value": 1
+    },
+    {
+      "effect_magnitude": 0,
+      "replicate_id": "null-003",
+      "seed": 4,
+      "uninformative_metric_value": 0,
+      "positive_control_metric_value": 0,
+      "perfect_metric_value": 1
+    },
+    {
+      "effect_magnitude": 0,
+      "replicate_id": "null-004",
+      "seed": 5,
+      "uninformative_metric_value": 0,
+      "positive_control_metric_value": 0,
+      "perfect_metric_value": 1
+    },
+    {
+      "effect_magnitude": 0,
+      "replicate_id": "null-005",
+      "seed": 6,
+      "uninformative_metric_value": 0,
+      "positive_control_metric_value": 0,
+      "perfect_metric_value": 1
+    },
+    {
+      "effect_magnitude": 0,
+      "replicate_id": "null-006",
+      "seed": 7,
+      "uninformative_metric_value": 0,
+      "positive_control_metric_value": 0,
+      "perfect_metric_value": 1
+    },
+    {
+      "effect_magnitude": 0,
+      "replicate_id": "null-007",
+      "seed": 8,
+      "uninformative_metric_value": 0,
+      "positive_control_metric_value": 0,
+      "perfect_metric_value": 1
+    },
+    {
+      "effect_magnitude": 0,
+      "replicate_id": "null-008",
+      "seed": 9,
+      "uninformative_metric_value": 0,
+      "positive_control_metric_value": 0,
+      "perfect_metric_value": 1
+    },
+    {
+      "effect_magnitude": 0,
+      "replicate_id": "null-009",
+      "seed": 10,
+      "uninformative_metric_value": 0,
+      "positive_control_metric_value": 0,
+      "perfect_metric_value": 1
+    },
+    {
+      "effect_magnitude": 0,
+      "replicate_id": "null-010",
+      "seed": 11,
+      "uninformative_metric_value": 0,
+      "positive_control_metric_value": 0,
+      "perfect_metric_value": 1
+    },
+    {
+      "effect_magnitude": 0,
+      "replicate_id": "null-011",
+      "seed": 12,
+      "uninformative_metric_value": 0,
+      "positive_control_metric_value": 0,
+      "perfect_metric_value": 1
+    },
+    {
+      "effect_magnitude": 0,
+      "replicate_id": "null-012",
+      "seed": 13,
+      "uninformative_metric_value": 0,
+      "positive_control_metric_value": 0,
+      "perfect_metric_value": 1
+    },
+    {
+      "effect_magnitude": 0,
+      "replicate_id": "null-013",
+      "seed": 14,
+      "uninformative_metric_value": 0,
+      "positive_control_metric_value": 0,
+      "perfect_metric_value": 1
+    },
+    {
+      "effect_magnitude": 0,
+      "replicate_id": "null-014",
+      "seed": 15,
+      "uninformative_metric_value": 0,
+      "positive_control_metric_value": 0,
+      "perfect_metric_value": 1
+    },
+    {
+      "effect_magnitude": 0,
+      "replicate_id": "null-015",
+      "seed": 16,
+      "uninformative_metric_value": 0,
+      "positive_control_metric_value": 0,
+      "perfect_metric_value": 1
+    },
+    {
+      "effect_magnitude": 0,
+      "replicate_id": "null-016",
+      "seed": 17,
+      "uninformative_metric_value": 0,
+      "positive_control_metric_value": 0,
+      "perfect_metric_value": 1
+    },
+    {
+      "effect_magnitude": 0,
+      "replicate_id": "null-017",
+      "seed": 18,
+      "uninformative_metric_value": 0,
+      "positive_control_metric_value": 0,
+      "perfect_metric_value": 1
+    },
+    {
+      "effect_magnitude": 0,
+      "replicate_id": "null-018",
+      "seed": 19,
+      "uninformative_metric_value": 0,
+      "positive_control_metric_value": 0,
+      "perfect_metric_value": 1
+    },
+    {
+      "effect_magnitude": 0,
+      "replicate_id": "null-019",
+      "seed": 20,
+      "uninformative_metric_value": 0,
+      "positive_control_metric_value": 0,
+      "perfect_metric_value": 1
+    },
+    {
+      "effect_magnitude": 1,
+      "replicate_id": "effect1-000",
+      "seed": 1,
+      "uninformative_metric_value": 0,
+      "positive_control_metric_value": 0.5,
+      "perfect_metric_value": 1
+    },
+    {
+      "effect_magnitude": 1,
+      "replicate_id": "effect1-001",
+      "seed": 2,
+      "uninformative_metric_value": 0,
+      "positive_control_metric_value": 0.5,
+      "perfect_metric_value": 1
+    },
+    {
+      "effect_magnitude": 1,
+      "replicate_id": "effect1-002",
+      "seed": 3,
+      "uninformative_metric_value": 0,
+      "positive_control_metric_value": 0.5,
+      "perfect_metric_value": 1
+    },
+    {
+      "effect_magnitude": 1,
+      "replicate_id": "effect1-003",
+      "seed": 4,
+      "uninformative_metric_value": 0,
+      "positive_control_metric_value": 0.5,
+      "perfect_metric_value": 1
+    },
+    {
+      "effect_magnitude": 1,
+      "replicate_id": "effect1-004",
+      "seed": 5,
+      "uninformative_metric_value": 0,
+      "positive_control_metric_value": 0.5,
+      "perfect_metric_value": 1
+    },
+    {
+      "effect_magnitude": 1,
+      "replicate_id": "effect1-005",
+      "seed": 6,
+      "uninformative_metric_value": 0,
+      "positive_control_metric_value": 0.5,
+      "perfect_metric_value": 1
+    },
+    {
+      "effect_magnitude": 1,
+      "replicate_id": "effect1-006",
+      "seed": 7,
+      "uninformative_metric_value": 0,
+      "positive_control_metric_value": 0.5,
+      "perfect_metric_value": 1
+    },
+    {
+      "effect_magnitude": 1,
+      "replicate_id": "effect1-007",
+      "seed": 8,
+      "uninformative_metric_value": 0,
+      "positive_control_metric_value": 0.5,
+      "perfect_metric_value": 1
+    },
+    {
+      "effect_magnitude": 1,
+      "replicate_id": "effect1-008",
+      "seed": 9,
+      "uninformative_metric_value": 0,
+      "positive_control_metric_value": 0.5,
+      "perfect_metric_value": 1
+    },
+    {
+      "effect_magnitude": 1,
+      "replicate_id": "effect1-009",
+      "seed": 10,
+      "uninformative_metric_value": 0,
+      "positive_control_metric_value": 0.5,
+      "perfect_metric_value": 1
+    },
+    {
+      "effect_magnitude": 1,
+      "replicate_id": "effect1-010",
+      "seed": 11,
+      "uninformative_metric_value": 0,
+      "positive_control_metric_value": 0.5,
+      "perfect_metric_value": 1
+    },
+    {
+      "effect_magnitude": 1,
+      "replicate_id": "effect1-011",
+      "seed": 12,
+      "uninformative_metric_value": 0,
+      "positive_control_metric_value": 0.5,
+      "perfect_metric_value": 1
+    },
+    {
+      "effect_magnitude": 1,
+      "replicate_id": "effect1-012",
+      "seed": 13,
+      "uninformative_metric_value": 0,
+      "positive_control_metric_value": 0.5,
+      "perfect_metric_value": 1
+    },
+    {
+      "effect_magnitude": 1,
+      "replicate_id": "effect1-013",
+      "seed": 14,
+      "uninformative_metric_value": 0,
+      "positive_control_metric_value": 0.5,
+      "perfect_metric_value": 1
+    },
+    {
+      "effect_magnitude": 1,
+      "replicate_id": "effect1-014",
+      "seed": 15,
+      "uninformative_metric_value": 0,
+      "positive_control_metric_value": 0.5,
+      "perfect_metric_value": 1
+    },
+    {
+      "effect_magnitude": 1,
+      "replicate_id": "effect1-015",
+      "seed": 16,
+      "uninformative_metric_value": 0,
+      "positive_control_metric_value": 0.5,
+      "perfect_metric_value": 1
+    },
+    {
+      "effect_magnitude": 1,
+      "replicate_id": "effect1-016",
+      "seed": 17,
+      "uninformative_metric_value": 0,
+      "positive_control_metric_value": 0.5,
+      "perfect_metric_value": 1
+    },
+    {
+      "effect_magnitude": 1,
+      "replicate_id": "effect1-017",
+      "seed": 18,
+      "uninformative_metric_value": 0,
+      "positive_control_metric_value": 0.5,
+      "perfect_metric_value": 1
+    },
+    {
+      "effect_magnitude": 1,
+      "replicate_id": "effect1-018",
+      "seed": 19,
+      "uninformative_metric_value": 0,
+      "positive_control_metric_value": 0.5,
+      "perfect_metric_value": 1
+    },
+    {
+      "effect_magnitude": 1,
+      "replicate_id": "effect1-019",
+      "seed": 20,
+      "uninformative_metric_value": 0,
+      "positive_control_metric_value": 0.5,
+      "perfect_metric_value": 1
+    },
+    {
+      "effect_magnitude": 2,
+      "replicate_id": "effect2-000",
+      "seed": 1,
+      "uninformative_metric_value": 0,
+      "positive_control_metric_value": 1,
+      "perfect_metric_value": 1
+    },
+    {
+      "effect_magnitude": 2,
+      "replicate_id": "effect2-001",
+      "seed": 2,
+      "uninformative_metric_value": 0,
+      "positive_control_metric_value": 1,
+      "perfect_metric_value": 1
+    },
+    {
+      "effect_magnitude": 2,
+      "replicate_id": "effect2-002",
+      "seed": 3,
+      "uninformative_metric_value": 0,
+      "positive_control_metric_value": 1,
+      "perfect_metric_value": 1
+    },
+    {
+      "effect_magnitude": 2,
+      "replicate_id": "effect2-003",
+      "seed": 4,
+      "uninformative_metric_value": 0,
+      "positive_control_metric_value": 1,
+      "perfect_metric_value": 1
+    },
+    {
+      "effect_magnitude": 2,
+      "replicate_id": "effect2-004",
+      "seed": 5,
+      "uninformative_metric_value": 0,
+      "positive_control_metric_value": 1,
+      "perfect_metric_value": 1
+    },
+    {
+      "effect_magnitude": 2,
+      "replicate_id": "effect2-005",
+      "seed": 6,
+      "uninformative_metric_value": 0,
+      "positive_control_metric_value": 1,
+      "perfect_metric_value": 1
+    },
+    {
+      "effect_magnitude": 2,
+      "replicate_id": "effect2-006",
+      "seed": 7,
+      "uninformative_metric_value": 0,
+      "positive_control_metric_value": 1,
+      "perfect_metric_value": 1
+    },
+    {
+      "effect_magnitude": 2,
+      "replicate_id": "effect2-007",
+      "seed": 8,
+      "uninformative_metric_value": 0,
+      "positive_control_metric_value": 1,
+      "perfect_metric_value": 1
+    },
+    {
+      "effect_magnitude": 2,
+      "replicate_id": "effect2-008",
+      "seed": 9,
+      "uninformative_metric_value": 0,
+      "positive_control_metric_value": 1,
+      "perfect_metric_value": 1
+    },
+    {
+      "effect_magnitude": 2,
+      "replicate_id": "effect2-009",
+      "seed": 10,
+      "uninformative_metric_value": 0,
+      "positive_control_metric_value": 1,
+      "perfect_metric_value": 1
+    },
+    {
+      "effect_magnitude": 2,
+      "replicate_id": "effect2-010",
+      "seed": 11,
+      "uninformative_metric_value": 0,
+      "positive_control_metric_value": 1,
+      "perfect_metric_value": 1
+    },
+    {
+      "effect_magnitude": 2,
+      "replicate_id": "effect2-011",
+      "seed": 12,
+      "uninformative_metric_value": 0,
+      "positive_control_metric_value": 1,
+      "perfect_metric_value": 1
+    },
+    {
+      "effect_magnitude": 2,
+      "replicate_id": "effect2-012",
+      "seed": 13,
+      "uninformative_metric_value": 0,
+      "positive_control_metric_value": 1,
+      "perfect_metric_value": 1
+    },
+    {
+      "effect_magnitude": 2,
+      "replicate_id": "effect2-013",
+      "seed": 14,
+      "uninformative_metric_value": 0,
+      "positive_control_metric_value": 1,
+      "perfect_metric_value": 1
+    },
+    {
+      "effect_magnitude": 2,
+      "replicate_id": "effect2-014",
+      "seed": 15,
+      "uninformative_metric_value": 0,
+      "positive_control_metric_value": 1,
+      "perfect_metric_value": 1
+    },
+    {
+      "effect_magnitude": 2,
+      "replicate_id": "effect2-015",
+      "seed": 16,
+      "uninformative_metric_value": 0,
+      "positive_control_metric_value": 1,
+      "perfect_metric_value": 1
+    },
+    {
+      "effect_magnitude": 2,
+      "replicate_id": "effect2-016",
+      "seed": 17,
+      "uninformative_metric_value": 0,
+      "positive_control_metric_value": 1,
+      "perfect_metric_value": 1
+    },
+    {
+      "effect_magnitude": 2,
+      "replicate_id": "effect2-017",
+      "seed": 18,
+      "uninformative_metric_value": 0,
+      "positive_control_metric_value": 1,
+      "perfect_metric_value": 1
+    },
+    {
+      "effect_magnitude": 2,
+      "replicate_id": "effect2-018",
+      "seed": 19,
+      "uninformative_metric_value": 0,
+      "positive_control_metric_value": 1,
+      "perfect_metric_value": 1
+    },
+    {
+      "effect_magnitude": 2,
+      "replicate_id": "effect2-019",
+      "seed": 20,
+      "uninformative_metric_value": 0,
+      "positive_control_metric_value": 1,
+      "perfect_metric_value": 1
+    }
+  ]
+}

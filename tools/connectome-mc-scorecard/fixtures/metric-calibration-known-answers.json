@@ -1,0 +1,55 @@
+{
+  "schema_version": "connectome-metric-calibration-v1",
+  "metric_id": "calibrated-score",
+  "direction": "HigherIsBetter",
+  "config": {
+    "minimum_effect_magnitude": 1,
+    "minimum_detection_probability": 0.8,
+    "maximum_null_false_positive_probability": 0.2,
+    "tie_tolerance": 1e-12,
+    "monotonicity_tolerance": 1e-9,
+    "wilson_z_critical": 1.6448536269514722
+  },
+  "bins": [
+    {
+      "effect_magnitude": 0,
+      "replicate_count": 20,
+      "positive_control_wins": 0,
+      "ties": 20,
+      "positive_control_losses": 0,
+      "positive_control_win_rate": 0,
+      "one_sided_wilson_lower_bound": 0,
+      "one_sided_wilson_upper_bound": 0.11915783736096448,
+      "mean_oriented_improvement": 0,
+      "mean_dynamic_range_fraction": 0
+    },
+    {
+      "effect_magnitude": 1,
+      "replicate_count": 20,
+      "positive_control_wins": 20,
+      "ties": 0,
+      "positive_control_losses": 0,
+      "positive_control_win_rate": 1,
+      "one_sided_wilson_lower_bound": 0.8808421626390356,
+      "one_sided_wilson_upper_bound": 1,
+      "mean_oriented_improvement": 0.5,
+      "mean_dynamic_range_fraction": 0.5
+    },
+    {
+      "effect_magnitude": 2,
+      "replicate_count": 20,
+      "positive_control_wins": 20,
+      "ties": 0,
+      "positive_control_losses": 0,
+      "positive_control_win_rate": 1,
+      "one_sided_wilson_lower_bound": 0.8808421626390356,
+      "one_sided_wilson_upper_bound": 1,
+      "mean_oriented_improvement": 1,
+      "mean_dynamic_range_fraction": 1
+    }
+  ],
+  "zero_effect_false_positive_upper_bound": 0.11915783736096448,
+  "minimum_positive_control_detection_lower_bound": 0.8808421626390356,
+  "monotonicity_violations": 0,
+  "calibrated_for_declared_grid": true
+}

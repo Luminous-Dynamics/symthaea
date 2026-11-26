@@ -1,0 +1,74 @@
+{
+  "planned_replicates": [
+    {
+      "replicate_id": "r0001",
+      "seed": 42,
+      "structural_beta": 0,
+      "null_is_true": true
+    },
+    {
+      "replicate_id": "r0002",
+      "seed": 43,
+      "structural_beta": 0,
+      "null_is_true": true
+    },
+    {
+      "replicate_id": "r0003",
+      "seed": 44,
+      "structural_beta": 0,
+      "null_is_true": true
+    }
+  ],
+  "records": [
+    {
+      "scenario_id": "null-weak",
+      "method_id": "baseline-cjar-plain-chisq",
+      "replicate_id": "r0001",
+      "seed": 42,
+      "structural_beta": 0,
+      "null_is_true": true,
+      "status": "COMPLETED",
+      "p_value": 0.2
+    },
+    {
+      "scenario_id": "null-weak",
+      "method_id": "candidate-cjar-crossfit-normal",
+      "replicate_id": "r0001",
+      "seed": 42,
+      "structural_beta": 0,
+      "null_is_true": true,
+      "status": "COMPLETED",
+      "p_value": 0.01
+    },
+    {
+      "scenario_id": "null-weak",
+      "method_id": "baseline-cjar-plain-chisq",
+      "replicate_id": "r0002",
+      "seed": 43,
+      "structural_beta": 0,
+      "null_is_true": true,
+      "status": "COMPLETED",
+      "p_value": 0.6
+    },
+    {
+      "scenario_id": "null-weak",
+      "method_id": "candidate-cjar-crossfit-normal",
+      "replicate_id": "r0002",
+      "seed": 43,
+      "structural_beta": 0,
+      "null_is_true": true,
+      "status": "COMPLETED",
+      "p_value": 0.4
+    },
+    {
+      "scenario_id": "null-weak",
+      "method_id": "baseline-cjar-plain-chisq",
+      "replicate_id": "r0003",
+      "seed": 44,
+      "structural_beta": 0,
+      "null_is_true": true,
+      "status": "COMPLETED",
+      "p_value": 0.5
+    }
+  ]
+}

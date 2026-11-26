@@ -1,0 +1,31 @@
+{
+  "$comment": "Synthetic evaluator known-answer only. Both method outputs are absent; the frozen plan supplies scenario truth and all planned pairs remain unknown.",
+  "schema_version": "connectome-mc-paired-comparison-v1",
+  "rejection_alpha": 0.05,
+  "confidence_alpha": 0.05,
+  "comparisons": [
+    {
+      "scenario_id": "null-zero-relevance-total-run-outage",
+      "baseline_method_id": "clusterIV-cjar-plain-chisq",
+      "candidate_method_id": "stata19-ar-cluster-vce",
+      "structural_beta": 0,
+      "null_is_true": true,
+      "rejection_alpha": 0.05,
+      "rejection_difference": {
+        "planned_pairs": 2,
+        "baseline_record_count": 0,
+        "candidate_record_count": 0,
+        "matched_record_pairs": 0,
+        "complete_rejection_pairs": 0,
+        "unknown_pairs": 2,
+        "observed_complete_pair_mean": null,
+        "conservative_interval": {
+          "lower": -1,
+          "upper": 1
+        },
+        "confidence_level": 0.95,
+        "hoeffding_radius": 1.9206455826398414
+      }
+    }
+  ]
+}
