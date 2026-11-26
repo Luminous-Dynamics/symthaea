@@ -1,0 +1,54 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://github.com/Luminous-Dynamics/symthaea/docs/research/scientific-discovery/scientific-temporal-trajectory-1.0.0.schema.json",
+  "title": "Symthaea Scientific Temporal Trajectory",
+  "type": "object",
+  "additionalProperties": false,
+  "required": [
+    "schema",
+    "schema_version",
+    "authority",
+    "inputs",
+    "outputs",
+    "non_equivalences"
+  ],
+  "properties": {
+    "schema": {
+      "const": "symthaea.research.scientific_discovery.temporal_trajectory"
+    },
+    "schema_version": {
+      "const": "1.0.0"
+    },
+    "authority": {
+      "const": "computational_dynamics_only"
+    },
+    "inputs": {
+      "type": "array",
+      "items": {
+        "enum": [
+          "scientific_state",
+          "temporal_predictor",
+          "prediction_horizon",
+          "temporal_observation"
+        ]
+      }
+    },
+    "outputs": {
+      "type": "array",
+      "items": {
+        "enum": [
+          "continuous_state",
+          "temporal_prediction",
+          "trajectory_residual"
+        ]
+      }
+    },
+    "non_equivalences": {
+      "type": "array",
+      "items": {
+        "type": "string"
+      },
+      "minItems": 5
+    }
+  }
+}
