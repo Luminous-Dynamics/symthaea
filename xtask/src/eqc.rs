@@ -292,6 +292,7 @@ fn validate_task(task: &Task) -> anyhow::Result<()> {
         bail!("{}: authority snapshot id is missing", task.task_id);
     }
     if task.resource_budget.timeout_seconds == 0
+        || task.resource_budget.max_tool_calls == 0
         || task.resource_budget.network_policy != "none"
         || task.resource_budget.cpu_seconds == Some(0)
         || task.resource_budget.memory_mib == Some(0)
@@ -306,6 +307,9 @@ fn validate_task(task: &Task) -> anyhow::Result<()> {
     }
     if task.expected.disposition == "deny" && task.negative_controls.is_empty() {
         bail!("{}: denied task must name a negative control", task.task_id);
+    }
+    if task.expected.reason_code.as_deref().is_some_and(str::is_empty) {
+        bail!("{}: reason_code cannot be empty when present", task.task_id);
     }
     for required in REQUIRED_PROVENANCE {
         if !task.required_provenance.iter().any(|item| item == required) {
