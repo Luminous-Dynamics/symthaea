@@ -105,3 +105,14 @@ The `source_origin_receipt` module adds a fourth, separately pinned DSSE authori
 This is a consumer-side verifier, not a fetcher or publisher-trust oracle. The origin service must independently acquire source records, validate publisher/transform metadata and attest to the exact bytes. The client verifies byte integrity and the pinned service's assertion; content hashes alone do not prove authorship, accuracy, freshness or complete disclosure of all upstream dependencies. At use time, re-run the three earlier authority checks and graph replay, re-acquire the exact bytes, then call `VerifiedSourceOriginSetV1::validate_at_use` at the same trusted time. This result is still not an action permit.
 
 Protocol: [MACE Source-Origin Attestation V1](../../../docs/research/MACE_SOURCE_ORIGIN_ATTESTATION_V1.md). Schema: [mace_source_origin_receipt_v1.schema.json](../../../data/schemas/mace_source_origin_receipt_v1.schema.json). Assurance evaluation: [MACE Source-Origin and Provenance Assurance Benchmark V1](../../../docs/research/MACE_SOURCE_ORIGIN_ASSURANCE_BENCHMARK_V1.md). This increment is authored but not compiled or executed here; no production service or benchmark score is claimed.
+
+
+## Independent source-origin witness quorum
+
+The `source_origin_witness` module adds a consumer-owned per-node corroboration policy over the four-authority source-origin result. A 2-of-3 profile can require two distinct pinned operator trust profiles **and** two distinct consumer-declared acquisition failure domains for every graph node. Each witness binds its observation to the exact replayed graph and the exact SHA-256 of the fourth-authority origin receipt.
+
+The verifier also requires normalized publisher identity and source revision to agree across witnesses, and requires acquisition-record digests to be distinct across operators. A source/ancestry/common-cause disagreement is a typed failure; the verifier never drops a dissenting witness and takes a majority. If a witness is unavailable, a per-node quorum may still pass only when all configured minimums remain satisfied. Otherwise the decision is insufficient.
+
+Policy: [mace_source_origin_witness_policy_v1.schema.json](../../../data/schemas/mace_source_origin_witness_policy_v1.schema.json). Receipt: [mace_source_origin_witness_receipt_v1.schema.json](../../../data/schemas/mace_source_origin_witness_receipt_v1.schema.json). Protocol: [MACE Source-Origin Witness Quorum V1](../../../docs/research/MACE_SOURCE_ORIGIN_WITNESS_QUORUM_V1.md).
+
+This proves consistency with independently signed observations under the consumer's trust assumptions. It does not prove that operator identities or declared failure domains are truly independent, or that any observer discovered every upstream dependency. The operator registry, independent fetch adapters, publisher metadata validation and transparency-service integration remain deployment work. Tests are authored but have not been executed.
