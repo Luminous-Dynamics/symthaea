@@ -86,6 +86,8 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
     let challenge = [scenario, rare_scenario];
     let receipt = basis.enrich_from_worst_scenario(&challenge, RbkrConfig::new(2))?;
     assert_eq!(receipt.scenario_id, "public-api-smoke-rare");
+    assert_eq!(receipt.checkpoint_sha256, "bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb");
+    assert_eq!(receipt.state_coordinate_id, "vlasov-1d1v-layout-smoke");
     assert_eq!(receipt.new_order, 2);
     assert!(receipt.post_response_residual < 1.0e-12);
 
