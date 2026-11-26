@@ -1146,7 +1146,7 @@ mod tests {
     fn rejects_span_that_splits_a_json_escape_sequence() {
         let (mut receipt, key, _) = fixture();
         let body = br#"{"model":"model-pinned-1","messages":[{"role":"user","content":"prefix\\ncontext"}]}"#;
-        let escape_start = body.windows(2).position(|window| window == b"\\\\n").unwrap() as u64;
+        let escape_start = body.windows(2).position(|window| window == b"\\n").unwrap() as u64;
         receipt.exposures[0].span_start_byte = escape_start;
         receipt.exposures[0].span_end_byte = escape_start + 1;
         receipt.exposures[0].exposed_span_sha256 = hash(b"\\");
