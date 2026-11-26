@@ -1,0 +1,155 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://luminousdynamics.io/schemas/mace_adaptive_decision_policy_v1.schema.json",
+  "title": "MACE Adaptive Decision Acquisition Policy V1",
+  "description": "A bounded, consumer-owned directed acyclic policy for sequential evidence acquisition. Structural graph validity, cryptographic receipt verification, and semantic safety constraints require an independent validator.",
+  "type": "object",
+  "additionalProperties": false,
+  "required": [
+    "version",
+    "policy_id",
+    "decision_need_sha256",
+    "utility_profile_sha256",
+    "evidence_dependency_graph_sha256",
+    "evaluation_mode",
+    "entry_node_id",
+    "maximum_horizon",
+    "maximum_query_count",
+    "maximum_policy_nodes",
+    "budgets",
+    "nodes"
+  ],
+  "properties": {
+    "version": { "const": 1 },
+    "policy_id": { "$ref": "#/$defs/identifier" },
+    "decision_need_sha256": { "$ref": "#/$defs/sha256" },
+    "utility_profile_sha256": { "$ref": "#/$defs/sha256" },
+    "evidence_dependency_graph_sha256": { "$ref": "#/$defs/sha256" },
+    "evaluation_mode": { "enum": ["evsi", "robust_minimax_regret"] },
+    "entry_node_id": { "$ref": "#/$defs/identifier" },
+    "maximum_horizon": { "type": "integer", "minimum": 1, "maximum": 32 },
+    "maximum_query_count": { "type": "integer", "minimum": 1, "maximum": 128 },
+    "maximum_policy_nodes": { "type": "integer", "minimum": 2, "maximum": 256 },
+    "budgets": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "maximum_tool_calls",
+        "maximum_latency_ns",
+        "maximum_context_tokens",
+        "maximum_inspected_bytes",
+        "maximum_acquisition_cost_utility_units"
+      ],
+      "properties": {
+        "maximum_tool_calls": { "type": "integer", "minimum": 1 },
+        "maximum_latency_ns": { "type": "integer", "minimum": 1 },
+        "maximum_context_tokens": { "type": "integer", "minimum": 1 },
+        "maximum_inspected_bytes": { "type": "integer", "minimum": 1 },
+        "maximum_acquisition_cost_utility_units": { "type": "integer", "minimum": 0 }
+      }
+    },
+    "nodes": {
+      "type": "array",
+      "minItems": 2,
+      "maxItems": 256,
+      "items": { "oneOf": [
+        { "$ref": "#/$defs/queryNode" },
+        { "$ref": "#/$defs/terminalNode" }
+      ] }
+    }
+  },
+  "$defs": {
+    "identifier": {
+      "type": "string",
+      "minLength": 1,
+      "maxLength": 512,
+      "pattern": "^[^\\u0000-\\u001F\\u007F]+$"
+    },
+    "sha256": {
+      "type": "string",
+      "pattern": "^[0-9a-f]{64}$"
+    },
+    "branch": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["observation_id", "target_node_id"],
+      "properties": {
+        "observation_id": { "$ref": "#/$defs/identifier" },
+        "target_node_id": { "$ref": "#/$defs/identifier" }
+      }
+    },
+    "queryNode": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "node_id",
+        "node_type",
+        "query_option_id",
+        "action_template_sha256",
+        "resource_profile_sha256",
+        "resource_receipt_sha256",
+        "resource_valid_until_unix",
+        "estimated_tool_calls",
+        "estimated_latency_ns",
+        "estimated_context_tokens",
+        "estimated_inspected_bytes",
+        "acquisition_cost_utility_units",
+        "history_conditioned_model_sha256",
+        "observation_branches",
+        "fallback_target_node_id"
+      ],
+      "properties": {
+        "node_id": { "$ref": "#/$defs/identifier" },
+        "node_type": { "const": "query" },
+        "query_option_id": { "$ref": "#/$defs/identifier" },
+        "action_template_sha256": { "$ref": "#/$defs/sha256" },
+        "resource_profile_sha256": { "$ref": "#/$defs/sha256" },
+        "resource_receipt_sha256": { "$ref": "#/$defs/sha256" },
+        "resource_valid_until_unix": { "type": "integer", "minimum": 1 },
+        "estimated_tool_calls": { "type": "integer", "minimum": 1 },
+        "estimated_latency_ns": { "type": "integer", "minimum": 0 },
+        "estimated_context_tokens": { "type": "integer", "minimum": 0 },
+        "estimated_inspected_bytes": { "type": "integer", "minimum": 0 },
+        "acquisition_cost_utility_units": { "type": "integer", "minimum": 0 },
+        "history_conditioned_model_sha256": { "$ref": "#/$defs/sha256" },
+        "calibration_profile_sha256": { "$ref": "#/$defs/sha256" },
+        "calibration_receipt_sha256": { "$ref": "#/$defs/sha256" },
+        "calibration_valid_until_unix": { "type": "integer", "minimum": 1 },
+        "support_set_sha256": { "$ref": "#/$defs/sha256" },
+        "observation_branches": {
+          "type": "array",
+          "minItems": 1,
+          "maxItems": 128,
+          "items": { "$ref": "#/$defs/branch" }
+        },
+        "fallback_target_node_id": { "$ref": "#/$defs/identifier" }
+      },
+      "allOf": [
+        {
+          "if": {
+            "properties": { "evaluation_mode": { "const": "evsi" } },
+            "required": ["evaluation_mode"]
+          },
+          "then": {
+            "required": [
+              "calibration_profile_sha256",
+              "calibration_receipt_sha256",
+              "calibration_valid_until_unix"
+            ]
+          }
+        }
+      ]
+    },
+    "terminalNode": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["node_id", "node_type", "terminal_action_id", "terminal_mode"],
+      "properties": {
+        "node_id": { "$ref": "#/$defs/identifier" },
+        "node_type": { "const": "terminal" },
+        "terminal_action_id": { "$ref": "#/$defs/identifier" },
+        "terminal_mode": { "enum": ["commit", "abstain", "defer"] }
+      }
+    }
+  }
+}
