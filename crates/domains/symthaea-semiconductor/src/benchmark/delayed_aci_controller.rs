@@ -1056,10 +1056,12 @@ mod tests {
         issue(&mut engine, "s2", "e2");
         close_delayed_aci_prediction_stream_v1(&mut engine).unwrap();
         assert!(engine.prediction_stream_closed);
+        let next_lane = (engine.next_prediction_step % engine.policy.feedback_delay_steps) as usize;
+        let next_alpha = engine.state.alpha_lanes[next_lane];
         assert!(
             issue_delayed_aci_prediction_v1(
                 &mut engine,
-                &prediction("s3", "e3", engine.state.alpha_lanes[0]),
+                &prediction("s3", "e3", next_alpha),
             )
             .is_err()
         );
