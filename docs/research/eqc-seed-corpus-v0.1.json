@@ -23,8 +23,9 @@
       "input_refs": [
         {
           "input_id": "synthetic-consent-001",
-          "artifact_path": "fixtures/eqc/consent-active-001.json",
-          "classification": "synthetic"
+          "artifact_path": "docs/research/eqc-fixtures/consent-active-001.json",
+          "classification": "synthetic",
+          "sha256": "67d2cc975ac265348d3e95ef5e025540aef0d566d675bd4468733d39a99f6bfe"
         }
       ],
       "authority_snapshot": {
@@ -89,8 +90,9 @@
       "input_refs": [
         {
           "input_id": "synthetic-consent-001",
-          "artifact_path": "fixtures/eqc/consent-active-001.json",
-          "classification": "synthetic"
+          "artifact_path": "docs/research/eqc-fixtures/consent-active-001.json",
+          "classification": "synthetic",
+          "sha256": "67d2cc975ac265348d3e95ef5e025540aef0d566d675bd4468733d39a99f6bfe"
         }
       ],
       "authority_snapshot": {
@@ -157,8 +159,9 @@
       "input_refs": [
         {
           "input_id": "synthetic-consent-revoked-001",
-          "artifact_path": "fixtures/eqc/consent-revoked-001.json",
-          "classification": "synthetic"
+          "artifact_path": "docs/research/eqc-fixtures/consent-revoked-001.json",
+          "classification": "synthetic",
+          "sha256": "b8e20712544dc9126d22fc42915d353ab3cf2c34f4f7351b6675986db246d779"
         }
       ],
       "authority_snapshot": {
@@ -225,8 +228,9 @@
       "input_refs": [
         {
           "input_id": "synthetic-challenge-001",
-          "artifact_path": "fixtures/eqc/challenge-consumed-001.json",
-          "classification": "synthetic"
+          "artifact_path": "docs/research/eqc-fixtures/challenge-consumed-001.json",
+          "classification": "synthetic",
+          "sha256": "486929ee0204c1a28e48595f619713accd556880f76096d6ce9904c12e0321b7"
         }
       ],
       "authority_snapshot": {
