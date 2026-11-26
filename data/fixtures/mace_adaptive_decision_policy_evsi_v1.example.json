@@ -1,0 +1,97 @@
+{
+  "version": 1,
+  "policy_id": "example-adaptive-evsi-v1",
+  "decision_need_sha256": "dddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddd",
+  "utility_profile_sha256": "eeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeee",
+  "evidence_dependency_graph_sha256": "ffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffff",
+  "evaluation_mode": "evsi",
+  "entry_node_id": "q-check-requirement",
+  "maximum_horizon": 2,
+  "maximum_query_count": 2,
+  "maximum_policy_nodes": 8,
+  "budgets": {
+    "maximum_tool_calls": 2,
+    "maximum_latency_ns": 6000000000,
+    "maximum_context_tokens": 2500,
+    "maximum_inspected_bytes": 64000,
+    "maximum_acquisition_cost_utility_units": 10
+  },
+  "nodes": [
+    {
+      "node_id": "q-check-requirement",
+      "node_type": "query",
+      "query_option_id": "verify-primary-requirement",
+      "action_template_sha256": "1111111111111111111111111111111111111111111111111111111111111111",
+      "resource_profile_sha256": "2222222222222222222222222222222222222222222222222222222222222222",
+      "resource_receipt_sha256": "3333333333333333333333333333333333333333333333333333333333333333",
+      "resource_valid_until_unix": 1900000000,
+      "estimated_tool_calls": 1,
+      "estimated_latency_ns": 2000000000,
+      "estimated_context_tokens": 1200,
+      "estimated_inspected_bytes": 32000,
+      "acquisition_cost_utility_units": 2,
+      "history_conditioned_model_sha256": "4444444444444444444444444444444444444444444444444444444444444444",
+      "observation_branches": [
+        {
+          "observation_id": "requirement-confirmed",
+          "target_node_id": "q-independent-cross-check"
+        },
+        {
+          "observation_id": "requirement-denied",
+          "target_node_id": "terminal-abstain"
+        }
+      ],
+      "fallback_target_node_id": "terminal-defer",
+      "calibration_profile_sha256": "9999999999999999999999999999999999999999999999999999999999999999",
+      "calibration_receipt_sha256": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+      "calibration_valid_until_unix": 1900000000
+    },
+    {
+      "node_id": "q-independent-cross-check",
+      "node_type": "query",
+      "query_option_id": "corroborate-independent-source",
+      "action_template_sha256": "5555555555555555555555555555555555555555555555555555555555555555",
+      "resource_profile_sha256": "6666666666666666666666666666666666666666666666666666666666666666",
+      "resource_receipt_sha256": "7777777777777777777777777777777777777777777777777777777777777777",
+      "resource_valid_until_unix": 1900000000,
+      "estimated_tool_calls": 1,
+      "estimated_latency_ns": 2500000000,
+      "estimated_context_tokens": 900,
+      "estimated_inspected_bytes": 24000,
+      "acquisition_cost_utility_units": 3,
+      "history_conditioned_model_sha256": "8888888888888888888888888888888888888888888888888888888888888888",
+      "observation_branches": [
+        {
+          "observation_id": "corroborated",
+          "target_node_id": "terminal-commit"
+        },
+        {
+          "observation_id": "contradicted",
+          "target_node_id": "terminal-abstain"
+        }
+      ],
+      "fallback_target_node_id": "terminal-defer",
+      "calibration_profile_sha256": "9999999999999999999999999999999999999999999999999999999999999999",
+      "calibration_receipt_sha256": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+      "calibration_valid_until_unix": 1900000000
+    },
+    {
+      "node_id": "terminal-commit",
+      "node_type": "terminal",
+      "terminal_action_id": "proceed-under-authorized-policy",
+      "terminal_mode": "commit"
+    },
+    {
+      "node_id": "terminal-abstain",
+      "node_type": "terminal",
+      "terminal_action_id": "do-not-proceed",
+      "terminal_mode": "abstain"
+    },
+    {
+      "node_id": "terminal-defer",
+      "node_type": "terminal",
+      "terminal_action_id": "request-human-review",
+      "terminal_mode": "defer"
+    }
+  ]
+}
