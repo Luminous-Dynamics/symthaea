@@ -15,12 +15,16 @@ use serde::{Deserialize, Deserializer, Serialize};
 use serde_json::Value;
 use sha2::{Digest, Sha256};
 use std::cmp::Ordering;
-use std::collections::{HashMap, HashSet};
+use std::collections::{HashMap, HashSet, VecDeque};
 use std::fmt;
 
 const GRAPH_DOMAIN: &str = "SAT-EVIDENCE-GRAPH-v0.1\n";
 const MAX_SAFE_INTEGER: u64 = 9_007_199_254_740_991;
 const GRAPH_SCHEMA_VERSION: &str = "sat-benchmark-augmentation/v0.1";
+const MAX_AUGMENTATION_BYTES: usize = 32 * 1024 * 1024;
+const MAX_OBSERVATIONS: usize = 100_000;
+const MAX_CLAIMS: usize = 100_000;
+const MAX_CLAIM_EDGES: usize = 250_000;
 
 #[derive(Debug, Clone, PartialEq)]
 enum StrictJson {
@@ -218,6 +222,8 @@ pub struct VerificationIssue {
 #[derive(Debug, Clone, Serialize)]
 pub struct VerificationReport {
     pub schema_version: String,
+    /// Full JSON Schema validation is an upstream, separately versioned step.
+    pub json_schema_validation_performed: bool,
     pub augmentation_id: String,
     pub observation_count: usize,
     pub claim_count: usize,
@@ -245,6 +251,9 @@ fn issue(issues: &mut Vec<VerificationIssue>, code: &str, path: impl Into<String
 }
 
 fn parse_strict_json(input: &str) -> Result<StrictJson, String> {
+    if input.len() > MAX_AUGMENTATION_BYTES {
+        return Err(format!("augmentation exceeds the {MAX_AUGMENTATION_BYTES}-byte input limit"));
+    }
     let mut deserializer = serde_json::Deserializer::from_str(input);
     let value = StrictJson::deserialize(&mut deserializer).map_err(|error| error.to_string())?;
     deserializer.end().map_err(|error| error.to_string())?;
@@ -317,6 +326,9 @@ fn normalize_string_set(
         return;
     };
     let Some((_, value)) = fields.iter_mut().find(|(name, _)| name == field) else {
+        if field == "invalidation_triggers" {
+            fields.push((field.to_owned(), StrictJson::Array(Vec::new())));
+        }
         return;
     };
     let StrictJson::Array(values) = value else {
@@ -468,51 +480,60 @@ fn detect_dependency_cycles(
     claim_ids: &HashSet<String>,
     issues: &mut Vec<VerificationIssue>,
 ) -> bool {
-    fn visit(
-        node: &str,
-        adjacency: &HashMap<String, Vec<String>>,
-        states: &mut HashMap<String, u8>,
-        issues: &mut Vec<VerificationIssue>,
-    ) -> bool {
-        states.insert(node.to_owned(), 1);
-        let mut acyclic = true;
-        if let Some(next_nodes) = adjacency.get(node) {
-            for next in next_nodes {
-                match states.get(next.as_str()).copied().unwrap_or(0) {
-                    0 => {
-                        if !visit(next, adjacency, states, issues) {
-                            acyclic = false;
-                        }
+    // Kahn's algorithm avoids recursive DFS stack exhaustion on attacker-sized graphs.
+    let mut indegree: HashMap<String, usize> =
+        claim_ids.iter().cloned().map(|claim_id| (claim_id, 0)).collect();
+
+    for (from, targets) in adjacency {
+        if !claim_ids.contains(from) {
+            continue;
+        }
+        for target in targets {
+            if let Some(degree) = indegree.get_mut(target) {
+                *degree += 1;
+            }
+        }
+    }
+
+    let mut queue = VecDeque::new();
+    for (claim_id, degree) in &indegree {
+        if *degree == 0 {
+            queue.push_back(claim_id.clone());
+        }
+    }
+
+    let mut visited = 0usize;
+    while let Some(node) = queue.pop_front() {
+        visited += 1;
+        if let Some(targets) = adjacency.get(&node) {
+            for target in targets {
+                if let Some(degree) = indegree.get_mut(target) {
+                    *degree -= 1;
+                    if *degree == 0 {
+                        queue.push_back(target.clone());
                     }
-                    1 => {
-                        issue(
-                            issues,
-                            "dependency_cycle",
-                            format!("claims.{node}.depends_on"),
-                            format!("dependency edge {node} -> {next} closes a cycle"),
-                        );
-                        acyclic = false;
-                    }
-                    _ => {}
                 }
             }
         }
-        states.insert(node.to_owned(), 2);
-        acyclic
     }
 
-    let mut states = HashMap::new();
-    let mut acyclic = true;
-    let mut ordered_ids: Vec<_> = claim_ids.iter().collect();
-    ordered_ids.sort_by(|left, right| utf16_cmp(left, right));
-    for claim_id in ordered_ids {
-        if states.get(claim_id.as_str()).copied().unwrap_or(0) == 0
-            && !visit(claim_id, adjacency, &mut states, issues)
-        {
-            acyclic = false;
-        }
+    if visited == claim_ids.len() {
+        true
+    } else {
+        let mut cyclic: Vec<_> = indegree
+            .iter()
+            .filter(|(_, degree)| **degree > 0)
+            .map(|(claim_id, _)| claim_id.clone())
+            .collect();
+        cyclic.sort_by(|left, right| utf16_cmp(left, right));
+        issue(
+            issues,
+            "dependency_cycle",
+            "claim_edges",
+            format!("dependency subgraph contains a cycle involving {}", cyclic.join(", ")),
+        );
+        false
     }
-    acyclic
 }
 
 fn check_supported_claims(
@@ -668,6 +689,18 @@ fn check_supported_claims(
 
 pub fn verify_augmentation(input: &str) -> Result<VerificationReport, String> {
     let raw = parse_strict_json(input)?;
+    if augmentation.observations.len() > MAX_OBSERVATIONS
+        || augmentation.claims.len() > MAX_CLAIMS
+        || augmentation.claim_edges.len() > MAX_CLAIM_EDGES
+    {
+        return Err(format!(
+            "graph exceeds resource limits: observations={}/{MAX_OBSERVATIONS}, claims={}/{MAX_CLAIMS}, edges={}/{MAX_CLAIM_EDGES}",
+            augmentation.observations.len(),
+            augmentation.claims.len(),
+            augmentation.claim_edges.len()
+        ));
+    }
+
     let augmentation: Augmentation =
         serde_json::from_str(input).map_err(|error| format!("augmentation shape: {error}"))?;
 
@@ -751,16 +784,7 @@ pub fn verify_augmentation(input: &str) -> Result<VerificationReport, String> {
                 );
             }
         }
-        for dependency in &claim.depends_on {
-            if !claim_ids.contains(dependency) && !augmentation.claims.iter().any(|item| item.claim_id == *dependency) {
-                issue(
-                    &mut issues,
-                    "unknown_claim_dependency",
-                    format!("claims[{index}].depends_on"),
-                    format!("claim dependency {dependency} does not resolve"),
-                );
-            }
-        }
+
 
         let _claim_metadata = (
             &claim.proposition,
@@ -769,6 +793,19 @@ pub fn verify_augmentation(input: &str) -> Result<VerificationReport, String> {
             &claim.valid_until,
             &claim.verifier_ref,
         );
+    }
+
+    for (index, claim) in augmentation.claims.iter().enumerate() {
+        for dependency in &claim.depends_on {
+            if !claim_ids.contains(dependency) {
+                issue(
+                    &mut issues,
+                    "unknown_claim_dependency",
+                    format!("claims[{index}].depends_on"),
+                    format!("claim dependency {dependency} does not resolve"),
+                );
+            }
+        }
     }
 
     let mut edge_keys = HashSet::new();
@@ -900,6 +937,7 @@ pub fn verify_augmentation(input: &str) -> Result<VerificationReport, String> {
 
     Ok(VerificationReport {
         schema_version: GRAPH_SCHEMA_VERSION.to_owned(),
+        json_schema_validation_performed: false,
         augmentation_id: augmentation.augmentation_id,
         observation_count: augmentation.observations.len(),
         claim_count: augmentation.claims.len(),
