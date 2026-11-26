@@ -1,0 +1,627 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://luminousdynamics.io/schemas/ceb/run-receipt-v0.schema.json",
+  "title": "CEB Run Receipt Statement",
+  "description": "An in-toto Statement carrying one CEB grading run. A passing predicate is necessary but not sufficient; acceptance requires verified DSSE signatures and a matching independent primary/regrade receipt pair.",
+  "type": "object",
+  "additionalProperties": false,
+  "required": [
+    "_type",
+    "subject",
+    "predicateType",
+    "predicate"
+  ],
+  "properties": {
+    "_type": {
+      "const": "https://in-toto.io/Statement/v1"
+    },
+    "subject": {
+      "type": "array",
+      "minItems": 3,
+      "items": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": [
+          "name",
+          "digest"
+        ],
+        "properties": {
+          "name": {
+            "type": "string",
+            "minLength": 1
+          },
+          "digest": {
+            "type": "object",
+            "additionalProperties": false,
+            "required": [
+              "sha256"
+            ],
+            "properties": {
+              "sha256": {
+                "type": "string",
+                "pattern": "^[0-9a-f]{64}$"
+              }
+            }
+          }
+        }
+      },
+      "maxItems": 3
+    },
+    "predicateType": {
+      "const": "https://luminousdynamics.io/attestations/ceb-run/v0"
+    },
+    "predicate": {
+      "$schema": "https://json-schema.org/draft/2020-12/schema",
+      "$id": "https://luminousdynamics.io/schemas/ceb/run-receipt-v0.schema.json",
+      "title": "CEB Run Receipt Predicate",
+      "description": "Predicate payload for an in-toto Statement. Authenticity is provided by a surrounding DSSE envelope; schema validation alone is not trust verification.",
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "schema_version",
+        "receipt_kind",
+        "receipt_id",
+        "task",
+        "candidate",
+        "agent",
+        "execution",
+        "grader",
+        "checks",
+        "result",
+        "resources",
+        "artifacts"
+      ],
+      "properties": {
+        "schema_version": {
+          "const": 0
+        },
+        "receipt_kind": {
+          "const": "ceb_run_receipt"
+        },
+        "receipt_id": {
+          "type": "string",
+          "pattern": "^[a-zA-Z0-9][a-zA-Z0-9._:-]{7,127}$"
+        },
+        "task": {
+          "type": "object",
+          "additionalProperties": false,
+          "required": [
+            "task_id",
+            "task_contract_sha256",
+            "source_tree_sha256",
+            "fixture_revision",
+            "source_tree_digest_algorithm"
+          ],
+          "properties": {
+            "task_id": {
+              "type": "string",
+              "pattern": "^CEB-[A-Z0-9]+-[0-9]{3}$"
+            },
+            "task_contract_sha256": {
+              "type": "string",
+              "pattern": "^[0-9a-f]{64}$"
+            },
+            "source_tree_sha256": {
+              "type": "string",
+              "pattern": "^[0-9a-f]{64}$"
+            },
+            "fixture_revision": {
+              "type": "string",
+              "minLength": 1
+            },
+            "source_tree_digest_algorithm": {
+              "const": "ceb-tree-v1"
+            }
+          }
+        },
+        "candidate": {
+          "type": "object",
+          "additionalProperties": false,
+          "required": [
+            "base_tree_sha256",
+            "patch_sha256",
+            "result_tree_sha256",
+            "changed_paths"
+          ],
+          "properties": {
+            "base_tree_sha256": {
+              "type": "string",
+              "pattern": "^[0-9a-f]{64}$"
+            },
+            "patch_sha256": {
+              "type": "string",
+              "pattern": "^[0-9a-f]{64}$"
+            },
+            "result_tree_sha256": {
+              "type": "string",
+              "pattern": "^[0-9a-f]{64}$"
+            },
+            "changed_paths": {
+              "type": "array",
+              "items": {
+                "type": "string",
+                "minLength": 1
+              },
+              "uniqueItems": true
+            }
+          }
+        },
+        "agent": {
+          "type": "object",
+          "additionalProperties": false,
+          "required": [
+            "agent_id",
+            "model_id",
+            "harness_sha256",
+            "prompt_sha256",
+            "configuration_sha256",
+            "secrets_exposed"
+          ],
+          "properties": {
+            "agent_id": {
+              "type": "string",
+              "minLength": 1
+            },
+            "model_id": {
+              "type": "string",
+              "minLength": 1
+            },
+            "harness_sha256": {
+              "type": "string",
+              "pattern": "^[0-9a-f]{64}$"
+            },
+            "prompt_sha256": {
+              "type": "string",
+              "pattern": "^[0-9a-f]{64}$"
+            },
+            "configuration_sha256": {
+              "type": "string",
+              "pattern": "^[0-9a-f]{64}$"
+            },
+            "secrets_exposed": {
+              "const": false
+            }
+          }
+        },
+        "execution": {
+          "type": "object",
+          "additionalProperties": false,
+          "required": [
+            "run_id",
+            "stage",
+            "runner_profile",
+            "image_digest",
+            "runner_policy_sha256",
+            "network_policy",
+            "started_at_utc",
+            "finished_at_utc",
+            "regrade_of_receipt_sha256",
+            "toolchain_lock_sha256"
+          ],
+          "properties": {
+            "run_id": {
+              "type": "string",
+              "minLength": 8
+            },
+            "stage": {
+              "enum": [
+                "primary",
+                "pristine_regrade"
+              ]
+            },
+            "runner_profile": {
+              "enum": [
+                "simulation",
+                "trusted_host_development",
+                "isolated_container",
+                "isolated_microvm"
+              ]
+            },
+            "image_digest": {
+              "type": [
+                "string",
+                "null"
+              ],
+              "pattern": "^sha256:[0-9a-f]{64}$"
+            },
+            "runner_policy_sha256": {
+              "type": "string",
+              "pattern": "^[0-9a-f]{64}$"
+            },
+            "network_policy": {
+              "enum": [
+                "disabled",
+                "allowlisted",
+                "unrestricted_not_qualifying"
+              ]
+            },
+            "started_at_utc": {
+              "type": "string",
+              "format": "date-time"
+            },
+            "finished_at_utc": {
+              "type": "string",
+              "format": "date-time"
+            },
+            "regrade_of_receipt_sha256": {
+              "type": [
+                "string",
+                "null"
+              ],
+              "pattern": "^[0-9a-f]{64}$"
+            },
+            "toolchain_lock_sha256": {
+              "type": [
+                "string",
+                "null"
+              ],
+              "pattern": "^[0-9a-f]{64}$"
+            }
+          }
+        },
+        "grader": {
+          "type": "object",
+          "additionalProperties": false,
+          "required": [
+            "grader_id",
+            "grader_sha256",
+            "trust_domain",
+            "candidate_access",
+            "hidden_tests_visible_to_agent",
+            "grader_writable_by_agent"
+          ],
+          "properties": {
+            "grader_id": {
+              "type": "string",
+              "minLength": 1
+            },
+            "grader_sha256": {
+              "type": "string",
+              "pattern": "^[0-9a-f]{64}$"
+            },
+            "trust_domain": {
+              "enum": [
+                "separate_host_control_plane",
+                "separate_vm",
+                "same_guest_not_qualifying"
+              ]
+            },
+            "candidate_access": {
+              "enum": [
+                "read_only",
+                "read_write_not_qualifying"
+              ]
+            },
+            "hidden_tests_visible_to_agent": {
+              "const": false
+            },
+            "grader_writable_by_agent": {
+              "const": false
+            }
+          }
+        },
+        "checks": {
+          "type": "array",
+          "minItems": 1,
+          "items": {
+            "type": "object",
+            "additionalProperties": false,
+            "required": [
+              "check_id",
+              "kind",
+              "required",
+              "authority",
+              "status",
+              "evidence_sha256"
+            ],
+            "properties": {
+              "check_id": {
+                "type": "string",
+                "pattern": "^[a-z0-9][a-z0-9._-]+$"
+              },
+              "kind": {
+                "enum": [
+                  "compile",
+                  "unit_test",
+                  "hidden_test",
+                  "property",
+                  "mutation",
+                  "fuzz",
+                  "static_analysis",
+                  "security_negative_control",
+                  "runtime_invariant",
+                  "performance",
+                  "formal_proof",
+                  "human_rubric"
+                ]
+              },
+              "required": {
+                "type": "boolean"
+              },
+              "authority": {
+                "enum": [
+                  "independent_grader",
+                  "external_tool",
+                  "qualified_reviewer"
+                ]
+              },
+              "status": {
+                "enum": [
+                  "pass",
+                  "fail",
+                  "error",
+                  "skipped"
+                ]
+              },
+              "evidence_sha256": {
+                "type": [
+                  "string",
+                  "null"
+                ],
+                "pattern": "^[0-9a-f]{64}$"
+              }
+            }
+          }
+        },
+        "result": {
+          "type": "object",
+          "additionalProperties": false,
+          "required": [
+            "verdict",
+            "required_check_count",
+            "required_pass_count",
+            "required_fail_count",
+            "required_error_count",
+            "required_skipped_count",
+            "safety_violation",
+            "protocol_violation"
+          ],
+          "properties": {
+            "verdict": {
+              "enum": [
+                "pass",
+                "fail",
+                "unresolved"
+              ]
+            },
+            "required_check_count": {
+              "type": "integer",
+              "minimum": 1
+            },
+            "required_pass_count": {
+              "type": "integer",
+              "minimum": 0
+            },
+            "required_fail_count": {
+              "type": "integer",
+              "minimum": 0
+            },
+            "required_error_count": {
+              "type": "integer",
+              "minimum": 0
+            },
+            "required_skipped_count": {
+              "type": "integer",
+              "minimum": 0
+            },
+            "safety_violation": {
+              "type": "boolean"
+            },
+            "protocol_violation": {
+              "type": "boolean"
+            }
+          }
+        },
+        "resources": {
+          "type": "object",
+          "additionalProperties": false,
+          "required": [
+            "wall_clock_ms",
+            "cpu_time_ms",
+            "peak_memory_bytes",
+            "peak_disk_bytes",
+            "output_bytes",
+            "input_tokens",
+            "output_tokens",
+            "cost_usd",
+            "turns",
+            "tool_calls"
+          ],
+          "properties": {
+            "wall_clock_ms": {
+              "type": "integer",
+              "minimum": 0
+            },
+            "cpu_time_ms": {
+              "type": "integer",
+              "minimum": 0
+            },
+            "peak_memory_bytes": {
+              "type": "integer",
+              "minimum": 0
+            },
+            "peak_disk_bytes": {
+              "type": "integer",
+              "minimum": 0
+            },
+            "output_bytes": {
+              "type": "integer",
+              "minimum": 0
+            },
+            "input_tokens": {
+              "type": [
+                "integer",
+                "null"
+              ],
+              "minimum": 0
+            },
+            "output_tokens": {
+              "type": [
+                "integer",
+                "null"
+              ],
+              "minimum": 0
+            },
+            "cost_usd": {
+              "type": [
+                "number",
+                "null"
+              ],
+              "minimum": 0
+            },
+            "turns": {
+              "type": "integer",
+              "minimum": 0
+            },
+            "tool_calls": {
+              "type": "integer",
+              "minimum": 0
+            }
+          }
+        },
+        "artifacts": {
+          "type": "array",
+          "items": {
+            "type": "object",
+            "additionalProperties": false,
+            "required": [
+              "artifact_id",
+              "role",
+              "sha256",
+              "size_bytes",
+              "path"
+            ],
+            "properties": {
+              "artifact_id": {
+                "type": "string",
+                "minLength": 1
+              },
+              "role": {
+                "enum": [
+                  "stdout",
+                  "stderr",
+                  "command_trace",
+                  "test_log",
+                  "security_log",
+                  "resource_log",
+                  "patch",
+                  "primary_report",
+                  "regrade_report",
+                  "other"
+                ]
+              },
+              "sha256": {
+                "type": "string",
+                "pattern": "^[0-9a-f]{64}$"
+              },
+              "size_bytes": {
+                "type": "integer",
+                "minimum": 0
+              },
+              "path": {
+                "type": "string",
+                "minLength": 1
+              }
+            }
+          }
+        }
+      },
+      "allOf": [
+        {
+          "if": {
+            "properties": {
+              "execution": {
+                "properties": {
+                  "stage": {
+                    "const": "pristine_regrade"
+                  }
+                }
+              }
+            }
+          },
+          "then": {
+            "properties": {
+              "execution": {
+                "properties": {
+                  "regrade_of_receipt_sha256": {
+                    "type": "string",
+                    "pattern": "^[0-9a-f]{64}$"
+                  }
+                }
+              }
+            }
+          }
+        },
+        {
+          "if": {
+            "properties": {
+              "result": {
+                "properties": {
+                  "verdict": {
+                    "const": "pass"
+                  }
+                }
+              }
+            }
+          },
+          "then": {
+            "properties": {
+              "execution": {
+                "properties": {
+                  "runner_profile": {
+                    "enum": [
+                      "isolated_container",
+                      "isolated_microvm"
+                    ]
+                  },
+                  "image_digest": {
+                    "type": "string",
+                    "pattern": "^sha256:[0-9a-f]{64}$"
+                  },
+                  "network_policy": {
+                    "enum": [
+                      "disabled",
+                      "allowlisted"
+                    ]
+                  }
+                }
+              },
+              "grader": {
+                "properties": {
+                  "trust_domain": {
+                    "enum": [
+                      "separate_host_control_plane",
+                      "separate_vm"
+                    ]
+                  },
+                  "candidate_access": {
+                    "const": "read_only"
+                  }
+                }
+              },
+              "result": {
+                "properties": {
+                  "safety_violation": {
+                    "const": false
+                  },
+                  "protocol_violation": {
+                    "const": false
+                  },
+                  "required_fail_count": {
+                    "const": 0
+                  },
+                  "required_error_count": {
+                    "const": 0
+                  },
+                  "required_skipped_count": {
+                    "const": 0
+                  }
+                }
+              }
+            }
+          }
+        }
+      ]
+    }
+  }
+}

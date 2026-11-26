@@ -1,0 +1,766 @@
+{
+  "schema_version": 0,
+  "benchmark_id": "CEB",
+  "release": "v0-design-catalog",
+  "status": "design_only",
+  "created_at": "2026-11-02",
+  "task_count": 12,
+  "tasks": [
+    {
+      "schema_version": 0,
+      "benchmark_id": "CEB",
+      "task_id": "CEB-ALG-001",
+      "execution_status": "design_only",
+      "lane": "algorithms",
+      "title": "Implement a streaming top-k index under bounded memory",
+      "objective": "Design and implement a streaming top-k data structure that maintains exact results under a fixed memory budget. Specify complexity and handle duplicate keys, ties, updates and empty streams.",
+      "agent_prompt": "Implement the requested streaming top-k index in the supplied fixture. Preserve the public API, document invariants and complexity, and include tests for ties, duplicates, updates and empty input. Do not change the acceptance tests or benchmark harness.",
+      "source_snapshot": {
+        "kind": "synthetic_fixture",
+        "uri": null,
+        "revision": null,
+        "tree_sha256": null,
+        "tree_digest_algorithm": "ceb-tree-v1"
+      },
+      "environment": {
+        "image": null,
+        "toolchain_lock_sha256": null,
+        "runner_profile": "not_provisioned",
+        "network_policy": "disabled",
+        "runner_policy_sha256": null
+      },
+      "agent_policy": {
+        "writable_paths": [],
+        "read_only_paths": [],
+        "secrets_exposed": false,
+        "grader_visible": false,
+        "human_approval_required": [
+          "destructive changes",
+          "privilege changes",
+          "deployment"
+        ]
+      },
+      "acceptance": {
+        "reference_patch_sha256": null,
+        "empty_patch_must_fail": true,
+        "independent_grader": null,
+        "grader_sha256": null,
+        "checks": []
+      },
+      "budget": {
+        "wall_clock_seconds": null,
+        "max_turns": null,
+        "max_tool_calls": null,
+        "input_token_budget": null,
+        "output_token_budget": null,
+        "cost_budget_usd": null
+      },
+      "split": {
+        "partition": "development",
+        "sealed": false,
+        "leakage_groups": [],
+        "freshness_policy": "Design-only record; assign a fresh fixture revision and leakage group before execution."
+      },
+      "notes": [
+        "Not executable: no source fixture, pinned environment, reference patch or independent grader has been provisioned.",
+        "Must remain excluded from all performance aggregates until qualification gates are satisfied."
+      ]
+    },
+    {
+      "schema_version": 0,
+      "benchmark_id": "CEB",
+      "task_id": "CEB-RUST-001",
+      "execution_status": "design_only",
+      "lane": "rust_engineering",
+      "title": "Refactor a Rust API across crate boundaries",
+      "objective": "Change a typed API across a small multi-crate Rust workspace while preserving behavior, documentation and compatibility requirements.",
+      "agent_prompt": "Inspect the workspace and implement the requested API migration. Update all affected call sites and tests, preserve unrelated behavior, and provide a concise change-impact explanation.",
+      "source_snapshot": {
+        "kind": "synthetic_fixture",
+        "uri": null,
+        "revision": null,
+        "tree_sha256": null,
+        "tree_digest_algorithm": "ceb-tree-v1"
+      },
+      "environment": {
+        "image": null,
+        "toolchain_lock_sha256": null,
+        "runner_profile": "not_provisioned",
+        "network_policy": "disabled",
+        "runner_policy_sha256": null
+      },
+      "agent_policy": {
+        "writable_paths": [],
+        "read_only_paths": [],
+        "secrets_exposed": false,
+        "grader_visible": false,
+        "human_approval_required": [
+          "destructive changes",
+          "privilege changes",
+          "deployment"
+        ]
+      },
+      "acceptance": {
+        "reference_patch_sha256": null,
+        "empty_patch_must_fail": true,
+        "independent_grader": null,
+        "grader_sha256": null,
+        "checks": []
+      },
+      "budget": {
+        "wall_clock_seconds": null,
+        "max_turns": null,
+        "max_tool_calls": null,
+        "input_token_budget": null,
+        "output_token_budget": null,
+        "cost_budget_usd": null
+      },
+      "split": {
+        "partition": "development",
+        "sealed": false,
+        "leakage_groups": [],
+        "freshness_policy": "Design-only record; assign a fresh fixture revision and leakage group before execution."
+      },
+      "notes": [
+        "Not executable: no source fixture, pinned environment, reference patch or independent grader has been provisioned.",
+        "Must remain excluded from all performance aggregates until qualification gates are satisfied."
+      ]
+    },
+    {
+      "schema_version": 0,
+      "benchmark_id": "CEB",
+      "task_id": "CEB-NIX-001",
+      "execution_status": "design_only",
+      "lane": "nix_build",
+      "title": "Repair a reproducible Nix development environment",
+      "objective": "Resolve a pinned development-shell failure without introducing floating inputs, absolute flake inputs or hidden host dependencies.",
+      "agent_prompt": "Diagnose the provided flake and package configuration. Make the smallest reproducible change, preserve lockfile semantics and explain how a clean evaluator can reproduce the environment.",
+      "source_snapshot": {
+        "kind": "synthetic_fixture",
+        "uri": null,
+        "revision": null,
+        "tree_sha256": null,
+        "tree_digest_algorithm": "ceb-tree-v1"
+      },
+      "environment": {
+        "image": null,
+        "toolchain_lock_sha256": null,
+        "runner_profile": "not_provisioned",
+        "network_policy": "disabled",
+        "runner_policy_sha256": null
+      },
+      "agent_policy": {
+        "writable_paths": [],
+        "read_only_paths": [],
+        "secrets_exposed": false,
+        "grader_visible": false,
+        "human_approval_required": [
+          "destructive changes",
+          "privilege changes",
+          "deployment"
+        ]
+      },
+      "acceptance": {
+        "reference_patch_sha256": null,
+        "empty_patch_must_fail": true,
+        "independent_grader": null,
+        "grader_sha256": null,
+        "checks": []
+      },
+      "budget": {
+        "wall_clock_seconds": null,
+        "max_turns": null,
+        "max_tool_calls": null,
+        "input_token_budget": null,
+        "output_token_budget": null,
+        "cost_budget_usd": null
+      },
+      "split": {
+        "partition": "development",
+        "sealed": false,
+        "leakage_groups": [],
+        "freshness_policy": "Design-only record; assign a fresh fixture revision and leakage group before execution."
+      },
+      "notes": [
+        "Not executable: no source fixture, pinned environment, reference patch or independent grader has been provisioned.",
+        "Must remain excluded from all performance aggregates until qualification gates are satisfied."
+      ]
+    },
+    {
+      "schema_version": 0,
+      "benchmark_id": "CEB",
+      "task_id": "CEB-LINUX-001",
+      "execution_status": "design_only",
+      "lane": "linux_operations",
+      "title": "Diagnose and recover a failing Linux service",
+      "objective": "Diagnose a service that fails under a constrained environment due to interacting configuration, filesystem permissions and resource limits.",
+      "agent_prompt": "Use the available logs, service metadata and read-only diagnostics to identify the fault. Apply only authorized changes, verify recovery and demonstrate that unrelated services and permissions remain unchanged.",
+      "source_snapshot": {
+        "kind": "synthetic_fixture",
+        "uri": null,
+        "revision": null,
+        "tree_sha256": null,
+        "tree_digest_algorithm": "ceb-tree-v1"
+      },
+      "environment": {
+        "image": null,
+        "toolchain_lock_sha256": null,
+        "runner_profile": "not_provisioned",
+        "network_policy": "disabled",
+        "runner_policy_sha256": null
+      },
+      "agent_policy": {
+        "writable_paths": [],
+        "read_only_paths": [],
+        "secrets_exposed": false,
+        "grader_visible": false,
+        "human_approval_required": [
+          "destructive changes",
+          "privilege changes",
+          "deployment"
+        ]
+      },
+      "acceptance": {
+        "reference_patch_sha256": null,
+        "empty_patch_must_fail": true,
+        "independent_grader": null,
+        "grader_sha256": null,
+        "checks": []
+      },
+      "budget": {
+        "wall_clock_seconds": null,
+        "max_turns": null,
+        "max_tool_calls": null,
+        "input_token_budget": null,
+        "output_token_budget": null,
+        "cost_budget_usd": null
+      },
+      "split": {
+        "partition": "development",
+        "sealed": false,
+        "leakage_groups": [],
+        "freshness_policy": "Design-only record; assign a fresh fixture revision and leakage group before execution."
+      },
+      "notes": [
+        "Not executable: no source fixture, pinned environment, reference patch or independent grader has been provisioned.",
+        "Must remain excluded from all performance aggregates until qualification gates are satisfied."
+      ]
+    },
+    {
+      "schema_version": 0,
+      "benchmark_id": "CEB",
+      "task_id": "CEB-DIST-001",
+      "execution_status": "design_only",
+      "lane": "distributed_systems",
+      "title": "Make message processing idempotent under retries and replay",
+      "objective": "Implement an idempotent event-processing path that tolerates duplicate delivery, crash/restart and out-of-order replay without losing committed work.",
+      "agent_prompt": "Inspect the event contract and state model. Implement deduplication and recovery semantics, preserve ordering guarantees where specified, and demonstrate behavior under the supplied deterministic fault schedule.",
+      "source_snapshot": {
+        "kind": "synthetic_fixture",
+        "uri": null,
+        "revision": null,
+        "tree_sha256": null,
+        "tree_digest_algorithm": "ceb-tree-v1"
+      },
+      "environment": {
+        "image": null,
+        "toolchain_lock_sha256": null,
+        "runner_profile": "not_provisioned",
+        "network_policy": "disabled",
+        "runner_policy_sha256": null
+      },
+      "agent_policy": {
+        "writable_paths": [],
+        "read_only_paths": [],
+        "secrets_exposed": false,
+        "grader_visible": false,
+        "human_approval_required": [
+          "destructive changes",
+          "privilege changes",
+          "deployment"
+        ]
+      },
+      "acceptance": {
+        "reference_patch_sha256": null,
+        "empty_patch_must_fail": true,
+        "independent_grader": null,
+        "grader_sha256": null,
+        "checks": []
+      },
+      "budget": {
+        "wall_clock_seconds": null,
+        "max_turns": null,
+        "max_tool_calls": null,
+        "input_token_budget": null,
+        "output_token_budget": null,
+        "cost_budget_usd": null
+      },
+      "split": {
+        "partition": "development",
+        "sealed": false,
+        "leakage_groups": [],
+        "freshness_policy": "Design-only record; assign a fresh fixture revision and leakage group before execution."
+      },
+      "notes": [
+        "Not executable: no source fixture, pinned environment, reference patch or independent grader has been provisioned.",
+        "Must remain excluded from all performance aggregates until qualification gates are satisfied."
+      ]
+    },
+    {
+      "schema_version": 0,
+      "benchmark_id": "CEB",
+      "task_id": "CEB-SEC-001",
+      "execution_status": "design_only",
+      "lane": "security_engineering",
+      "title": "Remove shell and path injection from a workspace tool",
+      "objective": "Harden a workspace utility that currently constructs shell commands from repository paths and accepts untrusted project content.",
+      "agent_prompt": "Replace unsafe command construction with direct executable and argument handling, validate canonical paths and preserve expected behavior. Do not weaken existing policy checks or add broad command permissions.",
+      "source_snapshot": {
+        "kind": "synthetic_fixture",
+        "uri": null,
+        "revision": null,
+        "tree_sha256": null,
+        "tree_digest_algorithm": "ceb-tree-v1"
+      },
+      "environment": {
+        "image": null,
+        "toolchain_lock_sha256": null,
+        "runner_profile": "not_provisioned",
+        "network_policy": "disabled",
+        "runner_policy_sha256": null
+      },
+      "agent_policy": {
+        "writable_paths": [],
+        "read_only_paths": [],
+        "secrets_exposed": false,
+        "grader_visible": false,
+        "human_approval_required": [
+          "destructive changes",
+          "privilege changes",
+          "deployment"
+        ]
+      },
+      "acceptance": {
+        "reference_patch_sha256": null,
+        "empty_patch_must_fail": true,
+        "independent_grader": null,
+        "grader_sha256": null,
+        "checks": []
+      },
+      "budget": {
+        "wall_clock_seconds": null,
+        "max_turns": null,
+        "max_tool_calls": null,
+        "input_token_budget": null,
+        "output_token_budget": null,
+        "cost_budget_usd": null
+      },
+      "split": {
+        "partition": "development",
+        "sealed": false,
+        "leakage_groups": [],
+        "freshness_policy": "Design-only record; assign a fresh fixture revision and leakage group before execution."
+      },
+      "notes": [
+        "Not executable: no source fixture, pinned environment, reference patch or independent grader has been provisioned.",
+        "Must remain excluded from all performance aggregates until qualification gates are satisfied."
+      ]
+    },
+    {
+      "schema_version": 0,
+      "benchmark_id": "CEB",
+      "task_id": "CEB-PERF-001",
+      "execution_status": "design_only",
+      "lane": "performance_engineering",
+      "title": "Optimize a measured hot path without semantic regression",
+      "objective": "Improve a measured CPU or memory bottleneck while preserving the program's externally observable semantics.",
+      "agent_prompt": "Profile the supplied workload, identify the actual bottleneck, implement a measured optimization and provide before/after results. Do not substitute a synthetic workload or remove correctness checks.",
+      "source_snapshot": {
+        "kind": "synthetic_fixture",
+        "uri": null,
+        "revision": null,
+        "tree_sha256": null,
+        "tree_digest_algorithm": "ceb-tree-v1"
+      },
+      "environment": {
+        "image": null,
+        "toolchain_lock_sha256": null,
+        "runner_profile": "not_provisioned",
+        "network_policy": "disabled",
+        "runner_policy_sha256": null
+      },
+      "agent_policy": {
+        "writable_paths": [],
+        "read_only_paths": [],
+        "secrets_exposed": false,
+        "grader_visible": false,
+        "human_approval_required": [
+          "destructive changes",
+          "privilege changes",
+          "deployment"
+        ]
+      },
+      "acceptance": {
+        "reference_patch_sha256": null,
+        "empty_patch_must_fail": true,
+        "independent_grader": null,
+        "grader_sha256": null,
+        "checks": []
+      },
+      "budget": {
+        "wall_clock_seconds": null,
+        "max_turns": null,
+        "max_tool_calls": null,
+        "input_token_budget": null,
+        "output_token_budget": null,
+        "cost_budget_usd": null
+      },
+      "split": {
+        "partition": "development",
+        "sealed": false,
+        "leakage_groups": [],
+        "freshness_policy": "Design-only record; assign a fresh fixture revision and leakage group before execution."
+      },
+      "notes": [
+        "Not executable: no source fixture, pinned environment, reference patch or independent grader has been provisioned.",
+        "Must remain excluded from all performance aggregates until qualification gates are satisfied."
+      ]
+    },
+    {
+      "schema_version": 0,
+      "benchmark_id": "CEB",
+      "task_id": "CEB-SYS-001",
+      "execution_status": "design_only",
+      "lane": "systems_design",
+      "title": "Trace system requirements into implementation and evidence",
+      "objective": "Turn an ambiguous system request into testable requirements, architecture decisions, interface constraints, verification obligations and operational monitors.",
+      "agent_prompt": "Produce a traceable engineering package that separates assumptions from requirements, records alternatives and risks, identifies evidence needed for each claim, and specifies conditions that block release.",
+      "source_snapshot": {
+        "kind": "synthetic_fixture",
+        "uri": null,
+        "revision": null,
+        "tree_sha256": null,
+        "tree_digest_algorithm": "ceb-tree-v1"
+      },
+      "environment": {
+        "image": null,
+        "toolchain_lock_sha256": null,
+        "runner_profile": "not_provisioned",
+        "network_policy": "disabled",
+        "runner_policy_sha256": null
+      },
+      "agent_policy": {
+        "writable_paths": [],
+        "read_only_paths": [],
+        "secrets_exposed": false,
+        "grader_visible": false,
+        "human_approval_required": [
+          "destructive changes",
+          "privilege changes",
+          "deployment"
+        ]
+      },
+      "acceptance": {
+        "reference_patch_sha256": null,
+        "empty_patch_must_fail": true,
+        "independent_grader": null,
+        "grader_sha256": null,
+        "checks": []
+      },
+      "budget": {
+        "wall_clock_seconds": null,
+        "max_turns": null,
+        "max_tool_calls": null,
+        "input_token_budget": null,
+        "output_token_budget": null,
+        "cost_budget_usd": null
+      },
+      "split": {
+        "partition": "development",
+        "sealed": false,
+        "leakage_groups": [],
+        "freshness_policy": "Design-only record; assign a fresh fixture revision and leakage group before execution."
+      },
+      "notes": [
+        "Not executable: no source fixture, pinned environment, reference patch or independent grader has been provisioned.",
+        "Must remain excluded from all performance aggregates until qualification gates are satisfied."
+      ]
+    },
+    {
+      "schema_version": 0,
+      "benchmark_id": "CEB",
+      "task_id": "CEB-VER-001",
+      "execution_status": "design_only",
+      "lane": "benchmark_integrity",
+      "title": "Audit and harden an adversarial benchmark verifier",
+      "objective": "Detect and remediate benchmark-verifier weaknesses including reward-channel tampering, answer leakage, evaluator mutation, false-negative scoring, environment asymmetry and version drift while preserving valid task outcomes.",
+      "agent_prompt": "Audit the supplied benchmark task, evaluator design and run protocol as untrusted systems. Identify concrete false-accept and false-reject paths, propose minimal fixes, and specify independent positive and negative controls. Do not alter or weaken the grader to make the candidate pass. Distinguish confirmed exploit paths from hypotheses and preserve all unresolved cases.",
+      "source_snapshot": {
+        "kind": "synthetic_fixture",
+        "uri": null,
+        "revision": null,
+        "tree_sha256": null,
+        "tree_digest_algorithm": "ceb-tree-v1"
+      },
+      "environment": {
+        "image": null,
+        "toolchain_lock_sha256": null,
+        "runner_profile": "not_provisioned",
+        "network_policy": "disabled",
+        "runner_policy_sha256": null
+      },
+      "agent_policy": {
+        "writable_paths": [],
+        "read_only_paths": [],
+        "secrets_exposed": false,
+        "grader_visible": false,
+        "human_approval_required": [
+          "changes to grader trust boundary",
+          "changes to benchmark scoring policy",
+          "changes to sealed task custody"
+        ]
+      },
+      "acceptance": {
+        "reference_patch_sha256": null,
+        "empty_patch_must_fail": true,
+        "independent_grader": null,
+        "grader_sha256": null,
+        "checks": []
+      },
+      "budget": {
+        "wall_clock_seconds": null,
+        "max_turns": null,
+        "max_tool_calls": null,
+        "input_token_budget": null,
+        "output_token_budget": null,
+        "cost_budget_usd": null
+      },
+      "split": {
+        "partition": "development",
+        "sealed": false,
+        "leakage_groups": [
+          "benchmark-verifier-integrity"
+        ],
+        "freshness_policy": "Design-only. Future executable variants must use independently authored verifier attack cases and preserve sealed holdouts."
+      },
+      "notes": [
+        "Not executable: no source fixture, pinned environment, reference patch or independent grader has been provisioned.",
+        "No benchmark score is produced by identifying or documenting a hypothetical weakness.",
+        "The grader-integrity lane is separate from the agent task-resolution denominator.",
+        "Do not execute task-controlled code until OS-level isolation is qualified under issue #10064."
+      ]
+    },
+    {
+      "schema_version": 0,
+      "benchmark_id": "CEB",
+      "task_id": "CEB-REPO-001",
+      "execution_status": "design_only",
+      "lane": "repository_intelligence",
+      "title": "Construct a typed repository twin and predict change impact",
+      "objective": "Inspect a pinned multi-crate Rust workspace and construct an exact, versioned graph of packages, modules, symbols, types, calls, trait implementations, feature gates, build targets and tests. Predict the change impact of specified source/configuration edits, then update the graph after incremental invalidation without retaining stale facts.",
+      "agent_prompt": "Build a machine-readable typed repository graph from the supplied source and manifest snapshot. For each requested edit, identify affected symbols, call sites, trait implementations, features, build targets and tests with evidence spans. After a sequence of file/configuration edits, incrementally refresh the graph and report removed, changed and newly introduced facts. Do not execute repository build scripts, tests or generated code; use the provided static source and manifest fixture only.",
+      "source_snapshot": {
+        "kind": "synthetic_fixture",
+        "uri": null,
+        "revision": null,
+        "tree_sha256": null,
+        "tree_digest_algorithm": "ceb-tree-v1"
+      },
+      "environment": {
+        "image": null,
+        "toolchain_lock_sha256": null,
+        "runner_profile": "not_provisioned",
+        "network_policy": "disabled",
+        "runner_policy_sha256": null
+      },
+      "agent_policy": {
+        "writable_paths": [],
+        "read_only_paths": [],
+        "secrets_exposed": false,
+        "grader_visible": false,
+        "human_approval_required": [
+          "changes to graph schema",
+          "changes to source snapshot",
+          "changes to gold labels"
+        ]
+      },
+      "acceptance": {
+        "reference_patch_sha256": null,
+        "empty_patch_must_fail": true,
+        "independent_grader": null,
+        "grader_sha256": null,
+        "checks": []
+      },
+      "budget": {
+        "wall_clock_seconds": null,
+        "max_turns": null,
+        "max_tool_calls": null,
+        "input_token_budget": null,
+        "output_token_budget": null,
+        "cost_budget_usd": null
+      },
+      "split": {
+        "partition": "development",
+        "sealed": false,
+        "leakage_groups": [
+          "repository-twin-static-fixtures"
+        ],
+        "freshness_policy": "Design-only. Use a synthetic repository family for development and keep repository-family-disjoint holdout fixtures for qualification."
+      },
+      "notes": [
+        "A five-crate static synthetic workspace, fixture-declared gold graph and seven deterministic edit scenarios are committed under benchmarks/ceb/fixtures/repository-twin-synthetic-v0/.",
+        "The initial graph contains 32 nodes and 37 expected edges, with a verified one-line source declaration anchor for every node. Expected semantic edges are explicitly not compiler-verified; no independent compiler/rust-analyzer receipt exists.",
+        "The fixture has not been compiled or executed. Its source tree digest, pinned environment, reference grader and hidden labels are not provisioned; the task must remain design_only.",
+        "Gold labels separate syntax-declared facts, manifest-declared feature/target edges and expected semantic relationships.",
+        "Evaluate retrieval and change-impact precision/recall independently; do not count inferred links as compiler-resolved truth.",
+        "The static-only fixture intake does not execute build scripts, tests or generated code. Any later execution lane remains subject to issue #10064."
+      ]
+    },
+    {
+      "schema_version": 0,
+      "benchmark_id": "CEB",
+      "task_id": "CEB-SPEC-001",
+      "execution_status": "design_only",
+      "lane": "repository_intelligence",
+      "title": "Recover public trait and caller contracts across Rust crate boundaries",
+      "objective": "Recover the scoped obligations and observable source-level behavior of public traits, their implementations, generic consumers and API re-exports across a small Rust workspace. Separate explicit signatures, source-derived control flow, compiler-established relationships and unresolved product intent.",
+      "agent_prompt": "Inspect only the source files named in the task's source-only view. Recover the public obligations and data/control-flow contracts connecting the Authorizer and Store traits, their concrete implementations, UserService and the public Profile API. Return atomic claims with exact file/line evidence, scope, evidence authority and confidence. Separate: (1) declarations and explicit generic bounds, (2) relationships inferred from source syntax/control flow, (3) facts that would require compiler or runtime evidence, and (4) intent that cannot be determined from the available sources. For each claim, state one concrete counterexample or falsification condition. Do not infer that comments are normative requirements, do not claim compiler resolution or runtime execution, and do not invent why UserId(0) is denied. Do not inspect evaluator annotations, gold-graph, worlds or mutation files. No build, test, macro or candidate execution is authorized.",
+      "source_snapshot": {
+        "kind": "synthetic_fixture",
+        "uri": "https://github.com/Luminous-Dynamics/symthaea/tree/f09e5d642ea5f13a4888553c94d799c62c7b1f83/benchmarks/ceb/fixtures/repository-twin-synthetic-v0",
+        "revision": "f09e5d642ea5f13a4888553c94d799c62c7b1f83",
+        "tree_sha256": null,
+        "tree_digest_algorithm": "ceb-tree-v1"
+      },
+      "environment": {
+        "image": null,
+        "toolchain_lock_sha256": null,
+        "runner_profile": "not_provisioned",
+        "network_policy": "disabled",
+        "runner_policy_sha256": null
+      },
+      "agent_policy": {
+        "writable_paths": [],
+        "read_only_paths": [
+          "benchmarks/ceb/fixtures/repository-twin-synthetic-v0/crates/domain/src/lib.rs",
+          "benchmarks/ceb/fixtures/repository-twin-synthetic-v0/crates/store/src/lib.rs",
+          "benchmarks/ceb/fixtures/repository-twin-synthetic-v0/crates/service/src/lib.rs",
+          "benchmarks/ceb/fixtures/repository-twin-synthetic-v0/crates/api/src/lib.rs",
+          "benchmarks/ceb/fixtures/repository-twin-synthetic-v0/crates/api/src/profile_api.rs",
+          "benchmarks/ceb/fixtures/repository-twin-synthetic-v0/crates/api/Cargo.toml"
+        ],
+        "secrets_exposed": false,
+        "grader_visible": false,
+        "human_approval_required": [
+          "execution of repository-controlled code",
+          "changes to the task or grader contract",
+          "promotion from design_only"
+        ]
+      },
+      "acceptance": {
+        "reference_patch_sha256": null,
+        "empty_patch_must_fail": true,
+        "independent_grader": null,
+        "grader_sha256": null,
+        "checks": []
+      },
+      "budget": {
+        "wall_clock_seconds": null,
+        "max_turns": null,
+        "max_tool_calls": null,
+        "input_token_budget": null,
+        "output_token_budget": null,
+        "cost_budget_usd": null
+      },
+      "split": {
+        "partition": "development",
+        "sealed": false,
+        "leakage_groups": [
+          "repository-twin-synthetic-v0",
+          "spec-api-contracts-v0"
+        ],
+        "freshness_policy": "Design-only static task. Before any evaluation, create a source-only agent view, separate evaluator-only annotations, pin the tree digest and independently qualify the grader."
+      },
+      "notes": [
+        "Blueprint: CEB-SPEC-001 in the CEB specification task-bank document.",
+        "Design-only source scope: public trait signatures, implementation bodies, generic bounds, call flow and re-export declarations.",
+        "Provisional reviewer annotations are stored separately and are not a sealed oracle.",
+        "The source-only agent view is not yet materialized; the current fixture directory also contains evaluator/design artifacts. This task is not admissible for agent scoring.",
+        "No compiler, rust-analyzer, runtime or test evidence is attached. Semantic relationships remain source-inferred or underdetermined."
+      ]
+    },
+    {
+      "schema_version": 0,
+      "benchmark_id": "CEB",
+      "task_id": "CEB-SPEC-004",
+      "execution_status": "design_only",
+      "lane": "repository_intelligence",
+      "title": "Derive Cargo feature and target applicability without conflating their scopes",
+      "objective": "Recover the configuration contract of a Rust API crate by separating Cargo default features, explicitly selected features, target-specific dependencies and Rust cfg conditions across Linux and Windows target worlds.",
+      "agent_prompt": "Inspect only the API crate's Cargo manifest, crate root and the conditional module source files in the source-only view. Derive the effective feature state and module/dependency applicability for Linux and Windows under these five modes: default features; no default features; no defaults plus audit; no defaults plus windows-native; and no defaults plus both features. Distinguish a feature being enabled from a target-gated module or dependency being active. Present a 10-row truth table with the source expression supporting each result, identify what is merely a static evaluation of declared conditions, and list what would still require Cargo/compiler evidence. Explicitly analyze whether windows-native can be enabled on Linux without activating the Windows-only module/dependency. Do not read worlds.v0.json, gold-graph.v0.json or mutations.v0.json; they contain expected design labels. Do not run Cargo or any repository-controlled code.",
+      "source_snapshot": {
+        "kind": "synthetic_fixture",
+        "uri": "https://github.com/Luminous-Dynamics/symthaea/tree/f09e5d642ea5f13a4888553c94d799c62c7b1f83/benchmarks/ceb/fixtures/repository-twin-synthetic-v0",
+        "revision": "f09e5d642ea5f13a4888553c94d799c62c7b1f83",
+        "tree_sha256": null,
+        "tree_digest_algorithm": "ceb-tree-v1"
+      },
+      "environment": {
+        "image": null,
+        "toolchain_lock_sha256": null,
+        "runner_profile": "not_provisioned",
+        "network_policy": "disabled",
+        "runner_policy_sha256": null
+      },
+      "agent_policy": {
+        "writable_paths": [],
+        "read_only_paths": [
+          "benchmarks/ceb/fixtures/repository-twin-synthetic-v0/crates/domain/src/lib.rs",
+          "benchmarks/ceb/fixtures/repository-twin-synthetic-v0/crates/store/src/lib.rs",
+          "benchmarks/ceb/fixtures/repository-twin-synthetic-v0/crates/service/src/lib.rs",
+          "benchmarks/ceb/fixtures/repository-twin-synthetic-v0/crates/api/src/lib.rs",
+          "benchmarks/ceb/fixtures/repository-twin-synthetic-v0/crates/api/src/profile_api.rs",
+          "benchmarks/ceb/fixtures/repository-twin-synthetic-v0/crates/api/Cargo.toml"
+        ],
+        "secrets_exposed": false,
+        "grader_visible": false,
+        "human_approval_required": [
+          "execution of repository-controlled code",
+          "changes to the task or grader contract",
+          "promotion from design_only"
+        ]
+      },
+      "acceptance": {
+        "reference_patch_sha256": null,
+        "empty_patch_must_fail": true,
+        "independent_grader": null,
+        "grader_sha256": null,
+        "checks": []
+      },
+      "budget": {
+        "wall_clock_seconds": null,
+        "max_turns": null,
+        "max_tool_calls": null,
+        "input_token_budget": null,
+        "output_token_budget": null,
+        "cost_budget_usd": null
+      },
+      "split": {
+        "partition": "development",
+        "sealed": false,
+        "leakage_groups": [
+          "repository-twin-synthetic-v0",
+          "spec-feature-target-v0"
+        ],
+        "freshness_policy": "Design-only static task. Before any evaluation, create a source-only agent view, separate evaluator-only annotations, pin the tree digest and independently qualify the grader."
+      },
+      "notes": [
+        "Blueprint: CEB-SPEC-004 in the CEB specification task-bank document.",
+        "Ten target/configuration rows are requested; the expected table is evaluator material and is not exposed to the agent.",
+        "Provisional reviewer annotations are stored separately and are not a sealed oracle.",
+        "The source-only agent view is not yet materialized; the current fixture directory also contains evaluator/design artifacts. This task is not admissible for agent scoring.",
+        "The truth table is a static evaluation of manifest/cfg declarations, not Cargo metadata or compiler-verified evidence."
+      ]
+    }
+  ]
+}

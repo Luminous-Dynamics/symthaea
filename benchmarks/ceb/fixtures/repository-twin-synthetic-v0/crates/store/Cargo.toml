@@ -1,0 +1,8 @@
+[package]
+name = "symthaea-ceb-store"
+version.workspace = true
+edition.workspace = true
+license.workspace = true
+
+[dependencies]
+symthaea-ceb-domain.workspace = true

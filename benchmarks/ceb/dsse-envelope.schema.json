@@ -1,0 +1,46 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://luminousdynamics.io/schemas/ceb/dsse-envelope-v0.schema.json",
+  "title": "CEB DSSE Attestation Envelope",
+  "description": "DSSE v1 envelope for a serialized in-toto CEB run statement. Signature verification and trust-root policy are performed by the independent receipt verifier.",
+  "type": "object",
+  "additionalProperties": false,
+  "required": [
+    "payloadType",
+    "payload",
+    "signatures"
+  ],
+  "properties": {
+    "payloadType": {
+      "const": "application/vnd.in-toto+json"
+    },
+    "payload": {
+      "type": "string",
+      "minLength": 1,
+      "pattern": "^[A-Za-z0-9+/]+={0,2}$"
+    },
+    "signatures": {
+      "type": "array",
+      "minItems": 1,
+      "items": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": [
+          "keyid",
+          "sig"
+        ],
+        "properties": {
+          "keyid": {
+            "type": "string",
+            "minLength": 1
+          },
+          "sig": {
+            "type": "string",
+            "minLength": 1,
+            "pattern": "^[A-Za-z0-9+/]+={0,2}$"
+          }
+        }
+      }
+    }
+  }
+}
