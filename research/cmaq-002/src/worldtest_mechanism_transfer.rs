@@ -1128,6 +1128,23 @@ mod tests {
     }
 
     #[test]
+    fn target_environment_family_must_match_declared_transfer_relation() {
+        let mut input = base_input();
+        for row in &mut input.tasks {
+            if row.condition == MechanismTransferCondition::SameFamilyHoldout {
+                row.task.environment_family_id = "incorrect-target-family".to_owned();
+            }
+        }
+        assert!(matches!(
+            evaluate_mechanism_transfer(&input),
+            Err(MechanismTransferError::TargetEnvironmentFamilyMismatch {
+                condition: MechanismTransferCondition::SameFamilyHoldout,
+                ..
+            })
+        ));
+    }
+
+    #[test]
     fn condition_profile_digest_must_be_nonempty() {
         let mut input = base_input();
         input.context.condition_profiles[2].profile_manifest_sha256 = [0; 32];
