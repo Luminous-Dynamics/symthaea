@@ -201,3 +201,24 @@ For each byte-offset lane, the [6,4,3] code guarantees decoding when `2e + s < 3
 The new receipt exposes `corrected_symbols`. The deterministic suite checks 48 single-error positions, all 15 two-erasure pairs, an eight-byte tile substitution, a selected one-error-plus-one-erasure out-of-radius case, and a two-error miscorrection caught by the external whole-payload SHA-256 digest.
 
 This closes an algorithmic gap in the synthetic decoder only. It is not a measured optical error model, does not add soft-decision information, and does not make the custom array code a standards Reed–Solomon implementation. Cargo/rustfmt/Clippy execution remains pending until the exact branch head is tested with a Rust toolchain.
+
+
+## 15. Prior art and pinned coding baselines
+
+Spatial interleaving against multidimensional burst/cluster errors is established. Blaum, Bruck and Vardy (1998) formulate 2D and 3D interleaving schemes, including graph-colouring and lattice-interleaver constructions: https://d3ccyth396mz21.cloudfront.net/publications/interleaving-schemes-for-multidimensional-cluster-errors. Chou and Neifeld (1998) study ECC plus 2D interleaving in volume holographic memory under random, systematic and correlated optical errors: https://opg.optica.org/ao/abstract.cfm?uri=ao-37-29-6951. This programme therefore makes no novelty claim for the general idea of spatial interleaving or ECC/interleaving composition. Its hypothesis is source-bound co-design and qualification against instrument-registered 3D physical channel maps.
+
+The code tournament must use pinned, independently verifiable baselines:
+
+- **Reed–Solomon / GRS:** a standards-derived symbol code and decoder for bounded symbol errors/erasures with matched n, k, field, symbolization and payload rate.
+- **Intel ISA-L erasure coding:** optimized Reed–Solomon-type block erasure routines over GF(2^8), suitable as an encode/erasure-reconstruction performance baseline. ISA-L's erasure API is not by itself an unknown-symbol-error decoder: https://github.com/intel/isa-l
+- **BCH:** binary correction baseline for bit-level errors when the physical readout can justify binary symbolization.
+- **LDPC:** long-block baseline where the reader supplies calibrated soft information; hard-decision and soft-decision variants must be distinct.
+- **Erasure coding / placement:** baseline code/layout combinations under exactly the same erased tiles and net storage budget.
+
+Pin repository release/commit, build flags, parameters, decoder settings and hardware. Measure both correctness and performance. Keep a custom linear MDS array code label distinct from Reed–Solomon/GRS standards compliance.
+
+## 16. A measurable challenge target (not a present result)
+
+After measured training and held-out specimen/reader maps exist, preregister a challenge target: achieve at least a 20% relative reduction in uncorrectable held-out spatial fault maps versus the strongest pinned classical code-plus-interleaver baseline, **at equal net payload efficiency and evaluation budget**, without regressing the declared random-error/burst strata or violating manufacturing constraints. If that target is not feasible, report the Pareto frontier and failure envelope rather than tuning the metric.
+
+This is a research target, not a claimed result. No percentage improvement is currently established by the synthetic starter layout.
