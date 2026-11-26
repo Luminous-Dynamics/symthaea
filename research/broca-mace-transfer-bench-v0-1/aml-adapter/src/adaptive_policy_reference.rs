@@ -332,7 +332,7 @@ pub fn evaluate_expected_reference_v1(
 ) -> Result<ExpectedReferenceResultV1, ReferenceRejectV1> {
     scenario.validate(true)?;
     let worlds = scenario.worlds.iter().enumerate()
-        .filter(|(_, world)| world.possible && world.probability_ppm.unwrap_or(0) > 0)
+        .filter(|(_, world)| world.possible)
         .map(|(index, _)| index)
         .collect::<Vec<_>>();
     let mut visited = 0usize;
@@ -940,4 +940,37 @@ mod tests {
         let result = evaluate_expected_reference_v1(&scenario).unwrap();
         assert!(result.expected_net_utility_numerator_ppm > 0);
     }
+
+    #[test]
+    fn possible_zero_mass_worlds_still_constrain_expected_action_permissions() {
+        let mut scenario = adaptive_scenario();
+        scenario.worlds = vec![
+            world("zero-mass-possible", "bad", Some(0), &[
+                ("route", "A"), ("check-a", "bad"), ("check-b", "unknown"),
+            ]),
+            world("positive-mass", "good", Some(1_000_000), &[
+                ("route", "A"), ("check-a", "good"), ("check-b", "unknown"),
+            ]),
+        ];
+        scenario.actions = vec![
+            action(
+                "abstain",
+                &[("bad", 0), ("good", 0)],
+                &[("bad", true), ("good", true)],
+            ),
+            action(
+                "commit",
+                &[("bad", 100), ("good", 100)],
+                &[("bad", false), ("good", true)],
+            ),
+        ];
+        scenario.budgets.maximum_queries = 0;
+
+        let result = evaluate_expected_reference_v1(&scenario).unwrap();
+        let ReferencePolicyNodeV1::Terminal { action_id } = result.policy else {
+            panic!("a zero query budget requires a terminal decision");
+        };
+        assert_eq!(action_id, "abstain");
+    }
+
 }
