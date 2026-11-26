@@ -1515,6 +1515,61 @@ mod tests {
     }
 
     #[test]
+    #[test]
+    fn bootstrap_reports_declared_only_and_verified_materialization_separately() {
+        let contrasts = vec![
+            MatchedEvidenceContrastV1 {
+                experiment_unit_id: "unit-declared".into(),
+                source_lineage_id: "lineage-1".into(),
+                evidence_binding_status: EvidenceBindingStatusV1::DeclaredOnly,
+                model_input_attested: false,
+                no_evidence_case_id: "no-1".into(),
+                local_evidence_case_id: "local-1".into(),
+                yoked_evidence_case_id: "yoked-1".into(),
+                local_minus_no_evidence_f1: Some(0.1),
+                local_minus_yoked_f1: Some(0.05),
+                local_minus_no_evidence_count_gated_f1: Some(0.1),
+                local_minus_yoked_count_gated_f1: Some(0.05),
+                local_revision_gain: Some(0.1),
+                yoked_revision_gain: Some(0.05),
+                local_output_tokens: 100,
+                no_evidence_output_tokens: 80,
+                yoked_output_tokens: 100,
+                local_elapsed_wall_time_ms: 1000,
+                no_evidence_elapsed_wall_time_ms: 900,
+                yoked_elapsed_wall_time_ms: 1000,
+                local_beats_yoked: Some(true),
+            },
+            MatchedEvidenceContrastV1 {
+                experiment_unit_id: "unit-verified".into(),
+                source_lineage_id: "lineage-2".into(),
+                evidence_binding_status: EvidenceBindingStatusV1::MaterializedAndContextBound,
+                model_input_attested: false,
+                no_evidence_case_id: "no-2".into(),
+                local_evidence_case_id: "local-2".into(),
+                yoked_evidence_case_id: "yoked-2".into(),
+                local_minus_no_evidence_f1: Some(0.2),
+                local_minus_yoked_f1: Some(0.1),
+                local_minus_no_evidence_count_gated_f1: Some(0.2),
+                local_minus_yoked_count_gated_f1: Some(0.1),
+                local_revision_gain: Some(0.2),
+                yoked_revision_gain: Some(0.1),
+                local_output_tokens: 100,
+                no_evidence_output_tokens: 80,
+                yoked_output_tokens: 100,
+                local_elapsed_wall_time_ms: 1000,
+                no_evidence_elapsed_wall_time_ms: 900,
+                yoked_elapsed_wall_time_ms: 1000,
+                local_beats_yoked: Some(true),
+            },
+        ];
+        let result =
+            bootstrap_matched_evidence_contrasts(&contrasts, 1_000, 0xA11CE).unwrap();
+        assert_eq!(result.verified_evidence_binding_units, 1);
+        assert_eq!(result.declared_only_evidence_binding_units, 1);
+        assert!(!result.all_evidence_bindings_verified);
+    }
+
     fn source_work_bootstrap_is_deterministic_and_clusters_excerpts() {
         let first = matched_evidence_triplet();
         let mut second = first.clone();
