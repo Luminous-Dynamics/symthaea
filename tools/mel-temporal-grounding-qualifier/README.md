@@ -124,3 +124,6 @@ Run the integrated byte-verification, temporal-revision join and in-toto Stateme
 The CLI emits a wrapper containing the exact compact in-toto Statement v1 JSON bytes, payload type and payload SHA-256. Its subjects bind target-audio reference, source-audio bytes, decoded PCM, each window, context/full manifests, verification report and revision report. The predicate records `DigestLinked` evidence and keeps all trust/authentication flags false.
 
 This is unsigned payload material for #13254. It is not a DSSE envelope, it has no signature, and it must not be treated as authenticated provenance until the existing signer and independent verifier validate it under the configured trust-root/role policy.
+
+
+The in-toto predicate also exposes the decoded PCM sample rate, channel count, frame count and sample format; source/PCM byte lengths; decoder and decode-profile digests; plus the revision's maximum and actual output-token and wall-time budgets. These fields are inspectable in the Statement, while decoder/runtime/runner/rights/model-input authentication flags remain false. The exact payload bytes and SHA-256 are returned for the #13254 DSSE signer.
