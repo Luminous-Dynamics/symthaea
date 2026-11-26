@@ -470,6 +470,31 @@ mod tests {
         assert_eq!(score.false_success_rate, Some(0.5));
     }
 
+
+
+    #[test]
+    fn reason_and_stage_errors_are_independent_dimensions() {
+        let records = vec![
+            record(
+                "reason-correct-stage-wrong",
+                "cluster-a",
+                failure("slip", "transport", 3),
+                failure("slip", "grasp", 1),
+            ),
+            record(
+                "reason-wrong-stage-correct",
+                "cluster-b",
+                failure("collision", "grasp", 1),
+                failure("slip", "grasp", 1),
+            ),
+        ];
+        let score = score_failure_fidelity(&records, &contract()).expect("valid records");
+        assert_eq!(score.failure_capture_recall, Some(1.0));
+        assert_eq!(score.reason_accuracy, Some(0.5));
+        assert_eq!(score.stage_accuracy, Some(0.5));
+        assert_eq!(score.false_success_rate, Some(0.0));
+    }
+
     #[test]
     fn candidate_false_failure_is_kept_separate_from_false_success() {
         let records = vec![record(
