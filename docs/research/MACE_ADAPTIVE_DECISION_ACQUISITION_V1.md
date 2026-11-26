@@ -256,6 +256,70 @@ Ablate the history digest, source-root graph, conditional model, resource attest
 
 The initial benchmark should be small enough to exhaustively enumerate all policy paths and state/outcome combinations. This gives MACE a trustworthy reference before optimizing runtime or adding learned policies.
 
+## 10. Independent finite-world reference evaluator
+
+The crate now exports `adaptive_policy_reference`, an independent reference evaluator for small finite acquisition worlds. It is deliberately separate from `decision_value_retrieval`: it does not call the production evaluator, reuse its EVSI likelihood calculation, or accept candidate-reported scores.
+
+### World representation
+
+A scenario contains:
+- a finite sorted state set and consumer-owned action utility/admissibility tables;
+- latent worlds, each mapping every candidate query to one deterministic observation;
+- an optional exact probability mass per possible world for EVSI;
+- conservative possible/not-possible support for robust evaluation;
+- query source-root IDs and per-query tool, latency, token, byte and utility-cost units;
+- finite horizon and per-path budgets.
+
+The joint-world table is the important independence boundary. Two queries over mirrored pages can have different query IDs but the same root IDs and the same observation mapping across worlds. Their outcomes remain correlated. The evaluator does not multiply marginal query likelihoods under a false conditional-independence assumption. Stochastic observations can be represented by multiple latent worlds with the same decision state and different observation assignments.
+
+### Expected-value objective
+
+For a terminal action chosen in each leaf, the evaluator computes the exact fixed-point numerator:
+
+[
+J_{EV}(pi)=sum_{w in W} p_wleft[U(a_pi(h_w),s_w)-C_pi(w)ight],
+]
+
+where (h_w) is the observation history for world (w), and (C_pi(w)) is the accumulated query cost on that world's path. The denominator is exactly 1,000,000; values are compared before rounding. Probability mass on possible worlds must sum to 1,000,000. Impossible worlds must have zero or absent mass.
+
+### Probability-free robust objective
+
+Robust mode ignores all probability fields and evaluates the conservative possible-world support:
+
+[
+J_R(pi)=max_{w in W_{possible}}
+left[
+max_{a:,allowed(a,s_w)} U(a,s_w)
+-U(a_pi(h_w),s_w)+C_pi(w)
+ight].
+]
+
+It selects the policy with minimum worst-case regret-plus-cost. Every terminal action must be admissible in every state still compatible with that observation history. No probability estimate is synthesized.
+
+### Search and limits
+
+The reference uses exact recursive backward induction over each reachable history, trying every eligible query and every consumer-permitted terminal action. Query outcomes partition the active joint worlds; each branch is solved independently because resource budgets are per path and the objective separates over disjoint observation histories. Equal scores prefer fewer policy nodes and then a canonical lexical policy representation.
+
+The search rejects scenarios exceeding the fixed small-world limits (8 states, 64 worlds, 6 actions, 8 queries, horizon 4) or the search-history cap. A returned policy exceeding the declared node cap is explicitly rejected as `PolicyTooLarge`; the reference does not silently substitute a different, potentially suboptimal smaller policy. The reference is not designed for production-scale search and has no learned proposal mechanism.
+
+### Deterministic adversarial fixtures
+
+The Rust module currently authors fixtures for:
+- conditional routing to different follow-up queries;
+- exact EVSI and robust evaluation over joint worlds;
+- duplicate source roots with mirrored observations;
+- revocation between the initial observation and terminal choice;
+- action prohibition across unresolved possible worlds;
+- per-path query, cost and resource ceilings;
+- malformed expected-value probability mass;
+- query enumeration-order invariance;
+- bounded search and policy-size rejection;
+- zero-probability/unsupported-world handling.
+
+These tests are authored only. They have not been compiled or run; hosted CI is not reported as passing. The reference can be used as an independent expected-result oracle for a later optimized executor and for cross-language implementations.
+
+
+
 ## 10. Limits
 
 This proposal does not prove source truth, full ancestry completeness, independence of declared operators, calibrated likelihood quality, safe real-world action or secure erasure. Those remain separate qualification obligations. The schema validates shape, not trust. A valid policy graph is not a valid evidence graph, and a valid evidence graph is not an action permit.
