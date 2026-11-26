@@ -948,9 +948,9 @@ impl WebResearcher {
             }
         }
 
-        let mut seen = HashSet::new();
-        urls.retain(|url| seen.insert(url.clone()));
-
+        // Preserve duplicate offers here so the global planner can emit one
+        // DuplicateSuppressed receipt for each repeated URL in deterministic
+        // query/provider order.
         let had_failure = receipts
             .iter()
             .any(|receipt| receipt.outcome.is_incomplete());
