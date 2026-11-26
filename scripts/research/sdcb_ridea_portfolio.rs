@@ -467,6 +467,42 @@ mod tests {
     }
 
     #[test]
+    fn candidate_pool_cap_is_enforced() {
+        let mut values = candidates();
+        while values.len() < MAX_PORTFOLIO_CANDIDATES + 1 {
+            let mut next = candidates()[0].clone();
+            next.id = format!("extra-{}", values.len());
+            values.push(next);
+        }
+        assert_eq!(
+            greedy_ridea_portfolio(
+                &history(), &target(), &values, &config(),
+                AcquisitionKind::RepresentativeInformativeDeAmplifying, 4, 4,
+            ),
+            Err(PortfolioError::SearchSpaceTooLarge)
+        );
+    }
+
+    #[test]
+    fn sample_and_step_caps_are_enforced() {
+        let long_history = vec![vec![0.0]; MAX_PORTFOLIO_SAMPLES];
+        assert_eq!(
+            greedy_ridea_portfolio(
+                &long_history, &target(), &[candidates()[0].clone()], &config(),
+                AcquisitionKind::RepresentativeInformativeDeAmplifying, 4, 1,
+            ),
+            Err(PortfolioError::SearchSpaceTooLarge)
+        );
+        assert_eq!(
+            greedy_ridea_portfolio(
+                &history(), &target(), &candidates(), &config(),
+                AcquisitionKind::RepresentativeInformativeDeAmplifying, 4, MAX_PORTFOLIO_STEPS + 1,
+            ),
+            Err(PortfolioError::SearchSpaceTooLarge)
+        );
+    }
+
+    #[test]
     fn r_i_portfolio_variant_uses_the_same_updated_history() {
         let result = greedy_ridea_portfolio(
             &history(), &target(), &candidates(), &config(),
