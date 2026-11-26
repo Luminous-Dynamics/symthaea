@@ -779,8 +779,14 @@ mod tests {
     #[test]
     fn unsorted_effect_labels_are_rejected() {
         let changed = ATTEMPT.replace(
-            "[\\n      \\"approved-payment\\",\\n      \\"financial-data\\"\\n    ]",
-            "[\\n      \\"financial-data\\",\\n      \\"approved-payment\\"\\n    ]",
+            r#"[
+      "approved-payment",
+      "financial-data"
+    ]"#,
+            r#"[
+      "financial-data",
+      "approved-payment"
+    ]"#,
         );
         assert!(matches!(
             verify_effect_receipt(&changed, RECEIPT, &expected_context()),
