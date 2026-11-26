@@ -10,6 +10,7 @@
     "case_id",
     "benchmark_method_revision",
     "sut_digest",
+    "evaluation_scope",
     "boundary_kind",
     "scenario_profiles",
     "infrastructure_profiles",
@@ -188,6 +189,9 @@
     },
     "boundary_kind": {
       "const": "store_boundary"
+    },
+    "evaluation_scope": {
+      "const": "metric_specific_partial"
     }
   },
   "$defs": {
