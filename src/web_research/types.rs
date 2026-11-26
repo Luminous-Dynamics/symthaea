@@ -63,13 +63,17 @@ impl ResearchStatus {
 
     /// Whether a caller may reasonably retry the acquisition.
     pub fn is_retriable(&self) -> bool {
-        matches!(self, Self::RateLimited | Self::RetrievalIncomplete)
+        matches!(
+            self,
+            Self::PartialSuccess | Self::RateLimited | Self::RetrievalIncomplete
+        )
     }
 }
 
 /// Stage at which a research acquisition attempt was made.
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Hash, Serialize, Deserialize)]
 pub enum AcquisitionStage {
+    SearchQuery,
     SearchProvider,
     ArxivApi,
     OpenReviewApi,
@@ -86,6 +90,7 @@ pub enum AcquisitionOutcome {
     Fetched,
     FetchedTruncated,
     Timeout,
+    RateLimited,
     ProviderFailed,
     HttpError,
     UnsupportedMedia,
@@ -102,6 +107,7 @@ impl AcquisitionOutcome {
             self,
             Self::FetchedTruncated
                 | Self::Timeout
+                | Self::RateLimited
                 | Self::ProviderFailed
                 | Self::HttpError
                 | Self::UnsupportedMedia
