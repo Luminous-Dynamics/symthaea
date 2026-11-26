@@ -440,10 +440,7 @@ fn digest_is_empty(digest: &[u8; 32]) -> bool {
     digest.iter().all(|byte| *byte == 0)
 }
 
-fn target_family_id(
-    source_family_id: &str,
-    condition: MechanismTransferCondition,
-) -> String {
+fn target_family_id(source_family_id: &str, condition: MechanismTransferCondition) -> String {
     match condition {
         MechanismTransferCondition::SameFamilyHoldout
         | MechanismTransferCondition::NuisanceShift
@@ -498,10 +495,8 @@ fn validate_context(context: &MechanismTransferContext) -> Result<(), MechanismT
                 condition: profile.condition,
             });
         }
-        let expected_family_id = target_family_id(
-            &context.source_environment_family_id,
-            profile.condition,
-        );
+        let expected_family_id =
+            target_family_id(&context.source_environment_family_id, profile.condition);
         if profile.target_environment_family_id != expected_family_id {
             return Err(MechanismTransferError::ConditionProfileRelationMismatch {
                 condition: profile.condition,
@@ -840,10 +835,7 @@ mod tests {
                     mechanism_relation,
                     observation_relation,
                     target_family_relation,
-                    target_environment_family_id: target_family_id(
-                        "source-family-v1",
-                        condition,
-                    ),
+                    target_environment_family_id: target_family_id("source-family-v1", condition),
                     profile_manifest_sha256: digest(30 + index as u8),
                 }
             })
