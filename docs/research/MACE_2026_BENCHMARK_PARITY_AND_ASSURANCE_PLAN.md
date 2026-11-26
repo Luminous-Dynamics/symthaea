@@ -115,7 +115,20 @@ Targets:
 - no invalidate-all shortcut: false invalidation and unnecessary revalidation must be reported;
 - preserve a time-indexed audit trail proving when a fact changed, what depended on it, when it ceased to be admissible, and whether a later answer used the current version.
 
-### 2.5 LongMemEval and other recall/reasoning suites
+### 2.5 MEMORA-Bench (embodied, egocentric-video memory)
+
+This is **MEMORA-Bench** from Yu, Yuan and Zhang (Findings of EMNLP 2026), not the conversational **Memora/FAMA** benchmark above. MEMORA-Bench contains 45 hours of egocentric video and measures both retrospective memory faithfulness and prospective memory-grounded planning. Its framework separates online memory editing from offline consolidation and uses typed spatial context, object identity/state, and temporal action evidence. The paper also reports a physical-robot demonstration.
+
+This is a relevant supplementary track for MACE's multimodal/embodied memory research and its eventual connection to physical twins and robotics. It should not be mixed into AML textual or multimodal score tables.
+
+Target:
+- reproduce the official benchmark with a matched perception model, answer/planning model, retrieval budget and simulator/robot setup;
+- improve prospective planning score by at least **3 paired points** against the strongest independently reproduced matched baseline;
+- report retrospective faithfulness and prospective planning separately;
+- stress OOD goals, unseen object arrangements, changed object states, participant preference drift, and whether procedures remembered from prior demonstrations transfer safely;
+- bind every action-relevant memory to its source clip/time interval, object identity/state, confidence and current validity.
+
+### 2.6 LongMemEval and other recall/reasoning suites
 
 Use LongMemEval and its current V2 protocol as secondary evidence of long-horizon retention, temporal reasoning, abstention and multi-session consistency. Target an improvement of at least **3.2 LAFS points initially** and **4.0 LAFS points at stretch**, against the strongest matched baseline. These are LAFS points under the specified evaluator, not raw accuracy percentage points. Freeze the dataset release, judge, model and task inclusion list before comparing runs.
 
@@ -279,3 +292,6 @@ This programme does not claim an external victory. It states the comparisons, ta
 ### Additional forgetting/filtering reference
 
 - Samarth Vinayaka, *When Should LLM Agents Forget? Memory Filtering Under Query-Critical Resolver Errors* (2026): https://aclanthology.org/2026.realm-1.16/. This is a separate synthetic study of query-time filtering, not the Memora/FAMA benchmark. MACE should use it to motivate calibrated reversible quarantine and paired false-drop/false-retain evaluation—not to infer universal error-cost ratios.
+
+
+**Naming note:** MEMORA-Bench (egocentric-video embodied memory) is distinct from Memora/FAMA (long-term personalized conversational memory) and from the separate EMNLP 2026 MEMORA multimodal reranking work on MM-BRIGHT. These should be reported as separate research lines.
