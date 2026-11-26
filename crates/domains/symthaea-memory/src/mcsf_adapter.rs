@@ -104,6 +104,9 @@ impl SymthaeaHdcMcsfAdapter {
         if query.trim().is_empty() {
             return Err("retrieval query must not be empty".to_owned());
         }
+        let query_hv = self.encoder.encode(query);
+        validate_hypervector(&query_hv.values, "query")?;
+
         if records.is_empty() {
             return Ok(Vec::new());
         }
@@ -120,9 +123,6 @@ impl SymthaeaHdcMcsfAdapter {
                 return Err(format!("duplicate memory ID: {}", record.memory_id));
             }
         }
-
-        let query_hv = self.encoder.encode(query);
-        validate_hypervector(&query_hv.values, "query")?;
 
         // Keep the engine's threshold below the full cosine range so the
         // adapter can apply deterministic tie-breaking before Top-K truncation.
@@ -324,6 +324,7 @@ mod tests {
                 .unwrap()
                 .is_empty()
         );
+        assert!(adapter.search(&[], "ab", 10).is_err());
     }
 
     #[test]
