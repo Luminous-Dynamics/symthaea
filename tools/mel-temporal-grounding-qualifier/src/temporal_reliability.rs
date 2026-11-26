@@ -1528,7 +1528,9 @@ mod tests {
         assert_eq!(pair.exact_occurrence_count_agreement, Some(true));
         assert_eq!(pair.interval_f1_symmetric, Some(1.0));
         assert!(pair.matched_iou_symmetric.unwrap() < 1.0);
-        assert_eq!(pair.start_boundary_mae_ms, Some(25.0));
+        // Only one of the two events is shifted: the mean is across both
+        // events in both scoring directions (25, 0, 25, 0) = 12.5 ms.
+        assert_eq!(pair.start_boundary_mae_ms, Some(12.5));
     }
 
     #[test]
