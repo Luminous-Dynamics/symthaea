@@ -332,6 +332,17 @@ jobs:
               cp "$RUNNER_TEMP/two-stage-design-estimator-report.json" "$evidence/"
             fi
           fi
+          if [[ -f tools/mel-temporal-grounding-qualifier/src/temporal_annotation_value.rs ]]; then
+            cp tools/mel-temporal-grounding-qualifier/src/temporal_annotation_value.rs "$evidence/"
+            cp tools/mel-temporal-grounding-qualifier/src/bin/mel-annotation-marginal-value-audit.rs "$evidence/"
+            cp tools/mel-temporal-grounding-qualifier/schemas/mel-temporal-annotation-marginal-value-v1.schema.json "$evidence/"
+            cp tools/mel-temporal-grounding-qualifier/fixtures/mel-annotation-marginal-value-aligned.synthetic.json "$evidence/"
+            cp tools/mel-temporal-grounding-qualifier/fixtures/mel-annotation-marginal-value-ambiguous.synthetic.json "$evidence/"
+            if [[ -f "$RUNNER_TEMP/marginal-value-aligned.json" ]]; then
+              cp "$RUNNER_TEMP/marginal-value-aligned.json" "$evidence/"
+              cp "$RUNNER_TEMP/marginal-value-ambiguous.json" "$evidence/"
+            fi
+          fi
           if [[ -f tools/mel-temporal-grounding-qualifier/src/temporal_consensus.rs ]]; then
             cp tools/mel-temporal-grounding-qualifier/src/temporal_consensus.rs "$evidence/"
             cp tools/mel-temporal-grounding-qualifier/src/bin/mel-multi-annotator-grounding-audit.rs "$evidence/"
