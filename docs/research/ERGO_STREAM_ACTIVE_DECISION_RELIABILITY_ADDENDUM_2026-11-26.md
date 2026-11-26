@@ -318,7 +318,7 @@ The following targets are proposed research gates, not achieved results or claim
 | Benchmark lane | Current external reference | Prospective target | Qualification condition |
 |---|---:|---:|---|
 | OVO-S overall spatial streaming | Gemini-3.1-Pro 59.2; Qwen3-VL-235B-A22B 53.6 | ≥62.0 overall | Same prefix-only information and documented frame/streaming budget; no hidden future frames |
-| OVO-S allocentric L4 | Gemini-3.1-Pro 54.9 | ≥55.0 L4 | No material L1/L2 regression; include map/trajectory counterfactuals and evidence-span correctness |
+| OVO-S allocentric L4 | Gemini-3.1-Pro 54.9 | ≥58.0 L4 | No material L1/L2 regression; include map/trajectory counterfactuals and evidence-span correctness |
 | OmniInteract overall IA-QTF1 | 0.368 | ≥0.45 | Official 1Q1A/1QnA denominators, invalid-output and interruption accounting |
 | OmniInteract continuous 1QnA IA-QTF1 | 0.052 | ≥0.12 | Full chain completion, context continuity and response-window scoring |
 | SPOT-Bench T-F1@5 at 1 Hz | Ctrl-SPOT 20.9 | ≥25.0 | Full-stream predictions, dead-time, false response and missed event accounting |
@@ -442,7 +442,7 @@ These are deliberately harder second-stage targets. They are only meaningful onc
 | Lane | Stretch target | Comparison condition |
 |---|---:|---|
 | OVO-S overall | ≥65.0 | Exceed Gemini-3.1-Pro 59.2 and the strongest reproduced open baseline; paired cluster interval must support the improvement |
-| OVO-S L4 | ≥60.0 | Exceed the reported 54.9 Gemini L4 result without a material L1–L3 regression |
+| OVO-S L4 | ≥62.0 | Exceed the reported 54.9 Gemini L4 result without a material L1–L3 regression |
 | OmniInteract overall | ≥0.50 IA-QTF1 | Official slot mix, full invalid-output and interruption accounting |
 | OmniInteract 1QnA | ≥0.15 IA-QTF1 | Continuous chain completion and context continuity |
 | SPOT-Bench | ≥28 T-F1@5 at 1 Hz | Full-stream scoring, including no-response periods |
