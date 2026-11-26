@@ -1,0 +1,191 @@
+{
+  "schema": "mel-temporal-annotation-reliability-corpus-v1",
+  "annotation_policy_version": "mel-musician-annotation-v1",
+  "minimum_annotations_per_unit": 2,
+  "plan": {
+    "evaluator_version": "mel-temporal-grounding-evaluator-v1",
+    "minimum_interval_iou": 0.5
+  },
+  "interval_iou_thresholds": [
+    0.25,
+    0.5,
+    0.75,
+    0.9
+  ],
+  "units": [
+    {
+      "unit_id": "item-1",
+      "source_lineage_sha256": "eeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeee",
+      "query_id": "query-item-1",
+      "query_text": "Every piano entrance",
+      "artifact": {
+        "audio_sha256": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+        "sample_rate_hz": 48000,
+        "channels": 2,
+        "total_frames": 2880000
+      },
+      "annotation_manifest_sha256": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+      "annotations": [
+        {
+          "annotator_id_sha256": "1111111111111111111111111111111111111111111111111111111111111111",
+          "annotation_sha256": "1111111111111111111111111111111111111111111111111111111111111111",
+          "state": "Present",
+          "intervals": [
+            {
+              "start_frame": 100,
+              "end_frame": 200
+            }
+          ],
+          "status_reason": null
+        },
+        {
+          "annotator_id_sha256": "2222222222222222222222222222222222222222222222222222222222222222",
+          "annotation_sha256": "2222222222222222222222222222222222222222222222222222222222222222",
+          "state": "Present",
+          "intervals": [
+            {
+              "start_frame": 110,
+              "end_frame": 210
+            }
+          ],
+          "status_reason": null
+        },
+        {
+          "annotator_id_sha256": "3333333333333333333333333333333333333333333333333333333333333333",
+          "annotation_sha256": "3333333333333333333333333333333333333333333333333333333333333333",
+          "state": "Present",
+          "intervals": [
+            {
+              "start_frame": 100,
+              "end_frame": 200
+            }
+          ],
+          "status_reason": null
+        }
+      ],
+      "assigned_annotator_ids_sha256": [
+        "1111111111111111111111111111111111111111111111111111111111111111",
+        "2222222222222222222222222222222222222222222222222222222222222222",
+        "3333333333333333333333333333333333333333333333333333333333333333"
+      ],
+      "nonresponses": []
+    },
+    {
+      "unit_id": "item-2",
+      "source_lineage_sha256": "eeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeee",
+      "query_id": "query-item-2",
+      "query_text": "Every piano entrance",
+      "artifact": {
+        "audio_sha256": "bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb",
+        "sample_rate_hz": 48000,
+        "channels": 2,
+        "total_frames": 2880000
+      },
+      "annotation_manifest_sha256": "bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb",
+      "annotations": [
+        {
+          "annotator_id_sha256": "1111111111111111111111111111111111111111111111111111111111111111",
+          "annotation_sha256": "4444444444444444444444444444444444444444444444444444444444444444",
+          "state": "Present",
+          "intervals": [
+            {
+              "start_frame": 300,
+              "end_frame": 400
+            },
+            {
+              "start_frame": 700,
+              "end_frame": 800
+            }
+          ],
+          "status_reason": null
+        },
+        {
+          "annotator_id_sha256": "2222222222222222222222222222222222222222222222222222222222222222",
+          "annotation_sha256": "5555555555555555555555555555555555555555555555555555555555555555",
+          "state": "Absent",
+          "intervals": [],
+          "status_reason": null
+        }
+      ],
+      "assigned_annotator_ids_sha256": [
+        "1111111111111111111111111111111111111111111111111111111111111111",
+        "2222222222222222222222222222222222222222222222222222222222222222",
+        "3333333333333333333333333333333333333333333333333333333333333333"
+      ],
+      "nonresponses": [
+        {
+          "annotator_id_sha256": "3333333333333333333333333333333333333333333333333333333333333333",
+          "reason": "TechnicalFailure"
+        }
+      ]
+    },
+    {
+      "unit_id": "item-3",
+      "source_lineage_sha256": "ffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffff",
+      "query_id": "query-item-3",
+      "query_text": "Every piano entrance",
+      "artifact": {
+        "audio_sha256": "cccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccc",
+        "sample_rate_hz": 48000,
+        "channels": 2,
+        "total_frames": 2880000
+      },
+      "annotation_manifest_sha256": "cccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccc",
+      "annotations": [
+        {
+          "annotator_id_sha256": "1111111111111111111111111111111111111111111111111111111111111111",
+          "annotation_sha256": "6666666666666666666666666666666666666666666666666666666666666666",
+          "state": "Ambiguous",
+          "intervals": [],
+          "status_reason": "gradual onset, no stable event boundary"
+        },
+        {
+          "annotator_id_sha256": "2222222222222222222222222222222222222222222222222222222222222222",
+          "annotation_sha256": "7777777777777777777777777777777777777777777777777777777777777777",
+          "state": "NotEstimable",
+          "intervals": [],
+          "status_reason": "masking makes the event unjudgeable"
+        }
+      ],
+      "assigned_annotator_ids_sha256": [
+        "1111111111111111111111111111111111111111111111111111111111111111",
+        "2222222222222222222222222222222222222222222222222222222222222222"
+      ],
+      "nonresponses": []
+    },
+    {
+      "unit_id": "item-4",
+      "source_lineage_sha256": "dddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddd",
+      "query_id": "query-item-4",
+      "query_text": "Every piano entrance",
+      "artifact": {
+        "audio_sha256": "dddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddd",
+        "sample_rate_hz": 48000,
+        "channels": 2,
+        "total_frames": 2880000
+      },
+      "annotation_manifest_sha256": "dddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddd",
+      "annotations": [
+        {
+          "annotator_id_sha256": "1111111111111111111111111111111111111111111111111111111111111111",
+          "annotation_sha256": "8888888888888888888888888888888888888888888888888888888888888888",
+          "state": "Absent",
+          "intervals": [],
+          "status_reason": null
+        },
+        {
+          "annotator_id_sha256": "2222222222222222222222222222222222222222222222222222222222222222",
+          "annotation_sha256": "9999999999999999999999999999999999999999999999999999999999999999",
+          "state": "Absent",
+          "intervals": [],
+          "status_reason": null
+        }
+      ],
+      "assigned_annotator_ids_sha256": [
+        "1111111111111111111111111111111111111111111111111111111111111111",
+        "2222222222222222222222222222222222222222222222222222222222222222"
+      ],
+      "nonresponses": []
+    }
+  ]
+}

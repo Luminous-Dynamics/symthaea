@@ -1,0 +1,2098 @@
+//! Corpus-level inter-annotator reliability for musical temporal grounding.
+//!
+//! Nominal disposition reliability is computed with a transparent,
+//! missing-rater-tolerant Krippendorff alpha calculation. Event-set and
+//! boundary agreement remain separate and reuse the production temporal
+//! grounding scorer at a preregistered IoU-threshold sweep.
+
+use std::collections::{BTreeMap, BTreeSet};
+
+use serde::{Deserialize, Serialize};
+
+use crate::temporal_consensus::IndependentTemporalAnnotationV1;
+use crate::temporal_grounding::{
+    AudioArtifactClockV1, GroundTruthStateV1, GroundingPredictionStateV1,
+    TEMPORAL_GROUNDING_SCHEMA_V1, TemporalGroundTruthV1, TemporalGroundingPlanV1,
+    TemporalGroundingPredictionV1, score_temporal_grounding, validate_temporal_ground_truth,
+    validate_temporal_grounding_plan,
+};
+
+const CORPUS_SCHEMA_V1: &str = "mel-temporal-annotation-reliability-corpus-v1";
+const REPORT_SCHEMA_V1: &str = "mel-temporal-annotation-reliability-report-v1";
+const RELIABILITY_EVALUATOR_V1: &str = "mel-temporal-annotation-reliability-v1";
+const MAX_ANNOTATIONS_PER_UNIT_V1: usize = 256;
+
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize, PartialOrd, Ord)]
+pub enum AnnotationNonresponseReasonV1 {
+    NotReturned,
+    Declined,
+    Withdrawn,
+    TechnicalFailure,
+    Incomplete,
+}
+
+#[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
+#[serde(deny_unknown_fields)]
+pub struct AnnotationNonresponseV1 {
+    pub annotator_id_sha256: String,
+    pub reason: AnnotationNonresponseReasonV1,
+}
+
+#[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
+#[serde(deny_unknown_fields)]
+pub struct TemporalReliabilityUnitV1 {
+    pub unit_id: String,
+    /// Opaque stable source-work lineage digest. Crops and edits of one work
+    /// must share this value so they cannot be mistaken for independent works.
+    pub source_lineage_sha256: String,
+    pub query_id: String,
+    pub query_text: String,
+    pub artifact: AudioArtifactClockV1,
+    pub annotation_manifest_sha256: String,
+    /// Frozen per-item assigned rater roster, using opaque identity commitments.
+    pub assigned_annotator_ids_sha256: Vec<String>,
+    pub annotations: Vec<IndependentTemporalAnnotationV1>,
+    /// Every assigned rater without a returned annotation must be represented here.
+    pub nonresponses: Vec<AnnotationNonresponseV1>,
+}
+
+#[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
+#[serde(deny_unknown_fields)]
+pub struct TemporalReliabilityCorpusV1 {
+    pub schema: String,
+    pub annotation_policy_version: String,
+    pub minimum_annotations_per_unit: u16,
+    /// Frozen evaluator identity and all other scoring-plan fields.
+    pub plan: TemporalGroundingPlanV1,
+    /// Must be strictly increasing, unique, and in (0, 1].
+    pub interval_iou_thresholds: Vec<f64>,
+    pub units: Vec<TemporalReliabilityUnitV1>,
+}
+
+#[derive(Debug, Clone, PartialEq, Serialize)]
+pub struct NominalKrippendorffAlphaV1 {
+    pub metric: &'static str,
+    pub items: usize,
+    pub ratings: usize,
+    pub category_counts: BTreeMap<String, usize>,
+    /// Observed pairwise disagreement under the Krippendorff coincidence matrix.
+    pub observed_disagreement: Option<f64>,
+    /// Expected disagreement from the pooled marginal category distribution.
+    pub expected_disagreement: Option<f64>,
+    pub alpha: Option<f64>,
+    pub status_reason: Option<String>,
+}
+
+#[derive(Debug, Clone, PartialEq, Serialize)]
+pub struct SourceWorkAlphaBootstrapV1 {
+    pub metric: &'static str,
+    pub source_work_clusters: usize,
+    pub bootstrap_replicates_requested: usize,
+    pub bootstrap_replicates_valid: usize,
+    pub bootstrap_replicates_degenerate: usize,
+    pub seed: u64,
+    pub valid_fraction: f64,
+    pub estimate: Option<f64>,
+    pub percentile_95_low: Option<f64>,
+    pub percentile_95_high: Option<f64>,
+    /// Proposed confirmatory floor; not a substitute for power analysis or
+    /// representative source-work sampling.
+    pub recommended_confirmatory_cluster_floor: usize,
+    pub confirmatory_cluster_floor_met: bool,
+    pub status_reason: Option<String>,
+}
+
+#[derive(Debug, Clone, PartialEq, Serialize)]
+pub struct TemporalPairwiseReliabilityV1 {
+    pub threshold: f64,
+    pub present_present_pairs: usize,
+    pub symmetric_event_f1_mean: Option<f64>,
+    pub matched_interval_iou_mean: Option<f64>,
+    pub exact_occurrence_count_agreement_rate: Option<f64>,
+    /// Boundary errors use one direction only to avoid double-counting each pair.
+    pub start_boundary_mae_frames: Option<f64>,
+    pub end_boundary_mae_frames: Option<f64>,
+    pub start_boundary_p95_abs_error_frames: Option<f64>,
+    pub end_boundary_p95_abs_error_frames: Option<f64>,
+}
+
+#[derive(Debug, Clone, PartialEq, Serialize)]
+pub struct SourceWorkTemporalMetricBootstrapV1 {
+    pub eligible_source_work_clusters: usize,
+    pub point_estimate: Option<f64>,
+    pub bootstrap_replicates_valid: usize,
+    pub percentile_95_low: Option<f64>,
+    pub percentile_95_high: Option<f64>,
+    pub status_reason: Option<String>,
+}
+
+#[derive(Debug, Clone, PartialEq, Serialize)]
+pub struct SourceWorkTemporalThresholdBootstrapV1 {
+    pub threshold: f64,
+    pub bootstrap_replicates_requested: usize,
+    pub seed: u64,
+    pub recommended_confirmatory_cluster_floor: usize,
+    pub symmetric_event_f1: SourceWorkTemporalMetricBootstrapV1,
+    pub matched_interval_iou: SourceWorkTemporalMetricBootstrapV1,
+    pub exact_occurrence_count_agreement: SourceWorkTemporalMetricBootstrapV1,
+    pub start_boundary_mae_frames: SourceWorkTemporalMetricBootstrapV1,
+    pub end_boundary_mae_frames: SourceWorkTemporalMetricBootstrapV1,
+}
+
+#[derive(Debug, Clone, PartialEq, Serialize)]
+pub struct TemporalReliabilityUnitSummaryV1 {
+    pub unit_id: String,
+    pub source_lineage_sha256: String,
+    pub assigned_annotator_ids_sha256: Vec<String>,
+    pub assigned_annotator_count: usize,
+    pub annotation_count: usize,
+    pub nonresponse_count: usize,
+    pub nonresponse_reason_counts: BTreeMap<String, usize>,
+    /// Raw independent label records are retained in the report.
+    pub annotations: Vec<IndependentTemporalAnnotationV1>,
+    /// Raw nonresponse records remain distinct from Ambiguous/NotEstimable labels.
+    pub nonresponses: Vec<AnnotationNonresponseV1>,
+    pub disposition_pair_count: usize,
+    pub disposition_agreement_rate: Option<f64>,
+    pub pairwise_by_iou_threshold: Vec<TemporalPairwiseReliabilityV1>,
+}
+
+#[derive(Debug, Clone, PartialEq, Serialize)]
+pub struct TemporalReliabilityReportV1 {
+    pub schema: &'static str,
+    pub evaluator_version: &'static str,
+    pub annotation_policy_version: String,
+    pub item_count: usize,
+    pub source_work_clusters: usize,
+    pub total_annotation_records: usize,
+    pub minimum_annotations_per_unit: u16,
+    pub assigned_rater_item_assignments: usize,
+    pub returned_rater_item_annotations: usize,
+    pub missing_rater_item_assignments: usize,
+    pub overall_annotation_coverage: Option<f64>,
+    pub complete_items: usize,
+    pub items_with_nonresponse: usize,
+    pub missing_reason_counts: BTreeMap<String, usize>,
+    pub annotator_coverage: Vec<AnnotatorCoverageV1>,
+    /// Source-work bootstrap treats the observed annotator panel as fixed.
+    pub source_work_bootstrap_rater_panel_fixed: bool,
+    /// Formal alpha applies only to returned nominal disposition ratings.
+    pub disposition_alpha: NominalKrippendorffAlphaV1,
+    pub disposition_alpha_source_work_bootstrap: Option<SourceWorkAlphaBootstrapV1>,
+    pub pairwise_temporal_source_work_bootstrap: Vec<SourceWorkTemporalThresholdBootstrapV1>,
+    /// Macro average across query items, so a heavily annotated item cannot
+    /// dominate a sparsely annotated item.
+    pub pairwise_by_iou_threshold: Vec<TemporalPairwiseReliabilityV1>,
+    pub unit_summaries: Vec<TemporalReliabilityUnitSummaryV1>,
+    pub raw_annotation_records_preserved: bool,
+    pub consensus_ground_truth_created: bool,
+    pub model_performance_scored: bool,
+    pub population_confidence_interval_computed: bool,
+    pub source_work_bootstrap_computed: bool,
+}
+
+#[derive(Debug, Clone, PartialEq, Serialize)]
+pub struct AnnotatorCoverageV1 {
+    pub annotator_id_sha256: String,
+    pub assigned_items: usize,
+    pub returned_annotations: usize,
+    pub missing_annotations: usize,
+    pub coverage_rate: Option<f64>,
+    pub missing_reason_counts: BTreeMap<String, usize>,
+}
+
+#[derive(Debug, Clone, Copy, Default)]
+struct CategoryCounts {
+    present: usize,
+    absent: usize,
+    ambiguous: usize,
+    not_estimable: usize,
+}
+
+fn checked_increment(value: &mut usize, label: &str) -> Result<(), String> {
+    *value = value
+        .checked_add(1)
+        .ok_or_else(|| format!("{label} overflow"))?;
+    Ok(())
+}
+
+fn nonresponse_reason_key(reason: AnnotationNonresponseReasonV1) -> &'static str {
+    match reason {
+        AnnotationNonresponseReasonV1::NotReturned => "NotReturned",
+        AnnotationNonresponseReasonV1::Declined => "Declined",
+        AnnotationNonresponseReasonV1::Withdrawn => "Withdrawn",
+        AnnotationNonresponseReasonV1::TechnicalFailure => "TechnicalFailure",
+        AnnotationNonresponseReasonV1::Incomplete => "Incomplete",
+    }
+}
+
+fn empty_missing_reason_counts() -> BTreeMap<String, usize> {
+    [
+        AnnotationNonresponseReasonV1::NotReturned,
+        AnnotationNonresponseReasonV1::Declined,
+        AnnotationNonresponseReasonV1::Withdrawn,
+        AnnotationNonresponseReasonV1::TechnicalFailure,
+        AnnotationNonresponseReasonV1::Incomplete,
+    ]
+    .into_iter()
+    .map(|reason| (nonresponse_reason_key(reason).to_owned(), 0))
+    .collect()
+}
+
+impl CategoryCounts {
+    fn increment(&mut self, state: GroundTruthStateV1) {
+        match state {
+            GroundTruthStateV1::Present => self.present += 1,
+            GroundTruthStateV1::Absent => self.absent += 1,
+            GroundTruthStateV1::Ambiguous => self.ambiguous += 1,
+            GroundTruthStateV1::NotEstimable => self.not_estimable += 1,
+        }
+    }
+
+    fn values(self) -> [usize; 4] {
+        [
+            self.present,
+            self.absent,
+            self.ambiguous,
+            self.not_estimable,
+        ]
+    }
+
+    fn as_map(self) -> BTreeMap<String, usize> {
+        BTreeMap::from([
+            ("Present".into(), self.present),
+            ("Absent".into(), self.absent),
+            ("Ambiguous".into(), self.ambiguous),
+            ("NotEstimable".into(), self.not_estimable),
+        ])
+    }
+}
+
+pub fn audit_reliability_corpus_json(input: &str) -> Result<TemporalReliabilityReportV1, String> {
+    let corpus: TemporalReliabilityCorpusV1 = serde_json::from_str(input)
+        .map_err(|error| format!("invalid temporal reliability corpus JSON: {error}"))?;
+    audit_reliability_corpus(&corpus)
+}
+
+pub fn audit_reliability_corpus_json_with_source_bootstrap(
+    input: &str,
+    bootstrap_replicates: usize,
+    seed: u64,
+) -> Result<TemporalReliabilityReportV1, String> {
+    let corpus: TemporalReliabilityCorpusV1 = serde_json::from_str(input)
+        .map_err(|error| format!("invalid temporal reliability corpus JSON: {error}"))?;
+    audit_reliability_corpus_with_source_bootstrap(&corpus, bootstrap_replicates, seed)
+}
+
+pub fn audit_reliability_corpus(
+    corpus: &TemporalReliabilityCorpusV1,
+) -> Result<TemporalReliabilityReportV1, String> {
+    validate_corpus(corpus)?;
+    let mut global_counts = CategoryCounts::default();
+    let mut total_ratings = 0_usize;
+    let mut observed_disagreement_total = 0.0_f64;
+    let mut source_lineages = BTreeSet::new();
+    let mut total_annotation_records = 0_usize;
+    let mut assigned_rater_item_assignments = 0_usize;
+    let mut missing_rater_item_assignments = 0_usize;
+    let mut complete_items = 0_usize;
+    let mut items_with_nonresponse = 0_usize;
+    let mut missing_reason_counts = empty_missing_reason_counts();
+    let mut annotator_coverage: BTreeMap<String, AnnotatorCoverageV1> = BTreeMap::new();
+    let mut unit_summaries = Vec::with_capacity(corpus.units.len());
+
+    for unit in &corpus.units {
+        source_lineages.insert(unit.source_lineage_sha256.as_str());
+        assigned_rater_item_assignments = assigned_rater_item_assignments
+            .checked_add(unit.assigned_annotator_ids_sha256.len())
+            .ok_or_else(|| "assigned rater-item assignment count overflow".to_string())?;
+        missing_rater_item_assignments = missing_rater_item_assignments
+            .checked_add(unit.nonresponses.len())
+            .ok_or_else(|| "missing rater-item assignment count overflow".to_string())?;
+        if unit.nonresponses.is_empty() {
+            complete_items = complete_items
+                .checked_add(1)
+                .ok_or_else(|| "complete item count overflow".to_string())?;
+        } else {
+            items_with_nonresponse = items_with_nonresponse
+                .checked_add(1)
+                .ok_or_else(|| "items-with-nonresponse count overflow".to_string())?;
+        }
+        for annotator_id in &unit.assigned_annotator_ids_sha256 {
+            let entry = annotator_coverage
+                .entry(annotator_id.clone())
+                .or_insert_with(|| AnnotatorCoverageV1 {
+                    annotator_id_sha256: annotator_id.clone(),
+                    assigned_items: 0,
+                    returned_annotations: 0,
+                    missing_annotations: 0,
+                    coverage_rate: None,
+                    missing_reason_counts: empty_missing_reason_counts(),
+                });
+            checked_increment(&mut entry.assigned_items, "annotator assigned-item count")?;
+        }
+        for annotation in &unit.annotations {
+            let entry = annotator_coverage
+                .get_mut(&annotation.annotator_id_sha256)
+                .ok_or_else(|| "validated annotation is absent from assigned roster".to_string())?;
+            checked_increment(&mut entry.returned_annotations, "annotator returned count")?;
+        }
+        for nonresponse in &unit.nonresponses {
+            let reason_key = nonresponse_reason_key(nonresponse.reason).to_owned();
+            let global_reason_count = missing_reason_counts
+                .get_mut(&reason_key)
+                .ok_or_else(|| "unknown missing annotation reason".to_string())?;
+            checked_increment(global_reason_count, "global missing reason count")?;
+            let entry = annotator_coverage
+                .get_mut(&nonresponse.annotator_id_sha256)
+                .ok_or_else(|| {
+                    "validated nonresponse is absent from assigned roster".to_string()
+                })?;
+            checked_increment(&mut entry.missing_annotations, "annotator missing count")?;
+            let rater_reason_count = entry
+                .missing_reason_counts
+                .get_mut(&reason_key)
+                .ok_or_else(|| "unknown annotator missing reason".to_string())?;
+            checked_increment(rater_reason_count, "annotator missing reason count")?;
+        }
+        let mut counts = CategoryCounts::default();
+        for annotation in &unit.annotations {
+            counts.increment(annotation.state);
+        }
+        let item_ratings = unit.annotations.len();
+        let sum_squares = counts.values().iter().try_fold(0_usize, |sum, count| {
+            let square = count
+                .checked_mul(*count)
+                .ok_or_else(|| "item category count square overflow".to_string())?;
+            sum.checked_add(square)
+                .ok_or_else(|| "item category count sum overflow".to_string())
+        })?;
+        let all_ordered_pairs = item_ratings
+            .checked_mul(item_ratings)
+            .ok_or_else(|| "item ordered-pair count overflow".to_string())?;
+        let ordered_disagreements = all_ordered_pairs
+            .checked_sub(sum_squares)
+            .ok_or_else(|| "item coincidence disagreement underflow".to_string())?;
+        let item_denominator = item_ratings
+            .checked_sub(1)
+            .ok_or_else(|| "item has fewer than two ratings".to_string())?;
+        observed_disagreement_total += ordered_disagreements as f64 / item_denominator as f64;
+        total_ratings = total_ratings
+            .checked_add(item_ratings)
+            .ok_or_else(|| "corpus rating count overflow".to_string())?;
+        total_annotation_records = total_annotation_records
+            .checked_add(item_ratings)
+            .ok_or_else(|| "corpus annotation record count overflow".to_string())?;
+        global_counts.present = global_counts
+            .present
+            .checked_add(counts.present)
+            .ok_or_else(|| "global Present count overflow".to_string())?;
+        global_counts.absent = global_counts
+            .absent
+            .checked_add(counts.absent)
+            .ok_or_else(|| "global Absent count overflow".to_string())?;
+        global_counts.ambiguous = global_counts
+            .ambiguous
+            .checked_add(counts.ambiguous)
+            .ok_or_else(|| "global Ambiguous count overflow".to_string())?;
+        global_counts.not_estimable = global_counts
+            .not_estimable
+            .checked_add(counts.not_estimable)
+            .ok_or_else(|| "global NotEstimable count overflow".to_string())?;
+        unit_summaries.push(summarize_unit(
+            unit,
+            &corpus.plan,
+            &corpus.annotation_policy_version,
+            &corpus.interval_iou_thresholds,
+        )?);
+    }
+
+    let observed_disagreement =
+        (total_ratings > 0).then_some(observed_disagreement_total / total_ratings as f64);
+    let global_sum_squares = global_counts
+        .values()
+        .iter()
+        .try_fold(0_usize, |sum, count| {
+            let square = count
+                .checked_mul(*count)
+                .ok_or_else(|| "global category count square overflow".to_string())?;
+            sum.checked_add(square)
+                .ok_or_else(|| "global category count sum overflow".to_string())
+        })?;
+    let expected_disagreement = if total_ratings > 1 {
+        let all_pairs = total_ratings
+            .checked_mul(total_ratings)
+            .ok_or_else(|| "global ordered-pair count overflow".to_string())?;
+        let denominator = total_ratings
+            .checked_mul(total_ratings - 1)
+            .ok_or_else(|| "global coincidence denominator overflow".to_string())?;
+        let numerator = all_pairs
+            .checked_sub(global_sum_squares)
+            .ok_or_else(|| "global coincidence disagreement underflow".to_string())?;
+        Some(numerator as f64 / denominator as f64)
+    } else {
+        None
+    };
+    let (alpha, alpha_status_reason) = match (observed_disagreement, expected_disagreement) {
+        (Some(_observed), Some(expected)) if expected > f64::EPSILON => {
+            let value = 1.0 - _observed / expected;
+            (Some(value), None)
+        }
+        (Some(_), Some(_)) => (
+            None,
+            Some("expected nominal disagreement is zero; all ratings share one category".into()),
+        ),
+        _ => (
+            None,
+            Some("insufficient ratings to calculate nominal Krippendorff alpha".into()),
+        ),
+    };
+
+    let disposition_alpha = NominalKrippendorffAlphaV1 {
+        metric: "krippendorff_alpha_nominal",
+        items: corpus.units.len(),
+        ratings: total_ratings,
+        category_counts: global_counts.as_map(),
+        observed_disagreement,
+        expected_disagreement,
+        alpha,
+        status_reason: alpha_status_reason,
+    };
+
+    let pairwise_by_iou_threshold =
+        aggregate_threshold_summaries(&unit_summaries, &corpus.interval_iou_thresholds);
+
+    Ok(TemporalReliabilityReportV1 {
+        schema: REPORT_SCHEMA_V1,
+        evaluator_version: RELIABILITY_EVALUATOR_V1,
+        annotation_policy_version: corpus.annotation_policy_version.clone(),
+        item_count: corpus.units.len(),
+        source_work_clusters: source_lineages.len(),
+        total_annotation_records,
+        minimum_annotations_per_unit: corpus.minimum_annotations_per_unit,
+        assigned_rater_item_assignments,
+        returned_rater_item_annotations: total_annotation_records,
+        missing_rater_item_assignments,
+        overall_annotation_coverage: rate(
+            total_annotation_records,
+            assigned_rater_item_assignments,
+        ),
+        complete_items,
+        items_with_nonresponse,
+        missing_reason_counts,
+        annotator_coverage: annotator_coverage
+            .into_values()
+            .map(|mut coverage| {
+                coverage.coverage_rate =
+                    rate(coverage.returned_annotations, coverage.assigned_items);
+                coverage
+            })
+            .collect(),
+        source_work_bootstrap_rater_panel_fixed: true,
+        disposition_alpha,
+        disposition_alpha_source_work_bootstrap: None,
+        pairwise_temporal_source_work_bootstrap: Vec::new(),
+        pairwise_by_iou_threshold,
+        unit_summaries,
+        raw_annotation_records_preserved: true,
+        consensus_ground_truth_created: false,
+        model_performance_scored: false,
+        population_confidence_interval_computed: false,
+        source_work_bootstrap_computed: false,
+    })
+}
+
+/// Audit the corpus and add a deterministic source-work-cluster bootstrap
+/// interval for nominal disposition alpha. All query-items from a sampled
+/// source work travel together in each replicate.
+pub fn audit_reliability_corpus_with_source_bootstrap(
+    corpus: &TemporalReliabilityCorpusV1,
+    bootstrap_replicates: usize,
+    seed: u64,
+) -> Result<TemporalReliabilityReportV1, String> {
+    if bootstrap_replicates < 1_000 {
+        return Err("source-work alpha bootstrap requires at least 1,000 replicates".into());
+    }
+    if bootstrap_replicates > 1_000_000 {
+        return Err("source-work alpha bootstrap is capped at 1,000,000 replicates".into());
+    }
+    if seed == 0 {
+        return Err("source-work alpha bootstrap seed must be nonzero".into());
+    }
+
+    let mut report = audit_reliability_corpus(corpus)?;
+    let mut by_lineage: BTreeMap<&str, Vec<&TemporalReliabilityUnitV1>> = BTreeMap::new();
+    for unit in &corpus.units {
+        by_lineage
+            .entry(unit.source_lineage_sha256.as_str())
+            .or_default()
+            .push(unit);
+    }
+    if by_lineage.len() < 2 {
+        return Err("source-work bootstrap requires at least two independent lineages".into());
+    }
+
+    let lineages: Vec<Vec<&TemporalReliabilityUnitV1>> = by_lineage.values().cloned().collect();
+    let original_units: Vec<&TemporalReliabilityUnitV1> = corpus.units.iter().collect();
+    let estimate = nominal_alpha_for_units(&original_units)?;
+    let mut rng_state = seed;
+    let mut samples = Vec::with_capacity(bootstrap_replicates);
+    let mut degenerate = 0_usize;
+
+    for _ in 0..bootstrap_replicates {
+        let mut sampled_units = Vec::new();
+        for _ in 0..lineages.len() {
+            let selected = unbiased_index(&mut rng_state, lineages.len());
+            sampled_units.extend(lineages[selected].iter().copied());
+        }
+        match nominal_alpha_for_units(&sampled_units)? {
+            Some(value) if value.is_finite() => samples.push(value),
+            _ => {
+                degenerate = degenerate
+                    .checked_add(1)
+                    .ok_or_else(|| "degenerate bootstrap replicate count overflow".to_string())?
+            }
+        }
+    }
+
+    let valid_fraction = samples.len() as f64 / bootstrap_replicates as f64;
+    let required_valid_replicates = bootstrap_replicates
+        .checked_mul(9)
+        .ok_or_else(|| "bootstrap valid-replicate threshold overflow".to_string())?
+        .div_ceil(10);
+    let (low, high, status_reason) = if samples.len() >= required_valid_replicates {
+        let mut ordered = samples.clone();
+        ordered.sort_by(f64::total_cmp);
+        let last = ordered.len() - 1;
+        let low_index = ((last as f64) * 0.025).floor() as usize;
+        let high_index = ((last as f64) * 0.975).ceil() as usize;
+        (
+            Some(ordered[low_index]),
+            Some(ordered[high_index.min(last)]),
+            None,
+        )
+    } else {
+        (
+            None,
+            None,
+            Some("fewer than 90% of bootstrap replicates had defined alpha".into()),
+        )
+    };
+
+    report.disposition_alpha_source_work_bootstrap = Some(SourceWorkAlphaBootstrapV1 {
+        metric: "krippendorff_alpha_nominal_source_work_cluster_bootstrap",
+        source_work_clusters: lineages.len(),
+        bootstrap_replicates_requested: bootstrap_replicates,
+        bootstrap_replicates_valid: samples.len(),
+        bootstrap_replicates_degenerate: degenerate,
+        seed,
+        valid_fraction,
+        estimate,
+        percentile_95_low: low,
+        percentile_95_high: high,
+        recommended_confirmatory_cluster_floor: 30,
+        confirmatory_cluster_floor_met: lineages.len() >= 30,
+        status_reason,
+    });
+    report.source_work_bootstrap_computed = true;
+    report.pairwise_temporal_source_work_bootstrap = bootstrap_temporal_metrics_by_source_work(
+        &report.unit_summaries,
+        bootstrap_replicates,
+        seed,
+    )?;
+    Ok(report)
+}
+
+fn bootstrap_temporal_metrics_by_source_work(
+    units: &[TemporalReliabilityUnitSummaryV1],
+    bootstrap_replicates: usize,
+    seed: u64,
+) -> Result<Vec<SourceWorkTemporalThresholdBootstrapV1>, String> {
+    let Some(first_unit) = units.first() else {
+        return Err("temporal metric bootstrap requires unit summaries".into());
+    };
+    let threshold_count = first_unit.pairwise_by_iou_threshold.len();
+    let mut results = Vec::with_capacity(threshold_count);
+    for threshold_index in 0..threshold_count {
+        let threshold = first_unit.pairwise_by_iou_threshold[threshold_index].threshold;
+        for unit in units {
+            if unit.pairwise_by_iou_threshold.len() != threshold_count
+                || unit.pairwise_by_iou_threshold[threshold_index].threshold != threshold
+            {
+                return Err("unit summaries disagree on the frozen IoU threshold sweep".into());
+            }
+        }
+        let threshold_summaries: Vec<_> = units
+            .iter()
+            .map(|unit| &unit.pairwise_by_iou_threshold[threshold_index])
+            .collect();
+        results.push(SourceWorkTemporalThresholdBootstrapV1 {
+            threshold,
+            bootstrap_replicates_requested: bootstrap_replicates,
+            seed,
+            recommended_confirmatory_cluster_floor: 30,
+            symmetric_event_f1: bootstrap_temporal_metric(
+                units,
+                &threshold_summaries,
+                |item| item.symmetric_event_f1_mean,
+                bootstrap_replicates,
+                seed,
+            )?,
+            matched_interval_iou: bootstrap_temporal_metric(
+                units,
+                &threshold_summaries,
+                |item| item.matched_interval_iou_mean,
+                bootstrap_replicates,
+                seed,
+            )?,
+            exact_occurrence_count_agreement: bootstrap_temporal_metric(
+                units,
+                &threshold_summaries,
+                |item| item.exact_occurrence_count_agreement_rate,
+                bootstrap_replicates,
+                seed,
+            )?,
+            start_boundary_mae_frames: bootstrap_temporal_metric(
+                units,
+                &threshold_summaries,
+                |item| item.start_boundary_mae_frames,
+                bootstrap_replicates,
+                seed,
+            )?,
+            end_boundary_mae_frames: bootstrap_temporal_metric(
+                units,
+                &threshold_summaries,
+                |item| item.end_boundary_mae_frames,
+                bootstrap_replicates,
+                seed,
+            )?,
+        });
+    }
+    Ok(results)
+}
+
+fn bootstrap_temporal_metric<F>(
+    units: &[TemporalReliabilityUnitSummaryV1],
+    summaries: &[&TemporalPairwiseReliabilityV1],
+    metric: F,
+    bootstrap_replicates: usize,
+    seed: u64,
+) -> Result<SourceWorkTemporalMetricBootstrapV1, String>
+where
+    F: Fn(&TemporalPairwiseReliabilityV1) -> Option<f64>,
+{
+    let mut by_lineage: BTreeMap<&str, Vec<f64>> = BTreeMap::new();
+    for (unit, summary) in units.iter().zip(summaries) {
+        if let Some(value) = metric(summary) {
+            if !value.is_finite() {
+                return Err("temporal agreement metric contains a non-finite value".into());
+            }
+            by_lineage
+                .entry(unit.source_lineage_sha256.as_str())
+                .or_default()
+                .push(value);
+        }
+    }
+    let cluster_values: Vec<f64> = by_lineage
+        .values()
+        .map(|values| mean(values).unwrap_or(0.0))
+        .collect();
+    let point_estimate = mean(&cluster_values);
+    if cluster_values.len() < 2 {
+        return Ok(SourceWorkTemporalMetricBootstrapV1 {
+            eligible_source_work_clusters: cluster_values.len(),
+            point_estimate,
+            bootstrap_replicates_valid: 0,
+            percentile_95_low: None,
+            percentile_95_high: None,
+            status_reason: Some(
+                "fewer than two source works contain eligible temporal event pairs".into(),
+            ),
+        });
+    }
+
+    let mut state = seed;
+    let samples = bootstrap_cluster_means(&cluster_values, bootstrap_replicates, &mut state);
+    let mut ordered = samples;
+    ordered.sort_by(f64::total_cmp);
+    let last = ordered.len() - 1;
+    let low_index = ((last as f64) * 0.025).floor() as usize;
+    let high_index = ((last as f64) * 0.975).ceil() as usize;
+    Ok(SourceWorkTemporalMetricBootstrapV1 {
+        eligible_source_work_clusters: cluster_values.len(),
+        point_estimate,
+        bootstrap_replicates_valid: bootstrap_replicates,
+        percentile_95_low: Some(ordered[low_index]),
+        percentile_95_high: Some(ordered[high_index.min(last)]),
+        status_reason: None,
+    })
+}
+
+fn nominal_alpha_for_units(units: &[&TemporalReliabilityUnitV1]) -> Result<Option<f64>, String> {
+    let mut pooled = CategoryCounts::default();
+    let mut total_ratings = 0_usize;
+    let mut observed_sum = 0.0_f64;
+
+    for unit in units {
+        let mut counts = CategoryCounts::default();
+        for annotation in &unit.annotations {
+            counts.increment(annotation.state);
+        }
+        let ratings = unit.annotations.len();
+        if ratings < 2 {
+            return Err("bootstrap item has fewer than two ratings".into());
+        }
+        let squares = counts.values().iter().try_fold(0_usize, |sum, count| {
+            sum.checked_add(
+                count
+                    .checked_mul(*count)
+                    .ok_or_else(|| "bootstrap category square overflow".to_string())?,
+            )
+            .ok_or_else(|| "bootstrap category-square sum overflow".to_string())
+        })?;
+        let ordered_pairs = ratings
+            .checked_mul(ratings)
+            .ok_or_else(|| "bootstrap item pair count overflow".to_string())?;
+        let disagreement = ordered_pairs
+            .checked_sub(squares)
+            .ok_or_else(|| "bootstrap item disagreement underflow".to_string())?;
+        observed_sum += disagreement as f64 / (ratings - 1) as f64;
+        total_ratings = total_ratings
+            .checked_add(ratings)
+            .ok_or_else(|| "bootstrap rating total overflow".to_string())?;
+        pooled.present = pooled
+            .present
+            .checked_add(counts.present)
+            .ok_or_else(|| "bootstrap Present total overflow".to_string())?;
+        pooled.absent = pooled
+            .absent
+            .checked_add(counts.absent)
+            .ok_or_else(|| "bootstrap Absent total overflow".to_string())?;
+        pooled.ambiguous = pooled
+            .ambiguous
+            .checked_add(counts.ambiguous)
+            .ok_or_else(|| "bootstrap Ambiguous total overflow".to_string())?;
+        pooled.not_estimable = pooled
+            .not_estimable
+            .checked_add(counts.not_estimable)
+            .ok_or_else(|| "bootstrap NotEstimable total overflow".to_string())?;
+    }
+    if total_ratings < 2 {
+        return Ok(None);
+    }
+    let squares = pooled.values().iter().try_fold(0_usize, |sum, count| {
+        sum.checked_add(
+            count
+                .checked_mul(*count)
+                .ok_or_else(|| "bootstrap pooled category square overflow".to_string())?,
+        )
+        .ok_or_else(|| "bootstrap pooled category-square sum overflow".to_string())
+    })?;
+    let all_pairs = total_ratings
+        .checked_mul(total_ratings)
+        .ok_or_else(|| "bootstrap pooled pair count overflow".to_string())?;
+    let denominator = total_ratings
+        .checked_mul(total_ratings - 1)
+        .ok_or_else(|| "bootstrap pooled denominator overflow".to_string())?;
+    let expected_num = all_pairs
+        .checked_sub(squares)
+        .ok_or_else(|| "bootstrap expected disagreement underflow".to_string())?;
+    let expected = expected_num as f64 / denominator as f64;
+    if expected <= f64::EPSILON {
+        return Ok(None);
+    }
+    let observed = observed_sum / total_ratings as f64;
+    Ok(Some(1.0 - observed / expected))
+}
+
+fn bootstrap_cluster_means(cluster_values: &[f64], replicates: usize, state: &mut u64) -> Vec<f64> {
+    let cluster_count = cluster_values.len();
+    if cluster_count == 0 || replicates == 0 {
+        return Vec::new();
+    }
+
+    (0..replicates)
+        .map(|_| {
+            let mut sum = 0.0;
+            for _ in 0..cluster_count {
+                let index = unbiased_index(state, cluster_count);
+                sum += cluster_values[index];
+            }
+            sum / cluster_count as f64
+        })
+        .collect()
+}
+
+fn next_splitmix64(state: &mut u64) -> u64 {
+    *state = state.wrapping_add(0x9E37_79B9_7F4A_7C15);
+    let mut value = *state;
+    value = (value ^ (value >> 30)).wrapping_mul(0xBF58_476D_1CE4_E5B9);
+    value = (value ^ (value >> 27)).wrapping_mul(0x94D0_49BB_1331_11EB);
+    value ^ (value >> 31)
+}
+
+fn unbiased_index(state: &mut u64, upper_bound: usize) -> usize {
+    let bound = upper_bound as u64;
+    let limit = u64::MAX - (u64::MAX % bound);
+    loop {
+        let value = next_splitmix64(state);
+        if value < limit {
+            return (value % bound) as usize;
+        }
+    }
+}
+
+fn validate_corpus(corpus: &TemporalReliabilityCorpusV1) -> Result<(), String> {
+    if corpus.schema != CORPUS_SCHEMA_V1 {
+        return Err(format!(
+            "unsupported reliability corpus schema: {}",
+            corpus.schema
+        ));
+    }
+    require_text(
+        &corpus.annotation_policy_version,
+        "annotation_policy_version",
+    )?;
+    if corpus.minimum_annotations_per_unit < 2 {
+        return Err("minimum_annotations_per_unit must be at least two".into());
+    }
+    let plan_issues = validate_temporal_grounding_plan(&corpus.plan);
+    if !plan_issues.is_empty() {
+        return Err(format!(
+            "invalid frozen temporal grounding plan: {plan_issues:?}"
+        ));
+    }
+    if corpus.units.len() < 2 {
+        return Err("formal reliability requires at least two query-items".into());
+    }
+    if corpus.interval_iou_thresholds.is_empty() {
+        return Err("at least one interval IoU threshold is required".into());
+    }
+    let mut previous_threshold = 0.0;
+    for threshold in &corpus.interval_iou_thresholds {
+        if !threshold.is_finite() || *threshold <= previous_threshold || *threshold > 1.0 {
+            return Err(
+                "IoU thresholds must be finite, unique, strictly increasing and in (0,1]".into(),
+            );
+        }
+        previous_threshold = *threshold;
+    }
+
+    let mut unit_ids = BTreeSet::new();
+    let mut annotation_digests = BTreeSet::new();
+    for (index, unit) in corpus.units.iter().enumerate() {
+        require_text(&unit.unit_id, &format!("units[{index}].unit_id"))?;
+        require_text(&unit.query_id, &format!("units[{index}].query_id"))?;
+        require_text(&unit.query_text, &format!("units[{index}].query_text"))?;
+        validate_digest(&unit.source_lineage_sha256, "source_lineage_sha256")?;
+        validate_digest(&unit.artifact.audio_sha256, "artifact.audio_sha256")?;
+        validate_digest(
+            &unit.annotation_manifest_sha256,
+            "annotation_manifest_sha256",
+        )?;
+        if !unit_ids.insert(unit.unit_id.as_str()) {
+            return Err(format!("duplicate reliability unit_id: {}", unit.unit_id));
+        }
+        if unit.annotations.len() < corpus.minimum_annotations_per_unit as usize {
+            return Err(format!(
+                "unit {} has {} annotations, below minimum {}",
+                unit.unit_id,
+                unit.annotations.len(),
+                corpus.minimum_annotations_per_unit
+            ));
+        }
+        if unit.annotations.len() > MAX_ANNOTATIONS_PER_UNIT_V1 {
+            return Err(format!(
+                "unit {} exceeds the maximum of {} independent annotations",
+                unit.unit_id, MAX_ANNOTATIONS_PER_UNIT_V1
+            ));
+        }
+        if unit.assigned_annotator_ids_sha256.len() < corpus.minimum_annotations_per_unit as usize
+            || unit.assigned_annotator_ids_sha256.len() > MAX_ANNOTATIONS_PER_UNIT_V1
+        {
+            return Err(format!(
+                "unit {} assigned roster must contain between the minimum panel size and {} raters",
+                unit.unit_id, MAX_ANNOTATIONS_PER_UNIT_V1
+            ));
+        }
+        if unit.nonresponses.len() > MAX_ANNOTATIONS_PER_UNIT_V1 {
+            return Err(format!(
+                "unit {} exceeds the maximum of {} nonresponse records",
+                unit.unit_id, MAX_ANNOTATIONS_PER_UNIT_V1
+            ));
+        }
+        let mut assigned_ids = BTreeSet::new();
+        for annotator_id in &unit.assigned_annotator_ids_sha256 {
+            validate_digest(annotator_id, "assigned_annotator_id_sha256")?;
+            if !assigned_ids.insert(annotator_id.as_str()) {
+                return Err(format!(
+                    "unit {} repeats an assigned annotator ID",
+                    unit.unit_id
+                ));
+            }
+        }
+        let mut returned_ids = BTreeSet::new();
+        let mut annotator_ids = BTreeSet::new();
+        for annotation in &unit.annotations {
+            validate_digest(&annotation.annotator_id_sha256, "annotator_id_sha256")?;
+            if !assigned_ids.contains(annotation.annotator_id_sha256.as_str()) {
+                return Err(format!(
+                    "unit {} annotation belongs to an annotator outside the assigned roster",
+                    unit.unit_id
+                ));
+            }
+            if !returned_ids.insert(annotation.annotator_id_sha256.as_str()) {
+                return Err(format!(
+                    "unit {} repeats a returned annotation identity",
+                    unit.unit_id
+                ));
+            }
+            validate_digest(&annotation.annotation_sha256, "annotation_sha256")?;
+            if !annotator_ids.insert(annotation.annotator_id_sha256.as_str()) {
+                return Err(format!("unit {} repeats an annotator ID", unit.unit_id));
+            }
+            if !annotation_digests.insert(annotation.annotation_sha256.as_str()) {
+                return Err("annotation record digest is reused across the corpus".into());
+            }
+            let truth = annotation_truth(corpus, unit, annotation);
+            let issues = validate_temporal_ground_truth(&truth);
+            if !issues.is_empty() {
+                return Err(format!(
+                    "unit {} annotation rejected by production validator: {issues:?}",
+                    unit.unit_id
+                ));
+            }
+        }
+        let mut nonresponse_ids = BTreeSet::new();
+        for nonresponse in &unit.nonresponses {
+            validate_digest(
+                &nonresponse.annotator_id_sha256,
+                "nonresponse.annotator_id_sha256",
+            )?;
+            if !assigned_ids.contains(nonresponse.annotator_id_sha256.as_str()) {
+                return Err(format!(
+                    "unit {} nonresponse belongs to an annotator outside the assigned roster",
+                    unit.unit_id
+                ));
+            }
+            if returned_ids.contains(nonresponse.annotator_id_sha256.as_str()) {
+                return Err(format!(
+                    "unit {} annotator cannot have both an annotation and a nonresponse record",
+                    unit.unit_id
+                ));
+            }
+            if !nonresponse_ids.insert(nonresponse.annotator_id_sha256.as_str()) {
+                return Err(format!(
+                    "unit {} repeats a nonresponse record for one annotator",
+                    unit.unit_id
+                ));
+            }
+        }
+        if assigned_ids.len() != returned_ids.len() + nonresponse_ids.len() {
+            return Err(format!(
+                "unit {} has assigned raters without either a returned annotation or explicit nonresponse",
+                unit.unit_id
+            ));
+        }
+    }
+    Ok(())
+}
+
+fn summarize_unit(
+    unit: &TemporalReliabilityUnitV1,
+    plan: &TemporalGroundingPlanV1,
+    annotation_policy_version: &str,
+    thresholds: &[f64],
+) -> Result<TemporalReliabilityUnitSummaryV1, String> {
+    let count = unit.annotations.len();
+    let pair_count = count.saturating_mul(count.saturating_sub(1)) / 2;
+    let mut agreement_pairs = 0_usize;
+    for left in 0..count {
+        for right in (left + 1)..count {
+            let a = &unit.annotations[left];
+            let b = &unit.annotations[right];
+            if a.state == b.state {
+                agreement_pairs += 1;
+            }
+        }
+    }
+
+    let mut pairwise_by_iou_threshold = Vec::with_capacity(thresholds.len());
+    for threshold in thresholds {
+        let mut f1_values = Vec::new();
+        let mut iou_values = Vec::new();
+        let mut count_agreement = Vec::new();
+        let mut start_errors = Vec::new();
+        let mut end_errors = Vec::new();
+        for left in 0..count {
+            for right in (left + 1)..count {
+                let a = &unit.annotations[left];
+                let b = &unit.annotations[right];
+                if a.state != GroundTruthStateV1::Present || b.state != GroundTruthStateV1::Present
+                {
+                    continue;
+                }
+                let mut threshold_plan = plan.clone();
+                threshold_plan.minimum_interval_iou = *threshold;
+                let left_truth = annotation_truth_for_unit(unit, a, annotation_policy_version);
+                let right_truth = annotation_truth_for_unit(unit, b, annotation_policy_version);
+                let left_prediction = annotation_prediction(unit, a);
+                let right_prediction = annotation_prediction(unit, b);
+                let left_score =
+                    score_temporal_grounding(&left_truth, &right_prediction, &threshold_plan)
+                        .map_err(|issues| {
+                            format!("left→right event agreement failed: {issues:?}")
+                        })?;
+                let right_score =
+                    score_temporal_grounding(&right_truth, &left_prediction, &threshold_plan)
+                        .map_err(|issues| {
+                            format!("right→left event agreement failed: {issues:?}")
+                        })?;
+                if let (Some(left_f1), Some(right_f1)) = (left_score.f1, right_score.f1) {
+                    f1_values.push((left_f1 + right_f1) / 2.0);
+                }
+                if let (Some(left_iou), Some(right_iou)) = (
+                    left_score.matched_interval_iou_mean,
+                    right_score.matched_interval_iou_mean,
+                ) {
+                    iou_values.push((left_iou + right_iou) / 2.0);
+                }
+                count_agreement.push(if a.intervals.len() == b.intervals.len() {
+                    1.0
+                } else {
+                    0.0
+                });
+                for matched in &left_score.matches {
+                    start_errors.push(matched.start_error_frames.unsigned_abs() as f64);
+                    end_errors.push(matched.end_error_frames.unsigned_abs() as f64);
+                }
+            }
+        }
+        pairwise_by_iou_threshold.push(TemporalPairwiseReliabilityV1 {
+            threshold: *threshold,
+            present_present_pairs: f1_values.len(),
+            symmetric_event_f1_mean: mean(&f1_values),
+            matched_interval_iou_mean: mean(&iou_values),
+            exact_occurrence_count_agreement_rate: mean(&count_agreement),
+            start_boundary_mae_frames: mean(&start_errors),
+            end_boundary_mae_frames: mean(&end_errors),
+            start_boundary_p95_abs_error_frames: percentile(&start_errors, 0.95),
+            end_boundary_p95_abs_error_frames: percentile(&end_errors, 0.95),
+        });
+    }
+
+    let mut nonresponse_reason_counts = empty_missing_reason_counts();
+    for nonresponse in &unit.nonresponses {
+        let key = nonresponse_reason_key(nonresponse.reason).to_owned();
+        let value = nonresponse_reason_counts
+            .get_mut(&key)
+            .ok_or_else(|| "unknown unit nonresponse reason".to_string())?;
+        checked_increment(value, "unit nonresponse reason count")?;
+    }
+
+    Ok(TemporalReliabilityUnitSummaryV1 {
+        unit_id: unit.unit_id.clone(),
+        source_lineage_sha256: unit.source_lineage_sha256.clone(),
+        assigned_annotator_ids_sha256: unit.assigned_annotator_ids_sha256.clone(),
+        assigned_annotator_count: unit.assigned_annotator_ids_sha256.len(),
+        annotation_count: count,
+        nonresponse_count: unit.nonresponses.len(),
+        nonresponse_reason_counts,
+        annotations: unit.annotations.clone(),
+        nonresponses: unit.nonresponses.clone(),
+        disposition_pair_count: pair_count,
+        disposition_agreement_rate: rate(agreement_pairs, pair_count),
+        pairwise_by_iou_threshold,
+    })
+}
+
+fn aggregate_threshold_summaries(
+    units: &[TemporalReliabilityUnitSummaryV1],
+    thresholds: &[f64],
+) -> Vec<TemporalPairwiseReliabilityV1> {
+    thresholds
+        .iter()
+        .enumerate()
+        .map(|(index, threshold)| {
+            let values: Vec<_> = units
+                .iter()
+                .map(|unit| &unit.pairwise_by_iou_threshold[index])
+                .collect();
+            TemporalPairwiseReliabilityV1 {
+                threshold: *threshold,
+                present_present_pairs: values.iter().map(|value| value.present_present_pairs).sum(),
+                symmetric_event_f1_mean: mean(
+                    &values
+                        .iter()
+                        .filter_map(|value| value.symmetric_event_f1_mean)
+                        .collect::<Vec<_>>(),
+                ),
+                matched_interval_iou_mean: mean(
+                    &values
+                        .iter()
+                        .filter_map(|value| value.matched_interval_iou_mean)
+                        .collect::<Vec<_>>(),
+                ),
+                exact_occurrence_count_agreement_rate: mean(
+                    &values
+                        .iter()
+                        .filter_map(|value| value.exact_occurrence_count_agreement_rate)
+                        .collect::<Vec<_>>(),
+                ),
+                start_boundary_mae_frames: mean(
+                    &values
+                        .iter()
+                        .filter_map(|value| value.start_boundary_mae_frames)
+                        .collect::<Vec<_>>(),
+                ),
+                end_boundary_mae_frames: mean(
+                    &values
+                        .iter()
+                        .filter_map(|value| value.end_boundary_mae_frames)
+                        .collect::<Vec<_>>(),
+                ),
+                start_boundary_p95_abs_error_frames: percentile(
+                    &values
+                        .iter()
+                        .filter_map(|value| value.start_boundary_p95_abs_error_frames)
+                        .collect::<Vec<_>>(),
+                    0.95,
+                ),
+                end_boundary_p95_abs_error_frames: percentile(
+                    &values
+                        .iter()
+                        .filter_map(|value| value.end_boundary_p95_abs_error_frames)
+                        .collect::<Vec<_>>(),
+                    0.95,
+                ),
+            }
+        })
+        .collect()
+}
+
+fn annotation_truth(
+    corpus: &TemporalReliabilityCorpusV1,
+    unit: &TemporalReliabilityUnitV1,
+    annotation: &IndependentTemporalAnnotationV1,
+) -> TemporalGroundTruthV1 {
+    TemporalGroundTruthV1 {
+        schema_version: TEMPORAL_GROUNDING_SCHEMA_V1.into(),
+        query_id: unit.query_id.clone(),
+        query_text: unit.query_text.clone(),
+        artifact: unit.artifact.clone(),
+        annotation_policy_version: corpus.annotation_policy_version.clone(),
+        annotation_set_sha256: annotation.annotation_sha256.clone(),
+        annotator_count: 1,
+        state: annotation.state,
+        intervals: annotation.intervals.clone(),
+        status_reason: annotation.status_reason.clone(),
+    }
+}
+
+fn annotation_truth_for_unit(
+    unit: &TemporalReliabilityUnitV1,
+    annotation: &IndependentTemporalAnnotationV1,
+    annotation_policy_version: &str,
+) -> TemporalGroundTruthV1 {
+    TemporalGroundTruthV1 {
+        schema_version: TEMPORAL_GROUNDING_SCHEMA_V1.into(),
+        query_id: unit.query_id.clone(),
+        query_text: unit.query_text.clone(),
+        artifact: unit.artifact.clone(),
+        annotation_policy_version: annotation_policy_version.into(),
+        annotation_set_sha256: annotation.annotation_sha256.clone(),
+        annotator_count: 1,
+        state: annotation.state,
+        intervals: annotation.intervals.clone(),
+        status_reason: annotation.status_reason.clone(),
+    }
+}
+
+fn annotation_prediction(
+    unit: &TemporalReliabilityUnitV1,
+    annotation: &IndependentTemporalAnnotationV1,
+) -> TemporalGroundingPredictionV1 {
+    TemporalGroundingPredictionV1 {
+        schema_version: TEMPORAL_GROUNDING_SCHEMA_V1.into(),
+        query_id: unit.query_id.clone(),
+        artifact: unit.artifact.clone(),
+        state: GroundingPredictionStateV1::Occurrences {
+            intervals: annotation.intervals.clone(),
+        },
+    }
+}
+
+fn validate_digest(value: &str, label: &str) -> Result<(), String> {
+    if value.len() != 64
+        || !value
+            .bytes()
+            .all(|byte| byte.is_ascii_digit() || (b'a'..=b'f').contains(&byte))
+    {
+        return Err(format!("{label} must be a lowercase SHA-256 digest"));
+    }
+    Ok(())
+}
+
+fn require_text(value: &str, label: &str) -> Result<(), String> {
+    if value.trim().is_empty() {
+        return Err(format!("{label} must not be empty"));
+    }
+    Ok(())
+}
+
+fn rate(numerator: usize, denominator: usize) -> Option<f64> {
+    (denominator > 0).then(|| numerator as f64 / denominator as f64)
+}
+
+fn mean(values: &[f64]) -> Option<f64> {
+    (!values.is_empty()).then(|| values.iter().sum::<f64>() / values.len() as f64)
+}
+
+fn percentile(values: &[f64], quantile: f64) -> Option<f64> {
+    if values.is_empty() {
+        return None;
+    }
+    let mut sorted = values.to_vec();
+    sorted.sort_by(f64::total_cmp);
+    let index = ((sorted.len() - 1) as f64 * quantile).ceil() as usize;
+    sorted.get(index).copied()
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use crate::temporal_consensus::IndependentTemporalAnnotationV1;
+    use crate::temporal_grounding::{FrameIntervalV1, TEMPORAL_GROUNDING_EVALUATOR_V1};
+
+    const AUDIO_A: &str = "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa";
+    const AUDIO_B: &str = "bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb";
+    const LINEAGE_A: &str = "cccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccc";
+    const LINEAGE_B: &str = "dddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddd";
+
+    fn digest(byte: char) -> String {
+        byte.to_string().repeat(64)
+    }
+
+    fn artifact(audio: &str) -> AudioArtifactClockV1 {
+        AudioArtifactClockV1 {
+            audio_sha256: audio.into(),
+            sample_rate_hz: 48_000,
+            channels: 2,
+            total_frames: 48_000 * 60,
+        }
+    }
+
+    fn annotation(
+        id: char,
+        receipt: char,
+        state: GroundTruthStateV1,
+        intervals: Vec<FrameIntervalV1>,
+        reason: Option<&str>,
+    ) -> IndependentTemporalAnnotationV1 {
+        IndependentTemporalAnnotationV1 {
+            annotator_id_sha256: digest(id),
+            annotation_sha256: digest(receipt),
+            state,
+            intervals,
+            status_reason: reason.map(str::to_owned),
+        }
+    }
+
+    fn unit(
+        id: &str,
+        lineage: &str,
+        audio: &str,
+        annotations: Vec<IndependentTemporalAnnotationV1>,
+    ) -> TemporalReliabilityUnitV1 {
+        let assigned_annotator_ids_sha256 = annotations
+            .iter()
+            .map(|annotation| annotation.annotator_id_sha256.clone())
+            .collect();
+        TemporalReliabilityUnitV1 {
+            unit_id: id.into(),
+            source_lineage_sha256: lineage.into(),
+            query_id: format!("query-{id}"),
+            query_text: "Every piano entrance".into(),
+            artifact: artifact(audio),
+            annotation_manifest_sha256: digest(if id == "item-1" { 'e' } else { 'f' }),
+            assigned_annotator_ids_sha256,
+            annotations,
+            nonresponses: Vec::new(),
+        }
+    }
+
+    fn corpus(units: Vec<TemporalReliabilityUnitV1>) -> TemporalReliabilityCorpusV1 {
+        TemporalReliabilityCorpusV1 {
+            schema: CORPUS_SCHEMA_V1.into(),
+            annotation_policy_version: "music-temporal-annotation-v1".into(),
+            minimum_annotations_per_unit: 2,
+            plan: TemporalGroundingPlanV1 {
+                evaluator_version: TEMPORAL_GROUNDING_EVALUATOR_V1.into(),
+                minimum_interval_iou: 0.5,
+            },
+            interval_iou_thresholds: vec![0.25, 0.5, 0.75, 0.9],
+            units,
+        }
+    }
+
+    #[test]
+    fn source_work_cluster_bootstrap_is_deterministic_and_resamples_clusters() {
+        let values = [0.0, 0.5, 1.0];
+        let mut first_state = 0x2026_1125;
+        let mut second_state = 0x2026_1125;
+        let first = bootstrap_cluster_means(&values, 2_000, &mut first_state);
+        let second = bootstrap_cluster_means(&values, 2_000, &mut second_state);
+        assert_eq!(first, second);
+        assert_eq!(first.len(), 2_000);
+        assert!(first.iter().all(|value| (0.0..=1.0).contains(value)));
+        let mut empty_state = 1;
+        assert!(bootstrap_cluster_means(&[], 1_000, &mut empty_state).is_empty());
+        assert!(bootstrap_cluster_means(&values, 0, &mut empty_state).is_empty());
+    }
+
+    #[test]
+    fn nominal_alpha_is_one_for_perfect_state_agreement_across_items() {
+        let units = vec![
+            unit(
+                "item-1",
+                LINEAGE_A,
+                AUDIO_A,
+                vec![
+                    annotation(
+                        '1',
+                        '1',
+                        GroundTruthStateV1::Present,
+                        vec![FrameIntervalV1 {
+                            start_frame: 100,
+                            end_frame: 200,
+                        }],
+                        None,
+                    ),
+                    annotation(
+                        '2',
+                        '2',
+                        GroundTruthStateV1::Present,
+                        vec![FrameIntervalV1 {
+                            start_frame: 100,
+                            end_frame: 200,
+                        }],
+                        None,
+                    ),
+                ],
+            ),
+            unit(
+                "item-2",
+                LINEAGE_B,
+                AUDIO_B,
+                vec![
+                    annotation('1', '3', GroundTruthStateV1::Absent, Vec::new(), None),
+                    annotation('2', '4', GroundTruthStateV1::Absent, Vec::new(), None),
+                ],
+            ),
+        ];
+        let result = audit_reliability_corpus(&corpus(units)).unwrap();
+        assert_eq!(result.disposition_alpha.ratings, 4);
+        assert_eq!(result.disposition_alpha.observed_disagreement, Some(0.0));
+        assert_eq!(result.disposition_alpha.alpha, Some(1.0));
+        assert_eq!(result.source_work_clusters, 2);
+        assert!(!result.consensus_ground_truth_created);
+        assert!(!result.population_confidence_interval_computed);
+    }
+
+    #[test]
+    fn nominal_alpha_can_be_negative_when_annotators_systematically_disagree() {
+        let units = vec![
+            unit(
+                "item-1",
+                LINEAGE_A,
+                AUDIO_A,
+                vec![
+                    annotation(
+                        '1',
+                        '1',
+                        GroundTruthStateV1::Present,
+                        vec![FrameIntervalV1 {
+                            start_frame: 100,
+                            end_frame: 200,
+                        }],
+                        None,
+                    ),
+                    annotation('2', '2', GroundTruthStateV1::Absent, Vec::new(), None),
+                ],
+            ),
+            unit(
+                "item-2",
+                LINEAGE_B,
+                AUDIO_B,
+                vec![
+                    annotation(
+                        '1',
+                        '3',
+                        GroundTruthStateV1::Present,
+                        vec![FrameIntervalV1 {
+                            start_frame: 100,
+                            end_frame: 200,
+                        }],
+                        None,
+                    ),
+                    annotation('2', '4', GroundTruthStateV1::Absent, Vec::new(), None),
+                ],
+            ),
+        ];
+        let result = audit_reliability_corpus(&corpus(units)).unwrap();
+        assert!(result.disposition_alpha.alpha.unwrap() < 0.0);
+    }
+
+    #[test]
+    fn degenerate_single_category_panel_returns_none_with_reason() {
+        let units = vec![
+            unit(
+                "item-1",
+                LINEAGE_A,
+                AUDIO_A,
+                vec![
+                    annotation(
+                        '1',
+                        '1',
+                        GroundTruthStateV1::Present,
+                        vec![FrameIntervalV1 {
+                            start_frame: 100,
+                            end_frame: 200,
+                        }],
+                        None,
+                    ),
+                    annotation(
+                        '2',
+                        '2',
+                        GroundTruthStateV1::Present,
+                        vec![FrameIntervalV1 {
+                            start_frame: 100,
+                            end_frame: 200,
+                        }],
+                        None,
+                    ),
+                ],
+            ),
+            unit(
+                "item-2",
+                LINEAGE_B,
+                AUDIO_B,
+                vec![
+                    annotation(
+                        '1',
+                        '3',
+                        GroundTruthStateV1::Present,
+                        vec![FrameIntervalV1 {
+                            start_frame: 100,
+                            end_frame: 200,
+                        }],
+                        None,
+                    ),
+                    annotation(
+                        '2',
+                        '4',
+                        GroundTruthStateV1::Present,
+                        vec![FrameIntervalV1 {
+                            start_frame: 100,
+                            end_frame: 200,
+                        }],
+                        None,
+                    ),
+                ],
+            ),
+        ];
+        let result = audit_reliability_corpus(&corpus(units)).unwrap();
+        assert_eq!(result.disposition_alpha.alpha, None);
+        assert!(result.disposition_alpha.status_reason.is_some());
+    }
+
+    #[test]
+    fn iou_threshold_sweep_separates_similar_from_exact_boundary_match() {
+        let units = vec![
+            unit(
+                "item-1",
+                LINEAGE_A,
+                AUDIO_A,
+                vec![
+                    annotation(
+                        '1',
+                        '1',
+                        GroundTruthStateV1::Present,
+                        vec![FrameIntervalV1 {
+                            start_frame: 100,
+                            end_frame: 200,
+                        }],
+                        None,
+                    ),
+                    annotation(
+                        '2',
+                        '2',
+                        GroundTruthStateV1::Present,
+                        vec![FrameIntervalV1 {
+                            start_frame: 120,
+                            end_frame: 220,
+                        }],
+                        None,
+                    ),
+                ],
+            ),
+            unit(
+                "item-2",
+                LINEAGE_B,
+                AUDIO_B,
+                vec![
+                    annotation(
+                        '1',
+                        '3',
+                        GroundTruthStateV1::Present,
+                        vec![FrameIntervalV1 {
+                            start_frame: 300,
+                            end_frame: 400,
+                        }],
+                        None,
+                    ),
+                    annotation(
+                        '2',
+                        '4',
+                        GroundTruthStateV1::Present,
+                        vec![FrameIntervalV1 {
+                            start_frame: 300,
+                            end_frame: 400,
+                        }],
+                        None,
+                    ),
+                ],
+            ),
+        ];
+        let result = audit_reliability_corpus(&corpus(units)).unwrap();
+        assert_eq!(result.pairwise_by_iou_threshold.len(), 4);
+        assert_eq!(result.pairwise_by_iou_threshold[0].present_present_pairs, 2);
+        assert!(
+            result.pairwise_by_iou_threshold[0]
+                .symmetric_event_f1_mean
+                .unwrap()
+                > 0.99
+        );
+        assert!(
+            result.pairwise_by_iou_threshold[2]
+                .symmetric_event_f1_mean
+                .unwrap()
+                < 1.0
+        );
+        assert!(
+            result.pairwise_by_iou_threshold[2]
+                .start_boundary_mae_frames
+                .is_some()
+        );
+    }
+
+    #[test]
+    fn mixed_missingness_is_supported_but_each_item_needs_two_annotations() {
+        let units = vec![
+            unit(
+                "item-1",
+                LINEAGE_A,
+                AUDIO_A,
+                vec![
+                    annotation(
+                        '1',
+                        '1',
+                        GroundTruthStateV1::Present,
+                        vec![FrameIntervalV1 {
+                            start_frame: 100,
+                            end_frame: 200,
+                        }],
+                        None,
+                    ),
+                    annotation('2', '2', GroundTruthStateV1::Absent, Vec::new(), None),
+                    annotation(
+                        '3',
+                        '3',
+                        GroundTruthStateV1::Ambiguous,
+                        Vec::new(),
+                        Some("soft onset"),
+                    ),
+                ],
+            ),
+            unit(
+                "item-2",
+                LINEAGE_B,
+                AUDIO_B,
+                vec![
+                    annotation(
+                        '1',
+                        '4',
+                        GroundTruthStateV1::NotEstimable,
+                        Vec::new(),
+                        Some("masked by percussion"),
+                    ),
+                    annotation(
+                        '3',
+                        '5',
+                        GroundTruthStateV1::NotEstimable,
+                        Vec::new(),
+                        Some("masked by percussion"),
+                    ),
+                ],
+            ),
+        ];
+        let result = audit_reliability_corpus(&corpus(units)).unwrap();
+        assert_eq!(result.total_annotation_records, 5);
+        assert_eq!(result.disposition_alpha.category_counts["Present"], 1);
+        assert_eq!(result.disposition_alpha.category_counts["Absent"], 1);
+        assert_eq!(result.disposition_alpha.category_counts["Ambiguous"], 1);
+        assert_eq!(result.disposition_alpha.category_counts["NotEstimable"], 2);
+    }
+
+    #[test]
+    fn source_work_alpha_bootstrap_is_deterministic_and_warns_on_small_corpus() {
+        let json = include_str!("../fixtures/mel-temporal-reliability-corpus.synthetic.json");
+        let corpus: TemporalReliabilityCorpusV1 = serde_json::from_str(json).unwrap();
+        let first =
+            audit_reliability_corpus_with_source_bootstrap(&corpus, 1_000, 0x2026_1125).unwrap();
+        let second =
+            audit_reliability_corpus_with_source_bootstrap(&corpus, 1_000, 0x2026_1125).unwrap();
+        let bootstrap = first
+            .disposition_alpha_source_work_bootstrap
+            .as_ref()
+            .unwrap();
+        assert_eq!(
+            first.disposition_alpha_source_work_bootstrap,
+            second.disposition_alpha_source_work_bootstrap
+        );
+        assert_eq!(bootstrap.source_work_clusters, 3);
+        assert_eq!(bootstrap.bootstrap_replicates_requested, 1_000);
+        assert!(bootstrap.bootstrap_replicates_valid >= 900);
+        assert_eq!(bootstrap.recommended_confirmatory_cluster_floor, 30);
+        assert!(!bootstrap.confirmatory_cluster_floor_met);
+        assert_eq!(bootstrap.estimate, first.disposition_alpha.alpha);
+        assert!(!first.population_confidence_interval_computed);
+        assert!(first.source_work_bootstrap_computed);
+    }
+
+    #[test]
+    fn source_work_alpha_bootstrap_rejects_unbounded_replicate_request() {
+        let json = include_str!("../fixtures/mel-temporal-reliability-corpus.synthetic.json");
+        let corpus: TemporalReliabilityCorpusV1 = serde_json::from_str(json).unwrap();
+        assert!(audit_reliability_corpus_with_source_bootstrap(&corpus, 1_000_001, 1,).is_err());
+    }
+
+    #[test]
+    fn temporal_bootstrap_with_one_eligible_work_reports_point_estimate_without_interval() {
+        let json = include_str!("../fixtures/mel-temporal-reliability-corpus.synthetic.json");
+        let corpus: TemporalReliabilityCorpusV1 = serde_json::from_str(json).unwrap();
+        let report =
+            audit_reliability_corpus_with_source_bootstrap(&corpus, 1_000, 0x2026_1125).unwrap();
+        assert_eq!(report.pairwise_temporal_source_work_bootstrap.len(), 4);
+        let first = &report.pairwise_temporal_source_work_bootstrap[0];
+        assert_eq!(first.symmetric_event_f1.eligible_source_work_clusters, 1);
+        assert_eq!(first.symmetric_event_f1.point_estimate, Some(1.0));
+        assert_eq!(first.symmetric_event_f1.percentile_95_low, None);
+        assert!(first.symmetric_event_f1.status_reason.is_some());
+    }
+
+    #[test]
+    fn temporal_bootstrap_emits_intervals_only_when_two_source_works_have_pairs() {
+        let json = include_str!("../fixtures/mel-temporal-reliability-corpus.synthetic.json");
+        let mut corpus: TemporalReliabilityCorpusV1 = serde_json::from_str(json).unwrap();
+        for annotation in &mut corpus.units[2].annotations {
+            annotation.state = GroundTruthStateV1::Present;
+            annotation.intervals = vec![FrameIntervalV1 {
+                start_frame: 1_000,
+                end_frame: 1_100,
+            }];
+            annotation.status_reason = None;
+        }
+        let first =
+            audit_reliability_corpus_with_source_bootstrap(&corpus, 1_000, 0xB00757).unwrap();
+        let second =
+            audit_reliability_corpus_with_source_bootstrap(&corpus, 1_000, 0xB00757).unwrap();
+        assert_eq!(
+            first.pairwise_temporal_source_work_bootstrap,
+            second.pairwise_temporal_source_work_bootstrap
+        );
+        let threshold = &first.pairwise_temporal_source_work_bootstrap[0];
+        assert_eq!(
+            threshold.symmetric_event_f1.eligible_source_work_clusters,
+            2
+        );
+        assert_eq!(
+            threshold.symmetric_event_f1.bootstrap_replicates_valid,
+            1_000
+        );
+        assert!(threshold.symmetric_event_f1.percentile_95_low.is_some());
+        assert!(threshold.symmetric_event_f1.percentile_95_high.is_some());
+        assert_eq!(
+            threshold.matched_interval_iou.eligible_source_work_clusters,
+            2
+        );
+        assert!(threshold.matched_interval_iou.percentile_95_low.is_some());
+    }
+
+    #[test]
+    fn source_work_alpha_bootstrap_keeps_degenerate_alpha_undefined() {
+        let json = include_str!("../fixtures/mel-temporal-reliability-corpus.synthetic.json");
+        let mut corpus: TemporalReliabilityCorpusV1 = serde_json::from_str(json).unwrap();
+        for unit in &mut corpus.units {
+            for annotation in &mut unit.annotations {
+                annotation.state = GroundTruthStateV1::Absent;
+                annotation.intervals.clear();
+                annotation.status_reason = None;
+            }
+        }
+        let report =
+            audit_reliability_corpus_with_source_bootstrap(&corpus, 1_000, 0x2026_1125).unwrap();
+        let bootstrap = report
+            .disposition_alpha_source_work_bootstrap
+            .as_ref()
+            .unwrap();
+        assert_eq!(report.disposition_alpha.alpha, None);
+        assert_eq!(bootstrap.estimate, None);
+        assert_eq!(bootstrap.bootstrap_replicates_valid, 0);
+        assert_eq!(bootstrap.percentile_95_low, None);
+        assert_eq!(bootstrap.percentile_95_high, None);
+        assert!(bootstrap.status_reason.is_some());
+        assert!(!bootstrap.confirmatory_cluster_floor_met);
+    }
+
+    #[test]
+    fn source_work_alpha_bootstrap_requires_multiple_lineages_and_valid_seed() {
+        let json = include_str!("../fixtures/mel-temporal-reliability-corpus.synthetic.json");
+        let mut corpus: TemporalReliabilityCorpusV1 = serde_json::from_str(json).unwrap();
+        for unit in &mut corpus.units {
+            unit.source_lineage_sha256 =
+                "eeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeee".into();
+        }
+        assert!(audit_reliability_corpus_with_source_bootstrap(&corpus, 1_000, 1).is_err());
+
+        let corpus: TemporalReliabilityCorpusV1 = serde_json::from_str(json).unwrap();
+        assert!(audit_reliability_corpus_with_source_bootstrap(&corpus, 999, 1).is_err());
+        assert!(audit_reliability_corpus_with_source_bootstrap(&corpus, 1_000, 0).is_err());
+    }
+
+    #[test]
+    fn annotation_digest_reuse_across_items_is_rejected() {
+        let mut units = vec![
+            unit(
+                "item-1",
+                LINEAGE_A,
+                AUDIO_A,
+                vec![
+                    annotation(
+                        '1',
+                        '1',
+                        GroundTruthStateV1::Present,
+                        vec![FrameIntervalV1 {
+                            start_frame: 100,
+                            end_frame: 200,
+                        }],
+                        None,
+                    ),
+                    annotation(
+                        '2',
+                        '2',
+                        GroundTruthStateV1::Present,
+                        vec![FrameIntervalV1 {
+                            start_frame: 100,
+                            end_frame: 200,
+                        }],
+                        None,
+                    ),
+                ],
+            ),
+            unit(
+                "item-2",
+                LINEAGE_B,
+                AUDIO_B,
+                vec![
+                    annotation('1', '3', GroundTruthStateV1::Absent, Vec::new(), None),
+                    annotation('2', '4', GroundTruthStateV1::Absent, Vec::new(), None),
+                ],
+            ),
+        ];
+        units[1].annotations[1].annotation_sha256 =
+            units[0].annotations[0].annotation_sha256.clone();
+        assert!(audit_reliability_corpus(&corpus(units)).is_err());
+    }
+
+    #[test]
+    fn per_item_annotation_panel_is_bounded_before_pairwise_expansion() {
+        let mut annotations = vec![
+            annotation('1', '1', GroundTruthStateV1::Absent, Vec::new(), None),
+            annotation('2', '2', GroundTruthStateV1::Absent, Vec::new(), None),
+        ];
+        for index in 2..=MAX_ANNOTATIONS_PER_UNIT_V1 {
+            let mut entry = annotation('1', '1', GroundTruthStateV1::Absent, Vec::new(), None);
+            entry.annotator_id_sha256 = format!("{:064x}", index + 1);
+            entry.annotation_sha256 = format!("{:064x}", index + 10_000);
+            annotations.push(entry);
+        }
+        let units = vec![
+            unit("item-1", LINEAGE_A, AUDIO_A, annotations),
+            unit(
+                "item-2",
+                LINEAGE_B,
+                AUDIO_B,
+                vec![
+                    annotation('3', '3', GroundTruthStateV1::Absent, Vec::new(), None),
+                    annotation('4', '4', GroundTruthStateV1::Absent, Vec::new(), None),
+                ],
+            ),
+        ];
+        assert!(audit_reliability_corpus(&corpus(units)).is_err());
+    }
+
+    #[test]
+    fn duplicate_unit_or_annotator_and_invalid_thresholds_are_rejected() {
+        let good = vec![
+            unit(
+                "item-1",
+                LINEAGE_A,
+                AUDIO_A,
+                vec![
+                    annotation(
+                        '1',
+                        '1',
+                        GroundTruthStateV1::Present,
+                        vec![FrameIntervalV1 {
+                            start_frame: 100,
+                            end_frame: 200,
+                        }],
+                        None,
+                    ),
+                    annotation(
+                        '2',
+                        '2',
+                        GroundTruthStateV1::Present,
+                        vec![FrameIntervalV1 {
+                            start_frame: 100,
+                            end_frame: 200,
+                        }],
+                        None,
+                    ),
+                ],
+            ),
+            unit(
+                "item-2",
+                LINEAGE_B,
+                AUDIO_B,
+                vec![
+                    annotation('1', '3', GroundTruthStateV1::Absent, Vec::new(), None),
+                    annotation('2', '4', GroundTruthStateV1::Absent, Vec::new(), None),
+                ],
+            ),
+        ];
+        assert!(audit_reliability_corpus(&corpus(vec![good[0].clone(), good[0].clone()])).is_err());
+        let mut duplicate_annotator = good.clone();
+        duplicate_annotator[0].annotations[1].annotator_id_sha256 = duplicate_annotator[0]
+            .annotations[0]
+            .annotator_id_sha256
+            .clone();
+        assert!(audit_reliability_corpus(&corpus(duplicate_annotator)).is_err());
+        let mut invalid_thresholds = corpus(good);
+        invalid_thresholds.interval_iou_thresholds = vec![0.5, 0.5];
+        assert!(audit_reliability_corpus(&invalid_thresholds).is_err());
+    }
+    #[test]
+    fn explicit_nonresponses_are_reported_separately_from_annotation_states() {
+        let mut units = vec![
+            unit(
+                "item-1",
+                LINEAGE_A,
+                AUDIO_A,
+                vec![
+                    annotation(
+                        '1',
+                        '1',
+                        GroundTruthStateV1::Present,
+                        vec![FrameIntervalV1 {
+                            start_frame: 100,
+                            end_frame: 200,
+                        }],
+                        None,
+                    ),
+                    annotation(
+                        '2',
+                        '2',
+                        GroundTruthStateV1::Present,
+                        vec![FrameIntervalV1 {
+                            start_frame: 100,
+                            end_frame: 200,
+                        }],
+                        None,
+                    ),
+                ],
+            ),
+            unit(
+                "item-2",
+                LINEAGE_B,
+                AUDIO_B,
+                vec![
+                    annotation('1', '3', GroundTruthStateV1::Absent, Vec::new(), None),
+                    annotation(
+                        '2',
+                        '4',
+                        GroundTruthStateV1::Ambiguous,
+                        Vec::new(),
+                        Some("gradual onset"),
+                    ),
+                ],
+            ),
+        ];
+        let missing_id = digest('3');
+        units[0]
+            .assigned_annotator_ids_sha256
+            .push(missing_id.clone());
+        units[0].nonresponses.push(AnnotationNonresponseV1 {
+            annotator_id_sha256: missing_id.clone(),
+            reason: AnnotationNonresponseReasonV1::TechnicalFailure,
+        });
+
+        let result = audit_reliability_corpus(&corpus(units)).unwrap();
+        assert_eq!(result.assigned_rater_item_assignments, 5);
+        assert_eq!(result.returned_rater_item_annotations, 4);
+        assert_eq!(result.missing_rater_item_assignments, 1);
+        assert_eq!(result.overall_annotation_coverage, Some(0.8));
+        assert_eq!(result.complete_items, 1);
+        assert_eq!(result.items_with_nonresponse, 1);
+        assert_eq!(result.missing_reason_counts["TechnicalFailure"], 1);
+        assert_eq!(result.disposition_alpha.ratings, 4);
+        assert_eq!(result.disposition_alpha.category_counts["Ambiguous"], 1);
+        assert_eq!(result.disposition_alpha.category_counts["Absent"], 1);
+        assert_eq!(result.annotator_coverage.len(), 3);
+
+        let missing_annotator = result
+            .annotator_coverage
+            .iter()
+            .find(|item| item.annotator_id_sha256 == missing_id)
+            .unwrap();
+        assert_eq!(missing_annotator.assigned_items, 1);
+        assert_eq!(missing_annotator.returned_annotations, 0);
+        assert_eq!(missing_annotator.missing_annotations, 1);
+        assert_eq!(missing_annotator.coverage_rate, Some(0.0));
+        assert_eq!(
+            missing_annotator.missing_reason_counts["TechnicalFailure"],
+            1
+        );
+
+        let stable_rater = result
+            .annotator_coverage
+            .iter()
+            .find(|item| item.annotator_id_sha256 == digest('1'))
+            .unwrap();
+        assert_eq!(stable_rater.assigned_items, 2);
+        assert_eq!(stable_rater.returned_annotations, 2);
+        assert_eq!(stable_rater.missing_annotations, 0);
+        assert_eq!(stable_rater.coverage_rate, Some(1.0));
+        assert!(result.source_work_bootstrap_rater_panel_fixed);
+        assert!(result.unit_summaries[0].nonresponses.len() == 1);
+        assert!(result.unit_summaries[0].annotations.len() == 2);
+    }
+
+    #[test]
+    fn assigned_roster_requires_exactly_one_annotation_or_nonresponse_per_rater() {
+        let mut unaccounted = vec![
+            unit(
+                "item-1",
+                LINEAGE_A,
+                AUDIO_A,
+                vec![
+                    annotation('1', '1', GroundTruthStateV1::Absent, Vec::new(), None),
+                    annotation('2', '2', GroundTruthStateV1::Absent, Vec::new(), None),
+                ],
+            ),
+            unit(
+                "item-2",
+                LINEAGE_B,
+                AUDIO_B,
+                vec![
+                    annotation('1', '3', GroundTruthStateV1::Absent, Vec::new(), None),
+                    annotation('2', '4', GroundTruthStateV1::Absent, Vec::new(), None),
+                ],
+            ),
+        ];
+        unaccounted[0]
+            .assigned_annotator_ids_sha256
+            .push(digest('3'));
+        assert!(audit_reliability_corpus(&corpus(unaccounted)).is_err());
+
+        let mut overlap = vec![
+            unit(
+                "item-1",
+                LINEAGE_A,
+                AUDIO_A,
+                vec![
+                    annotation('1', '1', GroundTruthStateV1::Absent, Vec::new(), None),
+                    annotation('2', '2', GroundTruthStateV1::Absent, Vec::new(), None),
+                ],
+            ),
+            unit(
+                "item-2",
+                LINEAGE_B,
+                AUDIO_B,
+                vec![
+                    annotation('1', '3', GroundTruthStateV1::Absent, Vec::new(), None),
+                    annotation('2', '4', GroundTruthStateV1::Absent, Vec::new(), None),
+                ],
+            ),
+        ];
+        overlap[0].nonresponses.push(AnnotationNonresponseV1 {
+            annotator_id_sha256: overlap[0].annotations[0].annotator_id_sha256.clone(),
+            reason: AnnotationNonresponseReasonV1::Declined,
+        });
+        assert!(audit_reliability_corpus(&corpus(overlap)).is_err());
+
+        let mut outside_roster = vec![
+            unit(
+                "item-1",
+                LINEAGE_A,
+                AUDIO_A,
+                vec![
+                    annotation('1', '1', GroundTruthStateV1::Absent, Vec::new(), None),
+                    annotation('2', '2', GroundTruthStateV1::Absent, Vec::new(), None),
+                ],
+            ),
+            unit(
+                "item-2",
+                LINEAGE_B,
+                AUDIO_B,
+                vec![
+                    annotation('1', '3', GroundTruthStateV1::Absent, Vec::new(), None),
+                    annotation('2', '4', GroundTruthStateV1::Absent, Vec::new(), None),
+                ],
+            ),
+        ];
+        outside_roster[0]
+            .nonresponses
+            .push(AnnotationNonresponseV1 {
+                annotator_id_sha256: digest('3'),
+                reason: AnnotationNonresponseReasonV1::NotReturned,
+            });
+        assert!(audit_reliability_corpus(&corpus(outside_roster)).is_err());
+
+        let mut duplicate_roster = vec![
+            unit(
+                "item-1",
+                LINEAGE_A,
+                AUDIO_A,
+                vec![
+                    annotation('1', '1', GroundTruthStateV1::Absent, Vec::new(), None),
+                    annotation('2', '2', GroundTruthStateV1::Absent, Vec::new(), None),
+                ],
+            ),
+            unit(
+                "item-2",
+                LINEAGE_B,
+                AUDIO_B,
+                vec![
+                    annotation('1', '3', GroundTruthStateV1::Absent, Vec::new(), None),
+                    annotation('2', '4', GroundTruthStateV1::Absent, Vec::new(), None),
+                ],
+            ),
+        ];
+        duplicate_roster[0]
+            .assigned_annotator_ids_sha256
+            .push(digest('1'));
+        assert!(audit_reliability_corpus(&corpus(duplicate_roster)).is_err());
+    }
+}
