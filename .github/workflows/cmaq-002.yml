@@ -37,7 +37,7 @@ jobs:
           python3 - <<'PY'
           import json
           from pathlib import Path
-          from jsonschema import Draft202012Validator, validate
+          from jsonschema import Draft202012Validator, ValidationError, validate
 
           schema = json.loads(Path("report.schema.json").read_text())
           Draft202012Validator.check_schema(schema)
