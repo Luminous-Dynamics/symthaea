@@ -121,3 +121,14 @@ This proves consistency with independently signed observations under the consume
 ## Provenance interoperability
 
 The companion [MACE W3C PROV and SCITT Interoperability V1](../../../docs/research/MACE_PROV_SCITT_INTEROP_V1.md) document defines a JSON-LD context for mapping MACE source/evidence nodes and acquisition/transformation activities to W3C PROV entities, activities and agents. It also specifies a future per-issuer SCITT transparency integration. The JSON-LD context is published at [mace_prov_jsonld_context_v1.jsonld](../../../data/schemas/mace_prov_jsonld_context_v1.jsonld). An executable exporter and SCITT client are not yet implemented.
+
+
+## Streaming temporal session ledger
+
+The `streaming_session` module is an in-memory, event-sourced reference state machine for a single user/session. It separates valid/effective time from trusted observed/transaction time, applies contiguous consumer sequence numbers, supports exact mutation replay, and emits before/after state-hash receipts. Mutations include append, correction/supersession, quarantine, revalidation, revocation and a rights-erasure request.
+
+The snapshot exposes only active messages, ordered by valid timestamp and then original ingestion sequence. Out-of-order valid-time corrections do not rewrite the monotonic observed-time history. Event-ID reuse with different mutation content, sequence gaps, duplicate turn IDs, malformed targets and consumer clock rollback fail closed. Failed transitions are staged before commit.
+
+This is not yet a hosted AML Add/Search service, durable append-only database, distributed CAS writer, or complete rights-erasure implementation. The erasure request removes payload from this in-memory projection, but message-derived mutation commitments remain; production must separately erase derived indexes, caches, replicas and backups and verify deletion receipts. Raw JSONL bytes and publisher/source authenticity remain the responsibility of the upstream ingestion/qualification boundaries.
+
+Protocol and benchmark: [MACE Streaming Temporal Session Ledger V1](../../../docs/research/MACE_STREAMING_TEMPORAL_SESSION_LEDGER_V1.md). Eleven deterministic test functions are authored; they have not been executed.

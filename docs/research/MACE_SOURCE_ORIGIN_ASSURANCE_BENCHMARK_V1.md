@@ -154,6 +154,8 @@ The external benchmark suite should be run as complementary instruments:
 - [MEMORA-Bench](https://aclanthology.org/2026.findings-emnlp.1211/) tests embodied memory on 45 hours of egocentric video, including retrospective faithfulness and prospective planning.
 - [LongMemEval-V2](https://github.com/xiaowu0162/LongMemEval-V2) contains 451 curated questions over web and enterprise trajectories, with haystacks up to 115 million tokens; it measures answer accuracy and query latency.
 
+A further complementary embodied-memory track is **MEMOBench** from Findings of EMNLP 2026: 30 history-dependent manipulation tasks, 1,500 expert demonstrations and 4,200 executable checkpoint instances. It labels process-level Storage, Update and Compression operations and reports that its strongest memory-module baseline reaches only 31.9% average task success. This is particularly relevant to MACE's streaming ledger and eventual Symtropy/robotics integration: measure memory operation correctness at intermediate checkpoints, not only terminal task success. [MEMOBench paper](https://aclanthology.org/2026.findings-emnlp.333/).
+
 These benchmarks probe different capabilities and must be run with their exact official harnesses, models, answerers, task splits and resource budgets. None alone establishes source-origin truth or causal independence.
 
 MACE therefore needs two scorecards:
@@ -211,3 +213,28 @@ The 2-of-3 policy is not a universal truth oracle: operator identity, failure-do
 ## External provenance interoperability
 
 The follow-on [MACE W3C PROV and SCITT Interoperability V1](MACE_PROV_SCITT_INTEROP_V1.md) defines a JSON-LD context and proposed mapping for interoperable graph export, plus a separate SCITT transparency integration path. This complements the source-origin assurance benchmark but does not change its ground-truth requirements: neither PROV representation nor transparency-log inclusion proves source truth or completeness.
+
+
+## 10. Streaming and bitemporal memory
+
+The follow-on [MACE Streaming Temporal Session Ledger V1](MACE_STREAMING_TEMPORAL_SESSION_LEDGER_V1.md) adds a typed event-sourced reference state machine with separate valid/effective time and trusted observed time, exact event idempotency, correction/supersession, quarantine/revalidation, revocation and an explicitly limited in-memory erasure request.
+
+The streaming benchmark must now include:
+- out-of-order arrivals where valid time differs from observed time;
+- correction chains with historical and current-state questions;
+- stale derived summaries/plans after a corrected parent;
+- exact event replay and event-ID conflict;
+- sequence gaps and trusted-clock rollback;
+- quarantine/revalidation and revocation;
+- rights erasure across the whole dependency/index/cache/backup closure;
+- multi-writer concurrency, crash recovery and unknown-outcome reconciliation.
+
+Proposed initial targets:
+- 100% deterministic replay and transition-fixture correctness;
+- zero stale/superseded/revoked evidence uses in exhaustive lifecycle fixtures;
+- 100% correction visibility in deterministic current-state queries;
+- 100% valid-time/observed-time fidelity in the bitemporal test set;
+- zero accepted event-ID reuse with different content;
+- report p50/p95/p99 append-ack, durable-commit and Search-visible latency separately.
+
+The current Rust module is an in-memory reference and does not yet meet durability, secure-erasure or hosted streaming SLOs. The production acceptance gate must require durable commit before acknowledgement, immediate Search visibility, transactionally allocated sequence numbers, idempotent replay after crashes, and independent deletion receipts from all derived stores.
