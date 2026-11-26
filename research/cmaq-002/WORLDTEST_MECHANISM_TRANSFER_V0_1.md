@@ -1,6 +1,6 @@
 # WorldTest Frozen Mechanism-Transfer Evaluator v0.1
 
-**Status:** Rust evaluator and 17 new deterministic tests authored; exact-head Rust 1.96 formatting, 85-test crate suite, strict Clippy, custody and MARA phase/reward qualification passed at `86b9d7981637917d3060dd65514f130209d920ae` (26 November 2026).  
+**Status:** Rust evaluator and 19 new deterministic tests authored; Rust 1.96 qualification passed at `86b9d7981637917d3060dd65514f130209d920ae`. CMAQ-002 is now pinned to Rust 1.100.0; exact-head Rust 1.100.0 qualification for this revision is pending.  
 **Research owner:** [#13707 — CMAQ-018](https://github.com/Luminous-Dynamics/symthaea/issues/13707).  
 **Base evaluator:** [#13711 — cluster-aware query portfolio](https://github.com/Luminous-Dynamics/symthaea/pull/13711).  
 **Parent protocol:** [#13688 — WorldTest / AutumnBench adapter](https://github.com/Luminous-Dynamics/symthaea/pull/13688).
@@ -21,7 +21,7 @@ This is the **frozen-transfer / zero-shot reuse** evaluator. It does not impleme
 
 ## Transfer-condition semantics
 
-Each condition is bound to an evaluator-owned profile manifest. The Rust contract checks the declared relation types and source/target family identity; the signed evaluator manifest must establish that the actual generator transformation conforms to the declared relation.
+Each condition is bound to an evaluator-owned profile manifest, its exact `target_environment_family_id`, mechanism/observation relation types, and a digest. Same-family, nuisance and parameter conditions bind the exact source-family ID; compositional and structural conditions bind exact distinct evaluator-assigned target-family IDs. Every task row must match the condition profile's exact target family, not merely claim to be different from the source. The signed evaluator manifest must establish that the actual generator transformation conforms to the declared relation.
 
 | Condition | Mechanism relation | Observation relation | Target family identity |
 |---|---|---|---|
@@ -136,8 +136,9 @@ The Rust tests cover:
 - failure/abstention retention in cluster and cell denominators;
 - source family identity and source/transfer manifest digest validation;
 - complete, unique, nonempty condition-profile validation;
+- exact target-family identity is bound by the condition profile and checked on every task row;
 - profile relation semantics must match the named condition;
-- source-to-target family identity must match its declared relation;
+- exact source-to-target family identity must match the evaluator-declared target family ID;
 - mutated shared checkpoint is rejected by the base evaluator;
 - shared exploration cost is charged once, separately from target-query costs.
 
