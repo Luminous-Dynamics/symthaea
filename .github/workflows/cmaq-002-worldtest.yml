@@ -17,11 +17,14 @@ on:
     branches:
       - research/cmaq-002-safe-decision-value-allocation-2026-10-31
       - research/cmaq-002-worldtest-adapter-v0-6-20261125
+      - research/cmaq-018-mechanism-transfer-v0-1-20261126
     paths:
       - "research/cmaq-002/src/worldtest_exploration.rs"
       - "research/cmaq-002/src/worldtest_phase_contract.rs"
       - "research/cmaq-002/src/worldtest_query_portfolio.rs"
       - "research/cmaq-002/src/worldtest_mechanism_transfer.rs"
+      - "research/cmaq-002/src/paired_intervention.rs"
+      - "research/cmaq-002/PAIRED_INTERVENTION_CONTRAST_V0_1.md"
       - "research/cmaq-002/src/main.rs"
       - "research/cmaq-002/WORLDTEST_MECHANISM_TRANSFER_V0_1.md"
       - "research/cmaq-002/worldtest-*"
