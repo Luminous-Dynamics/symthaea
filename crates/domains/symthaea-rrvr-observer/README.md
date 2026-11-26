@@ -9,7 +9,7 @@ A read-only, deterministic first slice of the RRVR-Symthaea integration.
 - Enforces an immutable ingest-sequence decision cut and matching evidence-ledger frontier.
 - Binds the canonical snapshot content to the digest in an external admission receipt.
 - Abstains on stale, unknown or disputed observations rather than filtering them.
-- Uses the existing 21-channel `symthaea-manipulator` state and 16,384D HDC encoder to summarize adjacent-state representation similarity.
+- Uses the existing 21-channel `symthaea-manipulator` state and 16,384D HDC encoder; emits per-observation HDC-vector SHA-256 digests and adjacent-state representation similarity.
 - Emits a constant-velocity joint-angle forecast as an **uncalibrated baseline**, not a probability or safety claim.
 
 ## What it does not do
