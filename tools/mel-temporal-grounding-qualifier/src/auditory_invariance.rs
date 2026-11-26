@@ -419,7 +419,9 @@ fn validate_variant(
     if variant.expected_relation != variant.option_a_relation
         && variant.expected_relation != variant.option_b_relation
     {
-        return Err(format!("{label} expected relation is not represented by A or B"));
+        return Err(format!(
+            "{label} expected relation is not represented by A or B"
+        ));
     }
     Ok(())
 }
@@ -589,19 +591,13 @@ fn summarize(results: &[AuditoryPairResultV1]) -> AuditoryMetricSummaryV1 {
         answer_a_rate: rate(answer_a_count, parsed_count),
         always_a_miss_rate,
         always_a_false_flip_rate,
-        always_a_accuracy_flip_stay: match (
-            always_a_miss_rate,
-            always_a_false_flip_rate,
-        ) {
+        always_a_accuracy_flip_stay: match (always_a_miss_rate, always_a_false_flip_rate) {
             (Some(mr), Some(ffr)) => Some(1.0 - (mr + ffr) / 2.0),
             _ => None,
         },
         always_b_miss_rate,
         always_b_false_flip_rate,
-        always_b_accuracy_flip_stay: match (
-            always_b_miss_rate,
-            always_b_false_flip_rate,
-        ) {
+        always_b_accuracy_flip_stay: match (always_b_miss_rate, always_b_false_flip_rate) {
             (Some(mr), Some(ffr)) => Some(1.0 - (mr + ffr) / 2.0),
             _ => None,
         },
