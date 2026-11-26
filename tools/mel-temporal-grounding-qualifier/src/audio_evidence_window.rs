@@ -46,6 +46,8 @@ impl PcmSampleFormatV1 {
 pub struct SourceAudioArtifactV1 {
     pub audio_sha256: String,
     pub byte_length: u64,
+    /// Digest-shaped reference only; legal/purpose authority is verified elsewhere.
+    pub rights_scope_receipt_sha256: String,
 }
 
 #[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
@@ -133,7 +135,10 @@ pub struct AudioEvidenceVerificationReportV1 {
     pub evidence_condition: EvidenceConditionV1,
     pub target_audio_sha256: String,
     pub source_audio_sha256: String,
+    pub rights_scope_receipt_sha256: String,
     pub decoded_pcm_sha256: String,
+    pub evidence_context_manifest_sha256: String,
+    pub full_manifest_sha256: String,
     pub source_audio_bytes_recomputed: bool,
     pub decoded_pcm_bytes_recomputed: bool,
     pub window_payloads_recomputed: bool,
@@ -142,7 +147,10 @@ pub struct AudioEvidenceVerificationReportV1 {
     pub verified_windows: Vec<VerifiedWindowV1>,
     /// Decoder/profile identifiers are supplied metadata until #13254 verifies
     /// their signed runner/tool attestation.
+    pub rights_scope_authenticated: bool,
     pub decoder_identity_authenticated: bool,
+    pub model_runtime_identity_authenticated: bool,
+    pub runner_receipt_verified: bool,
     /// This V1 adapter binds a context manifest, not the exact HTTP/API body.
     pub request_body_recomputed: bool,
     /// Input delivered to an adapter is not proof of model-internal consumption.
@@ -159,6 +167,7 @@ struct EvidenceContextDigestPayloadV1<'a> {
     target_audio_sha256: &'a str,
     source_audio_sha256: &'a str,
     source_audio_byte_length: u64,
+    rights_scope_receipt_sha256: &'a str,
     decoded_pcm_sha256: &'a str,
     decoded_pcm_byte_length: u64,
     sample_rate_hz: u32,
@@ -207,6 +216,10 @@ pub fn verify_audio_evidence_manifest(
     validate_digest(&manifest.runtime_identity_sha256, "runtime_identity_sha256")?;
     validate_digest(&manifest.decoding_config_sha256, "decoding_config_sha256")?;
     validate_digest(&manifest.source_audio.audio_sha256, "source_audio.audio_sha256")?;
+    validate_digest(
+        &manifest.source_audio.rights_scope_receipt_sha256,
+        "source_audio.rights_scope_receipt_sha256",
+    )?;
     validate_digest(&manifest.decoded_pcm.pcm_sha256, "decoded_pcm.pcm_sha256")?;
     validate_digest(
         &manifest.decoded_pcm.decoder_identity_sha256,
@@ -217,6 +230,9 @@ pub fn verify_audio_evidence_manifest(
         "decoded_pcm.decode_profile_sha256",
     )?;
 
+    if source_audio_bytes.is_empty() {
+        return Err("source audio byte payload must not be empty".into());
+    }
     validate_declared_length(
         source_audio_bytes,
         manifest.source_audio.byte_length,
@@ -232,6 +248,9 @@ pub fn verify_audio_evidence_manifest(
         manifest.decoded_pcm.byte_length,
         "decoded_pcm",
     )?;
+    if decoded_pcm_bytes.is_empty() {
+        return Err("decoded PCM byte payload must not be empty".into());
+    }
     let decoded_pcm_sha256 = sha256_hex(decoded_pcm_bytes);
     if decoded_pcm_sha256 != manifest.decoded_pcm.pcm_sha256 {
         return Err("decoded PCM bytes do not match declared SHA-256".into());
@@ -343,6 +362,8 @@ pub fn verify_audio_evidence_manifest(
     }
     verified_windows.sort_by_key(|window| window.position);
 
+    let full_manifest_sha256 = canonical_json_sha256(manifest)
+        .map_err(|error| format!("failed canonical evidence manifest encoding: {error}"))?;
     Ok(AudioEvidenceVerificationReportV1 {
         schema: REPORT_SCHEMA_V1,
         experiment_unit_id: manifest.experiment_unit_id.clone(),
@@ -350,14 +371,20 @@ pub fn verify_audio_evidence_manifest(
         evidence_condition: manifest.evidence_condition,
         target_audio_sha256: manifest.target_audio_sha256.clone(),
         source_audio_sha256,
+        rights_scope_receipt_sha256: manifest.source_audio.rights_scope_receipt_sha256.clone(),
         decoded_pcm_sha256,
+        evidence_context_manifest_sha256: manifest.context.context_manifest_sha256.clone(),
+        full_manifest_sha256,
         source_audio_bytes_recomputed: true,
         decoded_pcm_bytes_recomputed: true,
         window_payloads_recomputed: true,
         context_manifest_recomputed: true,
         verified_window_count: verified_windows.len(),
         verified_windows,
+        rights_scope_authenticated: false,
         decoder_identity_authenticated: false,
+        model_runtime_identity_authenticated: false,
+        runner_receipt_verified: false,
         request_body_recomputed: false,
         model_input_attested: false,
     })
@@ -411,6 +438,7 @@ fn context_digest(manifest: &AudioEvidenceWindowManifestV1) -> Result<String, St
         target_audio_sha256: &manifest.target_audio_sha256,
         source_audio_sha256: &manifest.source_audio.audio_sha256,
         source_audio_byte_length: manifest.source_audio.byte_length,
+        rights_scope_receipt_sha256: &manifest.source_audio.rights_scope_receipt_sha256,
         decoded_pcm_sha256: &manifest.decoded_pcm.pcm_sha256,
         decoded_pcm_byte_length: manifest.decoded_pcm.byte_length,
         sample_rate_hz: manifest.decoded_pcm.sample_rate_hz,
@@ -490,6 +518,7 @@ mod tests {
             source_audio: SourceAudioArtifactV1 {
                 audio_sha256: sha256_hex(SOURCE_AUDIO),
                 byte_length: SOURCE_AUDIO.len() as u64,
+                rights_scope_receipt_sha256: "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa".into(),
             },
             decoded_pcm: DecodedPcmArtifactV1 {
                 pcm_sha256: sha256_hex(PCM),
@@ -551,7 +580,12 @@ mod tests {
         assert_eq!(report.verified_windows[0].byte_length, 8);
         assert_eq!(report.verified_windows[1].byte_offset, 20);
         assert_eq!(report.verified_windows[1].byte_length, 12);
+        assert_eq!(report.full_manifest_sha256.len(), 64);
+        assert_eq!(report.evidence_context_manifest_sha256.len(), 64);
+        assert!(!report.rights_scope_authenticated);
         assert!(!report.decoder_identity_authenticated);
+        assert!(!report.model_runtime_identity_authenticated);
+        assert!(!report.runner_receipt_verified);
         assert!(!report.request_body_recomputed);
         assert!(!report.model_input_attested);
     }
