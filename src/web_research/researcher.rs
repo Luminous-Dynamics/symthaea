@@ -750,7 +750,7 @@ impl WebResearcher {
                 receipt.elapsed_ms = elapsed_ms(started);
                 receipts.push(receipt);
             }
-            Ok(response) => {
+            Ok(mut response) => {
                 let status = response.status();
                 let final_url = response.url().to_string();
                 let content_type = response
@@ -776,87 +776,125 @@ impl WebResearcher {
                     receipt.elapsed_ms = elapsed_ms(started);
                     receipts.push(receipt);
                 } else {
-                    match response.text().await {
-                        Err(error) => {
-                            let mut receipt = make_receipt(
-                                query_rank,
-                                None,
-                                AcquisitionStage::DuckDuckGo,
-                                query,
-                                AcquisitionOutcome::ReadFailed,
-                            );
-                            receipt.provider = Some("duckduckgo-html".to_string());
-                            receipt.requested_url = Some(ddg_url);
-                            receipt.final_url = Some(final_url);
-                            receipt.http_status = Some(status.as_u16());
-                            receipt.content_type = content_type;
-                            receipt.reason_code = Some("SEARCH_BODY_READ_FAILED".to_string());
-                            receipt.reason = Some(error.to_string());
-                            receipt.elapsed_ms = elapsed_ms(started);
-                            receipts.push(receipt);
-                        }
-                        Ok(html_text) => {
-                            let mut found = Vec::new();
-                            match scraper::Selector::parse("a.result__url") {
-                                Err(error) => {
-                                    let mut receipt = make_receipt(
-                                        query_rank,
-                                        None,
-                                        AcquisitionStage::DuckDuckGo,
-                                        query,
-                                        AcquisitionOutcome::ExtractionFailed,
-                                    );
-                                    receipt.provider = Some("duckduckgo-html".to_string());
-                                    receipt.requested_url = Some(ddg_url);
-                                    receipt.final_url = Some(final_url);
-                                    receipt.http_status = Some(status.as_u16());
-                                    receipt.content_type = content_type;
-                                    receipt.captured_bytes = html_text.len();
-                                    receipt.content_sha256 = Some(sha256_hex(html_text.as_bytes()));
-                                    receipt.reason_code =
-                                        Some("SEARCH_RESULT_EXTRACTION_FAILED".to_string());
-                                    receipt.reason = Some(error.to_string());
-                                    receipt.elapsed_ms = elapsed_ms(started);
-                                    receipts.push(receipt);
+                    let mut body = Vec::new();
+                    let mut truncated = false;
+                    let mut read_error = None;
+                    loop {
+                        match response.chunk().await {
+                            Ok(Some(chunk)) => {
+                                let remaining =
+                                    self.config.max_content_length.saturating_sub(body.len());
+                                let take = remaining.min(chunk.len());
+                                body.extend_from_slice(&chunk[..take]);
+                                if take < chunk.len() {
+                                    truncated = true;
+                                    break;
                                 }
-                                Ok(selector) => {
-                                    let document = scraper::Html::parse_document(&html_text);
-                                    for element in document.select(&selector) {
-                                        if let Some(href) = element.value().attr("href") {
-                                            if !href.contains("duckduckgo.com")
-                                                && href.starts_with("http")
-                                            {
-                                                found.push(href.to_string());
-                                            }
+                            }
+                            Ok(None) => break,
+                            Err(error) => {
+                                read_error = Some(error.to_string());
+                                break;
+                            }
+                        }
+                    }
+
+                    if let Some(reason) = read_error {
+                        let mut receipt = make_receipt(
+                            query_rank,
+                            None,
+                            AcquisitionStage::DuckDuckGo,
+                            query,
+                            AcquisitionOutcome::ReadFailed,
+                        );
+                        receipt.provider = Some("duckduckgo-html".to_string());
+                        receipt.requested_url = Some(ddg_url);
+                        receipt.final_url = Some(final_url);
+                        receipt.http_status = Some(status.as_u16());
+                        receipt.content_type = content_type;
+                        receipt.captured_bytes = body.len();
+                        receipt.content_sha256 = Some(sha256_hex(&body));
+                        receipt.reason_code = Some("SEARCH_BODY_READ_FAILED".to_string());
+                        receipt.reason = Some(reason);
+                        receipt.elapsed_ms = elapsed_ms(started);
+                        receipts.push(receipt);
+                    } else {
+                        let html_text = String::from_utf8_lossy(&body).into_owned();
+                        match scraper::Selector::parse("a.result__url") {
+                            Err(error) => {
+                                let mut receipt = make_receipt(
+                                    query_rank,
+                                    None,
+                                    AcquisitionStage::DuckDuckGo,
+                                    query,
+                                    AcquisitionOutcome::ExtractionFailed,
+                                );
+                                receipt.provider = Some("duckduckgo-html".to_string());
+                                receipt.requested_url = Some(ddg_url);
+                                receipt.final_url = Some(final_url);
+                                receipt.http_status = Some(status.as_u16());
+                                receipt.content_type = content_type;
+                                receipt.captured_bytes = body.len();
+                                receipt.content_sha256 = Some(sha256_hex(&body));
+                                receipt.reason_code =
+                                    Some("SEARCH_RESULT_EXTRACTION_FAILED".to_string());
+                                receipt.reason = Some(error.to_string());
+                                receipt.elapsed_ms = elapsed_ms(started);
+                                receipts.push(receipt);
+                            }
+                            Ok(selector) => {
+                                let document = scraper::Html::parse_document(&html_text);
+                                let mut found = Vec::new();
+                                for element in document.select(&selector) {
+                                    if let Some(href) = element.value().attr("href") {
+                                        if !href.contains("duckduckgo.com")
+                                            && href.starts_with("http")
+                                        {
+                                            found.push(href.to_string());
                                         }
                                     }
-                                    let mut receipt = make_receipt(
-                                        query_rank,
-                                        None,
-                                        AcquisitionStage::DuckDuckGo,
-                                        query,
-                                        if found.is_empty() {
-                                            AcquisitionOutcome::NoResults
-                                        } else {
-                                            AcquisitionOutcome::ResultsFound
-                                        },
-                                    );
-                                    receipt.provider = Some("duckduckgo-html".to_string());
-                                    receipt.requested_url = Some(ddg_url);
-                                    receipt.final_url = Some(final_url);
-                                    receipt.http_status = Some(status.as_u16());
-                                    receipt.content_type = content_type;
-                                    receipt.captured_bytes = html_text.len();
-                                    receipt.content_sha256 = Some(sha256_hex(html_text.as_bytes()));
-                                    receipt.reason = if found.is_empty() {
-                                        Some("search completed successfully with zero organic links".to_string())
-                                    } else {
-                                        None
-                                    };
-                                    receipt.elapsed_ms = elapsed_ms(started);
-                                    receipts.push(receipt);
-                                    urls.extend(found);
                                 }
+                                let mut receipt = make_receipt(
+                                    query_rank,
+                                    None,
+                                    AcquisitionStage::DuckDuckGo,
+                                    query,
+                                    if truncated {
+                                        AcquisitionOutcome::FetchedTruncated
+                                    } else if found.is_empty() {
+                                        AcquisitionOutcome::NoResults
+                                    } else {
+                                        AcquisitionOutcome::ResultsFound
+                                    },
+                                );
+                                receipt.provider = Some("duckduckgo-html".to_string());
+                                receipt.requested_url = Some(ddg_url);
+                                receipt.final_url = Some(final_url);
+                                receipt.http_status = Some(status.as_u16());
+                                receipt.content_type = content_type;
+                                receipt.captured_bytes = body.len();
+                                receipt.content_sha256 = Some(sha256_hex(&body));
+                                receipt.reason_code = if truncated {
+                                    Some("SEARCH_RESPONSE_TRUNCATED_AT_BUDGET".to_string())
+                                } else {
+                                    None
+                                };
+                                receipt.reason = if truncated {
+                                    Some(format!(
+                                        "search HTML capture stopped at the {} byte budget",
+                                        self.config.max_content_length
+                                    ))
+                                } else if found.is_empty() {
+                                    Some(
+                                        "search completed successfully with zero organic links"
+                                            .to_string(),
+                                    )
+                                } else {
+                                    None
+                                };
+                                receipt.elapsed_ms = elapsed_ms(started);
+                                receipts.push(receipt);
+                                urls.extend(found);
                             }
                         }
                     }
