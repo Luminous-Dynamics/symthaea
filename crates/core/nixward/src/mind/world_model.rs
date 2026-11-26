@@ -254,12 +254,17 @@ fn is_sha256_hex(value: &str) -> bool {
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub enum ContextualPredictionSource {
     ContextualDelta,
+    /// Equally relevant family-specific buckets predict materially different deltas.
+    /// The returned state is an identity placeholder; callers must treat this as UNKNOWN.
+    AmbiguousContextUnknown,
     GlobalActionDeltaFallback,
     UnknownActionIdentityFallback,
 }
 
 /// Prediction diagnostics for the context-conditioned HDC-delta candidate.
 ///
+/// For `AmbiguousContextUnknown`, `predicted_state` is an identity placeholder,
+/// not a forecast; callers must abstain rather than plan from it.
 /// `training_residual_mse` is a prequential training diagnostic, not a
 /// calibrated predictive interval or a held-out uncertainty guarantee.
 #[derive(Debug, Clone)]
@@ -655,6 +660,205 @@ impl NixWorldModel {
             independent_cluster_count: 0,
             training_residual_mse: None,
             outcome_counts: TransitionOutcomeCounts::default(),
+        })
+    }
+
+    /// Predict using only observable context and action-parameter HDC.
+    ///
+    /// Unlike `predict_state_with_context`, this API accepts no environment or
+    /// mechanism-family ID. It searches all family-scoped training buckets.
+    /// If equally relevant buckets imply materially different deltas, the
+    /// result is explicitly UNKNOWN instead of selecting one family silently.
+    /// In the UNKNOWN case, `predicted_state` is an identity placeholder and
+    /// must not be interpreted as a prediction or supplied to a planner.
+    pub fn predict_state_without_family_label(
+        &self,
+        state: &ContinuousHV,
+        action: &ActionCategory,
+        action_parameters: &ContinuousHV,
+        context: &ContinuousHV,
+    ) -> Result<ContextualPrediction, String> {
+        if state.as_slice().len() != self.dim
+            || context.as_slice().len() != self.dim
+            || action_parameters.as_slice().len() != self.dim
+            || state.as_slice().iter().any(|value| !value.is_finite())
+            || context
+                .as_slice()
+                .iter()
+                .any(|value| !value.is_finite() || value.abs() > 1.0)
+            || action_parameters
+                .as_slice()
+                .iter()
+                .any(|value| !value.is_finite() || value.abs() > 1.0)
+        {
+            return Err(
+                "prediction state and context must match the model dimension and be finite"
+                    .to_owned(),
+            );
+        }
+
+        let entries = self
+            .contextual_delta_vectors
+            .get(action)
+            .map(Vec::as_slice)
+            .unwrap_or(&[]);
+        let mut nearest: Option<(usize, f32, f32, f32)> = None;
+        let mut matches = Vec::new();
+
+        for (index, entry) in entries.iter().enumerate() {
+            let context_similarity = entry.context.similarity(context);
+            let action_similarity = entry.action_parameters.similarity(action_parameters);
+            if !context_similarity.is_finite() || !action_similarity.is_finite() {
+                continue;
+            }
+            let score = context_similarity.min(action_similarity);
+            if nearest.is_none_or(|(_, _, _, best_score)| score > best_score) {
+                nearest = Some((index, context_similarity, action_similarity, score));
+            }
+            if context_similarity >= CONTEXT_MATCH_THRESHOLD
+                && action_similarity >= CONTEXT_MATCH_THRESHOLD
+            {
+                matches.push((index, context_similarity, action_similarity, score));
+            }
+        }
+
+        if matches.is_empty() {
+            let (context_similarity, action_parameter_similarity) = nearest
+                .map(|(_, context, parameters, _)| {
+                    (context.max(0.0) as f64, parameters.max(0.0) as f64)
+                })
+                .unwrap_or((0.0, 0.0));
+            if let Some(global) = self.delta_vectors.get(action) {
+                let independent_cluster_count = entries
+                    .iter()
+                    .flat_map(|entry| entry.independent_cluster_ids.iter())
+                    .collect::<HashSet<_>>()
+                    .len();
+                let outcome_counts =
+                    entries
+                        .iter()
+                        .fold(TransitionOutcomeCounts::default(), |mut total, entry| {
+                            total.success += entry.outcome_counts.success;
+                            total.failure += entry.outcome_counts.failure;
+                            total.partial += entry.outcome_counts.partial;
+                            total.rolled_back += entry.outcome_counts.rolled_back;
+                            total
+                        });
+                return Ok(ContextualPrediction {
+                    predicted_state: state.add(&global.delta),
+                    source: ContextualPredictionSource::GlobalActionDeltaFallback,
+                    context_similarity,
+                    action_parameter_similarity,
+                    observation_count: global.observation_count,
+                    independent_cluster_count,
+                    training_residual_mse: None,
+                    outcome_counts,
+                });
+            }
+
+            return Ok(ContextualPrediction {
+                predicted_state: state.clone(),
+                source: ContextualPredictionSource::UnknownActionIdentityFallback,
+                context_similarity,
+                action_parameter_similarity,
+                observation_count: 0,
+                independent_cluster_count: 0,
+                training_residual_mse: None,
+                outcome_counts: TransitionOutcomeCounts::default(),
+            });
+        }
+
+        let best_score = matches
+            .iter()
+            .map(|(_, _, _, score)| *score)
+            .fold(f32::NEG_INFINITY, f32::max);
+        const MATCH_TIE_EPSILON: f32 = 1.0e-6;
+        const DELTA_CONFLICT_MSE: f64 = 1.0e-6;
+        let mut tied_matches: Vec<_> = matches
+            .into_iter()
+            .filter(|(_, _, _, score)| best_score - *score <= MATCH_TIE_EPSILON)
+            .collect();
+
+        // Stable ordering is based only on candidate-visible prediction data,
+        // never on environment-family ID or insertion order.
+        tied_matches.sort_by(|left, right| {
+            let left_delta = entries[left.0].delta.as_slice();
+            let right_delta = entries[right.0].delta.as_slice();
+            for (left_value, right_value) in left_delta.iter().zip(right_delta) {
+                let order = left_value.total_cmp(right_value);
+                if !order.is_eq() {
+                    return order;
+                }
+            }
+            left.1
+                .total_cmp(&right.1)
+                .then_with(|| left.2.total_cmp(&right.2))
+        });
+
+        let selected = &entries[tied_matches[0].0];
+        let best_context_similarity = tied_matches
+            .iter()
+            .map(|(_, context, _, _)| *context)
+            .fold(f32::NEG_INFINITY, f32::max);
+        let best_action_similarity = tied_matches
+            .iter()
+            .map(|(_, _, parameters, _)| *parameters)
+            .fold(f32::NEG_INFINITY, f32::max);
+
+        let mut observation_count = 0usize;
+        let mut independent_cluster_ids = HashSet::new();
+        let mut outcome_counts = TransitionOutcomeCounts::default();
+        let mut residual_squared_error = 0.0_f64;
+        let mut residual_count = 0usize;
+        let mut conflicting_delta = false;
+
+        for (index, _, _, _) in &tied_matches {
+            let entry = &entries[*index];
+            observation_count = observation_count.saturating_add(entry.observation_count);
+            independent_cluster_ids.extend(entry.independent_cluster_ids.iter().cloned());
+            outcome_counts.success =
+                outcome_counts.success.saturating_add(entry.outcome_counts.success);
+            outcome_counts.failure =
+                outcome_counts.failure.saturating_add(entry.outcome_counts.failure);
+            outcome_counts.partial =
+                outcome_counts.partial.saturating_add(entry.outcome_counts.partial);
+            outcome_counts.rolled_back =
+                outcome_counts.rolled_back.saturating_add(entry.outcome_counts.rolled_back);
+
+            if entry.residual_count > 0 {
+                residual_squared_error += entry.residual_mse * entry.residual_count as f64;
+                residual_count = residual_count.saturating_add(entry.residual_count);
+            }
+            if mean_squared_error(&selected.delta, &entry.delta)
+                .is_none_or(|mse| mse > DELTA_CONFLICT_MSE)
+            {
+                conflicting_delta = true;
+            }
+        }
+
+        if conflicting_delta {
+            return Ok(ContextualPrediction {
+                predicted_state: state.clone(),
+                source: ContextualPredictionSource::AmbiguousContextUnknown,
+                context_similarity: best_context_similarity.max(0.0) as f64,
+                action_parameter_similarity: best_action_similarity.max(0.0) as f64,
+                observation_count,
+                independent_cluster_count: independent_cluster_ids.len(),
+                training_residual_mse: None,
+                outcome_counts,
+            });
+        }
+
+        Ok(ContextualPrediction {
+            predicted_state: state.add(&selected.delta),
+            source: ContextualPredictionSource::ContextualDelta,
+            context_similarity: best_context_similarity.max(0.0) as f64,
+            action_parameter_similarity: best_action_similarity.max(0.0) as f64,
+            observation_count,
+            independent_cluster_count: independent_cluster_ids.len(),
+            training_residual_mse: (residual_count > 0)
+                .then_some(residual_squared_error / residual_count as f64),
+            outcome_counts,
         })
     }
 
@@ -1758,6 +1962,264 @@ mod tests {
             ContextualPredictionSource::GlobalActionDeltaFallback
         );
         assert!(prediction.action_parameter_similarity < 0.8);
+    }
+
+    #[test]
+    fn family_label_free_prediction_selects_distinct_observable_context() {
+        let dim = 256;
+        let mut wm = NixWorldModel::new(dim);
+        let before = ContinuousHV::random(dim, 400);
+        let after_a = ContinuousHV::random(dim, 401);
+        let after_b = ContinuousHV::random(dim, 402);
+        let context_a = ContinuousHV::random(dim, 403);
+        let context_b = ContinuousHV::random(dim, 404);
+
+        for index in 0..4 {
+            let mut episode_a = transition_episode(
+                &format!("observable-a-{index}"),
+                ActionCategory::Install,
+                ActionCategory::Install,
+                before.clone(),
+                context_a.clone(),
+                after_a.clone(),
+                TransitionOutcomeClass::Success,
+                &format!("observable-a-cluster-{index}"),
+            );
+            episode_a.environment_family_id = "training-family-a".to_owned();
+            wm.learn_episode(&episode_a)
+                .expect("family A training episode");
+
+            let mut episode_b = transition_episode(
+                &format!("observable-b-{index}"),
+                ActionCategory::Install,
+                ActionCategory::Install,
+                before.clone(),
+                context_b.clone(),
+                after_b.clone(),
+                TransitionOutcomeClass::Success,
+                &format!("observable-b-cluster-{index}"),
+            );
+            episode_b.environment_family_id = "training-family-b".to_owned();
+            wm.learn_episode(&episode_b)
+                .expect("family B training episode");
+        }
+
+        wm.observe(before.clone());
+        let global = wm.predict_state(&ActionCategory::Install);
+        let contextual = wm
+            .predict_state_without_family_label(
+                &before,
+                &ActionCategory::Install,
+                &ContinuousHV::random(dim, 90),
+                &context_a,
+            )
+            .expect("observable-context prediction");
+
+        let global_error =
+            mean_squared_error(&global, &after_a).expect("same-dimensional global prediction");
+        let contextual_error = mean_squared_error(&contextual.predicted_state, &after_a)
+            .expect("same-dimensional context prediction");
+        assert_eq!(contextual.source, ContextualPredictionSource::ContextualDelta);
+        assert_eq!(contextual.independent_cluster_count, 4);
+        assert!(contextual.context_similarity > 0.99);
+        assert!(contextual.action_parameter_similarity > 0.99);
+        assert!(
+            contextual_error + 1e-5 < global_error,
+            "context error {contextual_error} should beat pooled global error {global_error}"
+        );
+    }
+
+    #[test]
+    fn family_label_free_prediction_abstains_on_conflicting_equally_matched_deltas() {
+        let dim = 256;
+        let mut wm = NixWorldModel::new(dim);
+        let before = ContinuousHV::random(dim, 410);
+        let after_a = ContinuousHV::random(dim, 411);
+        let after_b = ContinuousHV::random(dim, 412);
+        let context = ContinuousHV::random(dim, 413);
+
+        let mut episode_a = transition_episode(
+            "ambiguous-family-a",
+            ActionCategory::Install,
+            ActionCategory::Install,
+            before.clone(),
+            context.clone(),
+            after_a,
+            TransitionOutcomeClass::Success,
+            "ambiguous-cluster-a",
+        );
+        episode_a.environment_family_id = "ambiguous-family-a".to_owned();
+        wm.learn_episode(&episode_a)
+            .expect("family A training episode");
+
+        let mut episode_b = transition_episode(
+            "ambiguous-family-b",
+            ActionCategory::Install,
+            ActionCategory::Install,
+            before.clone(),
+            context.clone(),
+            after_b,
+            TransitionOutcomeClass::Failure,
+            "ambiguous-cluster-b",
+        );
+        episode_b.environment_family_id = "ambiguous-family-b".to_owned();
+        wm.learn_episode(&episode_b)
+            .expect("family B training episode");
+
+        let prediction = wm
+            .predict_state_without_family_label(
+                &before,
+                &ActionCategory::Install,
+                &ContinuousHV::random(dim, 90),
+                &context,
+            )
+            .expect("ambiguous context is an explicit result");
+
+        assert_eq!(
+            prediction.source,
+            ContextualPredictionSource::AmbiguousContextUnknown
+        );
+        assert!((prediction.predicted_state.similarity(&before) - 1.0).abs() < 1e-5);
+        assert_eq!(prediction.observation_count, 2);
+        assert_eq!(prediction.independent_cluster_count, 2);
+        assert_eq!(prediction.training_residual_mse, None);
+    }
+
+    #[test]
+    fn family_label_free_prediction_uses_global_fallback_for_unseen_context() {
+        let dim = 256;
+        let mut wm = NixWorldModel::new(dim);
+        let before = ContinuousHV::random(dim, 420);
+        let after = ContinuousHV::random(dim, 421);
+        let training_context = ContinuousHV::random(dim, 422);
+        let unseen_context = ContinuousHV::random(dim, 423);
+        let episode = transition_episode(
+            "unseen-context-training",
+            ActionCategory::Install,
+            ActionCategory::Install,
+            before.clone(),
+            training_context,
+            after,
+            TransitionOutcomeClass::Success,
+            "unseen-context-cluster",
+        );
+        wm.learn_episode(&episode)
+            .expect("training episode");
+
+        let prediction = wm
+            .predict_state_without_family_label(
+                &before,
+                &ActionCategory::Install,
+                &ContinuousHV::random(dim, 90),
+                &unseen_context,
+            )
+            .expect("unseen context produces an explicit fallback");
+        assert_eq!(
+            prediction.source,
+            ContextualPredictionSource::GlobalActionDeltaFallback
+        );
+        assert!(prediction.context_similarity < 0.8);
+        assert!(prediction.action_parameter_similarity > 0.99);
+        assert_eq!(prediction.observation_count, 1);
+
+        let unknown_action = wm
+            .predict_state_without_family_label(
+                &before,
+                &ActionCategory::Configure,
+                &ContinuousHV::random(dim, 90),
+                &unseen_context,
+            )
+            .expect("unknown action returns an explicit identity fallback");
+        assert_eq!(
+            unknown_action.source,
+            ContextualPredictionSource::UnknownActionIdentityFallback
+        );
+    }
+
+    #[test]
+    fn family_label_free_prediction_is_order_invariant_and_deduplicates_clusters() {
+        let dim = 256;
+        let before = ContinuousHV::random(dim, 430);
+        let after = ContinuousHV::random(dim, 431);
+        let context = ContinuousHV::random(dim, 432);
+
+        let mut family_a = transition_episode(
+            "same-transition-family-a",
+            ActionCategory::Install,
+            ActionCategory::Install,
+            before.clone(),
+            context.clone(),
+            after.clone(),
+            TransitionOutcomeClass::Success,
+            "shared-independent-cluster",
+        );
+        family_a.environment_family_id = "same-transition-a".to_owned();
+        let mut family_b = transition_episode(
+            "same-transition-family-b",
+            ActionCategory::Install,
+            ActionCategory::Install,
+            before.clone(),
+            context.clone(),
+            after,
+            TransitionOutcomeClass::Failure,
+            "shared-independent-cluster",
+        );
+        family_b.environment_family_id = "same-transition-b".to_owned();
+
+        let mut forward = NixWorldModel::new(dim);
+        forward
+            .learn_episode(&family_a)
+            .expect("first family episode");
+        forward
+            .learn_episode(&family_b)
+            .expect("second family episode");
+
+        let mut reverse = NixWorldModel::new(dim);
+        reverse
+            .learn_episode(&family_b)
+            .expect("first reversed family episode");
+        reverse
+            .learn_episode(&family_a)
+            .expect("second reversed family episode");
+
+        let action_parameters = ContinuousHV::random(dim, 90);
+        let prediction_forward = forward
+            .predict_state_without_family_label(
+                &before,
+                &ActionCategory::Install,
+                &action_parameters,
+                &context,
+            )
+            .expect("forward family-order prediction");
+        let prediction_reverse = reverse
+            .predict_state_without_family_label(
+                &before,
+                &ActionCategory::Install,
+                &action_parameters,
+                &context,
+            )
+            .expect("reverse family-order prediction");
+
+        assert_eq!(
+            prediction_forward.source,
+            ContextualPredictionSource::ContextualDelta
+        );
+        assert_eq!(prediction_forward.observation_count, 2);
+        assert_eq!(prediction_forward.independent_cluster_count, 1);
+        assert_eq!(prediction_forward.outcome_counts.success, 1);
+        assert_eq!(prediction_forward.outcome_counts.failure, 1);
+        assert!(
+            (prediction_forward
+                .predicted_state
+                .similarity(&prediction_reverse.predicted_state)
+                - 1.0)
+                .abs()
+                < 1e-5
+        );
+        assert_eq!(
+            prediction_forward.independent_cluster_count,
+            prediction_reverse.independent_cluster_count
+        );
     }
 
     #[test]
