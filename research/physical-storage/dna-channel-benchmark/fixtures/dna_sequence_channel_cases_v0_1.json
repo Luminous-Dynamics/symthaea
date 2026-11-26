@@ -3,7 +3,7 @@
   "evidence_class": "synthetic_known_answer",
   "evidence_boundary": "All sequences and edits are synthetic fixtures, not estimates of physical synthesis or sequencing error rates.",
   "alphabet": "ACGTN",
-  "case_grouping": "Each read is a distinct read record; read_count records multiplicity/abundance and must not be assumed to represent independent molecule observations without provenance.",
+  "case_grouping": "Each reads[] item is a distinct read record. read_count is repeated observed read multiplicity within that record; it is not an independent-molecule count unless UMI or equivalent molecule provenance is separately supplied.",
   "scorer_only_labels": [
     {
       "case_id": "perfect",
@@ -156,8 +156,9 @@
       ],
       "expected": {
         "distinct_read_records": 3,
-        "molecule_observations": 7,
-        "duplicate_observations": 4
+        "read_observations": 7,
+        "additional_read_copies": 4,
+        "independent_molecule_count": "unknown_without_UMI_or_equivalent_molecule_lineage"
       }
     },
     {
