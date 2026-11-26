@@ -20177,6 +20177,7 @@ dependencies = [
  "candle-nn 0.8.4",
  "criterion",
  "serde",
+ "sha2 0.10.9",
  "serde_json",
  "symthaea-core",
  "symthaea-fep",
