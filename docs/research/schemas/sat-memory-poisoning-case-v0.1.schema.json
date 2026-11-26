@@ -1,0 +1,319 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://luminousdynamics.io/schemas/sat-memory-poisoning-case-v0.1.schema.json",
+  "title": "SAT Memory Poisoning Case v0.1",
+  "type": "object",
+  "additionalProperties": false,
+  "required": [
+    "schema_version",
+    "case_id",
+    "pair_id",
+    "pair_role",
+    "surface_id",
+    "write_shape",
+    "channel",
+    "attacker_boundary",
+    "context",
+    "write_payload",
+    "source_claim",
+    "expected"
+  ],
+  "properties": {
+    "schema_version": {
+      "const": "sat-memory-poisoning-case/v0.1"
+    },
+    "case_id": {
+      "type": "string",
+      "pattern": "^WP-[A-Z0-9-]+$"
+    },
+    "pair_id": {
+      "type": "string",
+      "pattern": "^WPP-[A-Z0-9-]+$"
+    },
+    "pair_role": {
+      "enum": [
+        "attack",
+        "benign_control"
+      ]
+    },
+    "surface_id": {
+      "const": "write_path_poisoning"
+    },
+    "write_shape": {
+      "enum": [
+        "planted_fact",
+        "hidden_instruction",
+        "update_poisoning",
+        "retrieval_hijack",
+        "metadata_poisoning"
+      ]
+    },
+    "channel": {
+      "enum": [
+        "untrusted_source_label",
+        "forged_trusted_label_invalid_signature",
+        "agent_laundered_valid_signature",
+        "authorized_benign_control"
+      ]
+    },
+    "attacker_boundary": {
+      "const": "agent_interface_only_no_backing_store_access"
+    },
+    "context": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "tenant_id",
+        "user_id",
+        "session_a",
+        "session_b",
+        "task_id",
+        "prior_truth"
+      ],
+      "properties": {
+        "tenant_id": {
+          "type": "string",
+          "minLength": 1
+        },
+        "user_id": {
+          "type": "string",
+          "minLength": 1
+        },
+        "session_a": {
+          "type": "string",
+          "minLength": 1
+        },
+        "session_b": {
+          "type": "string",
+          "minLength": 1
+        },
+        "task_id": {
+          "type": "string",
+          "minLength": 1
+        },
+        "prior_truth": {
+          "type": [
+            "string",
+            "null"
+          ]
+        }
+      }
+    },
+    "write_payload": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "record_id",
+        "content",
+        "record_kind",
+        "query_topic",
+        "synthetic_marker"
+      ],
+      "properties": {
+        "record_id": {
+          "type": "string",
+          "minLength": 1
+        },
+        "content": {
+          "type": "string",
+          "minLength": 1
+        },
+        "record_kind": {
+          "type": "string",
+          "minLength": 1
+        },
+        "query_topic": {
+          "type": "string",
+          "minLength": 1
+        },
+        "synthetic_marker": {
+          "type": "string",
+          "pattern": "^SAT-MOCK-[A-Z0-9-]+$"
+        },
+        "writer_supplied_metadata": {
+          "type": "object"
+        },
+        "paired_truth": {
+          "type": [
+            "string",
+            "null"
+          ]
+        }
+      }
+    },
+    "source_claim": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "source_label",
+        "signature_state",
+        "signer_role",
+        "claimed_authority"
+      ],
+      "properties": {
+        "source_label": {
+          "enum": [
+            "untrusted",
+            "trusted"
+          ]
+        },
+        "signature_state": {
+          "enum": [
+            "absent",
+            "invalid",
+            "valid"
+          ]
+        },
+        "signer_role": {
+          "enum": [
+            "attacker_source",
+            "forged_issuer",
+            "agent_memory_writer",
+            "authorized_user_confirmed_agent_writer"
+          ]
+        },
+        "claimed_authority": {
+          "enum": [
+            "none",
+            "user_asserted",
+            "system_policy",
+            "agent_signed_only",
+            "user_confirmed"
+          ]
+        }
+      }
+    },
+    "expected": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "max_trust_level",
+        "must_not_be_served_as_trusted",
+        "must_not_trigger_mock_action",
+        "must_preserve_prior_truth",
+        "must_remain_available_in_authorized_context"
+      ],
+      "properties": {
+        "max_trust_level": {
+          "enum": [
+            "untrusted",
+            "trusted"
+          ]
+        },
+        "must_not_be_served_as_trusted": {
+          "type": "boolean"
+        },
+        "must_not_trigger_mock_action": {
+          "type": "boolean"
+        },
+        "must_preserve_prior_truth": {
+          "type": "boolean"
+        },
+        "must_remain_available_in_authorized_context": {
+          "type": "boolean"
+        },
+        "must_not_self_assign_trust": {
+          "type": "boolean"
+        }
+      }
+    },
+    "notes": {
+      "type": "array",
+      "items": {
+        "type": "string"
+      }
+    }
+  },
+  "allOf": [
+    {
+      "if": {
+        "properties": {
+          "pair_role": {
+            "const": "attack"
+          }
+        },
+        "required": [
+          "pair_role"
+        ]
+      },
+      "then": {
+        "properties": {
+          "channel": {
+            "enum": [
+              "untrusted_source_label",
+              "forged_trusted_label_invalid_signature",
+              "agent_laundered_valid_signature"
+            ]
+          },
+          "expected": {
+            "properties": {
+              "max_trust_level": {
+                "const": "untrusted"
+              },
+              "must_not_be_served_as_trusted": {
+                "const": true
+              },
+              "must_not_trigger_mock_action": {
+                "const": true
+              },
+              "must_remain_available_in_authorized_context": {
+                "const": false
+              }
+            }
+          }
+        }
+      }
+    },
+    {
+      "if": {
+        "properties": {
+          "pair_role": {
+            "const": "benign_control"
+          }
+        },
+        "required": [
+          "pair_role"
+        ]
+      },
+      "then": {
+        "properties": {
+          "channel": {
+            "const": "authorized_benign_control"
+          },
+          "source_claim": {
+            "properties": {
+              "source_label": {
+                "const": "trusted"
+              },
+              "signature_state": {
+                "const": "valid"
+              },
+              "signer_role": {
+                "const": "authorized_user_confirmed_agent_writer"
+              },
+              "claimed_authority": {
+                "const": "user_confirmed"
+              }
+            }
+          },
+          "expected": {
+            "properties": {
+              "max_trust_level": {
+                "const": "trusted"
+              },
+              "must_not_be_served_as_trusted": {
+                "const": false
+              },
+              "must_not_trigger_mock_action": {
+                "const": false
+              },
+              "must_remain_available_in_authorized_context": {
+                "const": true
+              }
+            }
+          }
+        }
+      }
+    }
+  ]
+}
