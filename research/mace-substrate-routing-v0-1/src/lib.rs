@@ -595,24 +595,13 @@ mod tests {
     #[test]
     fn summary_route_requires_parent_graph_and_raw_source_resolution() {
         let req = request(QueryRegimeV1::BroadRecall);
-        let profiles = [
-            profile(SubstrateKindV1::DenseSemantic, cost(100, 1, 0)),
-            profile(SubstrateKindV1::TypedHdc, cost(100, 0, 0)),
-            profile(SubstrateKindV1::SparseLexical, cost(100, 0, 0)),
-            profile(SubstrateKindV1::HierarchicalSummary, cost(50, 0, 0)),
-            profile(SubstrateKindV1::DependencyGraph, cost(50, 0, 1)),
-            profile(SubstrateKindV1::RawTimeline, cost(50, 0, 0)),
-        ];
-        let mut req = req;
-        req.structured_content_query = false;
-        // Earlier fixed substrates are unavailable in this catalogue so the
-        // deterministic rule reaches the verified-summary fallback.
+        // Earlier fixed substrates are absent, so the deterministic rule
+        // reaches the verified-summary fallback.
         let profiles = [
             profile(SubstrateKindV1::HierarchicalSummary, cost(50, 0, 0)),
             profile(SubstrateKindV1::DependencyGraph, cost(50, 0, 1)),
             profile(SubstrateKindV1::RawTimeline, cost(50, 0, 0)),
         ];
-        let _ = profiles;
         let plan = route_mace_query_v1(&req, &profiles).unwrap();
         assert_eq!(
             plan.selected_substrates.iter().map(|x| x.kind).collect::<Vec<_>>(),
