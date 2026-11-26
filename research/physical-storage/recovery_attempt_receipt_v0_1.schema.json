@@ -1,0 +1,688 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://github.com/Luminous-Dynamics/symthaea/blob/research/independent-reader-qualification-001/research/physical-storage/recovery_attempt_receipt_v0_1.schema.json",
+  "title": "Independent Recovery Challenge Receipt v0.1",
+  "type": "object",
+  "additionalProperties": false,
+  "required": [
+    "schema_version",
+    "receipt_id",
+    "capsule_id",
+    "challenge_mode",
+    "evidence_class",
+    "qualification_stage",
+    "package_validation",
+    "reader_path",
+    "decoder_runs",
+    "scorer_reference",
+    "output_comparison",
+    "independence_assessment",
+    "negative_controls",
+    "resource_measurements",
+    "provenance"
+  ],
+  "properties": {
+    "schema_version": {
+      "const": "symthaea-independent-recovery-receipt-v0.1"
+    },
+    "receipt_id": {
+      "type": "string",
+      "minLength": 3
+    },
+    "capsule_id": {
+      "type": "string",
+      "minLength": 3
+    },
+    "challenge_mode": {
+      "enum": [
+        "blind",
+        "public_known_answer",
+        "synthetic_fixture"
+      ]
+    },
+    "evidence_class": {
+      "enum": [
+        "synthetic_fixture",
+        "published_reproduction",
+        "model_derived",
+        "physical_measurement"
+      ]
+    },
+    "qualification_stage": {
+      "enum": [
+        "fixture_only",
+        "capsule_structure_passed",
+        "digital_decoder_passed",
+        "physical_reader_replacement_passed",
+        "failed",
+        "incomplete"
+      ]
+    },
+    "package_validation": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "bagit_validator",
+        "bagit_version",
+        "payload_manifest_result",
+        "tag_manifest_result",
+        "descriptor_schema_result",
+        "path_safety_result",
+        "validator_receipt_ref"
+      ],
+      "properties": {
+        "bagit_validator": {
+          "type": [
+            "string",
+            "null"
+          ]
+        },
+        "bagit_version": {
+          "type": [
+            "string",
+            "null"
+          ]
+        },
+        "payload_manifest_result": {
+          "enum": [
+            "not_run",
+            "passed",
+            "failed"
+          ]
+        },
+        "tag_manifest_result": {
+          "enum": [
+            "not_run",
+            "passed",
+            "failed"
+          ]
+        },
+        "descriptor_schema_result": {
+          "enum": [
+            "not_run",
+            "passed",
+            "failed"
+          ]
+        },
+        "path_safety_result": {
+          "enum": [
+            "not_run",
+            "passed",
+            "failed"
+          ]
+        },
+        "validator_receipt_ref": {
+          "type": [
+            "string",
+            "null"
+          ]
+        }
+      }
+    },
+    "reader_path": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "physical_reader_present",
+        "reader_id",
+        "adapter_id",
+        "adapter_source_digest_sha256",
+        "raw_observation_digest_sha256",
+        "calibration_refs",
+        "network_disabled",
+        "vendor_runtime_withheld"
+      ],
+      "properties": {
+        "physical_reader_present": {
+          "type": "boolean"
+        },
+        "reader_id": {
+          "type": [
+            "string",
+            "null"
+          ]
+        },
+        "adapter_id": {
+          "type": [
+            "string",
+            "null"
+          ]
+        },
+        "adapter_source_digest_sha256": {
+          "type": [
+            "string",
+            "null"
+          ],
+          "pattern": "^[a-fA-F0-9]{64}$"
+        },
+        "raw_observation_digest_sha256": {
+          "type": [
+            "string",
+            "null"
+          ],
+          "pattern": "^[a-fA-F0-9]{64}$"
+        },
+        "calibration_refs": {
+          "type": "array",
+          "items": {
+            "type": "string"
+          }
+        },
+        "network_disabled": {
+          "type": "boolean"
+        },
+        "vendor_runtime_withheld": {
+          "type": "boolean"
+        }
+      }
+    },
+    "decoder_runs": {
+      "type": "array",
+      "minItems": 2,
+      "items": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": [
+          "implementation_id",
+          "source_ref",
+          "source_commit",
+          "source_digest_sha256",
+          "build_recipe_ref",
+          "dependency_lock_digest_sha256",
+          "runtime_environment_digest_sha256",
+          "execution_status",
+          "network_disabled",
+          "vendor_runtime_withheld",
+          "output_byte_length",
+          "output_sha256",
+          "recovered_payload_ref"
+        ],
+        "properties": {
+          "implementation_id": {
+            "type": "string",
+            "minLength": 1
+          },
+          "source_ref": {
+            "type": "string",
+            "minLength": 1
+          },
+          "source_commit": {
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "source_digest_sha256": {
+            "type": [
+              "string",
+              "null"
+            ],
+            "pattern": "^[a-fA-F0-9]{64}$"
+          },
+          "build_recipe_ref": {
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "dependency_lock_digest_sha256": {
+            "type": [
+              "string",
+              "null"
+            ],
+            "pattern": "^[a-fA-F0-9]{64}$"
+          },
+          "runtime_environment_digest_sha256": {
+            "type": [
+              "string",
+              "null"
+            ],
+            "pattern": "^[a-fA-F0-9]{64}$"
+          },
+          "execution_status": {
+            "enum": [
+              "not_run",
+              "built",
+              "executed",
+              "failed"
+            ]
+          },
+          "network_disabled": {
+            "type": "boolean"
+          },
+          "vendor_runtime_withheld": {
+            "type": "boolean"
+          },
+          "output_byte_length": {
+            "type": [
+              "integer",
+              "null"
+            ],
+            "minimum": 0
+          },
+          "output_sha256": {
+            "type": [
+              "string",
+              "null"
+            ],
+            "pattern": "^[a-fA-F0-9]{64}$"
+          },
+          "recovered_payload_ref": {
+            "type": [
+              "string",
+              "null"
+            ]
+          }
+        }
+      }
+    },
+    "scorer_reference": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "visibility",
+        "expected_byte_length",
+        "expected_digest_algorithm",
+        "expected_payload_digest",
+        "reference_payload_ref",
+        "scorer_identity",
+        "scorer_source_digest_sha256"
+      ],
+      "properties": {
+        "visibility": {
+          "const": "scorer_only"
+        },
+        "expected_byte_length": {
+          "type": [
+            "integer",
+            "null"
+          ],
+          "minimum": 0
+        },
+        "expected_digest_algorithm": {
+          "enum": [
+            "sha256",
+            "sha512"
+          ]
+        },
+        "expected_payload_digest": {
+          "type": [
+            "string",
+            "null"
+          ],
+          "pattern": "^[a-fA-F0-9]+$"
+        },
+        "reference_payload_ref": {
+          "type": [
+            "string",
+            "null"
+          ]
+        },
+        "scorer_identity": {
+          "type": [
+            "string",
+            "null"
+          ]
+        },
+        "scorer_source_digest_sha256": {
+          "type": [
+            "string",
+            "null"
+          ],
+          "pattern": "^[a-fA-F0-9]{64}$"
+        }
+      }
+    },
+    "output_comparison": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "decoder_outputs_byte_identical",
+        "all_outputs_match_expected_digest",
+        "exact_payload_match",
+        "independent_digest_recomputed",
+        "mismatch_handling"
+      ],
+      "properties": {
+        "decoder_outputs_byte_identical": {
+          "type": [
+            "boolean",
+            "null"
+          ]
+        },
+        "all_outputs_match_expected_digest": {
+          "type": [
+            "boolean",
+            "null"
+          ]
+        },
+        "exact_payload_match": {
+          "type": [
+            "boolean",
+            "null"
+          ]
+        },
+        "independent_digest_recomputed": {
+          "type": "boolean"
+        },
+        "mismatch_handling": {
+          "enum": [
+            "not_run",
+            "fail_closed",
+            "accepted_in_error",
+            "quarantined"
+          ]
+        }
+      }
+    },
+    "independence_assessment": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "status",
+        "assessor_ref",
+        "source_lineage_reviewed",
+        "common_code_reviewed",
+        "shared_dependencies",
+        "dependency_profile_status",
+        "dependency_profile_ref"
+      ],
+      "properties": {
+        "status": {
+          "enum": [
+            "unassessed",
+            "partial",
+            "qualified",
+            "failed"
+          ]
+        },
+        "assessor_ref": {
+          "type": [
+            "string",
+            "null"
+          ]
+        },
+        "source_lineage_reviewed": {
+          "type": "boolean"
+        },
+        "common_code_reviewed": {
+          "type": "boolean"
+        },
+        "shared_dependencies": {
+          "type": "array",
+          "items": {
+            "type": "string"
+          }
+        },
+        "dependency_profile_status": {
+          "enum": [
+            "complete",
+            "incomplete",
+            "unavailable"
+          ]
+        },
+        "dependency_profile_ref": {
+          "type": [
+            "string",
+            "null"
+          ]
+        }
+      }
+    },
+    "negative_controls": {
+      "type": "array",
+      "items": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": [
+          "control_id",
+          "expected_outcome",
+          "observed_outcome",
+          "result"
+        ],
+        "properties": {
+          "control_id": {
+            "type": "string",
+            "minLength": 1
+          },
+          "expected_outcome": {
+            "enum": [
+              "reject",
+              "fail_closed",
+              "quarantine",
+              "not_applicable"
+            ]
+          },
+          "observed_outcome": {
+            "enum": [
+              "not_run",
+              "reject",
+              "fail_closed",
+              "quarantine",
+              "accepted",
+              "error"
+            ]
+          },
+          "result": {
+            "enum": [
+              "not_run",
+              "pass",
+              "fail"
+            ]
+          }
+        }
+      }
+    },
+    "resource_measurements": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "system_boundary",
+        "wall_clock_seconds",
+        "peak_memory_bytes",
+        "energy_joules",
+        "measurement_method_ref"
+      ],
+      "properties": {
+        "system_boundary": {
+          "type": [
+            "string",
+            "null"
+          ]
+        },
+        "wall_clock_seconds": {
+          "type": [
+            "number",
+            "null"
+          ],
+          "minimum": 0
+        },
+        "peak_memory_bytes": {
+          "type": [
+            "integer",
+            "null"
+          ],
+          "minimum": 0
+        },
+        "energy_joules": {
+          "type": [
+            "number",
+            "null"
+          ],
+          "minimum": 0
+        },
+        "measurement_method_ref": {
+          "type": [
+            "string",
+            "null"
+          ]
+        }
+      }
+    },
+    "provenance": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "created_at",
+        "host_environment_ref",
+        "runner_identity",
+        "receipt_digest_sha256",
+        "notes"
+      ],
+      "properties": {
+        "created_at": {
+          "type": "string",
+          "format": "date-time"
+        },
+        "host_environment_ref": {
+          "type": [
+            "string",
+            "null"
+          ]
+        },
+        "runner_identity": {
+          "type": [
+            "string",
+            "null"
+          ]
+        },
+        "receipt_digest_sha256": {
+          "type": [
+            "string",
+            "null"
+          ],
+          "pattern": "^[a-fA-F0-9]{64}$"
+        },
+        "notes": {
+          "type": "string"
+        }
+      }
+    }
+  },
+  "allOf": [
+    {
+      "if": {
+        "properties": {
+          "qualification_stage": {
+            "const": "physical_reader_replacement_passed"
+          }
+        },
+        "required": [
+          "qualification_stage"
+        ]
+      },
+      "then": {
+        "properties": {
+          "evidence_class": {
+            "const": "physical_measurement"
+          },
+          "reader_path": {
+            "properties": {
+              "physical_reader_present": {
+                "const": true
+              },
+              "network_disabled": {
+                "const": true
+              },
+              "vendor_runtime_withheld": {
+                "const": true
+              }
+            }
+          },
+          "decoder_runs": {
+            "minItems": 2,
+            "items": {
+              "properties": {
+                "execution_status": {
+                  "const": "executed"
+                },
+                "network_disabled": {
+                  "const": true
+                },
+                "vendor_runtime_withheld": {
+                  "const": true
+                },
+                "output_sha256": {
+                  "type": "string"
+                },
+                "output_byte_length": {
+                  "type": "integer"
+                }
+              }
+            }
+          },
+          "output_comparison": {
+            "properties": {
+              "decoder_outputs_byte_identical": {
+                "const": true
+              },
+              "all_outputs_match_expected_digest": {
+                "const": true
+              },
+              "exact_payload_match": {
+                "const": true
+              },
+              "independent_digest_recomputed": {
+                "const": true
+              }
+            }
+          },
+          "independence_assessment": {
+            "properties": {
+              "status": {
+                "const": "qualified"
+              },
+              "source_lineage_reviewed": {
+                "const": true
+              },
+              "common_code_reviewed": {
+                "const": true
+              },
+              "dependency_profile_status": {
+                "const": "complete"
+              }
+            }
+          }
+        }
+      }
+    },
+    {
+      "if": {
+        "properties": {
+          "qualification_stage": {
+            "const": "digital_decoder_passed"
+          }
+        },
+        "required": [
+          "qualification_stage"
+        ]
+      },
+      "then": {
+        "properties": {
+          "decoder_runs": {
+            "items": {
+              "properties": {
+                "execution_status": {
+                  "const": "executed"
+                }
+              }
+            }
+          },
+          "output_comparison": {
+            "properties": {
+              "decoder_outputs_byte_identical": {
+                "const": true
+              },
+              "all_outputs_match_expected_digest": {
+                "const": true
+              },
+              "exact_payload_match": {
+                "const": true
+              }
+            }
+          }
+        }
+      }
+    }
+  ]
+}
