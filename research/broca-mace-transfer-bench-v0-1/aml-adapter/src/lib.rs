@@ -33,6 +33,7 @@ pub mod decision_value_retrieval;
 pub mod adaptive_policy_reference;
 pub mod adaptive_policy_optimized;
 pub mod timlmembench_protocol;
+pub mod non_regressive_learning;
 pub mod acquisition_receipt_v2;
 
 use std::collections::BTreeMap;

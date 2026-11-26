@@ -1,0 +1,106 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://luminousdynamics.io/schemas/mace_non_regressive_learning_gate_v1.schema.json",
+  "title": "MACE Non-Regressive Learning Gate V1",
+  "description": "Four matched evaluation run receipts and a retention policy for admitting an adaptive model update. Schema validation does not verify run receipts, signatures, scoring provenance, or independent task results.",
+  "type": "object",
+  "additionalProperties": false,
+  "required": [
+    "version",
+    "stable_before",
+    "stable_after",
+    "adaptation_before",
+    "adaptation_after",
+    "policy"
+  ],
+  "properties": {
+    "version": { "const": 1 },
+    "stable_before": { "$ref": "#/$defs/run" },
+    "stable_after": { "$ref": "#/$defs/run" },
+    "adaptation_before": { "$ref": "#/$defs/run" },
+    "adaptation_after": { "$ref": "#/$defs/run" },
+    "policy": { "$ref": "#/$defs/policy" }
+  },
+  "$defs": {
+    "sha256": {
+      "type": "string",
+      "pattern": "^[0-9a-f]{64}$"
+    },
+    "identifier": {
+      "type": "string",
+      "minLength": 1,
+      "maxLength": 512,
+      "pattern": "^[^\\u0000-\\u001F\\u007F]+$"
+    },
+    "run": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "run_id",
+        "benchmark_id",
+        "benchmark_release_sha256",
+        "split_id",
+        "stratum",
+        "evaluation_protocol_sha256",
+        "grader_sha256",
+        "task_set_sha256",
+        "comparison_group_sha256",
+        "candidate_state_sha256",
+        "run_receipt_sha256",
+        "task_scores"
+      ],
+      "properties": {
+        "run_id": { "$ref": "#/$defs/identifier" },
+        "benchmark_id": { "$ref": "#/$defs/identifier" },
+        "benchmark_release_sha256": { "$ref": "#/$defs/sha256" },
+        "split_id": { "$ref": "#/$defs/identifier" },
+        "stratum": { "enum": ["Stable", "Adaptation"] },
+        "evaluation_protocol_sha256": { "$ref": "#/$defs/sha256" },
+        "grader_sha256": { "$ref": "#/$defs/sha256" },
+        "task_set_sha256": { "$ref": "#/$defs/sha256" },
+        "comparison_group_sha256": { "$ref": "#/$defs/sha256" },
+        "candidate_state_sha256": { "$ref": "#/$defs/sha256" },
+        "run_receipt_sha256": { "$ref": "#/$defs/sha256" },
+        "task_scores": {
+          "type": "array",
+          "minItems": 1,
+          "maxItems": 1000000,
+          "items": { "$ref": "#/$defs/task_score" }
+        }
+      }
+    },
+    "task_score": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["task_id", "score_basis_points"],
+      "properties": {
+        "task_id": { "$ref": "#/$defs/identifier" },
+        "score_basis_points": {
+          "type": "integer",
+          "minimum": 0,
+          "maximum": 10000
+        }
+      }
+    },
+    "policy": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "maximum_stable_regression_basis_points",
+        "minimum_adaptation_gain_basis_points"
+      ],
+      "properties": {
+        "maximum_stable_regression_basis_points": {
+          "type": "integer",
+          "minimum": 0,
+          "maximum": 10000
+        },
+        "minimum_adaptation_gain_basis_points": {
+          "type": "integer",
+          "minimum": 0,
+          "maximum": 10000
+        }
+      }
+    }
+  }
+}
