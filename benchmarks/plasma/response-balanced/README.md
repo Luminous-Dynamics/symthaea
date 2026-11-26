@@ -268,6 +268,10 @@ This gives a research objective beyond a static reduced basis: minimize the cost
 
 The likely long-term design is a **local response-balanced atlas**, not one global basis: checkpoint-local subspaces are connected by explicit transitions, and each transition is requalified against positivity, the equation-specific invariant/structure contract, future response, memory, and the validity horizon. This is a research hypothesis, not an implemented atlas.
 
+- Zagorowska et al. (2024), *Automatic scenario generation for efficient solution of robust optimal control problems*, Int. J. Robust Nonlinear Control 34(2), 1370–1396. It iteratively adds worst-case scenarios using semi-infinite/local-reduction methods and shows worst cases can lie inside, not only on the boundary of, the uncertainty set. Therefore generic worst-case scenario generation is prior art; our candidate-specific step is to map the remaining kinetic input–output transfer residual to a biorthogonal trial/test enrichment and qualify the result with the exact pulse/solver derivatives: https://doi.org/10.1002/rnc.7038
+- Hesthaven, Pagliantini & Ripamonti (2024), *Adaptive symplectic model order reduction of parametric particle-based Vlasov–Poisson equation*, Mathematics of Computation 93, 1153–1202. Their particle-based Hamiltonian ROM evolves a local reduced phase space and uses adaptive parameter sampling plus DMD/DEIM hyper-reduction. It is a mandatory adjacent baseline for a particle-based K-RESP extension; local/adaptive symplectic bases are not new: https://doi.org/10.1090/mcom/3885
+- Zhang, Zhang & Lin (2026), *Data-Adaptive Entropy-Based Moment Reduction for Vlasov–Poisson–Dougherty Dynamics*, arXiv:2611.27904. Their collisional VPD moment model combines positive exponential reconstruction, data-adapted velocity functions, post-training and positive empirical cubature while retaining positivity, local conservation and entropy dissipation. It reports below 0.25% space-time distribution error with 13 variables per cell and 1.36–2.89× online speedup on its tested two-stream/heating/drive-switching cohorts. This is not a direct collisionless echo comparator, but it should be mandatory in a separate collisional VP-Dougherty/VPFP extension: https://arxiv.org/abs/2611.27904
+
 ## First physics-facing experiment: K-RESP-1
 
 The first target experiment is a frozen-checkpoint, two-pulse 1D1V collisionless Vlasov–Poisson echo cohort using the existing `sinusoidal_velocity_kick_v1` contract. Every path shares the same first pulse and the same post-phase-mixing, post-first-pulse checkpoint; only the second pulse varies across training, validation and held-out paths. This places the first pulse's reachable directions in the checkpoint-centred reachability Gramian and tests whether the reduced state preserves the response to unseen second pulses. A later atlas experiment will vary first-pulse histories and qualify separate checkpoint-local bases. The experiment contract is machine-readable:
@@ -281,6 +285,20 @@ The synthetic fixture also records a non-negotiable linearization contract: futu
 The synthetic fixture has two training pulse paths, one validation path, and five held-out second-pulse paths covering phase, amplitude, spatial mode, separation, and a combined out-of-training-range case. CI checks that the first pulse is identical across every split, the checkpoint lies strictly after the first pulse and before the second pulse, and pulse identities and split assignments do not leak. It is deliberately only a schema/split fixture: no solver was run, no echo was measured, no reference was converged, and no method ranking is claimed.
 
 The executable workflow checks that train/validation/test identifiers are disjoint, pulse identities are unique, pulses are time-ordered and within the declared admissible family, the held-out paths actually exercise unseen parameter values, required comparators are present, and all physical targets remain prospective. The actual physics cohort must replace the synthetic checkpoint and solver provenance with immutable solver revisions, exact state digests, grid/time refinements, and independently reproduced response measurements before any physical claim is admitted.
+
+## Separate collisional extension: K-RESP-C
+
+Do not merge collisional Vlasov–Poisson–Dougherty / Vlasov–Poisson–Fokker–Planck results into the collisionless K-RESP-1 scoreboard. The collision operator changes the admissible physical structure and the success metrics.
+
+For a future K-RESP-C cohort, require a second tournament containing the entropy-based Vlasov–Poisson–Dougherty moment model (Zhang et al. 2026), high-field VPFP micro–macro ROM, adaptive symplectic particle VP ROM, structure-preserving hyper-reduction, adaptive Hermite, tensor methods where matched, and a converged collisional full-order reference. Compare:
+- distribution and field errors on the same grid plus independently refined references;
+- positivity and realizability of the distribution;
+- exact/discrete mass, momentum and kinetic-energy conservation;
+- entropy dissipation / discrete H-theorem;
+- collision operator and cubature residuals;
+- online speed, memory, and total cost including basis fitting/post-training and hyper-reduction setup.
+
+The published VPD moment result (<0.25% space-time distribution error and 1.36–2.89× online speedup) is a useful bar for its own collisional cohort, not a target to misapply to collisionless echoes. RBKR must not trade away positivity, conservation or entropy dissipation to improve a pulse-response score.
 
 ## Benchmark ladder
 
