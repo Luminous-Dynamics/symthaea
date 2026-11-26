@@ -966,7 +966,7 @@ mod tests {
 
     #[test]
     fn no_permitted_action_causes_abstention() {
-        let decision = decide(&input(sample_state(0), vec![])).unwrap();
+        let decision = decide_inner(&input(sample_state(0), vec![]), true).unwrap();
         assert_eq!(decision.disposition, DecisionDisposition::Abstain);
         assert_eq!(decision.reason_codes, vec!["NO_FEASIBLE_PERMITTED_ACTION"]);
     }
