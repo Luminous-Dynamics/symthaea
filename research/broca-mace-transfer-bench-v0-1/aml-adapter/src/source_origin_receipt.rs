@@ -324,27 +324,46 @@ fn validate_artifacts(
     for node in graph.node_bindings() {
         let (input, measured) = by_id.remove(&node.evidence_id)
             .ok_or(SourceOriginRejectV1::MissingArtifact)?;
-        if sha256_hex(input.source_bytes) != node.source_sha256 {
-            return Err(SourceOriginRejectV1::SourceBytesMismatch);
-        }
-        if sha256_hex(input.payload_bytes) != node.payload_sha256 {
-            return Err(SourceOriginRejectV1::PayloadBytesMismatch);
-        }
-        match (&node.derivation_receipt_sha256, input.derivation_receipt_bytes) {
-            (None, None) if node.parent_evidence_ids.is_empty() => {}
-            (Some(expected), Some(bytes)) if !node.parent_evidence_ids.is_empty() => {
-                if sha256_hex(bytes) != *expected {
-                    return Err(SourceOriginRejectV1::DerivationReceiptMismatch);
-                }
-            }
-            _ => return Err(SourceOriginRejectV1::DerivationReceiptMismatch),
-        }
+        validate_node_artifact_bytes(node, input, &measured)?;
         lengths.insert(node.evidence_id.clone(), measured);
     }
     if !by_id.is_empty() {
         return Err(SourceOriginRejectV1::UnexpectedArtifact);
     }
     Ok(lengths)
+}
+
+fn validate_node_artifact_bytes(
+    node: &VerifiedSourceLineageNodeBindingV1,
+    input: &SourceOriginArtifactInputV1<'_>,
+    measured: &ArtifactLengthsV1,
+) -> Result<(), SourceOriginRejectV1> {
+    if input.evidence_id != node.evidence_id {
+        return Err(SourceOriginRejectV1::BindingMismatch);
+    }
+    if measured.source_bytes_len != input.source_bytes.len() as u64
+        || measured.payload_bytes_len != input.payload_bytes.len() as u64
+        || measured.derivation_receipt_bytes_len
+            != input.derivation_receipt_bytes.map_or(0, |bytes| bytes.len() as u64)
+    {
+        return Err(SourceOriginRejectV1::BindingMismatch);
+    }
+    if sha256_hex(input.source_bytes) != node.source_sha256 {
+        return Err(SourceOriginRejectV1::SourceBytesMismatch);
+    }
+    if sha256_hex(input.payload_bytes) != node.payload_sha256 {
+        return Err(SourceOriginRejectV1::PayloadBytesMismatch);
+    }
+    match (&node.derivation_receipt_sha256, input.derivation_receipt_bytes) {
+        (None, None) if node.parent_evidence_ids.is_empty() => {}
+        (Some(expected), Some(bytes)) if !node.parent_evidence_ids.is_empty() => {
+            if sha256_hex(bytes) != *expected {
+                return Err(SourceOriginRejectV1::DerivationReceiptMismatch);
+            }
+        }
+        _ => return Err(SourceOriginRejectV1::DerivationReceiptMismatch),
+    }
+    Ok(())
 }
 
 fn validate_receipt_binding(
@@ -621,6 +640,118 @@ mod tests {
             "ba7816bf8f01cfea414140de5dae2223b00361a396177a9cb410ff61f20015ad"
         );
         assert_ne!(sha256_hex(b"source"), sha256_hex(b"payload"));
+    }
+
+    fn test_node(
+        evidence_id: &str,
+        source_bytes: &[u8],
+        payload_bytes: &[u8],
+        parent_evidence_ids: Vec<String>,
+        derivation_receipt_bytes: Option<&[u8]>,
+    ) -> VerifiedSourceLineageNodeBindingV1 {
+        VerifiedSourceLineageNodeBindingV1 {
+            evidence_id: evidence_id.to_owned(),
+            source_id: "source:test".to_owned(),
+            source_sha256: sha256_hex(source_bytes),
+            payload_sha256: sha256_hex(payload_bytes),
+            evidence_class_sha256: "a".repeat(64),
+            parent_evidence_ids,
+            derivation_receipt_sha256: derivation_receipt_bytes.map(sha256_hex),
+            common_cause_group_sha256: Vec::new(),
+        }
+    }
+
+    #[test]
+    fn exact_artifact_bytes_match_the_verified_node_commitments() {
+        let source = b"immutable source bytes";
+        let payload = b"derived evidence payload";
+        let derivation = b"transformation receipt";
+        let node = test_node(
+            "derived-1", source, payload, vec!["root-1".to_owned()], Some(derivation),
+        );
+        let input = SourceOriginArtifactInputV1 {
+            evidence_id: "derived-1",
+            source_bytes: source,
+            payload_bytes: payload,
+            derivation_receipt_bytes: Some(derivation),
+        };
+        let measured = ArtifactLengthsV1 {
+            source_bytes_len: source.len() as u64,
+            payload_bytes_len: payload.len() as u64,
+            derivation_receipt_bytes_len: derivation.len() as u64,
+        };
+        assert_eq!(validate_node_artifact_bytes(&node, &input, &measured), Ok(()));
+    }
+
+    #[test]
+    fn altered_source_payload_and_derivation_bytes_are_rejected() {
+        let source = b"immutable source bytes";
+        let payload = b"derived evidence payload";
+        let derivation = b"transformation receipt";
+        let node = test_node(
+            "derived-1", source, payload, vec!["root-1".to_owned()], Some(derivation),
+        );
+        let measured = ArtifactLengthsV1 {
+            source_bytes_len: source.len() as u64,
+            payload_bytes_len: payload.len() as u64,
+            derivation_receipt_bytes_len: derivation.len() as u64,
+        };
+        let wrong_source = SourceOriginArtifactInputV1 {
+            evidence_id: "derived-1",
+            source_bytes: b"tampered source",
+            payload_bytes: payload,
+            derivation_receipt_bytes: Some(derivation),
+        };
+        assert_eq!(
+            validate_node_artifact_bytes(&node, &wrong_source, &measured),
+            Err(SourceOriginRejectV1::SourceBytesMismatch)
+        );
+        let wrong_payload = SourceOriginArtifactInputV1 {
+            source_bytes: source,
+            payload_bytes: b"tampered payload",
+            ..wrong_source
+        };
+        assert_eq!(
+            validate_node_artifact_bytes(&node, &wrong_payload, &measured),
+            Err(SourceOriginRejectV1::PayloadBytesMismatch)
+        );
+        let wrong_derivation = SourceOriginArtifactInputV1 {
+            source_bytes: source,
+            payload_bytes: payload,
+            derivation_receipt_bytes: Some(b"tampered transformation"),
+            ..wrong_source
+        };
+        assert_eq!(
+            validate_node_artifact_bytes(&node, &wrong_derivation, &measured),
+            Err(SourceOriginRejectV1::BindingMismatch)
+        );
+    }
+
+    #[test]
+    fn roots_reject_derivation_artifacts_and_derived_nodes_require_them() {
+        let source = b"root source";
+        let payload = b"root payload";
+        let node = test_node("root-1", source, payload, Vec::new(), None);
+        let root_input = SourceOriginArtifactInputV1 {
+            evidence_id: "root-1",
+            source_bytes: source,
+            payload_bytes: payload,
+            derivation_receipt_bytes: None,
+        };
+        let measured = ArtifactLengthsV1 {
+            source_bytes_len: source.len() as u64,
+            payload_bytes_len: payload.len() as u64,
+            derivation_receipt_bytes_len: 0,
+        };
+        assert_eq!(validate_node_artifact_bytes(&node, &root_input, &measured), Ok(()));
+        let unexpected = SourceOriginArtifactInputV1 {
+            derivation_receipt_bytes: Some(b"unexpected"),
+            ..root_input
+        };
+        assert_eq!(
+            validate_node_artifact_bytes(&node, &unexpected, &measured),
+            Err(SourceOriginRejectV1::BindingMismatch)
+        );
     }
 
     #[test]
