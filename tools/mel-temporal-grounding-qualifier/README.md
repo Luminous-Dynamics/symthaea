@@ -77,3 +77,25 @@ Run the synthetic dual-stream plan with:
     cargo +1.96.0 run --locked --manifest-path tools/mel-temporal-grounding-qualifier/Cargo.toml --bin mel-annotation-acquisition-plan -- tools/mel-temporal-grounding-qualifier/fixtures/mel-annotation-acquisition.synthetic.json
 
 The committed fixture is 11 candidates across two strata. It is a deterministic planner control only; no human study, unbiased population estimate, or annotation-quality improvement is established.
+
+
+## Paired marginal annotation value and musician effort
+
+The temporal_annotation_value module compares a before-panel with an after-panel that contains every original annotation unchanged and exactly one new independent annotation. It rejects rewritten/reordered/removed old records, duplicate annotators, changed query/audio/policy/scorer plan/model prediction, invalid session/selection digest syntax, and impossible listening/review/wall-time relationships.
+
+It evaluates each panel with the existing multi-annotator scorer and the production temporal scorer. Pairwise present/present event F1, matched IoU and count agreement are recomputed through the production one-to-one matcher in both directions. It reports:
+- disposition entropy and occurrence-count entropy before/after;
+- pairwise disposition agreement and Present/Present event-set agreement;
+- event-boundary spread before/after;
+- a **frozen panel sufficiency state** (SufficientlySupportedPresent, SufficientlySupportedAbsent or NeedsReview);
+- active listening, active review and elapsed wall time separately;
+- metric deltas per active-review minute, remaining undefined when active-review time is zero.
+
+The panel sufficiency state is a policy-defined workflow status, not a consensus ground truth or claim that one label is correct. An added Ambiguous or NotEstimable label is preserved and can increase entropy or return the panel to NeedsReview. No metric is reduced to a scalar “annotation value” score; lower entropy/agreement spread is not always better because it may conceal real musical ambiguity.
+
+Run the aligned and ambiguity-revealing fixtures with:
+
+    cargo +1.96.0 run --locked --manifest-path tools/mel-temporal-grounding-qualifier/Cargo.toml --bin mel-annotation-marginal-value-audit -- tools/mel-temporal-grounding-qualifier/fixtures/mel-annotation-marginal-value-aligned.synthetic.json
+    cargo +1.96.0 run --locked --manifest-path tools/mel-temporal-grounding-qualifier/Cargo.toml --bin mel-annotation-marginal-value-audit -- tools/mel-temporal-grounding-qualifier/fixtures/mel-annotation-marginal-value-ambiguous.synthetic.json
+
+Selection/session/annotation digests and effort telemetry remain unauthenticated metadata in this adapter. ActiveRefinement observations are descriptive; this item-level paired report does not make population claims or replace the separate ProbabilityAudit design.
