@@ -33,6 +33,7 @@ pub enum DecisionValueRejectV1 {
     InvalidIdentifier,
     InvalidDigest,
     InvalidDimensions,
+    NoPermittedAction,
     InvalidProbability,
     InvalidObservationSupport,
     UtilityOutOfRange,
@@ -55,6 +56,9 @@ pub struct DecisionValuePolicyV1 {
     /// Rows follow state_ids; columns follow action_ids.
     /// Larger values are better. Safety penalties belong in this utility table.
     pub utility_by_state_action: Vec<Vec<i64>>,
+    /// Hard consumer-owned action constraints. An action is considered only
+    /// when permitted in every state with positive posterior/support mass.
+    pub action_allowed_by_state: Vec<Vec<bool>>,
     pub maximum_tool_calls: u32,
     pub maximum_latency_ns: u64,
     pub maximum_context_tokens: u64,
@@ -84,6 +88,9 @@ impl DecisionValuePolicyV1 {
         }
         if self.utility_by_state_action.len() != self.state_ids.len()
             || self.utility_by_state_action.iter()
+                .any(|row| row.len() != self.action_ids.len())
+            || self.action_allowed_by_state.len() != self.state_ids.len()
+            || self.action_allowed_by_state.iter()
                 .any(|row| row.len() != self.action_ids.len())
         {
             return Err(DecisionValueRejectV1::InvalidDimensions);
@@ -426,6 +433,11 @@ pub fn evaluate_robust_value_v1(
     let mut baseline_minimax_regret = i128::MAX;
     let mut baseline_action_index = 0usize;
     for action_index in 0..policy.action_ids.len() {
+        if (0..policy.state_ids.len())
+            .any(|state_index| !policy.action_allowed_by_state[state_index][action_index])
+        {
+            continue;
+        }
         let worst_regret = (0..policy.state_ids.len())
             .map(|state_index| {
                 i128::from(best_utility_by_state[state_index])
@@ -436,6 +448,9 @@ pub fn evaluate_robust_value_v1(
             baseline_minimax_regret = worst_regret;
             baseline_action_index = action_index;
         }
+    }
+    if baseline_minimax_regret == i128::MAX {
+        return Err(DecisionValueRejectV1::NoPermittedAction);
     }
 
     let mut post_query_worst_case_regret = 0_i128;
@@ -457,6 +472,11 @@ pub fn evaluate_robust_value_v1(
         let mut best_action_regret = i128::MAX;
         let mut best_action_index = 0usize;
         for action_index in 0..policy.action_ids.len() {
+            if compatible_states.iter().any(|state_index|
+                !policy.action_allowed_by_state[*state_index][action_index])
+            {
+                continue;
+            }
             let worst_regret = compatible_states.iter()
                 .map(|state_index| {
                     i128::from(best_utility_by_state[*state_index])
@@ -467,6 +487,9 @@ pub fn evaluate_robust_value_v1(
                 best_action_regret = worst_regret;
                 best_action_index = action_index;
             }
+        }
+        if best_action_regret == i128::MAX {
+            return Err(DecisionValueRejectV1::NoPermittedAction);
         }
         post_query_worst_case_regret = post_query_worst_case_regret.max(best_action_regret);
         selected_actions_by_observation.push(RobustValueObservationChoiceV1 {
@@ -550,6 +573,10 @@ fn probability_model_sha256(
         h.update((row.len() as u64).to_be_bytes());
         for value in row { h.update(value.to_be_bytes()); }
     }
+    for row in &policy.action_allowed_by_state {
+        h.update((row.len() as u64).to_be_bytes());
+        for allowed in row { h.update([u8::from(*allowed)]); }
+    }
     h.update((prior.probability_ppm_by_state.len() as u64).to_be_bytes());
     for probability in &prior.probability_ppm_by_state {
         h.update(probability.to_be_bytes());
@@ -591,6 +618,11 @@ fn best_expected_action(
     let mut best_action = 0usize;
     let mut best_value: Option<i128> = None;
     for action_index in 0..policy.action_ids.len() {
+        if state_weights.iter().enumerate().any(|(state_index, weight)| {
+            *weight > 0 && !policy.action_allowed_by_state[state_index][action_index]
+        }) {
+            continue;
+        }
         let mut value = 0_i128;
         for (state_index, weight) in state_weights.iter().enumerate() {
             let term = weight.checked_mul(
@@ -603,7 +635,7 @@ fn best_expected_action(
             best_value = Some(value);
         }
     }
-    Ok((best_action, best_value.ok_or(DecisionValueRejectV1::InvalidDimensions)?))
+    Ok((best_action, best_value.ok_or(DecisionValueRejectV1::NoPermittedAction)?))
 }
 
 fn strict_sorted_unique(values: &[String]) -> bool {
@@ -663,6 +695,10 @@ mod tests {
             utility_by_state_action: vec![
                 vec![0, -100],
                 vec![0, 100],
+            ],
+            action_allowed_by_state: vec![
+                vec![true, true],
+                vec![true, true],
             ],
             maximum_tool_calls: 2,
             maximum_latency_ns: 10_000,
@@ -851,13 +887,45 @@ mod tests {
 
     #[test]
     fn stale_calibration_receipt_is_rejected() {
-        let mut prior = prior();
-        prior.valid_until_unix = 10;
+        let prior = prior();
+        let mut option = informative_option();
+        option.calibration_valid_until_unix = Some(10);
         assert_eq!(
             evaluate_expected_value_v1(
-                &policy(), &prior, &informative_option(), 10, &AcceptPinnedCalibration,
+                &policy(), &prior, &option, 10, &AcceptPinnedCalibration,
             ),
             Err(DecisionValueRejectV1::InvalidCalibration)
+        );
+    }
+
+    #[test]
+    fn hard_action_prohibitions_override_expected_utility() {
+        let mut policy = policy();
+        // Proceeding is categorically forbidden in the risky state even if
+        // its average utility could be made attractive by another state.
+        policy.action_allowed_by_state[0][1] = false;
+        let assessment = evaluate_expected_value_v1(
+            &policy, &prior(), &informative_option(), 10, &AcceptPinnedCalibration,
+        ).unwrap();
+        assert_eq!(
+            assessment.selected_actions_by_observation[0].selected_action_id.as_deref(),
+            Some("abstain")
+        );
+        assert_eq!(
+            assessment.selected_actions_by_observation[1].selected_action_id.as_deref(),
+            Some("proceed")
+        );
+    }
+
+    #[test]
+    fn no_action_is_selected_when_every_action_is_forbidden_in_a_possible_state() {
+        let mut policy = policy();
+        policy.action_allowed_by_state[0] = vec![false, false];
+        assert_eq!(
+            evaluate_expected_value_v1(
+                &policy, &prior(), &informative_option(), 10, &AcceptPinnedCalibration,
+            ),
+            Err(DecisionValueRejectV1::NoPermittedAction)
         );
     }
 }
