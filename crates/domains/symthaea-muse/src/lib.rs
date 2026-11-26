@@ -183,6 +183,8 @@ pub mod stream;
 pub mod streaming;
 #[cfg(feature = "theory")]
 pub mod structural_evidence;
+#[cfg(feature = "theory")]
+pub mod style_coverage;
 pub mod structure;
 #[cfg(feature = "theory")]
 pub mod studio_contract;
