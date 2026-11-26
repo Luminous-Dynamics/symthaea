@@ -99,3 +99,8 @@ The `audio_revision_binding` module provides `audit_revision_with_audio_evidence
 Local evidence must use the scored target's exact audio clock. Yoked evidence must remain a distinct source recording while retaining the same target query. A no-evidence revision case cannot be promoted by attaching an audio-window manifest. The resulting report says that materialized audio bytes are bound to the revision case but always keeps `model_input_attested=false`.
 
 This integration prevents a byte-valid manifest from being reused with a different query or revision arm. It remains a client-side evidence binding; provider/runtime input acceptance and internal model consumption require authenticated execution evidence from #13254.
+
+
+The evidence-window contract now distinguishes two work identities: `target_source_lineage_id` is the work being queried, while `source_lineage_id` is the work from which the audio window was materialized. LocalRetrieved requires equal lineages and the exact target audio digest. YokedRetrieved requires a different lineage and a different audio digest. A different encoding or crop from the same work is not accepted as a yoked source. The verification report returns both lineage IDs separately.
+
+The revision binding also requires the selected frame-range/payload tuple to match **exactly one** manifest window. A manifest with duplicate matching windows is rejected as ambiguous rather than picking an arbitrary occurrence.
