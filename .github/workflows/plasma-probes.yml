@@ -869,6 +869,13 @@ jobs:
           }
           assert fixture["success_targets"]["status"] == "prospective_only_not_achieved"
           assert fixture["success_targets"]["all_targets_are_prospective"] is True
+          response_qualification = fixture["response_qualification"]
+          assert response_qualification["checkpoint_state_residual_required"] is True
+          assert response_qualification["future_pulse_injection_residual_required"] is True
+          assert response_qualification["nonlinear_full_order_response_required"] is True
+          assert set(response_qualification["risk_summary_metrics"]) == {"weighted_mean", "worst_case", "cvar"}
+          assert response_qualification["cvar_alpha"] == 0.9
+          assert response_qualification["residual_threshold_status"] == "calibrate_on_independently_converged_physical_reference"
           assert fixture["claim_boundary"] == {
               "physical_solver_executed": False,
               "physical_response_measured": False,
