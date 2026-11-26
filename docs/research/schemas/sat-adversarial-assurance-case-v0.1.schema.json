@@ -276,9 +276,9 @@
             }
           },
           "attacker_capabilities": {
-            "contains": {
-              "const": "none"
-            }
+            "const": [
+              "none"
+            ]
           },
           "expected": {
             "properties": {
