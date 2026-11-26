@@ -614,6 +614,60 @@ mod tests {
 
 
 
+
+    #[test]
+    fn toy_world_exposes_copy_appearance_and_response_quotient_tradeoffs() {
+        let contract = contract();
+        let mut states = vec![
+            record("sticky-red", "red", 0, 2),
+            record("sticky-blue", "blue", 0, 2),
+            record("slippery-red", "red", 8, 2),
+            record("slippery-blue", "blue", 8, 2),
+        ];
+        let no_op_keys: Vec<_> = contract
+            .expected_keys()
+            .into_iter()
+            .filter(|key| key.intervention_id == "no_op")
+            .collect();
+        for state in &mut states {
+            for key in &no_op_keys {
+                state.responses.insert(key.clone(), 0);
+            }
+        }
+
+        // Copy/no-op grouping: identical no-op outcomes do not imply
+        // equivalent responses to registered interventions.
+        let mut copy_only = states.clone();
+        for state in &mut copy_only {
+            state.abstract_state_id = "copied-current-state".to_owned();
+        }
+        let copy_score =
+            score_abstraction(&copy_only, &contract).expect("copy-only partition");
+        assert_eq!(copy_score.candidate_class_count, 1);
+        assert_eq!(copy_score.false_merges, 4);
+
+        // Appearance grouping both merges different mechanisms and splits
+        // same-mechanism states under an irrelevant nuisance change.
+        let appearance_score =
+            score_abstraction(&states, &contract).expect("appearance partition");
+        assert_eq!(appearance_score.candidate_class_count, 2);
+        assert_eq!(appearance_score.false_merges, 2);
+        assert_eq!(appearance_score.false_splits, 2);
+
+        // Evaluator-only quotient by identical response signatures is a
+        // diagnostic upper bound, not a candidate-visible baseline.
+        let mut response_quotient = states;
+        response_quotient[0].abstract_state_id = "sticky".to_owned();
+        response_quotient[1].abstract_state_id = "sticky".to_owned();
+        response_quotient[2].abstract_state_id = "slippery".to_owned();
+        response_quotient[3].abstract_state_id = "slippery".to_owned();
+        let quotient_score =
+            score_abstraction(&response_quotient, &contract).expect("response quotient");
+        assert_eq!(quotient_score.candidate_class_count, 2);
+        assert_eq!(quotient_score.false_merges, 0);
+        assert_eq!(quotient_score.false_splits, 0);
+    }
+
     #[test]
     fn abstraction_score_reports_partition_cardinality_and_singletons() {
         let contract = contract();
