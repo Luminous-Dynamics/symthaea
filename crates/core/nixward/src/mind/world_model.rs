@@ -7,13 +7,21 @@
 //! The world model can predict outcomes of actions (transition model) and
 //! generate expected observations from state (likelihood model).
 //!
-//! ## Transition Model (Hybrid HDC → CfC)
+//! ## Transition Model (current implementation)
 //!
-//! Phase 1: HDC delta vectors — each action type gets a learned delta.
-//!   Prediction: next_state ≈ current_state + action_delta
-//!   Composable: multi-step plans = sequential addition of deltas.
+//! The production `NixWorldModel` baseline is HDC per-action mean-delta
+//! averaging: `next_state ≈ current_state + mean_delta[action]`.
+//! Unknown action categories retain the historical identity-state fallback;
+//! callers can inspect `TransitionSupport::NoExamples` through diagnostics.
 //!
-//! Phase 2: CfC neural model (auto-activates after ~50 episodes).
+//! `ContextualDeltaBaselineV1` is a separate research candidate keyed by
+//! exact domain/context/family/action-profile/parameter identity. It abstains
+//! on unseen keys and is not wired into production action selection.
+//!
+//! CfC/HDC-LTC transition integration is not implemented in this module.
+//! Separate HDC-LTC components exist in `symthaea-core`, but this
+//! `NixWorldModel` has no CfC model field, activation threshold, training
+//! path, inference path or CfC checkpoint.
 
 use super::predictive_hierarchy::PredictiveHierarchy;
 use std::collections::HashMap;
@@ -258,10 +266,126 @@ impl TransitionEpisodeV1 {
     }
 }
 
+
+/// Exact context/action key for the research-only contextual delta baseline.
+#[derive(Debug, Clone, Hash, PartialEq, Eq)]
+pub struct ContextualTransitionKeyV1 {
+    domain_id: String,
+    context_id: String,
+    environment_family_id: String,
+    action: ActionCategory,
+    action_profile_id: String,
+    action_parameters_blake3: String,
+}
+
+impl ContextualTransitionKeyV1 {
+    pub fn from_episode(episode: &TransitionEpisodeV1) -> Result<Self, String> {
+        episode.validate()?;
+        Ok(Self {
+            domain_id: episode.domain_id().to_owned(),
+            context_id: episode.context_id().to_owned(),
+            environment_family_id: episode.environment_family_id().to_owned(),
+            action: episode.action().clone(),
+            action_profile_id: episode.action_profile_id().to_owned(),
+            action_parameters_blake3: episode.action_parameters_blake3().to_owned(),
+        })
+    }
+
+    pub fn domain_id(&self) -> &str { &self.domain_id }
+    pub fn context_id(&self) -> &str { &self.context_id }
+    pub fn environment_family_id(&self) -> &str { &self.environment_family_id }
+    pub fn action(&self) -> &ActionCategory { &self.action }
+    pub fn action_profile_id(&self) -> &str { &self.action_profile_id }
+    pub fn action_parameters_blake3(&self) -> &str { &self.action_parameters_blake3 }
+}
+
+/// Research-only exact-key HDC delta table.
+///
+/// Unlike the legacy action-category table, this candidate never falls back
+/// across domains, contexts, environment families or action parameterizations.
+/// It returns `None` for an unseen key so callers can abstain or acquire more
+/// evidence rather than treating missing coverage as a no-op.
+pub struct ContextualDeltaBaselineV1 {
+    dim: usize,
+    entries: HashMap<ContextualTransitionKeyV1, DeltaEntry>,
+}
+
+impl ContextualDeltaBaselineV1 {
+    pub fn new(dim: usize) -> Self {
+        Self {
+            dim,
+            entries: HashMap::new(),
+        }
+    }
+
+    /// Record a completed episode after independent receipt verification.
+    ///
+    /// This method checks that the supplied state vectors match the episode's
+    /// BLAKE3 state digests. It cannot authenticate the execution receipt;
+    /// callers must do that before admitting the episode.
+    pub fn record_completed_episode(
+        &mut self,
+        episode: &TransitionEpisodeV1,
+        before_state: &ContinuousHV,
+        after_state: &ContinuousHV,
+    ) -> Result<(), String> {
+        episode.validate()?;
+        if !episode.has_completed_transition_measurement() {
+            return Err("only completed episodes with an after-state and receipt digest can be recorded".to_owned());
+        }
+        if before_state.as_slice().len() != self.dim
+            || after_state.as_slice().len() != self.dim
+        {
+            return Err("transition state dimension does not match contextual baseline dimension".to_owned());
+        }
+        if continuous_hv_blake3(before_state)? != episode.before_state_blake3() {
+            return Err("before-state vector does not match the episode digest".to_owned());
+        }
+        if Some(continuous_hv_blake3(after_state)?.as_str()) != episode.after_state_blake3() {
+            return Err("after-state vector does not match the episode digest".to_owned());
+        }
+
+        let key = ContextualTransitionKeyV1::from_episode(episode)?;
+        let entry = self
+            .entries
+            .entry(key)
+            .or_insert_with(|| DeltaEntry::new(self.dim));
+        entry.observe(&after_state.subtract(before_state));
+        Ok(())
+    }
+
+    /// Predict only when the exact context/action key has observed episodes.
+    pub fn predict(
+        &self,
+        key: &ContextualTransitionKeyV1,
+        current_state: &ContinuousHV,
+    ) -> Result<Option<TransitionPredictionDiagnostics>, String> {
+        if current_state.as_slice().len() != self.dim {
+            return Err("current state dimension does not match contextual baseline dimension".to_owned());
+        }
+        Ok(self.entries.get(key).map(|entry| entry.diagnostics(current_state)))
+    }
+
+    pub fn learned_key_count(&self) -> usize {
+        self.entries.len()
+    }
+
+    pub fn observations_for(&self, key: &ContextualTransitionKeyV1) -> usize {
+        self.entries
+            .get(key)
+            .map(|entry| entry.observation_count)
+            .unwrap_or(0)
+    }
+
+    pub fn total_observations(&self) -> usize {
+        self.entries.values().map(|entry| entry.observation_count).sum()
+    }
+}
+
 /// A learned state transition delta.
 #[derive(Debug, Clone)]
 struct DeltaEntry {
-    /// Average delta vector for this action category.
+    /// Average delta vector for this action category or exact context/action key.
     delta: ContinuousHV,
     /// Number of observations used to learn this delta.
     observation_count: usize,
@@ -271,6 +395,55 @@ struct DeltaEntry {
     non_finite_prequential_residual_count: usize,
     /// Mean squared L2 residual against the mean delta before each update.
     mean_squared_prequential_delta_error: f64,
+}
+
+impl DeltaEntry {
+    fn new(dim: usize) -> Self {
+        Self {
+            delta: ContinuousHV::zero(dim),
+            observation_count: 0,
+            residual_observation_count: 0,
+            non_finite_prequential_residual_count: 0,
+            mean_squared_prequential_delta_error: 0.0,
+        }
+    }
+
+    fn observe(&mut self, observed_delta: &ContinuousHV) {
+        if self.observation_count > 0 {
+            let residual = observed_delta.subtract(&self.delta);
+            let squared_error = f64::from(residual.norm()).powi(2);
+            if squared_error.is_finite() {
+                self.residual_observation_count += 1;
+                let residual_count = self.residual_observation_count as f64;
+                self.mean_squared_prequential_delta_error +=
+                    (squared_error - self.mean_squared_prequential_delta_error) / residual_count;
+            } else {
+                self.non_finite_prequential_residual_count += 1;
+            }
+        }
+
+        self.observation_count += 1;
+        let n = self.observation_count as f32;
+        let refs = [&self.delta, observed_delta];
+        let weights = [(n - 1.0) / n, 1.0 / n];
+        self.delta = ContinuousHV::weighted_bundle(&refs, &weights);
+    }
+
+    fn diagnostics(&self, current_state: &ContinuousHV) -> TransitionPredictionDiagnostics {
+        TransitionPredictionDiagnostics {
+            predicted_state: current_state.add(&self.delta),
+            support: if self.observation_count >= 3 {
+                TransitionSupport::AtLeastThreeExamples
+            } else {
+                TransitionSupport::FewerThanThreeExamples
+            },
+            observation_count: self.observation_count,
+            residual_observation_count: self.residual_observation_count,
+            non_finite_prequential_residual_count: self.non_finite_prequential_residual_count,
+            mean_squared_prequential_delta_error: (self.residual_observation_count > 0)
+                .then_some(self.mean_squared_prequential_delta_error),
+        }
+    }
 }
 
 
@@ -362,19 +535,7 @@ impl NixWorldModel {
         action: &ActionCategory,
     ) -> TransitionPredictionDiagnostics {
         match self.delta_vectors.get(action) {
-            Some(entry) => TransitionPredictionDiagnostics {
-                predicted_state: self.system_state.add(&entry.delta),
-                support: if entry.observation_count >= 3 {
-                    TransitionSupport::AtLeastThreeExamples
-                } else {
-                    TransitionSupport::FewerThanThreeExamples
-                },
-                observation_count: entry.observation_count,
-                residual_observation_count: entry.residual_observation_count,
-                non_finite_prequential_residual_count: entry.non_finite_prequential_residual_count,
-                mean_squared_prequential_delta_error: (entry.residual_observation_count > 0)
-                    .then_some(entry.mean_squared_prequential_delta_error),
-            },
+            Some(entry) => entry.diagnostics(&self.system_state),
             None => TransitionPredictionDiagnostics {
                 predicted_state: self.system_state.clone(),
                 support: TransitionSupport::NoExamples,
@@ -417,34 +578,8 @@ impl NixWorldModel {
         let entry = self
             .delta_vectors
             .entry(action)
-            .or_insert_with(|| DeltaEntry {
-                delta: ContinuousHV::zero(self.dim),
-                observation_count: 0,
-                residual_observation_count: 0,
-                non_finite_prequential_residual_count: 0,
-                mean_squared_prequential_delta_error: 0.0,
-            });
-
-        if entry.observation_count > 0 {
-            let residual = observed_delta.subtract(&entry.delta);
-            let squared_error = f64::from(residual.norm()).powi(2);
-            if squared_error.is_finite() {
-                entry.residual_observation_count += 1;
-                let residual_count = entry.residual_observation_count as f64;
-                entry.mean_squared_prequential_delta_error +=
-                    (squared_error - entry.mean_squared_prequential_delta_error) / residual_count;
-            } else {
-                entry.non_finite_prequential_residual_count += 1;
-            }
-        }
-
-        entry.observation_count += 1;
-        let n = entry.observation_count as f32;
-
-        // Running average: delta = ((n-1)/n) * old_delta + (1/n) * new_delta
-        let refs = [&entry.delta, &observed_delta];
-        let weights = [(n - 1.0) / n, 1.0 / n];
-        entry.delta = ContinuousHV::weighted_bundle(&refs, &weights);
+            .or_insert_with(|| DeltaEntry::new(self.dim));
+        entry.observe(&observed_delta);
     }
 
     /// Compute free energy between current state and a desired goal state.
@@ -817,6 +952,163 @@ mod tests {
             .expect("third sample updates prequential residual");
         assert!(contradictory_error > stable_error);
         assert!(contradictory_error.is_finite());
+    }
+
+
+    fn make_contextual_episode(
+        episode_id: &str,
+        context_id: &str,
+        action_parameters_blake3: &str,
+        before: &ContinuousHV,
+        after: &ContinuousHV,
+    ) -> TransitionEpisodeV1 {
+        TransitionEpisodeV1::new(
+            episode_id,
+            "nixos-host-v1",
+            context_id,
+            "install-mechanism-v1",
+            "cluster-1",
+            ActionCategory::Install,
+            "nix-install-v1",
+            action_parameters_blake3,
+            before,
+            Some(after),
+            TransitionOutcome::Completed,
+            1_000,
+            1_800_000_000_000,
+            Some("b".repeat(64)),
+        )
+        .expect("valid contextual transition episode")
+    }
+
+    #[test]
+    fn contextual_delta_table_separates_opposing_context_transitions() {
+        let dim = 128;
+        let before = ContinuousHV::zero(dim);
+        let mut a_values = vec![0.0_f32; dim];
+        let mut b_values = vec![0.0_f32; dim];
+        a_values[..dim / 2].fill(1.0);
+        b_values[dim / 2..].fill(1.0);
+        let after_a = ContinuousHV::from_vec(a_values);
+        let after_b = ContinuousHV::from_vec(b_values);
+
+        let episode_a = make_contextual_episode("episode-a", "context-a", &"a".repeat(64), &before, &after_a);
+        let episode_b = make_contextual_episode("episode-b", "context-b", &"a".repeat(64), &before, &after_b);
+        let key_a = ContextualTransitionKeyV1::from_episode(&episode_a).unwrap();
+        let key_b = ContextualTransitionKeyV1::from_episode(&episode_b).unwrap();
+
+        let mut contextual = ContextualDeltaBaselineV1::new(dim);
+        contextual.record_completed_episode(&episode_a, &before, &after_a).unwrap();
+        contextual.record_completed_episode(&episode_b, &before, &after_b).unwrap();
+
+        let predicted_a = contextual.predict(&key_a, &before).unwrap().unwrap();
+        let predicted_b = contextual.predict(&key_b, &before).unwrap().unwrap();
+        assert!(predicted_a.predicted_state.similarity(&after_a) > 0.999);
+        assert!(predicted_b.predicted_state.similarity(&after_b) > 0.999);
+        assert_eq!(contextual.learned_key_count(), 2);
+
+        let mut global = NixWorldModel::new(dim);
+        global.learn_transition(&before, ActionCategory::Install, &after_a);
+        global.learn_transition(&before, ActionCategory::Install, &after_b);
+        global.observe(before.clone());
+        let global_prediction = global.predict_state(&ActionCategory::Install);
+        assert!(
+            predicted_a.predicted_state.similarity(&after_a)
+                > global_prediction.similarity(&after_a) + 0.1
+        );
+        assert!(
+            predicted_b.predicted_state.similarity(&after_b)
+                > global_prediction.similarity(&after_b) + 0.1
+        );
+    }
+
+    #[test]
+    fn contextual_key_includes_action_parameter_identity() {
+        let dim = 128;
+        let before = ContinuousHV::random(dim, 501);
+        let after = ContinuousHV::random(dim, 502);
+        let first = make_contextual_episode("episode-a", "context-a", &"a".repeat(64), &before, &after);
+        let second = make_contextual_episode("episode-b", "context-a", &"c".repeat(64), &before, &after);
+        let key_first = ContextualTransitionKeyV1::from_episode(&first).unwrap();
+        let key_second = ContextualTransitionKeyV1::from_episode(&second).unwrap();
+
+        let mut contextual = ContextualDeltaBaselineV1::new(dim);
+        contextual.record_completed_episode(&first, &before, &after).unwrap();
+
+        assert!(contextual.predict(&key_first, &before).unwrap().is_some());
+        assert!(contextual.predict(&key_second, &before).unwrap().is_none());
+    }
+
+    #[test]
+    fn contextual_baseline_returns_none_for_unseen_context_key() {
+        let dim = 128;
+        let before = ContinuousHV::random(dim, 511);
+        let after = ContinuousHV::random(dim, 512);
+        let episode = make_contextual_episode("episode-a", "context-a", &"a".repeat(64), &before, &after);
+        let key = ContextualTransitionKeyV1::from_episode(&episode).unwrap();
+        let contextual = ContextualDeltaBaselineV1::new(dim);
+        assert!(contextual.predict(&key, &before).unwrap().is_none());
+    }
+
+    #[test]
+    fn contextual_baseline_rejects_incomplete_or_mismatched_episode_evidence() {
+        let dim = 128;
+        let before = ContinuousHV::random(dim, 521);
+        let after = ContinuousHV::random(dim, 522);
+        let failed = TransitionEpisodeV1::new(
+            "failed-episode",
+            "nixos-host-v1",
+            "context-a",
+            "install-mechanism-v1",
+            "cluster-1",
+            ActionCategory::Install,
+            "nix-install-v1",
+            "a".repeat(64),
+            &before,
+            Some(&after),
+            TransitionOutcome::Failed,
+            1_000,
+            1_800_000_000_000,
+            None,
+        )
+        .unwrap();
+        let mut contextual = ContextualDeltaBaselineV1::new(dim);
+        assert!(contextual.record_completed_episode(&failed, &before, &after).is_err());
+
+        let completed = make_contextual_episode("completed-episode", "context-a", &"a".repeat(64), &before, &after);
+        let wrong_after = ContinuousHV::random(dim, 523);
+        assert!(
+            contextual
+                .record_completed_episode(&completed, &before, &wrong_after)
+                .is_err()
+        );
+        assert_eq!(contextual.learned_key_count(), 0);
+    }
+
+    #[test]
+    fn contextual_baseline_updates_running_mean_for_repeated_exact_key() {
+        let dim = 128;
+        let before = ContinuousHV::zero(dim);
+        let mut first_values = vec![0.0_f32; dim];
+        let mut second_values = vec![0.0_f32; dim];
+        first_values[..dim / 2].fill(1.0);
+        second_values[..dim / 2].fill(0.5);
+        let first_after = ContinuousHV::from_vec(first_values);
+        let second_after = ContinuousHV::from_vec(second_values);
+        let first = make_contextual_episode("episode-1", "same-context", &"a".repeat(64), &before, &first_after);
+        let second = make_contextual_episode("episode-2", "same-context", &"a".repeat(64), &before, &second_after);
+        let key = ContextualTransitionKeyV1::from_episode(&first).unwrap();
+
+        let mut contextual = ContextualDeltaBaselineV1::new(dim);
+        contextual.record_completed_episode(&first, &before, &first_after).unwrap();
+        contextual.record_completed_episode(&second, &before, &second_after).unwrap();
+
+        assert_eq!(contextual.learned_key_count(), 1);
+        assert_eq!(contextual.observations_for(&key), 2);
+        let prediction = contextual.predict(&key, &before).unwrap().unwrap();
+        assert_eq!(prediction.observation_count, 2);
+        assert_eq!(prediction.residual_observation_count, 1);
+        assert!(prediction.mean_squared_prequential_delta_error.is_some());
     }
 
     #[test]
