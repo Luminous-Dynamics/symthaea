@@ -73,8 +73,19 @@ The initial contract artifacts are committed alongside this proposal:
 - `eqc-task-v0.1.schema.json`: versioned task/authority/request/expected-outcome contract.
 - `eqc-run-receipt-v0.1.schema.json`: source-head, environment, action, replay, independent-verifier and qualification receipt.
 - `eqc-seed-corpus-v0.1.json`: four synthetic public episodes covering an authorized read, wrong-subject denial, revoked-authority denial, and replayed-challenge denial.
+- `eqc-fixtures/*.json`: three synthetic consent/challenge artifacts; task manifests bind them to byte-level SHA-256 digests.
+- `xtask eqc-validate`: a Rust reference-contract evaluator that validates the frozen inputs, expected decisions, zero-side-effect denials, and two-sided baseline controls.
 
-The seed corpus is explicitly marked `synthetic_public_seed_unqualified`. It has no live health records and does not claim a clinical, EHR, Holochain, or cryptographic integration. JSON Schema validation and the reference/no-op harness are the next implementation gate; the presence of a schema or fixture alone is not a passing benchmark.
+Run the focused reference validator from the repository root:
+
+```bash
+cargo test --locked -p xtask
+cargo run --locked -p xtask -- eqc-validate \
+  --corpus docs/research/eqc-seed-corpus-v0.1.json \
+  --out /tmp/eqc-reference-report.json
+```
+
+The seed corpus is explicitly marked `synthetic_public_seed_unqualified`. It has no live health records and does not claim a clinical, EHR, Holochain, or cryptographic integration. The Rust evaluator validates the reference contract; it does not yet exercise an external system under test. Exact-head CI must run before any implementation claim is made.
 
 ## 3. Six independent dimensions
 
