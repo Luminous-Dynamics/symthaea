@@ -1,0 +1,414 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://github.com/Luminous-Dynamics/symthaea/docs/research/orchestration/SYM_RSI_LIMITATION_RESPONSE_TRACE_SCHEMA_V0_2026-11-26.json",
+  "title": "Symthaea limitation-to-method-response trace fragment v0",
+  "description": "A trace fragment referencing existing ResearchState, evidence-prefix, action-offer and executor-receipt authorities. It is not a second evidence store, scheduler, adjudicator or promotion service.",
+  "type": "object",
+  "additionalProperties": false,
+  "required": [
+    "schema_version",
+    "obligation_id",
+    "status",
+    "detected_at",
+    "detected_by",
+    "state_binding",
+    "limitation",
+    "impact",
+    "required_response",
+    "prospective_plan",
+    "execution",
+    "adjudication"
+  ],
+  "properties": {
+    "schema_version": {
+      "const": "symthaea-limitation-response-trace-v0"
+    },
+    "obligation_id": {
+      "type": "string",
+      "minLength": 1
+    },
+    "status": {
+      "enum": [
+        "OPEN",
+        "RESPONSE_PLANNED",
+        "EXECUTED",
+        "ADJUDICATED",
+        "WAIVED_WITH_REASON"
+      ]
+    },
+    "detected_at": {
+      "type": "string",
+      "format": "date-time"
+    },
+    "detected_by": {
+      "enum": [
+        "POLICY_SELF_DETECTED",
+        "INDEPENDENT_AUDITOR",
+        "DOMAIN_EXPERT",
+        "EXECUTOR_OBSERVATION",
+        "BENCHMARK_CONTROL"
+      ]
+    },
+    "state_binding": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "research_state_sha256",
+        "evidence_prefix_sha256",
+        "decision_id",
+        "claim_scope_sha256"
+      ],
+      "properties": {
+        "research_state_sha256": {
+          "type": "string",
+          "pattern": "^[a-f0-9]{64}$"
+        },
+        "evidence_prefix_sha256": {
+          "type": "string",
+          "pattern": "^[a-f0-9]{64}$"
+        },
+        "decision_id": {
+          "type": "string",
+          "minLength": 1
+        },
+        "claim_scope_sha256": {
+          "type": [
+            "string",
+            "null"
+          ],
+          "pattern": "^[a-f0-9]{64}$"
+        }
+      }
+    },
+    "limitation": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "class",
+        "description",
+        "affected_claim_ids",
+        "affected_evidence_ids"
+      ],
+      "properties": {
+        "class": {
+          "enum": [
+            "DATA_INTEGRITY",
+            "CONFOUNDING",
+            "SCOPE_MISMATCH",
+            "LOW_POWER",
+            "MULTIPLE_COMPARISONS",
+            "MODEL_MISFIT",
+            "MEASUREMENT_ERROR",
+            "SOURCE_CORRECTION",
+            "NON_IDENTIFIABILITY",
+            "UNCERTAINTY_MIS_CALIBRATION",
+            "OTHER"
+          ]
+        },
+        "description": {
+          "type": "string",
+          "minLength": 1
+        },
+        "affected_claim_ids": {
+          "type": "array",
+          "items": {
+            "type": "string",
+            "minLength": 1
+          },
+          "uniqueItems": true
+        },
+        "affected_evidence_ids": {
+          "type": "array",
+          "items": {
+            "type": "string",
+            "minLength": 1
+          },
+          "uniqueItems": true
+        }
+      }
+    },
+    "impact": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "severity",
+        "consequence",
+        "affected_outputs"
+      ],
+      "properties": {
+        "severity": {
+          "enum": [
+            "CRITICAL",
+            "HIGH",
+            "MODERATE",
+            "LOW",
+            "NOT_MATERIAL"
+          ]
+        },
+        "consequence": {
+          "type": "string",
+          "minLength": 1
+        },
+        "affected_outputs": {
+          "type": "array",
+          "items": {
+            "type": "string",
+            "minLength": 1
+          },
+          "uniqueItems": true
+        }
+      }
+    },
+    "required_response": {
+      "enum": [
+        "REANALYZE",
+        "ADD_CONTROL",
+        "REPLICATE",
+        "SENSITIVITY_ANALYSIS",
+        "REVISE_SCOPE",
+        "SEEK_INDEPENDENT_ADJUDICATION",
+        "ABSTAIN",
+        "JUSTIFIED_NO_CHANGE"
+      ]
+    },
+    "prospective_plan": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "permitted_action_offer_id",
+        "rationale",
+        "predicted_outcome",
+        "decision_consequence",
+        "success_condition",
+        "reversal_condition"
+      ],
+      "properties": {
+        "permitted_action_offer_id": {
+          "type": [
+            "string",
+            "null"
+          ],
+          "minLength": 1
+        },
+        "rationale": {
+          "type": "string",
+          "minLength": 1
+        },
+        "predicted_outcome": {
+          "type": "string",
+          "minLength": 1
+        },
+        "decision_consequence": {
+          "type": "string",
+          "minLength": 1
+        },
+        "success_condition": {
+          "type": "string",
+          "minLength": 1
+        },
+        "reversal_condition": {
+          "type": "string",
+          "minLength": 1
+        }
+      }
+    },
+    "execution": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "status",
+        "action_receipt_ref",
+        "post_state_sha256",
+        "post_evidence_prefix_sha256",
+        "method_changed",
+        "observed_effect"
+      ],
+      "properties": {
+        "status": {
+          "enum": [
+            "NOT_STARTED",
+            "COMPLETED",
+            "FAILED",
+            "NOT_REQUIRED"
+          ]
+        },
+        "action_receipt_ref": {
+          "type": [
+            "string",
+            "null"
+          ],
+          "minLength": 1
+        },
+        "post_state_sha256": {
+          "type": [
+            "string",
+            "null"
+          ],
+          "pattern": "^[a-f0-9]{64}$"
+        },
+        "post_evidence_prefix_sha256": {
+          "type": [
+            "string",
+            "null"
+          ],
+          "pattern": "^[a-f0-9]{64}$"
+        },
+        "method_changed": {
+          "type": [
+            "boolean",
+            "null"
+          ]
+        },
+        "observed_effect": {
+          "type": [
+            "string",
+            "null"
+          ]
+        }
+      }
+    },
+    "adjudication": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "status",
+        "authority_ref",
+        "reviewed_at",
+        "evidence_ref",
+        "disposition"
+      ],
+      "properties": {
+        "status": {
+          "enum": [
+            "PENDING",
+            "RESOLVED",
+            "NOT_RESOLVED",
+            "UNRESOLVED",
+            "WAIVED"
+          ]
+        },
+        "authority_ref": {
+          "type": [
+            "string",
+            "null"
+          ],
+          "minLength": 1
+        },
+        "reviewed_at": {
+          "type": [
+            "string",
+            "null"
+          ],
+          "format": "date-time"
+        },
+        "evidence_ref": {
+          "type": [
+            "string",
+            "null"
+          ],
+          "minLength": 1
+        },
+        "disposition": {
+          "type": "string",
+          "minLength": 1
+        }
+      }
+    }
+  },
+  "allOf": [
+    {
+      "if": {
+        "properties": {
+          "status": {
+            "enum": [
+              "EXECUTED",
+              "ADJUDICATED",
+              "WAIVED_WITH_REASON"
+            ]
+          }
+        }
+      },
+      "then": {
+        "properties": {
+          "execution": {
+            "properties": {
+              "status": {
+                "enum": [
+                  "COMPLETED",
+                  "FAILED",
+                  "NOT_REQUIRED"
+                ]
+              }
+            }
+          }
+        }
+      }
+    },
+    {
+      "if": {
+        "properties": {
+          "status": {
+            "const": "ADJUDICATED"
+          }
+        }
+      },
+      "then": {
+        "properties": {
+          "adjudication": {
+            "properties": {
+              "status": {
+                "enum": [
+                  "RESOLVED",
+                  "NOT_RESOLVED",
+                  "UNRESOLVED",
+                  "WAIVED"
+                ]
+              },
+              "authority_ref": {
+                "type": "string"
+              },
+              "reviewed_at": {
+                "type": "string"
+              },
+              "evidence_ref": {
+                "type": "string"
+              }
+            }
+          }
+        }
+      }
+    },
+    {
+      "if": {
+        "properties": {
+          "status": {
+            "const": "WAIVED_WITH_REASON"
+          }
+        }
+      },
+      "then": {
+        "properties": {
+          "required_response": {
+            "const": "JUSTIFIED_NO_CHANGE"
+          },
+          "adjudication": {
+            "properties": {
+              "status": {
+                "const": "WAIVED"
+              },
+              "authority_ref": {
+                "type": "string"
+              },
+              "reviewed_at": {
+                "type": "string"
+              },
+              "evidence_ref": {
+                "type": "string"
+              }
+            }
+          }
+        }
+      }
+    }
+  ]
+}
