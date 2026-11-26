@@ -156,6 +156,24 @@ This pulse residual assumes the basis is applied in the same state coordinates a
 
 These metrics are **finite-horizon linearized input–output residual proxies** for supplied discrete sensitivities. They are not H-infinity bounds, do not come with a classical balanced-truncation error theorem, and do not certify nonlinear Vlasov echo error. The classical H-infinity balanced-truncation bound is for stable LTI systems with exact Gramians; approximate-Gramian bounds have their own assumptions. The 2024 arbitrary-initial-condition estimator also assumes a stable LTI error system. Those methods are theoretical comparators; a plasma certificate must account for time variation, pulse-map jumps, finite amplitude, phase mixing, nonlinear branch changes, and the actual solver discretization. It is useful because it exposes whether a scenario-average balanced basis hides a poorly represented low-probability direction. The manufactured 51/49 fixture demonstrates that failure mode: a rank-one average basis retains the dominant scenario but loses the other scenario's response entirely, producing a weighted mean residual of 0.49 while both worst-case and 90%-CVaR residuals are 1.0.
 
+### Greedy worst-scenario response enrichment (R-RBKR candidate)
+
+The Rust prototype now has an optional development-set enrichment step. For a current biorthogonal basis \(P=VW^T\), a selected scenario forms
+\[
+M_s=Y_s^T(I-P)X_s=U_s\Sigma_s Z_s^T.
+\]
+For its leading singular triplet \((u_1,\sigma_1,z_1)\), append
+\[
+v_{r+1}=\frac{(I-P)X_s z_1}{\sqrt{\sigma_1}},
+\qquad
+w_{r+1}=\frac{(I-P^T)Y_s u_1}{\sqrt{\sigma_1}}.
+\]
+Because \(P\) is a projector and the residual directions are in the complementary trial/test spaces, the new pair is biorthogonal to the existing basis and has unit mutual pairing in exact arithmetic. The implementation checks the full pairing defect, resource limits, and the selected scenario's response residual before committing the candidate update.
+
+\`enrich_from_worst_scenario\` deterministically selects the scenario with the largest current transfer residual from a caller-supplied **development/challenge pool**, applies one enrichment, and returns a receipt with scenario and trajectory digest, previous/new order, added residual singular value, and before/after residual. It must never be run against the final sealed test set. The greedy step is not claimed to solve a global minimax optimization; it needs comparison against fixed-order average balancing, CVaR-driven selection, random greedy selection, and direct robust min-max basis optimization where tractable.
+
+The expected benchmark is a sequence of enrichment steps at fixed maximum bytes/runtime: show how quickly the worst-case and CVaR residual decrease, count high-fidelity acquisition calls and basis rebuild cost, then measure held-out nonlinear echo response separately. If the method requires more rank/bytes or full-order acquisitions than TW-ROM/EW-ROM or Padovan balancing to reach the same response tolerance, that is a negative result we must report.
+
 K-RESP-1's machine-readable `response_qualification` contract requires both residual channels, all three risk summaries (weighted mean, worst case, CVaR at alpha 0.9), and separate nonlinear full-order echo response measurements. The residual tolerance is deliberately marked `calibrate_on_independently_converged_physical_reference`; do not pick a synthetic threshold and call it a physical guarantee.
 
 Use three separate qualification views:
@@ -306,6 +324,8 @@ Report independent metric planes; do not hide trade-offs in one weighted score.
 **Future response:** complex amplitude error, wrapped phase error, waveform error, echo timing/width error, first-/second-order response error, branch false/miss/association rate, and held-out intervention response coverage.
 
 **Linearized response robustness:** per-scenario transfer residual, weighted mean, worst-case and registered CVaR; report training, validation and held-out residuals separately. These diagnostics do not replace nonlinear physical response measurements.
+
+**Robust enrichment efficiency:** worst-case/CVaR residual reduction per added coordinate, stored byte, factor/adjoint acquisition, wall-clock second and joule; include the greedy selection and candidate-validation overhead.
 
 **Reduction and system cost:** retained rank and bytes, factor bytes, construction/adjoint/finite-difference cost, projection/reconstruction/transition cost, diagnostic cost, total wall time, peak working memory including temporary buffers, data movement, and energy-to-solution.
 
