@@ -696,7 +696,6 @@ mod tests {
         }
     }
 
-
     #[test]
     fn production_entrypoint_rejects_synthetic_conformance_fixture() {
         let input: PolicyInput = serde_json::from_str(include_str!(
@@ -768,7 +767,10 @@ mod tests {
             decision.selected_offer_id.as_deref(),
             Some("classify-claim-a")
         );
-        assert_eq!(decision.selected_action_kind, Some(ActionKind::ClassifyClaimSource));
+        assert_eq!(
+            decision.selected_action_kind,
+            Some(ActionKind::ClassifyClaimSource)
+        );
     }
 
     #[test]
@@ -789,17 +791,21 @@ mod tests {
                     Some("claim-a"),
                     Some("ev-a1"),
                     &[
-                    ("query_units", 0),
-                    ("experiment_units", 0),
-                    ("review_minutes", 1),
-                ],
+                        ("query_units", 0),
+                        ("experiment_units", 0),
+                        ("review_minutes", 1),
+                    ],
                 ),
                 offer(
                     "classify-claim-a",
                     ActionKind::ClassifyClaimSource,
                     Some("claim-a"),
                     Some("ev-a1"),
-                    &[("query_units", 1), ("experiment_units", 0), ("review_minutes", 1)],
+                    &[
+                        ("query_units", 1),
+                        ("experiment_units", 0),
+                        ("review_minutes", 1),
+                    ],
                 ),
             ],
         );
@@ -825,7 +831,11 @@ mod tests {
                 ActionKind::VerifyArtifact,
                 Some("claim-a"),
                 Some("ev-a1"),
-                &[("query_units", 0), ("experiment_units", 0), ("review_minutes", 1)],
+                &[
+                    ("query_units", 0),
+                    ("experiment_units", 0),
+                    ("review_minutes", 1),
+                ],
             )],
         );
         let decision = decide_inner(&input, true).unwrap();
@@ -845,14 +855,16 @@ mod tests {
         state["evidence"][0]["retrieval_state"] = Value::String("FETCHED".to_owned());
         let evidence = state["evidence"].as_array().unwrap().clone();
         let episode = get_str(&state, "research_episode_id").unwrap().to_owned();
-        let sequence = state["evidence_prefix"]["sequence_number"].as_u64().unwrap();
-        let prefix = typed_research_state_contract::evidence_prefix_sha256(
-            &episode,
-            sequence,
-            &evidence,
-        );
+        let sequence = state["evidence_prefix"]["sequence_number"]
+            .as_u64()
+            .unwrap();
+        let prefix =
+            typed_research_state_contract::evidence_prefix_sha256(&episode, sequence, &evidence);
         state["evidence_prefix"]["prefix_sha256"] = Value::String(prefix.clone());
-        for relation in state["claims"][0]["evidence_relations"].as_array_mut().unwrap() {
+        for relation in state["claims"][0]["evidence_relations"]
+            .as_array_mut()
+            .unwrap()
+        {
             if relation["classifier_provenance"].is_object() {
                 relation["classifier_provenance"]["evidence_prefix_sha256"] =
                     Value::String(prefix.clone());
@@ -865,7 +877,11 @@ mod tests {
                 ActionKind::VerifyArtifact,
                 Some("claim-b"),
                 Some("ev-b1"),
-                &[("query_units", 0), ("experiment_units", 0), ("review_minutes", 1)],
+                &[
+                    ("query_units", 0),
+                    ("experiment_units", 0),
+                    ("review_minutes", 1),
+                ],
             )],
         );
         let decision = decide_inner(&input, true).unwrap();
@@ -884,7 +900,11 @@ mod tests {
                 ActionKind::ClassifyClaimSource,
                 Some("claim-a"),
                 Some("ev-a1"),
-                &[("query_units", 1), ("experiment_units", 0), ("review_minutes", 1)],
+                &[
+                    ("query_units", 1),
+                    ("experiment_units", 0),
+                    ("review_minutes", 1),
+                ],
             )],
         );
         let first = decide_inner(&input, true).unwrap();
@@ -917,7 +937,11 @@ mod tests {
                 ActionKind::ClassifyClaimSource,
                 Some("claim-a"),
                 Some("ev-a1"),
-                &[("query_units", 1), ("experiment_units", 0), ("review_minutes", 1)],
+                &[
+                    ("query_units", 1),
+                    ("experiment_units", 0),
+                    ("review_minutes", 1),
+                ],
             )],
         );
         let second_input = input(
@@ -927,11 +951,15 @@ mod tests {
                 ActionKind::ClassifyClaimSource,
                 Some("claim-a"),
                 Some("ev-a1"),
-                &[("query_units", 1), ("experiment_units", 0), ("review_minutes", 1)],
+                &[
+                    ("query_units", 1),
+                    ("experiment_units", 0),
+                    ("review_minutes", 1),
+                ],
             )],
         );
-        let first = decide(&first_input).unwrap();
-        let second = decide(&second_input).unwrap();
+        let first = decide_inner(&first_input, true).unwrap();
+        let second = decide_inner(&second_input, true).unwrap();
         assert_eq!(first.research_state_sha256, second.research_state_sha256);
         assert_ne!(first.action_offers_sha256, second.action_offers_sha256);
     }
@@ -1013,7 +1041,11 @@ mod tests {
                 ActionKind::Escalate,
                 None,
                 None,
-                &[("query_units", 0), ("experiment_units", 0), ("review_minutes", 1)],
+                &[
+                    ("query_units", 0),
+                    ("experiment_units", 0),
+                    ("review_minutes", 1),
+                ],
             )],
         );
         let decision = decide_inner(&input, true).unwrap();
@@ -1032,7 +1064,11 @@ mod tests {
                 ActionKind::RequestDiscriminatingExperiment,
                 Some("claim-c"),
                 None,
-                &[("query_units", 0), ("experiment_units", 2), ("review_minutes", 0)],
+                &[
+                    ("query_units", 0),
+                    ("experiment_units", 2),
+                    ("review_minutes", 0),
+                ],
             )],
         );
         let decision = decide_inner(&input, true).unwrap();
@@ -1040,7 +1076,10 @@ mod tests {
             decision.selected_offer_id.as_deref(),
             Some("probe-conflict")
         );
-        assert_eq!(decision.selected_action_kind, Some(ActionKind::RequestDiscriminatingExperiment));
+        assert_eq!(
+            decision.selected_action_kind,
+            Some(ActionKind::RequestDiscriminatingExperiment)
+        );
     }
 
     #[test]
@@ -1052,7 +1091,11 @@ mod tests {
                 ActionKind::RetrieveOrRecapture,
                 Some("claim-d"),
                 None,
-                &[("query_units", 1), ("experiment_units", 0), ("review_minutes", 0)],
+                &[
+                    ("query_units", 1),
+                    ("experiment_units", 0),
+                    ("review_minutes", 0),
+                ],
             )],
         );
         let decision = decide_inner(&input, true).unwrap();
@@ -1139,15 +1182,23 @@ mod tests {
         let input = input(
             artifact_verified_state(0),
             vec![
-                offer("offer-a", ActionKind::ClassifyClaimSource, Some("claim-a"), Some("ev-a1"),
-                        &[
+                offer(
+                    "offer-a",
+                    ActionKind::ClassifyClaimSource,
+                    Some("claim-a"),
+                    Some("ev-a1"),
+                    &[
                         ("query_units", 2),
                         ("experiment_units", 0),
                         ("review_minutes", 1),
                     ],
                 ),
-                offer("offer-b", ActionKind::ClassifyClaimSource, Some("claim-a"), Some("ev-a1"),
-                        &[
+                offer(
+                    "offer-b",
+                    ActionKind::ClassifyClaimSource,
+                    Some("claim-a"),
+                    Some("ev-a1"),
+                    &[
                         ("query_units", 1),
                         ("experiment_units", 0),
                         ("review_minutes", 2),
@@ -1193,7 +1244,10 @@ mod tests {
             ],
         );
         let decision = decide_inner(&input, true).unwrap();
-        assert_eq!(decision.selected_offer_id.as_deref(), Some("offer-b"));
+        assert_eq!(
+            decision.selected_offer_id.as_deref(),
+            Some("offer-b")
+        );
     }
 
     #[test]
@@ -1205,7 +1259,11 @@ mod tests {
                 ActionKind::ClassifyClaimSource,
                 Some("claim-a"),
                 Some("ev-a1"),
-                &[("query_units", 1), ("experiment_units", 0), ("review_minutes", 1)],
+                &[
+                    ("query_units", 1),
+                    ("experiment_units", 0),
+                    ("review_minutes", 1),
+                ],
             )],
         );
         let decision = decide_inner(&input, true).unwrap();
