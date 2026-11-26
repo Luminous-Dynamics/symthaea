@@ -1244,10 +1244,7 @@ mod tests {
             ],
         );
         let decision = decide_inner(&input, true).unwrap();
-        assert_eq!(
-            decision.selected_offer_id.as_deref(),
-            Some("offer-b")
-        );
+        assert_eq!(decision.selected_offer_id.as_deref(), Some("offer-b"));
     }
 
     #[test]
