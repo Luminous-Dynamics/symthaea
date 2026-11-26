@@ -724,8 +724,9 @@ impl CognitiveLoopService {
                     .support
                     .privacy_manager
                     .as_ref()
+                    // Missing privacy policy is a deny, never implicit consent.
                     .map(|pm| pm.can_share_cognitive())
-                    .unwrap_or(true);
+                    .unwrap_or(false);
 
                 if can_share {
                     if let Some(ref manager) = self.support.knowledge_manager {

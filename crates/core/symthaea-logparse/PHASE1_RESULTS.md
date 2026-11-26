@@ -1,5 +1,15 @@
 # Phase 1 results — real EVTX-ATTACK-SAMPLES corpus
 
+> [!CAUTION]
+> ## Generalization correction — read this before using any Phase 1 score
+>
+> The supervised probe's **0.815** result was a single event-level random split on the sbousseaden corpus. A later 5-fold event-level cross-validation measured **0.817 ± 0.018 on that same corpus**, but the cross-corpus experiment (train on sbousseaden, test on OTRF Security-Datasets) measured only **0.168 accuracy against 0.143 chance across seven labels**. Several classes were at or near zero. The experiment's own conclusion was that the probe learned collection/corpus fingerprints, not robust tactic semantics.
+>
+> Therefore, **0.815 / 0.817 are in-distribution results only, not MSP-grade detection or external generalization evidence**. The 0.168 OOD result is the more important external-validity finding. Do not advertise this classifier as a threat detector or as beating SOTA.
+>
+> A new provenance-grouped split path is being added in `probe.rs` and `examples/supervised_probe.rs` to keep source EVTX files on only one side of a train/test split. This is an additional leakage control, not a remedy for the already-observed cross-corpus failure. The current reference HDC encoder is still a local MAP-I implementation; the production Symthaea encoder path also remains unverified.
+
+
 **Date:** 2026-04-14
 **Corpus:** sbousseaden/EVTX-ATTACK-SAMPLES (`git clone --depth 1`)
 **Commit:** [to be added]

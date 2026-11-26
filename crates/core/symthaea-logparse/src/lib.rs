@@ -16,6 +16,7 @@
 //!   - `encoder` — HDC hypervector encoding (feature-gated on `hdc-encoder`)
 //!   - `cluster` — HDBSCAN wrapper + purity metric
 
+pub mod agent_behavior;
 pub mod cluster;
 pub mod encoder;
 pub mod event;

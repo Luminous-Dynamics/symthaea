@@ -41,14 +41,18 @@ pub enum TicketPriority {
     Critical,
 }
 
-/// Autonomy level for remote actions during the session.
+/// Requested autonomy tier for a remote support session.
+///
+/// This value is descriptive session metadata, not an execution capability.
+/// Remote mutations require independent, act-bound authorization enforced at
+/// the target participant; selecting FullAutonomous must never grant access.
 #[derive(Debug, Clone, Copy, PartialEq, Eq, PartialOrd, Ord, Serialize, Deserialize)]
 pub enum AutonomyLevel {
-    /// Read-only: diagnostics viewable but no actions.
+    /// Advisory session: diagnostics and recommendations only.
     Advisory,
-    /// Limited: pre-approved actions only (restart, clear cache).
+    /// Legacy tier label; permitted operations remain constrained by policy.
     SemiAutonomous,
-    /// Full: any action with rollback tracking.
+    /// Legacy tier label; not a bypass or an authorization grant.
     FullAutonomous,
 }
 
@@ -61,7 +65,7 @@ pub struct SupportSession {
     pub category: SupportCategory,
     /// Priority from triage.
     pub priority: TicketPriority,
-    /// Autonomy level (controls what the support agent can do).
+    /// Requested autonomy tier (descriptive only; does not grant action authority).
     pub autonomy: AutonomyLevel,
     /// RDP session ID (set when agent connects).
     pub rdp_session_id: Option<String>,

@@ -323,29 +323,28 @@ fn action_engine_autonomy_gates() {
         );
     }
 
-    // SemiAutonomous: allows only permitted actions (RestartService, ClearCache, RunDiagnostic)
-    assert!(engine.can_execute(&ActionType::RestartService, &AutonomyLevel::SemiAutonomous));
-    assert!(engine.can_execute(&ActionType::ClearCache, &AutonomyLevel::SemiAutonomous));
-    assert!(engine.can_execute(&ActionType::RunDiagnostic, &AutonomyLevel::SemiAutonomous));
-    assert!(
-        !engine.can_execute(&ActionType::UpdateConfig, &AutonomyLevel::SemiAutonomous),
-        "SemiAutonomous should block UpdateConfig (not in permitted list)"
-    );
-    assert!(
-        !engine.can_execute(
-            &ActionType::Custom("deploy-hotfix".to_string()),
-            &AutonomyLevel::SemiAutonomous
-        ),
-        "SemiAutonomous should block Custom actions"
-    );
-
-    // FullAutonomous: allows all
-    for action in &actions {
+    // Both autonomy tiers are bounded by the same read-only local allowlist.
+    // FullAutonomous is not an authorization bypass for mutating effects.
+    for level in [
+        AutonomyLevel::SemiAutonomous,
+        AutonomyLevel::FullAutonomous,
+    ] {
         assert!(
-            engine.can_execute(action, &AutonomyLevel::FullAutonomous),
-            "FullAutonomous should allow {:?}",
-            action
+            engine.can_execute(&ActionType::RunDiagnostic, &level),
+            "{level:?} should allow read-only diagnostics"
         );
+
+        for action in [
+            ActionType::RestartService,
+            ActionType::ClearCache,
+            ActionType::UpdateConfig,
+            ActionType::Custom("deploy-hotfix".to_string()),
+        ] {
+            assert!(
+                !engine.can_execute(&action, &level),
+                "{level:?} must not authorize mutation {action:?}"
+            );
+        }
     }
 }
 

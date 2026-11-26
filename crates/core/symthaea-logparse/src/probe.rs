@@ -276,11 +276,380 @@ pub fn stratified_split(
     (train_hvs, train_labels, test_hvs, test_labels)
 }
 
+/// A reproducible split that keeps every provenance group entirely in one arm.
+///
+/// This is appropriate when each file/host/incident group has exactly one
+/// ground-truth class. It refuses mixed-label groups rather than silently
+/// leaking related events across train and test.
+#[derive(Debug)]
+pub struct GroupStratifiedSplit {
+    pub train_hvs: Vec<Hdv>,
+    pub train_labels: Vec<String>,
+    pub train_group_ids: Vec<String>,
+    pub test_hvs: Vec<Hdv>,
+    pub test_labels: Vec<String>,
+    pub test_group_ids: Vec<String>,
+}
+
+/// Split by class and provenance group, never by individual event.
+///
+/// Every group ID must belong to exactly one class and each class must have
+/// at least two distinct groups. A class with only one source group cannot
+/// support a group-disjoint train/test estimate and is reported as an error.
+pub fn group_stratified_split(
+    hvs: &[Hdv],
+    labels: &[String],
+    group_ids: &[String],
+    train_frac: f32,
+    seed: u64,
+) -> Result<GroupStratifiedSplit, String> {
+    if hvs.len() != labels.len() || labels.len() != group_ids.len() {
+        return Err("hypervectors, labels, and group IDs must have equal length".into());
+    }
+    if hvs.is_empty() {
+        return Err("cannot split an empty dataset".into());
+    }
+    if !train_frac.is_finite() || train_frac <= 0.0 || train_frac >= 1.0 {
+        return Err("train fraction must be finite and strictly between 0 and 1".into());
+    }
+
+    let mut group_labels: std::collections::BTreeMap<String, String> =
+        std::collections::BTreeMap::new();
+    let mut by_label: std::collections::BTreeMap<
+        String,
+        std::collections::BTreeMap<String, Vec<usize>>,
+    > = Default::default();
+
+    for (index, (label, group_id)) in labels.iter().zip(group_ids.iter()).enumerate() {
+        if group_id.trim().is_empty() {
+            return Err(format!("empty provenance group ID at sample {index}"));
+        }
+        if let Some(existing_label) = group_labels.get(group_id) {
+            if existing_label != label {
+                return Err(format!(
+                    "provenance group {group_id:?} contains multiple labels"
+                ));
+            }
+        } else {
+            group_labels.insert(group_id.clone(), label.clone());
+        }
+        by_label
+            .entry(label.clone())
+            .or_default()
+            .entry(group_id.clone())
+            .or_default()
+            .push(index);
+    }
+
+    let mut state = seed.max(1);
+    let mut split = GroupStratifiedSplit {
+        train_hvs: Vec::new(),
+        train_labels: Vec::new(),
+        train_group_ids: Vec::new(),
+        test_hvs: Vec::new(),
+        test_labels: Vec::new(),
+        test_group_ids: Vec::new(),
+    };
+
+    for (label, groups) in by_label {
+        if groups.len() < 2 {
+            return Err(format!(
+                "class {label:?} has {} provenance group(s); at least two are required",
+                groups.len()
+            ));
+        }
+
+        let mut groups: Vec<(String, Vec<usize>)> = groups.into_iter().collect();
+        // Shuffle whole provenance groups, not individual events.
+        for i in (1..groups.len()).rev() {
+            let j = (xorshift(&mut state) as usize) % (i + 1);
+            groups.swap(i, j);
+        }
+        let n_train = ((groups.len() as f32) * train_frac).round() as usize;
+        let n_train = n_train.clamp(1, groups.len() - 1);
+
+        for (group_index, (group_id, sample_indices)) in groups.into_iter().enumerate() {
+            let is_train = group_index < n_train;
+            for sample_index in sample_indices {
+                if is_train {
+                    split.train_hvs.push(hvs[sample_index].clone());
+                    split.train_labels.push(label.clone());
+                    split.train_group_ids.push(group_id.clone());
+                } else {
+                    split.test_hvs.push(hvs[sample_index].clone());
+                    split.test_labels.push(label.clone());
+                    split.test_group_ids.push(group_id.clone());
+                }
+            }
+        }
+    }
+
+    if split.train_hvs.is_empty() || split.test_hvs.is_empty() {
+        return Err("group split produced an empty train or test partition".into());
+    }
+
+    Ok(split)
+}
+
+/// Build deterministic group-disjoint K-fold splits, stratified by class.
+///
+/// A provenance group (for example, one EVTX source file) is assigned to
+/// exactly one test fold. Every sample from that group is therefore excluded
+/// from training in that fold. Each class must contain at least `folds`
+/// distinct provenance groups. The function rejects mixed-label groups.
+pub fn group_kfold_splits(
+    hvs: &[Hdv],
+    labels: &[String],
+    group_ids: &[String],
+    folds: usize,
+    seed: u64,
+) -> Result<Vec<GroupStratifiedSplit>, String> {
+    if hvs.len() != labels.len() || labels.len() != group_ids.len() {
+        return Err("hypervectors, labels, and group IDs must have equal length".into());
+    }
+    if hvs.is_empty() {
+        return Err("cannot split an empty dataset".into());
+    }
+    if folds < 2 {
+        return Err("at least two folds are required".into());
+    }
+
+    let mut group_labels: std::collections::BTreeMap<String, String> =
+        std::collections::BTreeMap::new();
+    let mut by_label: std::collections::BTreeMap<
+        String,
+        std::collections::BTreeMap<String, Vec<usize>>,
+    > = Default::default();
+
+    for (index, (label, group_id)) in labels.iter().zip(group_ids.iter()).enumerate() {
+        if group_id.trim().is_empty() {
+            return Err(format!("empty provenance group ID at sample {index}"));
+        }
+        if let Some(existing_label) = group_labels.get(group_id) {
+            if existing_label != label {
+                return Err(format!(
+                    "provenance group {group_id:?} contains multiple labels"
+                ));
+            }
+        } else {
+            group_labels.insert(group_id.clone(), label.clone());
+        }
+        by_label
+            .entry(label.clone())
+            .or_default()
+            .entry(group_id.clone())
+            .or_default()
+            .push(index);
+    }
+
+    let mut state = seed.max(1);
+    let mut fold_groups: Vec<Vec<(String, String, Vec<usize>)>> =
+        (0..folds).map(|_| Vec::new()).collect();
+
+    for (label, groups) in by_label {
+        if groups.len() < folds {
+            return Err(format!(
+                "class {label:?} has {} provenance groups; {folds} required for group K-fold",
+                groups.len()
+            ));
+        }
+        let mut groups: Vec<(String, Vec<usize>)> = groups.into_iter().collect();
+        // Shuffle groups within each class; never shuffle individual events.
+        for i in (1..groups.len()).rev() {
+            let j = (xorshift(&mut state) as usize) % (i + 1);
+            groups.swap(i, j);
+        }
+        for (position, (group_id, sample_indices)) in groups.into_iter().enumerate() {
+            fold_groups[position % folds].push((label.clone(), group_id, sample_indices));
+        }
+    }
+
+    let mut result = Vec::with_capacity(folds);
+    for held_out_fold in 0..folds {
+        let mut split = GroupStratifiedSplit {
+            train_hvs: Vec::new(),
+            train_labels: Vec::new(),
+            train_group_ids: Vec::new(),
+            test_hvs: Vec::new(),
+            test_labels: Vec::new(),
+            test_group_ids: Vec::new(),
+        };
+
+        for (fold_index, groups) in fold_groups.iter().enumerate() {
+            for (label, group_id, sample_indices) in groups {
+                let is_test = fold_index == held_out_fold;
+                for &sample_index in sample_indices {
+                    if is_test {
+                        split.test_hvs.push(hvs[sample_index].clone());
+                        split.test_labels.push(label.clone());
+                        split.test_group_ids.push(group_id.clone());
+                    } else {
+                        split.train_hvs.push(hvs[sample_index].clone());
+                        split.train_labels.push(label.clone());
+                        split.train_group_ids.push(group_id.clone());
+                    }
+                }
+            }
+        }
+
+        if split.train_hvs.is_empty() || split.test_hvs.is_empty() {
+            return Err(format!("fold {held_out_fold} produced an empty partition"));
+        }
+        result.push(split);
+    }
+
+    Ok(result)
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
     use crate::encoder::encode;
     use crate::fixtures::generate_synthetic_corpus;
+
+    #[test]
+    fn grouped_split_keeps_each_provenance_group_in_one_partition() {
+        use std::collections::HashSet;
+
+        let hvs = vec![
+            vec![1, 1],
+            vec![1, -1],
+            vec![1, 1],
+            vec![-1, 1],
+            vec![-1, -1],
+            vec![1, -1],
+            vec![-1, -1],
+            vec![-1, 1],
+        ];
+        let labels = vec![
+            "A".to_string(), "A".to_string(), "A".to_string(), "A".to_string(),
+            "B".to_string(), "B".to_string(), "B".to_string(), "B".to_string(),
+        ];
+        let groups = vec![
+            "a-file-1".to_string(), "a-file-1".to_string(),
+            "a-file-2".to_string(), "a-file-2".to_string(),
+            "b-file-1".to_string(), "b-file-1".to_string(),
+            "b-file-2".to_string(), "b-file-2".to_string(),
+        ];
+
+        let split = group_stratified_split(&hvs, &labels, &groups, 0.5, 0xFACADE).unwrap();
+        let train_groups: HashSet<_> = split.train_group_ids.iter().collect();
+        let test_groups: HashSet<_> = split.test_group_ids.iter().collect();
+
+        assert!(train_groups.is_disjoint(&test_groups));
+        assert_eq!(split.train_hvs.len() + split.test_hvs.len(), hvs.len());
+        assert!(split.train_labels.iter().any(|label| label == "A"));
+        assert!(split.train_labels.iter().any(|label| label == "B"));
+        assert!(split.test_labels.iter().any(|label| label == "A"));
+        assert!(split.test_labels.iter().any(|label| label == "B"));
+    }
+
+    #[test]
+    fn grouped_split_rejects_a_group_with_multiple_labels() {
+        let hvs = vec![vec![1], vec![-1]];
+        let labels = vec!["benign".to_string(), "malicious".to_string()];
+        let groups = vec!["same-file".to_string(), "same-file".to_string()];
+
+        let error = group_stratified_split(&hvs, &labels, &groups, 0.8, 7).unwrap_err();
+        assert!(error.contains("multiple labels"));
+    }
+
+    #[test]
+    fn grouped_split_rejects_single_group_classes() {
+        let hvs = vec![vec![1], vec![-1], vec![1]];
+        let labels = vec!["A".to_string(), "A".to_string(), "B".to_string()];
+        let groups = vec!["a-1".to_string(), "a-2".to_string(), "b-1".to_string()];
+
+        let error = group_stratified_split(&hvs, &labels, &groups, 0.8, 7).unwrap_err();
+        assert!(error.contains("at least two are required"));
+    }
+
+    #[test]
+    fn grouped_split_is_deterministic_for_a_fixed_seed() {
+        let hvs = vec![vec![1], vec![-1], vec![1], vec![-1], vec![1], vec![-1], vec![1], vec![-1]];
+        let labels = vec![
+            "A".to_string(), "A".to_string(), "A".to_string(), "A".to_string(),
+            "B".to_string(), "B".to_string(), "B".to_string(), "B".to_string(),
+        ];
+        let groups = vec![
+            "a1".to_string(), "a1".to_string(), "a2".to_string(), "a2".to_string(),
+            "b1".to_string(), "b1".to_string(), "b2".to_string(), "b2".to_string(),
+        ];
+
+        let first = group_stratified_split(&hvs, &labels, &groups, 0.5, 17).unwrap();
+        let second = group_stratified_split(&hvs, &labels, &groups, 0.5, 17).unwrap();
+        assert_eq!(first.train_group_ids, second.train_group_ids);
+        assert_eq!(first.test_group_ids, second.test_group_ids);
+    }
+
+    #[test]
+    fn grouped_kfold_keeps_every_group_in_exactly_one_test_fold() {
+        use std::collections::{HashMap, HashSet};
+
+        let hvs: Vec<Hdv> = (0..18).map(|i| vec![i as i8, 1]).collect();
+        let labels: Vec<String> = (0..18)
+            .map(|i| if i < 9 { "A" } else { "B" }.to_string())
+            .collect();
+        let groups: Vec<String> = (0..18)
+            .map(|i| format!("{}-file-{}", if i < 9 { "A" } else { "B" }, i / 3))
+            .collect();
+
+        let splits = group_kfold_splits(&hvs, &labels, &groups, 3, 99).unwrap();
+        assert_eq!(splits.len(), 3);
+
+        let mut held_out_counts: HashMap<String, usize> = HashMap::new();
+        for split in &splits {
+            let train: HashSet<_> = split.train_group_ids.iter().collect();
+            let test: HashSet<_> = split.test_group_ids.iter().collect();
+            assert!(train.is_disjoint(&test));
+            assert!(split.test_labels.iter().any(|label| label == "A"));
+            assert!(split.test_labels.iter().any(|label| label == "B"));
+            for group in &test {
+                *held_out_counts.entry(group.to_string()).or_insert(0) += 1;
+            }
+        }
+        assert_eq!(held_out_counts.len(), 6);
+        assert!(held_out_counts.values().all(|count| *count == 1));
+    }
+
+    #[test]
+    fn grouped_kfold_rejects_insufficient_independent_groups() {
+        let hvs = vec![vec![1], vec![-1], vec![1]];
+        let labels = vec!["A".to_string(), "A".to_string(), "B".to_string()];
+        let groups = vec!["a1".to_string(), "a2".to_string(), "b1".to_string()];
+        let error = group_kfold_splits(&hvs, &labels, &groups, 2, 7).unwrap_err();
+        assert!(error.contains("required for group K-fold"));
+    }
+
+    #[test]
+    fn grouped_kfold_rejects_cross_label_group_identity() {
+        let hvs = vec![vec![1], vec![-1], vec![1], vec![-1]];
+        let labels = vec![
+            "A".to_string(), "A".to_string(), "B".to_string(), "B".to_string(),
+        ];
+        let groups = vec![
+            "same".to_string(), "a2".to_string(), "same".to_string(), "b2".to_string(),
+        ];
+        let error = group_kfold_splits(&hvs, &labels, &groups, 2, 7).unwrap_err();
+        assert!(error.contains("multiple labels"));
+    }
+
+    #[test]
+    fn grouped_kfold_is_deterministic_for_a_fixed_seed() {
+        let hvs: Vec<Hdv> = (0..12).map(|i| vec![i as i8, 1]).collect();
+        let labels: Vec<String> = (0..12)
+            .map(|i| if i < 6 { "A" } else { "B" }.to_string())
+            .collect();
+        let groups: Vec<String> = (0..12)
+            .map(|i| format!("{}-{}", if i < 6 { "A" } else { "B" }, i / 2))
+            .collect();
+        let first = group_kfold_splits(&hvs, &labels, &groups, 3, 17).unwrap();
+        let second = group_kfold_splits(&hvs, &labels, &groups, 3, 17).unwrap();
+        for (a, b) in first.iter().zip(second.iter()) {
+            assert_eq!(a.train_group_ids, b.train_group_ids);
+            assert_eq!(a.test_group_ids, b.test_group_ids);
+        }
+    }
 
     #[test]
     fn probe_learns_synthetic_classes() {
