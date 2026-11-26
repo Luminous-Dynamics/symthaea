@@ -140,6 +140,7 @@ pub enum LearningGateRejectV1 {
     TaskPopulationMismatch,
     InvalidRetentionPolicy,
     InvalidVerifierReceipt,
+    DuplicateVerificationReceipt,
     ArithmeticOverflow,
 }
 
@@ -191,6 +192,8 @@ impl LearningGateAssessmentV1 {
                     && self.verifier_ids.iter().all(|id| valid_atom(id, 512))
                     && self.verification_receipt_sha256.iter()
                         .all(|digest| validate_digest(digest).is_ok())
+                    && self.verification_receipt_sha256.iter()
+                        .collect::<std::collections::BTreeSet<_>>().len() == 4
                     && self.stable_delta_sum_basis_points.is_some()
                     && self.adaptation_delta_sum_basis_points.is_some()
                     && self.stable_task_count > 0
@@ -305,6 +308,9 @@ pub fn evaluate_non_regressive_learning_v1(
         }
         validate_digest(&receipt.verification_receipt_sha256)
             .map_err(|_| LearningGateRejectV1::InvalidVerifierReceipt)?;
+        if verification_digests.contains(&receipt.verification_receipt_sha256) {
+            return Err(LearningGateRejectV1::DuplicateVerificationReceipt);
+        }
         verifier_ids.push(receipt.verifier_id);
         verification_digests.push(receipt.verification_receipt_sha256);
     }
@@ -655,9 +661,16 @@ mod tests {
 
     impl LearningRunVerifierV1 for FixtureRunVerifier {
         fn verify_run(&self, run: &LearningRunSnapshotV1) -> Option<LearningRunVerificationReceiptV1> {
+            let receipt_digit = match run.run_id.as_str() {
+                "stable-before" => "6",
+                "stable-after" => "7",
+                "adapt-before" => "8",
+                "adapt-after" => "9",
+                _ => return None,
+            };
             Some(LearningRunVerificationReceiptV1 {
                 verifier_id: "fixture-independent-run-verifier".into(),
-                verification_receipt_sha256: if run.run_id.is_empty() { "0".repeat(64) } else { "6".repeat(64) },
+                verification_receipt_sha256: receipt_digit.repeat(64),
             })
         }
     }
