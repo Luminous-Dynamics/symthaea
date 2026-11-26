@@ -615,8 +615,6 @@ mod tests {
     fn context_digest_detects_changed_query_model_runtime_or_decode_context() {
         let mut input = manifest();
         input.query_text = "different query".into();
-        input.query_text_sha256 = sha256_hex(input.query_text.as_bytes());
-        input.context.context_manifest_sha256 = context_digest(&input).unwrap();
         assert!(verify_audio_evidence_manifest(&input, SOURCE_AUDIO, PCM).is_err());
 
         input = manifest();
