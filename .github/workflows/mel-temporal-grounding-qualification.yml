@@ -18,6 +18,7 @@ on:
     branches:
       - research/mel-ground-temporal-evaluator-v1-20261103
       - research/mel-temporal-grounding-count-gated-f1-v1-20261124
+      - research/mel-temporal-revision-audit-v1-20261124
     paths:
       - "crates/domains/symthaea-muse/src/temporal_grounding.rs"
       - "crates/domains/symthaea-muse/src/evidence_digest.rs"
@@ -90,6 +91,30 @@ jobs:
             and .source_work_bootstrap.confirmatory_source_cluster_floor_met == false
             and .source_work_bootstrap.local_minus_no_evidence_count_gated_f1.estimate == 0.5
           ' "$RUNNER_TEMP/revision-triplet-report.json" > /dev/null
+
+      - name: Replay exact audio evidence-window verification when module is present
+        if: hashFiles('tools/mel-temporal-grounding-qualifier/src/audio_evidence_window.rs') != ''
+        shell: bash
+        run: |
+          set -euo pipefail
+          cargo +1.96.0 run --locked --manifest-path tools/mel-temporal-grounding-qualifier/Cargo.toml --bin mel-audio-evidence-window-audit -- tools/mel-temporal-grounding-qualifier/fixtures/mel-audio-evidence-window.synthetic.json tools/mel-temporal-grounding-qualifier/fixtures/mel-audio-evidence-source.synthetic.bin tools/mel-temporal-grounding-qualifier/fixtures/mel-audio-evidence-pcm.synthetic.hex > "$RUNNER_TEMP/audio-evidence-window-report.json"
+          jq -e '
+            .schema == "mel-audio-evidence-verification-report-v1"
+            and .verified_window_count == 2
+            and .source_audio_bytes_recomputed == true
+            and .decoded_pcm_bytes_recomputed == true
+            and .window_payloads_recomputed == true
+            and .context_manifest_recomputed == true
+            and .verified_windows[0].position == 0
+            and .verified_windows[0].byte_offset == 4
+            and .verified_windows[0].byte_length == 8
+            and .verified_windows[1].position == 1
+            and .verified_windows[1].byte_offset == 20
+            and .verified_windows[1].byte_length == 12
+            and .decoder_identity_authenticated == false
+            and .request_body_recomputed == false
+            and .model_input_attested == false
+          ' "$RUNNER_TEMP/audio-evidence-window-report.json" > /dev/null
 
       - name: Assemble exact-head evidence
         if: always()
