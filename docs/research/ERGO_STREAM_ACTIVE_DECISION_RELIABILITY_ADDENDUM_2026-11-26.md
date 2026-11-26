@@ -547,3 +547,24 @@ Sources:
 | Cross-modal spatial decision | No shared official score | Zero false source joins on deterministic negative fixtures | Lower decision regret at lower acquisition cost | Hidden paired worlds; independent audio/video evidence and qualified transforms |
 
 These are research gates, not achieved Symthaea results. DCASE-native reproduction, OVO-S-native reproduction and internal cross-modal decision evaluation must be reported separately.
+
+
+## 11. Leaderboard freshness and the difference between measured SOTA and current industry capability
+
+An external snapshot audit dated 24 November 2026 reports that OVO-S-Bench's highest listed score remains Gemini-3.1-Pro at 59.2, while the newest model release represented in the benchmark's tracked model table dates to April 2026. The same secondary audit lists several newer frontier models without OVO-S results, including GPT-6.2 Astra, GPT-6 Astra, Gemini 4 Carbon and Claude Fable 5.2.
+
+This does **not** show that those untested models would score higher. It shows that the leaderboard is not a complete snapshot of the frontier available on 26 November 2026. Therefore:
+- call 59.2 the strongest currently reported OVO-S-compatible result, not the strongest model available in the industry today;
+- distinguish official benchmark leaderboard entries from secondary tracker coverage and from untested model-release claims;
+- do not impute or predict a benchmark score for an untested model;
+- before a superiority claim, rerun the best accessible current models and the Symthaea candidates on the exact same OVO-S release, streaming prefix protocol, allowed frame rate, context, prompting/response contract and resource budget;
+- publish model revision, access date, serving configuration, failed/unsupported runs and per-level scores;
+- keep the published Gemini score as a reproducibility anchor even if newer matched runs supersede it.
+
+The same principle applies to OmniInteract, SPOT-Bench and DCASE: a published table is a dated measurement of submitted systems under a particular protocol, not an omniscient statement of the current field. Benchmark freshness is itself part of the evidence record.
+
+The 59.2 overall / 54.9 L4 score and 86.6 streaming-human / 92.2 offline-human labels remain grounded in the official OVO-S project table. The model-coverage observation comes from a **secondary benchmark tracker**, and must be labelled as such rather than attributed to the benchmark authors.
+
+Sources:
+- Official OVO-S leaderboard: https://github.com/InternLM/OVO-S-Bench
+- Secondary benchmark coverage snapshot (24 November 2026): https://www.benchmarkalmanac.com/benchmarks/ovo-s-bench/
