@@ -1454,10 +1454,28 @@ mod tests {
         assert!(wm.learn_episode(&episode).is_err());
         assert_eq!(wm.total_observations(), 1);
 
-        let mut invalid = episode;
-        invalid.episode_id = "invalid-digest".to_owned();
-        invalid.provenance_sha256 = "not-a-sha256".to_owned();
-        assert!(wm.learn_episode(&invalid).is_err());
+        let mut invalid_provenance = episode.clone();
+        invalid_provenance.episode_id = "invalid-provenance-digest".to_owned();
+        invalid_provenance.provenance_sha256 = "not-a-sha256".to_owned();
+        assert!(wm.learn_episode(&invalid_provenance).is_err());
+        assert_eq!(wm.total_observations(), 1);
+
+        let mut invalid_assigned_action = episode.clone();
+        invalid_assigned_action.episode_id = "invalid-assigned-action-digest".to_owned();
+        invalid_assigned_action.assigned_action_sha256 = "not-a-sha256".to_owned();
+        assert!(wm.learn_episode(&invalid_assigned_action).is_err());
+        assert_eq!(wm.total_observations(), 1);
+
+        let mut invalid_realized_action = episode;
+        invalid_realized_action.episode_id = "invalid-realized-action-digest".to_owned();
+        if let TransitionExecution::Executed {
+            realized_action_sha256,
+            ..
+        } = &mut invalid_realized_action.execution
+        {
+            *realized_action_sha256 = "not-a-sha256".to_owned();
+        }
+        assert!(wm.learn_episode(&invalid_realized_action).is_err());
         assert_eq!(wm.total_observations(), 1);
     }
 
