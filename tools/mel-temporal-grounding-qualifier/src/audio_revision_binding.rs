@@ -351,7 +351,7 @@ mod tests {
             .iter()
             .filter_map(|subject| subject["name"].as_str())
             .collect();
-        assert!(subject_names.iter().any(|name| name.starts_with("target-audio/")));
+        assert!(subject_names.iter().any(|name| name.starts_with("target-audio-reference/")));
         assert!(subject_names.iter().any(|name| name.starts_with("source-audio/")));
         assert!(subject_names.iter().any(|name| name == &"audio-window/window-001"));
         assert!(subject_names.iter().any(|name| name == &"audio-window/window-002"));
