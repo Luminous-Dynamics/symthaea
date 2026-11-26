@@ -264,6 +264,16 @@ jobs:
               cp "$RUNNER_TEMP/temporal-reliability-report.json" "$evidence/"
             fi
           fi
+          if [[ -f tools/mel-temporal-grounding-qualifier/src/temporal_unitizing.rs ]]; then
+            cp tools/mel-temporal-grounding-qualifier/src/temporal_unitizing.rs "$evidence/"
+            cp tools/mel-temporal-grounding-qualifier/src/bin/mel-temporal-unitizing-audit.rs "$evidence/"
+            cp tools/mel-temporal-grounding-qualifier/fixtures/mel-temporal-unitizing-alpha-u.synthetic.json "$evidence/"
+            cp tools/mel-temporal-grounding-qualifier/schemas/mel-temporal-unitizing-alpha-u-corpus-v1.schema.json "$evidence/"
+            cp docs/research/MEL-GROUND-008-UNITIZING-ALPHA-U-V1.md "$evidence/"
+            if [[ -f "$RUNNER_TEMP/temporal-unitizing-report.json" ]]; then
+              cp "$RUNNER_TEMP/temporal-unitizing-report.json" "$evidence/"
+            fi
+          fi
           if [[ -f tools/mel-temporal-grounding-qualifier/src/temporal_consensus.rs ]]; then
             cp tools/mel-temporal-grounding-qualifier/src/temporal_consensus.rs "$evidence/"
             cp tools/mel-temporal-grounding-qualifier/src/bin/mel-multi-annotator-grounding-audit.rs "$evidence/"
