@@ -11,7 +11,7 @@
 //! system. Those are separate layers and must remain separate.
 
 use serde::de::{self, MapAccess, SeqAccess, Visitor};
-use serde::{Deserialize, Deserializer};
+use serde::{Deserialize, Deserializer, Serialize};
 use serde_json::Value;
 use sha2::{Digest, Sha256};
 use std::cmp::Ordering;
@@ -234,11 +234,6 @@ pub struct VerificationReport {
     pub qualification_assessed: bool,
     pub qualification_boundary: String,
     pub issues: Vec<VerificationIssue>,
-}
-
-#[derive(serde::Serialize)]
-struct ErrorReport {
-    error: String,
 }
 
 fn issue(issues: &mut Vec<VerificationIssue>, code: &str, path: impl Into<String>, message: impl Into<String>) {
@@ -876,8 +871,10 @@ pub fn verify_augmentation(input: &str) -> Result<VerificationReport, String> {
         );
     }
 
-    let semantic_valid = issues.is_empty();
-    let verified = semantic_valid && graph_root_matches;
+    let semantic_valid = issues
+        .iter()
+        .all(|entry| entry.code != "graph_root_mismatch" && entry.code != "invalid_graph_root_digest");
+    let verified = semantic_valid && graph_root_matches && valid_sha256(&augmentation.evidence_graph_root_digest);
     let _top_level_metadata = (
         &augmentation.created_at,
         &augmentation.native_benchmark,
