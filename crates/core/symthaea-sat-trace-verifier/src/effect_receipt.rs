@@ -255,6 +255,12 @@ pub fn verify_effect_receipt(
     validate_receipt_shape(&receipt)?;
     bind_receipt_to_attempt(&attempt, &receipt)?;
 
+    if receipt.source_attestations.is_empty() {
+        return Err(EffectReceiptError::InvalidShape(
+            "at least one source attestation is required".to_owned(),
+        ));
+    }
+
     let mut attestation_ids = HashSet::new();
     let mut source_event_ids = HashSet::new();
     for source in &receipt.source_attestations {
