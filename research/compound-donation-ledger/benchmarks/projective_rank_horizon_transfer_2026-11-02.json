@@ -1,0 +1,208 @@
+{
+  "schema_version": 1,
+  "run_date": "2026-11-02",
+  "execution_method": "Executed in private Python 3.13.5 / NumPy 2.3.5 using a direct reimplementation of the committed horizon-transfer script. Each candidate has the same fixed global weight gamma=1/1000 across all family-size prefixes; the e-BH threshold uses that weight, without renormalizing when m changes.",
+  "reference_harness": {
+    "path": "research/compound-donation-ledger/benchmarks/projective_rank_horizon_transfer.py",
+    "source_blob_sha": "a5f00e72cfd663dc2973aa906fe8f40664bc3aa0"
+  },
+  "environment": {
+    "python": "3.13.5",
+    "numpy": "2.3.5"
+  },
+  "design": {
+    "family_sizes": [
+      10,
+      100,
+      1000
+    ],
+    "max_family_size": 1000,
+    "fixed_candidate_weight": "1/1000",
+    "active_weight_mass": "m/1000",
+    "rounds": 80,
+    "streams_per_cell": 300,
+    "alpha": "1/20",
+    "null_probability": "1/2",
+    "alternative_probability": "3/4",
+    "alternative_fractions": [
+      0.1,
+      0.5
+    ],
+    "methods": [
+      "square_root",
+      "universal_dyadic_25",
+      "fixed_family_rank",
+      "projective_rank",
+      "projective_hybrid_rank"
+    ],
+    "metrics": {
+      "terminal_power": "mean fraction of alternatives rejected at final round",
+      "sup_fdr": "mean max_t FDP across streams; point estimate only"
+    }
+  },
+  "results": [
+    {
+      "family_size": 10,
+      "alternative_fraction": 0.1,
+      "seed": 20261212,
+      "methods": {
+        "square_root": {
+          "terminal_power": 0,
+          "sup_fdr_point_estimate": 0
+        },
+        "universal_dyadic_25": {
+          "terminal_power": 0.08666666666666667,
+          "sup_fdr_point_estimate": 0
+        },
+        "fixed_family_rank": {
+          "terminal_power": 0.43,
+          "sup_fdr_point_estimate": 0
+        },
+        "projective_rank": {
+          "terminal_power": 0.4866666666666667,
+          "sup_fdr_point_estimate": 0
+        },
+        "projective_hybrid_rank": {
+          "terminal_power": 0.45666666666666667,
+          "sup_fdr_point_estimate": 0
+        }
+      }
+    },
+    {
+      "family_size": 10,
+      "alternative_fraction": 0.5,
+      "seed": 20261612,
+      "methods": {
+        "square_root": {
+          "terminal_power": 0.018000000000000002,
+          "sup_fdr_point_estimate": 0
+        },
+        "universal_dyadic_25": {
+          "terminal_power": 0.184,
+          "sup_fdr_point_estimate": 0
+        },
+        "fixed_family_rank": {
+          "terminal_power": 0.608,
+          "sup_fdr_point_estimate": 0
+        },
+        "projective_rank": {
+          "terminal_power": 0.5546666666666666,
+          "sup_fdr_point_estimate": 0
+        },
+        "projective_hybrid_rank": {
+          "terminal_power": 0.49933333333333335,
+          "sup_fdr_point_estimate": 0
+        }
+      }
+    },
+    {
+      "family_size": 100,
+      "alternative_fraction": 0.1,
+      "seed": 20261302,
+      "methods": {
+        "square_root": {
+          "terminal_power": 0.02,
+          "sup_fdr_point_estimate": 0
+        },
+        "universal_dyadic_25": {
+          "terminal_power": 0.19933333333333333,
+          "sup_fdr_point_estimate": 0
+        },
+        "fixed_family_rank": {
+          "terminal_power": 0.6489999999999999,
+          "sup_fdr_point_estimate": 0
+        },
+        "projective_rank": {
+          "terminal_power": 0.5593333333333333,
+          "sup_fdr_point_estimate": 0
+        },
+        "projective_hybrid_rank": {
+          "terminal_power": 0.5136666666666666,
+          "sup_fdr_point_estimate": 0
+        }
+      }
+    },
+    {
+      "family_size": 100,
+      "alternative_fraction": 0.5,
+      "seed": 20261702,
+      "methods": {
+        "square_root": {
+          "terminal_power": 0.14373333333333335,
+          "sup_fdr_point_estimate": 0
+        },
+        "universal_dyadic_25": {
+          "terminal_power": 0.4241333333333333,
+          "sup_fdr_point_estimate": 0
+        },
+        "fixed_family_rank": {
+          "terminal_power": 0.7856666666666666,
+          "sup_fdr_point_estimate": 0.0006591396408469578
+        },
+        "projective_rank": {
+          "terminal_power": 0.6261333333333332,
+          "sup_fdr_point_estimate": 0.0001666666666666667
+        },
+        "projective_hybrid_rank": {
+          "terminal_power": 0.6177333333333334,
+          "sup_fdr_point_estimate": 0.0000980392156862745
+        }
+      }
+    },
+    {
+      "family_size": 1000,
+      "alternative_fraction": 0.1,
+      "seed": 20262202,
+      "methods": {
+        "square_root": {
+          "terminal_power": 0.3706666666666667,
+          "sup_fdr_point_estimate": 0
+        },
+        "universal_dyadic_25": {
+          "terminal_power": 0.5567666666666666,
+          "sup_fdr_point_estimate": 0.00009259259259259259
+        },
+        "fixed_family_rank": {
+          "terminal_power": 0.8239666666666666,
+          "sup_fdr_point_estimate": 0.005832351696888925
+        },
+        "projective_rank": {
+          "terminal_power": 0.6890666666666667,
+          "sup_fdr_point_estimate": 0.0009366588646951396
+        },
+        "projective_hybrid_rank": {
+          "terminal_power": 0.6910333333333334,
+          "sup_fdr_point_estimate": 0.0009368534790115411
+        }
+      }
+    },
+    {
+      "family_size": 1000,
+      "alternative_fraction": 0.5,
+      "seed": 20262602,
+      "methods": {
+        "square_root": {
+          "terminal_power": 0.8029933333333333,
+          "sup_fdr_point_estimate": 0.00028538037517183425
+        },
+        "universal_dyadic_25": {
+          "terminal_power": 0.7567466666666667,
+          "sup_fdr_point_estimate": 0.00019576951361841257
+        },
+        "fixed_family_rank": {
+          "terminal_power": 0.9090133333333331,
+          "sup_fdr_point_estimate": 0.002603429604996608
+        },
+        "projective_rank": {
+          "terminal_power": 0.7536266666666666,
+          "sup_fdr_point_estimate": 0.00022926464713445357
+        },
+        "projective_hybrid_rank": {
+          "terminal_power": 0.7926533333333333,
+          "sup_fdr_point_estimate": 0.00026357391494711185
+        }
+      }
+    }
+  ],
+  "claim_boundary": "Exploratory only: 300 streams per cell, one fixed weight sequence, one alpha, one Bernoulli LR model and independent coordinates. SupFDR confidence bounds are too wide at this sample size; no guarantee validation or superiority claim. Results show power trade-offs, not universal dominance."
+}

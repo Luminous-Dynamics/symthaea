@@ -1,0 +1,378 @@
+{
+  "schema_version": 4,
+  "run_date": "2026-11-02",
+  "execution_method": "Executed in the private Python 3.13.5 / NumPy 2.3.5 environment using a direct reimplementation of the committed harness logic. The generator, fixed-point rank priors, seeds, e-BH decisions and metrics matched the committed script. The committed script itself was not invoked as a shell command from the GitHub checkout; independent reproduction from the committed script remains a gate.",
+  "reference_harness": {
+    "path": "research/compound-donation-ledger/benchmarks/staircase_rank_geometric_exploratory.py",
+    "source_blob_sha": "1cdc68bb00cbd26caa4ce117beb54b557be942ac"
+  },
+  "environment": {
+    "python": "3.13.5",
+    "numpy": "2.3.5"
+  },
+  "design": {
+    "family_size": 100,
+    "rounds": 100,
+    "streams_per_cell": 3000,
+    "alpha": "1/20",
+    "null_success_probability": "1/2",
+    "alternative_success_probability": "3/4",
+    "likelihood_ratio": {
+      "success": "3/2",
+      "failure": "1/2"
+    },
+    "methods": [
+      "square_root",
+      "universal_dyadic_25",
+      "rank_geometric_fixed_family",
+      "rank_geometric_projective",
+      "rank_geometric_projective_hybrid"
+    ],
+    "metrics": {
+      "fixed_time_fdr": "mean FDP at final round",
+      "sup_fdr": "mean across streams of max_t FDP_t",
+      "terminal_power": "mean fraction of alternatives rejected at final round",
+      "probability_any_false": "Bernoulli probability of at least one false rejection; FWER-style diagnostic, not FDR"
+    },
+    "sup_fdr_one_sided_95_hoeffding_half_width": 0.022344769237094362
+  },
+  "results": [
+    {
+      "dependence": "independent",
+      "alternative_fraction": 0,
+      "seed": 20261852,
+      "methods": {
+        "square_root": {
+          "fixed_time_fdr": 0,
+          "sup_fdr": 0,
+          "sup_fdr_one_sided_95_hoeffding_upper": 0.022344769237094362,
+          "terminal_power": 0,
+          "probability_any_false": 0
+        },
+        "universal_dyadic_25": {
+          "fixed_time_fdr": 0,
+          "sup_fdr": 0,
+          "sup_fdr_one_sided_95_hoeffding_upper": 0.022344769237094362,
+          "terminal_power": 0,
+          "probability_any_false": 0
+        },
+        "rank_geometric_fixed_family": {
+          "fixed_time_fdr": 0.0036666666666666666,
+          "sup_fdr": 0.0036666666666666666,
+          "sup_fdr_one_sided_95_hoeffding_upper": 0.026011435903761027,
+          "terminal_power": 0,
+          "probability_any_false": 0.0036666666666666666
+        },
+        "rank_geometric_projective": {
+          "fixed_time_fdr": 0.016666666666666666,
+          "sup_fdr": 0.016666666666666666,
+          "sup_fdr_one_sided_95_hoeffding_upper": 0.03901143590376103,
+          "terminal_power": 0,
+          "probability_any_false": 0.016666666666666666
+        },
+        "rank_geometric_projective_hybrid": {
+          "fixed_time_fdr": 0.008,
+          "sup_fdr": 0.008,
+          "sup_fdr_one_sided_95_hoeffding_upper": 0.030344769237094362,
+          "terminal_power": 0,
+          "probability_any_false": 0.008
+        }
+      }
+    },
+    {
+      "dependence": "independent",
+      "alternative_fraction": 0.05,
+      "seed": 20262352,
+      "methods": {
+        "square_root": {
+          "fixed_time_fdr": 0,
+          "sup_fdr": 0,
+          "sup_fdr_one_sided_95_hoeffding_upper": 0.022344769237094362,
+          "terminal_power": 0.5873333333333334,
+          "probability_any_false": 0
+        },
+        "universal_dyadic_25": {
+          "fixed_time_fdr": 0.00012222222222222224,
+          "sup_fdr": 0.00016666666666666666,
+          "sup_fdr_one_sided_95_hoeffding_upper": 0.022511435903761028,
+          "terminal_power": 0.7042000000000002,
+          "probability_any_false": 0.0006666666666666666
+        },
+        "rank_geometric_fixed_family": {
+          "fixed_time_fdr": 0.006189682539682538,
+          "sup_fdr": 0.008427777777777777,
+          "sup_fdr_one_sided_95_hoeffding_upper": 0.03077254701487214,
+          "terminal_power": 0.9044,
+          "probability_any_false": 0.033666666666666664
+        },
+        "rank_geometric_projective": {
+          "fixed_time_fdr": 0.002938888888888889,
+          "sup_fdr": 0.005727777777777778,
+          "sup_fdr_one_sided_95_hoeffding_upper": 0.02807254701487214,
+          "terminal_power": 0.8884,
+          "probability_any_false": 0.015333333333333332
+        },
+        "rank_geometric_projective_hybrid": {
+          "fixed_time_fdr": 0.0020444444444444442,
+          "sup_fdr": 0.0038611111111111107,
+          "sup_fdr_one_sided_95_hoeffding_upper": 0.026205880348205472,
+          "terminal_power": 0.8568,
+          "probability_any_false": 0.01
+        }
+      }
+    },
+    {
+      "dependence": "independent",
+      "alternative_fraction": 0.2,
+      "seed": 20263852,
+      "methods": {
+        "square_root": {
+          "fixed_time_fdr": 0.0003223888970792996,
+          "sup_fdr": 0.00044587163782210213,
+          "sup_fdr_one_sided_95_hoeffding_upper": 0.022790640874916463,
+          "terminal_power": 0.8293333333333334,
+          "probability_any_false": 0.006
+        },
+        "universal_dyadic_25": {
+          "fixed_time_fdr": 0.0003531952839615378,
+          "sup_fdr": 0.0005370257666310298,
+          "sup_fdr_one_sided_95_hoeffding_upper": 0.02288179500372539,
+          "terminal_power": 0.8415666666666666,
+          "probability_any_false": 0.006666666666666667
+        },
+        "rank_geometric_fixed_family": {
+          "fixed_time_fdr": 0.006049846839320523,
+          "sup_fdr": 0.0089792429620603,
+          "sup_fdr_one_sided_95_hoeffding_upper": 0.03132401219915466,
+          "terminal_power": 0.9548499999999999,
+          "probability_any_false": 0.11133333333333334
+        },
+        "rank_geometric_projective": {
+          "fixed_time_fdr": 0.001172059177206236,
+          "sup_fdr": 0.003138152717022686,
+          "sup_fdr_one_sided_95_hoeffding_upper": 0.025482921954117048,
+          "terminal_power": 0.9068833333333333,
+          "probability_any_false": 0.022
+        },
+        "rank_geometric_projective_hybrid": {
+          "fixed_time_fdr": 0.0009829250413615738,
+          "sup_fdr": 0.0019152316566016256,
+          "sup_fdr_one_sided_95_hoeffding_upper": 0.02426000089369599,
+          "terminal_power": 0.89925,
+          "probability_any_false": 0.018666666666666668
+        }
+      }
+    },
+    {
+      "dependence": "independent",
+      "alternative_fraction": 0.5,
+      "seed": 20266852,
+      "methods": {
+        "square_root": {
+          "fixed_time_fdr": 0.0005102916789433772,
+          "sup_fdr": 0.0007333134928222401,
+          "sup_fdr_one_sided_95_hoeffding_upper": 0.023078082729916603,
+          "terminal_power": 0.9152466666666665,
+          "probability_any_false": 0.023333333333333334
+        },
+        "universal_dyadic_25": {
+          "fixed_time_fdr": 0.00030807608540165,
+          "sup_fdr": 0.0005231424723144151,
+          "sup_fdr_one_sided_95_hoeffding_upper": 0.022867911709408776,
+          "terminal_power": 0.8923466666666666,
+          "probability_any_false": 0.014
+        },
+        "rank_geometric_fixed_family": {
+          "fixed_time_fdr": 0.003167056611262198,
+          "sup_fdr": 0.00552458260504298,
+          "sup_fdr_one_sided_95_hoeffding_upper": 0.027869351842137343,
+          "terminal_power": 0.9662400000000001,
+          "probability_any_false": 0.14466666666666667
+        },
+        "rank_geometric_projective": {
+          "fixed_time_fdr": 0.0005222935712376317,
+          "sup_fdr": 0.0012143898664468396,
+          "sup_fdr_one_sided_95_hoeffding_upper": 0.023559159103541203,
+          "terminal_power": 0.9238466666666667,
+          "probability_any_false": 0.024
+        },
+        "rank_geometric_projective_hybrid": {
+          "fixed_time_fdr": 0.0005162970548978178,
+          "sup_fdr": 0.0009714949043293678,
+          "sup_fdr_one_sided_95_hoeffding_upper": 0.02331626414142373,
+          "terminal_power": 0.9218133333333332,
+          "probability_any_false": 0.023666666666666666
+        }
+      }
+    },
+    {
+      "dependence": "balanced_negative_null",
+      "alternative_fraction": 0,
+      "seed": 993051,
+      "methods": {
+        "square_root": {
+          "fixed_time_fdr": 0.0003333333333333333,
+          "sup_fdr": 0.0003333333333333333,
+          "sup_fdr_one_sided_95_hoeffding_upper": 0.022678102570427697,
+          "terminal_power": 0,
+          "probability_any_false": 0.0003333333333333333
+        },
+        "universal_dyadic_25": {
+          "fixed_time_fdr": 0.0003333333333333333,
+          "sup_fdr": 0.0003333333333333333,
+          "sup_fdr_one_sided_95_hoeffding_upper": 0.022678102570427697,
+          "terminal_power": 0,
+          "probability_any_false": 0.0003333333333333333
+        },
+        "rank_geometric_fixed_family": {
+          "fixed_time_fdr": 0.0033333333333333335,
+          "sup_fdr": 0.0033333333333333335,
+          "sup_fdr_one_sided_95_hoeffding_upper": 0.025678102570427696,
+          "terminal_power": 0,
+          "probability_any_false": 0.0033333333333333335
+        },
+        "rank_geometric_projective": {
+          "fixed_time_fdr": 0.017666666666666667,
+          "sup_fdr": 0.017666666666666667,
+          "sup_fdr_one_sided_95_hoeffding_upper": 0.04001143590376103,
+          "terminal_power": 0,
+          "probability_any_false": 0.017666666666666667
+        },
+        "rank_geometric_projective_hybrid": {
+          "fixed_time_fdr": 0.008666666666666666,
+          "sup_fdr": 0.008666666666666666,
+          "sup_fdr_one_sided_95_hoeffding_upper": 0.031011435903761028,
+          "terminal_power": 0,
+          "probability_any_false": 0.008666666666666666
+        }
+      }
+    },
+    {
+      "dependence": "balanced_negative_null",
+      "alternative_fraction": 0.05,
+      "seed": 993551,
+      "methods": {
+        "square_root": {
+          "fixed_time_fdr": 0,
+          "sup_fdr": 0,
+          "sup_fdr_one_sided_95_hoeffding_upper": 0.022344769237094362,
+          "terminal_power": 0.5841999999999999,
+          "probability_any_false": 0
+        },
+        "universal_dyadic_25": {
+          "fixed_time_fdr": 0,
+          "sup_fdr": 0,
+          "sup_fdr_one_sided_95_hoeffding_upper": 0.022344769237094362,
+          "terminal_power": 0.7024666666666666,
+          "probability_any_false": 0
+        },
+        "rank_geometric_fixed_family": {
+          "fixed_time_fdr": 0.004838888888888888,
+          "sup_fdr": 0.006266666666666667,
+          "sup_fdr_one_sided_95_hoeffding_upper": 0.02861143590376103,
+          "terminal_power": 0.9048,
+          "probability_any_false": 0.02666666666666667
+        },
+        "rank_geometric_projective": {
+          "fixed_time_fdr": 0.0019277777777777778,
+          "sup_fdr": 0.004533333333333333,
+          "sup_fdr_one_sided_95_hoeffding_upper": 0.026878102570427696,
+          "terminal_power": 0.8912,
+          "probability_any_false": 0.010333333333333333
+        },
+        "rank_geometric_projective_hybrid": {
+          "fixed_time_fdr": 0.000888888888888889,
+          "sup_fdr": 0.0022333333333333333,
+          "sup_fdr_one_sided_95_hoeffding_upper": 0.024578102570427696,
+          "terminal_power": 0.8600666666666666,
+          "probability_any_false": 0.004666666666666667
+        }
+      }
+    },
+    {
+      "dependence": "balanced_negative_null",
+      "alternative_fraction": 0.2,
+      "seed": 995051,
+      "methods": {
+        "square_root": {
+          "fixed_time_fdr": 0.0002610592280096924,
+          "sup_fdr": 0.00032496204059671553,
+          "sup_fdr_one_sided_95_hoeffding_upper": 0.022669731277691077,
+          "terminal_power": 0.8254166666666667,
+          "probability_any_false": 0.004666666666666667
+        },
+        "universal_dyadic_25": {
+          "fixed_time_fdr": 0.00029200063066162134,
+          "sup_fdr": 0.00037745911495911495,
+          "sup_fdr_one_sided_95_hoeffding_upper": 0.022722228352053477,
+          "terminal_power": 0.8381000000000001,
+          "probability_any_false": 0.005333333333333333
+        },
+        "rank_geometric_fixed_family": {
+          "fixed_time_fdr": 0.006047063631753696,
+          "sup_fdr": 0.009481458710135181,
+          "sup_fdr_one_sided_95_hoeffding_upper": 0.03182622794722954,
+          "terminal_power": 0.9555333333333333,
+          "probability_any_false": 0.11533333333333333
+        },
+        "rank_geometric_projective": {
+          "fixed_time_fdr": 0.0013704242223205074,
+          "sup_fdr": 0.003056877251575394,
+          "sup_fdr_one_sided_95_hoeffding_upper": 0.025401646488669757,
+          "terminal_power": 0.9048333333333334,
+          "probability_any_false": 0.025666666666666667
+        },
+        "rank_geometric_projective_hybrid": {
+          "fixed_time_fdr": 0.0010533887824135503,
+          "sup_fdr": 0.002422805393780626,
+          "sup_fdr_one_sided_95_hoeffding_upper": 0.024767574630874988,
+          "terminal_power": 0.8980833333333333,
+          "probability_any_false": 0.019666666666666666
+        }
+      }
+    },
+    {
+      "dependence": "balanced_negative_null",
+      "alternative_fraction": 0.5,
+      "seed": 998051,
+      "methods": {
+        "square_root": {
+          "fixed_time_fdr": 0.0004824139719353977,
+          "sup_fdr": 0.000643864100007522,
+          "sup_fdr_one_sided_95_hoeffding_upper": 0.022988633337101883,
+          "terminal_power": 0.9163333333333334,
+          "probability_any_false": 0.022333333333333334
+        },
+        "universal_dyadic_25": {
+          "fixed_time_fdr": 0.00027613423795560084,
+          "sup_fdr": 0.0004104101502729195,
+          "sup_fdr_one_sided_95_hoeffding_upper": 0.02275517938736728,
+          "terminal_power": 0.89352,
+          "probability_any_false": 0.013
+        },
+        "rank_geometric_fixed_family": {
+          "fixed_time_fdr": 0.003234770678941343,
+          "sup_fdr": 0.005530994716150733,
+          "sup_fdr_one_sided_95_hoeffding_upper": 0.027875763953245095,
+          "terminal_power": 0.9664866666666667,
+          "probability_any_false": 0.15166666666666667
+        },
+        "rank_geometric_projective": {
+          "fixed_time_fdr": 0.0005232125771126466,
+          "sup_fdr": 0.0011496105220649483,
+          "sup_fdr_one_sided_95_hoeffding_upper": 0.02349437975915931,
+          "terminal_power": 0.9249466666666667,
+          "probability_any_false": 0.024333333333333332
+        },
+        "rank_geometric_projective_hybrid": {
+          "fixed_time_fdr": 0.0005108309674639563,
+          "sup_fdr": 0.0010027097116074612,
+          "sup_fdr_one_sided_95_hoeffding_upper": 0.023347478948701823,
+          "terminal_power": 0.9227933333333334,
+          "probability_any_false": 0.023666666666666666
+        }
+      }
+    }
+  ],
+  "claim_boundary": "Exploratory only: one family size, one alpha, one Bernoulli likelihood-ratio model, homogeneous alternatives, independent or one balanced-negative null coupling, 3,000 streams per cell. Not confirmatory, not Rust validation, not a proof, not evidence of SOTA."
+}
