@@ -25,7 +25,10 @@ impl FailureFidelityContract {
             return Err("failure contract and source manifest must use SHA-256 digests".to_owned());
         }
         if self.domain_ids.is_empty()
-            || self.domain_ids.iter().any(|domain| domain.trim().is_empty())
+            || self
+                .domain_ids
+                .iter()
+                .any(|domain| domain.trim().is_empty())
         {
             return Err("failure contract must admit at least one non-empty domain".to_owned());
         }
@@ -35,7 +38,9 @@ impl FailureFidelityContract {
         if self.minimum_boundary_gap_basis_points == 0
             || self.minimum_boundary_gap_basis_points > 10_000
         {
-            return Err("minimum boundary gap must be between 1 and 10,000 basis points".to_owned());
+            return Err(
+                "minimum boundary gap must be between 1 and 10,000 basis points".to_owned(),
+            );
         }
         Ok(())
     }
@@ -52,10 +57,18 @@ pub struct FailureSignature {
 
 impl FailureSignature {
     fn validate(&self, stage_count: u32) -> Result<(), String> {
-        if self.reason_id.as_ref().is_some_and(|reason| reason.trim().is_empty()) {
+        if self
+            .reason_id
+            .as_ref()
+            .is_some_and(|reason| reason.trim().is_empty())
+        {
             return Err("known failure reason IDs must be non-empty".to_owned());
         }
-        if self.stage_id.as_ref().is_some_and(|stage| stage.trim().is_empty()) {
+        if self
+            .stage_id
+            .as_ref()
+            .is_some_and(|stage| stage.trim().is_empty())
+        {
             return Err("known failure stage IDs must be non-empty".to_owned());
         }
         match (&self.stage_id, self.stage_index) {
@@ -122,7 +135,9 @@ impl FailureTraceRecord {
             || self.environment_family_id.trim().is_empty()
             || self.environment_cluster_id.trim().is_empty()
         {
-            return Err("failure record, domain, family and cluster IDs must be non-empty".to_owned());
+            return Err(
+                "failure record, domain, family and cluster IDs must be non-empty".to_owned(),
+            );
         }
         if !contract.domain_ids.contains(&self.domain_id) {
             return Err("failure record domain is outside the frozen contract".to_owned());
@@ -130,7 +145,10 @@ impl FailureTraceRecord {
         for (name, digest) in [
             ("initial_state_sha256", &self.initial_state_sha256),
             ("realized_action_sha256", &self.realized_action_sha256),
-            ("candidate_checkpoint_sha256", &self.candidate_checkpoint_sha256),
+            (
+                "candidate_checkpoint_sha256",
+                &self.candidate_checkpoint_sha256,
+            ),
         ] {
             if !is_sha256(digest) {
                 return Err(format!("{name} must be a 64-character hexadecimal digest"));
@@ -138,11 +156,18 @@ impl FailureTraceRecord {
         }
         self.reference.validate(contract.stage_count)?;
         self.predicted.validate(contract.stage_count)?;
-        match (&self.boundary_pair_id, self.boundary_side, self.perturbation_units) {
+        match (
+            &self.boundary_pair_id,
+            self.boundary_side,
+            self.perturbation_units,
+        ) {
             (None, None, None) => {}
             (Some(pair_id), Some(_), Some(_)) if !pair_id.trim().is_empty() => {}
             _ => {
-                return Err("boundary pair ID, side and perturbation value must be supplied together".to_owned());
+                return Err(
+                    "boundary pair ID, side and perturbation value must be supplied together"
+                        .to_owned(),
+                );
             }
         }
         Ok(())
@@ -218,16 +243,23 @@ pub fn score_failure_fidelity(
         }
         match frozen_checkpoint {
             Some(checkpoint) if checkpoint != record.candidate_checkpoint_sha256 => {
-                return Err("one failure evaluation must use exactly one candidate checkpoint".to_owned());
+                return Err(
+                    "one failure evaluation must use exactly one candidate checkpoint".to_owned(),
+                );
             }
             None => frozen_checkpoint = Some(&record.candidate_checkpoint_sha256),
             _ => {}
         }
 
-        let metadata = (record.domain_id.as_str(), record.environment_family_id.as_str());
+        let metadata = (
+            record.domain_id.as_str(),
+            record.environment_family_id.as_str(),
+        );
         match cluster_metadata.get(record.environment_cluster_id.as_str()) {
             Some(previous) if *previous != metadata => {
-                return Err("one failure cluster cannot alias multiple domain/family identities".to_owned());
+                return Err(
+                    "one failure cluster cannot alias multiple domain/family identities".to_owned(),
+                );
             }
             None => {
                 cluster_metadata.insert(record.environment_cluster_id.as_str(), metadata);
@@ -235,7 +267,10 @@ pub fn score_failure_fidelity(
             _ => {}
         }
 
-        let cluster = score.clusters.entry(record.environment_cluster_id.clone()).or_default();
+        let cluster = score
+            .clusters
+            .entry(record.environment_cluster_id.clone())
+            .or_default();
         cluster.cases += 1;
         match (&record.reference, &record.predicted) {
             (OutcomeLabel::Failure(reference), OutcomeLabel::Failure(predicted)) => {
@@ -275,7 +310,9 @@ pub fn score_failure_fidelity(
     let mut boundary_counts = Vec::new();
     for (pair_id, pair) in boundary_groups {
         if pair.len() != 2 {
-            return Err(format!("boundary pair {pair_id} must contain exactly two records"));
+            return Err(format!(
+                "boundary pair {pair_id} must contain exactly two records"
+            ));
         }
         let lower = pair
             .iter()
@@ -292,10 +329,14 @@ pub fn score_failure_fidelity(
             || lower.realized_action_sha256 != upper.realized_action_sha256
             || lower.candidate_checkpoint_sha256 != upper.candidate_checkpoint_sha256
         {
-            return Err(format!("boundary pair {pair_id} does not share its frozen initial state/action/family/cluster/checkpoint"));
+            return Err(format!(
+                "boundary pair {pair_id} does not share its frozen initial state/action/family/cluster/checkpoint"
+            ));
         }
         if lower.perturbation_units >= upper.perturbation_units {
-            return Err(format!("boundary pair {pair_id} must have strictly ordered perturbation values"));
+            return Err(format!(
+                "boundary pair {pair_id} must have strictly ordered perturbation values"
+            ));
         }
         let reference_flip = lower.reference.is_failure() != upper.reference.is_failure();
         let predicted_flip = lower.predicted.is_failure() != upper.predicted.is_failure();
@@ -307,32 +348,48 @@ pub fn score_failure_fidelity(
     }
 
     if score.reference_failures > 0 {
-        let reason_matches: usize = score.clusters.values().map(|cluster| cluster.reason_matches).sum();
-        let stage_matches: usize = score.clusters.values().map(|cluster| cluster.stage_matches).sum();
-        score.failure_capture_recall =
-            Some((score.reference_failures - score.false_successes) as f64 / score.reference_failures as f64);
-        score.false_success_rate = Some(score.false_successes as f64 / score.reference_failures as f64);
+        let reason_matches: usize = score
+            .clusters
+            .values()
+            .map(|cluster| cluster.reason_matches)
+            .sum();
+        let stage_matches: usize = score
+            .clusters
+            .values()
+            .map(|cluster| cluster.stage_matches)
+            .sum();
+        score.failure_capture_recall = Some(
+            (score.reference_failures - score.false_successes) as f64
+                / score.reference_failures as f64,
+        );
+        score.false_success_rate =
+            Some(score.false_successes as f64 / score.reference_failures as f64);
         score.reason_accuracy = Some(reason_matches as f64 / score.reference_failures as f64);
         score.stage_accuracy = Some(stage_matches as f64 / score.reference_failures as f64);
     }
     if score.reference_successes > 0 {
-        score.false_failure_rate = Some(score.false_failures as f64 / score.reference_successes as f64);
+        score.false_failure_rate =
+            Some(score.false_failures as f64 / score.reference_successes as f64);
     }
     if !boundary_counts.is_empty() {
         score.boundary_pairs = boundary_counts.len();
         score.boundary_flip_accuracy = Some(
-            boundary_counts.iter().filter(|pair| pair.flip_matches).count() as f64
+            boundary_counts
+                .iter()
+                .filter(|pair| pair.flip_matches)
+                .count() as f64
                 / boundary_counts.len() as f64,
         );
         score.boundary_pair_outcome_accuracy = Some(
-            boundary_counts.iter().filter(|pair| pair.both_outcomes_match).count() as f64
+            boundary_counts
+                .iter()
+                .filter(|pair| pair.both_outcomes_match)
+                .count() as f64
                 / boundary_counts.len() as f64,
         );
     }
     Ok(score)
 }
-
-
 
 /// Rate-based scene-boundary pair. The reference success-side and failure-side
 /// are selected by the benchmark manifest. Both sides use one frozen reference
@@ -379,13 +436,19 @@ impl BoundaryRatePair {
             || self.environment_cluster_id.trim().is_empty()
             || self.perturbation_dimension_id.trim().is_empty()
         {
-            return Err("boundary pair and domain/family/cluster/perturbation IDs must be non-empty".to_owned());
+            return Err(
+                "boundary pair and domain/family/cluster/perturbation IDs must be non-empty"
+                    .to_owned(),
+            );
         }
         if !contract.domain_ids.contains(&self.domain_id) {
             return Err("boundary pair domain is outside the frozen contract".to_owned());
         }
         if !["position", "orientation", "size"].contains(&self.perturbation_dimension_id.as_str()) {
-            return Err("WorldFailBench perturbation dimension must be position, orientation or size".to_owned());
+            return Err(
+                "WorldFailBench perturbation dimension must be position, orientation or size"
+                    .to_owned(),
+            );
         }
         if self.success_side_perturbation_units == self.failure_side_perturbation_units {
             return Err("success-side and failure-side perturbations must differ".to_owned());
@@ -394,11 +457,20 @@ impl BoundaryRatePair {
             return Err("reference policy ID must be non-empty".to_owned());
         }
         for (name, digest) in [
-            ("pair_source_manifest_sha256", &self.pair_source_manifest_sha256),
+            (
+                "pair_source_manifest_sha256",
+                &self.pair_source_manifest_sha256,
+            ),
             ("success_side_scene_sha256", &self.success_side_scene_sha256),
             ("failure_side_scene_sha256", &self.failure_side_scene_sha256),
-            ("reference_policy_checkpoint_sha256", &self.reference_policy_checkpoint_sha256),
-            ("candidate_checkpoint_sha256", &self.candidate_checkpoint_sha256),
+            (
+                "reference_policy_checkpoint_sha256",
+                &self.reference_policy_checkpoint_sha256,
+            ),
+            (
+                "candidate_checkpoint_sha256",
+                &self.candidate_checkpoint_sha256,
+            ),
         ] {
             if !is_sha256(digest) {
                 return Err(format!("{name} must be a 64-character hexadecimal digest"));
@@ -408,11 +480,19 @@ impl BoundaryRatePair {
             return Err("success-side and failure-side scene digests must differ".to_owned());
         }
         for (name, digest) in [
-            ("success_side_action_trace_sha256", &self.success_side_action_trace_sha256),
-            ("failure_side_action_trace_sha256", &self.failure_side_action_trace_sha256),
+            (
+                "success_side_action_trace_sha256",
+                &self.success_side_action_trace_sha256,
+            ),
+            (
+                "failure_side_action_trace_sha256",
+                &self.failure_side_action_trace_sha256,
+            ),
         ] {
             if digest.as_ref().is_some_and(|value| !is_sha256(value)) {
-                return Err(format!("{name} must be a 64-character hexadecimal digest when supplied"));
+                return Err(format!(
+                    "{name} must be a 64-character hexadecimal digest when supplied"
+                ));
             }
         }
         if self.reference_success_side_trials != self.predicted_success_side_trials
@@ -423,13 +503,31 @@ impl BoundaryRatePair {
         if self.success_side_action_trace_sha256.is_some()
             != self.failure_side_action_trace_sha256.is_some()
         {
-            return Err("action trace provenance must be present for both sides or neither".to_owned());
+            return Err(
+                "action trace provenance must be present for both sides or neither".to_owned(),
+            );
         }
         for (label, successes, trials) in [
-            ("reference success side", self.reference_success_side_successes, self.reference_success_side_trials),
-            ("reference failure side", self.reference_failure_side_successes, self.reference_failure_side_trials),
-            ("predicted success side", self.predicted_success_side_successes, self.predicted_success_side_trials),
-            ("predicted failure side", self.predicted_failure_side_successes, self.predicted_failure_side_trials),
+            (
+                "reference success side",
+                self.reference_success_side_successes,
+                self.reference_success_side_trials,
+            ),
+            (
+                "reference failure side",
+                self.reference_failure_side_successes,
+                self.reference_failure_side_trials,
+            ),
+            (
+                "predicted success side",
+                self.predicted_success_side_successes,
+                self.predicted_success_side_trials,
+            ),
+            (
+                "predicted failure side",
+                self.predicted_failure_side_successes,
+                self.predicted_failure_side_trials,
+            ),
         ] {
             if trials == 0 {
                 return Err(format!("{label} must contain at least one rollout"));
@@ -560,7 +658,10 @@ pub fn score_boundary_rate_pairs(
         }
         match frozen_checkpoint {
             Some(checkpoint) if checkpoint != pair.candidate_checkpoint_sha256 => {
-                return Err("one boundary-rate evaluation must use exactly one frozen candidate checkpoint".to_owned());
+                return Err(
+                    "one boundary-rate evaluation must use exactly one frozen candidate checkpoint"
+                        .to_owned(),
+                );
             }
             None => frozen_checkpoint = Some(&pair.candidate_checkpoint_sha256),
             _ => {}
@@ -584,7 +685,10 @@ pub fn score_boundary_rate_pairs(
         let metadata = (pair.domain_id.as_str(), pair.environment_family_id.as_str());
         match cluster_metadata.get(pair.environment_cluster_id.as_str()) {
             Some(previous) if *previous != metadata => {
-                return Err("one boundary cluster cannot alias multiple domain/family identities".to_owned());
+                return Err(
+                    "one boundary cluster cannot alias multiple domain/family identities"
+                        .to_owned(),
+                );
             }
             None => {
                 cluster_metadata.insert(pair.environment_cluster_id.as_str(), metadata);
@@ -684,8 +788,7 @@ pub fn score_boundary_rate_pairs(
     let denominator = pairs.len() as f64;
     score.pair_weighted_boundary_detection_accuracy =
         Some(score.correct_boundary_detection_pairs as f64 / denominator);
-    score.pair_weighted_boundary_direction_accuracy =
-        Some(direction_matches as f64 / denominator);
+    score.pair_weighted_boundary_direction_accuracy = Some(direction_matches as f64 / denominator);
     score.pair_weighted_success_side_rate_mae_basis_points = Some(success_error_sum / denominator);
     score.pair_weighted_failure_side_rate_mae_basis_points = Some(failure_error_sum / denominator);
     score.pair_weighted_boundary_gap_mae_basis_points = Some(gap_error_sum / denominator);
@@ -702,15 +805,13 @@ pub fn score_boundary_rate_pairs(
     let mut cluster_predicted_gap = 0.0;
     for cluster in score.clusters.values_mut() {
         let cluster_denominator = cluster.pairs as f64;
-        let detection_accuracy =
-            cluster.correctly_detected_boundaries as f64 / cluster_denominator;
+        let detection_accuracy = cluster.correctly_detected_boundaries as f64 / cluster_denominator;
         let direction_accuracy = cluster.direction_matches as f64 / cluster_denominator;
         let success_error =
             cluster.success_side_rate_mae_basis_points.unwrap_or(0.0) / cluster_denominator;
         let failure_error =
             cluster.failure_side_rate_mae_basis_points.unwrap_or(0.0) / cluster_denominator;
-        let gap_error =
-            cluster.boundary_gap_mae_basis_points.unwrap_or(0.0) / cluster_denominator;
+        let gap_error = cluster.boundary_gap_mae_basis_points.unwrap_or(0.0) / cluster_denominator;
         let reference_gap =
             cluster.reference_mean_gap_basis_points.unwrap_or(0.0) / cluster_denominator;
         let predicted_gap =
@@ -739,7 +840,6 @@ pub fn score_boundary_rate_pairs(
     score.predicted_mean_gap_basis_points = Some(cluster_predicted_gap / cluster_count);
     Ok(score)
 }
-
 
 #[cfg(test)]
 mod tests {
@@ -786,8 +886,6 @@ mod tests {
         }
     }
 
-
-
     fn indeterminate_failure() -> OutcomeLabel {
         OutcomeLabel::Failure(FailureSignature {
             reason_id: None,
@@ -795,8 +893,6 @@ mod tests {
             stage_index: None,
         })
     }
-
-
 
     fn rate_pair(pair_id: &str, cluster: &str) -> BoundaryRatePair {
         BoundaryRatePair {
@@ -835,12 +931,27 @@ mod tests {
         assert_eq!(score.pairs, 1);
         assert_eq!(score.pair_measurements.len(), 1);
         assert_eq!(score.pair_measurements[0].pair_id, "pair-1");
-        assert_eq!(score.pair_measurements[0].environment_cluster_id, "cluster-1");
-        assert_eq!(score.pair_measurements[0].pair_source_manifest_sha256, "b".repeat(64));
-        assert_eq!(score.pair_measurements[0].candidate_checkpoint_sha256, "e".repeat(64));
-        assert_eq!(score.pair_measurements[0].reference_success_side_successes, 10);
+        assert_eq!(
+            score.pair_measurements[0].environment_cluster_id,
+            "cluster-1"
+        );
+        assert_eq!(
+            score.pair_measurements[0].pair_source_manifest_sha256,
+            "b".repeat(64)
+        );
+        assert_eq!(
+            score.pair_measurements[0].candidate_checkpoint_sha256,
+            "e".repeat(64)
+        );
+        assert_eq!(
+            score.pair_measurements[0].reference_success_side_successes,
+            10
+        );
         assert_eq!(score.pair_measurements[0].reference_success_side_trials, 10);
-        assert_eq!(score.pair_measurements[0].predicted_failure_side_successes, 2);
+        assert_eq!(
+            score.pair_measurements[0].predicted_failure_side_successes,
+            2
+        );
         assert_eq!(score.pair_measurements[0].predicted_failure_side_trials, 10);
         assert_eq!(
             score.pair_measurements[0].success_side_action_trace_sha256,
@@ -907,11 +1018,23 @@ mod tests {
 
         let mut mixed_checkpoint = rate_pair("pair-3", "cluster-3");
         mixed_checkpoint.candidate_checkpoint_sha256 = "f".repeat(64);
-        assert!(score_boundary_rate_pairs(&[rate_pair("pair-4", "cluster-4"), mixed_checkpoint], &contract()).is_err());
+        assert!(
+            score_boundary_rate_pairs(
+                &[rate_pair("pair-4", "cluster-4"), mixed_checkpoint],
+                &contract()
+            )
+            .is_err()
+        );
 
         let mut mixed_reference_policy = rate_pair("pair-5", "cluster-5");
         mixed_reference_policy.reference_policy_id = "fastwam".to_owned();
-        assert!(score_boundary_rate_pairs(&[rate_pair("pair-6", "cluster-6"), mixed_reference_policy], &contract()).is_err());
+        assert!(
+            score_boundary_rate_pairs(
+                &[rate_pair("pair-6", "cluster-6"), mixed_reference_policy],
+                &contract()
+            )
+            .is_err()
+        );
 
         let mut bad_reference_policy_digest = rate_pair("pair-7", "cluster-7");
         bad_reference_policy_digest.reference_policy_checkpoint_sha256 = "invalid".to_owned();
@@ -921,19 +1044,21 @@ mod tests {
         mixed_reference_policy_checkpoint.reference_policy_checkpoint_sha256 = "1".repeat(64);
         assert!(
             score_boundary_rate_pairs(
-                &[rate_pair("pair-9", "cluster-10"), mixed_reference_policy_checkpoint],
+                &[
+                    rate_pair("pair-9", "cluster-10"),
+                    mixed_reference_policy_checkpoint
+                ],
                 &contract()
             )
             .is_err()
         );
     }
 
-
-
     #[test]
     fn rate_boundary_rejects_identical_side_scenes_and_invalid_pair_manifest() {
         let mut identical_scenes = rate_pair("same-scene", "cluster-1");
-        identical_scenes.failure_side_scene_sha256 = identical_scenes.success_side_scene_sha256.clone();
+        identical_scenes.failure_side_scene_sha256 =
+            identical_scenes.success_side_scene_sha256.clone();
         assert!(score_boundary_rate_pairs(&[identical_scenes], &contract()).is_err());
 
         let mut invalid_manifest = rate_pair("invalid-manifest", "cluster-2");
@@ -944,8 +1069,6 @@ mod tests {
         invalid_action_trace.success_side_action_trace_sha256 = Some("not-a-digest".to_owned());
         assert!(score_boundary_rate_pairs(&[invalid_action_trace], &contract()).is_err());
     }
-
-
 
     #[test]
     fn rate_boundary_requires_predictions_on_the_same_rollout_denominators() {
@@ -972,8 +1095,6 @@ mod tests {
         assert!(score_boundary_rate_pairs(&[pair], &contract()).is_err());
     }
 
-
-
     #[test]
     fn primary_boundary_summary_weights_clusters_equally_and_preserves_pair_weighted_diagnostic() {
         let pair_a = rate_pair("cluster-a-pair", "cluster-a");
@@ -985,17 +1106,17 @@ mod tests {
         let mut pair_b3 = pair_b1.clone();
         pair_b3.pair_id = "cluster-b-pair-3".to_owned();
 
-        let score = score_boundary_rate_pairs(
-            &[pair_a, pair_b1, pair_b2, pair_b3],
-            &contract(),
-        )
-        .expect("valid cluster-stratified pairs");
+        let score = score_boundary_rate_pairs(&[pair_a, pair_b1, pair_b2, pair_b3], &contract())
+            .expect("valid cluster-stratified pairs");
 
         assert_eq!(score.clusters.len(), 2);
         assert_eq!(score.clusters["cluster-a"].pairs, 1);
         assert_eq!(score.clusters["cluster-b"].pairs, 3);
         assert_eq!(score.success_side_rate_mae_basis_points, Some(500.0));
-        assert_eq!(score.pair_weighted_success_side_rate_mae_basis_points, Some(750.0));
+        assert_eq!(
+            score.pair_weighted_success_side_rate_mae_basis_points,
+            Some(750.0)
+        );
         assert_eq!(
             score.clusters["cluster-b"].success_side_rate_mae_basis_points,
             Some(1_000.0)
@@ -1014,8 +1135,6 @@ mod tests {
         assert_eq!(score.clusters["cluster-1"].pairs, 2);
         assert_eq!(score.clusters["cluster-2"].pairs, 1);
     }
-
-
 
     #[test]
     fn failure_contract_rejects_invalid_boundary_threshold() {
@@ -1055,8 +1174,18 @@ mod tests {
     #[test]
     fn false_success_is_counted_against_reference_failures() {
         let records = vec![
-            record("case-fail", "cluster-1", failure("missed_contact", "grasp", 1), OutcomeLabel::Success),
-            record("case-success", "cluster-2", OutcomeLabel::Success, OutcomeLabel::Success),
+            record(
+                "case-fail",
+                "cluster-1",
+                failure("missed_contact", "grasp", 1),
+                OutcomeLabel::Success,
+            ),
+            record(
+                "case-success",
+                "cluster-2",
+                OutcomeLabel::Success,
+                OutcomeLabel::Success,
+            ),
         ];
         let score = score_failure_fidelity(&records, &contract()).expect("valid records");
         assert_eq!(score.reference_failures, 1);
@@ -1085,19 +1214,30 @@ mod tests {
 
     #[test]
     fn boundary_pair_scores_flip_detection_and_each_side() {
-        let mut lower = record("lower", "cluster-1", OutcomeLabel::Success, OutcomeLabel::Success);
+        let mut lower = record(
+            "lower",
+            "cluster-1",
+            OutcomeLabel::Success,
+            OutcomeLabel::Success,
+        );
         lower.initial_state_sha256 = "1".repeat(64);
         lower.realized_action_sha256 = "2".repeat(64);
         lower.boundary_pair_id = Some("boundary-1".to_owned());
         lower.boundary_side = Some(BoundarySide::LowerPerturbation);
         lower.perturbation_units = Some(10);
-        let mut upper = record("upper", "cluster-1", failure("object_slip", "lift", 2), failure("object_slip", "lift", 2));
+        let mut upper = record(
+            "upper",
+            "cluster-1",
+            failure("object_slip", "lift", 2),
+            failure("object_slip", "lift", 2),
+        );
         upper.initial_state_sha256 = lower.initial_state_sha256.clone();
         upper.realized_action_sha256 = lower.realized_action_sha256.clone();
         upper.boundary_pair_id = Some("boundary-1".to_owned());
         upper.boundary_side = Some(BoundarySide::UpperPerturbation);
         upper.perturbation_units = Some(11);
-        let score = score_failure_fidelity(&[lower, upper], &contract()).expect("valid boundary pair");
+        let score =
+            score_failure_fidelity(&[lower, upper], &contract()).expect("valid boundary pair");
         assert_eq!(score.boundary_pairs, 1);
         assert_eq!(score.boundary_flip_accuracy, Some(1.0));
         assert_eq!(score.boundary_pair_outcome_accuracy, Some(1.0));
@@ -1105,22 +1245,38 @@ mod tests {
 
     #[test]
     fn boundary_pair_does_not_hide_wrong_side_predictions() {
-        let mut lower = record("lower", "cluster-1", OutcomeLabel::Success, failure("false", "contact", 0));
+        let mut lower = record(
+            "lower",
+            "cluster-1",
+            OutcomeLabel::Success,
+            failure("false", "contact", 0),
+        );
         lower.boundary_pair_id = Some("boundary-1".to_owned());
         lower.boundary_side = Some(BoundarySide::LowerPerturbation);
         lower.perturbation_units = Some(0);
-        let mut upper = record("upper", "cluster-1", failure("slip", "lift", 2), OutcomeLabel::Success);
+        let mut upper = record(
+            "upper",
+            "cluster-1",
+            failure("slip", "lift", 2),
+            OutcomeLabel::Success,
+        );
         upper.boundary_pair_id = Some("boundary-1".to_owned());
         upper.boundary_side = Some(BoundarySide::UpperPerturbation);
         upper.perturbation_units = Some(1);
-        let score = score_failure_fidelity(&[lower, upper], &contract()).expect("valid boundary pair");
+        let score =
+            score_failure_fidelity(&[lower, upper], &contract()).expect("valid boundary pair");
         assert_eq!(score.boundary_flip_accuracy, Some(1.0));
         assert_eq!(score.boundary_pair_outcome_accuracy, Some(0.0));
     }
 
     #[test]
     fn incomplete_boundary_pairs_are_rejected() {
-        let mut lower = record("lower", "cluster-1", OutcomeLabel::Success, OutcomeLabel::Success);
+        let mut lower = record(
+            "lower",
+            "cluster-1",
+            OutcomeLabel::Success,
+            OutcomeLabel::Success,
+        );
         lower.boundary_pair_id = Some("boundary-1".to_owned());
         lower.boundary_side = Some(BoundarySide::LowerPerturbation);
         lower.perturbation_units = Some(0);
@@ -1129,11 +1285,21 @@ mod tests {
 
     #[test]
     fn boundary_pair_requires_shared_start_action_and_cluster() {
-        let mut lower = record("lower", "cluster-1", OutcomeLabel::Success, OutcomeLabel::Success);
+        let mut lower = record(
+            "lower",
+            "cluster-1",
+            OutcomeLabel::Success,
+            OutcomeLabel::Success,
+        );
         lower.boundary_pair_id = Some("boundary-1".to_owned());
         lower.boundary_side = Some(BoundarySide::LowerPerturbation);
         lower.perturbation_units = Some(0);
-        let mut upper = record("upper", "cluster-2", failure("slip", "lift", 2), failure("slip", "lift", 2));
+        let mut upper = record(
+            "upper",
+            "cluster-2",
+            failure("slip", "lift", 2),
+            failure("slip", "lift", 2),
+        );
         upper.boundary_pair_id = Some("boundary-1".to_owned());
         upper.boundary_side = Some(BoundarySide::UpperPerturbation);
         upper.perturbation_units = Some(1);
@@ -1142,8 +1308,18 @@ mod tests {
 
     #[test]
     fn mixed_candidate_checkpoints_and_invalid_digests_are_rejected() {
-        let mut first = record("first", "cluster-1", OutcomeLabel::Success, OutcomeLabel::Success);
-        let mut second = record("second", "cluster-2", OutcomeLabel::Success, OutcomeLabel::Success);
+        let mut first = record(
+            "first",
+            "cluster-1",
+            OutcomeLabel::Success,
+            OutcomeLabel::Success,
+        );
+        let mut second = record(
+            "second",
+            "cluster-2",
+            OutcomeLabel::Success,
+            OutcomeLabel::Success,
+        );
         second.candidate_checkpoint_sha256 = "invalid".to_owned();
         assert!(score_failure_fidelity(&[first.clone(), second], &contract()).is_err());
         first.realized_action_sha256 = "bad".to_owned();
@@ -1153,8 +1329,18 @@ mod tests {
     #[test]
     fn repeated_cases_are_reported_per_cluster_not_collapsed_to_independent_counts() {
         let records = vec![
-            record("case-a", "same-cluster", failure("slip", "lift", 2), failure("slip", "lift", 2)),
-            record("case-b", "same-cluster", failure("collision", "grasp", 1), OutcomeLabel::Success),
+            record(
+                "case-a",
+                "same-cluster",
+                failure("slip", "lift", 2),
+                failure("slip", "lift", 2),
+            ),
+            record(
+                "case-b",
+                "same-cluster",
+                failure("collision", "grasp", 1),
+                OutcomeLabel::Success,
+            ),
         ];
         let score = score_failure_fidelity(&records, &contract()).expect("valid records");
         let cluster = score.clusters.get("same-cluster").expect("cluster summary");
