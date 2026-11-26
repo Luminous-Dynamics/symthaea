@@ -232,6 +232,8 @@ ASI-Bench advertises a public 60-task seed42 catalog, but its leaderboard method
 - [Issue #13794](https://github.com/Luminous-Dynamics/symthaea/issues/13794): complete acquisition receipts and bounded concurrency.
 - [Issue #13800](https://github.com/Luminous-Dynamics/symthaea/issues/13800): prevent public convenience constructors from minting unprovenanced `HighConfidence` claims.
 - [Issue #13818](https://github.com/Luminous-Dynamics/symthaea/issues/13818): scientist-steerable, checkpointed research with independently replayable audit agents.
+- [PR #13819](https://github.com/Luminous-Dynamics/symthaea/pull/13819): claim-specific source-node graph wiring; does not adjudicate entailment.
+- [PR #13820](https://github.com/Luminous-Dynamics/symthaea/pull/13820): removes confidence-derived correctness feedback; independent outcome receipt types remain unfinished.
 - [Issue #8771](https://github.com/Luminous-Dynamics/symthaea/issues/8771): immutable benchmark anchors and sealed, adaptive scientific-task refreshes.
 - [PR #13665](https://github.com/Luminous-Dynamics/symthaea/pull/13665): typed public ResearchState evidence relation boundary.
 - [PR #13668](https://github.com/Luminous-Dynamics/symthaea/pull/13668): candidate-facing StateGuard B0 baseline.
@@ -241,4 +243,4 @@ Do not introduce a new web-research planner to solve an evidence-model defect. R
 
 ## 8. Claim boundary
 
-This is a benchmark protocol and code-audit map. The existing WebResearcher has not been evaluated on these external benchmarks, no current SOTA score is claimed, and PR #13790 is not yet Rust-qualified. The intended contribution is a measurable reduction in false support and unverifiable research claims, not a claim that fluent reports are equivalent to reliable scientific knowledge.
+This is a benchmark protocol and code-audit map. The existing WebResearcher has not been evaluated on these external benchmarks, no current SOTA score is claimed, and PRs #13790, #13819 and #13820 are draft changes awaiting their exact-head Rust workflows. The intended contribution is a measurable reduction in false support and unverifiable research claims, not a claim that fluent reports are equivalent to reliable scientific knowledge.
