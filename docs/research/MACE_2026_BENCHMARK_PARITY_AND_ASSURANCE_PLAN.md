@@ -33,6 +33,23 @@ These are separate leaderboard tracks with different tasks and scoring definitio
 
 The textual board is especially instructive: MemoraX leads not only overall but also on multiple capability dimensions, while the top open-source method remains materially behind. MACE should therefore first demonstrate open-source parity against the open leader, then a separate commercial-beating result. A claim that MACE is better than "industry" is not supportable until both comparisons are reproduced under the same official task set, API budget and scorer.
 
+#### Capability-gap diagnosis
+
+Using the official textual capability rows for MemoraX (commercial) versus Resurface (open-source), the largest absolute gaps are:
+
+| Capability | Commercial | Open source | Gap |
+|---|---:|---:|---:|
+| Personalization & care | 54.70 | 38.82 | **15.88** |
+| Streaming | 63.11 | 49.65 | **13.46** |
+| Epistemic safety & privacy | 81.98 | 68.59 | **13.39** |
+| Temporal & event sequencing | 67.05 | 57.76 | **9.29** |
+| Explicit fact recall | 70.85 | 62.98 | **7.87** |
+| Relational & multi-hop reasoning | 64.40 | 58.94 | **5.46** |
+| Memory governance | 78.10 | 76.55 | **1.55** |
+| In-context rules/workflow execution | 61.20 | 59.67 | **1.53** |
+
+These are descriptive capability gaps, not a decomposition of the overall-score weighting. They suggest a practical priority order: (1) trustworthy personalization and evolving user-state models, (2) streaming/continuous memory update under bounded latency, (3) epistemic safety/privacy grounded in evidence rights and uncertainty, then (4) temporal and relational memory. Governance is comparatively close in this particular textual comparison; MACE should prove that its assurance architecture improves real task results rather than merely adding protocol machinery.
+
 ### Agentic and lifecycle benchmarks
 
 - **AMA-Bench (ICML 2026):** tests real and synthetic agent-environment trajectories rather than dialogue alone. It evaluates recall, causal inference, state updating and state abstraction. The paper reports AMA-Agent at 57.22% average accuracy, 11.16 points above its strongest baseline. This is an important result for causal/trajectory memory, but it is a benchmark-specific result and not an AML score.
