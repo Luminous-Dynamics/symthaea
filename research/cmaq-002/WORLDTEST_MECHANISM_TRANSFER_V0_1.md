@@ -1,6 +1,6 @@
 # WorldTest Frozen Mechanism-Transfer Evaluator v0.1
 
-**Status:** Rust evaluator and 19 new deterministic tests authored; exact-head Rust 1.100.0 formatting, 87-test crate suite, strict Clippy, custody and MARA phase/reward qualification passed at `6343c8d626ce29923928cc8adf6deab40b5d9a62` (26 November 2026). Rust 1.96.0 compatibility was previously qualified on the earlier 17-test revision.  
+**Status:** Rust evaluator and 20 new deterministic tests authored. The 19-test revision passed exact-head Rust 1.100.0 qualification at `6343c8d626ce29923928cc8adf6deab40b5d9a62`; the underpowered-cell preservation update is now awaiting its own exact-head qualification. Rust 1.96.0 compatibility was previously qualified on the earlier 17-test revision.  
 **Research owner:** [#13707 — CMAQ-018](https://github.com/Luminous-Dynamics/symthaea/issues/13707).  
 **Base evaluator:** [#13711 — cluster-aware query portfolio](https://github.com/Luminous-Dynamics/symthaea/pull/13711).  
 **Parent protocol:** [#13688 — WorldTest / AutumnBench adapter](https://github.com/Luminous-Dynamics/symthaea/pull/13688).
@@ -84,7 +84,7 @@ The evaluator preserves:
 
 Failed, timed-out, invalid and abstained tasks stay in the cluster and cell denominators with explicit evaluator-assigned scores. Missing cluster/query-family cells remain absent, not zero-filled.
 
-The preregistered minimum independent cluster count is a context field and is checked separately for all fifteen cells. The tests use two clusters per cell only as a mechanical fixture. Actual scientific sample size must follow the power/MDE analysis and the #8908 preregistration; the existing ten-seed-per-synthetic-lane requirement is a starting floor, not a universal guarantee of power.
+The preregistered minimum independent cluster count is a context field and is checked separately for all fifteen cells. A cell below the floor is **retained** with its full task/cluster/disposition counts, its descriptive score, `cluster_floor_met=false` and the required floor value; the certificate reports `all_cell_cluster_floors_met=false`. It is not treated as confirmatory evidence. A truly missing cell still rejects the matrix. The tests use two clusters per cell only as a mechanical fixture. Actual scientific sample size must follow the power/MDE analysis and the #8908 preregistration; the existing ten-seed-per-synthetic-lane requirement is a starting floor, not a universal guarantee of power.
 
 ## Robustness reporting
 
@@ -127,7 +127,7 @@ The Rust tests cover:
 - full fifteen-cell coverage and deterministic ordering;
 - one weak structural-shift/planning cell exposed as the minimum;
 - missing cell rejection;
-- preregistered minimum clusters per cell;
+- underpowered cell is retained with explicit unmet cluster floor, while an actually missing cell is rejected;
 - repeated tasks within one cluster do not create extra independent clusters;
 - task-weighted and equal-cluster means differ as expected;
 - one cluster cannot span transfer conditions;

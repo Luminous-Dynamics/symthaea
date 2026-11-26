@@ -21,19 +21,19 @@ jobs:
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
-      - uses: dtolnay/rust-toolchain@1.96.0
+      - uses: dtolnay/rust-toolchain@1.100.0
       - name: Install pinned JSON Schema validator
         run: python3 -m pip install --disable-pip-version-check "jsonschema==4.25.1"
       - name: Unit tests
         working-directory: research/cmaq-002
-        run: cargo test --locked
+        run: cargo +1.100.0 test --locked
       - name: Run benchmark and validate report schema
         working-directory: research/cmaq-002
         shell: bash
         run: |
           set -euo pipefail
-          cargo run --quiet --locked -- --seed 4242 --probe-budget 2 --decision-horizon 1 --probe-cost 0.25 --allocator-cost 0.0 > /tmp/cmaq-002-report.json
-          cargo run --quiet --locked -- --seed 4242 --probe-budget 2 --decision-horizon 1 --probe-cost 0.25 --allocator-cost 100.0 > /tmp/cmaq-002-expensive-allocator.json
+          cargo +1.100.0 run --quiet --locked -- --seed 4242 --probe-budget 2 --decision-horizon 1 --probe-cost 0.25 --allocator-cost 0.0 > /tmp/cmaq-002-report.json
+          cargo +1.100.0 run --quiet --locked -- --seed 4242 --probe-budget 2 --decision-horizon 1 --probe-cost 0.25 --allocator-cost 100.0 > /tmp/cmaq-002-expensive-allocator.json
           python3 - <<'PY'
           import json
           from pathlib import Path

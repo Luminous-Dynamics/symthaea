@@ -1,4 +1,6 @@
 //! Cross-query transfer across held-out environment mechanisms.
+// A sub-floor cell remains visible and is explicitly ineligible for confirmatory inference.
+// All transfer cells share one frozen source checkpoint; target adaptation is a separate protocol.
 //!
 //! This is the frozen-transfer (zero-shot reuse) track. It evaluates the same
 //! exploration-derived checkpoint across 5 mechanism-transfer conditions and
@@ -120,6 +122,8 @@ pub struct MechanismTransferCellSummary {
     pub query_family: QueryFamily,
     pub task_count: u64,
     pub independent_cluster_count: u64,
+    pub minimum_independent_clusters_required: u64,
+    pub cluster_floor_met: bool,
     pub completed_count: u64,
     pub failed_count: u64,
     pub timed_out_count: u64,
@@ -176,6 +180,7 @@ pub struct MechanismTransferCertificate {
     pub maximum_cell_mean_score_ppm: u32,
     pub cell_mean_gap_ppm: u32,
     pub all_required_cells_present: bool,
+    pub all_cell_cluster_floors_met: bool,
 }
 
 #[derive(Clone, Debug, Eq, PartialEq)]
@@ -218,12 +223,6 @@ pub enum MechanismTransferError {
     MissingCell {
         condition: MechanismTransferCondition,
         query_family: QueryFamily,
-    },
-    TooFewIndependentClusters {
-        condition: MechanismTransferCondition,
-        query_family: QueryFamily,
-        observed: u64,
-        required: u64,
     },
     ArithmeticOverflow,
 }
@@ -303,17 +302,6 @@ impl fmt::Display for MechanismTransferError {
             } => write!(
                 formatter,
                 "mechanism-transfer matrix is missing cell ({}, {})",
-                condition.as_str(),
-                query_family.as_str()
-            ),
-            Self::TooFewIndependentClusters {
-                condition,
-                query_family,
-                observed,
-                required,
-            } => write!(
-                formatter,
-                "cell ({}, {}) has {observed} independent clusters; {required} required",
                 condition.as_str(),
                 query_family.as_str()
             ),
@@ -643,14 +631,6 @@ pub fn evaluate_mechanism_transfer(
             )?;
             let cluster_count = u64::try_from(cell.cluster_means_ppm.len())
                 .map_err(|_| MechanismTransferError::ArithmeticOverflow)?;
-            if cluster_count < input.context.minimum_independent_clusters_per_cell {
-                return Err(MechanismTransferError::TooFewIndependentClusters {
-                    condition,
-                    query_family,
-                    observed: cluster_count,
-                    required: input.context.minimum_independent_clusters_per_cell,
-                });
-            }
             let cluster_score_sum_ppm =
                 cell.cluster_means_ppm
                     .values()
@@ -683,6 +663,11 @@ pub fn evaluate_mechanism_transfer(
                 query_family,
                 task_count: cell.task_count,
                 independent_cluster_count: cluster_count,
+                minimum_independent_clusters_required: input
+                    .context
+                    .minimum_independent_clusters_per_cell,
+                cluster_floor_met: cluster_count
+                    >= input.context.minimum_independent_clusters_per_cell,
                 completed_count: cell.dispositions.completed,
                 failed_count: cell.dispositions.failed,
                 timed_out_count: cell.dispositions.timed_out,
@@ -751,6 +736,7 @@ pub fn evaluate_mechanism_transfer(
     let cell_mean_gap_ppm = maximum_cell_mean_score_ppm
         .checked_sub(minimum_cell_mean_score_ppm)
         .ok_or(MechanismTransferError::ArithmeticOverflow)?;
+    let all_cell_cluster_floors_met = cell_summaries.iter().all(|cell| cell.cluster_floor_met);
 
     Ok(MechanismTransferCertificate {
         context: input.context.clone(),
@@ -763,6 +749,7 @@ pub fn evaluate_mechanism_transfer(
         maximum_cell_mean_score_ppm,
         cell_mean_gap_ppm,
         all_required_cells_present: true,
+        all_cell_cluster_floors_met,
     })
 }
 
@@ -984,7 +971,7 @@ mod tests {
     }
 
     #[test]
-    fn preregistered_minimum_cluster_count_is_enforced_per_cell() {
+    fn preregistered_minimum_cluster_count_is_reported_without_discarding_cell() {
         let mut input = base_input();
         let omitted = input
             .tasks
@@ -999,15 +986,22 @@ mod tests {
         input
             .expected_task_ids
             .retain(|id| id != &removed.task.task_id);
-        assert!(matches!(
-            evaluate_mechanism_transfer(&input),
-            Err(MechanismTransferError::TooFewIndependentClusters {
-                condition: MechanismTransferCondition::NuisanceShift,
-                query_family: QueryFamily::ChangeDetection,
-                observed: 1,
-                required: 2,
+
+        let result = evaluate_mechanism_transfer(&input).unwrap();
+        let cell = result
+            .cell_summaries
+            .iter()
+            .find(|cell| {
+                cell.condition == MechanismTransferCondition::NuisanceShift
+                    && cell.query_family == QueryFamily::ChangeDetection
             })
-        ));
+            .unwrap();
+        assert_eq!(cell.task_count, 1);
+        assert_eq!(cell.independent_cluster_count, 1);
+        assert_eq!(cell.minimum_independent_clusters_required, 2);
+        assert!(!cell.cluster_floor_met);
+        assert!(!result.all_cell_cluster_floors_met);
+        assert_eq!(cell.mean_score_ppm, 800_000);
     }
 
     #[test]
