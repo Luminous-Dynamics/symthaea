@@ -34,6 +34,14 @@ Each media exposure binds:
 
 A content path is a structural locator; it is not a substitute for byte verification. The verifier must resolve the path in the exact captured body and check that it denotes the same content part covered by the byte span. All numeric offsets are half-open. Every video time is represented as presentation timestamp ticks multiplied by an explicit rational timebase; no implicit milliseconds or frame-rate assumptions are allowed. Audio ranges use sample frames, not scalar channel samples: start is inclusive and end is exclusive.
 
+## Provider request parameter coverage
+
+This extension inherits a known boundary issue in the current text producer: arbitrary provider request parameters are accepted as untyped JSON outside the message-segment source map (tracked in [#13722](https://github.com/Luminous-Dynamics/symthaea/issues/13722)). A memory-derived instruction, tool description, metadata value or provider-specific content field could otherwise bypass both text and media origin enumeration.
+
+A qualified implementation must bind the provider-specific request-parameter profile to the independent run manifest, allowlist fields whose values are genuinely static configuration, and require every dynamic text/media-bearing field to use typed source mappings. Unknown or unclassified fields must make the invocation non-qualifiable. The true no-memory arm must inspect all serialized provider fields and upload/reference surfaces, not only the standard message content array.
+
+The request-body digest commits to all bytes, but a digest alone does not establish complete origin classification. Until this gap is closed, the receipt can prove exact body integrity while its origin coverage remains limited to explicitly instrumented content paths.
+
 ## Media-specific lineage
 
 ### Images
