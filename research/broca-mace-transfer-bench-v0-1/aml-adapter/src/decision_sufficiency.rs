@@ -1357,7 +1357,7 @@ mod tests {
     };
     use crate::source_lineage_receipt::{
         MACE_SOURCE_LINEAGE_PREDICATE_TYPE_V1, SOURCE_LINEAGE_VERIFIER_ID_V1,
-        SourceLineageEnvelopeInputV1, verify_source_lineage_receipts_v1,
+        SourceLineageEnvelopeInputV1, SourceLineageRejectV1, verify_source_lineage_receipts_v1,
     };
     use crate::qualification_trust::{
         PinnedEd25519QualificationVerifierV1, QualificationKeyStatusV1,
