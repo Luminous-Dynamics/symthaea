@@ -1505,6 +1505,75 @@ mod tests {
         assert_eq!(prediction.independent_cluster_count, 1);
     }
 
+
+
+    #[test]
+    fn contextual_candidate_beats_global_delta_on_held_out_mechanism_family() {
+        let dim = 256;
+        let mut wm = NixWorldModel::new(dim);
+        let before = ContinuousHV::random(dim, 200);
+        let after_a = ContinuousHV::random(dim, 201);
+        let after_b = ContinuousHV::random(dim, 202);
+        let context_a = ContinuousHV::random(dim, 203);
+        let context_b = ContinuousHV::random(dim, 204);
+        let action_parameters = ContinuousHV::random(dim, 90);
+
+        for index in 0..4 {
+            let mut episode_a = transition_episode(
+                &format!("family-a-{index}"),
+                ActionCategory::Install,
+                ActionCategory::Install,
+                before.clone(),
+                context_a.clone(),
+                after_a.clone(),
+                TransitionOutcomeClass::Success,
+                &format!("family-a-cluster-{index}"),
+            );
+            episode_a.environment_family_id = "mechanism-family-a".to_owned();
+            wm.learn_episode(&episode_a).expect("family A training episode");
+
+            let mut episode_b = transition_episode(
+                &format!("family-b-{index}"),
+                ActionCategory::Install,
+                ActionCategory::Install,
+                before.clone(),
+                context_b.clone(),
+                after_b.clone(),
+                TransitionOutcomeClass::Success,
+                &format!("family-b-cluster-{index}"),
+            );
+            episode_b.environment_family_id = "mechanism-family-b".to_owned();
+            wm.learn_episode(&episode_b).expect("family B training episode");
+        }
+
+        wm.observe(before.clone());
+        let global_prediction = wm.predict_state(&ActionCategory::Install);
+        let contextual_prediction = wm
+            .predict_state_with_context(
+                &before,
+                &ActionCategory::Install,
+                "mechanism-family-a",
+                &action_parameters,
+                &context_a,
+            )
+            .expect("family A contextual prediction");
+
+        let global_error = mean_squared_error(&global_prediction, &after_a)
+            .expect("same-dimensional global prediction");
+        let contextual_error = mean_squared_error(&contextual_prediction.predicted_state, &after_a)
+            .expect("same-dimensional contextual prediction");
+
+        assert_eq!(
+            contextual_prediction.source,
+            ContextualPredictionSource::ContextualDelta
+        );
+        assert_eq!(contextual_prediction.independent_cluster_count, 4);
+        assert!(
+            contextual_error + 1e-5 < global_error,
+            "contextual error {contextual_error} should beat pooled global error {global_error}"
+        );
+    }
+
     #[test]
     fn contextual_prediction_falls_back_visibly_when_context_is_unseen() {
         let dim = 256;
