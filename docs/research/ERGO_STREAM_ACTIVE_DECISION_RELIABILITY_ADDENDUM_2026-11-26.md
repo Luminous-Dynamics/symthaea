@@ -540,8 +540,8 @@ Sources:
 
 | Lane | Official baseline anchor | First target | Stretch target | Required comparison |
 |---|---|---|---|---|
-| OVO-S streaming spatial | Gemini-3.1-Pro 59.2; Human streaming 86.6 | ≥62 overall | ≥65 overall | Prefix-only; report L1–L4; preserve streaming/offline human distinction |
-| OVO-S L4 allocentric map | Gemini-3.1-Pro 54.9 | ≥58 | ≥62 | No material L1–L3 regression; evidence-span and map consistency |
+| OVO-S streaming spatial | Gemini-3.1-Pro 59.2; Qwen3-VL-235B-A22B 53.6; Human streaming 86.6 | ≥62 overall | ≥65 overall | Prefix-only; report L1–L4; preserve streaming/offline human distinction |
+| OVO-S L4 allocentric map | Gemini-3.1-Pro 54.9; Qwen3-VL-235B-A22B 45.7 | ≥58 | ≥62 | No material L1–L3 regression; evidence-span and map consistency |
 | DCASE Task 3 audio-only | Best listed Mask mAP 0.1080 | Reproduce official top system | Paired improvement over reproduced leader | Four-channel evaluation input; exact map rendering and official scorer |
 | DCASE Task 3 audiovisual | Rank-1 cumulative entry 0.0131 Mask mAP / 0.4002 Pearson r | Reproduce official rank and all metrics | Improve both native quality and matched modality ablation | Do not infer superiority from cumulative rank alone |
 | Cross-modal spatial decision | No shared official score | Zero false source joins on deterministic negative fixtures | Lower decision regret at lower acquisition cost | Hidden paired worlds; independent audio/video evidence and qualified transforms |
