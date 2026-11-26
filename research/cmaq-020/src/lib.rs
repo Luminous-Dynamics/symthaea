@@ -240,7 +240,7 @@ pub struct CounterexampleProbe {
     pub left_state_id: String,
     pub right_state_id: String,
     pub dimension: CounterexampleDimension,
-    /// None means the witness is an already-visible invariant mismatch.
+    /// None means the witness is a structural invariant mismatch; no action-query cost is assigned here.
     pub probe_cost_units: Option<u64>,
 }
 
@@ -248,7 +248,8 @@ pub struct CounterexampleProbe {
 /// candidate currently assigns to the same abstraction class.
 ///
 /// The evaluator returns only the separating invariant/query identity. It
-/// never exposes the response values used to find the counterexample.
+/// never exposes the response or invariant values used to find the counterexample.
+/// Verification/reconstruction cost for invariant witnesses is charged separately.
 pub fn select_counterexample_probe(
     records: &[StateResponseRecord],
     contract: &StateResponseContract,
