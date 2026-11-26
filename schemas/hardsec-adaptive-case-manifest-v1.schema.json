@@ -1,0 +1,115 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://github.com/Luminous-Dynamics/symthaea/blob/main/schemas/hardsec-adaptive-case-manifest-v1.schema.json",
+  "title": "HARDSEC adaptive evaluator case manifest v1",
+  "type": "object",
+  "additionalProperties": false,
+  "required": [
+    "schema_version",
+    "campaign_id",
+    "evidence_domain",
+    "platform_id",
+    "holdout_axes",
+    "cases"
+  ],
+  "properties": {
+    "schema_version": {
+      "const": "hardsec-adaptive-case-manifest-v1"
+    },
+    "campaign_id": {
+      "type": "string",
+      "minLength": 1
+    },
+    "evidence_domain": {
+      "enum": [
+        "synthetic_fixture",
+        "simulator",
+        "physical_hardware"
+      ]
+    },
+    "platform_id": {
+      "type": "string",
+      "minLength": 1
+    },
+    "holdout_axes": {
+      "type": "array",
+      "uniqueItems": true,
+      "items": {
+        "enum": [
+          "program",
+          "execution",
+          "device_config",
+          "attack_family",
+          "adaptation_family"
+        ]
+      }
+    },
+    "cases": {
+      "type": "array",
+      "minItems": 3,
+      "items": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": [
+          "case_id",
+          "split",
+          "program_group_id",
+          "execution_group_id",
+          "device_config_id",
+          "attack_family_id",
+          "adaptation_family_id",
+          "adaptation_level",
+          "sensor_state"
+        ],
+        "properties": {
+          "case_id": {
+            "type": "string",
+            "minLength": 1
+          },
+          "split": {
+            "enum": [
+              "train",
+              "validation",
+              "test"
+            ]
+          },
+          "program_group_id": {
+            "type": "string",
+            "minLength": 1
+          },
+          "execution_group_id": {
+            "type": "string",
+            "minLength": 1
+          },
+          "device_config_id": {
+            "type": "string",
+            "minLength": 1
+          },
+          "attack_family_id": {
+            "type": "string",
+            "minLength": 1
+          },
+          "adaptation_family_id": {
+            "type": "string",
+            "minLength": 1
+          },
+          "adaptation_level": {
+            "type": "integer",
+            "minimum": 0
+          },
+          "sensor_state": {
+            "enum": [
+              "valid",
+              "missing",
+              "stale",
+              "misaligned",
+              "multiplexed",
+              "untrusted"
+            ]
+          }
+        }
+      }
+    }
+  },
+  "$comment": "Evaluator-side manifest. Required disjoint holdout axes are enforced by the Rust evaluator. Keep this file inaccessible to the detector."
+}

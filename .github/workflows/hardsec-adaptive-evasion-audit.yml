@@ -1,0 +1,114 @@
+name: HARDSEC-012 adaptive-evasion campaign audit
+
+on:
+  pull_request:
+    paths:
+      - "examples/hardsec_adaptive_evasion_audit.rs"
+      - "docs/research/HARDSEC_012_ADAPTIVE_EVASION_AUDITOR.md"
+      - "schemas/hardsec-adaptive-*.schema.json"
+      - "tests/fixtures/hardsec/adaptive-evasion-v1/**"
+      - "tools/hardsec-adaptive-evasion-audit-harness/**"
+      - ".github/workflows/hardsec-adaptive-evasion-audit.yml"
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: hardsec-adaptive-evasion-audit-${{ github.event.pull_request.number || github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  adaptive-evasion-audit:
+    runs-on: ubuntu-24.04
+    timeout-minutes: 15
+    steps:
+      - name: Checkout exact pull request revision
+        uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262
+        with:
+          persist-credentials: false
+      - name: Install pinned Rust toolchain
+        uses: dtolnay/rust-toolchain@1.96.0
+        with:
+          components: rustfmt
+      - name: Check formatting
+        run: rustfmt --edition 2024 --check examples/hardsec_adaptive_evasion_audit.rs
+      - name: Run focused unit suite
+        run: cargo test --locked --manifest-path tools/hardsec-adaptive-evasion-audit-harness/Cargo.toml --features hardsec-adaptive-evasion-audit --example hardsec_adaptive_evasion_audit
+      - name: Run known-answer fixture
+        shell: bash
+        run: |
+          set -euo pipefail
+          out_dir="$(mktemp -d)"
+          cargo run --locked --manifest-path tools/hardsec-adaptive-evasion-audit-harness/Cargo.toml --features hardsec-adaptive-evasion-audit --example hardsec_adaptive_evasion_audit -- \
+            --predictions tests/fixtures/hardsec/adaptive-evasion-v1/predictions.json \
+            --baseline-predictions tests/fixtures/hardsec/adaptive-evasion-v1/baseline-predictions.json \
+            --manifest tests/fixtures/hardsec/adaptive-evasion-v1/case-manifest.json \
+            --truth tests/fixtures/hardsec/adaptive-evasion-v1/evaluator-truth.json \
+            --receipt "$out_dir/receipt.json"
+          python3 - "$out_dir/receipt.json" <<'PY'
+          import json, math, sys
+          with open(sys.argv[1], "r", encoding="utf-8") as handle:
+              receipt = json.load(handle)
+          assert receipt["result"] == "evaluated"
+          metrics = receipt["primary_metrics"]
+          assert metrics["successful_attack_effect_cases"] == 3, metrics
+          assert metrics["successful_attack_alerts"] == 1, metrics
+          assert math.isclose(metrics["attack_effect_conditioned_recall"], 1.0 / 3.0, rel_tol=0.0, abs_tol=1e-12), metrics
+          assert metrics["failed_attack_attempts_excluded_from_success_recall"] == 1, metrics
+          assert metrics["unknown_attack_effect_attempts_excluded"] == 1, metrics
+          assert math.isclose(metrics["benign_false_alert_rate"], 0.25, rel_tol=0.0, abs_tol=1e-12), metrics
+          integrity = receipt["sensor_integrity"]
+          assert integrity["invalid_sensor_cases"] == 3, integrity
+          assert integrity["invalid_sensor_clear_verdicts"] == 1, integrity
+          assert integrity["integrity_outcome"] == "integrity_violation_observed", integrity
+          assert receipt["resource_cost"]["end_to_end_ns_sum"] == 1080
+          assert receipt["generalization"]["attack_family_group_count"] == 1
+          assert receipt["generalization"]["adaptation_family_level_group_count"] == 3
+          assert receipt["generalization"]["adaptation_family_count"] == 2
+          support = receipt["statistical_support"]
+          assert support["method"] == "deterministic_equal_group_percentile_bootstrap_v1"
+          assert support["replicates"] == 10_000
+          assert support["minimum_independent_groups"] == 10
+          assert support["attack_family_macro_recall"]["status"] == "unavailable_insufficient_independent_groups"
+          assert support["adaptation_family_level_macro_recall"]["independent_group_count"] == 3
+          assert support["program_macro_recall"]["independent_group_count"] == 3
+          assert support["program_macro_recall"]["distribution_free_hoeffding_95"]["status"] == "available_finite_sample_bound"
+          assert support["program_macro_recall"]["distribution_free_hoeffding_95"]["lower"] == 0.0
+          assert support["program_macro_recall"]["distribution_free_hoeffding_95"]["upper"] == 1.0
+          assert support["benign_program_macro_false_alert_rate"]["independent_group_count"] == 4
+          assert support["benign_program_macro_false_alert_rate"]["lower_percentile_95"] is None
+          assert support["benign_program_macro_false_alert_rate"]["distribution_free_hoeffding_95"]["status"] == "available_finite_sample_bound"
+          assert math.isclose(support["benign_program_macro_false_alert_rate"]["distribution_free_hoeffding_95"]["upper"], 0.9290507578703098, rel_tol=0.0, abs_tol=1e-12)
+          bounds = support["group_failure_bounds"]
+          assert bounds["attack_family"]["groups_with_any_failure"] == 1
+          assert bounds["attack_family"]["independent_group_count"] == 1
+          assert bounds["attack_family"]["upper_confidence_bound"] == 1.0
+          assert bounds["adaptation_family_level"]["groups_with_any_failure"] == 2
+          assert bounds["adaptation_family_level"]["independent_group_count"] == 3
+          assert bounds["benign_program"]["groups_with_any_failure"] == 1
+          assert bounds["benign_program"]["independent_group_count"] == 4
+          assert math.isclose(bounds["benign_program"]["upper_confidence_bound"], 0.8677566049821364, rel_tol=0.0, abs_tol=1e-12)
+          assert bounds["benign_program"]["bonferroni_endpoint_count"] == 6
+          paired = receipt["paired_baseline_comparison"]
+          assert paired["result"] == "paired"
+          assert paired["baseline_model_id"] == "fixture-baseline-detector"
+          assert paired["decision"] == "descriptive_paired_comparison_no_superiority_claim"
+          assert paired["operating_point_comparability"]["status"] == "not_verified_by_paired_ledger"
+          assert paired["operating_point_comparability"]["matched_false_alert_budget_verified"] is False
+          paired_groups = paired["group_metrics"]
+          program = paired_groups["program_group_level"]
+          assert program["independent_group_count"] == 3
+          assert math.isclose(program["candidate_macro_estimate"], 1.0 / 3.0, rel_tol=0.0, abs_tol=1e-12)
+          assert program["baseline_macro_estimate"] == 0.0
+          assert math.isclose(program["improvement_point_estimate"], 1.0 / 3.0, rel_tol=0.0, abs_tol=1e-12)
+          assert program["status"] == "unavailable_insufficient_independent_groups"
+          assert program["distribution_free_hoeffding_95"]["status"] == "available_finite_sample_bound"
+          assert program["distribution_free_hoeffding_95"]["lower"] == -1.0
+          assert program["distribution_free_hoeffding_95"]["upper"] == 1.0
+          benign = paired_groups["benign_false_alert_by_program"]
+          assert benign["independent_group_count"] == 4
+          assert math.isclose(benign["candidate_macro_estimate"], 0.25, rel_tol=0.0, abs_tol=1e-12)
+          assert math.isclose(benign["baseline_macro_estimate"], 0.5, rel_tol=0.0, abs_tol=1e-12)
+          assert math.isclose(benign["improvement_point_estimate"], 0.25, rel_tol=0.0, abs_tol=1e-12)
+          PY

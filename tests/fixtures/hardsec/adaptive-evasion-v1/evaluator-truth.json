@@ -1,0 +1,60 @@
+{
+  "schema_version": "hardsec-adaptive-oracle-v1",
+  "campaign_id": "hs012-synthetic-campaign-01",
+  "cases": [
+    {
+      "case_id": "c1",
+      "class": "malicious",
+      "attack_effect": "observed",
+      "outcome_evidence_sha256": "1111111111111111111111111111111111111111111111111111111111111111"
+    },
+    {
+      "case_id": "c2",
+      "class": "malicious",
+      "attack_effect": "observed",
+      "outcome_evidence_sha256": "2222222222222222222222222222222222222222222222222222222222222222"
+    },
+    {
+      "case_id": "c3",
+      "class": "malicious",
+      "attack_effect": "observed",
+      "outcome_evidence_sha256": "3333333333333333333333333333333333333333333333333333333333333333"
+    },
+    {
+      "case_id": "c4",
+      "class": "malicious",
+      "attack_effect": "not_observed",
+      "outcome_evidence_sha256": "4444444444444444444444444444444444444444444444444444444444444444"
+    },
+    {
+      "case_id": "c5",
+      "class": "malicious",
+      "attack_effect": "unknown",
+      "outcome_evidence_sha256": "5555555555555555555555555555555555555555555555555555555555555555"
+    },
+    {
+      "case_id": "c6",
+      "class": "benign",
+      "attack_effect": "not_applicable",
+      "outcome_evidence_sha256": "6666666666666666666666666666666666666666666666666666666666666666"
+    },
+    {
+      "case_id": "c7",
+      "class": "benign",
+      "attack_effect": "not_applicable",
+      "outcome_evidence_sha256": "7777777777777777777777777777777777777777777777777777777777777777"
+    },
+    {
+      "case_id": "c8",
+      "class": "benign",
+      "attack_effect": "not_applicable",
+      "outcome_evidence_sha256": "8888888888888888888888888888888888888888888888888888888888888888"
+    },
+    {
+      "case_id": "c9",
+      "class": "benign",
+      "attack_effect": "not_applicable",
+      "outcome_evidence_sha256": "9999999999999999999999999999999999999999999999999999999999999999"
+    }
+  ]
+}

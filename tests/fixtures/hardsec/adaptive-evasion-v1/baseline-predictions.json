@@ -1,0 +1,108 @@
+{
+  "schema_version": "hardsec-adaptive-predictions-v1",
+  "campaign_id": "hs012-synthetic-campaign-01",
+  "model_id": "fixture-baseline-detector",
+  "model_sha256": "cccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccc",
+  "threshold_profile_sha256": "dddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddd",
+  "cases": [
+    {
+      "case_id": "c1",
+      "response": "clear",
+      "score": 0.91,
+      "cost": {
+        "acquisition_ns": 100,
+        "inference_ns": 20,
+        "telemetry_bytes": 128,
+        "peak_memory_bytes": 2048
+      }
+    },
+    {
+      "case_id": "c2",
+      "response": "clear",
+      "score": 0.12,
+      "cost": {
+        "acquisition_ns": 100,
+        "inference_ns": 20,
+        "telemetry_bytes": 128,
+        "peak_memory_bytes": 2048
+      }
+    },
+    {
+      "case_id": "c3",
+      "response": "clear",
+      "score": null,
+      "cost": {
+        "acquisition_ns": 100,
+        "inference_ns": 20,
+        "telemetry_bytes": 128,
+        "peak_memory_bytes": 2048
+      }
+    },
+    {
+      "case_id": "c4",
+      "response": "alert",
+      "score": 0.88,
+      "cost": {
+        "acquisition_ns": 100,
+        "inference_ns": 20,
+        "telemetry_bytes": 128,
+        "peak_memory_bytes": 2048
+      }
+    },
+    {
+      "case_id": "c5",
+      "response": "alert",
+      "score": 0.77,
+      "cost": {
+        "acquisition_ns": 100,
+        "inference_ns": 20,
+        "telemetry_bytes": 128,
+        "peak_memory_bytes": 2048
+      }
+    },
+    {
+      "case_id": "c6",
+      "response": "alert",
+      "score": 0.08,
+      "cost": {
+        "acquisition_ns": 100,
+        "inference_ns": 20,
+        "telemetry_bytes": 128,
+        "peak_memory_bytes": 2048
+      }
+    },
+    {
+      "case_id": "c7",
+      "response": "alert",
+      "score": 0.81,
+      "cost": {
+        "acquisition_ns": 100,
+        "inference_ns": 20,
+        "telemetry_bytes": 128,
+        "peak_memory_bytes": 2048
+      }
+    },
+    {
+      "case_id": "c8",
+      "response": "sensor_invalid",
+      "score": 0.07,
+      "cost": {
+        "acquisition_ns": 100,
+        "inference_ns": 20,
+        "telemetry_bytes": 128,
+        "peak_memory_bytes": 2048
+      }
+    },
+    {
+      "case_id": "c9",
+      "response": "clear",
+      "score": null,
+      "cost": {
+        "acquisition_ns": 100,
+        "inference_ns": 20,
+        "telemetry_bytes": 128,
+        "peak_memory_bytes": 2048
+      }
+    }
+  ]
+}
