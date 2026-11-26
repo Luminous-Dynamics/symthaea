@@ -10,6 +10,7 @@ This lane tests whether research outcomes improve when the next role/tool/experi
 - `SYM_RSI_ORCHESTRATION_COUNTERFACTUAL_FIXTURES_V0_2026-11-07.json`: six synthetic branch controls.
 - `SYM_RSI_ORCHESTRATION_COUNTERFACTUAL_SCHEMA_V0_2026-11-07.json`: structural schema for the synthetic pack.
 - `SYM_RSI_LIMITATION_RESPONSE_TRACE_SCHEMA_V0_2026-11-26.json`: limitation-to-method-response trace fragment, bound to existing state/action/receipt authorities.
+- `SYM_RSI_LIMITATION_RESPONSE_FIXTURES_V0_2026-11-26.json`: five synthetic lifecycle examples for open, planned, executed, adjudicated and waived obligations.
 
 ## Counterfactual cases
 
