@@ -1887,4 +1887,174 @@ mod tests {
         invalid_thresholds.interval_iou_thresholds = vec![0.5, 0.5];
         assert!(audit_reliability_corpus(&invalid_thresholds).is_err());
     }
+    #[test]
+    fn explicit_nonresponses_are_reported_separately_from_annotation_states() {
+        let mut units = vec![
+            unit(
+                "item-1",
+                LINEAGE_A,
+                AUDIO_A,
+                vec![
+                    annotation(
+                        '1',
+                        '1',
+                        GroundTruthStateV1::Present,
+                        vec![FrameIntervalV1 { start_frame: 100, end_frame: 200 }],
+                        None,
+                    ),
+                    annotation(
+                        '2',
+                        '2',
+                        GroundTruthStateV1::Present,
+                        vec![FrameIntervalV1 { start_frame: 100, end_frame: 200 }],
+                        None,
+                    ),
+                ],
+            ),
+            unit(
+                "item-2",
+                LINEAGE_B,
+                AUDIO_B,
+                vec![
+                    annotation('1', '3', GroundTruthStateV1::Absent, Vec::new(), None),
+                    annotation('2', '4', GroundTruthStateV1::Ambiguous, Vec::new(), Some("gradual onset")),
+                ],
+            ),
+        ];
+        let missing_id = digest('3');
+        units[0].assigned_annotator_ids_sha256.push(missing_id.clone());
+        units[0].nonresponses.push(AnnotationNonresponseV1 {
+            annotator_id_sha256: missing_id.clone(),
+            reason: AnnotationNonresponseReasonV1::TechnicalFailure,
+        });
+
+        let result = audit_reliability_corpus(&corpus(units)).unwrap();
+        assert_eq!(result.assigned_rater_item_assignments, 5);
+        assert_eq!(result.returned_rater_item_annotations, 4);
+        assert_eq!(result.missing_rater_item_assignments, 1);
+        assert_eq!(result.overall_annotation_coverage, Some(0.8));
+        assert_eq!(result.complete_items, 1);
+        assert_eq!(result.items_with_nonresponse, 1);
+        assert_eq!(result.missing_reason_counts["TechnicalFailure"], 1);
+        assert_eq!(result.disposition_alpha.ratings, 4);
+        assert_eq!(result.disposition_alpha.category_counts["Ambiguous"], 1);
+        assert_eq!(result.disposition_alpha.category_counts["Absent"], 1);
+        assert_eq!(result.annotator_coverage.len(), 3);
+
+        let missing_annotator = result
+            .annotator_coverage
+            .iter()
+            .find(|item| item.annotator_id_sha256 == missing_id)
+            .unwrap();
+        assert_eq!(missing_annotator.assigned_items, 1);
+        assert_eq!(missing_annotator.returned_annotations, 0);
+        assert_eq!(missing_annotator.missing_annotations, 1);
+        assert_eq!(missing_annotator.coverage_rate, Some(0.0));
+        assert_eq!(missing_annotator.missing_reason_counts["TechnicalFailure"], 1);
+        assert!(result.source_work_bootstrap_rater_panel_fixed);
+        assert!(result.unit_summaries[0].nonresponses.len() == 1);
+        assert!(result.unit_summaries[0].annotations.len() == 2);
+    }
+
+    #[test]
+    fn assigned_roster_requires_exactly_one_annotation_or_nonresponse_per_rater() {
+        let mut unaccounted = vec![
+            unit(
+                "item-1",
+                LINEAGE_A,
+                AUDIO_A,
+                vec![
+                    annotation('1', '1', GroundTruthStateV1::Absent, Vec::new(), None),
+                    annotation('2', '2', GroundTruthStateV1::Absent, Vec::new(), None),
+                ],
+            ),
+            unit(
+                "item-2",
+                LINEAGE_B,
+                AUDIO_B,
+                vec![
+                    annotation('1', '3', GroundTruthStateV1::Absent, Vec::new(), None),
+                    annotation('2', '4', GroundTruthStateV1::Absent, Vec::new(), None),
+                ],
+            ),
+        ];
+        unaccounted[0].assigned_annotator_ids_sha256.push(digest('3'));
+        assert!(audit_reliability_corpus(&corpus(unaccounted)).is_err());
+
+        let mut overlap = vec![
+            unit(
+                "item-1",
+                LINEAGE_A,
+                AUDIO_A,
+                vec![
+                    annotation('1', '1', GroundTruthStateV1::Absent, Vec::new(), None),
+                    annotation('2', '2', GroundTruthStateV1::Absent, Vec::new(), None),
+                ],
+            ),
+            unit(
+                "item-2",
+                LINEAGE_B,
+                AUDIO_B,
+                vec![
+                    annotation('1', '3', GroundTruthStateV1::Absent, Vec::new(), None),
+                    annotation('2', '4', GroundTruthStateV1::Absent, Vec::new(), None),
+                ],
+            ),
+        ];
+        overlap[0].nonresponses.push(AnnotationNonresponseV1 {
+            annotator_id_sha256: overlap[0].annotations[0].annotator_id_sha256.clone(),
+            reason: AnnotationNonresponseReasonV1::Declined,
+        });
+        assert!(audit_reliability_corpus(&corpus(overlap)).is_err());
+
+        let mut outside_roster = vec![
+            unit(
+                "item-1",
+                LINEAGE_A,
+                AUDIO_A,
+                vec![
+                    annotation('1', '1', GroundTruthStateV1::Absent, Vec::new(), None),
+                    annotation('2', '2', GroundTruthStateV1::Absent, Vec::new(), None),
+                ],
+            ),
+            unit(
+                "item-2",
+                LINEAGE_B,
+                AUDIO_B,
+                vec![
+                    annotation('1', '3', GroundTruthStateV1::Absent, Vec::new(), None),
+                    annotation('2', '4', GroundTruthStateV1::Absent, Vec::new(), None),
+                ],
+            ),
+        ];
+        outside_roster[0].nonresponses.push(AnnotationNonresponseV1 {
+            annotator_id_sha256: digest('3'),
+            reason: AnnotationNonresponseReasonV1::NotReturned,
+        });
+        assert!(audit_reliability_corpus(&corpus(outside_roster)).is_err());
+
+        let mut duplicate_roster = vec![
+            unit(
+                "item-1",
+                LINEAGE_A,
+                AUDIO_A,
+                vec![
+                    annotation('1', '1', GroundTruthStateV1::Absent, Vec::new(), None),
+                    annotation('2', '2', GroundTruthStateV1::Absent, Vec::new(), None),
+                ],
+            ),
+            unit(
+                "item-2",
+                LINEAGE_B,
+                AUDIO_B,
+                vec![
+                    annotation('1', '3', GroundTruthStateV1::Absent, Vec::new(), None),
+                    annotation('2', '4', GroundTruthStateV1::Absent, Vec::new(), None),
+                ],
+            ),
+        ];
+        duplicate_roster[0].assigned_annotator_ids_sha256.push(digest('1'));
+        assert!(audit_reliability_corpus(&corpus(duplicate_roster)).is_err());
+    }
+
 }
