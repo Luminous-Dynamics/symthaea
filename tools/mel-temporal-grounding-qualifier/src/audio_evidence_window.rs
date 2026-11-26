@@ -96,6 +96,10 @@ pub struct AudioEvidenceWindowManifestV1 {
     pub schema: String,
     pub experiment_unit_id: String,
     pub query_id: String,
+    pub query_text_sha256: String,
+    pub model_identity_sha256: String,
+    pub runtime_identity_sha256: String,
+    pub decoding_config_sha256: String,
     pub evidence_condition: EvidenceConditionV1,
     /// Digest of the exact audio artifact whose content is being queried.
     pub target_audio_sha256: String,
@@ -149,6 +153,13 @@ struct EvidenceContextDigestPayloadV1<'a> {
     schema: &'static str,
     experiment_unit_id: &'a str,
     query_id: &'a str,
+    query_text_sha256: &'a str,
+    target_audio_sha256: &'a str,
+    source_audio_sha256: &'a str,
+    decoded_pcm_sha256: &'a str,
+    model_identity_sha256: &'a str,
+    runtime_identity_sha256: &'a str,
+    decoding_config_sha256: &'a str,
     prompt_sha256: &'a str,
     adapter_sha256: &'a str,
     retrieval_policy_sha256: &'a str,
@@ -176,6 +187,10 @@ pub fn verify_audio_evidence_manifest(
     require_text(&manifest.experiment_unit_id, "experiment_unit_id")?;
     require_text(&manifest.query_id, "query_id")?;
     validate_digest(&manifest.target_audio_sha256, "target_audio_sha256")?;
+    validate_digest(&manifest.query_text_sha256, "query_text_sha256")?;
+    validate_digest(&manifest.model_identity_sha256, "model_identity_sha256")?;
+    validate_digest(&manifest.runtime_identity_sha256, "runtime_identity_sha256")?;
+    validate_digest(&manifest.decoding_config_sha256, "decoding_config_sha256")?;
     validate_digest(&manifest.source_audio.audio_sha256, "source_audio.audio_sha256")?;
     validate_digest(&manifest.decoded_pcm.pcm_sha256, "decoded_pcm.pcm_sha256")?;
     validate_digest(
@@ -376,6 +391,13 @@ fn context_digest(manifest: &AudioEvidenceWindowManifestV1) -> Result<String, St
         schema: "mel-audio-evidence-context-v1",
         experiment_unit_id: &manifest.experiment_unit_id,
         query_id: &manifest.query_id,
+        query_text_sha256: &manifest.query_text_sha256,
+        target_audio_sha256: &manifest.target_audio_sha256,
+        source_audio_sha256: &manifest.source_audio.audio_sha256,
+        decoded_pcm_sha256: &manifest.decoded_pcm.pcm_sha256,
+        model_identity_sha256: &manifest.model_identity_sha256,
+        runtime_identity_sha256: &manifest.runtime_identity_sha256,
+        decoding_config_sha256: &manifest.decoding_config_sha256,
         prompt_sha256: &manifest.context.prompt_sha256,
         adapter_sha256: &manifest.context.adapter_sha256,
         retrieval_policy_sha256: &manifest.context.retrieval_policy_sha256,
@@ -433,6 +455,10 @@ mod tests {
             schema: MANIFEST_SCHEMA_V1.into(),
             experiment_unit_id: "mel-grounding-evidence-window-fixture-001".into(),
             query_id: "piano-entry-query-001".into(),
+            query_text_sha256: "6666666666666666666666666666666666666666666666666666666666666666".into(),
+            model_identity_sha256: "7777777777777777777777777777777777777777777777777777777777777777".into(),
+            runtime_identity_sha256: "8888888888888888888888888888888888888888888888888888888888888888".into(),
+            decoding_config_sha256: "9999999999999999999999999999999999999999999999999999999999999999".into(),
             evidence_condition: EvidenceConditionV1::LocalRetrieved,
             target_audio_sha256: sha256_hex(SOURCE_AUDIO),
             source_audio: SourceAudioArtifactV1 {
@@ -560,10 +586,35 @@ mod tests {
     }
 
     #[test]
-    fn context_digest_detects_changed_prompt_or_adapter() {
+    fn context_digest_detects_changed_query_model_runtime_or_decode_context() {
         let mut input = manifest();
+        input.query_text_sha256 =
+            "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa".into();
+        assert!(verify_audio_evidence_manifest(&input, SOURCE_AUDIO, PCM).is_err());
+
+        input = manifest();
+        input.model_identity_sha256 =
+            "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa".into();
+        assert!(verify_audio_evidence_manifest(&input, SOURCE_AUDIO, PCM).is_err());
+
+        input = manifest();
+        input.runtime_identity_sha256 =
+            "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa".into();
+        assert!(verify_audio_evidence_manifest(&input, SOURCE_AUDIO, PCM).is_err());
+
+        input = manifest();
+        input.decoding_config_sha256 =
+            "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa".into();
+        assert!(verify_audio_evidence_manifest(&input, SOURCE_AUDIO, PCM).is_err());
+
+        input = manifest();
         input.context.prompt_sha256 =
-            "6666666666666666666666666666666666666666666666666666666666666666".into();
+            "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa".into();
+        assert!(verify_audio_evidence_manifest(&input, SOURCE_AUDIO, PCM).is_err());
+
+        input = manifest();
+        input.context.adapter_sha256 =
+            "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa".into();
         assert!(verify_audio_evidence_manifest(&input, SOURCE_AUDIO, PCM).is_err());
     }
 
