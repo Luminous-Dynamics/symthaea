@@ -557,7 +557,10 @@ impl fmt::Display for PairedInterventionError {
                 formatter,
                 "pair {pair_id} disposition does not agree with its control/treatment branch dispositions"
             ),
-            Self::PenaltyOutOfRange { pair_id, penalty_ppm } => write!(
+            Self::PenaltyOutOfRange {
+                pair_id,
+                penalty_ppm,
+            } => write!(
                 formatter,
                 "pair {pair_id} has disposition penalty {penalty_ppm} above {PAIRED_INTERVENTION_SCORE_PPM}"
             ),
@@ -1440,10 +1443,12 @@ pub fn evaluate_paired_interventions(
     }
 
     results.sort_by(|left, right| left.pair_id.cmp(&right.pair_id));
-    let all_required_families_present =
-        family_summaries.iter().all(|summary| summary.pair_count > 0);
-    let all_family_cluster_floors_met =
-        family_summaries.iter().all(|summary| summary.cluster_floor_met);
+    let all_required_families_present = family_summaries
+        .iter()
+        .all(|summary| summary.pair_count > 0);
+    let all_family_cluster_floors_met = family_summaries
+        .iter()
+        .all(|summary| summary.cluster_floor_met);
     Ok(PairedInterventionCertificate {
         context: context.clone(),
         pair_count: u64::try_from(results.len())
