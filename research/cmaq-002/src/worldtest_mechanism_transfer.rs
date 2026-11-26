@@ -1,4 +1,5 @@
 //! Cross-query transfer across held-out environment mechanisms.
+// All transfer cells share one frozen source checkpoint; target adaptation is a separate protocol.
 //!
 //! This is the frozen-transfer (zero-shot reuse) track. It evaluates the same
 //! exploration-derived checkpoint across 5 mechanism-transfer conditions and
