@@ -1,6 +1,6 @@
 # Paired Intervention Contrast Evaluator v0.1
 
-**Status:** Rust evaluator and 21 deterministic tests authored; exact-head Rust 1.100.0 qualification pending. Underpowered families and all-failed families remain visible in the certificate, with an explicit unmet cluster-floor flag and no inferential estimate.  
+**Status:** Rust evaluator and 22 deterministic tests authored; exact-head Rust 1.100.0 qualification pending. Underpowered families and all-failed families remain visible in the certificate, with an explicit unmet cluster-floor flag and no inferential estimate.  
 **Research owner:** [#13720 — CMAQ-019](https://github.com/Luminous-Dynamics/symthaea/issues/13720).  
 **Transfer context:** [#13719 — frozen mechanism transfer](https://github.com/Luminous-Dynamics/symthaea/pull/13719).  
 **Statistical inference:** #8578.  
@@ -79,7 +79,7 @@ For each intervention family:
 2. average repeated pairs inside each independent cluster;
 3. calculate the primary family contrast error as the equal-weighted mean across completed cluster means.
 
-A task-pair-weighted error mean is retained as a diagnostic only. Family summaries preserve pair counts, completed/failed/timed-out/invalid/abstained counts, completed-cluster counts, sign accuracy, interval coverage, invariant observations and false changes.
+A task-pair-weighted error mean is retained as a diagnostic only. Family summaries preserve pair counts, completed/failed/timed-out/invalid/abstained counts, completed-cluster counts, sign accuracy, interval coverage, task-weighted interval width and equal-cluster interval width, invariant observations and false changes.
 
 A minimum number of independent completed clusters per family is preregistered and reported. The evaluator does **not** discard an entire campaign when one family falls below its floor: it preserves every pair, failure, timeout, invalid outcome and abstention, reports `cluster_floor_met=false`, and leaves unsupported completed-outcome estimates as `None`. The certificate separately reports whether all eight families are represented and whether every family met its completed-cluster floor. This prevents underpowered evidence from disappearing while ensuring it cannot be mistaken for confirmatory evidence. The Rust evaluator preserves the cluster deltas needed by #8578; it does not calculate confidence intervals or infer superiority.
 
@@ -104,7 +104,7 @@ The 19 deterministic Rust tests cover:
 - branch/pair disposition consistency;
 - failed and abstained pair retention and penalties;
 - cluster/environment-family identity;
-- paired interval ordering and coverage;
+- paired interval ordering, coverage and sharpness (including a deliberately wide interval that covers the outcome);
 - frozen invariant-variable membership;
 - repeated pairs within one cluster not increasing the independent-cluster count;
 - both-branch energy measurement;
