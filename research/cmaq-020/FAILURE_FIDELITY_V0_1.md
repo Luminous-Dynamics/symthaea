@@ -88,6 +88,8 @@ The scorecard does **not** assume the success side corresponds to a smaller nume
 
 The current API still does not reproduce the original WorldFailBench boundary scoring code. Its site describes that evaluation code as not yet released. The adapter must preserve dataset side metadata, policy variant, task/pair identities, the pair manifest and both side-scene digests, all 10 rollout outcomes per side and the benchmark's factor-specific reporting. The two side trajectories are policy rollouts in perturbed scenes; do not label them identical-action counterfactuals. Do not compare a one-pair mean rate score directly against the paper's published aggregate.
 
+Primary failure-fidelity aggregation is retained per independent environment cluster. The rate-boundary evaluator now computes **equal-cluster-weighted descriptive summaries** as its primary values and separately exposes pair-weighted diagnostics. A cluster that contributed ten pairs does not get ten times the primary influence of a cluster with one pair. Raw per-pair measurements retain source/policy/scene/candidate/action-trace provenance and the original successes/trials denominators for #8578. The evaluator itself does not emit confidence intervals.
+
 ## Statistical and evidence rules
 
 - The independent environment-generation cluster is the inferential unit, not the number of episodes.
