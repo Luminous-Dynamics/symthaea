@@ -1,0 +1,13 @@
+{
+  "$schema":"https://json-schema.org/draft/2020-12/schema",
+  "$id":"https://symthaea.luminousdynamics.io/schemas/evidence-gap-1.0.0.json",
+  "title":"Scientific Evidence Gap",
+  "type":"object",
+  "required":["schema","schema_version","authority","non_equivalences"],
+  "properties":{
+    "schema":{"const":"symthaea.scientific_discovery.evidence_gap"},
+    "schema_version":{"const":"1.0.0"},
+    "authority":{"const":"decision_support_only"},
+    "non_equivalences":{"type":"array","items":{"type":"string"},"minItems":4}
+  }
+}
