@@ -1167,6 +1167,199 @@ mod tests {
     }
 
     #[test]
+    fn shortlist_matches_independent_exhaustive_lexicographic_path_oracle() {
+        #[derive(Clone)]
+        struct OraclePath {
+            ids: Vec<String>,
+            priority: Vec<(f64, String)>,
+        }
+
+        fn distance_oracle(
+            left: &InverseVmCandidateV1,
+            right: &InverseVmCandidateV1,
+            policy: &InverseVmShortlistPolicyV1,
+        ) -> f64 {
+            let right_by_id: BTreeMap<&str, &RecipeSettingV1> = right
+                .recipe_settings
+                .iter()
+                .map(|setting| (setting.knob_id.as_str(), setting))
+                .collect();
+            let mut squared = 0.0;
+            let mut dimensions = 0_usize;
+            for left_setting in &left.recipe_settings {
+                let Some(right_setting) = right_by_id.get(left_setting.knob_id.as_str()) else {
+                    continue;
+                };
+                let Some(bound) = policy
+                    .recipe_knob_constraints
+                    .iter()
+                    .find(|constraint| constraint.knob_id == left_setting.knob_id)
+                else {
+                    continue;
+                };
+                let width = (bound.allowed.upper - bound.allowed.lower).max(f64::EPSILON);
+                let normalized = (left_setting.value - right_setting.value) / width;
+                squared += normalized * normalized;
+                dimensions += 1;
+            }
+            if dimensions == 0 {
+                f64::INFINITY
+            } else {
+                (squared / dimensions as f64).sqrt()
+            }
+        }
+
+        fn enumerate_paths(
+            selected: &mut Vec<String>,
+            priority: &mut Vec<(f64, String)>,
+            remaining: &mut Vec<String>,
+            candidates: &BTreeMap<String, InverseVmCandidateV1>,
+            base_scores: &BTreeMap<String, f64>,
+            policy: &InverseVmShortlistPolicyV1,
+            paths: &mut Vec<OraclePath>,
+        ) {
+            if selected.len() == policy.top_k {
+                paths.push(OraclePath {
+                    ids: selected.clone(),
+                    priority: priority.clone(),
+                });
+                return;
+            }
+
+            let mut extensions = Vec::new();
+            for candidate_id in remaining.iter() {
+                let candidate = &candidates[candidate_id];
+                let min_distance = selected
+                    .iter()
+                    .map(|selected_id| {
+                        distance_oracle(candidate, &candidates[selected_id], policy)
+                    })
+                    .fold(f64::INFINITY, f64::min);
+                if !selected.is_empty()
+                    && min_distance < policy.minimum_recipe_diversity_distance
+                {
+                    continue;
+                }
+                let diversity_bonus = if selected.is_empty() {
+                    0.0
+                } else {
+                    policy.diversity_weight * min_distance
+                };
+                extensions.push((
+                    candidate_id.clone(),
+                    base_scores[candidate_id] - diversity_bonus,
+                ));
+            }
+
+            if extensions.is_empty() {
+                paths.push(OraclePath {
+                    ids: selected.clone(),
+                    priority: priority.clone(),
+                });
+                return;
+            }
+
+            extensions.sort_by(|left, right| {
+                left.1
+                    .total_cmp(&right.1)
+                    .then_with(|| left.0.cmp(&right.0))
+            });
+            for (candidate_id, selected_score) in extensions {
+                let index = remaining
+                    .iter()
+                    .position(|id| id == &candidate_id)
+                    .expect("oracle candidate remains available");
+                let removed = remaining.remove(index);
+                selected.push(candidate_id.clone());
+                priority.push((selected_score, candidate_id));
+                enumerate_paths(
+                    selected,
+                    priority,
+                    remaining,
+                    candidates,
+                    base_scores,
+                    policy,
+                    paths,
+                );
+                priority.pop();
+                selected.pop();
+                remaining.insert(index, removed);
+            }
+        }
+
+        fn compare_paths(left: &OraclePath, right: &OraclePath) -> std::cmp::Ordering {
+            for (left_step, right_step) in left.priority.iter().zip(&right.priority) {
+                let order = left_step
+                    .0
+                    .total_cmp(&right_step.0)
+                    .then_with(|| left_step.1.cmp(&right_step.1));
+                if order != std::cmp::Ordering::Equal {
+                    return order;
+                }
+            }
+            left.priority.len().cmp(&right.priority.len())
+        }
+
+        let mut input = input(vec![
+            candidate("a", 200.0, 25.0, (99.7, 100.3), 0.15),
+            candidate("b", 205.0, 25.5, (100.0, 100.2), 0.30),
+            candidate("c", 350.0, 55.0, (99.5, 100.5), 0.10),
+            candidate("d", 480.0, 95.0, (99.3, 100.7), 0.20),
+        ]);
+        input.policy.top_k = 3;
+        input.policy.minimum_recipe_diversity_distance = 0.02;
+
+        let report = evaluate_inverse_vm_shortlist_v1(&input).unwrap();
+        assert_eq!(report.feasible_candidate_count, 4);
+
+        let candidates: BTreeMap<String, InverseVmCandidateV1> = input
+            .candidates
+            .iter()
+            .cloned()
+            .map(|candidate| (candidate.candidate_id.clone(), candidate))
+            .collect();
+        let base_scores: BTreeMap<String, f64> = report
+            .evaluations
+            .iter()
+            .map(|evaluation| {
+                (
+                    evaluation.candidate_id.clone(),
+                    evaluation.base_score.expect("all fixture candidates are feasible"),
+                )
+            })
+            .collect();
+        let mut remaining: Vec<String> = candidates.keys().cloned().collect();
+        let mut paths = Vec::new();
+        enumerate_paths(
+            &mut Vec::new(),
+            &mut Vec::new(),
+            &mut remaining,
+            &candidates,
+            &base_scores,
+            &input.policy,
+            &mut paths,
+        );
+        let oracle = paths
+            .iter()
+            .min_by(|left, right| compare_paths(left, right))
+            .expect("finite candidate pool has at least one path");
+
+        assert_eq!(report.top_k_candidate_ids, oracle.ids);
+        for (rank, (score, candidate_id)) in oracle.priority.iter().enumerate() {
+            let evaluation = report
+                .evaluations
+                .iter()
+                .find(|evaluation| evaluation.candidate_id == *candidate_id)
+                .unwrap();
+            assert_eq!(evaluation.selected_rank, Some(rank + 1));
+            assert!(
+                (evaluation.selected_score.unwrap() - score).abs() < 1.0e-12,
+                "selected score differs for {candidate_id}"
+            );
+        }
+    }
+
+    #[test]
     fn diversity_only_ranks_candidates_after_feasibility_gate() {
         let mut good = candidate("good", 200.0, 50.0, (99.0, 101.0), 0.2);
         good.recipe_settings[0].value = 240.0;
