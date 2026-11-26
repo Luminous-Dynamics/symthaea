@@ -164,7 +164,11 @@ pub fn validate_corpus_file(path: &Path, repository_root: &Path) -> anyhow::Resu
     validate_corpus(&corpus, &bytes, &root)
 }
 
-fn validate_corpus(corpus: &Corpus, raw_bytes: &[u8], repository_root: &Path) -> anyhow::Result<EqcReport> {
+fn validate_corpus(
+    corpus: &Corpus,
+    raw_bytes: &[u8],
+    repository_root: &Path,
+) -> anyhow::Result<EqcReport> {
     if corpus.schema != CORPUS_SCHEMA {
         bail!("unsupported EQC corpus schema: {}", corpus.schema);
     }
@@ -297,7 +301,10 @@ fn validate_task(task: &Task, repository_root: &Path) -> anyhow::Result<()> {
         bail!("{}: evaluated_at must be canonical UTC RFC3339", task.task_id);
     }
     if task.authority_snapshot.observed_at > task.request.evaluated_at {
-        bail!("{}: authority snapshot cannot be observed after the request evaluation time", task.task_id);
+        bail!(
+            "{}: authority snapshot cannot be observed after the request evaluation time",
+            task.task_id
+        );
     }
     if let Some(valid_until) = task.authority_snapshot.valid_until.as_deref() {
         if !is_canonical_utc(valid_until) {
@@ -339,7 +346,12 @@ fn validate_task(task: &Task, repository_root: &Path) -> anyhow::Result<()> {
             || relative_path.is_absolute()
             || input.artifact_path.starts_with("http://")
             || input.artifact_path.starts_with("https://")
-            || relative_path.components().any(|part| matches!(part, Component::ParentDir | Component::RootDir | Component::Prefix(_)))
+            || relative_path.components().any(|part| {
+                matches!(
+                    part,
+                    Component::ParentDir | Component::RootDir | Component::Prefix(_)
+                )
+            })
             || input.classification != "synthetic"
         {
             bail!("{}: seed inputs must be repository-local synthetic artifacts", task.task_id);
@@ -415,7 +427,10 @@ fn reference_disposition(task: &Task) -> &'static str {
 }
 
 fn is_sha256(value: &str) -> bool {
-    value.len() == 64 && value.bytes().all(|byte| byte.is_ascii_hexdigit() && !byte.is_ascii_uppercase())
+    value.len() == 64
+        && value
+            .bytes()
+            .all(|byte| byte.is_ascii_hexdigit() && !byte.is_ascii_uppercase())
 }
 
 fn is_canonical_utc(value: &str) -> bool {
@@ -430,7 +445,9 @@ fn is_canonical_utc(value: &str) -> bool {
         && bytes
             .iter()
             .enumerate()
-            .all(|(index, byte)| matches!(index, 4 | 7 | 10 | 13 | 16 | 19) || byte.is_ascii_digit())
+            .all(|(index, byte)| {
+                matches!(index, 4 | 7 | 10 | 13 | 16 | 19) || byte.is_ascii_digit()
+            })
 }
 
 #[cfg(test)]
@@ -502,7 +519,11 @@ mod tests {
 
     #[test]
     fn consumed_challenge_cannot_be_replayed() {
-        let task = seed_corpus().tasks.into_iter().find(|task| task.task_id == "eqc-trust-replayed-challenge-deny-001").unwrap();
+        let task = seed_corpus()
+            .tasks
+            .into_iter()
+            .find(|task| task.task_id == "eqc-trust-replayed-challenge-deny-001")
+            .unwrap();
         assert_eq!(task.request.challenge_state.as_deref(), Some("consumed"));
         assert_eq!(reference_disposition(&task), "deny");
     }
@@ -530,7 +551,11 @@ mod tests {
 
     #[test]
     fn denial_tasks_require_zero_mutations() {
-        let mut task = seed_corpus().tasks.into_iter().find(|task| task.expected.disposition == "deny").unwrap();
+        let mut task = seed_corpus()
+            .tasks
+            .into_iter()
+            .find(|task| task.expected.disposition == "deny")
+            .unwrap();
         task.expected.state_mutation_count = 1;
         assert!(validate_task(&task, &repository_root()).is_err());
     }
@@ -546,7 +571,8 @@ mod tests {
         )
         .expect("corpus validates");
         let encoded = serde_json::to_vec(&report).expect("report serializes");
-        let decoded: serde_json::Value = serde_json::from_slice(&encoded).expect("report JSON parses");
+        let decoded: serde_json::Value =
+            serde_json::from_slice(&encoded).expect("report JSON parses");
         assert_eq!(decoded["task_count"], 4);
         assert!(decoded.get("qualified").is_none());
     }
