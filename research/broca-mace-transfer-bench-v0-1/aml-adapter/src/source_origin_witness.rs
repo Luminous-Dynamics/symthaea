@@ -315,7 +315,7 @@ pub fn verify_source_origin_witnesses_v1(
     }
     origin.validate_at_use(graph, artifacts, current_origin_profile, now_unix)
         .map_err(SourceOriginWitnessRejectV1::Origin)?;
-    validate_verifier_set(graph, origin, policy, verifiers)?;
+    validate_verifier_set(graph, origin, current_origin_profile, policy, verifiers)?;
 
     let max_envelopes = graph.node_bindings().len()
         .checked_mul(policy.operators.len())
