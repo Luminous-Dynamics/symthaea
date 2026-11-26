@@ -9,6 +9,7 @@
     "corpus_id",
     "evidence_class",
     "grid",
+    "bootstrap_code",
     "reserved_roles",
     "bootstrap_objects",
     "fault_cases"
@@ -285,6 +286,87 @@
             "type": "string",
             "minLength": 1
           }
+        }
+      }
+    },
+    "bootstrap_code": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "format_id",
+        "field",
+        "primitive_polynomial_hex",
+        "data_shards",
+        "parity_shards",
+        "total_shards",
+        "correction_bound",
+        "systematic_generator_rows",
+        "data_tile_order",
+        "parity_tile_order",
+        "canonicalization"
+      ],
+      "properties": {
+        "format_id": {
+          "const": "bootstrap-mds-6-4-v1"
+        },
+        "field": {
+          "const": "GF(2^8)"
+        },
+        "primitive_polynomial_hex": {
+          "const": "0x11d"
+        },
+        "data_shards": {
+          "const": 4
+        },
+        "parity_shards": {
+          "const": 2
+        },
+        "total_shards": {
+          "const": 6
+        },
+        "correction_bound": {
+          "const": "up to two known shard erasures; no unknown-error claim in v0.1"
+        },
+        "systematic_generator_rows": {
+          "type": "array",
+          "minItems": 6,
+          "maxItems": 6,
+          "items": {
+            "type": "array",
+            "minItems": 4,
+            "maxItems": 4,
+            "items": {
+              "type": "integer",
+              "minimum": 0,
+              "maximum": 255
+            }
+          }
+        },
+        "data_tile_order": {
+          "type": "array",
+          "minItems": 4,
+          "maxItems": 4,
+          "uniqueItems": true,
+          "items": {
+            "type": "integer",
+            "minimum": 0,
+            "maximum": 47
+          }
+        },
+        "parity_tile_order": {
+          "type": "array",
+          "minItems": 2,
+          "maxItems": 2,
+          "uniqueItems": true,
+          "items": {
+            "type": "integer",
+            "minimum": 0,
+            "maximum": 47
+          }
+        },
+        "canonicalization": {
+          "type": "string",
+          "minLength": 1
         }
       }
     }
