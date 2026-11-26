@@ -210,6 +210,19 @@ struct VerifiedSourceOriginWitnessV1 {
 }
 
 #[derive(Clone, Debug, Eq, PartialEq)]
+pub struct SourceOriginWitnessAuditEntryV1 {
+    pub operator_id: String,
+    pub failure_domain_sha256: String,
+    pub evidence_id: String,
+    pub witness_receipt_sha256: String,
+    pub source_origin_receipt_sha256: String,
+    pub publisher_identity_sha256: String,
+    pub acquisition_record_sha256: String,
+    pub source_revision_sha256: String,
+    pub observed_at_unix: u64,
+}
+
+#[derive(Clone, Debug, Eq, PartialEq)]
 pub struct VerifiedSourceOriginWitnessSetV1 {
     graph_sha256: String,
     source_origin_receipt_bundle_sha256: String,
@@ -220,6 +233,23 @@ pub struct VerifiedSourceOriginWitnessSetV1 {
 }
 
 impl VerifiedSourceOriginWitnessSetV1 {
+    /// Public, immutable audit projection. Signature bytes remain encapsulated
+    /// and are revalidated by validate_at_use; envelope digests let callers
+    /// retain exact evidence references without copying opaque internal state.
+    pub fn audit_entries(&self) -> Vec<SourceOriginWitnessAuditEntryV1> {
+        self.witnesses.iter().map(|item| SourceOriginWitnessAuditEntryV1 {
+            operator_id: item.receipt.operator_id.clone(),
+            failure_domain_sha256: item.receipt.failure_domain_sha256.clone(),
+            evidence_id: item.receipt.evidence_id.clone(),
+            witness_receipt_sha256: item.envelope_sha256.clone(),
+            source_origin_receipt_sha256: item.receipt.source_origin_receipt_sha256.clone(),
+            publisher_identity_sha256: item.receipt.publisher_identity_sha256.clone(),
+            acquisition_record_sha256: item.receipt.acquisition_record_sha256.clone(),
+            source_revision_sha256: item.receipt.source_revision_sha256.clone(),
+            observed_at_unix: item.receipt.observed_at_unix,
+        }).collect()
+    }
+
     pub fn len(&self) -> usize { self.witnesses.len() }
     pub fn is_empty(&self) -> bool { self.witnesses.is_empty() }
     pub fn graph_sha256(&self) -> &str { &self.graph_sha256 }
