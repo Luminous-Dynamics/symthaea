@@ -1,0 +1,80 @@
+{
+  "schema_version": "hardsec-score-ledger-v1",
+  "dataset_id": "hardsec-009-selective-triage-fixture-v1",
+  "grouping_key": "insertion_source_family",
+  "score_semantics": "probability_of_trojan",
+  "model_sha256": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+  "config_sha256": "bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb",
+  "predictions": [
+    {
+      "sample_id": "train-benign-001",
+      "group_id": "train-source-family",
+      "split": "train",
+      "label": 0,
+      "score": 0.10
+    },
+    {
+      "sample_id": "train-trojan-001",
+      "group_id": "train-source-family",
+      "split": "train",
+      "label": 1,
+      "score": 0.90
+    },
+    {
+      "sample_id": "validation-benign-001",
+      "group_id": "validation-source-family",
+      "split": "validation",
+      "label": 0,
+      "score": 0.05
+    },
+    {
+      "sample_id": "validation-benign-002",
+      "group_id": "validation-source-family",
+      "split": "validation",
+      "label": 0,
+      "score": 0.08
+    },
+    {
+      "sample_id": "validation-trojan-001",
+      "group_id": "validation-source-family",
+      "split": "validation",
+      "label": 1,
+      "score": 0.82
+    },
+    {
+      "sample_id": "validation-trojan-002",
+      "group_id": "validation-source-family",
+      "split": "validation",
+      "label": 1,
+      "score": 0.99
+    },
+    {
+      "sample_id": "test-clear-001",
+      "group_id": "test-source-family-clear",
+      "split": "test",
+      "label": 0,
+      "score": 0.05
+    },
+    {
+      "sample_id": "test-suspect-001",
+      "group_id": "test-source-family-clear",
+      "split": "test",
+      "label": 1,
+      "score": 0.95
+    },
+    {
+      "sample_id": "test-abstain-benign-001",
+      "group_id": "test-source-family-abstain",
+      "split": "test",
+      "label": 0,
+      "score": 0.30
+    },
+    {
+      "sample_id": "test-abstain-trojan-001",
+      "group_id": "test-source-family-abstain",
+      "split": "test",
+      "label": 1,
+      "score": 0.70
+    }
+  ]
+}
