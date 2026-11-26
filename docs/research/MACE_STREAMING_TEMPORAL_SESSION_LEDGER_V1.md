@@ -82,7 +82,7 @@ The reference uses public typed structs and assumes the caller has already parse
 
 ## 6. Deterministic regression fixtures
 
-Ten test functions are authored:
+Fourteen test functions are authored:
 1. append visibility and before/after receipt binding;
 2. exact idempotent replay;
 3. event-ID content conflict rejection;
