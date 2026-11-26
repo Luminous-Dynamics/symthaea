@@ -707,7 +707,9 @@ mod tests {
         state: crate::temporal_grounding::GroundTruthStateV1,
     ) -> IndependentTemporalAnnotationV1 {
         let status_reason = match state {
-            GroundTruthStateV1::Ambiguous => Some("gradual entrance; human interpretation is uncertain"),
+            GroundTruthStateV1::Ambiguous => {
+                Some("gradual entrance; human interpretation is uncertain")
+            }
             GroundTruthStateV1::NotEstimable => Some("audio masking prevents reliable judgement"),
             GroundTruthStateV1::Present | GroundTruthStateV1::Absent => None,
         };
