@@ -40,27 +40,110 @@ impl ResearchSource {
 /// Status of a research operation
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Hash, Default, Serialize, Deserialize)]
 pub enum ResearchStatus {
-    /// Research completed successfully with results
+    /// All planned acquisition stages completed and at least one source was captured.
     #[default]
     Success,
-    /// Query returned no relevant results
+    /// Some sources were captured, but one or more acquisition attempts failed or were truncated.
+    PartialSuccess,
+    /// Search completed without finding a candidate source.
     NoResults,
-    /// An error occurred during research
+    /// No usable source was captured because acquisition was incomplete.
+    RetrievalIncomplete,
+    /// An unexpected research-pipeline error occurred.
     Error,
-    /// Request was rate-limited by the source
+    /// A request was rate-limited by a source.
     RateLimited,
 }
 
 impl ResearchStatus {
-    /// Whether the status represents a successful outcome
+    /// Whether the result contains usable research content.
     pub fn is_success(&self) -> bool {
-        matches!(self, Self::Success)
+        matches!(self, Self::Success | Self::PartialSuccess)
     }
 
-    /// Whether the status represents a retriable failure
+    /// Whether a caller may reasonably retry the acquisition.
     pub fn is_retriable(&self) -> bool {
-        matches!(self, Self::RateLimited)
+        matches!(self, Self::RateLimited | Self::RetrievalIncomplete)
     }
+}
+
+/// Stage at which a research acquisition attempt was made.
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Hash, Serialize, Deserialize)]
+pub enum AcquisitionStage {
+    SearchProvider,
+    ArxivApi,
+    OpenReviewApi,
+    DuckDuckGo,
+    HeuristicSeeds,
+    PageFetch,
+}
+
+/// Outcome of one acquisition attempt. Failed attempts remain in the report.
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Hash, Serialize, Deserialize)]
+pub enum AcquisitionOutcome {
+    ResultsFound,
+    NoResults,
+    Fetched,
+    FetchedTruncated,
+    Timeout,
+    ProviderFailed,
+    HttpError,
+    UnsupportedMedia,
+    ReadFailed,
+    ExtractionFailed,
+    BudgetExceeded,
+    DuplicateSuppressed,
+}
+
+impl AcquisitionOutcome {
+    /// Whether this outcome means evidence acquisition was incomplete.
+    pub fn is_incomplete(&self) -> bool {
+        matches!(
+            self,
+            Self::FetchedTruncated
+                | Self::Timeout
+                | Self::ProviderFailed
+                | Self::HttpError
+                | Self::UnsupportedMedia
+                | Self::ReadFailed
+                | Self::ExtractionFailed
+                | Self::BudgetExceeded
+        )
+    }
+}
+
+/// Append-only diagnostic for one search, page fetch or budget disposition.
+///
+/// The content SHA-256 is the captured page-body digest for page fetches, or
+/// the canonical returned-URL list digest for search API calls. It is an
+/// integrity commitment, not source authentication or claim entailment.
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
+pub struct AcquisitionReceipt {
+    pub attempt_id: String,
+    pub query_rank: usize,
+    pub source_rank: Option<usize>,
+    pub stage: AcquisitionStage,
+    pub provider: Option<String>,
+    pub query: String,
+    pub requested_url: Option<String>,
+    pub final_url: Option<String>,
+    pub http_status: Option<u16>,
+    pub content_type: Option<String>,
+    pub captured_bytes: usize,
+    pub content_sha256: Option<String>,
+    pub outcome: AcquisitionOutcome,
+    pub reason_code: Option<String>,
+    pub reason: Option<String>,
+    pub elapsed_ms: u64,
+    pub captured_at_unix_ms: u64,
+    pub extractor_version: Option<String>,
+}
+
+/// Detailed research output, including every recorded acquisition disposition.
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct WebResearchReport {
+    pub result: WebResearchResult,
+    pub acquisition_receipts: Vec<AcquisitionReceipt>,
 }
 
 /// Epistemic status of a verified claim
@@ -272,8 +355,11 @@ pub struct WebResearchConfig {
     pub max_concurrent_requests: usize,
     /// Request timeout in milliseconds
     pub request_timeout_ms: u64,
-    /// Maximum content length to process per page (bytes)
+    /// Maximum content length captured per page (bytes).
     pub max_content_length: usize,
+    /// Maximum distinct page sources fetched for one research query.
+    #[serde(default = "default_max_sources_per_research")]
+    pub max_sources_per_research: usize,
     /// User agent string for HTTP requests
     pub user_agent: String,
     /// Enable epistemic verification of claims
@@ -302,12 +388,17 @@ pub struct WebResearchConfig {
     pub openreview_token: Option<String>,
 }
 
+fn default_max_sources_per_research() -> usize {
+    20
+}
+
 impl Default for WebResearchConfig {
     fn default() -> Self {
         Self {
             max_concurrent_requests: 5,
             request_timeout_ms: 10_000,
             max_content_length: 100_000,
+            max_sources_per_research: default_max_sources_per_research(),
             user_agent: "Symthaea-HLB/0.2 (Epistemic Research Agent)".to_string(),
             verify_claims: true,
             confidence_threshold: 0.3,
