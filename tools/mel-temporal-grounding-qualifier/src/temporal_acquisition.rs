@@ -910,13 +910,15 @@ fn select_probability_audit(
                             SelectionStreamV1::ProbabilityAudit,
                             None,
                             SelectionReasonV1::UniformSourceWorkProbabilityDraw,
-                            Some(source_probability),
-                            Some(conditional_probability),
-                            Some(inclusion_probability),
-                            Some(eligible_sources),
-                            Some(selected_sources),
-                            Some(eligible_items_in_source_work),
-                            Some(selected_items_in_source_work),
+                            SelectionDesignMetadataV1 {
+                                source_work_probability: Some(source_probability),
+                                item_given_source_probability: Some(conditional_probability),
+                                item_probability: Some(inclusion_probability),
+                                eligible_source_works_in_stratum: Some(eligible_sources),
+                                selected_source_works_in_stratum: Some(selected_sources),
+                                eligible_items_in_source_work: Some(eligible_items_in_source_work),
+                                selected_items_in_source_work: Some(selected_items_in_source_work),
+                            },
                         ));
                         spent = spent
                             .checked_add(candidate.annotation_cost_units)
@@ -1174,13 +1176,7 @@ fn add_active_selection(
         SelectionStreamV1::ActiveRefinement,
         Some(band),
         reason,
-        None,
-        None,
-        None,
-        None,
-        None,
-        None,
-        None,
+        SelectionDesignMetadataV1::default(),
     ));
     Ok(())
 }
@@ -1227,11 +1223,8 @@ fn active_candidate_cmp(
         .then_with(|| a.item_id.cmp(&b.item_id))
 }
 
-fn selection_record(
-    candidate: &AnnotationAcquisitionCandidateV1,
-    stream: SelectionStreamV1,
-    priority_band: Option<ActivePriorityBandV1>,
-    reason: SelectionReasonV1,
+#[derive(Debug, Clone, Default)]
+struct SelectionDesignMetadataV1 {
     source_work_probability: Option<ProbabilityFractionV1>,
     item_given_source_probability: Option<ProbabilityFractionV1>,
     item_probability: Option<ProbabilityFractionV1>,
@@ -1239,6 +1232,14 @@ fn selection_record(
     selected_source_works_in_stratum: Option<usize>,
     eligible_items_in_source_work: Option<usize>,
     selected_items_in_source_work: Option<usize>,
+}
+
+fn selection_record(
+    candidate: &AnnotationAcquisitionCandidateV1,
+    stream: SelectionStreamV1,
+    priority_band: Option<ActivePriorityBandV1>,
+    reason: SelectionReasonV1,
+    design: SelectionDesignMetadataV1,
 ) -> AnnotationSelectionRecordV1 {
     AnnotationSelectionRecordV1 {
         item_id: candidate.item_id.clone(),
@@ -1256,13 +1257,13 @@ fn selection_record(
         occurrence_count_disagreement_ppm: candidate.occurrence_count_disagreement_ppm,
         prediction_coverage_ppm: candidate.prediction_coverage_ppm,
         boundary_dispersion_ms: candidate.boundary_dispersion_ms,
-        source_work_inclusion_probability: source_work_probability,
-        item_given_source_work_probability: item_given_source_probability,
-        item_inclusion_probability: item_probability,
-        eligible_source_works_in_stratum,
-        selected_source_works_in_stratum,
-        eligible_items_in_source_work,
-        selected_items_in_source_work,
+        source_work_inclusion_probability: design.source_work_probability,
+        item_given_source_work_probability: design.item_given_source_probability,
+        item_inclusion_probability: design.item_probability,
+        eligible_source_works_in_stratum: design.eligible_source_works_in_stratum,
+        selected_source_works_in_stratum: design.selected_source_works_in_stratum,
+        eligible_items_in_source_work: design.eligible_items_in_source_work,
+        selected_items_in_source_work: design.selected_items_in_source_work,
     }
 }
 
