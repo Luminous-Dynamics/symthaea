@@ -1,0 +1,99 @@
+name: Binius Public Benchmark Reproduction
+
+on:
+  pull_request:
+    paths:
+      - "crates/hdc-zkp-bench/**"
+      - "vendor/binius64/**"
+      - "papers/theory-foundations/binius-hdc/reproduce.sh"
+      - ".github/workflows/binius-public-reproduction.yml"
+  push:
+    branches: [main]
+    paths:
+      - "crates/hdc-zkp-bench/**"
+      - "vendor/binius64/**"
+      - "papers/theory-foundations/binius-hdc/reproduce.sh"
+      - ".github/workflows/binius-public-reproduction.yml"
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: binius-public-reproduction-${{ github.event.pull_request.head.sha || github.sha }}
+  cancel-in-progress: true
+
+jobs:
+  reproduce:
+    name: Locked Binius prover/verifier execution
+    runs-on: ubuntu-24.04
+    timeout-minutes: 45
+    steps:
+      - name: Checkout exact triggering revision
+        uses: actions/checkout@v4
+        with:
+          ref: ${{ github.event.pull_request.head.sha || github.sha }}
+          persist-credentials: false
+          fetch-depth: 1
+
+      - name: Install pinned Rust toolchain
+        uses: dtolnay/rust-toolchain@1.96.0
+
+      - name: Validate reproduction script syntax
+        run: bash -n papers/theory-foundations/binius-hdc/reproduce.sh
+
+      - name: Validate standalone benchmark manifest with committed lockfile
+        run: cargo check --locked --manifest-path crates/hdc-zkp-bench/Cargo.toml
+
+      - name: Execute real Binius prover and verifier
+        env:
+          EXPECTED_HEAD: ${{ github.event.pull_request.head.sha || github.sha }}
+        run: |
+          set -euo pipefail
+          cargo run --locked --release --manifest-path crates/hdc-zkp-bench/Cargo.toml \
+            > "$RUNNER_TEMP/binius-benchmark.log" 2>&1
+          cat "$RUNNER_TEMP/binius-benchmark.log"
+
+          sed -n '/^--- JSON (for paper) ---$/,$p' "$RUNNER_TEMP/binius-benchmark.log" \
+            | tail -n +2 > "$RUNNER_TEMP/binius-results.json"
+
+          # The local executable must attest that Binius ran a real proof while
+          # the current Winterfell comparator remains explicitly analytical.
+          jq -e '.binius.real_proof == true and .winterfell.real_proof == false' \
+            "$RUNNER_TEMP/binius-results.json" >/dev/null
+
+          jq -n \
+            --arg schema "luminous.symthaea.binius-reproduction-receipt.v1" \
+            --arg source_head "$EXPECTED_HEAD" \
+            --arg rustc "$(rustc --version)" \
+            --arg cargo "$(cargo --version)" \
+            --arg host "$(rustc -vV | sed -n 's/^host: //p')" \
+            --arg runner_os "$RUNNER_OS" \
+            --arg runner_arch "$RUNNER_ARCH" \
+            --arg stdout_sha256 "$(sha256sum "$RUNNER_TEMP/binius-benchmark.log" | cut -d' ' -f1)" \
+            --slurpfile result "$RUNNER_TEMP/binius-results.json" \
+            '{
+              schema: $schema,
+              source_head: $source_head,
+              toolchain: {rustc: $rustc, cargo: $cargo, host: $host},
+              runner: {os: $runner_os, architecture: $runner_arch},
+              benchmark_stdout_sha256: $stdout_sha256,
+              qualification: {
+                binius_prover_and_verifier_executed: $result[0].binius.real_proof,
+                winterfell_is_analytical_only: ($result[0].winterfell.real_proof == false),
+                scope: "standalone benchmark execution; not a cross-backend performance comparison"
+              }
+            }' > "$RUNNER_TEMP/binius-reproduction-receipt.json"
+
+          cat "$RUNNER_TEMP/binius-reproduction-receipt.json"
+
+      - name: Preserve exact-head run evidence
+        uses: actions/upload-artifact@v4
+        with:
+          name: binius-reproduction-${{ github.event.pull_request.head.sha || github.sha }}
+          path: |
+            ${{ runner.temp }}/binius-benchmark.log
+            ${{ runner.temp }}/binius-results.json
+            ${{ runner.temp }}/binius-reproduction-receipt.json
+          if-no-files-found: error
+          retention-days: 90
