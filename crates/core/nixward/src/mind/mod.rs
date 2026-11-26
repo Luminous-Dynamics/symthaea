@@ -29,7 +29,7 @@ pub mod predictive_hierarchy;
 pub mod working_memory;
 pub mod world_model;
 
-pub use active_inference::{ActionPlan, NixActiveInference, ScoredAction};
+pub use active_inference::{ActionPlan, NixActiveInference, ScoredAction, ScoredActionDiagnostics};
 pub use causal_graph::{CausalEdge, NixCausalGraph, RootCauseAnalysis, SideEffectPrediction};
 pub use episodic_memory::{EpisodeOutcome, NixEpisodicMemory, SystemEpisode};
 pub use goal_inference::{GoalInference, InferredGoal};
