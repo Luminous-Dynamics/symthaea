@@ -266,9 +266,10 @@ pub fn audit_annotation_marginal_value(
         pairwise_present_matched_iou_delta,
         pairwise_present_count_agreement_delta,
         maximum_event_boundary_spread_delta_ms,
-        decision_transition: decision_transition(
+        decision_transition: format!(
+            "{:?}->{:?}",
             before.frozen_decision_state,
-            after.frozen_decision_state,
+            after.frozen_decision_state
         ),
         effort: input.effort.clone(),
         active_listening_minutes,
@@ -606,6 +607,10 @@ fn decide_panel_state(
         return PanelDecisionStateV1::SufficientlySupportedAbsent;
     }
     PanelDecisionStateV1::NeedsReview
+}
+
+fn mean(values: &[f64]) -> Option<f64> {
+    (!values.is_empty()).then(|| values.iter().sum::<f64>() / values.len() as f64)
 }
 
 fn categorical_entropy(values: impl Iterator<Item = usize>) -> Option<f64> {
