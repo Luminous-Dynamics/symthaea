@@ -137,3 +137,12 @@ pub use vm_snapshot_dependency_impact::{
     compute_vm_snapshot_impact_closure_v1, seal_vm_snapshot_dependency_edge_v1,
     seal_vm_snapshot_dependency_graph_v1,
 };
+
+pub use observable_regime_router_guard::{
+    REGIME_ROUTER_TRAINING_MANIFEST_SCHEMA_V1, REGIME_ROUTING_INPUT_SCHEMA_V1,
+    REGIME_ROUTING_RECEIPT_SCHEMA_V1, RegimeFeatureObservationV1,
+    RegimeFeatureSourceKindV1, RegimeRouterTrainingManifestV1, RegimeRoutingGuardErrorV1,
+    RegimeRoutingInputV1, RegimeRoutingPurposeV1, RegimeRoutingReasonV1,
+    RegimeRoutingReceiptV1, RegimeRoutingStateV1, evaluate_regime_routing_v1,
+    seal_regime_router_training_manifest_v1, verify_regime_routing_receipt_v1,
+};
