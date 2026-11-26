@@ -106,8 +106,8 @@ The existing EGBT v1 hypothesis-only ledger remains unchanged. A future integrat
 
 ## 7. Limits
 
-The Rust reference supports at most four hypotheses, three binary-state devices, and two-outcome observations. It performs one Bayesian joint-state update; it does not propagate Markov drift between observations itself. The caller must supply likelihoods valid for the captured device state and declared calibration epoch. The preceding drift-aware decision reference models finite state transitions but is not yet connected to this ledger.
+The Rust reference supports at most four hypotheses, three binary-state devices, and at most four-outcome observations. It performs one Bayesian joint-state update; it does not propagate Markov drift between observations itself. The caller must supply likelihoods valid for the captured device state and declared calibration epoch. The preceding drift-aware decision reference models finite state transitions but is not yet connected to this ledger.
 
 Not implemented: cryptographic signature verification, source custody, trusted time, calibration-certificate revocation, continuous sensor state, Markov transition propagation in the ledger, common-cause model learning, physical metrology, HDC/CfC integration, or production persistence.
 
-**Evidence boundary:** nine Rust tests are authored but not compiled or executed in this environment. The JSON example and expected fixture are independently parsed and checked. No physical validation or external benchmark result is claimed.
+**Evidence boundary:** ten Rust tests are authored but not compiled or executed in this environment. The JSON example and expected fixture are independently parsed and checked. No physical validation or external benchmark result is claimed.

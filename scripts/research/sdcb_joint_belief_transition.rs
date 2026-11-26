@@ -17,6 +17,7 @@
 use std::collections::HashSet;
 
 const STATES: usize = 2;
+const MAX_OUTCOMES: usize = 4;
 const PROB_TOL: f64 = 1e-9;
 const EPS: f64 = 1e-12;
 const MAX_HYPOTHESES: usize = 4;
@@ -266,7 +267,10 @@ impl JointBeliefLedger {
     ) -> Result<(Vec<f64>, f64), Error> {
         let outcome_count = proposal.outcome_likelihoods.first()
             .map(Vec::len).unwrap_or(0);
-        if outcome_count < 2 || outcome >= outcome_count {
+        if outcome_count < 2 || outcome_count > MAX_OUTCOMES {
+            return Err(Error::InvalidLikelihoods);
+        }
+        if outcome >= outcome_count {
             return Err(Error::InvalidOutcome);
         }
         let expected_rows = self.hypothesis_ids.len() * STATES;
