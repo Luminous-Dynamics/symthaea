@@ -12,12 +12,9 @@ use sha2::{Digest, Sha256};
 use std::collections::BTreeSet;
 use thiserror::Error;
 
-pub const SELECTION_RISK_INPUT_SCHEMA_V1: &str =
-    "luminous.semi-bench.selection-risk-input.v1";
-pub const SELECTION_AUDIT_DESIGN_SCHEMA_V1: &str =
-    "luminous.semi-bench.selection-audit-design.v1";
-pub const SELECTION_RISK_REPORT_SCHEMA_V1: &str =
-    "luminous.semi-bench.selection-risk-report.v1";
+pub const SELECTION_RISK_INPUT_SCHEMA_V1: &str = "luminous.semi-bench.selection-risk-input.v1";
+pub const SELECTION_AUDIT_DESIGN_SCHEMA_V1: &str = "luminous.semi-bench.selection-audit-design.v1";
+pub const SELECTION_RISK_REPORT_SCHEMA_V1: &str = "luminous.semi-bench.selection-risk-report.v1";
 
 #[derive(Clone, Copy, Debug, Eq, PartialEq, Serialize, Deserialize)]
 #[serde(rename_all = "snake_case")]
@@ -237,7 +234,8 @@ fn estimate_from_independent_audit(
     let mut sum_weights = 0.0;
     let mut sum_squared_weights = 0.0;
     for observation in &input.independent_audit_losses {
-        if !missing_ids.contains(&observation.round_id) || !sample_ids.insert(observation.round_id) {
+        if !missing_ids.contains(&observation.round_id) || !sample_ids.insert(observation.round_id)
+        {
             return Err(SelectionRiskErrorV1(
                 "audit round must be unique and belong to the nonqualified population".into(),
             ));
@@ -282,10 +280,7 @@ fn estimate_from_independent_audit(
     let hoeffding_radius = if missing_count == 0 {
         0.0
     } else {
-        ((missing_count as f64
-            * (2.0 / design.confidence_delta).ln())
-            / 2.0)
-            .sqrt()
+        ((missing_count as f64 * (2.0 / design.confidence_delta).ln()) / 2.0).sqrt()
             / (n * design.minimum_inclusion_probability)
     };
     if !estimate.is_finite()
@@ -329,12 +324,18 @@ pub fn evaluate_selection_adjusted_population_risk_v1(
     canonical_input.unknown_round_ids.sort_unstable();
     canonical_input.blocked_round_ids.sort_unstable();
     canonical_input.unmeasured_round_ids.sort_unstable();
-    canonical_input.qualified_losses.sort_by_key(|item| item.round_id);
-    canonical_input.independent_audit_losses.sort_by_key(|item| item.round_id);
+    canonical_input
+        .qualified_losses
+        .sort_by_key(|item| item.round_id);
+    canonical_input
+        .independent_audit_losses
+        .sort_by_key(|item| item.round_id);
     let input = &canonical_input;
 
     if input.schema != SELECTION_RISK_INPUT_SCHEMA_V1 {
-        return Err(SelectionRiskErrorV1("selection-risk input schema is unsupported".into()));
+        return Err(SelectionRiskErrorV1(
+            "selection-risk input schema is unsupported".into(),
+        ));
     }
     if input.input_id.trim().is_empty()
         || !valid_sha256(&input.population_manifest_sha256)
@@ -356,7 +357,8 @@ pub fn evaluate_selection_adjusted_population_risk_v1(
     let mut loss_ids = BTreeSet::new();
     let mut qualified_loss_sum = 0.0;
     for observation in &input.qualified_losses {
-        if !qualified_ids.contains(&observation.round_id) || !loss_ids.insert(observation.round_id) {
+        if !qualified_ids.contains(&observation.round_id) || !loss_ids.insert(observation.round_id)
+        {
             return Err(SelectionRiskErrorV1(
                 "qualified loss must uniquely reference a qualified population round".into(),
             ));
@@ -391,7 +393,9 @@ pub fn evaluate_selection_adjusted_population_risk_v1(
     let population_point_estimate = if exact {
         Some(lower)
     } else {
-        audit.as_ref().map(|estimate| estimate.population_risk_estimate)
+        audit
+            .as_ref()
+            .map(|estimate| estimate.population_risk_estimate)
     };
     let mut assumptions_and_limits = vec![
         "Qualified-subset risk is not automatically population risk under outcome-dependent qualification.".into(),
@@ -452,7 +456,9 @@ pub fn evaluate_selection_adjusted_population_risk_v1(
 mod tests {
     use super::*;
 
-    fn digest(ch: char) -> String { std::iter::repeat_n(ch, 64).collect() }
+    fn digest(ch: char) -> String {
+        std::iter::repeat_n(ch, 64).collect()
+    }
 
     fn input() -> SelectionRiskInputV1 {
         SelectionRiskInputV1 {
@@ -467,10 +473,14 @@ mod tests {
             unmeasured_round_ids: vec![],
             qualified_losses: vec![
                 QualifiedLossObservationV1 {
-                    round_id: 1, loss: 1.0, evidence_receipt_sha256: digest('c'),
+                    round_id: 1,
+                    loss: 1.0,
+                    evidence_receipt_sha256: digest('c'),
                 },
                 QualifiedLossObservationV1 {
-                    round_id: 2, loss: 0.0, evidence_receipt_sha256: digest('d'),
+                    round_id: 2,
+                    loss: 0.0,
+                    evidence_receipt_sha256: digest('d'),
                 },
             ],
             audit_design: None,
@@ -522,11 +532,15 @@ mod tests {
         data.audit_design = Some(audit_design());
         data.independent_audit_losses = vec![
             IndependentAuditLossObservationV1 {
-                round_id: 3, loss: 1.0, inclusion_probability: 0.5,
+                round_id: 3,
+                loss: 1.0,
+                inclusion_probability: 0.5,
                 audit_measurement_receipt_sha256: digest('2'),
             },
             IndependentAuditLossObservationV1 {
-                round_id: 4, loss: 0.0, inclusion_probability: 1.0,
+                round_id: 4,
+                loss: 0.0,
+                inclusion_probability: 1.0,
                 audit_measurement_receipt_sha256: digest('3'),
             },
         ];
@@ -553,7 +567,9 @@ mod tests {
         let mut data = input();
         data.audit_design = Some(audit_design());
         data.independent_audit_losses = vec![IndependentAuditLossObservationV1 {
-            round_id: 3, loss: 1.0, inclusion_probability: 0.25,
+            round_id: 3,
+            loss: 1.0,
+            inclusion_probability: 0.25,
             audit_measurement_receipt_sha256: digest('2'),
         }];
         assert!(evaluate_selection_adjusted_population_risk_v1(&data).is_err());
@@ -577,7 +593,9 @@ mod tests {
         let mut data = input();
         data.audit_design = Some(audit_design());
         data.independent_audit_losses = vec![IndependentAuditLossObservationV1 {
-            round_id: 1, loss: 0.0, inclusion_probability: 0.5,
+            round_id: 1,
+            loss: 0.0,
+            inclusion_probability: 0.5,
             audit_measurement_receipt_sha256: digest('2'),
         }];
         assert!(evaluate_selection_adjusted_population_risk_v1(&data).is_err());
