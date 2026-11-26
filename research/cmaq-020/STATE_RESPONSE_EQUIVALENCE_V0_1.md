@@ -120,6 +120,20 @@ External anchors:
 
 These protocols must remain separate. Prediction of failure, recovery from failure, and downstream policy utility are different claims. No benchmark scores are pooled. Current CMAQ-020 failure-fidelity fixtures are synthetic known-answer tests only; no external benchmark adapter has been run.
 
+
+## Benchmark validity is a promotion gate
+
+A high score on a weak benchmark is not evidence of general capability. Before using an external task suite for a SOTA comparison, run an explicit validity audit for:
+
+1. **Shortcut solvability:** simple/no-language/copy/no-op/heuristic baselines must not solve the benchmark through unintended correlations.
+2. **Statistical significance:** use independent clusters, paired uncertainty and sufficient power for the target effect; repeated episodes within one environment are not independent samples.
+3. **Creeping overfit:** hold out initial-state perturbations, object configurations, nuisance/context values and mechanism families, including near and out-of-range splits.
+4. **Data-source dependence:** pin dataset/source revisions, hashes, licenses and training/test overlap; prevent near-duplicate source leakage.
+
+These four audit dimensions are motivated by the June 2026 study *What Are We Actually Benchmarking in Robot Manipulation?* (LIBERO, CALVIN, SimplerEnv, RoboCasa and RoboTwin 2.0). https://arxiv.org/abs/2606.04233
+
+CMAQ-020 must publish benchmark-validity results separately from model-performance scores. A benchmark failing an audit may remain useful as a diagnostic fixture but cannot substantiate a general-capability or SOTA claim.
+
 ## Next experimental matrix
 
 Compare full history/full state, symbolic/tabular mechanism state, linear projection, matched recurrent latent state, HDC-only, CfC/LTC-only, HDC+CfC/LTC factorized state, and retrieval-backed event references. Match exploration, task split, query adapter, compute, interaction budget and all-in memory (model, codebook, index, journal, provenance sidecar and replay data).
