@@ -1,8 +1,26 @@
 package eventorder
 
-import "testing"
+import ("testing";"strings")
 
 func dig(subject,value,purpose string)DigestRef{return DigestRef{"sha-256","event-order-test","1","application/json","jcs",purpose,subject,value}}
+func normalizedReport(in *Input,subject string,d DigestRef) VerifierReport {
+ r:=VerifierReport{SubjectID:subject,InputDigest:d,Status:"verified",VerifierID:"v1",Version:"1",BuildDigest:"b1",TrustStoreDigest:"roots1",ClaimsProfile:"mon020-normalized-evidence-v1",VerifiedAt:10,FreshUntil:1000}
+ prefix,id,_:=strings.Cut(subject,":")
+ switch prefix {
+ case "source": r.ClaimSourceID=id
+ case "control-root": for _,s:=range in.Sources{if s.ID==id{r.ClaimSourceID=id;r.ClaimControlRoot=s.ControlRoot}}
+ case "event": for _,e:=range in.Events{if e.ID==id{r.ClaimEventID=e.ID;r.ClaimEventKind=string(e.Kind);r.ClaimEventSubjectID=e.SubjectID;r.ClaimEventActivityID=e.ActivityID;r.ClaimEventSourceID=e.SourceID;r.ClaimEventSequence=e.Sequence}}
+ case "witness": for _,w:=range in.Witnesses{if w.ID==id{r.ClaimWitnessID=w.ID;r.ClaimWitnessBeforeEventID=w.BeforeEventID;r.ClaimWitnessAfterEventID=w.AfterEventID;r.ClaimWitnessSourceID=w.WitnessSourceID}}
+ }
+ return r
+}
+func addEventReport(in *Input,e Event){in.Reports=append(in.Reports,normalizedReport(in,"event:"+e.ID,e.RecordDigest))}
+func refreshEventReport(in *Input,id string){
+ for i,r:=range in.Reports{if r.SubjectID=="event:"+id{in.Reports=append(in.Reports[:i],in.Reports[i+1:]...);break}}
+ for _,e:=range in.Events{if e.ID==id{addEventReport(in,e);return}}
+}
+func setEventSequence(in *Input,id string,seq uint64){for i:=range in.Events{if in.Events[i].ID==id{in.Events[i].Sequence=seq;refreshEventReport(in,id);return}}}
+func addWitnessReport(in *Input,w OrderWitness){in.Witnesses=append(in.Witnesses,w);in.Reports=append(in.Reports,normalizedReport(in,"witness:"+w.ID,w.EvidenceDigest))}
 func base() (Input,map[string]VerifierPin) {
 	sources:=[]Source{
 		{ID:"db",ControlRoot:"db-root",IdentityDigest:dig("db","db-key","source-identity"),ControlRootDigest:dig("db","db-root","control-root-membership")},
@@ -17,14 +35,13 @@ func base() (Input,map[string]VerifierPin) {
 		{ID:"use-x",Kind:EntityUsed,SubjectID:"x",ActivityID:"b",SourceID:"agent",Sequence:6,RecordDigest:dig("use-x","u1","event")},
 		{ID:"end-b",Kind:ActivityEnded,SubjectID:"b",ActivityID:"b",SourceID:"agent",Sequence:7,RecordDigest:dig("end-b","e2","event")},
 	}
-	reports:=[]VerifierReport{}
-	mk:=func(id string,d DigestRef) VerifierReport{return VerifierReport{SubjectID:id,InputDigest:d,Status:"verified",VerifierID:"v1",Version:"1",BuildDigest:"b1",TrustStoreDigest:"roots1",VerifiedAt:10,FreshUntil:1000}}
-	for _,s:=range sources { reports=append(reports,mk("source:"+s.ID,s.IdentityDigest),mk("control-root:"+s.ID,s.ControlRootDigest)) }
-	for _,e:=range events { reports=append(reports,mk("event:"+e.ID,e.RecordDigest)) }
-	return Input{Sources:sources,Events:events,Reports:reports,EvaluationAt:100},map[string]VerifierPin{"v1":{"v1","1","b1","roots1"}}
+	in:=Input{Sources:sources,Events:events,EvaluationAt:100}
+	for _,s:=range sources { in.Reports=append(in.Reports,normalizedReport(&in,"source:"+s.ID,s.IdentityDigest),normalizedReport(&in,"control-root:"+s.ID,s.ControlRootDigest)) }
+	for _,e:=range events { addEventReport(&in,e) }
+	return in,map[string]VerifierPin{"v1":{"v1","1","b1","roots1"}}
 }
 func want(t *testing.T,in Input,p map[string]VerifierPin,d Decision){t.Helper();r:=Evaluate(in,p);if r.Decision!=d{t.Fatalf("got %s (%s), want %s",r.Decision,r.Reason,d)}}
-func moveActivityBToDB(in *Input){for i:=range in.Events{if in.Events[i].ActivityID=="b"{in.Events[i].SourceID="db";switch in.Events[i].ID{case "start-b":in.Events[i].Sequence=1;case "use-x":in.Events[i].Sequence=2;case "end-b":in.Events[i].Sequence=3}}}}
+func moveActivityBToDB(in *Input){for i:=range in.Events{if in.Events[i].ActivityID=="b"{in.Events[i].SourceID="db";switch in.Events[i].ID{case "start-b":in.Events[i].Sequence=1;case "use-x":in.Events[i].Sequence=2;case "end-b":in.Events[i].Sequence=3};refreshEventReport(in,in.Events[i].ID)}}}
 func TestSameSourceGenerationPrecedesUse(t *testing.T){in,p:=base();want(t,in,p,Qualified)}
 func TestSameSourceUseBeforeGenerationDenied(t *testing.T){
 	in,p:=base();for i:=range in.Events{if in.Events[i].ID=="gen-x"{in.Events[i].Sequence=8};if in.Events[i].ID=="use-x"{in.Events[i].Sequence=5}}
