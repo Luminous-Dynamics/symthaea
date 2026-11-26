@@ -154,42 +154,7 @@ pub fn replay_source_lineage_graph_v1(
         }
     }
 
-    // Reject missing parents and cyclic ancestry. Edges point child -> parent;
-    // Kahn's algorithm runs parent -> child using the reverse adjacency.
-    let mut indegree = BTreeMap::<String, usize>::new();
-    let mut children = BTreeMap::<String, Vec<String>>::new();
-    for (id, node) in &nodes {
-        indegree.insert(id.clone(), node.parent_evidence_ids.len());
-        for parent in &node.parent_evidence_ids {
-            if !nodes.contains_key(parent) {
-                return Err(SourceLineageRejectV1::DanglingParent);
-            }
-            children.entry(parent.clone()).or_default().push(id.clone());
-        }
-    }
-    let mut queue = VecDeque::new();
-    for (id, degree) in &indegree {
-        if *degree == 0 {
-            queue.push_back(id.clone());
-        }
-    }
-    let mut visited = 0usize;
-    while let Some(parent) = queue.pop_front() {
-        visited += 1;
-        if let Some(descendants) = children.get(&parent) {
-            for child in descendants {
-                let degree = indegree.get_mut(child)
-                    .ok_or(SourceLineageRejectV1::InvalidGraph)?;
-                *degree = degree.saturating_sub(1);
-                if *degree == 0 {
-                    queue.push_back(child.clone());
-                }
-            }
-        }
-    }
-    if visited != nodes.len() {
-        return Err(SourceLineageRejectV1::GraphCycle);
-    }
+    validate_graph_acyclic(&nodes)?;
 
     let expected_commitments = lineage.replay_commitments();
     let mut replayed = Vec::new();
@@ -333,6 +298,48 @@ fn lineage_graph_expected_set(lineage: &VerifiedSourceLineageSetV1) -> &str {
 
 fn lineage_graph_expected_need(lineage: &VerifiedSourceLineageSetV1) -> &str {
     lineage.decision_need_sha256()
+}
+
+fn validate_graph_acyclic(
+    nodes: &BTreeMap<String, SourceLineageGraphNodeV1>,
+) -> Result<(), SourceLineageRejectV1> {
+    // Edges point child -> parent; Kahn's algorithm runs parent -> child
+    // using the reverse adjacency. Missing parents fail before cycle checks.
+    let mut indegree = BTreeMap::<String, usize>::new();
+    let mut children = BTreeMap::<String, Vec<String>>::new();
+    for (id, node) in nodes {
+        indegree.insert(id.clone(), node.parent_evidence_ids.len());
+        for parent in &node.parent_evidence_ids {
+            if !nodes.contains_key(parent) {
+                return Err(SourceLineageRejectV1::DanglingParent);
+            }
+            children.entry(parent.clone()).or_default().push(id.clone());
+        }
+    }
+    let mut queue = VecDeque::new();
+    for (id, degree) in &indegree {
+        if *degree == 0 {
+            queue.push_back(id.clone());
+        }
+    }
+    let mut visited = 0usize;
+    while let Some(parent) = queue.pop_front() {
+        visited += 1;
+        if let Some(descendants) = children.get(&parent) {
+            for child in descendants {
+                let degree = indegree.get_mut(child)
+                    .ok_or(SourceLineageRejectV1::InvalidGraph)?;
+                *degree = degree.saturating_sub(1);
+                if *degree == 0 {
+                    queue.push_back(child.clone());
+                }
+            }
+        }
+    }
+    if visited != nodes.len() {
+        return Err(SourceLineageRejectV1::GraphCycle);
+    }
+    Ok(())
 }
 
 fn parse_graph(value: &Value) -> Result<SourceLineageGraphV1, SourceLineageRejectV1> {
@@ -632,6 +639,47 @@ mod tests {
             }]
         });
         assert_eq!(parse_graph(&graph), Err(SourceLineageRejectV1::InvalidGraph));
+    }
+
+    #[test]
+    fn graph_replay_rejects_dangling_parent_and_cycle() {
+        let root = SourceLineageGraphNodeV1 {
+            evidence_id: "e-0".into(),
+            source_id: "s-0".into(),
+            source_sha256: "a".repeat(64),
+            payload_sha256: "b".repeat(64),
+            evidence_class_sha256: "c".repeat(64),
+            satisfies_requirement_ids: Vec::new(),
+            parent_evidence_ids: vec!["e-1".into()],
+            derivation_receipt_sha256: Some("d".repeat(64)),
+            common_cause_group_sha256: Vec::new(),
+        };
+        let child = SourceLineageGraphNodeV1 {
+            evidence_id: "e-1".into(),
+            source_id: "s-1".into(),
+            source_sha256: "e".repeat(64),
+            payload_sha256: "f".repeat(64),
+            evidence_class_sha256: "a".repeat(64),
+            satisfies_requirement_ids: Vec::new(),
+            parent_evidence_ids: vec!["e-0".into()],
+            derivation_receipt_sha256: Some("b".repeat(64)),
+            common_cause_group_sha256: Vec::new(),
+        };
+        let cyclic = BTreeMap::from([
+            ("e-0".to_owned(), root.clone()),
+            ("e-1".to_owned(), child.clone()),
+        ]);
+        assert_eq!(validate_graph_acyclic(&cyclic), Err(SourceLineageRejectV1::GraphCycle));
+
+        let dangling_node = SourceLineageGraphNodeV1 {
+            parent_evidence_ids: vec!["missing-parent".into()],
+            ..child
+        };
+        let dangling = BTreeMap::from([("e-1".to_owned(), dangling_node)]);
+        assert_eq!(
+            validate_graph_acyclic(&dangling),
+            Err(SourceLineageRejectV1::DanglingParent)
+        );
     }
 
     #[test]
