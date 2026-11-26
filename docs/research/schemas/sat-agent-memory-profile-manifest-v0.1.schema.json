@@ -55,23 +55,6 @@
         "boundary_kind": {
           "const": "store_boundary"
         },
-        "included_components": {
-          "type": "array",
-          "uniqueItems": true,
-          "minItems": 5,
-          "items": {
-            "type": "string",
-            "enum": [
-              "agent_memory_read_path",
-              "persistent_memory_store",
-              "store_schema_and_indexes",
-              "integrity_heads_and_sidecars",
-              "backup_restore_domain",
-              "erasure_tombstone_or_revocation_state",
-              "memory_signing_keys_or_trust_marker"
-            ]
-          }
-        },
         "excluded_components": {
           "type": "array",
           "uniqueItems": true,
@@ -82,6 +65,54 @@
         },
         "bidirectional_verification_assessed": {
           "type": "boolean"
+        },
+        "component_groups": {
+          "type": "object",
+          "additionalProperties": false,
+          "required": [
+            "foundation_model",
+            "interaction_access_layer",
+            "execution_and_scheduling",
+            "underlying_infrastructure"
+          ],
+          "properties": {
+            "foundation_model": {
+              "type": "array",
+              "uniqueItems": true,
+              "minItems": 1,
+              "items": {
+                "type": "string",
+                "minLength": 1
+              }
+            },
+            "interaction_access_layer": {
+              "type": "array",
+              "uniqueItems": true,
+              "minItems": 1,
+              "items": {
+                "type": "string",
+                "minLength": 1
+              }
+            },
+            "execution_and_scheduling": {
+              "type": "array",
+              "uniqueItems": true,
+              "minItems": 1,
+              "items": {
+                "type": "string",
+                "minLength": 1
+              }
+            },
+            "underlying_infrastructure": {
+              "type": "array",
+              "uniqueItems": true,
+              "minItems": 1,
+              "items": {
+                "type": "string",
+                "minLength": 1
+              }
+            }
+          }
         }
       }
     },
@@ -249,16 +280,68 @@
       ],
       "properties": {
         "memory_poisoning_defense": {
-          "const": "applicable"
+          "type": "object",
+          "additionalProperties": false,
+          "required": [
+            "applicability",
+            "measured_by_this_adapter"
+          ],
+          "properties": {
+            "applicability": {
+              "const": "applicable"
+            },
+            "measured_by_this_adapter": {
+              "const": false
+            }
+          }
         },
         "cross_user_cross_session_isolation": {
-          "const": "applicable"
+          "type": "object",
+          "additionalProperties": false,
+          "required": [
+            "applicability",
+            "measured_by_this_adapter"
+          ],
+          "properties": {
+            "applicability": {
+              "const": "applicable"
+            },
+            "measured_by_this_adapter": {
+              "const": false
+            }
+          }
         },
         "data_deletion_right_to_be_forgotten": {
-          "const": "applicable"
+          "type": "object",
+          "additionalProperties": false,
+          "required": [
+            "applicability",
+            "measured_by_this_adapter"
+          ],
+          "properties": {
+            "applicability": {
+              "const": "applicable"
+            },
+            "measured_by_this_adapter": {
+              "const": false
+            }
+          }
         },
         "protection_of_memory_data_integrity": {
-          "const": "applicable"
+          "type": "object",
+          "additionalProperties": false,
+          "required": [
+            "applicability",
+            "measured_by_this_adapter"
+          ],
+          "properties": {
+            "applicability": {
+              "const": "applicable"
+            },
+            "measured_by_this_adapter": {
+              "const": true
+            }
+          }
         }
       }
     }
