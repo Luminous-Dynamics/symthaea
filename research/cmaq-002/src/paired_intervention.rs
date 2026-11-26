@@ -1440,6 +1440,10 @@ pub fn evaluate_paired_interventions(
     }
 
     results.sort_by(|left, right| left.pair_id.cmp(&right.pair_id));
+    let all_required_families_present =
+        family_summaries.iter().all(|summary| summary.pair_count > 0);
+    let all_family_cluster_floors_met =
+        family_summaries.iter().all(|summary| summary.cluster_floor_met);
     Ok(PairedInterventionCertificate {
         context: context.clone(),
         pair_count: u64::try_from(results.len())
@@ -1452,12 +1456,8 @@ pub fn evaluate_paired_interventions(
         total_elapsed_us,
         total_measured_energy_uj: total_energy_uj,
         all_expected_pairs_present: true,
-        all_required_families_present: family_summaries
-            .iter()
-            .all(|summary| summary.pair_count > 0),
-        all_family_cluster_floors_met: family_summaries
-            .iter()
-            .all(|summary| summary.cluster_floor_met),
+        all_required_families_present,
+        all_family_cluster_floors_met,
     })
 }
 
