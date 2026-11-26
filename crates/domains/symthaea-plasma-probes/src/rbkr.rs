@@ -1155,22 +1155,17 @@ mod tests {
             },
         ];
 
-        let (reach, observe) = aggregate_response_gramians(
-            &scenarios,
-            ResponseGramianAggregationConfig::default(),
-        )
-        .unwrap();
+        let (reach, observe) =
+            aggregate_response_gramians(&scenarios, ResponseGramianAggregationConfig::default())
+                .unwrap();
         assert!((reach.quadratic_form(&[1.0, 0.0]).unwrap() - 0.25).abs() < 1.0e-12);
         assert!((reach.quadratic_form(&[0.0, 1.0]).unwrap() - 0.75).abs() < 1.0e-12);
         assert!((observe.quadratic_form(&[1.0, 0.0]).unwrap() - 0.0625).abs() < 1.0e-12);
         assert!((observe.quadratic_form(&[0.0, 1.0]).unwrap() - 3.0).abs() < 1.0e-12);
 
-        let basis = ResponseBalancedBasis::from_empirical_gramians(
-            &reach,
-            &observe,
-            RbkrConfig::new(1),
-        )
-        .unwrap();
+        let basis =
+            ResponseBalancedBasis::from_empirical_gramians(&reach, &observe, RbkrConfig::new(1))
+                .unwrap();
         assert!(basis.biorthogonality_defect() < 1.0e-8);
     }
 
@@ -1198,10 +1193,7 @@ mod tests {
             Err(RbkrError::MixedScenarioCheckpoint)
         );
         assert_eq!(
-            aggregate_response_gramians(
-                &[base],
-                ResponseGramianAggregationConfig::new(1),
-            ),
+            aggregate_response_gramians(&[base], ResponseGramianAggregationConfig::new(1),),
             Err(RbkrError::ScenarioFactorStorageBudgetExceeded)
         );
     }
