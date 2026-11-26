@@ -101,13 +101,14 @@ impl StateResponseRecord {
     }
 }
 
-#[derive(Clone, Copy, Debug, Default, Eq, PartialEq)]
+#[derive(Clone, Copy, Debug, Default, PartialEq)]
 pub struct AbstractionScore {
     pub compared_pairs: usize,
     pub candidate_merged_pairs: usize,
     pub candidate_separated_pairs: usize,
     pub false_merges: usize,
     pub false_splits: usize,
+    pub max_normalized_pair_distortion: f64,
 }
 
 #[derive(Clone, Copy, Debug, PartialEq)]
@@ -120,7 +121,10 @@ pub fn assess_pair(
     left: &StateResponseRecord,
     right: &StateResponseRecord,
     contract: &StateResponseContract,
-) -> PairAssessment {
+) -> Result<PairAssessment, String> {
+    contract.validate()?;
+    left.validate_against(contract)?;
+    right.validate_against(contract)?;
     let mut maximum = 0.0_f64;
     for (key, left_value) in &left.responses {
         let right_value = right.responses.get(key).copied().unwrap_or_default();
@@ -128,11 +132,11 @@ pub fn assess_pair(
         let distance = left_value.abs_diff(right_value) as f64 / tolerance as f64;
         maximum = maximum.max(distance);
     }
-    PairAssessment {
+    Ok(PairAssessment {
         exact_equivalent: left.invariant_signature == right.invariant_signature
             && left.responses == right.responses,
         normalized_worst_case_distortion: maximum,
-    }
+    })
 }
 
 pub fn approximate_response_equivalent(
@@ -140,11 +144,14 @@ pub fn approximate_response_equivalent(
     right: &StateResponseRecord,
     contract: &StateResponseContract,
     epsilon: f64,
-) -> bool {
-    if !epsilon.is_finite() || epsilon < 0.0 || left.invariant_signature != right.invariant_signature {
-        return false;
+) -> Result<bool, String> {
+    if !epsilon.is_finite() || epsilon < 0.0 {
+        return Err("epsilon must be finite and non-negative".to_owned());
     }
-    assess_pair(left, right, contract).normalized_worst_case_distortion <= epsilon
+    if left.invariant_signature != right.invariant_signature {
+        return Ok(false);
+    }
+    Ok(assess_pair(left, right, contract)?.normalized_worst_case_distortion <= epsilon)
 }
 
 /// Score the candidate's state partition against evaluator-owned response
@@ -172,7 +179,11 @@ pub fn score_abstraction(
         for right_index in (left_index + 1)..records.len() {
             let left = &records[left_index];
             let right = &records[right_index];
-            let equivalent = assess_pair(left, right, contract).exact_equivalent;
+            let assessment = assess_pair(left, right, contract)?;
+            let equivalent = assessment.exact_equivalent;
+            score.max_normalized_pair_distortion = score
+                .max_normalized_pair_distortion
+                .max(assessment.normalized_worst_case_distortion);
             let merged = left.abstract_state_id == right.abstract_state_id;
             score.compared_pairs += 1;
             if merged {
@@ -255,7 +266,7 @@ mod tests {
         let contract = contract();
         let left = record("raw-a", "compressed-1", 0, 2);
         let right = record("raw-b", "compressed-1", 0, 2);
-        assert!(assess_pair(&left, &right, &contract).exact_equivalent);
+        assert!(assess_pair(&left, &right, &contract).expect("valid pair").exact_equivalent);
         assert_eq!(
             score_abstraction(&[left, right], &contract).expect("valid fixture").false_merges,
             0
@@ -286,7 +297,7 @@ mod tests {
         let contract = contract();
         let left = record("raw-a", "same-compressed-state", 0, 2);
         let right = record("raw-b", "same-compressed-state", 0, 3);
-        assert!(!assess_pair(&left, &right, &contract).exact_equivalent);
+        assert!(!assess_pair(&left, &right, &contract).expect("valid pair").exact_equivalent);
         assert_eq!(
             score_abstraction(&[left, right], &contract).expect("valid fixture").false_merges,
             1
@@ -299,9 +310,9 @@ mod tests {
         let a = record("a", "a", 0, 2);
         let b = record("b", "b", 8, 2);
         let c = record("c", "c", 16, 2);
-        assert!(approximate_response_equivalent(&a, &b, &contract, 1.0));
-        assert!(approximate_response_equivalent(&b, &c, &contract, 1.0));
-        assert!(!approximate_response_equivalent(&a, &c, &contract, 1.0));
+        assert!(approximate_response_equivalent(&a, &b, &contract, 1.0).expect("valid comparison"));
+        assert!(approximate_response_equivalent(&b, &c, &contract, 1.0).expect("valid comparison"));
+        assert!(!approximate_response_equivalent(&a, &c, &contract, 1.0).expect("valid comparison"));
     }
 
     #[test]
@@ -341,7 +352,7 @@ mod tests {
         let contract = contract();
         let left = record("a", "a", 0, 2);
         let right = record("b", "b", 0, 2);
-        assert!(!approximate_response_equivalent(&left, &right, &contract, f64::NAN));
-        assert!(!approximate_response_equivalent(&left, &right, &contract, -0.1));
+        assert!(approximate_response_equivalent(&left, &right, &contract, f64::NAN).is_err());
+        assert!(approximate_response_equivalent(&left, &right, &contract, -0.1).is_err());
     }
 }
