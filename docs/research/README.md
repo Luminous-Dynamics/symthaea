@@ -448,19 +448,11 @@ A falsifiable programme for spectral statistics, RH/prime-structure controls, ne
 ### Existing Symthaea selector integration
 
 - [Existing selector integration map](SDCB_EXISTING_SELECTOR_INTEGRATION_MAP_2026_11_26.md): audit of the HDC prediction-disagreement selector, Spark EIG, Cell Foundry HDC/CfC planner, Nuclear heuristic, synthetic ISRU bake-off, and decision-relevant chaos benchmark.
-### Representative, informative and de-amplifying acquisition
-
-- [R-IDeA acquisition protocol](SDCB_RIDEA_ROBUST_ACQUISITION_V1.md): exact R-I/R-IDeA equations, MMD representativeness and proxy de-amplification boundaries.
-- [R-IDeA episode schema](SDCB_RIDEA_EPISODE_V1.schema.json), [example](SDCB_RIDEA_EPISODE_V1.example.json), and [expected result](SDCB_RIDEA_EPISODE_V1.expected.json).
-- [R-IDeA Rust reference](../../scripts/research/sdcb_ridea.rs): biased empirical RBF-MMD, R-I, DeA sigmoid, R-IDeA and cost-separated ranking.
-- [R-IDeA harness README](../../scripts/research/SDCB_RIDEA_README.md): build instructions and claim limits.
-
-**Evidence boundary:** 16 Rust test functions are authored but not compiled/executed. Proxy predictions and EIG are supplied inputs; the proxy-training method and upstream R-IDeA are not reproduced.
 ### R-I / R-IDeA under model misspecification
 
 - [R-IDeA acquisition protocol](SDCB_RIDEA_ROBUST_ACQUISITION_V1.md): AISTATS 2026 equations for representativeness, EIG and proxy de-amplification.
 - [R-IDeA episode schema](SDCB_RIDEA_EPISODE_V1.schema.json), [example](SDCB_RIDEA_EPISODE_V1.example.json), and [expected result](SDCB_RIDEA_EPISODE_V1.expected.json).
-- [R-IDeA Rust reference](../../scripts/research/sdcb_ridea.rs) and [README](../../scripts/research/SDCB_RIDEA_README.md).
+- [R-IDeA Rust reference](../../scripts/research/sdcb_ridea.rs) and [README](../../scripts/research/SDCB_RIDEA_README.md): empirical RBF-MMD, R-I, DeA and cost-separated ranking.
 
 **Evidence boundary:** 17 authored Rust tests, not compiled or executed. The reference scores supplied EIG and proxy predictions; it does not train the proxy.
 ### Acquisition comparison bake-off
