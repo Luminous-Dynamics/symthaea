@@ -29,12 +29,15 @@ The returned request body is sent through the transport without a second seriali
 
 ## Authored tests (not executed)
 
-Seven deterministic tests cover:
+Eight deterministic tests cover:
 1. UTF-8/Unicode plus quote, backslash and newline escaping with exact offsets.
 2. Repeated identical memory strings from distinct evidence IDs retaining distinct offsets.
 3. Full fake-transport → artifact commitment → observer signing → consumer verifier round trip, including same-request-byte digest binding.
 4. Typed memory content rejected in the true no-memory arm.
-5. Artifact storage-profile substitution rejected before transport.
+5. Artifact storage-profile substitution rejected before transport;
+6. provider-parameter profile drift rejected before artifact storage or transport.
+
+Existing tests also retain their prior Unicode, repeated-origin, no-memory and pinned-model controls.
 
 Tests use a fake artifact writer whose ciphertext digest is a test commitment over the body, not encryption. The fake resolver returns the test body. These fixtures only test the interface and binding logic.
 
