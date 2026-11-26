@@ -467,6 +467,14 @@ pub struct BoundaryRatePairMeasurement {
     pub success_side_action_trace_sha256: Option<String>,
     pub failure_side_action_trace_sha256: Option<String>,
     pub candidate_checkpoint_sha256: String,
+    pub reference_success_side_successes: u32,
+    pub reference_success_side_trials: u32,
+    pub reference_failure_side_successes: u32,
+    pub reference_failure_side_trials: u32,
+    pub predicted_success_side_successes: u32,
+    pub predicted_success_side_trials: u32,
+    pub predicted_failure_side_successes: u32,
+    pub predicted_failure_side_trials: u32,
     pub reference_success_side_rate_basis_points: f64,
     pub predicted_success_side_rate_basis_points: f64,
     pub reference_failure_side_rate_basis_points: f64,
@@ -616,6 +624,14 @@ pub fn score_boundary_rate_pairs(
             success_side_action_trace_sha256: pair.success_side_action_trace_sha256.clone(),
             failure_side_action_trace_sha256: pair.failure_side_action_trace_sha256.clone(),
             candidate_checkpoint_sha256: pair.candidate_checkpoint_sha256.clone(),
+            reference_success_side_successes: pair.reference_success_side_successes,
+            reference_success_side_trials: pair.reference_success_side_trials,
+            reference_failure_side_successes: pair.reference_failure_side_successes,
+            reference_failure_side_trials: pair.reference_failure_side_trials,
+            predicted_success_side_successes: pair.predicted_success_side_successes,
+            predicted_success_side_trials: pair.predicted_success_side_trials,
+            predicted_failure_side_successes: pair.predicted_failure_side_successes,
+            predicted_failure_side_trials: pair.predicted_failure_side_trials,
             reference_success_side_rate_basis_points: reference_success_rate,
             predicted_success_side_rate_basis_points: predicted_success_rate,
             reference_failure_side_rate_basis_points: reference_failure_rate,
@@ -750,6 +766,10 @@ mod tests {
         assert_eq!(score.pair_measurements[0].environment_cluster_id, "cluster-1");
         assert_eq!(score.pair_measurements[0].pair_source_manifest_sha256, "b".repeat(64));
         assert_eq!(score.pair_measurements[0].candidate_checkpoint_sha256, "e".repeat(64));
+        assert_eq!(score.pair_measurements[0].reference_success_side_successes, 10);
+        assert_eq!(score.pair_measurements[0].reference_success_side_trials, 10);
+        assert_eq!(score.pair_measurements[0].predicted_failure_side_successes, 2);
+        assert_eq!(score.pair_measurements[0].predicted_failure_side_trials, 10);
         assert_eq!(
             score.pair_measurements[0].success_side_action_trace_sha256,
             Some("1".repeat(64))
