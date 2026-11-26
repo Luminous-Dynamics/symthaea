@@ -55,6 +55,14 @@ pub enum SourceLineageRejectV1 {
     UnexpectedReceipt,
     DuplicateReceipt,
     BindingMismatch,
+    InvalidGraph,
+    GraphDigestMismatch,
+    GraphCycle,
+    DanglingParent,
+    CandidateLineageMismatch,
+    MissingRequirementEvidence,
+    RootFamilyMismatch,
+    ClosureDigestMismatch,
     NotYetValid,
     Expired,
     InvalidSignature,
@@ -103,6 +111,14 @@ struct VerifiedSourceLineageReceiptV1 {
 }
 
 #[derive(Clone, Debug, Eq, PartialEq)]
+pub struct SourceLineageReplayCommitmentV1 {
+    pub requirement_id: String,
+    pub root_family_sha256: String,
+    pub source_graph_sha256: String,
+    pub lineage_closure_sha256: String,
+}
+
+#[derive(Clone, Debug, Eq, PartialEq)]
 pub struct VerifiedSourceLineageSetV1 {
     receipts: Vec<VerifiedSourceLineageReceiptV1>,
     sufficiency_receipt_sha256: String,
@@ -122,6 +138,16 @@ impl VerifiedSourceLineageSetV1 {
 
     pub fn lineage_profile_sha256(&self) -> &str {
         &self.lineage_profile_sha256
+    }
+
+    /// Immutable commitments exposed for an independent graph replay step.
+    pub fn replay_commitments(&self) -> Vec<SourceLineageReplayCommitmentV1> {
+        self.receipts.iter().map(|item| SourceLineageReplayCommitmentV1 {
+            requirement_id: item.receipt.requirement_id.clone(),
+            root_family_sha256: item.receipt.root_family_sha256.clone(),
+            source_graph_sha256: item.receipt.source_graph_sha256.clone(),
+            lineage_closure_sha256: item.receipt.lineage_closure_sha256.clone(),
+        }).collect()
     }
 
     /// Recheck every lineage receipt using the currently pinned resolver profile.
