@@ -96,6 +96,10 @@ Relevant references:
 - World-model benchmark taxonomy: https://world-model-benchmarks.github.io/World-Model-Benchmarks/
 
 
+### Equal-cluster boundary aggregation
+
+The replicated boundary-rate evaluator aggregates descriptive metrics within each independent environment cluster first, then gives clusters equal weight in the primary summary. Pair-weighted values are retained as diagnostics. Raw per-pair measurements—including source manifest, side scene digests, reference policy/checkpoint, candidate checkpoint, optional action-trace digests and each side's successes/trials—remain available for #8578. The crate does not manufacture confidence intervals; inferential resampling and simultaneous uncertainty belong to #8578.
+
 ## Failure fidelity is a separate qualification axis
 
 A predicted state may match the final task-success label while getting the failure itself wrong. A world model can hallucinate a successful lift after missed contact, or reproduce failure but place it at the wrong execution stage. CMAQ-020 therefore adds the executable [failure-fidelity scorecard](FAILURE_FIDELITY_V0_1.md) in `src/failure_fidelity.rs`.
