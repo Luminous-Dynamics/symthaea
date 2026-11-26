@@ -33,6 +33,7 @@
   ],
   "experiment_policy_frontier": [
     {
+      "experiment_id": "NO_EXPERIMENT_LOTTERY",
       "actions_by_outcome": [
         "balanced",
         "balanced"
@@ -41,9 +42,10 @@
         8,
         -1
       ],
-      "cost_units": 1
+      "cost_units": 0
     },
     {
+      "experiment_id": "NO_EXPERIMENT_LOTTERY",
       "actions_by_outcome": [
         "balanced",
         "safe"
@@ -52,9 +54,10 @@
         7,
         -0.5
       ],
-      "cost_units": 1
+      "cost_units": 0
     },
     {
+      "experiment_id": "NO_EXPERIMENT_LOTTERY",
       "actions_by_outcome": [
         "safe",
         "safe"
@@ -63,8 +66,9 @@
         6,
         0
       ],
-      "cost_units": 1
+      "cost_units": 0
     }
   ],
-  "claim_ceiling": "finite_pareto_and_hard_constraint_fixture_only"
+  "claim_ceiling": "finite_pareto_and_hard_constraint_fixture_only",
+  "note": "The experiment outcomes are independent of the hypothesis, so any outcome-contingent action allocation is exactly reproducible as a free lottery. The Pareto oracle includes that no-experiment lottery baseline; the paid uninformative measurement is dominated and does not appear on the frontier."
 }
