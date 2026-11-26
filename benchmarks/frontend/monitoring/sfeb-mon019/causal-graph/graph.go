@@ -214,6 +214,9 @@ func Evaluate(g Graph,pins map[string]VerifierPin) Result {
 			if generatedBy[id]>1 { return result(Divergent,"immutable entity has conflicting generation edges: "+id,checked...) }
 			if n.ExternalRoot {
 				agent,ok:=nodes[n.SourceID]
+				if attributedTo[id]!="" && attributedTo[id]!=n.SourceID {
+					return result(Divergent,"external entity source attribution conflicts with its declared source: "+id,checked...)
+				}
 				if !nonempty(n.SourceID) || !ok || agent.Kind!=Agent || !agent.RequiresVerification || attributedTo[id]!=n.SourceID {
 					return result(Indeterminate,"external entity lacks a verifier-qualified source attribution: "+id,checked...)
 				}
