@@ -77,6 +77,170 @@ impl ActionCategory {
     }
 }
 
+
+/// Execution disposition for an observed system transition.
+///
+/// A failed or unknown outcome is still retained as an episode. It must not be
+/// silently converted into a successful action→state training pair.
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub enum TransitionOutcome {
+    Completed,
+    Failed,
+    TimedOut,
+    Aborted,
+    Unknown,
+}
+
+/// Provenance-bound transition observation for the NixWard world model.
+///
+/// This record supplements the existing per-action mean-delta baseline. It
+/// does not itself grant execution authority, authenticate a receipt, or
+/// automatically update the model.
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub struct TransitionEpisodeV1 {
+    pub episode_id: String,
+    pub domain_id: String,
+    pub context_id: String,
+    pub environment_family_id: String,
+    pub environment_cluster_id: String,
+    pub action: ActionCategory,
+    pub action_profile_id: String,
+    /// BLAKE3 digest of canonical action parameters, computed by the caller.
+    pub action_parameters_blake3: String,
+    /// BLAKE3 digest of canonical before-state hypervector bytes.
+    pub before_state_blake3: String,
+    /// BLAKE3 digest of canonical after-state hypervector bytes, when observed.
+    pub after_state_blake3: Option<String>,
+    pub outcome: TransitionOutcome,
+    /// Registered observation horizon for this episode.
+    pub observation_horizon_ms: u64,
+    pub observed_at_unix_ms: u64,
+    /// BLAKE3 digest of the execution/observation receipt, when supplied.
+    pub execution_receipt_blake3: Option<String>,
+}
+
+fn valid_blake3_hex(value: &str) -> bool {
+    value.len() == 64 && value.bytes().all(|byte| byte.is_ascii_hexdigit())
+}
+
+/// Hash a ContinuousHV using a canonical dimension + little-endian f32
+/// encoding. Non-finite values are rejected rather than normalized.
+pub fn continuous_hv_blake3(state: &ContinuousHV) -> Result<String, String> {
+    if !state.as_slice().iter().all(|value| value.is_finite()) {
+        return Err("state hypervector contains non-finite values".to_owned());
+    }
+
+    let mut hasher = blake3::Hasher::new();
+    hasher.update(&(state.as_slice().len() as u64).to_le_bytes());
+    for value in state.as_slice() {
+        hasher.update(&value.to_bits().to_le_bytes());
+    }
+
+    let digest = hasher.finalize();
+    let mut encoded = String::with_capacity(64);
+    for byte in digest.as_bytes() {
+        use std::fmt::Write as _;
+        write!(&mut encoded, "{byte:02x}").expect("writing into String cannot fail");
+    }
+    Ok(encoded)
+}
+
+impl TransitionEpisodeV1 {
+    #[allow(clippy::too_many_arguments)]
+    pub fn new(
+        episode_id: impl Into<String>,
+        domain_id: impl Into<String>,
+        context_id: impl Into<String>,
+        environment_family_id: impl Into<String>,
+        environment_cluster_id: impl Into<String>,
+        action: ActionCategory,
+        action_profile_id: impl Into<String>,
+        action_parameters_blake3: impl Into<String>,
+        before_state: &ContinuousHV,
+        after_state: Option<&ContinuousHV>,
+        outcome: TransitionOutcome,
+        observation_horizon_ms: u64,
+        observed_at_unix_ms: u64,
+        execution_receipt_blake3: Option<String>,
+    ) -> Result<Self, String> {
+        if let Some(after) = after_state {
+            if before_state.as_slice().len() != after.as_slice().len() {
+                return Err("before/after state dimensions do not match".to_owned());
+            }
+        }
+
+        let episode = Self {
+            episode_id: episode_id.into(),
+            domain_id: domain_id.into(),
+            context_id: context_id.into(),
+            environment_family_id: environment_family_id.into(),
+            environment_cluster_id: environment_cluster_id.into(),
+            action,
+            action_profile_id: action_profile_id.into(),
+            action_parameters_blake3: action_parameters_blake3.into(),
+            before_state_blake3: continuous_hv_blake3(before_state)?,
+            after_state_blake3: after_state.map(continuous_hv_blake3).transpose()?,
+            outcome,
+            observation_horizon_ms,
+            observed_at_unix_ms,
+            execution_receipt_blake3,
+        };
+        episode.validate()?;
+        Ok(episode)
+    }
+
+    pub fn validate(&self) -> Result<(), String> {
+        if [
+            self.episode_id.as_str(),
+            self.domain_id.as_str(),
+            self.context_id.as_str(),
+            self.environment_family_id.as_str(),
+            self.environment_cluster_id.as_str(),
+            self.action_profile_id.as_str(),
+        ]
+        .iter()
+        .any(|value| value.trim().is_empty())
+        {
+            return Err("episode, domain, context, family, cluster and action-profile IDs must be non-empty".to_owned());
+        }
+        if !valid_blake3_hex(&self.action_parameters_blake3)
+            || !valid_blake3_hex(&self.before_state_blake3)
+            || self
+                .after_state_blake3
+                .as_ref()
+                .is_some_and(|digest| !valid_blake3_hex(digest))
+            || self
+                .execution_receipt_blake3
+                .as_ref()
+                .is_some_and(|digest| !valid_blake3_hex(digest))
+        {
+            return Err("action, state and receipt digests must be 64-character hexadecimal BLAKE3 values".to_owned());
+        }
+        if self.observation_horizon_ms == 0 {
+            return Err("observation_horizon_ms must be positive".to_owned());
+        }
+        if self.outcome == TransitionOutcome::Completed {
+            if self.after_state_blake3.is_none() {
+                return Err("completed transitions require an observed after-state".to_owned());
+            }
+            if self.execution_receipt_blake3.is_none() {
+                return Err("completed transitions require an execution/observation receipt digest".to_owned());
+            }
+        }
+        Ok(())
+    }
+
+    /// True only when a completed after-state and receipt digest are present.
+    ///
+    /// The caller must still have an independent verifier authenticate the
+    /// receipt before promoting this episode into a training/evidence set.
+    pub fn has_completed_transition_measurement(&self) -> bool {
+        self.outcome == TransitionOutcome::Completed
+            && self.after_state_blake3.is_some()
+            && self.execution_receipt_blake3.is_some()
+    }
+}
+
 /// A learned state transition delta.
 #[derive(Debug, Clone)]
 struct DeltaEntry {
@@ -276,6 +440,185 @@ impl Default for NixWorldModel {
 #[cfg(test)]
 mod tests {
     use super::*;
+
+
+    #[test]
+    fn transition_episode_hashes_canonical_state_and_records_context() {
+        let before = ContinuousHV::random(128, 11);
+        let after = ContinuousHV::random(128, 12);
+        let episode = TransitionEpisodeV1::new(
+            "episode-1",
+            "nixos-host-v1",
+            "workstation-gpu",
+            "install-family-v1",
+            "cluster-42",
+            ActionCategory::Install,
+            "nix-install-v1",
+            "a".repeat(64),
+            &before,
+            Some(&after),
+            TransitionOutcome::Completed,
+            5_000,
+            1_800_000_000_000,
+            Some("b".repeat(64)),
+        )
+        .expect("valid completed transition");
+        assert_eq!(episode.before_state_blake3, continuous_hv_blake3(&before).unwrap());
+        assert_eq!(episode.after_state_blake3, Some(continuous_hv_blake3(&after).unwrap()));
+        assert!(episode.has_completed_transition_measurement());
+    }
+
+    #[test]
+    fn state_digest_is_deterministic_and_dimension_sensitive() {
+        let first = ContinuousHV::random(128, 5);
+        let same = ContinuousHV::random(128, 5);
+        let different_dimension = ContinuousHV::random(256, 5);
+        assert_eq!(continuous_hv_blake3(&first).unwrap(), continuous_hv_blake3(&same).unwrap());
+        assert_ne!(
+            continuous_hv_blake3(&first).unwrap(),
+            continuous_hv_blake3(&different_dimension).unwrap()
+        );
+    }
+
+    #[test]
+    fn non_finite_state_is_rejected_before_digesting() {
+        let mut values = vec![0.25_f32; 128];
+        values[17] = f32::NAN;
+        let state = ContinuousHV::from_vec(values);
+        assert!(continuous_hv_blake3(&state).is_err());
+    }
+
+    #[test]
+    fn failed_partial_and_unknown_outcomes_are_retained_but_not_completed() {
+        let before = ContinuousHV::random(128, 21);
+        let partial_after = ContinuousHV::random(128, 22);
+
+        for outcome in [
+            TransitionOutcome::Failed,
+            TransitionOutcome::TimedOut,
+            TransitionOutcome::Aborted,
+        ] {
+            let episode = TransitionEpisodeV1::new(
+                format!("episode-{outcome:?}"),
+                "nixos-host-v1",
+                "workstation-gpu",
+                "install-family-v1",
+                "cluster-42",
+                ActionCategory::Install,
+                "nix-install-v1",
+                "a".repeat(64),
+                &before,
+                Some(&partial_after),
+                outcome,
+                5_000,
+                1_800_000_000_000,
+                None,
+            )
+            .expect("failed/partial observation remains representable");
+            assert!(!episode.has_completed_transition_measurement());
+            assert!(episode.after_state_blake3.is_some());
+        }
+
+        let unknown = TransitionEpisodeV1::new(
+            "episode-unknown",
+            "nixos-host-v1",
+            "workstation-gpu",
+            "install-family-v1",
+            "cluster-42",
+            ActionCategory::Install,
+            "nix-install-v1",
+            "a".repeat(64),
+            &before,
+            None,
+            TransitionOutcome::Unknown,
+            5_000,
+            1_800_000_000_000,
+            None,
+        )
+        .expect("unknown execution remains representable");
+        assert!(!unknown.has_completed_transition_measurement());
+        assert!(unknown.after_state_blake3.is_none());
+    }
+
+    #[test]
+    fn completed_outcome_requires_after_state_and_receipt_digest() {
+        let before = ContinuousHV::random(128, 31);
+        let after = ContinuousHV::random(128, 32);
+        let missing_after = TransitionEpisodeV1::new(
+            "episode-missing-after",
+            "nixos-host-v1",
+            "workstation-gpu",
+            "install-family-v1",
+            "cluster-42",
+            ActionCategory::Install,
+            "nix-install-v1",
+            "a".repeat(64),
+            &before,
+            None,
+            TransitionOutcome::Completed,
+            5_000,
+            1_800_000_000_000,
+            Some("b".repeat(64)),
+        );
+        assert!(missing_after.is_err());
+
+        let missing_receipt = TransitionEpisodeV1::new(
+            "episode-missing-receipt",
+            "nixos-host-v1",
+            "workstation-gpu",
+            "install-family-v1",
+            "cluster-42",
+            ActionCategory::Install,
+            "nix-install-v1",
+            "a".repeat(64),
+            &before,
+            Some(&after),
+            TransitionOutcome::Completed,
+            5_000,
+            1_800_000_000_000,
+            None,
+        );
+        assert!(missing_receipt.is_err());
+    }
+
+    #[test]
+    fn transition_episode_rejects_mismatched_dimensions_and_bad_provenance() {
+        let before = ContinuousHV::random(128, 41);
+        let after = ContinuousHV::random(256, 42);
+        assert!(TransitionEpisodeV1::new(
+            "episode-bad-dimension",
+            "nixos-host-v1",
+            "workstation-gpu",
+            "install-family-v1",
+            "cluster-42",
+            ActionCategory::Install,
+            "nix-install-v1",
+            "a".repeat(64),
+            &before,
+            Some(&after),
+            TransitionOutcome::Completed,
+            5_000,
+            1_800_000_000_000,
+            Some("b".repeat(64)),
+        ).is_err());
+
+        assert!(TransitionEpisodeV1::new(
+            "episode-bad-receipt",
+            "nixos-host-v1",
+            "workstation-gpu",
+            "install-family-v1",
+            "cluster-42",
+            ActionCategory::Install,
+            "nix-install-v1",
+            "bad-digest",
+            &before,
+            Some(&before),
+            TransitionOutcome::Completed,
+            5_000,
+            1_800_000_000_000,
+            Some("b".repeat(64)),
+        ).is_err());
+    }
 
     #[test]
     fn test_learn_and_predict() {
