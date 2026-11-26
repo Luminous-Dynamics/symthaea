@@ -1666,6 +1666,7 @@ fn make_receipt(
         .map(|rank| rank.to_string())
         .unwrap_or_else(|| "query".to_string());
     let captured_at_unix_ms = now_unix_ms();
+    let process_id = std::process::id();
     let sequence = {
         let mut next = NEXT_ACQUISITION_ATTEMPT_ID
             .lock()
@@ -1676,7 +1677,7 @@ fn make_receipt(
     };
     AcquisitionReceipt {
         attempt_id: format!(
-            "a{captured_at_unix_ms}-{sequence}-q{query_rank}-{stage_id}-{rank_id}"
+            "a{captured_at_unix_ms}-p{process_id}-{sequence}-q{query_rank}-{stage_id}-{rank_id}"
         ),
         query_rank,
         source_rank,
