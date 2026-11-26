@@ -1,0 +1,287 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://luminousdynamics.io/schemas/resonance-analytic-reference-v0.1.schema.json",
+  "title": "RESONANCE-001 analytical reference fixture v0.1",
+  "type": "object",
+  "additionalProperties": false,
+  "required": [
+    "schema",
+    "claim_ceiling",
+    "series_rlc",
+    "parallel_rlc",
+    "coupled_identical_resonators",
+    "driven_lossy_coupled_loops"
+  ],
+  "properties": {
+    "schema": {
+      "const": "symthaea.resonance.analytic_reference.v0.1"
+    },
+    "claim_ceiling": {
+      "const": "ideal_lumped_analytical_only"
+    },
+    "series_rlc": {
+      "$ref": "#/$defs/series"
+    },
+    "parallel_rlc": {
+      "$ref": "#/$defs/parallel"
+    },
+    "coupled_identical_resonators": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "inductance_1_h",
+        "capacitance_1_f",
+        "inductance_2_h",
+        "capacitance_2_f",
+        "coupling_coefficient",
+        "expected"
+      ],
+      "properties": {
+        "inductance_1_h": {
+          "type": "number",
+          "exclusiveMinimum": 0
+        },
+        "capacitance_1_f": {
+          "type": "number",
+          "exclusiveMinimum": 0
+        },
+        "inductance_2_h": {
+          "type": "number",
+          "exclusiveMinimum": 0
+        },
+        "capacitance_2_f": {
+          "type": "number",
+          "exclusiveMinimum": 0
+        },
+        "coupling_coefficient": {
+          "type": "number",
+          "minimum": 0,
+          "exclusiveMaximum": 1
+        },
+        "expected": {
+          "type": "object"
+        }
+      }
+    },
+    "driven_lossy_coupled_loops": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "primary_resistance_ohm",
+        "primary_inductance_h",
+        "primary_capacitance_f",
+        "secondary_resistance_ohm",
+        "secondary_inductance_h",
+        "secondary_capacitance_f",
+        "coupling_coefficient",
+        "secondary_winding_polarity",
+        "frequency_hz",
+        "expected"
+      ],
+      "properties": {
+        "primary_resistance_ohm": {
+          "type": "number",
+          "exclusiveMinimum": 0
+        },
+        "primary_inductance_h": {
+          "type": "number",
+          "exclusiveMinimum": 0
+        },
+        "primary_capacitance_f": {
+          "type": "number",
+          "exclusiveMinimum": 0
+        },
+        "secondary_resistance_ohm": {
+          "type": "number",
+          "exclusiveMinimum": 0
+        },
+        "secondary_inductance_h": {
+          "type": "number",
+          "exclusiveMinimum": 0
+        },
+        "secondary_capacitance_f": {
+          "type": "number",
+          "exclusiveMinimum": 0
+        },
+        "coupling_coefficient": {
+          "type": "number",
+          "minimum": 0,
+          "exclusiveMaximum": 1
+        },
+        "secondary_winding_polarity": {
+          "enum": [
+            -1,
+            1
+          ]
+        },
+        "frequency_hz": {
+          "type": "number",
+          "exclusiveMinimum": 0
+        },
+        "expected": {
+          "type": "object",
+          "additionalProperties": false,
+          "required": [
+            "mutual_inductance_h",
+            "primary_input_impedance_ohm",
+            "secondary_current_per_volt_a_per_v",
+            "secondary_resistor_voltage_per_volt",
+            "secondary_resistor_power_w_per_v2",
+            "primary_current_per_volt_a_per_v",
+            "primary_input_power_w_per_v2",
+            "primary_resistor_power_w_per_v2",
+            "power_balance_residual_w_per_v2"
+          ],
+          "properties": {
+            "mutual_inductance_h": {
+              "type": "number"
+            },
+            "primary_input_impedance_ohm": {
+              "type": "object",
+              "required": [
+                "real",
+                "imaginary"
+              ],
+              "properties": {
+                "real": {
+                  "type": "number"
+                },
+                "imaginary": {
+                  "type": "number"
+                }
+              }
+            },
+            "secondary_current_per_volt_a_per_v": {
+              "type": "object",
+              "required": [
+                "real",
+                "imaginary"
+              ],
+              "properties": {
+                "real": {
+                  "type": "number"
+                },
+                "imaginary": {
+                  "type": "number"
+                }
+              }
+            },
+            "secondary_resistor_voltage_per_volt": {
+              "type": "object",
+              "required": [
+                "real",
+                "imaginary"
+              ],
+              "properties": {
+                "real": {
+                  "type": "number"
+                },
+                "imaginary": {
+                  "type": "number"
+                }
+              }
+            },
+            "secondary_resistor_power_w_per_v2": {
+              "type": "number"
+            },
+            "primary_current_per_volt_a_per_v": {
+              "type": "object",
+              "required": [
+                "real",
+                "imaginary"
+              ],
+              "properties": {
+                "real": {
+                  "type": "number"
+                },
+                "imaginary": {
+                  "type": "number"
+                }
+              }
+            },
+            "primary_input_power_w_per_v2": {
+              "type": "number"
+            },
+            "primary_resistor_power_w_per_v2": {
+              "type": "number"
+            },
+            "power_balance_residual_w_per_v2": {
+              "type": "number"
+            }
+          }
+        }
+      }
+    }
+  },
+  "$defs": {
+    "common": {
+      "type": "object",
+      "additionalProperties": false,
+      "properties": {
+        "resistance_ohm": {
+          "type": "number",
+          "exclusiveMinimum": 0
+        },
+        "inductance_h": {
+          "type": "number",
+          "exclusiveMinimum": 0
+        },
+        "capacitance_f": {
+          "type": "number",
+          "exclusiveMinimum": 0
+        },
+        "expected": {
+          "type": "object",
+          "required": [
+            "angular_frequency_rad_s",
+            "frequency_hz",
+            "quality_factor",
+            "half_power_bandwidth_hz",
+            "impedance_at_resonance_ohm"
+          ],
+          "properties": {
+            "angular_frequency_rad_s": {
+              "type": "number"
+            },
+            "frequency_hz": {
+              "type": "number"
+            },
+            "quality_factor": {
+              "type": "number"
+            },
+            "half_power_bandwidth_hz": {
+              "type": "number"
+            },
+            "impedance_at_resonance_ohm": {
+              "type": "object",
+              "required": [
+                "real",
+                "imaginary"
+              ],
+              "properties": {
+                "real": {
+                  "type": "number"
+                },
+                "imaginary": {
+                  "type": "number"
+                }
+              }
+            }
+          }
+        }
+      },
+      "required": [
+        "resistance_ohm",
+        "inductance_h",
+        "capacitance_f",
+        "expected"
+      ]
+    },
+    "series": {
+      "$ref": "#/$defs/common"
+    },
+    "parallel": {
+      "$ref": "#/$defs/common"
+    }
+  }
+}

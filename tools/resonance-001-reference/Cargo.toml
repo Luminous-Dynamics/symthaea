@@ -1,0 +1,11 @@
+[package]
+name = "resonance-001-reference"
+version = "0.1.0"
+edition = "2024"
+license = "AGPL-3.0-only"
+description = "Dependency-free analytical RLC and coupled-resonator reference cases"
+
+[lib]
+path = "src/lib.rs"
+
+[workspace]
