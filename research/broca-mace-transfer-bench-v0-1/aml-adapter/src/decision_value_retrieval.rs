@@ -145,7 +145,11 @@ pub struct DecisionRetrievalOptionV1 {
 }
 
 impl DecisionRetrievalOptionV1 {
-    pub fn validate(&self, policy: &DecisionValuePolicyV1) -> Result<(), DecisionValueRejectV1> {
+    pub fn validate(
+        &self,
+        policy: &DecisionValuePolicyV1,
+        require_calibrated_likelihoods: bool,
+    ) -> Result<(), DecisionValueRejectV1> {
         if !valid_atom(&self.query_option_id, MAX_ID_BYTES)
             || !valid_sha256(&self.action_template_sha256)
         {
@@ -160,25 +164,31 @@ impl DecisionRetrievalOptionV1 {
         }
         let states = policy.state_ids.len();
         let observations = self.observation_ids.len();
-        if self.likelihood_ppm_by_state.len() != states
-            || self.possible_observation_by_state.len() != states
-            || self.likelihood_ppm_by_state.iter().any(|row| row.len() != observations)
+        if self.possible_observation_by_state.len() != states
             || self.possible_observation_by_state.iter().any(|row| row.len() != observations)
+            || (require_calibrated_likelihoods
+                && (self.likelihood_ppm_by_state.len() != states
+                    || self.likelihood_ppm_by_state.iter().any(|row| row.len() != observations)))
+            || (!self.likelihood_ppm_by_state.is_empty()
+                && (self.likelihood_ppm_by_state.len() != states
+                    || self.likelihood_ppm_by_state.iter().any(|row| row.len() != observations)))
         {
             return Err(DecisionValueRejectV1::InvalidDimensions);
         }
-        for (likelihoods, support) in self.likelihood_ppm_by_state
-            .iter().zip(self.possible_observation_by_state.iter())
-        {
-            let sum = likelihoods.iter().try_fold(0_u64, |total, value| {
-                if *value > 1_000_000 { return None; }
-                total.checked_add(u64::from(*value))
-            }).ok_or(DecisionValueRejectV1::InvalidProbability)?;
-            if sum != 1_000_000 {
-                return Err(DecisionValueRejectV1::InvalidProbability);
-            }
+        for support in &self.possible_observation_by_state {
             if !support.iter().any(|possible| *possible) {
                 return Err(DecisionValueRejectV1::InvalidObservationSupport);
+            }
+        }
+        if require_calibrated_likelihoods || !self.likelihood_ppm_by_state.is_empty() {
+            for likelihoods in &self.likelihood_ppm_by_state {
+                let sum = likelihoods.iter().try_fold(0_u64, |total, value| {
+                    if *value > 1_000_000 { return None; }
+                    total.checked_add(u64::from(*value))
+                }).ok_or(DecisionValueRejectV1::InvalidProbability)?;
+                if sum != 1_000_000 {
+                    return Err(DecisionValueRejectV1::InvalidProbability);
+                }
             }
         }
         if self.tool_calls == 0 {
@@ -260,7 +270,7 @@ pub fn evaluate_expected_value_v1(
     calibration_verifier: &impl DecisionCalibrationReceiptVerifierV1,
 ) -> Result<ExpectedValueAssessmentV1, DecisionValueRejectV1> {
     policy.validate()?;
-    option.validate(policy)?;
+    option.validate(policy, true)?;
     if !valid_sha256(&prior.calibration_profile_sha256)
         || !valid_sha256(&prior.calibration_receipt_sha256)
         || prior.valid_until_unix <= now_unix
@@ -385,7 +395,7 @@ pub fn evaluate_robust_value_v1(
     option: &DecisionRetrievalOptionV1,
 ) -> Result<RobustValueAssessmentV1, DecisionValueRejectV1> {
     policy.validate()?;
-    option.validate(policy)?;
+    option.validate(policy, false)?;
 
     let best_utility_by_state = policy.utility_by_state_action.iter()
         .map(|row| *row.iter().max().ok_or(DecisionValueRejectV1::InvalidDimensions))
@@ -683,6 +693,14 @@ mod tests {
         assert_eq!(assessment.acquisition_cost_utility_units, 5);
         assert_eq!(assessment.robust_net_value_utility_units, 95);
         assert!(assessment.worth_retrieving);
+    }
+
+    #[test]
+    fn robust_evaluation_needs_no_calibrated_probability_matrix() {
+        let mut option = informative_option();
+        option.likelihood_ppm_by_state.clear();
+        let assessment = evaluate_robust_value_v1(&policy(), &option).unwrap();
+        assert_eq!(assessment.robust_net_value_utility_units, 95);
     }
 
     #[test]
