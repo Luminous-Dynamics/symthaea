@@ -104,20 +104,47 @@ impl WebResearcher {
         let search_queries = self.plan_queries(query);
         let concurrency = self.config.max_concurrent_requests;
         let mut acquisition_receipts = Vec::new();
+        let deadline = tokio::time::Instant::now()
+            + Duration::from_millis(self.config.max_research_duration_ms);
 
-        if concurrency == 0 {
-            for (query_rank, search_query) in search_queries.iter().enumerate() {
+        let query_budget = self.config.max_search_queries_per_research;
+        let mut indexed_queries = Vec::new();
+        for (query_rank, search_query) in search_queries.into_iter().enumerate() {
+            if query_rank < query_budget {
+                indexed_queries.push((query_rank, search_query));
+            } else {
                 let mut receipt = make_receipt(
                     query_rank,
                     None,
                     AcquisitionStage::SearchProvider,
-                    search_query,
+                    &search_query,
                     AcquisitionOutcome::BudgetExceeded,
                 );
-                receipt.reason_code = Some("ZERO_CONCURRENCY_BUDGET".to_string());
+                receipt.reason_code = Some("MAX_SEARCH_QUERIES_PER_RESEARCH".to_string());
+                receipt.reason = Some(format!(
+                    "planned query budget of {query_budget} was reached before this query ran"
+                ));
+                acquisition_receipts.push(receipt);
+            }
+        }
+
+        if concurrency == 0 || self.config.max_research_duration_ms == 0 {
+            let reason_code = if concurrency == 0 {
+                "ZERO_CONCURRENCY_BUDGET"
+            } else {
+                "ZERO_RESEARCH_DURATION_BUDGET"
+            };
+            for (query_rank, search_query) in indexed_queries {
+                let mut receipt = make_receipt(
+                    query_rank,
+                    None,
+                    AcquisitionStage::SearchProvider,
+                    &search_query,
+                    AcquisitionOutcome::BudgetExceeded,
+                );
+                receipt.reason_code = Some(reason_code.to_string());
                 receipt.reason = Some(
-                    "max_concurrent_requests is zero; no network request was attempted"
-                        .to_string(),
+                    "acquisition budget prevented the planned query from starting".to_string(),
                 );
                 acquisition_receipts.push(receipt);
             }
@@ -127,15 +154,51 @@ impl WebResearcher {
             });
         }
 
+        if indexed_queries.is_empty() {
+            return Ok(WebResearchReport {
+                result: WebResearchResult::with_status(ResearchStatus::RetrievalIncomplete),
+                acquisition_receipts,
+            });
+        }
+
         // Search queries are concurrent, but their results are restored to
         // the planned query order before page candidates are constructed.
-        let indexed_queries: Vec<(usize, String)> =
-            search_queries.into_iter().enumerate().collect();
         let mut search_results = bounded_map_ordered(
             indexed_queries,
             concurrency,
             |query_rank, search_query| {
-                self.fetch_search_results_with_receipts(&search_query, query_rank)
+                let deadline = deadline.clone();
+                async move {
+                    match tokio::time::timeout_at(
+                        deadline,
+                        self.fetch_search_results_with_receipts(&search_query, query_rank),
+                    )
+                    .await
+                    {
+                        Ok(result) => result,
+                        Err(_) => {
+                            let mut receipt = make_receipt(
+                                query_rank,
+                                None,
+                                AcquisitionStage::SearchProvider,
+                                &search_query,
+                                AcquisitionOutcome::Timeout,
+                            );
+                            receipt.reason_code =
+                                Some("TOTAL_RESEARCH_DEADLINE_EXCEEDED".to_string());
+                            receipt.reason = Some(
+                                "the end-to-end acquisition deadline expired during query search"
+                                    .to_string(),
+                            );
+                            SearchQueryAcquisition {
+                                query: search_query,
+                                urls: Vec::new(),
+                                receipts: vec![receipt],
+                                had_failure: true,
+                            }
+                        }
+                    }
+                }
             },
         )
         .await;
@@ -190,7 +253,41 @@ impl WebResearcher {
                 .enumerate()
                 .collect::<Vec<_>>(),
             concurrency,
-            |_ordinal, candidate| self.fetch_and_extract_with_receipt(candidate),
+            |_ordinal, candidate| {
+                let deadline = deadline.clone();
+                let candidate_for_timeout = candidate.clone();
+                async move {
+                    match tokio::time::timeout_at(
+                        deadline,
+                        self.fetch_and_extract_with_receipt(candidate),
+                    )
+                    .await
+                    {
+                        Ok(result) => result,
+                        Err(_) => {
+                            let mut receipt = make_receipt(
+                                candidate_for_timeout.query_rank,
+                                Some(candidate_for_timeout.source_rank),
+                                AcquisitionStage::PageFetch,
+                                &candidate_for_timeout.query,
+                                AcquisitionOutcome::Timeout,
+                            );
+                            receipt.requested_url = Some(candidate_for_timeout.url.clone());
+                            receipt.reason_code =
+                                Some("TOTAL_RESEARCH_DEADLINE_EXCEEDED".to_string());
+                            receipt.reason = Some(
+                                "the end-to-end acquisition deadline expired during page fetch"
+                                    .to_string(),
+                            );
+                            PageAcquisition {
+                                candidate: candidate_for_timeout,
+                                receipt,
+                                extraction: None,
+                            }
+                        }
+                    }
+                }
+            },
         )
         .await;
         page_results.sort_by_key(|(_, page)| {
