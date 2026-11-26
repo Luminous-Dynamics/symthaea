@@ -1,0 +1,189 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://luminousdynamics.io/schemas/mel-music-listen-bench-case-v1.schema.json",
+  "title": "MEL MusicListenBench CLEAN-FLIP-STAY Case V1",
+  "type": "object",
+  "additionalProperties": false,
+  "required": [
+    "schema",
+    "benchmark_id",
+    "benchmark_version",
+    "dataset_revision_sha256",
+    "official_scorer_revision_sha256",
+    "split",
+    "triads"
+  ],
+  "properties": {
+    "schema": {
+      "const": "mel-music-listen-bench-case-v1"
+    },
+    "benchmark_id": {
+      "type": "string",
+      "minLength": 1
+    },
+    "benchmark_version": {
+      "const": "1.0"
+    },
+    "split": {
+      "enum": [
+        "RenderedTest",
+        "RealRecordingTest"
+      ]
+    },
+    "triads": {
+      "type": "array",
+      "minItems": 1,
+      "items": {
+        "$ref": "#/$defs/triad"
+      }
+    },
+    "dataset_revision_sha256": {
+      "$ref": "#/$defs/digest"
+    },
+    "official_scorer_revision_sha256": {
+      "$ref": "#/$defs/digest"
+    }
+  },
+  "$defs": {
+    "digest": {
+      "type": "string",
+      "pattern": "^[0-9a-f]{64}$"
+    },
+    "task": {
+      "enum": [
+        "Melody",
+        "Harmony",
+        "Timbre",
+        "Rhythm"
+      ]
+    },
+    "relation": {
+      "enum": [
+        "Same",
+        "Different"
+      ]
+    },
+    "answer": {
+      "enum": [
+        "ChoiceA",
+        "ChoiceB",
+        "Unparseable",
+        "Abstain"
+      ]
+    },
+    "variant": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "variant_id",
+        "audio_sha256",
+        "question",
+        "question_sha256",
+        "option_a_relation",
+        "option_b_relation",
+        "expected_relation",
+        "model_answer"
+      ],
+      "properties": {
+        "variant_id": {
+          "type": "string",
+          "minLength": 1
+        },
+        "audio_sha256": {
+          "$ref": "#/$defs/digest"
+        },
+        "question": {
+          "type": "string",
+          "minLength": 1
+        },
+        "question_sha256": {
+          "$ref": "#/$defs/digest"
+        },
+        "option_a_relation": {
+          "$ref": "#/$defs/relation"
+        },
+        "option_b_relation": {
+          "$ref": "#/$defs/relation"
+        },
+        "expected_relation": {
+          "$ref": "#/$defs/relation"
+        },
+        "model_answer": {
+          "$ref": "#/$defs/answer"
+        }
+      }
+    },
+    "triad": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "item_id",
+        "pair_id",
+        "source_lineage_sha256",
+        "task",
+        "flip_factor",
+        "stay_factor",
+        "model_identity_sha256",
+        "system_prompt_sha256",
+        "runtime_identity_sha256",
+        "decoding_config_sha256",
+        "clean",
+        "flip",
+        "stay"
+      ],
+      "properties": {
+        "item_id": {
+          "type": "string",
+          "minLength": 1
+        },
+        "pair_id": {
+          "type": "string",
+          "minLength": 1
+        },
+        "source_lineage_sha256": {
+          "$ref": "#/$defs/digest"
+        },
+        "task": {
+          "$ref": "#/$defs/task"
+        },
+        "flip_factor": {
+          "enum": [
+            "NoteIdentity",
+            "ChordThirdQuality",
+            "InstrumentFamily",
+            "PulseRate"
+          ]
+        },
+        "stay_factor": {
+          "enum": [
+            "Room",
+            "Eq",
+            "Hiss",
+            "RelativePitchPreservingTransposition"
+          ]
+        },
+        "model_identity_sha256": {
+          "$ref": "#/$defs/digest"
+        },
+        "system_prompt_sha256": {
+          "$ref": "#/$defs/digest"
+        },
+        "runtime_identity_sha256": {
+          "$ref": "#/$defs/digest"
+        },
+        "decoding_config_sha256": {
+          "$ref": "#/$defs/digest"
+        },
+        "clean": {
+          "$ref": "#/$defs/variant"
+        },
+        "flip": {
+          "$ref": "#/$defs/variant"
+        },
+        "stay": {
+          "$ref": "#/$defs/variant"
+        }
+      }
+    }
+  }
+}
