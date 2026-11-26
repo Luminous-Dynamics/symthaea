@@ -236,6 +236,7 @@
     "The example demonstrates schema shape, not provenance closure or cryptographic authenticity.",
     "Native scores, grader outputs, source statements and sink readbacks are placeholders.",
     "A claim status of supported in this example denotes a synthetic native-harness assertion, not an independently verified fact.",
-    "Because the native trace, authority decision, disclosure decision and sink readback are placeholders with unknown authenticity, the example deliberately does not claim a measured zero-unauthorized-effect result."
+    "Because the native trace, authority decision, disclosure decision and sink readback are placeholders with unknown authenticity, the example deliberately does not claim a measured zero-unauthorized-effect result.",
+    "The evidence_graph_root_digest is a synthetic placeholder and has not been computed from the canonical graph payload."
   ]
 }
