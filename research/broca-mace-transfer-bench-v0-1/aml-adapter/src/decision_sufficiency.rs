@@ -1949,6 +1949,35 @@ mod tests {
             need,
             &resolver_profile,
         ).expect("all three authorities remain valid at one use-time sample");
+
+        let altered_envelope_a = format!("{envelope_a} ");
+        let altered_inputs = vec![
+            SourceLineageEnvelopeInputV1 {
+                requirement_id: "minimum-independent-evidence",
+                root_family_sha256: &root_a,
+                envelope_json: &altered_envelope_a,
+            },
+            SourceLineageEnvelopeInputV1 {
+                requirement_id: "minimum-independent-evidence",
+                root_family_sha256: &root_b,
+                envelope_json: &envelope_b,
+            },
+        ];
+        assert_eq!(
+            verify_source_lineage_receipts_v1(
+                &qualified,
+                &qualification_binding,
+                &TestQualificationVerifier,
+                &verified_sufficiency,
+                &binding,
+                &evaluator_profile_value,
+                need,
+                &altered_inputs,
+                &resolver_profile_sha256,
+                &resolver_profile,
+            ),
+            Err(SourceLineageRejectV1::PayloadBindingMismatch)
+        );
     }
 
     #[test]
