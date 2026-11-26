@@ -267,6 +267,7 @@ pub struct ContextualPrediction {
     pub predicted_state: ContinuousHV,
     pub source: ContextualPredictionSource,
     pub context_similarity: f64,
+    pub action_parameter_similarity: f64,
     pub observation_count: usize,
     pub independent_cluster_count: usize,
     pub training_residual_mse: Option<f64>,
@@ -1577,7 +1578,10 @@ mod tests {
     }
 
     #[test]
-    fn contextual_candidate_beats_global_delta_on_held_out_mechanism_family() {
+    fn contextual_candidate_beats_global_delta_when_mechanism_family_is_known() {
+        // This is a known-family contextual retrieval comparison, not a
+        // held-out-family transfer result: both mechanism families appear in
+        // training and prediction explicitly supplies family A.
         let dim = 256;
         let mut wm = NixWorldModel::new(dim);
         let before = ContinuousHV::random(dim, 200);
@@ -1679,6 +1683,45 @@ mod tests {
         );
         assert_eq!(prediction.observation_count, 1);
         assert!(prediction.training_residual_mse.is_none());
+    }
+
+    #[test]
+    fn contextual_prediction_uses_global_fallback_for_unseen_mechanism_family() {
+        let dim = 256;
+        let mut wm = NixWorldModel::new(dim);
+        let before = ContinuousHV::random(dim, 300);
+        let after = ContinuousHV::random(dim, 301);
+        let context = ContinuousHV::random(dim, 302);
+        let action_parameters = ContinuousHV::random(dim, 90);
+        let episode = transition_episode(
+            "known-family-training",
+            ActionCategory::Install,
+            ActionCategory::Install,
+            before.clone(),
+            context.clone(),
+            after,
+            TransitionOutcomeClass::Success,
+            "known-family-cluster",
+        );
+        wm.learn_episode(&episode)
+            .expect("known-family training episode");
+
+        let prediction = wm
+            .predict_state_with_context(
+                &before,
+                &ActionCategory::Install,
+                "unseen-mechanism-family",
+                &action_parameters,
+                &context,
+            )
+            .expect("unseen family remains an explicit prediction");
+        assert_eq!(
+            prediction.source,
+            ContextualPredictionSource::GlobalActionDeltaFallback
+        );
+        assert_eq!(prediction.context_similarity, 0.0);
+        assert_eq!(prediction.action_parameter_similarity, 0.0);
+        assert_eq!(prediction.observation_count, 1);
     }
 
     #[test]
