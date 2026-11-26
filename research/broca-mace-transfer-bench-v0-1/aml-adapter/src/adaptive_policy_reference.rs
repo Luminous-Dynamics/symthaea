@@ -126,13 +126,13 @@ impl ReferencePolicyNodeV1 {
 
     fn canonical_key(&self) -> String {
         match self {
-            Self::Terminal { action_id } => format!("T:{action_id}"),
+            Self::Terminal { action_id } => format!("0:T:{action_id}"),
             Self::Query { query_id, branches } => {
                 let encoded = branches.iter()
                     .map(|branch| format!("{}=>{}", branch.observation_id, branch.next.canonical_key()))
                     .collect::<Vec<_>>()
                     .join("|");
-                format!("Q:{query_id}[{encoded}]")
+                format!("1:Q:{query_id}[{encoded}]")
             }
         }
     }
@@ -242,8 +242,8 @@ impl ReferenceScenarioV1 {
             || self.maximum_horizon == 0
             || self.maximum_horizon > MAX_HORIZON as u32
             || self.maximum_policy_nodes < 1
-            || self.maximum_queries == 0
-            || self.maximum_tool_calls == 0
+            || self.budgets.maximum_queries > MAX_QUERIES as u32
+            || self.budgets.maximum_tool_calls > (MAX_QUERIES * 4) as u32
         {
             return Err(ReferenceRejectV1::EmptyScenario);
         }
@@ -296,7 +296,7 @@ impl ReferenceScenarioV1 {
                     !action.utility_by_state.contains_key(state)
                         || !action.allowed_by_state.contains_key(state)
                 })
-                || action.utility_by_state.values().any(|value| value.abs() > MAX_UTILITY_ABS)
+                || action.utility_by_state.values().any(|value| value.unsigned_abs() > MAX_UTILITY_ABS as u64)
             {
                 return Err(ReferenceRejectV1::InvalidActionTable);
             }
@@ -453,7 +453,9 @@ fn consider_expected(best: &mut Option<ExpectedCandidateV1>, candidate: Expected
     let replace = best.as_ref().is_none_or(|current| {
         candidate.net() > current.net()
             || (candidate.net() == current.net()
-                && candidate.policy.canonical_key() < current.policy.canonical_key())
+                && (candidate.policy.node_count() < current.policy.node_count()
+                    || (candidate.policy.node_count() == current.policy.node_count()
+                        && candidate.policy.canonical_key() < current.policy.canonical_key())))
     });
     if replace {
         *best = Some(candidate);
@@ -587,7 +589,9 @@ fn consider_robust(best: &mut Option<RobustCandidateV1>, candidate: RobustCandid
     let replace = best.as_ref().is_none_or(|current| {
         candidate.worst_regret < current.worst_regret
             || (candidate.worst_regret == current.worst_regret
-                && candidate.policy.canonical_key() < current.policy.canonical_key())
+                && (candidate.policy.node_count() < current.policy.node_count()
+                    || (candidate.policy.node_count() == current.policy.node_count()
+                        && candidate.policy.canonical_key() < current.policy.canonical_key())))
     });
     if replace {
         *best = Some(candidate);
@@ -762,6 +766,21 @@ mod tests {
         assert!(count <= 1);
     }
 
+    fn action_for_world<'a>(
+        node: &'a ReferencePolicyNodeV1,
+        world: &ReferenceWorldV1,
+    ) -> &'a str {
+        match node {
+            ReferencePolicyNodeV1::Terminal { action_id } => action_id,
+            ReferencePolicyNodeV1::Query { query_id, branches } => {
+                let observation = &world.observation_by_query[query_id];
+                let branch = branches.iter().find(|branch| &branch.observation_id == observation)
+                    .expect("the selected policy has a branch for every possible observation");
+                action_for_world(&branch.next, world)
+            }
+        }
+    }
+
     #[test]
     fn mid_run_revocation_requires_revalidation_before_commit() {
         let scenario = ReferenceScenarioV1 {
@@ -787,25 +806,23 @@ mod tests {
             budgets: budgets(),
         };
         let result = evaluate_expected_reference_v1(&scenario).unwrap();
-        assert!(contains_query(&result.policy, "revalidate"));
-        let ReferencePolicyNodeV1::Query { branches, .. } = &result.policy else {
-            panic!("policy must revalidate before terminal selection");
-        };
-        let revoked = branches.iter().find(|branch| branch.observation_id == "valid-at-first-check")
-            .expect("first observation branch");
-        assert!(contains_query(&revoked.next, "revalidate"));
+        let active = scenario.worlds.iter().find(|world| world.world_id == "active-world").unwrap();
+        let revoked = scenario.worlds.iter().find(|world| world.world_id == "revoked-world").unwrap();
+        assert_eq!(action_for_world(&result.policy, active), "commit");
+        assert_eq!(action_for_world(&result.policy, revoked), "abstain");
     }
 
     #[test]
     fn hard_action_constraints_prevent_commit_when_any_world_forbids_it() {
         let mut scenario = adaptive_scenario();
+        scenario.budgets.maximum_queries = 0;
         scenario.actions = vec![
             action("abstain", &[("bad", 0), ("good", 0)], &[("bad", true), ("good", true)]),
             action("commit", &[("bad", 100), ("good", 100)], &[("bad", false), ("good", true)]),
         ];
         let result = evaluate_expected_reference_v1(&scenario).unwrap();
         let ReferencePolicyNodeV1::Terminal { action_id } = result.policy else {
-            panic!("uninformative evidence must not justify an impermissible action");
+            panic!("no query budget means the evaluator must choose a universally permitted terminal action");
         };
         assert_eq!(action_id, "abstain");
     }
@@ -813,6 +830,7 @@ mod tests {
     #[test]
     fn query_budget_and_cost_caps_exclude_ineligible_acquisitions() {
         let mut scenario = adaptive_scenario();
+        scenario.budgets.maximum_queries = 2;
         scenario.budgets.maximum_cost_utility_units = 0;
         scenario.queries.iter_mut().for_each(|query| query.cost_utility_units = 1);
         let result = evaluate_expected_reference_v1(&scenario).unwrap();
