@@ -127,3 +127,10 @@ This is unsigned payload material for #13254. It is not a DSSE envelope, it has 
 
 
 The in-toto predicate also exposes the decoded PCM sample rate, channel count, frame count and sample format; source/PCM byte lengths; decoder and decode-profile digests; plus the revision's maximum and actual output-token and wall-time budgets. These fields are inspectable in the Statement, while decoder/runtime/runner/rights/model-input authentication flags remain false. The exact payload bytes and SHA-256 are returned for the #13254 DSSE signer.
+
+
+## Verified evidence-ablation triplet gate
+
+Use `audio_revision_binding::audit_verified_audio_evidence_triplet` for confirmatory matched contrasts. It accepts one NoEvidence, one LocalRetrieved and one YokedRetrieved arm. The NoEvidence arm must have no evidence reference, manifest or byte payload. Both retrieved arms must provide their manifest plus raw source and decoded PCM bytes and pass the integrated byte/window/revision identity join before the function calls the existing matched-contrast evaluator.
+
+The returned report includes the paired contrast and the independently verified local/yoked materialization reports. It always leaves `model_input_attested=false`. This prevents a metadata-only revision triplet from receiving verified evidence-use credit, while preserving the distinction between materialized client-side bytes and a signed provider/runtime receipt.
