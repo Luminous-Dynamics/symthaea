@@ -1,0 +1,271 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://luminousdynamics.io/schemas/connectome-query-impact-report-v0.1.schema.json",
+  "title": "Connectome proofreading query-impact report v0.1",
+  "type": "object",
+  "additionalProperties": false,
+  "required": [
+    "report_version",
+    "candidate_id",
+    "operation_id",
+    "sample_hash",
+    "task_route",
+    "source_volume_id",
+    "base_graph_snapshot_sha256",
+    "hypothetical_result_graph_snapshot_sha256",
+    "candidate_patch_sha256",
+    "query_impacts"
+  ],
+  "$defs": {
+    "id": {
+      "type": "string",
+      "minLength": 1
+    },
+    "sha": {
+      "type": "string",
+      "pattern": "^[0-9a-f]{64}$"
+    },
+    "sample_hash": {
+      "type": "string",
+      "pattern": "^[0-9a-f]{32}$"
+    },
+    "interval": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "lower",
+        "upper"
+      ],
+      "properties": {
+        "lower": {
+          "type": "number"
+        },
+        "upper": {
+          "type": "number"
+        }
+      }
+    },
+    "decision_class": {
+      "enum": [
+        "BelowThreshold",
+        "AtOrAboveThreshold",
+        "Indeterminate",
+        "NotConfigured"
+      ]
+    },
+    "decision_flip": {
+      "enum": [
+        "Impossible",
+        "Possible",
+        "Guaranteed",
+        "NotConfigured"
+      ]
+    },
+    "scenario": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "scenario_id",
+        "baseline",
+        "hypothetical_after_edit",
+        "effect_interval",
+        "minimum_absolute_effect",
+        "maximum_absolute_effect",
+        "normalized_materiality_lower",
+        "normalized_materiality_upper",
+        "baseline_decision",
+        "after_edit_decision",
+        "decision_flip",
+        "materiality_exceeded_possible",
+        "materiality_exceeded_guaranteed",
+        "effect_method",
+        "decision_flip_method",
+        "paired_decision_world_count",
+        "decision_flip_scope"
+      ],
+      "properties": {
+        "scenario_id": {
+          "$ref": "#/$defs/id"
+        },
+        "baseline": {
+          "$ref": "#/$defs/interval"
+        },
+        "hypothetical_after_edit": {
+          "$ref": "#/$defs/interval"
+        },
+        "effect_interval": {
+          "$ref": "#/$defs/interval"
+        },
+        "minimum_absolute_effect": {
+          "type": "number",
+          "minimum": 0
+        },
+        "maximum_absolute_effect": {
+          "type": "number",
+          "minimum": 0
+        },
+        "normalized_materiality_lower": {
+          "type": "number",
+          "minimum": 0
+        },
+        "normalized_materiality_upper": {
+          "type": "number",
+          "minimum": 0
+        },
+        "baseline_decision": {
+          "$ref": "#/$defs/decision_class"
+        },
+        "after_edit_decision": {
+          "$ref": "#/$defs/decision_class"
+        },
+        "decision_flip": {
+          "$ref": "#/$defs/decision_flip"
+        },
+        "materiality_exceeded_possible": {
+          "type": "boolean"
+        },
+        "materiality_exceeded_guaranteed": {
+          "type": "boolean"
+        },
+        "effect_method": {
+          "$ref": "#/$defs/effect_method"
+        },
+        "decision_flip_method": {
+          "$ref": "#/$defs/decision_flip_method"
+        },
+        "paired_decision_world_count": {
+          "type": "integer",
+          "minimum": 0
+        },
+        "decision_flip_scope": {
+          "$ref": "#/$defs/decision_flip_scope"
+        }
+      }
+    },
+    "query": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "query_id",
+        "query_definition_sha256",
+        "metric_id",
+        "unit_id",
+        "materiality_threshold",
+        "scenarios",
+        "worst_case_maximum_absolute_effect",
+        "worst_case_normalized_materiality",
+        "materiality_exceeded_possible",
+        "materiality_exceeded_guaranteed",
+        "aggregate_decision_flip",
+        "aggregate_decision_flip_scope"
+      ],
+      "properties": {
+        "query_id": {
+          "$ref": "#/$defs/id"
+        },
+        "query_definition_sha256": {
+          "$ref": "#/$defs/sha"
+        },
+        "metric_id": {
+          "$ref": "#/$defs/id"
+        },
+        "unit_id": {
+          "$ref": "#/$defs/id"
+        },
+        "materiality_threshold": {
+          "type": "number",
+          "exclusiveMinimum": 0
+        },
+        "scenarios": {
+          "type": "array",
+          "minItems": 1,
+          "items": {
+            "$ref": "#/$defs/scenario"
+          }
+        },
+        "worst_case_maximum_absolute_effect": {
+          "type": "number",
+          "minimum": 0
+        },
+        "worst_case_normalized_materiality": {
+          "type": "number",
+          "minimum": 0
+        },
+        "materiality_exceeded_possible": {
+          "type": "boolean"
+        },
+        "materiality_exceeded_guaranteed": {
+          "type": "boolean"
+        },
+        "aggregate_decision_flip": {
+          "$ref": "#/$defs/decision_flip"
+        },
+        "aggregate_decision_flip_scope": {
+          "$ref": "#/$defs/decision_flip_scope"
+        }
+      }
+    },
+    "effect_method": {
+      "enum": [
+        "RectangularOuterBound",
+        "PairedSharedWorlds"
+      ]
+    },
+    "decision_flip_method": {
+      "enum": [
+        "NotConfigured",
+        "MarginalIntervalOuterBound",
+        "PairedSharedWorlds"
+      ]
+    },
+    "decision_flip_scope": {
+      "enum": [
+        "NotApplicable",
+        "MarginalRectangularProduct",
+        "SuppliedPairedWorldSet",
+        "DeclaredFiniteUniverse",
+        "Mixed"
+      ]
+    }
+  },
+  "properties": {
+    "report_version": {
+      "const": "0.1"
+    },
+    "candidate_id": {
+      "$ref": "#/$defs/id"
+    },
+    "operation_id": {
+      "$ref": "#/$defs/id"
+    },
+    "sample_hash": {
+      "$ref": "#/$defs/sample_hash"
+    },
+    "task_route": {
+      "enum": [
+        "FalseSplitCorrection",
+        "FalseMergeIdentification",
+        "SplitMaskGeneration"
+      ]
+    },
+    "source_volume_id": {
+      "$ref": "#/$defs/id"
+    },
+    "base_graph_snapshot_sha256": {
+      "$ref": "#/$defs/sha"
+    },
+    "hypothetical_result_graph_snapshot_sha256": {
+      "$ref": "#/$defs/sha"
+    },
+    "candidate_patch_sha256": {
+      "$ref": "#/$defs/sha"
+    },
+    "query_impacts": {
+      "type": "array",
+      "minItems": 1,
+      "items": {
+        "$ref": "#/$defs/query"
+      }
+    }
+  }
+}
