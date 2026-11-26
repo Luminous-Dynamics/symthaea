@@ -196,7 +196,7 @@ pub enum MaceContextExposureRejectV1 {
     InvalidResponseBinding, InvalidSignatureAlgorithm, InvalidSignatureEncoding,
     InvalidObserverKeyId, UnknownObserverKey, SignatureMismatch,
     EvidenceAdmissionRejected, MemoryExposureInNoMemoryArm,
-    CanonicalizationFailed,
+    ObserverSigningFailed, CanonicalizationFailed,
 }
 
 /// Fetches an immutable encrypted request-body object, verifies its ciphertext
@@ -497,6 +497,38 @@ fn verify_observer_signature(
         .map_err(|_| MaceContextExposureRejectV1::SignatureMismatch)
 }
 
+
+/// Signs a finalized receipt digest using an observer key whose custody is
+/// provided by the deployment. Implementations may wrap a KMS/HSM; this trait
+/// does not expose private key material to the MACE adapter.
+pub trait MaceExposureReceiptSignerV1 {
+    fn key_id(&self) -> &str;
+    fn sign_digest(
+        &self,
+        digest: &[u8; 32],
+    ) -> Result<[u8; 64], MaceContextExposureRejectV1>;
+}
+
+/// Adds the observer's Ed25519 signature to a fully populated receipt.
+/// Request serialization, source-span mapping, artifact custody and response
+/// binding must already have been completed by the qualified capture adapter.
+pub fn sign_mace_context_exposure_receipt_v1(
+    mut receipt: MaceContextExposureReceiptV1,
+    signer: &impl MaceExposureReceiptSignerV1,
+) -> Result<MaceContextExposureReceiptV1, MaceContextExposureRejectV1> {
+    validate_identifier(signer.key_id(), 256)
+        .map_err(|_| MaceContextExposureRejectV1::InvalidObserverKeyId)?;
+    receipt.signature.algorithm = "Ed25519".to_owned();
+    receipt.signature.key_id = signer.key_id().to_owned();
+    receipt.signature.signature_base64.clear();
+    let digest = exposure_signature_digest_v1(&receipt)?;
+    let signature = signer
+        .sign_digest(&digest)
+        .map_err(|_| MaceContextExposureRejectV1::ObserverSigningFailed)?;
+    receipt.signature.signature_base64 = BASE64_STANDARD.encode(signature);
+    Ok(receipt)
+}
+
 /// SHA-256 over Ed25519 SubjectPublicKeyInfo DER, truncated to the first 16
 /// bytes. This matches MON-005's witness-key-ID convention.
 pub fn ed25519_spki_key_id_v1(key: &VerifyingKey) -> String {
@@ -564,6 +596,15 @@ mod tests {
     const D7: &str = "7777777777777777777777777777777777777777777777777777777777777777";
     const D8: &str = "8888888888888888888888888888888888888888888888888888888888888888";
     const D9: &str = "9999999999999999999999999999999999999999999999999999999999999999";
+
+    struct TestSigner<'a> { key: &'a SigningKey, key_id: String }
+    impl MaceExposureReceiptSignerV1 for TestSigner<'_> {
+        fn key_id(&self) -> &str { &self.key_id }
+        fn sign_digest(&self, digest: &[u8; 32])
+            -> Result<[u8; 64], MaceContextExposureRejectV1> {
+            Ok(self.key.sign(digest).to_bytes())
+        }
+    }
 
     struct FakeBodyResolver { body: Vec<u8>, fail: bool }
     impl MaceRequestBodyArtifactResolverV1 for FakeBodyResolver {
@@ -677,6 +718,25 @@ mod tests {
         parse_and_verify_mace_context_exposure_receipt_v1(
             &serde_json::to_vec(receipt).unwrap(), expected, &body_resolver, &keys, evidence,
         )
+    }
+
+    #[test]
+    fn signer_finalizes_receipt_using_domain_separated_digest() {
+        let (mut receipt, key, body) = fixture();
+        receipt.signature.signature_base64.clear();
+        receipt.signature.key_id.clear();
+        let signer = TestSigner {
+            key: &key,
+            key_id: ed25519_spki_key_id_v1(&key.verifying_key()),
+        };
+        let signed = sign_mace_context_exposure_receipt_v1(receipt, &signer).unwrap();
+        assert_eq!(signed.signature.algorithm, "Ed25519");
+        assert_eq!(signed.signature.key_id, signer.key_id);
+        assert_eq!(
+            verify_fixture(&signed, body, &key, &expected(), &AcceptEvidence)
+                .unwrap().artifact_id(),
+            "encrypted://artifact/1"
+        );
     }
 
     #[test]
