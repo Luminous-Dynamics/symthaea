@@ -2255,6 +2255,226 @@ mod tests {
         );
     }
     #[test]
+    fn cmaq_held_out_family_ids_transfer_through_observable_context_without_family_labels() {
+        const DIM: usize = 256;
+        let mut world_model = NixWorldModel::new(DIM);
+        let context_a = ContinuousHV::random(DIM, 740);
+        let context_b = ContinuousHV::random(DIM, 741);
+        let delta_a = ContinuousHV::from_vec(
+            std::iter::once(0.1)
+                .chain(std::iter::repeat_n(0.0, DIM - 1))
+                .collect(),
+        );
+        let delta_b = ContinuousHV::from_vec(
+            std::iter::once(0.5)
+                .chain(std::iter::repeat_n(0.0, DIM - 1))
+                .collect(),
+        );
+        let action_parameters = ContinuousHV::random(DIM, 90);
+        let state_with = |coordinate_zero: f32, nuisance: f32| {
+            let mut values = vec![0.0; DIM];
+            values[0] = coordinate_zero;
+            values[1] = nuisance;
+            ContinuousHV::from_vec(values)
+        };
+
+        let training_family_ids = ["training-mechanism-a", "training-mechanism-b"];
+        let held_out_family_ids = ["heldout-mechanism-c", "heldout-mechanism-d"];
+        assert!(
+            held_out_family_ids
+                .iter()
+                .all(|family| !training_family_ids.contains(family)),
+            "evaluation family IDs must be disjoint from training family IDs"
+        );
+
+        // Train only on A/B identities. Each has a distinct observable context
+        // and action response map. Three independent clusters per family.
+        for index in 0..3 {
+            let before_a = state_with(0.1, -0.8 + index as f32 * 0.05);
+            let mut episode_a = transition_episode(
+                &format!("cmaq024-training-a-{index}"),
+                ActionCategory::Install,
+                ActionCategory::Install,
+                before_a.clone(),
+                context_a.clone(),
+                before_a.add(&delta_a),
+                TransitionOutcomeClass::Success,
+                &format!("cmaq024-training-a-cluster-{index}"),
+            );
+            episode_a.environment_family_id = training_family_ids[0].to_owned();
+            world_model
+                .learn_episode(&episode_a)
+                .expect("training family A episode");
+
+            let before_b = state_with(0.1, 0.55 + index as f32 * 0.05);
+            let mut episode_b = transition_episode(
+                &format!("cmaq024-training-b-{index}"),
+                ActionCategory::Install,
+                ActionCategory::Install,
+                before_b.clone(),
+                context_b.clone(),
+                before_b.add(&delta_b),
+                TransitionOutcomeClass::Success,
+                &format!("cmaq024-training-b-cluster-{index}"),
+            );
+            episode_b.environment_family_id = training_family_ids[1].to_owned();
+            world_model
+                .learn_episode(&episode_b)
+                .expect("training family B episode");
+        }
+
+        // Entire evaluation family identities and all cluster IDs are disjoint.
+        // Their response maps are transferable from A/B only through observable
+        // context and action-parameter signatures.
+        let evaluation_states = [
+            (
+                "c-left",
+                held_out_family_ids[0],
+                "cmaq024-heldout-c-cluster-left",
+                state_with(0.1, -0.65),
+                context_a.clone(),
+                200_i64,
+            ),
+            (
+                "c-right",
+                held_out_family_ids[0],
+                "cmaq024-heldout-c-cluster-right",
+                state_with(0.1, -0.35),
+                context_a.clone(),
+                200_i64,
+            ),
+            (
+                "d-left",
+                held_out_family_ids[1],
+                "cmaq024-heldout-d-cluster-left",
+                state_with(0.1, 0.45),
+                context_b.clone(),
+                600_i64,
+            ),
+            (
+                "d-right",
+                held_out_family_ids[1],
+                "cmaq024-heldout-d-cluster-right",
+                state_with(0.1, 0.75),
+                context_b.clone(),
+                600_i64,
+            ),
+        ];
+
+        let key = ResponseKey::new("install", "coordinate_0_after_action", 1);
+        let mut contract = StateResponseContract {
+            contract_id: "cmaq-024-heldout-family-context-v1".to_owned(),
+            contract_sha256: "e".repeat(64),
+            source_manifest_sha256: "f".repeat(64),
+            domain_ids: ["toy-nixos-domain".to_owned()].into_iter().collect(),
+            intervention_ids: ["install".to_owned()].into_iter().collect(),
+            query_ids: ["coordinate_0_after_action".to_owned()]
+                .into_iter()
+                .collect(),
+            horizons: [1].into_iter().collect(),
+            invariant_ids: ["constant-invariant".to_owned()].into_iter().collect(),
+            tolerance_units: BTreeMap::new(),
+            probe_cost_units: BTreeMap::new(),
+        };
+        contract.tolerance_units.insert(key.clone(), 1);
+        contract.probe_cost_units.insert(key.clone(), 1);
+        contract.validate().expect("frozen held-out family contract");
+
+        let quantize_query = |state: &ContinuousHV| {
+            (state.as_slice()[0] as f64 * 1000.0).round() as i64
+        };
+        let mut hdc_records = Vec::new();
+        let mut global_records = Vec::new();
+        let mut identity_records = Vec::new();
+        let mut full_state_records = Vec::new();
+        let mut hdc_exact_response_count = 0usize;
+        let mut global_exact_response_count = 0usize;
+        let mut identity_exact_response_count = 0usize;
+
+        // Family IDs are evaluator-only annotations: the candidate call below
+        // receives no family ID and constructs labels before attaching responses.
+        for (state_id, family, cluster, before, context, reference_response) in
+            &evaluation_states
+        {
+            let hdc_prediction = world_model
+                .predict_state_without_family_label(
+                    before,
+                    &ActionCategory::Install,
+                    &action_parameters,
+                    context,
+                )
+                .expect("family-label-free held-out family prediction");
+            assert_eq!(
+                hdc_prediction.source,
+                ContextualPredictionSource::ContextualDelta,
+                "observable context should uniquely retrieve the transferred response map"
+            );
+
+            let hdc_response = quantize_query(&hdc_prediction.predicted_state);
+            hdc_exact_response_count += usize::from(hdc_response == *reference_response);
+            let hdc_label = format!("query:{hdc_response}");
+            let full_state_label = hdc_prediction
+                .predicted_state
+                .as_slice()
+                .iter()
+                .map(|value| format!("{value:.6}"))
+                .collect::<Vec<_>>()
+                .join(",");
+
+            world_model.observe(before.clone());
+            let global_prediction = world_model.predict_state(&ActionCategory::Install);
+            let global_response = quantize_query(&global_prediction);
+            global_exact_response_count +=
+                usize::from(global_response == *reference_response);
+            let global_label = format!("query:{global_response}");
+            let identity_response = quantize_query(before);
+            identity_exact_response_count +=
+                usize::from(identity_response == *reference_response);
+            let identity_label = format!("query:{identity_response}");
+
+            let build_record = |abstract_state_id: String| StateResponseRecord {
+                state_id: (*state_id).to_owned(),
+                domain_id: "toy-nixos-domain".to_owned(),
+                environment_family_id: (*family).to_owned(),
+                environment_cluster_id: (*cluster).to_owned(),
+                source_state_sha256: format!("{:x}", Sha256::digest(state_id.as_bytes())),
+                candidate_checkpoint_sha256: "d".repeat(64),
+                abstract_state_id,
+                invariant_signature: [("constant-invariant".to_owned(), 1)]
+                    .into_iter()
+                    .collect(),
+                // Reference response is attached only after candidate prediction.
+                responses: [(key.clone(), *reference_response)].into_iter().collect(),
+            };
+
+            hdc_records.push(build_record(hdc_label));
+            global_records.push(build_record(global_label));
+            identity_records.push(build_record(identity_label));
+            full_state_records.push(build_record(full_state_label));
+        }
+
+        let hdc_score =
+            score_abstraction(&hdc_records, &contract).expect("score held-out HDC partition");
+        let global_score =
+            score_abstraction(&global_records, &contract).expect("score held-out global partition");
+        let identity_score =
+            score_abstraction(&identity_records, &contract).expect("score held-out identity partition");
+        let full_state_score =
+            score_abstraction(&full_state_records, &contract).expect("score held-out full-state partition");
+
+        assert_eq!(hdc_exact_response_count, 4);
+        assert_eq!(global_exact_response_count, 0);
+        assert_eq!(identity_exact_response_count, 0);
+        assert_eq!(hdc_score.false_merges, 0);
+        assert_eq!(hdc_score.false_splits, 0);
+        assert_eq!(hdc_score.candidate_class_count, 2);
+        assert_eq!(global_score.false_merges, 4);
+        assert_eq!(identity_score.false_merges, 4);
+        assert_eq!(full_state_score.false_splits, 2);
+        assert_eq!(full_state_score.candidate_class_count, 4);
+    }
+
+    #[test]
     fn cmaq_adapter_qualifies_query_sufficient_partition_from_real_nixward_hdc_predictions() {
         const DIM: usize = 256;
         let mut world_model = NixWorldModel::new(DIM);
