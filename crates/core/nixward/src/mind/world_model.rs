@@ -125,6 +125,8 @@ pub enum TransitionExecution {
     /// An action was executed and its resulting state was observed.
     Executed {
         realized_action: ActionCategory,
+        realized_action_sha256: String,
+        realized_action_parameters: ContinuousHV,
         outcome: TransitionOutcomeClass,
         state_after: ContinuousHV,
         state_after_sha256: String,
@@ -140,6 +142,10 @@ pub enum TransitionExecution {
 pub struct TransitionEpisodeV1 {
     pub episode_id: String,
     pub assigned_action: ActionCategory,
+    /// Exact canonical intent/action payload identity, including parameters.
+    pub assigned_action_sha256: String,
+    /// HDC encoding of assigned action parameters.
+    pub assigned_action_parameters: ContinuousHV,
     pub state_before: ContinuousHV,
     /// HDC context at action time (configuration, workload, environment, etc.).
     pub context: ContinuousHV,
@@ -162,7 +168,10 @@ impl TransitionEpisodeV1 {
     /// them from exact source bytes and authenticate the receipt independently.
     pub fn validate(&self) -> Result<(), String> {
         let dimension = self.state_before.as_slice().len();
-        if dimension == 0 || self.context.as_slice().len() != dimension {
+        if dimension == 0
+            || self.context.as_slice().len() != dimension
+            || self.assigned_action_parameters.as_slice().len() != dimension
+        {
             return Err("state_before and context must have the same non-zero HDC dimension".to_owned());
         }
         if self
@@ -170,6 +179,7 @@ impl TransitionEpisodeV1 {
             .as_slice()
             .iter()
             .chain(self.context.as_slice())
+            .chain(self.assigned_action_parameters.as_slice())
             .any(|value| !value.is_finite() || value.abs() > 1.0)
         {
             return Err("state_before and context must contain finite HDC values in [-1, 1]".to_owned());
@@ -185,6 +195,7 @@ impl TransitionEpisodeV1 {
             return Err("horizon_steps must be positive and capture time non-negative".to_owned());
         }
         for (name, digest) in [
+            ("assigned_action_sha256", &self.assigned_action_sha256),
             ("state_before_sha256", &self.state_before_sha256),
             ("source_manifest_sha256", &self.source_manifest_sha256),
             ("provenance_sha256", &self.provenance_sha256),
@@ -195,11 +206,24 @@ impl TransitionEpisodeV1 {
         }
 
         if let TransitionExecution::Executed {
+            realized_action_sha256,
+            realized_action_parameters,
             state_after,
             state_after_sha256,
             ..
         } = &self.execution
         {
+            if realized_action_parameters.as_slice().len() != dimension
+                || realized_action_parameters
+                    .as_slice()
+                    .iter()
+                    .any(|value| !value.is_finite() || value.abs() > 1.0)
+            {
+                return Err("realized action parameters must match the HDC dimension and contain finite values in [-1, 1]".to_owned());
+            }
+            if !is_sha256_hex(realized_action_sha256) {
+                return Err("realized_action_sha256 must be a 64-character SHA-256 hex digest".to_owned());
+            }
             if state_after.as_slice().len() != dimension
                 || state_after
                     .as_slice()
@@ -247,6 +271,7 @@ pub struct ContextualPrediction {
 #[derive(Debug, Clone)]
 struct ContextDeltaEntry {
     environment_family_id: String,
+    action_parameters: ContinuousHV,
     context: ContinuousHV,
     delta: ContinuousHV,
     observation_count: usize,
@@ -395,12 +420,13 @@ impl NixWorldModel {
             return Err("episode HDC dimension does not match this world model".to_owned());
         }
 
-        let (realized_action, state_after) = match &episode.execution {
+        let (realized_action, realized_action_parameters, state_after) = match &episode.execution {
             TransitionExecution::Executed {
                 realized_action,
+                realized_action_parameters,
                 state_after,
                 ..
-            } => (realized_action.clone(), state_after),
+            } => (realized_action.clone(), realized_action_parameters, state_after),
             TransitionExecution::NotExecuted => {
                 return Err("unexecuted transition episodes cannot train the dynamics model".to_owned());
             }
@@ -420,12 +446,24 @@ impl NixWorldModel {
             .iter()
             .enumerate()
             .filter(|(_, entry)| entry.environment_family_id == episode.environment_family_id)
-            .map(|(index, entry)| (index, entry.context.similarity(&episode.context)))
-            .filter(|(_, similarity)| similarity.is_finite())
-            .max_by(|left, right| left.1.total_cmp(&right.1));
+            .map(|(index, entry)| {
+                (
+                    index,
+                    entry.context.similarity(&episode.context),
+                    entry.action_parameters.similarity(realized_action_parameters),
+                )
+            })
+            .filter(|(_, context_similarity, action_similarity)| {
+                context_similarity.is_finite() && action_similarity.is_finite()
+            })
+            .max_by(|left, right| left.1.min(left.2).total_cmp(&right.1.min(right.2)));
 
-        if let Some((index, _similarity)) =
-            best_match.filter(|(_, similarity)| *similarity >= CONTEXT_MATCH_THRESHOLD)
+        if let Some((index, _context_similarity, _action_similarity)) = best_match.filter(
+            |(_, context_similarity, action_similarity)| {
+                *context_similarity >= CONTEXT_MATCH_THRESHOLD
+                    && *action_similarity >= CONTEXT_MATCH_THRESHOLD
+            },
+        )
         {
             let entry = &mut entries[index];
             if let Some(residual_mse) = mean_squared_error(&entry.delta, &observed_delta) {
@@ -451,6 +489,7 @@ impl NixWorldModel {
             independent_cluster_ids.insert(episode.independent_cluster_id.clone());
             entries.push(ContextDeltaEntry {
                 environment_family_id: episode.environment_family_id.clone(),
+                action_parameters: realized_action_parameters.clone(),
                 context: episode.context.clone(),
                 delta: observed_delta,
                 observation_count: 1,
@@ -482,12 +521,15 @@ impl NixWorldModel {
         state: &ContinuousHV,
         action: &ActionCategory,
         environment_family_id: &str,
+        action_parameters: &ContinuousHV,
         context: &ContinuousHV,
     ) -> Result<ContextualPrediction, String> {
         if state.as_slice().len() != self.dim
             || context.as_slice().len() != self.dim
+            || action_parameters.as_slice().len() != self.dim
             || state.as_slice().iter().any(|value| !value.is_finite())
             || context.as_slice().iter().any(|value| !value.is_finite())
+            || action_parameters.as_slice().iter().any(|value| !value.is_finite())
         {
             return Err("prediction state and context must match the model dimension and be finite".to_owned());
         }
@@ -497,19 +539,32 @@ impl NixWorldModel {
                 .iter()
                 .enumerate()
                 .filter(|(_, entry)| entry.environment_family_id == environment_family_id)
-                .map(|(index, entry)| (index, entry.context.similarity(context)))
-                .filter(|(_, similarity)| similarity.is_finite())
-                .max_by(|left, right| left.1.total_cmp(&right.1))
+                .map(|(index, entry)| {
+                    (
+                        index,
+                        entry.context.similarity(context),
+                        entry.action_parameters.similarity(action_parameters),
+                    )
+                })
+                .filter(|(_, context_similarity, action_similarity)| {
+                    context_similarity.is_finite() && action_similarity.is_finite()
+                })
+                .max_by(|left, right| left.1.min(left.2).total_cmp(&right.1.min(right.2)))
         });
 
-        if let Some((index, similarity)) =
-            best_match.filter(|(_, similarity)| *similarity >= CONTEXT_MATCH_THRESHOLD)
+        if let Some((index, context_similarity, action_similarity)) = best_match.filter(
+            |(_, context_similarity, action_similarity)| {
+                *context_similarity >= CONTEXT_MATCH_THRESHOLD
+                    && *action_similarity >= CONTEXT_MATCH_THRESHOLD
+            },
+        )
         {
             let entry = &self.contextual_delta_vectors[action][index];
             return Ok(ContextualPrediction {
                 predicted_state: state.add(&entry.delta),
                 source: ContextualPredictionSource::ContextualDelta,
-                context_similarity: similarity as f64,
+                context_similarity: context_similarity as f64,
+                action_parameter_similarity: action_similarity as f64,
                 observation_count: entry.observation_count,
                 independent_cluster_count: entry.independent_cluster_ids.len(),
                 training_residual_mse: (entry.residual_count > 0).then_some(entry.residual_mse),
@@ -517,9 +572,11 @@ impl NixWorldModel {
             });
         }
 
-        let context_similarity = best_match
-            .map(|(_, similarity)| similarity.max(0.0) as f64)
-            .unwrap_or(0.0);
+        let (context_similarity, action_parameter_similarity) = best_match
+            .map(|(_, context_similarity, action_similarity)| {
+                (context_similarity.max(0.0) as f64, action_similarity.max(0.0) as f64)
+            })
+            .unwrap_or((0.0, 0.0));
         if let Some(entry) = self.delta_vectors.get(action) {
             let independent_cluster_count = self
                 .contextual_delta_vectors
@@ -549,6 +606,7 @@ impl NixWorldModel {
                 predicted_state: state.add(&entry.delta),
                 source: ContextualPredictionSource::GlobalActionDeltaFallback,
                 context_similarity,
+                action_parameter_similarity,
                 observation_count: entry.observation_count,
                 independent_cluster_count,
                 training_residual_mse: None,
@@ -560,6 +618,7 @@ impl NixWorldModel {
             predicted_state: state.clone(),
             source: ContextualPredictionSource::UnknownActionIdentityFallback,
             context_similarity,
+            action_parameter_similarity,
             observation_count: 0,
             independent_cluster_count: 0,
             training_residual_mse: None,
@@ -1141,10 +1200,14 @@ mod tests {
         TransitionEpisodeV1 {
             episode_id: episode_id.to_owned(),
             assigned_action,
+            assigned_action_sha256: "f".repeat(64),
+            assigned_action_parameters: ContinuousHV::random(256, 90),
             state_before: before,
             context,
             execution: TransitionExecution::Executed {
                 realized_action,
+                realized_action_sha256: "e".repeat(64),
+                realized_action_parameters: ContinuousHV::random(256, 90),
                 outcome,
                 state_after: after,
                 state_after_sha256: "d".repeat(64),
@@ -1186,6 +1249,7 @@ mod tests {
             &before,
             &ActionCategory::Rollback,
             "nix-build-family",
+            &ContinuousHV::random(dim, 90),
             &context,
         ).expect("valid contextual prediction");
         assert_eq!(learned.source, ContextualPredictionSource::ContextualDelta);
@@ -1196,6 +1260,7 @@ mod tests {
             &before,
             &ActionCategory::Install,
             "nix-build-family",
+            &ContinuousHV::random(dim, 90),
             &context,
         ).expect("valid fallback prediction");
         assert_eq!(
@@ -1227,6 +1292,7 @@ mod tests {
             &before,
             &ActionCategory::Rebuild,
             "nix-build-family",
+            &ContinuousHV::random(dim, 90),
             &context,
         ).expect("valid prediction");
         assert_eq!(prediction.source, ContextualPredictionSource::ContextualDelta);
@@ -1299,12 +1365,14 @@ mod tests {
             &state,
             &ActionCategory::Install,
             "nix-build-family",
+            &ContinuousHV::random(dim, 90),
             &context_a,
         ).expect("context a prediction");
         let prediction_b = wm.predict_state_with_context(
             &state,
             &ActionCategory::Install,
             "nix-build-family",
+            &ContinuousHV::random(dim, 90),
             &context_b,
         ).expect("context b prediction");
 
@@ -1352,6 +1420,7 @@ mod tests {
             &state,
             &ActionCategory::Update,
             "nix-build-family",
+            &ContinuousHV::random(dim, 90),
             &context,
         ).expect("valid prediction");
         assert_eq!(prediction.observation_count, 2);
@@ -1421,6 +1490,7 @@ mod tests {
             &state,
             &ActionCategory::Install,
             "nix-build-family",
+            &ContinuousHV::random(dim, 90),
             &context,
         ).expect("family-scoped prediction");
         assert_eq!(prediction.source, ContextualPredictionSource::ContextualDelta);
@@ -1450,6 +1520,7 @@ mod tests {
             &state,
             &ActionCategory::Install,
             "nix-build-family",
+            &ContinuousHV::random(dim, 90),
             &context_b,
         ).expect("fallback prediction");
         assert_eq!(
@@ -1475,6 +1546,7 @@ mod tests {
             &ContinuousHV::zero(dim),
             &ActionCategory::Install,
             "nix-build-family",
+            &ContinuousHV::random(dim, 90),
             &invalid_context,
         ).is_err());
     }
