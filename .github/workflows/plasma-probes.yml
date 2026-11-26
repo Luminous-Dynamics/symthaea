@@ -777,6 +777,7 @@ jobs:
           assert cohort["spatial_domain"]["maximum"] > cohort["spatial_domain"]["minimum"]
           assert cohort["velocity_domain"]["maximum"] > cohort["velocity_domain"]["minimum"]
           assert cohort["state_metric_id"].strip()
+          assert cohort["state_coordinate_id"].strip()
           linearization = fixture["linearization_contract"]
           assert linearization["status"] == "synthetic_derivatives_not_computed"
           assert linearization["derivative_source"] == "not_computed_synthetic"
