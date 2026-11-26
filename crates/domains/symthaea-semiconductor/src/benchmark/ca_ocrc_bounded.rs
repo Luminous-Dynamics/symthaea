@@ -1589,6 +1589,14 @@ mod tests {
             ),
         )
         .unwrap();
+        step_ca_ocrc_round_v1(
+            &mut engine,
+            &input(
+                prediction(1, "s1", CaOcrcSetKindV1::Interval, true, Some(0.9)),
+                Vec::new(),
+            ),
+        )
+        .unwrap();
         let feedback = feedback(2, "s0", "l0", 1, LabelConsumptionEligibilityV1::EligibleUnderDeclaredPolicy);
         let report = step_ca_ocrc_round_v1(
             &mut engine,
