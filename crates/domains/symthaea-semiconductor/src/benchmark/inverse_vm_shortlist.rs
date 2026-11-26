@@ -1019,7 +1019,7 @@ mod tests {
 
     #[test]
     fn uncertainty_interval_crossing_target_or_side_constraint_is_rejected() {
-        let wide_target = candidate("wide", 200.0, 50.0, (97.0, 101.0), 0.2);
+        let mut wide_target = candidate("wide", 200.0, 50.0, (97.0, 101.0), 0.2);
         wide_target.candidate_evidence_sha256 = candidate_digest(&wide_target).unwrap();
         let input = input(vec![wide_target]);
         let report = evaluate_inverse_vm_shortlist_v1(&input).unwrap();
