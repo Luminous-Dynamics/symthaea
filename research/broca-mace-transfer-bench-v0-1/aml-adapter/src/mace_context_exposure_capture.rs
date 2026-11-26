@@ -708,6 +708,58 @@ mod tests {
     }
 
     #[test]
+    fn serializes_non_memory_provider_parameters_in_deterministic_json() {
+        let mut request_parameters = BTreeMap::new();
+        request_parameters.insert("temperature".to_owned(), serde_json::json!(0.2));
+        request_parameters.insert("top_p".to_owned(), serde_json::json!(0.7));
+        let request = MaceProviderNeutralRequestV1 {
+            model: "test-model".to_owned(),
+            request_parameters,
+            messages: vec![MaceRequestMessageV1 {
+                role: MaceContextRoleV1::User,
+                segments: vec![MaceRequestSegmentV1 {
+                    text: "plain".to_owned(),
+                    origin: MaceRequestSegmentOriginV1::NonMemory,
+                }],
+            }],
+        };
+        let serialized = serialize_mace_provider_request_with_exposure_map_v1(
+            &request, MaceMemoryArmV1::ConventionalRetrieval
+        ).unwrap();
+        let parsed: Value = serde_json::from_slice(serialized.body()).unwrap();
+        assert_eq!(parsed["model"], "test-model");
+        assert_eq!(parsed["temperature"], serde_json::json!(0.2));
+        assert_eq!(parsed["top_p"], serde_json::json!(0.7));
+    }
+
+    #[test]
+    fn rejects_request_model_alias_not_equal_to_pinned_revision() {
+        let request = MaceProviderNeutralRequestV1 {
+            model: "un-pinned-alias".to_owned(),
+            request_parameters: BTreeMap::new(),
+            messages: vec![MaceRequestMessageV1 {
+                role: MaceContextRoleV1::User,
+                segments: vec![MaceRequestSegmentV1 {
+                    text: "plain".to_owned(),
+                    origin: MaceRequestSegmentOriginV1::NonMemory,
+                }],
+            }],
+        };
+        assert_eq!(
+            capture_send_and_sign_mace_invocation_v1(
+                &request, &expected(),
+                MaceExposureCaptureContextV1 {
+                    receipt_id: "receipt-1", captured_at_monotonic_ns: 42,
+                    candidate_decision_trace_sha256: D8, admission_denials: vec![],
+                    model_declared_support_event_ids: vec![],
+                },
+                &TestArtifactStore, &TestTransport, &signer(),
+            ).unwrap_err(),
+            MaceExposureCaptureRejectV1::EmptyModel
+        );
+    }
+
+    #[test]
     fn true_no_memory_arm_rejects_typed_memory_segments() {
         let request = MaceProviderNeutralRequestV1 {
             model: "test-model".to_owned(),
