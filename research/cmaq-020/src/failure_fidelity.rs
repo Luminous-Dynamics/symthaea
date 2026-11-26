@@ -356,6 +356,9 @@ pub struct BoundaryRatePair {
     /// Reference policy configuration used for both sides of this pair.
     pub reference_policy_id: String,
     pub reference_policy_checkpoint_sha256: String,
+    /// Optional source action traces; if absent, this is not an identical-action comparison.
+    pub success_side_action_trace_sha256: Option<String>,
+    pub failure_side_action_trace_sha256: Option<String>,
     /// Frozen world-model candidate being evaluated.
     pub candidate_checkpoint_sha256: String,
     pub reference_success_side_successes: u32,
@@ -401,6 +404,14 @@ impl BoundaryRatePair {
         if self.success_side_scene_sha256 == self.failure_side_scene_sha256 {
             return Err("success-side and failure-side scene digests must differ".to_owned());
         }
+        for (name, digest) in [
+            ("success_side_action_trace_sha256", &self.success_side_action_trace_sha256),
+            ("failure_side_action_trace_sha256", &self.failure_side_action_trace_sha256),
+        ] {
+            if digest.as_ref().is_some_and(|value| !is_sha256(value)) {
+                return Err(format!("{name} must be a 64-character hexadecimal digest when supplied"));
+            }
+        }
         for (label, successes, trials) in [
             ("reference success side", self.reference_success_side_successes, self.reference_success_side_trials),
             ("reference failure side", self.reference_failure_side_successes, self.reference_failure_side_trials),
@@ -435,6 +446,14 @@ pub struct BoundaryRateClusterCounts {
 pub struct BoundaryRatePairMeasurement {
     pub pair_id: String,
     pub environment_cluster_id: String,
+    pub pair_source_manifest_sha256: String,
+    pub success_side_scene_sha256: String,
+    pub failure_side_scene_sha256: String,
+    pub reference_policy_id: String,
+    pub reference_policy_checkpoint_sha256: String,
+    pub success_side_action_trace_sha256: Option<String>,
+    pub failure_side_action_trace_sha256: Option<String>,
+    pub candidate_checkpoint_sha256: String,
     pub reference_success_side_rate_basis_points: f64,
     pub predicted_success_side_rate_basis_points: f64,
     pub reference_failure_side_rate_basis_points: f64,
@@ -576,6 +595,14 @@ pub fn score_boundary_rate_pairs(
         score.pair_measurements.push(BoundaryRatePairMeasurement {
             pair_id: pair.pair_id.clone(),
             environment_cluster_id: pair.environment_cluster_id.clone(),
+            pair_source_manifest_sha256: pair.pair_source_manifest_sha256.clone(),
+            success_side_scene_sha256: pair.success_side_scene_sha256.clone(),
+            failure_side_scene_sha256: pair.failure_side_scene_sha256.clone(),
+            reference_policy_id: pair.reference_policy_id.clone(),
+            reference_policy_checkpoint_sha256: pair.reference_policy_checkpoint_sha256.clone(),
+            success_side_action_trace_sha256: pair.success_side_action_trace_sha256.clone(),
+            failure_side_action_trace_sha256: pair.failure_side_action_trace_sha256.clone(),
+            candidate_checkpoint_sha256: pair.candidate_checkpoint_sha256.clone(),
             reference_success_side_rate_basis_points: reference_success_rate,
             predicted_success_side_rate_basis_points: predicted_success_rate,
             reference_failure_side_rate_basis_points: reference_failure_rate,
@@ -684,6 +711,8 @@ mod tests {
             failure_side_scene_sha256: "d".repeat(64),
             reference_policy_id: "pi05-data-50".to_owned(),
             reference_policy_checkpoint_sha256: "f".repeat(64),
+            success_side_action_trace_sha256: None,
+            failure_side_action_trace_sha256: None,
             candidate_checkpoint_sha256: "e".repeat(64),
             reference_success_side_successes: 10,
             reference_success_side_trials: 10,
@@ -704,6 +733,8 @@ mod tests {
         assert_eq!(score.pair_measurements.len(), 1);
         assert_eq!(score.pair_measurements[0].pair_id, "pair-1");
         assert_eq!(score.pair_measurements[0].environment_cluster_id, "cluster-1");
+        assert_eq!(score.pair_measurements[0].pair_source_manifest_sha256, "b".repeat(64));
+        assert_eq!(score.pair_measurements[0].candidate_checkpoint_sha256, "e".repeat(64));
         assert_eq!(score.detected_reference_boundaries, 1);
         assert_eq!(score.detected_predicted_boundaries, 1);
         assert_eq!(score.boundary_detection_accuracy, Some(1.0));
