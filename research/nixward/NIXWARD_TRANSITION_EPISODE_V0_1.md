@@ -14,8 +14,7 @@ NixWard also has `SystemEpisode` records with before/after states and outcome la
 `TransitionEpisodeV1` binds:
 
 - episode ID;
-- assigned action category and exact action payload SHA-256;
-- HDC assigned-action parameter signature;
+- assigned action category, exact assigned-action payload SHA-256 and HDC assigned-parameter signature;
 - state-before vector and digest;
 - environment context HDC vector;
 - environment, mechanism-family and independent-cluster identities;
@@ -52,11 +51,13 @@ Candidate buckets are separated by:
 3. nearest HDC realized-action-parameter signature above the frozen similarity threshold;
 4. nearest HDC environment-context signature above the same threshold.
 
-For a matching bucket, the model predicts by adding its running-mean transition delta to the provided current state. If neither context nor action parameters meet the threshold, it explicitly falls back to the global action-delta baseline. The prediction reports its source, context similarity, action-parameter similarity, observation count, number of distinct cluster IDs and prequential training residual MSE.
+The realized-action payload digest is retained and syntax-checked as provenance, while the HDC parameter signature supports generalization across semantically similar parameter settings. The current implementation's parameter/context matcher is a simple nearest-prototype rule; it is not yet a learned metric or a causal mechanism embedding.
+
+For a matching bucket, the model predicts by adding its running-mean transition delta to the provided current state. The prediction reports both similarities separately. If either context or action parameters fail the threshold, it explicitly falls back to the global action-delta baseline. The prediction reports its source, context similarity, action-parameter similarity, observation count, number of distinct cluster IDs and prequential training residual MSE.
 
 The initial threshold is `0.8`. It is an engineering starting point, not a tuned optimum. Threshold sweeps and matched ablations are required before making comparative claims.
 
-The training residual is measured against the bucket mean *before* incorporating the new observation. It is a descriptive prequential residual, **not** a calibrated predictive interval or a guarantee of held-out uncertainty. Cluster count is descriptive metadata, not a confidence interval or independent-sample declaration.
+The training residual is measured against the bucket mean *before* incorporating the new observation. Outcome counts are retained as a separate diagnostic. It is a descriptive prequential residual, **not** a calibrated predictive interval or a guarantee of held-out uncertainty. Cluster count is descriptive metadata, not a confidence interval or independent-sample declaration.
 
 Outcome counts are reported separately from transition-state prediction. A future reliability model may predict success/failure calibration, but this first increment only retains the labels; it does not claim a calibrated success predictor.
 
