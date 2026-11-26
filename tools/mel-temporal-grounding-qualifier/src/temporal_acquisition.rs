@@ -962,6 +962,48 @@ fn select_probability_audit(
     Ok((selections, unmet, spent, selected_source_count, design))
 }
 
+#[derive(Debug, Default)]
+struct ActiveSelectionState {
+    selected: BTreeSet<usize>,
+    selections: Vec<AnnotationSelectionRecordV1>,
+    spent: u64,
+    source_counts: BTreeMap<String, u32>,
+    stratum_counts: BTreeMap<String, u32>,
+}
+
+impl ActiveSelectionState {
+    fn add(
+        &mut self,
+        index: usize,
+        candidates: &[AnnotationAcquisitionCandidateV1],
+        band: ActivePriorityBandV1,
+        reason: SelectionReasonV1,
+    ) -> Result<(), String> {
+        if !self.selected.insert(index) {
+            return Err("active selector attempted to schedule a duplicate candidate".into());
+        }
+        let candidate = &candidates[index];
+        self.spent = self
+            .spent
+            .checked_add(candidate.annotation_cost_units)
+            .ok_or_else(|| "active budget usage overflow".to_string())?;
+        *self.source_counts
+            .entry(candidate.source_work_id_sha256.clone())
+            .or_default() += 1;
+        *self.stratum_counts
+            .entry(candidate.source_stratum_id.clone())
+            .or_default() += 1;
+        self.selections.push(selection_record(
+            candidate,
+            SelectionStreamV1::ActiveRefinement,
+            Some(band),
+            reason,
+            SelectionDesignMetadataV1::default(),
+        ));
+        Ok(())
+    }
+}
+
 fn select_active(
     candidates: &[AnnotationAcquisitionCandidateV1],
     eligible: &[usize],
@@ -1068,7 +1110,7 @@ fn select_active(
                 if let Some(index) = next {
                     let candidate = &candidates[index];
                     let (_, reason) = active_priority(candidate, config).ok_or_else(|| {
-                        "state.selected active candidate has no priority reason".to_string()
+                        "selected active candidate has no priority reason".to_string()
                     })?;
                     state.add(index, candidates, band, reason)?;
                     progress = true;
@@ -1084,25 +1126,26 @@ fn select_active(
         .stratum_quotas
         .iter()
         .filter_map(|quota| {
-            let state.selected_count = state.stratum_counts
+            let selected_count = state
+                .stratum_counts
                 .get(&quota.source_stratum_id)
                 .copied()
                 .unwrap_or(0);
-            (state.selected_count < quota.active_minimum_items).then(|| UnmetAnnotationQuotaV1 {
+            (selected_count < quota.active_minimum_items).then(|| UnmetAnnotationQuotaV1 {
                 source_stratum_id: quota.source_stratum_id.clone(),
                 stream: QuotaStreamV1::ActiveRefinement,
                 requested: quota.active_minimum_items,
-                state.selected: state.selected_count,
+                selected: selected_count,
             })
         })
         .collect();
 
-    Ok(ActiveSelectionResult {
-        selections: state.selections,
+    Ok((
+        state.selections,
         unmet,
-        spent: state.spent,
-        source_counts: state.source_counts,
-    })
+        state.spent,
+        state.source_counts,
+    ))
 }
 
 
