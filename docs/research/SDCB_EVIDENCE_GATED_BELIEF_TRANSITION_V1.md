@@ -180,7 +180,32 @@ Every hypothesis should carry predictions that could disconfirm it. The system c
 ### Evidence integrity becomes orthogonal to scientific correctness
 A correctly authenticated observation can still support a bad model; a good-looking model can still be based on corrupted evidence. Score both axes separately.
 
-## 10. Implementation and validation status
+## 10. Luminous integration and evidence-class separation
+
+The contract is intended to span the Luminous architecture, but this PR does not claim that these integrations are implemented.
+
+| Component | Candidate responsibility | Explicit boundary |
+|---|---|---|
+| Symthaea | Maintain competing hypotheses, predict outcomes, select a probe, compute posterior beliefs | Must not certify its own observation or silently change the frozen task/system identity |
+| Symtropy | Execute isolated simulations and, where separately integrated, coordinate controlled physical experiments | A simulation result must remain labelled simulation; it is not a physical measurement |
+| Mycelix | Principal identity, delegated authority, verifier/key registry, revocation and auditable attestation references | Trust/identity consensus does not establish scientific truth or authorize a model to self-verify |
+| Independent verifier | Validate run identity, experiment binding, instrument/protocol receipt, observation provenance and signer authority | Must be separated from the proposing agent and execution principal |
+| Evidence execution architecture | Carry intent → authority → execution → observation → independent verification → replay | Unknown execution outcome blocks new mutation until reconciliation |
+
+### Evidence classes must never collapse
+
+The next wire-contract version should explicitly carry an evidence-origin classification:
+
+- **analytic** — exact mathematical controls and hand-computable oracles;
+- **synthetic** — generated observations with known ground truth;
+- **simulated** — outputs from a pinned simulator and configuration;
+- **physical** — instrument-captured observations with calibration, acquisition and custody metadata.
+
+The class, environment digest, authorized-execution receipt, protocol digest, and calibration/instrument digest should be bound into the accepted transition. A simulated pass cannot satisfy a physical-evidence requirement. A physical observation can still be scientifically inconclusive or inconsistent with the model.
+
+For production, the verifier's signed attestation should bind these fields, including a verifier key identifier and revocation check. The current v1 Rust source and schema do not yet encode this complete attestation or evidence-origin model; it is a versioned integration requirement, not a completed feature.
+
+## 11. Implementation and validation status
 
 The reference source is standard-library-only and independent of the production Symthaea workspace. It implements:
 - finite-hypothesis expected information gain;
