@@ -76,7 +76,7 @@
       },
       "stay": {
         "variant_id": "p2-stay",
-        "audio_sha256": "gggggggggggggggggggggggggggggggggggggggggggggggggggggggggggggggg",
+        "audio_sha256": "0000000000000000000000000000000000000000000000000000000000000000",
         "question": "Do these two clips have the same melody? A = same, B = different.",
         "question_sha256": "cf3b38abafe982fcc011ac005a839177235aac5a39ad3a4a1a48c32e758b7914",
         "option_a_relation": "Same",
@@ -94,7 +94,7 @@
       "stay_factor": "Room",
       "clean": {
         "variant_id": "p3-clean",
-        "audio_sha256": "hhhhhhhhhhhhhhhhhhhhhhhhhhhhhhhhhhhhhhhhhhhhhhhhhhhhhhhhhhhhhhhh",
+        "audio_sha256": "1111111111111111111111111111111111111111111111111111111111111111",
         "question": "Do these two clips play the same chord quality? A = same, B = different.",
         "question_sha256": "12879423a90c46c437bc5d789c48fd2f67afebd3ca239fdd4ed81c584926249d",
         "option_a_relation": "Same",
@@ -104,7 +104,7 @@
       },
       "flip": {
         "variant_id": "p3-flip",
-        "audio_sha256": "iiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiii",
+        "audio_sha256": "2222222222222222222222222222222222222222222222222222222222222222",
         "question": "Do these two clips play the same chord quality? A = same, B = different.",
         "question_sha256": "12879423a90c46c437bc5d789c48fd2f67afebd3ca239fdd4ed81c584926249d",
         "option_a_relation": "Same",
@@ -114,7 +114,7 @@
       },
       "stay": {
         "variant_id": "p3-stay",
-        "audio_sha256": "jjjjjjjjjjjjjjjjjjjjjjjjjjjjjjjjjjjjjjjjjjjjjjjjjjjjjjjjjjjjjjjj",
+        "audio_sha256": "3333333333333333333333333333333333333333333333333333333333333333",
         "question": "Do these two clips play the same chord quality? A = same, B = different.",
         "question_sha256": "12879423a90c46c437bc5d789c48fd2f67afebd3ca239fdd4ed81c584926249d",
         "option_a_relation": "Same",
@@ -132,7 +132,7 @@
       "stay_factor": "Eq",
       "clean": {
         "variant_id": "p4-clean",
-        "audio_sha256": "kkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkk",
+        "audio_sha256": "4444444444444444444444444444444444444444444444444444444444444444",
         "question": "Do these two clips use the same instrument? A = same, B = different.",
         "question_sha256": "6b09827b5cd3e6a49b944ce4c8356a78bee407ddabf1205148e78b163b7827ff",
         "option_a_relation": "Same",
@@ -142,7 +142,7 @@
       },
       "flip": {
         "variant_id": "p4-flip",
-        "audio_sha256": "llllllllllllllllllllllllllllllllllllllllllllllllllllllllllllllll",
+        "audio_sha256": "5555555555555555555555555555555555555555555555555555555555555555",
         "question": "Do these two clips use the same instrument? A = same, B = different.",
         "question_sha256": "6b09827b5cd3e6a49b944ce4c8356a78bee407ddabf1205148e78b163b7827ff",
         "option_a_relation": "Same",
@@ -152,7 +152,7 @@
       },
       "stay": {
         "variant_id": "p4-stay",
-        "audio_sha256": "mmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmm",
+        "audio_sha256": "6666666666666666666666666666666666666666666666666666666666666666",
         "question": "Do these two clips use the same instrument? A = same, B = different.",
         "question_sha256": "6b09827b5cd3e6a49b944ce4c8356a78bee407ddabf1205148e78b163b7827ff",
         "option_a_relation": "Same",
@@ -170,7 +170,7 @@
       "stay_factor": "Hiss",
       "clean": {
         "variant_id": "p5-clean",
-        "audio_sha256": "nnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnn",
+        "audio_sha256": "7777777777777777777777777777777777777777777777777777777777777777",
         "question": "Which clip is faster? A = clip A, B = clip B.",
         "question_sha256": "2b9c6952e675f11fc4bf51c2d9e6d39d6e8503aec836c0c3e7c1104c3c2d6539",
         "option_a_relation": "ClipAFaster",
@@ -180,7 +180,7 @@
       },
       "flip": {
         "variant_id": "p5-flip",
-        "audio_sha256": "oooooooooooooooooooooooooooooooooooooooooooooooooooooooooooooooo",
+        "audio_sha256": "8888888888888888888888888888888888888888888888888888888888888888",
         "question": "Which clip is slower? A = clip A, B = clip B.",
         "question_sha256": "66617f8ca2cb9fb20245f17c047fc6e4df1590a44be3bc9511d1061a164d3914",
         "option_a_relation": "ClipBFaster",
@@ -190,7 +190,7 @@
       },
       "stay": {
         "variant_id": "p5-stay",
-        "audio_sha256": "pppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppp",
+        "audio_sha256": "9999999999999999999999999999999999999999999999999999999999999999",
         "question": "Which clip is faster? A = clip A, B = clip B.",
         "question_sha256": "2b9c6952e675f11fc4bf51c2d9e6d39d6e8503aec836c0c3e7c1104c3c2d6539",
         "option_a_relation": "ClipAFaster",
@@ -208,7 +208,7 @@
       "stay_factor": "Transposition",
       "clean": {
         "variant_id": "p6-clean",
-        "audio_sha256": "qqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqq",
+        "audio_sha256": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
         "question": "Do these two clips play the same chord quality? A = same, B = different.",
         "question_sha256": "12879423a90c46c437bc5d789c48fd2f67afebd3ca239fdd4ed81c584926249d",
         "option_a_relation": "Same",
@@ -218,7 +218,7 @@
       },
       "flip": {
         "variant_id": "p6-flip",
-        "audio_sha256": "rrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrr",
+        "audio_sha256": "bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb",
         "question": "Do these two clips play the same chord quality? A = same, B = different.",
         "question_sha256": "12879423a90c46c437bc5d789c48fd2f67afebd3ca239fdd4ed81c584926249d",
         "option_a_relation": "Same",
@@ -228,7 +228,7 @@
       },
       "stay": {
         "variant_id": "p6-stay",
-        "audio_sha256": "ssssssssssssssssssssssssssssssssssssssssssssssssssssssssssssssss",
+        "audio_sha256": "cccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccc",
         "question": "Do these two clips play the same chord quality? A = same, B = different.",
         "question_sha256": "12879423a90c46c437bc5d789c48fd2f67afebd3ca239fdd4ed81c584926249d",
         "option_a_relation": "Same",
