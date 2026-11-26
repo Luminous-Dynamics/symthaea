@@ -726,11 +726,15 @@ mod tests {
         ExpectedLineageBindingV1 {
             run_id: "run-1",
             query_invocation_id: "invocation-1",
-            qualified_evidence_set_sha256: "1".repeat(64).leak(),
-            decision_need_sha256: "2".repeat(64).leak(),
+            qualified_evidence_set_sha256:
+                "1111111111111111111111111111111111111111111111111111111111111111",
+            decision_need_sha256:
+                "2222222222222222222222222222222222222222222222222222222222222222",
             requirement_id: "minimum-independent-evidence",
-            evidence_class_sha256: "3".repeat(64).leak(),
-            root_family_sha256: "4".repeat(64).leak(),
+            evidence_class_sha256:
+                "3333333333333333333333333333333333333333333333333333333333333333",
+            root_family_sha256:
+                "4444444444444444444444444444444444444444444444444444444444444444",
             expected_profile_sha256: profile_digest,
         }
     }
