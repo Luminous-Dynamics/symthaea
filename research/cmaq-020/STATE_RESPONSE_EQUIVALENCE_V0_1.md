@@ -74,7 +74,7 @@ The evaluator now supports a deterministic, cost-aware next-counterexample selec
 
 This makes refinement cost observable instead of granting free access to the oracle's entire response table. The relative probe costs are contract inputs and must be frozen before held-out evaluation; they are not a dynamic estimate derived from the hidden response. The counterexample selector is a finite diagnostic tool, not a proof that all possible future interventions have been covered.
 
-Added deterministic tests cover: lowest-cost separating query selection, no disclosure of response values, invariant mismatch handling, ignored already-separated pairs, deterministic selection under input reordering, sequential refinement of multiple false merges, missing/zero probe-cost rejection, domain and digest validation, single-checkpoint enforcement and cluster/family consistency.
+Added deterministic tests cover: lowest-cost separating query selection, no disclosure of response values, invariant mismatch handling, ignored already-separated pairs, deterministic selection under input reordering, sequential refinement of multiple false merges, missing/zero probe-cost rejection, domain and digest validation, single-checkpoint enforcement, cluster/family consistency, and a copy/no-op negative control where identical no-op response cannot hide a state-distinguishing action.
 
 
 ## External reliability anchors added to the evaluation matrix
