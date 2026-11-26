@@ -59,9 +59,12 @@ pub struct SourceEvidence {
     pub source_type: ResearchSource,
     /// Relevant text from the source
     pub relevant_text: String,
-    /// Does this source support the claim?
+    /// Claim-source relation from an explicit adjudicator.
+    /// None means unclassified/neutral; retrieval relevance or domain credibility
+    /// must never be converted into support or contradiction.
     pub supports: Option<bool>,
-    /// Similarity score to the claim (0.0 - 1.0)
+    /// Similarity score to the verification query (0.0 - 1.0).
+    /// Similarity is not evidence of claim-level entailment.
     pub similarity: f32,
     /// Credibility score of the source (0.0 - 1.0)
     pub credibility: f32,
@@ -172,10 +175,8 @@ impl EpistemicVerifier {
                     total_contradict_score += credibility * source.similarity;
                 }
                 None => {
-                    // Neutral/unclear - slight support if similarity is high
-                    if source.similarity > 0.7 {
-                        total_support_score += credibility * source.similarity * 0.3;
-                    }
+                    // Unclassified sources contribute neither support nor
+                    // contradiction. Relevance and credibility are not entailment.
                 }
             }
         }
@@ -209,7 +210,9 @@ impl EpistemicVerifier {
                 domain: self.extract_domain(&r.url),
                 source_type: r.source_type,
                 relevant_text: r.summary.clone(),
-                supports: Some(r.confidence > 0.5),
+                // Result-level confidence/relevance cannot establish
+                // whether this individual source supports this individual claim.
+                supports: None,
                 similarity: r.relevance,
                 credibility: r.confidence,
             })
@@ -412,6 +415,58 @@ mod tests {
         let result = verifier.verify_claim("Rust provides memory safety", &context);
         assert_eq!(result.status, EpistemicStatus::HighConfidence);
         assert!(result.confidence > 0.8);
+    }
+
+    #[test]
+    fn neutral_high_similarity_sources_never_become_supporting_evidence() {
+        let verifier = EpistemicVerifier::new();
+        let sources = (0..3)
+            .map(|index| SourceEvidence {
+                url: format!("https://trusted{index}.example/evidence"),
+                domain: "rust-lang.org".to_string(),
+                source_type: ResearchSource::Documentation,
+                relevant_text: "Highly relevant retrieval text, but no adjudicated relation".to_string(),
+                supports: None,
+                similarity: 1.0,
+                credibility: 1.0,
+            })
+            .collect();
+        let context = VerificationContext {
+            sources,
+            query: "Does claim X follow from source text?".to_string(),
+            domain: "general".to_string(),
+        };
+
+        let result = verifier.verify_claim("Claim X", &context);
+        assert_eq!(result.status, EpistemicStatus::InsufficientEvidence);
+        assert_eq!(result.confidence, 0.2);
+        assert!(result.supporting_sources.is_empty());
+        assert!(result.contradicting_sources.is_empty());
+    }
+
+    #[test]
+    fn result_level_confidence_does_not_assign_claim_source_support() {
+        let verifier = EpistemicVerifier::new();
+        let results = (0..3)
+            .map(|index| WebResearchResult {
+                title: format!("Retrieved document {index}"),
+                url: format!("https://trusted{index}.example/document"),
+                content: "Page content not adjudicated against the claim".to_string(),
+                summary: "High-relevance page summary".to_string(),
+                source_type: ResearchSource::Documentation,
+                relevance: 1.0,
+                confidence: 0.99,
+                epistemic_status: EpistemicStatus::HighConfidence,
+                status: ResearchStatus::Success,
+                claims: vec![],
+            })
+            .collect::<Vec<_>>();
+
+        let verified = verifier.verify_from_results("A separate claim", &results);
+        assert_eq!(verified.status, EpistemicStatus::InsufficientEvidence);
+        assert_eq!(verified.confidence, 0.2);
+        assert!(verified.supporting_sources.is_empty());
+        assert!(verified.contradicting_sources.is_empty());
     }
 
     #[test]
