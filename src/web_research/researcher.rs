@@ -1836,7 +1836,10 @@ mod tests {
         assert!(ResearchStatus::PartialSuccess.is_success());
         assert!(!ResearchStatus::NoResults.is_success());
         assert!(!ResearchStatus::RetrievalIncomplete.is_success());
+        assert!(ResearchStatus::PartialSuccess.is_retriable());
+        assert!(ResearchStatus::RateLimited.is_retriable());
         assert!(ResearchStatus::RetrievalIncomplete.is_retriable());
+        assert!(!ResearchStatus::NoResults.is_retriable());
     }
 
     #[tokio::test]
@@ -1870,6 +1873,44 @@ mod tests {
         assert!(peak.load(Ordering::SeqCst) <= 3);
         assert!(peak.load(Ordering::SeqCst) > 1);
         assert_eq!(active.load(Ordering::SeqCst), 0);
+    }
+
+    #[test]
+    fn no_source_status_distinguishes_empty_search_rate_limit_and_failure() {
+        let no_results = make_receipt(
+            0,
+            None,
+            AcquisitionStage::DuckDuckGo,
+            "test query",
+            AcquisitionOutcome::NoResults,
+        );
+        let rate_limited = make_receipt(
+            0,
+            None,
+            AcquisitionStage::SearchProvider,
+            "test query",
+            AcquisitionOutcome::RateLimited,
+        );
+        let failed = make_receipt(
+            0,
+            None,
+            AcquisitionStage::PageFetch,
+            "test query",
+            AcquisitionOutcome::Timeout,
+        );
+
+        assert_eq!(
+            status_without_usable_sources(&[no_results.clone()]),
+            ResearchStatus::NoResults
+        );
+        assert_eq!(
+            status_without_usable_sources(&[rate_limited]),
+            ResearchStatus::RateLimited
+        );
+        assert_eq!(
+            status_without_usable_sources(&[no_results, failed]),
+            ResearchStatus::RetrievalIncomplete
+        );
     }
 
     #[test]
