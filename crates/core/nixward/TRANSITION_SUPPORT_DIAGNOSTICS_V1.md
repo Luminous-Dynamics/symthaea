@@ -14,7 +14,7 @@ The three-example threshold is not a confidence guarantee and must not be treate
 
 ## Prequential delta error
 
-For every observation after the first, the implementation compares the new observed state delta against the existing mean delta **before** incorporating the new observation. It records the running mean squared L2 residual and the count of available residual observations.
+For every observation after the first, the implementation compares the new observed state delta against the existing mean delta **before** incorporating the new observation. It records the running mean squared L2 residual and the count of available residual observations. Non-finite residuals are counted separately and excluded from the mean; they are not silently treated as zero. This diagnostic does not repair invalid inputs or prevent the legacy mean-delta vector itself from being contaminated by invalid transition data.
 
 This is a descriptive prequential training-stream diagnostic. It is not:
 - a calibrated predictive variance;
