@@ -15,10 +15,9 @@
 use std::collections::{BTreeMap, HashMap};
 
 use crate::adaptive_policy_reference::{
-    evaluate_expected_reference_v1, evaluate_robust_reference_v1,
     ExpectedReferenceResultV1, ReferenceActionV1, ReferencePolicyBranchV1,
     ReferencePolicyNodeV1, ReferenceQueryV1, ReferenceRejectV1,
-    ReferenceScenarioV1, ReferenceWorldV1, RobustReferenceResultV1,
+    ReferenceScenarioV1, RobustReferenceResultV1,
 };
 
 const MAX_MEMOIZED_STATES: usize = 50_000;
@@ -468,6 +467,9 @@ pub fn evaluate_robust_memoized_v1(
 #[cfg(test)]
 mod tests {
     use super::*;
+    use crate::adaptive_policy_reference::{
+        evaluate_expected_reference_v1, evaluate_robust_reference_v1, ReferenceWorldV1,
+    };
 
     fn action(
         id: &str,
@@ -602,6 +604,15 @@ mod tests {
     #[test]
     fn zero_mass_possible_world_still_constrains_memoized_expected_action() {
         let mut input = scenario(0);
+        let mut zero_mass_forbidden = input.worlds[0].clone();
+        zero_mass_forbidden.world_id = "zero-mass-forbidden".to_owned();
+        zero_mass_forbidden.state_id = "bad".to_owned();
+        zero_mass_forbidden.probability_ppm = Some(0);
+        let mut positive_mass_allowed = input.worlds[1].clone();
+        positive_mass_allowed.world_id = "positive-mass-allowed".to_owned();
+        positive_mass_allowed.state_id = "good".to_owned();
+        positive_mass_allowed.probability_ppm = Some(1_000_000);
+        input.worlds = vec![zero_mass_forbidden, positive_mass_allowed];
         input.budgets.maximum_queries = 0;
         input.actions = vec![
             action("abstain", 0, 0, true, true),
