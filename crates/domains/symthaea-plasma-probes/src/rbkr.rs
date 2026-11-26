@@ -1173,10 +1173,10 @@ mod tests {
         let (reach, observe) =
             aggregate_response_gramians(&scenarios, ResponseGramianAggregationConfig::default())
                 .unwrap();
-        assert!((reach.quadratic_form(&[1.0, 0.0]).unwrap() - 0.25).abs() < 1.0e-12);
-        assert!((reach.quadratic_form(&[0.0, 1.0]).unwrap() - 0.75).abs() < 1.0e-12);
-        assert!((observe.quadratic_form(&[1.0, 0.0]).unwrap() - 0.0625).abs() < 1.0e-12);
-        assert!((observe.quadratic_form(&[0.0, 1.0]).unwrap() - 3.0).abs() < 1.0e-12);
+        assert!((checked_dot(&[1.0, 0.0], &reach.apply(&[1.0, 0.0]).unwrap()).unwrap() - 0.25).abs() < 1.0e-12);
+        assert!((checked_dot(&[0.0, 1.0], &reach.apply(&[0.0, 1.0]).unwrap()).unwrap() - 0.75).abs() < 1.0e-12);
+        assert!((checked_dot(&[1.0, 0.0], &observe.apply(&[1.0, 0.0]).unwrap()).unwrap() - 0.0625).abs() < 1.0e-12);
+        assert!((checked_dot(&[0.0, 1.0], &observe.apply(&[0.0, 1.0]).unwrap()).unwrap() - 3.0).abs() < 1.0e-12);
 
         let basis =
             ResponseBalancedBasis::from_empirical_gramians(&reach, &observe, RbkrConfig::new(1))
