@@ -201,6 +201,14 @@ pub fn assess_pair(
     {
         return Err("one environment cluster cannot alias multiple domain/family identities".to_owned());
     }
+    Ok(assess_pair_validated(left, right, contract))
+}
+
+fn assess_pair_validated(
+    left: &StateResponseRecord,
+    right: &StateResponseRecord,
+    contract: &StateResponseContract,
+) -> PairAssessment {
     let mut maximum = 0.0_f64;
     for (key, left_value) in &left.responses {
         let right_value = right.responses[key];
@@ -208,11 +216,11 @@ pub fn assess_pair(
         let distance = left_value.abs_diff(right_value) as f64 / tolerance as f64;
         maximum = maximum.max(distance);
     }
-    Ok(PairAssessment {
+    PairAssessment {
         exact_equivalent: left.invariant_signature == right.invariant_signature
             && left.responses == right.responses,
         normalized_worst_case_distortion: maximum,
-    })
+    }
 }
 
 pub fn approximate_response_equivalent(
@@ -289,7 +297,7 @@ pub fn score_abstraction(
         for right_index in (left_index + 1)..records.len() {
             let left = &records[left_index];
             let right = &records[right_index];
-            let assessment = assess_pair(left, right, contract)?;
+            let assessment = assess_pair_validated(left, right, contract);
             let equivalent = assessment.exact_equivalent;
             score.max_normalized_pair_distortion = score
                 .max_normalized_pair_distortion
