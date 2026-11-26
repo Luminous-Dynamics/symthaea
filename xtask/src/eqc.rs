@@ -70,7 +70,6 @@ struct InputRef {
     input_id: String,
     artifact_path: String,
     classification: String,
-    #[serde(default)]
     sha256: String,
 }
 
@@ -386,6 +385,23 @@ fn validate_task(task: &Task, repository_root: &Path) -> anyhow::Result<()> {
     Ok(())
 }
 
+fn json_string<'a>(
+    artifact: &'a Value,
+    field: &str,
+    task: &Task,
+    input: &InputRef,
+) -> anyhow::Result<&'a str> {
+    artifact
+        .get(field)
+        .and_then(Value::as_str)
+        .with_context(|| {
+            format!(
+                "{}: synthetic input '{}' is missing string field '{}'",
+                task.task_id, input.input_id, field
+            )
+        })
+}
+
 fn validate_synthetic_input(
     task: &Task,
     input: &InputRef,
@@ -394,25 +410,13 @@ fn validate_synthetic_input(
     let artifact: Value = serde_json::from_slice(bytes)
         .with_context(|| format!("{}: parse synthetic input '{}'", task.task_id, input.input_id))?;
 
-    let get = |field: &str| -> anyhow::Result<&str> {
-        artifact
-            .get(field)
-            .and_then(Value::as_str)
-            .with_context(|| {
-                format!(
-                    "{}: synthetic input '{}' is missing string field '{}'",
-                    task.task_id, input.input_id, field
-                )
-            })
-    };
-
     match input.input_id.as_str() {
         "synthetic-consent-001" | "synthetic-consent-revoked-001" => {
-            if get("schema")? != "luminous.eqc.synthetic-consent.v0.1"
-                || get("consent_id")? != input.input_id
-                || Some(get("principal_id")?) != task.authority_snapshot.principal_id.as_deref()
-                || Some(get("subject_id")?) != task.authority_snapshot.subject_id.as_deref()
-                || get("status")? != task.authority_snapshot.status
+            if json_string(&artifact, "schema", task, input)? != "luminous.eqc.synthetic-consent.v0.1"
+                || json_string(&artifact, "consent_id", task, input)? != input.input_id
+                || Some(json_string(&artifact, "principal_id", task, input)?) != task.authority_snapshot.principal_id.as_deref()
+                || Some(json_string(&artifact, "subject_id", task, input)?) != task.authority_snapshot.subject_id.as_deref()
+                || json_string(&artifact, "status", task, input)? != task.authority_snapshot.status
             {
                 bail!(
                     "{}: consent fixture '{}' does not match the authority snapshot",
@@ -435,8 +439,8 @@ fn validate_synthetic_input(
                 .collect::<anyhow::Result<Vec<_>>>()?;
 
             if fixture_scopes != task.authority_snapshot.scopes
-                || Some(get("valid_until")?) != task.authority_snapshot.valid_until.as_deref()
-                || get("valid_from")? > task.request.evaluated_at.as_str()
+                || Some(json_string(&artifact, "valid_until", task, input)?) != task.authority_snapshot.valid_until.as_deref()
+                || json_string(&artifact, "valid_from", task, input)? > task.request.evaluated_at.as_str()
             {
                 bail!(
                     "{}: consent fixture '{}' disagrees with scopes or temporal bounds",
@@ -447,7 +451,7 @@ fn validate_synthetic_input(
             match task.authority_snapshot.status.as_str() {
                 "active" if artifact.get("revoked_at").is_none() => {}
                 "revoked" => {
-                    let revoked_at = get("revoked_at")?;
+                    let revoked_at = json_string(&artifact, "revoked_at", task, input)?;
                     if !is_canonical_utc(revoked_at) || revoked_at > task.request.evaluated_at {
                         bail!(
                             "{}: revoked consent fixture '{}' has invalid revocation time",
@@ -462,18 +466,18 @@ fn validate_synthetic_input(
             }
         }
         "synthetic-challenge-001" => {
-            if get("schema")? != "luminous.eqc.synthetic-challenge.v0.1"
-                || Some(get("challenge_id")?) != task.request.challenge_id.as_deref()
-                || get("issuer_id")? != task.actor.actor_id
-                || get("subject_id")? != task.subject.subject_id
-                || get("state")? != task.request.challenge_state.as_deref().unwrap_or("")
+            if json_string(&artifact, "schema", task, input)? != "luminous.eqc.synthetic-challenge.v0.1"
+                || Some(json_string(&artifact, "challenge_id", task, input)?) != task.request.challenge_id.as_deref()
+                || json_string(&artifact, "issuer_id", task, input)? != task.actor.actor_id
+                || json_string(&artifact, "subject_id", task, input)? != task.subject.subject_id
+                || json_string(&artifact, "state", task, input)? != task.request.challenge_state.as_deref().unwrap_or("")
             {
                 bail!(
                     "{}: challenge fixture '{}' does not match the request",
                     task.task_id, input.input_id
                 );
             }
-            let consumed_at = get("consumed_at")?;
+            let consumed_at = json_string(&artifact, "consumed_at", task, input)?;
             if !is_canonical_utc(consumed_at) || consumed_at > task.request.evaluated_at {
                 bail!(
                     "{}: consumed challenge fixture '{}' has invalid consumption time",
