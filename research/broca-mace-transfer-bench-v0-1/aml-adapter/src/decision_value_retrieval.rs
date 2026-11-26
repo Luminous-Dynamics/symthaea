@@ -489,6 +489,9 @@ pub fn choose_expected_value_query_v1(
         let replace = best.as_ref().is_none_or(|current| {
             assessment.expected_net_value_numerator_ppm2
                 > current.assessment.expected_net_value_numerator_ppm2
+                || (assessment.expected_net_value_numerator_ppm2
+                    == current.assessment.expected_net_value_numerator_ppm2
+                    && option.query_option_id < current.query_option_id)
         });
         if replace {
             best = Some(ExpectedValueSelectionV1 {
@@ -643,6 +646,9 @@ pub fn choose_robust_value_query_v1(
         let replace = best.as_ref().is_none_or(|current| {
             assessment.robust_net_value_utility_units
                 > current.assessment.robust_net_value_utility_units
+                || (assessment.robust_net_value_utility_units
+                    == current.assessment.robust_net_value_utility_units
+                    && option.query_option_id < current.query_option_id)
         });
         if replace {
             best = Some(RobustValueSelectionV1 {
@@ -1073,6 +1079,36 @@ mod tests {
             &policy(), &prior(), &[expensive], 10, &AcceptPinnedCalibration, &AcceptPinnedResource,
         ).unwrap();
         assert!(stopped.is_none());
+    }
+
+    #[test]
+    fn equal_value_selection_is_independent_of_candidate_order() {
+        let policy = policy();
+        let prior = prior();
+        let mut later = informative_option();
+        later.query_option_id = "z-source".into();
+        let mut earlier = informative_option();
+        earlier.query_option_id = "a-source".into();
+
+        let expected_forward = choose_expected_value_query_v1(
+            &policy, &prior, &[later.clone(), earlier.clone()],
+            10, &AcceptPinnedCalibration, &AcceptPinnedResource,
+        ).unwrap().unwrap();
+        let expected_reverse = choose_expected_value_query_v1(
+            &policy, &prior, &[earlier.clone(), later.clone()],
+            10, &AcceptPinnedCalibration, &AcceptPinnedResource,
+        ).unwrap().unwrap();
+        assert_eq!(expected_forward.query_option_id, "a-source");
+        assert_eq!(expected_reverse.query_option_id, "a-source");
+
+        let robust_forward = choose_robust_value_query_v1(
+            &policy, &[later.clone(), earlier.clone()], 10, &AcceptPinnedResource,
+        ).unwrap().unwrap();
+        let robust_reverse = choose_robust_value_query_v1(
+            &policy, &[earlier, later], 10, &AcceptPinnedResource,
+        ).unwrap().unwrap();
+        assert_eq!(robust_forward.query_option_id, "a-source");
+        assert_eq!(robust_reverse.query_option_id, "a-source");
     }
 
     #[test]
