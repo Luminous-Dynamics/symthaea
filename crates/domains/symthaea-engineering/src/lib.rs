@@ -12,7 +12,7 @@ use symthaea_digital_twin::TwinState;
 use symthaea_fabrication_kernel::autonomy_loop::{AutonomyEvent, AutonomyLoop};
 use symthaea_fabrication_kernel::cincinnati_live::{AnomalyAlert, CincinnatiMonitor};
 use symthaea_fabrication_kernel::csg::CSGNode;
-use symthaea_fabrication_kernel::{GeometricThought, TriangleMesh};
+use symthaea_fabrication_kernel::{ConstraintFitStatus, GeometricThought, TriangleMesh};
 use symthaea_formal_safety::{EvidenceKind, ProofObligation, SafetyCase};
 use symthaea_harmonies::{AlignmentResult, EightHarmonies};
 use symthaea_materials::{MaterialAgingModel, MaterialProperty};
@@ -404,6 +404,10 @@ impl EngineeringManager {
         }
     }
 
+    /// Prepare the local fabrication loop after a declared build-volume precheck.
+    ///
+    /// This does not establish material/process qualification, structural adequacy,
+    /// machine safety, or production/dispatch authority.
     pub fn prepare_fabrication(
         &mut self,
         thought: &GeometricThought,
@@ -414,10 +418,40 @@ impl EngineeringManager {
             self.last_moral_assessment = Some(alignment.clone());
             return Err(format!("❌ Moral Veto: {}", alignment.summary));
         }
-        if !thought.fits_constraints() {
-            return Err("Constraint mismatch.".into());
+        match thought.evaluate_constraints() {
+            ConstraintFitStatus::FitsDeclaredBuildVolume => {}
+            ConstraintFitStatus::NotEvaluatedNoProfile => {
+                return Err(
+                    "Build-volume check not evaluated: printer constraint profile is missing."
+                        .into(),
+                );
+            }
+            ConstraintFitStatus::InvalidConstraintProfile => {
+                return Err(
+                    "Build-volume check rejected: printer constraint profile is invalid.".into(),
+                );
+            }
+            ConstraintFitStatus::InvalidGeometryBounds => {
+                return Err(
+                    "Build-volume check rejected: resolved geometry bounds are invalid.".into(),
+                );
+            }
+            ConstraintFitStatus::InvalidGeometryStructure => {
+                return Err(
+                    "Build-volume check rejected: CSG structure or transform validation failed."
+                        .into(),
+                );
+            }
+            ConstraintFitStatus::ExceedsDeclaredBuildVolume => {
+                return Err(
+                    "Build-volume check rejected: geometry exceeds the declared printer volume."
+                        .into(),
+                );
+            }
         }
-        let mesh = thought.resolve();
+        let mesh = thought
+            .try_resolve()
+            .map_err(|error| format!("Checked CSG resolution failed: {error:?}"))?;
         self.last_mesh = Some(mesh);
         self.fabrication_loop
             .0
