@@ -154,6 +154,8 @@ The external benchmark suite should be run as complementary instruments:
 - [MEMORA-Bench](https://aclanthology.org/2026.findings-emnlp.1211/) tests embodied memory on 45 hours of egocentric video, including retrospective faithfulness and prospective planning.
 - [LongMemEval-V2](https://github.com/xiaowu0162/LongMemEval-V2) contains 451 curated questions over web and enterprise trajectories, with haystacks up to 115 million tokens; it measures answer accuracy and query latency.
 
+A further complementary embodied-memory track is **MEMOBench** from Findings of EMNLP 2026: 30 history-dependent manipulation tasks, 1,500 expert demonstrations and 4,200 executable checkpoint instances. It labels process-level Storage, Update and Compression operations and reports that its strongest memory-module baseline reaches only 31.9% average task success. This is particularly relevant to MACE's streaming ledger and eventual Symtropy/robotics integration: measure memory operation correctness at intermediate checkpoints, not only terminal task success. [MEMOBench paper](https://aclanthology.org/2026.findings-emnlp.XXX/) (the published anthology identifier should be pinned before adding a formal leaderboard target).
+
 These benchmarks probe different capabilities and must be run with their exact official harnesses, models, answerers, task splits and resource budgets. None alone establishes source-origin truth or causal independence.
 
 MACE therefore needs two scorecards:
