@@ -6,11 +6,11 @@ import (
 )
 
 func benchmarkInput(n int, crossSource bool) (Input, map[string]VerifierPin) {
-	sources := []Source{{ID: "agent", ControlRoot: "agent-root", IdentityDigest: dig("agent", "a-key", "source-identity")}}
+	sources := []Source{{ID: "agent", ControlRoot: "agent-root", IdentityDigest: dig("agent", "a-key", "source-identity"), ControlRootDigest: dig("agent", "agent-root", "control-root-membership")}}
 	if crossSource {
 		sources = append(sources,
-			Source{ID: "db", ControlRoot: "db-root", IdentityDigest: dig("db", "d-key", "source-identity")},
-			Source{ID: "observer", ControlRoot: "observer-root", IdentityDigest: dig("observer", "o-key", "source-identity")},
+			Source{ID: "db", ControlRoot: "db-root", IdentityDigest: dig("db", "d-key", "source-identity"), ControlRootDigest: dig("db", "db-root", "control-root-membership")},
+			Source{ID: "observer", ControlRoot: "observer-root", IdentityDigest: dig("observer", "o-key", "source-identity"), ControlRootDigest: dig("observer", "observer-root", "control-root-membership")},
 		)
 	}
 	in := Input{Sources: sources, EvaluationAt: 100}
@@ -55,17 +55,15 @@ func benchmarkInput(n int, crossSource bool) (Input, map[string]VerifierPin) {
 		Event{ID: "end-producer", Kind: ActivityEnded, SubjectID: "producer", ActivityID: "producer", SourceID: "agent", Sequence: producerEndSeq, RecordDigest: dig("end-producer", "ep", "event")},
 		Event{ID: "end-consumer", Kind: ActivityEnded, SubjectID: "consumer", ActivityID: "consumer", SourceID: consumerEndSource, Sequence: consumerEndSeq, RecordDigest: dig("end-consumer", "ec", "event")},
 	)
-	mk := func(subject string, d DigestRef) VerifierReport {
-		return VerifierReport{SubjectID: subject, InputDigest: d, Status: "verified", VerifierID: "v1", Version: "1", BuildDigest: "b1", TrustStoreDigest: "roots1", VerifiedAt: 10, FreshUntil: 100000}
-	}
 	for _, s := range sources {
-		in.Reports = append(in.Reports, mk("source:"+s.ID, s.IdentityDigest))
+		in.Reports = append(in.Reports, normalizedReport(&in, "source:"+s.ID, s.IdentityDigest))
+		in.Reports = append(in.Reports, normalizedReport(&in, "control-root:"+s.ID, s.ControlRootDigest))
 	}
 	for _, e := range in.Events {
-		in.Reports = append(in.Reports, mk("event:"+e.ID, e.RecordDigest))
+		in.Reports = append(in.Reports, normalizedReport(&in, "event:"+e.ID, e.RecordDigest))
 	}
 	for _, w := range in.Witnesses {
-		in.Reports = append(in.Reports, mk("witness:"+w.ID, w.EvidenceDigest))
+		in.Reports = append(in.Reports, normalizedReport(&in, "witness:"+w.ID, w.EvidenceDigest))
 	}
 	return in, map[string]VerifierPin{"v1": {"v1", "1", "b1", "roots1"}}
 }
