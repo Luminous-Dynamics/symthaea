@@ -3,6 +3,7 @@ pub mod worldtest_phase_contract;
 pub mod worldtest_query_portfolio;
 pub mod worldtest_mechanism_transfer;
 pub mod paired_intervention;
+pub mod paired_intervention;
 
 use std::collections::{BTreeMap, BTreeSet};
 use std::env;
