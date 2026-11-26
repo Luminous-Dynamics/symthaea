@@ -45,7 +45,15 @@ jobs:
           components: rustfmt, clippy
 
       - name: Check formatting of the new Rust module
-        run: rustfmt --check --edition 2024 research/cmaq-002/src/worldtest_exploration.rs research/cmaq-002/src/worldtest_phase_contract.rs research/cmaq-002/src/worldtest_query_portfolio.rs
+        run: |
+          files=(
+            research/cmaq-002/src/worldtest_exploration.rs
+            research/cmaq-002/src/worldtest_phase_contract.rs
+          )
+          if [[ -f research/cmaq-002/src/worldtest_query_portfolio.rs ]]; then
+            files+=(research/cmaq-002/src/worldtest_query_portfolio.rs)
+          fi
+          rustfmt --check --edition 2024 "${files[@]}"
 
       - name: Run CMAQ-002 evaluator tests
         working-directory: research/cmaq-002
