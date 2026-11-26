@@ -5,6 +5,7 @@ on:
     branches:
       - research/mel-temporal-grounding-count-gated-f1-v1-20261124
       - research/mel-temporal-revision-audit-v1-20261124
+      - research/mel-auditory-flip-stay-v1-20261126
     paths:
       - "crates/domains/symthaea-muse/src/temporal_grounding.rs"
       - "crates/domains/symthaea-muse/src/evidence_digest.rs"
@@ -70,6 +71,39 @@ jobs:
 
       - name: Warnings-denied Clippy on exact production source
         run: cargo +1.96.0 clippy --locked --manifest-path tools/mel-temporal-grounding-qualifier/Cargo.toml --all-targets -- -D warnings
+
+      - name: Replay MusicListenBench FLIP/STAY synthetic triplets when module is present
+        if: hashFiles('tools/mel-temporal-grounding-qualifier/src/auditory_invariance.rs') != ''
+        shell: bash
+        run: |
+          set -euo pipefail
+          cargo +1.96.0 run --locked --manifest-path tools/mel-temporal-grounding-qualifier/Cargo.toml --bin mel-auditory-flip-stay-audit -- tools/mel-temporal-grounding-qualifier/fixtures/mel-listenbench-flip-stay.synthetic.json > "$RUNNER_TEMP/mel-auditory-flip-stay-report.json"
+          jq -e '
+            .schema == "mel-auditory-flip-stay-report-v1"
+            and .pair_count == 6
+            and .source_lineage_clusters == 4
+            and .confirmatory_source_floor_met == false
+            and .overall.clean_accuracy > 0.83
+            and .overall.clean_accuracy < 0.84
+            and .overall.miss_rate == 0.0
+            and .overall.false_flip_rate > 0.16
+            and .overall.false_flip_rate < 0.17
+            and .overall.conditional_stay_items == 5
+            and .overall.conditional_false_flip_rate == 0.2
+            and .overall.accuracy_flip_stay > 0.91
+            and .overall.accuracy_flip_stay < 0.92
+            and .overall.joint_clean_flip_stay_rate > 0.66
+            and .overall.joint_clean_flip_stay_rate < 0.67
+            and .overall.answer_a_count == 11
+            and .overall.answer_b_count == 7
+            and .overall.parsed_answer_rate == 1.0
+            and (.by_task | length) == 4
+            and (.by_stay_factor | length) == 4
+            and .audio_bytes_recomputed == false
+            and .inference_receipt_authenticated == false
+            and .benchmark_manifest_authenticated == false
+            and .population_confidence_interval_computed == false
+          ' "$RUNNER_TEMP/mel-auditory-flip-stay-report.json" > /dev/null
 
       - name: Replay paired temporal revision when module is present
         if: hashFiles('tools/mel-temporal-grounding-qualifier/src/temporal_revision.rs') != ''
