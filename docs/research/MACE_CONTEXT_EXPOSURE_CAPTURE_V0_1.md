@@ -14,7 +14,7 @@ Crate export:
 
 ## What is implemented
 
-- A provider-neutral request model with a pinned model selector, deterministic static provider parameters, ordered messages and typed content segments. Provider parameters are restricted to scalar strings, numbers and booleans; nested objects/arrays are rejected until provider-specific leaf source maps exist. The exact sorted parameter map is hashed and compared with an independently pinned run-manifest profile before artifact storage or transport.
+- A provider-neutral request model with a pinned model selector, deterministic static provider parameters, ordered messages and typed content segments. The generic parameter map permits only numbers and booleans. Free-form strings, nested objects and arrays are rejected; provider-specific text-bearing fields require a dedicated typed source map. The exact sorted parameter map is hashed and compared with an independently pinned run-manifest profile before artifact storage or transport.
 - Each segment is either non-memory content or memory content with canonical evidence identity, payload digest, exposure kind, parent IDs, dependency closure, transformation, source, authority, admissibility and current-lifecycle commitments.
 - A deterministic JSON serializer that writes the request exactly once.
 - UTF-8 byte offsets are captured while serializing each typed memory-origin segment. It does not search the final prompt for repeated strings or use pre-serialization character offsets.
@@ -45,7 +45,7 @@ Tests use a fake artifact writer whose ciphertext digest is a test commitment ov
 
 The generic request model no longer accepts arbitrary `serde_json::Value` trees. Its provider parameter map is a typed scalar-only map (`String`, `Number`, `Bool`) so nested metadata, instruction objects, tool descriptions/schemas and opaque dynamic payloads cannot bypass the message source map. Provider adapters that need structured fields must expose source-aware typed leaves rather than reintroducing an unclassified JSON passthrough.
 
-The canonical JSON encoding of the sorted scalar map is hashed as `provider_parameter_profile_sha256`. The digest is pinned independently in the run manifest, included in the signed receipt and checked by the consumer verifier. Any parameter changes during a run—including the no-memory arm—make the invocation non-qualifiable.
+The canonical JSON encoding of the sorted numeric/boolean map is hashed as `provider_parameter_profile_sha256`. The digest is pinned independently in the run manifest, included in the signed receipt and checked by the consumer verifier. Any parameter changes during a run—including the no-memory arm—make the invocation non-qualifiable.
 
 This profile is a fixed-configuration commitment, not proof of source authority. Values must be declared static non-memory experiment configuration before the run. Dynamic session, user, tool, cached or memory-derived content must be expressed through the typed source-aware content path, never stored in this static profile. If that invariant cannot be established by the renderer/provider adapter, qualification must fail closed.
 
