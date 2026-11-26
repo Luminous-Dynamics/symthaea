@@ -23,6 +23,7 @@ on:
       - "research/cmaq-002/src/worldtest_query_portfolio.rs"
       - "research/cmaq-002/src/worldtest_mechanism_transfer.rs"
       - "research/cmaq-002/src/main.rs"
+      - "research/cmaq-002/WORLDTEST_MECHANISM_TRANSFER_V0_1.md"
       - "research/cmaq-002/worldtest-*"
       - "research/cmaq-002/WORLDTEST_QUERY_PORTFOLIO_V0_1.md"
       - "research/cmaq-002/fixtures/worldtest-*"
