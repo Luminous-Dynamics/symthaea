@@ -197,13 +197,9 @@ pub fn evaluate_full_archive(
          PayloadDisposition::Exact | PayloadDisposition::Recovered) => {
             FullArchiveDisposition::Pass
         }
-        (BootstrapDisposition::NotEvaluated, PayloadDisposition::NotEvaluated)
-        | (BootstrapDisposition::Passed | BootstrapDisposition::Recovered,
-           PayloadDisposition::NotEvaluated) => FullArchiveDisposition::NotEvaluated,
-        (BootstrapDisposition::Incomplete | BootstrapDisposition::NotEvaluated, _) => {
-            FullArchiveDisposition::Incomplete
-        }
-        (_, PayloadDisposition::NotEvaluated) => FullArchiveDisposition::NotEvaluated,
+        (BootstrapDisposition::NotEvaluated, _)
+        | (_, PayloadDisposition::NotEvaluated) => FullArchiveDisposition::NotEvaluated,
+        (BootstrapDisposition::Incomplete, _) => FullArchiveDisposition::Incomplete,
     }
 }
 
@@ -323,6 +319,14 @@ mod tests {
         assert_eq!(
             evaluate_full_archive(BootstrapDisposition::Incomplete, PayloadDisposition::Exact),
             FullArchiveDisposition::Incomplete
+        );
+        assert_eq!(
+            evaluate_full_archive(BootstrapDisposition::NotEvaluated, PayloadDisposition::Exact),
+            FullArchiveDisposition::NotEvaluated
+        );
+        assert_eq!(
+            evaluate_full_archive(BootstrapDisposition::Passed, PayloadDisposition::NotEvaluated),
+            FullArchiveDisposition::NotEvaluated
         );
         assert_eq!(
             evaluate_full_archive(BootstrapDisposition::Failed, PayloadDisposition::Exact),
