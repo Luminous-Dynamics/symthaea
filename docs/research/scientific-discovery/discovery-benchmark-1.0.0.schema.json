@@ -1,0 +1,13 @@
+{
+  "$schema":"https://json-schema.org/draft/2020-12/schema",
+  "$id":"https://symthaea.luminousdynamics.io/schemas/scientific-discovery-benchmark-1.0.0.json",
+  "title":"Scientific Discovery Process Benchmark",
+  "type":"object",
+  "required":["schema","schema_version","dimensions","non_equivalences"],
+  "properties":{
+    "schema":{"const":"symthaea.scientific_discovery.benchmark"},
+    "schema_version":{"const":"1.0.0"},
+    "dimensions":{"type":"array","items":{"enum":["calibration","model_lineage_diversity","information_gain","provenance_integrity","negative_result_retention"]},"minItems":5,"uniqueItems":true},
+    "non_equivalences":{"type":"array","const":["process_score_is_not_scientific_truth","computational_benchmark_is_not_experimental_validation","model_agreement_is_not_independent_corroboration","benchmark_success_is_not_official_criterion_evidence"]}
+  }
+}
