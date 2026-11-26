@@ -566,6 +566,8 @@ mod tests {
         16, 17, 18, 19, 20, 21, 22, 23, 24, 25, 26, 27, 28, 29, 30, 31,
     ];
 
+    const REQUEST_BODY: &[u8] = br#"{"schema":"mel-client-model-request-v1","experiment_unit_id":"mel-grounding-evidence-window-fixture-001","query_id":"piano-entry-query-001","query_text_sha256":"8faaeb1470e86800e5d84b45b7f311a7f1554eaad46c77b45bd3210d289c1cc2","target_audio_sha256":"b12dbd7c993ac1f0ddf6c0cef16c605ce48da060738b83837e39bdadf9df83ef","model_identity_sha256":"7777777777777777777777777777777777777777777777777777777777777777","runtime_identity_sha256":"8888888888888888888888888888888888888888888888888888888888888888","decoding_config_sha256":"9999999999999999999999999999999999999999999999999999999999999999","prompt_sha256":"3333333333333333333333333333333333333333333333333333333333333333","adapter_sha256":"4444444444444444444444444444444444444444444444444444444444444444","retrieval_policy_sha256":"5555555555555555555555555555555555555555555555555555555555555555","audio_windows":[{"window_id":"window-001","start_frame":1,"end_frame":3,"sha256":"3fc77626f4c70d9e28aa4c1cd901fcf28a7a6a690788342dcb45884f5dc3acb0"},{"window_id":"window-002","start_frame":5,"end_frame":8,"sha256":"74cac05eac42e84ae16f372efbe5354a1fa5e03b39ae90df4a9dcd81a59fb792"}]}"#;
+
     fn manifest() -> AudioEvidenceWindowManifestV1 {
         let mut manifest = AudioEvidenceWindowManifestV1 {
             schema: MANIFEST_SCHEMA_V1.into(),
@@ -609,6 +611,11 @@ mod tests {
                     window_pcm_sha256: sha256_hex(&PCM[20..32]),
                 },
             ],
+            request_body: ClientRequestBodyV1 {
+                body_sha256: sha256_hex(REQUEST_BODY),
+                byte_length: REQUEST_BODY.len() as u64,
+                content_type: "application/json".into(),
+            },
             context: EvidenceContextV1 {
                 prompt_sha256: "3333333333333333333333333333333333333333333333333333333333333333".into(),
                 adapter_sha256: "4444444444444444444444444444444444444444444444444444444444444444".into(),
@@ -639,7 +646,7 @@ mod tests {
             manifest.context.context_manifest_sha256,
             "0fe3a258449c9fa4b4625c1c91d155c51f95f7694f38472973382ef95504ed95"
         );
-        let report = verify_audio_evidence_manifest(&manifest, SOURCE_AUDIO, PCM).unwrap();
+        let report = verify_audio_evidence_manifest(&manifest, SOURCE_AUDIO, PCM, REQUEST_BODY).unwrap();
         assert_eq!(
             report.full_manifest_sha256,
             "70a121d88275034cf68428f20002c51d3cc6f83275e6e77bc80e5a1e3a5a8556"
@@ -669,30 +676,48 @@ mod tests {
     fn one_byte_source_mutation_is_rejected() {
         let mut bytes = SOURCE_AUDIO.to_vec();
         bytes[0] ^= 1;
-        assert!(verify_audio_evidence_manifest(&manifest(), &bytes, PCM).is_err());
+        assert!(verify_audio_evidence_manifest(&manifest(), &bytes, PCM, REQUEST_BODY).is_err());
     }
 
     #[test]
     fn one_sample_pcm_mutation_is_rejected() {
         let mut bytes = PCM.to_vec();
         bytes[5] ^= 1;
-        assert!(verify_audio_evidence_manifest(&manifest(), SOURCE_AUDIO, &bytes).is_err());
+        assert!(verify_audio_evidence_manifest(&manifest(), SOURCE_AUDIO, &bytes, REQUEST_BODY).is_err());
+    }
+
+    #[test]
+    fn request_body_bytes_are_recomputed_and_must_match_declared_digest() {
+        let report =
+            verify_audio_evidence_manifest(&manifest(), SOURCE_AUDIO, PCM, REQUEST_BODY).unwrap();
+        assert!(report.request_body_bytes_recomputed);
+        assert!(!report.request_body_delivery_attested);
+        assert_eq!(
+            report.request_body_sha256,
+            "a93528c8fc47a15de50927eb61355ff89360b5698281de7dd9bc1b61104de616"
+        );
+
+        let mut mutated = REQUEST_BODY.to_vec();
+        mutated[0] ^= 1;
+        assert!(
+            verify_audio_evidence_manifest(&manifest(), SOURCE_AUDIO, PCM, &mutated).is_err()
+        );
     }
 
     #[test]
     fn local_evidence_must_bind_exact_target_audio() {
         let mut input = manifest();
         input.target_audio_sha256 = "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa".into();
-        assert!(verify_audio_evidence_manifest(&input, SOURCE_AUDIO, PCM).is_err());
+        assert!(verify_audio_evidence_manifest(&input, SOURCE_AUDIO, PCM, REQUEST_BODY).is_err());
     }
 
     #[test]
     fn yoked_evidence_must_bind_different_target_audio() {
         let mut input = manifest();
         input.evidence_condition = EvidenceConditionV1::YokedRetrieved;
-        assert!(verify_audio_evidence_manifest(&input, SOURCE_AUDIO, PCM).is_err());
+        assert!(verify_audio_evidence_manifest(&input, SOURCE_AUDIO, PCM, REQUEST_BODY).is_err());
         input.target_audio_sha256 = "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa".into();
-        assert!(verify_audio_evidence_manifest(&input, SOURCE_AUDIO, PCM).is_ok());
+        assert!(verify_audio_evidence_manifest(&input, SOURCE_AUDIO, PCM, REQUEST_BODY).is_ok());
     }
 
     #[test]
@@ -701,13 +726,13 @@ mod tests {
         input.evidence_condition = EvidenceConditionV1::YokedRetrieved;
         input.target_audio_sha256 =
             "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa".into();
-        assert!(verify_audio_evidence_manifest(&input, SOURCE_AUDIO, PCM).is_err());
+        assert!(verify_audio_evidence_manifest(&input, SOURCE_AUDIO, PCM, REQUEST_BODY).is_err());
 
         input = manifest();
         input.evidence_condition = EvidenceConditionV1::YokedRetrieved;
         input.source_lineage_id = "different-digest-same-work".into();
         input.context.context_manifest_sha256 = context_digest(&input).unwrap();
-        assert!(verify_audio_evidence_manifest(&input, SOURCE_AUDIO, PCM).is_err());
+        assert!(verify_audio_evidence_manifest(&input, SOURCE_AUDIO, PCM, REQUEST_BODY).is_err());
 
         input = manifest();
         input.evidence_condition = EvidenceConditionV1::YokedRetrieved;
@@ -715,7 +740,7 @@ mod tests {
             "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa".into();
         input.source_lineage_id = "synthetic-yoked-source-lineage-001".into();
         input.context.context_manifest_sha256 = context_digest(&input).unwrap();
-        assert!(verify_audio_evidence_manifest(&input, SOURCE_AUDIO, PCM).is_ok());
+        assert!(verify_audio_evidence_manifest(&input, SOURCE_AUDIO, PCM, REQUEST_BODY).is_ok());
     }
 
     #[test]
@@ -723,11 +748,11 @@ mod tests {
         let mut input = manifest();
         input.windows[0].start_frame = 0;
         input.windows[0].end_frame = 0;
-        assert!(verify_audio_evidence_manifest(&input, SOURCE_AUDIO, PCM).is_err());
+        assert!(verify_audio_evidence_manifest(&input, SOURCE_AUDIO, PCM, REQUEST_BODY).is_err());
 
         input = manifest();
         input.windows[0].end_frame = 9;
-        assert!(verify_audio_evidence_manifest(&input, SOURCE_AUDIO, PCM).is_err());
+        assert!(verify_audio_evidence_manifest(&input, SOURCE_AUDIO, PCM, REQUEST_BODY).is_err());
     }
 
     #[test]
@@ -735,49 +760,49 @@ mod tests {
         let mut input = manifest();
         input.context.items.swap(0, 1);
         input.context.context_manifest_sha256 = context_digest(&input).unwrap();
-        assert!(verify_audio_evidence_manifest(&input, SOURCE_AUDIO, PCM).is_err());
+        assert!(verify_audio_evidence_manifest(&input, SOURCE_AUDIO, PCM, REQUEST_BODY).is_err());
 
         input = manifest();
         input.context.items[1].position = 4;
         input.context.context_manifest_sha256 = context_digest(&input).unwrap();
-        assert!(verify_audio_evidence_manifest(&input, SOURCE_AUDIO, PCM).is_err());
+        assert!(verify_audio_evidence_manifest(&input, SOURCE_AUDIO, PCM, REQUEST_BODY).is_err());
     }
 
     #[test]
     fn context_digest_detects_changed_query_model_runtime_or_decode_context() {
         let mut input = manifest();
         input.query_text = "different query".into();
-        assert!(verify_audio_evidence_manifest(&input, SOURCE_AUDIO, PCM).is_err());
+        assert!(verify_audio_evidence_manifest(&input, SOURCE_AUDIO, PCM, REQUEST_BODY).is_err());
 
         input = manifest();
         input.query_text_sha256 =
             "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa".into();
-        assert!(verify_audio_evidence_manifest(&input, SOURCE_AUDIO, PCM).is_err());
+        assert!(verify_audio_evidence_manifest(&input, SOURCE_AUDIO, PCM, REQUEST_BODY).is_err());
 
         input = manifest();
         input.model_identity_sha256 =
             "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa".into();
-        assert!(verify_audio_evidence_manifest(&input, SOURCE_AUDIO, PCM).is_err());
+        assert!(verify_audio_evidence_manifest(&input, SOURCE_AUDIO, PCM, REQUEST_BODY).is_err());
 
         input = manifest();
         input.runtime_identity_sha256 =
             "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa".into();
-        assert!(verify_audio_evidence_manifest(&input, SOURCE_AUDIO, PCM).is_err());
+        assert!(verify_audio_evidence_manifest(&input, SOURCE_AUDIO, PCM, REQUEST_BODY).is_err());
 
         input = manifest();
         input.decoding_config_sha256 =
             "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa".into();
-        assert!(verify_audio_evidence_manifest(&input, SOURCE_AUDIO, PCM).is_err());
+        assert!(verify_audio_evidence_manifest(&input, SOURCE_AUDIO, PCM, REQUEST_BODY).is_err());
 
         input = manifest();
         input.context.prompt_sha256 =
             "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa".into();
-        assert!(verify_audio_evidence_manifest(&input, SOURCE_AUDIO, PCM).is_err());
+        assert!(verify_audio_evidence_manifest(&input, SOURCE_AUDIO, PCM, REQUEST_BODY).is_err());
 
         input = manifest();
         input.context.adapter_sha256 =
             "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa".into();
-        assert!(verify_audio_evidence_manifest(&input, SOURCE_AUDIO, PCM).is_err());
+        assert!(verify_audio_evidence_manifest(&input, SOURCE_AUDIO, PCM, REQUEST_BODY).is_err());
     }
 
     #[test]
@@ -786,18 +811,18 @@ mod tests {
         input.context.items[0].payload_sha256 =
             "7777777777777777777777777777777777777777777777777777777777777777".into();
         input.context.context_manifest_sha256 = context_digest(&input).unwrap();
-        assert!(verify_audio_evidence_manifest(&input, SOURCE_AUDIO, PCM).is_err());
+        assert!(verify_audio_evidence_manifest(&input, SOURCE_AUDIO, PCM, REQUEST_BODY).is_err());
     }
 
     #[test]
     fn malformed_lengths_and_clock_metadata_are_rejected() {
         let mut input = manifest();
         input.decoded_pcm.byte_length += 1;
-        assert!(verify_audio_evidence_manifest(&input, SOURCE_AUDIO, PCM).is_err());
+        assert!(verify_audio_evidence_manifest(&input, SOURCE_AUDIO, PCM, REQUEST_BODY).is_err());
 
         input = manifest();
         input.decoded_pcm.channels = 0;
-        assert!(verify_audio_evidence_manifest(&input, SOURCE_AUDIO, PCM).is_err());
+        assert!(verify_audio_evidence_manifest(&input, SOURCE_AUDIO, PCM, REQUEST_BODY).is_err());
     }
 
     #[test]
@@ -806,6 +831,6 @@ mod tests {
         input.decoded_pcm.total_frames = u64::MAX;
         input.decoded_pcm.byte_length = u64::MAX;
         let tiny = &PCM[..];
-        assert!(verify_audio_evidence_manifest(&input, SOURCE_AUDIO, tiny).is_err());
+        assert!(verify_audio_evidence_manifest(&input, SOURCE_AUDIO, tiny, REQUEST_BODY).is_err());
     }
 }
