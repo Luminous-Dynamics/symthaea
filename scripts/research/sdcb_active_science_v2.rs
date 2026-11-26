@@ -528,6 +528,47 @@ mod tests {
     }
 
     #[test]
+    fn positive_average_disagreement_does_not_guarantee_pairwise_identifiability() {
+        let mut e = observational_equivalence_fixture();
+        e.hypotheses.push(LinearHypothesis {
+            hypothesis_id: "duplicate-of-mechanism-x".into(),
+            a: e.hypotheses[0].a.clone(),
+            b: e.hypotheses[0].b.clone(),
+            c: e.hypotheses[0].c.clone(),
+        });
+        validate_episode(&e).unwrap();
+        let probe = find_probe(&e, "impulse-sensor-x").unwrap();
+        let predictions: Vec<f64> = e.hypotheses.iter()
+            .map(|h| predict_trace(h, &e.initial_state, probe.sensor_index, &probe.input_sequence)
+                .unwrap().last().copied().unwrap())
+            .collect();
+        let mean = predictions.iter().sum::<f64>() / predictions.len() as f64;
+        let population_variance = predictions.iter()
+            .map(|v| (v-mean).powi(2)).sum::<f64>() / predictions.len() as f64;
+        assert!(population_variance > 0.0);
+        assert!(minimum_pairwise_margin(&e, probe).unwrap() <= 0.0);
+        assert_eq!(choose_discriminating_probe(&e).unwrap(), None);
+    }
+
+    #[test]
+    fn near_equivalent_mechanisms_remain_ambiguous_inside_noise_envelope() {
+        let mut e = observational_equivalence_fixture();
+        e.hypotheses[1].b = vec![1.0, 0.05];
+        let probe = find_probe(&e, "impulse-sensor-x").unwrap();
+        assert!(minimum_pairwise_margin(&e, probe).unwrap() < 0.0);
+        let receipt = ObservationReceipt {
+            episode_id: e.episode_id.clone(),
+            probe_id: probe.probe_id.clone(),
+            sensor_index: probe.sensor_index,
+            observed_trace: vec![0.0, 1.0, 0.0],
+            declared_noise_bound: e.sensor_noise_bound,
+        };
+        let compatible = consistent_hypotheses(&e, probe, &receipt).unwrap();
+        assert_eq!(compatible.len(), 2);
+        assert!(matches!(candidate_set_disposition(&compatible), CandidateSetDisposition::MultipleCandidates(_)));
+    }
+
+    #[test]
     fn no_candidate_fit_requires_model_revision_or_abstention() {
         let e = observational_equivalence_fixture();
         let other = LinearHypothesis {
