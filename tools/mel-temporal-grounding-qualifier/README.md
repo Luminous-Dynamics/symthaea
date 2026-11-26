@@ -52,3 +52,12 @@ Run the synthetic corpus fixture with:
     cargo +1.96.0 run --locked --manifest-path tools/mel-temporal-grounding-qualifier/Cargo.toml --bin mel-temporal-reliability-audit -- tools/mel-temporal-grounding-qualifier/fixtures/mel-temporal-reliability-corpus.synthetic.json
 
 The strict input envelope is defined in schemas/mel-temporal-annotation-reliability-corpus-v1.schema.json. Structural cross-record checks and the actual alpha/temporal scoring rules are enforced by Rust.
+
+
+### Assigned-rater roster and explicit missingness
+
+Each corpus item now carries an explicit assigned-annotator SHA-256 roster and a nonresponses list. Every assigned rater must appear exactly once as either a returned independent annotation or a nonresponse record. Nonresponse reasons are NotReturned, Declined, Withdrawn, TechnicalFailure, or Incomplete; they are not reclassified as Absent, Ambiguous or NotEstimable.
+
+The report includes assigned rater-item slots, returned annotation count, missing assignment count, overall coverage, complete/partial item counts, missingness by reason, and per-pseudonymous-rater coverage across items. Unit summaries retain the assigned roster, raw annotation records and raw nonresponse records.
+
+Krippendorff alpha is computed over returned categorical annotations only. Missing ratings remain outside the coincidence matrix and visible in separate coverage denominators. The source-work bootstrap resamples source-work lineages while treating the observed annotator panel as fixed; it does not generalize to an unseen rater population.
