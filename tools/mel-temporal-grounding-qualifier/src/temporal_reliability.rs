@@ -12,14 +12,13 @@ use std::collections::{BTreeMap, BTreeSet};
 use serde::{Deserialize, Serialize};
 
 use crate::temporal_consensus::{
-    audit_multi_annotator_case, AnnotatorGroundingResultV1,
-    IndependentTemporalAnnotationV1, MultiAnnotatorGroundingSummaryV1,
-    MultiAnnotatorTemporalCaseV1,
+    AnnotatorGroundingResultV1, IndependentTemporalAnnotationV1, MultiAnnotatorGroundingSummaryV1,
+    MultiAnnotatorTemporalCaseV1, audit_multi_annotator_case,
 };
 use crate::temporal_grounding::{
-    score_temporal_grounding, AudioArtifactClockV1, GroundTruthStateV1,
-    GroundingPredictionStateV1, TemporalGroundTruthV1, TemporalGroundingPlanV1,
-    TemporalGroundingPredictionV1, TemporalGroundingScoreV1, TEMPORAL_GROUNDING_SCHEMA_V1,
+    AudioArtifactClockV1, GroundTruthStateV1, GroundingPredictionStateV1,
+    TEMPORAL_GROUNDING_SCHEMA_V1, TemporalGroundTruthV1, TemporalGroundingPlanV1,
+    TemporalGroundingPredictionV1, TemporalGroundingScoreV1, score_temporal_grounding,
 };
 
 const DATASET_SCHEMA_V1: &str = "mel-multi-annotator-reliability-dataset-v1";
@@ -239,8 +238,12 @@ pub fn audit_multi_annotator_dataset(
             unique_annotators.insert(annotation.annotator_id_sha256.as_str());
         }
         pairwise_results.extend(pairwise_item_results(item)?);
-        let model_report = audit_multi_annotator_case(&item.case)
-            .map_err(|error| format!("item {} rejected by per-annotator model scorer: {error}", item.item_id))?;
+        let model_report = audit_multi_annotator_case(&item.case).map_err(|error| {
+            format!(
+                "item {} rejected by per-annotator model scorer: {error}",
+                item.item_id
+            )
+        })?;
         model_grounding_by_item.push(ModelGroundingItemReliabilityV1 {
             item_id: item.item_id.clone(),
             query_id: item.case.query_id.clone(),
@@ -304,10 +307,16 @@ pub fn audit_multi_annotator_dataset(
 
 fn validate_dataset(dataset: &MultiAnnotatorReliabilityDatasetV1) -> Result<(), String> {
     if dataset.schema != DATASET_SCHEMA_V1 {
-        return Err(format!("unsupported reliability dataset schema: {}", dataset.schema));
+        return Err(format!(
+            "unsupported reliability dataset schema: {}",
+            dataset.schema
+        ));
     }
     require_text(&dataset.dataset_id, "dataset_id")?;
-    require_text(&dataset.annotation_policy_version, "annotation_policy_version")?;
+    require_text(
+        &dataset.annotation_policy_version,
+        "annotation_policy_version",
+    )?;
     if dataset.minimum_raters_per_item < 2 {
         return Err("minimum_raters_per_item must be at least two".into());
     }
@@ -321,7 +330,10 @@ fn validate_dataset(dataset: &MultiAnnotatorReliabilityDatasetV1) -> Result<(), 
         return Err("bootstrap seed must be nonzero".into());
     }
     if dataset.boundary_tolerances_ms.is_empty()
-        || dataset.boundary_tolerances_ms.iter().any(|value| *value == 0)
+        || dataset
+            .boundary_tolerances_ms
+            .iter()
+            .any(|value| *value == 0)
         || dataset
             .boundary_tolerances_ms
             .windows(2)
@@ -340,7 +352,10 @@ fn validate_dataset(dataset: &MultiAnnotatorReliabilityDatasetV1) -> Result<(), 
             return Err(format!("duplicate reliability item_id: {}", item.item_id));
         }
         if !query_ids.insert(item.case.query_id.as_str()) {
-            return Err(format!("duplicate reliability query_id: {}", item.case.query_id));
+            return Err(format!(
+                "duplicate reliability query_id: {}",
+                item.case.query_id
+            ));
         }
         if item.case.minimum_annotator_count != dataset.minimum_raters_per_item {
             return Err(format!(
@@ -391,8 +406,8 @@ fn pairwise_item_results(
             let right = &annotations[b];
             let eligible_left = is_nominal_state(left.state);
             let eligible_right = is_nominal_state(right.state);
-            let state_agreement = (eligible_left && eligible_right)
-                .then_some(left.state == right.state);
+            let state_agreement =
+                (eligible_left && eligible_right).then_some(left.state == right.state);
 
             let (f1, iou, exact_count, count_difference, starts, ends, exclusion_reason) =
                 if !eligible_left || !eligible_right {
@@ -419,21 +434,15 @@ fn pairwise_item_results(
                     );
                     let left_count = left.intervals.len();
                     let right_count = right.intervals.len();
-                    let mut starts = boundary_errors_ms(
-                        &left_score,
-                        item.case.artifact.sample_rate_hz,
-                        true,
-                    );
+                    let mut starts =
+                        boundary_errors_ms(&left_score, item.case.artifact.sample_rate_hz, true);
                     starts.extend(boundary_errors_ms(
                         &right_score,
                         item.case.artifact.sample_rate_hz,
                         true,
                     ));
-                    let mut ends = boundary_errors_ms(
-                        &left_score,
-                        item.case.artifact.sample_rate_hz,
-                        false,
-                    );
+                    let mut ends =
+                        boundary_errors_ms(&left_score, item.case.artifact.sample_rate_hz, false);
                     ends.extend(boundary_errors_ms(
                         &right_score,
                         item.case.artifact.sample_rate_hz,
@@ -501,8 +510,9 @@ fn score_annotation_direction(
             intervals: prediction_annotation.intervals.clone(),
         },
     };
-    score_temporal_grounding(&truth, &prediction, &case.plan)
-        .map_err(|issues| format!("pairwise production scorer rejected a Present/Present pair: {issues:?}"))
+    score_temporal_grounding(&truth, &prediction, &case.plan).map_err(|issues| {
+        format!("pairwise production scorer rejected a Present/Present pair: {issues:?}")
+    })
 }
 
 fn nominal_alpha(items: &[MultiAnnotatorReliabilityItemV1]) -> KrippendorffAlphaNominalV1 {
@@ -551,18 +561,15 @@ fn nominal_alpha(items: &[MultiAnnotatorReliabilityItemV1]) -> KrippendorffAlpha
     }
 
     let ordered_coincidences: u64 = coincidences.iter().flatten().sum();
-    let observed_disagreement = (ordered_coincidences > 0).then(|| {
-        (coincidences[0][1] + coincidences[1][0]) as f64
-            / ordered_coincidences as f64
-    });
+    let observed_disagreement = (ordered_coincidences > 0)
+        .then(|| (coincidences[0][1] + coincidences[1][0]) as f64 / ordered_coincidences as f64);
     let marginals = [
         coincidences[0][0] + coincidences[0][1],
         coincidences[1][0] + coincidences[1][1],
     ];
     let marginal_total = marginals[0] + marginals[1];
     let expected_disagreement = (marginal_total > 1).then(|| {
-        (marginals[0] * marginals[1] * 2) as f64
-            / (marginal_total * (marginal_total - 1)) as f64
+        (marginals[0] * marginals[1] * 2) as f64 / (marginal_total * (marginal_total - 1)) as f64
     });
     let alpha = observed_disagreement
         .zip(expected_disagreement)
@@ -611,30 +618,24 @@ fn summarize_model_grounding(
         present_items,
         one_to_many_items,
         absent_items,
-        source_work_macro_present_mean_f1: mean_item_metric(
-            items,
-            |summary| summary.present_mean_f1,
-        ),
-        source_work_macro_present_exact_count_accuracy: mean_item_metric(
-            items,
-            |summary| summary.present_exact_count_accuracy,
-        ),
-        source_work_macro_one_to_many_count_gated_f1: mean_item_metric(
-            items,
-            |summary| summary.one_to_many_mean_count_gated_f1,
-        ),
-        source_work_macro_absent_claim_accuracy: mean_item_metric(
-            items,
-            |summary| summary.absent_claim_accuracy,
-        ),
-        source_work_macro_prediction_coverage: mean_item_metric(
-            items,
-            |summary| summary.prediction_coverage,
-        ),
-        source_work_macro_fully_correct_rate: mean_item_metric(
-            items,
-            |summary| summary.fully_correct_rate,
-        ),
+        source_work_macro_present_mean_f1: mean_item_metric(items, |summary| {
+            summary.present_mean_f1
+        }),
+        source_work_macro_present_exact_count_accuracy: mean_item_metric(items, |summary| {
+            summary.present_exact_count_accuracy
+        }),
+        source_work_macro_one_to_many_count_gated_f1: mean_item_metric(items, |summary| {
+            summary.one_to_many_mean_count_gated_f1
+        }),
+        source_work_macro_absent_claim_accuracy: mean_item_metric(items, |summary| {
+            summary.absent_claim_accuracy
+        }),
+        source_work_macro_prediction_coverage: mean_item_metric(items, |summary| {
+            summary.prediction_coverage
+        }),
+        source_work_macro_fully_correct_rate: mean_item_metric(items, |summary| {
+            summary.fully_correct_rate
+        }),
         model_confidence_calibration_computed: false,
     }
 }
@@ -723,13 +724,22 @@ fn boundary_tolerance_summary(
     BoundaryToleranceAgreementV1 {
         tolerance_ms,
         start_within_tolerance_rate: mean(
-            &cluster_metrics.iter().map(|item| item.0).collect::<Vec<_>>(),
+            &cluster_metrics
+                .iter()
+                .map(|item| item.0)
+                .collect::<Vec<_>>(),
         ),
         end_within_tolerance_rate: mean(
-            &cluster_metrics.iter().map(|item| item.1).collect::<Vec<_>>(),
+            &cluster_metrics
+                .iter()
+                .map(|item| item.1)
+                .collect::<Vec<_>>(),
         ),
         both_boundaries_within_tolerance_rate: mean(
-            &cluster_metrics.iter().map(|item| item.2).collect::<Vec<_>>(),
+            &cluster_metrics
+                .iter()
+                .map(|item| item.2)
+                .collect::<Vec<_>>(),
         ),
         start_boundary_observations: start_observations,
         end_boundary_observations: end_observations,
@@ -762,8 +772,7 @@ fn summarize_dataset(
     let same_state_absent_pairs = pairwise
         .iter()
         .filter(|pair| {
-            pair.state_a == GroundTruthStateV1::Absent
-                && pair.state_b == GroundTruthStateV1::Absent
+            pair.state_a == GroundTruthStateV1::Absent && pair.state_b == GroundTruthStateV1::Absent
         })
         .count();
     let present_absent_disagreement_pairs = pairwise
@@ -838,7 +847,8 @@ fn bootstrap_dataset(
             .push(index);
     }
     let cluster_keys: Vec<_> = clusters.keys().copied().collect();
-    let mut cluster_pairwise: BTreeMap<&str, Vec<&PairwiseAnnotationReliabilityV1>> = BTreeMap::new();
+    let mut cluster_pairwise: BTreeMap<&str, Vec<&PairwiseAnnotationReliabilityV1>> =
+        BTreeMap::new();
     for pair in pairwise {
         cluster_pairwise
             .entry(pair.source_work_id_sha256.as_str())
@@ -848,19 +858,35 @@ fn bootstrap_dataset(
 
     let cluster_f1 = cluster_keys
         .iter()
-        .map(|key| cluster_pair_metric(cluster_pairwise.get(key).map(Vec::as_slice), |pair| pair.interval_f1_symmetric))
+        .map(|key| {
+            cluster_pair_metric(cluster_pairwise.get(key).map(Vec::as_slice), |pair| {
+                pair.interval_f1_symmetric
+            })
+        })
         .collect::<Vec<_>>();
     let cluster_iou = cluster_keys
         .iter()
-        .map(|key| cluster_pair_metric(cluster_pairwise.get(key).map(Vec::as_slice), |pair| pair.matched_iou_symmetric))
+        .map(|key| {
+            cluster_pair_metric(cluster_pairwise.get(key).map(Vec::as_slice), |pair| {
+                pair.matched_iou_symmetric
+            })
+        })
         .collect::<Vec<_>>();
     let cluster_count_agreement = cluster_keys
         .iter()
-        .map(|key| cluster_pair_metric(cluster_pairwise.get(key).map(Vec::as_slice), |pair| pair.exact_occurrence_count_agreement.map(bool_to_f64)))
+        .map(|key| {
+            cluster_pair_metric(cluster_pairwise.get(key).map(Vec::as_slice), |pair| {
+                pair.exact_occurrence_count_agreement.map(bool_to_f64)
+            })
+        })
         .collect::<Vec<_>>();
     let cluster_state_agreement = cluster_keys
         .iter()
-        .map(|key| cluster_pair_metric(cluster_pairwise.get(key).map(Vec::as_slice), |pair| pair.state_agreement.map(bool_to_f64)))
+        .map(|key| {
+            cluster_pair_metric(cluster_pairwise.get(key).map(Vec::as_slice), |pair| {
+                pair.state_agreement.map(bool_to_f64)
+            })
+        })
         .collect::<Vec<_>>();
     let cluster_start_mae = cluster_keys
         .iter()
@@ -936,15 +962,18 @@ fn bootstrap_dataset(
             let item_indices = clusters
                 .get(key)
                 .ok_or_else(|| "bootstrap source cluster disappeared".to_string())?;
-            sampled_items.extend(item_indices.iter().map(|item_index| &dataset.items[*item_index]));
+            sampled_items.extend(
+                item_indices
+                    .iter()
+                    .map(|item_index| &dataset.items[*item_index]),
+            );
             push_some(&mut sampled_state, cluster_state_agreement[index]);
             push_some(&mut sampled_f1, cluster_f1[index]);
             push_some(&mut sampled_iou, cluster_iou[index]);
             push_some(&mut sampled_count, cluster_count_agreement[index]);
             push_some(&mut sampled_start, cluster_start_mae[index]);
             push_some(&mut sampled_end, cluster_end_mae[index]);
-            for (tolerance_index, cluster_values) in
-                cluster_boundary_tolerances.iter().enumerate()
+            for (tolerance_index, cluster_values) in cluster_boundary_tolerances.iter().enumerate()
             {
                 if let Some((start, end, both)) = cluster_values[index] {
                     sampled_tolerances[tolerance_index].0.push(start);
@@ -1063,10 +1092,7 @@ fn cluster_pair_metric(
     pairs: Option<&[&PairwiseAnnotationReliabilityV1]>,
     field: impl Fn(&PairwiseAnnotationReliabilityV1) -> Option<f64>,
 ) -> Option<f64> {
-    let values: Vec<_> = pairs?
-        .iter()
-        .filter_map(|pair| field(pair))
-        .collect();
+    let values: Vec<_> = pairs?.iter().filter_map(|pair| field(pair)).collect();
     mean(&values)
 }
 
@@ -1091,7 +1117,10 @@ fn cluster_mean(values: &[Option<f64>]) -> Option<f64> {
     mean(&values.iter().filter_map(|value| *value).collect::<Vec<_>>())
 }
 
-fn percentile_interval(point: Option<f64>, mut samples: Vec<Option<f64>>) -> Option<PercentileIntervalV1> {
+fn percentile_interval(
+    point: Option<f64>,
+    mut samples: Vec<Option<f64>>,
+) -> Option<PercentileIntervalV1> {
     let estimate = point?;
     let mut values: Vec<_> = samples.drain(..).flatten().collect();
     if values.len() < 800 {
@@ -1135,7 +1164,10 @@ fn boundary_errors_ms(
 }
 
 fn is_nominal_state(state: GroundTruthStateV1) -> bool {
-    matches!(state, GroundTruthStateV1::Present | GroundTruthStateV1::Absent)
+    matches!(
+        state,
+        GroundTruthStateV1::Present | GroundTruthStateV1::Absent
+    )
 }
 
 fn average_optional(left: Option<f64>, right: Option<f64>) -> Option<f64> {
@@ -1191,8 +1223,8 @@ fn require_text(value: &str, label: &str) -> Result<(), String> {
 mod tests {
     use super::*;
     use crate::temporal_grounding::{
-        AudioArtifactClockV1, FrameIntervalV1, TemporalGroundingPlanV1,
-        TEMPORAL_GROUNDING_EVALUATOR_V1,
+        AudioArtifactClockV1, FrameIntervalV1, TEMPORAL_GROUNDING_EVALUATOR_V1,
+        TemporalGroundingPlanV1,
     };
 
     const MANIFEST: &str = "eeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeee";
@@ -1287,8 +1319,20 @@ mod tests {
             Vec::new()
         };
         let annotations = vec![
-            annotation('1', item_key * 4 + 1, state, annotation_intervals.clone(), None),
-            annotation('2', item_key * 4 + 2, state, annotation_intervals.clone(), None),
+            annotation(
+                '1',
+                item_key * 4 + 1,
+                state,
+                annotation_intervals.clone(),
+                None,
+            ),
+            annotation(
+                '2',
+                item_key * 4 + 2,
+                state,
+                annotation_intervals.clone(),
+                None,
+            ),
             annotation('3', item_key * 4 + 3, state, annotation_intervals, None),
         ];
         MultiAnnotatorReliabilityItemV1 {
@@ -1320,8 +1364,20 @@ mod tests {
         ];
         let mut items = Vec::new();
         for cluster in ['a', 'b', 'c'] {
-            items.push(item(&format!("{cluster}-present"), cluster, &format!("{cluster}-q1"), GroundTruthStateV1::Present, two_events.clone()));
-            items.push(item(&format!("{cluster}-absent"), cluster, &format!("{cluster}-q2"), GroundTruthStateV1::Absent, Vec::new()));
+            items.push(item(
+                &format!("{cluster}-present"),
+                cluster,
+                &format!("{cluster}-q1"),
+                GroundTruthStateV1::Present,
+                two_events.clone(),
+            ));
+            items.push(item(
+                &format!("{cluster}-absent"),
+                cluster,
+                &format!("{cluster}-q2"),
+                GroundTruthStateV1::Absent,
+                Vec::new(),
+            ));
         }
         dataset(items)
     }
@@ -1335,22 +1391,34 @@ mod tests {
         assert_eq!(report.model_grounding_summary.one_to_many_items, 3);
         assert_eq!(report.model_grounding_summary.absent_items, 3);
         assert_eq!(
-            report.model_grounding_summary.source_work_macro_present_mean_f1,
+            report
+                .model_grounding_summary
+                .source_work_macro_present_mean_f1,
             Some(1.0)
         );
         assert_eq!(
-            report.model_grounding_summary.source_work_macro_one_to_many_count_gated_f1,
+            report
+                .model_grounding_summary
+                .source_work_macro_one_to_many_count_gated_f1,
             Some(1.0)
         );
         assert_eq!(
-            report.model_grounding_summary.source_work_macro_absent_claim_accuracy,
+            report
+                .model_grounding_summary
+                .source_work_macro_absent_claim_accuracy,
             Some(1.0)
         );
         assert_eq!(
-            report.model_grounding_summary.source_work_macro_prediction_coverage,
+            report
+                .model_grounding_summary
+                .source_work_macro_prediction_coverage,
             Some(1.0)
         );
-        assert!(!report.model_grounding_summary.model_confidence_calibration_computed);
+        assert!(
+            !report
+                .model_grounding_summary
+                .model_confidence_calibration_computed
+        );
         assert_eq!(report.model_grounding_by_item.len(), 6);
         assert_eq!(report.model_grounding_by_item[0].annotations.len(), 3);
         assert_eq!(
@@ -1359,7 +1427,10 @@ mod tests {
         );
         assert_eq!(
             report.model_grounding_by_item[0].artifact.audio_sha256,
-            report.model_grounding_by_item[0].prediction.artifact.audio_sha256
+            report.model_grounding_by_item[0]
+                .prediction
+                .artifact
+                .audio_sha256
         );
     }
 
@@ -1376,10 +1447,14 @@ mod tests {
     #[test]
     fn all_same_category_has_undefined_expected_disagreement_not_alpha_one() {
         let mut data = balanced_agreement_dataset();
-        data.items.retain(|item| item.case.annotations[0].state == GroundTruthStateV1::Present);
+        data.items
+            .retain(|item| item.case.annotations[0].state == GroundTruthStateV1::Present);
         let report = audit_multi_annotator_dataset(&data).unwrap();
         assert_eq!(report.summary.state_reliability.alpha, None);
-        assert_eq!(report.summary.state_reliability.expected_disagreement, Some(0.0));
+        assert_eq!(
+            report.summary.state_reliability.expected_disagreement,
+            Some(0.0)
+        );
     }
 
     #[test]
@@ -1391,10 +1466,18 @@ mod tests {
         assert!(report.summary.state_reliability.alpha.unwrap() < 1.0);
         assert_eq!(report.summary.present_absent_disagreement_pairs, 2);
         assert_eq!(
-            report.model_grounding_by_item[0].summary.absent_claim_accuracy,
+            report.model_grounding_by_item[0]
+                .summary
+                .absent_claim_accuracy,
             Some(0.0)
         );
-        assert!(report.model_grounding_summary.source_work_macro_absent_claim_accuracy.unwrap() < 1.0);
+        assert!(
+            report
+                .model_grounding_summary
+                .source_work_macro_absent_claim_accuracy
+                .unwrap()
+                < 1.0
+        );
     }
 
     #[test]
@@ -1403,7 +1486,10 @@ mod tests {
         let pair = report
             .pairwise_results
             .iter()
-            .find(|pair| pair.state_a == GroundTruthStateV1::Present && pair.state_b == GroundTruthStateV1::Present)
+            .find(|pair| {
+                pair.state_a == GroundTruthStateV1::Present
+                    && pair.state_b == GroundTruthStateV1::Present
+            })
             .unwrap();
         assert_eq!(pair.interval_f1_symmetric, Some(1.0));
         assert_eq!(pair.matched_iou_symmetric, Some(1.0));
@@ -1415,16 +1501,24 @@ mod tests {
     fn slight_boundary_shift_preserves_count_but_changes_temporal_agreement() {
         let mut data = balanced_agreement_dataset();
         let query_id = data.items[0].case.query_id.clone();
-        let annotator_a = data.items[0].case.annotations[0].annotator_id_sha256.clone();
-        let annotator_b = data.items[0].case.annotations[1].annotator_id_sha256.clone();
+        let annotator_a = data.items[0].case.annotations[0]
+            .annotator_id_sha256
+            .clone();
+        let annotator_b = data.items[0].case.annotations[1]
+            .annotator_id_sha256
+            .clone();
         data.items[0].case.annotations[1].intervals[0].start_frame += 1_200;
         data.items[0].case.annotations[1].intervals[0].end_frame += 1_200;
         let report = audit_multi_annotator_dataset(&data).unwrap();
-        let pair = report.pairwise_results.iter().find(|pair| {
-            pair.query_id == query_id
-                && pair.annotator_a_sha256 == annotator_a
-                && pair.annotator_b_sha256 == annotator_b
-        }).unwrap();
+        let pair = report
+            .pairwise_results
+            .iter()
+            .find(|pair| {
+                pair.query_id == query_id
+                    && pair.annotator_a_sha256 == annotator_a
+                    && pair.annotator_b_sha256 == annotator_b
+            })
+            .unwrap();
         assert_eq!(pair.exact_occurrence_count_agreement, Some(true));
         assert_eq!(pair.interval_f1_symmetric, Some(1.0));
         assert!(pair.matched_iou_symmetric.unwrap() < 1.0);
@@ -1436,11 +1530,17 @@ mod tests {
         let mut data = balanced_agreement_dataset();
         data.items[0].case.annotations[2].intervals.pop();
         let report = audit_multi_annotator_dataset(&data).unwrap();
-        let pair = report.pairwise_results.iter().find(|pair| {
-            pair.query_id == data.items[0].case.query_id
-                && pair.annotator_a_sha256 == data.items[0].case.annotations[0].annotator_id_sha256
-                && pair.annotator_b_sha256 == data.items[0].case.annotations[2].annotator_id_sha256
-        }).unwrap();
+        let pair = report
+            .pairwise_results
+            .iter()
+            .find(|pair| {
+                pair.query_id == data.items[0].case.query_id
+                    && pair.annotator_a_sha256
+                        == data.items[0].case.annotations[0].annotator_id_sha256
+                    && pair.annotator_b_sha256
+                        == data.items[0].case.annotations[2].annotator_id_sha256
+            })
+            .unwrap();
         assert_eq!(pair.state_agreement, Some(true));
         assert_eq!(pair.exact_occurrence_count_agreement, Some(false));
         assert_eq!(pair.occurrence_count_difference, Some(1));
@@ -1454,7 +1554,8 @@ mod tests {
         data.items[0].case.annotations[2].status_reason = Some("gradual onset".into());
         data.items[1].case.annotations[2].state = GroundTruthStateV1::NotEstimable;
         data.items[1].case.annotations[2].intervals.clear();
-        data.items[1].case.annotations[2].status_reason = Some("masking prevents a reliable judgement".into());
+        data.items[1].case.annotations[2].status_reason =
+            Some("masking prevents a reliable judgement".into());
         let report = audit_multi_annotator_dataset(&data).unwrap();
         assert_eq!(report.summary.ambiguous_or_not_estimable_excluded_pairs, 4);
         assert_eq!(report.summary.state_reliability.ambiguous_exclusions, 1);

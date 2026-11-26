@@ -11,9 +11,8 @@ use std::collections::{BTreeMap, BTreeSet};
 use serde::{Deserialize, Serialize};
 
 use crate::temporal_acquisition::{
-    plan_annotation_acquisition, AnnotationAcquisitionDatasetV1,
-    AnnotationSelectionRecordV1,
-    ProbabilityAuditStratumDesignV1, SelectionStreamV1,
+    AnnotationAcquisitionDatasetV1, AnnotationSelectionRecordV1, ProbabilityAuditStratumDesignV1,
+    SelectionStreamV1, plan_annotation_acquisition,
 };
 
 const ESTIMATOR_SCHEMA_V1: &str = "mel-two-stage-design-estimator-input-v1";
@@ -144,7 +143,10 @@ pub fn estimate_design_based_metric(
     input: &DesignEstimatorInputV1,
 ) -> Result<DesignEstimatorReportV1, String> {
     if input.schema != ESTIMATOR_SCHEMA_V1 {
-        return Err(format!("unsupported estimator input schema: {}", input.schema));
+        return Err(format!(
+            "unsupported estimator input schema: {}",
+            input.schema
+        ));
     }
     require_text(&input.metric_id, "metric_id")?;
     require_text(&input.evaluator_version, "evaluator_version")?;
@@ -164,7 +166,9 @@ pub fn estimate_design_based_metric(
     }
     let selection_receipt_match_verified = input.expected_selection_receipt_sha256.is_some();
     if planned.probability_audit_is_adaptive || !planned.source_work_sets_are_disjoint {
-        return Err("planner report does not satisfy frozen independent audit-stream invariants".into());
+        return Err(
+            "planner report does not satisfy frozen independent audit-stream invariants".into(),
+        );
     }
     if planned.probability_audit.is_empty() {
         return Err("probability audit sample is empty".into());
@@ -174,12 +178,24 @@ pub fn estimate_design_based_metric(
     let mut scoring_receipts = BTreeSet::new();
     for outcome in &input.observed_audit_outcomes {
         require_text(&outcome.item_id, "observed_audit_outcomes.item_id")?;
-        validate_digest(&outcome.source_work_id_sha256, "outcome.source_work_id_sha256")?;
-        validate_digest(&outcome.scoring_report_sha256, "outcome.scoring_report_sha256")?;
+        validate_digest(
+            &outcome.source_work_id_sha256,
+            "outcome.source_work_id_sha256",
+        )?;
+        validate_digest(
+            &outcome.scoring_report_sha256,
+            "outcome.scoring_report_sha256",
+        )?;
         if !scoring_receipts.insert(outcome.scoring_report_sha256.as_str()) {
-            return Err(format!("duplicate scoring-report receipt for item {}", outcome.item_id));
+            return Err(format!(
+                "duplicate scoring-report receipt for item {}",
+                outcome.item_id
+            ));
         }
-        validate_digest(&outcome.model_identity_sha256, "outcome.model_identity_sha256")?;
+        validate_digest(
+            &outcome.model_identity_sha256,
+            "outcome.model_identity_sha256",
+        )?;
         validate_digest(&outcome.scoring_plan_sha256, "outcome.scoring_plan_sha256")?;
         if outcome.model_identity_sha256 != input.model_identity_sha256
             || outcome.evaluator_version != input.evaluator_version
@@ -203,7 +219,10 @@ pub fn estimate_design_based_metric(
             ));
         }
         if outcomes.insert(outcome.item_id.as_str(), outcome).is_some() {
-            return Err(format!("duplicate observed audit outcome for {}", outcome.item_id));
+            return Err(format!(
+                "duplicate observed audit outcome for {}",
+                outcome.item_id
+            ));
         }
     }
 
@@ -232,7 +251,10 @@ pub fn estimate_design_based_metric(
             return Err("planner probability-audit field contains a non-audit selection".into());
         }
         if !outcomes.contains_key(selection.item_id.as_str()) {
-            return Err(format!("missing observed outcome for selected item {}", selection.item_id));
+            return Err(format!(
+                "missing observed outcome for selected item {}",
+                selection.item_id
+            ));
         }
     }
 
@@ -329,15 +351,13 @@ pub fn estimate_design_based_metric(
         }
         let source_work_estimate: f64 = selected
             .iter()
-            .map(|item| (item.outcome / item.source_work_size as f64) / item.first_order_probability)
+            .map(|item| {
+                (item.outcome / item.source_work_size as f64) / item.first_order_probability
+            })
             .sum();
-        let source_work_mean_estimate =
-            source_work_estimate / design.eligible_source_works as f64;
-        let source_work_variance = estimate_stratum_variance(
-            design,
-            &selected,
-            EstimatorTargetV1::SourceWorkMean,
-        );
+        let source_work_mean_estimate = source_work_estimate / design.eligible_source_works as f64;
+        let source_work_variance =
+            estimate_stratum_variance(design, &selected, EstimatorTargetV1::SourceWorkMean);
         let (source_work_variance_value, source_work_variance_reason) = match source_work_variance {
             Ok(value) if value.is_finite() && value >= 0.0 => (Some(value), None),
             Ok(value) if !value.is_finite() => (
@@ -354,8 +374,10 @@ pub fn estimate_design_based_metric(
             source_work_total_variance += value;
         } else {
             source_work_variance_available = false;
-            source_work_variance_unavailable_reasons
-                .push((design.source_stratum_id.clone(), source_work_variance_reason.unwrap()));
+            source_work_variance_unavailable_reasons.push((
+                design.source_stratum_id.clone(),
+                source_work_variance_reason.unwrap(),
+            ));
         }
 
         total_estimate += estimate;
@@ -370,14 +392,10 @@ pub fn estimate_design_based_metric(
         let source_work_variance_standard_error = source_work_variance_value.map(f64::sqrt);
         let source_work_mean_variance = source_work_variance_value
             .map(|value| value / (design.eligible_source_works as f64).powi(2));
-        let mean_variance = variance_value.map(|value| {
-            value / (design.eligible_query_items as f64).powi(2)
-        });
+        let mean_variance =
+            variance_value.map(|value| value / (design.eligible_query_items as f64).powi(2));
         let source_work_fpc = if design.eligible_source_works > 0 {
-            Some(
-                1.0 - design.selected_source_works as f64
-                    / design.eligible_source_works as f64,
-            )
+            Some(1.0 - design.selected_source_works as f64 / design.eligible_source_works as f64)
         } else {
             None
         };
@@ -411,7 +429,9 @@ pub fn estimate_design_based_metric(
     }
 
     if population_item_count == 0 {
-        return Err("no eligible probability-audit query items exist in the finite population".into());
+        return Err(
+            "no eligible probability-audit query items exist in the finite population".into(),
+        );
     }
     let population_mean = total_estimate / population_item_count as f64;
     let population_variance = total_variance_available.then_some(total_variance);
@@ -493,9 +513,7 @@ pub(crate) fn estimate_stratum_variance(
                 EstimatorTargetV1::QueryItem => right.outcome,
                 EstimatorTargetV1::SourceWorkMean => right.outcome / right.source_work_size as f64,
             };
-            variance += covariance_factor
-                * (left_value / pi_left)
-                * (right_value / pi_right);
+            variance += covariance_factor * (left_value / pi_left) * (right_value / pi_right);
         }
     }
     Ok(variance)
@@ -539,15 +557,13 @@ fn second_order_inclusion_probability(
         if left_n != right_n || left_m != right_m {
             return Err(VarianceUnavailableReasonV1::ZeroJointInclusionProbability);
         }
-        (selected_works as f64 / works as f64)
-            * (left_m as f64 * (left_m - 1) as f64)
+        (selected_works as f64 / works as f64) * (left_m as f64 * (left_m - 1) as f64)
             / (left_n as f64 * (left_n - 1) as f64)
     } else {
         if works <= 1 || selected_works <= 1 {
             return Err(VarianceUnavailableReasonV1::FewerThanTwoSelectedSourceWorks);
         }
-        let between_source_probability = (selected_works as f64
-            * (selected_works - 1) as f64)
+        let between_source_probability = (selected_works as f64 * (selected_works - 1) as f64)
             / (works as f64 * (works - 1) as f64);
         let left_conditional = left_m as f64 / left_n as f64;
         let right_conditional = right_m as f64 / right_n as f64;
@@ -589,8 +605,8 @@ mod tests {
     use std::collections::BTreeSet;
 
     use crate::temporal_acquisition::{
-        AnnotationAcquisitionCandidateV1, AnnotationCohortRoleV1,
-        AnnotationStratumQuotaV1, AuthorizationStateV1,
+        AnnotationAcquisitionCandidateV1, AnnotationCohortRoleV1, AnnotationStratumQuotaV1,
+        AuthorizationStateV1,
     };
 
     fn digest(byte: char) -> String {
@@ -809,7 +825,8 @@ mod tests {
             if selected_sets.insert(selected) {
                 means.push(report.estimated_source_work_population_mean.unwrap());
                 variances.push(
-                    report.estimated_source_work_population_total_variance
+                    report
+                        .estimated_source_work_population_total_variance
                         .expect("two selected source works support between-work variance"),
                 );
             }
@@ -882,7 +899,9 @@ mod tests {
     #[test]
     fn duplicate_metric_rows_and_active_stream_data_are_rejected() {
         let mut input = estimator_input(dataset(23, 2));
-        input.observed_audit_outcomes.push(input.observed_audit_outcomes[0].clone());
+        input
+            .observed_audit_outcomes
+            .push(input.observed_audit_outcomes[0].clone());
         assert!(estimate_design_based_metric(&input).is_err());
 
         let mut input = estimator_input(dataset(23, 2));
@@ -893,8 +912,9 @@ mod tests {
     #[test]
     fn scoring_report_receipts_must_be_unique_per_audited_query_item() {
         let mut input = estimator_input(dataset(29, 2));
-        input.observed_audit_outcomes[1].scoring_report_sha256 =
-            input.observed_audit_outcomes[0].scoring_report_sha256.clone();
+        input.observed_audit_outcomes[1].scoring_report_sha256 = input.observed_audit_outcomes[0]
+            .scoring_report_sha256
+            .clone();
         assert!(estimate_design_based_metric(&input).is_err());
     }
 
@@ -911,7 +931,16 @@ mod tests {
         assert_eq!(report.metric_id, "grounded-correct");
         assert_eq!(report.eligible_probability_audit_items, 6);
         assert!(report.estimated_source_work_population_mean.is_some());
-        assert!(report.estimated_source_work_population_total_variance.is_some());
-        assert!(report.estimated_source_work_population_total_variance.unwrap().is_finite());
+        assert!(
+            report
+                .estimated_source_work_population_total_variance
+                .is_some()
+        );
+        assert!(
+            report
+                .estimated_source_work_population_total_variance
+                .unwrap()
+                .is_finite()
+        );
     }
 }

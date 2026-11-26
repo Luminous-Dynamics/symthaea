@@ -12,12 +12,12 @@ use serde::{Deserialize, Serialize};
 
 use crate::evidence_digest::canonical_json_sha256;
 use crate::temporal_acquisition::{
-    plan_annotation_acquisition, AnnotationAcquisitionDatasetV1,
-    AnnotationSelectionRecordV1, ProbabilityAuditStratumDesignV1, SelectionStreamV1,
+    AnnotationAcquisitionDatasetV1, AnnotationSelectionRecordV1, ProbabilityAuditStratumDesignV1,
+    SelectionStreamV1, plan_annotation_acquisition,
 };
 use crate::temporal_design_estimator::{
-    estimate_stratum_variance, probability_to_f64, EstimatorTargetV1,
-    SampledItemV1, VarianceUnavailableReasonV1,
+    EstimatorTargetV1, SampledItemV1, VarianceUnavailableReasonV1, estimate_stratum_variance,
+    probability_to_f64,
 };
 use crate::temporal_selective::{IdentifiabilityBasisV1, SelectiveDecisionV1};
 
@@ -173,13 +173,13 @@ pub fn audit_selective_design_risk(
     input: &SelectiveDesignRiskInputV1,
 ) -> Result<SelectiveDesignRiskReportV1, String> {
     if input.schema != INPUT_SCHEMA_V1 {
-        return Err(format!("unsupported selective design-risk schema: {}", input.schema));
+        return Err(format!(
+            "unsupported selective design-risk schema: {}",
+            input.schema
+        ));
     }
     validate_threshold_plan(&input.threshold_plan)?;
-    validate_digest(
-        &input.threshold_plan_sha256,
-        "threshold_plan_sha256",
-    )?;
+    validate_digest(&input.threshold_plan_sha256, "threshold_plan_sha256")?;
     let expected_threshold_digest = canonical_json_sha256(&input.threshold_plan)
         .map_err(|error| format!("failed to hash frozen threshold plan: {error}"))?;
     if input.threshold_plan_sha256 != expected_threshold_digest {
@@ -202,7 +202,9 @@ pub fn audit_selective_design_risk(
         .as_deref()
         .is_some_and(|expected| expected != planned.selection_receipt_sha256)
     {
-        return Err("expected selection receipt does not match deterministic planner replay".into());
+        return Err(
+            "expected selection receipt does not match deterministic planner replay".into(),
+        );
     }
     if planned.probability_audit_is_adaptive || !planned.source_work_sets_are_disjoint {
         return Err("planner output is not a frozen, source-disjoint probability audit".into());
@@ -230,7 +232,10 @@ pub fn audit_selective_design_risk(
             ));
         }
         if outcomes.insert(outcome.item_id.as_str(), outcome).is_some() {
-            return Err(format!("duplicate selective outcome for item {}", outcome.item_id));
+            return Err(format!(
+                "duplicate selective outcome for item {}",
+                outcome.item_id
+            ));
         }
     }
 
@@ -246,7 +251,10 @@ pub fn audit_selective_design_risk(
             selected_ids.len()
         ));
     }
-    if outcomes.keys().any(|item_id| !selected_ids.contains(*item_id)) {
+    if outcomes
+        .keys()
+        .any(|item_id| !selected_ids.contains(*item_id))
+    {
         return Err("selective outcomes include an unselected or active-refinement item".into());
     }
 
@@ -267,18 +275,28 @@ pub fn audit_selective_design_risk(
                 selection.item_id
             ));
         }
-        let inclusion = probability_to_f64(
-            selection
-                .item_inclusion_probability
-                .ok_or_else(|| format!("selected item {} lacks inclusion probability", selection.item_id))?,
-        )?;
+        let inclusion =
+            probability_to_f64(selection.item_inclusion_probability.ok_or_else(|| {
+                format!(
+                    "selected item {} lacks inclusion probability",
+                    selection.item_id
+                )
+            })?)?;
         if !(0.0..=1.0).contains(&inclusion) || inclusion == 0.0 {
-            return Err(format!("selected item {} has invalid inclusion probability", selection.item_id));
+            return Err(format!(
+                "selected item {} has invalid inclusion probability",
+                selection.item_id
+            ));
         }
         let source_work_size = selection
             .eligible_items_in_source_work
             .filter(|count| *count > 0)
-            .ok_or_else(|| format!("selected item {} lacks eligible source-work size", selection.item_id))?;
+            .ok_or_else(|| {
+                format!(
+                    "selected item {} lacks eligible source-work size",
+                    selection.item_id
+                )
+            })?;
         joined.push(JoinedAuditItem {
             selection,
             outcome,
@@ -288,11 +306,17 @@ pub fn audit_selective_design_risk(
     }
 
     let eligible_items = checked_sum(
-        planned.probability_audit_design.iter().map(|design| design.eligible_query_items),
+        planned
+            .probability_audit_design
+            .iter()
+            .map(|design| design.eligible_query_items),
         "eligible query-item population",
     )?;
     let eligible_works = checked_sum(
-        planned.probability_audit_design.iter().map(|design| design.eligible_source_works),
+        planned
+            .probability_audit_design
+            .iter()
+            .map(|design| design.eligible_source_works),
         "eligible source-work population",
     )?;
     if eligible_items == 0 || eligible_works == 0 {
@@ -324,7 +348,11 @@ pub fn audit_selective_design_risk(
     let sample_evidence_strata = summarize_sample_evidence_strata(&joined);
 
     let always_answer_error = make_samples(&joined, |item| {
-        if item.outcome.unconditional_answer_correct { 0.0 } else { 1.0 }
+        if item.outcome.unconditional_answer_correct {
+            0.0
+        } else {
+            1.0
+        }
     });
     let always_item_total = ht_total(&always_answer_error, EstimatorTargetV1::QueryItem);
     let always_work_total = ht_total(&always_answer_error, EstimatorTargetV1::SourceWorkMean);
@@ -357,14 +385,10 @@ pub fn audit_selective_design_risk(
             bool_value(is_covered(item.outcome, *threshold))
         });
         let errors = make_samples(&joined, |item| {
-            bool_value(
-                is_covered(item.outcome, *threshold) && !item.outcome.decision_correct,
-            )
+            bool_value(is_covered(item.outcome, *threshold) && !item.outcome.decision_correct)
         });
         let false_absences = make_samples(&joined, |item| {
-            bool_value(
-                is_covered(item.outcome, *threshold) && item.outcome.false_absence_claim,
-            )
+            bool_value(is_covered(item.outcome, *threshold) && item.outcome.false_absence_claim)
         });
 
         let sample_covered_items = joined
@@ -373,15 +397,11 @@ pub fn audit_selective_design_risk(
             .count();
         let sample_covered_errors = joined
             .iter()
-            .filter(|item| {
-                is_covered(item.outcome, *threshold) && !item.outcome.decision_correct
-            })
+            .filter(|item| is_covered(item.outcome, *threshold) && !item.outcome.decision_correct)
             .count();
         let sample_false_absence_claims = joined
             .iter()
-            .filter(|item| {
-                is_covered(item.outcome, *threshold) && item.outcome.false_absence_claim
-            })
+            .filter(|item| is_covered(item.outcome, *threshold) && item.outcome.false_absence_claim)
             .count();
 
         let covered_item_total = ht_total(&covered, EstimatorTargetV1::QueryItem);
@@ -450,10 +470,10 @@ pub fn audit_selective_design_risk(
             ratio_interval(risk, variance)
         });
 
-        let item_false_absence_rate = (covered_item_total > 0.0)
-            .then_some(false_absence_item_total / covered_item_total);
-        let work_false_absence_rate = (covered_work_total > 0.0)
-            .then_some(false_absence_work_total / covered_work_total);
+        let item_false_absence_rate =
+            (covered_item_total > 0.0).then_some(false_absence_item_total / covered_item_total);
+        let work_false_absence_rate =
+            (covered_work_total > 0.0).then_some(false_absence_work_total / covered_work_total);
         let item_false_absence_interval = item_false_absence_rate.map(|rate| {
             let linearized = make_samples(&joined, |item| {
                 let c = bool_value(is_covered(item.outcome, *threshold));
@@ -553,17 +573,26 @@ fn validate_outcome_identity(
     for (value, label) in [
         (&outcome.source_work_id_sha256, "source_work_id_sha256"),
         (&outcome.selective_report_sha256, "selective_report_sha256"),
-        (&outcome.adjudication_profile_sha256, "adjudication_profile_sha256"),
+        (
+            &outcome.adjudication_profile_sha256,
+            "adjudication_profile_sha256",
+        ),
         (&outcome.model_identity_sha256, "model_identity_sha256"),
         (&outcome.runtime_identity_sha256, "runtime_identity_sha256"),
         (&outcome.decoding_config_sha256, "decoding_config_sha256"),
-        (&outcome.hardware_identity_sha256, "hardware_identity_sha256"),
+        (
+            &outcome.hardware_identity_sha256,
+            "hardware_identity_sha256",
+        ),
         (&outcome.scoring_plan_sha256, "scoring_plan_sha256"),
     ] {
         validate_digest(value, label)?;
     }
     if outcome.decision_confidence_ppm > 1_000_000 {
-        return Err(format!("item {} confidence exceeds 1,000,000 ppm", outcome.item_id));
+        return Err(format!(
+            "item {} confidence exceeds 1,000,000 ppm",
+            outcome.item_id
+        ));
     }
     if outcome.model_identity_sha256 != input.model_identity_sha256
         || outcome.runtime_identity_sha256 != input.runtime_identity_sha256
@@ -572,14 +601,20 @@ fn validate_outcome_identity(
         || outcome.evaluator_version != input.evaluator_version
         || outcome.scoring_plan_sha256 != input.scoring_plan_sha256
     {
-        return Err(format!("item {} has a model/runtime/evaluator/plan mismatch", outcome.item_id));
+        return Err(format!(
+            "item {} has a model/runtime/evaluator/plan mismatch",
+            outcome.item_id
+        ));
     }
     Ok(())
 }
 
 fn validate_threshold_plan(plan: &FrozenSelectiveThresholdPlanV1) -> Result<(), String> {
     if plan.schema != THRESHOLD_SCHEMA_V1 {
-        return Err(format!("unsupported selective threshold plan schema: {}", plan.schema));
+        return Err(format!(
+            "unsupported selective threshold plan schema: {}",
+            plan.schema
+        ));
     }
     if plan.tie_rule != "greater_or_equal" {
         return Err("V1 threshold tie rule must be greater_or_equal".into());
@@ -590,7 +625,9 @@ fn validate_threshold_plan(plan: &FrozenSelectiveThresholdPlanV1) -> Result<(), 
     let mut previous = None;
     for threshold in &plan.thresholds_ppm {
         if *threshold > 1_000_000 || previous.is_some_and(|prior| prior >= *threshold) {
-            return Err("thresholds must be unique, strictly increasing values in 0..=1,000,000".into());
+            return Err(
+                "thresholds must be unique, strictly increasing values in 0..=1,000,000".into(),
+            );
         }
         previous = Some(*threshold);
     }
@@ -608,10 +645,7 @@ fn is_covered(outcome: &SelectiveAuditOutcomeV1, threshold_ppm: u32) -> bool {
     ) && outcome.decision_confidence_ppm >= threshold_ppm
 }
 
-fn make_samples<'a, F>(
-    joined: &'a [JoinedAuditItem<'a>],
-    value: F,
-) -> Vec<SampledItemV1<'a>>
+fn make_samples<'a, F>(joined: &'a [JoinedAuditItem<'a>], value: F) -> Vec<SampledItemV1<'a>>
 where
     F: Fn(&JoinedAuditItem<'a>) -> f64,
 {
@@ -693,7 +727,9 @@ fn proportion_interval_from_total(
             standard_error: None,
             confidence_95_low: None,
             confidence_95_high: None,
-            variance_unavailable_reason: Some(VarianceUnavailableReasonV1::NonFiniteVarianceEstimate),
+            variance_unavailable_reason: Some(
+                VarianceUnavailableReasonV1::NonFiniteVarianceEstimate,
+            ),
         },
         Err(reason) => ProportionIntervalV1 {
             estimate,
@@ -726,7 +762,9 @@ fn ratio_interval(
             standard_error: None,
             confidence_95_low: None,
             confidence_95_high: None,
-            variance_unavailable_reason: Some(VarianceUnavailableReasonV1::NonFiniteVarianceEstimate),
+            variance_unavailable_reason: Some(
+                VarianceUnavailableReasonV1::NonFiniteVarianceEstimate,
+            ),
         },
         Err(reason) => ProportionIntervalV1 {
             estimate,
@@ -753,9 +791,7 @@ fn summarize_sample_evidence_strata(
         .map(|(evidence_stratum, items)| {
             let covered: Vec<_> = items
                 .iter()
-                .filter(|item| {
-                    is_covered(item.outcome, 0)
-                })
+                .filter(|item| is_covered(item.outcome, 0))
                 .collect();
             EvidenceStratumSampleCountV1 {
                 evidence_stratum: evidence_stratum.to_owned(),
@@ -806,8 +842,8 @@ fn require_text(value: &str, label: &str) -> Result<(), String> {
 mod tests {
     use super::*;
     use crate::temporal_acquisition::{
-        AnnotationAcquisitionCandidateV1, AnnotationAcquisitionConfigV1,
-        AnnotationCohortRoleV1, AnnotationStratumQuotaV1, AuthorizationStateV1,
+        AnnotationAcquisitionCandidateV1, AnnotationAcquisitionConfigV1, AnnotationCohortRoleV1,
+        AnnotationStratumQuotaV1, AuthorizationStateV1,
     };
 
     fn digest(char: char) -> String {
@@ -841,7 +877,11 @@ mod tests {
         }
     }
 
-    fn dataset(seed: u64, source_works: u32, items_per_work: usize) -> AnnotationAcquisitionDatasetV1 {
+    fn dataset(
+        seed: u64,
+        source_works: u32,
+        items_per_work: usize,
+    ) -> AnnotationAcquisitionDatasetV1 {
         let mut candidates = Vec::new();
         for work_index in 0..source_works {
             let work = char::from(b'a' + u8::try_from(work_index).unwrap());
@@ -968,16 +1008,29 @@ mod tests {
     #[test]
     fn false_absence_is_a_covered_error_and_remains_separate() {
         let mut input = base_input(dataset(5, 3, 2));
-        input.observed_probability_audit_outcomes[0].decision =
-            SelectiveDecisionV1::ClaimAbsent;
+        input.observed_probability_audit_outcomes[0].decision = SelectiveDecisionV1::ClaimAbsent;
         input.observed_probability_audit_outcomes[0].decision_correct = false;
         input.observed_probability_audit_outcomes[0].unconditional_answer_correct = false;
         input.observed_probability_audit_outcomes[0].false_absence_claim = true;
         let report = audit_selective_design_risk(&input).unwrap();
         let point = &report.risk_coverage[0];
         assert_eq!(point.sample_false_absence_claims, 1);
-        assert!(point.item_weighted_selective_risk.as_ref().unwrap().estimate > 0.0);
-        assert!(point.item_weighted_false_absence_rate.as_ref().unwrap().estimate > 0.0);
+        assert!(
+            point
+                .item_weighted_selective_risk
+                .as_ref()
+                .unwrap()
+                .estimate
+                > 0.0
+        );
+        assert!(
+            point
+                .item_weighted_false_absence_rate
+                .as_ref()
+                .unwrap()
+                .estimate
+                > 0.0
+        );
     }
 
     #[test]
@@ -1012,15 +1065,37 @@ mod tests {
         let report = audit_selective_design_risk(&input).unwrap();
         let point = &report.risk_coverage[0];
         assert_eq!(
-            point.item_weighted_selective_risk.as_ref().unwrap().estimate,
+            point
+                .item_weighted_selective_risk
+                .as_ref()
+                .unwrap()
+                .estimate,
             0.0
         );
         assert_eq!(
-            point.source_work_weighted_selective_risk.as_ref().unwrap().estimate,
+            point
+                .source_work_weighted_selective_risk
+                .as_ref()
+                .unwrap()
+                .estimate,
             0.0
         );
-        assert!(point.item_weighted_selective_risk.as_ref().unwrap().standard_error.is_some());
-        assert!(point.source_work_weighted_selective_risk.as_ref().unwrap().standard_error.is_some());
+        assert!(
+            point
+                .item_weighted_selective_risk
+                .as_ref()
+                .unwrap()
+                .standard_error
+                .is_some()
+        );
+        assert!(
+            point
+                .source_work_weighted_selective_risk
+                .as_ref()
+                .unwrap()
+                .standard_error
+                .is_some()
+        );
     }
 
     #[test]
@@ -1050,8 +1125,16 @@ mod tests {
         let report = audit_selective_design_risk(&input).unwrap();
         let point = &report.risk_coverage[0];
         assert_ne!(
-            point.item_weighted_selective_risk.as_ref().unwrap().estimate,
-            point.source_work_weighted_selective_risk.as_ref().unwrap().estimate
+            point
+                .item_weighted_selective_risk
+                .as_ref()
+                .unwrap()
+                .estimate,
+            point
+                .source_work_weighted_selective_risk
+                .as_ref()
+                .unwrap()
+                .estimate
         );
     }
 
@@ -1081,7 +1164,13 @@ mod tests {
             }
             let report = audit_selective_design_risk(&input).unwrap();
             let point = &report.risk_coverage[0];
-            risks.push(point.item_weighted_selective_risk.as_ref().unwrap().estimate);
+            risks.push(
+                point
+                    .item_weighted_selective_risk
+                    .as_ref()
+                    .unwrap()
+                    .estimate,
+            );
             risk_variances.push(
                 point
                     .item_weighted_selective_risk
@@ -1111,15 +1200,19 @@ mod tests {
         input.threshold_plan.thresholds_ppm = vec![0, 500_000];
         input.threshold_plan_sha256 = canonical_json_sha256(&input.threshold_plan).unwrap();
         let report = audit_selective_design_risk(&input).unwrap();
-        assert!(report.risk_coverage[0]
-            .item_weighted_coverage
-            .variance_unavailable_reason
-            .is_some());
-        assert!(report.risk_coverage[0]
-            .item_weighted_selective_risk
-            .as_ref()
-            .unwrap()
-            .variance_unavailable_reason
-            .is_some());
+        assert!(
+            report.risk_coverage[0]
+                .item_weighted_coverage
+                .variance_unavailable_reason
+                .is_some()
+        );
+        assert!(
+            report.risk_coverage[0]
+                .item_weighted_selective_risk
+                .as_ref()
+                .unwrap()
+                .variance_unavailable_reason
+                .is_some()
+        );
     }
 }

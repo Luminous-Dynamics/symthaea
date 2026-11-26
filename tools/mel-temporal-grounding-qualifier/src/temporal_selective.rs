@@ -10,10 +10,10 @@ use std::collections::{BTreeMap, BTreeSet};
 use serde::{Deserialize, Serialize};
 
 use crate::temporal_grounding::{
-    score_temporal_grounding, validate_temporal_ground_truth,
-    validate_temporal_grounding_prediction, GroundingPredictionStateV1,
-    GroundTruthStateV1, TemporalGroundTruthV1, TemporalGroundingOutcomeV1,
-    TemporalGroundingPlanV1, TemporalGroundingPredictionV1, TemporalGroundingScoreV1,
+    GroundTruthStateV1, GroundingPredictionStateV1, TemporalGroundTruthV1,
+    TemporalGroundingOutcomeV1, TemporalGroundingPlanV1, TemporalGroundingPredictionV1,
+    TemporalGroundingScoreV1, score_temporal_grounding, validate_temporal_ground_truth,
+    validate_temporal_grounding_prediction,
 };
 
 const CASE_SCHEMA_V1: &str = "mel-selective-temporal-case-v1";
@@ -235,7 +235,10 @@ pub fn audit_selective_batch(
     batch: &SelectiveGroundingBatchV1,
 ) -> Result<SelectiveGroundingReportV1, String> {
     if batch.schema != BATCH_SCHEMA_V1 {
-        return Err(format!("unsupported selective-grounding batch schema: {}", batch.schema));
+        return Err(format!(
+            "unsupported selective-grounding batch schema: {}",
+            batch.schema
+        ));
     }
     require_text(&batch.evaluation_id, "evaluation_id")?;
     validate_digest(&batch.model_identity_sha256, "model_identity_sha256")?;
@@ -283,41 +286,55 @@ fn score_case(
     case_ids: &mut BTreeSet<String>,
 ) -> Result<SelectiveCaseResultV1, String> {
     if case.schema != CASE_SCHEMA_V1 {
-        return Err(format!("unsupported case schema for {}: {}", case.case_id, case.schema));
+        return Err(format!(
+            "unsupported case schema for {}: {}",
+            case.case_id, case.schema
+        ));
     }
     require_text(&case.case_id, "case_id")?;
     require_text(&case.source_lineage_id, "source_lineage_id")?;
     require_text(&case.evidence_stratum, "evidence_stratum")?;
-    validate_digest(&case.adjudication_profile_sha256, "adjudication_profile_sha256")?;
-    if !case.decision_confidence.is_finite()
-        || !(0.0..=1.0).contains(&case.decision_confidence)
-    {
-        return Err(format!("case {} has confidence outside [0,1]", case.case_id));
+    validate_digest(
+        &case.adjudication_profile_sha256,
+        "adjudication_profile_sha256",
+    )?;
+    if !case.decision_confidence.is_finite() || !(0.0..=1.0).contains(&case.decision_confidence) {
+        return Err(format!(
+            "case {} has confidence outside [0,1]",
+            case.case_id
+        ));
     }
     if case.inference_cost.forward_passes == 0
         || case.inference_cost.selective_wall_time_ms == 0
         || case.inference_cost.one_pass_baseline_wall_time_ms == 0
     {
-        return Err(format!("case {} has invalid inference-cost measurements", case.case_id));
+        return Err(format!(
+            "case {} has invalid inference-cost measurements",
+            case.case_id
+        ));
     }
     if !case_ids.insert(case.case_id.clone()) {
-        return Err(format!("duplicate selective-grounding case_id: {}", case.case_id));
+        return Err(format!(
+            "duplicate selective-grounding case_id: {}",
+            case.case_id
+        ));
     }
 
     let basis_matches_truth = matches!(
         (case.truth.state, case.identifiability_basis),
-        (GroundTruthStateV1::Present, IdentifiabilityBasisV1::ClearPositive)
-            | (GroundTruthStateV1::Absent, IdentifiabilityBasisV1::ClearAbsence)
-            | (
-                GroundTruthStateV1::Ambiguous,
-                IdentifiabilityBasisV1::AnnotatorDisagreement
-                    | IdentifiabilityBasisV1::TaskAmbiguity
-            )
-            | (
-                GroundTruthStateV1::NotEstimable,
-                IdentifiabilityBasisV1::SignalInsufficient
-                    | IdentifiabilityBasisV1::UnsupportedQuery
-            )
+        (
+            GroundTruthStateV1::Present,
+            IdentifiabilityBasisV1::ClearPositive
+        ) | (
+            GroundTruthStateV1::Absent,
+            IdentifiabilityBasisV1::ClearAbsence
+        ) | (
+            GroundTruthStateV1::Ambiguous,
+            IdentifiabilityBasisV1::AnnotatorDisagreement | IdentifiabilityBasisV1::TaskAmbiguity
+        ) | (
+            GroundTruthStateV1::NotEstimable,
+            IdentifiabilityBasisV1::SignalInsufficient | IdentifiabilityBasisV1::UnsupportedQuery
+        )
     );
     if !basis_matches_truth {
         return Err(format!(
@@ -328,11 +345,17 @@ fn score_case(
 
     let truth_issues = validate_temporal_ground_truth(&case.truth);
     if !truth_issues.is_empty() {
-        return Err(format!("case {} has invalid ground truth: {truth_issues:?}", case.case_id));
+        return Err(format!(
+            "case {} has invalid ground truth: {truth_issues:?}",
+            case.case_id
+        ));
     }
     let prediction_issues = validate_temporal_grounding_prediction(&case.prediction);
     if !prediction_issues.is_empty() {
-        return Err(format!("case {} has invalid prediction: {prediction_issues:?}", case.case_id));
+        return Err(format!(
+            "case {} has invalid prediction: {prediction_issues:?}",
+            case.case_id
+        ));
     }
     let unconditional_issues =
         validate_temporal_grounding_prediction(&case.unconditional_prediction);
@@ -360,7 +383,10 @@ fn score_case(
         (SelectiveDecisionV1::Answer, GroundingPredictionStateV1::Occurrences { .. })
         | (SelectiveDecisionV1::ClaimAbsent, GroundingPredictionStateV1::QueryAbsent)
         | (SelectiveDecisionV1::AbstainAmbiguous, GroundingPredictionStateV1::Ambiguous { .. })
-        | (SelectiveDecisionV1::AbstainNotEstimable, GroundingPredictionStateV1::NotEstimable { .. }) => {}
+        | (
+            SelectiveDecisionV1::AbstainNotEstimable,
+            GroundingPredictionStateV1::NotEstimable { .. },
+        ) => {}
         (decision, prediction) => {
             return Err(format!(
                 "case {} decision {:?} contradicts prediction disposition {:?}",
@@ -369,19 +395,32 @@ fn score_case(
         }
     }
 
-    if matches!(case.decision, SelectiveDecisionV1::Answer | SelectiveDecisionV1::ClaimAbsent)
-        && case.prediction != case.unconditional_prediction
+    if matches!(
+        case.decision,
+        SelectiveDecisionV1::Answer | SelectiveDecisionV1::ClaimAbsent
+    ) && case.prediction != case.unconditional_prediction
     {
         return Err(format!(
             "case {} covered decision must use the same prediction as its unconditional candidate",
             case.case_id
         ));
     }
-    let score = score_temporal_grounding(&case.truth, &case.prediction, plan)
-        .map_err(|issues| format!("case {} rejected by production scorer: {issues:?}", case.case_id))?;
+    let score =
+        score_temporal_grounding(&case.truth, &case.prediction, plan).map_err(|issues| {
+            format!(
+                "case {} rejected by production scorer: {issues:?}",
+                case.case_id
+            )
+        })?;
     let unconditional_score =
-        score_temporal_grounding(&case.truth, &case.unconditional_prediction, plan)
-            .map_err(|issues| format!("case {} unconditional candidate rejected by production scorer: {issues:?}", case.case_id))?;
+        score_temporal_grounding(&case.truth, &case.unconditional_prediction, plan).map_err(
+            |issues| {
+                format!(
+                    "case {} unconditional candidate rejected by production scorer: {issues:?}",
+                    case.case_id
+                )
+            },
+        )?;
 
     let reason_correct = match case.truth.state {
         GroundTruthStateV1::Ambiguous => {
@@ -400,18 +439,14 @@ fn score_case(
             case.decision == SelectiveDecisionV1::ClaimAbsent
                 && score.correct_absence_claim == Some(true)
         }
-        GroundTruthStateV1::Ambiguous => {
-            case.decision == SelectiveDecisionV1::AbstainAmbiguous
-        }
+        GroundTruthStateV1::Ambiguous => case.decision == SelectiveDecisionV1::AbstainAmbiguous,
         GroundTruthStateV1::NotEstimable => {
             case.decision == SelectiveDecisionV1::AbstainNotEstimable
         }
     };
     let unconditional_answer_correct = match case.truth.state {
         GroundTruthStateV1::Present => is_perfect_present(&unconditional_score),
-        GroundTruthStateV1::Absent => {
-            unconditional_score.correct_absence_claim == Some(true)
-        }
+        GroundTruthStateV1::Absent => unconditional_score.correct_absence_claim == Some(true),
         GroundTruthStateV1::Ambiguous | GroundTruthStateV1::NotEstimable => false,
     };
     let covered = matches!(
@@ -485,18 +520,24 @@ fn summarize(results: &[SelectiveCaseResultV1]) -> SelectiveGroundingSummaryV1 {
         .iter()
         .filter(|item| item.decision == SelectiveDecisionV1::AbstainNotEstimable)
         .count();
-    let false_absence_claims = results.iter().filter(|item| item.false_absence_claim).count();
+    let false_absence_claims = results
+        .iter()
+        .filter(|item| item.false_absence_claim)
+        .count();
     let non_absent_cases = results
         .iter()
         .filter(|item| item.truth_state != GroundTruthStateV1::Absent)
         .count();
-    let forward_passes = results.iter()
+    let forward_passes = results
+        .iter()
         .map(|item| item.inference_cost.forward_passes as f64)
         .collect::<Vec<_>>();
-    let selective_latency = results.iter()
+    let selective_latency = results
+        .iter()
         .map(|item| item.inference_cost.selective_wall_time_ms as f64)
         .collect::<Vec<_>>();
-    let latency_multipliers = results.iter()
+    let latency_multipliers = results
+        .iter()
         .map(|item| item.latency_multiplier)
         .collect::<Vec<_>>();
     let decision_confidence_brier = mean(
@@ -529,12 +570,23 @@ fn summarize(results: &[SelectiveCaseResultV1]) -> SelectiveGroundingSummaryV1 {
 
     let present_answer: Vec<_> = results
         .iter()
-        .filter(|item| item.truth_state == GroundTruthStateV1::Present
-            && item.decision == SelectiveDecisionV1::Answer)
+        .filter(|item| {
+            item.truth_state == GroundTruthStateV1::Present
+                && item.decision == SelectiveDecisionV1::Answer
+        })
         .collect();
-    let present_scores: Vec<_> = present_answer.iter().filter_map(|item| item.answer_f1).collect();
-    let present_recalls: Vec<_> = present_answer.iter().filter_map(|item| item.answer_recall).collect();
-    let present_count_gated: Vec<_> = present_answer.iter().filter_map(|item| item.count_gated_f1).collect();
+    let present_scores: Vec<_> = present_answer
+        .iter()
+        .filter_map(|item| item.answer_f1)
+        .collect();
+    let present_recalls: Vec<_> = present_answer
+        .iter()
+        .filter_map(|item| item.answer_recall)
+        .collect();
+    let present_count_gated: Vec<_> = present_answer
+        .iter()
+        .filter_map(|item| item.count_gated_f1)
+        .collect();
 
     let ambiguous_predictions = results
         .iter()
@@ -542,8 +594,10 @@ fn summarize(results: &[SelectiveCaseResultV1]) -> SelectiveGroundingSummaryV1 {
         .count();
     let ambiguous_correct = results
         .iter()
-        .filter(|item| item.reason_correct == Some(true)
-            && item.decision == SelectiveDecisionV1::AbstainAmbiguous)
+        .filter(|item| {
+            item.reason_correct == Some(true)
+                && item.decision == SelectiveDecisionV1::AbstainAmbiguous
+        })
         .count();
     let ambiguous_truth = results
         .iter()
@@ -556,8 +610,10 @@ fn summarize(results: &[SelectiveCaseResultV1]) -> SelectiveGroundingSummaryV1 {
         .count();
     let not_estimable_correct = results
         .iter()
-        .filter(|item| item.reason_correct == Some(true)
-            && item.decision == SelectiveDecisionV1::AbstainNotEstimable)
+        .filter(|item| {
+            item.reason_correct == Some(true)
+                && item.decision == SelectiveDecisionV1::AbstainNotEstimable
+        })
         .count();
     let not_estimable_truth = results
         .iter()
@@ -566,8 +622,11 @@ fn summarize(results: &[SelectiveCaseResultV1]) -> SelectiveGroundingSummaryV1 {
 
     SelectiveGroundingSummaryV1 {
         cases,
-        source_work_clusters: results.iter().map(|item| item.source_lineage_id.as_str())
-            .collect::<BTreeSet<_>>().len(),
+        source_work_clusters: results
+            .iter()
+            .map(|item| item.source_lineage_id.as_str())
+            .collect::<BTreeSet<_>>()
+            .len(),
         covered_cases: covered.len(),
         coverage: covered.len() as f64 / cases as f64,
         selective_errors,
@@ -604,15 +663,25 @@ fn summarize(results: &[SelectiveCaseResultV1]) -> SelectiveGroundingSummaryV1 {
         max_coverage_at_risk_le_5_percent,
         always_answer_coverage: 1.0,
         always_answer_risk: rate(
-            results.iter().filter(|item| !item.unconditional_answer_correct).count(),
+            results
+                .iter()
+                .filter(|item| !item.unconditional_answer_correct)
+                .count(),
             cases,
-        ).unwrap_or(1.0),
+        )
+        .unwrap_or(1.0),
         random_abstention_baseline_risk: rate(
-            results.iter().filter(|item| !item.unconditional_answer_correct).count(),
+            results
+                .iter()
+                .filter(|item| !item.unconditional_answer_correct)
+                .count(),
             cases,
         ),
         random_abstention_baseline_aurc: rate(
-            results.iter().filter(|item| !item.unconditional_answer_correct).count(),
+            results
+                .iter()
+                .filter(|item| !item.unconditional_answer_correct)
+                .count(),
             cases,
         ),
         always_abstain_coverage: 0.0,
@@ -623,14 +692,20 @@ fn summarize(results: &[SelectiveCaseResultV1]) -> SelectiveGroundingSummaryV1 {
 fn summarize_strata(results: &[SelectiveCaseResultV1]) -> Vec<StratumSelectiveSummaryV1> {
     let mut groups: BTreeMap<&str, Vec<&SelectiveCaseResultV1>> = BTreeMap::new();
     for result in results {
-        groups.entry(result.evidence_stratum.as_str()).or_default().push(result);
+        groups
+            .entry(result.evidence_stratum.as_str())
+            .or_default()
+            .push(result);
     }
     groups
         .into_iter()
         .map(|(stratum, items)| {
             let covered: Vec<_> = items.iter().filter(|item| item.covered).collect();
             let errors = covered.iter().filter(|item| !item.decision_correct).count();
-            let reasons: Vec<_> = items.iter().filter_map(|item| item.reason_correct).collect();
+            let reasons: Vec<_> = items
+                .iter()
+                .filter_map(|item| item.reason_correct)
+                .collect();
             StratumSelectiveSummaryV1 {
                 evidence_stratum: stratum.to_owned(),
                 cases: items.len(),
@@ -646,7 +721,12 @@ fn summarize_strata(results: &[SelectiveCaseResultV1]) -> Vec<StratumSelectiveSu
                     .iter()
                     .filter(|item| item.decision == SelectiveDecisionV1::AbstainNotEstimable)
                     .count(),
-                reason_correct_rate: mean(&reasons.iter().map(|value| if *value { 1.0 } else { 0.0 }).collect::<Vec<_>>()),
+                reason_correct_rate: mean(
+                    &reasons
+                        .iter()
+                        .map(|value| if *value { 1.0 } else { 0.0 })
+                        .collect::<Vec<_>>(),
+                ),
             }
         })
         .collect()
@@ -655,8 +735,7 @@ fn summarize_strata(results: &[SelectiveCaseResultV1]) -> Vec<StratumSelectiveSu
 fn summarize_identifiability_basis(
     results: &[SelectiveCaseResultV1],
 ) -> Vec<IdentifiabilityBasisSummaryV1> {
-    let mut groups: BTreeMap<IdentifiabilityBasisV1, Vec<&SelectiveCaseResultV1>> =
-        BTreeMap::new();
+    let mut groups: BTreeMap<IdentifiabilityBasisV1, Vec<&SelectiveCaseResultV1>> = BTreeMap::new();
     for result in results {
         groups
             .entry(result.identifiability_basis)
@@ -701,7 +780,12 @@ fn make_calibration_bins(
                 lower_inclusive: lower,
                 upper_exclusive: upper,
                 count: items.len(),
-                mean_confidence: mean(&items.iter().map(|item| item.decision_confidence).collect::<Vec<_>>()),
+                mean_confidence: mean(
+                    &items
+                        .iter()
+                        .map(|item| item.decision_confidence)
+                        .collect::<Vec<_>>(),
+                ),
                 observed_decision_accuracy: rate(
                     items.iter().filter(|item| item.decision_correct).count(),
                     items.len(),
@@ -722,7 +806,7 @@ fn ece(bins: &[CalibrationBinV1], total: usize) -> Option<f64> {
                 (bin.count as f64 / total as f64)
                     * (bin.mean_confidence.unwrap_or(0.0)
                         - bin.observed_decision_accuracy.unwrap_or(0.0))
-                        .abs()
+                    .abs()
             })
             .sum(),
     )
@@ -802,7 +886,9 @@ fn risk_at_coverage(points: &[RiskCoveragePointV1], target: f64) -> Option<f64> 
 
 fn validate_digest(value: &str, label: &str) -> Result<(), String> {
     if value.len() != 64
-        || !value.bytes().all(|byte| byte.is_ascii_digit() || (b'a'..=b'f').contains(&byte))
+        || !value
+            .bytes()
+            .all(|byte| byte.is_ascii_digit() || (b'a'..=b'f').contains(&byte))
     {
         return Err(format!("{label} must be a lowercase SHA-256 digest"));
     }
@@ -848,7 +934,11 @@ mod tests {
         }
     }
 
-    fn truth(state: GroundTruthStateV1, intervals: Vec<crate::temporal_grounding::FrameIntervalV1>, reason: Option<&str>) -> TemporalGroundTruthV1 {
+    fn truth(
+        state: GroundTruthStateV1,
+        intervals: Vec<crate::temporal_grounding::FrameIntervalV1>,
+        reason: Option<&str>,
+    ) -> TemporalGroundTruthV1 {
         TemporalGroundTruthV1 {
             schema_version: TEMPORAL_GROUNDING_SCHEMA_V1.into(),
             query_id: "query-piano".into(),
@@ -927,7 +1017,8 @@ mod tests {
             model_identity_sha256: MODEL.into(),
             runtime_identity_sha256: RUNTIME.into(),
             decoding_config_sha256: DECODING.into(),
-            hardware_identity_sha256: "1111111111111111111111111111111111111111111111111111111111111111".into(),
+            hardware_identity_sha256:
+                "1111111111111111111111111111111111111111111111111111111111111111".into(),
             plan: TemporalGroundingPlanV1 {
                 evaluator_version: TEMPORAL_GROUNDING_EVALUATOR_V1.into(),
                 minimum_interval_iou: 0.5,
@@ -941,11 +1032,17 @@ mod tests {
         let present = case(
             "present",
             GroundTruthStateV1::Present,
-            vec![crate::temporal_grounding::FrameIntervalV1 { start_frame: 100, end_frame: 200 }],
+            vec![crate::temporal_grounding::FrameIntervalV1 {
+                start_frame: 100,
+                end_frame: 200,
+            }],
             None,
             SelectiveDecisionV1::Answer,
             GroundingPredictionStateV1::Occurrences {
-                intervals: vec![crate::temporal_grounding::FrameIntervalV1 { start_frame: 100, end_frame: 200 }],
+                intervals: vec![crate::temporal_grounding::FrameIntervalV1 {
+                    start_frame: 100,
+                    end_frame: 200,
+                }],
             },
             0.95,
         );
@@ -975,7 +1072,10 @@ mod tests {
             Some("gradual entrance"),
             SelectiveDecisionV1::AbstainAmbiguous,
             GroundingPredictionStateV1::Ambiguous {
-                candidate_intervals: vec![crate::temporal_grounding::FrameIntervalV1 { start_frame: 90, end_frame: 210 }],
+                candidate_intervals: vec![crate::temporal_grounding::FrameIntervalV1 {
+                    start_frame: 90,
+                    end_frame: 210,
+                }],
                 reason: "two plausible entrances".into(),
             },
             0.8,
@@ -1004,7 +1104,10 @@ mod tests {
         let wrong_present = case(
             "wrong-present",
             GroundTruthStateV1::Present,
-            vec![crate::temporal_grounding::FrameIntervalV1 { start_frame: 100, end_frame: 200 }],
+            vec![crate::temporal_grounding::FrameIntervalV1 {
+                start_frame: 100,
+                end_frame: 200,
+            }],
             None,
             SelectiveDecisionV1::ClaimAbsent,
             GroundingPredictionStateV1::QueryAbsent,
@@ -1019,7 +1122,8 @@ mod tests {
             GroundingPredictionStateV1::QueryAbsent,
             0.99,
         );
-        let report = audit_selective_batch(&batch(vec![wrong_present, wrong_unobservable])).unwrap();
+        let report =
+            audit_selective_batch(&batch(vec![wrong_present, wrong_unobservable])).unwrap();
         assert_eq!(report.summary.false_absence_claims, 2);
         assert_eq!(report.summary.false_absence_claim_rate, 1.0);
         assert_eq!(report.summary.selective_risk, Some(1.0));
@@ -1030,11 +1134,17 @@ mod tests {
         let wrong = case(
             "confident-wrong",
             GroundTruthStateV1::Present,
-            vec![crate::temporal_grounding::FrameIntervalV1 { start_frame: 100, end_frame: 200 }],
+            vec![crate::temporal_grounding::FrameIntervalV1 {
+                start_frame: 100,
+                end_frame: 200,
+            }],
             None,
             SelectiveDecisionV1::Answer,
             GroundingPredictionStateV1::Occurrences {
-                intervals: vec![crate::temporal_grounding::FrameIntervalV1 { start_frame: 300, end_frame: 400 }],
+                intervals: vec![crate::temporal_grounding::FrameIntervalV1 {
+                    start_frame: 300,
+                    end_frame: 400,
+                }],
             },
             0.99,
         );
@@ -1048,7 +1158,10 @@ mod tests {
         let abstain = case(
             "abstain-clear",
             GroundTruthStateV1::Present,
-            vec![crate::temporal_grounding::FrameIntervalV1 { start_frame: 100, end_frame: 200 }],
+            vec![crate::temporal_grounding::FrameIntervalV1 {
+                start_frame: 100,
+                end_frame: 200,
+            }],
             None,
             SelectiveDecisionV1::AbstainNotEstimable,
             GroundingPredictionStateV1::NotEstimable {
@@ -1078,21 +1191,16 @@ mod tests {
             },
             0.6,
         );
-        abstain.unconditional_prediction = prediction(
-            GroundingPredictionStateV1::Occurrences {
-                intervals: vec![crate::temporal_grounding::FrameIntervalV1 {
-                    start_frame: 100,
-                    end_frame: 200,
-                }],
-            },
-        );
+        abstain.unconditional_prediction = prediction(GroundingPredictionStateV1::Occurrences {
+            intervals: vec![crate::temporal_grounding::FrameIntervalV1 {
+                start_frame: 100,
+                end_frame: 200,
+            }],
+        });
         let report = audit_selective_batch(&batch(vec![abstain])).unwrap();
         assert_eq!(report.summary.coverage, 0.0);
         assert_eq!(report.summary.always_answer_risk, 0.0);
-        assert_eq!(
-            report.case_results[0].unconditional_score.f1,
-            Some(1.0)
-        );
+        assert_eq!(report.case_results[0].unconditional_score.f1, Some(1.0));
         assert_eq!(report.case_results[0].unconditional_answer_correct, true);
     }
 
@@ -1124,21 +1232,32 @@ mod tests {
         let right = case(
             "baseline-right",
             GroundTruthStateV1::Present,
-            vec![crate::temporal_grounding::FrameIntervalV1 { start_frame: 100, end_frame: 200 }],
+            vec![crate::temporal_grounding::FrameIntervalV1 {
+                start_frame: 100,
+                end_frame: 200,
+            }],
             None,
             SelectiveDecisionV1::Answer,
             GroundingPredictionStateV1::Occurrences {
-                intervals: vec![crate::temporal_grounding::FrameIntervalV1 { start_frame: 100, end_frame: 200 }],
+                intervals: vec![crate::temporal_grounding::FrameIntervalV1 {
+                    start_frame: 100,
+                    end_frame: 200,
+                }],
             },
             0.9,
         );
         let abstain = case(
             "baseline-abstain",
             GroundTruthStateV1::Present,
-            vec![crate::temporal_grounding::FrameIntervalV1 { start_frame: 100, end_frame: 200 }],
+            vec![crate::temporal_grounding::FrameIntervalV1 {
+                start_frame: 100,
+                end_frame: 200,
+            }],
             None,
             SelectiveDecisionV1::AbstainNotEstimable,
-            GroundingPredictionStateV1::NotEstimable { reason: "not answered".into() },
+            GroundingPredictionStateV1::NotEstimable {
+                reason: "not answered".into(),
+            },
             0.8,
         );
         let report = audit_selective_batch(&batch(vec![right, abstain])).unwrap();
@@ -1156,22 +1275,34 @@ mod tests {
         let right = case(
             "right",
             GroundTruthStateV1::Present,
-            vec![crate::temporal_grounding::FrameIntervalV1 { start_frame: 100, end_frame: 200 }],
+            vec![crate::temporal_grounding::FrameIntervalV1 {
+                start_frame: 100,
+                end_frame: 200,
+            }],
             None,
             SelectiveDecisionV1::Answer,
             GroundingPredictionStateV1::Occurrences {
-                intervals: vec![crate::temporal_grounding::FrameIntervalV1 { start_frame: 100, end_frame: 200 }],
+                intervals: vec![crate::temporal_grounding::FrameIntervalV1 {
+                    start_frame: 100,
+                    end_frame: 200,
+                }],
             },
             0.95,
         );
         let wrong = case(
             "wrong",
             GroundTruthStateV1::Present,
-            vec![crate::temporal_grounding::FrameIntervalV1 { start_frame: 100, end_frame: 200 }],
+            vec![crate::temporal_grounding::FrameIntervalV1 {
+                start_frame: 100,
+                end_frame: 200,
+            }],
             None,
             SelectiveDecisionV1::Answer,
             GroundingPredictionStateV1::Occurrences {
-                intervals: vec![crate::temporal_grounding::FrameIntervalV1 { start_frame: 300, end_frame: 400 }],
+                intervals: vec![crate::temporal_grounding::FrameIntervalV1 {
+                    start_frame: 300,
+                    end_frame: 400,
+                }],
             },
             0.1,
         );
@@ -1236,7 +1367,9 @@ mod tests {
         assert!(audit_selective_batch(&invalid).is_err());
 
         invalid.cases[0].inference_cost.forward_passes = 1;
-        invalid.cases[0].inference_cost.one_pass_baseline_wall_time_ms = 0;
+        invalid.cases[0]
+            .inference_cost
+            .one_pass_baseline_wall_time_ms = 0;
         assert!(audit_selective_batch(&invalid).is_err());
     }
 
@@ -1245,11 +1378,17 @@ mod tests {
         let mut invalid = batch(vec![case(
             "bad-confidence",
             GroundTruthStateV1::Present,
-            vec![crate::temporal_grounding::FrameIntervalV1 { start_frame: 100, end_frame: 200 }],
+            vec![crate::temporal_grounding::FrameIntervalV1 {
+                start_frame: 100,
+                end_frame: 200,
+            }],
             None,
             SelectiveDecisionV1::Answer,
             GroundingPredictionStateV1::Occurrences {
-                intervals: vec![crate::temporal_grounding::FrameIntervalV1 { start_frame: 100, end_frame: 200 }],
+                intervals: vec![crate::temporal_grounding::FrameIntervalV1 {
+                    start_frame: 100,
+                    end_frame: 200,
+                }],
             },
             0.7,
         )]);
@@ -1259,7 +1398,10 @@ mod tests {
         let mut invalid = batch(vec![case(
             "bad-binding",
             GroundTruthStateV1::Present,
-            vec![crate::temporal_grounding::FrameIntervalV1 { start_frame: 100, end_frame: 200 }],
+            vec![crate::temporal_grounding::FrameIntervalV1 {
+                start_frame: 100,
+                end_frame: 200,
+            }],
             None,
             SelectiveDecisionV1::Answer,
             GroundingPredictionStateV1::QueryAbsent,
@@ -1336,11 +1478,17 @@ mod tests {
         let mut first = case(
             "first",
             GroundTruthStateV1::Present,
-            vec![crate::temporal_grounding::FrameIntervalV1 { start_frame: 100, end_frame: 200 }],
+            vec![crate::temporal_grounding::FrameIntervalV1 {
+                start_frame: 100,
+                end_frame: 200,
+            }],
             None,
             SelectiveDecisionV1::Answer,
             GroundingPredictionStateV1::Occurrences {
-                intervals: vec![crate::temporal_grounding::FrameIntervalV1 { start_frame: 100, end_frame: 200 }],
+                intervals: vec![crate::temporal_grounding::FrameIntervalV1 {
+                    start_frame: 100,
+                    end_frame: 200,
+                }],
             },
             0.9,
         );
