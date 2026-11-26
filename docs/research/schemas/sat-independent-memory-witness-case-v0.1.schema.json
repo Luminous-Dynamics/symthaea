@@ -1,0 +1,266 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://luminousdynamics.io/schemas/sat-independent-memory-witness-case-v0.1.schema.json",
+  "title": "SAT Independent Memory Witness Fault Case v0.1",
+  "type": "object",
+  "additionalProperties": false,
+  "required": [
+    "schema_version",
+    "case_id",
+    "case_role",
+    "fault_family",
+    "operation",
+    "witness_profile",
+    "injection",
+    "expected",
+    "evidence_required"
+  ],
+  "properties": {
+    "schema_version": {
+      "const": "sat-independent-memory-witness-case/v0.1"
+    },
+    "case_id": {
+      "type": "string",
+      "pattern": "^MW-[A-Z0-9-]+$"
+    },
+    "case_role": {
+      "enum": [
+        "fault_injection",
+        "benign_control"
+      ]
+    },
+    "fault_family": {
+      "enum": [
+        "store_rollback",
+        "local_receipt_rollback",
+        "receipt_replay",
+        "idempotency_conflict",
+        "equivocation",
+        "freeze_attack",
+        "witness_unavailable",
+        "quorum_unavailable",
+        "byzantine_witness",
+        "ambiguous_commit",
+        "crash_recovery",
+        "erasure_resurrection",
+        "common_cause_dependency",
+        "key_rotation",
+        "normal_operation"
+      ]
+    },
+    "operation": {
+      "enum": [
+        "read",
+        "write",
+        "erase",
+        "restore",
+        "witness_append",
+        "witness_key_rotation",
+        "restart",
+        "reconcile"
+      ]
+    },
+    "witness_profile": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "witness_count",
+        "quorum_size",
+        "max_byzantine",
+        "independent_operators_required",
+        "freshness_policy"
+      ],
+      "properties": {
+        "witness_count": {
+          "const": 4
+        },
+        "quorum_size": {
+          "const": 3
+        },
+        "max_byzantine": {
+          "const": 1
+        },
+        "independent_operators_required": {
+          "const": 4
+        },
+        "freshness_policy": {
+          "enum": [
+            "fresh_quorum_required",
+            "bounded_staleness_downgrade",
+            "offline_not_evaluable"
+          ]
+        }
+      }
+    },
+    "injection": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "faults",
+        "rollback_domain",
+        "operation_id_reused",
+        "state_before_generation",
+        "state_after_generation"
+      ],
+      "properties": {
+        "faults": {
+          "type": "array",
+          "items": {
+            "enum": [
+              "restore_store",
+              "restore_local_receipt_cache",
+              "replay_old_receipt",
+              "substitute_payload_same_operation_id",
+              "witness_equivocation",
+              "serve_stale_checkpoint",
+              "disable_witness",
+              "one_witness_byzantine",
+              "two_witnesses_unavailable",
+              "timeout_after_append",
+              "crash_before_append",
+              "crash_after_append_before_local_commit",
+              "restore_pre_erasure_backup",
+              "shared_admin_backup_domain",
+              "rotate_witness_key"
+            ]
+          }
+        },
+        "rollback_domain": {
+          "enum": [
+            "store_only",
+            "store_plus_local_cache",
+            "one_witness",
+            "witness_quorum",
+            "shared_admin_domain",
+            "none"
+          ]
+        },
+        "operation_id_reused": {
+          "type": "boolean"
+        },
+        "state_before_generation": {
+          "type": "integer",
+          "minimum": 0
+        },
+        "state_after_generation": {
+          "type": "integer",
+          "minimum": 0
+        },
+        "notes": {
+          "type": "array",
+          "items": {
+            "type": "string"
+          }
+        }
+      }
+    },
+    "expected": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "stale_state_may_be_served",
+        "conflicting_successor_may_commit",
+        "expected_outcome",
+        "valid_operation_should_complete",
+        "idempotency_must_hold"
+      ],
+      "properties": {
+        "stale_state_may_be_served": {
+          "const": false
+        },
+        "conflicting_successor_may_commit": {
+          "const": false
+        },
+        "expected_outcome": {
+          "enum": [
+            "reject_rollback",
+            "reconcile_to_witness",
+            "hold_for_reconciliation",
+            "report_equivocation",
+            "block_no_quorum",
+            "commit_with_quorum",
+            "complete_idempotently",
+            "fail_independence_gate",
+            "evaluable_control"
+          ]
+        },
+        "valid_operation_should_complete": {
+          "type": "boolean"
+        },
+        "idempotency_must_hold": {
+          "type": "boolean"
+        },
+        "erased_record_may_be_served": {
+          "const": false
+        },
+        "notes": {
+          "type": "array",
+          "items": {
+            "type": "string"
+          }
+        }
+      }
+    },
+    "evidence_required": {
+      "type": "array",
+      "minItems": 1,
+      "items": {
+        "type": "string",
+        "minLength": 1
+      }
+    },
+    "notes": {
+      "type": "array",
+      "items": {
+        "type": "string"
+      }
+    }
+  },
+  "allOf": [
+    {
+      "if": {
+        "properties": {
+          "case_role": {
+            "const": "fault_injection"
+          }
+        },
+        "required": [
+          "case_role"
+        ]
+      },
+      "then": {
+        "properties": {
+          "expected": {
+            "properties": {
+              "stale_state_may_be_served": {
+                "const": false
+              },
+              "conflicting_successor_may_commit": {
+                "const": false
+              }
+            }
+          }
+        }
+      }
+    },
+    {
+      "if": {
+        "properties": {
+          "case_role": {
+            "const": "benign_control"
+          }
+        },
+        "required": [
+          "case_role"
+        ]
+      },
+      "then": {
+        "properties": {
+          "fault_family": {
+            "const": "normal_operation"
+          }
+        }
+      }
+    }
+  ]
+}
