@@ -16,7 +16,7 @@ The verifier MUST NOT turn a valid signature, transparency receipt, source label
 The implementation should execute the following phases in fixed order. Stop at a hard identity or cryptographic failure, but retain all independent diagnostics that can safely be computed without trusting failed inputs.
 
 1. **Parse and schema:** strict JSON; reject duplicate keys, unknown critical fields, invalid formats and unsupported versions. Validate the attempt and receipt against their pinned schemas.
-2. **Freeze context:** recompute the manifest, attempt, authority, disclosure, effect-binding and receipt-statement commitments under the declared canonicalization and domain-separation profile.
+2. **Freeze context:** require evaluator-owned pins for run ID, manifest digest, attempt ID, idempotency key, intent digest, authority/disclosure decisions, exact-effect binding and trust-policy digest. These expected values must not be copied from the subject-controlled attempt or receipt. Recompute the manifest, attempt, authority, disclosure, effect-binding and receipt-statement commitments under the declared canonicalization and domain-separation profile.
 3. **Bind identities:** exact run ID, manifest digest, attempt ID, idempotency key, intent digest, authority/disclosure digests, effect binding and frozen trust-policy digest.
 4. **Verify signatures:** resolve signer identity and key from the frozen trust bundle; validate key usage, algorithm allowlist, certificate/credential chain, validity and revocation semantics at signing time and verification time; verify the source statement bytes, not an ambiguous reconstructed subset.
 5. **Verify transparency:** validate the selected SCITT COSE receipt or Sigstore Rekor bundle, signed checkpoint, inclusion proof and consistency proof. Compare against a prior checkpoint stored outside the subject's control. Missing prior state is `unanchored` or `inconclusive`, never silently accepted as continuous.
@@ -33,7 +33,7 @@ Proposed public concepts:
 
 - `EffectAttempt`: frozen run, attempt, intent and exact-effect identity.
 - `EffectReceipt`: receipt identity, reported outcome, optional observed projection and source attestations.
-- `EffectVerificationContext`: expected run/manifest/policy digests and declared effect profile.
+- `ExpectedEffectAttempt`: evaluator-owned run, manifest, attempt, idempotency, intent, authority/disclosure, exact-effect and trust-policy pins; this context is passed separately from the subject's documents.
 - `EffectVerificationReport`: orthogonal dispositions for structure, binding, authenticity, transparency, independence, source freshness, effect match and mutation control.
 - `AttemptLedger`: caller-supplied immutable prior state; owns idempotency-to-intent binding, current attempt IDs, terminal states and source sequence pins.
 - `EvidenceResolver`: resolves content-addressed evidence references from an offline evidence bundle. It has no network or mutation capability.
