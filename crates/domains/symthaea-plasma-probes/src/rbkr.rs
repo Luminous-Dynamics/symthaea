@@ -60,6 +60,8 @@ pub enum RbkrError {
     MixedScenarioCheckpoint,
     #[error("response Gramian scenarios use different state metrics")]
     MixedScenarioStateMetric,
+    #[error("positive-weight scenario is missing reachability or observability factors")]
+    EmptyScenarioGramian,
     #[error("response Gramian scenario weight must be finite and non-negative")]
     InvalidScenarioWeight,
     #[error("response Gramian aggregation factor-storage budget exceeded")]
@@ -182,6 +184,11 @@ pub fn aggregate_response_gramians(
         }
         if scenario.scenario_weight == 0.0 {
             continue;
+        }
+        if scenario.reachability.weighted_factors.is_empty()
+            || scenario.observability.weighted_factors.is_empty()
+        {
+            return Err(RbkrError::EmptyScenarioGramian);
         }
         reach_factor_count = reach_factor_count
             .checked_add(scenario.reachability.weighted_factors.len())
@@ -1167,6 +1174,27 @@ mod tests {
             ResponseBalancedBasis::from_empirical_gramians(&reach, &observe, RbkrConfig::new(1))
                 .unwrap();
         assert!(basis.biorthogonality_defect() < 1.0e-8);
+    }
+
+    #[test]
+    fn response_scenario_aggregation_rejects_missing_positive_weight_evidence() {
+        let empty_reach = EmpiricalGramian::new(2).unwrap();
+        let observe = gramian(2, &[vec![1.0, 0.0]]);
+        let scenario = ResponseGramianScenario {
+            task_contract_id: "kresp1-contract-v1",
+            checkpoint_id: "checkpoint-a",
+            state_metric_id: "metric-v1",
+            reachability: &empty_reach,
+            observability: &observe,
+            scenario_weight: 1.0,
+        };
+        assert_eq!(
+            aggregate_response_gramians(
+                &[scenario],
+                ResponseGramianAggregationConfig::default(),
+            ),
+            Err(RbkrError::EmptyScenarioGramian)
+        );
     }
 
     #[test]
