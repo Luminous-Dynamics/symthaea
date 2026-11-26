@@ -35,7 +35,7 @@ type DigestRef struct {
 }
 
 func (d DigestRef) Valid() bool {
-	return d.Algorithm != "" && d.Profile != "" && d.Version != "" && d.PayloadType != "" && d.Canonicalization != "" && d.Encoding != "" && d.Purpose != "" && d.Subject != "" && d.Value != ""
+	return nonempty(d.Algorithm, d.Profile, d.Version, d.PayloadType, d.Canonicalization, d.Encoding, d.Purpose, d.Subject, d.Value)
 }
 
 func (d DigestRef) Equal(other DigestRef) (bool, bool) {
@@ -88,6 +88,8 @@ type Grant struct {
 	ValidFrom     int64     `json:"effective_at_micros"`
 	ExpiresAt     *int64    `json:"expires_at_micros,omitempty"`
 	RevokedAt     *int64    `json:"revoked_at_micros,omitempty"`
+	RevocationID     string     `json:"revocation_event_id,omitempty"`
+	RevocationDigest *DigestRef `json:"revocation_digest,omitempty"`
 	RequestDigest DigestRef `json:"request_digest"`
 	RecordDigest  DigestRef `json:"record_digest"`
 	IssuerDigest  DigestRef `json:"issuer_identity_digest"`
@@ -166,6 +168,14 @@ func requiredReports(b Bundle, op Operation) ([]required, error) {
 			return nil, fmt.Errorf("grant evidence incomplete: %s", g.ID)
 		}
 		items = append(items, required{"grant", g.ID, g.RecordDigest})
+		if g.RevokedAt != nil {
+			if g.RevocationDigest == nil || !g.RevocationDigest.Valid() || !nonempty(g.RevocationID) {
+				return nil, fmt.Errorf("revocation event evidence incomplete: %s", g.ID)
+			}
+			items = append(items, required{"revocation", g.RevocationID, *g.RevocationDigest})
+		} else if g.RevocationDigest != nil || g.RevocationID != "" {
+			return nil, fmt.Errorf("revocation event metadata without effective revocation: %s", g.ID)
+		}
 		if prior, ok := issuers[g.Issuer]; ok {
 			eq, cmp := prior.Equal(g.IssuerDigest)
 			if !eq || !cmp {
