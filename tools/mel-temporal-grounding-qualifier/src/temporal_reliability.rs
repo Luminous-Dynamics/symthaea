@@ -345,7 +345,9 @@ pub fn audit_reliability_corpus(
             checked_increment(global_reason_count, "global missing reason count")?;
             let entry = annotator_coverage
                 .get_mut(&nonresponse.annotator_id_sha256)
-                .ok_or_else(|| "validated nonresponse is absent from assigned roster".to_string())?;
+                .ok_or_else(|| {
+                    "validated nonresponse is absent from assigned roster".to_string()
+                })?;
             checked_increment(&mut entry.missing_annotations, "annotator missing count")?;
             let rater_reason_count = entry
                 .missing_reason_counts
@@ -481,10 +483,8 @@ pub fn audit_reliability_corpus(
         annotator_coverage: annotator_coverage
             .into_values()
             .map(|mut coverage| {
-                coverage.coverage_rate = rate(
-                    coverage.returned_annotations,
-                    coverage.assigned_items,
-                );
+                coverage.coverage_rate =
+                    rate(coverage.returned_annotations, coverage.assigned_items);
                 coverage
             })
             .collect(),
@@ -925,7 +925,10 @@ fn validate_corpus(corpus: &TemporalReliabilityCorpusV1) -> Result<(), String> {
         for annotator_id in &unit.assigned_annotator_ids_sha256 {
             validate_digest(annotator_id, "assigned_annotator_id_sha256")?;
             if !assigned_ids.insert(annotator_id.as_str()) {
-                return Err(format!("unit {} repeats an assigned annotator ID", unit.unit_id));
+                return Err(format!(
+                    "unit {} repeats an assigned annotator ID",
+                    unit.unit_id
+                ));
             }
         }
         let mut returned_ids = BTreeSet::new();
@@ -939,7 +942,10 @@ fn validate_corpus(corpus: &TemporalReliabilityCorpusV1) -> Result<(), String> {
                 ));
             }
             if !returned_ids.insert(annotation.annotator_id_sha256.as_str()) {
-                return Err(format!("unit {} repeats a returned annotation identity", unit.unit_id));
+                return Err(format!(
+                    "unit {} repeats a returned annotation identity",
+                    unit.unit_id
+                ));
             }
             validate_digest(&annotation.annotation_sha256, "annotation_sha256")?;
             if !annotator_ids.insert(annotation.annotator_id_sha256.as_str()) {
@@ -1899,14 +1905,20 @@ mod tests {
                         '1',
                         '1',
                         GroundTruthStateV1::Present,
-                        vec![FrameIntervalV1 { start_frame: 100, end_frame: 200 }],
+                        vec![FrameIntervalV1 {
+                            start_frame: 100,
+                            end_frame: 200,
+                        }],
                         None,
                     ),
                     annotation(
                         '2',
                         '2',
                         GroundTruthStateV1::Present,
-                        vec![FrameIntervalV1 { start_frame: 100, end_frame: 200 }],
+                        vec![FrameIntervalV1 {
+                            start_frame: 100,
+                            end_frame: 200,
+                        }],
                         None,
                     ),
                 ],
@@ -1917,12 +1929,20 @@ mod tests {
                 AUDIO_B,
                 vec![
                     annotation('1', '3', GroundTruthStateV1::Absent, Vec::new(), None),
-                    annotation('2', '4', GroundTruthStateV1::Ambiguous, Vec::new(), Some("gradual onset")),
+                    annotation(
+                        '2',
+                        '4',
+                        GroundTruthStateV1::Ambiguous,
+                        Vec::new(),
+                        Some("gradual onset"),
+                    ),
                 ],
             ),
         ];
         let missing_id = digest('3');
-        units[0].assigned_annotator_ids_sha256.push(missing_id.clone());
+        units[0]
+            .assigned_annotator_ids_sha256
+            .push(missing_id.clone());
         units[0].nonresponses.push(AnnotationNonresponseV1 {
             annotator_id_sha256: missing_id.clone(),
             reason: AnnotationNonresponseReasonV1::TechnicalFailure,
@@ -1950,7 +1970,10 @@ mod tests {
         assert_eq!(missing_annotator.returned_annotations, 0);
         assert_eq!(missing_annotator.missing_annotations, 1);
         assert_eq!(missing_annotator.coverage_rate, Some(0.0));
-        assert_eq!(missing_annotator.missing_reason_counts["TechnicalFailure"], 1);
+        assert_eq!(
+            missing_annotator.missing_reason_counts["TechnicalFailure"],
+            1
+        );
 
         let stable_rater = result
             .annotator_coverage
@@ -1988,7 +2011,9 @@ mod tests {
                 ],
             ),
         ];
-        unaccounted[0].assigned_annotator_ids_sha256.push(digest('3'));
+        unaccounted[0]
+            .assigned_annotator_ids_sha256
+            .push(digest('3'));
         assert!(audit_reliability_corpus(&corpus(unaccounted)).is_err());
 
         let mut overlap = vec![
@@ -2037,10 +2062,12 @@ mod tests {
                 ],
             ),
         ];
-        outside_roster[0].nonresponses.push(AnnotationNonresponseV1 {
-            annotator_id_sha256: digest('3'),
-            reason: AnnotationNonresponseReasonV1::NotReturned,
-        });
+        outside_roster[0]
+            .nonresponses
+            .push(AnnotationNonresponseV1 {
+                annotator_id_sha256: digest('3'),
+                reason: AnnotationNonresponseReasonV1::NotReturned,
+            });
         assert!(audit_reliability_corpus(&corpus(outside_roster)).is_err());
 
         let mut duplicate_roster = vec![
@@ -2063,8 +2090,9 @@ mod tests {
                 ],
             ),
         ];
-        duplicate_roster[0].assigned_annotator_ids_sha256.push(digest('1'));
+        duplicate_roster[0]
+            .assigned_annotator_ids_sha256
+            .push(digest('1'));
         assert!(audit_reliability_corpus(&corpus(duplicate_roster)).is_err());
     }
-
 }
