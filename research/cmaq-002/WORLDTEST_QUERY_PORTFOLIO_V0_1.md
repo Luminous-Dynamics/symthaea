@@ -40,7 +40,7 @@ S_f = \frac{1}{N_f}\sum_{j=1}^{N_f} s_{fj},
 
 using integer floor division. Failed, timed-out, invalid and abstained tasks require explicit evaluator-assigned scores and remain in (N_f). A missing task or family rejects the portfolio.
 
-The certificate preserves sorted per-task family/cluster identity, per-cluster task counts and per-query-family counts within each cluster, plus the total number of distinct environment families and independent clusters. It therefore retains a statistical grouping key for cluster-aware downstream analysis; it does not itself compute confidence intervals or infer statistical significance. A cluster ID may map to only one environment-family ID.
+The certificate preserves sorted per-task family/cluster identity, per-cluster task counts, per-query-family counts, integer score sums and per-family means within each cluster, plus the total number of distinct environment families and independent clusters. It therefore retains a statistical grouping key for cluster-aware downstream analysis; it does not itself compute confidence intervals or infer statistical significance. A cluster ID may map to only one environment-family ID.
 
 The certificate reports the vector
 
@@ -71,7 +71,7 @@ The Rust suite includes:
 - missing family/task and unexpected/duplicate task;
 - duplicate run IDs;
 - missing or untrimmed environment-family/cluster IDs;
-- multiple query-task rows sharing one independent cluster are counted once for cluster-level analysis;
+- multiple query-task rows sharing one independent cluster are counted once for cluster-level analysis, with per-cluster/per-family normalized score sums and means preserved (missing family cells remain `None`);
 - one environment cluster assigned to conflicting environment families is rejected;
 - same exploration/challenge program rejection;
 - changed shared trace, checkpoint and candidate artifact rejection;
