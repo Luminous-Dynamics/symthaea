@@ -35,6 +35,7 @@ The CLI writes per-case JSON receipts under results/, C1/C2 control receipts, an
 - C3 checks the exact post-mutation/restored file state. A failed edit-landed check is ERROR and excluded from the denominator.
 - T9 restores the pre-write store bundle while the protected rollback anchor remains outside it.
 - T10 first proves that the SUT erasure API physically removes exactly the named record while leaving all other records byte-for-byte unchanged; it then restores the pre-erasure store bundle while the protected erasure tombstone and whole-store anchor remain outside it.
+- A post-erasure write regression confirms that allocation sequence gaps are valid, later genuine writes remain readable, and every surviving pre-erasure record remains unchanged.
 - Two additional shared-rollback-domain probes are deliberately outside the native denominator: they restore the store and both local trust-domain files together, demonstrating that a co-located anchor/tombstone cannot resist a full snapshot rollback.
 - The native metric is recomputed without modification: (REJECTED + read-time REPORTED + 0.5 * audit-time REPORTED) / N.
 - T1-T5, T6-T8, T9 and T10 category scores remain separately visible.
