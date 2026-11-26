@@ -348,6 +348,149 @@ mod tests {
             .unwrap()
     }
 
+    fn yoked_materialization() -> (
+        RevisionCaseV2,
+        AudioEvidenceWindowManifestV1,
+        Vec<u8>,
+        Vec<u8>,
+    ) {
+        let mut case = revision_case();
+        case.evidence_condition = RevisionEvidenceConditionV1::YokedRetrieved;
+        let mut manifest = evidence_manifest();
+        let source = b"MEL-GROUND-009 synthetic yoked source audio v1\\n".to_vec();
+        let pcm: Vec<u8> = PCM.iter().map(|sample| sample ^ 0x5a).collect();
+        let source_sha256 = sha256_hex(&source);
+        manifest.evidence_condition = AudioEvidenceConditionV1::YokedRetrieved;
+        manifest.source_audio.audio_sha256 = source_sha256.clone();
+        manifest.source_audio.byte_length = source.len() as u64;
+        manifest.source_lineage_id = "synthetic-yoked-source-lineage-001".into();
+        manifest.decoded_pcm.pcm_sha256 = sha256_hex(&pcm);
+        manifest.windows[0].window_pcm_sha256 = sha256_hex(&pcm[4..12]);
+        manifest.windows[1].window_pcm_sha256 = sha256_hex(&pcm[20..32]);
+        manifest.context.items[0].payload_sha256 = manifest.windows[0].window_pcm_sha256.clone();
+        manifest.context.items[1].payload_sha256 = manifest.windows[1].window_pcm_sha256.clone();
+        case.evidence.as_mut().unwrap().source_audio_sha256 = source_sha256;
+        case.evidence.as_mut().unwrap().evidence_payload_sha256 =
+            manifest.windows[0].window_pcm_sha256.clone();
+        manifest.context.context_manifest_sha256 =
+            recompute_audio_context_manifest_sha256(&manifest).unwrap();
+        (case, manifest, source, pcm)
+    }
+
+    #[test]
+    fn only_byte_verified_local_and_yoked_arms_produce_a_paired_contrast() {
+        let mut no_case = revision_case();
+        no_case.evidence_condition = RevisionEvidenceConditionV1::NoEvidence;
+        no_case.evidence = None;
+        let local_case = revision_case();
+        let local_manifest = evidence_manifest();
+        let (yoked_case, yoked_manifest, yoked_source, yoked_pcm) =
+            yoked_materialization();
+
+        let result = audit_verified_audio_evidence_triplet(
+            AudioEvidenceRevisionArmInput {
+                revision_case: &no_case,
+                evidence_manifest: None,
+                source_audio_bytes: None,
+                decoded_pcm_bytes: None,
+            },
+            AudioEvidenceRevisionArmInput {
+                revision_case: &local_case,
+                evidence_manifest: Some(&local_manifest),
+                source_audio_bytes: Some(SOURCE_AUDIO),
+                decoded_pcm_bytes: Some(PCM),
+            },
+            AudioEvidenceRevisionArmInput {
+                revision_case: &yoked_case,
+                evidence_manifest: Some(&yoked_manifest),
+                source_audio_bytes: Some(&yoked_source),
+                decoded_pcm_bytes: Some(&yoked_pcm),
+            },
+        )
+        .unwrap();
+
+        assert!(result.no_evidence_arm_has_no_materialization);
+        assert!(result.local_evidence_bytes_verified);
+        assert!(result.yoked_evidence_bytes_verified);
+        assert!(!result.model_input_attested);
+        assert_eq!(result.contrast.local_minus_no_evidence_f1, Some(0.0));
+        assert_eq!(result.contrast.local_minus_yoked_f1, Some(0.0));
+        assert_eq!(result.contrast.local_beats_yoked, Some(false));
+        assert_ne!(
+            result.local_audio_bound_report.audio_evidence_report.source_lineage_id,
+            result.yoked_audio_bound_report.audio_evidence_report.source_lineage_id
+        );
+    }
+
+    #[test]
+    fn verified_triplet_rejects_manifest_on_no_evidence_arm() {
+        let no_case = revision_case();
+        let local_case = revision_case();
+        let local_manifest = evidence_manifest();
+        let (yoked_case, yoked_manifest, yoked_source, yoked_pcm) =
+            yoked_materialization();
+
+        assert!(
+            audit_verified_audio_evidence_triplet(
+                AudioEvidenceRevisionArmInput {
+                    revision_case: &no_case,
+                    evidence_manifest: Some(&local_manifest),
+                    source_audio_bytes: Some(SOURCE_AUDIO),
+                    decoded_pcm_bytes: Some(PCM),
+                },
+                AudioEvidenceRevisionArmInput {
+                    revision_case: &local_case,
+                    evidence_manifest: Some(&local_manifest),
+                    source_audio_bytes: Some(SOURCE_AUDIO),
+                    decoded_pcm_bytes: Some(PCM),
+                },
+                AudioEvidenceRevisionArmInput {
+                    revision_case: &yoked_case,
+                    evidence_manifest: Some(&yoked_manifest),
+                    source_audio_bytes: Some(&yoked_source),
+                    decoded_pcm_bytes: Some(&yoked_pcm),
+                },
+            )
+            .is_err()
+        );
+    }
+
+    #[test]
+    fn verified_triplet_rejects_invalid_yoked_bytes_before_contrast() {
+        let mut no_case = revision_case();
+        no_case.evidence_condition = RevisionEvidenceConditionV1::NoEvidence;
+        no_case.evidence = None;
+        let local_case = revision_case();
+        let local_manifest = evidence_manifest();
+        let (yoked_case, yoked_manifest, mut yoked_source, yoked_pcm) =
+            yoked_materialization();
+        yoked_source[0] ^= 1;
+
+        assert!(
+            audit_verified_audio_evidence_triplet(
+                AudioEvidenceRevisionArmInput {
+                    revision_case: &no_case,
+                    evidence_manifest: None,
+                    source_audio_bytes: None,
+                    decoded_pcm_bytes: None,
+                },
+                AudioEvidenceRevisionArmInput {
+                    revision_case: &local_case,
+                    evidence_manifest: Some(&local_manifest),
+                    source_audio_bytes: Some(SOURCE_AUDIO),
+                    decoded_pcm_bytes: Some(PCM),
+                },
+                AudioEvidenceRevisionArmInput {
+                    revision_case: &yoked_case,
+                    evidence_manifest: Some(&yoked_manifest),
+                    source_audio_bytes: Some(&yoked_source),
+                    decoded_pcm_bytes: Some(&yoked_pcm),
+                },
+            )
+            .is_err()
+        );
+    }
+
     #[test]
     fn exact_audio_materialization_and_revision_metadata_join() {
         let report = audit_revision_with_audio_evidence(
