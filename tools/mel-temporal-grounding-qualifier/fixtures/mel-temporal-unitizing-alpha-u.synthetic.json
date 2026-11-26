@@ -1,0 +1,171 @@
+{
+  "schema": "mel-temporal-unitizing-alpha-u-corpus-v1",
+  "annotation_manifest_sha256": "ffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffff",
+  "minimum_eligible_unitizers_per_item": 2,
+  "items": [
+    {
+      "item_id": "item-001-piano-present",
+      "source_work_cluster_sha256": "1111111111111111111111111111111111111111111111111111111111111111",
+      "query_id": "query-piano-entrance",
+      "query_text": "Every piano entrance",
+      "artifact": {
+        "audio_sha256": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+        "sample_rate_hz": 48000,
+        "channels": 2,
+        "total_frames": 480000
+      },
+      "annotation_policy_version": "mel-temporal-policy-v1",
+      "annotations": [
+        {
+          "annotator_id_sha256": "1111111111111111111111111111111111111111111111111111111111111111",
+          "annotation_sha256": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+          "state": "Present",
+          "intervals": [
+            {
+              "start_frame": 100,
+              "end_frame": 200
+            },
+            {
+              "start_frame": 500,
+              "end_frame": 650
+            }
+          ],
+          "status_reason": null
+        },
+        {
+          "annotator_id_sha256": "2222222222222222222222222222222222222222222222222222222222222222",
+          "annotation_sha256": "bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb",
+          "state": "Present",
+          "intervals": [
+            {
+              "start_frame": 100,
+              "end_frame": 200
+            },
+            {
+              "start_frame": 510,
+              "end_frame": 660
+            }
+          ],
+          "status_reason": null
+        },
+        {
+          "annotator_id_sha256": "3333333333333333333333333333333333333333333333333333333333333333",
+          "annotation_sha256": "cccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccc",
+          "state": "Present",
+          "intervals": [
+            {
+              "start_frame": 105,
+              "end_frame": 205
+            },
+            {
+              "start_frame": 500,
+              "end_frame": 650
+            }
+          ],
+          "status_reason": null
+        },
+        {
+          "annotator_id_sha256": "4444444444444444444444444444444444444444444444444444444444444444",
+          "annotation_sha256": "dddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddd",
+          "state": "Ambiguous",
+          "intervals": [
+            {
+              "start_frame": 300,
+              "end_frame": 380
+            }
+          ],
+          "status_reason": "gradual pad/piano blend; the event identity is disputed"
+        },
+        {
+          "annotator_id_sha256": "5555555555555555555555555555555555555555555555555555555555555555",
+          "annotation_sha256": "eeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeee",
+          "state": "NotEstimable",
+          "intervals": [],
+          "status_reason": "masking prevents a stable judgement of the second entrance"
+        }
+      ]
+    },
+    {
+      "item_id": "item-002-strings-absent",
+      "source_work_cluster_sha256": "1111111111111111111111111111111111111111111111111111111111111111",
+      "query_id": "query-strings-entrance",
+      "query_text": "Every string-section entrance",
+      "artifact": {
+        "audio_sha256": "bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb",
+        "sample_rate_hz": 48000,
+        "channels": 2,
+        "total_frames": 480000
+      },
+      "annotation_policy_version": "mel-temporal-policy-v1",
+      "annotations": [
+        {
+          "annotator_id_sha256": "1111111111111111111111111111111111111111111111111111111111111111",
+          "annotation_sha256": "ffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffff",
+          "state": "Absent",
+          "intervals": [],
+          "status_reason": null
+        },
+        {
+          "annotator_id_sha256": "2222222222222222222222222222222222222222222222222222222222222222",
+          "annotation_sha256": "7777777777777777777777777777777777777777777777777777777777777777",
+          "state": "Absent",
+          "intervals": [],
+          "status_reason": null
+        },
+        {
+          "annotator_id_sha256": "3333333333333333333333333333333333333333333333333333333333333333",
+          "annotation_sha256": "8888888888888888888888888888888888888888888888888888888888888888",
+          "state": "Absent",
+          "intervals": [],
+          "status_reason": null
+        }
+      ]
+    },
+    {
+      "item_id": "item-003-vocal-insufficient",
+      "source_work_cluster_sha256": "2222222222222222222222222222222222222222222222222222222222222222",
+      "query_id": "query-vocal-entrance",
+      "query_text": "Every vocal entrance",
+      "artifact": {
+        "audio_sha256": "cccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccc",
+        "sample_rate_hz": 48000,
+        "channels": 2,
+        "total_frames": 480000
+      },
+      "annotation_policy_version": "mel-temporal-policy-v1",
+      "annotations": [
+        {
+          "annotator_id_sha256": "1111111111111111111111111111111111111111111111111111111111111111",
+          "annotation_sha256": "9999999999999999999999999999999999999999999999999999999999999999",
+          "state": "Present",
+          "intervals": [
+            {
+              "start_frame": 2000,
+              "end_frame": 3000
+            }
+          ],
+          "status_reason": null
+        },
+        {
+          "annotator_id_sha256": "4444444444444444444444444444444444444444444444444444444444444444",
+          "annotation_sha256": "0000000000000000000000000000000000000000000000000000000000000000",
+          "state": "Ambiguous",
+          "intervals": [
+            {
+              "start_frame": 1900,
+              "end_frame": 3100
+            }
+          ],
+          "status_reason": "vocal-like synthesizer lead is not reliably distinguishable"
+        },
+        {
+          "annotator_id_sha256": "5555555555555555555555555555555555555555555555555555555555555555",
+          "annotation_sha256": "1111111111111111111111111111111111111111111111111111111111111111",
+          "state": "NotEstimable",
+          "intervals": [],
+          "status_reason": "vocals are heavily masked"
+        }
+      ]
+    }
+  ]
+}
