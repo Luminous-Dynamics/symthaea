@@ -1,0 +1,63 @@
+name: HARDSEC-014 telemetry trace lineage audit
+
+on:
+  pull_request:
+    paths:
+      - "examples/hardsec_trace_lineage_audit.rs"
+      - "schemas/hardsec-telemetry-trace-lineage-v1.schema.json"
+      - "tests/fixtures/hardsec/telemetry-trace-lineage-v1.json"
+      - "tools/hardsec-trace-lineage-audit-harness/**"
+      - ".github/workflows/hardsec-trace-lineage-audit.yml"
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: hardsec-trace-lineage-audit-${{ github.event.pull_request.number || github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  trace-lineage-audit:
+    runs-on: ubuntu-24.04
+    timeout-minutes: 15
+    steps:
+      - name: Checkout exact pull request revision
+        uses: actions/checkout@v4
+      - name: Install pinned Rust toolchain
+        uses: dtolnay/rust-toolchain@1.96.0
+        with:
+          components: rustfmt
+      - name: Check formatting
+        run: rustfmt --edition 2024 --check examples/hardsec_trace_lineage_audit.rs
+      - name: Run focused unit suite
+        run: cargo test --locked --manifest-path tools/hardsec-trace-lineage-audit-harness/Cargo.toml --features hardsec-trace-lineage-audit --example hardsec_trace_lineage_audit
+      - name: Run known-answer fixture
+        shell: bash
+        run: |
+          set -euo pipefail
+          out_dir="$(mktemp -d)"
+          cargo run --locked --manifest-path tools/hardsec-trace-lineage-audit-harness/Cargo.toml --features hardsec-trace-lineage-audit --example hardsec_trace_lineage_audit -- \
+            --manifest tests/fixtures/hardsec/telemetry-trace-lineage-v1.json \
+            --receipt "$out_dir/receipt.json"
+          python3 - "$out_dir/receipt.json" <<'PY'
+          import json, sys
+          with open(sys.argv[1], "r", encoding="utf-8") as handle:
+              receipt = json.load(handle)
+          assert receipt["result"] == "audited"
+          lineage = receipt["trace_lineage"]
+          assert lineage["trace_record_count"] == 5, lineage
+          assert lineage["original_trace_count"] == 4, lineage
+          assert lineage["repeated_iteration_trace_count"] == 1, lineage
+          windows = receipt["window_support"]
+          assert windows["raw_window_count"] == 7, windows
+          assert windows["repeated_iteration_window_count"] == 2, windows
+          assert windows["duplicate_content_hash_group_count"] == 2, windows
+          assert windows["duplicate_content_extra_occurrences"] == 2, windows
+          groups = receipt["independent_group_support"]
+          assert groups["unique_program_count"] == 4, groups
+          assert groups["unique_execution_id_count"] == 4, groups
+          assert groups["unique_attack_family_count_excluding_none"] == 3, groups
+          assert groups["effective_sample_size_estimate"] is None, groups
+          assert receipt["sampling_policy"]["offset_validation"]["ess_estimate"] is None
+          PY
