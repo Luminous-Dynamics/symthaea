@@ -255,12 +255,18 @@ fn first_available(
     candidates: &[SubstrateKindV1],
     profiles: &[SubstrateProfileV1],
 ) -> Result<SubstrateKindV1, RouteRejectV1> {
+    let mut last_rejection = RouteRejectV1::RequiredSubstrateUnavailable;
     for kind in candidates {
-        if profile_for(*kind, profiles).is_ok() {
-            return Ok(*kind);
+        match profile_for(*kind, profiles) {
+            Ok(_) => return Ok(*kind),
+            Err(RouteRejectV1::InvalidCostProfile) => {
+                last_rejection = RouteRejectV1::InvalidCostProfile;
+            }
+            Err(RouteRejectV1::RequiredSubstrateUnavailable) => {}
+            Err(other) => return Err(other),
         }
     }
-    Err(RouteRejectV1::RequiredSubstrateUnavailable)
+    Err(last_rejection)
 }
 
 /// Creates a deterministic, fail-closed query plan over pre-qualified
@@ -713,6 +719,23 @@ mod tests {
             plan.selected_substrates[0].kind,
             SubstrateKindV1::TypedHdc
         );
+    }
+
+    #[test]
+    fn event_id_hdc_remains_a_distinct_associative_substrate() {
+        let req = request(QueryRegimeV1::BroadRecall);
+        let profiles = [profile(
+            SubstrateKindV1::EventIdHdc,
+            cost(100, 0, 0),
+        )];
+        let plan = route_mace_query_v1(&req, &profiles).unwrap();
+        assert_eq!(
+            plan.selected_substrates[0].kind,
+            SubstrateKindV1::EventIdHdc
+        );
+        assert!(plan.steps.iter().any(|step| {
+            step.action == RouteActionV1::AssociativeCandidateLookup
+        }));
     }
 
     #[test]
