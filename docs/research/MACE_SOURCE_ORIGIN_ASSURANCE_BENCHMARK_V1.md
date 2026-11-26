@@ -341,3 +341,8 @@ Targets for deterministic governance, role-leakage and lifecycle controls remain
 The reference implementation is exported as `adaptive_policy_reference` in the AML adapter crate. Portable input is defined by `data/schemas/mace_adaptive_reference_scenario_v1.schema.json` and a worked finite joint-world fixture at `data/fixtures/mace_adaptive_reference_scenario_v1.example.json`. The oracle computes exact expected net utility and probability-free worst-case regret as separate objectives; it must be used to qualify optimized executors and learned proposal policies on small worlds before large benchmark claims.
 
 The reference suite currently authors 15 deterministic tests. They have not been compiled or executed. It validates only the supplied finite scenario; it does not prove that a scenario's world support is complete, probabilities are empirically calibrated, source-root labels are correct, or external receipt signatures are genuine. Gold scenario construction and independent audit remain mandatory.
+
+
+## 17. Benchmark result evidence capsule
+
+Every external and MACE-specific benchmark run should emit a [MACE Benchmark Result Capsule V1](MACE_BENCHMARK_RESULT_CAPSULE_V1.md), validated against `data/schemas/mace_benchmark_result_capsule_v1.schema.json`. The capsule binds benchmark release/harness/split/grader, candidate commit/config, model, task denominator, safety events, all-in resource usage, paired baseline, uncertainty method and verification level. A self-reported capsule is not an attestation; independent replay and official evaluation remain separate evidence stages.
