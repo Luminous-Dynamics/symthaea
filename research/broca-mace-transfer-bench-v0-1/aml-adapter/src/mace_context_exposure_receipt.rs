@@ -834,16 +834,25 @@ mod tests {
     }
 
     fn expected() -> MaceExpectedExposureBindingV1<'static> {
+        expected_with_parameter_profile(
+            "44136fa355b3678a1146ad16f7e8649e94fb4fc21fe77e8310c060f61caaff8a"
+        )
+    }
+
+    fn expected_with_parameter_profile(
+        profile: &str,
+    ) -> MaceExpectedExposureBindingV1<'_> {
         MaceExpectedExposureBindingV1 {
             run_id: "run-1", pair_block_id: "pair-1", world_cluster_id: "cluster-1",
             query_id: "query-1", arm: MaceMemoryArmV1::ConventionalRetrieval,
             invocation_sequence: 0, decision_need_sha256: D1, candidate_policy_sha256: D2,
             source_registry_root_sha256: D3, lineage_profile_sha256: D4,
             lifecycle_profile_sha256: D5, renderer_profile_sha256: D6,
-            transport_adapter_profile_sha256: D7, provider_parameter_profile_sha256: "44136fa355b3678a1146ad16f7e8649e94fb4fc21fe77e8310c060f61caaff8a", model_revision: "model-pinned-1",
-            clock_profile_sha256: D8, observer_profile_sha256: D9,
-            storage_profile_sha256: D1, encryption_profile_sha256: D2,
-            access_policy_sha256: D3, retention_policy_sha256: D4,
+            transport_adapter_profile_sha256: D7, provider_parameter_profile_sha256: profile,
+            model_revision: "model-pinned-1", clock_profile_sha256: D8,
+            observer_profile_sha256: D9, storage_profile_sha256: D1,
+            encryption_profile_sha256: D2, access_policy_sha256: D3,
+            retention_policy_sha256: D4,
         }
     }
     fn fixture() -> (MaceContextExposureReceiptV1, SigningKey, Vec<u8>) {
@@ -1103,11 +1112,7 @@ mod tests {
         let profile = hash(&serde_json::to_vec(&parameters).unwrap());
         receipt.provider_parameter_profile_sha256 = profile.clone();
         refresh_body_binding(&mut receipt, body, &key);
-        let base = expected();
-        let bound = MaceExpectedExposureBindingV1 {
-            provider_parameter_profile_sha256: &profile,
-            ..base
-        };
+        let bound = expected_with_parameter_profile(&profile);
         assert!(
             verify_fixture(&receipt, body.to_vec(), &key, &bound, &AcceptEvidence).is_ok()
         );
