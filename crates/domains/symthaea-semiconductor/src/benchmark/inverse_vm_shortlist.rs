@@ -1132,6 +1132,8 @@ mod tests {
         let mut receipt = ForwardEvaluationReceiptV1 {
             schema: FORWARD_EVALUATION_RECEIPT_SCHEMA_V1.into(),
             evaluator_id: "forward-evaluator.v1".into(),
+            clock_domain_id: "fab-clock".into(),
+            clock_mapping_sha256: digest('9'),
             process_snapshot_sha256: candidate.process_snapshot_sha256.clone(),
             forward_model_sha256: candidate.forward_model_sha256.clone(),
             model_qualification_report_sha256: Some(digest('f')),
