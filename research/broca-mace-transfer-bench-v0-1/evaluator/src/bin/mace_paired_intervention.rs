@@ -34,6 +34,8 @@ const HDC_CODEBOOK_SEED: u64 = 0x4D41_4345_4844_4301;
 const HDC_NEURON_SEED: u64 = 0x4D41_4345_4C54_4301;
 const TOP_K: usize = 2;
 const BOOTSTRAP_REPLICATES: usize = 2_000;
+const MIN_INFERENCE_CLUSTERS: u64 = 500;
+const MAX_GENERATED_CLUSTERS: u64 = 3_000;
 const SCALE: f64 = 1_000_000.0;
 
 #[derive(Clone, Copy, Debug, Eq, PartialEq, Ord, PartialOrd)]
@@ -41,6 +43,7 @@ enum Arm {
     NoMemory,
     ExactScopeScan,
     ConventionalRetrieval,
+    QualifiedSymbolicRetrieval,
     StaticHdc,
     HdcLtc,
     TypedContentHdc,
@@ -52,6 +55,7 @@ impl Arm {
         Self::NoMemory,
         Self::ExactScopeScan,
         Self::ConventionalRetrieval,
+        Self::QualifiedSymbolicRetrieval,
         Self::StaticHdc,
         Self::HdcLtc,
         Self::TypedContentHdc,
@@ -63,6 +67,7 @@ impl Arm {
             Self::NoMemory => "no_memory",
             Self::ExactScopeScan => "exact_scope_scan",
             Self::ConventionalRetrieval => "conventional_retrieval",
+            Self::QualifiedSymbolicRetrieval => "qualified_symbolic_retrieval",
             Self::StaticHdc => "static_hdc",
             Self::HdcLtc => "hdc_ltc",
             Self::TypedContentHdc => "typed_content_hdc",
@@ -215,6 +220,54 @@ fn conventional_ids(memory: &[Experience], query: Query, top_k: usize) -> Vec<u3
     ids
 }
 
+fn identification_method_rank(method: broca_mace_policy::IdentificationMethodV1) -> u8 {
+    match method {
+        broca_mace_policy::IdentificationMethodV1::RandomizedControlledTrial => 3,
+        broca_mace_policy::IdentificationMethodV1::QuasiExperimental => 2,
+        broca_mace_policy::IdentificationMethodV1::Observational => 1,
+        broca_mace_policy::IdentificationMethodV1::Unknown => 0,
+    }
+}
+
+/// Stronger candidate-visible symbolic comparator. It exact-filters by
+/// DecisionNeed scope/action, then prioritizes records the unchanged MACE
+/// qualification gate can admit, stronger identification methods, explicit
+/// trust/reconciliation/freshness flags, tighter uncertainty and stable IDs.
+/// It never reads evaluator truth, optimal actions or target utilities.
+fn qualified_symbolic_ids(memory: &[Experience], query: Query, top_k: usize) -> Vec<u32> {
+    let mut ids = Vec::new();
+    for action in [Action::A, Action::B] {
+        let mut candidates: Vec<&Experience> = memory
+            .iter()
+            .filter(|item| item.scope == query.scope && item.action == action)
+            .collect();
+        candidates.sort_by(|left, right| {
+            is_qualified(right, query)
+                .cmp(&is_qualified(left, query))
+                .then_with(|| {
+                    identification_method_rank(right.causal_identification.method)
+                        .cmp(&identification_method_rank(left.causal_identification.method))
+                })
+                .then_with(|| right.source_trusted.cmp(&left.source_trusted))
+                .then_with(|| right.outcome_reconciled.cmp(&left.outcome_reconciled))
+                .then_with(|| (!right.source_retracted).cmp(&(!left.source_retracted)))
+                .then_with(|| {
+                    right
+                        .delayed_horizon_complete
+                        .cmp(&left.delayed_horizon_complete)
+                })
+                .then_with(|| {
+                    left.measurement_error_bound
+                        .total_cmp(&right.measurement_error_bound)
+                })
+                .then_with(|| right.event_id.cmp(&left.event_id))
+                .then_with(|| left.source_family.cmp(&right.source_family))
+        });
+        ids.extend(candidates.into_iter().take(top_k).map(|item| item.event_id));
+    }
+    ids
+}
+
 fn exact_scope_ids(memory: &[Experience], query: Query) -> Vec<u32> {
     let mut ids = Vec::new();
     for action in [Action::A, Action::B] {
@@ -310,6 +363,12 @@ fn execute_arm(
                 .unwrap_or(u64::MAX)
                 .saturating_mul(size_of::<u32>() as u64);
             Ok(conventional_ids(&memory, case.query, TOP_K))
+        }
+        Arm::QualifiedSymbolicRetrieval => {
+            index_bytes = u64::try_from(memory.len())
+                .unwrap_or(u64::MAX)
+                .saturating_mul(size_of::<u32>() as u64);
+            Ok(qualified_symbolic_ids(&memory, case.query, TOP_K))
         }
         Arm::StaticHdc => hdc_hits(
             &memory,
@@ -710,6 +769,7 @@ fn evaluator_record(
 #[derive(Clone, Debug)]
 struct ContrastRows {
     utility_deltas_by_cluster: BTreeMap<u64, Vec<f64>>,
+    regret_deltas_by_cluster: BTreeMap<u64, Vec<f64>>,
     regret_deltas: Vec<f64>,
     latency_deltas: Vec<i64>,
     memory_deltas: Vec<i64>,
@@ -724,6 +784,7 @@ impl Default for ContrastRows {
     fn default() -> Self {
         Self {
             utility_deltas_by_cluster: BTreeMap::new(),
+            regret_deltas_by_cluster: BTreeMap::new(),
             regret_deltas: Vec::new(),
             latency_deltas: Vec::new(),
             memory_deltas: Vec::new(),
@@ -773,25 +834,49 @@ fn contrast_record(
     baseline: Arm,
     treatment: Arm,
     rows: &BTreeMap<(u64, String, Arm), ScoredArm>,
-) -> Value {
+) -> Result<Value, String> {
     let mut contrast = ContrastRows::default();
-    let mut keys = BTreeSet::new();
-    for ((cluster, family, arm), _) in rows {
-        if *arm == baseline {
-            keys.insert((*cluster, family.clone()));
-        }
+    let baseline_keys: BTreeSet<(u64, String)> = rows
+        .keys()
+        .filter(|(_, _, arm)| *arm == baseline)
+        .map(|(cluster, family, _)| (*cluster, family.clone()))
+        .collect();
+    let treatment_keys: BTreeSet<(u64, String)> = rows
+        .keys()
+        .filter(|(_, _, arm)| *arm == treatment)
+        .map(|(cluster, family, _)| (*cluster, family.clone()))
+        .collect();
+
+    if baseline_keys.is_empty() {
+        return Err(format!("contrast {contrast_id} has no baseline pair blocks"));
+    }
+    if baseline_keys != treatment_keys {
+        let baseline_without_treatment: Vec<_> =
+            baseline_keys.difference(&treatment_keys).cloned().collect();
+        let treatment_without_baseline: Vec<_> =
+            treatment_keys.difference(&baseline_keys).cloned().collect();
+        return Err(format!(
+            "contrast {contrast_id} has unmatched pair blocks: baseline_without_treatment={baseline_without_treatment:?}, treatment_without_baseline={treatment_without_baseline:?}"
+        ));
     }
 
-    for (cluster, family) in keys {
-        let Some(base) = rows.get(&(cluster, family.clone(), baseline)) else {
-            continue;
-        };
-        let Some(treat) = rows.get(&(cluster, family.clone(), treatment)) else {
-            continue;
-        };
+    for (cluster, family) in baseline_keys {
+        let base = rows
+            .get(&(cluster, family.clone(), baseline))
+            .ok_or_else(|| format!("contrast {contrast_id} missing baseline row"))?;
+        let treat = rows
+            .get(&(cluster, family.clone(), treatment))
+            .ok_or_else(|| format!("contrast {contrast_id} missing treatment row"))?;
+        if base.pair_block_id != treat.pair_block_id {
+            return Err(format!(
+                "contrast {contrast_id} pair identity mismatch at cluster {cluster}, family {family}"
+            ));
+        }
         let delta = (treat.utility_micros - base.utility_micros) as f64;
         contrast.utility_deltas_by_cluster.entry(cluster).or_default().push(delta);
-        contrast.regret_deltas.push((treat.regret_micros - base.regret_micros) as f64);
+        let regret_delta = (treat.regret_micros - base.regret_micros) as f64;
+        contrast.regret_deltas_by_cluster.entry(cluster).or_default().push(regret_delta);
+        contrast.regret_deltas.push(regret_delta);
         contrast.latency_deltas.push(
             i64::try_from(treat.latency_ns).unwrap_or(i64::MAX)
                 - i64::try_from(base.latency_ns).unwrap_or(i64::MAX),
@@ -817,22 +902,23 @@ fn contrast_record(
         .values()
         .map(|deltas| deltas.iter().sum::<f64>() / deltas.len() as f64)
         .collect();
-    let mean_delta = if contrast.pair_count == 0 {
-        0.0
-    } else {
-        contrast.utility_deltas_by_cluster.values()
-            .flat_map(|items| items.iter())
-            .sum::<f64>() / contrast.pair_count as f64
-    };
+    let cluster_regret_means: Vec<f64> = contrast
+        .regret_deltas_by_cluster
+        .values()
+        .map(|deltas| deltas.iter().sum::<f64>() / deltas.len() as f64)
+        .collect();
+    let mean_delta = cluster_means.iter().sum::<f64>() / cluster_means.len() as f64;
+    let pair_weighted_mean_delta = contrast
+        .utility_deltas_by_cluster
+        .values()
+        .flat_map(|items| items.iter())
+        .sum::<f64>() / contrast.pair_count as f64;
     let (ci_lower, ci_upper) = bootstrap_interval(
         &cluster_means,
         0x4D41_4345_0000_0000_u64 ^ (contrast_id.bytes().map(u64::from).sum::<u64>()),
     );
-    let mean_regret_delta = if contrast.regret_deltas.is_empty() {
-        0.0
-    } else {
-        contrast.regret_deltas.iter().sum::<f64>() / contrast.regret_deltas.len() as f64
-    };
+    let mean_regret_delta =
+        cluster_regret_means.iter().sum::<f64>() / cluster_regret_means.len() as f64;
     let mean_memory_delta = if contrast.memory_deltas.is_empty() {
         0.0
     } else {
@@ -861,11 +947,13 @@ fn contrast_record(
         latency_deltas[index]
     };
 
-    json!({
+    Ok(json!({
         "contrast_id": contrast_id,
         "baseline_arm": baseline.name(),
         "treatment_arm": treatment.name(),
+        "estimand_weighting": "equal_world_cluster_means",
         "mean_utility_delta_micros": mean_delta,
+        "mean_pair_weighted_utility_delta_micros": pair_weighted_mean_delta,
         "ci95_lower_micros": ci_lower,
         "ci95_upper_micros": ci_upper,
         "world_cluster_count": contrast.utility_deltas_by_cluster.len(),
@@ -877,7 +965,7 @@ fn contrast_record(
         "worst_family_success_delta_pp": worst_family_delta,
         "p95_latency_delta_ns": p95_latency_delta,
         "all_in_memory_bytes_delta": mean_memory_delta.round() as i64
-    })
+    }))
 }
 
 fn write_jsonl(path: &str, records: &[Value]) -> Result<(), String> {
@@ -926,9 +1014,11 @@ fn run() -> Result<(), String> {
         .first()
         .map(|value| value.parse::<u64>().map_err(|error| error.to_string()))
         .transpose()?
-        .unwrap_or(256);
-    if clusters == 0 || clusters > 10_000 {
-        return Err("cluster count must be in 1..=10000".to_string());
+        .unwrap_or(512);
+    if clusters < MIN_INFERENCE_CLUSTERS || clusters > MAX_GENERATED_CLUSTERS {
+        return Err(format!(
+            "inferential run requires {MIN_INFERENCE_CLUSTERS}..={MAX_GENERATED_CLUSTERS} cluster-scoped worlds"
+        ));
     }
     let candidate_path = args.get(1).map(String::as_str).unwrap_or("mace_candidate_decisions.jsonl");
     let evaluator_path = args.get(2).map(String::as_str).unwrap_or("mace_evaluator_scores.jsonl");
@@ -1019,22 +1109,23 @@ fn run() -> Result<(), String> {
     }
 
     let contrasts = vec![
-        contrast_record("memory_vs_none", Arm::NoMemory, Arm::HdcLtc, &scores),
-        contrast_record("content_vs_placebo", Arm::SemanticPlacebo, Arm::HdcLtc, &scores),
-        contrast_record("hdc_ltc_vs_conventional", Arm::ConventionalRetrieval, Arm::HdcLtc, &scores),
-        contrast_record("hdc_ltc_vs_static_hdc", Arm::StaticHdc, Arm::HdcLtc, &scores),
+        contrast_record("memory_vs_none", Arm::NoMemory, Arm::HdcLtc, &scores)?,
+        contrast_record("content_vs_placebo", Arm::SemanticPlacebo, Arm::HdcLtc, &scores)?,
+        contrast_record("hdc_ltc_vs_conventional", Arm::ConventionalRetrieval, Arm::HdcLtc, &scores)?,
+        contrast_record("hdc_ltc_vs_qualified_symbolic", Arm::QualifiedSymbolicRetrieval, Arm::HdcLtc, &scores)?,
+        contrast_record("hdc_ltc_vs_static_hdc", Arm::StaticHdc, Arm::HdcLtc, &scores)?,
         contrast_record(
             "typed_content_hdc_vs_conventional",
             Arm::ConventionalRetrieval,
             Arm::TypedContentHdc,
             &scores,
-        ),
+        )?,
         contrast_record(
             "typed_content_hdc_vs_static_hdc",
             Arm::StaticHdc,
             Arm::TypedContentHdc,
             &scores,
-        ),
+        )?,
         // Evidence-complete decision reference: exact-scope candidate-visible
         // records versus the compressed top-k typed representation. This is a
         // decision-sufficiency gap, not an equal-cost practical baseline.
@@ -1043,7 +1134,7 @@ fn run() -> Result<(), String> {
             Arm::ExactScopeScan,
             Arm::TypedContentHdc,
             &scores,
-        ),
+        )?,
     ];
     let summary = json!({
         "schema_version": SCHEMA_VERSION,
@@ -1082,6 +1173,140 @@ fn main() {
 #[cfg(test)]
 mod tests {
     use super::*;
+
+    fn add_synthetic_pair(
+        rows: &mut BTreeMap<(u64, String, Arm), ScoredArm>,
+        cluster: u64,
+        family: &str,
+        utility_delta: i64,
+    ) {
+        let family_key = family.to_string();
+        let pair_block_id = format!("cluster-{cluster}:{family}");
+        let baseline = ScoredArm {
+            arm: Arm::ConventionalRetrieval,
+            cluster,
+            family: family_key.clone(),
+            pair_block_id: pair_block_id.clone(),
+            decision: Some(Action::B),
+            utility_micros: 0,
+            regret_micros: 100,
+            task_success: false,
+            latency_ns: 10,
+            memory_bytes: 100,
+            invalid_evidence_use_count: 0,
+            stale_evidence_use_count: 0,
+            wrong_scope_evidence_use_count: 0,
+            false_causal_claim_count: 0,
+            support_count: 1,
+        };
+        let treatment = ScoredArm {
+            arm: Arm::HdcLtc,
+            cluster,
+            family: family_key.clone(),
+            pair_block_id,
+            decision: Some(Action::A),
+            utility_micros: utility_delta,
+            regret_micros: 100 - utility_delta,
+            task_success: utility_delta > 0,
+            latency_ns: 12,
+            memory_bytes: 120,
+            invalid_evidence_use_count: 0,
+            stale_evidence_use_count: 0,
+            wrong_scope_evidence_use_count: 0,
+            false_causal_claim_count: 0,
+            support_count: 1,
+        };
+        rows.insert((cluster, family_key.clone(), Arm::ConventionalRetrieval), baseline);
+        rows.insert((cluster, family_key, Arm::HdcLtc), treatment);
+    }
+
+    #[test]
+    fn cluster_weighted_point_estimate_matches_bootstrap_unit() {
+        let mut rows = BTreeMap::new();
+        add_synthetic_pair(&mut rows, 1, "family-a", 10);
+        add_synthetic_pair(&mut rows, 1, "family-b", 10);
+        add_synthetic_pair(&mut rows, 2, "family-c", 100);
+        let summary = contrast_record(
+            "test-cluster-weighting",
+            Arm::ConventionalRetrieval,
+            Arm::HdcLtc,
+            &rows,
+        )
+        .unwrap();
+        assert_eq!(summary["mean_utility_delta_micros"].as_f64(), Some(55.0));
+        assert_eq!(
+            summary["mean_pair_weighted_utility_delta_micros"].as_f64(),
+            Some(40.0)
+        );
+        assert_eq!(summary["world_cluster_count"].as_u64(), Some(2));
+    }
+
+    #[test]
+    fn incomplete_pair_blocks_fail_closed_instead_of_being_dropped() {
+        let mut rows = BTreeMap::new();
+        add_synthetic_pair(&mut rows, 1, "matched", 10);
+        let unmatched = ScoredArm {
+            arm: Arm::ConventionalRetrieval,
+            cluster: 2,
+            family: "missing-treatment".to_string(),
+            pair_block_id: "cluster-2:missing-treatment".to_string(),
+            decision: Some(Action::A),
+            utility_micros: 20,
+            regret_micros: 80,
+            task_success: true,
+            latency_ns: 10,
+            memory_bytes: 100,
+            invalid_evidence_use_count: 0,
+            stale_evidence_use_count: 0,
+            wrong_scope_evidence_use_count: 0,
+            false_causal_claim_count: 0,
+            support_count: 1,
+        };
+        rows.insert(
+            (2, "missing-treatment".to_string(), Arm::ConventionalRetrieval),
+            unmatched,
+        );
+        let error = contrast_record(
+            "test-missing-pair",
+            Arm::ConventionalRetrieval,
+            Arm::HdcLtc,
+            &rows,
+        )
+        .unwrap_err();
+        assert!(error.contains("unmatched pair blocks"));
+    }
+
+    #[test]
+    fn qualified_symbolic_ranker_prefers_qualified_rct_over_decoy() {
+        let cases = stress::generated_worlds(1);
+        let target = cases
+            .iter()
+            .find(|item| item.family == "observational_high_reward_decoy")
+            .expect("observational decoy exists");
+        let donor = cases
+            .iter()
+            .find(|item| item.family == "identified_effect")
+            .expect("qualified donor exists");
+        let mut memory = target.memory.clone();
+        let mut qualified = *donor
+            .memory
+            .iter()
+            .find(|item| item.action == Action::A)
+            .expect("qualified action A evidence exists");
+        qualified.event_id = 99_000;
+        memory.push(qualified);
+
+        let ids = qualified_symbolic_ids(&memory, target.query, TOP_K);
+        let selected_a = memory
+            .iter()
+            .find(|item| item.event_id == ids[0])
+            .expect("first action A result resolves");
+        assert_eq!(selected_a.event_id, 99_000);
+        assert!(is_qualified(selected_a, target.query));
+
+        memory.reverse();
+        assert_eq!(ids, qualified_symbolic_ids(&memory, target.query, TOP_K));
+    }
 
     #[test]
     fn true_no_memory_arm_has_no_prior_memory_or_evidence() {
