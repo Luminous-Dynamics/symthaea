@@ -665,6 +665,38 @@
         "offline"
       ],
       "positive_control": false
+    },
+    {
+      "id": "AUTH-049",
+      "family": "policy_evaluation",
+      "description": "A mandatory Cedar authority guardrail returns an evaluation error while a separate permit policy matches; diagnostics expose the error.",
+      "expected_decision": "indeterminate",
+      "reason_code": "mandatory_guardrail_evaluation_incomplete",
+      "required_control": "must_hold",
+      "severity": "critical",
+      "tags": [
+        "cedar",
+        "policy-error",
+        "mandatory-guardrail",
+        "diagnostics"
+      ],
+      "positive_control": false
+    },
+    {
+      "id": "AUTH-050",
+      "family": "completeness",
+      "description": "An OPA decision event is dropped by a configured rate or buffer limit; absence of the event is used to claim no decision or no downstream action.",
+      "expected_decision": "indeterminate",
+      "reason_code": "decision_log_capture_loss",
+      "required_control": "must_hold",
+      "severity": "critical",
+      "tags": [
+        "opa",
+        "dropped-event",
+        "capture-completeness",
+        "absence"
+      ],
+      "positive_control": false
     }
   ]
 }
