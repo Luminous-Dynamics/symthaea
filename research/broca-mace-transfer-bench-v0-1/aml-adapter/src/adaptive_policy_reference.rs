@@ -806,14 +806,12 @@ mod tests {
         scenario.queries[1].source_root_ids = vec!["root-a".into()];
         // The second path is an exact mirror of the first across every latent world.
         for world in &mut scenario.worlds {
-            world.observation_by_query.insert(
-                "check-b".into(),
-                world.observation_by_query["check-a"].clone(),
-            );
+            let mirrored = world.observation_by_query["check-a"].clone();
+            world.observation_by_query.insert("check-b".into(), mirrored);
         }
         let result = evaluate_expected_reference_v1(&scenario).unwrap();
-        let count = usize::from(contains_query(&result.policy, "check-a"))
-            + usize::from(contains_query(&result.policy, "check-b"));
+        let count = (if contains_query(&result.policy, "check-a") { 1 } else { 0 })
+            + (if contains_query(&result.policy, "check-b") { 1 } else { 0 });
         assert!(count <= 1);
     }
 
