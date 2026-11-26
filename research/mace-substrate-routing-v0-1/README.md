@@ -23,15 +23,15 @@ Every successful plan explicitly requires canonical evidence resolution and curr
 - Historical as-known query: bitemporal historical projection plus raw source access.
 - Multi-hop causal query: verified dependency graph plus raw source access.
 - Sequential action: bitemporal state; add procedural memory only when the caller declares that a qualified skill is required; always check skill preconditions.
-- Broad recall: choose exactly one candidate substrate according to a fixed, auditable preference order. Structured queries prefer typed HDC; other queries prefer dense semantic search, then typed HDC, sparse lexical, then raw scan.
+- Broad recall: choose one candidate substrate according to a fixed, auditable preference order. Structured queries prefer typed HDC; other queries prefer dense semantic search, then typed HDC, sparse lexical, lineage-verified hierarchical summary, then raw scan. A selected summary requires dependency-graph parent closure plus raw-source resolution; if either is unavailable, the route is non-qualifying.
 
 The preference order is a transparent baseline, not an optimality claim. The next research increment should replace it with a held-out, cost-sensitive selector while preserving the same hard evidence and resource gates.
 
 ## Resource accounting
 
-Each substrate profile contains a caller-supplied estimated cost vector. Costs are summed component-wise across selected substrates and compared against the caller-supplied budget. No weighted scalar score can trade excess latency for fewer tokens or trade failed evidence checks for lower cost.
+Each substrate profile contains caller-supplied amortized estimates for five phases: construction, maintenance, retrieval, verification and generation. The cost profile also pins the number of scored queries over which construction and maintenance are amortized; a zero denominator is rejected. The router sums each phase and the all-phase total component-wise across selected substrates, then compares that vector against the caller-supplied budget. No weighted scalar score can trade excess latency for fewer tokens or trade failed evidence checks for lower cost.
 
-The cost vector includes context bytes, context tokens, model calls, tool calls, verification operations, CPU microseconds, latency microseconds and storage bytes. The estimates are not measurements; production qualification requires phase-attributed receipts for construction, maintenance, retrieval, verification and generation.
+The per-phase vector includes context bytes, context tokens, model calls, tool calls, verification operations, CPU microseconds, latency microseconds and storage bytes. Estimates are not measurements. Production qualification requires phase-attributed resource receipts and an independently pinned amortization window.
 
 ## Reproduction
 
