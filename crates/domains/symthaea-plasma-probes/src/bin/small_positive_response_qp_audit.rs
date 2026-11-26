@@ -47,7 +47,9 @@ fn assert_close(actual: f64, expected: f64, field: &str) -> Result<(), Box<dyn E
     if !actual.is_finite() || (actual - expected).abs() > tolerance {
         return Err(IoError::new(
             ErrorKind::InvalidData,
-            format!("{field} mismatch: actual={actual}, expected={expected}, tolerance={tolerance}"),
+            format!(
+                "{field} mismatch: actual={actual}, expected={expected}, tolerance={tolerance}"
+            ),
         )
         .into());
     }
@@ -99,10 +101,26 @@ fn run() -> Result<(), Box<dyn Error>> {
         assert_close(*actual, *expected, &format!("projected_values[{index}]"))?;
     }
     for (actual, expected, field) in [
-        (report.achieved_mass, input.expected.achieved_mass, "achieved_mass"),
-        (report.mass_residual, input.expected.mass_residual, "mass_residual"),
-        (report.achieved_response, input.expected.achieved_response, "achieved_response"),
-        (report.response_residual, input.expected.response_residual, "response_residual"),
+        (
+            report.achieved_mass,
+            input.expected.achieved_mass,
+            "achieved_mass",
+        ),
+        (
+            report.mass_residual,
+            input.expected.mass_residual,
+            "mass_residual",
+        ),
+        (
+            report.achieved_response,
+            input.expected.achieved_response,
+            "achieved_response",
+        ),
+        (
+            report.response_residual,
+            input.expected.response_residual,
+            "response_residual",
+        ),
         (
             report.lagrange_multipliers[0],
             input.expected.lagrange_multipliers[0],
@@ -118,7 +136,11 @@ fn run() -> Result<(), Box<dyn Error>> {
             input.expected.weighted_correction_norm,
             "weighted_correction_norm",
         ),
-        (report.objective_value, input.expected.objective_value, "objective_value"),
+        (
+            report.objective_value,
+            input.expected.objective_value,
+            "objective_value",
+        ),
         (
             report.maximum_primal_violation,
             input.expected.maximum_primal_violation,
