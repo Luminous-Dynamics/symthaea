@@ -1,0 +1,91 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://luminousdynamics.io/schemas/mace_claim_relative_revalidation_v1.schema.json",
+  "title": "MACE Claim-Relative Revalidation V1",
+  "description": "Exact binding and result envelope for claim-specific revalidation after a source lifecycle transition. This schema validates structure only; independent evidence verification and ledger receipt verification are separate obligations.",
+  "type": "object",
+  "additionalProperties": false,
+  "required": ["version", "binding", "evidence"],
+  "properties": {
+    "version": { "const": 1 },
+    "binding": { "$ref": "#/$defs/binding" },
+    "evidence": {
+      "oneOf": [
+        { "$ref": "#/$defs/evidence" },
+        { "type": "null" }
+      ]
+    }
+  },
+  "$defs": {
+    "sha256": {
+      "type": "string",
+      "pattern": "^[0-9a-f]{64}$"
+    },
+    "identifier": {
+      "type": "string",
+      "minLength": 1,
+      "maxLength": 512,
+      "pattern": "^[^\\u0000-\\u001F\\u007F]+$"
+    },
+    "binding": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "claim_id",
+        "claim_sha256",
+        "source_event_id",
+        "source_transition_receipt_sha256",
+        "source_revision_before_sha256",
+        "source_revision_after_sha256",
+        "test_artifact_sha256",
+        "verifier_policy_sha256"
+      ],
+      "properties": {
+        "claim_id": { "$ref": "#/$defs/identifier" },
+        "claim_sha256": { "$ref": "#/$defs/sha256" },
+        "source_event_id": { "$ref": "#/$defs/identifier" },
+        "source_transition_receipt_sha256": { "$ref": "#/$defs/sha256" },
+        "source_revision_before_sha256": { "$ref": "#/$defs/sha256" },
+        "source_revision_after_sha256": { "$ref": "#/$defs/sha256" },
+        "test_artifact_sha256": { "$ref": "#/$defs/sha256" },
+        "verifier_policy_sha256": { "$ref": "#/$defs/sha256" }
+      }
+    },
+    "evidence": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "binding_sha256",
+        "outcome",
+        "result_sha256",
+        "execution_receipt_sha256",
+        "evaluator_id"
+      ],
+      "properties": {
+        "binding_sha256": { "$ref": "#/$defs/sha256" },
+        "outcome": {
+          "enum": [
+            "Pass",
+            "Fail",
+            "NotRun",
+            "Skipped",
+            "InfrastructureFailure",
+            "Inconclusive"
+          ]
+        },
+        "result_sha256": { "$ref": "#/$defs/sha256" },
+        "execution_receipt_sha256": { "$ref": "#/$defs/sha256" },
+        "evaluator_id": { "$ref": "#/$defs/identifier" }
+      }
+    },
+    "independent_verifier_receipt": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["verifier_id", "verification_receipt_sha256"],
+      "properties": {
+        "verifier_id": { "$ref": "#/$defs/identifier" },
+        "verification_receipt_sha256": { "$ref": "#/$defs/sha256" }
+      }
+    }
+  }
+}
