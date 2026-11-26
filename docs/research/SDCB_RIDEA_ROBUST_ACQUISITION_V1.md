@@ -47,6 +47,7 @@ The Rust file implements the paper's scoring layer for a finite candidate pool:
 - DeA sigmoid from supplied current-model and proxy predictions;
 - R-IDeA score and an explicitly separate score-per-cost extension;
 - deterministic candidate ranking, tie-breaking, and abstention if all scores are non-positive;
+- explicit computational bounds of 512 samples per empirical distribution, 64 dimensions, and 64 candidates;
 - fail-closed validation for malformed samples, dimensions, non-finite predictions, invalid scales, duplicate IDs and zero baseline MMD.
 
 The reference does **not** train g, infer EIG, construct a posterior, or assess downstream decision value. EIG is supplied by a separate method. The proxy is also supplied by an upstream model. This keeps the equation reference small and makes the missing pieces explicit.
