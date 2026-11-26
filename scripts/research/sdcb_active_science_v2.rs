@@ -168,14 +168,23 @@ pub struct ProbeChoice {
     pub cost: ResourceVector,
 }
 
+fn matrix_matches_shape_and_finiteness(matrix: &Matrix, rows: usize, cols: usize) -> bool {
+    matrix.rows == rows
+        && matrix.cols == cols
+        && matrix.data.len() == rows
+        && matrix
+            .data
+            .iter()
+            .all(|row| row.len() == cols && row.iter().all(|value| value.is_finite()))
+}
+
 fn validate_hypothesis(h: &LinearHypothesis, n: usize) -> Result<(), ActiveScienceError> {
     if h.hypothesis_id.trim().is_empty()
-        || h.a.rows != n
-        || h.a.cols != n
+        || !matrix_matches_shape_and_finiteness(&h.a, n, n)
         || h.b.len() != n
-        || h.c.cols != n
-        || h.c.rows == 0
         || h.b.iter().any(|x| !x.is_finite())
+        || h.c.rows == 0
+        || !matrix_matches_shape_and_finiteness(&h.c, h.c.rows, n)
     {
         return Err(ActiveScienceError::InvalidHypothesis);
     }
@@ -1149,6 +1158,40 @@ mod tests {
             "impulse-sensor-x"
         );
     }
+    #[test]
+    fn malformed_public_matrix_storage_fails_closed() {
+        let mut episode = observational_equivalence_fixture();
+        episode.hypotheses[0].a.data.pop();
+        assert_eq!(
+            validate_episode(&episode),
+            Err(ActiveScienceError::InvalidHypothesis)
+        );
+
+        let mut episode = observational_equivalence_fixture();
+        episode.hypotheses[0].c.data[0].pop();
+        assert_eq!(
+            validate_episode(&episode),
+            Err(ActiveScienceError::InvalidHypothesis)
+        );
+    }
+
+    #[test]
+    fn nonfinite_matrix_entries_fail_closed() {
+        let mut episode = observational_equivalence_fixture();
+        episode.hypotheses[0].a.data[0][0] = f64::NAN;
+        assert_eq!(
+            validate_episode(&episode),
+            Err(ActiveScienceError::InvalidHypothesis)
+        );
+
+        let mut episode = observational_equivalence_fixture();
+        episode.hypotheses[0].c.data[0][0] = f64::INFINITY;
+        assert_eq!(
+            validate_episode(&episode),
+            Err(ActiveScienceError::InvalidHypothesis)
+        );
+    }
+
     #[test]
     fn nonfinite_probe_inputs_fail_closed() {
         let mut e = observational_equivalence_fixture();
