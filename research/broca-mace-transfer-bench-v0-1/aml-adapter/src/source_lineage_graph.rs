@@ -649,12 +649,54 @@ mod tests {
         );
     }
 
+    fn graph_node(
+        evidence_id: &str,
+        source_id: &str,
+        source_sha256: char,
+        payload_sha256: char,
+        parents: &[&str],
+        derivation: Option<char>,
+        common_causes: &[char],
+        satisfies: &[&str],
+    ) -> SourceLineageGraphNodeV1 {
+        SourceLineageGraphNodeV1 {
+            evidence_id: evidence_id.to_owned(),
+            source_id: source_id.to_owned(),
+            source_sha256: source_sha256.to_string().repeat(64),
+            payload_sha256: payload_sha256.to_string().repeat(64),
+            evidence_class_sha256: "c".repeat(64),
+            satisfies_requirement_ids: satisfies.iter().map(|v| (*v).to_owned()).collect(),
+            parent_evidence_ids: parents.iter().map(|v| (*v).to_owned()).collect(),
+            derivation_receipt_sha256: derivation.map(|v| v.to_string().repeat(64)),
+            common_cause_group_sha256: common_causes.iter()
+                .map(|v| v.to_string().repeat(64)).collect(),
+        }
+    }
+
     #[test]
-    fn common_cause_union_collapses_distinct_root_identities() {
-        let mut union = UnionFind::new(3);
-        union.join(0, 1);
-        assert_eq!(union.find(0), union.find(1));
-        assert_ne!(union.find(0), union.find(2));
+    fn common_cause_roots_collapse_but_independent_roots_remain_distinct() {
+        let nodes = BTreeMap::from([
+            ("root-a".to_owned(), graph_node("root-a", "source-a", 'a', '1', &[], None, &['f'], &[])),
+            ("root-b".to_owned(), graph_node("root-b", "source-b", 'b', '2', &[], None, &['f'], &[])),
+            ("root-c".to_owned(), graph_node("root-c", "source-c", 'd', '3', &[], None, &[], &["req"])),
+            ("derived".to_owned(), graph_node(
+                "derived", "transform-x", 'e', '4', &["root-a", "root-b"],
+                Some('e'), &[], &["req"],
+            )),
+        ]);
+        let families = replay_requirement_families(
+            "req",
+            &["derived".to_owned(), "root-c".to_owned()],
+            &nodes,
+        ).expect("root-family replay");
+        assert_eq!(families.len(), 2);
+        let merged = families.iter().find(|family| family.source_root_count == 2)
+            .expect("the two shared-common-cause roots collapse");
+        assert_eq!(merged.closure_node_count, 3);
+        let independent = families.iter().find(|family| family.source_root_count == 1)
+            .expect("the independent root remains separate");
+        assert_eq!(independent.closure_node_count, 1);
+        assert_ne!(merged.root_family_sha256, independent.root_family_sha256);
     }
 
     #[test]
