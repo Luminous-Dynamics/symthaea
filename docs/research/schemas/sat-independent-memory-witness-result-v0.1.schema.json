@@ -162,7 +162,9 @@
         "nonce_challenge_digest",
         "response_set_digest",
         "checks",
-        "evidence_refs"
+        "evidence_refs",
+        "verifier_role",
+        "assessment_scope"
       ],
       "properties": {
         "verification_status": {
@@ -260,6 +262,19 @@
             "type": "string",
             "minLength": 1
           }
+        },
+        "verifier_role": {
+          "enum": [
+            "independent_evaluator",
+            "subject_component",
+            "not_declared"
+          ]
+        },
+        "assessment_scope": {
+          "enum": [
+            "witness_state_only",
+            "sat_l5_third_party"
+          ]
         }
       }
     }
@@ -359,6 +374,115 @@
                   },
                   "t10_erasure_state_verified": {
                     "const": true
+                  }
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    {
+      "if": {
+        "properties": {
+          "third_party_verification": {
+            "properties": {
+              "decision": {
+                "const": "qualified"
+              }
+            },
+            "required": [
+              "decision"
+            ]
+          }
+        },
+        "required": [
+          "third_party_verification"
+        ]
+      },
+      "then": {
+        "properties": {
+          "third_party_verification": {
+            "properties": {
+              "verifier_role": {
+                "const": "independent_evaluator"
+              },
+              "assessment_scope": {
+                "const": "sat_l5_third_party"
+              }
+            }
+          }
+        }
+      }
+    },
+    {
+      "if": {
+        "properties": {
+          "third_party_verification": {
+            "properties": {
+              "verification_status": {
+                "const": "not_performed"
+              }
+            },
+            "required": [
+              "verification_status"
+            ]
+          }
+        },
+        "required": [
+          "third_party_verification"
+        ]
+      },
+      "then": {
+        "properties": {
+          "third_party_verification": {
+            "properties": {
+              "decision": {
+                "const": "not_assessed"
+              },
+              "verifier_role": {
+                "const": "not_declared"
+              },
+              "verifier_identity": {
+                "type": "null"
+              },
+              "verifier_build_digest": {
+                "type": "null"
+              }
+            }
+          }
+        }
+      }
+    },
+    {
+      "if": {
+        "properties": {
+          "third_party_verification": {
+            "properties": {
+              "transparency_log_used": {
+                "const": false
+              }
+            },
+            "required": [
+              "transparency_log_used"
+            ]
+          }
+        },
+        "required": [
+          "third_party_verification"
+        ]
+      },
+      "then": {
+        "properties": {
+          "third_party_verification": {
+            "properties": {
+              "checks": {
+                "properties": {
+                  "transparency_inclusion_verified": {
+                    "const": false
+                  },
+                  "transparency_consistency_verified": {
+                    "const": false
                   }
                 }
               }
