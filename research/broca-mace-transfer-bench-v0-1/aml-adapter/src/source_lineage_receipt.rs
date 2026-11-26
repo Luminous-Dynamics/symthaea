@@ -15,7 +15,10 @@ use sha2::{Digest, Sha256};
 
 use crate::decision_sufficiency::{
     DecisionNeedV1, DecisionSufficiencyReceiptV1, DecisionSufficiencyRejectV1,
-    VerifiedDecisionSufficiencyV1,
+    DecisionSufficiencyUseBindingV1, VerifiedDecisionSufficiencyV1,
+};
+use crate::evidence_qualification_gate::{
+    EvidenceQualificationBindingV1, EvidenceQualificationSignatureVerifierV1,
 };
 use crate::qualification_dsse::{
     DSSE_PAYLOAD_TYPE_V1, IN_TOTO_STATEMENT_TYPE_V1,
@@ -127,11 +130,25 @@ impl VerifiedSourceLineageSetV1 {
     pub fn validate_at_use(
         &self,
         qualified: &QualifiedCandidateEvidenceBatchV1,
+        qualification_binding: &EvidenceQualificationBindingV1<'_>,
+        current_qualification_verifier: &impl EvidenceQualificationSignatureVerifierV1,
         sufficiency: &VerifiedDecisionSufficiencyV1,
+        sufficiency_binding: &DecisionSufficiencyUseBindingV1<'_>,
+        current_evaluator_profile: &PinnedEd25519QualificationVerifierV1,
         decision_need: &DecisionNeedV1,
         current_lineage_profile: &PinnedEd25519QualificationVerifierV1,
-        now_unix: u64,
     ) -> Result<(), SourceLineageRejectV1> {
+        if qualification_binding.now_unix != sufficiency_binding.now_unix {
+            return Err(SourceLineageRejectV1::BindingMismatch);
+        }
+        sufficiency.validate_at_use(
+            qualified,
+            qualification_binding,
+            current_qualification_verifier,
+            sufficiency_binding,
+            current_evaluator_profile,
+        ).map_err(SourceLineageRejectV1::Sufficiency)?;
+        let now_unix = sufficiency_binding.now_unix;
         let sufficiency_receipt = sufficiency.receipt();
         let need_digest = decision_need.digest()
             .map_err(SourceLineageRejectV1::Sufficiency)?;
@@ -213,13 +230,33 @@ struct ExpectedLineageBindingV1<'a> {
 /// bound to the same qualified set and DecisionNeed.
 pub fn verify_source_lineage_receipts_v1(
     qualified: &QualifiedCandidateEvidenceBatchV1,
+    qualification_binding: &EvidenceQualificationBindingV1<'_>,
+    current_qualification_verifier: &impl EvidenceQualificationSignatureVerifierV1,
     sufficiency: &VerifiedDecisionSufficiencyV1,
+    sufficiency_binding: &DecisionSufficiencyUseBindingV1<'_>,
+    current_evaluator_profile: &PinnedEd25519QualificationVerifierV1,
     decision_need: &DecisionNeedV1,
     envelopes: &[SourceLineageEnvelopeInputV1<'_>],
     expected_lineage_profile_sha256: &str,
     lineage_profile: &PinnedEd25519QualificationVerifierV1,
-    now_unix: u64,
 ) -> Result<VerifiedSourceLineageSetV1, SourceLineageRejectV1> {
+    if qualification_binding.now_unix != sufficiency_binding.now_unix {
+        return Err(SourceLineageRejectV1::BindingMismatch);
+    }
+    sufficiency.validate_at_use(
+        qualified,
+        qualification_binding,
+        current_qualification_verifier,
+        sufficiency_binding,
+        current_evaluator_profile,
+    ).map_err(SourceLineageRejectV1::Sufficiency)?;
+    let now_unix = sufficiency_binding.now_unix;
+    if sufficiency_binding.decision_need.digest()
+        .map_err(SourceLineageRejectV1::Sufficiency)? != decision_need.digest()
+            .map_err(SourceLineageRejectV1::Sufficiency)?
+    {
+        return Err(SourceLineageRejectV1::BindingMismatch);
+    }
     let receipt = sufficiency.receipt();
     let need_digest = decision_need.digest()
         .map_err(SourceLineageRejectV1::Sufficiency)?;
