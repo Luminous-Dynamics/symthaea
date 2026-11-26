@@ -35,6 +35,22 @@ This relation may be non-transitive. The fixture `a=0, b=8, c=16` with tolerance
 
 The initial slice is intentionally independent of HDC/CfC model internals. Subsequent adapters will consume actual Symthaea checkpoint/state fingerprints and evaluator-side response records only after the interface and custody contract are qualified.
 
+
+## Counterexample-guided refinement (new v0.2 evaluator increment)
+
+The evaluator now supports a deterministic, cost-aware next-counterexample selector over the candidate's *currently merged* state pairs.
+
+- An invariant mismatch is surfaced as an immediate, zero-acquisition-cost witness.
+- Otherwise the evaluator selects the cheapest registered intervention × query × horizon key that distinguishes the pair; ties are resolved deterministically.
+- Only the two opaque state IDs, contract ID, separating dimension and relative probe cost are returned.
+- The hidden response values, invariant values and evaluator reference labels are not returned.
+- The candidate must perform the permitted query/interaction and submit a revised abstraction on a subsequent evaluation. The evaluator does not auto-split the candidate's partition.
+- If a candidate refines one false merge but leaves another, the next call selects a remaining counterexample. When no candidate-merged pair remains distinguishable within the finite contract, the selector returns no counterexample.
+
+This makes refinement cost observable instead of granting free access to the oracle's entire response table. The relative probe costs are contract inputs and must be frozen before held-out evaluation; they are not a dynamic estimate derived from the hidden response. The counterexample selector is a finite diagnostic tool, not a proof that all possible future interventions have been covered.
+
+Added deterministic tests cover: lowest-cost separating query selection, no disclosure of response values, invariant mismatch handling, ignored already-separated pairs, deterministic selection under input reordering, sequential refinement of multiple false merges, and missing/zero probe-cost rejection.
+
 ## Next experimental matrix
 
 Compare full history/full state, symbolic/tabular mechanism state, linear projection, matched recurrent latent state, HDC-only, CfC/LTC-only, HDC+CfC/LTC factorized state, and retrieval-backed event references. Match exploration, task split, query adapter, compute, interaction budget and all-in memory (model, codebook, index, journal, provenance sidecar and replay data).
