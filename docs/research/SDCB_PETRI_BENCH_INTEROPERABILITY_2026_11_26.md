@@ -10,7 +10,7 @@ For the current portal snapshot, GPT-5.6-Sol has 73/90 episodes and a 34% solved
 
 The v0.5 report's 540-episode results remain useful as a fully described archived evaluation: six frontier models × 30 tasks × three episodes. Its blind-value ablation and retraction must stay attached to those numbers.
 
-## 4. Why petri-bench changes our evaluation strategy
+## 2. Why petri-bench changes our evaluation strategy
 
 petri-bench directly evaluates the scientific method of an agent rather than only rediscovery of a published result. Its working draft v0.5 describes procedural mystery worlds generated from deterministic simulation engines, a blind budgeted experiment interface, and an objective score computed from episode logs without an LLM judge in the headline metric.
 
