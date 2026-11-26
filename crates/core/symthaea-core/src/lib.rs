@@ -98,4 +98,6 @@ pub mod synthesis_trait;
 pub mod temporal;
 
 /// Runtime configuration and workspace execution primitives for the conscious engine.
+/// Domain-neutral HDC scientific world-model representation and structural retrieval.
+pub mod scientific_world_model;
 pub mod rt;
