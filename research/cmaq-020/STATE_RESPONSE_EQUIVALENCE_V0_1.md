@@ -179,3 +179,15 @@ See [`WORLD_MODEL_COMPARATORS_2026.md`](WORLD_MODEL_COMPARATORS_2026.md) for the
 - TD-MPC2 / matched RSSM: separate continuous-control baseline when action and cost interfaces are genuinely comparable.
 
 Predictive state representations, causal states, bisimulation and rate–distortion are established conceptual foundations. This work tests a task- and intervention-conditioned evaluation contract for Symthaea's action-conditioned world state; it does not claim to replace those theories.
+
+## Budgeted counterexample-guided refinement (CMAQ-021)
+
+The follow-on [CMAQ-021 budgeted CEGAR protocol](BUDGETED_CEGAR_V0_1.md) adds a candidate-visible observation receipt and a replay-resistant probe-budget ledger. Counterexample selection still returns only the pair and registered intervention/query/horizon identity. The candidate must execute that probe and submit the observation returned by the environment; the receipt is then checked against the deterministic reference record and charged at the contract-frozen cost.
+
+Every refinement attempt is scored against the same immutable evaluator records and a new candidate-checkpoint digest. The report separates false merges removed from false splits introduced, as well as false merges introduced, false splits resolved, whether the selected pair was actually separated, cumulative cost and cost per removed false merge. Probe execution cost remains charged even when the candidate's subsequent partition update is invalid or ineffective.
+
+A three-state known-answer fixture demonstrates why "zero false merges" is not enough: a candidate can remove two false merges with one probe while creating a false split between two response-equivalent nuisance variants. Both dimensions and the probe cost remain visible.
+
+**Information-leakage boundary:** the selected counterexample identity is itself an oracle hint—it tells the candidate which state pair and query to investigate. The returned identity does not reveal numeric response values, but this is not an oracle-blind evaluation. Comparisons must include controls that receive the same hint and pay the same probe budget. A future blind-query protocol should be evaluated separately rather than conflated with this CEGAR setting.
+
+The receipt digest is format-checked in this dependency-free crate; the runner must independently recompute it from exact observation bytes, authenticate the source and attach signed custody evidence (#9437). Structural invariant witnesses have no intervention probe cost in this v0.1 ledger; their reconstruction/verification cost requires a separate accounting path.

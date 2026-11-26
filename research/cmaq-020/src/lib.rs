@@ -1,12 +1,18 @@
 use std::collections::{BTreeMap, BTreeSet};
 
 pub mod failure_fidelity;
+pub mod refinement;
 
 pub use failure_fidelity::{
     BoundaryRateClusterSummary, BoundaryRateFidelityScore, BoundaryRatePair,
     BoundaryRatePairMeasurement, BoundarySide, FailureClusterCounts, FailureFidelityContract,
     FailureFidelityScore, FailureSignature, FailureTraceRecord, OutcomeLabel,
     score_boundary_rate_pairs, score_failure_fidelity,
+};
+
+pub use refinement::{
+    BudgetedRefinementScore, ProbeBudgetLedger, ProbeCharge, ProbeObservationReceiptV1,
+    RefinementEffectiveness, score_budgeted_refinement_step, score_refinement_transition,
 };
 
 #[derive(Clone, Debug, Eq, Ord, PartialEq, PartialOrd)]
