@@ -852,7 +852,7 @@ mod tests {
         let mut index = DerivedProjectionIndexV1::new("user-1", "session-1").unwrap();
         index.register_projection(&ledger, spec("summary-v1", 1, &["event-1"], &[])).unwrap();
         let unrelated = ledger.apply(append("event-2", 2, 200, "unrelated"), 1_100).unwrap().receipt;
-        let result = index.apply_transition(&unrelated).unwrap();
+        let result = index.apply_transition(&ledger, &unrelated).unwrap();
         assert!(result.receipt.invalidated_projection_ids.is_empty());
         assert_eq!(index.projection("summary-v1").unwrap().status(), DerivedProjectionStatusV1::Current);
     }
@@ -1003,6 +1003,6 @@ mod tests {
         assert_eq!(replay.receipt, first.receipt);
         let mut altered = transition.clone();
         altered.session_id = "other".into();
-        assert_eq!(index.apply_transition(&altered), Err(TemporalProjectionRejectV1::InvalidTransitionReceipt));
+        assert_eq!(index.apply_transition(&ledger, &altered), Err(TemporalProjectionRejectV1::InvalidTransitionReceipt));
     }
 }
