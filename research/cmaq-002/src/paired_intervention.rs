@@ -1154,10 +1154,9 @@ pub fn evaluate_paired_interventions(
                 sign_eligible.then(|| effect_sign(predicted_effect) == effect_sign(true_effect));
             let covered = true_effect >= i128::from(interval.lower_micro)
                 && true_effect <= i128::from(interval.upper_micro);
-            let interval_width_micro = u128::try_from(
-                i128::from(interval.upper_micro) - i128::from(interval.lower_micro),
-            )
-            .map_err(|_| PairedInterventionError::ArithmeticOverflow)?;
+            let interval_width_micro =
+                u128::try_from(i128::from(interval.upper_micro) - i128::from(interval.lower_micro))
+                    .map_err(|_| PairedInterventionError::ArithmeticOverflow)?;
 
             let expected_invariant_ids = context
                 .expected_invariant_variable_ids
@@ -1360,8 +1359,7 @@ pub fn evaluate_paired_interventions(
                 );
             }
             let mean_interval_width_micro = if cluster.interval_count > 0 {
-                let mean = cluster.interval_width_sum_micro
-                    / u128::from(cluster.interval_count);
+                let mean = cluster.interval_width_sum_micro / u128::from(cluster.interval_count);
                 cluster_interval_width_means.push(mean);
                 cluster_interval_rates.push(
                     u128::from(cluster.interval_covered_count)
@@ -1416,10 +1414,7 @@ pub fn evaluate_paired_interventions(
             None
         };
         let task_weighted_mean_interval_width = if accumulator.interval_count > 0 {
-            Some(
-                accumulator.task_interval_width_sum_micro
-                    / u128::from(accumulator.interval_count),
-            )
+            Some(accumulator.task_interval_width_sum_micro / u128::from(accumulator.interval_count))
         } else {
             None
         };
@@ -1776,7 +1771,11 @@ mod tests {
             upper_micro: 2_000,
         });
         let result = evaluate_paired_interventions(&input).unwrap();
-        let row = result.pair_results.iter().find(|row| row.pair_id == pair_id).unwrap();
+        let row = result
+            .pair_results
+            .iter()
+            .find(|row| row.pair_id == pair_id)
+            .unwrap();
         assert_eq!(row.predicted_interval_covered, Some(true));
         assert_eq!(row.predicted_interval_width_micro, Some(2_000));
         let directional = result
