@@ -1,0 +1,184 @@
+{
+  "schema": "mel-temporal-annotation-marginal-value-v1",
+  "source_work_id_sha256": "bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb",
+  "selection_stream": "ActiveRefinement",
+  "selection_receipt_sha256": "cccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccc",
+  "decision_profile": {
+    "profile_id": "music-temporal-panel-v1",
+    "minimum_eligible_annotators": 4,
+    "minimum_present_support_ppm": 900000,
+    "minimum_absent_support_ppm": 900000,
+    "maximum_ambiguous_not_estimable_share_ppm": 0,
+    "minimum_pairwise_present_event_f1_ppm": 900000,
+    "minimum_pairwise_present_count_agreement_ppm": 900000,
+    "maximum_event_boundary_spread_ms": 50
+  },
+  "before_panel": {
+    "schema": "mel-multi-annotator-temporal-grounding-v1",
+    "query_id": "query-piano-entry-001",
+    "query_text": "Every piano entrance",
+    "artifact": {
+      "audio_sha256": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+      "sample_rate_hz": 48000,
+      "channels": 2,
+      "total_frames": 2880000
+    },
+    "annotation_policy_version": "mel-musician-annotation-v1",
+    "annotation_manifest_sha256": "4444444444444444444444444444444444444444444444444444444444444444",
+    "minimum_annotator_count": 2,
+    "plan": {
+      "evaluator_version": "mel-temporal-grounding-evaluator-v1",
+      "minimum_interval_iou": 0.5
+    },
+    "prediction": {
+      "schema_version": "mel-temporal-grounding-v1",
+      "query_id": "query-piano-entry-001",
+      "artifact": {
+        "audio_sha256": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+        "sample_rate_hz": 48000,
+        "channels": 2,
+        "total_frames": 2880000
+      },
+      "state": {
+        "Occurrences": {
+          "intervals": [
+            {
+              "start_frame": 100,
+              "end_frame": 200
+            }
+          ]
+        }
+      }
+    },
+    "annotations": [
+      {
+        "annotator_id_sha256": "1111111111111111111111111111111111111111111111111111111111111111",
+        "annotation_sha256": "eeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeee",
+        "state": "Present",
+        "intervals": [
+          {
+            "start_frame": 100,
+            "end_frame": 200
+          }
+        ],
+        "status_reason": null
+      },
+      {
+        "annotator_id_sha256": "2222222222222222222222222222222222222222222222222222222222222222",
+        "annotation_sha256": "ffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffff",
+        "state": "Present",
+        "intervals": [
+          {
+            "start_frame": 100,
+            "end_frame": 200
+          }
+        ],
+        "status_reason": null
+      },
+      {
+        "annotator_id_sha256": "3333333333333333333333333333333333333333333333333333333333333333",
+        "annotation_sha256": "9999999999999999999999999999999999999999999999999999999999999999",
+        "state": "Present",
+        "intervals": [
+          {
+            "start_frame": 100,
+            "end_frame": 200
+          }
+        ],
+        "status_reason": null
+      }
+    ]
+  },
+  "after_panel": {
+    "schema": "mel-multi-annotator-temporal-grounding-v1",
+    "query_id": "query-piano-entry-001",
+    "query_text": "Every piano entrance",
+    "artifact": {
+      "audio_sha256": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+      "sample_rate_hz": 48000,
+      "channels": 2,
+      "total_frames": 2880000
+    },
+    "annotation_policy_version": "mel-musician-annotation-v1",
+    "annotation_manifest_sha256": "5555555555555555555555555555555555555555555555555555555555555555",
+    "minimum_annotator_count": 2,
+    "plan": {
+      "evaluator_version": "mel-temporal-grounding-evaluator-v1",
+      "minimum_interval_iou": 0.5
+    },
+    "prediction": {
+      "schema_version": "mel-temporal-grounding-v1",
+      "query_id": "query-piano-entry-001",
+      "artifact": {
+        "audio_sha256": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+        "sample_rate_hz": 48000,
+        "channels": 2,
+        "total_frames": 2880000
+      },
+      "state": {
+        "Occurrences": {
+          "intervals": [
+            {
+              "start_frame": 100,
+              "end_frame": 200
+            }
+          ]
+        }
+      }
+    },
+    "annotations": [
+      {
+        "annotator_id_sha256": "1111111111111111111111111111111111111111111111111111111111111111",
+        "annotation_sha256": "eeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeee",
+        "state": "Present",
+        "intervals": [
+          {
+            "start_frame": 100,
+            "end_frame": 200
+          }
+        ],
+        "status_reason": null
+      },
+      {
+        "annotator_id_sha256": "2222222222222222222222222222222222222222222222222222222222222222",
+        "annotation_sha256": "ffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffff",
+        "state": "Present",
+        "intervals": [
+          {
+            "start_frame": 100,
+            "end_frame": 200
+          }
+        ],
+        "status_reason": null
+      },
+      {
+        "annotator_id_sha256": "3333333333333333333333333333333333333333333333333333333333333333",
+        "annotation_sha256": "9999999999999999999999999999999999999999999999999999999999999999",
+        "state": "Present",
+        "intervals": [
+          {
+            "start_frame": 100,
+            "end_frame": 200
+          }
+        ],
+        "status_reason": null
+      },
+      {
+        "annotator_id_sha256": "4444444444444444444444444444444444444444444444444444444444444444",
+        "annotation_sha256": "8888888888888888888888888888888888888888888888888888888888888888",
+        "state": "Ambiguous",
+        "intervals": [],
+        "status_reason": "gradual entrance disputed by listeners"
+      }
+    ]
+  },
+  "effort": {
+    "session_receipt_sha256": "dddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddd",
+    "active_listening_seconds": 120,
+    "active_review_seconds": 240,
+    "elapsed_wall_seconds": 300,
+    "replay_count": 3,
+    "seek_count": 4,
+    "self_reported_difficulty_ppm": 500000
+  }
+}
