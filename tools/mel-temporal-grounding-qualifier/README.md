@@ -11,7 +11,7 @@ The auditory_invariance module is a MusicListenBench v1.0 consumer. It accepts o
 - model, prompt, runtime and decoding identities;
 - separate FLIP and STAY intervention factors.
 
-The evaluator converts each A/B response into its semantic relation before scoring. It reports clean accuracy, FLIP miss rate, STAY false-flip rate, clean-correct conditional error rates, Acc_FS, three-way joint correctness, answer bias, parsing and abstention coverage. All metrics are reported overall and by task/STAY factor.
+The evaluator converts each A/B response into its semantic relation before scoring. It reports clean accuracy, FLIP miss rate, STAY false-flip rate, clean-correct conditional error rates, Acc_FS, three-way joint correctness, answer bias, exact always-A/always-B Acc_FS baselines under each question's own option mapping, parsing and abstention coverage. All metrics are reported overall and by task/STAY factor.
 
 Run the synthetic replay:
 
