@@ -8,6 +8,7 @@ on:
       - "crates/core/nixward/src/mind/mod.rs"
       - "crates/core/nixward/Cargo.toml"
       - "Cargo.lock"
+      - "Cargo.toml"
       - ".github/workflows/cmaq-020.yml"
   push:
     branches:
