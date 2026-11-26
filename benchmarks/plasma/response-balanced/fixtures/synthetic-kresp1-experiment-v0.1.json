@@ -22,11 +22,12 @@
   "frozen_checkpoint": {
     "checkpoint_id": "synthetic-phase-mixed-checkpoint",
     "step": 0,
-    "time": 6,
+    "time": 3.5,
     "state_sha256": "0000000000000000000000000000000000000000000000000000000000000000",
     "phase_mixing_complete": true,
     "second_pulse_not_yet_applied": true,
-    "solver_revision": "synthetic-no-solver-run"
+    "solver_revision": "synthetic-no-solver-run",
+    "first_pulse_not_yet_applied": true
   },
   "pulse_family": {
     "operator_id": "sinusoidal_velocity_kick_v1",
@@ -245,7 +246,7 @@
     }
   ],
   "prediction_horizon": {
-    "start_time": 6,
+    "start_time": 3.5,
     "end_time": 30,
     "unit": "omega_pe^-1"
   },
