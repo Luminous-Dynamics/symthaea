@@ -273,14 +273,13 @@ pub fn evaluate_worldtest_exploration(
     let total_interactions = u128::from(action_count)
         .checked_add(u128::from(reset_count))
         .ok_or(WorldTestExplorationError::ArithmeticOverflow)?;
-    let reset_share_ppm = if total_interactions == 0 {
-        0
-    } else {
-        let numerator = u128::from(reset_count)
-            .checked_mul(u128::from(WORLDTEST_RATIO_PPM))
-            .ok_or(WorldTestExplorationError::ArithmeticOverflow)?;
-        u32::try_from(numerator / total_interactions)
-            .map_err(|_| WorldTestExplorationError::ArithmeticOverflow)?
+    let numerator = u128::from(reset_count)
+        .checked_mul(u128::from(WORLDTEST_RATIO_PPM))
+        .ok_or(WorldTestExplorationError::ArithmeticOverflow)?;
+    let reset_share_ppm = match numerator.checked_div(total_interactions) {
+        Some(value) => u32::try_from(value)
+            .map_err(|_| WorldTestExplorationError::ArithmeticOverflow)?,
+        None => 0,
     };
 
     let mut ratios: Vec<u32> = replay_pairs
@@ -299,7 +298,7 @@ pub fn evaluate_worldtest_exploration(
         let mean = u32::try_from(sum / ratios.len() as u128)
             .map_err(|_| WorldTestExplorationError::ArithmeticOverflow)?;
         let middle = ratios.len() / 2;
-        let median = if ratios.len() % 2 == 0 {
+        let median = if ratios.len().is_multiple_of(2) {
             let pair_sum = u64::from(ratios[middle - 1])
                 .checked_add(u64::from(ratios[middle]))
                 .ok_or(WorldTestExplorationError::ArithmeticOverflow)?;
