@@ -917,10 +917,8 @@ fn select_probability_audit(
                     let inclusion_denominator = (eligible_sources as u64)
                         .checked_mul(eligible_items_in_source_work as u64)
                         .ok_or_else(|| "audit item inclusion denominator overflow".to_string())?;
-                    let inclusion_probability = reduced_probability_fraction(
-                        inclusion_numerator,
-                        inclusion_denominator,
-                    )?;
+                    let inclusion_probability =
+                        reduced_probability_fraction(inclusion_numerator, inclusion_denominator)?;
 
                     for item_index in item_indices.into_iter().take(selected_items_in_source_work) {
                         let candidate = &candidates[item_index];
