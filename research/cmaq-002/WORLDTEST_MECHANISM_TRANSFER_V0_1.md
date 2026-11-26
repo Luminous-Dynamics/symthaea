@@ -1,6 +1,6 @@
 # WorldTest Frozen Mechanism-Transfer Evaluator v0.1
 
-**Status:** Rust evaluator and 17 deterministic tests authored; exact-head Rust 1.96 qualification pending.  
+**Status:** Rust evaluator and 17 new deterministic tests authored; exact-head Rust 1.96 formatting, 85-test crate suite, strict Clippy, custody and MARA phase/reward qualification passed at `86b9d7981637917d3060dd65514f130209d920ae` (26 November 2026).  
 **Research owner:** [#13707 — CMAQ-018](https://github.com/Luminous-Dynamics/symthaea/issues/13707).  
 **Base evaluator:** [#13711 — cluster-aware query portfolio](https://github.com/Luminous-Dynamics/symthaea/pull/13711).  
 **Parent protocol:** [#13688 — WorldTest / AutumnBench adapter](https://github.com/Luminous-Dynamics/symthaea/pull/13688).
