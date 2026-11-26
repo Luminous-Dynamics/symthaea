@@ -31,6 +31,7 @@ fn main() {
         "duplicate_effect",
         "stale_authority_effect",
         "unresolved_command_holder",
+        "open_world_residual",
     ];
 
     let problem = RobustDecisionProblem {
@@ -43,26 +44,27 @@ fn main() {
         decision_loss: BTreeMap::from([
             (
                 "hold_reconcile".to_owned(),
-                loss_row(&states, &[0.35, 0.35, 0.05, 0.10, 0.15, 0.25, 0.25]),
+                loss_row(&states, &[0.35, 0.35, 0.05, 0.10, 0.15, 0.25, 0.25, 0.30]),
             ),
             (
                 "recommend_fresh_attempt".to_owned(),
-                loss_row(&states, &[0.0, 0.0, 0.95, 0.95, 1.0, 1.0, 0.90]),
+                loss_row(&states, &[0.0, 0.0, 0.95, 0.95, 1.0, 1.0, 0.90, 1.0]),
             ),
             (
                 "abstain".to_owned(),
-                loss_row(&states, &[0.45; 7]),
+                loss_row(&states, &[0.45; 8]),
             ),
         ]),
         maximum_worst_case_loss: 1.0,
     };
 
-    // A complete journal read separates no-effect, once-applied,
-    // partial/duplicate/stale and unresolved-holder histories.
+    // A journal read plus independently validated scope-closure receipt
+    // separates known effect histories while retaining an unresolved outcome.
+    // A journal read alone cannot eliminate open_world_residual.
     let journal_probe = RobustProbe {
-        probe_id: "read_endpoint_journal".to_owned(),
-        acquisition_cost_units: 1.0,
-        result_delay_steps: 2,
+        probe_id: "reconcile_effect_and_scope".to_owned(),
+        acquisition_cost_units: 2.0,
+        result_delay_steps: 5,
         outcomes: vec![
             RobustProbeOutcome {
                 outcome_id: "complete_no_effect".to_owned(),
@@ -84,8 +86,11 @@ fn main() {
                 ],
             },
             RobustProbeOutcome {
-                outcome_id: "holder_unresolved".to_owned(),
-                possible_state_ids: vec!["unresolved_command_holder".to_owned()],
+                outcome_id: "scope_incomplete_or_unmodelled".to_owned(),
+                possible_state_ids: vec![
+                    "unresolved_command_holder".to_owned(),
+                    "open_world_residual".to_owned(),
+                ],
             },
         ],
     };
@@ -104,6 +109,7 @@ fn main() {
                     "not_dispatched".to_owned(),
                     "duplicate_effect".to_owned(),
                     "unresolved_command_holder".to_owned(),
+                    "open_world_residual".to_owned(),
                 ],
             },
             RobustProbeOutcome {
@@ -113,6 +119,7 @@ fn main() {
                     "applied_once_ack_lost".to_owned(),
                     "partial_effect".to_owned(),
                     "stale_authority_effect".to_owned(),
+                    "open_world_residual".to_owned(),
                 ],
             },
         ],
@@ -120,7 +127,7 @@ fn main() {
 
     let context = RobustProbeContext {
         permitted_probe_ids: vec![
-            "read_endpoint_journal".to_owned(),
+            "reconcile_effect_and_scope".to_owned(),
             "weakly_discriminating_camera_sample".to_owned(),
         ],
         remaining_cost_budget_units: 2.0,
@@ -134,14 +141,14 @@ fn main() {
         .expect("weak probe has complete outcome support");
 
     assert_eq!(journal.current_minimax_loss, 0.35);
-    assert_eq!(journal.worst_case_post_observation_minimax_loss, 0.25);
-    assert!((journal.guaranteed_worst_case_loss_reduction - 0.10).abs() < 1e-12);
+    assert_eq!(journal.worst_case_post_observation_minimax_loss, 0.30);
+    assert!((journal.guaranteed_worst_case_loss_reduction - 0.05).abs() < 1e-12);
     assert_eq!(weak.current_minimax_loss, 0.35);
     assert_eq!(weak.worst_case_post_observation_minimax_loss, 0.35);
     assert_eq!(weak.guaranteed_worst_case_loss_reduction, 0.0);
 
     println!(
-        "AERB synthetic robust probe comparison: journal guaranteed loss reduction = {:.2}; weak visual probe = {:.2}; no prior probabilities used.",
+        "AERB synthetic robust probe comparison: journal + independent scope closure guaranteed loss reduction = {:.2}; weak visual probe = {:.2}; no prior probabilities used.",
         journal.guaranteed_worst_case_loss_reduction,
         weak.guaranteed_worst_case_loss_reduction
     );
