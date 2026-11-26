@@ -16,11 +16,11 @@ Five Go fuzz targets were each run for two seconds on the final recorded source 
 
 | Fuzz target | Executions | Result |
 |---|---:|---|
-| FuzzDigestMutationNeverEqualsAcrossContextChanges | 96,472 | PASS |
-| FuzzOARConfirmationCannotAppearWithoutExecution | 97,595 | PASS |
-| FuzzAACOverclaimNeverPasses | 102,413 | PASS |
-| FuzzCrossTenantScopeNeverQualifies | 95,638 | PASS |
-| FuzzOARCrossRunReferenceNeverConfirms | 98,094 | PASS |
+| FuzzDigestMutationNeverEqualsAcrossContextChanges | 90,319 | PASS |
+| FuzzOARConfirmationCannotAppearWithoutExecution | 96,574 | PASS |
+| FuzzAACOverclaimNeverPasses | 111,676 | PASS |
+| FuzzCrossTenantScopeNeverQualifies | 97,166 | PASS |
+| FuzzOARCrossRunReferenceNeverConfirms | 114,068 | PASS |
 
 The fuzz targets are bounded smoke tests, not statistically meaningful security proof. Run the 30-second command set in run-local.sh and preserve full transcripts for qualification.
 
@@ -30,10 +30,10 @@ A local go test -run '^$' -bench . -benchmem run reported:
 
 | Benchmark | ns/op | B/op | allocs/op |
 |---|---:|---:|---:|
-| BenchmarkCompareDigestEqual | 235.0 | 0 | 0 |
-| BenchmarkCompareDigestIncomparable | 246.8 | 0 | 0 |
-| BenchmarkQualifyDigitalEffect | 549.2 | 0 | 0 |
-| BenchmarkProjectOARLifecycle | 534.3 | 864 | 6 |
+| BenchmarkCompareDigestEqual | 237.2 | 0 | 0 |
+| BenchmarkCompareDigestIncomparable | 229.7 | 0 | 0 |
+| BenchmarkQualifyDigitalEffect | 568.1 | 0 | 0 |
+| BenchmarkProjectOARLifecycle | 525.2 | 864 | 6 |
 
 These are semantic-model microbenchmarks on this host. They are not database throughput, end-to-end action latency, cost per action, or a vendor comparison.
 
