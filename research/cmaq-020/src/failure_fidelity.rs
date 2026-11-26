@@ -446,13 +446,20 @@ impl BoundaryRatePair {
     }
 }
 
-#[derive(Clone, Copy, Debug, Default, Eq, PartialEq)]
-pub struct BoundaryRateClusterCounts {
+#[derive(Clone, Debug, Default, PartialEq)]
+pub struct BoundaryRateClusterSummary {
     pub pairs: usize,
     pub detected_reference_boundaries: usize,
     pub detected_predicted_boundaries: usize,
     pub correctly_detected_boundaries: usize,
     pub direction_matches: usize,
+    pub boundary_detection_accuracy: Option<f64>,
+    pub boundary_direction_accuracy: Option<f64>,
+    pub success_side_rate_mae_basis_points: Option<f64>,
+    pub failure_side_rate_mae_basis_points: Option<f64>,
+    pub boundary_gap_mae_basis_points: Option<f64>,
+    pub reference_mean_gap_basis_points: Option<f64>,
+    pub predicted_mean_gap_basis_points: Option<f64>,
 }
 
 #[derive(Clone, Debug, Default, PartialEq)]
@@ -503,7 +510,15 @@ pub struct BoundaryRateFidelityScore {
     pub boundary_gap_mae_basis_points: Option<f64>,
     pub reference_mean_gap_basis_points: Option<f64>,
     pub predicted_mean_gap_basis_points: Option<f64>,
-    pub clusters: BTreeMap<String, BoundaryRateClusterCounts>,
+    /// Pair-weighted diagnostic means; cluster-weighted means above are primary.
+    pub pair_weighted_boundary_detection_accuracy: Option<f64>,
+    pub pair_weighted_boundary_direction_accuracy: Option<f64>,
+    pub pair_weighted_success_side_rate_mae_basis_points: Option<f64>,
+    pub pair_weighted_failure_side_rate_mae_basis_points: Option<f64>,
+    pub pair_weighted_boundary_gap_mae_basis_points: Option<f64>,
+    pub pair_weighted_reference_mean_gap_basis_points: Option<f64>,
+    pub pair_weighted_predicted_mean_gap_basis_points: Option<f64>,
+    pub clusters: BTreeMap<String, BoundaryRateClusterSummary>,
 }
 
 /// Score replicated success/failure boundary pairs without collapsing
@@ -654,17 +669,74 @@ pub fn score_boundary_rate_pairs(
         cluster.detected_predicted_boundaries += predicted_detected as usize;
         cluster.correctly_detected_boundaries += detection_correct as usize;
         cluster.direction_matches += direction_match as usize;
+        cluster.success_side_rate_mae_basis_points =
+            Some(cluster.success_side_rate_mae_basis_points.unwrap_or(0.0) + success_side_error);
+        cluster.failure_side_rate_mae_basis_points =
+            Some(cluster.failure_side_rate_mae_basis_points.unwrap_or(0.0) + failure_side_error);
+        cluster.boundary_gap_mae_basis_points =
+            Some(cluster.boundary_gap_mae_basis_points.unwrap_or(0.0) + gap_error);
+        cluster.reference_mean_gap_basis_points =
+            Some(cluster.reference_mean_gap_basis_points.unwrap_or(0.0) + reference_gap);
+        cluster.predicted_mean_gap_basis_points =
+            Some(cluster.predicted_mean_gap_basis_points.unwrap_or(0.0) + predicted_gap);
     }
 
     let denominator = pairs.len() as f64;
-    score.boundary_detection_accuracy =
+    score.pair_weighted_boundary_detection_accuracy =
         Some(score.correct_boundary_detection_pairs as f64 / denominator);
-    score.boundary_direction_accuracy = Some(direction_matches as f64 / denominator);
-    score.success_side_rate_mae_basis_points = Some(success_error_sum / denominator);
-    score.failure_side_rate_mae_basis_points = Some(failure_error_sum / denominator);
-    score.boundary_gap_mae_basis_points = Some(gap_error_sum / denominator);
-    score.reference_mean_gap_basis_points = Some(reference_gap_sum / denominator);
-    score.predicted_mean_gap_basis_points = Some(predicted_gap_sum / denominator);
+    score.pair_weighted_boundary_direction_accuracy =
+        Some(direction_matches as f64 / denominator);
+    score.pair_weighted_success_side_rate_mae_basis_points = Some(success_error_sum / denominator);
+    score.pair_weighted_failure_side_rate_mae_basis_points = Some(failure_error_sum / denominator);
+    score.pair_weighted_boundary_gap_mae_basis_points = Some(gap_error_sum / denominator);
+    score.pair_weighted_reference_mean_gap_basis_points = Some(reference_gap_sum / denominator);
+    score.pair_weighted_predicted_mean_gap_basis_points = Some(predicted_gap_sum / denominator);
+
+    let cluster_count = score.clusters.len() as f64;
+    let mut cluster_detection_accuracy = 0.0;
+    let mut cluster_direction_accuracy = 0.0;
+    let mut cluster_success_error = 0.0;
+    let mut cluster_failure_error = 0.0;
+    let mut cluster_gap_error = 0.0;
+    let mut cluster_reference_gap = 0.0;
+    let mut cluster_predicted_gap = 0.0;
+    for cluster in score.clusters.values_mut() {
+        let cluster_denominator = cluster.pairs as f64;
+        let detection_accuracy =
+            cluster.correctly_detected_boundaries as f64 / cluster_denominator;
+        let direction_accuracy = cluster.direction_matches as f64 / cluster_denominator;
+        let success_error =
+            cluster.success_side_rate_mae_basis_points.unwrap_or(0.0) / cluster_denominator;
+        let failure_error =
+            cluster.failure_side_rate_mae_basis_points.unwrap_or(0.0) / cluster_denominator;
+        let gap_error =
+            cluster.boundary_gap_mae_basis_points.unwrap_or(0.0) / cluster_denominator;
+        let reference_gap =
+            cluster.reference_mean_gap_basis_points.unwrap_or(0.0) / cluster_denominator;
+        let predicted_gap =
+            cluster.predicted_mean_gap_basis_points.unwrap_or(0.0) / cluster_denominator;
+        cluster.boundary_detection_accuracy = Some(detection_accuracy);
+        cluster.boundary_direction_accuracy = Some(direction_accuracy);
+        cluster.success_side_rate_mae_basis_points = Some(success_error);
+        cluster.failure_side_rate_mae_basis_points = Some(failure_error);
+        cluster.boundary_gap_mae_basis_points = Some(gap_error);
+        cluster.reference_mean_gap_basis_points = Some(reference_gap);
+        cluster.predicted_mean_gap_basis_points = Some(predicted_gap);
+        cluster_detection_accuracy += detection_accuracy;
+        cluster_direction_accuracy += direction_accuracy;
+        cluster_success_error += success_error;
+        cluster_failure_error += failure_error;
+        cluster_gap_error += gap_error;
+        cluster_reference_gap += reference_gap;
+        cluster_predicted_gap += predicted_gap;
+    }
+    score.boundary_detection_accuracy = Some(cluster_detection_accuracy / cluster_count);
+    score.boundary_direction_accuracy = Some(cluster_direction_accuracy / cluster_count);
+    score.success_side_rate_mae_basis_points = Some(cluster_success_error / cluster_count);
+    score.failure_side_rate_mae_basis_points = Some(cluster_failure_error / cluster_count);
+    score.boundary_gap_mae_basis_points = Some(cluster_gap_error / cluster_count);
+    score.reference_mean_gap_basis_points = Some(cluster_reference_gap / cluster_count);
+    score.predicted_mean_gap_basis_points = Some(cluster_predicted_gap / cluster_count);
     Ok(score)
 }
 
