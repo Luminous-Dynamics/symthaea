@@ -4,6 +4,7 @@ pub mod binary_metrics;
 pub mod calibration_requalification;
 pub mod dtco_manifest;
 pub mod inverse_vm_shortlist;
+pub mod inverse_vm_shortlist_stability;
 pub mod label_consumption_guard;
 pub mod metrology_audit;
 pub mod metrology_qualification_gate;
@@ -152,4 +153,12 @@ pub use inverse_vm_shortlist::{
     seal_forward_evaluation_receipt_v1, seal_historical_support_receipt_v1,
     seal_inverse_vm_candidate_v1,
     seal_inverse_vm_shortlist_policy_v1, verify_inverse_vm_shortlist_v1,
+};
+
+pub use inverse_vm_shortlist_stability::{
+    INVERSE_VM_STABILITY_INPUT_SCHEMA_V1, INVERSE_VM_STABILITY_REPORT_SCHEMA_V1,
+    InverseVmCandidateScenarioStateV1, InverseVmCandidateStabilityV1,
+    InverseVmRobustnessScenarioV1, InverseVmScenarioReplayV1, InverseVmStabilityErrorV1,
+    InverseVmStabilityInputV1, InverseVmStabilityReportV1,
+    evaluate_inverse_vm_stability_v1, verify_inverse_vm_stability_v1,
 };
