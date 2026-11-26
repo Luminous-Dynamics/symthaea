@@ -172,31 +172,27 @@ impl EpistemicConsciousness {
         current_phi < self.phi_threshold as f64
     }
 
-    /// Perform autonomous research on a query
+    /// Perform autonomous research on a query.
+    ///
+    /// Research confidence is a prediction, not an observed correctness label.
+    /// The result is integrated for downstream use, but it never updates
+    /// source reliability or domain expertise by self-labeling its claims.
     pub async fn research(&mut self, query: &str) -> anyhow::Result<WebResearchResult> {
         let result = self.researcher.research_and_verify(query).await?;
+        self.integrate_research_result(result).await
+    }
 
-        // Integrate the result
+    /// Integrate a research result without treating its own confidence as truth.
+    ///
+    /// Independent, provenance-bound outcome adjudication is a separate input
+    /// path. Until that path supplies a qualified outcome, meta-learning state
+    /// remains unchanged by this research result.
+    async fn integrate_research_result(
+        &mut self,
+        result: WebResearchResult,
+    ) -> anyhow::Result<WebResearchResult> {
         let integration = self.integrator.integrate(result.clone()).await?;
-
-        // Update last Phi
         self.last_phi = integration.phi_after;
-
-        // Record outcomes for meta-learning
-        for claim in &result.claims {
-            // For now, assume high-confidence claims are correct
-            // In a real system, this would be based on user feedback
-            let outcome = VerificationOutcome {
-                claim: claim.text.clone(),
-                source_domain: self.extract_domain(&result.url),
-                source_type: result.source_type,
-                was_correct: claim.confidence > 0.7,
-                predicted_confidence: claim.confidence,
-                domain: self.detect_domain(query),
-            };
-            self.learner.record_outcome(outcome)?;
-        }
-
         Ok(result)
     }
 
@@ -298,6 +294,37 @@ mod tests {
         let ec = ec.unwrap();
         assert!(!ec.should_research(0.8)); // High Phi, no research needed
         assert!(ec.should_research(0.3)); // Low Phi, research needed
+    }
+
+    #[tokio::test]
+    async fn research_confidence_does_not_self_label_meta_learning_outcomes() {
+        let mut consciousness = EpistemicConsciousness::new().unwrap();
+        let result = WebResearchResult {
+            title: "Test result".to_string(),
+            url: "https://aggregate.example/result".to_string(),
+            content: "Source-backed test content".to_string(),
+            summary: "A deliberately high-confidence test claim".to_string(),
+            source_type: ResearchSource::Documentation,
+            relevance: 0.99,
+            confidence: 0.99,
+            epistemic_status: EpistemicStatus::HighConfidence,
+            status: ResearchStatus::Success,
+            claims: vec![VerifiedClaim::verified(
+                "A deliberately high-confidence claim for regression testing",
+                vec!["https://claim-source.example/evidence".to_string()],
+            )],
+        };
+
+        let integrated = consciousness
+            .integrate_research_result(result.clone())
+            .await
+            .unwrap();
+
+        assert_eq!(integrated.claims.len(), 1);
+        assert_eq!(integrated.claims[0].confidence, 0.9);
+        assert_eq!(consciousness.integrator.total_claims(), 1);
+        assert_eq!(consciousness.learner.stats().total_outcomes, 0);
+        assert_eq!(consciousness.learner.stats().accuracy, 0.5);
     }
 
     #[test]
