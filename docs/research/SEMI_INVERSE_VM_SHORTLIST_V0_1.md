@@ -76,7 +76,7 @@ Candidates are sorted and tie-broken deterministically by candidate ID. Input ca
 
 ## Authored adversarial unit tests
 
-The current Rust module includes tests for:
+The current Rust module includes 14 tests for:
 1. deterministic known-answer ranking and full replay;
 2. recipe hard-bound rejection;
 3. historical-support envelope rejection despite an attractive forward prediction;
@@ -88,7 +88,9 @@ The current Rust module includes tests for:
 9. duplicate candidate ID and duplicate recipe knob rejection;
 10. policy/candidate input-order-invariant report digest;
 11. shortlist receipt tamper detection;
-12. diversity spacing applied only after feasibility and permitted to produce a shorter-than-K shortlist.
+12. diversity spacing applied only after feasibility and permitted to produce a shorter-than-K shortlist;
+13. malformed/blank historical-support neighbour IDs are rejected;
+14. minimum recipe-diversity spacing is enforced as a hard top-K selection constraint.
 
 Exact-head rustfmt, strict Clippy, crate tests and SEMI-BENCH-001 reference workflow remain mandatory before marking these tests as passed.
 
