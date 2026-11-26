@@ -1,0 +1,713 @@
+// Copyright (C) 2024-2026 Luminous Dynamics
+// SPDX-License-Identifier: AGPL-3.0-or-later
+// Commercial licensing: see COMMERCIAL_LICENSE.md at repository root
+
+//! Finite-horizon empirical balanced projection primitives.
+//!
+//! Constructs biorthogonal trial/test bases from empirical reachability and
+//! observability factors. This is a linearized reduction primitive only: it
+//! does not derive solver tangents/adjoints, execute Vlasov dynamics, or certify
+//! nonlinear echo preservation.
+
+use super::EmpiricalGramian;
+use thiserror::Error;
+
+#[derive(Clone, Debug, Error, PartialEq, Eq)]
+pub enum RbkrError {
+    #[error("RBKR configuration is invalid")]
+    InvalidConfiguration,
+    #[error("reachability and observability state dimensions differ")]
+    StateDimensionMismatch,
+    #[error("reachability and observability Gramians must both contain factors")]
+    EmptyGramian,
+    #[error("cross-Gramian factor-pair budget exceeded")]
+    CrossGramianBudgetExceeded,
+    #[error("factor-space SVD storage budget exceeded")]
+    SvdStorageBudgetExceeded,
+    #[error("Jacobi SVD work budget exceeded")]
+    JacobiWorkBudgetExceeded,
+    #[error("basis construction work or storage budget exceeded")]
+    BasisBudgetExceeded,
+    #[error("cross-Gramian arithmetic is non-finite")]
+    NonFiniteArithmetic,
+    #[error("one-sided Jacobi SVD did not converge")]
+    SvdDidNotConverge,
+    #[error("requested order exceeds the numerically supported balanced rank")]
+    InsufficientBalancedRank,
+    #[error("trial and test bases are not biorthogonal within tolerance")]
+    BiorthogonalityFailure,
+    #[error("state vector dimension mismatch")]
+    StateVectorDimensionMismatch,
+    #[error("reduced coordinate dimension mismatch or non-finite coordinate")]
+    ReducedVectorDimensionMismatch,
+    #[error("linear A matrix must be finite, square, and match the state dimension")]
+    InvalidAOperator,
+    #[error("linear B matrix must be finite, non-empty, and have the state dimension as its row count")]
+    InvalidBOperator,
+    #[error("linear C matrix must be finite, non-empty, and have the state dimension as its column count")]
+    InvalidCOperator,
+}
+
+/// Numerical and resource controls for deterministic RBKR construction.
+#[derive(Clone, Copy, Debug, PartialEq)]
+pub struct RbkrConfig {
+    pub retained_order: usize,
+    pub relative_singular_value_cutoff: f64,
+    pub jacobi_tolerance: f64,
+    pub maximum_jacobi_sweeps: usize,
+    pub maximum_cross_gramian_entries: usize,
+    pub maximum_svd_storage_entries: usize,
+    pub maximum_jacobi_scalar_operations: usize,
+    pub maximum_basis_scalars: usize,
+    pub maximum_basis_scalar_operations: usize,
+    pub biorthogonality_tolerance: f64,
+}
+
+impl RbkrConfig {
+    pub fn new(retained_order: usize) -> Self {
+        Self {
+            retained_order,
+            relative_singular_value_cutoff: 1.0e-12,
+            jacobi_tolerance: 1.0e-12,
+            maximum_jacobi_sweeps: 64,
+            maximum_cross_gramian_entries: 1_000_000,
+            maximum_svd_storage_entries: 2_000_000,
+            maximum_jacobi_scalar_operations: 100_000_000,
+            maximum_basis_scalars: 8_000_000,
+            maximum_basis_scalar_operations: 100_000_000,
+            biorthogonality_tolerance: 1.0e-8,
+        }
+    }
+
+    fn validate(self) -> Result<(), RbkrError> {
+        if self.retained_order == 0
+            || !self.relative_singular_value_cutoff.is_finite()
+            || !(0.0..1.0).contains(&self.relative_singular_value_cutoff)
+            || !self.jacobi_tolerance.is_finite()
+            || self.jacobi_tolerance <= 0.0
+            || self.jacobi_tolerance >= 1.0
+            || self.maximum_jacobi_sweeps == 0
+            || self.maximum_cross_gramian_entries == 0
+            || self.maximum_svd_storage_entries == 0
+            || self.maximum_jacobi_scalar_operations == 0
+            || self.maximum_basis_scalars == 0
+            || self.maximum_basis_scalar_operations == 0
+            || !self.biorthogonality_tolerance.is_finite()
+            || self.biorthogonality_tolerance <= 0.0
+            || self.biorthogonality_tolerance >= 1.0
+        {
+            return Err(RbkrError::InvalidConfiguration);
+        }
+        Ok(())
+    }
+}
+
+impl Default for RbkrConfig {
+    fn default() -> Self {
+        Self::new(1)
+    }
+}
+
+/// Finite-dimensional empirical balanced trial/test basis.
+///
+/// The trial basis reconstructs states; the test basis extracts reduced
+/// coordinates. Their cross-pairing is checked against the identity. The
+/// singular values are empirical, finite-horizon quantities for the supplied
+/// intervention and QoI weights, not nonlinear Vlasov error bounds.
+#[derive(Clone, Debug, PartialEq)]
+pub struct ResponseBalancedBasis {
+    state_dimension: usize,
+    trial_basis: Vec<Vec<f64>>,
+    test_basis: Vec<Vec<f64>>,
+    balanced_singular_values: Vec<f64>,
+    biorthogonality_defect: f64,
+}
+
+impl ResponseBalancedBasis {
+    /// Build the bases from Wc = X X^T and Wo = Y Y^T.
+    ///
+    /// The caller supplies factors in one shared state coordinate system and
+    /// state metric. The method forms H = Y^T X, computes its SVD, and returns
+    /// Vstate = X V Sigma^(-1/2) and Wstate = Y U Sigma^(-1/2), so that
+    /// Wstate^T Vstate is identity to the reported numerical tolerance.
+    pub fn from_empirical_gramians(
+        reachability: &EmpiricalGramian,
+        observability: &EmpiricalGramian,
+        config: RbkrConfig,
+    ) -> Result<Self, RbkrError> {
+        config.validate()?;
+        if reachability.dimension != observability.dimension {
+            return Err(RbkrError::StateDimensionMismatch);
+        }
+        let dimension = reachability.dimension;
+        let reach_count = reachability.weighted_factors.len();
+        let observe_count = observability.weighted_factors.len();
+        if reach_count == 0 || observe_count == 0 {
+            return Err(RbkrError::EmptyGramian);
+        }
+
+        let cross_entries = observe_count
+            .checked_mul(reach_count)
+            .ok_or(RbkrError::CrossGramianBudgetExceeded)?;
+        if cross_entries > config.maximum_cross_gramian_entries {
+            return Err(RbkrError::CrossGramianBudgetExceeded);
+        }
+        let right_entries = reach_count
+            .checked_mul(reach_count)
+            .ok_or(RbkrError::SvdStorageBudgetExceeded)?;
+        let svd_entries = cross_entries
+            .checked_add(right_entries)
+            .ok_or(RbkrError::SvdStorageBudgetExceeded)?;
+        if svd_entries > config.maximum_svd_storage_entries {
+            return Err(RbkrError::SvdStorageBudgetExceeded);
+        }
+
+        let pairs = reach_count
+            .checked_mul(reach_count.saturating_sub(1))
+            .and_then(|value| value.checked_div(2))
+            .ok_or(RbkrError::JacobiWorkBudgetExceeded)?;
+        let jacobi_work = pairs
+            .checked_mul(observe_count)
+            .and_then(|value| value.checked_mul(config.maximum_jacobi_sweeps))
+            .ok_or(RbkrError::JacobiWorkBudgetExceeded)?;
+        if jacobi_work > config.maximum_jacobi_scalar_operations {
+            return Err(RbkrError::JacobiWorkBudgetExceeded);
+        }
+
+        let basis_scalars = dimension
+            .checked_mul(config.retained_order)
+            .and_then(|value| value.checked_mul(2))
+            .ok_or(RbkrError::BasisBudgetExceeded)?;
+        let basis_work = dimension
+            .checked_mul(reach_count.checked_add(observe_count).ok_or(RbkrError::BasisBudgetExceeded)?)
+            .and_then(|value| value.checked_mul(config.retained_order))
+            .ok_or(RbkrError::BasisBudgetExceeded)?;
+        if basis_scalars > config.maximum_basis_scalars
+            || basis_work > config.maximum_basis_scalar_operations
+        {
+            return Err(RbkrError::BasisBudgetExceeded);
+        }
+
+        let mut cross = vec![vec![0.0; reach_count]; observe_count];
+        for (row, y_factor) in observability.weighted_factors.iter().enumerate() {
+            validate_factor(y_factor, dimension)?;
+            for (column, x_factor) in reachability.weighted_factors.iter().enumerate() {
+                validate_factor(x_factor, dimension)?;
+                cross[row][column] = checked_dot(y_factor, x_factor)?;
+            }
+        }
+
+        let (rotated_cross, right_vectors) = one_sided_jacobi_svd(
+            cross,
+            config.maximum_jacobi_sweeps,
+            config.jacobi_tolerance,
+        )?;
+        let mut unsorted_singular_values = (0..reach_count)
+            .map(|index| column_squared_norm(&rotated_cross, index).map(f64::sqrt))
+            .collect::<Result<Vec<_>, _>>()?;
+        if unsorted_singular_values.iter().any(|value| !value.is_finite()) {
+            return Err(RbkrError::NonFiniteArithmetic);
+        }
+        let mut order = (0..reach_count).collect::<Vec<_>>();
+        order.sort_by(|left, right| {
+            unsorted_singular_values[*right].total_cmp(&unsorted_singular_values[*left])
+        });
+        let singular_values = order
+            .iter()
+            .map(|index| unsorted_singular_values[*index])
+            .collect::<Vec<_>>();
+        let maximum = singular_values.first().copied().unwrap_or(0.0);
+        if maximum <= 0.0 || !maximum.is_finite() {
+            return Err(RbkrError::InsufficientBalancedRank);
+        }
+        let threshold = maximum * config.relative_singular_value_cutoff;
+        let available = singular_values.iter().take_while(|value| **value > threshold).count();
+        if config.retained_order > available {
+            return Err(RbkrError::InsufficientBalancedRank);
+        }
+
+        let retained = config.retained_order;
+        let mut trial_basis = vec![vec![0.0; dimension]; retained];
+        let mut test_basis = vec![vec![0.0; dimension]; retained];
+
+        for reduced_index in 0..retained {
+            let source_column = order[reduced_index];
+            let sigma = singular_values[reduced_index];
+            let inverse_sqrt = 1.0 / sigma.sqrt();
+            if !inverse_sqrt.is_finite() {
+                return Err(RbkrError::NonFiniteArithmetic);
+            }
+
+            // Trial vectors: X V Sigma^(-1/2).
+            for (factor_index, factor) in reachability.weighted_factors.iter().enumerate() {
+                let coefficient = right_vectors[factor_index][source_column] * inverse_sqrt;
+                for (state_index, value) in factor.iter().enumerate() {
+                    trial_basis[reduced_index][state_index] += coefficient * value;
+                }
+            }
+
+            // Left singular vectors are the normalized columns of the rotated H.
+            // Test vectors: Y U Sigma^(-1/2).
+            let left_vector = (0..observe_count)
+                .map(|row| rotated_cross[row][source_column] / sigma)
+                .collect::<Vec<_>>();
+            for (factor_index, factor) in observability.weighted_factors.iter().enumerate() {
+                let coefficient = left_vector[factor_index] * inverse_sqrt;
+                for (state_index, value) in factor.iter().enumerate() {
+                    test_basis[reduced_index][state_index] += coefficient * value;
+                }
+            }
+        }
+
+        if trial_basis.iter().flatten().any(|value| !value.is_finite())
+            || test_basis.iter().flatten().any(|value| !value.is_finite())
+        {
+            return Err(RbkrError::NonFiniteArithmetic);
+        }
+        let defect = pairing_defect(&trial_basis, &test_basis)?;
+        if defect > config.biorthogonality_tolerance {
+            return Err(RbkrError::BiorthogonalityFailure);
+        }
+
+        Ok(Self {
+            state_dimension: dimension,
+            trial_basis,
+            test_basis,
+            balanced_singular_values: singular_values,
+            biorthogonality_defect: defect,
+        })
+    }
+
+    pub fn state_dimension(&self) -> usize {
+        self.state_dimension
+    }
+
+    pub fn reduced_order(&self) -> usize {
+        self.trial_basis.len()
+    }
+
+    pub fn trial_basis(&self) -> &[Vec<f64>] {
+        &self.trial_basis
+    }
+
+    pub fn test_basis(&self) -> &[Vec<f64>] {
+        &self.test_basis
+    }
+
+    /// Descending empirical balanced singular values, including discarded modes.
+    pub fn balanced_singular_values(&self) -> &[f64] {
+        &self.balanced_singular_values
+    }
+
+    pub fn biorthogonality_defect(&self) -> f64 {
+        self.biorthogonality_defect
+    }
+
+    /// Compute reduced coordinates z = W^T x.
+    pub fn reduce_state(&self, state: &[f64]) -> Result<Vec<f64>, RbkrError> {
+        if state.len() != self.state_dimension {
+            return Err(RbkrError::StateVectorDimensionMismatch);
+        }
+        self.test_basis.iter().map(|basis| checked_dot(basis, state)).collect()
+    }
+
+    /// Reconstruct the trial-space approximation x_hat = V z.
+    pub fn reconstruct_state(&self, coordinates: &[f64]) -> Result<Vec<f64>, RbkrError> {
+        if coordinates.len() != self.reduced_order()
+            || coordinates.iter().any(|value| !value.is_finite())
+        {
+            return Err(RbkrError::ReducedVectorDimensionMismatch);
+        }
+        let mut state = vec![0.0; self.state_dimension];
+        for (coordinate, basis) in coordinates.iter().zip(&self.trial_basis) {
+            for (slot, value) in state.iter_mut().zip(basis) {
+                *slot += coordinate * value;
+                if !slot.is_finite() {
+                    return Err(RbkrError::NonFiniteArithmetic);
+                }
+            }
+        }
+        Ok(state)
+    }
+
+    /// Project a frozen discrete linearized system: Ar = W^T A V,
+    /// Br = W^T B, and Cr = C V. A/B/C must be derived independently from the
+    /// actual discrete solver, intervention map, and registered QoI map.
+    pub fn project_linear_system(
+        &self,
+        a: &[Vec<f64>],
+        b: &[Vec<f64>],
+        c: &[Vec<f64>],
+    ) -> Result<ReducedLinearSystem, RbkrError> {
+        let n = self.state_dimension;
+        if a.len() != n
+            || a.iter().any(|row| row.len() != n || row.iter().any(|value| !value.is_finite()))
+        {
+            return Err(RbkrError::InvalidAOperator);
+        }
+        let input_count = b.first().map(Vec::len).unwrap_or(0);
+        if b.len() != n
+            || input_count == 0
+            || b.iter().any(|row| row.len() != input_count || row.iter().any(|value| !value.is_finite()))
+        {
+            return Err(RbkrError::InvalidBOperator);
+        }
+        if c.is_empty()
+            || c.iter().any(|row| row.len() != n || row.iter().any(|value| !value.is_finite()))
+        {
+            return Err(RbkrError::InvalidCOperator);
+        }
+
+        let order = self.reduced_order();
+        let output_count = c.len();
+        let mut a_trial = vec![vec![0.0; order]; n];
+        for state_row in 0..n {
+            for (basis_index, trial) in self.trial_basis.iter().enumerate() {
+                a_trial[state_row][basis_index] = checked_dot(&a[state_row], trial)?;
+            }
+        }
+        let mut reduced_a = vec![vec![0.0; order]; order];
+        for (row, test) in self.test_basis.iter().enumerate() {
+            for reduced_column in 0..order {
+                reduced_a[row][reduced_column] =
+                    checked_dot(test, &matrix_column(&a_trial, reduced_column))?;
+            }
+        }
+        let mut reduced_b = vec![vec![0.0; input_count]; order];
+        for (row, test) in self.test_basis.iter().enumerate() {
+            for input_index in 0..input_count {
+                reduced_b[row][input_index] =
+                    checked_dot(test, &matrix_column(b, input_index))?;
+            }
+        }
+        let mut reduced_c = vec![vec![0.0; order]; output_count];
+        for output_index in 0..output_count {
+            for (column, trial) in self.trial_basis.iter().enumerate() {
+                reduced_c[output_index][column] = checked_dot(&c[output_index], trial)?;
+            }
+        }
+        Ok(ReducedLinearSystem { a: reduced_a, b: reduced_b, c: reduced_c })
+    }
+}
+
+#[derive(Clone, Debug, PartialEq)]
+pub struct ReducedLinearSystem {
+    pub a: Vec<Vec<f64>>,
+    pub b: Vec<Vec<f64>>,
+    pub c: Vec<Vec<f64>>,
+}
+
+fn validate_factor(factor: &[f64], dimension: usize) -> Result<(), RbkrError> {
+    if factor.len() != dimension {
+        return Err(RbkrError::StateDimensionMismatch);
+    }
+    if factor.iter().any(|value| !value.is_finite()) {
+        return Err(RbkrError::NonFiniteArithmetic);
+    }
+    Ok(())
+}
+
+fn checked_dot(left: &[f64], right: &[f64]) -> Result<f64, RbkrError> {
+    if left.len() != right.len() {
+        return Err(RbkrError::StateDimensionMismatch);
+    }
+    let mut sum = 0.0;
+    for (a, b) in left.iter().zip(right) {
+        sum += a * b;
+        if !sum.is_finite() {
+            return Err(RbkrError::NonFiniteArithmetic);
+        }
+    }
+    Ok(sum)
+}
+
+fn column_squared_norm(matrix: &[Vec<f64>], column_index: usize) -> Result<f64, RbkrError> {
+    let mut sum = 0.0;
+    for row in matrix {
+        let value = *row.get(column_index).ok_or(RbkrError::NonFiniteArithmetic)?;
+        sum += value * value;
+        if !sum.is_finite() {
+            return Err(RbkrError::NonFiniteArithmetic);
+        }
+    }
+    Ok(sum)
+}
+
+fn matrix_column(matrix: &[Vec<f64>], index: usize) -> Vec<f64> {
+    matrix.iter().map(|row| row[index]).collect()
+}
+
+fn pairing_defect(trial: &[Vec<f64>], test: &[Vec<f64>]) -> Result<f64, RbkrError> {
+    let mut defect = 0.0_f64;
+    for (row, test_vector) in test.iter().enumerate() {
+        for (column, trial_vector) in trial.iter().enumerate() {
+            let expected = if row == column { 1.0 } else { 0.0 };
+            defect = defect.max((checked_dot(test_vector, trial_vector)? - expected).abs());
+        }
+    }
+    Ok(defect)
+}
+
+fn column_inner_product(
+    matrix: &[Vec<f64>],
+    left: usize,
+    right: usize,
+) -> Result<f64, RbkrError> {
+    let mut sum = 0.0;
+    for row in matrix {
+        sum += row[left] * row[right];
+        if !sum.is_finite() {
+            return Err(RbkrError::NonFiniteArithmetic);
+        }
+    }
+    Ok(sum)
+}
+
+/// One-sided Jacobi SVD: columns of the returned matrix are orthogonal and
+/// right_vectors contains the matching right singular vectors.
+fn one_sided_jacobi_svd(
+    mut matrix: Vec<Vec<f64>>,
+    maximum_sweeps: usize,
+    tolerance: f64,
+) -> Result<(Vec<Vec<f64>>, Vec<Vec<f64>>), RbkrError> {
+    let rows = matrix.len();
+    let columns = matrix.first().map(Vec::len).unwrap_or(0);
+    if rows == 0 || columns == 0 || matrix.iter().any(|row| row.len() != columns) {
+        return Err(RbkrError::EmptyGramian);
+    }
+    let mut right_vectors = vec![vec![0.0; columns]; columns];
+    for index in 0..columns {
+        right_vectors[index][index] = 1.0;
+    }
+
+    let mut converged = columns <= 1;
+    for _ in 0..maximum_sweeps {
+        if converged {
+            break;
+        }
+        let mut rotated_any = false;
+        for left in 0..columns {
+            for right in (left + 1)..columns {
+                let alpha = column_squared_norm(&matrix, left)?;
+                let beta = column_squared_norm(&matrix, right)?;
+                let gamma = column_inner_product(&matrix, left, right)?;
+                if alpha == 0.0 || beta == 0.0 {
+                    continue;
+                }
+                let scale = alpha.sqrt() * beta.sqrt();
+                if gamma.abs() <= tolerance * scale {
+                    continue;
+                }
+                let zeta = (beta - alpha) / (2.0 * gamma);
+                if !zeta.is_finite() {
+                    return Err(RbkrError::NonFiniteArithmetic);
+                }
+                let denominator = zeta.abs() + zeta.hypot(1.0);
+                let tangent = if zeta >= 0.0 { 1.0 / denominator } else { -1.0 / denominator };
+                let cosine = 1.0 / (1.0 + tangent * tangent).sqrt();
+                let sine = cosine * tangent;
+
+                for row in &mut matrix {
+                    let a = row[left];
+                    let b = row[right];
+                    row[left] = cosine * a - sine * b;
+                    row[right] = sine * a + cosine * b;
+                }
+                for row in &mut right_vectors {
+                    let a = row[left];
+                    let b = row[right];
+                    row[left] = cosine * a - sine * b;
+                    row[right] = sine * a + cosine * b;
+                }
+                rotated_any = true;
+            }
+        }
+        if !rotated_any {
+            converged = true;
+        }
+    }
+
+    if !converged {
+        for left in 0..columns {
+            for right in (left + 1)..columns {
+                let alpha = column_squared_norm(&matrix, left)?;
+                let beta = column_squared_norm(&matrix, right)?;
+                let gamma = column_inner_product(&matrix, left, right)?;
+                if alpha > 0.0
+                    && beta > 0.0
+                    && gamma.abs() > 10.0 * tolerance * alpha.sqrt() * beta.sqrt()
+                {
+                    return Err(RbkrError::SvdDidNotConverge);
+                }
+            }
+        }
+    }
+    if matrix.iter().flatten().any(|value| !value.is_finite())
+        || right_vectors.iter().flatten().any(|value| !value.is_finite())
+    {
+        return Err(RbkrError::NonFiniteArithmetic);
+    }
+    Ok((matrix, right_vectors))
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use crate::EmpiricalGramian;
+
+    fn gramian(dimension: usize, factors: &[Vec<f64>]) -> EmpiricalGramian {
+        let mut result = EmpiricalGramian::new(dimension).unwrap();
+        for factor in factors {
+            result.add_direction(factor, 1.0).unwrap();
+        }
+        result
+    }
+
+    #[test]
+    fn low_energy_direction_is_selected_when_future_observability_is_high() {
+        // POD of the reachability Gramian alone selects e1 (energy 1 versus
+        // 1e-4). The declared future output makes e2's balanced value larger.
+        let reach = gramian(2, &[vec![1.0, 0.0], vec![0.0, 0.01]]);
+        let observe = gramian(2, &[vec![0.1, 0.0], vec![0.0, 100.0]]);
+        let basis = ResponseBalancedBasis::from_empirical_gramians(
+            &reach, &observe, RbkrConfig::new(1),
+        ).unwrap();
+
+        assert_eq!(basis.reduced_order(), 1);
+        assert!((basis.balanced_singular_values()[0] - 1.0).abs() < 1.0e-12);
+        assert!((basis.balanced_singular_values()[1] - 0.1).abs() < 1.0e-12);
+        assert!(basis.trial_basis()[0][0].abs() < 1.0e-12);
+        assert!((basis.trial_basis()[0][1] - 0.01).abs() < 1.0e-12);
+        assert!(basis.test_basis()[0][0].abs() < 1.0e-12);
+        assert!((basis.test_basis()[0][1] - 100.0).abs() < 1.0e-10);
+        assert!(basis.biorthogonality_defect() < 1.0e-10);
+
+        let reduced = basis.reduce_state(&[0.0, 3.0]).unwrap();
+        let restored = basis.reconstruct_state(&reduced).unwrap();
+        assert!(restored[0].abs() < 1.0e-12);
+        assert!((restored[1] - 3.0).abs() < 1.0e-10);
+    }
+
+    #[test]
+    fn full_order_bases_are_biorthogonal_for_non_aligned_factors() {
+        let reach = gramian(3, &[
+            vec![1.0, 0.5, 0.0],
+            vec![0.0, 0.7, 0.2],
+            vec![0.1, 0.0, 0.8],
+        ]);
+        let observe = gramian(3, &[
+            vec![0.5, 0.1, 0.0],
+            vec![0.0, 1.3, 0.4],
+            vec![0.2, 0.0, 0.9],
+        ]);
+        let basis = ResponseBalancedBasis::from_empirical_gramians(
+            &reach, &observe, RbkrConfig::new(3),
+        ).unwrap();
+        assert!(basis.biorthogonality_defect() < 1.0e-8);
+
+        for scale in [1.0, 2.0, -0.5] {
+            let state = vec![scale, scale * 0.25, -scale * 2.0];
+            let restored = basis.reconstruct_state(&basis.reduce_state(&state).unwrap()).unwrap();
+            for (actual, expected) in restored.iter().zip(&state) {
+                assert!((actual - expected).abs() < 1.0e-8);
+            }
+        }
+    }
+
+    #[test]
+    fn reduced_abc_operators_match_full_dynamics_in_reduced_coordinates() {
+        let reach = gramian(2, &[vec![1.0, 0.2], vec![0.1, 1.0]]);
+        let observe = gramian(2, &[vec![0.7, 0.1], vec![0.2, 1.1]]);
+        let basis = ResponseBalancedBasis::from_empirical_gramians(
+            &reach, &observe, RbkrConfig::new(2),
+        ).unwrap();
+        let a = vec![vec![0.8, 0.3], vec![-0.1, 0.9]];
+        let b = vec![vec![1.0], vec![0.25]];
+        let c = vec![vec![0.5, -0.2]];
+        let reduced = basis.project_linear_system(&a, &b, &c).unwrap();
+
+        let z = vec![0.4, -0.7];
+        let full = basis.reconstruct_state(&z).unwrap();
+        let full_next = a.iter().map(|row| checked_dot(row, &full).unwrap()).collect::<Vec<_>>();
+        let expected_next = basis.reduce_state(&full_next).unwrap();
+        let actual_next = reduced.a.iter().map(|row| checked_dot(row, &z).unwrap()).collect::<Vec<_>>();
+        for (actual, expected) in actual_next.iter().zip(expected_next) {
+            assert!((actual - expected).abs() < 1.0e-8);
+        }
+
+        let input = b.iter().map(|row| row[0]).collect::<Vec<_>>();
+        let expected_input = basis.reduce_state(&input).unwrap();
+        let actual_input = reduced.b.iter().map(|row| row[0]).collect::<Vec<_>>();
+        for (actual, expected) in actual_input.iter().zip(expected_input) {
+            assert!((actual - expected).abs() < 1.0e-8);
+        }
+        let expected_output = checked_dot(&c[0], &full).unwrap();
+        let actual_output = checked_dot(&reduced.c[0], &z).unwrap();
+        assert!((actual_output - expected_output).abs() < 1.0e-8);
+    }
+
+    #[test]
+    fn empty_gramians_and_dimension_mismatches_are_rejected() {
+        let empty = EmpiricalGramian::new(2).unwrap();
+        let populated = gramian(2, &[vec![1.0, 0.0]]);
+        assert_eq!(
+            ResponseBalancedBasis::from_empirical_gramians(
+                &empty, &populated, RbkrConfig::new(1),
+            ),
+            Err(RbkrError::EmptyGramian)
+        );
+        let wrong = gramian(3, &[vec![1.0, 0.0, 0.0]]);
+        assert_eq!(
+            ResponseBalancedBasis::from_empirical_gramians(
+                &populated, &wrong, RbkrConfig::new(1),
+            ),
+            Err(RbkrError::StateDimensionMismatch)
+        );
+    }
+
+    #[test]
+    fn zero_cross_gramian_and_budget_exhaustion_fail_closed() {
+        let reach = gramian(2, &[vec![1.0, 0.0]]);
+        let observe = gramian(2, &[vec![0.0, 1.0]]);
+        assert_eq!(
+            ResponseBalancedBasis::from_empirical_gramians(
+                &reach, &observe, RbkrConfig::new(1),
+            ),
+            Err(RbkrError::InsufficientBalancedRank)
+        );
+
+        let mut config = RbkrConfig::new(1);
+        config.maximum_cross_gramian_entries = 0;
+        assert_eq!(
+            ResponseBalancedBasis::from_empirical_gramians(&reach, &observe, config),
+            Err(RbkrError::InvalidConfiguration)
+        );
+    }
+
+    #[test]
+    fn non_finite_state_and_invalid_operator_shapes_are_rejected() {
+        let reach = gramian(2, &[vec![1.0, 0.2], vec![0.1, 1.0]]);
+        let observe = gramian(2, &[vec![0.7, 0.1], vec![0.2, 1.1]]);
+        let basis = ResponseBalancedBasis::from_empirical_gramians(
+            &reach, &observe, RbkrConfig::new(1),
+        ).unwrap();
+        assert_eq!(
+            basis.reconstruct_state(&[f64::NAN]),
+            Err(RbkrError::ReducedVectorDimensionMismatch)
+        );
+        assert_eq!(
+            basis.project_linear_system(
+                &[vec![1.0]], &[vec![1.0], vec![1.0]], &[vec![1.0, 0.0]],
+            ),
+            Err(RbkrError::InvalidAOperator)
+        );
+        assert_eq!(
+            basis.project_linear_system(
+                &[vec![1.0, 0.0], vec![0.0, 1.0]],
+                &[vec![1.0], vec![f64::INFINITY]],
+                &[vec![1.0, 0.0]],
+            ),
+            Err(RbkrError::InvalidBOperator)
+        );
+    }
+}
