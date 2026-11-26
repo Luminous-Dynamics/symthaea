@@ -1,0 +1,135 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://luminousdynamics.io/sat/schemas/evidence-continuity-case/0.1",
+  "title": "SAT Evidence Continuity Fixture v0.1",
+  "type": "object",
+  "additionalProperties": false,
+  "required": [
+    "schema_version",
+    "case_id",
+    "track",
+    "description",
+    "initial_state_ref",
+    "mutation",
+    "expected"
+  ],
+  "properties": {
+    "schema_version": {
+      "const": "sat-evidence-continuity-case/v0.1"
+    },
+    "case_id": {
+      "type": "string",
+      "pattern": "^SAT-EGC-[0-9]{3}$"
+    },
+    "track": {
+      "type": "string",
+      "enum": [
+        "graph_correctness",
+        "change_impact",
+        "witness_independence",
+        "evaluator_integrity",
+        "evidence_survivability"
+      ]
+    },
+    "description": {
+      "type": "string",
+      "minLength": 10
+    },
+    "initial_state_ref": {
+      "type": "string",
+      "minLength": 1
+    },
+    "mutation": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "target",
+        "operation",
+        "value"
+      ],
+      "properties": {
+        "target": {
+          "type": "string",
+          "minLength": 1
+        },
+        "operation": {
+          "type": "string",
+          "enum": [
+            "replace",
+            "remove",
+            "add",
+            "reorder",
+            "replay",
+            "rollback",
+            "fork",
+            "withhold",
+            "contradict",
+            "change_component",
+            "revoke_key",
+            "disable_source"
+          ]
+        },
+        "value": {}
+      }
+    },
+    "expected": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "claim_state",
+        "revalidation_disposition",
+        "qualification_effect"
+      ],
+      "properties": {
+        "claim_state": {
+          "type": "string",
+          "enum": [
+            "supported",
+            "refuted",
+            "inconclusive",
+            "invalid_evidence",
+            "stale",
+            "withdrawn"
+          ]
+        },
+        "revalidation_disposition": {
+          "type": "string",
+          "enum": [
+            "no_revalidation",
+            "targeted_revalidation",
+            "full_new_run",
+            "hold_for_reconciliation",
+            "reject_evidence"
+          ]
+        },
+        "qualification_effect": {
+          "type": "string",
+          "enum": [
+            "supports",
+            "adverse",
+            "inconclusive",
+            "not_qualified"
+          ]
+        }
+      }
+    },
+    "severity": {
+      "type": "string",
+      "enum": [
+        "critical",
+        "high",
+        "medium",
+        "low"
+      ]
+    },
+    "public_or_holdout": {
+      "const": "public_development"
+    },
+    "rationale": {
+      "type": "array",
+      "items": {
+        "type": "string"
+      }
+    }
+  }
+}

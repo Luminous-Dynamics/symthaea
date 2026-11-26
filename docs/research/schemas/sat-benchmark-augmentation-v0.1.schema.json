@@ -1,0 +1,528 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://luminousdynamics.io/sat/schemas/benchmark-augmentation/0.1",
+  "title": "SAT Native Benchmark Augmentation v0.1",
+  "type": "object",
+  "additionalProperties": false,
+  "required": [
+    "schema_version",
+    "augmentation_id",
+    "created_at",
+    "native_benchmark",
+    "subject",
+    "run_context",
+    "observations",
+    "claims",
+    "claim_edges",
+    "evidence_graph_root_digest",
+    "native_metrics_ref",
+    "sat_metrics",
+    "qualification_disposition",
+    "limitations"
+  ],
+  "properties": {
+    "schema_version": {
+      "const": "sat-benchmark-augmentation/v0.1"
+    },
+    "augmentation_id": {
+      "type": "string",
+      "minLength": 1,
+      "maxLength": 160
+    },
+    "created_at": {
+      "type": "string",
+      "format": "date-time"
+    },
+    "native_benchmark": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "benchmark_id",
+        "protocol_version",
+        "task_instance_id",
+        "adapter_version",
+        "native_run_receipt_ref",
+        "native_run_receipt_digest",
+        "native_metric_definition_ref",
+        "native_result_digest"
+      ],
+      "properties": {
+        "benchmark_id": {
+          "type": "string",
+          "minLength": 1
+        },
+        "protocol_version": {
+          "type": "string",
+          "minLength": 1
+        },
+        "task_instance_id": {
+          "type": "string",
+          "minLength": 1
+        },
+        "adapter_version": {
+          "type": "string",
+          "minLength": 1
+        },
+        "native_run_receipt_ref": {
+          "type": "string",
+          "minLength": 1
+        },
+        "native_run_receipt_digest": {
+          "$ref": "#/$defs/digest"
+        },
+        "native_metric_definition_ref": {
+          "type": "string",
+          "minLength": 1
+        },
+        "native_result_digest": {
+          "$ref": "#/$defs/digest"
+        }
+      }
+    },
+    "subject": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "system_digest",
+        "model_revision_ref",
+        "prompt_digest",
+        "toolchain_digest",
+        "policy_digest",
+        "runner_digest",
+        "isolation_policy_digest",
+        "trust_policy_digest"
+      ],
+      "properties": {
+        "system_digest": {
+          "$ref": "#/$defs/digest"
+        },
+        "model_revision_ref": {
+          "type": "string",
+          "minLength": 1
+        },
+        "prompt_digest": {
+          "$ref": "#/$defs/digest"
+        },
+        "toolchain_digest": {
+          "$ref": "#/$defs/digest"
+        },
+        "policy_digest": {
+          "$ref": "#/$defs/digest"
+        },
+        "runner_digest": {
+          "$ref": "#/$defs/digest"
+        },
+        "isolation_policy_digest": {
+          "$ref": "#/$defs/digest"
+        },
+        "trust_policy_digest": {
+          "$ref": "#/$defs/digest"
+        }
+      }
+    },
+    "run_context": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "task_state_digest",
+        "environment_digest",
+        "threat_model_digest",
+        "seed",
+        "started_at",
+        "ended_at",
+        "attacker_mode",
+        "attacker_budget_ref",
+        "resource_budget_ref"
+      ],
+      "properties": {
+        "task_state_digest": {
+          "$ref": "#/$defs/digest"
+        },
+        "environment_digest": {
+          "$ref": "#/$defs/digest"
+        },
+        "threat_model_digest": {
+          "$ref": "#/$defs/digest"
+        },
+        "seed": {
+          "type": [
+            "integer",
+            "string"
+          ]
+        },
+        "started_at": {
+          "type": "string",
+          "format": "date-time"
+        },
+        "ended_at": {
+          "type": "string",
+          "format": "date-time"
+        },
+        "attacker_mode": {
+          "type": "string",
+          "enum": [
+            "none",
+            "fixed",
+            "adaptive",
+            "unknown"
+          ]
+        },
+        "attacker_budget_ref": {
+          "type": "string",
+          "minLength": 1
+        },
+        "resource_budget_ref": {
+          "type": "string",
+          "minLength": 1
+        }
+      }
+    },
+    "observations": {
+      "type": "array",
+      "minItems": 1,
+      "items": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": [
+          "observation_id",
+          "kind",
+          "artifact_ref",
+          "artifact_digest",
+          "source_id",
+          "source_role",
+          "observed_at",
+          "scope_ref",
+          "authenticity_state",
+          "independence_state"
+        ],
+        "properties": {
+          "observation_id": {
+            "type": "string",
+            "minLength": 1
+          },
+          "kind": {
+            "type": "string",
+            "enum": [
+              "native_trace",
+              "authority_decision",
+              "disclosure_decision",
+              "external_effect_readback",
+              "source_attestation",
+              "transparency_receipt",
+              "checkpoint",
+              "witness_attestation",
+              "auditor_finding",
+              "human_adjudication",
+              "other"
+            ]
+          },
+          "artifact_ref": {
+            "type": "string",
+            "minLength": 1
+          },
+          "artifact_digest": {
+            "$ref": "#/$defs/digest"
+          },
+          "source_id": {
+            "type": "string",
+            "minLength": 1
+          },
+          "source_role": {
+            "type": "string",
+            "enum": [
+              "subject",
+              "benchmark_harness",
+              "native_grader",
+              "independent_sink",
+              "independent_witness",
+              "evaluator",
+              "human_adjudicator",
+              "other"
+            ]
+          },
+          "observed_at": {
+            "type": "string",
+            "format": "date-time"
+          },
+          "scope_ref": {
+            "type": "string",
+            "minLength": 1
+          },
+          "attempt_id": {
+            "type": "string"
+          },
+          "authenticity_state": {
+            "type": "string",
+            "enum": [
+              "verified",
+              "invalid",
+              "unknown",
+              "not_applicable"
+            ]
+          },
+          "independence_state": {
+            "type": "string",
+            "enum": [
+              "satisfied",
+              "not_satisfied",
+              "unverified",
+              "not_applicable"
+            ]
+          },
+          "limitations": {
+            "type": "array",
+            "items": {
+              "type": "string"
+            }
+          }
+        }
+      }
+    },
+    "claims": {
+      "type": "array",
+      "minItems": 1,
+      "items": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": [
+          "claim_id",
+          "claim_type",
+          "proposition",
+          "scope_ref",
+          "status",
+          "evidence_refs",
+          "depends_on",
+          "validity_state",
+          "consequence_if_false"
+        ],
+        "properties": {
+          "claim_id": {
+            "type": "string",
+            "minLength": 1
+          },
+          "claim_type": {
+            "type": "string",
+            "enum": [
+              "native_task_outcome",
+              "authority",
+              "disclosure",
+              "effect_correspondence",
+              "evidence_authenticity",
+              "transparency_continuity",
+              "witness_independence",
+              "isolation",
+              "auditor_finding",
+              "change_continuity",
+              "human_agency",
+              "other"
+            ]
+          },
+          "proposition": {
+            "type": "string",
+            "minLength": 1
+          },
+          "scope_ref": {
+            "type": "string",
+            "minLength": 1
+          },
+          "status": {
+            "type": "string",
+            "enum": [
+              "supported",
+              "refuted",
+              "inconclusive",
+              "invalid_evidence",
+              "withdrawn"
+            ]
+          },
+          "evidence_refs": {
+            "type": "array",
+            "items": {
+              "type": "string",
+              "minLength": 1
+            },
+            "uniqueItems": true
+          },
+          "depends_on": {
+            "type": "array",
+            "items": {
+              "type": "string",
+              "minLength": 1
+            },
+            "uniqueItems": true
+          },
+          "validity_state": {
+            "type": "string",
+            "enum": [
+              "current",
+              "stale",
+              "expired",
+              "unknown"
+            ]
+          },
+          "valid_from": {
+            "type": "string",
+            "format": "date-time"
+          },
+          "valid_until": {
+            "type": "string",
+            "format": "date-time"
+          },
+          "consequence_if_false": {
+            "type": "string",
+            "enum": [
+              "critical",
+              "high",
+              "medium",
+              "low",
+              "informational"
+            ]
+          },
+          "verifier_ref": {
+            "type": "string",
+            "minLength": 1
+          },
+          "invalidation_triggers": {
+            "type": "array",
+            "items": {
+              "type": "string"
+            }
+          }
+        }
+      }
+    },
+    "claim_edges": {
+      "type": "array",
+      "items": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": [
+          "from_claim_id",
+          "to_claim_id",
+          "relation"
+        ],
+        "properties": {
+          "from_claim_id": {
+            "type": "string",
+            "minLength": 1
+          },
+          "to_claim_id": {
+            "type": "string",
+            "minLength": 1
+          },
+          "relation": {
+            "type": "string",
+            "enum": [
+              "depends_on",
+              "supports",
+              "refutes",
+              "supersedes",
+              "invalidated_by"
+            ]
+          },
+          "rule_ref": {
+            "type": "string",
+            "minLength": 1
+          }
+        }
+      }
+    },
+    "evidence_graph_root_digest": {
+      "$ref": "#/$defs/digest"
+    },
+    "native_metrics_ref": {
+      "type": "string",
+      "minLength": 1
+    },
+    "sat_metrics": {
+      "type": "array",
+      "minItems": 1,
+      "items": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": [
+          "metric_id",
+          "value",
+          "unit",
+          "numerator",
+          "denominator",
+          "status",
+          "method_ref"
+        ],
+        "properties": {
+          "metric_id": {
+            "type": "string",
+            "minLength": 1
+          },
+          "value": {
+            "type": [
+              "number",
+              "string"
+            ]
+          },
+          "unit": {
+            "type": "string",
+            "minLength": 1
+          },
+          "numerator": {
+            "type": [
+              "integer",
+              "null"
+            ]
+          },
+          "denominator": {
+            "type": [
+              "integer",
+              "null"
+            ]
+          },
+          "status": {
+            "type": "string",
+            "enum": [
+              "measured",
+              "not_measured",
+              "inconclusive",
+              "not_applicable"
+            ]
+          },
+          "method_ref": {
+            "type": "string",
+            "minLength": 1
+          }
+        }
+      }
+    },
+    "qualification_disposition": {
+      "type": "string",
+      "enum": [
+        "qualified_within_scope",
+        "not_qualified",
+        "inconclusive",
+        "invalid_evidence"
+      ]
+    },
+    "report_ref": {
+      "type": "string",
+      "minLength": 1
+    },
+    "report_digest": {
+      "$ref": "#/$defs/digest"
+    },
+    "limitations": {
+      "type": "array",
+      "items": {
+        "type": "string"
+      }
+    },
+    "supersedes_augmentation_id": {
+      "type": "string",
+      "minLength": 1
+    }
+  },
+  "$defs": {
+    "digest": {
+      "type": "string",
+      "pattern": "^sha256:[0-9a-f]{64}$"
+    }
+  }
+}
