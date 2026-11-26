@@ -75,7 +75,10 @@ pub struct ProbeBudgetLedger {
 }
 
 impl ProbeBudgetLedger {
-    pub fn new(contract: &StateResponseContract, budget_limit_units: u64) -> Result<Self, String> {
+    pub fn new(
+        contract: &StateResponseContract,
+        budget_limit_units: u64,
+    ) -> Result<Self, String> {
         contract.validate()?;
         Ok(Self {
             contract_id: contract.contract_id.clone(),
@@ -157,22 +160,16 @@ impl ProbeBudgetLedger {
             || receipt.right_state_id != probe.right_state_id
             || receipt.response_key != *key
         {
-            return Err(
-                "probe receipt identity does not match the selected counterexample".to_owned(),
-            );
+            return Err("probe receipt identity does not match the selected counterexample".to_owned());
         }
         if receipt.source_manifest_sha256 != contract.source_manifest_sha256 {
-            return Err(
-                "probe receipt source manifest differs from the frozen contract".to_owned(),
-            );
+            return Err("probe receipt source manifest differs from the frozen contract".to_owned());
         }
         let current_checkpoint = &current_records[0].candidate_checkpoint_sha256;
         if !is_sha256(&receipt.candidate_checkpoint_sha256)
             || receipt.candidate_checkpoint_sha256 != *current_checkpoint
         {
-            return Err(
-                "probe receipt candidate checkpoint differs from the current partition".to_owned(),
-            );
+            return Err("probe receipt candidate checkpoint differs from the current partition".to_owned());
         }
         if !is_sha256(&receipt.receipt_sha256) {
             return Err("probe receipt digest must be a 64-character SHA-256 hex value".to_owned());
@@ -205,9 +202,7 @@ impl ProbeBudgetLedger {
             );
         }
         if receipt.left_observed_value == receipt.right_observed_value {
-            return Err(
-                "selected counterexample receipt did not observe a separating result".to_owned(),
-            );
+            return Err("selected counterexample receipt did not observe a separating result".to_owned());
         }
 
         let next_spent = self
@@ -261,10 +256,7 @@ impl ProbeBudgetLedger {
         if !is_sha256(&request.candidate_checkpoint_sha256)
             || request.candidate_checkpoint_sha256 != *current_checkpoint
         {
-            return Err(
-                "blind probe request candidate checkpoint differs from the current partition"
-                    .to_owned(),
-            );
+            return Err("blind probe request candidate checkpoint differs from the current partition".to_owned());
         }
         if request.left_state_id >= request.right_state_id {
             return Err(
@@ -296,24 +288,16 @@ impl ProbeBudgetLedger {
             || receipt.right_state_id != request.right_state_id
             || receipt.response_key != request.response_key
         {
-            return Err(
-                "blind probe receipt identity does not match the candidate request".to_owned(),
-            );
+            return Err("blind probe receipt identity does not match the candidate request".to_owned());
         }
         if receipt.source_manifest_sha256 != contract.source_manifest_sha256 {
-            return Err(
-                "blind probe receipt source manifest differs from the frozen contract".to_owned(),
-            );
+            return Err("blind probe receipt source manifest differs from the frozen contract".to_owned());
         }
         if receipt.candidate_checkpoint_sha256 != request.candidate_checkpoint_sha256 {
-            return Err(
-                "blind probe receipt candidate checkpoint differs from the request".to_owned(),
-            );
+            return Err("blind probe receipt candidate checkpoint differs from the request".to_owned());
         }
         if !is_sha256(&receipt.receipt_sha256) {
-            return Err(
-                "blind probe receipt digest must be a 64-character SHA-256 hex value".to_owned(),
-            );
+            return Err("blind probe receipt digest must be a 64-character SHA-256 hex value".to_owned());
         }
         if self
             .accepted_receipt_sha256
@@ -447,7 +431,8 @@ pub fn score_refinement_transition(
             let after_left = after_by_id[before_left.state_id.as_str()];
             let after_right = after_by_id[before_right.state_id.as_str()];
             let equivalent = assess_pair(before_left, before_right, contract)?.exact_equivalent;
-            let before_merged = before_left.abstract_state_id == before_right.abstract_state_id;
+            let before_merged =
+                before_left.abstract_state_id == before_right.abstract_state_id;
             let after_merged = after_left.abstract_state_id == after_right.abstract_state_id;
 
             let before_false_merge = before_merged && !equivalent;
@@ -488,8 +473,10 @@ pub fn score_budgeted_refinement_step(
     let charge = ledger.charge_probe(before_records, contract, probe, receipt)?;
     let effectiveness =
         score_refinement_transition(before_records, after_records, contract, probe)?;
-    let cost_per_resolved_false_merge_units = (effectiveness.false_merges_resolved > 0)
-        .then_some(charge.cost_units as f64 / effectiveness.false_merges_resolved as f64);
+    let cost_per_resolved_false_merge_units =
+        (effectiveness.false_merges_resolved > 0).then_some(
+            charge.cost_units as f64 / effectiveness.false_merges_resolved as f64,
+        );
     Ok(BudgetedRefinementScore {
         charge,
         effectiveness,
@@ -519,11 +506,7 @@ mod tests {
         };
         for key in contract.expected_keys() {
             contract.tolerance_units.insert(key.clone(), 1);
-            let cost = if key.intervention_id == "probe_fast" {
-                1
-            } else {
-                4
-            };
+            let cost = if key.intervention_id == "probe_fast" { 1 } else { 4 };
             contract.probe_cost_units.insert(key, cost);
         }
         contract
@@ -688,10 +671,21 @@ mod tests {
             response_key: ResponseKey::new("probe_unregistered", "displacement", 1),
             ..request.clone()
         };
-        let unregistered_receipt = receipt("a", "b", unregistered.response_key.clone(), 0, 0);
+        let unregistered_receipt = receipt(
+            "a",
+            "b",
+            unregistered.response_key.clone(),
+            0,
+            0,
+        );
         assert!(
             ledger
-                .charge_blind_probe(&current, &contract, &unregistered, &unregistered_receipt,)
+                .charge_blind_probe(
+                    &current,
+                    &contract,
+                    &unregistered,
+                    &unregistered_receipt,
+                )
                 .is_err()
         );
         assert_eq!(ledger.spent_units(), 0);
@@ -699,8 +693,13 @@ mod tests {
             candidate_checkpoint_sha256: "d".repeat(64),
             ..request.clone()
         };
-        let wrong_checkpoint_receipt =
-            receipt("a", "b", wrong_checkpoint.response_key.clone(), 0, 0);
+        let wrong_checkpoint_receipt = receipt(
+            "a",
+            "b",
+            wrong_checkpoint.response_key.clone(),
+            0,
+            0,
+        );
         assert!(
             ledger
                 .charge_blind_probe(
@@ -713,11 +712,17 @@ mod tests {
         );
         assert_eq!(ledger.spent_units(), 0);
 
-        let mut wrong_receipt_checkpoint = receipt("a", "b", request.response_key.clone(), 0, 0);
+        let mut wrong_receipt_checkpoint =
+            receipt("a", "b", request.response_key.clone(), 0, 0);
         wrong_receipt_checkpoint.candidate_checkpoint_sha256 = "d".repeat(64);
         assert!(
             ledger
-                .charge_blind_probe(&current, &contract, &request, &wrong_receipt_checkpoint,)
+                .charge_blind_probe(
+                    &current,
+                    &contract,
+                    &request,
+                    &wrong_receipt_checkpoint,
+                )
                 .is_err()
         );
         assert_eq!(ledger.spent_units(), 0);
@@ -1007,7 +1012,12 @@ mod tests {
         changed_contract_digest.contract_sha256 = "c".repeat(64);
         assert!(
             ledger
-                .charge_probe(&before, &changed_contract_digest, &probe, &observation,)
+                .charge_probe(
+                    &before,
+                    &changed_contract_digest,
+                    &probe,
+                    &observation,
+                )
                 .is_err()
         );
 
@@ -1015,7 +1025,12 @@ mod tests {
         changed_source_manifest.source_manifest_sha256 = "d".repeat(64);
         assert!(
             ledger
-                .charge_probe(&before, &changed_source_manifest, &probe, &observation,)
+                .charge_probe(
+                    &before,
+                    &changed_source_manifest,
+                    &probe,
+                    &observation,
+                )
                 .is_err()
         );
         assert_eq!(ledger.spent_units(), 0);
@@ -1067,7 +1082,9 @@ mod tests {
             record("a", "class-a", 0, 0, &"c".repeat(64), '1'),
             record("b", "class-b", 10, 10, &"c".repeat(64), '2'),
         ];
-        assert!(score_refinement_transition(&before, &after, &contract, &probe).is_err());
+        assert!(
+            score_refinement_transition(&before, &after, &contract, &probe).is_err()
+        );
     }
 
     #[test]
@@ -1084,8 +1101,9 @@ mod tests {
             record("a", "still-merged", 0, 0, &"d".repeat(64), '1'),
             record("b", "still-merged", 10, 10, &"d".repeat(64), '2'),
         ];
-        let result = score_refinement_transition(&before, &after, &contract, &probe)
-            .expect("valid but ineffective refinement");
+        let result =
+            score_refinement_transition(&before, &after, &contract, &probe)
+                .expect("valid but ineffective refinement");
         assert_eq!(result.false_merges_resolved, 0);
         assert!(!result.selected_pair_separated);
     }
