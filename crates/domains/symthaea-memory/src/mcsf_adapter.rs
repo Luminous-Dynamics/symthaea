@@ -56,7 +56,6 @@ pub struct HdcAdapterMetadata {
 }
 
 /// Explicitly configured character-trigram HDC baseline over Symthaea memory.
-#[derive(Debug)]
 pub struct SymthaeaHdcMcsfAdapter {
     encoder: CharNgramEncoder,
     seed: u64,
