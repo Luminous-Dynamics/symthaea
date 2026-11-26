@@ -1724,7 +1724,18 @@ mod tests {
         let config = WebResearchConfig::default();
         assert_eq!(config.max_concurrent_requests, 5);
         assert_eq!(config.max_sources_per_research, 20);
+        assert_eq!(config.max_search_queries_per_research, 8);
+        assert_eq!(config.max_research_duration_ms, 60_000);
         assert_eq!(config.max_content_length, 100_000);
+    }
+
+    #[test]
+    fn research_status_distinguishes_partial_and_incomplete_acquisition() {
+        assert!(ResearchStatus::Success.is_success());
+        assert!(ResearchStatus::PartialSuccess.is_success());
+        assert!(!ResearchStatus::NoResults.is_success());
+        assert!(!ResearchStatus::RetrievalIncomplete.is_success());
+        assert!(ResearchStatus::RetrievalIncomplete.is_retriable());
     }
 
     #[tokio::test]
