@@ -1,0 +1,367 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://github.com/Luminous-Dynamics/symthaea/blob/main/data/schemas/mace_context_exposure_receipt_v0_1.schema.json",
+  "title": "MACE model-context exposure receipt v0.1",
+  "description": "Harness-captured evidence of memory-derived bytes transmitted to a model invocation. It records exposure, not semantic attention or causal influence.",
+  "type": "object",
+  "additionalProperties": false,
+  "required": [
+    "schema_version",
+    "record_type",
+    "receipt_id",
+    "run_id",
+    "pair_block_id",
+    "world_cluster_id",
+    "query_id",
+    "arm",
+    "invocation_sequence",
+    "decision_need_sha256",
+    "candidate_policy_sha256",
+    "source_registry_root_sha256",
+    "lineage_profile_sha256",
+    "lifecycle_profile_sha256",
+    "renderer_profile_sha256",
+    "transport_adapter_profile_sha256",
+    "model_revision",
+    "capture",
+    "exposures",
+    "admission_denials",
+    "response_binding",
+    "captured_at_monotonic_ns",
+    "clock_profile_sha256",
+    "observer_profile_sha256",
+    "signature"
+  ],
+  "properties": {
+    "schema_version": {
+      "const": "mace_context_exposure_receipt_v0_1"
+    },
+    "record_type": {
+      "const": "model_context_exposure"
+    },
+    "receipt_id": {
+      "$ref": "#/$defs/id"
+    },
+    "run_id": {
+      "$ref": "#/$defs/id"
+    },
+    "pair_block_id": {
+      "$ref": "#/$defs/id"
+    },
+    "world_cluster_id": {
+      "$ref": "#/$defs/id"
+    },
+    "query_id": {
+      "$ref": "#/$defs/id"
+    },
+    "arm": {
+      "$ref": "#/$defs/arm"
+    },
+    "invocation_sequence": {
+      "type": "integer",
+      "minimum": 0
+    },
+    "decision_need_sha256": {
+      "$ref": "#/$defs/sha256"
+    },
+    "candidate_policy_sha256": {
+      "$ref": "#/$defs/sha256"
+    },
+    "source_registry_root_sha256": {
+      "$ref": "#/$defs/sha256"
+    },
+    "lineage_profile_sha256": {
+      "$ref": "#/$defs/sha256"
+    },
+    "lifecycle_profile_sha256": {
+      "$ref": "#/$defs/sha256"
+    },
+    "renderer_profile_sha256": {
+      "$ref": "#/$defs/sha256"
+    },
+    "transport_adapter_profile_sha256": {
+      "$ref": "#/$defs/sha256"
+    },
+    "model_revision": {
+      "type": "string",
+      "minLength": 1,
+      "maxLength": 512
+    },
+    "capture": {
+      "$ref": "#/$defs/capture"
+    },
+    "exposures": {
+      "type": "array",
+      "items": {
+        "$ref": "#/$defs/exposure"
+      }
+    },
+    "admission_denials": {
+      "type": "array",
+      "items": {
+        "$ref": "#/$defs/admission_denial"
+      }
+    },
+    "response_binding": {
+      "$ref": "#/$defs/response_binding"
+    },
+    "captured_at_monotonic_ns": {
+      "type": "integer",
+      "minimum": 0
+    },
+    "clock_profile_sha256": {
+      "$ref": "#/$defs/sha256"
+    },
+    "observer_profile_sha256": {
+      "$ref": "#/$defs/sha256"
+    },
+    "signature": {
+      "$ref": "#/$defs/signature"
+    }
+  },
+  "$defs": {
+    "sha256": {
+      "type": "string",
+      "pattern": "^[a-f0-9]{64}$"
+    },
+    "id": {
+      "type": "string",
+      "minLength": 1,
+      "maxLength": 256
+    },
+    "arm": {
+      "type": "string",
+      "enum": [
+        "no_memory",
+        "exact_scope_scan",
+        "conventional_retrieval",
+        "static_hdc",
+        "hdc_ltc",
+        "semantic_placebo",
+        "pre_correction_snapshot",
+        "post_correction_snapshot"
+      ]
+    },
+    "capture": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "capture_point",
+        "request_media_type",
+        "provider_request_body_sha256",
+        "provider_request_body_bytes",
+        "complete_provider_request_body",
+        "complete_memory_origin_enumeration",
+        "untracked_memory_origin_span_count"
+      ],
+      "properties": {
+        "capture_point": {
+          "const": "serialized_request_before_network_send"
+        },
+        "request_media_type": {
+          "type": "string",
+          "minLength": 1,
+          "maxLength": 128
+        },
+        "provider_request_body_sha256": {
+          "$ref": "#/$defs/sha256"
+        },
+        "provider_request_body_bytes": {
+          "type": "integer",
+          "minimum": 1
+        },
+        "complete_provider_request_body": {
+          "const": true
+        },
+        "complete_memory_origin_enumeration": {
+          "const": true
+        },
+        "untracked_memory_origin_span_count": {
+          "const": 0
+        },
+        "provider_request_id": {
+          "$ref": "#/$defs/id"
+        }
+      }
+    },
+    "exposure": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "exposure_id",
+        "evidence_id",
+        "evidence_payload_sha256",
+        "exposed_span_sha256",
+        "span_start_byte",
+        "span_end_byte",
+        "context_role",
+        "message_index",
+        "exposure_kind",
+        "parent_event_ids",
+        "dependency_closure_sha256",
+        "transformation_receipt_sha256",
+        "source_receipt_sha256",
+        "authority_receipt_sha256",
+        "admissibility_receipt_sha256",
+        "lifecycle_revalidation_receipt_sha256",
+        "admission_status"
+      ],
+      "properties": {
+        "exposure_id": {
+          "$ref": "#/$defs/id"
+        },
+        "evidence_id": {
+          "$ref": "#/$defs/id"
+        },
+        "evidence_payload_sha256": {
+          "$ref": "#/$defs/sha256"
+        },
+        "exposed_span_sha256": {
+          "$ref": "#/$defs/sha256"
+        },
+        "span_start_byte": {
+          "type": "integer",
+          "minimum": 0
+        },
+        "span_end_byte": {
+          "type": "integer",
+          "minimum": 1
+        },
+        "context_role": {
+          "type": "string",
+          "enum": [
+            "system",
+            "developer",
+            "user",
+            "assistant",
+            "tool"
+          ]
+        },
+        "message_index": {
+          "type": "integer",
+          "minimum": 0
+        },
+        "exposure_kind": {
+          "type": "string",
+          "enum": [
+            "verbatim_source",
+            "deterministic_derivative",
+            "model_generated_derivative",
+            "cached_model_output",
+            "tool_output_projection"
+          ]
+        },
+        "parent_event_ids": {
+          "type": "array",
+          "items": {
+            "$ref": "#/$defs/id"
+          },
+          "uniqueItems": true
+        },
+        "dependency_closure_sha256": {
+          "$ref": "#/$defs/sha256"
+        },
+        "transformation_receipt_sha256": {
+          "$ref": "#/$defs/sha256"
+        },
+        "source_receipt_sha256": {
+          "$ref": "#/$defs/sha256"
+        },
+        "authority_receipt_sha256": {
+          "$ref": "#/$defs/sha256"
+        },
+        "admissibility_receipt_sha256": {
+          "$ref": "#/$defs/sha256"
+        },
+        "lifecycle_revalidation_receipt_sha256": {
+          "$ref": "#/$defs/sha256"
+        },
+        "admission_status": {
+          "const": "admitted"
+        }
+      }
+    },
+    "admission_denial": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "evidence_id",
+        "reason",
+        "admission_receipt_sha256"
+      ],
+      "properties": {
+        "evidence_id": {
+          "$ref": "#/$defs/id"
+        },
+        "reason": {
+          "type": "string",
+          "enum": [
+            "wrong_scope",
+            "unauthorized",
+            "untrusted_source",
+            "invalid_lineage",
+            "retracted",
+            "revoked",
+            "superseded",
+            "stale_at_use",
+            "rights_restricted",
+            "common_cause_unresolved",
+            "digest_mismatch",
+            "unknown_evidence"
+          ]
+        },
+        "admission_receipt_sha256": {
+          "$ref": "#/$defs/sha256"
+        }
+      }
+    },
+    "response_binding": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "provider_response_id",
+        "provider_response_body_sha256",
+        "candidate_decision_trace_sha256"
+      ],
+      "properties": {
+        "provider_response_id": {
+          "$ref": "#/$defs/id"
+        },
+        "provider_response_body_sha256": {
+          "$ref": "#/$defs/sha256"
+        },
+        "candidate_decision_trace_sha256": {
+          "$ref": "#/$defs/sha256"
+        },
+        "model_declared_support_event_ids": {
+          "type": "array",
+          "items": {
+            "$ref": "#/$defs/id"
+          },
+          "uniqueItems": true
+        }
+      }
+    },
+    "signature": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "algorithm",
+        "key_id",
+        "signature_base64"
+      ],
+      "properties": {
+        "algorithm": {
+          "const": "Ed25519"
+        },
+        "key_id": {
+          "$ref": "#/$defs/id"
+        },
+        "signature_base64": {
+          "type": "string",
+          "pattern": "^[A-Za-z0-9+/]{86}==$"
+        }
+      }
+    }
+  }
+}
