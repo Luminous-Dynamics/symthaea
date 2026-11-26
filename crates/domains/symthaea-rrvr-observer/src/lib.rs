@@ -53,7 +53,7 @@ pub enum ObservationQuality {
 
 /// One typed manipulator observation. Ingest sequence is the decision-cut
 /// ordering key; event/acquisition timestamps retain their source clocks.
-#[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
+#[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct ObservationRecord {
     pub observation_id: String,
     pub source_id: String,
@@ -81,7 +81,7 @@ pub struct AdmissionReceipt {
 }
 
 /// Immutable episode snapshot at one declared receiver-ingest frontier.
-#[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
+#[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct EpisodeSnapshot {
     pub schema_version: String,
     pub snapshot_id: String,
