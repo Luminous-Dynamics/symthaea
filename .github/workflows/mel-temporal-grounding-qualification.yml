@@ -265,6 +265,16 @@ jobs:
               cp "$RUNNER_TEMP/multi-annotator-report.json" "$evidence/"
             fi
           fi
+          if [[ -f tools/mel-temporal-grounding-qualifier/src/temporal_reliability.rs ]]; then
+            cp tools/mel-temporal-grounding-qualifier/src/temporal_reliability.rs "$evidence/"
+            cp tools/mel-temporal-grounding-qualifier/src/bin/mel-temporal-reliability-audit.rs "$evidence/"
+            cp tools/mel-temporal-grounding-qualifier/fixtures/mel-temporal-reliability-corpus.synthetic.json "$evidence/"
+            cp tools/mel-temporal-grounding-qualifier/schemas/mel-temporal-annotation-reliability-corpus-v1.schema.json "$evidence/"
+            cp docs/research/MEL-GROUND-007-CORPUS-TEMPORAL-RELIABILITY-V1.md "$evidence/"
+            if [[ -f "$RUNNER_TEMP/temporal-reliability-report.json" ]]; then
+              cp "$RUNNER_TEMP/temporal-reliability-report.json" "$evidence/"
+            fi
+          fi
           if [[ -f tools/mel-temporal-grounding-qualifier/src/temporal_revision.rs ]]; then
             cp tools/mel-temporal-grounding-qualifier/src/temporal_revision.rs "$evidence/"
             cp tools/mel-temporal-grounding-qualifier/src/bin/mel-temporal-revision-audit.rs "$evidence/"
