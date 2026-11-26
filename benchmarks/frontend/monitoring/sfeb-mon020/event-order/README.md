@@ -15,3 +15,10 @@ It enforces:
 The package does not verify cryptography itself or authenticate report transport. It does not establish event-source completeness, factual truth, destination effect or physical outcome. A signed source can still omit events; MON-016/017 own bounded capture/completeness and reconciliation.
 
 Run: `go test -race -count=5 ./...`, `go vet ./...`, `go test -cover ./...`, `go test -run=^$ -fuzz=FuzzSequenceOrder -fuzztime=2s`.
+
+
+## Normalized verifier claim profile
+
+Each verifier report must identify `mon020-normalized-evidence-v1` and bind the exact normalized source identity/control-root membership, event fields (ID, kind, subject, activity, source incarnation, sequence), or witness fields (exact predecessor, successor, witness source). A signature over record bytes alone is not enough if the parsed event projection supplied to the order evaluator differs. This semantic join consumes verifier reports; it does not verify the underlying signature or authenticate report transport.
+
+The implementation also requires exactly one authenticated generation event for any entity with use or invalidation events. Missing generation remains indeterminate.
