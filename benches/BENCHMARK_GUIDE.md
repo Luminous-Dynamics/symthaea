@@ -26,13 +26,11 @@ cargo bench --bench ethics
 
 ## External Benchmarks
 
-**Registry status (checked 2026-11-02):** the paths historically referenced below
-(`benchmarks/manifest.json`, `benchmarks/external/run_external.py`, and
-`benchmarks/REPRO.md`) are not present at those paths on the current `main`
-branch. The commands from the earlier version of this guide are therefore not
-reproducible from this checkout. Do not report these external suites as currently
-registered or runnable until the registry, adapters, data licenses and reviewer
-path are restored and independently validated.
+**Registry status (updated 2026-11-04):** an external metadata registry has been restored at [`benchmarks/manifest.json`](../benchmarks/manifest.json), governed by [`manifest.schema.json`](../benchmarks/manifest.schema.json). It currently contains one **metadata-only / access-gated** entry: Physical-Engineering's Last Exam (PLE). Reproduction and qualification rules are in [`benchmarks/REPRO.md`](../benchmarks/REPRO.md).
+
+PLE is a high-value external engineering comparator, but it is **not runnable from this checkout yet**. Its runner/data revisions are not pinned, the 29-task development dataset is access-gated, and Symthaea's #10064 isolation plus #10436 custody gates remain prerequisites. The official upstream runner and grader must be used unchanged after qualification; no local PLE grader or score is claimed.
+
+Historical paths such as `benchmarks/external/run_external.py` remain unavailable. Do not invoke or refer to them as executable. The new registry is metadata-only and does not imply an adapter, benchmark result or qualified execution environment.
 
 Recommended current evaluation references:
 
