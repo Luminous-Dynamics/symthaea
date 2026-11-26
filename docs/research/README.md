@@ -463,3 +463,6 @@ A falsifiable programme for spectral statistics, RH/prime-structure controls, ne
 - [R-IDeA Rust reference](../../scripts/research/sdcb_ridea.rs) and [README](../../scripts/research/SDCB_RIDEA_README.md).
 
 **Evidence boundary:** 16 authored Rust tests, not compiled or executed. The reference scores supplied EIG and proxy predictions; it does not train the proxy.
+### Acquisition comparison bake-off
+
+- [SDCB acquisition comparison bake-off v1](SDCB_ACQUISITION_COMPARISON_BAKEOFF_V1.md): preregistered adapters and matched evaluation across fixed/OFAT/space-filling/random, prediction disagreement, Spark EIG, R-I/R-IDeA, EVSI, exact non-myopic, robust maximin and Pareto/MOBO methods.
