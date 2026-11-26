@@ -37,13 +37,13 @@ The following are reference points from their benchmark owners or published sour
 
 ### Primary references
 
-- DeepResearch Bench II methodology and leaderboard note: https://agentresearchlab.com/benchmarks/deepresearch-bench-ii/ <Cite ref="turn802324view1"/>
-- Unified DeepResearch Bench leaderboard portal (judge/version migration notice): https://huggingface.co/spaces/muset-ai/DeepResearch-Bench-Leaderboard <Cite ref="turn356101search5"/>
-- DeepResearch Bench I paper/results: https://deepresearch-bench.github.io/ <Cite ref="turn356101search1"/>
-- OpenScience benchmark and its October 1 comparability caveat: https://www.openscience.sh/benchmark <Cite ref="turn802324view2"/>
-- AI Index 2026 AstaBench summary: https://hai.stanford.edu/assets/files/ai_index_report_2026_chapter_5_science.pdf <Cite ref="turn356101search36"/>
-- ScienceAgentBench: https://hal.cs.princeton.edu/scienceagentbench <Cite ref="turn356101search9"/>
-- Autonomous Science Bench: https://asb.open-ssi.org/about <Cite ref="turn356101search6"/>
+- DeepResearch Bench II methodology and leaderboard note: https://agentresearchlab.com/benchmarks/deepresearch-bench-ii/
+- Unified DeepResearch Bench leaderboard portal (judge/version migration notice): https://huggingface.co/spaces/muset-ai/DeepResearch-Bench-Leaderboard
+- DeepResearch Bench I paper/results: https://deepresearch-bench.github.io/
+- OpenScience benchmark and its October 1 comparability caveat: https://www.openscience.sh/benchmark
+- AI Index 2026 AstaBench summary: https://hai.stanford.edu/assets/files/ai_index_report_2026_chapter_5_science.pdf
+- ScienceAgentBench: https://hal.cs.princeton.edu/scienceagentbench
+- Autonomous Science Bench: https://asb.open-ssi.org/about
 
 ## 3. Benchmark architecture
 
