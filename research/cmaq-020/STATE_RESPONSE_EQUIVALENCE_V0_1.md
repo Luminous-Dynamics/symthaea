@@ -38,7 +38,7 @@ The record-set validator rejects:
 
 The cluster ID is carried through to support #8578's cluster-level inference. A task/state row is not thereby declared an independent sample. State records from the same environment cluster may be compared descriptively, but the inferential unit remains the independently generated cluster.
 
-These fields establish identity and custody only. A SHA-256 digest does not authenticate the source publisher, prove the source data are true, or establish independent generation. Source authenticity, evaluator isolation and signed receipts remain separate gates (#9437).
+These fields establish identity and custody only. In this dependency-free crate, SHA-256 fields are syntax-checked as 64-character hexadecimal strings; the crate does not recompute the digest from the external manifest/payload or authenticate its publisher. The runner/custody layer must independently recompute and compare each digest against the exact bytes and attach signed receipts. A SHA-256 digest alone does not prove the source data are true or establish independent generation. Source authenticity, evaluator isolation and signed receipts remain separate gates (#9437).
 
 ## Approximate response
 
