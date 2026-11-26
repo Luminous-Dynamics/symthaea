@@ -151,3 +151,6 @@ Treat these as orthogonal criteria first and publish their joint Pareto frontier
 ## 8. Claim boundary
 
 The R-I/R-IDeA scorer contains 18 authored tests, and the separate linear proxy trainer contains 13. Neither has been compiled or executed in this environment. The scorer still takes EIG and proxy predictions as inputs; the proxy helper produces a simplified linear-feature g but does not reproduce the original Pyro architecture or the paper's experimental results. It does not train models, run an upstream R-IDeA reproduction, test Symthaea HDC/CfC, authenticate physical observations, or demonstrate SOTA performance.
+### Greedy portfolio extension
+
+The [R-IDeA portfolio protocol](SDCB_RIDEA_PORTFOLIO_DESIGN_V1.md) recomputes the MMD² representativeness term after each selected design and re-ranks the remaining candidates. It is explicitly a design-only greedy batch planner: candidate EIG and proxy predictions remain frozen, no observation outcome is processed, and joint EIG is not calculated.
