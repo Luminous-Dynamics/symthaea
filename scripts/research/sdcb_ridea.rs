@@ -17,9 +17,9 @@
 //! extension and is NOT part of the original R-IDeA acquisition equation.
 
 const EPS: f64 = 1e-12;
-const MAX_SAMPLES: usize = 1024;
+const MAX_SAMPLES: usize = 512;
 const MAX_DIMENSION: usize = 64;
-const MAX_CANDIDATES: usize = 256;
+const MAX_CANDIDATES: usize = 64;
 
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub enum RideaError {
@@ -425,6 +425,18 @@ mod tests {
         assert_eq!(selected.candidate_id, "representative-informative-deamplifying");
     }
 
+    #[test]
+    fn r_i_selects_representative_candidate_over_higher_eig_extrapolation() {
+        let selected = select_ridea_candidate(
+            &history(),
+            &target(),
+            &[extrapolating_candidate(), representative_candidate()],
+            &config(),
+            AcquisitionKind::RepresentativeInformative,
+        ).unwrap().unwrap();
+        assert_eq!(selected.candidate_id, "representative-informative-deamplifying");
+        assert!(selected.representative_informative > 0.0);
+    }
     #[test]
     fn r_i_penalizes_distribution_shift_even_without_deamplification() {
         let score = score_ridea_candidate(
