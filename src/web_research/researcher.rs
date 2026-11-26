@@ -550,15 +550,21 @@ impl WebResearcher {
                     receipts.push(receipt);
                 }
                 Err(error) => {
+                    let http_status = http_status_from_error(&error);
                     let mut receipt = make_receipt(
                         query_rank,
                         None,
                         AcquisitionStage::SearchProvider,
                         query,
-                        AcquisitionOutcome::ProviderFailed,
+                        if http_status == Some(429) {
+                            AcquisitionOutcome::RateLimited
+                        } else {
+                            AcquisitionOutcome::ProviderFailed
+                        },
                     );
                     receipt.provider = Some(provider.to_string());
                     receipt.requested_url = requested_url;
+                    receipt.http_status = http_status;
                     receipt.reason_code = Some("SEARCH_PROVIDER_FAILED".to_string());
                     receipt.reason = Some(format!("{error:#}"));
                     receipt.elapsed_ms = elapsed_ms(started);
@@ -602,15 +608,21 @@ impl WebResearcher {
                     receipts.push(receipt);
                 }
                 Err(error) => {
+                    let http_status = http_status_from_error(&error);
                     let mut receipt = make_receipt(
                         query_rank,
                         None,
                         AcquisitionStage::ArxivApi,
                         query,
-                        AcquisitionOutcome::ProviderFailed,
+                        if http_status == Some(429) {
+                            AcquisitionOutcome::RateLimited
+                        } else {
+                            AcquisitionOutcome::ProviderFailed
+                        },
                     );
                     receipt.provider = Some("arxiv".to_string());
                     receipt.requested_url = Some(self.config.arxiv_endpoint.clone());
+                    receipt.http_status = http_status;
                     receipt.reason_code = Some("ARXIV_SEARCH_FAILED".to_string());
                     receipt.reason = Some(format!("{error:#}"));
                     receipt.elapsed_ms = elapsed_ms(started);
@@ -654,15 +666,21 @@ impl WebResearcher {
                     receipts.push(receipt);
                 }
                 Err(error) => {
+                    let http_status = http_status_from_error(&error);
                     let mut receipt = make_receipt(
                         query_rank,
                         None,
                         AcquisitionStage::OpenReviewApi,
                         query,
-                        AcquisitionOutcome::ProviderFailed,
+                        if http_status == Some(429) {
+                            AcquisitionOutcome::RateLimited
+                        } else {
+                            AcquisitionOutcome::ProviderFailed
+                        },
                     );
                     receipt.provider = Some("openreview".to_string());
                     receipt.requested_url = Some(self.config.openreview_endpoint.clone());
+                    receipt.http_status = http_status;
                     receipt.reason_code = Some("OPENREVIEW_SEARCH_FAILED".to_string());
                     receipt.reason = Some(format!("{error:#}"));
                     receipt.elapsed_ms = elapsed_ms(started);
@@ -777,14 +795,22 @@ impl WebResearcher {
                         None,
                         AcquisitionStage::DuckDuckGo,
                         query,
-                        AcquisitionOutcome::HttpError,
+                        if status.as_u16() == 429 {
+                            AcquisitionOutcome::RateLimited
+                        } else {
+                            AcquisitionOutcome::HttpError
+                        },
                     );
                     receipt.provider = Some("duckduckgo-html".to_string());
                     receipt.requested_url = Some(ddg_url);
                     receipt.final_url = Some(final_url);
                     receipt.http_status = Some(status.as_u16());
                     receipt.content_type = content_type;
-                    receipt.reason_code = Some("SEARCH_HTTP_ERROR".to_string());
+                    receipt.reason_code = Some(if status.as_u16() == 429 {
+                        "SEARCH_RATE_LIMITED".to_string()
+                    } else {
+                        "SEARCH_HTTP_ERROR".to_string()
+                    });
                     receipt.reason = Some(format!("DuckDuckGo returned HTTP {status}"));
                     receipt.elapsed_ms = elapsed_ms(started);
                     receipts.push(receipt);
@@ -1172,13 +1198,21 @@ impl WebResearcher {
                 Some(candidate.source_rank),
                 AcquisitionStage::PageFetch,
                 &candidate.query,
-                AcquisitionOutcome::HttpError,
+                if status.as_u16() == 429 {
+                    AcquisitionOutcome::RateLimited
+                } else {
+                    AcquisitionOutcome::HttpError
+                },
             );
             receipt.requested_url = Some(candidate.url.clone());
             receipt.final_url = Some(final_url);
             receipt.http_status = Some(status.as_u16());
             receipt.content_type = content_type;
-            receipt.reason_code = Some("PAGE_HTTP_ERROR".to_string());
+            receipt.reason_code = Some(if status.as_u16() == 429 {
+                "PAGE_RATE_LIMITED".to_string()
+            } else {
+                "PAGE_HTTP_ERROR".to_string()
+            });
             receipt.reason = Some(format!("page fetch returned HTTP {status}"));
             receipt.elapsed_ms = elapsed_ms(started);
             return PageAcquisition {
@@ -1527,6 +1561,15 @@ fn elapsed_ms(started: Instant) -> u64 {
 
 fn sha256_hex(bytes: &[u8]) -> String {
     format!("{:x}", Sha256::digest(bytes))
+}
+
+fn http_status_from_error(error: &anyhow::Error) -> Option<u16> {
+    error.chain().find_map(|cause| {
+        cause
+            .downcast_ref::<reqwest::Error>()
+            .and_then(reqwest::Error::status)
+            .map(|status| status.as_u16())
+    })
 }
 
 fn status_without_usable_sources(receipts: &[AcquisitionReceipt]) -> ResearchStatus {
