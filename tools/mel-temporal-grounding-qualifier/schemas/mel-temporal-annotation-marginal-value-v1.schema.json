@@ -1,0 +1,144 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://github.com/Luminous-Dynamics/symthaea/blob/main/tools/mel-temporal-grounding-qualifier/schemas/mel-temporal-annotation-marginal-value-v1.schema.json",
+  "title": "MEL Temporal Annotation Marginal Value Input V1",
+  "type": "object",
+  "additionalProperties": false,
+  "required": [
+    "schema",
+    "source_work_id_sha256",
+    "selection_stream",
+    "selection_receipt_sha256",
+    "decision_profile",
+    "before_panel",
+    "after_panel",
+    "effort"
+  ],
+  "properties": {
+    "schema": {
+      "const": "mel-temporal-annotation-marginal-value-v1"
+    },
+    "source_work_id_sha256": {
+      "type": "string",
+      "pattern": "^[0-9a-f]{64}$"
+    },
+    "selection_stream": {
+      "enum": [
+        "ActiveRefinement",
+        "ProbabilityAudit"
+      ]
+    },
+    "selection_receipt_sha256": {
+      "type": "string",
+      "pattern": "^[0-9a-f]{64}$"
+    },
+    "decision_profile": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "profile_id",
+        "minimum_eligible_annotators",
+        "minimum_present_support_ppm",
+        "minimum_absent_support_ppm",
+        "maximum_ambiguous_not_estimable_share_ppm",
+        "minimum_pairwise_present_event_f1_ppm",
+        "minimum_pairwise_present_count_agreement_ppm",
+        "maximum_event_boundary_spread_ms"
+      ],
+      "properties": {
+        "profile_id": {
+          "type": "string",
+          "minLength": 1
+        },
+        "minimum_eligible_annotators": {
+          "type": "integer",
+          "minimum": 2,
+          "maximum": 65535
+        },
+        "minimum_present_support_ppm": {
+          "type": "integer",
+          "minimum": 0,
+          "maximum": 1000000
+        },
+        "minimum_absent_support_ppm": {
+          "type": "integer",
+          "minimum": 0,
+          "maximum": 1000000
+        },
+        "maximum_ambiguous_not_estimable_share_ppm": {
+          "type": "integer",
+          "minimum": 0,
+          "maximum": 1000000
+        },
+        "minimum_pairwise_present_event_f1_ppm": {
+          "type": "integer",
+          "minimum": 0,
+          "maximum": 1000000
+        },
+        "minimum_pairwise_present_count_agreement_ppm": {
+          "type": "integer",
+          "minimum": 0,
+          "maximum": 1000000
+        },
+        "maximum_event_boundary_spread_ms": {
+          "type": "integer",
+          "minimum": 0
+        }
+      }
+    },
+    "before_panel": {
+      "$ref": "mel-multi-annotator-temporal-grounding-v1.schema.json"
+    },
+    "after_panel": {
+      "$ref": "mel-multi-annotator-temporal-grounding-v1.schema.json"
+    },
+    "effort": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "session_receipt_sha256",
+        "active_listening_seconds",
+        "active_review_seconds",
+        "elapsed_wall_seconds",
+        "replay_count",
+        "seek_count"
+      ],
+      "properties": {
+        "session_receipt_sha256": {
+          "type": "string",
+          "pattern": "^[0-9a-f]{64}$"
+        },
+        "active_listening_seconds": {
+          "type": "integer",
+          "minimum": 0
+        },
+        "active_review_seconds": {
+          "type": "integer",
+          "minimum": 0
+        },
+        "elapsed_wall_seconds": {
+          "type": "integer",
+          "minimum": 0
+        },
+        "replay_count": {
+          "type": "integer",
+          "minimum": 0,
+          "maximum": 4294967295
+        },
+        "seek_count": {
+          "type": "integer",
+          "minimum": 0,
+          "maximum": 4294967295
+        },
+        "self_reported_difficulty_ppm": {
+          "type": [
+            "integer",
+            "null"
+          ],
+          "minimum": 0,
+          "maximum": 1000000
+        }
+      }
+    }
+  }
+}
