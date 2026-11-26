@@ -14,7 +14,6 @@
 //! selector, or evidence that any declared reference/intervention is valid.
 
 const VARIANCE_FLOOR: f64 = 1e-12;
-const PROBABILITY_TOL: f64 = 1e-10;
 const OBJECTIVE_TOL: f64 = 1e-12;
 const MAX_ACTIONS: usize = 16;
 
