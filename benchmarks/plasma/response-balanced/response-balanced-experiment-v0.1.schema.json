@@ -48,7 +48,8 @@
         "velocity_domain",
         "time_unit",
         "maximum_time",
-        "state_metric_id"
+        "state_metric_id",
+        "state_coordinate_id"
       ],
       "properties": {
         "equation": {
@@ -108,6 +109,10 @@
           "exclusiveMinimum": 0
         },
         "state_metric_id": {
+          "type": "string",
+          "minLength": 1
+        },
+        "state_coordinate_id": {
           "type": "string",
           "minLength": 1
         }
