@@ -109,3 +109,39 @@ The eventual result should be a **decoder-independent channel contract** that al
 - the preservation capsule records format parameters, reader contract, decoder source/build identity and migration lineage.
 
 This is how the programme moves beyond “our code beats our old code” toward a reusable qualification system for archival media.
+
+
+## 8. Additional 4+2 erasure reference: reed-solomon-engine 0.2.0
+
+A further Rust comparator surfaced during the 26 November 2026 literature/code audit:
+
+- Repository: https://github.com/stephenberry/reed-solomon-engine
+- Crate: `reed-solomon-engine` 0.2.0
+- Observed release/current commit: `656761fdaf64a49881386527ac1844e25c6dc1af`
+- Cargo manifest blob: `7c0ff8d29789e5fa588f26ee04974c461b8d4420`
+- Wire-format document blob: `5099ce118da4907690c2ad76503065fb52dda5bd`
+- License: MIT OR Apache-2.0.
+
+It has no runtime dependencies, supports `no_std` and allocation-free caller-buffer APIs, and documents runtime-selected SIMD kernels (NEON, AVX2, SSSE3), with scalar-reference equivalence tests. It only reconstructs shards already known to be missing; it does not detect unknown corruptions. This therefore belongs in the erasure-only performance lane, not the error/erasure-correction leaderboard.
+
+A useful exact-geometry comparison is its `Codec::new(4, 2)` configuration. Its documented systematic Vandermonde wire format uses GF(2^8), polynomial 0x11D and primitive element 0x02. The parity rows derived from its documented construction for 4+2 are:
+
+```text
+[27, 28, 18, 20]
+[28, 27, 20, 18]
+```
+
+The current Symthaea custom MDS [6,4,3] reference instead uses:
+
+```text
+[1, 1, 1, 1]
+[1, 2, 3, 4]
+```
+
+Both use the same GF polynomial and 4+2 geometry, but they are **not byte-compatible**. This is a useful reminder that field polynomial equality is necessary but not sufficient for wire-format equivalence: generator matrix, row order, shard order and parity layout must also match. Treat them as separate format versions and compare both under the same erased-shard workloads and resource budgets.
+
+The upstream performance claims (including SIMD speedups and decode scaling) are not Luminous measurements. They are hypotheses to reproduce on the declared target hardware. Because the current local GPU/CPU environment differs from the upstream measured environment, record CPU model, target features, compiler, shard sizes, shard count, warm-up, repetitions and selected kernel before comparing.
+
+References:
+- https://docs.rs/reed-solomon-engine/0.2.0/
+- https://github.com/stephenberry/reed-solomon-engine
