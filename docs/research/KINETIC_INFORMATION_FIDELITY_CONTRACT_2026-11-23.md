@@ -232,6 +232,20 @@ A useful descriptive efficiency is
 
 Weights must be frozen before the tournament. RPE is a secondary summary, never a replacement for the three-axis Pareto frontier or the individual hard gates.
 
+For deployment comparison, add two operational metrics:
+
+```
+QST = sum of physical time increments whose entire interval is independently qualified
+      / declared physical simulation horizon
+
+QSP/J = sum of qualified physical simulation seconds
+        / total measured joules for the complete workflow
+```
+
+A time interval counts as qualified only when every mandatory physical, response, branch, boundary and geometric-structure gate passes. UNKNOWN intervals do not count as qualified time. Energy must include the solver, diagnostics, observation, representation changes, checkpointing, shadow overlap, fallback and recovery; amortize training / model construction over a declared rollout count and report both amortized and cold-start totals. If energy cannot be measured, report QSP per wall-clock second and core/GPU-hours separately rather than infer joules from runtime.
+
+The goal is not maximum simulated time at any cost. Report QSP/J alongside the full accuracy–latency–memory Pareto frontier, false-stay rate, false-handoff rate, hand-off lead-time sufficiency and rollback rate. An aggressive controller that accumulates more simulated time by crossing a hard gate must score worse, not better.
+
 **Important limit:** passing a finite intervention library establishes preservation only for that tested family and envelope. It does not prove that the complete microscopic state is uniquely recoverable or that every unregistered future intervention is safe.
 
 ## 3. Validity horizon and the FNO lesson
