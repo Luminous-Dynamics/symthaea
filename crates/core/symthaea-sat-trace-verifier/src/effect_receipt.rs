@@ -16,7 +16,7 @@ use serde::Deserialize;
 use std::collections::HashSet;
 use std::fmt;
 
-const EFFECT_BINDING_DOMAIN: &str = "SAT-EFFECT-ATTEMPT-BINDING-v0.1\\n";
+const EFFECT_BINDING_DOMAIN: &str = "SAT-EFFECT-ATTEMPT-BINDING-v0.1\n";
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Deserialize)]
 #[serde(rename_all = "snake_case")]
