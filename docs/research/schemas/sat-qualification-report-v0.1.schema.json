@@ -1,0 +1,34 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://luminousdynamics.io/sat/schemas/qualification-report/0.1",
+  "title": "SAT Qualification Report v0.1",
+  "type": "object", "additionalProperties": false,
+  "required": ["schema_version", "report_id", "run_id", "manifest_digest", "evaluated_at", "evaluator_id", "qualification_status", "profile_id", "track_results", "gate_results", "claims", "metrics", "limitations"],
+  "properties": {
+    "schema_version": {"const": "sat-qualification-report/v0.1"},
+    "report_id": {"type": "string", "minLength": 1},
+    "run_id": {"type": "string", "format": "uuid"},
+    "manifest_digest": {"$ref": "#/$defs/digest"},
+    "evaluated_at": {"type": "string", "format": "date-time"},
+    "evaluator_id": {"type": "string", "minLength": 1},
+    "qualification_status": {"enum": ["qualified", "not_qualified", "inconclusive", "invalid"]},
+    "profile_id": {"type": "string", "minLength": 1},
+    "track_results": {"type": "array", "minItems": 1, "items": {"type": "object", "additionalProperties": false, "required": ["track_id", "status", "scope_statement", "evidence_refs"], "properties": {"track_id": {"type": "string"}, "status": {"enum": ["pass", "fail", "inconclusive", "not_run", "out_of_scope"]}, "scope_statement": {"type": "string"}, "evidence_refs": {"type": "array", "items": {"type": "string"}}, "limitations": {"type": "array", "items": {"type": "string"}}}}},
+    "gate_results": {"type": "array", "minItems": 1, "items": {"type": "object", "additionalProperties": false, "required": ["gate_id", "severity", "outcome", "blocking", "evidence_refs", "rationale"], "properties": {"gate_id": {"type": "string"}, "severity": {"enum": ["critical", "major", "minor"]}, "outcome": {"enum": ["pass", "fail", "inconclusive", "not_run"]}, "blocking": {"type": "boolean"}, "evidence_refs": {"type": "array", "items": {"type": "string"}}, "rationale": {"type": "string"}}}},
+    "claims": {"type": "array", "minItems": 1, "items": {"type": "object", "additionalProperties": false, "required": ["claim_id", "claim", "status", "applicability", "evidence_refs"], "properties": {"claim_id": {"type": "string"}, "claim": {"type": "string"}, "status": {"enum": ["supported", "unsupported", "inconclusive", "out_of_scope"]}, "applicability": {"type": "string"}, "evidence_refs": {"type": "array", "items": {"type": "string"}}, "counterevidence_refs": {"type": "array", "items": {"type": "string"}}, "limitations": {"type": "array", "items": {"type": "string"}}}}},
+    "metrics": {"type": "array", "items": {"type": "object", "additionalProperties": false, "required": ["metric_id", "value", "unit", "sample_count", "evidence_refs"], "properties": {"metric_id": {"type": "string"}, "value": {"type": "number"}, "unit": {"type": "string"}, "sample_count": {"type": "integer", "minimum": 0}, "confidence_interval": {"type": "array", "minItems": 2, "maxItems": 2, "items": {"type": "number"}}, "evidence_refs": {"type": "array", "items": {"type": "string"}}}}},
+    "limitations": {"type": "array", "items": {"type": "string"}},
+    "appeal_channel": {"type": "string", "format": "uri"}
+  },
+  "$defs": {"digest": {"type": "string", "pattern": "^sha256:[0-9a-f]{64}$"}},
+  "allOf": [
+    {
+      "if": {"properties": {"qualification_status": {"const": "qualified"}}, "required": ["qualification_status"]},
+      "then": {"properties": {"gate_results": {"not": {"contains": {"properties": {"blocking": {"const": true}, "outcome": {"enum": ["fail", "inconclusive", "not_run"]}}, "required": ["blocking", "outcome"]}}}}}
+    },
+    {
+      "if": {"properties": {"qualification_status": {"const": "not_qualified"}}, "required": ["qualification_status"]},
+      "then": {"properties": {"gate_results": {"contains": {"properties": {"blocking": {"const": true}, "outcome": {"const": "fail"}}, "required": ["blocking", "outcome"]}}}}
+    }
+  ]
+}

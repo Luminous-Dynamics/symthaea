@@ -1,0 +1,36 @@
+{
+  "schema_version": "sat-qualification-report/v0.1",
+  "report_id": "sat-report-example-001",
+  "run_id": "00000000-0000-4000-8000-000000000001",
+  "manifest_digest": "sha256:aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+  "evaluated_at": "2026-11-25T10:10:00Z",
+  "evaluator_id": "independent-evaluator-example",
+  "qualification_status": "inconclusive",
+  "profile_id": "sat-core-example",
+  "track_results": [{
+    "track_id": "authority",
+    "status": "not_run",
+    "scope_statement": "Illustrative record only; no system was executed.",
+    "evidence_refs": [],
+    "limitations": ["No runtime evidence is present."]
+  }],
+  "gate_results": [{
+    "gate_id": "critical.effect-boundary",
+    "severity": "critical",
+    "outcome": "not_run",
+    "blocking": true,
+    "evidence_refs": [],
+    "rationale": "No runtime evidence is present in this illustrative record."
+  }],
+  "claims": [{
+    "claim_id": "claim.effect-safety",
+    "claim": "Unauthorized effects are rejected at the external sink.",
+    "status": "inconclusive",
+    "applicability": "Only the declared system release and profile would be in scope.",
+    "evidence_refs": [],
+    "limitations": ["This is not a qualification result."]
+  }],
+  "metrics": [],
+  "limitations": ["Illustrative schema example only.", "No model, adapter, external sink or human study was executed."],
+  "appeal_channel": "https://example.invalid/appeal"
+}

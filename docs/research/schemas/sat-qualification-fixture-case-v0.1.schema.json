@@ -1,0 +1,80 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://luminousdynamics.io/sat/schemas/fixture-case/0.1",
+  "title": "SAT Contract Fixture Case v0.1",
+  "type": "object",
+  "additionalProperties": false,
+  "required": [
+    "case_id",
+    "family",
+    "purpose",
+    "setup",
+    "stimulus",
+    "expected_disposition",
+    "oracle_assertions"
+  ],
+  "properties": {
+    "case_id": {
+      "type": "string",
+      "minLength": 1
+    },
+    "family": {
+      "enum": [
+        "identity",
+        "authority",
+        "lineage",
+        "disclosure",
+        "effect_observation",
+        "recovery",
+        "evidence_integrity",
+        "auditor_integrity",
+        "adaptive_control",
+        "human_agency",
+        "utility",
+        "compositional",
+        "assurance_continuity",
+        "checkpoint_integrity"
+      ]
+    },
+    "purpose": {
+      "type": "string",
+      "minLength": 1
+    },
+    "setup": {
+      "type": "array",
+      "items": {
+        "type": "string"
+      }
+    },
+    "stimulus": {
+      "type": "string",
+      "minLength": 1
+    },
+    "expected_disposition": {
+      "enum": [
+        "allow",
+        "deny",
+        "hold_and_reconcile",
+        "not_qualified",
+        "invalid_evidence",
+        "independent_adjudication",
+        "measure_and_report",
+        "inconclusive"
+      ]
+    },
+    "oracle_assertions": {
+      "type": "array",
+      "minItems": 1,
+      "items": {
+        "type": "string",
+        "minLength": 1
+      }
+    },
+    "required_evidence": {
+      "type": "array",
+      "items": {
+        "type": "string"
+      }
+    }
+  }
+}

@@ -1,0 +1,758 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://luminousdynamics.io/sat/schemas/event-record/0.1",
+  "title": "SAT Event Record v0.1",
+  "type": "object",
+  "additionalProperties": false,
+  "required": [
+    "schema_version",
+    "run_id",
+    "manifest_digest",
+    "event_id",
+    "sequence",
+    "occurred_at",
+    "event_type",
+    "actor",
+    "causality",
+    "evidence_refs",
+    "integrity"
+  ],
+  "properties": {
+    "schema_version": {
+      "const": "sat-event-record/v0.1"
+    },
+    "run_id": {
+      "type": "string",
+      "format": "uuid"
+    },
+    "event_id": {
+      "type": "string",
+      "minLength": 1
+    },
+    "sequence": {
+      "type": "integer",
+      "minimum": 1
+    },
+    "occurred_at": {
+      "type": "string",
+      "format": "date-time"
+    },
+    "event_type": {
+      "enum": [
+        "proposal_created",
+        "data_accessed",
+        "data_transformed",
+        "delegation_issued",
+        "delegation_revoked",
+        "authorization_decided",
+        "effect_submitted",
+        "effect_observed",
+        "effect_reconciled",
+        "monitor_intervened",
+        "human_decided",
+        "auditor_finding",
+        "process_fenced",
+        "evidence_ingested"
+      ]
+    },
+    "actor": {
+      "type": "object",
+      "required": [
+        "principal_id",
+        "role",
+        "component_id"
+      ],
+      "additionalProperties": false,
+      "properties": {
+        "principal_id": {
+          "type": "string"
+        },
+        "role": {
+          "enum": [
+            "human",
+            "agent",
+            "sub_agent",
+            "policy_engine",
+            "monitor",
+            "sink_observer",
+            "auditor",
+            "evaluator",
+            "operator",
+            "system"
+          ]
+        },
+        "component_id": {
+          "type": "string"
+        }
+      }
+    },
+    "causality": {
+      "type": "object",
+      "required": [
+        "correlation_id",
+        "parent_event_ids"
+      ],
+      "additionalProperties": false,
+      "properties": {
+        "correlation_id": {
+          "type": "string"
+        },
+        "parent_event_ids": {
+          "type": "array",
+          "uniqueItems": true,
+          "items": {
+            "type": "string"
+          }
+        }
+      }
+    },
+    "data_lineage_refs": {
+      "type": "array",
+      "items": {
+        "type": "string"
+      },
+      "uniqueItems": true
+    },
+    "effect_binding": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "action",
+        "resource",
+        "sink",
+        "purpose",
+        "parameters_digest",
+        "payload_digest",
+        "payload_labels",
+        "binding_digest",
+        "sink_projection_digest",
+        "sink_projection_id",
+        "sink_projection_version",
+        "sink_projection"
+      ],
+      "properties": {
+        "action": {
+          "type": "string",
+          "minLength": 1
+        },
+        "resource": {
+          "type": "string",
+          "minLength": 1
+        },
+        "sink": {
+          "type": "string",
+          "minLength": 1
+        },
+        "purpose": {
+          "type": "string",
+          "minLength": 1
+        },
+        "parameters_digest": {
+          "$ref": "#/$defs/digest"
+        },
+        "payload_digest": {
+          "$ref": "#/$defs/digest"
+        },
+        "payload_labels": {
+          "type": "array",
+          "uniqueItems": true,
+          "items": {
+            "type": "string"
+          }
+        },
+        "lineage_proof_ref": {
+          "type": "string"
+        },
+        "interaction_intent_ref": {
+          "type": "string"
+        },
+        "idempotency_key": {
+          "type": "string"
+        },
+        "binding_digest": {
+          "$ref": "#/$defs/digest"
+        },
+        "sink_projection_digest": {
+          "$ref": "#/$defs/digest"
+        },
+        "sink_projection_id": {
+          "type": "string",
+          "minLength": 1
+        },
+        "sink_projection_version": {
+          "type": "string",
+          "minLength": 1
+        },
+        "sink_projection": {
+          "type": "object",
+          "description": "Connector-versioned projection fields independently observable at the actual sink.",
+          "additionalProperties": true
+        },
+        "attempt_id": {
+          "type": "string",
+          "minLength": 1
+        }
+      }
+    },
+    "authority_decision": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "decision",
+        "policy_digest",
+        "exact_effect_digest"
+      ],
+      "properties": {
+        "decision": {
+          "enum": [
+            "allow",
+            "deny",
+            "indeterminate"
+          ]
+        },
+        "policy_digest": {
+          "$ref": "#/$defs/digest"
+        },
+        "exact_effect_digest": {
+          "$ref": "#/$defs/digest"
+        },
+        "grant_refs": {
+          "type": "array",
+          "items": {
+            "type": "string"
+          }
+        },
+        "decision_receipt_ref": {
+          "type": "string"
+        },
+        "valid_until": {
+          "type": "string",
+          "format": "date-time"
+        }
+      }
+    },
+    "effect_observation": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "outcome",
+        "observer_id",
+        "source_of_truth",
+        "observed_at",
+        "idempotency_key",
+        "sink_projection_id",
+        "sink_projection_version",
+        "observed_projection",
+        "attempt_id"
+      ],
+      "properties": {
+        "outcome": {
+          "enum": [
+            "observed_applied",
+            "observed_not_applied",
+            "unknown"
+          ]
+        },
+        "observer_id": {
+          "type": "string"
+        },
+        "source_of_truth": {
+          "type": "string"
+        },
+        "observed_at": {
+          "type": "string",
+          "format": "date-time"
+        },
+        "state_version": {
+          "type": "string"
+        },
+        "reconciliation_ref": {
+          "type": "string"
+        },
+        "idempotency_key": {
+          "type": "string"
+        },
+        "observed_effect_digest": {
+          "$ref": "#/$defs/digest"
+        },
+        "sink_projection_id": {
+          "type": "string",
+          "minLength": 1
+        },
+        "sink_projection_version": {
+          "type": "string",
+          "minLength": 1
+        },
+        "observed_projection": {
+          "type": "object",
+          "description": "Fields reconstructed from the authoritative sink readback under the same projection adapter.",
+          "additionalProperties": true
+        },
+        "attempt_id": {
+          "type": "string",
+          "minLength": 1
+        }
+      }
+    },
+    "human_decision": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "decision",
+        "decision_maker_id",
+        "independent_first"
+      ],
+      "properties": {
+        "decision": {
+          "enum": [
+            "approve",
+            "deny",
+            "defer",
+            "contest",
+            "revoke",
+            "withdraw",
+            "appeal"
+          ]
+        },
+        "decision_maker_id": {
+          "type": "string"
+        },
+        "independent_first": {
+          "type": "boolean"
+        },
+        "information_order_arm": {
+          "enum": [
+            "independent_first",
+            "ai_first",
+            "evidence_first",
+            "no_ai_control"
+          ]
+        }
+      }
+    },
+    "auditor_finding": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "finding_id",
+        "status",
+        "evidence_refs"
+      ],
+      "properties": {
+        "finding_id": {
+          "type": "string"
+        },
+        "status": {
+          "enum": [
+            "suspected",
+            "substantiated",
+            "disconfirmed",
+            "inconclusive"
+          ]
+        },
+        "evidence_refs": {
+          "type": "array",
+          "minItems": 1,
+          "items": {
+            "type": "string"
+          }
+        },
+        "disconfirmation_refs": {
+          "type": "array",
+          "items": {
+            "type": "string"
+          }
+        }
+      }
+    },
+    "evidence_refs": {
+      "type": "array",
+      "items": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": [
+          "artifact_id",
+          "digest",
+          "source_id",
+          "capture_method"
+        ],
+        "properties": {
+          "artifact_id": {
+            "type": "string"
+          },
+          "digest": {
+            "$ref": "#/$defs/digest"
+          },
+          "source_id": {
+            "type": "string"
+          },
+          "capture_method": {
+            "enum": [
+              "native_export",
+              "independent_api_read",
+              "sink_snapshot",
+              "packet_capture",
+              "signed_receipt",
+              "human_attestation",
+              "other"
+            ]
+          },
+          "independently_observed": {
+            "type": "boolean"
+          }
+        }
+      }
+    },
+    "integrity": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "hash_algorithm",
+        "previous_event_digest",
+        "event_digest"
+      ],
+      "properties": {
+        "hash_algorithm": {
+          "const": "sha256-jcs-v1"
+        },
+        "previous_event_digest": {
+          "type": [
+            "string",
+            "null"
+          ],
+          "pattern": "^sha256:[0-9a-f]{64}$"
+        },
+        "event_digest": {
+          "$ref": "#/$defs/digest"
+        },
+        "signature_ref": {
+          "type": "string"
+        },
+        "signer_id": {
+          "type": "string"
+        }
+      }
+    },
+    "disclosure_decision": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "decision",
+        "policy_digest",
+        "exact_disclosure_digest"
+      ],
+      "properties": {
+        "decision": {
+          "enum": [
+            "allow",
+            "deny",
+            "indeterminate",
+            "not_applicable"
+          ]
+        },
+        "policy_digest": {
+          "$ref": "#/$defs/digest"
+        },
+        "exact_disclosure_digest": {
+          "$ref": "#/$defs/digest"
+        },
+        "lineage_evidence_refs": {
+          "type": "array",
+          "items": {
+            "type": "string"
+          }
+        },
+        "not_applicable_reason": {
+          "type": "string",
+          "minLength": 1
+        }
+      }
+    },
+    "manifest_digest": {
+      "$ref": "#/$defs/digest"
+    }
+  },
+  "$defs": {
+    "digest": {
+      "type": "string",
+      "pattern": "^sha256:[0-9a-f]{64}$"
+    }
+  },
+  "allOf": [
+    {
+      "if": {
+        "properties": {
+          "event_type": {
+            "const": "authorization_decided"
+          }
+        },
+        "required": [
+          "event_type"
+        ]
+      },
+      "then": {
+        "required": [
+          "effect_binding",
+          "authority_decision",
+          "disclosure_decision"
+        ]
+      }
+    },
+    {
+      "if": {
+        "properties": {
+          "event_type": {
+            "const": "effect_submitted"
+          }
+        },
+        "required": [
+          "event_type"
+        ]
+      },
+      "then": {
+        "required": [
+          "effect_binding",
+          "authority_decision",
+          "disclosure_decision"
+        ],
+        "properties": {
+          "effect_binding": {
+            "required": [
+              "idempotency_key",
+              "attempt_id"
+            ]
+          }
+        }
+      }
+    },
+    {
+      "if": {
+        "properties": {
+          "event_type": {
+            "const": "effect_observed"
+          }
+        },
+        "required": [
+          "event_type"
+        ]
+      },
+      "then": {
+        "required": [
+          "effect_binding",
+          "effect_observation"
+        ],
+        "properties": {
+          "actor": {
+            "properties": {
+              "role": {
+                "const": "sink_observer"
+              }
+            }
+          },
+          "effect_binding": {
+            "required": [
+              "idempotency_key",
+              "attempt_id"
+            ]
+          }
+        }
+      }
+    },
+    {
+      "if": {
+        "properties": {
+          "event_type": {
+            "const": "effect_reconciled"
+          }
+        },
+        "required": [
+          "event_type"
+        ]
+      },
+      "then": {
+        "required": [
+          "effect_binding",
+          "effect_observation"
+        ],
+        "properties": {
+          "actor": {
+            "properties": {
+              "role": {
+                "const": "sink_observer"
+              }
+            }
+          },
+          "effect_binding": {
+            "required": [
+              "idempotency_key",
+              "attempt_id"
+            ]
+          }
+        }
+      }
+    },
+    {
+      "if": {
+        "properties": {
+          "event_type": {
+            "const": "human_decided"
+          }
+        },
+        "required": [
+          "event_type"
+        ]
+      },
+      "then": {
+        "required": [
+          "human_decision"
+        ],
+        "properties": {
+          "actor": {
+            "properties": {
+              "role": {
+                "const": "human"
+              }
+            }
+          }
+        }
+      }
+    },
+    {
+      "if": {
+        "properties": {
+          "event_type": {
+            "const": "auditor_finding"
+          }
+        },
+        "required": [
+          "event_type"
+        ]
+      },
+      "then": {
+        "required": [
+          "auditor_finding"
+        ],
+        "properties": {
+          "actor": {
+            "properties": {
+              "role": {
+                "const": "auditor"
+              }
+            }
+          }
+        }
+      }
+    },
+    {
+      "if": {
+        "properties": {
+          "disclosure_decision": {
+            "properties": {
+              "decision": {
+                "const": "not_applicable"
+              }
+            },
+            "required": [
+              "decision"
+            ]
+          }
+        },
+        "required": [
+          "disclosure_decision"
+        ]
+      },
+      "then": {
+        "properties": {
+          "disclosure_decision": {
+            "required": [
+              "not_applicable_reason"
+            ]
+          }
+        }
+      }
+    },
+    {
+      "if": {
+        "properties": {
+          "effect_observation": {
+            "properties": {
+              "outcome": {
+                "const": "observed_applied"
+              }
+            },
+            "required": [
+              "outcome"
+            ]
+          }
+        },
+        "required": [
+          "effect_observation"
+        ]
+      },
+      "then": {
+        "properties": {
+          "effect_observation": {
+            "required": [
+              "observed_effect_digest",
+              "observed_projection"
+            ]
+          }
+        }
+      }
+    },
+    {
+      "if": {
+        "properties": {
+          "event_type": {
+            "const": "effect_submitted"
+          },
+          "authority_decision": {
+            "properties": {
+              "decision": {
+                "const": "allow"
+              }
+            },
+            "required": [
+              "decision"
+            ]
+          }
+        },
+        "required": [
+          "event_type",
+          "authority_decision"
+        ]
+      },
+      "then": {
+        "properties": {
+          "authority_decision": {
+            "required": [
+              "decision_receipt_ref",
+              "valid_until"
+            ]
+          }
+        }
+      }
+    },
+    {
+      "if": {
+        "properties": {
+          "event_type": {
+            "const": "effect_reconciled"
+          }
+        },
+        "required": [
+          "event_type"
+        ]
+      },
+      "then": {
+        "properties": {
+          "effect_observation": {
+            "required": [
+              "reconciliation_ref"
+            ]
+          }
+        }
+      }
+    }
+  ]
+}
