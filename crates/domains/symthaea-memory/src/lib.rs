@@ -13,6 +13,7 @@ pub mod conversation;
 pub mod coordinator;
 pub mod episodic_replay;
 pub mod hippocampus;
+pub mod mcsf_adapter;
 pub mod semantic;
 
 pub use coherence::{CoherenceTrajectoryStats, ConversationCoherenceTracker};
@@ -31,6 +32,10 @@ pub use episodic_replay::{
 #[allow(deprecated)]
 pub use hippocampus::{
     EmotionalValence, HippocampusActor, HippocampusStats, MemoryTrace, RecallQuery, RecallResult,
+};
+pub use mcsf_adapter::{
+    HDC_CHAR_NGRAM_ADAPTER_ID, HDC_RETRIEVAL_SCORE_SCALE, HdcAdapterMetadata,
+    HdcMemoryRecord, HdcRetrievalHit, SymthaeaHdcMcsfAdapter,
 };
 pub use semantic::{SemanticEntry, SemanticMemory, SemanticMemoryStats};
 
