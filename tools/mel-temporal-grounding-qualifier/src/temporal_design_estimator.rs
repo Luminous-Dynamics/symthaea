@@ -259,7 +259,6 @@ pub fn estimate_design_based_metric(
     }
 
     let mut stratum_estimates = Vec::new();
-    let mut variance_unavailable_reasons = Vec::new();
     let mut total_estimate = 0.0;
     let mut total_variance = 0.0;
     let mut total_variance_available = true;
@@ -605,8 +604,8 @@ mod tests {
     use std::collections::BTreeSet;
 
     use crate::temporal_acquisition::{
-        AnnotationAcquisitionCandidateV1, AnnotationCohortRoleV1, AnnotationStratumQuotaV1,
-        AuthorizationStateV1,
+        AnnotationAcquisitionCandidateV1, AnnotationAcquisitionConfigV1,
+        AnnotationCohortRoleV1, AnnotationStratumQuotaV1, AuthorizationStateV1,
     };
 
     fn digest(byte: char) -> String {
