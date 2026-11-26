@@ -59,7 +59,11 @@ The public `openactionrecord/oar` repository provides a manifest with 18 main an
 
 MON should invoke the maintained OAR verifiers against the actual official corpus. The Go CEJI preflight is a normalized semantic checker; it is not a replacement verifier and does not reproduce OAR's Ed25519/JCS/sealing/timestamp checks.
 
-## 5. Draft version and implementation boundary
+## 5. Executable outcome mapping
+
+The small standard-library Go adapter in `oar-outcome/` implements the OAR outcome projection as a pure mapping: `confirmed` → `committed`; `denied`, `rejected`, `expired`, `refused` → `refused`; all other and unknown outcomes → `unresolved`. It has three named tests covering positive confirmation, the full refusal vocabulary, and non-terminal/unconfirmed/unknown cases. Local Go 1.23.2 preflight: race ×5 passed, vet passed, 100% statement coverage. This is not a signed OAR bundle parser or a cryptographic test-vector run.
+
+## 6. Draft version and implementation boundary
 
 OAR -01 is an active Internet-Draft published 25 November 2026. Its implementation-status section states that the public OAR format/repository implements every construction from -00, while new -01 additions are planned and not yet implemented in the referenced implementation. The public repository's current specification reports OAR 0.3 and contains the 24-case main/compatibility vector corpus.
 
@@ -70,7 +74,7 @@ Therefore:
 - create a separate draft -01 profile adapter only once the new fields and vectors are implemented and stable;
 - test approval display-binding and authority recheck edge cases against OAR vectors before adding MON composition vectors.
 
-## 6. Independence policy
+## 7. Independence policy
 
 OAR permits confirmation by the issuer or another party with read access. MON deployment policy may require the observer to be independently administered from the sink, action producer and authorization service. This is a stricter deployment qualification. It MUST NOT be described as a universal OAR requirement.
 
