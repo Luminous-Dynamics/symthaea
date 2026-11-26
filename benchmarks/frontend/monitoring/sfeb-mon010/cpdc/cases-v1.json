@@ -1,0 +1,37 @@
+{
+  "version": "CPDC-SYNTHETIC-1.1",
+  "cases": [
+    {"id":"C01","name":"publisher correction reaches pending action","current_state":"superseded","source_authenticated":true,"semantic_match":true,"affects_action":true,"action_state":"pending","approval_bytes_match":true,"decision_authorized":true,"measurement_authority":"NONE"},
+    {"id":"C02","name":"publisher retraction reaches pending action","current_state":"retracted","source_authenticated":true,"semantic_match":true,"affects_action":true,"action_state":"pending","approval_bytes_match":true,"decision_authorized":true,"measurement_authority":"NONE"},
+    {"id":"C03","name":"independent dispute reaches pending action","current_state":"disputed","source_authenticated":true,"semantic_match":true,"affects_action":true,"action_state":"pending","approval_bytes_match":true,"decision_authorized":true,"measurement_authority":"NONE"},
+    {"id":"C04","name":"source unavailable before pending action","current_state":"unavailable","source_authenticated":true,"semantic_match":true,"affects_action":true,"action_state":"pending","approval_bytes_match":true,"decision_authorized":true,"measurement_authority":"NONE"},
+    {"id":"C05","name":"correction after immutable executed action","current_state":"superseded","source_authenticated":true,"semantic_match":true,"affects_action":true,"action_state":"executed","approval_bytes_match":true,"decision_authorized":true,"measurement_authority":"NONE"},
+    {"id":"C06","name":"unrelated source correction does not contaminate decision","current_state":"superseded","source_authenticated":true,"semantic_match":true,"affects_action":false,"action_state":"pending","approval_bytes_match":true,"decision_authorized":true,"measurement_authority":"NONE"},
+    {"id":"C07","name":"unit substitution is not a valid same-figure replacement","current_state":"current","source_authenticated":true,"semantic_match":false,"affects_action":false,"action_state":"pending","approval_bytes_match":true,"decision_authorized":true,"measurement_authority":"NONE"},
+    {"id":"C08","name":"population substitution is not a valid same-figure replacement","current_state":"current","source_authenticated":true,"semantic_match":false,"affects_action":false,"action_state":"pending","approval_bytes_match":true,"decision_authorized":true,"measurement_authority":"NONE"},
+    {"id":"C09","name":"historical as-of query predates later correction","current_state":"superseded","historical_query":true,"historical_state":"current","source_authenticated":true,"semantic_match":true,"affects_action":false,"action_state":"pending","approval_bytes_match":true,"decision_authorized":true,"measurement_authority":"NONE"},
+    {"id":"C10","name":"unavailable source is explicitly restored","current_state":"restored","source_authenticated":true,"semantic_match":true,"affects_action":false,"action_state":"pending","approval_bytes_match":true,"decision_authorized":true,"measurement_authority":"NONE"},
+    {"id":"C11","name":"approval bytes differ from executed action request","current_state":"current","source_authenticated":true,"semantic_match":true,"affects_action":false,"action_state":"pending","approval_bytes_match":false,"decision_authorized":true,"measurement_authority":"NONE"},
+    {"id":"C12","name":"authority-free measurement capsule cannot authorize","current_state":"current","source_authenticated":true,"semantic_match":true,"affects_action":false,"action_state":"pending","approval_bytes_match":true,"decision_authorized":false,"measurement_authority":"NONE"},
+    {"id":"C13","name":"measurement claim with authority-like label still cannot authorize","current_state":"current","source_authenticated":true,"semantic_match":true,"affects_action":false,"action_state":"pending","approval_bytes_match":true,"decision_authorized":false,"measurement_authority":"APPROVED"},
+    {"id":"C14","name":"publisher authentication failed","current_state":"current","source_authenticated":false,"semantic_match":true,"affects_action":false,"action_state":"pending","approval_bytes_match":true,"decision_authorized":true,"measurement_authority":"NONE"},
+    {"id":"C15","name":"historical pending action is not retroactively reauthorized by a later correction","current_state":"superseded","historical_query":true,"historical_state":"current","source_authenticated":true,"semantic_match":true,"affects_action":true,"action_state":"pending","approval_bytes_match":true,"decision_authorized":true,"measurement_authority":"NONE"}
+  ],
+  "expected": {
+    "C01":{"source_usable":false,"reauthorize":true,"action_allowed":false,"preserve_execution":false,"current_risk_review":false},
+    "C02":{"source_usable":false,"reauthorize":true,"action_allowed":false,"preserve_execution":false,"current_risk_review":false},
+    "C03":{"source_usable":false,"reauthorize":true,"action_allowed":false,"preserve_execution":false,"current_risk_review":false},
+    "C04":{"source_usable":false,"reauthorize":true,"action_allowed":false,"preserve_execution":false,"current_risk_review":false},
+    "C05":{"source_usable":false,"reauthorize":false,"action_allowed":false,"preserve_execution":true,"current_risk_review":true},
+    "C06":{"source_usable":false,"reauthorize":false,"action_allowed":false,"preserve_execution":false,"current_risk_review":false},
+    "C07":{"source_usable":false,"reauthorize":false,"action_allowed":false,"preserve_execution":false,"current_risk_review":false},
+    "C08":{"source_usable":false,"reauthorize":false,"action_allowed":false,"preserve_execution":false,"current_risk_review":false},
+    "C09":{"source_usable":true,"reauthorize":false,"action_allowed":true,"preserve_execution":false,"current_risk_review":false},
+    "C10":{"source_usable":true,"reauthorize":false,"action_allowed":true,"preserve_execution":false,"current_risk_review":false},
+    "C11":{"source_usable":true,"reauthorize":false,"action_allowed":false,"preserve_execution":false,"current_risk_review":false},
+    "C12":{"source_usable":true,"reauthorize":false,"action_allowed":false,"preserve_execution":false,"current_risk_review":false},
+    "C13":{"source_usable":true,"reauthorize":false,"action_allowed":false,"preserve_execution":false,"current_risk_review":false},
+    "C14":{"source_usable":false,"reauthorize":false,"action_allowed":false,"preserve_execution":false,"current_risk_review":false},
+    "C15":{"source_usable":true,"reauthorize":false,"action_allowed":true,"preserve_execution":false,"current_risk_review":false}
+  }
+}

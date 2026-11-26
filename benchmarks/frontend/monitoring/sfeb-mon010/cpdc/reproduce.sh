@@ -1,0 +1,6 @@
+#!/usr/bin/env sh
+set -eu
+cd "$(dirname "$0")"
+go test -race -count=5 ./...
+go vet ./...
+go run . cases-v1.json
