@@ -31,6 +31,13 @@ jobs:
         with:
           components: rustfmt, clippy
 
+      - name: Validate strict observer schemas
+        shell: bash
+        run: |
+          set -euo pipefail
+          jq empty crates/domains/symthaea-rrvr-observer/schemas/episode_snapshot_v0_1.schema.json
+          jq empty crates/domains/symthaea-rrvr-observer/schemas/observer_report_v0_1.schema.json
+
       - name: Check formatting
         run: cargo fmt --check -p symthaea-rrvr-observer
 
