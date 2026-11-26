@@ -481,7 +481,7 @@ pub fn audit_unitizing_corpus(
         },
         source_work_summaries,
         item_results: results,
-        unitizing_alpha_computed: !scored.is_empty(),
+        unitizing_alpha_computed: results.iter().any(|item| item.coefficients.is_some()),
         consensus_ground_truth_created: false,
         pooled_continuum_alpha_computed: false,
         population_confidence_interval_computed: false,
