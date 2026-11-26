@@ -110,12 +110,14 @@ pub fn build_audio_evidence_in_toto_statement(
     evidence_manifest: &AudioEvidenceWindowManifestV1,
     source_audio_bytes: &[u8],
     decoded_pcm_bytes: &[u8],
+    request_body_bytes: &[u8],
 ) -> Result<UnsignedInTotoAudioEvidenceStatementV1, String> {
     let audit = audit_revision_with_audio_evidence(
         revision_case,
         evidence_manifest,
         source_audio_bytes,
         decoded_pcm_bytes,
+        request_body_bytes,
     )?;
 
     let revision_report_sha256 = canonical_json_sha256(&audit.revision_report)
