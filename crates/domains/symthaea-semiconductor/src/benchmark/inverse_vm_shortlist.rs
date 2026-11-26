@@ -19,6 +19,8 @@ pub const INVERSE_VM_SHORTLIST_REPORT_SCHEMA_V1: &str =
     "luminous.semi-bench.inverse-vm-shortlist-report.v1";
 pub const FORWARD_EVALUATION_RECEIPT_SCHEMA_V1: &str =
     "luminous.semi-bench.inverse-vm-forward-evaluation-receipt.v1";
+pub const HISTORICAL_SUPPORT_RECEIPT_SCHEMA_V1: &str =
+    "luminous.semi-bench.inverse-vm-historical-support-receipt.v1";
 
 #[derive(Clone, Copy, Debug, Eq, PartialEq, Serialize, Deserialize)]
 #[serde(rename_all = "snake_case")]
@@ -54,6 +56,13 @@ pub enum CandidateScreenReasonV1 {
     RecipeValueOutsideHardBound,
     ConstraintSourceUnavailable,
     HistoricalSupportReceiptMissing,
+    HistoricalSupportReceiptSchemaMismatch,
+    HistoricalSupportReceiptDigestMismatch,
+    HistoricalSupportReceiptContextMismatch,
+    HistoricalSupportReceiptRecipeMismatch,
+    HistoricalSupportReceiptNeighbourMismatch,
+    HistoricalSupportReceiptNotYetAvailable,
+    HistoricalSupportReceiptClockMismatch,
     HistoricalSupportCountInsufficient,
     HistoricalSupportDigestMismatch,
     HistoricalSupportDistanceNonFinite,
@@ -132,6 +141,24 @@ pub struct HistoricalSupportEvidenceV1 {
     /// Normalized distance in the declared historical-support feature space.
     pub normalized_distance: f64,
     pub support_policy_sha256: String,
+    pub receipt: Option<HistoricalSupportReceiptV1>,
+}
+
+#[derive(Clone, Debug, PartialEq, Serialize, Deserialize)]
+pub struct HistoricalSupportReceiptV1 {
+    pub schema: String,
+    pub evaluator_id: String,
+    pub process_snapshot_sha256: String,
+    pub support_manifest_sha256: String,
+    pub support_policy_sha256: String,
+    pub recipe_settings_sha256: String,
+    pub neighbour_ids_sha256: String,
+    pub normalized_distance: f64,
+    pub clock_domain_id: String,
+    pub clock_mapping_sha256: String,
+    pub evaluated_at_unix_seconds: i64,
+    pub available_at_unix_seconds: i64,
+    pub receipt_sha256: String,
 }
 
 #[derive(Clone, Debug, PartialEq, Serialize, Deserialize)]
@@ -233,8 +260,9 @@ pub struct InverseVmShortlistReportV1 {
     pub recipe_write_executed: bool,
     pub physical_experiment_authorized: bool,
     pub equipment_control_authority: bool,
-    /// Forward receipts are content-bound but not issuer-authenticated in this version.
+    /// Forward/support receipts are content-bound but not issuer-authenticated in this version.
     pub forward_evaluation_receipt_authenticity_proven: bool,
+    pub historical_support_receipt_authenticity_proven: bool,
     pub report_sha256: String,
 }
 
@@ -455,6 +483,82 @@ fn normalized_recipe_distance(
     }
 }
 
+fn sorted_neighbour_ids_digest(
+    neighbour_ids: &[String],
+) -> Result<String, InverseVmShortlistErrorV1> {
+    let mut canonical = neighbour_ids.to_vec();
+    canonical.sort();
+    json_sha256(&canonical)
+}
+
+fn support_receipt_digest(
+    receipt: &HistoricalSupportReceiptV1,
+) -> Result<String, InverseVmShortlistErrorV1> {
+    let mut canonical = receipt.clone();
+    canonical.receipt_sha256.clear();
+    json_sha256(&canonical)
+}
+
+/// Seals the support evaluator's result for one process/recipe query. This
+/// content digest is not an authenticated signature by the support service.
+pub fn seal_historical_support_receipt_v1(
+    receipt: &HistoricalSupportReceiptV1,
+) -> Result<String, InverseVmShortlistErrorV1> {
+    support_receipt_digest(receipt)
+}
+
+fn validate_historical_support_receipt(
+    input: &InverseVmShortlistInputV1,
+    candidate: &InverseVmCandidateV1,
+    support: &HistoricalSupportEvidenceV1,
+) -> Result<Vec<CandidateScreenReasonV1>, InverseVmShortlistErrorV1> {
+    let mut reasons = Vec::new();
+    let Some(receipt) = support.receipt.as_ref() else {
+        reasons.push(CandidateScreenReasonV1::HistoricalSupportReceiptMissing);
+        return Ok(reasons);
+    };
+    if receipt.schema != HISTORICAL_SUPPORT_RECEIPT_SCHEMA_V1 {
+        reasons.push(CandidateScreenReasonV1::HistoricalSupportReceiptSchemaMismatch);
+    }
+    require_text(&receipt.evaluator_id, "support_receipt.evaluator_id")?;
+    if !valid_sha256(&receipt.receipt_sha256)
+        || support_receipt_digest(receipt)? != receipt.receipt_sha256
+    {
+        reasons.push(CandidateScreenReasonV1::HistoricalSupportReceiptDigestMismatch);
+    }
+    if receipt.process_snapshot_sha256 != input.process_snapshot_sha256
+        || receipt.process_snapshot_sha256 != candidate.process_snapshot_sha256
+        || receipt.support_manifest_sha256 != support.support_manifest_sha256
+        || receipt.support_policy_sha256 != support.support_policy_sha256
+        || receipt.normalized_distance != support.normalized_distance
+    {
+        reasons.push(CandidateScreenReasonV1::HistoricalSupportReceiptContextMismatch);
+    }
+    if receipt.recipe_settings_sha256 != recipe_settings_digest(&candidate.recipe_settings)? {
+        reasons.push(CandidateScreenReasonV1::HistoricalSupportReceiptRecipeMismatch);
+    }
+    if receipt.neighbour_ids_sha256 != sorted_neighbour_ids_digest(&support.neighbour_ids)? {
+        reasons.push(CandidateScreenReasonV1::HistoricalSupportReceiptNeighbourMismatch);
+    }
+    if receipt.clock_domain_id != input.clock_domain_id
+        || receipt.clock_mapping_sha256 != input.clock_mapping_sha256
+        || !valid_sha256(&receipt.clock_mapping_sha256)
+    {
+        reasons.push(CandidateScreenReasonV1::HistoricalSupportReceiptClockMismatch);
+    }
+    if receipt.evaluated_at_unix_seconds < 0
+        || receipt.available_at_unix_seconds < receipt.evaluated_at_unix_seconds
+    {
+        reasons.push(CandidateScreenReasonV1::HistoricalSupportReceiptContextMismatch);
+    }
+    if receipt.available_at_unix_seconds > input.decision_at_unix_seconds {
+        reasons.push(CandidateScreenReasonV1::HistoricalSupportReceiptNotYetAvailable);
+    }
+    reasons.sort();
+    reasons.dedup();
+    Ok(reasons)
+}
+
 fn validate_forward_evaluation_receipt(
     input: &InverseVmShortlistInputV1,
     candidate: &InverseVmCandidateV1,
@@ -617,6 +721,22 @@ fn screen_candidate(
             {
                 reasons.push(CandidateScreenReasonV1::InvalidSupportNeighbourId);
                 state = CandidateScreenStateV1::Rejected;
+            }
+            let support_receipt_reasons =
+                validate_historical_support_receipt(input, candidate, support)?;
+            for reason in support_receipt_reasons {
+                let receipt_is_missing =
+                    reason == CandidateScreenReasonV1::HistoricalSupportReceiptMissing;
+                let receipt_is_late =
+                    reason == CandidateScreenReasonV1::HistoricalSupportReceiptNotYetAvailable;
+                reasons.push(reason);
+                if state != CandidateScreenStateV1::Rejected {
+                    state = if receipt_is_missing || receipt_is_late {
+                        CandidateScreenStateV1::Unknown
+                    } else {
+                        CandidateScreenStateV1::Rejected
+                    };
+                }
             }
             if support.neighbour_ids.len() < policy.minimum_support_neighbours {
                 reasons.push(CandidateScreenReasonV1::HistoricalSupportCountInsufficient);
@@ -883,6 +1003,7 @@ fn unknown_report(
         physical_experiment_authorized: false,
         equipment_control_authority: false,
         forward_evaluation_receipt_authenticity_proven: false,
+        historical_support_receipt_authenticity_proven: false,
         report_sha256: String::new(),
     };
     report.report_sha256 = report_digest(&report)?;
@@ -1103,6 +1224,7 @@ mod tests {
                 neighbour_ids: vec![format!("n-{id}-1"), format!("n-{id}-2")],
                 normalized_distance: support_distance,
                 support_policy_sha256: digest('d'),
+                receipt: None,
             }),
             forward_model_sha256: digest('b'),
             forward_evidence_state: ForwardEvidenceStateV1::Qualified,
@@ -1123,9 +1245,35 @@ mod tests {
             ],
             candidate_evidence_sha256: String::new(),
         };
+        let support = value.historical_support.as_mut().unwrap();
+        support.receipt = Some(support_receipt(&value, support_distance));
         value.forward_evaluation_receipt = Some(forward_receipt(&value));
         value.candidate_evidence_sha256 = candidate_digest(&value).unwrap();
         value
+    }
+
+    fn support_receipt(
+        candidate: &InverseVmCandidateV1,
+        normalized_distance: f64,
+    ) -> HistoricalSupportReceiptV1 {
+        let support = candidate.historical_support.as_ref().unwrap();
+        let mut receipt = HistoricalSupportReceiptV1 {
+            schema: HISTORICAL_SUPPORT_RECEIPT_SCHEMA_V1.into(),
+            evaluator_id: "historical-support-evaluator.v1".into(),
+            process_snapshot_sha256: candidate.process_snapshot_sha256.clone(),
+            support_manifest_sha256: support.support_manifest_sha256.clone(),
+            support_policy_sha256: support.support_policy_sha256.clone(),
+            recipe_settings_sha256: recipe_settings_digest(&candidate.recipe_settings).unwrap(),
+            neighbour_ids_sha256: sorted_neighbour_ids_digest(&support.neighbour_ids).unwrap(),
+            normalized_distance,
+            clock_domain_id: "fab-clock".into(),
+            clock_mapping_sha256: digest('9'),
+            evaluated_at_unix_seconds: 80,
+            available_at_unix_seconds: 90,
+            receipt_sha256: String::new(),
+        };
+        receipt.receipt_sha256 = support_receipt_digest(&receipt).unwrap();
+        receipt
     }
 
     fn forward_receipt(candidate: &InverseVmCandidateV1) -> ForwardEvaluationReceiptV1 {
@@ -1159,6 +1307,92 @@ mod tests {
             policy: policy(),
             candidates,
         }
+    }
+
+    #[test]
+    fn missing_historical_support_receipt_is_unknown() {
+        let mut candidate = candidate("missing-support-receipt", 200.0, 50.0, (99.0, 101.0), 0.2);
+        candidate.historical_support.as_mut().unwrap().receipt = None;
+        candidate.candidate_evidence_sha256 = candidate_digest(&candidate).unwrap();
+        let report = evaluate_inverse_vm_shortlist_v1(&input(vec![candidate])).unwrap();
+        assert_eq!(report.evaluations[0].state, CandidateScreenStateV1::Unknown);
+        assert!(
+            report.evaluations[0]
+                .reasons
+                .contains(&CandidateScreenReasonV1::HistoricalSupportReceiptMissing)
+        );
+        assert!(report.top_k_candidate_ids.is_empty());
+        assert!(!report.historical_support_receipt_authenticity_proven);
+    }
+
+    #[test]
+    fn late_or_recipe_mismatched_support_receipt_is_not_used() {
+        let mut late_input = input(vec![candidate("late-support", 200.0, 50.0, (99.0, 101.0), 0.2)]);
+        let support_receipt = late_input.candidates[0]
+            .historical_support
+            .as_mut()
+            .unwrap()
+            .receipt
+            .as_mut()
+            .unwrap();
+        support_receipt.available_at_unix_seconds = 2_001;
+        support_receipt.receipt_sha256 = support_receipt_digest(support_receipt).unwrap();
+        late_input.candidates[0].candidate_evidence_sha256 =
+            candidate_digest(&late_input.candidates[0]).unwrap();
+        let late_report = evaluate_inverse_vm_shortlist_v1(&late_input).unwrap();
+        assert_eq!(late_report.evaluations[0].state, CandidateScreenStateV1::Unknown);
+        assert!(
+            late_report.evaluations[0]
+                .reasons
+                .contains(&CandidateScreenReasonV1::HistoricalSupportReceiptNotYetAvailable)
+        );
+
+        let mut recipe_mismatch =
+            candidate("support-recipe-mismatch", 200.0, 50.0, (99.0, 101.0), 0.2);
+        recipe_mismatch.recipe_settings[0].value += 1.0;
+        recipe_mismatch.candidate_evidence_sha256 =
+            candidate_digest(&recipe_mismatch).unwrap();
+        let report = evaluate_inverse_vm_shortlist_v1(&input(vec![recipe_mismatch])).unwrap();
+        assert_eq!(report.evaluations[0].state, CandidateScreenStateV1::Rejected);
+        assert!(
+            report.evaluations[0]
+                .reasons
+                .contains(&CandidateScreenReasonV1::HistoricalSupportReceiptRecipeMismatch)
+        );
+    }
+
+    #[test]
+    fn support_receipt_neighbour_and_clock_mutations_are_rejected() {
+        let mut neighbour_mismatch =
+            candidate("support-neighbour-mismatch", 200.0, 50.0, (99.0, 101.0), 0.2);
+        neighbour_mismatch.historical_support.as_mut().unwrap().neighbour_ids[0] =
+            "different-neighbour".into();
+        neighbour_mismatch.candidate_evidence_sha256 =
+            candidate_digest(&neighbour_mismatch).unwrap();
+        let neighbour_report =
+            evaluate_inverse_vm_shortlist_v1(&input(vec![neighbour_mismatch])).unwrap();
+        assert_eq!(neighbour_report.evaluations[0].state, CandidateScreenStateV1::Rejected);
+        assert!(
+            neighbour_report.evaluations[0]
+                .reasons
+                .contains(&CandidateScreenReasonV1::HistoricalSupportReceiptNeighbourMismatch)
+        );
+
+        let mut clock_mismatch =
+            candidate("support-clock-mismatch", 200.0, 50.0, (99.0, 101.0), 0.2);
+        let support = clock_mismatch.historical_support.as_mut().unwrap();
+        let receipt = support.receipt.as_mut().unwrap();
+        receipt.clock_mapping_sha256 = digest('8');
+        receipt.receipt_sha256 = support_receipt_digest(receipt).unwrap();
+        clock_mismatch.candidate_evidence_sha256 =
+            candidate_digest(&clock_mismatch).unwrap();
+        let clock_report = evaluate_inverse_vm_shortlist_v1(&input(vec![clock_mismatch])).unwrap();
+        assert_eq!(clock_report.evaluations[0].state, CandidateScreenStateV1::Rejected);
+        assert!(
+            clock_report.evaluations[0]
+                .reasons
+                .contains(&CandidateScreenReasonV1::HistoricalSupportReceiptClockMismatch)
+        );
     }
 
     #[test]
