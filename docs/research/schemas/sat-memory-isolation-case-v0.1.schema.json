@@ -178,7 +178,8 @@
             "record_id",
             "source_owner_user_id",
             "source_tenant_id",
-            "content_digest"
+            "content_digest",
+            "content"
           ],
           "properties": {
             "record_id": {
@@ -196,6 +197,10 @@
             "content_digest": {
               "type": "string",
               "pattern": "^sha256:[a-f0-9]{64}$"
+            },
+            "content": {
+              "type": "string",
+              "minLength": 1
             }
           }
         },
