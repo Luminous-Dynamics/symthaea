@@ -156,6 +156,8 @@ This pulse residual assumes the basis is applied in the same state coordinates a
 
 These metrics are **finite-horizon linearized input–output residual proxies** for supplied discrete sensitivities. They are not H-infinity bounds, do not come with a classical balanced-truncation error theorem, and do not certify nonlinear Vlasov echo error. The classical H-infinity balanced-truncation bound is for stable LTI systems with exact Gramians; approximate-Gramian bounds have their own assumptions. The 2024 arbitrary-initial-condition estimator also assumes a stable LTI error system. Those methods are theoretical comparators; a plasma certificate must account for time variation, pulse-map jumps, finite amplitude, phase mixing, nonlinear branch changes, and the actual solver discretization. It is useful because it exposes whether a scenario-average balanced basis hides a poorly represented low-probability direction. The manufactured 51/49 fixture demonstrates that failure mode: a rank-one average basis retains the dominant scenario but loses the other scenario's response entirely, producing a weighted mean residual of 0.49 while both worst-case and 90%-CVaR residuals are 1.0.
 
+K-RESP-1's machine-readable `response_qualification` contract requires both residual channels, all three risk summaries (weighted mean, worst case, CVaR at alpha 0.9), and separate nonlinear full-order echo response measurements. The residual tolerance is deliberately marked `calibrate_on_independently_converged_physical_reference`; do not pick a synthetic threshold and call it a physical guarantee.
+
 Use three separate qualification views:
 - the training-weighted mean for average-case efficiency;
 - CVaR / worst-case residuals for the registered challenge family;
