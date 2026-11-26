@@ -5,13 +5,12 @@ use sha2::{Digest, Sha256};
 use std::collections::BTreeMap;
 
 use symthaea_semiconductor::benchmark::{
-    CA_OCRC_FEEDBACK_SCHEMA_V1, CA_OCRC_PREDICTION_SCHEMA_V1,
-    CA_OCRC_POLICY_SCHEMA_V1, CA_OCRC_ROUND_INPUT_SCHEMA_V1,
-    CaOcrcEngineV1, CaOcrcLabelFeedbackV1, CaOcrcPolicyV1, CaOcrcPredictionInputV1,
-    CaOcrcPredictionSetV1, CaOcrcRoundInputV1, CaOcrcSetKindV1,
-    LabelConsumptionEligibilityReportV1, LabelConsumptionEligibilityV1,
-    LabelEvidenceFrontierV1, CaOcrcFeedbackDispositionV1,
-    create_ca_ocrc_engine_v1, step_ca_ocrc_round_v1,
+    CA_OCRC_FEEDBACK_SCHEMA_V1, CA_OCRC_POLICY_SCHEMA_V1, CA_OCRC_PREDICTION_SCHEMA_V1,
+    CA_OCRC_ROUND_INPUT_SCHEMA_V1, CaOcrcEngineV1, CaOcrcFeedbackDispositionV1,
+    CaOcrcLabelFeedbackV1, CaOcrcPolicyV1, CaOcrcPredictionInputV1, CaOcrcPredictionSetV1,
+    CaOcrcRoundInputV1, CaOcrcSetKindV1, LabelConsumptionEligibilityReportV1,
+    LabelConsumptionEligibilityV1, LabelEvidenceFrontierV1, create_ca_ocrc_engine_v1,
+    step_ca_ocrc_round_v1,
 };
 
 fn digest(ch: char) -> String {
@@ -125,7 +124,10 @@ fn feedback(round: u64, sample: &str, label: &str) -> CaOcrcLabelFeedbackV1 {
     }
 }
 
-fn round(prediction: CaOcrcPredictionInputV1, feedbacks: Vec<CaOcrcLabelFeedbackV1>) -> CaOcrcRoundInputV1 {
+fn round(
+    prediction: CaOcrcPredictionInputV1,
+    feedbacks: Vec<CaOcrcLabelFeedbackV1>,
+) -> CaOcrcRoundInputV1 {
     CaOcrcRoundInputV1 {
         schema: CA_OCRC_ROUND_INPUT_SCHEMA_V1.into(),
         prediction,
@@ -220,18 +222,9 @@ fn production_round_engine_matches_independent_ca_ocrc_state_machine() {
     let mut engine = engine();
     let rounds = [
         round(prediction(0, "s0", 0.9), Vec::new()),
-        round(
-            prediction(1, "s1", 0.3),
-            vec![feedback(1, "s1", "l1")],
-        ),
-        round(
-            prediction(2, "s2", 0.9),
-            vec![feedback(2, "s0", "l0")],
-        ),
-        round(
-            prediction(3, "s3", 0.1),
-            vec![feedback(3, "s2", "l2")],
-        ),
+        round(prediction(1, "s1", 0.3), vec![feedback(1, "s1", "l1")]),
+        round(prediction(2, "s2", 0.9), vec![feedback(2, "s0", "l0")]),
+        round(prediction(3, "s3", 0.1), vec![feedback(3, "s2", "l2")]),
     ];
 
     let (expected_thresholds, expected_occupancies, expected_updates) = reference_replay();
@@ -283,7 +276,11 @@ fn optimal_bernoulli_proxy_is_checked_against_independent_grid_search() {
     for step in 1..=200_000 {
         let p = step as f64 / 200_000.0 * (2.0 / 3.0);
         let ratio = 3.0 * p / 2.0;
-        let h = if ratio == 0.0 { f64::INFINITY } else { ratio - 1.0 - ratio.ln() };
+        let h = if ratio == 0.0 {
+            f64::INFINITY
+        } else {
+            ratio - 1.0 - ratio.ln()
+        };
         let value = 3.0 / (p * 500.0) + (-2.0 * h).exp();
         if value < best_grid {
             best_grid = value;
