@@ -34,7 +34,7 @@ Other required baselines and adjacent methods:
 - Tensor-network Vlasov–Poisson compression: Åsgrim et al. (2026), https://doi.org/10.1016/j.jcp.2026.115330
 - Adaptive Fourier Vlasov–Poisson with wavenumber-domain expansion: Cho & Russo (2026), https://arxiv.org/abs/2607.12368
 - Adaptive structure-preserving hyper-reduction for particle-based Vlasov–Poisson models: Pagliantini & Vismara (2026), https://doi.org/10.1016/j.jcp.2025.114609
-- Non-Markovian FNO closure for Landau damping: Burles et al. (2026), https://doi.org/10.1017/S0022377826101233
+- Non-Markovian FNO closure for Landau damping: Burles et al. (2026), https://doi.org/10.1017/S0022377826102517
 - NEOPIC particle-measure field operator: https://arxiv.org/abs/2610.40528
 
 These methods solve different reduction problems. A closure that predicts selected moments is not a microscopic distribution reconstruction method; a particle-field operator is not automatically a state-space ROM; a high-order tensor representation is not necessarily an intervention-balanced representation. Report unsupported metrics as UNSUPPORTED rather than forcing unlike methods onto one score.
