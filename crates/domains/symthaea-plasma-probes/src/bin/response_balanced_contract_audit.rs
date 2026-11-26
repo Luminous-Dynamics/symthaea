@@ -325,6 +325,15 @@ fn audit(fixture: &Value) -> Result<(), String> {
         }
     }
 
+    let prior_art = string_array(fixture, "methodological_prior_art")?;
+    for method in [
+        "semi_infinite_worst_case_scenario_generation",
+        "adaptive_symplectic_particle_vlasov_rom",
+    ] {
+        if !prior_art.iter().any(|value| value == method) {
+            return Err(format!("methodological prior-art entry {method} is missing"));
+        }
+    }
     let comparators = string_array(fixture, "comparators")?;
     let adjacent_methods = string_array(fixture, "adjacent_methods")?;
     for method in [
@@ -332,6 +341,8 @@ fn audit(fixture: &Value) -> Result<(), String> {
         "adaptive_nitrom_port",
         "adaptive_opinf_nitrom_hybrid_port",
         "symmetry_augmented_kinetic_closure",
+        "entropy_based_vlasov_poisson_dougherty_moment_port",
+        "adaptive_symplectic_particle_vlasov_rom_port",
     ] {
         if !adjacent_methods.iter().any(|value| value == method) {
             return Err(format!("adjacent method {method} is not registered"));
