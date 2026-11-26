@@ -8,6 +8,7 @@ use std::fs::{self, File, OpenOptions};
 use std::io::{Read, Seek, SeekFrom, Write};
 use std::path::Path;
 
+use sha2::{Digest, Sha256};
 use symthaea_core::hdc::BinaryHV;
 use symthaea_hdc_store::header::{
     DATA_OFFSET, ENTRY_HV_OFFSET, ENTRY_SIZE, HEADER_PAGE_SIZE, HEADER_SIZE, STATUS_LIVE,
@@ -83,6 +84,64 @@ fn read_all(path: &Path) -> Vec<u8> {
         .expect("read store bytes");
     bytes
 }
+
+fn external_state_digest(store_path: &Path, store_id: &str) -> [u8; 32] {
+    let mut hasher = Sha256::new();
+    hasher.update(b"luminous.hdc-store.external-state-anchor.v0.1\\0");
+    hasher.update((store_id.len() as u64).to_le_bytes());
+    hasher.update(store_id.as_bytes());
+
+    for (label, path) in [
+        ("store", store_path.to_path_buf()),
+        ("lsh", lsh_snapshot_path(store_path)),
+        ("txn", batch_journal_path(store_path)),
+    ] {
+        hasher.update((label.len() as u64).to_le_bytes());
+        hasher.update(label.as_bytes());
+        match fs::read(&path) {
+            Ok(bytes) => {
+                hasher.update([1_u8]);
+                hasher.update((bytes.len() as u64).to_le_bytes());
+                hasher.update(&bytes);
+            }
+            Err(error) if error.kind() == std::io::ErrorKind::NotFound => {
+                hasher.update([0_u8]);
+                hasher.update(0_u64.to_le_bytes());
+            }
+            Err(error) => panic!("read anchor input {}: {error}", path.display()),
+        }
+    }
+
+    let digest = hasher.finalize();
+    let mut output = [0_u8; 32];
+    output.copy_from_slice(&digest);
+    output
+}
+
+#[derive(Debug)]
+struct ExternalStateAnchor {
+    store_id: String,
+    digest: [u8; 32],
+}
+
+impl ExternalStateAnchor {
+    fn capture(store_path: &Path, store_id: &str) -> Self {
+        Self {
+            store_id: store_id.to_owned(),
+            digest: external_state_digest(store_path, store_id),
+        }
+    }
+
+    fn validates(&self, store_path: &Path) -> bool {
+        external_state_digest(store_path, &self.store_id) == self.digest
+    }
+}
+
+fn high_water_record_id(store_path: &Path) -> Option<u64> {
+    let reader = HdcStoreReader::open(store_path).ok()?;
+    reader.ids().max()
+}
+
 
 fn changed_offsets(before: &[u8], after: &[u8]) -> Vec<usize> {
     assert_eq!(before.len(), after.len(), "edit unexpectedly changed file length");
@@ -480,3 +539,66 @@ fn hdc_store_at_rest_integrity_baseline_t1_to_t10() {
 
     // C1/C2 are mandatory validity gates, not scored cases.
 }
+
+#[test]
+fn external_state_commitment_catches_t9_and_t10_while_high_water_misses_erasure() {
+    let root = tempdir().expect("temporary external-anchor benchmark root");
+
+    // T9: a high-water record ID and an external full-state commitment both
+    // detect restoring a backup that predates a genuine appended record.
+    let t9_path = root.path().join("anchor-t9.hdc");
+    seed_store(&t9_path);
+    let t9_snapshot = root.path().join("anchor-t9-snapshot");
+    snapshot_store_family(&t9_path, &t9_snapshot);
+    {
+        let mut store = HdcStore::open(&t9_path).expect("T9 anchor reopen");
+        store
+            .append(66, &BinaryHV::random(0x414e_4348_4f52_5439))
+            .expect("T9 anchor genuine append");
+        store.checkpoint_lsh().expect("T9 anchor checkpoint");
+        store.sync_all().expect("T9 anchor sync");
+    }
+    let t9_high_water_anchor = high_water_record_id(&t9_path).expect("T9 high-water mark");
+    let t9_state_anchor = ExternalStateAnchor::capture(&t9_path, "symthaea-user-memory-A");
+    assert_eq!(t9_high_water_anchor, 66);
+    restore_store_family(&t9_snapshot, &t9_path);
+    assert_ne!(high_water_record_id(&t9_path), Some(t9_high_water_anchor));
+    assert!(!t9_state_anchor.validates(&t9_path));
+
+    // T10: deletion leaves the maximum record ID unchanged. A high-water-only
+    // witness therefore misses the restored record, while a commitment to the
+    // complete current state and tombstone epoch detects the resurrection.
+    let t10_path = root.path().join("anchor-t10.hdc");
+    seed_store(&t10_path);
+    let t10_snapshot = root.path().join("anchor-t10-snapshot");
+    snapshot_store_family(&t10_path, &t10_snapshot);
+    let t10_pre_delete_high_water = high_water_record_id(&t10_path).expect("pre-delete high-water");
+    {
+        let mut store = HdcStore::open(&t10_path).expect("T10 anchor reopen");
+        assert!(store.delete(SEED_IDS[2]).expect("T10 anchor delete"));
+        store.checkpoint_lsh().expect("T10 anchor checkpoint");
+        store.sync_all().expect("T10 anchor sync");
+    }
+    let t10_post_delete_high_water = high_water_record_id(&t10_path).expect("post-delete high-water");
+    assert_eq!(t10_pre_delete_high_water, t10_post_delete_high_water);
+    let t10_state_anchor = ExternalStateAnchor::capture(&t10_path, "symthaea-user-memory-B");
+
+    restore_store_family(&t10_snapshot, &t10_path);
+    assert_eq!(
+        high_water_record_id(&t10_path),
+        Some(t10_post_delete_high_water),
+        "generation-independent maximum ID cannot detect the restored deletion"
+    );
+    assert!(!t10_state_anchor.validates(&t10_path));
+    assert!(
+        read_record(&t10_path, SEED_IDS[2])
+            .expect("read resurrected record")
+            .is_some(),
+        "baseline SUT accepts the restored pre-erasure record"
+    );
+
+    println!(
+        "{{\\"schema\\":\\"luminous.hdc-store.external-anchor-reference.v0.1\\",\\"t9_high_water_detects_rollback\\":true,\\"t9_full_state_anchor_detects_rollback\\":true,\\"t10_high_water_misses_resurrection\\":true,\\"t10_full_state_anchor_detects_resurrection\\":true,\\"anchor_placement\\":\\"outside_store_and_snapshot_set\\",\\"production_integration\\":false}}"
+    );
+}
+
