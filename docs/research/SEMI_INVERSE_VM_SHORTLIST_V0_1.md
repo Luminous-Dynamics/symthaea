@@ -107,6 +107,27 @@ The current Rust module includes 22 tests for:
 
 An additional independent exhaustive top-K oracle separately recomputes normalized recipe distances, enumerates all valid sequences under the minimum-diversity rule, and compares the lexicographically optimal greedy path and per-rank scores with the production result. Exact-head rustfmt, strict Clippy, crate tests and SEMI-BENCH-001 reference workflow remain mandatory before marking these tests as passed.
 
+## Scenario robustness audit
+
+The companion module `inverse_vm_shortlist_stability` replays the same candidate inventory under explicit stress scenarios such as sensor dropout, reference drift, model-interval widening, support sparsification and delayed evidence.
+
+Every scenario must keep the same:
+- process snapshot and decision time;
+- clock domain and mapping;
+- target, hard recipe/side constraints, support policy and ranking policy;
+- candidate IDs and exact recipe vectors.
+
+A scenario may vary the forward prediction intervals, model evidence status/receipt availability, support neighbour set/distance or evidence arrival time, but each changed claim must be resealed with its own forward/support receipts.
+
+The report gives per-candidate:
+- count and fraction of scenarios remaining feasible;
+- count and fraction selected into top-K;
+- best, worst and median selected rank;
+- rank spread and whether it meets the declared stability limit;
+- per-scenario state and selected rank.
+
+The fractions are **descriptive stress-scenario frequencies, not probabilities or confidence levels** unless the scenario generator is separately calibrated and justified. The evaluator never changes a recipe, relaxes constraints or infers probability from an unweighted scenario list.
+
 ## Benchmark programme
 
 ### Faithful paper reproduction
