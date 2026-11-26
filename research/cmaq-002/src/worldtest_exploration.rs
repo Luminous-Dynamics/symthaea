@@ -279,7 +279,7 @@ pub fn evaluate_worldtest_exploration(
     let reset_share_ppm = match numerator.checked_div(total_interactions) {
         Some(value) => {
             u32::try_from(value).map_err(|_| WorldTestExplorationError::ArithmeticOverflow)?
-        },
+        }
         None => 0,
     };
 
