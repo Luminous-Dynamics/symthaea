@@ -1,0 +1,32 @@
+{
+  "schema_version": "1.0.0",
+  "fixture_id": "drift-aware-cross-device-replication-v1",
+  "execution_kind": "independent_exact_finite_policy_enumeration",
+  "rust_compiled_or_executed": false,
+  "selected_policy": {
+    "first_experiment_id": "science-b",
+    "second_experiments_by_first_outcome": ["science-c", "science-c"],
+    "actions_by_outcome_pair": ["choose-h0", "abstain", "abstain", "choose-h1"],
+    "scenario_values": [0.77848, 0.77848],
+    "worst_case_value": 0.77848,
+    "baseline_action_id": "abstain",
+    "baseline_worst_case_value": 0.6,
+    "robust_gain": 0.17848,
+    "expected_cost_by_scenario": [2.0, 2.0],
+    "maximum_path_cost": 2
+  },
+  "comparative_controls": {
+    "no_experiment_abstain": 0.6,
+    "same_device_b_repeated_twice": 0.772,
+    "independent_devices_b_then_c": 0.77848,
+    "calibrate_a_then_science_a_nominal": 0.8888,
+    "calibrate_a_then_science_a_shifted": 0.7025,
+    "calibrate_a_then_science_a_worst_case": 0.7025
+  },
+  "analytic_notes": [
+    "The exact maximin policy chooses separate devices B and C.",
+    "The two device-state offsets have independent priors; the policy abstains when their observations disagree.",
+    "Calibration followed by measurement on A is informative under nominal drift but loses value under the shifted transition scenario.",
+    "Cross-device observations are not assumed independent if a future fixture includes a shared latent or correlated transition."
+  ]
+}
