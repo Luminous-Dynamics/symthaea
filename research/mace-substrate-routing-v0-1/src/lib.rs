@@ -94,14 +94,46 @@ impl ResourceVectorV1 {
     }
 }
 
+/// Amortized resource estimate by memory-system lifecycle phase. The
+/// estimator must declare its evaluation-window/query-count convention in the
+/// independently pinned substrate profile. These remain estimates, not receipts.
+#[derive(Clone, Copy, Debug, Default, Eq, PartialEq)]
+pub struct PhaseCostBreakdownV1 {
+    pub construction: ResourceVectorV1,
+    pub maintenance: ResourceVectorV1,
+    pub retrieval: ResourceVectorV1,
+    pub verification: ResourceVectorV1,
+    pub generation: ResourceVectorV1,
+}
+
+impl PhaseCostBreakdownV1 {
+    pub fn checked_add(self, rhs: Self) -> Option<Self> {
+        Some(Self {
+            construction: self.construction.checked_add(rhs.construction)?,
+            maintenance: self.maintenance.checked_add(rhs.maintenance)?,
+            retrieval: self.retrieval.checked_add(rhs.retrieval)?,
+            verification: self.verification.checked_add(rhs.verification)?,
+            generation: self.generation.checked_add(rhs.generation)?,
+        })
+    }
+
+    pub fn checked_total(self) -> Option<ResourceVectorV1> {
+        self.construction
+            .checked_add(self.maintenance)?
+            .checked_add(self.retrieval)?
+            .checked_add(self.verification)?
+            .checked_add(self.generation)
+    }
+}
+
 #[derive(Clone, Copy, Debug, Eq, PartialEq)]
 pub struct SubstrateProfileV1 {
     pub kind: SubstrateKindV1,
     /// Digest assigned by the independently pinned substrate catalogue.
     pub profile_sha256: [u8; 32],
     pub enabled: bool,
-    /// Estimated per-invocation cost, not a measured resource receipt.
-    pub estimated_cost: ResourceVectorV1,
+    /// Estimated amortized cost by lifecycle phase, not measured receipts.
+    pub estimated_phase_costs: PhaseCostBreakdownV1,
 }
 
 #[derive(Clone, Copy, Debug, Eq, PartialEq)]
@@ -140,6 +172,7 @@ pub struct RoutePlanV1 {
     pub regime: QueryRegimeV1,
     pub selected_substrates: Vec<SubstrateBindingV1>,
     pub steps: Vec<RouteStepV1>,
+    pub estimated_phase_costs: PhaseCostBreakdownV1,
     pub estimated_cost: ResourceVectorV1,
     pub declared_budget: ResourceVectorV1,
     pub estimate_only: bool,
@@ -396,16 +429,19 @@ pub fn route_mace_query_v1(
     add_global_step(&mut steps, RouteActionV1::RevalidateLifecycleAtUse);
     add_global_step(&mut steps, RouteActionV1::EnforceContextAndResourceCaps);
 
-    let mut estimated_cost = ResourceVectorV1::default();
+    let mut estimated_phase_costs = PhaseCostBreakdownV1::default();
     for binding in &selected {
         let profile = profile_for(binding.kind, profiles)?;
         if profile.profile_sha256 != binding.profile_sha256 {
             return Err(RouteRejectV1::RequiredSubstrateUnavailable);
         }
-        estimated_cost = estimated_cost
-            .checked_add(profile.estimated_cost)
+        estimated_phase_costs = estimated_phase_costs
+            .checked_add(profile.estimated_phase_costs)
             .ok_or(RouteRejectV1::ResourceCostOverflow)?;
     }
+    let estimated_cost = estimated_phase_costs
+        .checked_total()
+        .ok_or(RouteRejectV1::ResourceCostOverflow)?;
     if !estimated_cost.componentwise_le(request.resource_budget) {
         return Err(RouteRejectV1::ResourceBudgetExceeded);
     }
@@ -416,6 +452,7 @@ pub fn route_mace_query_v1(
         regime: request.regime,
         selected_substrates: selected,
         steps,
+        estimated_phase_costs,
         estimated_cost,
         declared_budget: request.resource_budget,
         estimate_only: true,
@@ -447,12 +484,27 @@ mod tests {
         }
     }
 
-    fn profile(kind: SubstrateKindV1, estimated_cost: ResourceVectorV1) -> SubstrateProfileV1 {
+    fn profile(kind: SubstrateKindV1, retrieval_cost: ResourceVectorV1) -> SubstrateProfileV1 {
         SubstrateProfileV1 {
             kind,
             profile_sha256: PROFILE_DIGEST,
             enabled: true,
-            estimated_cost,
+            estimated_phase_costs: PhaseCostBreakdownV1 {
+                retrieval: retrieval_cost,
+                ..PhaseCostBreakdownV1::default()
+            },
+        }
+    }
+
+    fn profile_with_phases(
+        kind: SubstrateKindV1,
+        estimated_phase_costs: PhaseCostBreakdownV1,
+    ) -> SubstrateProfileV1 {
+        SubstrateProfileV1 {
+            kind,
+            profile_sha256: PROFILE_DIGEST,
+            enabled: true,
+            estimated_phase_costs,
         }
     }
 
@@ -696,11 +748,17 @@ mod tests {
         let profiles = [
             profile(
                 SubstrateKindV1::BitemporalLedger,
-                ResourceVectorV1 { context_bytes: u64::MAX, ..ResourceVectorV1::default() },
+                PhaseCostBreakdownV1 {
+                    construction: ResourceVectorV1 { context_bytes: u64::MAX, ..ResourceVectorV1::default() },
+                    ..PhaseCostBreakdownV1::default()
+                },
             ),
             profile(
                 SubstrateKindV1::RawTimeline,
-                ResourceVectorV1 { context_bytes: 1, ..ResourceVectorV1::default() },
+                PhaseCostBreakdownV1 {
+                    retrieval: ResourceVectorV1 { context_bytes: 1, ..ResourceVectorV1::default() },
+                    ..PhaseCostBreakdownV1::default()
+                },
             ),
         ];
         assert_eq!(
