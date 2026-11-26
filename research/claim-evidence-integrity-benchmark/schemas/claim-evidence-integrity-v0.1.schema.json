@@ -1,0 +1,380 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://github.com/Luminous-Dynamics/symthaea/research/claim-evidence-integrity-benchmark/schemas/claim-evidence-integrity-v0.1.schema.json",
+  "title": "Symthaea Claim-Evidence Integrity Fixture Pack v0.1",
+  "type": "object",
+  "additionalProperties": false,
+  "required": [
+    "schema_version",
+    "status",
+    "created_at",
+    "source_issue",
+    "purpose",
+    "verdicts",
+    "relation_labels",
+    "temporal_axes",
+    "evidence_digest_algorithm",
+    "fixtures",
+    "evaluation_policy",
+    "limitations"
+  ],
+  "properties": {
+    "schema_version": {
+      "const": "symthaea-claim-evidence-integrity-v0.1"
+    },
+    "status": {
+      "const": "SYNTHETIC_KNOWN_ANSWER_FIXTURES_NOT_EXPERT_GOLD"
+    },
+    "created_at": {
+      "type": "string",
+      "format": "date-time"
+    },
+    "source_issue": {
+      "const": 13635
+    },
+    "purpose": {
+      "type": "string",
+      "minLength": 1
+    },
+    "verdicts": {
+      "type": "array",
+      "minItems": 5,
+      "uniqueItems": true,
+      "items": {
+        "enum": [
+          "SUPPORTED",
+          "REFUTED",
+          "MIXED",
+          "UNDECIDABLE",
+          "OUT_OF_SCOPE"
+        ]
+      }
+    },
+    "relation_labels": {
+      "type": "array",
+      "minItems": 5,
+      "uniqueItems": true,
+      "items": {
+        "enum": [
+          "supports",
+          "refutes",
+          "qualifies",
+          "irrelevant",
+          "unresolved"
+        ]
+      }
+    },
+    "temporal_axes": {
+      "type": "array",
+      "minItems": 4,
+      "uniqueItems": true,
+      "items": {
+        "enum": [
+          "claim_reference_time",
+          "evidence_publication_time",
+          "evidence_retrieval_time",
+          "model_knowledge_cutoff"
+        ]
+      }
+    },
+    "evidence_digest_algorithm": {
+      "const": "SHA-256 over artifact_text UTF-8 bytes; fixture strings are ASCII so byte offsets are unambiguous."
+    },
+    "fixtures": {
+      "type": "array",
+      "minItems": 12,
+      "items": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": [
+          "fixture_id",
+          "family",
+          "claim_scope",
+          "claim",
+          "claim_reference_time",
+          "verification_time",
+          "model_knowledge_cutoff",
+          "evidence",
+          "label_provenance",
+          "expected_verdict",
+          "required_invariants",
+          "description",
+          "status"
+        ],
+        "properties": {
+          "fixture_id": {
+            "type": "string",
+            "minLength": 1
+          },
+          "family": {
+            "type": "string",
+            "minLength": 1
+          },
+          "claim": {
+            "type": "string",
+            "minLength": 1
+          },
+          "claim_reference_time": {
+            "type": "string",
+            "format": "date-time"
+          },
+          "verification_time": {
+            "type": "string",
+            "format": "date-time"
+          },
+          "model_knowledge_cutoff": {
+            "type": "string",
+            "format": "date-time"
+          },
+          "evidence": {
+            "type": "array",
+            "items": {
+              "type": "object",
+              "additionalProperties": false,
+              "required": [
+                "evidence_id",
+                "source_id",
+                "source_family_id",
+                "source_role",
+                "canonical_url",
+                "publication_time",
+                "retrieval_time",
+                "content_integrity",
+                "artifact_text",
+                "artifact_sha256",
+                "quote_span",
+                "relation_to_claim",
+                "correction_status",
+                "relationship_notes"
+              ],
+              "properties": {
+                "evidence_id": {
+                  "type": "string",
+                  "minLength": 1
+                },
+                "source_id": {
+                  "type": "string",
+                  "minLength": 1
+                },
+                "source_family_id": {
+                  "type": "string",
+                  "minLength": 1
+                },
+                "source_role": {
+                  "enum": [
+                    "primary",
+                    "secondary",
+                    "registry",
+                    "syndicated",
+                    "unknown"
+                  ]
+                },
+                "canonical_url": {
+                  "type": "string",
+                  "format": "uri"
+                },
+                "publication_time": {
+                  "type": "string",
+                  "format": "date-time"
+                },
+                "retrieval_time": {
+                  "type": "string",
+                  "format": "date-time"
+                },
+                "content_integrity": {
+                  "enum": [
+                    "clean",
+                    "compromised",
+                    "missing",
+                    "unknown"
+                  ]
+                },
+                "artifact_text": {
+                  "type": "string",
+                  "minLength": 1
+                },
+                "artifact_sha256": {
+                  "type": "string",
+                  "pattern": "^[a-f0-9]{64}$"
+                },
+                "quote_span": {
+                  "type": "object",
+                  "additionalProperties": false,
+                  "required": [
+                    "byte_start",
+                    "byte_end",
+                    "quote"
+                  ],
+                  "properties": {
+                    "byte_start": {
+                      "type": "integer",
+                      "minimum": 0
+                    },
+                    "byte_end": {
+                      "type": "integer",
+                      "minimum": 1
+                    },
+                    "quote": {
+                      "type": "string",
+                      "minLength": 1
+                    }
+                  }
+                },
+                "relation_to_claim": {
+                  "enum": [
+                    "supports",
+                    "refutes",
+                    "qualifies",
+                    "irrelevant",
+                    "unresolved"
+                  ]
+                },
+                "correction_status": {
+                  "enum": [
+                    "none",
+                    "corrected",
+                    "retracted",
+                    "superseded"
+                  ]
+                },
+                "relationship_notes": {
+                  "type": "string"
+                }
+              }
+            }
+          },
+          "expected_verdict": {
+            "enum": [
+              "SUPPORTED",
+              "REFUTED",
+              "MIXED",
+              "UNDECIDABLE",
+              "OUT_OF_SCOPE"
+            ]
+          },
+          "required_invariants": {
+            "type": "array",
+            "minItems": 1,
+            "uniqueItems": true,
+            "items": {
+              "type": "string",
+              "minLength": 1
+            }
+          },
+          "description": {
+            "type": "string",
+            "minLength": 1
+          },
+          "status": {
+            "const": "SYNTHETIC_KNOWN_ANSWER_NOT_EXPERT_GOLD"
+          },
+          "claim_scope": {
+            "type": "object",
+            "additionalProperties": false,
+            "required": [
+              "population",
+              "outcome_or_measure",
+              "quantifier_or_effect",
+              "domain_or_reference_boundary",
+              "scope_note"
+            ],
+            "properties": {
+              "population": {
+                "type": "string",
+                "minLength": 1
+              },
+              "outcome_or_measure": {
+                "type": "string",
+                "minLength": 1
+              },
+              "quantifier_or_effect": {
+                "type": "string",
+                "minLength": 1
+              },
+              "domain_or_reference_boundary": {
+                "type": "string",
+                "minLength": 1
+              },
+              "scope_note": {
+                "type": "string",
+                "minLength": 1
+              }
+            }
+          },
+          "label_provenance": {
+            "type": "object",
+            "additionalProperties": false,
+            "required": [
+              "label_status",
+              "authority_id",
+              "evidence_reference",
+              "independent_of_candidate",
+              "permitted_use"
+            ],
+            "properties": {
+              "label_status": {
+                "const": "SYNTHETIC_KNOWN_ANSWER"
+              },
+              "authority_id": {
+                "type": "string",
+                "minLength": 1
+              },
+              "evidence_reference": {
+                "type": "string",
+                "minLength": 1
+              },
+              "independent_of_candidate": {
+                "const": true
+              },
+              "permitted_use": {
+                "type": "string",
+                "minLength": 1
+              }
+            }
+          }
+        }
+      }
+    },
+    "evaluation_policy": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "denominator",
+        "score_separation",
+        "primary_contract",
+        "no_single_scalar",
+        "oracle_custody"
+      ],
+      "properties": {
+        "denominator": {
+          "type": "string"
+        },
+        "score_separation": {
+          "type": "array",
+          "minItems": 8,
+          "uniqueItems": true,
+          "items": {
+            "type": "string"
+          }
+        },
+        "primary_contract": {
+          "type": "string"
+        },
+        "no_single_scalar": {
+          "type": "string"
+        },
+        "oracle_custody": {
+          "type": "string"
+        }
+      }
+    },
+    "limitations": {
+      "type": "array",
+      "minItems": 3,
+      "items": {
+        "type": "string",
+        "minLength": 1
+      }
+    }
+  }
+}
