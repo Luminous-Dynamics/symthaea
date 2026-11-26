@@ -59,7 +59,9 @@ pub enum RbkrError {
 pub enum FiniteHorizonGramianError {
     #[error("finite-horizon trajectory axes are inconsistent")]
     InvalidTrajectoryAxes,
-    #[error("finite-horizon state, input, or output matrix has an invalid shape or non-finite value")]
+    #[error(
+        "finite-horizon state, input, or output matrix has an invalid shape or non-finite value"
+    )]
     InvalidTrajectoryMatrix,
     #[error("input cost must be finite and strictly positive")]
     InvalidInputCost,
@@ -81,7 +83,10 @@ pub struct FiniteHorizonGramianConfig {
 }
 
 impl FiniteHorizonGramianConfig {
-    pub fn new(maximum_factor_scalars: usize, maximum_propagation_scalar_operations: usize) -> Self {
+    pub fn new(
+        maximum_factor_scalars: usize,
+        maximum_propagation_scalar_operations: usize,
+    ) -> Self {
         Self {
             maximum_factor_scalars,
             maximum_propagation_scalar_operations,
@@ -152,9 +157,9 @@ pub fn build_finite_horizon_gramians(
         let input_count = matrix.first().map(Vec::len).unwrap_or(0);
         if matrix.len() != dimension
             || input_count == 0
-            || matrix.iter().any(|row| {
-                row.len() != input_count || row.iter().any(|value| !value.is_finite())
-            })
+            || matrix
+                .iter()
+                .any(|row| row.len() != input_count || row.iter().any(|value| !value.is_finite()))
             || costs.len() != input_count
         {
             return Err(FiniteHorizonGramianError::InvalidTrajectoryMatrix);
@@ -177,9 +182,10 @@ pub fn build_finite_horizon_gramians(
     }
 
     for (sample, (matrix, weights)) in future_c.iter().zip(qoi_weights).enumerate() {
-        if matrix.iter().any(|row| {
-            row.len() != dimension || row.iter().any(|value| !value.is_finite())
-        }) || weights.len() != matrix.len()
+        if matrix
+            .iter()
+            .any(|row| row.len() != dimension || row.iter().any(|value| !value.is_finite()))
+            || weights.len() != matrix.len()
         {
             return Err(FiniteHorizonGramianError::InvalidTrajectoryMatrix);
         }
@@ -256,9 +262,9 @@ fn validate_square_sequence(
 ) -> Result<(), FiniteHorizonGramianError> {
     if matrices.iter().any(|matrix| {
         matrix.len() != dimension
-            || matrix.iter().any(|row| {
-                row.len() != dimension || row.iter().any(|value| !value.is_finite())
-            })
+            || matrix
+                .iter()
+                .any(|row| row.len() != dimension || row.iter().any(|value| !value.is_finite()))
     }) {
         return Err(FiniteHorizonGramianError::InvalidTrajectoryMatrix);
     }
@@ -884,12 +890,9 @@ mod tests {
         assert!(reachable[1].abs() < 1.0e-12);
         assert!((observable[1] - 100.0).abs() < 1.0e-10);
 
-        let basis = ResponseBalancedBasis::from_empirical_gramians(
-            &reach,
-            &observe,
-            RbkrConfig::new(1),
-        )
-        .unwrap();
+        let basis =
+            ResponseBalancedBasis::from_empirical_gramians(&reach, &observe, RbkrConfig::new(1))
+                .unwrap();
         assert!(basis.trial_basis()[0][0].abs() < 1.0e-12);
         assert!((basis.trial_basis()[0][1] - 0.01).abs() < 1.0e-10);
         assert!(basis.biorthogonality_defect() < 1.0e-8);
