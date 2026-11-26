@@ -203,3 +203,35 @@ The optimized solver exposes expanded-state, cache-hit, cache-miss, and recursiv
 
 The optimized solver is a candidate implementation, not a production executor. Its tests are authored but have not been compiled or run in this environment. No speedup or benchmark score is claimed.
 
+## TimlMemBench Rust protocol smoke adapter
+
+A Rust-native, offline JSONL protocol smoke adapter is available as
+`src/bin/timlmembench_lexical.rs`, backed by
+`src/timlmembench_protocol.rs`.
+
+Run it from the Symthaea repository root:
+
+```bash
+cargo run --manifest-path research/broca-mace-transfer-bench-v0-1/aml-adapter/Cargo.toml --bin timlmembench_lexical
+```
+
+Pass the executable command to the official TimlMemBench runner through its
+`--adapter-command` option. The process implements one-request/one-response
+JSONL handling for `reset`, `ingest_session`, `query` and `close`; keeps
+each sample behind an explicit reset boundary; supports both canonical-pool
+and raw-native request shapes; and rejects unknown query fields rather than
+silently accepting benchmark gold labels.
+
+This adapter intentionally uses deterministic lexical overlap and returns the
+highest-ranked evidence text extractively. It is only a wiring/smoke baseline:
+it does not implement MACE lifecycle governance, evidence qualification,
+authority enforcement, feedback learning, an LLM answer model, or official
+semantic judging. It must not be reported as a paper baseline, MACE benchmark
+score, or SOTA comparison. The authoritative TimlMemBench grader and label
+boundary remain controlled by the external benchmark repository.
+
+Seven deterministic unit tests are authored for protocol round-trip, sample
+isolation, canonical-pool handling, gold-field rejection, duplicate-session
+rejection, close semantics and deterministic lexical tie-breaking. They have not been run in
+this environment.
+
