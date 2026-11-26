@@ -3,7 +3,7 @@ use serde::{Deserialize, Serialize};
 use sha2::{Digest, Sha256};
 use std::collections::HashSet;
 use std::fs;
-use std::path::Path;
+use std::path::{Component, Path};
 
 const CORPUS_SCHEMA: &str = "luminous.eqc.seed-corpus.v0.1";
 const TASK_SCHEMA: &str = "luminous.eqc.task.v0.1";
@@ -71,7 +71,7 @@ struct InputRef {
     artifact_path: String,
     classification: String,
     #[serde(default)]
-    sha256: Option<String>,
+    sha256: String,
 }
 
 #[derive(Debug, Clone, Deserialize)]
@@ -146,15 +146,24 @@ pub struct TaskReport {
     pub reference_pass: bool,
 }
 
-pub fn validate_corpus_file(path: &Path) -> anyhow::Result<EqcReport> {
-    let bytes = fs::read(path)
-        .with_context(|| format!("read EQC seed corpus {}", path.display()))?;
+pub fn validate_corpus_file(path: &Path, repository_root: &Path) -> anyhow::Result<EqcReport> {
+    let root = repository_root
+        .canonicalize()
+        .with_context(|| format!("resolve repository root {}", repository_root.display()))?;
+    let corpus_path = path
+        .canonicalize()
+        .with_context(|| format!("resolve EQC seed corpus {}", path.display()))?;
+    if !corpus_path.starts_with(&root) {
+        bail!("EQC seed corpus must be inside the repository root");
+    }
+    let bytes = fs::read(&corpus_path)
+        .with_context(|| format!("read EQC seed corpus {}", corpus_path.display()))?;
     let corpus: Corpus = serde_json::from_slice(&bytes)
-        .with_context(|| format!("parse EQC seed corpus {}", path.display()))?;
-    validate_corpus(&corpus, &bytes)
+        .with_context(|| format!("parse EQC seed corpus {}", corpus_path.display()))?;
+    validate_corpus(&corpus, &bytes, &root)
 }
 
-fn validate_corpus(corpus: &Corpus, raw_bytes: &[u8]) -> anyhow::Result<EqcReport> {
+fn validate_corpus(corpus: &Corpus, raw_bytes: &[u8], repository_root: &Path) -> anyhow::Result<EqcReport> {
     if corpus.schema != CORPUS_SCHEMA {
         bail!("unsupported EQC corpus schema: {}", corpus.schema);
     }
@@ -180,7 +189,7 @@ fn validate_corpus(corpus: &Corpus, raw_bytes: &[u8]) -> anyhow::Result<EqcRepor
     let mut allow_all_fails_negative_controls = false;
 
     for task in &corpus.tasks {
-        validate_task(task)?;
+        validate_task(task, repository_root)?;
         if !ids.insert(task.task_id.as_str()) {
             bail!("duplicate EQC task id: {}", task.task_id);
         }
@@ -254,7 +263,7 @@ fn validate_corpus(corpus: &Corpus, raw_bytes: &[u8]) -> anyhow::Result<EqcRepor
     })
 }
 
-fn validate_task(task: &Task) -> anyhow::Result<()> {
+fn validate_task(task: &Task, repository_root: &Path) -> anyhow::Result<()> {
     if task.schema != TASK_SCHEMA {
         bail!("{}: unsupported task schema", task.task_id);
     }
@@ -317,19 +326,33 @@ fn validate_task(task: &Task) -> anyhow::Result<()> {
         }
     }
     for input in &task.input_refs {
+        let relative_path = Path::new(&input.artifact_path);
         if input.input_id.is_empty()
             || input.artifact_path.is_empty()
+            || relative_path.is_absolute()
             || input.artifact_path.starts_with("http://")
             || input.artifact_path.starts_with("https://")
-            || input.artifact_path.split('/').any(|part| part == "..")
+            || relative_path.components().any(|part| matches!(part, Component::ParentDir | Component::RootDir | Component::Prefix(_)))
             || input.classification != "synthetic"
         {
-            bail!("{}: seed inputs must be local, synthetic artifacts", task.task_id);
+            bail!("{}: seed inputs must be repository-local synthetic artifacts", task.task_id);
         }
-        if let Some(digest) = input.sha256.as_deref() {
-            if !is_sha256(digest) {
-                bail!("{}: input '{}' has malformed SHA-256", task.task_id, input.input_id);
-            }
+        if !is_sha256(&input.sha256) {
+            bail!("{}: input '{}' has malformed SHA-256", task.task_id, input.input_id);
+        }
+        let unresolved_path = repository_root.join(relative_path);
+        let resolved_path = unresolved_path.canonicalize().with_context(|| {
+            format!("{}: resolve synthetic input '{}'", task.task_id, input.input_id)
+        })?;
+        if !resolved_path.starts_with(repository_root) {
+            bail!("{}: input '{}' escapes the repository root", task.task_id, input.input_id);
+        }
+        let input_bytes = fs::read(&resolved_path).with_context(|| {
+            format!("{}: read synthetic input '{}'", task.task_id, input.input_id)
+        })?;
+        let observed_digest = format!("{:x}", Sha256::digest(&input_bytes));
+        if observed_digest != input.sha256 {
+            bail!("{}: SHA-256 mismatch for input '{}'", task.task_id, input.input_id);
         }
     }
     if task.request.action == "challenge.consume"
@@ -412,10 +435,22 @@ mod tests {
             .expect("EQC public seed parses")
     }
 
+    fn repository_root() -> std::path::PathBuf {
+        std::path::PathBuf::from(env!("CARGO_MANIFEST_DIR"))
+            .parent()
+            .expect("xtask is one directory below the repository root")
+            .canonicalize()
+            .expect("repository root resolves")
+    }
+
     #[test]
     fn public_seed_reference_passes_and_baselines_fail_their_controls() {
-        let raw = include_bytes!("../../docs/research/eqc-seed-corpus-v0.1.json");
-        let report = validate_corpus(&seed_corpus(), raw).expect("seed validates");
+        let root = repository_root();
+        let report = validate_corpus_file(
+            &root.join("docs/research/eqc-seed-corpus-v0.1.json"),
+            &root,
+        )
+        .expect("seed validates");
         assert_eq!(report.task_count, 4);
         assert_eq!(report.reference_pass_count, 4);
         assert!(report.no_op_fails_positive_controls);
@@ -469,7 +504,7 @@ mod tests {
     fn malformed_timestamps_are_rejected_before_decision() {
         let mut task = seed_corpus().tasks.remove(0);
         task.authority_snapshot.observed_at = "not-a-date".into();
-        assert!(validate_task(&task).is_err());
+        assert!(validate_task(&task, &repository_root()).is_err());
     }
 
     #[test]
@@ -489,9 +524,11 @@ mod tests {
     #[test]
     fn report_is_json_serializable_without_claiming_system_qualification() {
         let raw = include_bytes!("../../docs/research/eqc-seed-corpus-v0.1.json");
+        let root = repository_root();
         let report = validate_corpus(
             &serde_json::from_slice(raw).expect("corpus parses"),
             raw,
+            &root,
         )
         .expect("corpus validates");
         let encoded = serde_json::to_vec(&report).expect("report serializes");
