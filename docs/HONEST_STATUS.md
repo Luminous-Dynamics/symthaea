@@ -1,14 +1,16 @@
 # Symthaea Honest Status
 
+> **Historical snapshot — not current release status or a production certification.** This audit was last updated on 5 February 2026 for version 0.5.0. Repository scope, implementations, benchmarks, and documentation have changed since then. Use the current [root README evidence table](../README.md#evidence-table), its linked reproduction commands, and the exact commit under review for current claims. If this snapshot conflicts with current evidence or code, do not treat this document as authoritative. "Production Ready" below records the historical audit's label; it does not mean independently certified, secure, clinically validated, or suitable for production deployment.
+
 **Updated**: February 5, 2026
 **Methodology**: Deep codebase audit against documentation claims
 **Version**: 0.5.0
 
 ---
 
-## Production Ready (100%)
+## Components marked complete in the 5 February 2026 audit (historical label)
 
-These work, are tested, and match documentation:
+The historical audit recorded the following components as implemented and matching the documentation it reviewed at that time:
 
 | Component | Location | Tests | Evidence |
 |-----------|----------|-------|----------|
