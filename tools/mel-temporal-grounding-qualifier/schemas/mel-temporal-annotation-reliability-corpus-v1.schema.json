@@ -164,6 +164,8 @@
         "annotation_manifest_sha256",
         "annotations",
         "assigned_annotator_ids_sha256",
+        "nonresponses",
+        "assigned_annotator_ids_sha256",
         "nonresponses"
       ],
       "additionalProperties": false,
