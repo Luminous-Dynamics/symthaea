@@ -1,0 +1,56 @@
+name: RoboDojo Contract Harness
+
+on:
+  pull_request:
+    types: [opened, synchronize, reopened, ready_for_review]
+    paths:
+      - "experiments/robodojo-contract/**"
+      - ".github/workflows/robodojo-contract.yml"
+  push:
+    branches: [main]
+    paths:
+      - "experiments/robodojo-contract/**"
+      - ".github/workflows/robodojo-contract.yml"
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: robodojo-contract-${{ github.ref }}
+  cancel-in-progress: true
+
+env:
+  CARGO_TERM_COLOR: always
+  RUST_BACKTRACE: 1
+
+jobs:
+  contract:
+    name: isolated contract and scoring tests
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Install pinned Rust toolchain
+        uses: dtolnay/rust-toolchain@1.96.0
+
+      - name: Test observation/action contracts and RC statistics
+        run: cargo test --locked --manifest-path experiments/robodojo-contract/Cargo.toml
+
+      - name: Run end-to-end contract smoke trace
+        run: cargo run --locked --manifest-path experiments/robodojo-contract/Cargo.toml
+
+      - name: Exercise trial TSV summary and paired comparison
+        run: |
+          cargo run --locked --manifest-path experiments/robodojo-contract/Cargo.toml -- --summarize experiments/robodojo-contract/examples/synthetic_trials.tsv
+          cargo run --locked --manifest-path experiments/robodojo-contract/Cargo.toml -- --compare experiments/robodojo-contract/examples/synthetic_trials.tsv baseline symthaea_sidecar
+
+      - name: Exercise confidence calibration CLI with authoritative outcomes
+        run: cargo run --locked --manifest-path experiments/robodojo-contract/Cargo.toml -- --calibrate experiments/robodojo-contract/examples/synthetic_forecasts.tsv experiments/robodojo-contract/examples/synthetic_trials.tsv
+
+      - name: Exercise shift-stratified robustness CLI
+        run: cargo run --locked --manifest-path experiments/robodojo-contract/Cargo.toml -- --shift-audit experiments/robodojo-contract/examples/synthetic_trials.tsv experiments/robodojo-contract/examples/synthetic_shift_plan.tsv baseline symthaea_sidecar
+
+      - name: Exercise paired active-sensing benchmark audit
+        run: cargo run --locked --manifest-path experiments/robodojo-contract/Cargo.toml -- --sensing-audit experiments/robodojo-contract/examples/synthetic_sensing_trials.tsv

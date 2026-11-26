@@ -1,0 +1,526 @@
+//! Probability calibration for recovery and intervention signals.
+//!
+//! Forecasts must be recorded before the outcome is observed. An invalid run,
+//! timeout, or safety stop is treated as a failure of end-to-end task completion
+//! when building the binary outcome; it must not be silently dropped.
+use std::collections::{BTreeMap, BTreeSet};
+
+#[derive(Debug, Clone, PartialEq)]
+pub struct SuccessForecast {
+    pub task_id: String,
+    pub variant_id: String,
+    pub trial_id: String,
+    /// Probability emitted before the trial of achieving the benchmark's full
+    /// completion criterion. Must be finite and lie in [0, 1].
+    pub predicted_success_probability: f64,
+    /// True only if the trial achieved the full task completion criterion.
+    pub success: bool,
+    /// False if the trial timed out, errored, was interrupted, or had no valid run.
+    pub valid_run: bool,
+}
+
+impl SuccessForecast {
+    pub fn validate(&self) -> Result<(), CalibrationError> {
+        if self.task_id.trim().is_empty()
+            || self.variant_id.trim().is_empty()
+            || self.trial_id.trim().is_empty()
+        {
+            return Err(CalibrationError::EmptyIdentifier);
+        }
+        let p = self.predicted_success_probability;
+        if !p.is_finite() || !(0.0..=1.0).contains(&p) {
+            return Err(CalibrationError::ProbabilityOutOfRange);
+        }
+        if self.success && !self.valid_run {
+            return Err(CalibrationError::SuccessOnInvalidRun);
+        }
+        Ok(())
+    }
+}
+
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub enum CalibrationError {
+    EmptyForecasts,
+    EmptyIdentifier,
+    ProbabilityOutOfRange,
+    SuccessOnInvalidRun,
+    DuplicateForecast,
+    InvalidBinCount,
+    InvalidConfidenceThreshold,
+}
+
+#[derive(Debug, Clone, PartialEq)]
+pub struct ReliabilityBin {
+    pub lower_bound: f64,
+    pub upper_bound: f64,
+    pub count: usize,
+    pub mean_predicted_probability: f64,
+    pub observed_success_rate: f64,
+    pub absolute_calibration_gap: f64,
+}
+
+#[derive(Debug, Clone, PartialEq)]
+pub struct RiskCoveragePoint {
+    /// Fraction of trials retained, starting at 1 / N and ending at 1.
+    pub coverage: f64,
+    /// Failure fraction among the retained highest-confidence trials.
+    pub risk: f64,
+    pub retained_trials: usize,
+}
+
+#[derive(Debug, Clone, PartialEq)]
+pub struct CalibrationSummary {
+    pub task_id: String,
+    pub variant_id: String,
+    /// Includes operationally invalid runs. Invalid runs are failures, not missing labels.
+    pub total_trials: usize,
+    pub valid_runs: usize,
+    pub successes: usize,
+    pub failures: usize,
+    pub mean_predicted_probability: f64,
+    pub observed_success_rate: f64,
+    pub brier_score: f64,
+    pub log_loss: f64,
+    pub expected_calibration_error: f64,
+    pub confidence_threshold: f64,
+    pub high_confidence_trials: usize,
+    pub high_confidence_failure_rate: Option<f64>,
+    /// Area under the risk-versus-coverage curve; lower is better when confidence ranks failures.
+    pub risk_coverage_auc: f64,
+    pub reliability_bins: Vec<ReliabilityBin>,
+    pub risk_coverage: Vec<RiskCoveragePoint>,
+}
+
+/// Summarize full-completion probability forecasts per task and policy variant.
+///
+/// ECE uses fixed-width probability bins. The risk-coverage curve retains trials
+/// in descending predicted-success probability; ties are ordered by trial ID.
+/// The curve and all error metrics include invalid runs, which count as failures
+/// for end-to-end reliability. Probabilities must have been generated before
+/// outcomes are known; this module cannot enforce that data-collection property.
+pub fn summarize_calibration(
+    forecasts: &[SuccessForecast],
+    bin_count: usize,
+    confidence_threshold: f64,
+) -> Result<Vec<CalibrationSummary>, CalibrationError> {
+    if forecasts.is_empty() { return Err(CalibrationError::EmptyForecasts); }
+    if bin_count == 0 { return Err(CalibrationError::InvalidBinCount); }
+    if !confidence_threshold.is_finite() || !(0.0..=1.0).contains(&confidence_threshold) {
+        return Err(CalibrationError::InvalidConfidenceThreshold);
+    }
+
+    let mut groups: BTreeMap<(String, String), Vec<&SuccessForecast>> = BTreeMap::new();
+    let mut seen = BTreeSet::new();
+    for record in forecasts {
+        record.validate()?;
+        let key = (record.task_id.clone(), record.variant_id.clone(), record.trial_id.clone());
+        if !seen.insert(key) { return Err(CalibrationError::DuplicateForecast); }
+        groups.entry((record.task_id.clone(), record.variant_id.clone())).or_default().push(record);
+    }
+
+    let mut summaries = Vec::with_capacity(groups.len());
+    for ((task_id, variant_id), rows) in groups {
+        let n = rows.len();
+        let mut bins: Vec<Vec<&SuccessForecast>> = (0..bin_count).map(|_| Vec::new()).collect();
+        let mut probability_sum = 0.0;
+        let mut brier_sum = 0.0;
+        let mut log_loss_sum = 0.0;
+        let mut successes = 0usize;
+        let mut high_count = 0usize;
+        let mut high_failures = 0usize;
+        let mut ranked: Vec<&SuccessForecast> = rows.clone();
+
+        for row in &rows {
+            let p = row.predicted_success_probability;
+            let outcome = if row.success { 1.0 } else { 0.0 };
+            probability_sum += p;
+            brier_sum += (p - outcome) * (p - outcome);
+            let clipped = p.clamp(1e-15, 1.0 - 1e-15);
+            log_loss_sum -= outcome * clipped.ln() + (1.0 - outcome) * (1.0 - clipped).ln();
+            if row.success { successes += 1; }
+            if p >= confidence_threshold {
+                high_count += 1;
+                if !row.success { high_failures += 1; }
+            }
+            let bin_index = ((p * bin_count as f64).floor() as usize).min(bin_count - 1);
+            bins[bin_index].push(*row);
+        }
+
+        let reliability_bins: Vec<ReliabilityBin> = bins.into_iter().enumerate().filter_map(|(i, bin)| {
+            if bin.is_empty() { return None; }
+            let count = bin.len();
+            let mean_p = bin.iter().map(|r| r.predicted_success_probability).sum::<f64>() / count as f64;
+            let observed = bin.iter().filter(|r| r.success).count() as f64 / count as f64;
+            Some(ReliabilityBin {
+                lower_bound: i as f64 / bin_count as f64,
+                upper_bound: (i + 1) as f64 / bin_count as f64,
+                count,
+                mean_predicted_probability: mean_p,
+                observed_success_rate: observed,
+                absolute_calibration_gap: (mean_p - observed).abs(),
+            })
+        }).collect();
+
+        let expected_calibration_error = reliability_bins.iter()
+            .map(|bin| bin.count as f64 / n as f64 * bin.absolute_calibration_gap)
+            .sum::<f64>();
+
+        ranked.sort_by(|a, b| {
+            b.predicted_success_probability.total_cmp(&a.predicted_success_probability)
+                .then_with(|| a.trial_id.cmp(&b.trial_id))
+        });
+        let mut risk_coverage = Vec::with_capacity(n);
+        let mut failures_seen = 0usize;
+        let mut previous_coverage = 0.0;
+        let mut previous_risk = 0.0;
+        let mut risk_coverage_auc = 0.0;
+        for (index, row) in ranked.iter().enumerate() {
+            if !row.success { failures_seen += 1; }
+            let retained = index + 1;
+            let coverage = retained as f64 / n as f64;
+            let risk = failures_seen as f64 / retained as f64;
+            risk_coverage_auc += (coverage - previous_coverage) * (risk + previous_risk) / 2.0;
+            risk_coverage.push(RiskCoveragePoint { coverage, risk, retained_trials: retained });
+            previous_coverage = coverage;
+            previous_risk = risk;
+        }
+
+        summaries.push(CalibrationSummary {
+            task_id,
+            variant_id,
+            total_trials: n,
+            valid_runs: rows.iter().filter(|r| r.valid_run).count(),
+            successes,
+            failures: n - successes,
+            mean_predicted_probability: probability_sum / n as f64,
+            observed_success_rate: successes as f64 / n as f64,
+            brier_score: brier_sum / n as f64,
+            log_loss: log_loss_sum / n as f64,
+            expected_calibration_error,
+            confidence_threshold,
+            high_confidence_trials: high_count,
+            high_confidence_failure_rate: (high_count > 0).then(|| high_failures as f64 / high_count as f64),
+            risk_coverage_auc,
+            reliability_bins,
+            risk_coverage,
+        });
+    }
+    Ok(summaries)
+}
+
+/// Costs expressed in one consistent utility unit (for example, estimated
+/// failure loss, or a declared normalized proxy). Do not mix dollars, seconds,
+/// and arbitrary scores without an explicit conversion.
+#[derive(Debug, Clone, Copy, PartialEq)]
+pub struct InterventionPolicy {
+    pub failure_cost: f64,
+    pub intervention_cost: f64,
+    pub minimum_expected_benefit: f64,
+    pub minimum_continue_probability: f64,
+    pub max_replans: u32,
+}
+
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub enum InterventionConfigError {
+    InvalidFailureCost,
+    InvalidInterventionCost,
+    InvalidMinimumBenefit,
+    InvalidContinueProbability,
+}
+
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub enum InterventionError {
+    InvalidCurrentProbability,
+    InvalidPostInterventionProbability,
+}
+
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub enum EscalationReason {
+    ConfidenceBelowContinueThreshold,
+    ReplanBudgetExhausted,
+}
+
+#[derive(Debug, Clone, Copy, PartialEq)]
+pub enum InterventionDecision {
+    Continue {
+        expected_benefit: f64,
+    },
+    RequestReplan {
+        expected_benefit: f64,
+        replans_remaining: u32,
+    },
+    StopAndEscalate {
+        expected_benefit: f64,
+        reason: EscalationReason,
+    },
+}
+
+impl InterventionPolicy {
+    pub fn new(
+        failure_cost: f64,
+        intervention_cost: f64,
+        minimum_expected_benefit: f64,
+        minimum_continue_probability: f64,
+        max_replans: u32,
+    ) -> Result<Self, InterventionConfigError> {
+        if !failure_cost.is_finite() || failure_cost <= 0.0 {
+            return Err(InterventionConfigError::InvalidFailureCost);
+        }
+        if !intervention_cost.is_finite() || intervention_cost < 0.0 {
+            return Err(InterventionConfigError::InvalidInterventionCost);
+        }
+        if !minimum_expected_benefit.is_finite() || minimum_expected_benefit < 0.0 {
+            return Err(InterventionConfigError::InvalidMinimumBenefit);
+        }
+        if !minimum_continue_probability.is_finite()
+            || !(0.0..=1.0).contains(&minimum_continue_probability)
+        {
+            return Err(InterventionConfigError::InvalidContinueProbability);
+        }
+        Ok(Self {
+            failure_cost,
+            intervention_cost,
+            minimum_expected_benefit,
+            minimum_continue_probability,
+            max_replans,
+        })
+    }
+
+    /// Choose whether to continue, replan, or stop for review.
+    ///
+    /// expected_benefit = (p_success_after_replan - p_success_now) * failure_cost
+    ///                    - intervention_cost
+    ///
+    /// The probabilities must be calibrated on held-out data and describe the
+    /// same task/condition. This simple expected-value rule is a research
+    /// baseline: it does not account for unmodelled hazards or physical dynamics.
+    pub fn decide(
+        &self,
+        current_success_probability: f64,
+        post_replan_success_probability: f64,
+        replans_used: u32,
+    ) -> Result<InterventionDecision, InterventionError> {
+        if !current_success_probability.is_finite()
+            || !(0.0..=1.0).contains(&current_success_probability)
+        {
+            return Err(InterventionError::InvalidCurrentProbability);
+        }
+        if !post_replan_success_probability.is_finite()
+            || !(0.0..=1.0).contains(&post_replan_success_probability)
+        {
+            return Err(InterventionError::InvalidPostInterventionProbability);
+        }
+
+        let expected_benefit =
+            (post_replan_success_probability - current_success_probability) * self.failure_cost
+                - self.intervention_cost;
+        let can_replan = replans_used < self.max_replans;
+        if can_replan && expected_benefit > self.minimum_expected_benefit {
+            return Ok(InterventionDecision::RequestReplan {
+                expected_benefit,
+                replans_remaining: self.max_replans - replans_used,
+            });
+        }
+
+        if current_success_probability < self.minimum_continue_probability {
+            let reason = if can_replan {
+                EscalationReason::ConfidenceBelowContinueThreshold
+            } else {
+                EscalationReason::ReplanBudgetExhausted
+            };
+            return Ok(InterventionDecision::StopAndEscalate {
+                expected_benefit,
+                reason,
+            });
+        }
+
+        Ok(InterventionDecision::Continue { expected_benefit })
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    fn forecast(id: &str, probability: f64, success: bool, valid_run: bool) -> SuccessForecast {
+        SuccessForecast {
+            task_id: "store_in_safe".to_owned(),
+            variant_id: "sidecar".to_owned(),
+            trial_id: id.to_owned(),
+            predicted_success_probability: probability,
+            success,
+            valid_run,
+        }
+    }
+
+    fn intervention_policy() -> InterventionPolicy {
+        InterventionPolicy::new(100.0, 10.0, 5.0, 0.6, 2).unwrap()
+    }
+
+    #[test]
+    fn expected_value_gate_replans_when_predicted_gain_exceeds_cost() {
+        match intervention_policy().decide(0.3, 0.8, 0).unwrap() {
+            InterventionDecision::RequestReplan { expected_benefit, replans_remaining } => {
+                assert!((expected_benefit - 40.0).abs() < 1e-9);
+                assert_eq!(replans_remaining, 2);
+            }
+            other => panic!("expected replan request, got {other:?}"),
+        }
+    }
+
+    #[test]
+    fn expected_value_gate_continues_when_replanning_is_not_worth_its_cost() {
+        match intervention_policy().decide(0.8, 0.82, 0).unwrap() {
+            InterventionDecision::Continue { expected_benefit } => {
+                assert!((expected_benefit + 8.0).abs() < 1e-9);
+            }
+            other => panic!("expected continue, got {other:?}"),
+        }
+    }
+
+    #[test]
+    fn low_confidence_with_no_replan_budget_stops_for_review() {
+        match intervention_policy().decide(0.2, 0.9, 2).unwrap() {
+            InterventionDecision::StopAndEscalate { expected_benefit, reason } => {
+                assert!((expected_benefit - 60.0).abs() < 1e-9);
+                assert_eq!(reason, EscalationReason::ReplanBudgetExhausted);
+            }
+            other => panic!("expected stop/escalate, got {other:?}"),
+        }
+    }
+
+    #[test]
+    fn low_confidence_stops_when_replan_has_insufficient_expected_benefit() {
+        let policy = InterventionPolicy::new(100.0, 50.0, 5.0, 0.6, 2).unwrap();
+        match policy.decide(0.3, 0.7, 0).unwrap() {
+            InterventionDecision::StopAndEscalate { expected_benefit, reason } => {
+                assert!((expected_benefit + 10.0).abs() < 1e-9);
+                assert_eq!(reason, EscalationReason::ConfidenceBelowContinueThreshold);
+            }
+            other => panic!("expected stop/escalate, got {other:?}"),
+        }
+    }
+
+    #[test]
+    fn invalid_probability_is_rejected_before_decision() {
+        assert_eq!(
+            intervention_policy().decide(f64::NAN, 0.9, 0),
+            Err(InterventionError::InvalidCurrentProbability)
+        );
+        assert_eq!(
+            intervention_policy().decide(0.5, f64::INFINITY, 0),
+            Err(InterventionError::InvalidPostInterventionProbability)
+        );
+    }
+
+    #[test]
+    fn intervention_configuration_rejects_invalid_costs_and_thresholds() {
+        assert_eq!(
+            InterventionPolicy::new(0.0, 1.0, 0.0, 0.5, 1),
+            Err(InterventionConfigError::InvalidFailureCost)
+        );
+        assert_eq!(
+            InterventionPolicy::new(1.0, -1.0, 0.0, 0.5, 1),
+            Err(InterventionConfigError::InvalidInterventionCost)
+        );
+        assert_eq!(
+            InterventionPolicy::new(1.0, 1.0, -1.0, 0.5, 1),
+            Err(InterventionConfigError::InvalidMinimumBenefit)
+        );
+        assert_eq!(
+            InterventionPolicy::new(1.0, 1.0, 0.0, 1.1, 1),
+            Err(InterventionConfigError::InvalidContinueProbability)
+        );
+    }
+
+    #[test]
+    fn expected_value_decisions_are_deterministic() {
+        let policy = intervention_policy();
+        assert_eq!(policy.decide(0.45, 0.8, 0), policy.decide(0.45, 0.8, 0));
+    }
+
+    #[test]
+    fn perfect_forecasts_have_zero_brier_and_calibration_error() {
+        let rows = vec![forecast("a", 0.0, false, true), forecast("b", 1.0, true, true)];
+        let summary = summarize_calibration(&rows, 5, 0.8).unwrap();
+        assert_eq!(summary.len(), 1);
+        assert_eq!(summary[0].brier_score, 0.0);
+        assert!(summary[0].expected_calibration_error.abs() < 1e-12);
+        assert!(summary[0].log_loss < 1e-12);
+        assert_eq!(summary[0].high_confidence_failure_rate, Some(0.0));
+    }
+
+    #[test]
+    fn confidently_wrong_forecast_is_penalized() {
+        let summary = summarize_calibration(&[forecast("a", 0.99, false, true)], 10, 0.8).unwrap();
+        assert!(summary[0].brier_score > 0.9);
+        assert!(summary[0].log_loss > 4.0);
+        assert!(summary[0].expected_calibration_error > 0.9);
+        assert_eq!(summary[0].high_confidence_failure_rate, Some(1.0));
+    }
+
+    #[test]
+    fn invalid_run_counts_as_failure_in_calibration() {
+        let summary = summarize_calibration(&[forecast("timeout", 0.9, false, false)], 10, 0.8).unwrap();
+        assert_eq!(summary[0].total_trials, 1);
+        assert_eq!(summary[0].valid_runs, 0);
+        assert_eq!(summary[0].failures, 1);
+        assert_eq!(summary[0].high_confidence_failure_rate, Some(1.0));
+    }
+
+    #[test]
+    fn confidence_ranks_success_before_failure_on_risk_coverage_curve() {
+        let rows = vec![
+            forecast("low-success", 0.2, true, true),
+            forecast("high-failure", 0.1, false, true),
+            forecast("high-success", 0.9, true, true),
+        ];
+        let summary = summarize_calibration(&rows, 5, 0.8).unwrap();
+        let curve = &summary[0].risk_coverage;
+        assert_eq!(curve.len(), 3);
+        assert_eq!(curve[0].risk, 0.0);
+        assert_eq!(curve[0].retained_trials, 1);
+        assert!(curve[2].risk > 0.0);
+    }
+
+    #[test]
+    fn duplicate_forecasts_are_rejected() {
+        let row = forecast("duplicate", 0.8, true, true);
+        assert_eq!(
+            summarize_calibration(&[row.clone(), row], 10, 0.8),
+            Err(CalibrationError::DuplicateForecast)
+        );
+    }
+
+    #[test]
+    fn invalid_probabilities_and_success_on_invalid_run_are_rejected() {
+        assert_eq!(
+            summarize_calibration(&[forecast("nan", f64::NAN, false, true)], 10, 0.8),
+            Err(CalibrationError::ProbabilityOutOfRange)
+        );
+        assert_eq!(
+            summarize_calibration(&[forecast("invalid", 0.5, true, false)], 10, 0.8),
+            Err(CalibrationError::SuccessOnInvalidRun)
+        );
+        assert_eq!(
+            summarize_calibration(&[forecast("valid", 0.5, false, true)], 0, 0.8),
+            Err(CalibrationError::InvalidBinCount)
+        );
+    }
+
+    #[test]
+    fn calibration_groups_are_deterministic_and_isolated_by_variant() {
+        let rows = vec![
+            forecast("a", 0.4, false, true),
+            SuccessForecast {
+                variant_id: "baseline".to_owned(),
+                ..forecast("b", 0.6, true, true)
+            },
+            forecast("c", 0.7, true, true),
+        ];
+        let a = summarize_calibration(&rows, 5, 0.8).unwrap();
+        let b = summarize_calibration(&rows, 5, 0.8).unwrap();
+        assert_eq!(a, b);
+        assert_eq!(a.len(), 2);
+    }
+}

@@ -1,0 +1,12 @@
+[package]
+name = "symthaea-robodojo-contract"
+version = "0.1.0"
+edition = "2024"
+rust-version = "1.85"
+license = "AGPL-3.0-or-later"
+description = "Dependency-free episode, observation, and action contract gate for robotics evaluation"
+
+# Nested workspace: keep this deterministic contract harness runnable without
+# resolving Symthaea's full workspace or installing Isaac Sim.
+[workspace]
+resolver = "2"
