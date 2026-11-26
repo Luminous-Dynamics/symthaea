@@ -1,0 +1,188 @@
+# ErgoStream Active Decision and Multimodal Reliability Addendum
+
+**Date:** 2026-11-26  
+**Status:** proposed benchmark protocol addendum; no new benchmark result or superiority claim  
+**Programme:** Symthaea #13401 / #13402; Symtropy #7442 / #7497 / #7516 / #7518 / #7529 / #7555 / #7558 / #7556 / #7577  
+**Purpose:** extend the frozen task-agnostic acquisition preregistration with evaluator-qualified decision-sufficient acquisition and a multi-axis reliability protocol for asynchronous multimodal alignment.
+
+## 1. New evidence that changes the competitive framing
+
+Two developments make a single pooled synchronization score scientifically inadequate.
+
+### 1.1 AV synchronization metrics are measurement instruments
+
+Sharma and Tapadiya's August 2026 preprint, *What Do Audio-Visual Synchronization Metrics Actually Measure?* (arXiv:2608.25157), audits AV-Align, ImageBind AV-relevance, JavisScore and Synchformer/DeSync using controlled-distortion monotonicity, preprocessing sensitivity, rank uncertainty, cross-metric agreement and a PEAVS human-aligned proxy.
+
+The paper reports an axis split:
+- Synchformer/DeSync is strongest on temporal-offset tracking (reported Kendall tau 0.84).
+- ImageBind/JavisScore better match the PEAVS human-aligned proxy (reported tau 0.20) and content-disruption families.
+- Cross-metric agreement is low (reported Krippendorff alpha 0.066).
+- Linear and simple k-nearest-neighbour score fusion do not improve agreement with the human-aligned proxy over the best individual metric.
+
+The work is described as an ECCV 2026 workshop poster and non-archival preprint. Treat the values as the paper's reported results, not as a definitive field-wide consensus. Its main methodological lesson is still important: a synchronization evaluator must itself be qualified as a measurement instrument. A new metric should not be considered better merely because it agrees with one other metric or produces a stronger leaderboard rank.
+
+Reference: https://arxiv.org/abs/2608.25157
+
+### 1.2 Generated-audio/video quality is a distinct task from feature alignment
+
+Two 2026 benchmarks address generated audiovisual content rather than the feature-extraction task targeted by AV-SyncBench.
+
+**SyncReward** (arXiv:2610.16338, 12 October 2026) reports SyncReward-Data-80K with 80,000 professional synchronization ratings on clips from eight audiovisual generators, plus a 1,000-clip held-out benchmark with multiple professional ratings per clip. Its taxonomy covers Speech, Onset, Instrument and Ambient sound families. The preprint reports that current specialized metrics and omni-modal models can diverge from human ratings. The project page says release of data, benchmark, model and code is planned; verify availability, license and exact artifact versions before treating it as an executable external baseline.
+
+Reference: https://arxiv.org/abs/2610.16338  
+Project: https://github.com/WeChatCV/SyncReward
+
+**Beyond Time Shifts / SyncBench** (ECCV 2026) proposes a reference-free evaluator for generated audiovisual synchronization using Qwen2.5-Omni-3B, SynthSync and human preference data. The public project reports approximately 306,000 pairwise human annotations and, for its trained evaluator, NDCG 0.9435, Kendall tau 0.4899, MRR 0.7674 and pairwise accuracy 72.38%. These are native SyncBench results, not AV-SyncBench results and not clock-offset classification accuracy.
+
+Reference: https://chenhaoqcdyq.github.io/BeyondTimeShifts/  
+Repository: https://github.com/chenhaoqcdyq/BeyondTimeShifts
+
+These datasets measure a different target from AV-SyncBench:
+- AV-SyncBench: whether a feature model ranks the original audio/video pair above controlled temporal or semantic perturbations.
+- SyncReward / SyncBench: whether an evaluator of generated clips aligns with human judgements of generated audiovisual quality.
+
+They must remain distinct benchmark lanes.
+
+## 2. Multimodal reliability card — required scorecard
+
+Every ErgoStream audiovisual or multimodal result should report a reliability card, not a single synchronization number.
+
+| Dimension | What it measures | Example metrics / controls |
+|---|---|---|
+| Clock registration | Recovery of device timebases | offset/rate error, held-out anchor residual, rank, singular spectrum, condition diagnostic |
+| Event correspondence | Which observations refer to the same event | pairwise precision/recall, false association, set-valued correctness, false-unique rate |
+| Temporal sensitivity | Response to controlled timing errors | monotonicity across offset/jitter/speed tiers, local-jitter response |
+| Semantic integrity | Correct source/event association when timing is held fixed | source/timbre substitution detection, event-count and event-type consistency |
+| Human alignment | Agreement with independent human assessment | rank correlation, pairwise preference accuracy, calibration and confidence intervals |
+| Metric stability | Sensitivity to harmless pipeline changes | decoder/window/preprocessing perturbations, rank-flip rate, bootstrap ranking uncertainty |
+| Missingness and conflict | Behavior under incomplete/disagreeing modalities | coverage, failure denominators, correct abstention, selective risk |
+| Cost and latency | Practical acquisition/evaluation burden | media seconds, compute, memory, wall time, energy where measured, cost per qualified pair |
+
+The card must display per-stratum denominators, confidence intervals, ties, missing outputs and failed samples. A scalar may be included for a precisely defined native task, but it cannot replace the card.
+
+### Required metric-audit controls
+
+Before a metric is used as a training reward, model-selection signal or leaderboard authority, test:
+
+1. **Known-distortion monotonicity:** score must move in the expected direction under controlled offset, jitter, speed, event deletion/addition and semantic substitution.
+2. **Benign-transform stability:** decoder, crop, frame-rate, sample-rate and windowing changes that preserve the relevant event should not arbitrarily reverse model rankings.
+3. **Axis specificity:** a temporal-only change should primarily affect temporal metrics; a source-only change should primarily affect semantic/source metrics.
+4. **Human agreement:** use independent multi-rater labels on a held-out sample; report agreement and uncertainty rather than assuming one reference metric is ground truth.
+5. **Rank uncertainty:** bootstrap at video/scene/source level rather than treating correlated crops or perturbation pairs as independent.
+6. **Shortcut/identity controls:** duplicate media, source memorization, background leakage and easy low-level cues must not reveal the positive/negative assignment.
+7. **Selective validity:** ambiguous, missing-source or conflicting-modality cases should permit abstention; confidence must be calibrated on independent strata.
+
+Metric fusion is a hypothesis, not an automatic improvement. It must demonstrate incremental human agreement and stable ranking under paired bootstrap evaluation.
+
+## 3. External comparator hierarchy and fair comparisons
+
+Keep each external benchmark on its native task and protocol.
+
+| Lane | Primary comparison | Secondary comparator | ErgoStream extension |
+|---|---|---|---|
+| Real AV feature alignment | AV-SyncBench official protocol | Synchformer, SparseSync and compatible frozen models | active observation acquisition and reusable event-grammar transfer after native reproduction |
+| Generated AV evaluation | SyncReward-Bench and SyncBench where artifacts are released and licensed | PEAVS and the metric-audit protocol | source/event explanation, uncertainty, event completeness and decision relevance |
+| Clock registration | MATH-SYNC v1.1 | paired-anchor OLS / Theil-Sen / Huber | active anchor selection and corrupted-reference abstention |
+| Structural transfer | exact finite graph matching and graph-transfer suites | FOR/ETC, graphon diagnostics, ReCoG-style relative contexts | explicit witness ambiguity and counterexamples on unseen families |
+| Decision-focused learning | robust worst-case regret minimization | finite Bayes-risk / EVSI and exact finite-horizon policy oracles | minimize observation cost subject to evidence constraints and a predeclared regret ceiling |
+
+### Important 2026 adjacent work
+
+- ReCoG (arXiv:2611.01753, 1 November 2026) reports that removing a large proportion of source graph edges improved transfer for four graph pretraining methods, and reports gains of 7.61 percentage points in mean one-shot cross-domain node classification and 4.47 points in cross-type transfer to heterophilous graphs across 18 target datasets. Include full-graph, edge-thinned and relative-context arms wherever graph assumptions fit. This is a result to reproduce, not evidence that edge-thinning always helps every relation task. https://arxiv.org/abs/2611.01753
+- Yamao et al., *Robust Decision-Focused Learning via Worst-Case Regret Minimization*, UAI 2026 / PMLR 337, models both measurement-error uncertainty around observed coefficients and distribution-shift uncertainty through a Wasserstein ambiguity set, then minimizes worst-case decision regret. It is a relevant competitor to prediction-only objectives: https://proceedings.mlr.press/v337/yamao26a.html
+- MATH-SYNC v1.1, archived 2 October 2026, adds G12-A/B/C/D estimator, anchor geometry, reference sensitivity and convergence/scaling experiments. The authoritative Zenodo record states that Harvard and WESAD remain controlled schedule-replay experiments, not absolute physical clock measurements: https://zenodo.org/records/23106783
+
+## 4. MATH-SYNC v1.1 reproduction checklist
+
+The exact v1.1 archive is 6.9 MB and publishes SHA-256:
+
+\`7f029bc9b7f892e65dcfa29fd4241eb362a8eb223356ab0037b21a7d852ea3a1\`
+
+Download and verify the archive bytes before trusting the checksum or running any experiment. Preserve the frozen archive, release commit, environment, dependency versions, data manifests, participant exclusions, random seeds and score aggregation.
+
+The current article reports the following supplementary results:
+
+- Alternative estimators: OLS, Huber, LAD, Tukey and RANSAC. Under nominal/stress contamination, robust estimators substantially outperform OLS; Huber and LAD converged in all 150 trials, while Tukey had 33 failures and RANSAC required approximately 1.1–1.2 seconds per realization in that implementation.
+- Anchor geometry: 2,700 trials; 63 rank-deficient cases, 60 with four anchors and three with six anchors. Increasing temporal span from 25% to 100% reduced median RMSE across the reported scenario/anchor combinations.
+- Reference sensitivity: six possible references; a controlled smooth non-affine 20 ms reference perturbation worsened all 300 paired comparisons. This is a synthetic stressor, not an estimate of real hardware reference bias.
+- Tolerance: at relative tolerance 1e-4, 50/50 trials converged after median one iteration but median RMSE rose to 1.431 ms; at 1e-6, 50/50 converged with median five iterations and RMSE 1.088 ms; at 1e-8, 49/50 converged with median 11 iterations and RMSE 1.087 ms.
+- Scaling: 1,000 trials across 20 stream/anchor configurations; 936 converged and 64 reached the iteration limit. The largest 40-stream/128-anchor configuration had 4,622 observations and 206 unknowns, with approximately 462 ms median solve-only time on the study workstation.
+
+These numbers define a reproduction target. They do not imply that ErgoStream has reproduced the experiments. The Rust v0.1 reference currently has a lower 8-stream/2,048-observation bound; extending it to the external scale envelope requires a separate qualification increment.
+
+Paper: https://www.mdpi.com/2227-7390/14/20/3720  
+Archive: https://zenodo.org/records/23106783  
+Release: https://github.com/jrhechavarriah/MATH_SYNC_v1.0/releases/tag/v1.1
+
+## 5. Decision-sufficient active acquisition — evaluator contract
+
+The active-acquisition benchmark must keep three objects separate:
+
+1. **Candidate hypothesis set:** candidate-local explanations and their predicted decision-equivalence classes.
+2. **Evaluator-admissible witness set:** the complete set of structural witnesses compatible with the frozen public evidence prefix, established by independent owner-side validation.
+3. **Ground-truth probe outcome support:** the possible outcome set for each declared probe under each evaluator-admissible witness, held outside the candidate process.
+
+A candidate is not allowed to establish its own truth set. The evaluator must use an independent structural validator to bind candidate-local hypothesis IDs to canonical evaluator witness identities.
+
+### Non-compensable evaluator checks
+
+- **False exclusion:** admissible witness omitted by the candidate. A candidate cannot obtain DecisionSufficient by shrinking its own hypothesis set.
+- **False inclusion:** candidate hypothesis does not map to an admissible witness.
+- **False decision equivalence:** candidate groups witnesses that imply materially different downstream decisions.
+- **False decision split:** candidate separates witnesses that are decision-equivalent under the frozen domain utility/tolerance contract.
+- **False probe utility:** candidate predicts a separating outcome partition but evaluator truth shows a shared outcome remains compatible with decisions that disagree.
+- **False outcome support:** candidate omits a possible outcome or predicts a spurious outcome.
+- **Unnecessary abstention:** candidate returns Unresolved despite an affordable, legal, truth-discriminating probe.
+- **Decision-sufficient validity:** complete admissible witness coverage and evaluator-confirmed decision equivalence are both required.
+
+The evaluator-only reference implementation is in Symtropy draft PR #7577, stacked on candidate policy PR #7558 and tracked by #7555. It reports each failure count separately; it does not authorize probe execution, certify physical sensors or replace blind episode custody.
+
+### Multi-step policy qualification
+
+The first #7558 policy is a one-step minimax decision-partition baseline. It must not be presented as an optimal sequential researcher.
+
+The next policy comparison should include:
+- no acquisition/passive schedule;
+- cheapest-first and uniform coverage;
+- random legal probe;
+- maximum-hypothesis-split;
+- one-step minimax decision-disagreement reduction;
+- calibrated entropy and EVSI only where the likelihood model is justified;
+- two-step and finite-horizon lookahead;
+- evaluator-only exact finite-horizon policy on tiny worlds.
+
+For every method, compare cost to a predeclared terminal decision-regret ceiling, not merely the number of hypotheses removed. Report regret, decision error, false-sufficiency, false-exclusion, unnecessary abstention, accepted and failed probe attempts, observation latency, energy and compute. Preserve all failures in the denominator.
+
+A robust extension should minimize worst-case downstream regret over evaluator-admissible hypotheses and a declared outcome uncertainty set. Probabilistic/expected EVSI is a separate arm and requires a frozen, calibrated outcome model; entropy is not a substitute for decision utility.
+
+## 6. Preregistered target metrics and claim thresholds
+
+These are prospective targets, not achieved results:
+
+| Objective | Target / qualification rule |
+|---|---|
+| Exhaustive finite witness correctness | Zero false-unique, false-exclusion and false-sufficiency on the complete tiny-world oracle suite |
+| Probe correctness | Zero false probe-utility claims on exhaustive finite fixtures |
+| Active acquisition efficiency | At least 20% lower acquisition cost than the strongest matched passive baseline at equal or lower held-out decision regret, with no false-sufficiency regression |
+| False-sufficiency rate | Target below 1%; zero observed false-sufficiency among 300 independent confirmatory negative cases only supports an approximate 95% upper bound near 1% under an IID/binomial interpretation; cluster dependence requires a cluster-aware bound and usually more cases |
+| MATH-SYNC reproducibility | Reproduce G12 outputs, failures and participant-level results under the exact frozen v1.1 code/data/environment protocol before any comparative claim |
+| AV-SyncBench reproduction | Reproduce the official score path, reference models, preprocessing variants, ties and every stratum before adding candidate comparisons |
+| Human-aligned generated AV | Run only after dataset/model artifacts and licenses are available; evaluate on sealed clips and preserve independent human raters |
+| Transfer contribution | Explicit witnesses must show incremental predictive or decision value beyond the strongest applicable M1/M2 diagnostic on sealed generator families |
+
+No aggregate score can compensate for false causal transfer, false-sufficiency, false-unique or unsupported physical claims.
+
+## 7. Integration and status
+
+- Symtropy #7556: independent Jacobi-SVD rank audit and MATH-SYNC v1.1 reproduction delta. Exact-head Rust 1.96 workflow passed for the currently recorded PR head; this is bounded rank-diagnostic qualification, not full MATH-SYNC reproduction.
+- Symtropy #7558: one-step decision-sufficient minimax probe selector. Exact-head Rust 1.96 formatting, tests and strict Clippy passed on its recorded head; this is a candidate policy reference, not empirical acquisition superiority.
+- Symtropy #7557: evaluator-only decision-sufficiency and probe-claim scorer. The first workflow exposed a dependency path error before compilation; the path has been corrected and a new exact-head run is pending.
+- Symtropy #7555: active disambiguation research contract.
+- Symtropy #7516: AV-SyncBench adapter/reproduction owner.
+- Symtropy #7518 / #7529: MATH-SYNC reproduction and active calibration ownership.
+- Symthaea #11171: production research-policy integration owner.
+- Existing blind episode, source custody, and evidence receipt owners remain authoritative. Do not create another episode runner, sensor/timebase service, evidence ledger, truth store or production scheduler.
+
+**Current limitation:** the evaluator reference is a separate package in the same public repository and has not yet been integrated into the blind owner-side execution service. Package separation is not process or OS isolation. No hidden answer keys should be placed in a candidate-accessible process or artifact.
+
+No claim of SOTA, physical synchronization, human-level audiovisual judgment, causal discovery, general intelligence or production safety follows from this addendum.
