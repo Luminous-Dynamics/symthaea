@@ -402,7 +402,10 @@
           "adaptive_fourier",
           "tensor_network_vlasov_poisson",
           "non_markovian_fno_closure",
-          "full_order_reference"
+          "full_order_reference",
+          "time_windowed_pod",
+          "energy_windowed_pod",
+          "conservative_fluid_kinetic_rom"
         ]
       }
     },
