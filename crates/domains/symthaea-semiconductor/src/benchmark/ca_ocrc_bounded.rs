@@ -562,6 +562,12 @@ pub fn create_ca_ocrc_engine_v1(
     }
     validate_policy(&policy)?;
     let policy_sha256 = policy_digest(&policy)?;
+    let delay_assumption_attested = policy.bounded_actual_delay_assumption_attested;
+    let mut guarantee_invalid_reasons = BTreeSet::new();
+    if !delay_assumption_attested {
+        guarantee_invalid_reasons
+            .insert("bounded_actual_delay_assumption_not_attested".to_string());
+    }
     Ok(CaOcrcEngineV1 {
         schema: CA_OCRC_ENGINE_SCHEMA_V1.into(),
         engine_id: engine_id.into(),
@@ -576,12 +582,8 @@ pub fn create_ca_ocrc_engine_v1(
             tracked: BTreeMap::new(),
             accepted_label_revisions: BTreeSet::new(),
             seen_feedback_attempt_digests: BTreeSet::new(),
-            theorem_assumptions_intact: policy.bounded_actual_delay_assumption_attested,
-            guarantee_invalid_reasons: if policy.bounded_actual_delay_assumption_attested {
-                BTreeSet::new()
-            } else {
-                BTreeSet::from(["bounded_actual_delay_assumption_not_attested".into()])
-            },
+            theorem_assumptions_intact: delay_assumption_attested,
+            guarantee_invalid_reasons,
             max_observed_occupancy: 0,
         },
         predictions_by_round: BTreeMap::new(),
@@ -1052,10 +1054,6 @@ pub fn step_ca_ocrc_round_v1(
             "{}:{}",
             feedback.label_id, feedback.label_revision
         ));
-        candidate
-            .state
-            .feedback_received_sample_ids
-            .insert(feedback.sample_id.clone());
         candidate.state.tracked.remove(&origin_round);
         let result = make_feedback_result(
             feedback,
@@ -1613,7 +1611,8 @@ mod tests {
             ),
         )
         .unwrap();
-        assert!(report.prediction_receipt.admitted_to_tracking);
+        assert!(!report.prediction_receipt.admitted_to_tracking);
+        assert_eq!(report.tracking_occupancy_after, 0);
         assert!(!report.theorem_assumptions_intact);
         assert!(engine.state.guarantee_invalid_reasons.contains("physical_measurement_not_selected"));
     }
