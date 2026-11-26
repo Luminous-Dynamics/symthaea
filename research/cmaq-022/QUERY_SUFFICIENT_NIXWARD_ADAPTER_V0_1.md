@@ -43,9 +43,9 @@ The deterministic assertions require:
 | Candidate | Exact query responses | False merges | False splits | Candidate classes |
 |---|---:|---:|---:|---:|
 | Contextual HDC query readout | 4/4 | 0 | 0 | 2 |
-| Pooled global delta readout | 0/4 | 4 | not promoted as a useful partition | 1 |
-| Identity/no-op readout | 0/4 | 4 | not promoted as a useful partition | 1 |
-| Full predicted HDC state | not a scalar-readout predictor | 0 | 2 | 4 |
+| Pooled global delta readout | 0/4 | 4 | 0 | 1 |
+| Identity/no-op readout | 0/4 | 4 | 0 | 1 |
+| Full predicted HDC state | not measured | 0 | 2 | 4 |
 
 The global predictor pools the two distinct action effects and therefore predicts the same coordinate-0 value for all four states. The identity predictor also leaves the coordinate unchanged for all four. Both collapse states with different permitted future responses. The full-state partition remembers nuisance detail and splits response-equivalent states. The query-conditioned HDC partition is expected to retain exactly the distinction needed by the frozen contract, and no more.
 
