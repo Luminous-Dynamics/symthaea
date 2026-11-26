@@ -157,14 +157,55 @@
       "additionalProperties": false,
       "required": [
         "native_case_id",
+        "donor_record",
+        "victim_slot_record_id",
+        "victim_slot_owner_user_id",
         "donor_record_is_genuine",
         "victim_identifiers_retained",
         "requires_store_boundary",
+        "evaluator_has_store_write_access",
+        "ordinary_read_path_required",
         "separate_isolation_result"
       ],
       "properties": {
         "native_case_id": {
           "const": "T6"
+        },
+        "donor_record": {
+          "type": "object",
+          "additionalProperties": false,
+          "required": [
+            "record_id",
+            "source_owner_user_id",
+            "source_tenant_id",
+            "content_digest"
+          ],
+          "properties": {
+            "record_id": {
+              "type": "string",
+              "minLength": 1
+            },
+            "source_owner_user_id": {
+              "type": "string",
+              "minLength": 1
+            },
+            "source_tenant_id": {
+              "type": "string",
+              "minLength": 1
+            },
+            "content_digest": {
+              "type": "string",
+              "pattern": "^sha256:[a-f0-9]{64}$"
+            }
+          }
+        },
+        "victim_slot_record_id": {
+          "type": "string",
+          "minLength": 1
+        },
+        "victim_slot_owner_user_id": {
+          "type": "string",
+          "minLength": 1
         },
         "donor_record_is_genuine": {
           "const": true
@@ -173,6 +214,12 @@
           "const": true
         },
         "requires_store_boundary": {
+          "const": true
+        },
+        "evaluator_has_store_write_access": {
+          "const": true
+        },
+        "ordinary_read_path_required": {
           "const": true
         },
         "separate_isolation_result": {
@@ -304,14 +351,14 @@
         ]
       },
       "then": {
+        "required": [
+          "placement_reference"
+        ],
         "properties": {
           "placement_reference": {
             "const": null
           }
-        },
-        "required": [
-          "placement_reference"
-        ]
+        }
       }
     },
     {
@@ -326,9 +373,15 @@
         ]
       },
       "then": {
+        "required": [
+          "placement_reference"
+        ],
         "properties": {
           "placement_reference": {
             "type": "object"
+          },
+          "boundary_axis": {
+            "const": "user"
           }
         }
       }
