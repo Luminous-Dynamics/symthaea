@@ -7,21 +7,24 @@ func digest(id,value,purpose string) DigestRef {
 }
 func base() (Graph,map[string]VerifierPin) {
 	in:=digest("input","abc","source-response")
+	inv:=digest("invocation-record","call","signed-tool-invocation")
+	md:=digest("manifest:tool-call","manifest","capture-manifest")
 	activity:=Node{ID:"tool-call",Kind:Activity,DeclaredInputs:[]string{"source-input"}}
 	nodes:=[]Node{
 		{ID:"source-input",Kind:Entity,Digest:&in,ExternalRoot:true,RequiresVerification:true},
+		{ID:"invocation-record",Kind:Entity,Digest:&inv,ExternalRoot:true,RequiresVerification:true},
 		activity,
 		{ID:"output",Kind:Entity,Digest:ptrDigest(digest("output","out","derived-output"))},
 		{ID:"collector",Kind:Agent},
 	}
 	edges:=[]Edge{
-		{ID:"use-1",Kind:Used,From:"source-input",To:"tool-call",EvidenceID:"source-input"},
-		{ID:"gen-1",Kind:Generated,From:"tool-call",To:"output",EvidenceID:"source-input"},
-		{ID:"assoc-1",Kind:AssociatedWith,From:"tool-call",To:"collector",EvidenceID:"source-input"},
+		{ID:"use-1",Kind:Used,From:"source-input",To:"tool-call",EvidenceID:"invocation-record"},
+		{ID:"gen-1",Kind:Generated,From:"tool-call",To:"output",EvidenceID:"invocation-record"},
+		{ID:"assoc-1",Kind:AssociatedWith,From:"tool-call",To:"collector",EvidenceID:"invocation-record"},
 	}
-	m:=Manifest{ActivityID:"tool-call",CollectorID:"collector",SourceID:"source-a",SnapshotID:"s1",QueryID:"q1",StartCursor:"0",EndCursor:"1",TerminalWatermark:"1",ObservedInputs:[]string{"source-input"},Complete:true,ObservedAt:200}
-	r:=VerifierReport{SubjectID:"source-input",InputDigest:in,Status:"verified",VerifierID:"v1",Version:"1",BuildDigest:"b1",TrustStoreDigest:"t1",VerifiedAt:100,FreshUntil:500}
-	return Graph{Nodes:nodes,Edges:edges,Manifests:[]Manifest{m},Reports:[]VerifierReport{r}},map[string]VerifierPin{"v1":{"v1","1","b1","t1"}}
+	m:=Manifest{ActivityID:"tool-call",CollectorID:"collector",SourceID:"source-a",SnapshotID:"s1",QueryID:"q1",StartCursor:"0",EndCursor:"1",TerminalWatermark:"1",ObservedInputs:[]string{"source-input"},Complete:true,Digest:md,ObservedAt:200}
+	mk:=func(id string,d DigestRef)VerifierReport{return VerifierReport{SubjectID:id,InputDigest:d,Status:"verified",VerifierID:"v1",Version:"1",BuildDigest:"b1",TrustStoreDigest:"t1",VerifiedAt:100,FreshUntil:500}}
+	return Graph{Nodes:nodes,Edges:edges,Manifests:[]Manifest{m},Reports:[]VerifierReport{mk("source-input",in),mk("invocation-record",inv),mk("manifest:tool-call",md)}},map[string]VerifierPin{"v1":{"v1","1","b1","t1"}}
 }
 func ptrDigest(d DigestRef)*DigestRef{return &d}
 func check(t *testing.T,g Graph,p map[string]VerifierPin,want Decision) {
@@ -51,5 +54,8 @@ func TestMissingExternalOrigin(t *testing.T){g,p:=base();g.Nodes[0].ExternalRoot
 func TestGeneratedThenConsumedPath(t *testing.T){g,p:=base();g.Nodes=append(g.Nodes,Node{ID:"decision",Kind:Activity,DeclaredInputs:[]string{"output"}});g.Edges=append(g.Edges,Edge{ID:"use-output",Kind:Used,From:"output",To:"decision",EvidenceID:"source-input"});g.Manifests=append(g.Manifests,Manifest{ActivityID:"decision",CollectorID:"collector",SourceID:"source-a",SnapshotID:"s2",QueryID:"q2",StartCursor:"1",EndCursor:"2",TerminalWatermark:"2",ObservedInputs:[]string{"output"},Complete:true,ObservedAt:220});check(t,g,p,Qualified)}
 func TestSupersessionNotInCausalDAG(t *testing.T){g,p:=base();g.Nodes=append(g.Nodes,Node{ID:"corrected",Kind:Entity,Digest:ptrDigest(digest("corrected","new","correction"))});g.Edges=append(g.Edges,Edge{ID:"supersedes-1",Kind:Supersedes,From:"corrected",To:"source-input",EvidenceID:"source-input"});check(t,g,p,Qualified)}
 func TestDuplicateActivityManifestDivergent(t *testing.T){g,p:=base();g.Manifests=append(g.Manifests,g.Manifests[0]);check(t,g,p,Divergent)}
+func TestCaptureManifestSignatureMissing(t *testing.T){g,p:=base();g.Reports=g.Reports[:2];check(t,g,p,Indeterminate)}
+func TestCaptureManifestDigestMismatch(t *testing.T){g,p:=base();g.Reports[2].InputDigest.Value="tampered";check(t,g,p,Denied)}
+func TestEdgeEvidenceNotVerified(t *testing.T){g,p:=base();g.Nodes[1].RequiresVerification=false;check(t,g,p,Indeterminate)}
 func TestTraceIdAloneCannotProveCompleteness(t *testing.T){g,p:=base();g.Manifests[0].CollectorID="";check(t,g,p,Indeterminate)}
 func FuzzDigestProfileIsolation(f *testing.F){f.Add("response","decision","value");f.Fuzz(func(t *testing.T,a,b,v string){if a==b{return};x:=digest("s",v,a);y:=digest("s",v,b);eq,cmp:=x.Equal(y);if eq||cmp{t.Fatal("different digest purposes compared")}})}
