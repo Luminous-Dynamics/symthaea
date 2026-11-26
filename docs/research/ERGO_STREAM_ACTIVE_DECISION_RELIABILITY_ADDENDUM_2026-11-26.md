@@ -721,3 +721,19 @@ Keep the lanes independent:
 VIS-012 #13855 owns the candidate projection and controlled adapter. Vision Mind #3934 owns persistent belief/geometry integration. HDC/dense/hybrid representation comparisons remain in #8152. Symtropy retains hidden truth and independent scoring. No second SLAM backend, map store, sensor service or scheduler is introduced by the benchmark protocol.
 
 The target is a joint Pareto frontier over semantic spatial reasoning, geometric accuracy, topological correctness, long-term map revision, uncertainty calibration and measured resource cost—not a pooled leaderboard.
+
+
+## 15. KITTI Odometry current modality-specific reference
+
+The official KITTI odometry table currently lists:
+- **SOFT2 (stereo):** 0.53% translation error and 0.0009 deg/m rotation error.
+- **V-LOAM (LiDAR):** 0.54% and 0.0013 deg/m.
+- **LOAM (LiDAR):** 0.55% and 0.0013 deg/m.
+
+This is not one pooled "SLAM SOTA" comparison: SOFT2 uses stereo imagery, V-LOAM/LOAM use LiDAR point clouds. Use SOFT2 as a stereo reproduction anchor and keep LiDAR references separate.
+
+KITTI's official protocol has 22 stereo sequences (00–10 with public training ground truth; 11–21 hidden test), requires fully automatic evaluation with one parameter set across test sequences, and computes translation (%) / rotation (deg/m) over 100–800m subsequences. The benchmark policy requires significant novel work leading to a peer-reviewed publication for official submissions; it also reports a server restore on 7 September 2026 to the 7 August 2026 backup, so intervening submission history may need resubmission.
+
+Source: https://www.cvlibs.net/datasets/kitti/eval_odometry.php
+
+A prospective stereo goal is to reproduce SOFT2 first, then beat 0.53% / 0.0009 deg/m on the official hidden-test protocol using the same modality and fixed-parameter rules. A train-split result is a development result, not leaderboard superiority. This target is research-only and not achieved by Symthaea.
