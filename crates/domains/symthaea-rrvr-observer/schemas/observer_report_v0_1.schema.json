@@ -120,18 +120,24 @@
       }
     },
     "trajectory_representation": {
-      "type": [
-        "object",
-        "null"
-      ],
-      "$ref": "#/$defs/trajectory_representation"
+      "anyOf": [
+        {
+          "$ref": "#/$defs/trajectory_representation"
+        },
+        {
+          "type": "null"
+        }
+      ]
     },
     "constant_velocity_forecast": {
-      "type": [
-        "object",
-        "null"
-      ],
-      "$ref": "#/$defs/forecast"
+      "anyOf": [
+        {
+          "$ref": "#/$defs/forecast"
+        },
+        {
+          "type": "null"
+        }
+      ]
     },
     "claim_ceiling": {
       "type": "string",
