@@ -775,7 +775,7 @@ jobs:
           assert cohort["spatial_domain"]["maximum"] > cohort["spatial_domain"]["minimum"]
           assert cohort["velocity_domain"]["maximum"] > cohort["velocity_domain"]["minimum"]
           assert horizon["start_time"] == checkpoint["time"]
-          assert checkpoint["first_pulse_not_yet_applied"] is True
+          assert checkpoint["first_pulse_applied"] is True
           assert checkpoint["second_pulse_not_yet_applied"] is True
           assert horizon["end_time"] <= cohort["maximum_time"]
           assert pulse_family["maximum_application_time"] <= cohort["maximum_time"]
@@ -790,8 +790,10 @@ jobs:
           for group_name, trials in split_groups.items():
               for trial in trials:
                   all_trial_ids.append(trial["trial_id"])
+                  assert len(trial["pulses"]) == 2, f"{group_name}/{trial['trial_id']}: K-RESP-1 requires exactly two pulses"
                   times = [pulse["application_time"] for pulse in trial["pulses"]]
                   assert times == sorted(times), f"{group_name}/{trial['trial_id']}: pulses must be time ordered"
+                  assert times[0] < checkpoint["time"] < times[1], f"{group_name}/{trial['trial_id']}: checkpoint must lie after pulse one and before pulse two"
                   assert len({pulse["pulse_id"] for pulse in trial["pulses"]}) == len(trial["pulses"])
                   for pulse in trial["pulses"]:
                       all_pulse_ids.append(pulse["pulse_id"])
@@ -799,24 +801,31 @@ jobs:
                       assert pulse_family["allowed_kick_amplitude"]["minimum"] <= pulse["kick_amplitude"] <= pulse_family["allowed_kick_amplitude"]["maximum"]
                       assert pulse_family["allowed_phase_rad"]["minimum"] <= pulse["phase_rad"] <= pulse_family["allowed_phase_rad"]["maximum"]
                       assert pulse["application_time"] <= pulse_family["maximum_application_time"]
-                      assert pulse["application_time"] > checkpoint["time"]
                       assert pulse["application_time"] < horizon["end_time"]
 
           assert len(all_trial_ids) == len(set(all_trial_ids)), "trial ids leak or duplicate across splits"
           assert len(all_pulse_ids) == len(set(all_pulse_ids)), "pulse ids must be globally unique"
 
-          training_pulses = [pulse for trial in split["training"] for pulse in trial["pulses"]]
-          held_out_pulses = [pulse for trial in split["held_out"] for pulse in trial["pulses"]]
+          all_trials = [trial for trials in split_groups.values() for trial in trials]
+          first_pulse_signatures = {
+              (
+                  trial["pulses"][0]["spatial_mode"],
+                  trial["pulses"][0]["kick_amplitude"],
+                  trial["pulses"][0]["phase_rad"],
+                  trial["pulses"][0]["application_time"],
+              )
+              for trial in all_trials
+          }
+          assert len(first_pulse_signatures) == 1, "all paths must share the same first pulse/checkpoint history"
+
+          training_pulses = [trial["pulses"][1] for trial in split["training"]]
+          held_out_pulses = [trial["pulses"][1] for trial in split["held_out"]]
           training_phases = {pulse["phase_rad"] for pulse in training_pulses}
           training_amplitudes = {pulse["kick_amplitude"] for pulse in training_pulses}
           training_modes = {pulse["spatial_mode"] for pulse in training_pulses}
           training_separations = {
               trial["pulses"][1]["application_time"] - trial["pulses"][0]["application_time"]
               for trial in split["training"] if len(trial["pulses"]) == 2
-          }
-          training_orders = {
-              tuple(pulse["spatial_mode"] for pulse in trial["pulses"])
-              for trial in split["training"]
           }
           assert any(pulse["phase_rad"] not in training_phases for pulse in held_out_pulses)
           assert any(pulse["kick_amplitude"] not in training_amplitudes for pulse in held_out_pulses)
@@ -826,11 +835,6 @@ jobs:
               for trial in split["held_out"] if len(trial["pulses"]) == 2
           }
           assert any(separation not in training_separations for separation in held_out_separations)
-          held_out_orders = {
-              tuple(pulse["spatial_mode"] for pulse in trial["pulses"])
-              for trial in split["held_out"]
-          }
-          assert any(order not in training_orders for order in held_out_orders)
 
           qoi_ids = {item["qoi_id"] for item in fixture["observables"]}
           assert len(qoi_ids) == len(fixture["observables"])
