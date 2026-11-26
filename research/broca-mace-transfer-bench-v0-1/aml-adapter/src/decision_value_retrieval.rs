@@ -175,12 +175,15 @@ impl DecisionRetrievalOptionV1 {
     ) -> Result<(), DecisionValueRejectV1> {
         if !valid_atom(&self.query_option_id, MAX_ID_BYTES)
             || !valid_sha256(&self.action_template_sha256)
-            || (require_calibrated_likelihoods
-                && (!self.calibration_profile_sha256.as_deref().is_some_and(valid_sha256)
-                    || !self.calibration_receipt_sha256.as_deref().is_some_and(valid_sha256)
-                    || self.calibration_valid_until_unix.is_none()))
         {
             return Err(DecisionValueRejectV1::InvalidIdentifier);
+        }
+        if require_calibrated_likelihoods
+            && (!self.calibration_profile_sha256.as_deref().is_some_and(valid_sha256)
+                || !self.calibration_receipt_sha256.as_deref().is_some_and(valid_sha256)
+                || self.calibration_valid_until_unix.is_none())
+        {
+            return Err(DecisionValueRejectV1::InvalidCalibration);
         }
         if self.observation_ids.is_empty()
             || self.observation_ids.len() > MAX_OBSERVATIONS
@@ -431,7 +434,14 @@ pub fn evaluate_robust_value_v1(
     option.validate(policy, false)?;
 
     let best_utility_by_state = policy.utility_by_state_action.iter()
-        .map(|row| *row.iter().max().ok_or(DecisionValueRejectV1::InvalidDimensions))
+        .zip(policy.action_allowed_by_state.iter())
+        .map(|(utilities, allowed)| {
+            utilities.iter().zip(allowed.iter())
+                .filter(|(_, permitted)| **permitted)
+                .map(|(utility, _)| *utility)
+                .max()
+                .ok_or(DecisionValueRejectV1::NoPermittedAction)
+        })
         .collect::<Result<Vec<_>, _>>()?;
 
     let mut baseline_minimax_regret = i128::MAX;
@@ -899,6 +909,20 @@ mod tests {
                 &policy(), &prior, &option, 10, &AcceptPinnedCalibration,
             ),
             Err(DecisionValueRejectV1::InvalidCalibration)
+        );
+    }
+
+    #[test]
+    fn robust_regret_uses_only_permitted_actions_as_state_oracles() {
+        let mut policy = policy();
+        policy.action_allowed_by_state[0][1] = false;
+        let assessment = evaluate_robust_value_v1(&policy, &informative_option()).unwrap();
+        assert_eq!(assessment.baseline_minimax_regret_utility_units, 100);
+        assert_eq!(assessment.post_query_worst_case_regret_utility_units, 0);
+        assert_eq!(assessment.robust_net_value_utility_units, 95);
+        assert_eq!(
+            assessment.selected_actions_by_observation[0].selected_action_id.as_deref(),
+            Some("abstain")
         );
     }
 
