@@ -424,7 +424,50 @@ Report M3−M2 and M4−M3 incremental effects on sealed families, with paired c
 
 **Negative-result rule:** if FOR/ETC and compatible graph-domain diagnostics explain transfer outcomes as well as M3, report that the explicit witness has not demonstrated incremental predictive value. It may still be useful as an audit contract, but that is a separate claim from better transfer generalization.
 
-## 14. References (snapshot 2026-11-25)
+## 15. Active calibration acquisition under identifiability and cost
+
+### Falsifiable question
+
+Can a policy choose which known-correspondence event/stream observation to request next so that the gauge-fixed joint clock design becomes identifiable and well-conditioned with fewer observations, less waiting and lower acquisition cost than passive, random or uniformly spaced schedules?
+
+This extends MATH-SYNC's static anchor-count / temporal-span sensitivity analysis into a sequential decision problem. The benchmark must not confuse event correspondence with clock calibration: the acquisition policy may use only already-qualified event identities or explicit calibration pulses. A semantic event whose identity is uncertain cannot be used as clock ground truth by feeding the same unverified identity into the design matrix.
+
+Symtropy execution owner: [#7529 — ERGO-STREAM-ACTIVE-ANCHOR-001](https://github.com/Luminous-Dynamics/symtropy/issues/7529). It composes with #7493 (clock/event factorial), #7498 (paired-anchor estimators), #7520 (joint inverse-affine estimator), #7518 (MATH-SYNC reproduction) and #7516 (AV-SyncBench external adapter).
+
+### Factorial acquisition tournament
+
+Policies see the current public sparse design, currently requestable known-correspondence observations, expected acquisition costs and availability metadata. They do not see future timestamps, hidden clock parameters, evaluator rank, generator seed or held-out event times. Every accepted, rejected, unavailable, late, duplicate and over-budget request remains in the action-attempt denominator.
+
+Compare:
+
+- passive fixed schedule and no-query controls;
+- first-two-available anchors, earliest-available and uniform random selection;
+- uniformly spaced temporal coverage;
+- rank-greedy acquisition (maximize rank increase first);
+- E-optimal greedy acquisition (maximize smallest singular value once full rank can be reached);
+- D-optimal greedy acquisition (maximize information-volume / log determinant);
+- cost- and latency-aware E/D-optimal acquisition, retaining a hard rank-first constraint;
+- an evaluator-only oracle schedule upper bound, never exposed to candidate agents.
+
+Use a lexicographic objective: **(1)** reach full column rank; **(2)** improve scaled conditioning; **(3)** reduce held-out latent event-time / clock parameter error; **(4)** minimize query cost, wait and energy. A regularized or high-scoring but rank-deficient fit is not an identifiable solution. Distinguish numerical pivot-ratio proxies from SVD smallest singular value and condition estimates.
+
+### Required conditions and metrics
+
+Cross anchor count (1/2/4/6/8/12/16/24), temporal span and clustering with missing reference events, heterogeneous native rates, out-of-order arrivals, Gaussian jitter, heavy tails, gross outliers, burst dropout, reference corruption, stream reset, piecewise drift and an explicitly non-affine negative control. Keep known-correspondence clock trials separate from shuffled / ambiguous semantic event-association arms.
+
+Measure queries to first full rank, proportion reaching full rank under budget, rank trajectory, scaled singular-value/condition diagnostics, held-out latent event-time RMSE/MAE, inverse-clock rate/offset error, prediction interval coverage, false-identifiable / false-unique / unnecessary-abstention, rejected/late attempts, total wait, query cost and energy. Downstream decision regret remains a separate secondary estimand.
+
+### Acceptance gate
+
+Reproduce the passive MATH-SYNC anchor-count/span sensitivity before claiming active improvement. Then compare policies on paired generator-family blocks and held-out schedules. An active policy advances only if it improves cost or held-out reconstruction over *all* non-oracle passive baselines at matched noise, latency, sample and compute budgets, with paired confidence intervals, no increase in false-identifiability, and explicit abstention when the budget cannot close the rank gap.
+
+Add a corrupted-reference / non-affine world where more observations can be misleading. The policy must detect model invalidity or abstain; it must not overfit a bad reference with more anchors. E/D-optimal gains must be checked against an independent SVD/eigenvalue implementation; the current QR pivot ratio is not sufficient for that gate.
+
+### Research interpretation
+
+This is a proposed ERGOstream research frontier, not an existing result or proven SOTA. MATH-SYNC already demonstrates that anchor number and temporal spread affect rank and reconstruction; #7529 asks whether sequential acquisition can select the best information-bearing observation under real costs. The policy's contribution must be measured against strong passive schedules and an oracle upper bound, not asserted from a synthetic demo.
+
+## 16. References (snapshot 2026-11-25)
 
 - Continual Learning Bench (CL-Bench, 2026-06-04): https://arxiv.org/abs/2606.05661
 - Continual Learning Exam (CLE, 2026-10-25): https://arxiv.org/abs/2610.33956
