@@ -31,7 +31,7 @@ Other required baselines and adjacent methods:
 
 - Snapshot POD / SVD.
 - Adaptive Hermite Vlasov reduction with dynamically scaled basis and conservative projections: Shao, Wang & Wu (2026), https://arxiv.org/abs/2605.17820
-- Tensor-network Vlasov–Poisson compression: Åsgrim et al. (2026), https://doi.org/10.1016/j.jcp.2026.115330
+- Tensor-network Vlasov–Poisson compression: Åsgrim et al. (2026), https://arxiv.org/abs/2602.13092
 - Adaptive Fourier Vlasov–Poisson with wavenumber-domain expansion: Cho & Russo (2026), https://arxiv.org/abs/2607.12368
 - Adaptive structure-preserving hyper-reduction for particle-based Vlasov–Poisson models: Pagliantini & Vismara (2026), https://doi.org/10.1016/j.jcp.2025.114609
 - Non-Markovian FNO closure for Landau damping: Burles et al. (2026), https://doi.org/10.1017/S0022377826102517
