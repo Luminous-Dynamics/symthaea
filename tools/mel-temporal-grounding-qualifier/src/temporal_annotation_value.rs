@@ -10,12 +10,11 @@
 use serde::{Deserialize, Serialize};
 
 use crate::temporal_consensus::{
-    audit_multi_annotator_case, MultiAnnotatorGroundingReportV1,
-    MultiAnnotatorTemporalCaseV1,
+    MultiAnnotatorGroundingReportV1, MultiAnnotatorTemporalCaseV1, audit_multi_annotator_case,
 };
 use crate::temporal_grounding::{
-    score_temporal_grounding, GroundTruthStateV1, GroundingPredictionStateV1,
-    TemporalGroundTruthV1, TemporalGroundingPredictionV1, TEMPORAL_GROUNDING_SCHEMA_V1,
+    GroundTruthStateV1, GroundingPredictionStateV1, TEMPORAL_GROUNDING_SCHEMA_V1,
+    TemporalGroundTruthV1, TemporalGroundingPredictionV1, score_temporal_grounding,
 };
 
 const INPUT_SCHEMA_V1: &str = "mel-temporal-annotation-marginal-value-v1";
@@ -278,8 +277,8 @@ pub fn audit_annotation_marginal_value(
         per_minute_deltas,
         model_fully_correct_rate_delta_against_panel,
         annotation_record_count_delta: 1,
-        selected_item_is_probability_audit_draw:
-            input.selection_stream == AnnotationSelectionStreamV1::ProbabilityAudit,
+        selected_item_is_probability_audit_draw: input.selection_stream
+            == AnnotationSelectionStreamV1::ProbabilityAudit,
         active_stream_is_probability_sample: false,
         population_estimate_computed: false,
         selection_receipt_authenticated: false,
@@ -292,11 +291,17 @@ pub fn audit_annotation_marginal_value(
 
 fn validate_input(input: &AnnotationMarginalValueInputV1) -> Result<(), String> {
     if input.schema != INPUT_SCHEMA_V1 {
-        return Err(format!("unsupported annotation marginal-value schema: {}", input.schema));
+        return Err(format!(
+            "unsupported annotation marginal-value schema: {}",
+            input.schema
+        ));
     }
     validate_digest(&input.source_work_id_sha256, "source_work_id_sha256")?;
     validate_digest(&input.selection_receipt_sha256, "selection_receipt_sha256")?;
-    require_text(&input.decision_profile.profile_id, "decision_profile.profile_id")?;
+    require_text(
+        &input.decision_profile.profile_id,
+        "decision_profile.profile_id",
+    )?;
     validate_decision_profile(&input.decision_profile)?;
     validate_effort(&input.effort)?;
 
@@ -316,10 +321,14 @@ fn validate_input(input: &AnnotationMarginalValueInputV1) -> Result<(), String> 
         return Err("before/after annotation manifests must have distinct digests".into());
     }
     if after.annotations.len() != before.annotations.len().saturating_add(1) {
-        return Err("after panel must contain exactly one more annotation than before panel".into());
+        return Err(
+            "after panel must contain exactly one more annotation than before panel".into(),
+        );
     }
     if after.annotations[..before.annotations.len()] != before.annotations[..] {
-        return Err("after panel rewrites, reorders or removes an existing annotation record".into());
+        return Err(
+            "after panel rewrites, reorders or removes an existing annotation record".into(),
+        );
     }
 
     let new_annotation = after.annotations.last().unwrap();
@@ -345,8 +354,14 @@ fn validate_decision_profile(profile: &FrozenPanelDecisionProfileV1) -> Result<(
         return Err("decision profile requires at least two eligible annotators".into());
     }
     for (label, value) in [
-        ("minimum_present_support_ppm", profile.minimum_present_support_ppm),
-        ("minimum_absent_support_ppm", profile.minimum_absent_support_ppm),
+        (
+            "minimum_present_support_ppm",
+            profile.minimum_present_support_ppm,
+        ),
+        (
+            "minimum_absent_support_ppm",
+            profile.minimum_absent_support_ppm,
+        ),
         (
             "maximum_ambiguous_not_estimable_share_ppm",
             profile.maximum_ambiguous_not_estimable_share_ppm,
@@ -372,9 +387,14 @@ fn validate_effort(effort: &AnnotationEffortReceiptV1) -> Result<(), String> {
     if effort.active_listening_seconds > effort.active_review_seconds
         || effort.active_review_seconds > effort.elapsed_wall_seconds
     {
-        return Err("effort durations must satisfy listening <= review <= elapsed wall time".into());
+        return Err(
+            "effort durations must satisfy listening <= review <= elapsed wall time".into(),
+        );
     }
-    if effort.self_reported_difficulty_ppm.is_some_and(|value| value > 1_000_000) {
+    if effort
+        .self_reported_difficulty_ppm
+        .is_some_and(|value| value > 1_000_000)
+    {
         return Err("self_reported_difficulty_ppm must be in [0, 1,000,000]".into());
     }
     Ok(())
@@ -392,14 +412,18 @@ fn snapshot(
         GroundTruthStateV1::Ambiguous => 2,
         GroundTruthStateV1::NotEstimable => 3,
     }));
-    let present_counts: Vec<_> = case.annotations.iter()
+    let present_counts: Vec<_> = case
+        .annotations
+        .iter()
         .filter(|item| item.state == GroundTruthStateV1::Present)
         .map(|item| item.intervals.len())
         .collect();
     let count_entropy = categorical_entropy(present_counts.iter().copied());
     let pairwise = pairwise_annotation_metrics(case)?;
     let summary = &report.summary;
-    let boundary_spread = report.event_reference_boundary_distributions.iter()
+    let boundary_spread = report
+        .event_reference_boundary_distributions
+        .iter()
         .map(|item| item.start_spread_frames.max(item.end_spread_frames))
         .max()
         .map(|frames| frames as f64 * 1_000.0 / report.prediction.artifact.sample_rate_hz as f64);
@@ -462,9 +486,13 @@ fn pairwise_annotation_metrics(
             let left_prediction = annotation_prediction(case, left);
             let right_prediction = annotation_prediction(case, right);
             let left_score = score_temporal_grounding(&left_truth, &right_prediction, &case.plan)
-                .map_err(|issues| format!("left-to-right pairwise annotation scoring failed: {issues:?}"))?;
+                .map_err(|issues| {
+                format!("left-to-right pairwise annotation scoring failed: {issues:?}")
+            })?;
             let right_score = score_temporal_grounding(&right_truth, &left_prediction, &case.plan)
-                .map_err(|issues| format!("right-to-left pairwise annotation scoring failed: {issues:?}"))?;
+                .map_err(|issues| {
+                    format!("right-to-left pairwise annotation scoring failed: {issues:?}")
+                })?;
             present_pairs += 1;
             if left_score.predicted_occurrences == left_score.ground_truth_occurrences
                 && right_score.predicted_occurrences == right_score.ground_truth_occurrences
@@ -527,10 +555,16 @@ fn annotation_prediction(
             GroundTruthStateV1::Absent => GroundingPredictionStateV1::QueryAbsent,
             GroundTruthStateV1::Ambiguous => GroundingPredictionStateV1::Ambiguous {
                 candidate_intervals: annotation.intervals.clone(),
-                reason: annotation.status_reason.clone().unwrap_or_else(|| "ambiguous".into()),
+                reason: annotation
+                    .status_reason
+                    .clone()
+                    .unwrap_or_else(|| "ambiguous".into()),
             },
             GroundTruthStateV1::NotEstimable => GroundingPredictionStateV1::NotEstimable {
-                reason: annotation.status_reason.clone().unwrap_or_else(|| "not estimable".into()),
+                reason: annotation
+                    .status_reason
+                    .clone()
+                    .unwrap_or_else(|| "not estimable".into()),
             },
         },
     }
@@ -561,9 +595,8 @@ fn decide_panel_state(
         && pairwise.present_exact_count_agreement.is_some_and(|value| {
             value >= profile.minimum_pairwise_present_count_agreement_ppm as f64 / PPM_SCALE
         })
-        && boundary_spread_ms.is_some_and(|value| {
-            value <= profile.maximum_event_boundary_spread_ms as f64
-        })
+        && boundary_spread_ms
+            .is_some_and(|value| value <= profile.maximum_event_boundary_spread_ms as f64)
     {
         return PanelDecisionStateV1::SufficientlySupportedPresent;
     }
@@ -597,10 +630,7 @@ fn categorical_entropy(values: impl Iterator<Item = usize>) -> Option<f64> {
     )
 }
 
-fn decision_transition(
-    before: PanelDecisionStateV1,
-    after: PanelDecisionStateV1,
-) -> String {
+fn decision_transition(before: PanelDecisionStateV1, after: PanelDecisionStateV1) -> String {
     format!("{before:?}->{after:?}")
 }
 
@@ -609,7 +639,8 @@ fn delta(before: Option<f64>, after: Option<f64>) -> Option<f64> {
 }
 
 fn per_minute(delta: Option<f64>, active_review_minutes: f64) -> Option<f64> {
-    delta.zip((active_review_minutes > 0.0).then_some(active_review_minutes))
+    delta
+        .zip((active_review_minutes > 0.0).then_some(active_review_minutes))
         .map(|(delta, minutes)| delta / minutes)
 }
 
@@ -637,15 +668,17 @@ mod tests {
     use crate::temporal_consensus::IndependentTemporalAnnotationV1;
     use crate::temporal_grounding::{
         AudioArtifactClockV1, FrameIntervalV1, GroundTruthStateV1, GroundingPredictionStateV1,
-        TemporalGroundingPlanV1, TemporalGroundingPredictionV1, TEMPORAL_GROUNDING_EVALUATOR_V1,
-        TEMPORAL_GROUNDING_SCHEMA_V1,
+        TEMPORAL_GROUNDING_EVALUATOR_V1, TEMPORAL_GROUNDING_SCHEMA_V1, TemporalGroundingPlanV1,
+        TemporalGroundingPredictionV1,
     };
 
     const SOURCE: &str = "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa";
     const WORK: &str = "bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb";
     const SELECTION: &str = "cccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccc";
 
-    fn digest(ch: char) -> String { ch.to_string().repeat(64) }
+    fn digest(ch: char) -> String {
+        ch.to_string().repeat(64)
+    }
 
     fn artifact() -> AudioArtifactClockV1 {
         AudioArtifactClockV1 {
@@ -663,19 +696,31 @@ mod tests {
         }
     }
 
-    fn annotation(id: char, record: char, state: crate::temporal_grounding::GroundTruthStateV1) -> IndependentTemporalAnnotationV1 {
+    fn annotation(
+        id: char,
+        record: char,
+        state: crate::temporal_grounding::GroundTruthStateV1,
+    ) -> IndependentTemporalAnnotationV1 {
         IndependentTemporalAnnotationV1 {
             annotator_id_sha256: digest(id),
             annotation_sha256: digest(record),
             state,
             intervals: if state == GroundTruthStateV1::Present {
-                vec![FrameIntervalV1 { start_frame: 100, end_frame: 200 }]
-            } else { Vec::new() },
+                vec![FrameIntervalV1 {
+                    start_frame: 100,
+                    end_frame: 200,
+                }]
+            } else {
+                Vec::new()
+            },
             status_reason: None,
         }
     }
 
-    fn panel(records: Vec<IndependentTemporalAnnotationV1>, manifest: char) -> MultiAnnotatorTemporalCaseV1 {
+    fn panel(
+        records: Vec<IndependentTemporalAnnotationV1>,
+        manifest: char,
+    ) -> MultiAnnotatorTemporalCaseV1 {
         let art = artifact();
         MultiAnnotatorTemporalCaseV1 {
             schema: "mel-multi-annotator-temporal-grounding-v1".into(),
@@ -691,14 +736,21 @@ mod tests {
                 query_id: "query-1".into(),
                 artifact: art,
                 state: GroundingPredictionStateV1::Occurrences {
-                    intervals: vec![FrameIntervalV1 { start_frame: 100, end_frame: 200 }],
+                    intervals: vec![FrameIntervalV1 {
+                        start_frame: 100,
+                        end_frame: 200,
+                    }],
                 },
             },
             annotations: records,
         }
     }
 
-    fn input(before: MultiAnnotatorTemporalCaseV1, after: MultiAnnotatorTemporalCaseV1, review_seconds: u64) -> AnnotationMarginalValueInputV1 {
+    fn input(
+        before: MultiAnnotatorTemporalCaseV1,
+        after: MultiAnnotatorTemporalCaseV1,
+        review_seconds: u64,
+    ) -> AnnotationMarginalValueInputV1 {
         AnnotationMarginalValueInputV1 {
             schema: INPUT_SCHEMA_V1.into(),
             source_work_id_sha256: WORK.into(),
@@ -740,8 +792,14 @@ mod tests {
         after_records.push(annotation('4', '4', GroundTruthStateV1::Present));
         let after = panel(after_records, 'f');
         let report = audit_annotation_marginal_value(&input(before, after, 120)).unwrap();
-        assert_eq!(report.before.frozen_decision_state, PanelDecisionStateV1::NeedsReview);
-        assert_eq!(report.after.frozen_decision_state, PanelDecisionStateV1::SufficientlySupportedPresent);
+        assert_eq!(
+            report.before.frozen_decision_state,
+            PanelDecisionStateV1::NeedsReview
+        );
+        assert_eq!(
+            report.after.frozen_decision_state,
+            PanelDecisionStateV1::SufficientlySupportedPresent
+        );
         assert_eq!(
             report.decision_transition,
             "NeedsReview->SufficientlySupportedPresent"
@@ -753,7 +811,10 @@ mod tests {
         assert_eq!(report.effort.active_listening_seconds, 120);
         assert_eq!(report.disposition_entropy_delta_bits, Some(0.0));
         assert_eq!(report.after.pairwise_present_symmetric_event_f1, Some(1.0));
-        assert_eq!(report.after.pairwise_present_exact_count_agreement, Some(1.0));
+        assert_eq!(
+            report.after.pairwise_present_exact_count_agreement,
+            Some(1.0)
+        );
         assert!(!report.single_marginal_value_score_created);
     }
 
@@ -769,10 +830,16 @@ mod tests {
         after_records.push(annotation('4', '4', GroundTruthStateV1::Ambiguous));
         let after = panel(after_records, 'f');
         let report = audit_annotation_marginal_value(&input(before, after, 180)).unwrap();
-        assert!(report.after.disposition_entropy_bits.unwrap() > report.before.disposition_entropy_bits.unwrap());
+        assert!(
+            report.after.disposition_entropy_bits.unwrap()
+                > report.before.disposition_entropy_bits.unwrap()
+        );
         assert_eq!(report.after.ambiguous_annotations, 1);
         assert_eq!(report.after.absent_annotations, 0);
-        assert_eq!(report.after.frozen_decision_state, PanelDecisionStateV1::NeedsReview);
+        assert_eq!(
+            report.after.frozen_decision_state,
+            PanelDecisionStateV1::NeedsReview
+        );
     }
 
     #[test]
@@ -803,6 +870,11 @@ mod tests {
         paired.effort.active_listening_seconds = 0;
         paired.effort.elapsed_wall_seconds = 30;
         let report = audit_annotation_marginal_value(&paired).unwrap();
-        assert_eq!(report.per_minute_deltas.disposition_entropy_bits_per_active_review_minute, None);
+        assert_eq!(
+            report
+                .per_minute_deltas
+                .disposition_entropy_bits_per_active_review_minute,
+            None
+        );
     }
 }
