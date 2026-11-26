@@ -142,7 +142,7 @@ Exit codes:
 
 ## 8. Source-authored regression matrix
 
-The current implementation contains 16 unit tests covering:
+The current implementation contains 18 unit tests covering:
 - minimal valid graph and pinned golden root;
 - graph-array order invariance;
 - omitted versus explicit-empty invalidation triggers;
@@ -157,7 +157,8 @@ The current implementation contains 16 unit tests covering:
 - duplicate JSON keys;
 - non-integer numeric rejection;
 - UTF-16 ordering;
-- effect claims without independent sink read-back;
+- effect claims without independent sink read-back and a valid independent-sink positive control;
+- unknown edge relations;
 - recorded-root substitution.
 
 The tests are authored but have **not** been compiled or executed in this authoring environment. They must run against the exact PR head before any implementation claim is promoted to executed evidence.
