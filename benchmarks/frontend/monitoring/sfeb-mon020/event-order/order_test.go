@@ -44,75 +44,52 @@ func want(t *testing.T,in Input,p map[string]VerifierPin,d Decision){t.Helper();
 func moveActivityBToDB(in *Input){for i:=range in.Events{if in.Events[i].ActivityID=="b"{in.Events[i].SourceID="db";switch in.Events[i].ID{case "start-b":in.Events[i].Sequence=1;case "use-x":in.Events[i].Sequence=2;case "end-b":in.Events[i].Sequence=3};refreshEventReport(in,in.Events[i].ID)}}}
 func TestSameSourceGenerationPrecedesUse(t *testing.T){in,p:=base();want(t,in,p,Qualified)}
 func TestSameSourceUseBeforeGenerationDenied(t *testing.T){
-	in,p:=base();for i:=range in.Events{if in.Events[i].ID=="gen-x"{in.Events[i].Sequence=8};if in.Events[i].ID=="use-x"{in.Events[i].Sequence=5}}
-	for i:=range in.Reports{for _,e:=range in.Events{if in.Reports[i].SubjectID=="event:"+e.ID{in.Reports[i].InputDigest=e.RecordDigest}}}
-	want(t,in,p,Denied)
+	in,p:=base();setEventSequence(&in,"gen-x",8);setEventSequence(&in,"end-a",9);want(t,in,p,Denied)
 }
 func TestMissingEventReportIndeterminate(t *testing.T){in,p:=base();in.Reports=in.Reports[:len(in.Reports)-1];want(t,in,p,Indeterminate)}
 func TestInvalidEventReportDenied(t *testing.T){in,p:=base();for i:=range in.Reports{if in.Reports[i].SubjectID=="event:start-a"{in.Reports[i].Status="invalid"}};want(t,in,p,Denied)}
 func TestUnverifiedSourceIdentityIndeterminate(t *testing.T){in,p:=base();in.Reports=in.Reports[0:0];want(t,in,p,Indeterminate)}
 func TestDuplicateSourceSequenceDivergent(t *testing.T){
-	in,p:=base();e:=in.Events[1];e.ID="other-event";e.RecordDigest=dig("other-event","z","event");in.Events=append(in.Events,e);in.Reports=append(in.Reports,VerifierReport{SubjectID:"event:other-event",InputDigest:e.RecordDigest,Status:"verified",VerifierID:"v1",Version:"1",BuildDigest:"b1",TrustStoreDigest:"roots1",VerifiedAt:10,FreshUntil:1000});want(t,in,p,Divergent)
+	in,p:=base();e:=in.Events[1];e.ID="other-event";e.RecordDigest=dig("other-event","z","event");in.Events=append(in.Events,e);addEventReport(&in,e);want(t,in,p,Divergent)
 }
 func TestCrossSourceWithoutWitnessIndeterminate(t *testing.T){
-	in,p:=base();for i:=range in.Events{if in.Events[i].ID=="use-x"{in.Events[i].SourceID="db";in.Events[i].Sequence=1};if in.Events[i].ID=="start-b"{in.Events[i].SourceID="db";in.Events[i].Sequence=1};if in.Events[i].ID=="end-b"{in.Events[i].SourceID="db";in.Events[i].Sequence=2}}
-	// Rebuild valid unique sequence for db and report bindings.
-	in.Events[3].Sequence=1;in.Events[4].Sequence=2;in.Events[5].Sequence=3
-	want(t,in,p,Indeterminate)
+	in,p:=base();moveActivityBToDB(&in);want(t,in,p,Indeterminate)
 }
 func TestCrossSourceIndependentWitnessQualifies(t *testing.T){
-	in,p:=base()
-	// move activity b and its events to a second source; witness source remains a distinct control root.
-	for i:=range in.Events{if in.Events[i].ActivityID=="b"{in.Events[i].SourceID="db";if in.Events[i].ID=="start-b"{in.Events[i].Sequence=1};if in.Events[i].ID=="use-x"{in.Events[i].Sequence=2};if in.Events[i].ID=="end-b"{in.Events[i].Sequence=3}}}
-	d:=dig("handoff-1","g-before-u","order-witness")
-	in.Witnesses=[]OrderWitness{{ID:"handoff-1",BeforeEventID:"gen-x",AfterEventID:"use-x",WitnessSourceID:"observer",EvidenceDigest:d}}
-	in.Reports=append(in.Reports,VerifierReport{SubjectID:"witness:handoff-1",InputDigest:d,Status:"verified",VerifierID:"v1",Version:"1",BuildDigest:"b1",TrustStoreDigest:"roots1",VerifiedAt:10,FreshUntil:1000})
+	in,p:=base();moveActivityBToDB(&in)
+	addWitnessReport(&in,OrderWitness{ID:"handoff-1",BeforeEventID:"gen-x",AfterEventID:"use-x",WitnessSourceID:"observer",EvidenceDigest:dig("handoff-1","g-before-u","order-witness")})
 	want(t,in,p,Qualified)
 }
 func TestWitnessSharesEndpointRootIndeterminate(t *testing.T){
-	in,p:=base()
-	for i:=range in.Events{if in.Events[i].ActivityID=="b"{in.Events[i].SourceID="db";if in.Events[i].ID=="start-b"{in.Events[i].Sequence=1};if in.Events[i].ID=="use-x"{in.Events[i].Sequence=2};if in.Events[i].ID=="end-b"{in.Events[i].Sequence=3}}}
-	d:=dig("w","h","order-witness")
-	in.Witnesses=[]OrderWitness{{ID:"w",BeforeEventID:"gen-x",AfterEventID:"use-x",WitnessSourceID:"db",EvidenceDigest:d}}
-	in.Reports=append(in.Reports,VerifierReport{SubjectID:"witness:w",InputDigest:d,Status:"verified",VerifierID:"v1",Version:"1",BuildDigest:"b1",TrustStoreDigest:"roots1",VerifiedAt:10,FreshUntil:1000})
+	in,p:=base();moveActivityBToDB(&in)
+	addWitnessReport(&in,OrderWitness{ID:"w",BeforeEventID:"gen-x",AfterEventID:"use-x",WitnessSourceID:"db",EvidenceDigest:dig("w","h","order-witness")})
 	want(t,in,p,Indeterminate)
 }
-func TestTimestampAloneCannotOrderCrossSource(t *testing.T){in,p:=base();for i:=range in.Events{if in.Events[i].ID=="use-x"{in.Events[i].SourceID="db";in.Events[i].Sequence=2}};want(t,in,p,Indeterminate)}
+func TestTimestampAloneCannotOrderCrossSource(t *testing.T){in,p:=base();moveActivityBToDB(&in);want(t,in,p,Indeterminate)}
 func TestActivityBoundaryMissing(t *testing.T){in,p:=base();for i,e:=range in.Events{if e.ID=="start-b"{in.Events=append(in.Events[:i],in.Events[i+1:]...);break}};want(t,in,p,Indeterminate)}
 func TestActivityEndBeforeUseDenied(t *testing.T){
-	in,p:=base();for i:=range in.Events{if in.Events[i].ID=="end-b"{in.Events[i].Sequence=5};if in.Events[i].ID=="use-x"{in.Events[i].Sequence=6}}
-	want(t,in,p,Denied)
+	in,p:=base();setEventSequence(&in,"end-b",5);want(t,in,p,Denied)
 }
 func TestInvalidationAfterUseQualifies(t *testing.T){
 	in,p:=base();e:=Event{ID:"invalidate-x",Kind:EntityInvalidated,SubjectID:"x",SourceID:"agent",Sequence:8,RecordDigest:dig("invalidate-x","i","event")}
-	in.Events=append(in.Events,e);in.Reports=append(in.Reports,VerifierReport{SubjectID:"event:invalidate-x",InputDigest:e.RecordDigest,Status:"verified",VerifierID:"v1",Version:"1",BuildDigest:"b1",TrustStoreDigest:"roots1",VerifiedAt:10,FreshUntil:1000})
+	in.Events=append(in.Events,e);addEventReport(&in,e)
 	want(t,in,p,Qualified)
 }
 func TestUseAfterInvalidationDenied(t *testing.T){
 	in,p:=base();e:=Event{ID:"invalidate-x",Kind:EntityInvalidated,SubjectID:"x",SourceID:"agent",Sequence:5,RecordDigest:dig("invalidate-x","i","event")}
-	in.Events=append(in.Events,e);in.Reports=append(in.Reports,VerifierReport{SubjectID:"event:invalidate-x",InputDigest:e.RecordDigest,Status:"verified",VerifierID:"v1",Version:"1",BuildDigest:"b1",TrustStoreDigest:"roots1",VerifiedAt:10,FreshUntil:1000})
+	in.Events=append(in.Events,e);addEventReport(&in,e)
 	want(t,in,p,Denied)
 }
 func TestOrderWitnessCycleDivergent(t *testing.T){
 	in,p:=base()
 	moveActivityBToDB(&in)
-	d1:=dig("forward","forward","order-witness")
-	d2:=dig("reverse","reverse","order-witness")
-	in.Witnesses=[]OrderWitness{
-		{ID:"forward",BeforeEventID:"gen-x",AfterEventID:"use-x",WitnessSourceID:"observer",EvidenceDigest:d1},
-		{ID:"reverse",BeforeEventID:"use-x",AfterEventID:"gen-x",WitnessSourceID:"observer",EvidenceDigest:d2},
-	}
-	in.Reports=append(in.Reports,
-		VerifierReport{SubjectID:"witness:forward",InputDigest:d1,Status:"verified",VerifierID:"v1",Version:"1",BuildDigest:"b1",TrustStoreDigest:"roots1",VerifiedAt:10,FreshUntil:1000},
-		VerifierReport{SubjectID:"witness:reverse",InputDigest:d2,Status:"verified",VerifierID:"v1",Version:"1",BuildDigest:"b1",TrustStoreDigest:"roots1",VerifiedAt:10,FreshUntil:1000},
-	)
+	addWitnessReport(&in,OrderWitness{ID:"forward",BeforeEventID:"gen-x",AfterEventID:"use-x",WitnessSourceID:"observer",EvidenceDigest:dig("forward","payload","order-witness")})
+	addWitnessReport(&in,OrderWitness{ID:"reverse",BeforeEventID:"use-x",AfterEventID:"gen-x",WitnessSourceID:"observer",EvidenceDigest:dig("reverse","payload","order-witness")})
 	want(t,in,p,Divergent)
 }
 func TestSameSourceReverseWitnessDivergence(t *testing.T){
 	in,p:=base()
-	d:=dig("reverse","contradiction","order-witness")
-	in.Witnesses=[]OrderWitness{{ID:"reverse",BeforeEventID:"use-x",AfterEventID:"gen-x",WitnessSourceID:"observer",EvidenceDigest:d}}
-	in.Reports=append(in.Reports,VerifierReport{SubjectID:"witness:reverse",InputDigest:d,Status:"verified",VerifierID:"v1",Version:"1",BuildDigest:"b1",TrustStoreDigest:"roots1",VerifiedAt:10,FreshUntil:1000})
+	addWitnessReport(&in,OrderWitness{ID:"reverse",BeforeEventID:"use-x",AfterEventID:"gen-x",WitnessSourceID:"observer",EvidenceDigest:dig("reverse","payload","order-witness")})
 	want(t,in,p,Divergent)
 }
 func FuzzSequenceOrder(f *testing.F){f.Add(uint64(2),uint64(3));f.Fuzz(func(t *testing.T,a,b uint64){if a==0||b==0{return};if a==b{return};if (a<b)!=(b>a){t.Fatal("sequence ordering is not antisymmetric")}})}
@@ -132,7 +109,7 @@ func TestStaleVerifierReportIndeterminate(t *testing.T) {
 func TestOrderWitnessEvidenceMissingIndeterminate(t *testing.T) {
 	in, p := base()
 	moveActivityBToDB(&in)
-	d := dig("handoff", "g-before-u", "order-witness")
+	d := dig("handoff-1", "g-before-u", "order-witness")
 	in.Witnesses = []OrderWitness{{ID: "handoff-1", BeforeEventID: "gen-x", AfterEventID: "use-x", WitnessSourceID: "observer", EvidenceDigest: d}}
 	want(t, in, p, Indeterminate)
 }
