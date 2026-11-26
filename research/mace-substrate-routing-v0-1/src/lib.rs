@@ -258,7 +258,18 @@ fn first_available(
     let mut last_rejection = RouteRejectV1::RequiredSubstrateUnavailable;
     for kind in candidates {
         match profile_for(*kind, profiles) {
-            Ok(_) => return Ok(*kind),
+            Ok(_) => {
+                if *kind == SubstrateKindV1::HierarchicalSummary
+                    && (profile_for(SubstrateKindV1::DependencyGraph, profiles).is_err()
+                        || profile_for(SubstrateKindV1::RawTimeline, profiles).is_err())
+                {
+                    // A summary is eligible only when both its verified parent
+                    // closure and raw-source resolution route are available.
+                    // Otherwise continue to a safer standalone substrate.
+                    continue;
+                }
+                return Ok(*kind);
+            }
             Err(RouteRejectV1::InvalidCostProfile) => {
                 last_rejection = RouteRejectV1::InvalidCostProfile;
             }
@@ -779,6 +790,27 @@ mod tests {
         }));
         assert!(plan.steps.iter().any(|step| {
             step.action == RouteActionV1::ReadRawSource
+        }));
+    }
+
+    #[test]
+    fn summary_without_verified_parents_falls_back_to_raw_source() {
+        let req = request(QueryRegimeV1::BroadRecall);
+        let profiles = [
+            profile(SubstrateKindV1::HierarchicalSummary, cost(50, 0, 0)),
+            profile(SubstrateKindV1::RawTimeline, cost(100, 0, 0)),
+        ];
+        let plan = route_mace_query_v1(&req, &profiles).unwrap();
+        assert_eq!(
+            plan.selected_substrates,
+            vec![SubstrateBindingV1 {
+                kind: SubstrateKindV1::RawTimeline,
+                profile_sha256: PROFILE_DIGEST,
+                amortization_query_count: 100,
+            }]
+        );
+        assert!(!plan.steps.iter().any(|step| {
+            step.action == RouteActionV1::ReadQualifiedSummary
         }));
     }
 
