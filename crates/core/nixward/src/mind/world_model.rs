@@ -257,14 +257,18 @@ pub enum ContextualPredictionSource {
     /// Equally relevant family-specific buckets predict materially different deltas.
     /// The returned state is an identity placeholder; callers must treat this as UNKNOWN.
     AmbiguousContextUnknown,
+    /// Observable context matches, but independent cluster support is below the frozen minimum.
+    /// The returned state is an identity placeholder; callers must treat this as UNKNOWN.
+    InsufficientContextSupportUnknown,
     GlobalActionDeltaFallback,
     UnknownActionIdentityFallback,
 }
 
 /// Prediction diagnostics for the context-conditioned HDC-delta candidate.
 ///
-/// For `AmbiguousContextUnknown`, `predicted_state` is an identity placeholder,
-/// not a forecast; callers must abstain rather than plan from it.
+/// For `AmbiguousContextUnknown` and `InsufficientContextSupportUnknown`,
+/// `predicted_state` is an identity placeholder, not a forecast; callers must
+/// abstain rather than plan from it.
 /// `training_residual_mse` is a prequential training diagnostic, not a
 /// calibrated predictive interval or a held-out uncertainty guarantee.
 #[derive(Debug, Clone)]
@@ -294,6 +298,8 @@ struct ContextDeltaEntry {
 }
 
 const CONTEXT_MATCH_THRESHOLD: f32 = 0.8;
+/// Minimum distinct training clusters before a family-blind contextual forecast.
+const CONTEXTUAL_MIN_INDEPENDENT_CLUSTERS: usize = 3;
 
 /// A learned state transition delta.
 #[derive(Debug, Clone)]
@@ -816,14 +822,18 @@ impl NixWorldModel {
             let entry = &entries[*index];
             observation_count = observation_count.saturating_add(entry.observation_count);
             independent_cluster_ids.extend(entry.independent_cluster_ids.iter().cloned());
-            outcome_counts.success =
-                outcome_counts.success.saturating_add(entry.outcome_counts.success);
-            outcome_counts.failure =
-                outcome_counts.failure.saturating_add(entry.outcome_counts.failure);
-            outcome_counts.partial =
-                outcome_counts.partial.saturating_add(entry.outcome_counts.partial);
-            outcome_counts.rolled_back =
-                outcome_counts.rolled_back.saturating_add(entry.outcome_counts.rolled_back);
+            outcome_counts.success = outcome_counts
+                .success
+                .saturating_add(entry.outcome_counts.success);
+            outcome_counts.failure = outcome_counts
+                .failure
+                .saturating_add(entry.outcome_counts.failure);
+            outcome_counts.partial = outcome_counts
+                .partial
+                .saturating_add(entry.outcome_counts.partial);
+            outcome_counts.rolled_back = outcome_counts
+                .rolled_back
+                .saturating_add(entry.outcome_counts.rolled_back);
 
             if entry.residual_count > 0 {
                 residual_squared_error += entry.residual_mse * entry.residual_count as f64;
@@ -840,6 +850,19 @@ impl NixWorldModel {
             return Ok(ContextualPrediction {
                 predicted_state: state.clone(),
                 source: ContextualPredictionSource::AmbiguousContextUnknown,
+                context_similarity: best_context_similarity.max(0.0) as f64,
+                action_parameter_similarity: best_action_similarity.max(0.0) as f64,
+                observation_count,
+                independent_cluster_count: independent_cluster_ids.len(),
+                training_residual_mse: None,
+                outcome_counts,
+            });
+        }
+
+        if independent_cluster_ids.len() < CONTEXTUAL_MIN_INDEPENDENT_CLUSTERS {
+            return Ok(ContextualPrediction {
+                predicted_state: state.clone(),
+                source: ContextualPredictionSource::InsufficientContextSupportUnknown,
                 context_similarity: best_context_similarity.max(0.0) as f64,
                 action_parameter_similarity: best_action_similarity.max(0.0) as f64,
                 observation_count,
@@ -973,7 +996,7 @@ impl Default for NixWorldModel {
 mod tests {
     use super::*;
     use cmaq_020_state_response::{
-        score_abstraction, ResponseKey, StateResponseContract, StateResponseRecord,
+        ResponseKey, StateResponseContract, StateResponseRecord, score_abstraction,
     };
     use sha2::{Digest, Sha256};
     use std::collections::BTreeMap;
@@ -2024,7 +2047,10 @@ mod tests {
             mean_squared_error(&global, &after_a).expect("same-dimensional global prediction");
         let contextual_error = mean_squared_error(&contextual.predicted_state, &after_a)
             .expect("same-dimensional context prediction");
-        assert_eq!(contextual.source, ContextualPredictionSource::ContextualDelta);
+        assert_eq!(
+            contextual.source,
+            ContextualPredictionSource::ContextualDelta
+        );
         assert_eq!(contextual.independent_cluster_count, 4);
         assert!(contextual.context_similarity > 0.99);
         assert!(contextual.action_parameter_similarity > 0.99);
@@ -2108,8 +2134,7 @@ mod tests {
             TransitionOutcomeClass::Success,
             "unseen-context-cluster",
         );
-        wm.learn_episode(&episode)
-            .expect("training episode");
+        wm.learn_episode(&episode).expect("training episode");
 
         let prediction = wm
             .predict_state_without_family_label(
@@ -2139,6 +2164,42 @@ mod tests {
             unknown_action.source,
             ContextualPredictionSource::UnknownActionIdentityFallback
         );
+    }
+
+    #[test]
+    fn family_label_free_prediction_abstains_with_fewer_than_three_independent_clusters() {
+        let dim = 256;
+        let mut wm = NixWorldModel::new(dim);
+        let before = ContinuousHV::random(dim, 425);
+        let after = ContinuousHV::random(dim, 426);
+        let context = ContinuousHV::random(dim, 427);
+        let episode = transition_episode(
+            "single-context-cluster",
+            ActionCategory::Install,
+            ActionCategory::Install,
+            before.clone(),
+            context.clone(),
+            after,
+            TransitionOutcomeClass::Success,
+            "only-independent-cluster",
+        );
+        wm.learn_episode(&episode).expect("single training episode");
+
+        let prediction = wm
+            .predict_state_without_family_label(
+                &before,
+                &ActionCategory::Install,
+                &ContinuousHV::random(dim, 90),
+                &context,
+            )
+            .expect("under-supported context returns explicit UNKNOWN");
+        assert_eq!(
+            prediction.source,
+            ContextualPredictionSource::InsufficientContextSupportUnknown
+        );
+        assert_eq!(prediction.observation_count, 1);
+        assert_eq!(prediction.independent_cluster_count, 1);
+        assert!((prediction.predicted_state.similarity(&before) - 1.0).abs() < 1e-5);
     }
 
     #[test]
@@ -2207,10 +2268,12 @@ mod tests {
 
         assert_eq!(
             prediction_forward.source,
-            ContextualPredictionSource::ContextualDelta
+            ContextualPredictionSource::InsufficientContextSupportUnknown
         );
+        assert!((prediction_forward.predicted_state.similarity(&before) - 1.0).abs() < 1e-5);
         assert_eq!(prediction_forward.observation_count, 2);
         assert_eq!(prediction_forward.independent_cluster_count, 1);
+        assert_eq!(prediction_forward.training_residual_mse, None);
         assert_eq!(prediction_forward.outcome_counts.success, 1);
         assert_eq!(prediction_forward.outcome_counts.failure, 1);
         assert!(
@@ -2254,6 +2317,221 @@ mod tests {
             .is_err()
         );
     }
+    #[test]
+    fn cmaq_held_out_family_ids_transfer_through_observable_context_without_family_labels() {
+        const DIM: usize = 256;
+        let mut world_model = NixWorldModel::new(DIM);
+        let context_a = ContinuousHV::random(DIM, 740);
+        let context_b = ContinuousHV::random(DIM, 741);
+        let delta_a = ContinuousHV::from_vec(
+            std::iter::once(0.1)
+                .chain(std::iter::repeat_n(0.0, DIM - 1))
+                .collect(),
+        );
+        let delta_b = ContinuousHV::from_vec(
+            std::iter::once(0.5)
+                .chain(std::iter::repeat_n(0.0, DIM - 1))
+                .collect(),
+        );
+        let action_parameters = ContinuousHV::random(DIM, 90);
+        let state_with = |coordinate_zero: f32, nuisance: f32| {
+            let mut values = vec![0.0; DIM];
+            values[0] = coordinate_zero;
+            values[1] = nuisance;
+            ContinuousHV::from_vec(values)
+        };
+
+        let training_family_ids = ["training-mechanism-a", "training-mechanism-b"];
+        let held_out_family_ids = ["heldout-mechanism-c", "heldout-mechanism-d"];
+        assert!(
+            held_out_family_ids
+                .iter()
+                .all(|family| !training_family_ids.contains(family)),
+            "evaluation family IDs must be disjoint from training family IDs"
+        );
+
+        // Train only on A/B identities. Each has a distinct observable context
+        // and action response map. Three independent clusters per family.
+        for index in 0..3 {
+            let before_a = state_with(0.1, -0.8 + index as f32 * 0.05);
+            let mut episode_a = transition_episode(
+                &format!("cmaq024-training-a-{index}"),
+                ActionCategory::Install,
+                ActionCategory::Install,
+                before_a.clone(),
+                context_a.clone(),
+                before_a.add(&delta_a),
+                TransitionOutcomeClass::Success,
+                &format!("cmaq024-training-a-cluster-{index}"),
+            );
+            episode_a.environment_family_id = training_family_ids[0].to_owned();
+            world_model
+                .learn_episode(&episode_a)
+                .expect("training family A episode");
+
+            let before_b = state_with(0.1, 0.55 + index as f32 * 0.05);
+            let mut episode_b = transition_episode(
+                &format!("cmaq024-training-b-{index}"),
+                ActionCategory::Install,
+                ActionCategory::Install,
+                before_b.clone(),
+                context_b.clone(),
+                before_b.add(&delta_b),
+                TransitionOutcomeClass::Success,
+                &format!("cmaq024-training-b-cluster-{index}"),
+            );
+            episode_b.environment_family_id = training_family_ids[1].to_owned();
+            world_model
+                .learn_episode(&episode_b)
+                .expect("training family B episode");
+        }
+
+        // Entire evaluation family identities and all cluster IDs are disjoint.
+        // Their response maps are transferable from A/B only through observable
+        // context and action-parameter signatures.
+        let evaluation_states = [
+            (
+                "c-left",
+                held_out_family_ids[0],
+                "cmaq024-heldout-c-cluster-left",
+                state_with(0.1, -0.65),
+                context_a.clone(),
+                200_i64,
+            ),
+            (
+                "c-right",
+                held_out_family_ids[0],
+                "cmaq024-heldout-c-cluster-right",
+                state_with(0.1, -0.35),
+                context_a.clone(),
+                200_i64,
+            ),
+            (
+                "d-left",
+                held_out_family_ids[1],
+                "cmaq024-heldout-d-cluster-left",
+                state_with(0.1, 0.45),
+                context_b.clone(),
+                600_i64,
+            ),
+            (
+                "d-right",
+                held_out_family_ids[1],
+                "cmaq024-heldout-d-cluster-right",
+                state_with(0.1, 0.75),
+                context_b.clone(),
+                600_i64,
+            ),
+        ];
+
+        let key = ResponseKey::new("install", "coordinate_0_after_action", 1);
+        let mut contract = StateResponseContract {
+            contract_id: "cmaq-024-heldout-family-context-v1".to_owned(),
+            contract_sha256: "e".repeat(64),
+            source_manifest_sha256: "f".repeat(64),
+            domain_ids: ["toy-nixos-domain".to_owned()].into_iter().collect(),
+            intervention_ids: ["install".to_owned()].into_iter().collect(),
+            query_ids: ["coordinate_0_after_action".to_owned()]
+                .into_iter()
+                .collect(),
+            horizons: [1].into_iter().collect(),
+            invariant_ids: ["constant-invariant".to_owned()].into_iter().collect(),
+            tolerance_units: BTreeMap::new(),
+            probe_cost_units: BTreeMap::new(),
+        };
+        contract.tolerance_units.insert(key.clone(), 1);
+        contract.probe_cost_units.insert(key.clone(), 1);
+        contract
+            .validate()
+            .expect("frozen held-out family contract");
+
+        let quantize_query =
+            |state: &ContinuousHV| (state.as_slice()[0] as f64 * 1000.0).round() as i64;
+        let mut hdc_records = Vec::new();
+        let mut global_records = Vec::new();
+        let mut identity_records = Vec::new();
+        let mut full_state_records = Vec::new();
+        let mut hdc_exact_response_count = 0usize;
+        let mut global_exact_response_count = 0usize;
+        let mut identity_exact_response_count = 0usize;
+
+        // Family IDs are evaluator-only annotations: the candidate call below
+        // receives no family ID and constructs labels before attaching responses.
+        for (state_id, family, cluster, before, context, reference_response) in &evaluation_states {
+            let hdc_prediction = world_model
+                .predict_state_without_family_label(
+                    before,
+                    &ActionCategory::Install,
+                    &action_parameters,
+                    context,
+                )
+                .expect("family-label-free held-out family prediction");
+            assert_eq!(
+                hdc_prediction.source,
+                ContextualPredictionSource::ContextualDelta,
+                "observable context should uniquely retrieve the transferred response map"
+            );
+
+            let hdc_response = quantize_query(&hdc_prediction.predicted_state);
+            hdc_exact_response_count += (hdc_response == *reference_response) as usize;
+            let hdc_label = format!("query:{hdc_response}");
+            let full_state_label = hdc_prediction
+                .predicted_state
+                .as_slice()
+                .iter()
+                .map(|value| format!("{value:.6}"))
+                .collect::<Vec<_>>()
+                .join(",");
+
+            world_model.observe(before.clone());
+            let global_prediction = world_model.predict_state(&ActionCategory::Install);
+            let global_response = quantize_query(&global_prediction);
+            global_exact_response_count += (global_response == *reference_response) as usize;
+            let global_label = format!("query:{global_response}");
+            let identity_response = quantize_query(before);
+            identity_exact_response_count += (identity_response == *reference_response) as usize;
+            let identity_label = format!("query:{identity_response}");
+
+            let build_record = |abstract_state_id: String| StateResponseRecord {
+                state_id: (*state_id).to_owned(),
+                domain_id: "toy-nixos-domain".to_owned(),
+                environment_family_id: (*family).to_owned(),
+                environment_cluster_id: (*cluster).to_owned(),
+                source_state_sha256: format!("{:x}", Sha256::digest(state_id.as_bytes())),
+                candidate_checkpoint_sha256: "d".repeat(64),
+                abstract_state_id,
+                invariant_signature: [("constant-invariant".to_owned(), 1)].into_iter().collect(),
+                // Reference response is attached only after candidate prediction.
+                responses: [(key.clone(), *reference_response)].into_iter().collect(),
+            };
+
+            hdc_records.push(build_record(hdc_label));
+            global_records.push(build_record(global_label));
+            identity_records.push(build_record(identity_label));
+            full_state_records.push(build_record(full_state_label));
+        }
+
+        let hdc_score =
+            score_abstraction(&hdc_records, &contract).expect("score held-out HDC partition");
+        let global_score =
+            score_abstraction(&global_records, &contract).expect("score held-out global partition");
+        let identity_score = score_abstraction(&identity_records, &contract)
+            .expect("score held-out identity partition");
+        let full_state_score = score_abstraction(&full_state_records, &contract)
+            .expect("score held-out full-state partition");
+
+        assert_eq!(hdc_exact_response_count, 4);
+        assert_eq!(global_exact_response_count, 0);
+        assert_eq!(identity_exact_response_count, 0);
+        assert_eq!(hdc_score.false_merges, 0);
+        assert_eq!(hdc_score.false_splits, 0);
+        assert_eq!(hdc_score.candidate_class_count, 2);
+        assert_eq!(global_score.false_merges, 4);
+        assert_eq!(identity_score.false_merges, 4);
+        assert_eq!(full_state_score.false_splits, 2);
+        assert_eq!(full_state_score.candidate_class_count, 4);
+    }
+
     #[test]
     fn cmaq_adapter_qualifies_query_sufficient_partition_from_real_nixward_hdc_predictions() {
         const DIM: usize = 256;
@@ -2371,9 +2649,8 @@ mod tests {
         contract.probe_cost_units.insert(key.clone(), 1);
         contract.validate().expect("frozen CMAQ response contract");
 
-        let quantize_query = |state: &ContinuousHV| {
-            (state.as_slice()[0] as f64 * 1000.0).round() as i64
-        };
+        let quantize_query =
+            |state: &ContinuousHV| (state.as_slice()[0] as f64 * 1000.0).round() as i64;
         let mut hdc_records = Vec::new();
         let mut global_records = Vec::new();
         let mut identity_records = Vec::new();
@@ -2384,9 +2661,7 @@ mod tests {
 
         // Candidate prediction and abstraction-label construction happen before
         // evaluator-only response values are attached to the records below.
-        for (state_id, family, cluster, before, context, reference_response) in
-            &evaluation_states
-        {
+        for (state_id, family, cluster, before, context, reference_response) in &evaluation_states {
             let hdc_prediction = world_model
                 .predict_state_without_family_label(
                     before,
@@ -2402,7 +2677,7 @@ mod tests {
             );
 
             let hdc_response = quantize_query(&hdc_prediction.predicted_state);
-            hdc_exact_response_count += usize::from(hdc_response == *reference_response);
+            hdc_exact_response_count += (hdc_response == *reference_response) as usize;
             let hdc_label = format!("coordinate_0:{hdc_response}");
             let full_state_label = hdc_prediction
                 .predicted_state
@@ -2415,12 +2690,10 @@ mod tests {
             world_model.observe(before.clone());
             let global_prediction = world_model.predict_state(&ActionCategory::Install);
             let global_response = quantize_query(&global_prediction);
-            global_exact_response_count +=
-                usize::from(global_response == *reference_response);
+            global_exact_response_count += (global_response == *reference_response) as usize;
             let global_label = format!("coordinate_0:{global_response}");
             let identity_response = quantize_query(before);
-            identity_exact_response_count +=
-                usize::from(identity_response == *reference_response);
+            identity_exact_response_count += (identity_response == *reference_response) as usize;
             let identity_label = format!("coordinate_0:{identity_response}");
 
             let build_record = |abstract_state_id: String| StateResponseRecord {
@@ -2431,9 +2704,7 @@ mod tests {
                 source_state_sha256: format!("{:x}", Sha256::digest(state_id.as_bytes())),
                 candidate_checkpoint_sha256: "c".repeat(64),
                 abstract_state_id,
-                invariant_signature: [("constant-invariant".to_owned(), 1)]
-                    .into_iter()
-                    .collect(),
+                invariant_signature: [("constant-invariant".to_owned(), 1)].into_iter().collect(),
                 // This is evaluator-only reference information; it is never
                 // passed into NixWorldModel or used to create candidate labels.
                 responses: [(key.clone(), *reference_response)].into_iter().collect(),
@@ -2474,5 +2745,4 @@ mod tests {
         assert!(hdc_score.false_merges < identity_score.false_merges);
         assert!(hdc_score.false_splits < full_state_score.false_splits);
     }
-
 }
