@@ -1,0 +1,36 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://luminousdynamics.io/schemas/connectome-detector-validation-counts-input-v1.schema.json",
+  "title": "Detector validation confusion matrix input",
+  "type": "object",
+  "additionalProperties": false,
+  "required": [
+    "true_positive",
+    "false_negative",
+    "true_negative",
+    "false_positive",
+    "z_score"
+  ],
+  "properties": {
+    "true_positive": {
+      "type": "integer",
+      "minimum": 0
+    },
+    "false_negative": {
+      "type": "integer",
+      "minimum": 0
+    },
+    "true_negative": {
+      "type": "integer",
+      "minimum": 0
+    },
+    "false_positive": {
+      "type": "integer",
+      "minimum": 0
+    },
+    "z_score": {
+      "type": "number",
+      "exclusiveMinimum": 0
+    }
+  }
+}

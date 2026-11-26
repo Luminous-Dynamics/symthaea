@@ -1,0 +1,47 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://luminousdynamics.io/schemas/connectome-detector-prevalence-input-v1.schema.json",
+  "title": "Detector prevalence interval inversion input",
+  "type": "object",
+  "additionalProperties": false,
+  "required": [
+    "observed_positive_fraction",
+    "sensitivity",
+    "specificity"
+  ],
+  "properties": {
+    "observed_positive_fraction": {
+      "type": "number",
+      "minimum": 0,
+      "maximum": 1
+    },
+    "sensitivity": {
+      "$ref": "#/$defs/probabilityBounds"
+    },
+    "specificity": {
+      "$ref": "#/$defs/probabilityBounds"
+    }
+  },
+  "$defs": {
+    "probabilityBounds": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "lower",
+        "upper"
+      ],
+      "properties": {
+        "lower": {
+          "type": "number",
+          "minimum": 0,
+          "maximum": 1
+        },
+        "upper": {
+          "type": "number",
+          "minimum": 0,
+          "maximum": 1
+        }
+      }
+    }
+  }
+}

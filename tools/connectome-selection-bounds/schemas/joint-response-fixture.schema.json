@@ -1,0 +1,58 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://luminousdynamics.io/schemas/connectome-joint-response-fixture-v1.schema.json",
+  "title": "Joint response known-answer fixture",
+  "type": "object",
+  "additionalProperties": false,
+  "required": [
+    "input",
+    "expected"
+  ],
+  "properties": {
+    "input": {
+      "$ref": "https://luminousdynamics.io/schemas/connectome-joint-response-input-v1.schema.json"
+    },
+    "expected": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "joint_prevalence_bounds",
+        "target_given_source_bounds",
+        "independence_product_not_assumed"
+      ],
+      "properties": {
+        "joint_prevalence_bounds": {
+          "$ref": "#/$defs/interval"
+        },
+        "target_given_source_bounds": {
+          "$ref": "#/$defs/interval"
+        },
+        "independence_product_not_assumed": {
+          "const": true
+        }
+      }
+    }
+  },
+  "$defs": {
+    "interval": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "lower",
+        "upper"
+      ],
+      "properties": {
+        "lower": {
+          "type": "number",
+          "minimum": 0,
+          "maximum": 1
+        },
+        "upper": {
+          "type": "number",
+          "minimum": 0,
+          "maximum": 1
+        }
+      }
+    }
+  }
+}

@@ -1,0 +1,19 @@
+{
+  "input": {
+    "observed_positive_fraction": 0.6,
+    "sensitivity": {
+      "lower": 0.8,
+      "upper": 0.9
+    },
+    "specificity": {
+      "lower": 0.9,
+      "upper": 0.95
+    }
+  },
+  "expected": {
+    "latent_prevalence_bounds": [
+      0.625,
+      0.7333333333333333
+    ]
+  }
+}

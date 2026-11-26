@@ -1,0 +1,33 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://luminousdynamics.io/schemas/connectome-detector-prevalence-fixture-v1.schema.json",
+  "title": "Detector prevalence known-answer fixture",
+  "type": "object",
+  "additionalProperties": false,
+  "required": [
+    "input",
+    "expected"
+  ],
+  "properties": {
+    "input": {
+      "$ref": "https://luminousdynamics.io/schemas/connectome-detector-prevalence-input-v1.schema.json"
+    },
+    "expected": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "latent_prevalence_bounds"
+      ],
+      "properties": {
+        "latent_prevalence_bounds": {
+          "type": "array",
+          "minItems": 2,
+          "maxItems": 2,
+          "items": {
+            "type": "number"
+          }
+        }
+      }
+    }
+  }
+}

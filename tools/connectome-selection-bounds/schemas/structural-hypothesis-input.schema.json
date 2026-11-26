@@ -1,0 +1,81 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://luminousdynamics.io/schemas/connectome-structural-hypothesis-input-v1.schema.json",
+  "title": "Structural response hypothesis set input",
+  "type": "object",
+  "additionalProperties": false,
+  "required": [
+    "hypotheses"
+  ],
+  "properties": {
+    "hypotheses": {
+      "type": "array",
+      "minItems": 1,
+      "items": {
+        "$ref": "#/$defs/hypothesis"
+      }
+    }
+  },
+  "$defs": {
+    "probabilityInterval": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "lower",
+        "upper"
+      ],
+      "properties": {
+        "lower": {
+          "type": "number",
+          "minimum": 0,
+          "maximum": 1
+        },
+        "upper": {
+          "type": "number",
+          "minimum": 0,
+          "maximum": 1
+        }
+      }
+    },
+    "hypothesis": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "hypothesis_id",
+        "source_entity_id",
+        "target_entity_id",
+        "evidence_manifest_sha256",
+        "admissible",
+        "source_prevalence",
+        "target_prevalence"
+      ],
+      "properties": {
+        "hypothesis_id": {
+          "type": "string",
+          "minLength": 1
+        },
+        "source_entity_id": {
+          "type": "string",
+          "minLength": 1
+        },
+        "target_entity_id": {
+          "type": "string",
+          "minLength": 1
+        },
+        "evidence_manifest_sha256": {
+          "type": "string",
+          "pattern": "^[A-Fa-f0-9]{64}$"
+        },
+        "admissible": {
+          "type": "boolean"
+        },
+        "source_prevalence": {
+          "$ref": "#/$defs/probabilityInterval"
+        },
+        "target_prevalence": {
+          "$ref": "#/$defs/probabilityInterval"
+        }
+      }
+    }
+  }
+}
