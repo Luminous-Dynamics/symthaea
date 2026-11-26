@@ -966,6 +966,12 @@ pub struct VerifiedDecisionSufficiencyV1 {
 }
 
 impl VerifiedDecisionSufficiencyV1 {
+    /// Expose the immutable, already verified receipt to follow-on verifiers.
+    /// Callers must still perform validate_at_use with current trust profiles.
+    pub fn receipt(&self) -> &DecisionSufficiencyReceiptV1 {
+        &self.receipt
+    }
+
     pub fn status(&self) -> DecisionSufficiencyStatusV1 {
         self.receipt.status
     }
