@@ -103,8 +103,8 @@ JSON Schema validates field shape, primitive bounds and mode-specific fields. It
 
 Two illustrative policy fixtures are published:
 
-- [EVSI adaptive policy example](../../../data/fixtures/mace_adaptive_decision_policy_evsi_v1.example.json)
-- [Probability-free robust adaptive policy example](../../../data/fixtures/mace_adaptive_decision_policy_robust_v1.example.json)
+- [EVSI adaptive policy example](../../data/fixtures/mace_adaptive_decision_policy_evsi_v1.example.json)
+- [Probability-free robust adaptive policy example](../../data/fixtures/mace_adaptive_decision_policy_robust_v1.example.json)
 
 Both demonstrate a two-query path: first verify a primary requirement, then seek an independent cross-check only when the first observation warrants it. Contradiction or denial leads to abstention; unknown/unavailable results defer. The SHA-256-shaped values are deterministic placeholders for schema examples only. They are not valid signatures, trust profiles, calibrated models, independently issued resource receipts or authority to execute the policy.
 
