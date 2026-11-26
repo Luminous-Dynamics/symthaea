@@ -412,10 +412,13 @@ fn validate_synthetic_input(
 
     match input.input_id.as_str() {
         "synthetic-consent-001" | "synthetic-consent-revoked-001" => {
-            if json_string(&artifact, "schema", task, input)? != "luminous.eqc.synthetic-consent.v0.1"
+            if json_string(&artifact, "schema", task, input)?
+                != "luminous.eqc.synthetic-consent.v0.1"
                 || json_string(&artifact, "consent_id", task, input)? != input.input_id
-                || Some(json_string(&artifact, "principal_id", task, input)?) != task.authority_snapshot.principal_id.as_deref()
-                || Some(json_string(&artifact, "subject_id", task, input)?) != task.authority_snapshot.subject_id.as_deref()
+                || Some(json_string(&artifact, "principal_id", task, input)?)
+                    != task.authority_snapshot.principal_id.as_deref()
+                || Some(json_string(&artifact, "subject_id", task, input)?)
+                    != task.authority_snapshot.subject_id.as_deref()
                 || json_string(&artifact, "status", task, input)? != task.authority_snapshot.status
             {
                 bail!(
@@ -428,7 +431,10 @@ fn validate_synthetic_input(
                 .get("scopes")
                 .and_then(Value::as_array)
                 .with_context(|| {
-                    format!("{}: consent fixture '{}' has no scopes array", task.task_id, input.input_id)
+                    format!(
+                        "{}: consent fixture '{}' has no scopes array",
+                        task.task_id, input.input_id
+                    )
                 })?
                 .iter()
                 .map(|scope| {
@@ -439,8 +445,10 @@ fn validate_synthetic_input(
                 .collect::<anyhow::Result<Vec<_>>>()?;
 
             if fixture_scopes != task.authority_snapshot.scopes
-                || Some(json_string(&artifact, "valid_until", task, input)?) != task.authority_snapshot.valid_until.as_deref()
-                || json_string(&artifact, "valid_from", task, input)? > task.request.evaluated_at.as_str()
+                || Some(json_string(&artifact, "valid_until", task, input)?)
+                    != task.authority_snapshot.valid_until.as_deref()
+                || json_string(&artifact, "valid_from", task, input)?
+                    > task.request.evaluated_at.as_str()
             {
                 bail!(
                     "{}: consent fixture '{}' disagrees with scopes or temporal bounds",
@@ -466,11 +474,14 @@ fn validate_synthetic_input(
             }
         }
         "synthetic-challenge-001" => {
-            if json_string(&artifact, "schema", task, input)? != "luminous.eqc.synthetic-challenge.v0.1"
-                || Some(json_string(&artifact, "challenge_id", task, input)?) != task.request.challenge_id.as_deref()
+            if json_string(&artifact, "schema", task, input)?
+                != "luminous.eqc.synthetic-challenge.v0.1"
+                || Some(json_string(&artifact, "challenge_id", task, input)?)
+                    != task.request.challenge_id.as_deref()
                 || json_string(&artifact, "issuer_id", task, input)? != task.actor.actor_id
                 || json_string(&artifact, "subject_id", task, input)? != task.subject.subject_id
-                || json_string(&artifact, "state", task, input)? != task.request.challenge_state.as_deref().unwrap_or("")
+                || json_string(&artifact, "state", task, input)?
+                    != task.request.challenge_state.as_deref().unwrap_or("")
             {
                 bail!(
                     "{}: challenge fixture '{}' does not match the request",
@@ -650,6 +661,38 @@ mod tests {
     fn future_authority_snapshot_is_not_used_for_an_earlier_request() {
         let mut task = seed_corpus().tasks.remove(0);
         task.authority_snapshot.observed_at = "2026-11-26T02:00:00Z".into();
+        assert!(validate_task(&task, &repository_root()).is_err());
+    }
+
+    #[test]
+    fn tampered_fixture_digest_is_rejected() {
+        let mut task = seed_corpus().tasks.remove(0);
+        task.input_refs[0].sha256 = "0".repeat(64);
+        assert!(validate_task(&task, &repository_root()).is_err());
+    }
+
+    #[test]
+    fn consent_fixture_must_match_authority_snapshot() {
+        let mut task = seed_corpus().tasks.remove(0);
+        task.authority_snapshot.scopes.clear();
+        assert!(validate_task(&task, &repository_root()).is_err());
+    }
+
+    #[test]
+    fn path_traversal_is_rejected_before_reading_inputs() {
+        let mut task = seed_corpus().tasks.remove(0);
+        task.input_refs[0].artifact_path = "../Cargo.toml".into();
+        assert!(validate_task(&task, &repository_root()).is_err());
+    }
+
+    #[test]
+    fn challenge_fixture_must_match_consumed_state() {
+        let mut task = seed_corpus()
+            .tasks
+            .into_iter()
+            .find(|task| task.task_id == "eqc-trust-replayed-challenge-deny-001")
+            .unwrap();
+        task.request.challenge_state = Some("unused".into());
         assert!(validate_task(&task, &repository_root()).is_err());
     }
 
