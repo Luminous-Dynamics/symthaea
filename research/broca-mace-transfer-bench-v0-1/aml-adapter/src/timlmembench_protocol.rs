@@ -273,9 +273,10 @@ fn canonical_docs(object: &Map<String, Value>) -> Result<Vec<LexicalDocV1>, Stri
         }
         let memory_id = item.get("memory_id")
             .and_then(Value::as_str)
-            .filter(|value| !value.trim().is_empty())
-            .unwrap_or("canonical-memory-without-id")
-            .to_owned();
+            .map(str::trim)
+            .filter(|value| !value.is_empty())
+            .map(str::to_owned)
+            .ok_or_else(|| "canonical memory item with content must have a memory_id".to_owned())?;
         docs.push(LexicalDocV1 { memory_id, text });
     }
     Ok(docs)
