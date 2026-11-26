@@ -39,7 +39,9 @@ fn assert_close(actual: f64, expected: f64, field: &str) -> Result<(), Box<dyn E
     if !actual.is_finite() || (actual - expected).abs() > tolerance {
         return Err(IoError::new(
             ErrorKind::InvalidData,
-            format!("{field} mismatch: actual={actual}, expected={expected}, tolerance={tolerance}"),
+            format!(
+                "{field} mismatch: actual={actual}, expected={expected}, tolerance={tolerance}"
+            ),
         )
         .into());
     }
@@ -88,8 +90,16 @@ fn run() -> Result<(), Box<dyn Error>> {
     {
         assert_close(*actual, *expected, &format!("projected_values[{index}]"))?;
     }
-    assert_close(report.achieved_mass, input.expected.achieved_mass, "achieved_mass")?;
-    assert_close(report.mass_residual, input.expected.mass_residual, "mass_residual")?;
+    assert_close(
+        report.achieved_mass,
+        input.expected.achieved_mass,
+        "achieved_mass",
+    )?;
+    assert_close(
+        report.mass_residual,
+        input.expected.mass_residual,
+        "mass_residual",
+    )?;
     assert_close(
         report.lagrange_multiplier,
         input.expected.lagrange_multiplier,
