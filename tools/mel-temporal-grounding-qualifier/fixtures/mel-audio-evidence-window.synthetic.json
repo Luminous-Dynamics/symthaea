@@ -2,7 +2,7 @@
   "schema": "mel-audio-evidence-window-v1",
   "experiment_unit_id": "mel-grounding-evidence-window-fixture-001",
   "query_id": "piano-entry-query-001",
-  "query_text_sha256": "6666666666666666666666666666666666666666666666666666666666666666",
+  "query_text_sha256": "8faaeb1470e86800e5d84b45b7f311a7f1554eaad46c77b45bd3210d289c1cc2",
   "model_identity_sha256": "7777777777777777777777777777777777777777777777777777777777777777",
   "runtime_identity_sha256": "8888888888888888888888888888888888888888888888888888888888888888",
   "decoding_config_sha256": "9999999999999999999999999999999999999999999999999999999999999999",
@@ -52,6 +52,7 @@
         "payload_sha256": "74cac05eac42e84ae16f372efbe5354a1fa5e03b39ae90df4a9dcd81a59fb792"
       }
     ],
-    "context_manifest_sha256": "385c03cca36c205486e269bb4050a473ea25932fe444f4b90b537104bf88497c"
-  }
+    "context_manifest_sha256": "587a02b45b5a4334fde276e956f4b9f391804ecba7536d66188da9c693726f54"
+  },
+  "query_text": "Identify every piano entrance in the supplied recording."
 }
