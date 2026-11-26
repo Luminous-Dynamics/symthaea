@@ -63,7 +63,7 @@ The origin-verifier profile and keys must live in a separate administrative and 
 
 ## 6. Adversarial tests and next work
 
-The next test increment should include end-to-end signed fixtures for:
+The module now includes authored deterministic fixtures for known SHA-256 behavior, exact source/payload/derivation matching, altered source/payload/derivation rejection, root-versus-derived receipt rules, Ed25519 DSSE verification, exact expiry-boundary rejection, altered signed-payload rejection, authority-role separation and sorted parent enforcement. These tests have not been executed. The next test increment should add full graph-to-origin integration fixtures for:
 
 - exact source and payload bytes; changed bytes; truncated bytes; same digest field with different supplied data;
 - missing, extra and duplicate ancestor artifacts/receipts;
