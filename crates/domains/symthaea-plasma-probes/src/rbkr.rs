@@ -128,6 +128,9 @@ pub struct ResponseGramianScenario<'a> {
 pub struct ScenarioResponseResidual {
     pub scenario_id: String,
     pub trajectory_sha256: String,
+    pub checkpoint_sha256: String,
+    pub state_coordinate_id: String,
+    pub state_metric_id: String,
     pub normalized_weight: f64,
     pub response_residual: f64,
 }
@@ -143,6 +146,11 @@ pub struct ScenarioResponseResidual {
 pub struct ResponseEnrichmentReceipt {
     pub scenario_id: String,
     pub trajectory_sha256: String,
+    pub task_contract_id: String,
+    pub checkpoint_id: String,
+    pub checkpoint_sha256: String,
+    pub state_coordinate_id: String,
+    pub state_metric_id: String,
     pub previous_order: usize,
     pub new_order: usize,
     pub pre_response_residual: f64,
@@ -151,6 +159,11 @@ pub struct ResponseEnrichmentReceipt {
 }
 
 pub struct ResponseResidualReport {
+    pub task_contract_id: String,
+    pub checkpoint_id: String,
+    pub checkpoint_sha256: String,
+    pub state_coordinate_id: String,
+    pub state_metric_id: String,
     pub scenarios: Vec<ScenarioResponseResidual>,
     pub weighted_mean: f64,
     pub worst_case: f64,
@@ -274,6 +287,9 @@ pub fn evaluate_response_scenario_residuals(
         reports.push(ScenarioResponseResidual {
             scenario_id: scenario.scenario_id.to_owned(),
             trajectory_sha256: scenario.trajectory_sha256.to_owned(),
+            checkpoint_sha256: scenario.checkpoint_sha256.to_owned(),
+            state_coordinate_id: scenario.state_coordinate_id.to_owned(),
+            state_metric_id: scenario.state_metric_id.to_owned(),
             normalized_weight,
             response_residual: residual,
         });
@@ -309,6 +325,11 @@ pub fn evaluate_response_scenario_residuals(
     }
 
     Ok(ResponseResidualReport {
+        task_contract_id: first.task_contract_id.to_owned(),
+        checkpoint_id: first.checkpoint_id.to_owned(),
+        checkpoint_sha256: first.checkpoint_sha256.to_owned(),
+        state_coordinate_id: first.state_coordinate_id.to_owned(),
+        state_metric_id: first.state_metric_id.to_owned(),
         scenarios: reports,
         weighted_mean,
         worst_case,
@@ -1387,6 +1408,11 @@ impl ResponseBalancedBasis {
         Ok(ResponseEnrichmentReceipt {
             scenario_id: selected.scenario_id.to_owned(),
             trajectory_sha256: selected.trajectory_sha256.to_owned(),
+            task_contract_id: selected.task_contract_id.to_owned(),
+            checkpoint_id: selected.checkpoint_id.to_owned(),
+            checkpoint_sha256: selected.checkpoint_sha256.to_owned(),
+            state_coordinate_id: selected.state_coordinate_id.to_owned(),
+            state_metric_id: selected.state_metric_id.to_owned(),
             previous_order,
             new_order: self.reduced_order(),
             pre_response_residual: pre_residual,
