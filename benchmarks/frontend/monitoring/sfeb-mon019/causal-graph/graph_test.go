@@ -68,3 +68,27 @@ func TestTraceIdAloneCannotProveCompleteness(t *testing.T){g,p:=base();g.Manifes
 func TestCaptureCollectorIdentityUnverified(t *testing.T){g,p:=base();for i,r:=range g.Reports{if r.SubjectID=="collector"{g.Reports=append(g.Reports[:i],g.Reports[i+1:]...);break}};check(t,g,p,Indeterminate)}
 func TestCaptureSourceIdentityUnverified(t *testing.T){g,p:=base();for i:=range g.Reports{if g.Reports[i].SubjectID=="source-a"{g.Reports[i].Status="unverified"}};check(t,g,p,Indeterminate)}
 func FuzzDigestProfileIsolation(f *testing.F){f.Add("response","decision","value");f.Fuzz(func(t *testing.T,a,b,v string){if a==b{return};x:=digest("s",v,a);y:=digest("s",v,b);eq,cmp:=x.Equal(y);if eq||cmp{t.Fatal("different digest purposes compared")}})}
+
+func TestObservedByRequiresAgent(t *testing.T) {
+	g, p := base()
+	g.Edges = append(g.Edges, Edge{ID:"observed-output", Kind:ObservedBy, From:"output", To:"collector", EvidenceID:"invocation-record"})
+	check(t, g, p, Qualified)
+}
+
+func TestObservedByCannotTargetActivity(t *testing.T) {
+	g, p := base()
+	g.Edges = append(g.Edges, Edge{ID:"observed-output", Kind:ObservedBy, From:"output", To:"tool-call", EvidenceID:"invocation-record"})
+	check(t, g, p, Denied)
+}
+
+func TestAuthorityAndAttributionEdgesAreNotCausalEdges(t *testing.T) {
+	g, p := base()
+	d := digest("authority-record", "auth", "authority")
+	g.Nodes = append(g.Nodes, Node{ID:"authority-record", Kind:Entity, Digest:&d, RequiresVerification:true})
+	g.Reports = append(g.Reports, VerifierReport{SubjectID:"authority-record", InputDigest:d, Status:"verified", VerifierID:"v1", Version:"1", BuildDigest:"b1", TrustStoreDigest:"t1", VerifiedAt:110, FreshUntil:500})
+	g.Edges = append(g.Edges,
+		Edge{ID:"authority-link", Kind:AuthorizedBy, From:"authority-record", To:"tool-call", EvidenceID:"invocation-record"},
+		Edge{ID:"observe-link", Kind:ObservedBy, From:"output", To:"collector", EvidenceID:"invocation-record"},
+	)
+	check(t, g, p, Qualified)
+}
