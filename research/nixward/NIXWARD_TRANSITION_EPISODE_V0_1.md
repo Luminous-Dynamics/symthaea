@@ -68,7 +68,8 @@ Outcome counts are reported separately from transition-state prediction. A futur
 - unexecuted and outcome-unknown episodes are rejected without model mutation;
 - distinct environment contexts receive different contextual deltas;
 - distinct environment families do not share contextual buckets;
-- a deterministic two-mechanism fixture compares held-out family-A prediction against the pooled global action-delta baseline; the contextual prediction must have lower state MSE;
+- a deterministic two-mechanism fixture compares **known-family** contextual retrieval against the pooled global action-delta baseline; this is not held-out-family transfer;
+- an actually unseen mechanism-family ID falls back to the global baseline under the current family-scoped prediction API;
 - different action parameter signatures do not silently reuse a contextual delta;
 - unknown context/action parameters visibly fall back to the global baseline;
 - repeated rows in one environment cluster do not inflate distinct-cluster counts;
@@ -88,7 +89,7 @@ Compare with identical source histories, environment splits and action budgets:
 7. matched RSSM/recurrent dynamics baseline;
 8. HDC-LTC/CfC only after a real, explicitly wired transition field, training path and inference path exist.
 
-Evaluate held-out action × parameter × context × mechanism combinations. Include no-op/copy controls, unseen actions, parameter changes, nuisance/context shifts, partial execution, failed rebuilds, rollbacks and outcome-unknown reconciliation cases.
+Evaluate held-out action × parameter × context × mechanism combinations. The current contextual predictor requires an exact environment-family ID, so its known-family test is not evidence of held-out-family transfer; the new unseen-family negative control exposes its current global-delta fallback. Add a family-label-free context retrieval/ambiguity-abstention arm before making transfer claims. Include no-op/copy controls, unseen actions, parameter changes, nuisance/context shifts, partial execution, failed rebuilds, rollbacks and outcome-unknown reconciliation cases.
 
 Keep metrics separate:
 
@@ -102,6 +103,10 @@ Keep metrics separate:
 - all-in state/checkpoint bytes, model update cost, inference latency and memory.
 
 Use independent environment clusters for inference. Repeated transition episodes within one cluster must not be treated as independent replicates. Reuse #8578 statistical ownership.
+
+## Held-out-family limitation
+
+The current contextual bucket is stratified by `environment_family_id`, and `predict_state_with_context` requires that ID at inference. The known-family test therefore measures retrieval when the family is supplied and has appeared in training; it is not a zero-shot mechanism-family transfer result. The unseen-family test confirms that the current API falls back to the pooled global delta. A separate family-label-free retrieval path must use only observable context/action features and return an explicit ambiguous/unknown result when equally matched families imply incompatible deltas.
 
 ## Claim boundary
 
