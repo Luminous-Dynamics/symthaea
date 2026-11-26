@@ -5,6 +5,7 @@ mod crate_status;
 mod duplicate_scan;
 mod manifest;
 mod rhn_sweep;
+mod eqc;
 
 #[derive(Parser)]
 struct Cli {
@@ -62,6 +63,13 @@ enum Commands {
         #[arg(long)]
         out: PathBuf,
     },
+    /// Validate the public synthetic EQC seed against a small fail-closed reference policy.
+    EqcValidate {
+        #[arg(long, default_value = "docs/research/eqc-seed-corpus-v0.1.json")]
+        corpus: PathBuf,
+        #[arg(long)]
+        out: Option<PathBuf>,
+    },
     GenerateManifest {
         #[arg(long, default_value = ".")]
         root: PathBuf,
@@ -105,6 +113,29 @@ fn main() -> anyhow::Result<()> {
         }
         Commands::RhnFinalize { input, out } => {
             rhn_sweep::run_finalize(input, out)?;
+        }
+        Commands::EqcValidate { corpus, out } => {
+            let root = PathBuf::from(env!("CARGO_MANIFEST_DIR"))
+                .parent()
+                .expect("xtask lives one level below the workspace root")
+                .to_path_buf();
+            let corpus_path = if corpus.is_absolute() {
+                corpus
+            } else {
+                root.join(corpus)
+            };
+            let report = eqc::validate_corpus_file(&corpus_path)?;
+            let encoded = serde_json::to_vec_pretty(&report)?;
+            if let Some(out) = out {
+                let output_path = if out.is_absolute() { out } else { root.join(out) };
+                if let Some(parent) = output_path.parent() {
+                    std::fs::create_dir_all(parent)?;
+                }
+                std::fs::write(&output_path, &encoded)?;
+                println!("EQC reference report written to {}", output_path.display());
+            } else {
+                println!("{}", String::from_utf8(encoded)?);
+            }
         }
         Commands::GenerateManifest { root } => {
             let files = vec!["Cargo.toml", "src/lib.rs", "symthaea-core/Cargo.toml"];
