@@ -1,7 +1,7 @@
 //! Emit an unsigned in-toto Statement v1 payload for an audio-bound revision.
 //!
 //! Usage: mel-audio-evidence-in-toto <revision-case.json> <audio-manifest.json>
-//!        <source-audio.bin> <decoded-pcm.hex>
+//!        <source-audio.bin> <decoded-pcm.hex> <request-body.bin>
 //!
 //! The output is an unsigned in-toto payload for the #13254 DSSE signer. It is
 //! not a DSSE envelope and it carries no signer or trust-root verification.
@@ -50,9 +50,9 @@ fn hex_nibble(byte: u8) -> Option<u8> {
 
 fn run() -> Result<String, String> {
     let args: Vec<_> = env::args_os().skip(1).collect();
-    if args.len() != 4 {
+    if args.len() != 5 {
         return Err(
-            "usage: mel-audio-evidence-in-toto <revision-case.json> <audio-manifest.json> <source-audio.bin> <decoded-pcm.hex>"
+            "usage: mel-audio-evidence-in-toto <revision-case.json> <audio-manifest.json> <source-audio.bin> <decoded-pcm.hex> <request-body.bin>"
                 .into(),
         );
     }
@@ -60,6 +60,7 @@ fn run() -> Result<String, String> {
     let manifest_path = args[1].to_string_lossy().into_owned();
     let source_path = args[2].to_string_lossy().into_owned();
     let pcm_path = args[3].to_string_lossy().into_owned();
+    let request_body_path = args[4].to_string_lossy().into_owned();
 
     let revision_text = fs::read_to_string(&revision_path)
         .map_err(|error| format!("failed reading revision case {revision_path}: {error}"))?;
@@ -68,6 +69,8 @@ fn run() -> Result<String, String> {
     let source_audio = fs::read(&source_path)
         .map_err(|error| format!("failed reading source audio {source_path}: {error}"))?;
     let decoded_pcm = decode_hex_file(&pcm_path)?;
+    let request_body = fs::read(&request_body_path)
+        .map_err(|error| format!("failed reading request body {request_body_path}: {error}"))?;
 
     let revision_case: RevisionCaseV2 = serde_json::from_str(&revision_text)
         .map_err(|error| format!("invalid temporal revision case JSON: {error}"))?;
@@ -80,6 +83,7 @@ fn run() -> Result<String, String> {
             &evidence_manifest,
             &source_audio,
             &decoded_pcm,
+            &request_body,
         )?;
     serde_json::to_string_pretty(&payload)
         .map_err(|error| format!("failed serializing unsigned in-toto payload: {error}"))
