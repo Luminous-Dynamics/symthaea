@@ -603,7 +603,7 @@ mod tests {
         let report = verify_audio_evidence_manifest(&manifest, SOURCE_AUDIO, PCM).unwrap();
         assert_eq!(
             report.full_manifest_sha256,
-            "bb2de684ebff527e256268969b8d08e60bc6e907844c44402b04fb21364f3e69"
+            "70a121d88275034cf68428f20002c51d3cc6f83275e6e77bc80e5a1e3a5a8556"
         );
         assert!(report.source_audio_bytes_recomputed);
         assert!(report.decoded_pcm_bytes_recomputed);
@@ -652,6 +652,29 @@ mod tests {
         input.evidence_condition = EvidenceConditionV1::YokedRetrieved;
         assert!(verify_audio_evidence_manifest(&input, SOURCE_AUDIO, PCM).is_err());
         input.target_audio_sha256 = "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa".into();
+        assert!(verify_audio_evidence_manifest(&input, SOURCE_AUDIO, PCM).is_ok());
+    }
+
+    #[test]
+    fn yoked_source_must_differ_by_both_audio_digest_and_source_lineage() {
+        let mut input = manifest();
+        input.evidence_condition = EvidenceConditionV1::YokedRetrieved;
+        input.target_audio_sha256 =
+            "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa".into();
+        assert!(verify_audio_evidence_manifest(&input, SOURCE_AUDIO, PCM).is_err());
+
+        input = manifest();
+        input.evidence_condition = EvidenceConditionV1::YokedRetrieved;
+        input.source_lineage_id = "different-digest-same-work".into();
+        input.context.context_manifest_sha256 = context_digest(&input).unwrap();
+        assert!(verify_audio_evidence_manifest(&input, SOURCE_AUDIO, PCM).is_err());
+
+        input = manifest();
+        input.evidence_condition = EvidenceConditionV1::YokedRetrieved;
+        input.target_audio_sha256 =
+            "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa".into();
+        input.source_lineage_id = "synthetic-yoked-source-lineage-001".into();
+        input.context.context_manifest_sha256 = context_digest(&input).unwrap();
         assert!(verify_audio_evidence_manifest(&input, SOURCE_AUDIO, PCM).is_ok());
     }
 
