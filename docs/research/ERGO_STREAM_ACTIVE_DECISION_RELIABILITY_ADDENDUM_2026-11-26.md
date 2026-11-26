@@ -186,3 +186,58 @@ No aggregate score can compensate for false causal transfer, false-sufficiency, 
 **Current limitation:** the evaluator reference is a separate package in the same public repository and has not yet been integrated into the blind owner-side execution service. Package separation is not process or OS isolation. No hidden answer keys should be placed in a candidate-accessible process or artifact.
 
 No claim of SOTA, physical synchronization, human-level audiovisual judgment, causal discovery, general intelligence or production safety follows from this addendum.
+
+
+## 2. Streaming perception and sequential access comparators
+
+The existing Symtropy #6675 issue already owns the policy-level benchmark for choosing what to acquire, when to wait, when to repeat, when to stop, and when to respond under deadlines and costs. ErgoStream should plug its epistemic decision-sufficiency layer into that tournament rather than build a second active-media scheduler.
+
+The following external benchmarks should be retained as distinct comparison lanes:
+
+| Comparator | Native task and reported evidence | What ErgoStream should learn from it | What it does not establish |
+|---|---|---|---|
+| Video Active Perception (VAP), arXiv:2605.01662 | Training-free frame/keyframe acquisition for long-form video QA; reports up to 5.6× frame efficiency over standard sampling on EgoSchema, NExT-QA, ActivityNet-QA, IntentQA and CLEVRER | Matched frame-budget and cost-to-answer baselines; acquire moments that differ from expectations rather than uniformly sampling | It is task-question-conditioned frame selection, not task-agnostic structural acquisition or decision-sufficiency qualification |
+| SEW-Bench / Access-Structured Perception, arXiv:2608.22975 | On a 4,096-token episodic retrieval budget, reports 75–94% retrieval accuracy for query-conditioned access vs 3–19% for equal-budget query-independent sampling | Strong baseline for access policy and resource allocation under a fixed budget | The authors report that ASP did not beat a verbatim-only baseline on any backbone, and two of four preregistered falsification criteria fired; this is a necessary warning against assuming compressed state is automatically useful. Natural-video benchmarks were not run due to dataset agreements |
+| TRACE, arXiv:2609.30670 | 1,240 records across 517 videos; evaluates eight models/systems in eight configurations; measures temporal validity, response triggers, completion, workload and reliability | Require causal evidence-availability timestamps, response delay, false alarms, missed windows, completion and workload alongside task accuracy | Streaming video QA/response evaluation is not itself task-agnostic acquisition or event-identity transfer |
+| SPOT-Bench, NeurIPS 2026 E&D | Fully proactive streaming-video benchmark; every prediction across the whole stream is evaluated using Timeliness-F1. Its live detection table lists Ctrl-SPOT baseline T-F1@5 of 20.9 at 1Hz | Include no-response dead time, prediction spam, missed events, timely response and silence quality; evaluate the entire stream, not only sampled question points | The current repository states that interaction/intervention held-out test splits are planned for a later challenge release; some leaderboard tasks are detection-only at present |
+| DIVE, arXiv:2610.28405 | 525 audio/video samples with human annotations; reports sub-second average response latency for leading systems, while average response-window rates remain at or below 53.77% | Separate latency from response-window coverage and participation quality; include multi-party, ongoing and proactive interaction strata | Full-duplex interaction quality is not a clock-registration score or a measure of structural correspondence |
+
+### Consequence for ErgoStream
+
+A useful benchmark should make the full observation/decision timeline explicit:
+
+1. Evidence exists in the world.
+2. Evidence becomes available to the candidate after acquisition/transport delay.
+3. The candidate may acquire, wait, repeat, stop, answer or abstain.
+4. The decision deadline may expire before a high-fidelity observation arrives.
+5. The evaluator scores the decision against all admissible worlds and the actual evidence available at the time.
+
+This makes it possible to distinguish:
+- **frame efficiency** from **decision efficiency**;
+- **low latency** from **timely, correct participation**;
+- **information gain** from **decision value**;
+- **structural uniqueness** from **decision sufficiency**;
+- **memory compression** from **useful, independently validated reuse**.
+
+The policy tournament in Symtropy #6675 is the owner for sequential action scheduling, deadline and resource accounting, EIG/EVSI comparison and exact finite-horizon policy-tree oracle. ErgoStream #7555/#7558 supply the hypothesis-set and one-step decision-partition layer; #7577 supplies evaluator-side qualification of candidate claims. No duplicate scheduler or memory engine should be introduced.
+
+### Matched evaluation requirements
+
+For every method, report identical:
+- source stream and evidence availability trace;
+- legal action set and source-dependency/common-cause groups;
+- acquisition, processing and waiting costs;
+- response deadline and stale-evidence policy;
+- candidate inference and memory budgets;
+- held-out outcome and hidden evaluator probe sets.
+
+Report separately:
+- answer/task correctness;
+- time-to-valid-decision and p50/p95/p99 response delay;
+- response-window coverage and false-response rate;
+- missed-target rate and no-response dead-time;
+- acquired frames/audio duration/bytes and modality mix;
+- candidate inference cost, memory and energy where measured;
+- terminal decision regret and false-sufficiency / false-unique rates.
+
+Do not compare VAP frame-efficiency, SEW retrieval accuracy, TRACE QA accuracy, SPOT Timeliness-F1, DIVE response-window rate, AV-SyncBench pairwise accuracy or MATH-SYNC clock RMSE as though they were measurements of the same variable. They are different tasks and different estimands.
