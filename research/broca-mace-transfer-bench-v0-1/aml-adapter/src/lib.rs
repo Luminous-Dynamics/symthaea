@@ -26,6 +26,7 @@ pub mod decision_sufficiency;
 pub mod source_lineage_receipt;
 pub mod source_lineage_graph;
 pub mod source_origin_receipt;
+pub mod source_origin_witness;
 pub mod acquisition_receipt_v2;
 
 use std::collections::BTreeMap;
