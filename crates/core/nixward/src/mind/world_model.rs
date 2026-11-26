@@ -206,7 +206,7 @@ impl TransitionEpisodeV1 {
                     .iter()
                     .any(|value| !value.is_finite() || value.abs() > 1.0)
             {
-                return Err("executed state_after must match the HDC dimension and be finite".to_owned());
+                return Err("executed state_after must match the HDC dimension and contain finite values in [-1, 1]".to_owned());
             }
             if !is_sha256_hex(state_after_sha256) {
                 return Err("state_after_sha256 must be a 64-character SHA-256 hex digest".to_owned());
@@ -424,7 +424,7 @@ impl NixWorldModel {
             .filter(|(_, similarity)| similarity.is_finite())
             .max_by(|left, right| left.1.total_cmp(&right.1));
 
-        if let Some((index, similarity)) =
+        if let Some((index, _similarity)) =
             best_match.filter(|(_, similarity)| *similarity >= CONTEXT_MATCH_THRESHOLD)
         {
             let entry = &mut entries[index];
@@ -446,11 +446,6 @@ impl NixWorldModel {
                 .independent_cluster_ids
                 .insert(episode.independent_cluster_id.clone());
 
-            // Keep a finite similarity check explicit; invalid HDC values
-            // should have been rejected by episode validation.
-            if !similarity.is_finite() {
-                return Err("context similarity is non-finite".to_owned());
-            }
         } else {
             let mut independent_cluster_ids = HashSet::new();
             independent_cluster_ids.insert(episode.independent_cluster_id.clone());
