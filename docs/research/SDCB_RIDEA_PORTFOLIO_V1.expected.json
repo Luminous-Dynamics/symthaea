@@ -1,0 +1,45 @@
+{
+  "schema_version": "1.0.0",
+  "fixture_id": "ridea-greedy-portfolio-coverage-v1",
+  "execution_kind": "independent_sequential_mmd2_and_ridea_formula_calculation",
+  "rust_compiled_or_executed": false,
+  "initial_mmd2": 0.14173847129404793,
+  "steps": [
+    {
+      "candidate_id": "cover-a",
+      "cost_before": 0,
+      "cost_after": 1,
+      "mmd2_before": 0.14173847129404793,
+      "mmd2_after": 0.03760812682641457,
+      "robust_ratio": 0.8673326779841111,
+      "expected_information_gain": 0.7,
+      "representative_informative": 0.6071328745888777,
+      "deamplifying_weight": 0.8807970779778823,
+      "ridea_score": 0.5347608618821955,
+      "ridea_per_cost_unit": 0.5347608618821955
+    },
+    {
+      "candidate_id": "cover-b",
+      "cost_before": 1,
+      "cost_after": 2,
+      "mmd2_before": 0.03760812682641457,
+      "mmd2_after": 0,
+      "robust_ratio": 1,
+      "expected_information_gain": 0.65,
+      "representative_informative": 0.65,
+      "deamplifying_weight": 0.8021838885585817,
+      "ridea_score": 0.5214195275630781,
+      "ridea_per_cost_unit": 0.5214195275630781
+    }
+  ],
+  "selected_candidate_ids": [
+    "cover-a",
+    "cover-b"
+  ],
+  "final_mmd2": 0,
+  "total_cost_units": 2,
+  "remaining_budget_units": 0,
+  "stop_reason": "TargetDistributionMatched",
+  "claim_ceiling": "greedy_design_only_portfolio_fixture",
+  "note": "EIG and proxy predictions are frozen. This validates sequential MMD representativeness updates and score recomputation, not joint EIG, posterior learning or full adaptive R-IDeA."
+}
