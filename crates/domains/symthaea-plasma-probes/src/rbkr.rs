@@ -1178,9 +1178,18 @@ impl ResponseBalancedBasis {
         let next_order = current_order
             .checked_add(1)
             .ok_or(RbkrError::BasisBudgetExceeded)?;
-        let basis_scalars = dimension
+        let current_basis_scalars = dimension
+            .checked_mul(current_order)
+            .and_then(|value| value.checked_mul(2))
+            .ok_or(RbkrError::BasisBudgetExceeded)?;
+        let candidate_basis_scalars = dimension
             .checked_mul(next_order)
             .and_then(|value| value.checked_mul(2))
+            .ok_or(RbkrError::BasisBudgetExceeded)?;
+        // The current basis remains live while the independent candidate is
+        // constructed and checked, so charge both allocations at peak.
+        let peak_basis_scalars = current_basis_scalars
+            .checked_add(candidate_basis_scalars)
             .ok_or(RbkrError::BasisBudgetExceeded)?;
         let basis_work = dimension
             .checked_mul(
@@ -1190,7 +1199,7 @@ impl ResponseBalancedBasis {
             )
             .and_then(|value| value.checked_mul(next_order))
             .ok_or(RbkrError::BasisBudgetExceeded)?;
-        if basis_scalars > config.maximum_basis_scalars
+        if peak_basis_scalars > config.maximum_basis_scalars
             || basis_work > config.maximum_basis_scalar_operations
         {
             return Err(RbkrError::BasisBudgetExceeded);
@@ -1321,19 +1330,23 @@ impl ResponseBalancedBasis {
             return Err(RbkrError::NonFiniteArithmetic);
         }
 
-        let mut candidate_trial_basis = self.trial_basis.clone();
-        let mut candidate_test_basis = self.test_basis.clone();
-        candidate_trial_basis.push(new_trial);
-        candidate_test_basis.push(new_test);
-        let defect = pairing_defect(&candidate_trial_basis, &candidate_test_basis)?;
+        let pre_residual = self.linearized_response_residual(reachability, observability)?;
+        let mut candidate = self.clone();
+        candidate.trial_basis.push(new_trial);
+        candidate.test_basis.push(new_test);
+        let defect = pairing_defect(&candidate.trial_basis, &candidate.test_basis)?;
         if defect > config.biorthogonality_tolerance {
             return Err(RbkrError::BiorthogonalityFailure);
         }
+        candidate.response_enrichment_singular_values.push(sigma);
+        candidate.biorthogonality_defect = defect;
+        let post_residual =
+            candidate.linearized_response_residual(reachability, observability)?;
+        if post_residual > pre_residual + config.biorthogonality_tolerance {
+            return Err(RbkrError::ResponseEnrichmentUnavailable);
+        }
 
-        self.trial_basis = candidate_trial_basis;
-        self.test_basis = candidate_test_basis;
-        self.response_enrichment_singular_values.push(sigma);
-        self.biorthogonality_defect = defect;
+        *self = candidate;
         Ok(sigma)
     }
 
@@ -1366,15 +1379,10 @@ impl ResponseBalancedBasis {
         let selected = scenarios[worst_index];
         let pre_residual = report.scenarios[worst_index].response_residual;
         let previous_order = self.reduced_order();
-        let backup = self.clone();
         let added_singular_value =
             self.enrich_from_scenario(selected.reachability, selected.observability, config)?;
         let post_residual =
             self.linearized_response_residual(selected.reachability, selected.observability)?;
-        if post_residual > pre_residual + config.biorthogonality_tolerance {
-            *self = backup;
-            return Err(RbkrError::ResponseEnrichmentUnavailable);
-        }
 
         Ok(ResponseEnrichmentReceipt {
             scenario_id: selected.scenario_id.to_owned(),
@@ -1838,6 +1846,61 @@ mod tests {
 
         assert!(preserved < 1.0e-12);
         assert!((lost - 1.0).abs() < 1.0e-12);
+    }
+
+    #[test]
+    fn worst_scenario_enrichment_charges_old_and_candidate_basis_storage() {
+        let reach_a = gramian(2, &[vec![1.0, 0.0]]);
+        let observe_a = gramian(2, &[vec![1.0, 0.0]]);
+        let reach_b = gramian(2, &[vec![0.0, 1.0]]);
+        let observe_b = gramian(2, &[vec![0.0, 1.0]]);
+        let scenarios = [
+            ResponseGramianScenario {
+                scenario_id: "common-storage",
+                trajectory_sha256: "3333333333333333333333333333333333333333333333333333333333333333",
+                task_contract_id: "kresp1-contract-v1",
+                checkpoint_id: "checkpoint-storage",
+                checkpoint_sha256: "cccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccc",
+                state_coordinate_id: "vlasov-1d1v-layout-v1",
+                state_metric_id: "metric-v1",
+                reachability: &reach_a,
+                observability: &observe_a,
+                scenario_weight: 0.6,
+            },
+            ResponseGramianScenario {
+                scenario_id: "rare-storage",
+                trajectory_sha256: "4444444444444444444444444444444444444444444444444444444444444444",
+                task_contract_id: "kresp1-contract-v1",
+                checkpoint_id: "checkpoint-storage",
+                checkpoint_sha256: "cccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccc",
+                state_coordinate_id: "vlasov-1d1v-layout-v1",
+                state_metric_id: "metric-v1",
+                reachability: &reach_b,
+                observability: &observe_b,
+                scenario_weight: 0.4,
+            },
+        ];
+        let (reach, observe) = aggregate_response_gramians(
+            &scenarios,
+            ResponseGramianAggregationConfig::default(),
+        )
+        .unwrap();
+        let mut basis = ResponseBalancedBasis::from_empirical_gramians(
+            &reach,
+            &observe,
+            RbkrConfig::new(1),
+        )
+        .unwrap();
+        let before = basis.reduced_order();
+        let mut config = RbkrConfig::new(2);
+        // For n=2, current order 1 and candidate order 2 require
+        // 4 + 8 = 12 live basis scalars, not merely 8 output scalars.
+        config.maximum_basis_scalars = 8;
+        assert_eq!(
+            basis.enrich_from_worst_scenario(&scenarios, config),
+            Err(RbkrError::BasisBudgetExceeded)
+        );
+        assert_eq!(basis.reduced_order(), before);
     }
 
     #[test]
