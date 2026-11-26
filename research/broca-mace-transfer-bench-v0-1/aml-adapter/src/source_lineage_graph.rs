@@ -226,11 +226,6 @@ pub fn replay_source_lineage_graph_v1(
             .collect::<BTreeMap<_, _>>();
         let mut common_cause_owner = BTreeMap::<String, usize>::new();
         for (root_digest, index) in &root_index {
-            let root_node_id = root_paths.get(root_digest)
-                .and_then(|nodes| nodes.iter().find(|node_id| {
-                    nodes_for_root(&nodes, &**node_id, &root_digest, &nodes).is_some()
-                }));
-            let _ = root_node_id;
             for root_node in root_paths.get(root_digest).into_iter().flatten() {
                 let node = nodes.get(root_node).ok_or(SourceLineageRejectV1::InvalidGraph)?;
                 for group in &node.common_cause_group_sha256 {
