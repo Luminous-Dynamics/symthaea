@@ -193,6 +193,7 @@ pub struct RoutePlanV1 {
 #[derive(Clone, Copy, Debug, Eq, PartialEq)]
 pub enum RouteRejectV1 {
     DuplicateSubstrateProfile,
+    InvalidBindingDigest,
     InvalidCostProfile,
     RequiredSubstrateUnavailable,
     TooManySubstrates,
@@ -212,6 +213,9 @@ fn profile_for(
     }
     if !first.enabled {
         return Err(RouteRejectV1::RequiredSubstrateUnavailable);
+    }
+    if first.profile_sha256.iter().all(|byte| *byte == 0) {
+        return Err(RouteRejectV1::InvalidBindingDigest);
     }
     if first.amortization_query_count == 0 {
         return Err(RouteRejectV1::InvalidCostProfile);
@@ -287,6 +291,11 @@ pub fn route_mace_query_v1(
     request: &RouteRequestV1,
     profiles: &[SubstrateProfileV1],
 ) -> Result<RoutePlanV1, RouteRejectV1> {
+    if request.decision_need_sha256.iter().all(|byte| *byte == 0)
+        || request.substrate_catalog_sha256.iter().all(|byte| *byte == 0)
+    {
+        return Err(RouteRejectV1::InvalidBindingDigest);
+    }
     // Reject duplicate catalogue entries even when the selected route would
     // not happen to consult the duplicate kind.
     let mut seen = BTreeSet::new();
@@ -889,6 +898,47 @@ mod tests {
         assert_eq!(plan.estimated_cost.model_calls, 2);
         assert_eq!(plan.estimated_cost.tool_calls, 1);
         assert_eq!(plan.estimated_cost.verification_ops, 5);
+    }
+
+    #[test]
+    fn zero_decision_need_digest_is_rejected() {
+        let mut req = request(QueryRegimeV1::BroadRecall);
+        req.decision_need_sha256 = [0; 32];
+        let profiles = [profile(
+            SubstrateKindV1::DenseSemantic,
+            cost(100, 1, 0),
+        )];
+        assert_eq!(
+            route_mace_query_v1(&req, &profiles),
+            Err(RouteRejectV1::InvalidBindingDigest)
+        );
+    }
+
+    #[test]
+    fn zero_catalogue_digest_is_rejected() {
+        let mut req = request(QueryRegimeV1::BroadRecall);
+        req.substrate_catalog_sha256 = [0; 32];
+        let profiles = [profile(
+            SubstrateKindV1::DenseSemantic,
+            cost(100, 1, 0),
+        )];
+        assert_eq!(
+            route_mace_query_v1(&req, &profiles),
+            Err(RouteRejectV1::InvalidBindingDigest)
+        );
+    }
+
+    #[test]
+    fn zero_substrate_profile_digest_is_rejected() {
+        let mut p = profile(
+            SubstrateKindV1::DenseSemantic,
+            cost(100, 1, 0),
+        );
+        p.profile_sha256 = [0; 32];
+        assert_eq!(
+            route_mace_query_v1(&request(QueryRegimeV1::BroadRecall), &[p]),
+            Err(RouteRejectV1::InvalidBindingDigest)
+        );
     }
 
     #[test]
