@@ -124,7 +124,7 @@ fn main() -> anyhow::Result<()> {
             } else {
                 root.join(corpus)
             };
-            let report = eqc::validate_corpus_file(&corpus_path)?;
+            let report = eqc::validate_corpus_file(&corpus_path, &root)?;
             let encoded = serde_json::to_vec_pretty(&report)?;
             if let Some(out) = out {
                 let output_path = if out.is_absolute() { out } else { root.join(out) };
