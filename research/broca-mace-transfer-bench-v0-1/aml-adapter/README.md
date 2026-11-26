@@ -175,3 +175,10 @@ Protocol: [MACE Decision-Value Retrieval V1](../../../docs/research/MACE_DECISIO
 The next research proposal defines a bounded, history-conditioned policy DAG for multi-step evidence acquisition. Unlike the current one-query EVSI/robust evaluator, an adaptive policy can choose a follow-up source based on the previous observation, preserve contradictory evidence, account for shared source roots, and stop or defer under explicit budget and lifecycle constraints. The policy contract is a research schema; this crate does not yet execute adaptive policies.
 
 Protocol: [MACE Adaptive Decision Acquisition V1](../../../docs/research/MACE_ADAPTIVE_DECISION_ACQUISITION_V1.md). Schema: [mace_adaptive_decision_policy_v1.schema.json](../../../data/schemas/mace_adaptive_decision_policy_v1.schema.json).
+
+
+## Independent exhaustive adaptive-policy reference
+
+The `adaptive_policy_reference` module is an independent finite-world oracle for bounded sequential acquisition policies. It evaluates exact fixed-point expected net utility and a separate probability-free worst-case regret objective over shared latent worlds. It preserves query dependence, rejects prohibited terminal actions, enforces per-path budgets and returns a deterministic policy tree. It is deliberately bounded to small scenarios and is not a production executor or learned policy.
+
+Protocol: [MACE Adaptive Decision Acquisition V1](../../../docs/research/MACE_ADAPTIVE_DECISION_ACQUISITION_V1.md). The reference module includes deterministic adversarial test functions; they are authored but have not been compiled or run.
