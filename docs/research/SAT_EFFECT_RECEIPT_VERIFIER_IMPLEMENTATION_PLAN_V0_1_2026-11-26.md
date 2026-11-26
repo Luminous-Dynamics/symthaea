@@ -1,7 +1,7 @@
 # SAT External Effect Receipt Verifier — Implementation and Benchmark Plan v0.1
 
 **Date:** 2026-11-26  
-**Status:** engineering plan; schemas and examples authored; implementation and execution pending.  
+**Status:** schemas/examples/fixtures contract-validated; read-only structural Rust reference source authored; compile/test and cryptographic adapter execution pending.  
 **Parent:** `SAT_EXTERNAL_EFFECT_RECEIPT_PROFILE_V0_1_2026-11-26.md`  
 **Target crate:** `crates/core/symthaea-sat-trace-verifier`
 
