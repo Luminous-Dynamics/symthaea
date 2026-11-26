@@ -1638,7 +1638,9 @@ mod tests {
     fn audit_probability_is_exact_when_items_are_sampled_within_source_works() {
         let mut dataset = synthetic_dataset();
         dataset.config.stratum_quotas[0].audit_source_work_count = 1;
-        dataset.config.stratum_quotas[1].audit_source_work_count = 1;
+        // This test is scoped to the stratum-a within-work probability.
+        // Stratum-b has its own three-work design and is disabled here.
+        dataset.config.stratum_quotas[1].audit_source_work_count = 0;
 
         // Work f has three query candidates (two are aliased into the same
         // source work); work h has one. The configured two-item within-work
