@@ -1,0 +1,87 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://luminousdynamics.io/schemas/mace_source_origin_witness_receipt_v1.schema.json",
+  "title": "MACE Source-Origin Witness Receipt V1",
+  "description": "A separately pinned acquisition operator's signed observation binding source metadata and independently observed ancestry to a replayed graph and exact source-origin receipt.",
+  "type": "object",
+  "additionalProperties": false,
+  "required": [
+    "schema_version",
+    "run_id",
+    "query_invocation_id",
+    "graph_sha256",
+    "source_origin_receipt_sha256",
+    "operator_id",
+    "failure_domain_sha256",
+    "evidence_id",
+    "source_id",
+    "source_sha256",
+    "payload_sha256",
+    "evidence_class_sha256",
+    "observed_parent_evidence_ids",
+    "derivation_receipt_sha256",
+    "common_cause_group_sha256",
+    "publisher_identity_sha256",
+    "acquisition_record_sha256",
+    "source_revision_sha256",
+    "observed_at_unix",
+    "issued_at_unix",
+    "expires_at_unix",
+    "status",
+    "issuer_profile_sha256",
+    "key_id"
+  ],
+  "properties": {
+    "schema_version": { "const": "mace_source_origin_witness_receipt_v1" },
+    "run_id": { "type": "string", "minLength": 1, "maxLength": 256 },
+    "query_invocation_id": { "type": "string", "minLength": 1, "maxLength": 256 },
+    "graph_sha256": { "type": "string", "pattern": "^[0-9a-f]{64}$" },
+    "source_origin_receipt_sha256": { "type": "string", "pattern": "^[0-9a-f]{64}$" },
+    "operator_id": { "type": "string", "minLength": 1, "maxLength": 256 },
+    "failure_domain_sha256": { "type": "string", "pattern": "^[0-9a-f]{64}$" },
+    "evidence_id": { "type": "string", "minLength": 1, "maxLength": 512 },
+    "source_id": { "type": "string", "minLength": 1, "maxLength": 1024 },
+    "source_sha256": { "type": "string", "pattern": "^[0-9a-f]{64}$" },
+    "payload_sha256": { "type": "string", "pattern": "^[0-9a-f]{64}$" },
+    "evidence_class_sha256": { "type": "string", "pattern": "^[0-9a-f]{64}$" },
+    "observed_parent_evidence_ids": {
+      "type": "array",
+      "maxItems": 1024,
+      "uniqueItems": true,
+      "items": { "type": "string", "minLength": 1, "maxLength": 512 }
+    },
+    "derivation_receipt_sha256": {
+      "oneOf": [
+        { "type": "string", "pattern": "^[0-9a-f]{64}$" },
+        { "type": "null" }
+      ]
+    },
+    "common_cause_group_sha256": {
+      "type": "array",
+      "maxItems": 1024,
+      "uniqueItems": true,
+      "items": { "type": "string", "pattern": "^[0-9a-f]{64}$" }
+    },
+    "publisher_identity_sha256": { "type": "string", "pattern": "^[0-9a-f]{64}$" },
+    "acquisition_record_sha256": { "type": "string", "pattern": "^[0-9a-f]{64}$" },
+    "source_revision_sha256": { "type": "string", "pattern": "^[0-9a-f]{64}$" },
+    "observed_at_unix": { "type": "integer", "minimum": 0 },
+    "issued_at_unix": { "type": "integer", "minimum": 0 },
+    "expires_at_unix": { "type": "integer", "minimum": 1 },
+    "status": { "const": "observed_consistent" },
+    "issuer_profile_sha256": { "type": "string", "pattern": "^[0-9a-f]{64}$" },
+    "key_id": { "type": "string", "pattern": "^[0-9a-f]{64}$" }
+  },
+  "allOf": [
+    {
+      "if": { "properties": { "observed_parent_evidence_ids": { "maxItems": 0 } } },
+      "then": { "properties": { "derivation_receipt_sha256": { "type": "null" } } },
+      "else": {
+        "properties": {
+          "derivation_receipt_sha256": { "type": "string", "pattern": "^[0-9a-f]{64}$" }
+        }
+      }
+    }
+  ],
+  "$comment": "Runtime binds the exact in-toto subject and DSSE PAE to graph_sha256, the exact source-origin envelope digest, run/invocation, node identity and consumer-pinned operator/failure-domain/profile. It requires observed ancestry, derivation and common-cause edges to equal the replayed graph exactly; any disagreement is disputed, not majority-voted away. It also enforces observation freshness, time bounds and trust-key separation."
+}
