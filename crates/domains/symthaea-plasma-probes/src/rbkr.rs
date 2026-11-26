@@ -659,6 +659,34 @@ mod tests {
     }
 
     #[test]
+    fn rectangular_factor_spaces_preserve_supported_state_rank() {
+        // Three reachability factors and two observability factors create a
+        // 2x3 cross-factor matrix. Its rank is two, the full state dimension.
+        let reach = gramian(
+            2,
+            &[
+                vec![1.0, 0.0],
+                vec![0.0, 1.0],
+                vec![1.0, 1.0],
+            ],
+        );
+        let observe = gramian(2, &[vec![1.0, 0.0], vec![0.0, 1.0]]);
+        let basis =
+            ResponseBalancedBasis::from_empirical_gramians(&reach, &observe, RbkrConfig::new(2))
+                .unwrap();
+
+        assert_eq!(basis.reduced_order(), 2);
+        assert!(basis.biorthogonality_defect() < 1.0e-8);
+        let state = vec![0.37, -1.25];
+        let restored = basis
+            .reconstruct_state(&basis.reduce_state(&state).unwrap())
+            .unwrap();
+        for (actual, expected) in restored.iter().zip(&state) {
+            assert!((actual - expected).abs() < 1.0e-8);
+        }
+    }
+
+    #[test]
     fn reduced_abc_operators_match_full_dynamics_in_reduced_coordinates() {
         let reach = gramian(2, &[vec![1.0, 0.2], vec![0.1, 1.0]]);
         let observe = gramian(2, &[vec![0.7, 0.1], vec![0.2, 1.1]]);
