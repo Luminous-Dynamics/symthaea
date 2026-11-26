@@ -37,12 +37,13 @@ The receipt binds:
 2. The exact source-registry, lineage and lifecycle profiles used at admission.
 3. Renderer, provider transport adapter and model revision identities.
 4. The SHA-256 of the exact UTF-8 provider request body captured after serialization and immediately before network send.
-5. Every memory-originated byte span in that body, mapped to a canonical evidence ID, payload digest, dependency closure, transformation receipt, source/authority/admissibility receipts and current-at-use revalidation receipt.
+5. An immutable content-addressed artifact reference for the exact request-body bytes, binding plaintext digest/length, ciphertext digest, storage/encryption/access/retention profiles and an independent custody receipt. The raw request body is not copied into the signed receipt or public benchmark records; it is retained as an encrypted evidence artifact with least-privilege access and a declared retention policy.
+6. Every memory-originated byte span in that body, mapped to a canonical evidence ID, payload digest, dependency closure, transformation receipt, source/authority/admissibility receipts and current-at-use revalidation receipt.
 6. Explicit admission denials, so retrieval success cannot be confused with admissibility.
 7. The provider response digest and the candidate decision-trace digest.
 8. A signature from the configured context-observer identity, verified against an independently pinned observer profile.
 
-The `span_start_byte` is inclusive and `span_end_byte` is exclusive, measured in UTF-8 bytes of the exact serialized request body whose digest is `provider_request_body_sha256`. The verifier must check bounds, recompute each span digest, reject overlaps that cannot be explained by the renderer's declared segment map, and ensure that every memory-origin span is enumerated exactly once.
+The `span_start_byte` is inclusive and `span_end_byte` is exclusive, measured in UTF-8 bytes of the exact serialized request body whose digest is `provider_request_body_sha256`. The verifier must retrieve the immutable request-body artifact through the independently pinned storage profile, validate its custody receipt and ciphertext digest, decrypt under the authorized evidence-access policy, verify plaintext digest and byte length against the capture fields, recompute each span digest, reject bounds errors and unexplained overlaps, and ensure that every memory-origin span is enumerated exactly once. The artifact ID must resolve immutably; a mutable URL or a digest without recoverable bytes is insufficient for later independent verification.
 
 For source evidence that is sent verbatim, the transformation receipt is an identity-transform receipt. For summaries, merged chunks, cached answers, tool projections or model-generated derivatives, the transformation receipt must bind the exact output digest and all required parent IDs/digests. Unknown ancestry is not an admissible substitute.
 
@@ -56,7 +57,7 @@ This receipt establishes only the second statement, subject to the observer and 
 
 ## Trust and limits
 
-A valid Ed25519 signature proves that the configured signing key signed the receipt bytes. It does not, by itself, prove that the observer captured every request span or that the key is independent of the candidate process. The verifier must pin the observer profile outside the candidate-controlled memory/log/backup domain and qualify the capture implementation.
+A valid Ed25519 signature proves that the configured signing key signed the receipt bytes. It does not, by itself, prove that the observer captured every request span or that the key is independent of the candidate process. The verifier must pin the observer profile outside the candidate-controlled memory/log/backup domain and qualify the capture implementation. The body artifact must be encrypted separately from the candidate memory store, with independently pinned storage, encryption, access, retention and custody profiles. Access to plaintext is limited to authorized evaluators/verifiers; public receipts expose only opaque artifact identity and commitments. Erasure must be reported separately from benchmark retention requirements: a retention hold for independent evaluation is not a permission to reuse the content as agent memory.
 
 This v0.1 contract captures the client-side provider request. It cannot see hidden system prompts, provider-side prompt rewriting, internal retrieval, model routing, or transformations performed after the provider receives the request. Those require a provider-signed ingress receipt or a separately attested serving boundary; absent that evidence, the claim is explicitly limited to the transmitted client request.
 
@@ -71,7 +72,7 @@ where `receipt_without_signature` is the complete receipt object with the top-le
 1. Strictly parse the receipt; reject duplicate/unknown fields, malformed digests, invalid signature encoding, duplicate exposure IDs and impossible byte ranges.
 2. Verify the Ed25519 signature using a key authorized by the independently pinned observer profile.
 3. Verify the observer profile, transport adapter, renderer, model and clock profile digests against the run manifest.
-4. Recompute the request-body digest; validate each span hash and ensure full memory-origin span coverage.
+4. Resolve and retrieve the immutable encrypted body artifact; verify custody, ciphertext and plaintext commitments, then recompute the request-body digest; validate each span hash and ensure full memory-origin span coverage.
 5. Resolve every evidence ID to exactly one canonical source record and verify its payload digest.
 6. Recompute/verify dependency closure and transformation receipts; reject cycles, dangling parents, ambiguous aliases and unverified roots.
 7. Verify source authentication, authority, rights, scope, estimand and current lifecycle at the decision-consumption boundary.
@@ -85,6 +86,7 @@ Cross-record invariants (unique invocation sequence, no missing calls, one-to-on
 
 - Retrieved but not admitted; admitted but not rendered; rendered but removed before send.
 - Truncated, duplicated, reordered, overlapping or incorrectly offset spans.
+- Missing, mutable, inaccessible or wrong-custody request-body artifact; ciphertext/plaintext digest mismatch; artifact length mismatch.
 - A span hash that does not match the captured request body.
 - A summary with a missing, swapped or retracted parent.
 - Two evidence IDs that alias one source or share a common cause but are presented as independent.
