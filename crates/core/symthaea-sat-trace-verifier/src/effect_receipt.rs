@@ -763,6 +763,32 @@ mod tests {
     }
 
     #[test]
+    fn changed_effect_fields_without_recomputed_binding_digest_are_rejected() {
+        let changed = ATTEMPT.replace(
+            "account:recipient-opaque-17",
+            "account:attacker",
+        );
+        assert!(matches!(
+            verify_effect_receipt(&changed, RECEIPT, &expected_context()),
+            Err(EffectReceiptError::InvalidDigest(
+                "attempt.effect_binding.binding_digest"
+            ))
+        ));
+    }
+
+    #[test]
+    fn unsorted_effect_labels_are_rejected() {
+        let changed = ATTEMPT.replace(
+            "[\\n      \\"approved-payment\\",\\n      \\"financial-data\\"\\n    ]",
+            "[\\n      \\"financial-data\\",\\n      \\"approved-payment\\"\\n    ]",
+        );
+        assert!(matches!(
+            verify_effect_receipt(&changed, RECEIPT, &expected_context()),
+            Err(EffectReceiptError::InvalidShape(_))
+        ));
+    }
+
+    #[test]
     fn receipt_cannot_substitute_its_own_trust_policy() {
         let substituted = RECEIPT.replace(
             "3333333333333333333333333333333333333333333333333333333333333333",
