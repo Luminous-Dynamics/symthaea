@@ -316,6 +316,26 @@ mod tests {
         );
         assert!(report.materialized_audio_bytes_bound_to_revision_case);
         assert!(!report.model_input_attested);
+
+        let payload = build_audio_evidence_in_toto_statement(
+            &case,
+            &manifest,
+            yoked_source,
+            &yoked_pcm,
+        )
+        .unwrap();
+        let statement: serde_json::Value =
+            serde_json::from_str(&payload.statement_json).unwrap();
+        assert_eq!(
+            statement["predicate"]["target_source_lineage_id"],
+            "synthetic-source-lineage-001"
+        );
+        assert_eq!(
+            statement["predicate"]["evidence_source_lineage_id"],
+            "synthetic-yoked-source-lineage-001"
+        );
+        assert_eq!(statement["predicate"]["target_audio_bytes_recomputed"], false);
+        assert_eq!(statement["predicate"]["model_input_attested"], false);
     }
 
     #[test]
