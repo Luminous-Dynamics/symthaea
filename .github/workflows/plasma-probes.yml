@@ -776,6 +776,16 @@ jobs:
           horizon = fixture["prediction_horizon"]
           assert cohort["spatial_domain"]["maximum"] > cohort["spatial_domain"]["minimum"]
           assert cohort["velocity_domain"]["maximum"] > cohort["velocity_domain"]["minimum"]
+          assert cohort["state_metric_id"].strip()
+          linearization = fixture["linearization_contract"]
+          assert linearization["status"] == "synthetic_derivatives_not_computed"
+          assert linearization["derivative_source"] == "not_computed_synthetic"
+          assert linearization["future_solver_transition_jacobians_required"] is True
+          assert linearization["pulse_map_state_jacobian_required"] is True
+          assert linearization["pulse_map_parameter_jacobian_required"] is True
+          assert linearization["split_solver_composition_order_required"] is True
+          assert linearization["independent_finite_difference_cross_check_required"] is True
+          assert linearization["branch_change_disposition"] == "UNKNOWN_OR_HANDOFF"
           assert horizon["start_time"] == checkpoint["time"]
           assert checkpoint["first_pulse_applied"] is True
           assert checkpoint["second_pulse_not_yet_applied"] is True
