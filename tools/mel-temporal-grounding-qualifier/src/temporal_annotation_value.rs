@@ -123,6 +123,8 @@ pub struct AnnotationMarginalValueReportV1 {
     pub audio_sha256: String,
     pub selection_stream: AnnotationSelectionStreamV1,
     pub selection_receipt_sha256: String,
+    /// Exact frozen policy used to derive the panel sufficiency state.
+    pub decision_profile: FrozenPanelDecisionProfileV1,
     pub before_annotation_manifest_sha256: String,
     pub after_annotation_manifest_sha256: String,
     pub newly_added_annotator_id_sha256: String,
@@ -258,6 +260,7 @@ pub fn audit_annotation_marginal_value(
         audio_sha256: input.before_panel.artifact.audio_sha256.clone(),
         selection_stream: input.selection_stream,
         selection_receipt_sha256: input.selection_receipt_sha256.clone(),
+        decision_profile: input.decision_profile.clone(),
         before_annotation_manifest_sha256: input.before_panel.annotation_manifest_sha256.clone(),
         after_annotation_manifest_sha256: input.after_panel.annotation_manifest_sha256.clone(),
         newly_added_annotator_id_sha256: new_annotation.annotator_id_sha256.clone(),
@@ -815,6 +818,11 @@ mod tests {
         assert_eq!(
             report.decision_transition,
             "NeedsReview->SufficientlySupportedPresent"
+        );
+        assert_eq!(report.decision_profile.profile_id, "profile-v1");
+        assert_eq!(
+            report.decision_profile.minimum_pairwise_present_event_f1_ppm,
+            900_000
         );
         assert_eq!(report.annotation_record_count_delta, 1);
         assert_eq!(report.active_review_minutes, 2.0);
