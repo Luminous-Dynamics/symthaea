@@ -31,6 +31,8 @@ use crate::mace_context_exposure_receipt::{
     MaceExposureReceiptSignerV1,
     MACE_CONTEXT_EXPOSURE_MAX_BODY_BYTES_V1,
     MACE_CONTEXT_EXPOSURE_MAX_SPANS_V1,
+    MACE_STATIC_PROVIDER_NUMBER_PARAMETER_KEYS_V1,
+    MACE_STATIC_PROVIDER_BOOLEAN_PARAMETER_KEYS_V1,
 };
 
 pub const MACE_CONTEXT_EXPOSURE_CAPTURE_MAX_MESSAGES_V1: usize = 10_000;
@@ -113,6 +115,8 @@ pub enum MaceExposureCaptureRejectV1 {
     InvalidDigest,
     ModelRevisionMismatch,
     RequestParameterProfileMismatch,
+    UnclassifiedProviderParameterKey,
+    ProviderParameterTypeMismatch,
     EmptyMessages,
     TooManyMessages,
     EmptySegmentList,
@@ -429,10 +433,18 @@ fn append_json_string_content(output: &mut Vec<u8>, value: &str) {
 fn provider_parameter_profile_sha256(
     parameters: &BTreeMap<String, MaceProviderStaticParameterV1>,
 ) -> Result<String, MaceExposureCaptureRejectV1> {
-    for key in parameters.keys() {
+    for (key, value) in parameters {
         validate_identifier(key)?;
-        if key == "model" || key == "messages" {
-            return Err(MaceExposureCaptureRejectV1::InvalidIdentifier);
+        if MACE_STATIC_PROVIDER_NUMBER_PARAMETER_KEYS_V1.contains(&key.as_str()) {
+            if !matches!(value, MaceProviderStaticParameterV1::Number(_)) {
+                return Err(MaceExposureCaptureRejectV1::ProviderParameterTypeMismatch);
+            }
+        } else if MACE_STATIC_PROVIDER_BOOLEAN_PARAMETER_KEYS_V1.contains(&key.as_str()) {
+            if !matches!(value, MaceProviderStaticParameterV1::Bool(_)) {
+                return Err(MaceExposureCaptureRejectV1::ProviderParameterTypeMismatch);
+            }
+        } else {
+            return Err(MaceExposureCaptureRejectV1::UnclassifiedProviderParameterKey);
         }
     }
     let canonical = serde_json::to_vec(parameters)
