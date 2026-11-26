@@ -68,17 +68,27 @@ pub struct MaceRequestMessageV1 {
     pub segments: Vec<MaceRequestSegmentV1>,
 }
 
+/// Provider request parameters are restricted to scalar static configuration.
+/// Dynamic text/media-bearing fields must be represented as typed, provenance-
+/// carrying message segments or rejected by a provider-specific adapter.
+#[derive(Clone, Debug, Eq, PartialEq, serde::Serialize)]
+#[serde(untagged)]
+pub enum MaceProviderStaticParameterV1 {
+    String(String),
+    Number(serde_json::Number),
+    Bool(bool),
+}
+
 #[derive(Clone, Debug, Eq, PartialEq)]
 pub struct MaceProviderNeutralRequestV1 {
     /// Exact provider model selector sent in the serialized request. It must
     /// match the independently pinned model_revision in the run manifest.
     pub model: String,
-    /// Additional provider request fields such as temperature, top_p,
-    /// response_format and tool schemas. These are non-memory fields; memory-
-    /// derived content must be expressed as typed message segments instead.
-    /// BTreeMap gives deterministic key order. Reserved model/messages keys
-    /// are rejected to prevent duplicate JSON members.
-    pub request_parameters: BTreeMap<String, Value>,
+    /// Provider-specific scalar configuration only. Nested objects/arrays are
+    /// intentionally unsupported until their text/media leaves have a typed
+    /// source map. The exact canonical map digest is pinned in the independent
+    /// run manifest and repeated in the signed exposure receipt.
+    pub request_parameters: BTreeMap<String, MaceProviderStaticParameterV1>,
     pub messages: Vec<MaceRequestMessageV1>,
 }
 
@@ -86,12 +96,16 @@ pub struct MaceProviderNeutralRequestV1 {
 pub struct MaceSerializedProviderRequestV1 {
     body: Vec<u8>,
     exposures: Vec<MaceMemoryExposureSpanV1>,
+    provider_parameter_profile_sha256: String,
 }
 
 impl MaceSerializedProviderRequestV1 {
     pub fn body(&self) -> &[u8] { &self.body }
     pub fn exposures(&self) -> &[MaceMemoryExposureSpanV1] { &self.exposures }
     pub fn body_sha256(&self) -> String { sha256_hex(&self.body) }
+    pub fn provider_parameter_profile_sha256(&self) -> &str {
+        &self.provider_parameter_profile_sha256
+    }
 }
 
 #[derive(Clone, Copy, Debug, Eq, PartialEq)]
@@ -99,6 +113,7 @@ pub enum MaceExposureCaptureRejectV1 {
     InvalidIdentifier,
     InvalidDigest,
     ModelRevisionMismatch,
+    RequestParameterProfileMismatch,
     EmptyMessages,
     TooManyMessages,
     EmptySegmentList,
@@ -162,6 +177,8 @@ pub fn serialize_mace_provider_request_with_exposure_map_v1(
     arm: MaceMemoryArmV1,
 ) -> Result<MaceSerializedProviderRequestV1, MaceExposureCaptureRejectV1> {
     validate_identifier(&request.model)?;
+    let provider_parameter_profile_sha256 =
+        provider_parameter_profile_sha256(&request.request_parameters)?;
     if request.messages.is_empty() {
         return Err(MaceExposureCaptureRejectV1::EmptyMessages);
     }
@@ -263,7 +280,11 @@ pub fn serialize_mace_provider_request_with_exposure_map_v1(
     }
 
     // Spans are emitted in serializer order and are disjoint by construction.
-    Ok(MaceSerializedProviderRequestV1 { body, exposures })
+    Ok(MaceSerializedProviderRequestV1 {
+        body,
+        exposures,
+        provider_parameter_profile_sha256,
+    })
 }
 
 /// Serialize, retain, send and sign exactly one model invocation.
@@ -285,6 +306,7 @@ pub fn capture_send_and_sign_mace_invocation_v1(
         return Err(MaceExposureCaptureRejectV1::ModelRevisionMismatch);
     }
     validate_digest(context.candidate_decision_trace_sha256)?;
+    validate_digest(expected.provider_parameter_profile_sha256)?;
     if expected.arm == MaceMemoryArmV1::NoMemory && !context.admission_denials.is_empty() {
         return Err(MaceExposureCaptureRejectV1::MemoryInNoMemoryArm);
     }
@@ -292,6 +314,9 @@ pub fn capture_send_and_sign_mace_invocation_v1(
     validate_digest(expected.observer_profile_sha256)?;
 
     let serialized = serialize_mace_provider_request_with_exposure_map_v1(request, expected.arm)?;
+    if serialized.provider_parameter_profile_sha256() != expected.provider_parameter_profile_sha256 {
+        return Err(MaceExposureCaptureRejectV1::RequestParameterProfileMismatch);
+    }
     let body_sha256 = serialized.body_sha256();
     let artifact = artifact_writer
         .store_immutable_encrypted(serialized.body(), expected)
@@ -331,6 +356,7 @@ pub fn capture_send_and_sign_mace_invocation_v1(
         lifecycle_profile_sha256: expected.lifecycle_profile_sha256.to_owned(),
         renderer_profile_sha256: expected.renderer_profile_sha256.to_owned(),
         transport_adapter_profile_sha256: expected.transport_adapter_profile_sha256.to_owned(),
+        provider_parameter_profile_sha256: expected.provider_parameter_profile_sha256.to_owned(),
         model_revision: expected.model_revision.to_owned(),
         capture: MaceContextCaptureV1 {
             capture_point: "serialized_request_before_network_send".to_owned(),
@@ -399,6 +425,20 @@ fn append_json_string_content(output: &mut Vec<u8>, value: &str) {
             }
         }
     }
+}
+
+fn provider_parameter_profile_sha256(
+    parameters: &BTreeMap<String, MaceProviderStaticParameterV1>,
+) -> Result<String, MaceExposureCaptureRejectV1> {
+    for key in parameters.keys() {
+        validate_identifier(key)?;
+        if key == "model" || key == "messages" {
+            return Err(MaceExposureCaptureRejectV1::InvalidIdentifier);
+        }
+    }
+    let canonical = serde_json::to_vec(parameters)
+        .map_err(|_| MaceExposureCaptureRejectV1::InvalidCaptureContext)?;
+    Ok(sha256_hex(&canonical))
 }
 
 fn context_role_name(role: MaceContextRoleV1) -> &'static str {
@@ -590,7 +630,7 @@ mod tests {
             invocation_sequence: 0, decision_need_sha256: D1, candidate_policy_sha256: D2,
             source_registry_root_sha256: D3, lineage_profile_sha256: D4,
             lifecycle_profile_sha256: D5, renderer_profile_sha256: D6,
-            transport_adapter_profile_sha256: D7, model_revision: "model-v1",
+            transport_adapter_profile_sha256: D7, provider_parameter_profile_sha256: "44136fa355b3678a1146ad16f7e8649e94fb4fc21fe77e8310c060f61caaff8a", model_revision: "model-v1",
             clock_profile_sha256: D8, observer_profile_sha256: D9,
             storage_profile_sha256: D1, encryption_profile_sha256: D2,
             access_policy_sha256: D3, retention_policy_sha256: D4,
@@ -709,8 +749,8 @@ mod tests {
     #[test]
     fn serializes_non_memory_provider_parameters_in_deterministic_json() {
         let mut request_parameters = BTreeMap::new();
-        request_parameters.insert("temperature".to_owned(), serde_json::json!(0.2));
-        request_parameters.insert("top_p".to_owned(), serde_json::json!(0.7));
+        request_parameters.insert("temperature".to_owned(), MaceProviderStaticParameterV1::Number(serde_json::Number::from(2)));
+        request_parameters.insert("top_p".to_owned(), MaceProviderStaticParameterV1::Number(serde_json::Number::from(7)));
         let request = MaceProviderNeutralRequestV1 {
             model: "test-model".to_owned(),
             request_parameters,
@@ -727,8 +767,8 @@ mod tests {
         ).unwrap();
         let parsed: Value = serde_json::from_slice(serialized.body()).unwrap();
         assert_eq!(parsed["model"], "test-model");
-        assert_eq!(parsed["temperature"], serde_json::json!(0.2));
-        assert_eq!(parsed["top_p"], serde_json::json!(0.7));
+        assert_eq!(parsed["temperature"], serde_json::json!(2));
+        assert_eq!(parsed["top_p"], serde_json::json!(7));
     }
 
     #[test]
