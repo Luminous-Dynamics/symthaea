@@ -41,13 +41,18 @@ The evaluator returns a DSSE v1.0.2 envelope carrying an in-toto Statement v1. T
 - query, original candidate set, exact qualified-evidence set and original qualification receipt;
 - DecisionNeed digest and purpose;
 - sufficiency policy, calibration profile and calibration receipt;
-- status and every required requirement disposition with supporting receipt digests;
+- status and every required requirement disposition, exact evidence-class digest and supporting receipt digests;
+- for each claimed-met requirement, sorted independent-root-family digests paired with transitive-lineage/common-cause provenance-receipt digests;
 - risk upper bound, risk limit and confidence;
 - regret upper bound and declared regret tolerance;
 - observed cost, latency, context tokens, tool calls and maximum evidence age;
 - evaluator trust-profile digest, signer key ID, issue time and expiry.
 
 The verifier requires the evaluator role identifier to be distinct from the qualification role, and rejects a shared trust-profile digest or signer key ID. The evaluator trust profile must be freshly provisioned and pinned outside candidate memory and its rollback domain. A cached old evaluator verifier can miss revocation and is not a current-at-use guarantee.
+
+A requirement marked **met** must name the exact evidence-class digest in the DecisionNeed, include supporting basis receipts, and carry at least the DecisionNeed minimum number of distinct root-family commitments. Each root-family commitment is paired with a provenance receipt that identifies the evaluator's transitive lineage and common-cause analysis. The consumer rejects wrong evidence classes, duplicate/noncanonical family identities, missing lineage commitments, and an insufficient family count.
+
+The evaluator must resolve the provenance receipts independently: trace derivation edges to source roots, collapse shared roots and common-cause dependencies, reject unknown ancestry as independent, and compute root families from source lineage rather than document count, chunk count, vendor count, or copied URLs. The signed digests make the claim auditable and replayable; they do not make the provenance computation true by themselves. The consumer-side verifier currently checks the committed digests and family cardinality but does not independently fetch/replay each lineage receipt or recompute the source graph.
 
 The evaluator attestation is a signed claim from a separate authority. This verifier does not implement the evaluator's risk model, reproduce its calibration data, independently measure the resource figures, or mathematically prove its regret bound. Those are requirements on the evaluator service and independent measurement pipeline.
 
@@ -65,7 +70,7 @@ The verifier accepts a sufficient status only if:
 - the evaluator signature is valid under the evaluator's separately pinned profile;
 - the receipt is valid at the trusted current time and bound to the exact qualified evidence set and DecisionNeed.
 
-Insufficient, indeterminate and abstained are valid evaluator outcomes when their receipt is correctly signed and bound. They never become sufficient by having a non-empty evidence set. A sufficient status with missing measurements or a breached limit is rejected.
+Insufficient, indeterminate and abstained are valid evaluator outcomes when their receipt is correctly signed and bound. An unmet or unknown requirement may carry no basis receipts and no root-family commitments; a requirement marked met may not. They never become sufficient by having a non-empty evidence set. A sufficient status with missing measurements, wrong evidence class, too few independent roots or a breached limit is rejected.
 
 ## 5. Revalidation at every use
 
