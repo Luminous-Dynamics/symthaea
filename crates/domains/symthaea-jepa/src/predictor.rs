@@ -119,6 +119,18 @@ impl LatentPredictor {
         input_grad
     }
 
+    /// Append exact learned parameter bytes to a canonical model digest buffer.
+    pub(crate) fn append_parameters_to(&self, output: &mut Vec<u8>) {
+        output.extend_from_slice(&(self.latent_dim as u64).to_le_bytes());
+        output.extend_from_slice(&(self.num_actions as u64).to_le_bytes());
+        for values in [&self.w1, &self.b1, &self.w2, &self.b2] {
+            output.extend_from_slice(&(values.len() as u64).to_le_bytes());
+            for value in values {
+                output.extend_from_slice(&value.to_bits().to_le_bytes());
+            }
+        }
+    }
+
     fn make_input(&self, latent: &[f32], action: u8) -> Vec<f32> {
         let input_dim = self.latent_dim + self.num_actions;
         let mut input = Vec::with_capacity(input_dim);

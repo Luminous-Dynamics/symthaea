@@ -1,0 +1,48 @@
+name: VIS-005 observation-grounded JEPA contract
+
+on:
+  pull_request:
+    paths:
+      - "crates/domains/symthaea-jepa/**"
+      - ".github/workflows/vis005-jepa-observed-transition.yml"
+  push:
+    paths:
+      - "crates/domains/symthaea-jepa/**"
+      - ".github/workflows/vis005-jepa-observed-transition.yml"
+
+permissions:
+  contents: read
+
+concurrency:
+  group: vis005-jepa-observed-transition-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  observed-transition:
+    name: Observed transition and action-set contract
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Install repository Rust toolchain
+        uses: dtolnay/rust-toolchain@master
+        with:
+          toolchain: "1.96.0"
+          components: rustfmt, clippy
+
+      - name: Check formatting
+        run: rustfmt --edition 2024 --check crates/domains/symthaea-jepa/src/lib.rs
+
+      - name: Parse versioned JSON contracts
+        run: |
+          python3 -m json.tool crates/domains/symthaea-jepa/schemas/observed-transition-evidence.v0.1.schema.json >/dev/null
+          python3 -m json.tool crates/domains/symthaea-jepa/schemas/one-step-action-set.v0.1.schema.json >/dev/null
+
+      - name: Run JEPA crate tests
+        working-directory: crates/domains/symthaea-jepa
+        run: cargo test --locked
+
+      - name: Run JEPA crate Clippy
+        working-directory: crates/domains/symthaea-jepa
+        run: cargo clippy --locked --all-targets -- -D warnings

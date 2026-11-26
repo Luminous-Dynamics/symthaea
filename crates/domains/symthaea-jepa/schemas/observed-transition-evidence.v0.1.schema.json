@@ -1,0 +1,152 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://luminousdynamics.io/schemas/symthaea-jepa-observed-transition-evidence-v0.1.json",
+  "title": "JEPA observation-grounded transition evidence",
+  "description": "Versioned evidence contract for training one-step JEPA against a later observed embedding, bound to an episode/branch/forecast and requested target time. The Rust API recomputes embedding digests; raw observation, history and action-manifest digests must be authenticated by the upstream adapter.",
+  "type": "object",
+  "additionalProperties": false,
+  "required": [
+    "schema_version",
+    "source_history_sha256",
+    "source_observation_sha256",
+    "source_embedding_sha256",
+    "target_observation_sha256",
+    "target_embedding_sha256",
+    "action_manifest_sha256",
+    "action_binding_sha256",
+    "episode_id",
+    "branch_id",
+    "forecast_id",
+    "source_observation_id",
+    "target_observation_id",
+    "source_sequence",
+    "target_sequence",
+    "action_id",
+    "action_index",
+    "source_observed_at_seconds",
+    "forecast_issued_at_seconds",
+    "action_started_at_seconds",
+    "action_ended_at_seconds",
+    "requested_target_time_seconds",
+    "target_observed_at_seconds",
+    "max_target_lateness_seconds",
+    "predictor_parameters_sha256"
+  ],
+  "properties": {
+    "schema_version": {
+      "const": "symthaea-jepa-observed-transition-evidence-v0.1"
+    },
+    "source_history_sha256": {
+      "type": "string",
+      "pattern": "^[a-f0-9]{64}$"
+    },
+    "source_observation_sha256": {
+      "type": "string",
+      "pattern": "^[a-f0-9]{64}$",
+      "description": "Upstream digest of the observed source frame/event bytes; not recomputed from the HDC embedding."
+    },
+    "source_embedding_sha256": {
+      "type": "string",
+      "pattern": "^[a-f0-9]{64}$",
+      "description": "Recomputed by the JEPA crate over the canonical HDC f32 bit representation."
+    },
+    "target_observation_sha256": {
+      "type": "string",
+      "pattern": "^[a-f0-9]{64}$",
+      "description": "Upstream digest of the later acquired target observation bytes; not a model-generated target."
+    },
+    "target_embedding_sha256": {
+      "type": "string",
+      "pattern": "^[a-f0-9]{64}$",
+      "description": "Recomputed by the JEPA crate over the canonical target HDC f32 bit representation."
+    },
+    "action_manifest_sha256": {
+      "type": "string",
+      "pattern": "^[a-f0-9]{64}$"
+    },
+    "source_observation_id": {
+      "type": "string",
+      "minLength": 1
+    },
+    "target_observation_id": {
+      "type": "string",
+      "minLength": 1
+    },
+    "source_sequence": {
+      "type": "integer",
+      "minimum": 0
+    },
+    "target_sequence": {
+      "type": "integer",
+      "minimum": 1
+    },
+    "action_id": {
+      "type": "integer",
+      "minimum": 0
+    },
+    "action_index": {
+      "type": "integer",
+      "minimum": 0,
+      "maximum": 255
+    },
+    "source_observed_at_seconds": {
+      "type": "number"
+    },
+    "action_started_at_seconds": {
+      "type": "number"
+    },
+    "action_ended_at_seconds": {
+      "type": "number"
+    },
+    "target_observed_at_seconds": {
+      "type": "number"
+    },
+    "episode_id": {
+      "type": "string",
+      "minLength": 1
+    },
+    "branch_id": {
+      "type": "string",
+      "minLength": 1
+    },
+    "forecast_id": {
+      "type": "string",
+      "minLength": 1
+    },
+    "forecast_issued_at_seconds": {
+      "type": "number"
+    },
+    "requested_target_time_seconds": {
+      "type": "number"
+    },
+    "max_target_lateness_seconds": {
+      "type": "number",
+      "minimum": 0
+    },
+    "action_binding_sha256": {
+      "type": "string",
+      "pattern": "^[a-f0-9]{64}$",
+      "description": "Recomputed by JEPA from the action-manifest digest, stable action ID and discrete action index."
+    },
+    "predictor_parameters_sha256": {
+      "type": "string",
+      "pattern": "^[a-f0-9]{64}$",
+      "description": "Digest of the forecast-producing JEPA configuration and exact context, target and latent-predictor parameter bits. Evaluation requires loading a model with this exact digest; training may use a later model."
+    }
+  },
+  "x-rust-invariants": [
+    "source_sequence < target_sequence",
+    "source_observed_at_seconds <= forecast_issued_at_seconds <= action_started_at_seconds",
+    "requested_target_time_seconds >= action_started_at_seconds",
+    "target_observed_at_seconds >= requested_target_time_seconds",
+    "target_observed_at_seconds - requested_target_time_seconds <= max_target_lateness_seconds",
+    "all timestamps and maximum lateness must be finite",
+    "episode_id, branch_id, forecast_id and observation IDs must be non-empty; source and target observation IDs must differ",
+    "the action index must exist in the configured discrete action space",
+    "source_embedding_sha256 and target_embedding_sha256 are recomputed from the exact supplied ContinuousHV values and must match",
+    "both embeddings must have configured input dimension and finite f32 values",
+    "action_started_at_seconds <= action_ended_at_seconds <= requested_target_time_seconds",
+    "action_binding_sha256 equals the domain-separated SHA-256 of action_manifest_sha256, action_id and action_index",
+    "evaluate_observed_transition requires the loaded JEPA prediction-parameter digest to equal the forecast's predictor_parameters_sha256"
+  ]
+}

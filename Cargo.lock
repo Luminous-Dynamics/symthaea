@@ -19186,6 +19186,7 @@ dependencies = [
  "rand 0.8.6",
  "serde",
  "symthaea-core",
+ "sha2",
 ]
 
 [[package]]

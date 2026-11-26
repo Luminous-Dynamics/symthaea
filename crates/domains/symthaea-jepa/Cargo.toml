@@ -7,6 +7,7 @@ license = "AGPL-3.0-or-later"
 
 [dependencies]
 symthaea-core = { path = "../../core/symthaea-core" }
+sha2 = { workspace = true }
 serde = { workspace = true }
 rand = { workspace = true }
 
