@@ -347,14 +347,27 @@ pub fn verify_effect_receipt(
         let observed_projection = receipt
             .observed_effect
             .as_ref()
-            .map(|projection| projection.projection_digest.as_str());
-        let matching_source_projection = receipt.source_attestations.iter().any(|source| {
-            source.projection_digest.as_deref() == observed_projection
-                && source.outcome == receipt.observed_outcome
-        });
-        if !matching_source_projection {
+            .map(|projection| projection.projection_digest.as_str())
+            .ok_or_else(|| {
+                EffectReceiptError::InvalidShape(
+                    "applied or partial outcome requires observed_effect".to_owned(),
+                )
+            })?;
+        let mut applying_source_count = 0usize;
+        for source in &receipt.source_attestations {
+            if matches!(source.outcome, EffectOutcome::Applied | EffectOutcome::Partial) {
+                applying_source_count += 1;
+                if source.projection_digest.as_deref() != Some(observed_projection) {
+                    return Err(EffectReceiptError::SourceBindingMismatch {
+                        attestation_id: source.attestation_id.clone(),
+                        field: "projection_digest",
+                    });
+                }
+            }
+        }
+        if applying_source_count == 0 {
             return Err(EffectReceiptError::InvalidShape(
-                "no source attestation commits to the exact observed projection and outcome".to_owned(),
+                "no source attestation commits to the applied or partial observed projection".to_owned(),
             ));
         }
     }
@@ -763,6 +776,25 @@ mod tests {
             Err(EffectReceiptError::InvalidDigest(
                 "receipt.observed_effect.projection_digest"
             ))
+        ));
+    }
+
+    #[test]
+    fn every_source_claiming_applied_must_bind_to_the_same_projection() {
+        let marker = r#""attestation_id": "att-ledger-001""#;
+        let (prefix, source_tail) = RECEIPT.split_once(marker).unwrap();
+        let source_tail = source_tail.replacen(
+            r#""projection_digest": "sha256:1aafde6f570e11e8fdb2f0df027bee548f32a9f5e02ebfb886c8407e68320e51""#,
+            r#""projection_digest": "sha256:9999999999999999999999999999999999999999999999999999999999999999""#,
+            1,
+        );
+        let conflicting = format!("{prefix}{marker}{source_tail}");
+        assert!(matches!(
+            verify_effect_receipt(ATTEMPT, &conflicting, &expected_context()),
+            Err(EffectReceiptError::SourceBindingMismatch {
+                field: "projection_digest",
+                ..
+            })
         ));
     }
 
