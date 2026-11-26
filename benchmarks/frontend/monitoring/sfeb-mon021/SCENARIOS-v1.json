@@ -1,0 +1,349 @@
+{
+  "corpus_id": "MON-021-POSTGRES-CDC-CONTINUITY",
+  "corpus_version": "1.0.0",
+  "status": "research_seed",
+  "purpose": "Synthetic scenarios for PostgreSQL logical-decoding snapshot, slot, WAL, durability, retention and failover continuity assurance. Descriptive seeds, not runtime observations.",
+  "postgresql_profile": "PostgreSQL 18; adapters must pin exact minor version and output-plugin profile.",
+  "scenarios": [
+    {
+      "id": "CDC-001",
+      "family": "identity",
+      "description": "A logical slot is bound to the exact cluster system identifier, database, slot name, output plugin and profile digest.",
+      "expected_decision": "qualified",
+      "reason_code": "exact_source_slot_profile",
+      "required_control": "continue",
+      "severity": "critical",
+      "positive_control": true
+    },
+    {
+      "id": "CDC-002",
+      "family": "identity",
+      "description": "The slot name matches but the database OID/name differs from the declared source.",
+      "expected_decision": "denied",
+      "reason_code": "database_scope_mismatch",
+      "required_control": "deny",
+      "severity": "critical",
+      "positive_control": false
+    },
+    {
+      "id": "CDC-003",
+      "family": "identity",
+      "description": "The slot name and database match but cluster system identifier differs.",
+      "expected_decision": "denied",
+      "reason_code": "cluster_identity_mismatch",
+      "required_control": "deny",
+      "severity": "critical",
+      "positive_control": false
+    },
+    {
+      "id": "CDC-004",
+      "family": "identity",
+      "description": "The output plugin or filter configuration changes within one capture epoch.",
+      "expected_decision": "divergent",
+      "reason_code": "decoder_profile_changed",
+      "required_control": "surface",
+      "severity": "critical",
+      "positive_control": false
+    },
+    {
+      "id": "CDC-005",
+      "family": "snapshot",
+      "description": "The exported snapshot and slot consistent_point are exactly bound to the same source epoch.",
+      "expected_decision": "qualified",
+      "reason_code": "snapshot_stream_anchor_matches",
+      "required_control": "continue",
+      "severity": "critical",
+      "positive_control": true
+    },
+    {
+      "id": "CDC-006",
+      "family": "snapshot",
+      "description": "Snapshot enumeration is captured from another slot or database.",
+      "expected_decision": "denied",
+      "reason_code": "snapshot_source_substitution",
+      "required_control": "deny",
+      "severity": "critical",
+      "positive_control": false
+    },
+    {
+      "id": "CDC-007",
+      "family": "snapshot",
+      "description": "The exported snapshot expires before the snapshot reader imports it.",
+      "expected_decision": "indeterminate",
+      "reason_code": "snapshot_import_not_established",
+      "required_control": "hold",
+      "severity": "critical",
+      "positive_control": false
+    },
+    {
+      "id": "CDC-008",
+      "family": "snapshot",
+      "description": "The first decoded stream boundary does not reconcile with the slot consistent_point and snapshot manifest.",
+      "expected_decision": "indeterminate",
+      "reason_code": "snapshot_stream_gap",
+      "required_control": "hold",
+      "severity": "critical",
+      "positive_control": false
+    },
+    {
+      "id": "CDC-009",
+      "family": "replay",
+      "description": "After crash, exact same event IDs and payload digests are replayed from an earlier slot checkpoint.",
+      "expected_decision": "qualified",
+      "reason_code": "exact_replay_idempotent",
+      "required_control": "continue",
+      "severity": "critical",
+      "positive_control": true
+    },
+    {
+      "id": "CDC-010",
+      "family": "replay",
+      "description": "The same stable decoded event ID reappears with different payload bytes.",
+      "expected_decision": "divergent",
+      "reason_code": "event_identity_payload_conflict",
+      "required_control": "surface",
+      "severity": "critical",
+      "positive_control": false
+    },
+    {
+      "id": "CDC-011",
+      "family": "durability",
+      "description": "The consumer persists all messages and a terminal capture manifest before advancing the acknowledgement watermark.",
+      "expected_decision": "qualified",
+      "reason_code": "durable_before_ack",
+      "required_control": "continue",
+      "severity": "critical",
+      "positive_control": true
+    },
+    {
+      "id": "CDC-012",
+      "family": "durability",
+      "description": "The consumer advances confirmed_flush_lsn beyond the durable evidence watermark.",
+      "expected_decision": "denied",
+      "reason_code": "ack_ahead_of_durable_evidence",
+      "required_control": "deny",
+      "severity": "critical",
+      "positive_control": false
+    },
+    {
+      "id": "CDC-013",
+      "family": "durability",
+      "description": "The evidence commit result is unknown after a lost acknowledgement; consumer wants to advance slot feedback.",
+      "expected_decision": "indeterminate",
+      "reason_code": "evidence_commit_unknown",
+      "required_control": "hold",
+      "severity": "critical",
+      "positive_control": false
+    },
+    {
+      "id": "CDC-014",
+      "family": "durability",
+      "description": "The slot replays an overlapping range already sealed; all duplicate identities and digests match prior manifest.",
+      "expected_decision": "qualified",
+      "reason_code": "overlap_reconciles_exactly",
+      "required_control": "continue",
+      "severity": "critical",
+      "positive_control": true
+    },
+    {
+      "id": "CDC-015",
+      "family": "durability",
+      "description": "An overlapping replay contains one message whose prior ID/digest differs.",
+      "expected_decision": "divergent",
+      "reason_code": "overlap_equivocation",
+      "required_control": "surface",
+      "severity": "critical",
+      "positive_control": false
+    },
+    {
+      "id": "CDC-016",
+      "family": "retention",
+      "description": "Slot reports wal_status=lost or an invalidation reason is present.",
+      "expected_decision": "denied",
+      "reason_code": "slot_invalidated",
+      "required_control": "deny",
+      "severity": "critical",
+      "positive_control": false
+    },
+    {
+      "id": "CDC-017",
+      "family": "retention",
+      "description": "Slot reports wal_status=unreserved and required retention boundary is not independently shown safe.",
+      "expected_decision": "indeterminate",
+      "reason_code": "wal_retention_at_risk",
+      "required_control": "hold",
+      "severity": "critical",
+      "positive_control": false
+    },
+    {
+      "id": "CDC-018",
+      "family": "retention",
+      "description": "restart_lsn, catalog_xmin and safe_wal_size are captured as source health, with retained range supported.",
+      "expected_decision": "qualified",
+      "reason_code": "retention_evidence_present",
+      "required_control": "continue",
+      "severity": "critical",
+      "positive_control": true
+    },
+    {
+      "id": "CDC-019",
+      "family": "failover",
+      "description": "Failover slot is persistent, synced on intended standby, valid and retains required WAL/catalog state.",
+      "expected_decision": "qualified",
+      "reason_code": "standby_slot_ready",
+      "required_control": "continue",
+      "severity": "critical",
+      "positive_control": true
+    },
+    {
+      "id": "CDC-020",
+      "family": "failover",
+      "description": "Failover slot exists on standby but synced=false at promotion.",
+      "expected_decision": "denied",
+      "reason_code": "standby_slot_not_synced",
+      "required_control": "deny",
+      "severity": "critical",
+      "positive_control": false
+    },
+    {
+      "id": "CDC-021",
+      "family": "failover",
+      "description": "Standby slot is temporary or has invalidation reason.",
+      "expected_decision": "denied",
+      "reason_code": "standby_slot_not_persistent_valid",
+      "required_control": "deny",
+      "severity": "critical",
+      "positive_control": false
+    },
+    {
+      "id": "CDC-022",
+      "family": "failover",
+      "description": "Standby received WAL is behind the evidence/consumer required boundary.",
+      "expected_decision": "indeterminate",
+      "reason_code": "standby_behind_consumer",
+      "required_control": "hold",
+      "severity": "critical",
+      "positive_control": false
+    },
+    {
+      "id": "CDC-023",
+      "family": "failover",
+      "description": "Old primary remains active after promotion and emits changes from a competing lineage.",
+      "expected_decision": "divergent",
+      "reason_code": "old_primary_split_brain",
+      "required_control": "surface",
+      "severity": "critical",
+      "positive_control": false
+    },
+    {
+      "id": "CDC-024",
+      "family": "timeline",
+      "description": "WAL positions on two different timelines after their fork are compared numerically without a verified ancestry handoff.",
+      "expected_decision": "indeterminate",
+      "reason_code": "cross_timeline_lsn_incomparable",
+      "required_control": "hold",
+      "severity": "critical",
+      "positive_control": false
+    },
+    {
+      "id": "CDC-025",
+      "family": "timeline",
+      "description": "A timeline history chain and fork-point handoff are verified and source epoch changes explicitly.",
+      "expected_decision": "qualified",
+      "reason_code": "timeline_handoff_verified",
+      "required_control": "continue",
+      "severity": "critical",
+      "positive_control": true
+    },
+    {
+      "id": "CDC-026",
+      "family": "completeness",
+      "description": "A numeric LSN gap is treated as a missing logical row event without considering plugin semantics.",
+      "expected_decision": "denied",
+      "reason_code": "lsn_adjacency_is_not_event_completeness",
+      "required_control": "deny",
+      "severity": "critical",
+      "positive_control": false
+    },
+    {
+      "id": "CDC-027",
+      "family": "completeness",
+      "description": "A bounded capture manifest has source, slot, plugin, start, terminal, snapshot lineage and collector coverage.",
+      "expected_decision": "qualified",
+      "reason_code": "bounded_capture_complete_within_profile",
+      "required_control": "continue",
+      "severity": "critical",
+      "positive_control": true
+    },
+    {
+      "id": "CDC-028",
+      "family": "completeness",
+      "description": "Capture health records queue overflow/dropped events, but manifest still claims complete.",
+      "expected_decision": "denied",
+      "reason_code": "capture_drop_false_completeness",
+      "required_control": "deny",
+      "severity": "critical",
+      "positive_control": false
+    },
+    {
+      "id": "CDC-029",
+      "family": "identity",
+      "description": "An uninitialized NULL confirmed_flush_lsn or restart_lsn is silently treated as numeric zero.",
+      "expected_decision": "denied",
+      "reason_code": "null_lsn_not_zero",
+      "required_control": "deny",
+      "severity": "critical",
+      "positive_control": false
+    },
+    {
+      "id": "CDC-030",
+      "family": "durability",
+      "description": "The consumer receives a decoded event but crashes before evidence persistence; PostgreSQL replays it on restart.",
+      "expected_decision": "qualified",
+      "reason_code": "crash_replay_before_durable_ack",
+      "required_control": "continue",
+      "severity": "critical",
+      "positive_control": true
+    },
+    {
+      "id": "CDC-031",
+      "family": "failover",
+      "description": "Standby slot sync is asynchronous and has not completed before planned promotion.",
+      "expected_decision": "indeterminate",
+      "reason_code": "slot_sync_not_yet_complete",
+      "required_control": "hold",
+      "severity": "critical",
+      "positive_control": false
+    },
+    {
+      "id": "CDC-032",
+      "family": "identity",
+      "description": "Same slot name is recreated with a new slot/source epoch but old source identity is reused.",
+      "expected_decision": "divergent",
+      "reason_code": "slot_recreation_identity_reuse",
+      "required_control": "surface",
+      "severity": "critical",
+      "positive_control": false
+    },
+    {
+      "id": "CDC-033",
+      "family": "completeness",
+      "description": "The plugin filters out a class of changes and the MON claim improperly generalizes beyond the declared output profile.",
+      "expected_decision": "denied",
+      "reason_code": "plugin_scope_overclaim",
+      "required_control": "deny",
+      "severity": "critical",
+      "positive_control": false
+    },
+    {
+      "id": "CDC-034",
+      "family": "durability",
+      "description": "A consumer advances its flush acknowledgment only to the last sealed durable manifest watermark.",
+      "expected_decision": "qualified",
+      "reason_code": "flush_bound_to_sealed_manifest",
+      "required_control": "continue",
+      "severity": "critical",
+      "positive_control": true
+    }
+  ]
+}
