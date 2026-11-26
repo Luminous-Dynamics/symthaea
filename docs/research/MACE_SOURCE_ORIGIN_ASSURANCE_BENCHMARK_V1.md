@@ -334,3 +334,10 @@ Score every stage separately. A system that retrieves the right fact but leaks i
 
 Targets for deterministic governance, role-leakage and lifecycle controls remain zero accepted violations in exhaustive fixtures. For non-deterministic external benchmarks, publish coverage, risk and confidence intervals rather than imposing a universal zero-error claim from small samples.
 
+
+
+## 16. Exhaustive adaptive-policy reference protocol
+
+The reference implementation is exported as `adaptive_policy_reference` in the AML adapter crate. Portable input is defined by `data/schemas/mace_adaptive_reference_scenario_v1.schema.json` and a worked finite joint-world fixture at `data/fixtures/mace_adaptive_reference_scenario_v1.example.json`. The oracle computes exact expected net utility and probability-free worst-case regret as separate objectives; it must be used to qualify optimized executors and learned proposal policies on small worlds before large benchmark claims.
+
+The reference suite currently authors 15 deterministic tests. They have not been compiled or executed. It validates only the supplied finite scenario; it does not prove that a scenario's world support is complete, probabilities are empirically calibrated, source-root labels are correct, or external receipt signatures are genuine. Gold scenario construction and independent audit remain mandatory.
