@@ -102,9 +102,10 @@ pub struct AuditoryInvarianceRunV1 {
     pub dataset_revision_sha256: String,
     pub split: DatasetSplitV1,
     pub model_identity_sha256: String,
-    pub system_prompt_sha256: String,
-    pub runtime_identity_sha256: String,
-    pub decoding_config_sha256: String,
+    /// Optional: standard MusicListenBench submissions do not require these.
+    pub system_prompt_sha256: Option<String>,
+    pub runtime_identity_sha256: Option<String>,
+    pub decoding_config_sha256: Option<String>,
     pub pairs: Vec<AuditoryPairV1>,
 }
 
@@ -151,6 +152,12 @@ pub struct AuditoryMetricSummaryV1 {
     pub clean_items: usize,
     pub clean_correct: usize,
     pub clean_accuracy: Option<f64>,
+    pub clean_answer_a_rate: Option<f64>,
+    pub clean_acc_given_a: Option<f64>,
+    pub clean_acc_given_b: Option<f64>,
+    pub clean_balanced_accuracy: Option<f64>,
+    pub clean_letter_gap: Option<f64>,
+    pub flip_stay_answer_a_rate: Option<f64>,
     pub flip_items: usize,
     pub flip_correct: usize,
     pub flip_miss_count: usize,
@@ -195,6 +202,12 @@ pub struct StayFactorMetricV1 {
 }
 
 #[derive(Debug, Clone, PartialEq, Serialize)]
+pub struct FlipFactorMetricV1 {
+    pub factor: FlipFactorV1,
+    pub metrics: AuditoryMetricSummaryV1,
+}
+
+#[derive(Debug, Clone, PartialEq, Serialize)]
 pub struct AuditoryInvarianceReportV1 {
     pub schema: &'static str,
     pub dataset_id: String,
@@ -202,15 +215,17 @@ pub struct AuditoryInvarianceReportV1 {
     pub dataset_revision_sha256: String,
     pub split: DatasetSplitV1,
     pub model_identity_sha256: String,
-    pub system_prompt_sha256: String,
-    pub runtime_identity_sha256: String,
-    pub decoding_config_sha256: String,
+    /// Optional: standard MusicListenBench submissions do not require these.
+    pub system_prompt_sha256: Option<String>,
+    pub runtime_identity_sha256: Option<String>,
+    pub decoding_config_sha256: Option<String>,
     pub pair_count: usize,
     pub source_lineage_clusters: usize,
     pub recommended_confirmatory_source_floor: usize,
     pub confirmatory_source_floor_met: bool,
     pub overall: AuditoryMetricSummaryV1,
     pub by_task: Vec<TaskMetricV1>,
+    pub by_flip_factor: Vec<FlipFactorMetricV1>,
     pub by_stay_factor: Vec<StayFactorMetricV1>,
     pub pair_results: Vec<AuditoryPairResultV1>,
     /// The input includes digests, but this scorer does not re-read audio bytes.
@@ -260,10 +275,15 @@ pub fn audit_auditory_invariance(
 
     let overall = summarize(&results);
     let mut task_groups: BTreeMap<MusicalTaskV1, Vec<AuditoryPairResultV1>> = BTreeMap::new();
+    let mut flip_groups: BTreeMap<FlipFactorV1, Vec<AuditoryPairResultV1>> = BTreeMap::new();
     let mut factor_groups: BTreeMap<StayFactorV1, Vec<AuditoryPairResultV1>> = BTreeMap::new();
     for result in &results {
         task_groups
             .entry(result.task)
+            .or_default()
+            .push(result.clone());
+        flip_groups
+            .entry(result.flip_factor)
             .or_default()
             .push(result.clone());
         factor_groups
@@ -275,6 +295,13 @@ pub fn audit_auditory_invariance(
         .into_iter()
         .map(|(task, items)| TaskMetricV1 {
             task,
+            metrics: summarize(&items),
+        })
+        .collect();
+    let by_flip_factor = flip_groups
+        .into_iter()
+        .map(|(factor, items)| FlipFactorMetricV1 {
+            factor,
             metrics: summarize(&items),
         })
         .collect();
@@ -302,6 +329,7 @@ pub fn audit_auditory_invariance(
         confirmatory_source_floor_met: source_lineages.len() >= CONFIRMATORY_SOURCE_FLOOR,
         overall,
         by_task,
+        by_flip_factor,
         by_stay_factor,
         pair_results: results,
         audio_bytes_recomputed: false,
@@ -319,9 +347,16 @@ fn validate_run_identity(run: &AuditoryInvarianceRunV1) -> Result<(), String> {
     require_text(&run.dataset_version, "dataset_version")?;
     validate_digest(&run.dataset_revision_sha256, "dataset_revision_sha256")?;
     validate_digest(&run.model_identity_sha256, "model_identity_sha256")?;
-    validate_digest(&run.system_prompt_sha256, "system_prompt_sha256")?;
-    validate_digest(&run.runtime_identity_sha256, "runtime_identity_sha256")?;
-    validate_digest(&run.decoding_config_sha256, "decoding_config_sha256")
+    if let Some(value) = &run.system_prompt_sha256 {
+        validate_digest(value, "system_prompt_sha256")?;
+    }
+    if let Some(value) = &run.runtime_identity_sha256 {
+        validate_digest(value, "runtime_identity_sha256")?;
+    }
+    if let Some(value) = &run.decoding_config_sha256 {
+        validate_digest(value, "decoding_config_sha256")?;
+    }
+    Ok(())
 }
 
 fn validate_pair(pair: &AuditoryPairV1, index: usize) -> Result<(), String> {
@@ -493,6 +528,28 @@ fn score_variant(variant: &AuditoryVariantV1) -> VariantOutcomeV1 {
 fn summarize(results: &[AuditoryPairResultV1]) -> AuditoryMetricSummaryV1 {
     let pairs = results.len();
     let clean_correct = results.iter().filter(|result| result.clean.correct).count();
+    let clean_a_count = results
+        .iter()
+        .filter(|result| result.clean.model_answer == ModelAnswerV1::A)
+        .count();
+    let clean_gold_a = results
+        .iter()
+        .filter(|result| result.clean.expected_relation == result.clean.option_a_relation)
+        .count();
+    let clean_gold_b = pairs.saturating_sub(clean_gold_a);
+    let clean_correct_given_a = results
+        .iter()
+        .filter(|result| result.clean.expected_relation == result.clean.option_a_relation && result.clean.correct)
+        .count();
+    let clean_correct_given_b = results
+        .iter()
+        .filter(|result| result.clean.expected_relation == result.clean.option_b_relation && result.clean.correct)
+        .count();
+    let flip_stay_a_count = results
+        .iter()
+        .map(|result| usize::from(result.flip.model_answer == ModelAnswerV1::A)
+            + usize::from(result.stay.model_answer == ModelAnswerV1::A))
+        .sum::<usize>();
     let flip_correct = results.iter().filter(|result| result.flip.correct).count();
     let flip_miss_count = pairs.saturating_sub(flip_correct);
     let stay_correct = results.iter().filter(|result| result.stay.correct).count();
@@ -563,6 +620,24 @@ fn summarize(results: &[AuditoryPairResultV1]) -> AuditoryMetricSummaryV1 {
         clean_items: pairs,
         clean_correct,
         clean_accuracy: rate(clean_correct, pairs),
+        clean_answer_a_rate: rate(clean_a_count, pairs),
+        clean_acc_given_a: rate(clean_correct_given_a, clean_gold_a),
+        clean_acc_given_b: rate(clean_correct_given_b, clean_gold_b),
+        clean_balanced_accuracy: match (
+            rate(clean_correct_given_a, clean_gold_a),
+            rate(clean_correct_given_b, clean_gold_b),
+        ) {
+            (Some(a), Some(b)) => Some((a + b) / 2.0),
+            _ => None,
+        },
+        clean_letter_gap: match (
+            rate(clean_correct_given_a, clean_gold_a),
+            rate(clean_correct_given_b, clean_gold_b),
+        ) {
+            (Some(a), Some(b)) => Some((a - b).abs()),
+            _ => None,
+        },
+        flip_stay_answer_a_rate: rate(flip_stay_a_count, pairs.saturating_mul(2)),
         flip_items: pairs,
         flip_correct,
         flip_miss_count,
@@ -700,9 +775,9 @@ mod tests {
             dataset_revision_sha256: DATASET.into(),
             split: DatasetSplitV1::SyntheticFixture,
             model_identity_sha256: MODEL.into(),
-            system_prompt_sha256: PROMPT.into(),
-            runtime_identity_sha256: RUNTIME.into(),
-            decoding_config_sha256: DECODING.into(),
+            system_prompt_sha256: Some(PROMPT.into()),
+            runtime_identity_sha256: Some(RUNTIME.into()),
+            decoding_config_sha256: Some(DECODING.into()),
             pairs,
         }
     }
