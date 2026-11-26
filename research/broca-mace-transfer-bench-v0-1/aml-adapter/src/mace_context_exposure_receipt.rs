@@ -370,8 +370,14 @@ fn verify_provider_request_contract(
         return Err(MaceContextExposureRejectV1::WrongProviderParameterProfile);
     }
 
+    if request.messages.is_empty() {
+        return Err(MaceContextExposureRejectV1::InvalidRequestBody);
+    }
     let mut content_ranges = Vec::with_capacity(request.messages.len());
     for message in &request.messages {
+        if !matches!(message.role, "system" | "developer" | "user" | "assistant" | "tool") {
+            return Err(MaceContextExposureRejectV1::InvalidRequestBody);
+        }
         let _: String = serde_json::from_str(message.content.get())
             .map_err(|_| MaceContextExposureRejectV1::InvalidRequestBody)?;
         let raw = message.content.get().as_bytes();
