@@ -1,0 +1,240 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "title": "BASALT claim-scoped admission and evidence-capsule benchmark v1",
+  "type": "object",
+  "additionalProperties": false,
+  "required": [
+    "suite_id",
+    "benchmark_version",
+    "claim_ceiling",
+    "implementation_status",
+    "result_algebra",
+    "scenarios",
+    "metrics",
+    "comparison_arms",
+    "workload_matrix",
+    "benchmark_policy"
+  ],
+  "properties": {
+    "suite_id": {
+      "const": "basalt-claim-admission-capsule-benchmark-v1"
+    },
+    "benchmark_version": {
+      "const": 1
+    },
+    "claim_ceiling": {
+      "type": "string",
+      "minLength": 1
+    },
+    "implementation_status": {
+      "enum": [
+        "specification_only",
+        "reference_evaluator",
+        "integrated"
+      ]
+    },
+    "result_algebra": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "values",
+        "admission_rule",
+        "unknown_is_admissible"
+      ],
+      "properties": {
+        "values": {
+          "const": [
+            "valid",
+            "invalid",
+            "unknown"
+          ]
+        },
+        "admission_rule": {
+          "const": "all_mandatory_obligations_valid"
+        },
+        "unknown_is_admissible": {
+          "const": false
+        }
+      }
+    },
+    "scenarios": {
+      "type": "array",
+      "minItems": 20,
+      "maxItems": 100,
+      "items": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": [
+          "id",
+          "class",
+          "mutation",
+          "expected_result",
+          "admission_allowed"
+        ],
+        "properties": {
+          "id": {
+            "type": "string",
+            "pattern": "^ADM-[0-9]{3}$"
+          },
+          "class": {
+            "enum": [
+              "positive",
+              "negative",
+              "unknown",
+              "metamorphic",
+              "recovery"
+            ]
+          },
+          "mutation": {
+            "type": "string",
+            "minLength": 1
+          },
+          "expected_result": {
+            "enum": [
+              "valid",
+              "invalid",
+              "unknown",
+              "reverify_required"
+            ]
+          },
+          "admission_allowed": {
+            "type": "boolean"
+          }
+        }
+      }
+    },
+    "metrics": {
+      "type": "array",
+      "minItems": 8,
+      "maxItems": 40,
+      "items": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": [
+          "id",
+          "class",
+          "unit",
+          "target"
+        ],
+        "properties": {
+          "id": {
+            "type": "string",
+            "minLength": 1
+          },
+          "class": {
+            "enum": [
+              "safety",
+              "efficiency",
+              "diagnostic"
+            ]
+          },
+          "unit": {
+            "type": "string",
+            "minLength": 1
+          },
+          "target": {
+            "type": "string",
+            "minLength": 1
+          }
+        }
+      }
+    },
+    "comparison_arms": {
+      "type": "array",
+      "minItems": 4,
+      "maxItems": 10,
+      "uniqueItems": true,
+      "items": {
+        "type": "string",
+        "enum": [
+          "global_rerun",
+          "full_capsule_reverification",
+          "dependency_selective_reverification",
+          "cache_only_negative_control",
+          "exact_small_graph_oracle"
+        ]
+      }
+    },
+    "workload_matrix": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "dependency_nodes",
+        "dependency_drift_percent",
+        "capsule_counts",
+        "graph_shapes"
+      ],
+      "properties": {
+        "dependency_nodes": {
+          "type": "array",
+          "minItems": 3,
+          "items": {
+            "type": "integer",
+            "minimum": 1
+          }
+        },
+        "dependency_drift_percent": {
+          "type": "array",
+          "minItems": 3,
+          "items": {
+            "type": "integer",
+            "minimum": 0,
+            "maximum": 100
+          }
+        },
+        "capsule_counts": {
+          "type": "array",
+          "minItems": 3,
+          "items": {
+            "type": "integer",
+            "minimum": 1
+          }
+        },
+        "graph_shapes": {
+          "type": "array",
+          "minItems": 3,
+          "items": {
+            "type": "string",
+            "minLength": 1
+          }
+        }
+      }
+    },
+    "benchmark_policy": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "safety_before_efficiency",
+        "zero_unknown_admissions",
+        "zero_invalid_admissions",
+        "require_fresh_linearizable_scope_read",
+        "global_revision_is_audit_watermark_not_global_invalidation",
+        "cache_only_never_admits",
+        "publish_raw_vectors"
+      ],
+      "properties": {
+        "safety_before_efficiency": {
+          "const": true
+        },
+        "zero_unknown_admissions": {
+          "const": true
+        },
+        "zero_invalid_admissions": {
+          "const": true
+        },
+        "require_fresh_linearizable_scope_read": {
+          "const": true
+        },
+        "global_revision_is_audit_watermark_not_global_invalidation": {
+          "const": true
+        },
+        "cache_only_never_admits": {
+          "const": true
+        },
+        "publish_raw_vectors": {
+          "const": true
+        }
+      }
+    }
+  }
+}

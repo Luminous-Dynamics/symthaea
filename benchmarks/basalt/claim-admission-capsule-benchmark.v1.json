@@ -1,0 +1,365 @@
+{
+  "suite_id": "basalt-claim-admission-capsule-benchmark-v1",
+  "benchmark_version": 1,
+  "title": "BASALT claim-scoped three-valued admission and evidence-capsule qualification",
+  "claim_ceiling": "Specification and deterministic fixture plan only. No integrated DSSE, Rekor, witness, etcd, observer qualification, or production capsule evaluator is claimed.",
+  "implementation_status": "specification_only",
+  "result_algebra": {
+    "values": [
+      "valid",
+      "invalid",
+      "unknown"
+    ],
+    "admission_rule": "all_mandatory_obligations_valid",
+    "unknown_is_admissible": false
+  },
+  "scenarios": [
+    {
+      "id": "ADM-001",
+      "class": "positive",
+      "mutation": "All mandatory obligations are independently valid for exact subject, context and intended use",
+      "expected_result": "valid",
+      "admission_allowed": true
+    },
+    {
+      "id": "ADM-002",
+      "class": "unknown",
+      "mutation": "One mandatory obligation is absent",
+      "expected_result": "unknown",
+      "admission_allowed": false
+    },
+    {
+      "id": "ADM-003",
+      "class": "negative",
+      "mutation": "One mandatory proof is affirmatively disproven",
+      "expected_result": "invalid",
+      "admission_allowed": false
+    },
+    {
+      "id": "ADM-004",
+      "class": "negative",
+      "mutation": "One mandatory proof is invalid while another mandatory proof is unknown",
+      "expected_result": "invalid",
+      "admission_allowed": false
+    },
+    {
+      "id": "ADM-005",
+      "class": "positive",
+      "mutation": "Exact capsule reuse for identical subject, use, context and current relevant authority scopes",
+      "expected_result": "valid",
+      "admission_allowed": true
+    },
+    {
+      "id": "ADM-006",
+      "class": "negative",
+      "mutation": "Replace the claimed subject digest while retaining the original capsule",
+      "expected_result": "invalid",
+      "admission_allowed": false
+    },
+    {
+      "id": "ADM-007",
+      "class": "negative",
+      "mutation": "Present a capsule for a broader intended use than its explicit scope",
+      "expected_result": "invalid",
+      "admission_allowed": false
+    },
+    {
+      "id": "ADM-008",
+      "class": "unknown",
+      "mutation": "Change observer binary or configuration without a matching qualification record",
+      "expected_result": "unknown",
+      "admission_allowed": false
+    },
+    {
+      "id": "ADM-009",
+      "class": "negative",
+      "mutation": "Present narrower workload qualification for a workload outside the qualified envelope",
+      "expected_result": "invalid",
+      "admission_allowed": false
+    },
+    {
+      "id": "ADM-010",
+      "class": "unknown",
+      "mutation": "Omit a required dependency from the capsule graph",
+      "expected_result": "unknown",
+      "admission_allowed": false
+    },
+    {
+      "id": "ADM-011",
+      "class": "negative",
+      "mutation": "Substitute a dependency digest while preserving its display name",
+      "expected_result": "invalid",
+      "admission_allowed": false
+    },
+    {
+      "id": "ADM-012",
+      "class": "negative",
+      "mutation": "Introduce a cycle into the dependency graph",
+      "expected_result": "invalid",
+      "admission_allowed": false
+    },
+    {
+      "id": "ADM-013",
+      "class": "unknown",
+      "mutation": "Omit a required dependency edge from the dependency closure",
+      "expected_result": "unknown",
+      "admission_allowed": false
+    },
+    {
+      "id": "ADM-014",
+      "class": "unknown",
+      "mutation": "Current signer revocation or policy state cannot be obtained from an authoritative source",
+      "expected_result": "unknown",
+      "admission_allowed": false
+    },
+    {
+      "id": "ADM-015",
+      "class": "metamorphic",
+      "mutation": "Advance a relevant source, log, signer, trust-root, witness or policy scope after capsule creation",
+      "expected_result": "reverify_required",
+      "admission_allowed": false
+    },
+    {
+      "id": "ADM-016",
+      "class": "metamorphic",
+      "mutation": "Advance an unrelated global authority key while all relevant scopes remain identical and linearly verified",
+      "expected_result": "valid",
+      "admission_allowed": true
+    },
+    {
+      "id": "ADM-017",
+      "class": "unknown",
+      "mutation": "Remote authority or required witness quorum is unavailable",
+      "expected_result": "unknown",
+      "admission_allowed": false
+    },
+    {
+      "id": "ADM-018",
+      "class": "unknown",
+      "mutation": "Supply an etcd serializable member-local read as freshness evidence",
+      "expected_result": "unknown",
+      "admission_allowed": false
+    },
+    {
+      "id": "ADM-019",
+      "class": "unknown",
+      "mutation": "Restore a local cache to an older internally consistent database snapshot without independent current anchor evidence",
+      "expected_result": "unknown",
+      "admission_allowed": false
+    },
+    {
+      "id": "ADM-020",
+      "class": "negative",
+      "mutation": "Present two signed transparency checkpoints with the same tree size and different roots",
+      "expected_result": "invalid",
+      "admission_allowed": false
+    },
+    {
+      "id": "ADM-021",
+      "class": "negative",
+      "mutation": "Use a mathematically valid signature from a signer not authorized for the exact source and claim",
+      "expected_result": "invalid",
+      "admission_allowed": false
+    },
+    {
+      "id": "ADM-022",
+      "class": "metamorphic",
+      "mutation": "Caller supplies valid=true while one or more mandatory obligations are unknown or invalid",
+      "expected_result": "unknown",
+      "admission_allowed": false
+    },
+    {
+      "id": "ADM-023",
+      "class": "negative",
+      "mutation": "Use an unsupported major capsule schema version or ambiguous canonical encoding",
+      "expected_result": "invalid",
+      "admission_allowed": false
+    },
+    {
+      "id": "ADM-024",
+      "class": "unknown",
+      "mutation": "Required trusted time or currentness service is unavailable",
+      "expected_result": "unknown",
+      "admission_allowed": false
+    },
+    {
+      "id": "ADM-025",
+      "class": "recovery",
+      "mutation": "Remote authority committed exact receipt but client lost response; lookup returns the same accepted receipt and revision",
+      "expected_result": "valid",
+      "admission_allowed": true
+    },
+    {
+      "id": "ADM-026",
+      "class": "metamorphic",
+      "mutation": "Permute obligation order and normalize reason-code order",
+      "expected_result": "valid",
+      "admission_allowed": true
+    },
+    {
+      "id": "ADM-027",
+      "class": "metamorphic",
+      "mutation": "Delete an optional obligation explicitly marked non-mandatory by the exact versioned profile",
+      "expected_result": "valid",
+      "admission_allowed": true
+    },
+    {
+      "id": "ADM-028",
+      "class": "unknown",
+      "mutation": "Profile marks an obligation mandatory but a verifier silently reports not-applicable without policy authorization",
+      "expected_result": "unknown",
+      "admission_allowed": false
+    }
+  ],
+  "metrics": [
+    {
+      "id": "invalid_capsule_admissions",
+      "class": "safety",
+      "unit": "count",
+      "target": "0"
+    },
+    {
+      "id": "unknown_capsule_admissions",
+      "class": "safety",
+      "unit": "count",
+      "target": "0"
+    },
+    {
+      "id": "cross_subject_acceptances",
+      "class": "safety",
+      "unit": "count",
+      "target": "0"
+    },
+    {
+      "id": "cross_use_acceptances",
+      "class": "safety",
+      "unit": "count",
+      "target": "0"
+    },
+    {
+      "id": "stale_dependency_acceptances",
+      "class": "safety",
+      "unit": "count",
+      "target": "0"
+    },
+    {
+      "id": "unanchored_snapshot_restore_promotions",
+      "class": "safety",
+      "unit": "count",
+      "target": "0"
+    },
+    {
+      "id": "policy_downgrade_acceptances",
+      "class": "safety",
+      "unit": "count",
+      "target": "0"
+    },
+    {
+      "id": "stale_read_freshness_false_passes",
+      "class": "safety",
+      "unit": "count",
+      "target": "0"
+    },
+    {
+      "id": "reference_independent_evaluator_mismatches",
+      "class": "safety",
+      "unit": "count",
+      "target": "0"
+    },
+    {
+      "id": "obligation_order_result_mismatches",
+      "class": "safety",
+      "unit": "count",
+      "target": "0"
+    },
+    {
+      "id": "required_dependency_invalidation_recall",
+      "class": "safety",
+      "unit": "percent",
+      "target": "100% on preregistered seeded mutation set"
+    },
+    {
+      "id": "unnecessary_reverification_work",
+      "class": "efficiency",
+      "unit": "normalized work units",
+      "target": "at least 30% below global rerun on held-out drift-heavy workload"
+    },
+    {
+      "id": "verification_cpu_time",
+      "class": "efficiency",
+      "unit": "milliseconds",
+      "target": "measure p50/p95/p99; no fixed cross-hardware threshold"
+    },
+    {
+      "id": "proof_bytes_transferred",
+      "class": "efficiency",
+      "unit": "bytes",
+      "target": "measure by proof type and cache mode"
+    },
+    {
+      "id": "end_to_end_admission_latency",
+      "class": "efficiency",
+      "unit": "milliseconds",
+      "target": "measure p50/p95/p99 with authority/witness/network boundary explicit"
+    },
+    {
+      "id": "capsule_size",
+      "class": "diagnostic",
+      "unit": "bytes",
+      "target": "measure p50/p95/p99 and inline-vs-reference breakdown"
+    },
+    {
+      "id": "dependency_graph_traversal",
+      "class": "efficiency",
+      "unit": "nodes per second",
+      "target": "measure across graph size and topology"
+    },
+    {
+      "id": "revocation_to_unknown_or_reject_delay",
+      "class": "safety",
+      "unit": "milliseconds",
+      "target": "zero admissions after authoritative change; measure detection delay"
+    }
+  ],
+  "comparison_arms": [
+    "global_rerun",
+    "full_capsule_reverification",
+    "dependency_selective_reverification",
+    "cache_only_negative_control",
+    "exact_small_graph_oracle"
+  ],
+  "workload_matrix": {
+    "dependency_nodes": [
+      10,
+      100,
+      1000
+    ],
+    "dependency_drift_percent": [
+      1,
+      10,
+      30,
+      70
+    ],
+    "capsule_counts": [
+      1000,
+      10000,
+      100000
+    ],
+    "graph_shapes": [
+      "shallow-wide",
+      "deep-chain",
+      "high-fanout",
+      "sparse-random",
+      "dense-invalidating"
+    ]
+  },
+  "benchmark_policy": {
+    "safety_before_efficiency": true,
+    "zero_unknown_admissions": true,
+    "zero_invalid_admissions": true,
+    "require_fresh_linearizable_scope_read": true,
+    "global_revision_is_audit_watermark_not_global_invalidation": true,
+    "cache_only_never_admits": true,
+    "publish_raw_vectors": true
+  }
+}
