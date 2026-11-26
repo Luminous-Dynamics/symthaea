@@ -2,6 +2,7 @@ package causalgraph
 
 import (
 	"fmt"
+	"reflect"
 	"sort"
 	"strings"
 )
@@ -177,7 +178,7 @@ func Evaluate(g Graph,pins map[string]VerifierPin) Result {
 			return result(Indeterminate,"node identity or kind invalid",checked...)
 		}
 		if old,ok:=nodes[n.ID]; ok {
-			if old!=n { return result(Divergent,"node identifier reused with conflicting content: "+n.ID,checked...) }
+			if !reflect.DeepEqual(old,n) { return result(Divergent,"node identifier reused with conflicting content: "+n.ID,checked...) }
 			return result(Divergent,"duplicate node identity: "+n.ID,checked...)
 		}
 		if n.Kind==Entity && n.Digest!=nil && !n.Digest.Valid() {
@@ -200,6 +201,7 @@ func Evaluate(g Graph,pins map[string]VerifierPin) Result {
 		if !edgeTypeValid(e,nodes) { return result(Denied,"edge endpoint type/reference invalid: "+e.ID,checked...) }
 		ev,ok:=nodes[e.EvidenceID]
 		if !ok || ev.Kind!=Entity { return result(Indeterminate,"edge evidence entity missing: "+e.ID,checked...) }
+		if !ev.RequiresVerification { return result(Indeterminate,"edge evidence lacks a required authenticated source-verifier claim: "+e.ID,checked...) }
 		edges[e.ID]=e
 		if e.Kind!=Supersedes { adj[e.From]=append(adj[e.From],e.To) }
 		if e.Kind==Used { incomingUsed[e.To]=append(incomingUsed[e.To],e.From) }
@@ -240,7 +242,7 @@ func Evaluate(g Graph,pins map[string]VerifierPin) Result {
 		if n.Kind!=Activity { continue }
 		m,ok:=manifestByActivity[id]
 		if !ok { return result(Indeterminate,"activity has no independent capture manifest: "+id,checked...) }
-		if !nonempty(m.CollectorID,m.SourceID,m.SnapshotID,m.QueryID,m.StartCursor,m.EndCursor,m.TerminalWatermark) || m.ObservedAt<=0 {
+		if !nonempty(m.CollectorID,m.SourceID,m.SnapshotID,m.QueryID,m.StartCursor,m.EndCursor,m.TerminalWatermark) || !m.Digest.Valid() || m.ObservedAt<=0 {
 			return result(Indeterminate,"activity capture boundary is incomplete: "+id,checked...)
 		}
 		if !m.Complete || len(m.Gaps)>0 { return result(Indeterminate,"activity input capture is incomplete: "+id,checked...) }
@@ -259,6 +261,12 @@ func Evaluate(g Graph,pins map[string]VerifierPin) Result {
 		d,why:=verifyNode(n,g.Reports,pins,observedAt)
 		if d!=Qualified { return result(d,why,checked...) }
 	}
+	for _,m:=range g.Manifests {
+		fake:=Node{ID:"manifest:"+m.ActivityID,Kind:Entity,Digest:&m.Digest,RequiresVerification:true}
+		d,why:=verifyNode(fake,g.Reports,pins,observedAt)
+		if d!=Qualified { return result(d,"capture manifest "+m.ActivityID+": "+why,checked...) }
+	}
+	checked=append(checked,"capture-manifest-verifier-reports")
 	checked=append(checked,"pinned-source-verifier-reports","exact-source-byte-binding","verifier-freshness")
 	return result(Qualified,"causal provenance structure and supplied source-verifier evidence qualify only within the declared capture boundary; factual truth and downstream effects require separate gates",checked...)
 }
