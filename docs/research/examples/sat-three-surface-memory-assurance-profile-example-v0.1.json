@@ -156,6 +156,14 @@
       "dimension_id": "external_effect_consequence",
       "measurement_state": "not_measured",
       "relationship": "An agent action or attempted tool call is not proof of a sink-side external effect; use independently reconciled effect evidence."
+    },
+    {
+      "dimension_id": "witness_survivability",
+      "measurement_state": "referenced_not_run",
+      "relationship": "Independent witness freshness, quorum safety, split-view resistance and T10 recovery are separate from the native at-rest score; SAT's fault-injection contract is authored but no remote witness service is implemented or evaluated.",
+      "protocol_refs": [
+        "https://github.com/Luminous-Dynamics/symthaea/pull/13847"
+      ]
     }
   ],
   "aggregation_policy": {
