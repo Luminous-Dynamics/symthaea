@@ -1298,6 +1298,10 @@ mod tests {
         audio: &str,
         annotations: Vec<IndependentTemporalAnnotationV1>,
     ) -> TemporalReliabilityUnitV1 {
+        let assigned_annotator_ids_sha256 = annotations
+            .iter()
+            .map(|annotation| annotation.annotator_id_sha256.clone())
+            .collect();
         TemporalReliabilityUnitV1 {
             unit_id: id.into(),
             source_lineage_sha256: lineage.into(),
@@ -1305,7 +1309,9 @@ mod tests {
             query_text: "Every piano entrance".into(),
             artifact: artifact(audio),
             annotation_manifest_sha256: digest(if id == "item-1" { 'e' } else { 'f' }),
+            assigned_annotator_ids_sha256,
             annotations,
+            nonresponses: Vec::new(),
         }
     }
 
