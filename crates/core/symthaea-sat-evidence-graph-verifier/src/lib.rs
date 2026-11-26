@@ -1269,7 +1269,7 @@ mod tests {
         seal(&mut value);
         let report = verify_augmentation(&serde_json::to_string(&value).unwrap()).unwrap();
         assert!(has_issue(&report, "critical_evidence_not_independent_and_verified"));
-        assert_eq!(report.admissible_supported_claim_count, 0);
+        assert_eq!(report.supported_claims_passing_declared_state_checks, 0);
     }
 
     #[test]
