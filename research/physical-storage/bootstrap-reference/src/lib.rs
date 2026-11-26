@@ -1,3 +1,5 @@
+pub mod bootstrap_codec;
+
 //! Fail-closed bootstrap/control-plane qualification semantics.
 //!
 //! This crate is a dependency-free decision kernel. It is not an optical reader,
