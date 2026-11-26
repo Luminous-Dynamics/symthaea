@@ -32,8 +32,25 @@ Prefer reuse, but do not infer a capability from a crate name.
 | symthaea-digital-twin | Store telemetry, prediction residuals, epistemic/aleatoric uncertainty | Current ingestion takes caller-supplied expected value/tolerance; it does not establish a physical state or independently predict dynamics |
 | symthaea-control | Kalman/LQG/MPC as baselines or explicit model-based estimators | Record estimator assumptions, process/noise models and operating envelope |
 | symthaea-humanoid | Separate push/fall-recovery locomotion test lane | Do not pool biped locomotion with manipulation recovery or claim RoboRecover equivalence |
+| symthaea-manipulator | First manipulation observer/process-model integration: 21-channel state, 16,384D HDC encoder, normalized state-prediction residual, sensorimotor binding and typed perturbation definitions | Its SimpleManipulatorSimulator is a simplified first-order joint-space approximation; its one-step predictor clones the same model used by the plant. Use for process-model tests only until an independently parameterized plant/model mismatch campaign exists. Keep its actuator safety supervisor separate from RRVR evidence adjudication |
 | decision-predictability-benchmark | Existing finite-world EVSI and prior-free robust decision-value evaluator | Reuse; do not create a competing EVSI engine. The evaluator does not execute probes |
 | symthaea-formal-safety | Record proposed assurance obligations and evidence references | Current convenience discharge changes status when a reference is attached; that alone is not proof checking |
+
+### Manipulation-domain reuse and circularity controls
+
+The existing `symthaea-manipulator` domain is the preferred first integration target for manipulation-specific observer features:
+
+- `ManipulatorState` exposes 21 typed channels: seven joint angles, seven joint velocities, three end-effector position values, three end-effector force values, and gripper opening.
+- `ManipulatorHdcEncoder` maps these typed numeric channels into a 16,384-dimensional `ContinuousHV`, using fixed per-channel ranges and weights. This is a more appropriate proprioceptive HDC path than converting robot measurements into free-form text.
+- `normalized_state_prediction_error` supplies a transparent deterministic baseline over joint angles/velocities, end-effector position/force and gripper opening. Its hard-coded scales must be recorded and sensitivity-tested; it is not a calibrated probability.
+- `SensorimotorInputBinder` keeps thought and body vectors role-bound. The observer may reuse the body encoding, but must not let task intent overwrite measured body state.
+- `ManipulatorPerturbation` defines force, friction, payload, joint-failure and collision perturbations. Verify which schedules are actually applied by the current runner before claiming a fault campaign; type definitions alone do not prove injection.
+- `ManipulatorSafetySupervisor` is the existing embodiment's final actuator-command gate. Do not route RRVR observer output into it as an evidence verdict, and do not treat its own safety decision as an independent physical-effect observation. Keep the host controller's safety path unchanged in the overlay experiment.
+- `ActiveInferenceManipulatorAgent` exposes a genuine `perceived_free_energy` separately from legacy hand-derived joint-deviation/force scores. Do not label the latter as the agent's variational free energy.
+
+**Critical non-circularity constraint:** `SimpleManipulatorSimulator::predict_next_state` clones the current simulator and advances the clone with the same simplified dynamics implementation as the live plant. The embodiment then steps that same plant and computes a one-step residual. This is useful for deterministic implementation-consistency tests; it is not an independent model of unknown plant dynamics and may produce optimistically small residuals. Do not use same-model residuals to substantiate physical anomaly detection or calibrated uncertainty.
+
+The first useful manipulation campaign should therefore compare a frozen observer model against a separately instantiated plant profile with preregistered mismatch in inertias, damping, gravity, payload, sensor noise/latency and external disturbances. Keep the plant's hidden parameters evaluator-side. Report oracle/same-model as a diagnostic upper bound, not a deployable baseline. Add a second, independently implemented metric recomputation over recorded plant states. The current simulator documentation explicitly says its gravity model is a first-order approximation and degrades for highly coupled configurations; maintain that envelope as part of every result.
 
 **Explicit non-use:** symthaea-vision-manifold PredictiveCodingHierarchy.dream_ahead currently evolves its coarse state using a placeholder identity-like permutation. It must not be described or benchmarked as a qualified physical world model. The frame encoder's measured residual/novelty may be tested as a feature, subject to held-out visual evaluation.
 
@@ -121,6 +138,8 @@ The existing finite-world evaluator is not a probe executor. The independent exe
 ### Lane A — process-model software qualification
 
 Use frozen RRVR deterministic fault-harness traces and known-truth synthetic streams. Keep the evidence domain process_model. This lane tests parser, time semantics, digest binding, anomaly features, calibration plumbing, decision-cut enforcement, OOD abstention and deterministic output. It is not simulator evidence.
+
+For manipulation-specific signal and model-mismatch experiments, use `symthaea-manipulator` as a separately identified sublane. First establish the zero-mismatch code-consistency control, then freeze observer parameters and vary the plant profile independently. Introduce held-out inertial/damping/gravity/payload changes, sensor timing/noise faults, force disturbances, friction shifts, joint failures and collisions. Keep true plant state and hidden changed parameters evaluator-side. No outputs from this sublane are RoboRecover host results or physical evidence.
 
 ### Lane B — simulator qualification
 
