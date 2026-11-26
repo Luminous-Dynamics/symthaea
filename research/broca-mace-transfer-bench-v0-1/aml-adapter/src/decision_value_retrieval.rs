@@ -16,6 +16,8 @@
 
 use std::collections::BTreeSet;
 
+use sha2::{Digest, Sha256};
+
 const PROBABILITY_SCALE: i128 = 1_000_000;
 const MAX_STATES: usize = 128;
 const MAX_ACTIONS: usize = 128;
@@ -105,17 +107,29 @@ pub struct CalibratedDecisionPriorV1 {
     pub probability_ppm_by_state: Vec<u32>,
 }
 
+#[derive(Clone, Copy, Debug, Eq, PartialEq)]
+pub enum CalibrationReceiptRejectV1 {
+    InvalidSignature,
+    ProfileMismatch,
+    DecisionNeedMismatch,
+    ProbabilityModelMismatch,
+    Expired,
+    Revoked,
+}
+
 pub trait DecisionCalibrationReceiptVerifierV1 {
     /// Implementations must verify the signed calibration receipt, profile
-    /// pin, DecisionNeed binding and validity window using the caller's trusted
-    /// current time. A digest-shaped string alone is not verification.
+    /// pin, DecisionNeed binding, exact probability-model digest and validity
+    /// window using the caller's trusted current time. A digest-shaped string
+    /// alone is not verification.
     fn verify(
         &self,
         decision_need_sha256: &str,
         calibration_profile_sha256: &str,
         calibration_receipt_sha256: &str,
+        probability_model_sha256: &str,
         now_unix: u64,
-    ) -> Result<(), ()>;
+    ) -> Result<(), CalibrationReceiptRejectV1>;
 }
 
 /// One candidate retrieval/verification operation, not a retrieved fact.
@@ -286,10 +300,12 @@ pub fn evaluate_expected_value_v1(
     if prior_sum != 1_000_000 {
         return Err(DecisionValueRejectV1::InvalidProbability);
     }
+    let probability_model_sha256 = probability_model_sha256(policy, prior, option);
     calibration_verifier.verify(
         &policy.decision_need_sha256,
         &prior.calibration_profile_sha256,
         &prior.calibration_receipt_sha256,
+        &probability_model_sha256,
         now_unix,
     ).map_err(|_| DecisionValueRejectV1::CalibrationReceiptRejected)?;
 
@@ -508,6 +524,57 @@ pub fn choose_robust_value_query_v1(
     Ok(best)
 }
 
+fn probability_model_sha256(
+    policy: &DecisionValuePolicyV1,
+    prior: &CalibratedDecisionPriorV1,
+    option: &DecisionRetrievalOptionV1,
+) -> String {
+    let mut h = Sha256::new();
+    h.update(b"luminous:mace:retrieval-probability-model:v1\\0");
+    hash_field(&mut h, &policy.decision_need_sha256);
+    hash_field(&mut h, &policy.utility_profile_sha256);
+    hash_field(&mut h, &prior.calibration_profile_sha256);
+    h.update(prior.valid_until_unix.to_be_bytes());
+    h.update((policy.state_ids.len() as u64).to_be_bytes());
+    for state in &policy.state_ids { hash_field(&mut h, state); }
+    h.update((policy.action_ids.len() as u64).to_be_bytes());
+    for action in &policy.action_ids { hash_field(&mut h, action); }
+    h.update((policy.utility_by_state_action.len() as u64).to_be_bytes());
+    for row in &policy.utility_by_state_action {
+        h.update((row.len() as u64).to_be_bytes());
+        for value in row { h.update(value.to_be_bytes()); }
+    }
+    h.update((prior.probability_ppm_by_state.len() as u64).to_be_bytes());
+    for probability in &prior.probability_ppm_by_state {
+        h.update(probability.to_be_bytes());
+    }
+    hash_field(&mut h, &option.query_option_id);
+    hash_field(&mut h, &option.action_template_sha256);
+    h.update((option.observation_ids.len() as u64).to_be_bytes());
+    for observation in &option.observation_ids { hash_field(&mut h, observation); }
+    h.update((option.likelihood_ppm_by_state.len() as u64).to_be_bytes());
+    for row in &option.likelihood_ppm_by_state {
+        h.update((row.len() as u64).to_be_bytes());
+        for probability in row { h.update(probability.to_be_bytes()); }
+    }
+    hex_digest(&h.finalize())
+}
+
+fn hash_field(hasher: &mut Sha256, value: &str) {
+    hasher.update((value.len() as u64).to_be_bytes());
+    hasher.update(value.as_bytes());
+}
+
+fn hex_digest(bytes: &[u8]) -> String {
+    const HEX: &[u8; 16] = b"0123456789abcdef";
+    let mut output = String::with_capacity(bytes.len() * 2);
+    for byte in bytes {
+        output.push(HEX[usize::from(byte >> 4)] as char);
+        output.push(HEX[usize::from(byte & 0x0f)] as char);
+    }
+    output
+}
+
 fn best_expected_action(
     policy: &DecisionValuePolicyV1,
     state_weights: &[i128],
@@ -561,7 +628,7 @@ mod tests {
             _calibration_profile_sha256: &str,
             _calibration_receipt_sha256: &str,
             _now_unix: u64,
-        ) -> Result<(), ()> {
+        ) -> Result<(), CalibrationReceiptRejectV1> {
             Ok(())
         }
     }
@@ -574,8 +641,8 @@ mod tests {
             _calibration_profile_sha256: &str,
             _calibration_receipt_sha256: &str,
             _now_unix: u64,
-        ) -> Result<(), ()> {
-            Err(())
+        ) -> Result<(), CalibrationReceiptRejectV1> {
+            Err(CalibrationReceiptRejectV1::InvalidSignature)
         }
     }
 
@@ -641,6 +708,49 @@ mod tests {
             assessment.selected_actions_by_observation.iter()
                 .map(|item| item.selected_action_id.as_deref().unwrap()).collect::<Vec<_>>(),
             vec!["abstain", "proceed"]
+        );
+    }
+
+    struct PinnedModelCalibration {
+        expected_model_sha256: String,
+    }
+    impl DecisionCalibrationReceiptVerifierV1 for PinnedModelCalibration {
+        fn verify(
+            &self,
+            _decision_need_sha256: &str,
+            _calibration_profile_sha256: &str,
+            _calibration_receipt_sha256: &str,
+            probability_model_sha256: &str,
+            _now_unix: u64,
+        ) -> Result<(), CalibrationReceiptRejectV1> {
+            if probability_model_sha256 == self.expected_model_sha256 {
+                Ok(())
+            } else {
+                Err(CalibrationReceiptRejectV1::ProbabilityModelMismatch)
+            }
+        }
+    }
+
+    #[test]
+    fn calibration_receipt_is_bound_to_the_exact_prior_and_likelihood_model() {
+        let policy = policy();
+        let prior = prior();
+        let option = informative_option();
+        let model_sha256 = probability_model_sha256(&policy, &prior, &option);
+        let verifier = PinnedModelCalibration { expected_model_sha256: model_sha256 };
+        assert!(evaluate_expected_value_v1(
+            &policy, &prior, &option, 10, &verifier,
+        ).is_ok());
+        let mut altered_option = option.clone();
+        altered_option.likelihood_ppm_by_state = vec![
+            vec![500_000, 500_000],
+            vec![500_000, 500_000],
+        ];
+        assert_eq!(
+            evaluate_expected_value_v1(
+                &policy, &prior, &altered_option, 10, &verifier,
+            ),
+            Err(DecisionValueRejectV1::CalibrationReceiptRejected)
         );
     }
 
