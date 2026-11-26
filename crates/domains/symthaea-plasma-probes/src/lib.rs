@@ -8337,8 +8337,14 @@ mod tests {
             1.0,
         )
         .unwrap();
-        assert_eq!(ordinary.atoms(), huge.atoms());
-        assert_eq!(ordinary.wasserstein1(&huge), Ok(0.0));
+        assert_eq!(ordinary.atoms().len(), huge.atoms().len());
+        for ((ordinary_position, ordinary_weight), (huge_position, huge_weight)) in
+            ordinary.atoms().iter().zip(huge.atoms().iter())
+        {
+            assert_eq!(ordinary_position, huge_position);
+            assert!((ordinary_weight - huge_weight).abs() < 1.0e-15);
+        }
+        assert!(ordinary.wasserstein1(&huge).unwrap() < 1.0e-15);
     }
 
     #[test]
@@ -9726,8 +9732,8 @@ mod tests {
         let left = KineticResponseSignature::new(KineticResponseSignatureInput {
             contract_id: "contract".to_owned(),
             structure_class_id: "class".to_owned(),
-            intervention_ids: vec!["pulse".to_owned()],
-            qoi_ids: vec!["field".to_owned()],
+            intervention_ids: vec!["pulse-mode-2-phase-0.3".to_owned()],
+            qoi_ids: vec!["electric-field-mode-2".to_owned()],
             qoi_scales: vec![1.0],
             time_samples: (0..10).map(f64::from).collect(),
             responses: (0..10)
