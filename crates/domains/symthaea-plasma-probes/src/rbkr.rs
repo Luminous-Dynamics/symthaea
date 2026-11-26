@@ -1197,10 +1197,7 @@ mod tests {
             scenario_weight: 1.0,
         };
         assert_eq!(
-            aggregate_response_gramians(
-                &[scenario],
-                ResponseGramianAggregationConfig::default(),
-            ),
+            aggregate_response_gramians(&[scenario], ResponseGramianAggregationConfig::default(),),
             Err(RbkrError::EmptyScenarioGramian)
         );
     }
