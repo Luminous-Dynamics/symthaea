@@ -1,0 +1,266 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://github.com/Luminous-Dynamics/symthaea/blob/main/tools/mel-temporal-grounding-qualifier/schemas/mel-audio-evidence-window-v1.schema.json",
+  "title": "MEL audio evidence window manifest v1",
+  "type": "object",
+  "additionalProperties": false,
+  "required": [
+    "schema",
+    "experiment_unit_id",
+    "target_source_lineage_id",
+    "source_lineage_id",
+    "query_id",
+    "query_text",
+    "query_text_sha256",
+    "model_identity_sha256",
+    "runtime_identity_sha256",
+    "decoding_config_sha256",
+    "evidence_condition",
+    "target_audio_sha256",
+    "source_audio",
+    "decoded_pcm",
+    "windows",
+    "request_body",
+    "context"
+  ],
+  "properties": {
+    "schema": {
+      "const": "mel-audio-evidence-window-v1"
+    },
+    "experiment_unit_id": {
+      "type": "string",
+      "minLength": 1
+    },
+    "query_id": {
+      "type": "string",
+      "minLength": 1
+    },
+    "query_text_sha256": {
+      "type": "string",
+      "pattern": "^[0-9a-f]{64}$"
+    },
+    "model_identity_sha256": {
+      "type": "string",
+      "pattern": "^[0-9a-f]{64}$"
+    },
+    "runtime_identity_sha256": {
+      "type": "string",
+      "pattern": "^[0-9a-f]{64}$"
+    },
+    "decoding_config_sha256": {
+      "type": "string",
+      "pattern": "^[0-9a-f]{64}$"
+    },
+    "evidence_condition": {
+      "enum": [
+        "LocalRetrieved",
+        "YokedRetrieved"
+      ]
+    },
+    "target_audio_sha256": {
+      "type": "string",
+      "pattern": "^[0-9a-f]{64}$"
+    },
+    "source_audio": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "audio_sha256",
+        "byte_length",
+        "rights_scope_receipt_sha256"
+      ],
+      "properties": {
+        "audio_sha256": {
+          "type": "string",
+          "pattern": "^[0-9a-f]{64}$"
+        },
+        "byte_length": {
+          "type": "integer",
+          "minimum": 0
+        },
+        "rights_scope_receipt_sha256": {
+          "type": "string",
+          "pattern": "^[0-9a-f]{64}$"
+        }
+      }
+    },
+    "decoded_pcm": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "pcm_sha256",
+        "byte_length",
+        "sample_rate_hz",
+        "channels",
+        "total_frames",
+        "sample_format",
+        "decoder_identity_sha256",
+        "decode_profile_sha256"
+      ],
+      "properties": {
+        "pcm_sha256": {
+          "type": "string",
+          "pattern": "^[0-9a-f]{64}$"
+        },
+        "byte_length": {
+          "type": "integer",
+          "minimum": 0
+        },
+        "sample_rate_hz": {
+          "type": "integer",
+          "minimum": 1
+        },
+        "channels": {
+          "type": "integer",
+          "minimum": 1,
+          "maximum": 65535
+        },
+        "total_frames": {
+          "type": "integer",
+          "minimum": 1
+        },
+        "sample_format": {
+          "enum": [
+            "U8",
+            "S16Le",
+            "S24Le",
+            "S32Le",
+            "F32Le"
+          ]
+        },
+        "decoder_identity_sha256": {
+          "type": "string",
+          "pattern": "^[0-9a-f]{64}$"
+        },
+        "decode_profile_sha256": {
+          "type": "string",
+          "pattern": "^[0-9a-f]{64}$"
+        }
+      }
+    },
+    "windows": {
+      "type": "array",
+      "minItems": 1,
+      "items": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": [
+          "window_id",
+          "start_frame",
+          "end_frame",
+          "window_pcm_sha256"
+        ],
+        "properties": {
+          "window_id": {
+            "type": "string",
+            "minLength": 1
+          },
+          "start_frame": {
+            "type": "integer",
+            "minimum": 0
+          },
+          "end_frame": {
+            "type": "integer",
+            "minimum": 1
+          },
+          "window_pcm_sha256": {
+            "type": "string",
+            "pattern": "^[0-9a-f]{64}$"
+          }
+        }
+      }
+    },
+    "context": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "prompt_sha256",
+        "adapter_sha256",
+        "retrieval_policy_sha256",
+        "items",
+        "context_manifest_sha256"
+      ],
+      "properties": {
+        "prompt_sha256": {
+          "type": "string",
+          "pattern": "^[0-9a-f]{64}$"
+        },
+        "adapter_sha256": {
+          "type": "string",
+          "pattern": "^[0-9a-f]{64}$"
+        },
+        "retrieval_policy_sha256": {
+          "type": "string",
+          "pattern": "^[0-9a-f]{64}$"
+        },
+        "items": {
+          "type": "array",
+          "minItems": 1,
+          "items": {
+            "type": "object",
+            "additionalProperties": false,
+            "required": [
+              "position",
+              "window_id",
+              "payload_sha256"
+            ],
+            "properties": {
+              "position": {
+                "type": "integer",
+                "minimum": 0,
+                "maximum": 4294967295
+              },
+              "window_id": {
+                "type": "string",
+                "minLength": 1
+              },
+              "payload_sha256": {
+                "type": "string",
+                "pattern": "^[0-9a-f]{64}$"
+              }
+            }
+          }
+        },
+        "context_manifest_sha256": {
+          "type": "string",
+          "pattern": "^[0-9a-f]{64}$"
+        }
+      }
+    },
+    "query_text": {
+      "type": "string",
+      "minLength": 1
+    },
+    "source_lineage_id": {
+      "type": "string",
+      "minLength": 1
+    },
+    "target_source_lineage_id": {
+      "type": "string",
+      "minLength": 1
+    },
+    "request_body": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "body_sha256",
+        "byte_length",
+        "content_type"
+      ],
+      "properties": {
+        "body_sha256": {
+          "type": "string",
+          "pattern": "^[0-9a-f]{64}$"
+        },
+        "byte_length": {
+          "type": "integer",
+          "minimum": 1
+        },
+        "content_type": {
+          "type": "string",
+          "minLength": 1
+        }
+      }
+    }
+  }
+}

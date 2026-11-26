@@ -11,3 +11,9 @@ pub mod evidence_digest;
 pub mod temporal_grounding;
 
 pub mod temporal_revision;
+
+pub mod audio_evidence_window;
+
+pub mod audio_revision_binding;
+
+pub mod audio_evidence_in_toto;

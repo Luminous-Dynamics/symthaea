@@ -64,3 +64,73 @@ V2 reports an observed edit class and a scorer-derived edit delta (predicted-cou
 - Other remains unclassified rather than being treated as verified.
 
 These checks reuse the production scorer's existing matches and TP/FP/FN; they do not introduce a second interval matcher. They assess whether the declared action is consistent with the observed change, not whether the model's internal reasoning was authentic or whether the named sub-action (for example, split vs add) is causally correct.
+
+
+## Exact audio evidence-window verifier
+
+The audio_evidence_window module recomputes SHA-256 over the exact source-audio bytes, decoded PCM bytes, each selected half-open PCM frame window, the ordered context manifest, and the full evidence manifest. Frame-to-byte offsets use checked integer arithmetic over channels × bytes-per-sample. The context digest binds the query-text digest, target/source audio, rights-scope receipt reference, PCM sample clock and format, decoder/profile identity, window coordinates, model/runtime/decoding identity, prompt/adapter/retrieval policy and exact context order.
+
+Run the synthetic CLI replay with:
+
+    cargo +1.96.0 run --locked --manifest-path tools/mel-temporal-grounding-qualifier/Cargo.toml --bin mel-audio-evidence-window-audit -- tools/mel-temporal-grounding-qualifier/fixtures/mel-audio-evidence-window.synthetic.json tools/mel-temporal-grounding-qualifier/fixtures/mel-audio-evidence-source.synthetic.bin tools/mel-temporal-grounding-qualifier/fixtures/mel-audio-evidence-pcm.synthetic.hex
+
+The decoded PCM fixture is stored as hexadecimal text and decoded to raw bytes by the CLI before hashing. The source-audio fixture is read byte-for-byte. The report marks rights, decoder, model/runtime and runner receipt authentication false; request-body recomputation and model-internal input attestation also remain false. A digest reference is not legal authority, a signed execution receipt or proof of internal model consumption. Those stages must compose with #13254 and the selected backend's attestation capability.
+
+
+## Exact audio evidence-window verifier (MEL-GROUND-009)
+
+The `audio_evidence_window` module verifies a versioned manifest against actual source-audio bytes and decoded PCM bytes. It recomputes the source-file SHA-256, full decoded-PCM SHA-256, each selected half-open frame-window SHA-256, the ordered context-manifest digest, and the canonical full-manifest digest.
+
+The context commitment includes the exact query-text digest, target/source audio identities, rights-scope receipt reference, PCM sample rate/channel/frame/sample-format tuple, decoder/profile identifiers, window coordinates and payload digests, model/runtime/decoding identities, prompt/adapter/retrieval policy, and exact ordered window list. Frame-to-byte offsets use checked integer arithmetic over channels × bytes-per-sample.
+
+Run:
+
+    cargo +1.96.0 run --locked --manifest-path tools/mel-temporal-grounding-qualifier/Cargo.toml --bin mel-audio-evidence-window-audit -- tools/mel-temporal-grounding-qualifier/fixtures/mel-audio-evidence-window.synthetic.json tools/mel-temporal-grounding-qualifier/fixtures/mel-audio-evidence-source.synthetic.bin tools/mel-temporal-grounding-qualifier/fixtures/mel-audio-evidence-pcm.synthetic.hex
+
+The decoded PCM fixture is stored as hexadecimal text and decoded to raw bytes by the CLI before hashing. The source-audio fixture is read byte-for-byte.
+
+This is a byte/coordinate verification layer only. The report explicitly keeps rights-scope authentication, decoder identity authentication, model/runtime identity authentication, runner-receipt verification, request-body recomputation and model-input attestation false. The digests are content commitments, not signatures. The receipt/authentication bridge remains owned by #13254; capture closure remains #13348/#13349.
+
+
+## Binding verified audio to revision trials
+
+The `audio_revision_binding` module provides `audit_revision_with_audio_evidence`. It invokes the raw-byte audio verifier and the production V2 temporal-revision scorer in one path, then joins experiment unit, source-work lineage, query text, target artifact, evidence condition, model/runtime/decoding configuration, prompt, adapter, retrieval policy and the exact selected window coordinates/payload digest.
+
+Local evidence must use the scored target's exact audio clock. Yoked evidence must remain a distinct source recording while retaining the same target query. A no-evidence revision case cannot be promoted by attaching an audio-window manifest. The resulting report says that materialized audio bytes are bound to the revision case but always keeps `model_input_attested=false`.
+
+This integration prevents a byte-valid manifest from being reused with a different query or revision arm. It remains a client-side evidence binding; provider/runtime input acceptance and internal model consumption require authenticated execution evidence from #13254.
+
+
+The evidence-window contract now distinguishes two work identities: `target_source_lineage_id` is the work being queried, while `source_lineage_id` is the work from which the audio window was materialized. LocalRetrieved requires equal lineages and the exact target audio digest. YokedRetrieved requires a different lineage and a different audio digest. A different encoding or crop from the same work is not accepted as a yoked source. The verification report returns both lineage IDs separately.
+
+The revision binding also requires the selected frame-range/payload tuple to match **exactly one** manifest window. A manifest with duplicate matching windows is rejected as ambiguous rather than picking an arbitrary occurrence.
+
+
+## Unsigned in-toto Statement consumer for #13254
+
+The `audio_evidence_in_toto` module emits a standard in-toto Statement v1 JSON payload for the verified audio↔revision join. Its subjects bind the source-audio bytes, decoded PCM, every selected window, ordered context manifest, full evidence manifest, byte-verification report and temporal-revision report. The predicate records the experiment/source lineages, query, target/evidence audio identities, model/runtime/decoder configuration, window byte coordinates and each achieved assurance stage.
+
+The payload type is `application/vnd.in-toto+json`; the function returns the exact statement JSON bytes and their SHA-256 so the existing #13254 DSSE signer/verifier can consume them. The target audio appears as a `target-audio-reference` subject because a yoked evidence run may not have supplied the target's raw bytes to this verifier.
+
+This module deliberately sets `dsse_envelope_created=false` and `signature_verified=false`. It does not implement DSSE, Sigstore, key distribution, trust roots, signer-role policy or transparency verification. A signed runner/provider receipt must be produced and verified by #13254 before any stronger execution or model-input claim is allowed.
+
+
+## Unsigned in-toto Statement payload
+
+Run the integrated byte-verification, temporal-revision join and in-toto Statement builder with:
+
+    cargo +1.96.0 run --locked --manifest-path tools/mel-temporal-grounding-qualifier/Cargo.toml --bin mel-audio-evidence-in-toto -- tools/mel-temporal-grounding-qualifier/fixtures/mel-audio-bound-revision.synthetic.json tools/mel-temporal-grounding-qualifier/fixtures/mel-audio-evidence-window.synthetic.json tools/mel-temporal-grounding-qualifier/fixtures/mel-audio-evidence-source.synthetic.bin tools/mel-temporal-grounding-qualifier/fixtures/mel-audio-evidence-pcm.synthetic.hex
+
+The CLI emits a wrapper containing the exact compact in-toto Statement v1 JSON bytes, payload type and payload SHA-256. Its subjects bind target-audio reference, source-audio bytes, decoded PCM, each window, context/full manifests, verification report and revision report. The predicate records `DigestLinked` evidence and keeps all trust/authentication flags false.
+
+This is unsigned payload material for #13254. It is not a DSSE envelope, it has no signature, and it must not be treated as authenticated provenance until the existing signer and independent verifier validate it under the configured trust-root/role policy.
+
+
+The in-toto predicate also exposes the decoded PCM sample rate, channel count, frame count and sample format; source/PCM byte lengths; decoder and decode-profile digests; plus the revision's maximum and actual output-token and wall-time budgets. These fields are inspectable in the Statement, while decoder/runtime/runner/rights/model-input authentication flags remain false. The exact payload bytes and SHA-256 are returned for the #13254 DSSE signer.
+
+
+## Verified evidence-ablation triplet gate
+
+Use `audio_revision_binding::audit_verified_audio_evidence_triplet` for confirmatory matched contrasts. It accepts one NoEvidence, one LocalRetrieved and one YokedRetrieved arm. The NoEvidence arm must have no evidence reference, manifest or byte payload. Both retrieved arms must provide their manifest plus raw source and decoded PCM bytes and pass the integrated byte/window/revision identity join before the function calls the existing matched-contrast evaluator.
+
+The returned report includes the paired contrast and the independently verified local/yoked materialization reports. It always leaves `model_input_attested=false`. This prevents a metadata-only revision triplet from receiving verified evidence-use credit, while preserving the distinction between materialized client-side bytes and a signed provider/runtime receipt.
