@@ -1,0 +1,96 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "SDCB_COMMON_CAUSE_MEASUREMENT_V1.schema.json",
+  "title": "SDCB common-cause measurement design episode v1",
+  "description": "Finite two-stage decision episode over scientific hypotheses, a shared binary common-cause state, and binary local states for up to three devices. Cross-field probability and calibration-independence rules are enforced by the Rust reference.",
+  "type": "object",
+  "additionalProperties": false,
+  "required": ["schema_version", "fixture_id", "description", "scientific_hypotheses", "device_ids", "joint_prior_order", "joint_prior", "actions", "scenarios", "candidates", "outcome_order", "resource_budget_units", "transition_assumption"],
+  "properties": {
+    "schema_version": { "const": "1.0.0" },
+    "fixture_id": { "type": "string", "minLength": 1 },
+    "description": { "type": "string", "minLength": 1 },
+    "scientific_hypotheses": {
+      "type": "array", "minItems": 2, "maxItems": 4,
+      "items": { "type": "string", "minLength": 1 }, "uniqueItems": true
+    },
+    "device_ids": {
+      "type": "array", "minItems": 1, "maxItems": 3,
+      "items": { "type": "string", "minLength": 1 }, "uniqueItems": true
+    },
+    "joint_prior_order": {
+      "const": "hypothesis-major; instrument_code bit 0 is shared g; bit (device_index + 1) is that device's local state"
+    },
+    "joint_prior": {
+      "type": "array", "minItems": 8, "maxItems": 32,
+      "items": { "type": "number", "minimum": 0, "maximum": 1 }
+    },
+    "actions": {
+      "type": "array", "minItems": 2, "maxItems": 3,
+      "items": { "type": "string", "minLength": 1 }, "uniqueItems": true
+    },
+    "scenarios": {
+      "type": "array", "minItems": 1, "maxItems": 4,
+      "items": {
+        "type": "object", "additionalProperties": false,
+        "required": ["scenario_id", "utility_by_hypothesis", "common_transition", "local_transition_by_device"],
+        "properties": {
+          "scenario_id": { "type": "string", "minLength": 1 },
+          "utility_by_hypothesis": {
+            "type": "array", "minItems": 2, "maxItems": 4,
+            "items": {
+              "type": "array", "minItems": 2, "maxItems": 3,
+              "items": { "type": "number" }
+            }
+          },
+          "common_transition": {
+            "type": "array", "minItems": 2, "maxItems": 2,
+            "items": {
+              "type": "array", "minItems": 2, "maxItems": 2,
+              "items": { "type": "number", "minimum": 0, "maximum": 1 }
+            }
+          },
+          "local_transition_by_device": {
+            "type": "array", "minItems": 1, "maxItems": 3,
+            "items": {
+              "type": "array", "minItems": 2, "maxItems": 2,
+              "items": {
+                "type": "array", "minItems": 2, "maxItems": 2,
+                "items": {
+                  "type": "array", "minItems": 2, "maxItems": 2,
+                  "items": { "type": "number", "minimum": 0, "maximum": 1 }
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "candidates": {
+      "type": "array", "minItems": 2, "maxItems": 3,
+      "items": {
+        "type": "object", "additionalProperties": false,
+        "required": ["experiment_id", "device_id", "role", "cost_units", "likelihoods_by_scenario"],
+        "properties": {
+          "experiment_id": { "type": "string", "minLength": 1 },
+          "device_id": { "type": "string", "minLength": 1 },
+          "role": { "enum": ["shared_reference_calibration", "scientific_measurement"] },
+          "cost_units": { "type": "integer", "minimum": 1 },
+          "likelihoods_by_scenario": {
+            "type": "array", "minItems": 1, "maxItems": 4,
+            "items": {
+              "type": "array", "minItems": 8, "maxItems": 16,
+              "items": {
+                "type": "array", "minItems": 2, "maxItems": 2,
+                "items": { "type": "number", "minimum": 0, "maximum": 1 }
+              }
+            }
+          }
+        }
+      }
+    },
+    "outcome_order": { "const": ["0", "1"] },
+    "resource_budget_units": { "type": "integer", "minimum": 1 },
+    "transition_assumption": { "type": "string", "minLength": 1 }
+  }
+}

@@ -1,0 +1,29 @@
+{
+  "schema_version": "1.0.0",
+  "fixture_id": "shared-common-cause-reference-control-v1",
+  "execution_kind": "independent_exhaustive_finite_policy_enumeration",
+  "rust_compiled_or_executed": false,
+  "selected_policy": {
+    "first_experiment_id": "shared-reference-calibration",
+    "second_experiments_by_first_outcome": ["science-a", "science-a"],
+    "actions_by_outcome_pair": ["choose-h0", "choose-h1", "choose-h1", "choose-h0"],
+    "scenario_values": [0.905, 0.743],
+    "worst_case_value": 0.743,
+    "baseline_action_id": "choose-h0",
+    "baseline_worst_case_value": 0.5,
+    "robust_gain": 0.243,
+    "expected_cost_by_scenario": [2.0, 2.0],
+    "maximum_path_cost": 2
+  },
+  "negative_controls": {
+    "same_device_repeat_best_value_by_scenario": [0.5, 0.5],
+    "cross_device_science_agreement_best_value_by_scenario": [0.5, 0.5],
+    "reason": "All science devices share the same unknown common-cause state. Different device IDs do not provide independent information about the scientific hypothesis when the common state is unobserved."
+  },
+  "analytical_identities": {
+    "stable_reference_then_science": "0.95^2 + 0.05^2 = 0.905",
+    "drifting_reference_then_science": "(1 + (2*0.95-1)*(2*0.95-1)*(1-2*0.20))/2 = 0.743",
+    "same_or_cross_device_science_only": "0.5 under the symmetric h XOR g observation model"
+  },
+  "claim_boundary": "These are finite analytical controls, not measurements of physical sensors, external benchmark results, or a SOTA comparison."
+}
