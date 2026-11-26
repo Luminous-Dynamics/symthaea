@@ -196,9 +196,6 @@ impl DecisionRetrievalOptionV1 {
             || (require_calibrated_likelihoods
                 && (self.likelihood_ppm_by_state.len() != states
                     || self.likelihood_ppm_by_state.iter().any(|row| row.len() != observations)))
-            || (!self.likelihood_ppm_by_state.is_empty()
-                && (self.likelihood_ppm_by_state.len() != states
-                    || self.likelihood_ppm_by_state.iter().any(|row| row.len() != observations)))
         {
             return Err(DecisionValueRejectV1::InvalidDimensions);
         }
@@ -207,14 +204,21 @@ impl DecisionRetrievalOptionV1 {
                 return Err(DecisionValueRejectV1::InvalidObservationSupport);
             }
         }
-        if require_calibrated_likelihoods || !self.likelihood_ppm_by_state.is_empty() {
-            for likelihoods in &self.likelihood_ppm_by_state {
+        if require_calibrated_likelihoods {
+            for (likelihoods, support) in self.likelihood_ppm_by_state
+                .iter().zip(self.possible_observation_by_state.iter())
+            {
                 let sum = likelihoods.iter().try_fold(0_u64, |total, value| {
                     if *value > 1_000_000 { return None; }
                     total.checked_add(u64::from(*value))
                 }).ok_or(DecisionValueRejectV1::InvalidProbability)?;
                 if sum != 1_000_000 {
                     return Err(DecisionValueRejectV1::InvalidProbability);
+                }
+                if likelihoods.iter().zip(support.iter())
+                    .any(|(probability, possible)| *probability > 0 && !possible)
+                {
+                    return Err(DecisionValueRejectV1::InvalidObservationSupport);
                 }
             }
         }
