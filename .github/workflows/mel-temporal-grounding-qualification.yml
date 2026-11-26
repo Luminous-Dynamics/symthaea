@@ -4,9 +4,11 @@ on:
   push:
     branches:
       - research/mel-temporal-grounding-count-gated-f1-v1-20261124
+      - research/mel-multi-annotator-grounding-v1-20261124
       - research/mel-temporal-revision-audit-v1-20261124
       - research/mel-multi-annotator-grounding-v1-20261124
       - research/mel-annotator-reliability-corpus-v1-20261125
+      - research/mel-temporal-unitizing-alpha-u-v1-20261126
     paths:
       - "crates/domains/symthaea-muse/src/temporal_grounding.rs"
       - "crates/domains/symthaea-muse/src/evidence_digest.rs"
@@ -150,6 +152,42 @@ jobs:
             and .source_work_bootstrap_computed == false
           ' "$RUNNER_TEMP/temporal-reliability-report.json" > /dev/null
 
+      - name: Replay corrected multi-rater unitizing alpha-u corpus when module is present
+        if: hashFiles('tools/mel-temporal-grounding-qualifier/src/temporal_unitizing.rs') != ''
+        shell: bash
+        run: |
+          set -euo pipefail
+          cargo +1.96.0 run --locked --manifest-path tools/mel-temporal-grounding-qualifier/Cargo.toml --bin mel-temporal-unitizing-audit -- tools/mel-temporal-grounding-qualifier/fixtures/mel-temporal-unitizing-alpha-u.synthetic.json > "$RUNNER_TEMP/temporal-unitizing-report.json"
+          jq -e '
+            .schema == "mel-temporal-unitizing-alpha-u-report-v1"
+            and .evaluator_version == "mel-temporal-unitizing-alpha-u-v1"
+            and .summary.item_count == 3
+            and .summary.scored_item_count == 2
+            and .summary.insufficient_eligible_items == 1
+            and .summary.total_annotation_records == 11
+            and .summary.total_eligible_unitizations == 7
+            and .summary.excluded_ambiguous == 2
+            and .summary.excluded_not_estimable == 2
+            and .summary.source_work_clusters == 2
+            and .item_results[0].status == "Scored"
+            and .item_results[0].eligible_unitizers == 3
+            and .item_results[0].coefficients.u_alpha_nominal != null
+            and .item_results[0].coefficients.u_alpha_binary != null
+            and .item_results[1].status == "Scored"
+            and .item_results[1].coefficients.u_alpha_nominal == 1.0
+            and .item_results[1].coefficients.u_alpha_binary == 1.0
+            and .item_results[1].coefficients.cu_alpha_nominal == null
+            and .item_results[2].status == "InsufficientEligibleUnitizers"
+            and .item_results[2].eligible_unitizers == 1
+            and .unitizing_alpha_computed == true
+            and .consensus_ground_truth_created == false
+            and .pooled_continuum_alpha_computed == false
+            and .population_confidence_interval_computed == false
+            and .source_work_bootstrap_computed == false
+            and .model_performance_scored == false
+            and .annotation_receipts_authenticated == false
+          ' "$RUNNER_TEMP/temporal-unitizing-report.json" > /dev/null
+
       - name: Replay paired temporal revision when module is present
         if: hashFiles('tools/mel-temporal-grounding-qualifier/src/temporal_revision.rs') != ''
         shell: bash
@@ -209,6 +247,15 @@ jobs:
           cp crates/domains/symthaea-muse/src/temporal_grounding.rs "$evidence/"
           cp crates/domains/symthaea-muse/src/evidence_digest.rs "$evidence/"
           cp docs/research/MEL-GROUND-001-TEMPORAL-GROUNDING-SCORER-V1.md "$evidence/"
+          if [[ -f tools/mel-temporal-grounding-qualifier/src/temporal_unitizing.rs ]]; then
+            cp tools/mel-temporal-grounding-qualifier/src/temporal_unitizing.rs "$evidence/"
+            cp tools/mel-temporal-grounding-qualifier/src/bin/mel-temporal-unitizing-audit.rs "$evidence/"
+            cp tools/mel-temporal-grounding-qualifier/fixtures/mel-temporal-unitizing-alpha-u.synthetic.json "$evidence/"
+            cp docs/research/MEL-GROUND-008-UNITIZING-ALPHA-U-V1.md "$evidence/"
+            if [[ -f "$RUNNER_TEMP/temporal-unitizing-report.json" ]]; then
+              cp "$RUNNER_TEMP/temporal-unitizing-report.json" "$evidence/"
+            fi
+          fi
           if [[ -f tools/mel-temporal-grounding-qualifier/src/temporal_reliability.rs ]]; then
             cp tools/mel-temporal-grounding-qualifier/src/temporal_reliability.rs "$evidence/"
             cp tools/mel-temporal-grounding-qualifier/src/bin/mel-temporal-reliability-audit.rs "$evidence/"
