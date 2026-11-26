@@ -65,7 +65,7 @@ The binary lower/upper boundary pair in the unit fixtures is not sufficient for 
 Each pair binds:
 - pair/domain/environment-family/independent-cluster IDs;
 - perturbation dimension and the two side perturbation values;
-- common initial-state, realized-action and candidate-checkpoint digests;
+- a pair-source manifest digest, distinct success-side and failure-side scene digests, the reference policy configuration/checkpoint, and the frozen candidate checkpoint;
 - reference success counts and trial counts for both the success-labelled and failure-labelled scene variants;
 - candidate-predicted success counts and trial counts for both variants.
 
@@ -80,11 +80,13 @@ For each side, the evaluator calculates success rate in basis points. It reports
 - boundary-presence agreement and gap-direction agreement;
 - per-cluster pair counts and boundary-detection summaries.
 
+The two scene variants are perturbations of a shared source pair manifest, but their scene digests must differ. The reference policy identity and checkpoint are frozen across one evaluation; run separate evaluations for different policy configurations. The policy's closed-loop action traces on each side may differ, so this score measures scene-boundary fidelity under the same policy, not an identical-action causal effect. When action transcripts are available, retain their digests as additional provenance; the public dataset README does not list action-trace files in its episode schemas.
+
 The minimum detectable gap is preregistered in `FailureFidelityContract.minimum_boundary_gap_basis_points`. The current synthetic fixture uses 2,000 basis points (20 percentage points) as an example only; an external benchmark adapter must pin the threshold and side semantics to the benchmark protocol before evaluating a candidate. This is a scorecard option, not a replacement for WorldFailBench's published boundary metric.
 
 The scorecard does **not** assume the success side corresponds to a smaller numeric perturbation. The dataset's position, orientation and size dimensions can have different directions; labels in the evaluator manifest determine which scene is the success side and which is the failure side.
 
-The current API still does not reproduce the original WorldFailBench boundary scoring code. Its site describes that evaluation code as not yet released. The adapter must preserve dataset side metadata, policy variants, task/pair identities, all 10 rollout outcomes per side and the benchmark's factor-specific reporting. Do not compare a one-pair mean rate score directly against the paper's published aggregate.
+The current API still does not reproduce the original WorldFailBench boundary scoring code. Its site describes that evaluation code as not yet released. The adapter must preserve dataset side metadata, policy variant, task/pair identities, the pair manifest and both side-scene digests, all 10 rollout outcomes per side and the benchmark's factor-specific reporting. The two side trajectories are policy rollouts in perturbed scenes; do not label them identical-action counterfactuals. Do not compare a one-pair mean rate score directly against the paper's published aggregate.
 
 ## Statistical and evidence rules
 
@@ -104,7 +106,7 @@ WorldFailBench asks whether world models reproduce the observable reason a robot
 
 The documented public simulator release lists 5,000 RoboTwin and 1,500 LIBERO episodes (6,500). A separate boundary set lists 120 pairs and 2,400 rollouts (10 rollouts per side). The additional 400 G1 reference rollouts in paper scope are not part of those documented public simulator counts. The dataset's failure taxonomy includes Task Planning Failure, Action Execution Failure and Indeterminate/Unjudgable; stage annotations can be unknown.
 
-The linked Hugging Face dataset card and DAXIAORobotics/WorldFailBench dataset repository declare Apache-2.0. The separate tangxiaoyang18/WorldFailBench public project-site README says the evaluation code is not yet released. The open dataset documentation is therefore not the original executable scorer. Before dataset admission, pin the exact archive revision, compute SHA-256, inventory all files, check the license for all referenced assets and record policy/checkpoint provenance.
+The linked Hugging Face dataset card and DAXIAORobotics/WorldFailBench dataset repository declare Apache-2.0. The separate tangxiaoyang18/WorldFailBench public project-site README says the evaluation code is not yet released. The open dataset documentation is therefore not the original executable scorer. Before dataset admission, pin the exact archive revision, compute SHA-256, inventory all files, check the license for all referenced assets, and record the exact reference-policy checkpoint. The release README names policy configurations but does not provide a checkpoint SHA-256 in its episode metadata; without independently resolving the exact checkpoint, keep the data at metadata-only / not-qualified status.
 
 The website's published RoboTwin score table gives its Ref–Ref diagnostic TFE 0.061, SFE 0.094, TPC 0.814 and SPC 0.903. Across the seven world-model rows, DW05 has the lowest listed TFE (0.159) and highest listed TPC (0.402); Ctrl has the highest listed world-model SPC (0.095). TFE/SFE are lower-is-better and TPC/SPC higher-is-better. These metrics are not combined into one score, and the public results site does not publish a single pooled boundary score. This is a benchmark-reported snapshot, not a Symthaea comparison.
 
