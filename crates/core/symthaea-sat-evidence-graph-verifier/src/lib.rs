@@ -566,7 +566,7 @@ fn check_supported_claims(
     issues: &mut Vec<VerificationIssue>,
 ) -> (usize, usize) {
     let mut supported_count = 0;
-    let mut admissible_count = 0;
+    let mut own_admissible: HashMap<String, bool> = HashMap::new();
 
     for claim in claims.iter().filter(|claim| claim.status == "supported") {
         supported_count += 1;
@@ -678,34 +678,115 @@ fn check_supported_claims(
             }
         }
 
+        own_admissible.insert(claim.claim_id.clone(), admissible);
+    }
+
+    // Propagate admissibility through the complete dependency DAG. A claim's
+    // own evidence can be sound while one of its premises is not; status labels
+    // alone must never let that dependent claim pass.
+    let mut remaining_dependencies: HashMap<String, usize> =
+        claims.iter().map(|claim| (claim.claim_id.clone(), 0)).collect();
+    let mut dependents: HashMap<String, Vec<String>> = HashMap::new();
+
+    for claim in claims {
         for dependency in &claim.depends_on {
-            match claims_by_id.get(dependency) {
-                Some(required) if required.status == "supported" && required.validity_state == "current" => {}
-                Some(_) => {
-                    issue(
-                        issues,
-                        "supported_claim_has_unsupported_dependency",
-                        format!("{base_path}.depends_on"),
-                        format!("dependency {dependency} is not both supported and current"),
-                    );
-                    admissible = false;
-                }
-                None => {
-                    issue(
-                        issues,
-                        "unknown_claim_dependency",
-                        format!("{base_path}.depends_on"),
-                        format!("claim dependency {dependency} does not resolve"),
-                    );
-                    admissible = false;
-                }
+            if claims_by_id.contains_key(dependency) {
+                *remaining_dependencies.entry(claim.claim_id.clone()).or_insert(0) += 1;
+                dependents
+                    .entry(dependency.clone())
+                    .or_default()
+                    .push(claim.claim_id.clone());
+            } else if claim.status == "supported" {
+                issue(
+                    issues,
+                    "unknown_claim_dependency",
+                    format!("claims.{}.depends_on", claim.claim_id),
+                    format!("claim dependency {dependency} does not resolve"),
+                );
+                own_admissible.insert(claim.claim_id.clone(), false);
+            }
+        }
+    }
+
+    let mut ready = VecDeque::new();
+    for claim in claims {
+        if remaining_dependencies.get(&claim.claim_id).copied().unwrap_or(0) == 0 {
+            ready.push_back(claim.claim_id.clone());
+        }
+    }
+
+    let mut final_admissible: HashMap<String, bool> = HashMap::new();
+    let mut dependency_failed: HashSet<String> = HashSet::new();
+
+    while let Some(claim_id) = ready.pop_front() {
+        let claim = match claims_by_id.get(&claim_id) {
+            Some(claim) => *claim,
+            None => continue,
+        };
+        let mut passes = own_admissible.get(&claim_id).copied().unwrap_or(false)
+            && claim.status == "supported"
+            && claim.validity_state == "current";
+
+        if dependency_failed.contains(&claim_id) {
+            passes = false;
+            if claim.status == "supported" {
+                let failed: Vec<_> = claim
+                    .depends_on
+                    .iter()
+                    .filter(|dependency| {
+                        final_admissible.get(*dependency).copied() == Some(false)
+                    })
+                    .cloned()
+                    .collect();
+                issue(
+                    issues,
+                    "supported_claim_has_inadmissible_dependency",
+                    format!("claims.{claim_id}.depends_on"),
+                    format!("one or more transitive premises failed declared-state admissibility: {}", failed.join(", ")),
+                );
             }
         }
 
-        if admissible {
-            admissible_count += 1;
+        final_admissible.insert(claim_id.clone(), passes);
+
+        if let Some(children) = dependents.get(&claim_id) {
+            for child in children {
+                if !passes {
+                    dependency_failed.insert(child.clone());
+                }
+                if let Some(remaining) = remaining_dependencies.get_mut(child) {
+                    *remaining = remaining.saturating_sub(1);
+                    if *remaining == 0 {
+                        ready.push_back(child.clone());
+                    }
+                }
+            }
         }
     }
+
+    // Any node not reached by Kahn's traversal is in or downstream of a cycle.
+    // The global cycle diagnostic is emitted by the graph-cycle check as well.
+    for claim in claims {
+        if !final_admissible.contains_key(&claim.claim_id) {
+            if claim.status == "supported" {
+                issue(
+                    issues,
+                    "supported_claim_dependency_unresolved",
+                    format!("claims.{}.depends_on", claim.claim_id),
+                    "dependency could not be resolved through an acyclic admissibility order",
+                );
+            }
+            final_admissible.insert(claim.claim_id.clone(), false);
+        }
+    }
+
+    let admissible_count = claims
+        .iter()
+        .filter(|claim| {
+            claim.status == "supported"
+                && final_admissible.get(&claim.claim_id).copied() == Some(true)
+        })
+        .count();
 
     (supported_count, admissible_count)
 }
@@ -1056,6 +1137,12 @@ pub fn verify_augmentation(input: &str) -> Result<VerificationReport, String> {
             "recorded root does not match the normalized graph payload",
         );
     }
+
+    issues.sort_by(|left, right| {
+        utf16_cmp(&left.code, &right.code)
+            .then_with(|| utf16_cmp(&left.path, &right.path))
+            .then_with(|| utf16_cmp(&left.message, &right.message))
+    });
 
     let semantic_valid = issues
         .iter()
