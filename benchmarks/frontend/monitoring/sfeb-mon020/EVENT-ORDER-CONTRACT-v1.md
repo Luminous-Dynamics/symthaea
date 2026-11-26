@@ -146,32 +146,36 @@ Targets are prospective, not achieved results. Finite-case zero failures are not
 
 ## 12. Executable reference and local preflight
 
-The standard-library Go package in `event-order/` consumes normalized verifier reports. It independently checks source identity, separate control-root membership, event-record digest binding, witness digest/event identity binding, source-local sequence uniqueness, same-source order, independent cross-source handoff, generation-before-use, generation/use-before-invalidation, activity start/end boundaries and order-graph acyclicity. It does not perform cryptographic verification itself.
+The standard-library Go package in `event-order/` consumes normalized verifier reports under the pinned `mon020-normalized-evidence-v1` profile. It checks source identity and separate control-root membership, exact normalized event and witness fields, source-local sequence uniqueness, same-source ordering, independent cross-source handoffs, generation-before-use, generation/use-before-invalidation, activity start/end boundaries and order-graph acyclicity.
+
+An entity used or invalidated without exactly one authenticated generation event is **indeterminate**. A verified signature report whose normalized event fields do not match the event projection being ordered is **denied**. A witness report must bind the exact predecessor and successor IDs. This prevents a valid signature report over one record from being attached to a different parsed event or handoff.
 
 Local reconstructed-source preflight (not an exact remote checkout replay):
 
 - `go test -race -count=5 ./...`: PASS.
 - `go vet ./...`: PASS.
-- `go test -count=1 -cover ./...`: PASS, 89.5% statement coverage.
-- `go test -run=^$ -fuzz=FuzzSequenceOrder -fuzztime=2s`: PASS, 67,732 executions in the recorded run.
+- `go test -count=1 -cover ./...`: PASS, 88.0% statement coverage.
+- `go test -run=^$ -fuzz=FuzzSequenceOrder -fuzztime=2s`: PASS, 70,950 executions in the recorded run.
 - 22 named tests plus one fuzz target.
 
-The 23-case JSON scenario file remains descriptive seed data, not yet fully parameterized executable fixtures. The remote branch was not cloned/replayed locally because GitHub DNS resolution was unavailable. Hosted CI, JSON Schema validator execution, upstream cryptographic vectors and independent holdout review remain pending.
+The seed corpus contains 23 descriptive scenarios, including 6 positive controls; it is not yet fully parameterized executable fixtures. The remote branch was not cloned/replayed locally because GitHub DNS resolution was unavailable. Hosted CI, JSON Schema validator execution, upstream cryptographic vectors and blind independent holdouts remain pending.
 
-Exploratory Go microbenchmarks (Go 1.23.2, Linux amd64, Intel Xeon Platinum 8573C; three iterations per point):
+### Exploratory performance results
 
-| Workload | Events / witnesses | ns/op | MB allocated/op |
-|---|---:|---:|---:|
-| Same-source ordering | 24 events | 109,263 | 0.076 |
-| Same-source ordering | 204 events | 947,060 | 0.671 |
-| Same-source ordering | 2,004 events | 13,638,079 | 7.555 |
-| Same-source ordering | 20,004 events | 153,026,250 | 84.555 |
-| Cross-source handoffs | 10 witnesses | 99,876 | 0.084 |
-| Cross-source handoffs | 100 witnesses | 901,064 | 0.734 |
-| Cross-source handoffs | 1,000 witnesses | 12,866,927 | 8.498 |
-| Cross-source handoffs | 5,000 witnesses | 66,858,275 | 46.499 |
+Go 1.23.2, Linux amd64, Intel Xeon Platinum 8573C, three measured iterations per point:
 
-These measurements include only in-memory semantic checks and synthetic normalized verifier reports. They do not include actual signature verification, remote source collection, independent witness services, event-stream completeness, network, storage, PostgreSQL/Holochain, action effects or physical instrumentation. Three iterations are directional only and do not support stable p95/p99 claims.
+| Workload | Events / witnesses | ns/op | MB allocated/op | allocs/op |
+|---|---:|---:|---:|---:|
+| Same-source ordering | 24 events | 119,278 | 0.082 | 221 |
+| Same-source ordering | 204 events | 1,096,538 | 0.712 | 1,534 |
+| Same-source ordering | 2,004 events | 12,007,756 | 7.976 | 16,121 |
+| Same-source ordering | 20,004 events | 234,743,413 | 88.709 | 162,243 |
+| Cross-source handoffs | 10 witnesses | 100,166 | 0.093 | 271 |
+| Cross-source handoffs | 100 witnesses | 1,502,315 | 0.798 | 1,869 |
+| Cross-source handoffs | 1,000 witnesses | 21,323,172 | 9.117 | 18,963 |
+| Cross-source handoffs | 5,000 witnesses | 78,169,076 | 49.630 | 95,862 |
+
+These are in-memory semantic microbenchmarks. They exclude cryptographic verification, actual transport, external source collection, capture completeness, remote witness services, storage durability, PostgreSQL/Holochain, dispatch, destination readback and physical instrumentation. Three iterations do not support stable p95/p99 claims.
 
 ## 13. Claim ceiling
 
