@@ -433,6 +433,14 @@ fn validate_context(
     Ok(())
 }
 
+/// Recompute the context commitment for a manifest producer. The verifier
+/// still recomputes it from the received manifest before accepting the bytes.
+pub fn recompute_audio_context_manifest_sha256(
+    manifest: &AudioEvidenceWindowManifestV1,
+) -> Result<String, String> {
+    context_digest(manifest)
+}
+
 fn context_digest(manifest: &AudioEvidenceWindowManifestV1) -> Result<String, String> {
     let payload = EvidenceContextDigestPayloadV1 {
         schema: "mel-audio-evidence-context-v1",
