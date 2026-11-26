@@ -22,7 +22,7 @@ fn all_single_symbol_error_positions_and_byte_lanes_are_corrected() {
             let (recovered, corrected) =
                 mds_recover_errors_and_erasures(damaged).unwrap();
 
-            assert_eq!(&recovered[..DATA_SHARDS], &data);
+            assert_eq!(&recovered[..DATA_SHARDS], &data[..]);
             assert_eq!(corrected, 1, "shard={shard}, byte_offset={byte_offset}");
         }
     }
