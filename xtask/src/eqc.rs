@@ -630,16 +630,17 @@ mod tests {
     #[test]
     fn public_seed_reference_passes_and_baselines_fail_their_controls() {
         let root = repository_root();
-        let report = validate_corpus_file(
-            &root.join("docs/research/eqc-seed-corpus-v0.1.json"),
-            &root,
-        )
-        .expect("seed validates");
+        let report =
+            validate_corpus_file(&root.join("docs/research/eqc-seed-corpus-v0.1.json"), &root)
+                .expect("seed validates");
         assert_eq!(report.task_count, 4);
         assert_eq!(report.reference_pass_count, 4);
         assert!(report.no_op_fails_positive_controls);
         assert!(report.allow_all_fails_negative_controls);
-        assert_eq!(report.evaluation_mode, "reference_contract_only_not_system_under_test");
+        assert_eq!(
+            report.evaluation_mode,
+            "reference_contract_only_not_system_under_test"
+        );
     }
 
     #[test]
