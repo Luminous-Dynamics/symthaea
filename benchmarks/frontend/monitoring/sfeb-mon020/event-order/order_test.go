@@ -5,9 +5,9 @@ import "testing"
 func dig(subject,value,purpose string)DigestRef{return DigestRef{"sha-256","event-order-test","1","application/json","jcs",purpose,subject,value}}
 func base() (Input,map[string]VerifierPin) {
 	sources:=[]Source{
-		{ID:"db",ControlRoot:"db-root",IdentityDigest:dig("db","db-key","source-identity")},
-		{ID:"agent",ControlRoot:"agent-root",IdentityDigest:dig("agent","agent-key","source-identity")},
-		{ID:"observer",ControlRoot:"observer-root",IdentityDigest:dig("observer","observer-key","source-identity")},
+		{ID:"db",ControlRoot:"db-root",IdentityDigest:dig("db","db-key","source-identity"),ControlRootDigest:dig("db","db-root","control-root-membership")},
+		{ID:"agent",ControlRoot:"agent-root",IdentityDigest:dig("agent","agent-key","source-identity"),ControlRootDigest:dig("agent","agent-root","control-root-membership")},
+		{ID:"observer",ControlRoot:"observer-root",IdentityDigest:dig("observer","observer-key","source-identity"),ControlRootDigest:dig("observer","observer-root","control-root-membership")},
 	}
 	events:=[]Event{
 		{ID:"start-a",Kind:ActivityStarted,SubjectID:"a",ActivityID:"a",SourceID:"agent",Sequence:1,RecordDigest:dig("start-a","s1","event")},
@@ -19,11 +19,12 @@ func base() (Input,map[string]VerifierPin) {
 	}
 	reports:=[]VerifierReport{}
 	mk:=func(id string,d DigestRef) VerifierReport{return VerifierReport{SubjectID:id,InputDigest:d,Status:"verified",VerifierID:"v1",Version:"1",BuildDigest:"b1",TrustStoreDigest:"roots1",VerifiedAt:10,FreshUntil:1000}}
-	for _,s:=range sources { reports=append(reports,mk("source:"+s.ID,s.IdentityDigest)) }
+	for _,s:=range sources { reports=append(reports,mk("source:"+s.ID,s.IdentityDigest),mk("control-root:"+s.ID,s.ControlRootDigest)) }
 	for _,e:=range events { reports=append(reports,mk("event:"+e.ID,e.RecordDigest)) }
 	return Input{Sources:sources,Events:events,Reports:reports,EvaluationAt:100},map[string]VerifierPin{"v1":{"v1","1","b1","roots1"}}
 }
 func want(t *testing.T,in Input,p map[string]VerifierPin,d Decision){t.Helper();r:=Evaluate(in,p);if r.Decision!=d{t.Fatalf("got %s (%s), want %s",r.Decision,r.Reason,d)}}
+func moveActivityBToDB(in *Input){for i:=range in.Events{if in.Events[i].ActivityID=="b"{in.Events[i].SourceID="db";switch in.Events[i].ID{case "start-b":in.Events[i].Sequence=1;case "use-x":in.Events[i].Sequence=2;case "end-b":in.Events[i].Sequence=3}}}}
 func TestSameSourceGenerationPrecedesUse(t *testing.T){in,p:=base();want(t,in,p,Qualified)}
 func TestSameSourceUseBeforeGenerationDenied(t *testing.T){
 	in,p:=base();for i:=range in.Events{if in.Events[i].ID=="gen-x"{in.Events[i].Sequence=8};if in.Events[i].ID=="use-x"{in.Events[i].Sequence=5}}
@@ -46,7 +47,7 @@ func TestCrossSourceIndependentWitnessQualifies(t *testing.T){
 	in,p:=base()
 	// move activity b and its events to a second source; witness source remains a distinct control root.
 	for i:=range in.Events{if in.Events[i].ActivityID=="b"{in.Events[i].SourceID="db";if in.Events[i].ID=="start-b"{in.Events[i].Sequence=1};if in.Events[i].ID=="use-x"{in.Events[i].Sequence=2};if in.Events[i].ID=="end-b"{in.Events[i].Sequence=3}}}
-	d:=dig("handoff","g-before-u","order-witness")
+	d:=dig("handoff-1","g-before-u","order-witness")
 	in.Witnesses=[]OrderWitness{{ID:"handoff-1",BeforeEventID:"gen-x",AfterEventID:"use-x",WitnessSourceID:"observer",EvidenceDigest:d}}
 	in.Reports=append(in.Reports,VerifierReport{SubjectID:"witness:handoff-1",InputDigest:d,Status:"verified",VerifierID:"v1",Version:"1",BuildDigest:"b1",TrustStoreDigest:"roots1",VerifiedAt:10,FreshUntil:1000})
 	want(t,in,p,Qualified)
@@ -54,7 +55,7 @@ func TestCrossSourceIndependentWitnessQualifies(t *testing.T){
 func TestWitnessSharesEndpointRootIndeterminate(t *testing.T){
 	in,p:=base()
 	for i:=range in.Events{if in.Events[i].ActivityID=="b"{in.Events[i].SourceID="db";if in.Events[i].ID=="start-b"{in.Events[i].Sequence=1};if in.Events[i].ID=="use-x"{in.Events[i].Sequence=2};if in.Events[i].ID=="end-b"{in.Events[i].Sequence=3}}}
-	d:=dig("handoff","h","order-witness")
+	d:=dig("w","h","order-witness")
 	in.Witnesses=[]OrderWitness{{ID:"w",BeforeEventID:"gen-x",AfterEventID:"use-x",WitnessSourceID:"db",EvidenceDigest:d}}
 	in.Reports=append(in.Reports,VerifierReport{SubjectID:"witness:w",InputDigest:d,Status:"verified",VerifierID:"v1",Version:"1",BuildDigest:"b1",TrustStoreDigest:"roots1",VerifiedAt:10,FreshUntil:1000})
 	want(t,in,p,Indeterminate)
@@ -78,8 +79,8 @@ func TestUseAfterInvalidationDenied(t *testing.T){
 func TestOrderWitnessCycleDivergent(t *testing.T){
 	in,p:=base()
 	moveActivityBToDB(&in)
-	d1:=dig("handoff-1","forward","order-witness")
-	d2:=dig("handoff-2","reverse","order-witness")
+	d1:=dig("forward","forward","order-witness")
+	d2:=dig("reverse","reverse","order-witness")
 	in.Witnesses=[]OrderWitness{
 		{ID:"forward",BeforeEventID:"gen-x",AfterEventID:"use-x",WitnessSourceID:"observer",EvidenceDigest:d1},
 		{ID:"reverse",BeforeEventID:"use-x",AfterEventID:"gen-x",WitnessSourceID:"observer",EvidenceDigest:d2},
@@ -117,4 +118,21 @@ func TestOrderWitnessEvidenceMissingIndeterminate(t *testing.T) {
 	d := dig("handoff", "g-before-u", "order-witness")
 	in.Witnesses = []OrderWitness{{ID: "handoff-1", BeforeEventID: "gen-x", AfterEventID: "use-x", WitnessSourceID: "observer", EvidenceDigest: d}}
 	want(t, in, p, Indeterminate)
+}
+
+func TestUseWithoutGenerationIndeterminate(t *testing.T) {
+	in,p:=base()
+	for i,e:=range in.Events { if e.ID=="gen-x" { in.Events=append(in.Events[:i],in.Events[i+1:]...); break } }
+	for i,r:=range in.Reports { if r.SubjectID=="event:gen-x" { in.Reports=append(in.Reports[:i],in.Reports[i+1:]...); break } }
+	want(t,in,p,Indeterminate)
+}
+func TestEventDigestSubjectMismatchIndeterminate(t *testing.T) {
+	in,p:=base()
+	for i:=range in.Events { if in.Events[i].ID=="gen-x" { in.Events[i].RecordDigest.Subject="other-event" } }
+	want(t,in,p,Indeterminate)
+}
+func TestControlRootEvidenceMissingIndeterminate(t *testing.T) {
+	in,p:=base()
+	for i,r:=range in.Reports { if r.SubjectID=="control-root:observer" { in.Reports=append(in.Reports[:i],in.Reports[i+1:]...); break } }
+	want(t,in,p,Indeterminate)
 }
