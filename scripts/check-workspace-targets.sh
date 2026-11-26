@@ -32,6 +32,8 @@ EXCLUDES=(
   "crates/core/symthaea-zkproof/host"
   "crates/domains/symthaea-architecture-engineering"
   "crates/domains/symthaea-dishwasher-design"
+  # Temporary on main; remove when the active experiment-design crate PR #13453 is integrated.
+  "crates/domains/symthaea-experiment-design"
   "crates/domains/symthaea-marine-geometry"
   "crates/domains/symthaea-rea-compat"
   "crates/domains/symthaea-rea-evidence-verifier"
