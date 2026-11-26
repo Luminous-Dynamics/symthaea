@@ -101,11 +101,19 @@
     }
   ],
   "selection": {
-    "at_cost_rate_utility_per_unit": 0.21,
-    "selected_experiment_id": "decision-boundary-probe",
-    "net_evsi": 0.2,
-    "selected_experiment_id_at_higher_cost": null,
-    "explanation": "The decision-relevant experiment costs more utility than its gross EVSI at this rate."
+    "cases": [
+      {
+        "cost_rate_utility_per_unit": 0,
+        "selected_experiment_id": "decision-boundary-probe",
+        "net_evsi": 0.2
+      },
+      {
+        "cost_rate_utility_per_unit": 0.21,
+        "selected_experiment_id": null,
+        "net_evsi": null
+      }
+    ],
+    "explanation": "At 0.21 utility per cost unit, the decision-relevant experiment's 0.2 gross EVSI does not cover its cost."
   },
   "claim_ceiling": "analytic_fixture_only"
 }
