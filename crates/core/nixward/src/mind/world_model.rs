@@ -2004,6 +2004,7 @@ mod tests {
                 .expect("family B training episode");
         }
 
+        wm.observe(before.clone());
         let global = wm.predict_state(&ActionCategory::Install);
         let contextual = wm
             .predict_state_without_family_label(
