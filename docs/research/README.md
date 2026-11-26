@@ -403,3 +403,14 @@ A falsifiable programme for spectral statistics, RH/prime-structure controls, ne
 ### Scientific-discovery benchmark interoperability
 
 - [Scientific-discovery benchmark interoperability](SDCB_SCIENTIFIC_DISCOVERY_INTEROPERABILITY_V1.md): adapters and matched evaluation plans for Autonomous Science Bench, FIRE-Bench, SciAgentArena, AstaBench, SorryDB, Goedel-Prover-V2 and the Open Agent Leaderboard.
+
+
+### Evidence-gated scientific belief transitions
+
+- [Evidence-Gated Belief Transitions v1](SDCB_EVIDENCE_GATED_BELIEF_TRANSITION_V1.md): formal state-transition contract, update integrity, metrics, and claim boundaries.
+- [External benchmark update — 26 November 2026](SDCB_EXTERNAL_BENCHMARK_UPDATE_2026_11_26.md): Beyond Accuracy, ActiveSciBench, Autonomous Science Bench, ACDB, AutoSciBench and CoDBench.
+- [Experiment transition schema](SDCB_EXPERIMENT_TRANSITION_V1.schema.json): accepted belief-transition wire contract.
+- [Belief-transition Rust reference](../../scripts/research/sdcb_belief_transition.rs): standard-library-only expected information gain, cost-aware experiment selection, Bayesian update and atomic evidence gate.
+- [Reference harness README](../../scripts/research/SDCB_BELIEF_TRANSITION_README.md): independent compile/run instructions and trust boundaries.
+
+**Evidence boundary:** 23 Rust unit tests are authored; compilation and execution have not been performed in this environment. The reference code does not authenticate signatures, source custody, or physical sensors.
