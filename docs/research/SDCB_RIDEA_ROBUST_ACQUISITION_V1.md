@@ -69,7 +69,7 @@ Two candidate designs:
 | Candidate | EIG | Design | Cost | |f-hat − g| |
 |---|---:|---:|---:|---:|
 | representative/informative/de-amplifying | 0.8 | 1 | 1 | 1.5 |
-| high-EIG extrapolation | 1.2 | 4 | 1.5 | 0.1 |
+| high-EIG extrapolation | 1.2 | 4 | 1 | 0.1 |
 
 With lambda = 0.5, tau = 0.5 and kappa = 0.5:
 
