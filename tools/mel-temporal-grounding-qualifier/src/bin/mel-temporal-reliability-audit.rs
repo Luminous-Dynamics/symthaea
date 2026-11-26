@@ -29,8 +29,7 @@ fn read_input() -> Result<String, String> {
 
 fn run() -> Result<String, String> {
     let input = read_input()?;
-    let report =
-        audit_reliability_corpus_json_with_source_bootstrap(&input, 2_000, 0x2026_1125)?;
+    let report = audit_reliability_corpus_json_with_source_bootstrap(&input, 2_000, 0x2026_1125)?;
     serde_json::to_string_pretty(&report)
         .map_err(|error| format!("failed serializing reliability report: {error}"))
 }

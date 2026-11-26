@@ -13,8 +13,7 @@ use crate::temporal_consensus::IndependentTemporalAnnotationV1;
 use crate::temporal_grounding::{
     AudioArtifactClockV1, GroundTruthStateV1, GroundingPredictionStateV1,
     TEMPORAL_GROUNDING_SCHEMA_V1, TemporalGroundTruthV1, TemporalGroundingPlanV1,
-    TemporalGroundingPredictionV1,
-    score_temporal_grounding, validate_temporal_ground_truth,
+    TemporalGroundingPredictionV1, score_temporal_grounding, validate_temporal_ground_truth,
     validate_temporal_grounding_plan,
 };
 
@@ -173,7 +172,12 @@ impl CategoryCounts {
     }
 
     fn values(self) -> [usize; 4] {
-        [self.present, self.absent, self.ambiguous, self.not_estimable]
+        [
+            self.present,
+            self.absent,
+            self.ambiguous,
+            self.not_estimable,
+        ]
     }
 
     fn as_map(self) -> BTreeMap<String, usize> {
@@ -199,11 +203,7 @@ pub fn audit_reliability_corpus_json_with_source_bootstrap(
 ) -> Result<TemporalReliabilityReportV1, String> {
     let corpus: TemporalReliabilityCorpusV1 = serde_json::from_str(input)
         .map_err(|error| format!("invalid temporal reliability corpus JSON: {error}"))?;
-    audit_reliability_corpus_with_source_bootstrap(
-        &corpus,
-        bootstrap_replicates,
-        seed,
-    )
+    audit_reliability_corpus_with_source_bootstrap(&corpus, bootstrap_replicates, seed)
 }
 
 pub fn audit_reliability_corpus(
@@ -240,8 +240,7 @@ pub fn audit_reliability_corpus(
         let item_denominator = item_ratings
             .checked_sub(1)
             .ok_or_else(|| "item has fewer than two ratings".to_string())?;
-        observed_disagreement_total +=
-            ordered_disagreements as f64 / item_denominator as f64;
+        observed_disagreement_total += ordered_disagreements as f64 / item_denominator as f64;
         total_ratings = total_ratings
             .checked_add(item_ratings)
             .ok_or_else(|| "corpus rating count overflow".to_string())?;
@@ -272,18 +271,18 @@ pub fn audit_reliability_corpus(
         )?);
     }
 
-    let observed_disagreement = (total_ratings > 0)
-        .then_some(observed_disagreement_total / total_ratings as f64);
-    let global_sum_squares = global_counts.values().iter().try_fold(
-        0_usize,
-        |sum, count| {
+    let observed_disagreement =
+        (total_ratings > 0).then_some(observed_disagreement_total / total_ratings as f64);
+    let global_sum_squares = global_counts
+        .values()
+        .iter()
+        .try_fold(0_usize, |sum, count| {
             let square = count
                 .checked_mul(*count)
                 .ok_or_else(|| "global category count square overflow".to_string())?;
             sum.checked_add(square)
                 .ok_or_else(|| "global category count sum overflow".to_string())
-        },
-    )?;
+        })?;
     let expected_disagreement = if total_ratings > 1 {
         let all_pairs = total_ratings
             .checked_mul(total_ratings)
@@ -378,8 +377,7 @@ pub fn audit_reliability_corpus_with_source_bootstrap(
         return Err("source-work bootstrap requires at least two independent lineages".into());
     }
 
-    let lineages: Vec<Vec<&TemporalReliabilityUnitV1>> =
-        by_lineage.values().cloned().collect();
+    let lineages: Vec<Vec<&TemporalReliabilityUnitV1>> = by_lineage.values().cloned().collect();
     let original_units: Vec<&TemporalReliabilityUnitV1> = corpus.units.iter().collect();
     let estimate = nominal_alpha_for_units(&original_units)?;
     let mut rng_state = seed;
@@ -394,9 +392,11 @@ pub fn audit_reliability_corpus_with_source_bootstrap(
         }
         match nominal_alpha_for_units(&sampled_units)? {
             Some(value) if value.is_finite() => samples.push(value),
-            _ => degenerate = degenerate
-                .checked_add(1)
-                .ok_or_else(|| "degenerate bootstrap replicate count overflow".to_string())?,
+            _ => {
+                degenerate = degenerate
+                    .checked_add(1)
+                    .ok_or_else(|| "degenerate bootstrap replicate count overflow".to_string())?
+            }
         }
     }
 
@@ -440,12 +440,11 @@ pub fn audit_reliability_corpus_with_source_bootstrap(
         status_reason,
     });
     report.source_work_bootstrap_computed = true;
-    report.pairwise_temporal_source_work_bootstrap =
-        bootstrap_temporal_metrics_by_source_work(
-            &report.unit_summaries,
-            bootstrap_replicates,
-            seed,
-        )?;
+    report.pairwise_temporal_source_work_bootstrap = bootstrap_temporal_metrics_by_source_work(
+        &report.unit_summaries,
+        bootstrap_replicates,
+        seed,
+    )?;
     Ok(report)
 }
 
@@ -558,11 +557,7 @@ where
     }
 
     let mut state = seed;
-    let samples = bootstrap_cluster_means(
-        &cluster_values,
-        bootstrap_replicates,
-        &mut state,
-    );
+    let samples = bootstrap_cluster_means(&cluster_values, bootstrap_replicates, &mut state);
     let mut ordered = samples;
     ordered.sort_by(f64::total_cmp);
     let last = ordered.len() - 1;
@@ -578,9 +573,7 @@ where
     })
 }
 
-fn nominal_alpha_for_units(
-    units: &[&TemporalReliabilityUnitV1],
-) -> Result<Option<f64>, String> {
+fn nominal_alpha_for_units(units: &[&TemporalReliabilityUnitV1]) -> Result<Option<f64>, String> {
     let mut pooled = CategoryCounts::default();
     let mut total_ratings = 0_usize;
     let mut observed_sum = 0.0_f64;
@@ -596,24 +589,37 @@ fn nominal_alpha_for_units(
         }
         let squares = counts.values().iter().try_fold(0_usize, |sum, count| {
             sum.checked_add(
-                count.checked_mul(*count)
-                    .ok_or_else(|| "bootstrap category square overflow".to_string())?
-            ).ok_or_else(|| "bootstrap category-square sum overflow".to_string())
+                count
+                    .checked_mul(*count)
+                    .ok_or_else(|| "bootstrap category square overflow".to_string())?,
+            )
+            .ok_or_else(|| "bootstrap category-square sum overflow".to_string())
         })?;
-        let ordered_pairs = ratings.checked_mul(ratings)
+        let ordered_pairs = ratings
+            .checked_mul(ratings)
             .ok_or_else(|| "bootstrap item pair count overflow".to_string())?;
-        let disagreement = ordered_pairs.checked_sub(squares)
+        let disagreement = ordered_pairs
+            .checked_sub(squares)
             .ok_or_else(|| "bootstrap item disagreement underflow".to_string())?;
         observed_sum += disagreement as f64 / (ratings - 1) as f64;
-        total_ratings = total_ratings.checked_add(ratings)
+        total_ratings = total_ratings
+            .checked_add(ratings)
             .ok_or_else(|| "bootstrap rating total overflow".to_string())?;
-        pooled.present = pooled.present.checked_add(counts.present)
+        pooled.present = pooled
+            .present
+            .checked_add(counts.present)
             .ok_or_else(|| "bootstrap Present total overflow".to_string())?;
-        pooled.absent = pooled.absent.checked_add(counts.absent)
+        pooled.absent = pooled
+            .absent
+            .checked_add(counts.absent)
             .ok_or_else(|| "bootstrap Absent total overflow".to_string())?;
-        pooled.ambiguous = pooled.ambiguous.checked_add(counts.ambiguous)
+        pooled.ambiguous = pooled
+            .ambiguous
+            .checked_add(counts.ambiguous)
             .ok_or_else(|| "bootstrap Ambiguous total overflow".to_string())?;
-        pooled.not_estimable = pooled.not_estimable.checked_add(counts.not_estimable)
+        pooled.not_estimable = pooled
+            .not_estimable
+            .checked_add(counts.not_estimable)
             .ok_or_else(|| "bootstrap NotEstimable total overflow".to_string())?;
     }
     if total_ratings < 2 {
@@ -621,15 +627,20 @@ fn nominal_alpha_for_units(
     }
     let squares = pooled.values().iter().try_fold(0_usize, |sum, count| {
         sum.checked_add(
-            count.checked_mul(*count)
-                .ok_or_else(|| "bootstrap pooled category square overflow".to_string())?
-        ).ok_or_else(|| "bootstrap pooled category-square sum overflow".to_string())
+            count
+                .checked_mul(*count)
+                .ok_or_else(|| "bootstrap pooled category square overflow".to_string())?,
+        )
+        .ok_or_else(|| "bootstrap pooled category-square sum overflow".to_string())
     })?;
-    let all_pairs = total_ratings.checked_mul(total_ratings)
+    let all_pairs = total_ratings
+        .checked_mul(total_ratings)
         .ok_or_else(|| "bootstrap pooled pair count overflow".to_string())?;
-    let denominator = total_ratings.checked_mul(total_ratings - 1)
+    let denominator = total_ratings
+        .checked_mul(total_ratings - 1)
         .ok_or_else(|| "bootstrap pooled denominator overflow".to_string())?;
-    let expected_num = all_pairs.checked_sub(squares)
+    let expected_num = all_pairs
+        .checked_sub(squares)
         .ok_or_else(|| "bootstrap expected disagreement underflow".to_string())?;
     let expected = expected_num as f64 / denominator as f64;
     if expected <= f64::EPSILON {
@@ -660,15 +671,23 @@ fn unbiased_index(state: &mut u64, upper_bound: usize) -> usize {
 
 fn validate_corpus(corpus: &TemporalReliabilityCorpusV1) -> Result<(), String> {
     if corpus.schema != CORPUS_SCHEMA_V1 {
-        return Err(format!("unsupported reliability corpus schema: {}", corpus.schema));
+        return Err(format!(
+            "unsupported reliability corpus schema: {}",
+            corpus.schema
+        ));
     }
-    require_text(&corpus.annotation_policy_version, "annotation_policy_version")?;
+    require_text(
+        &corpus.annotation_policy_version,
+        "annotation_policy_version",
+    )?;
     if corpus.minimum_annotations_per_unit < 2 {
         return Err("minimum_annotations_per_unit must be at least two".into());
     }
     let plan_issues = validate_temporal_grounding_plan(&corpus.plan);
     if !plan_issues.is_empty() {
-        return Err(format!("invalid frozen temporal grounding plan: {plan_issues:?}"));
+        return Err(format!(
+            "invalid frozen temporal grounding plan: {plan_issues:?}"
+        ));
     }
     if corpus.units.len() < 2 {
         return Err("formal reliability requires at least two query-items".into());
@@ -679,7 +698,9 @@ fn validate_corpus(corpus: &TemporalReliabilityCorpusV1) -> Result<(), String> {
     let mut previous_threshold = 0.0;
     for threshold in &corpus.interval_iou_thresholds {
         if !threshold.is_finite() || *threshold <= previous_threshold || *threshold > 1.0 {
-            return Err("IoU thresholds must be finite, unique, strictly increasing and in (0,1]".into());
+            return Err(
+                "IoU thresholds must be finite, unique, strictly increasing and in (0,1]".into(),
+            );
         }
         previous_threshold = *threshold;
     }
@@ -692,7 +713,10 @@ fn validate_corpus(corpus: &TemporalReliabilityCorpusV1) -> Result<(), String> {
         require_text(&unit.query_text, &format!("units[{index}].query_text"))?;
         validate_digest(&unit.source_lineage_sha256, "source_lineage_sha256")?;
         validate_digest(&unit.artifact.audio_sha256, "artifact.audio_sha256")?;
-        validate_digest(&unit.annotation_manifest_sha256, "annotation_manifest_sha256")?;
+        validate_digest(
+            &unit.annotation_manifest_sha256,
+            "annotation_manifest_sha256",
+        )?;
         if !unit_ids.insert(unit.unit_id.as_str()) {
             return Err(format!("duplicate reliability unit_id: {}", unit.unit_id));
         }
@@ -707,8 +731,7 @@ fn validate_corpus(corpus: &TemporalReliabilityCorpusV1) -> Result<(), String> {
         if unit.annotations.len() > MAX_ANNOTATIONS_PER_UNIT_V1 {
             return Err(format!(
                 "unit {} exceeds the maximum of {} independent annotations",
-                unit.unit_id,
-                MAX_ANNOTATIONS_PER_UNIT_V1
+                unit.unit_id, MAX_ANNOTATIONS_PER_UNIT_V1
             ));
         }
         let mut annotator_ids = BTreeSet::new();
@@ -716,10 +739,7 @@ fn validate_corpus(corpus: &TemporalReliabilityCorpusV1) -> Result<(), String> {
             validate_digest(&annotation.annotator_id_sha256, "annotator_id_sha256")?;
             validate_digest(&annotation.annotation_sha256, "annotation_sha256")?;
             if !annotator_ids.insert(annotation.annotator_id_sha256.as_str()) {
-                return Err(format!(
-                    "unit {} repeats an annotator ID",
-                    unit.unit_id
-                ));
+                return Err(format!("unit {} repeats an annotator ID", unit.unit_id));
             }
             if !annotation_digests.insert(annotation.annotation_sha256.as_str()) {
                 return Err("annotation record digest is reused across the corpus".into());
@@ -767,8 +787,7 @@ fn summarize_unit(
             for right in (left + 1)..count {
                 let a = &unit.annotations[left];
                 let b = &unit.annotations[right];
-                if a.state != GroundTruthStateV1::Present
-                    || b.state != GroundTruthStateV1::Present
+                if a.state != GroundTruthStateV1::Present || b.state != GroundTruthStateV1::Present
                 {
                     continue;
                 }
@@ -778,18 +797,16 @@ fn summarize_unit(
                 let right_truth = annotation_truth_for_unit(unit, b, annotation_policy_version);
                 let left_prediction = annotation_prediction(unit, a);
                 let right_prediction = annotation_prediction(unit, b);
-                let left_score = score_temporal_grounding(
-                    &left_truth,
-                    &right_prediction,
-                    &threshold_plan,
-                )
-                .map_err(|issues| format!("left→right event agreement failed: {issues:?}"))?;
-                let right_score = score_temporal_grounding(
-                    &right_truth,
-                    &left_prediction,
-                    &threshold_plan,
-                )
-                .map_err(|issues| format!("right→left event agreement failed: {issues:?}"))?;
+                let left_score =
+                    score_temporal_grounding(&left_truth, &right_prediction, &threshold_plan)
+                        .map_err(|issues| {
+                            format!("left→right event agreement failed: {issues:?}")
+                        })?;
+                let right_score =
+                    score_temporal_grounding(&right_truth, &left_prediction, &threshold_plan)
+                        .map_err(|issues| {
+                            format!("right→left event agreement failed: {issues:?}")
+                        })?;
                 if let (Some(left_f1), Some(right_f1)) = (left_score.f1, right_score.f1) {
                     f1_values.push((left_f1 + right_f1) / 2.0);
                 }
@@ -799,7 +816,11 @@ fn summarize_unit(
                 ) {
                     iou_values.push((left_iou + right_iou) / 2.0);
                 }
-                count_agreement.push(if a.intervals.len() == b.intervals.len() { 1.0 } else { 0.0 });
+                count_agreement.push(if a.intervals.len() == b.intervals.len() {
+                    1.0
+                } else {
+                    0.0
+                });
                 for matched in &left_score.matches {
                     start_errors.push(matched.start_error_frames.unsigned_abs() as f64);
                     end_errors.push(matched.end_error_frames.unsigned_abs() as f64);
@@ -843,10 +864,7 @@ fn aggregate_threshold_summaries(
                 .collect();
             TemporalPairwiseReliabilityV1 {
                 threshold: *threshold,
-                present_present_pairs: values
-                    .iter()
-                    .map(|value| value.present_present_pairs)
-                    .sum(),
+                present_present_pairs: values.iter().map(|value| value.present_present_pairs).sum(),
                 symmetric_event_f1_mean: mean(
                     &values
                         .iter()
@@ -988,9 +1006,7 @@ fn percentile(values: &[f64], quantile: f64) -> Option<f64> {
 mod tests {
     use super::*;
     use crate::temporal_consensus::IndependentTemporalAnnotationV1;
-    use crate::temporal_grounding::{
-        FrameIntervalV1, TEMPORAL_GROUNDING_EVALUATOR_V1,
-    };
+    use crate::temporal_grounding::{FrameIntervalV1, TEMPORAL_GROUNDING_EVALUATOR_V1};
 
     const AUDIO_A: &str = "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa";
     const AUDIO_B: &str = "bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb";
@@ -1065,8 +1081,26 @@ mod tests {
                 LINEAGE_A,
                 AUDIO_A,
                 vec![
-                    annotation('1', '1', GroundTruthStateV1::Present, vec![FrameIntervalV1 { start_frame: 100, end_frame: 200 }], None),
-                    annotation('2', '2', GroundTruthStateV1::Present, vec![FrameIntervalV1 { start_frame: 100, end_frame: 200 }], None),
+                    annotation(
+                        '1',
+                        '1',
+                        GroundTruthStateV1::Present,
+                        vec![FrameIntervalV1 {
+                            start_frame: 100,
+                            end_frame: 200,
+                        }],
+                        None,
+                    ),
+                    annotation(
+                        '2',
+                        '2',
+                        GroundTruthStateV1::Present,
+                        vec![FrameIntervalV1 {
+                            start_frame: 100,
+                            end_frame: 200,
+                        }],
+                        None,
+                    ),
                 ],
             ),
             unit(
@@ -1096,7 +1130,16 @@ mod tests {
                 LINEAGE_A,
                 AUDIO_A,
                 vec![
-                    annotation('1', '1', GroundTruthStateV1::Present, vec![FrameIntervalV1 { start_frame: 100, end_frame: 200 }], None),
+                    annotation(
+                        '1',
+                        '1',
+                        GroundTruthStateV1::Present,
+                        vec![FrameIntervalV1 {
+                            start_frame: 100,
+                            end_frame: 200,
+                        }],
+                        None,
+                    ),
                     annotation('2', '2', GroundTruthStateV1::Absent, Vec::new(), None),
                 ],
             ),
@@ -1105,7 +1148,16 @@ mod tests {
                 LINEAGE_B,
                 AUDIO_B,
                 vec![
-                    annotation('1', '3', GroundTruthStateV1::Present, vec![FrameIntervalV1 { start_frame: 100, end_frame: 200 }], None),
+                    annotation(
+                        '1',
+                        '3',
+                        GroundTruthStateV1::Present,
+                        vec![FrameIntervalV1 {
+                            start_frame: 100,
+                            end_frame: 200,
+                        }],
+                        None,
+                    ),
                     annotation('2', '4', GroundTruthStateV1::Absent, Vec::new(), None),
                 ],
             ),
@@ -1122,8 +1174,26 @@ mod tests {
                 LINEAGE_A,
                 AUDIO_A,
                 vec![
-                    annotation('1', '1', GroundTruthStateV1::Present, vec![FrameIntervalV1 { start_frame: 100, end_frame: 200 }], None),
-                    annotation('2', '2', GroundTruthStateV1::Present, vec![FrameIntervalV1 { start_frame: 100, end_frame: 200 }], None),
+                    annotation(
+                        '1',
+                        '1',
+                        GroundTruthStateV1::Present,
+                        vec![FrameIntervalV1 {
+                            start_frame: 100,
+                            end_frame: 200,
+                        }],
+                        None,
+                    ),
+                    annotation(
+                        '2',
+                        '2',
+                        GroundTruthStateV1::Present,
+                        vec![FrameIntervalV1 {
+                            start_frame: 100,
+                            end_frame: 200,
+                        }],
+                        None,
+                    ),
                 ],
             ),
             unit(
@@ -1131,8 +1201,26 @@ mod tests {
                 LINEAGE_B,
                 AUDIO_B,
                 vec![
-                    annotation('1', '3', GroundTruthStateV1::Present, vec![FrameIntervalV1 { start_frame: 100, end_frame: 200 }], None),
-                    annotation('2', '4', GroundTruthStateV1::Present, vec![FrameIntervalV1 { start_frame: 100, end_frame: 200 }], None),
+                    annotation(
+                        '1',
+                        '3',
+                        GroundTruthStateV1::Present,
+                        vec![FrameIntervalV1 {
+                            start_frame: 100,
+                            end_frame: 200,
+                        }],
+                        None,
+                    ),
+                    annotation(
+                        '2',
+                        '4',
+                        GroundTruthStateV1::Present,
+                        vec![FrameIntervalV1 {
+                            start_frame: 100,
+                            end_frame: 200,
+                        }],
+                        None,
+                    ),
                 ],
             ),
         ];
@@ -1149,8 +1237,26 @@ mod tests {
                 LINEAGE_A,
                 AUDIO_A,
                 vec![
-                    annotation('1', '1', GroundTruthStateV1::Present, vec![FrameIntervalV1 { start_frame: 100, end_frame: 200 }], None),
-                    annotation('2', '2', GroundTruthStateV1::Present, vec![FrameIntervalV1 { start_frame: 120, end_frame: 220 }], None),
+                    annotation(
+                        '1',
+                        '1',
+                        GroundTruthStateV1::Present,
+                        vec![FrameIntervalV1 {
+                            start_frame: 100,
+                            end_frame: 200,
+                        }],
+                        None,
+                    ),
+                    annotation(
+                        '2',
+                        '2',
+                        GroundTruthStateV1::Present,
+                        vec![FrameIntervalV1 {
+                            start_frame: 120,
+                            end_frame: 220,
+                        }],
+                        None,
+                    ),
                 ],
             ),
             unit(
@@ -1158,17 +1264,49 @@ mod tests {
                 LINEAGE_B,
                 AUDIO_B,
                 vec![
-                    annotation('1', '3', GroundTruthStateV1::Present, vec![FrameIntervalV1 { start_frame: 300, end_frame: 400 }], None),
-                    annotation('2', '4', GroundTruthStateV1::Present, vec![FrameIntervalV1 { start_frame: 300, end_frame: 400 }], None),
+                    annotation(
+                        '1',
+                        '3',
+                        GroundTruthStateV1::Present,
+                        vec![FrameIntervalV1 {
+                            start_frame: 300,
+                            end_frame: 400,
+                        }],
+                        None,
+                    ),
+                    annotation(
+                        '2',
+                        '4',
+                        GroundTruthStateV1::Present,
+                        vec![FrameIntervalV1 {
+                            start_frame: 300,
+                            end_frame: 400,
+                        }],
+                        None,
+                    ),
                 ],
             ),
         ];
         let result = audit_reliability_corpus(&corpus(units)).unwrap();
         assert_eq!(result.pairwise_by_iou_threshold.len(), 4);
         assert_eq!(result.pairwise_by_iou_threshold[0].present_present_pairs, 2);
-        assert!(result.pairwise_by_iou_threshold[0].symmetric_event_f1_mean.unwrap() > 0.99);
-        assert!(result.pairwise_by_iou_threshold[2].symmetric_event_f1_mean.unwrap() < 1.0);
-        assert!(result.pairwise_by_iou_threshold[2].start_boundary_mae_frames.is_some());
+        assert!(
+            result.pairwise_by_iou_threshold[0]
+                .symmetric_event_f1_mean
+                .unwrap()
+                > 0.99
+        );
+        assert!(
+            result.pairwise_by_iou_threshold[2]
+                .symmetric_event_f1_mean
+                .unwrap()
+                < 1.0
+        );
+        assert!(
+            result.pairwise_by_iou_threshold[2]
+                .start_boundary_mae_frames
+                .is_some()
+        );
     }
 
     #[test]
@@ -1179,9 +1317,24 @@ mod tests {
                 LINEAGE_A,
                 AUDIO_A,
                 vec![
-                    annotation('1', '1', GroundTruthStateV1::Present, vec![FrameIntervalV1 { start_frame: 100, end_frame: 200 }], None),
+                    annotation(
+                        '1',
+                        '1',
+                        GroundTruthStateV1::Present,
+                        vec![FrameIntervalV1 {
+                            start_frame: 100,
+                            end_frame: 200,
+                        }],
+                        None,
+                    ),
                     annotation('2', '2', GroundTruthStateV1::Absent, Vec::new(), None),
-                    annotation('3', '3', GroundTruthStateV1::Ambiguous, Vec::new(), Some("soft onset")),
+                    annotation(
+                        '3',
+                        '3',
+                        GroundTruthStateV1::Ambiguous,
+                        Vec::new(),
+                        Some("soft onset"),
+                    ),
                 ],
             ),
             unit(
@@ -1189,8 +1342,20 @@ mod tests {
                 LINEAGE_B,
                 AUDIO_B,
                 vec![
-                    annotation('1', '4', GroundTruthStateV1::NotEstimable, Vec::new(), Some("masked by percussion")),
-                    annotation('3', '5', GroundTruthStateV1::NotEstimable, Vec::new(), Some("masked by percussion")),
+                    annotation(
+                        '1',
+                        '4',
+                        GroundTruthStateV1::NotEstimable,
+                        Vec::new(),
+                        Some("masked by percussion"),
+                    ),
+                    annotation(
+                        '3',
+                        '5',
+                        GroundTruthStateV1::NotEstimable,
+                        Vec::new(),
+                        Some("masked by percussion"),
+                    ),
                 ],
             ),
         ];
@@ -1207,11 +1372,9 @@ mod tests {
         let json = include_str!("../fixtures/mel-temporal-reliability-corpus.synthetic.json");
         let corpus: TemporalReliabilityCorpusV1 = serde_json::from_str(json).unwrap();
         let first =
-            audit_reliability_corpus_with_source_bootstrap(&corpus, 1_000, 0x2026_1125)
-                .unwrap();
+            audit_reliability_corpus_with_source_bootstrap(&corpus, 1_000, 0x2026_1125).unwrap();
         let second =
-            audit_reliability_corpus_with_source_bootstrap(&corpus, 1_000, 0x2026_1125)
-                .unwrap();
+            audit_reliability_corpus_with_source_bootstrap(&corpus, 1_000, 0x2026_1125).unwrap();
         let bootstrap = first
             .disposition_alpha_source_work_bootstrap
             .as_ref()
@@ -1234,12 +1397,7 @@ mod tests {
     fn source_work_alpha_bootstrap_rejects_unbounded_replicate_request() {
         let json = include_str!("../fixtures/mel-temporal-reliability-corpus.synthetic.json");
         let corpus: TemporalReliabilityCorpusV1 = serde_json::from_str(json).unwrap();
-        assert!(audit_reliability_corpus_with_source_bootstrap(
-            &corpus,
-            1_000_001,
-            1,
-        )
-        .is_err());
+        assert!(audit_reliability_corpus_with_source_bootstrap(&corpus, 1_000_001, 1,).is_err());
     }
 
     #[test]
@@ -1247,8 +1405,7 @@ mod tests {
         let json = include_str!("../fixtures/mel-temporal-reliability-corpus.synthetic.json");
         let corpus: TemporalReliabilityCorpusV1 = serde_json::from_str(json).unwrap();
         let report =
-            audit_reliability_corpus_with_source_bootstrap(&corpus, 1_000, 0x2026_1125)
-                .unwrap();
+            audit_reliability_corpus_with_source_bootstrap(&corpus, 1_000, 0x2026_1125).unwrap();
         assert_eq!(report.pairwise_temporal_source_work_bootstrap.len(), 4);
         let first = &report.pairwise_temporal_source_work_bootstrap[0];
         assert_eq!(first.symmetric_event_f1.eligible_source_work_clusters, 1);
@@ -1278,11 +1435,20 @@ mod tests {
             second.pairwise_temporal_source_work_bootstrap
         );
         let threshold = &first.pairwise_temporal_source_work_bootstrap[0];
-        assert_eq!(threshold.symmetric_event_f1.eligible_source_work_clusters, 2);
-        assert_eq!(threshold.symmetric_event_f1.bootstrap_replicates_valid, 1_000);
+        assert_eq!(
+            threshold.symmetric_event_f1.eligible_source_work_clusters,
+            2
+        );
+        assert_eq!(
+            threshold.symmetric_event_f1.bootstrap_replicates_valid,
+            1_000
+        );
         assert!(threshold.symmetric_event_f1.percentile_95_low.is_some());
         assert!(threshold.symmetric_event_f1.percentile_95_high.is_some());
-        assert_eq!(threshold.matched_interval_iou.eligible_source_work_clusters, 2);
+        assert_eq!(
+            threshold.matched_interval_iou.eligible_source_work_clusters,
+            2
+        );
         assert!(threshold.matched_interval_iou.percentile_95_low.is_some());
     }
 
@@ -1298,8 +1464,7 @@ mod tests {
             }
         }
         let report =
-            audit_reliability_corpus_with_source_bootstrap(&corpus, 1_000, 0x2026_1125)
-                .unwrap();
+            audit_reliability_corpus_with_source_bootstrap(&corpus, 1_000, 0x2026_1125).unwrap();
         let bootstrap = report
             .disposition_alpha_source_work_bootstrap
             .as_ref()
@@ -1318,7 +1483,8 @@ mod tests {
         let json = include_str!("../fixtures/mel-temporal-reliability-corpus.synthetic.json");
         let mut corpus: TemporalReliabilityCorpusV1 = serde_json::from_str(json).unwrap();
         for unit in &mut corpus.units {
-            unit.source_lineage_sha256 = "eeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeee".into();
+            unit.source_lineage_sha256 =
+                "eeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeee".into();
         }
         assert!(audit_reliability_corpus_with_source_bootstrap(&corpus, 1_000, 1).is_err());
 
@@ -1335,8 +1501,26 @@ mod tests {
                 LINEAGE_A,
                 AUDIO_A,
                 vec![
-                    annotation('1', '1', GroundTruthStateV1::Present, vec![FrameIntervalV1 { start_frame: 100, end_frame: 200 }], None),
-                    annotation('2', '2', GroundTruthStateV1::Present, vec![FrameIntervalV1 { start_frame: 100, end_frame: 200 }], None),
+                    annotation(
+                        '1',
+                        '1',
+                        GroundTruthStateV1::Present,
+                        vec![FrameIntervalV1 {
+                            start_frame: 100,
+                            end_frame: 200,
+                        }],
+                        None,
+                    ),
+                    annotation(
+                        '2',
+                        '2',
+                        GroundTruthStateV1::Present,
+                        vec![FrameIntervalV1 {
+                            start_frame: 100,
+                            end_frame: 200,
+                        }],
+                        None,
+                    ),
                 ],
             ),
             unit(
@@ -1389,8 +1573,26 @@ mod tests {
                 LINEAGE_A,
                 AUDIO_A,
                 vec![
-                    annotation('1', '1', GroundTruthStateV1::Present, vec![FrameIntervalV1 { start_frame: 100, end_frame: 200 }], None),
-                    annotation('2', '2', GroundTruthStateV1::Present, vec![FrameIntervalV1 { start_frame: 100, end_frame: 200 }], None),
+                    annotation(
+                        '1',
+                        '1',
+                        GroundTruthStateV1::Present,
+                        vec![FrameIntervalV1 {
+                            start_frame: 100,
+                            end_frame: 200,
+                        }],
+                        None,
+                    ),
+                    annotation(
+                        '2',
+                        '2',
+                        GroundTruthStateV1::Present,
+                        vec![FrameIntervalV1 {
+                            start_frame: 100,
+                            end_frame: 200,
+                        }],
+                        None,
+                    ),
                 ],
             ),
             unit(
@@ -1405,8 +1607,10 @@ mod tests {
         ];
         assert!(audit_reliability_corpus(&corpus(vec![good[0].clone(), good[0].clone()])).is_err());
         let mut duplicate_annotator = good.clone();
-        duplicate_annotator[0].annotations[1].annotator_id_sha256 =
-            duplicate_annotator[0].annotations[0].annotator_id_sha256.clone();
+        duplicate_annotator[0].annotations[1].annotator_id_sha256 = duplicate_annotator[0]
+            .annotations[0]
+            .annotator_id_sha256
+            .clone();
         assert!(audit_reliability_corpus(&corpus(duplicate_annotator)).is_err());
         let mut invalid_thresholds = corpus(good);
         invalid_thresholds.interval_iou_thresholds = vec![0.5, 0.5];
