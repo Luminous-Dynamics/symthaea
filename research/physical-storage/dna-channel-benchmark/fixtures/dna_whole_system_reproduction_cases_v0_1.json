@@ -1,0 +1,106 @@
+{
+  "schema_version": "dna-whole-system-reproduction-cases-v0.1",
+  "corpus_id": "DNA-WHOLE-SYSTEM-REPRODUCTION-CASES-V0.1",
+  "evidence_class": "synthetic_semantic_fixture",
+  "cases": [
+    {
+      "case_id": "DNA-SAM-CODEBOOK-README-COUNTS",
+      "control_type": "codebook_accounting",
+      "input_facts": {
+        "valid_words": 42560,
+        "data_words": 37768,
+        "replacement_words": 9792
+      },
+      "expected_disposition": "reject",
+      "rationale": "Data plus replacement words sum to 47560, exceeding the declared 42560 valid codewords. Reproduction and density admission must be blocked until source-of-truth reconciliation."
+    },
+    {
+      "case_id": "DNA-SAM-CODEBOOK-PAPER-COUNTS",
+      "control_type": "codebook_accounting",
+      "input_facts": {
+        "valid_words": 42560,
+        "data_words": 32768,
+        "replacement_words": 9792
+      },
+      "expected_disposition": "incomplete",
+      "rationale": "Counts reconcile arithmetically but still require verification against the exact publication archive and implementation."
+    },
+    {
+      "case_id": "SIYUAN-REPOSITORY-NO-LICENSE",
+      "control_type": "license_gate",
+      "input_facts": {
+        "repository_license_file_present": false,
+        "simulator_license": "not_granted",
+        "paper_license": "CC BY-NC-ND 4.0"
+      },
+      "expected_disposition": "incomplete",
+      "rationale": "A public repository and public paper do not prove source-code or simulator redistribution rights. Rights clearance is required before reuse or derivative bundling."
+    },
+    {
+      "case_id": "COPIES-ARE-NOT-READ-COVERAGE",
+      "control_type": "copy_read_unit_separation",
+      "input_facts": {
+        "physical_molecule_copies_per_strand": 6,
+        "sequencing_reads_per_strand": 120,
+        "umi_molecule_provenance_available": false
+      },
+      "expected_disposition": "separate_stratum",
+      "rationale": "Read count and physical molecule copy count are different units. Without validated molecule provenance, the reads cannot establish six independent physical copies."
+    },
+    {
+      "case_id": "IN-VITRO-IS-NOT-IN-VIVO",
+      "control_type": "evidence_class_separation",
+      "input_facts": {
+        "in_vitro_synthesis_and_sequencing_result_present": true,
+        "in_vivo_passaging_result_present": false
+      },
+      "expected_disposition": "separate_stratum",
+      "rationale": "An in-vitro retrieval result cannot be promoted into an in-vivo stability claim or a generic retention claim."
+    },
+    {
+      "case_id": "PASSAGING-IS-NOT-GENERIC-RETENTION",
+      "control_type": "evidence_class_separation",
+      "input_facts": {
+        "bacterial_passaging_generations": 100,
+        "environmental_storage_retention_years": null
+      },
+      "expected_disposition": "separate_stratum",
+      "rationale": "A biological passaging result is a modality-specific experiment, not a conventional media lifetime estimate."
+    },
+    {
+      "case_id": "DECODED-SEQUENCES-WRONG-BYTES",
+      "control_type": "exact_file_integrity",
+      "input_facts": {
+        "sequence_alignment_success": true,
+        "decoded_file_length_matches": true,
+        "independent_sha256_matches": false
+      },
+      "expected_disposition": "reject",
+      "rationale": "Sequence-level success does not qualify an archive when the final payload digest does not match."
+    },
+    {
+      "case_id": "OBSERVED-HEAD-WITHOUT-WEIGHTS",
+      "control_type": "source_pin_completeness",
+      "input_facts": {
+        "repository_commit_pinned": true,
+        "model_weights_pinned": false,
+        "training_preprocessing_pinned": false
+      },
+      "expected_disposition": "incomplete",
+      "rationale": "A repository commit alone is insufficient to reproduce a trained model result without the exact weights and preprocessing."
+    },
+    {
+      "case_id": "PRE-INDEX-DENSITY-AS-NET-DENSITY",
+      "control_type": "density_denominator",
+      "input_facts": {
+        "base_mapping_bits_per_nt": 1.875,
+        "primer_overhead_included": false,
+        "index_overhead_included": false,
+        "ecc_overhead_included": false,
+        "replacement_overhead_included": false
+      },
+      "expected_disposition": "reject",
+      "rationale": "Pre-overhead codebook capacity is not net archive information density. All sequence and recovery overheads must be counted."
+    }
+  ]
+}

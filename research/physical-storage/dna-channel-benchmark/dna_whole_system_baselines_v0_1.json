@@ -1,0 +1,178 @@
+{
+  "schema_version": "dna-whole-system-codec-baselines-v0.1",
+  "corpus_id": "DNA-WHOLE-SYSTEM-CODEC-BASELINES-V0.1",
+  "programme_issue": "https://github.com/Luminous-Dynamics/symthaea/issues/13772",
+  "parent_issue": "https://github.com/Luminous-Dynamics/symthaea/issues/13729",
+  "evidence_class": "source_review",
+  "baselines": [
+    {
+      "baseline_id": "DNA-SAM-2026",
+      "name": "DNA-SaM",
+      "paper": {
+        "citation": "Wang et al., Towards scalable DNA data storage with DNA-SaM codec system, Nature Communications 17, 11772 (19 October 2026)",
+        "doi": "10.1038/s41467-026-78759-4",
+        "url": "https://www.nature.com/articles/s41467-026-78759-4",
+        "publication_archive_doi": "10.5281/zenodo.21615403"
+      },
+      "source": {
+        "repository": "DNA-intelligence/DNA-SaM",
+        "observed_head": "fd5aa708775782952938e08fcfe22d19bcc2cc8a",
+        "observed_readme_blob": "6df38c3bf416705b518be0698f64f6584f865fc8",
+        "license": "MIT",
+        "license_file_blob": "6b94d8352b01b5ed862440356e345f821f101791"
+      },
+      "architecture": [
+        "15-bit to 8-nt codebook mapping",
+        "Suffix-automaton-based forbidden-pattern detection and replacement",
+        "Hierarchical PB/TB/GB/MB address hierarchy",
+        "Address, file-attribute and XOR metadata strands",
+        "Single-base edit correction and XOR recovery",
+        "Primer and strand index overhead"
+      ],
+      "reported_metrics": {
+        "raw_codebook_payload_ratio_bits_per_nt": 1.875,
+        "repository_claimed_density_bits_per_nt": 1.88,
+        "physical_density_eb_per_g": null,
+        "sequence_length_typical_nt": 193,
+        "coverage_for_complete_recovery": "20x minimum under specific reported in-vitro conditions for most tested datasets",
+        "in_vivo_passaging_generations": 100,
+        "in_vivo_text_file_bytes": 3288,
+        "in_vivo_text_strands": 41,
+        "in_vivo_text_payload_bytes_per_strand": 105,
+        "in_vivo_independent_strains_reported": 3,
+        "in_vivo_large_image_bytes": 1060000,
+        "in_vivo_large_image_wet_validation_scope": "one randomly selected unit, not the whole multi-unit image corpus"
+      },
+      "source_discrepancies": [
+        {
+          "field": "8-nt codebook partition",
+          "manuscript_claim": "42,560 valid words; 32,768 data codewords; 9,792 replacement codewords",
+          "repository_readme_claim": "42,560 valid words; 37,768 data codewords; 9,792 replacement codewords",
+          "consequence": "README partition sums to 47,560 and exceeds its own valid-word total by 5,000; resolve against publication-associated Zenodo archive and exact source before any reproduced density claim."
+        }
+      ],
+      "evidence_status": "paper_and_source_reviewed_reproduction_pending",
+      "reproduction_blockers": [
+        "Resolve codebook count/partition discrepancy.",
+        "Pin the exact publication-associated archive and compare it with repository HEAD.",
+        "Reproduce the paper's in-silico baseline under its original runtime and data definitions.",
+        "Separate read coverage, molecule copy count and unique molecule count.",
+        "Reproduce in-vitro data only where lawful data access and laboratory resources permit."
+      ],
+      "evidence_boundary": "The >2^70 PB system capacity is theoretical. One hundred generations of plasmid passaging is an in-vivo stability experiment under the specific tested biological protocol, not an ordinary media-retention lifetime result."
+    },
+    {
+      "baseline_id": "SIYUAN-CODE-2026",
+      "name": "Siyuan Code",
+      "paper": {
+        "citation": "Li et al., Towards density-optimal DNA storage with practical bijective coding, Nature Communications 17, 10261 (27 August 2026)",
+        "doi": "10.1038/s41467-026-77024-y",
+        "url": "https://www.nature.com/articles/s41467-026-77024-y",
+        "license": "CC BY-NC-ND 4.0 for article text and applicable figures; does not grant permission to redistribute adapted material."
+      },
+      "source": {
+        "repository": "DNASiyuanCode/SiyuanCode",
+        "observed_head": "a037d04dbee4afe22c685a1e0803f599b516ae6f",
+        "observed_readme_blob": "acbf26a5a1400d220aba4a26819f67a2d5bbf43b",
+        "root_license_file": "not_found_at_observed_head",
+        "simulator": "modified MESA simulator",
+        "simulator_license": "README states simulator is public but without a license"
+      },
+      "architecture": [
+        "Trie-based catalog of forbidden sequence motifs",
+        "Dynamic programming / enumerative bijective mapping to suitable sequences",
+        "RS-based slice error correction",
+        "Per-slice checksum and slice index",
+        "Multiple copies per strand"
+      ],
+      "reported_metrics": {
+        "net_information_density_bits_per_nt": 1.66,
+        "physical_density_eb_per_g": 41,
+        "encode_decode_speed_mb_per_s": 1,
+        "reported_copies_per_strand_for_perfect_retrieval": 6
+      },
+      "evidence_status": "paper_and_repo_source_reviewed_license_clearance_required",
+      "reproduction_blockers": [
+        "No root LICENSE file was found at the observed repository HEAD; do not assume an open-source license.",
+        "The README identifies a modified MESA simulator with no license; do not redistribute or bundle it without permission.",
+        "Resolve sample, raw-read and encoded-data reuse rights.",
+        "Pin source and dependencies; reproduce the exact six-copy and sequencing protocol before comparing against other copy/read budgets.",
+        "Audit complete strand/index/checksum/ECC/primer overhead before accepting the reported net density."
+      ],
+      "evidence_boundary": "The 41 EB/g, 1.66 bits/nt, ~1 MB/s and six-copy retrieval are paper-reported values under the study's in-vitro conditions. They are not Luminous measurements or guaranteed general operating points."
+    },
+    {
+      "baseline_id": "POLUS-SEQFORMER-2026",
+      "name": "Polus / SeqFormer",
+      "paper": {
+        "citation": "Ding et al., Polus: a context-aware enhancement framework for DNA storage via transformer-based soft-decision decoding, Bioinformatics 42(8), btag563 (3 August 2026)",
+        "doi": "10.1093/bioinformatics/btag563",
+        "url": "https://academic.oup.com/bioinformatics/article/42/8/btag563/8744088"
+      },
+      "source": {
+        "polus_repository": "dinglulu/Polus",
+        "polus_observed_commit": "656b58008e196dbad42c9b09f8ec1bf350ee8614",
+        "seqformer_repository": "dinglulu/SeqFormer",
+        "seqformer_observed_commit": "f95fb2f866c13033874a505bf5effe7195e246e6",
+        "seqformer_pin_status": "observed repository head; not yet proven to be the exact paper training artifact/model-weight release"
+      },
+      "reported_metrics": {
+        "dna_fountain_coverage_reduction_percent": 38.9,
+        "effective_density_increase_percent_approx": 80,
+        "evidence_class": "paper-reported in-silico benchmark"
+      },
+      "evidence_status": "source_pins_observed_model_artifact_reconciliation_pending",
+      "reproduction_blockers": [
+        "Pin model weights, tokenizer/feature preprocessing and training split.",
+        "Reconcile exact SeqFormer commit and model weights with publication artifacts.",
+        "Reproduce the published DNA Fountain and Yin-Yang cases before any extension."
+      ]
+    },
+    {
+      "baseline_id": "DT4DDS-2026-CODEC-COMPARISON",
+      "name": "DT4DDS six-codec DNA storage benchmark",
+      "paper": {
+        "citation": "Gimpel et al., Comparison of state-of-the-art error-correction coding for sequence-based DNA data storage, Nature Communications 17, 3963 (14 March 2026)",
+        "doi": "10.1038/s41467-026-70548-3",
+        "url": "https://doi.org/10.1038/s41467-026-70548-3",
+        "software_archive_doi": "10.5281/zenodo.17391326",
+        "notebooks_archive_doi": "10.5281/zenodo.17391328",
+        "source_data_accession": "ENA PRJEB90546"
+      },
+      "source": {
+        "repository": "fml-ethz/dt4dds-benchmark",
+        "observed_commit": "0928fd7f26709ce63fd4d0765c50db1be8af0f7d"
+      },
+      "codec_families": [
+        "DNA-Aeon",
+        "DNA Fountain",
+        "DNA-RS",
+        "Goldman",
+        "HEDGES",
+        "Yin–Yang"
+      ],
+      "reported_metrics": {
+        "material_deposition_in_vitro_eb_per_g": 43,
+        "electrochemical_synthesis_in_vitro_eb_per_g": 13,
+        "realistic_workflow_feasibility_in_silico_eb_per_g": 117,
+        "isolated_test_error_rate_percent_up_to": 14,
+        "isolated_sequence_loss_percent_up_to": 65
+      },
+      "evidence_status": "paper_and_software_pins_recorded_reproduction_pending",
+      "notes": "Separate in-vitro demonstrations from the 117 EB/g in-silico feasibility estimate and the isolated error/loss envelopes."
+    },
+    {
+      "baseline_id": "DNA-SAM-AND-SIYUAN-REPRODUCTION-RULE",
+      "name": "Cross-system comparison policy",
+      "evidence_status": "protocol_only",
+      "rules": [
+        "Do not compare molecule copies per strand with sequencing reads per strand.",
+        "Do not compare pre-primer or pre-index bit density with full net payload bits per nucleotide.",
+        "Do not count PCR duplicates as independent molecule copies.",
+        "Keep in-silico, paper-reproduction, in-vitro and in-vivo evidence classes separate.",
+        "All decoded files are evaluated by an independent byte-exact scorer and out-of-band digest.",
+        "No paper's sample-size, data-rights or protocol limitations may be silently omitted."
+      ]
+    }
+  ]
+}

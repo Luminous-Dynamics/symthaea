@@ -1,0 +1,73 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://github.com/Luminous-Dynamics/symthaea/blob/research/dna-whole-system-codec-001/research/physical-storage/dna-channel-benchmark/dna_whole_system_reproduction_cases_v0_1.schema.json",
+  "title": "DNA Whole-System Reproduction Cases v0.1",
+  "type": "object",
+  "additionalProperties": false,
+  "required": [
+    "schema_version",
+    "corpus_id",
+    "evidence_class",
+    "cases"
+  ],
+  "properties": {
+    "schema_version": {
+      "const": "dna-whole-system-reproduction-cases-v0.1"
+    },
+    "corpus_id": {
+      "type": "string",
+      "pattern": "^[A-Z0-9][A-Z0-9._-]{2,127}$"
+    },
+    "evidence_class": {
+      "const": "synthetic_semantic_fixture"
+    },
+    "cases": {
+      "type": "array",
+      "minItems": 6,
+      "items": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": [
+          "case_id",
+          "control_type",
+          "input_facts",
+          "expected_disposition",
+          "rationale"
+        ],
+        "properties": {
+          "case_id": {
+            "type": "string",
+            "minLength": 1
+          },
+          "control_type": {
+            "enum": [
+              "codebook_accounting",
+              "license_gate",
+              "copy_read_unit_separation",
+              "evidence_class_separation",
+              "exact_file_integrity",
+              "source_pin_completeness",
+              "density_denominator"
+            ]
+          },
+          "input_facts": {
+            "type": "object"
+          },
+          "expected_disposition": {
+            "enum": [
+              "admit",
+              "reject",
+              "incomplete",
+              "separate_stratum",
+              "abstain"
+            ]
+          },
+          "rationale": {
+            "type": "string",
+            "minLength": 1
+          }
+        }
+      }
+    }
+  }
+}
