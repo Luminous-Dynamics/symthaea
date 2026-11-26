@@ -552,7 +552,7 @@ fn summarize(results: &[SelectiveCaseResultV1]) -> SelectiveGroundingSummaryV1 {
     let calibration_bins = make_calibration_bins(results, 10);
     let decision_confidence_ece = ece(&calibration_bins, cases);
 
-    let mut ranked: Vec<_> = covered.iter().copied().collect();
+    let mut ranked = covered.to_vec();
     ranked.sort_by(|left, right| {
         right
             .decision_confidence
@@ -1211,7 +1211,7 @@ mod tests {
         assert_eq!(report.summary.coverage, 0.0);
         assert_eq!(report.summary.always_answer_risk, 0.0);
         assert_eq!(report.case_results[0].unconditional_score.f1, Some(1.0));
-        assert_eq!(report.case_results[0].unconditional_answer_correct, true);
+        assert!(report.case_results[0].unconditional_answer_correct);
     }
 
     #[test]
