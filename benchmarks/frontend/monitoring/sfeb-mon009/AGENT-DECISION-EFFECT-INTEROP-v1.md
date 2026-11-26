@@ -129,3 +129,13 @@ Compare the Action Capsule, AEE, Vaara, Decision Provenance, Measurement Capsule
 - [RFC 9943](https://www.rfc-editor.org/rfc/rfc9943.html)
 
 All draft profiles are work in progress and must be version-pinned and rechecked before conformance claims.
+
+
+### 3.5 Measurement Capsule is authority-free
+
+The active Declared-versus-Observed Measurement Capsules -01 draft is unusually explicit about a boundary worth preserving: a measurement capsule is produced by a party that is neither the claim subject nor a participant in the action; its authority state is fixed to NONE; and it MUST NOT carry a decision, approval or authorization field. Its UNCHECKABLE state is a first-class measurement outcome. The draft also defines correction capsules as new immutable records rather than edits to existing capsules.
+
+MON-009 should use a Measurement Capsule as third-party observation evidence, not as an authorization result or policy gate. The consumer must not translate UNCHECKABLE into success, denial, or evidence that no action occurred. Any decision based on a measurement belongs in a separate decision-provenance record with its own authority, policy and approval binding.
+
+The -01 draft's own open issues and implementation-status notes also matter for benchmarking: its stated profile and the author's implementation are not fully aligned yet. Use its wire test vectors and profile requirements as a conformance target, but publish unsupported fields/kinds and implementation gaps rather than claiming complete interoperability.
+
