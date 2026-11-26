@@ -117,7 +117,7 @@
         "phase_mixing_complete",
         "second_pulse_not_yet_applied",
         "solver_revision",
-        "first_pulse_not_yet_applied"
+        "first_pulse_applied"
       ],
       "properties": {
         "checkpoint_id": {
@@ -146,7 +146,7 @@
           "type": "string",
           "minLength": 1
         },
-        "first_pulse_not_yet_applied": {
+        "first_pulse_applied": {
           "const": true
         }
       }
