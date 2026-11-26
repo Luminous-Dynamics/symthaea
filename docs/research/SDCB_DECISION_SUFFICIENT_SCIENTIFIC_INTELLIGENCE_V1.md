@@ -4,7 +4,11 @@
 **Parent:** SDCB evidence-gated belief transitions v1
 **Implementation:** [one-step decision value](../../scripts/research/sdcb_decision_value.rs) and [exact finite-horizon oracle](../../scripts/research/sdcb_nonmyopic_oracle.rs)
 **Design fixture:** [SDCB_DECISION_VALUE_EPISODE_V1.example.json](SDCB_DECISION_VALUE_EPISODE_V1.example.json)
+**Expected result:** [SDCB_DECISION_VALUE_EPISODE_V1.expected.json](SDCB_DECISION_VALUE_EPISODE_V1.expected.json)
 **Schema:** [SDCB_DECISION_VALUE_EPISODE_V1.schema.json](SDCB_DECISION_VALUE_EPISODE_V1.schema.json)
+**Sequential fixture:** [SDCB_NONMYOPIC_VALUE_EPISODE_V1.example.json](SDCB_NONMYOPIC_VALUE_EPISODE_V1.example.json)
+**Sequential expected result:** [SDCB_NONMYOPIC_VALUE_EPISODE_V1.expected.json](SDCB_NONMYOPIC_VALUE_EPISODE_V1.expected.json)
+**Sequential schema:** [SDCB_NONMYOPIC_VALUE_EPISODE_V1.schema.json](SDCB_NONMYOPIC_VALUE_EPISODE_V1.schema.json)
 
 ## 1. Research thesis
 
@@ -125,7 +129,9 @@ The standalone Rust reference implements:
 - abstention when all experiments have zero or negative net decision value;
 - negative controls for high information with no decision value, cost overruns, malformed probabilities, and duplicate candidate IDs.
 
-The source has 15 authored Rust tests and uses only the Rust standard library. It has not been compiled or executed in this environment because rustc/cargo are unavailable. The checked-in Draft 2020-12 episode schema passed meta-schema validation, and the example episode passed schema validation plus independent semantic checks for prior normalization, utility dimensions, unique hypothesis IDs, likelihood dimensions, and likelihood row sums. A separate numerical reference calculation was used to check the frozen three-hypothesis example; this is not Rust execution.
+The separate finite-horizon oracle in scripts/research/sdcb_nonmyopic_oracle.rs performs adaptive Bellman recursion for small finite experiment sets. It supports optional stopping, budget constraints, consume-once experiment IDs, outcome-contingent follow-ups, and explicit per-experiment cost. It is bounded to eight candidates, four experiments per policy, and four outcomes per experiment.
+
+The one-step source has 15 authored Rust tests and the finite-horizon source has 10 authored Rust tests and uses only the Rust standard library. It has not been compiled or executed in this environment because rustc/cargo are unavailable. The checked-in Draft 2020-12 episode schema passed meta-schema validation, and the example episode passed schema validation plus independent semantic checks for prior normalization, utility dimensions, unique hypothesis IDs, likelihood dimensions, and likelihood row sums. A separate numerical reference calculation was used to check the frozen three-hypothesis example; this is not Rust execution.
 
 ## 7. Benchmark strategy and comparison
 
@@ -197,9 +203,9 @@ One-step EVSI can still be myopic. An experiment may have zero immediate decisio
 
 For belief state p, remaining experiments E, budget b, and horizon k, the Bellman recurrence is:
 
-\[ V(p,E,b,k)=\max\left\{V_0(p),\max_{e\in E,\ c(e)\le b}\left[-\lambda c(e)+\sum_o P(o|p,e)V(p_{e,o},E\\setminus\\{e\},b-c(e),k-1)\right]\right\}. \]
+\[ V(p,E,b,k)=\max\left\{V_0(p),\max_{e\in E,\ c(e)\le b}\left[-\lambda c(e)+\sum_o P(o|p,e)V(p_{e,o},E\setminus\{e\},b-c(e),k-1)\right]\right\}. \]
 
-The policy is adaptive: after each outcome it can choose a different next experiment, or stop. Each candidate is used at most once. Costs are charged at every selected experiment node. The implementation rejects duplicate candidate IDs and caps the exact candidate set at 12 to keep the reference oracle bounded and auditable.
+The policy is adaptive: after each outcome it can choose a different next experiment, or stop. Each candidate is used at most once. Costs are charged at every selected experiment node. The implementation rejects duplicate candidate IDs and caps the exact candidate set at eight, policy horizon at four, and outcome branching at four to keep the reference oracle bounded and auditable.
 
 ### Sequential counterexample
 
@@ -218,11 +224,11 @@ The finite-horizon oracle is intentionally an exhaustive small-instance comparat
 
 ## 12. Limitations and next extensions
 
-The one-step decision-value module assumes supplied likelihoods and utilities. The exact non-myopic oracle handles only small finite candidate sets (at most 12) and is exponential in the horizon/outcome branching. Both assume a finite hypothesis set and known likelihoods; neither learns likelihoods or utility models, solves continuous design problems, models utility ambiguity, or authenticates evidence.
+The one-step decision-value module assumes supplied likelihoods and utilities. The exact non-myopic oracle handles at most eight candidates, four experiments per policy, and four outcomes per experiment; it is exponential in the horizon and outcome branching. Both assume a finite hypothesis set and known likelihoods; neither learns likelihoods or utility models, solves continuous design problems, models utility ambiguity, or authenticates evidence.
 
 Next research increments:
 
-1. Finite-horizon non-myopic planning against an exact dynamic-programming oracle.
+1. Approximate or bounded-horizon policies that approach the exact small-instance oracle at larger candidate counts.
 2. Robust EVSI under posterior and likelihood misspecification.
 3. Multi-objective Pareto decision value without arbitrary scalarization.
 4. Safe experiment design with hard constraints, chance constraints, and intervention authority.
