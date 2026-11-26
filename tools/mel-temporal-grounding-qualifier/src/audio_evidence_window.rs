@@ -598,7 +598,7 @@ mod tests {
         let manifest = manifest();
         assert_eq!(
             manifest.context.context_manifest_sha256,
-            "621c6faea6b381f98fb62adde3c71325c0d6b90dcc331aae54ba9649eccaa6a6"
+            "0fe3a258449c9fa4b4625c1c91d155c51f95f7694f38472973382ef95504ed95"
         );
         let report = verify_audio_evidence_manifest(&manifest, SOURCE_AUDIO, PCM).unwrap();
         assert_eq!(
@@ -609,6 +609,7 @@ mod tests {
         assert!(report.decoded_pcm_bytes_recomputed);
         assert!(report.window_payloads_recomputed);
         assert!(report.context_manifest_recomputed);
+        assert_eq!(report.target_source_lineage_id, "synthetic-source-lineage-001");
         assert_eq!(report.source_lineage_id, "synthetic-source-lineage-001");
         assert_eq!(report.verified_window_count, 2);
         assert_eq!(report.verified_windows[0].byte_offset, 4);
