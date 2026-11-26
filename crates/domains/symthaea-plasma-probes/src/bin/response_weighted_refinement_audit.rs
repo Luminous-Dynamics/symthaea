@@ -12,7 +12,7 @@ use std::{
 
 use serde::Deserialize;
 use symthaea_plasma_probes::{
-    ComplexResponse, ModeResponseMatrix, ModeRefinementDisposition,
+    ComplexResponse, ModeRefinementDisposition, ModeResponseMatrix,
     plan_response_weighted_refinement,
 };
 
@@ -71,7 +71,9 @@ fn assert_close(actual: f64, expected: f64, field: &str) -> Result<(), Box<dyn E
     if !actual.is_finite() || (actual - expected).abs() > tolerance {
         return Err(IoError::new(
             ErrorKind::InvalidData,
-            format!("{field} mismatch: actual={actual}, expected={expected}, tolerance={tolerance}"),
+            format!(
+                "{field} mismatch: actual={actual}, expected={expected}, tolerance={tolerance}"
+            ),
         )
         .into());
     }
@@ -119,12 +121,7 @@ fn run() -> Result<(), Box<dyn Error>> {
     let coefficients = input
         .coefficients
         .into_iter()
-        .map(|entry| {
-            Ok((
-                entry.mode,
-                ComplexResponse::new(entry.real, entry.imag)?,
-            ))
-        })
+        .map(|entry| Ok((entry.mode, ComplexResponse::new(entry.real, entry.imag)?)))
         .collect::<Result<Vec<_>, Box<dyn Error>>>()?;
     let encoded_bytes = input
         .encoded_bytes
@@ -180,11 +177,18 @@ fn run() -> Result<(), Box<dyn Error>> {
                 format!("mode {} has no measured response bound", expected.mode),
             )
         })?;
-        assert_close(actual_bound, expected.response_loss_bound, "response_loss_bound")?;
+        assert_close(
+            actual_bound,
+            expected.response_loss_bound,
+            "response_loss_bound",
+        )?;
         if disposition_name(actual.disposition) != expected.disposition {
             return Err(IoError::new(
                 ErrorKind::InvalidData,
-                format!("mode {} disposition differs from expected fixture", expected.mode),
+                format!(
+                    "mode {} disposition differs from expected fixture",
+                    expected.mode
+                ),
             )
             .into());
         }
