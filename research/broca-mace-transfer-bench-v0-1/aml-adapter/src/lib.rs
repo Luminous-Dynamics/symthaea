@@ -28,6 +28,7 @@ pub mod source_lineage_graph;
 pub mod source_origin_receipt;
 pub mod source_origin_witness;
 pub mod streaming_session;
+pub mod temporal_projection;
 pub mod acquisition_receipt_v2;
 
 use std::collections::BTreeMap;
