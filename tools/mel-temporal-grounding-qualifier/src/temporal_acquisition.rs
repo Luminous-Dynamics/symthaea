@@ -1325,7 +1325,9 @@ mod tests {
     use super::*;
 
     fn digest(byte: char) -> String {
-        byte.to_string().repeat(64)
+        const HEX: &[u8; 16] = b"0123456789abcdef";
+        let normalized = char::from(HEX[(byte as usize) % HEX.len()]);
+        normalized.to_string().repeat(64)
     }
 
     fn config() -> AnnotationAcquisitionConfigV1 {
