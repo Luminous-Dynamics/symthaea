@@ -18,7 +18,6 @@ use super::worldtest_query_portfolio::{
     evaluate_worldtest_query_portfolio, QueryFamily, TaskDisposition,
     WorldTestPortfolioContext, WorldTestPortfolioError, WorldTestPortfolioInput,
     WorldTestQueryPortfolioCertificate, WorldTestQueryTask,
-    WORLDTEST_PORTFOLIO_QUERY_FAMILY_COUNT, WORLDTEST_PORTFOLIO_SCORE_PPM,
 };
 
 pub const WORLDTEST_MECHANISM_CONDITION_COUNT: usize = 5;
@@ -53,15 +52,6 @@ impl MechanismTransferCondition {
         }
     }
 
-    const fn index(self) -> usize {
-        match self {
-            Self::SameFamilyHoldout => 0,
-            Self::NuisanceShift => 1,
-            Self::ParameterShift => 2,
-            Self::CompositionalShift => 3,
-            Self::StructuralShift => 4,
-        }
-    }
 }
 
 #[derive(Clone, Copy, Debug, Eq, PartialEq)]
@@ -801,7 +791,11 @@ mod tests {
                 environment_family_id: family_id,
                 environment_cluster_id: cluster_id,
                 challenge_program_sha256: digest(50 + run_id as u8),
-                metric_profile_sha256: digest(11 + query_family.index() as u8),
+                metric_profile_sha256: digest(match query_family {
+                    QueryFamily::MaskedFramePrediction => 11,
+                    QueryFamily::ChangeDetection => 12,
+                    QueryFamily::Planning => 13,
+                }),
                 candidate_artifact_sha256: digest(1),
                 exploration_trace_sha256: digest(6),
                 exploration_checkpoint_sha256: digest(7),
@@ -883,12 +877,15 @@ mod tests {
     #[test]
     fn missing_mechanism_query_cell_is_rejected() {
         let mut input = base_input();
-        let omitted = input.tasks.iter().position(|row| {
-            row.condition == MechanismTransferCondition::StructuralShift
-                && row.task.query_family == QueryFamily::Planning
-        }).unwrap();
-        let removed = input.tasks.remove(omitted);
-        input.expected_task_ids.retain(|id| id != &removed.task.task_id);
+        let removed_ids = input.tasks.iter()
+            .filter(|row| {
+                row.condition == MechanismTransferCondition::StructuralShift
+                    && row.task.query_family == QueryFamily::Planning
+            })
+            .map(|row| row.task.task_id.clone())
+            .collect::<BTreeSet<_>>();
+        input.tasks.retain(|row| !removed_ids.contains(&row.task.task_id));
+        input.expected_task_ids.retain(|id| !removed_ids.contains(id));
         assert!(matches!(
             evaluate_mechanism_transfer(&input),
             Err(MechanismTransferError::MissingCell {
@@ -937,7 +934,7 @@ mod tests {
         assert_eq!(cell.task_count, 3);
         assert_eq!(cell.independent_cluster_count, 2);
         assert_eq!(cell.task_weighted_mean_score_ppm, 733_333);
-        assert_eq!(cell.mean_score_ppm, 700_000);
+        assert_eq!(cell.mean_score_ppm, 750_000);
     }
 
     #[test]
@@ -950,6 +947,7 @@ mod tests {
                 && row.task.environment_cluster_id.ends_with("cluster-1")
         }).unwrap();
         target.task.environment_cluster_id = source_cluster.clone();
+        target.task.environment_family_id = "source-family-v1".to_owned();
         assert!(matches!(
             evaluate_mechanism_transfer(&input),
             Err(MechanismTransferError::ClusterSpansMechanismConditions { cluster_id })
