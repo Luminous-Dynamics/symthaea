@@ -71,3 +71,6 @@ The suite mutates source and decision linkage, approval bytes, decision authorit
 3. Connect this preflight to MON-009 v0.2.3 reconciler output and MON-010 claimgraph/CPDC output using exact serialized evidence bytes.
 4. Compare matched end-to-end fault traces against PostgreSQL outbox/logical decoding, DBOS, Temporal and SCITT/Rekor; report W0 throughput separately from W6 effect-qualified throughput.
 5. Execute PostgreSQL race/rollback/revocation integration and a physically observed effect trial before making production claims.
+
+
+The OAR outcome projection is executable in [`oar-outcome/`](oar-outcome/README.md), with three named tests, race ×5, vet and 100% statement coverage.
