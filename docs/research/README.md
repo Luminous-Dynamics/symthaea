@@ -450,11 +450,14 @@ A falsifiable programme for spectral statistics, RH/prime-structure controls, ne
 - [Existing selector integration map](SDCB_EXISTING_SELECTOR_INTEGRATION_MAP_2026_11_26.md): audit of the HDC prediction-disagreement selector, Spark EIG, Cell Foundry HDC/CfC planner, Nuclear heuristic, synthetic ISRU bake-off, and decision-relevant chaos benchmark.
 ### R-I / R-IDeA under model misspecification
 
-- [R-IDeA acquisition protocol](SDCB_RIDEA_ROBUST_ACQUISITION_V1.md): AISTATS 2026 equations for representativeness, EIG and proxy de-amplification.
+- [R-IDeA acquisition protocol](SDCB_RIDEA_ROBUST_ACQUISITION_V1.md): AISTATS 2026 equations and source-faithful released MMD² semantics.
 - [R-IDeA episode schema](SDCB_RIDEA_EPISODE_V1.schema.json), [example](SDCB_RIDEA_EPISODE_V1.example.json), and [expected result](SDCB_RIDEA_EPISODE_V1.expected.json).
-- [R-IDeA Rust reference](../../scripts/research/sdcb_ridea.rs) and [README](../../scripts/research/SDCB_RIDEA_README.md): empirical RBF-MMD, R-I, DeA and cost-separated ranking.
+- [R-IDeA score reference](../../scripts/research/sdcb_ridea.rs): empirical MMD², R-I, DeA and cost-separated ranking.
+- [Linear proxy trainer](../../scripts/research/sdcb_ridea_proxy.rs), [protocol](SDCB_RIDEA_PROXY_TRAINING_V1.md), and [fixture](SDCB_RIDEA_PROXY_TRAINING_V1.example.json): MSE + hinge-margin + L2 proxy objective with a transparent linear feature map.
+- [Proxy episode schema](SDCB_RIDEA_PROXY_TRAINING_V1.schema.json) and [expected result](SDCB_RIDEA_PROXY_TRAINING_V1.expected.json).
+- [R-IDeA harness README](../../scripts/research/SDCB_RIDEA_README.md) and [proxy README](../../scripts/research/SDCB_RIDEA_PROXY_README.md).
 
-**Evidence boundary:** 17 authored Rust tests, not compiled or executed. The reference scores supplied EIG and proxy predictions; it does not train the proxy.
+**Evidence boundary:** 18 R-I/R-IDeA scoring tests plus 13 proxy-training tests (31 total) are authored but not compiled/executed. The proxy trainer is a linear-feature reference, not the original Pyro architecture or an upstream experiment reproduction.
 ### Acquisition comparison bake-off
 
 - [SDCB acquisition comparison bake-off v1](SDCB_ACQUISITION_COMPARISON_BAKEOFF_V1.md): preregistered adapters and matched evaluation across fixed/OFAT/space-filling/random, prediction disagreement, Spark EIG, R-I/R-IDeA, EVSI, exact non-myopic, robust maximin and Pareto/MOBO methods.
