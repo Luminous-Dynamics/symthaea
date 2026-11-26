@@ -102,6 +102,24 @@ When a pre-erasure backup is restored, the current witness still names the post-
 
 This tests only the declared store/sidecar boundary. It does not prove complete deletion from every external cache, replica, export or archival backup; that remains the separate Data Deletion and Right to Be Forgotten metric.
 
+## 4.6 Relationship to IETF integrity levels and third-party verification
+
+The November 2026 at-rest Internet-Draft's informative ladder defines L4 as a whole-store head anchored off the store and describes a fifth level—third-party verification without the store's cooperation—as proposed until a subsystem earns it. SAT treats that fifth-level idea as a research target, not an adopted level or formal IETF requirement.
+
+A SAT third-party verifier must validate more than a Merkle inclusion proof or a checkpoint signature. It must independently check:
+- exact SUT, backend, configuration, evaluator and case-set identities;
+- complete declared store root and the current witnessed generation;
+- quorum receipts over the exact same transition digest and predecessor;
+- witness key status, operator identity and common-cause independence evidence;
+- transparency inclusion and append-only consistency against independently retained checkpoints;
+- freshness/currentness under a declared trusted time or monotonic client-state assumption;
+- cross-monitor view consistency and split-view alarms;
+- T9/T10 recovery and current erasure state from the ordinary read boundary or a separately authenticated reconciliation receipt.
+
+RFC 9162 consistency proofs demonstrate that a tree head extends a prior tree; they do not force the log to reveal its newest head or prevent split views alone. Likewise, a valid signature proves a key signed a checkpoint, not that the key is still authorized, that the head is fresh, or that all clients saw the same view.
+
+SAT should report separate subclaims: `inclusion_verified`, `consistency_verified`, `signature_verified`, `freshness_verified`, `view_consistency_verified`, `quorum_independence_assessed`, and `current_state_reconciled`. The verifier's top-level state is qualified only when every mandatory subclaim for the declared profile is satisfied. Unknown is not pass.
+
 ## 5. Fault-injection campaign
 
 The development case set covers:
