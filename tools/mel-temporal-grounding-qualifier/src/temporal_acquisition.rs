@@ -365,8 +365,7 @@ pub fn plan_annotation_acquisition(
         .iter()
         .map(|selection| selection.source_work_id_sha256.clone())
         .collect();
-    let audit_source_set: BTreeSet<&str> =
-        audit_source_ids.iter().map(String::as_str).collect();
+    let audit_source_set: BTreeSet<&str> = audit_source_ids.iter().map(String::as_str).collect();
 
     let (active_refinement, active_unmet, active_spent, active_source_counts) =
         select_active(&candidates, &eligible_active, &config, &audit_source_set)?;

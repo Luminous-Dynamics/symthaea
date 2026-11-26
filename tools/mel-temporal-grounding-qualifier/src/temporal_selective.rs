@@ -924,8 +924,8 @@ fn percentile(values: &[f64], quantile: f64) -> Option<f64> {
 mod tests {
     use super::*;
     use crate::temporal_grounding::{
-        AudioArtifactClockV1, GroundingPredictionStateV1,
-        TEMPORAL_GROUNDING_EVALUATOR_V1, TEMPORAL_GROUNDING_SCHEMA_V1,
+        AudioArtifactClockV1, GroundingPredictionStateV1, TEMPORAL_GROUNDING_EVALUATOR_V1,
+        TEMPORAL_GROUNDING_SCHEMA_V1,
     };
 
     const AUDIO: &str = "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa";

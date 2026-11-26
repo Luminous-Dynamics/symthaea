@@ -604,8 +604,8 @@ mod tests {
     use std::collections::BTreeSet;
 
     use crate::temporal_acquisition::{
-        AnnotationAcquisitionCandidateV1, AnnotationAcquisitionConfigV1,
-        AnnotationCohortRoleV1, AnnotationStratumQuotaV1, AuthorizationStateV1,
+        AnnotationAcquisitionCandidateV1, AnnotationAcquisitionConfigV1, AnnotationCohortRoleV1,
+        AnnotationStratumQuotaV1, AuthorizationStateV1,
     };
 
     fn digest(byte: char) -> String {
