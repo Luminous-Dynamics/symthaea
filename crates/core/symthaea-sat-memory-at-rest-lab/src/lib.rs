@@ -1188,6 +1188,52 @@ mod tests {
     }
 
     #[test]
+    fn genuine_write_after_erasure_preserves_survivors_and_accepts_sequence_gaps() {
+        let root = fresh_temp_dir("write-after-erasure").unwrap();
+        let paths = LabPaths::new(&root);
+        Sut::initialize(&paths, ProfileMode::ProtectedRead).unwrap();
+        let sut = Sut::open(paths.clone(), ProfileMode::ProtectedRead);
+        sut.seed().unwrap();
+        let before = load_store_file(&paths).unwrap();
+
+        assert!(sut.erase_record("A-4").unwrap());
+        let after_erasure = load_store_file(&paths).unwrap();
+        let survivors: Vec<Record> = before
+            .records
+            .iter()
+            .filter(|record| record.record_id != "A-4")
+            .cloned()
+            .collect();
+        assert_eq!(after_erasure.records, survivors);
+
+        let writer_after_restart = Sut::open(paths.clone(), ProfileMode::ProtectedRead);
+        writer_after_restart
+            .write_record("A", "A-AFTER-ERASURE", "user-A", "VALID-POST-ERASURE-WRITE")
+            .unwrap();
+
+        let reader_after_restart = Sut::open(paths.clone(), ProfileMode::ProtectedRead);
+        let served = reader_after_restart.read_context("A").unwrap();
+        assert!(served.iter().any(|record| {
+            record.record_id == "A-AFTER-ERASURE"
+                && record.fact == "VALID-POST-ERASURE-WRITE"
+        }));
+        assert!(served.iter().all(|record| record.record_id != "A-4"));
+
+        let final_store = load_store_file(&paths).unwrap();
+        assert_eq!(final_store.generation, before.generation + 2);
+        assert!(final_store.records.iter().all(|record| record.record_id != "A-4"));
+        assert_eq!(
+            final_store.records.iter().find(|record| record.record_id == "A-AFTER-ERASURE").unwrap().sequence,
+            before.generation + 2
+        );
+        for survivor in &survivors {
+            assert!(final_store.records.contains(survivor));
+        }
+
+        let _ = fs::remove_dir_all(root);
+    }
+
+    #[test]
     fn complete_local_domain_rollback_defeats_the_example_t9_anchor() {
         let root = fresh_temp_dir("t9-full-domain").unwrap();
         let paths = LabPaths::new(&root);
