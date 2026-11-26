@@ -435,3 +435,13 @@ A falsifiable programme for spectral statistics, RH/prime-structure controls, ne
 - [Non-myopic expected result](SDCB_NONMYOPIC_VALUE_EPISODE_V1.expected.json): expected value 0.85 versus stop value 0.80, checked by independent dynamic-programming calculation.
 
 **Evidence boundary:** 10 additional Rust test functions are authored but not compiled/executed. The exact oracle is intentionally bounded to 8 candidates, 4 steps, and 4 outcomes.
+### Robust and Pareto-aware scientific decision design
+
+- [Robust and Pareto-Aware Scientific Decision Design v1](SDCB_ROBUST_AND_PARETO_DECISION_DESIGN_V1.md): finite ambiguity-set robust EVSI, model-misspecification safeguards, Pareto policy frontiers, and non-compensatory constraints.
+- [petri-bench interoperability analysis](SDCB_PETRI_BENCH_INTEROPERABILITY_2026_11_26.md): method-integrity benchmark comparison and proposed extensions.
+- [Robust episode schema](SDCB_ROBUST_DECISION_EPISODE_V1.schema.json), [example](SDCB_ROBUST_DECISION_EPISODE_V1.example.json), and [expected result](SDCB_ROBUST_DECISION_EPISODE_V1.expected.json).
+- [Pareto episode schema](SDCB_PARETO_DECISION_EPISODE_V1.schema.json), [example](SDCB_PARETO_DECISION_EPISODE_V1.example.json), and [expected result](SDCB_PARETO_DECISION_EPISODE_V1.expected.json).
+- [Robust/Pareto Rust reference](../../scripts/research/sdcb_robust_pareto.rs): maximin experiment choice, Pareto action/policy frontiers, per-hypothesis safety floors, and zero-cost lottery controls.
+- [Robust/Pareto harness README](../../scripts/research/SDCB_ROBUST_PARETO_README.md): compile instructions, limits and claim boundaries.
+
+**Evidence boundary:** 19 Rust test functions are authored but have not been compiled or executed. Independent numerical calculations match the frozen robust and Pareto fixtures. No external benchmark, Symthaea model, or physical system has been evaluated.
