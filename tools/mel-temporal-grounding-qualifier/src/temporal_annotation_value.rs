@@ -208,6 +208,10 @@ pub fn audit_annotation_marginal_value(
         before.model_fully_correct_rate_against_panel,
         after.model_fully_correct_rate_against_panel,
     );
+    let decision_transition = format!(
+        "{:?}->{:?}",
+        before.frozen_decision_state, after.frozen_decision_state
+    );
 
     let active_listening_minutes = input.effort.active_listening_seconds as f64 / 60.0;
     let active_review_minutes = input.effort.active_review_seconds as f64 / 60.0;
@@ -266,10 +270,7 @@ pub fn audit_annotation_marginal_value(
         pairwise_present_matched_iou_delta,
         pairwise_present_count_agreement_delta,
         maximum_event_boundary_spread_delta_ms,
-        decision_transition: format!(
-            "{:?}->{:?}",
-            before.frozen_decision_state, after.frozen_decision_state
-        ),
+        decision_transition,
         effort: input.effort.clone(),
         active_listening_minutes,
         active_review_minutes,
