@@ -1,0 +1,11 @@
+[package]
+name = "connectome-query-stop-calibration"
+version = "0.1.0"
+edition = "2024"
+license = "AGPL-3.0-only"
+description = "Volume-disjoint finite-sample calibration of query-specific future proofreading drift"
+
+[lib]
+path = "src/lib.rs"
+
+[workspace]

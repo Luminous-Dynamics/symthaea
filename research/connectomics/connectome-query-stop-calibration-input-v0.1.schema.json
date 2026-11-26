@@ -1,0 +1,148 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://luminousdynamics.io/schemas/connectome-query-stop-calibration-input-v0.1.schema.json",
+  "title": "Query-specific future proofreading drift calibration input v0.1",
+  "type": "object",
+  "additionalProperties": false,
+  "required": [
+    "profile_id",
+    "calibration_profile_sha256",
+    "group_disjointness_report_sha256",
+    "query_id",
+    "query_definition_sha256",
+    "analysis_code_sha256",
+    "metric_id",
+    "unit_id",
+    "calibration_stratum_id",
+    "materiality_threshold",
+    "future_horizon_edits",
+    "alpha",
+    "target_source_volume_id",
+    "target_independence_cluster_id",
+    "target_is_disjoint_from_calibration",
+    "target_observed_max_drift_ratio",
+    "target_current_uncertainty_width_ratio",
+    "calibration_trajectories",
+    "exchangeability_assessment_sha256",
+    "target_exchangeability_supported",
+    "calibration_trajectory_manifest_sha256"
+  ],
+  "$defs": {
+    "id": {
+      "type": "string",
+      "minLength": 1
+    },
+    "sha": {
+      "type": "string",
+      "pattern": "^[0-9a-f]{64}$"
+    },
+    "trajectory": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "trajectory_id",
+        "source_volume_id",
+        "independence_cluster_id",
+        "evidence_sha256",
+        "observed_max_drift_ratio",
+        "future_max_drift_ratio"
+      ],
+      "properties": {
+        "trajectory_id": {
+          "$ref": "#/$defs/id"
+        },
+        "source_volume_id": {
+          "$ref": "#/$defs/id"
+        },
+        "independence_cluster_id": {
+          "$ref": "#/$defs/id"
+        },
+        "evidence_sha256": {
+          "$ref": "#/$defs/sha"
+        },
+        "observed_max_drift_ratio": {
+          "type": "number",
+          "minimum": 0
+        },
+        "future_max_drift_ratio": {
+          "type": "number",
+          "minimum": 0
+        }
+      }
+    }
+  },
+  "properties": {
+    "profile_id": {
+      "$ref": "#/$defs/id"
+    },
+    "calibration_profile_sha256": {
+      "$ref": "#/$defs/sha"
+    },
+    "group_disjointness_report_sha256": {
+      "$ref": "#/$defs/sha"
+    },
+    "query_id": {
+      "$ref": "#/$defs/id"
+    },
+    "query_definition_sha256": {
+      "$ref": "#/$defs/sha"
+    },
+    "analysis_code_sha256": {
+      "$ref": "#/$defs/sha"
+    },
+    "metric_id": {
+      "$ref": "#/$defs/id"
+    },
+    "unit_id": {
+      "$ref": "#/$defs/id"
+    },
+    "calibration_stratum_id": {
+      "$ref": "#/$defs/id"
+    },
+    "materiality_threshold": {
+      "type": "number",
+      "exclusiveMinimum": 0
+    },
+    "future_horizon_edits": {
+      "type": "integer",
+      "minimum": 1
+    },
+    "alpha": {
+      "type": "number",
+      "exclusiveMinimum": 0,
+      "exclusiveMaximum": 1
+    },
+    "target_source_volume_id": {
+      "$ref": "#/$defs/id"
+    },
+    "target_independence_cluster_id": {
+      "$ref": "#/$defs/id"
+    },
+    "target_is_disjoint_from_calibration": {
+      "type": "boolean"
+    },
+    "target_observed_max_drift_ratio": {
+      "type": "number",
+      "minimum": 0
+    },
+    "target_current_uncertainty_width_ratio": {
+      "type": "number",
+      "minimum": 0
+    },
+    "calibration_trajectories": {
+      "type": "array",
+      "items": {
+        "$ref": "#/$defs/trajectory"
+      }
+    },
+    "exchangeability_assessment_sha256": {
+      "$ref": "#/$defs/sha"
+    },
+    "target_exchangeability_supported": {
+      "type": "boolean"
+    },
+    "calibration_trajectory_manifest_sha256": {
+      "$ref": "#/$defs/sha"
+    }
+  }
+}
