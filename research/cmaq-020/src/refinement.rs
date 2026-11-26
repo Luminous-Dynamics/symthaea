@@ -27,6 +27,8 @@ fn is_sha256(value: &str) -> bool {
 #[derive(Clone, Debug, Eq, PartialEq)]
 pub struct ProbeObservationReceiptV1 {
     pub contract_id: String,
+    /// Exact candidate checkpoint that initiated and received this probe.
+    pub candidate_checkpoint_sha256: String,
     pub left_state_id: String,
     pub right_state_id: String,
     pub response_key: ResponseKey,
@@ -45,6 +47,8 @@ pub struct ProbeObservationReceiptV1 {
 #[derive(Clone, Debug, Eq, PartialEq)]
 pub struct BlindProbeRequest {
     pub contract_id: String,
+    /// Checkpoint whose current partition selected the pair for probing.
+    pub candidate_checkpoint_sha256: String,
     /// Canonical ordering is required: left_state_id must sort before right_state_id.
     pub left_state_id: String,
     pub right_state_id: String,
@@ -161,6 +165,12 @@ impl ProbeBudgetLedger {
         if receipt.source_manifest_sha256 != contract.source_manifest_sha256 {
             return Err("probe receipt source manifest differs from the frozen contract".to_owned());
         }
+        let current_checkpoint = &current_records[0].candidate_checkpoint_sha256;
+        if !is_sha256(&receipt.candidate_checkpoint_sha256)
+            || receipt.candidate_checkpoint_sha256 != *current_checkpoint
+        {
+            return Err("probe receipt candidate checkpoint differs from the current partition".to_owned());
+        }
         if !is_sha256(&receipt.receipt_sha256) {
             return Err("probe receipt digest must be a 64-character SHA-256 hex value".to_owned());
         }
@@ -242,6 +252,12 @@ impl ProbeBudgetLedger {
         if request.contract_id != contract.contract_id {
             return Err("blind probe request belongs to a different contract".to_owned());
         }
+        let current_checkpoint = &current_records[0].candidate_checkpoint_sha256;
+        if !is_sha256(&request.candidate_checkpoint_sha256)
+            || request.candidate_checkpoint_sha256 != *current_checkpoint
+        {
+            return Err("blind probe request candidate checkpoint differs from the current partition".to_owned());
+        }
         if request.left_state_id >= request.right_state_id {
             return Err(
                 "blind probe state IDs must be distinct and canonically ordered".to_owned(),
@@ -276,6 +292,9 @@ impl ProbeBudgetLedger {
         }
         if receipt.source_manifest_sha256 != contract.source_manifest_sha256 {
             return Err("blind probe receipt source manifest differs from the frozen contract".to_owned());
+        }
+        if receipt.candidate_checkpoint_sha256 != request.candidate_checkpoint_sha256 {
+            return Err("blind probe receipt candidate checkpoint differs from the request".to_owned());
         }
         if !is_sha256(&receipt.receipt_sha256) {
             return Err("blind probe receipt digest must be a 64-character SHA-256 hex value".to_owned());
@@ -536,6 +555,7 @@ mod tests {
     ) -> ProbeObservationReceiptV1 {
         ProbeObservationReceiptV1 {
             contract_id: "budgeted-cegar-v1".to_owned(),
+            candidate_checkpoint_sha256: "c".repeat(64),
             left_state_id: left.to_owned(),
             right_state_id: right.to_owned(),
             response_key: key,
@@ -570,6 +590,7 @@ mod tests {
 
         let request = BlindProbeRequest {
             contract_id: contract.contract_id.clone(),
+            candidate_checkpoint_sha256: "c".repeat(64),
             left_state_id: "a".to_owned(),
             right_state_id: "b".to_owned(),
             response_key: ResponseKey::new("probe_fast", "displacement", 1),
@@ -598,6 +619,7 @@ mod tests {
         let mut ledger = ProbeBudgetLedger::new(&contract, 10).expect("valid budget");
         let unmerged = BlindProbeRequest {
             contract_id: contract.contract_id.clone(),
+            candidate_checkpoint_sha256: "c".repeat(64),
             left_state_id: "a".to_owned(),
             right_state_id: "b".to_owned(),
             response_key: key.clone(),
@@ -615,6 +637,7 @@ mod tests {
         ];
         let reversed = BlindProbeRequest {
             contract_id: contract.contract_id.clone(),
+            candidate_checkpoint_sha256: "c".repeat(64),
             left_state_id: "b".to_owned(),
             right_state_id: "a".to_owned(),
             response_key: key.clone(),
@@ -638,6 +661,7 @@ mod tests {
         ];
         let request = BlindProbeRequest {
             contract_id: contract.contract_id.clone(),
+            candidate_checkpoint_sha256: "c".repeat(64),
             left_state_id: "a".to_owned(),
             right_state_id: "b".to_owned(),
             response_key: ResponseKey::new("probe_fast", "displacement", 1),
@@ -665,6 +689,29 @@ mod tests {
                 .is_err()
         );
         assert_eq!(ledger.spent_units(), 0);
+        let wrong_checkpoint = BlindProbeRequest {
+            candidate_checkpoint_sha256: "d".repeat(64),
+            ..request.clone()
+        };
+        let wrong_checkpoint_receipt = receipt(
+            "a",
+            "b",
+            wrong_checkpoint.response_key.clone(),
+            0,
+            0,
+        );
+        assert!(
+            ledger
+                .charge_blind_probe(
+                    &current,
+                    &contract,
+                    &wrong_checkpoint,
+                    &wrong_checkpoint_receipt,
+                )
+                .is_err()
+        );
+        assert_eq!(ledger.spent_units(), 0);
+
         let bad_receipt = receipt("a", "b", request.response_key.clone(), 0, 1);
         assert!(
             ledger
@@ -692,6 +739,7 @@ mod tests {
         ];
         let request = BlindProbeRequest {
             contract_id: contract.contract_id.clone(),
+            candidate_checkpoint_sha256: "c".repeat(64),
             left_state_id: "a".to_owned(),
             right_state_id: "b".to_owned(),
             response_key: ResponseKey::new("probe_fast", "displacement", 1),
