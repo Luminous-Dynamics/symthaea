@@ -212,6 +212,8 @@ pub struct PairedInterventionPairResult {
     pub sign_eligible: bool,
     pub sign_correct: Option<bool>,
     pub predicted_interval_covered: Option<bool>,
+    /// Width of the predicted paired-effect interval; sharpness diagnostic.
+    pub predicted_interval_width_micro: Option<u128>,
     pub invariant_observation_count: u64,
     pub invariant_false_change_count: u64,
 }
@@ -234,6 +236,8 @@ pub struct PairedInterventionClusterSummary {
     pub sign_correct_count: u64,
     pub interval_count: u64,
     pub interval_covered_count: u64,
+    pub interval_width_sum_micro: u128,
+    pub mean_interval_width_micro: Option<u128>,
     pub invariant_observation_count: u64,
     pub invariant_false_change_count: u64,
 }
@@ -261,6 +265,10 @@ pub struct PairedInterventionFamilySummary {
     pub cluster_balanced_sign_accuracy_ppm: Option<u32>,
     pub interval_pair_count: u64,
     pub interval_covered_pair_count: u64,
+    /// Task-pair-weighted diagnostic interval width.
+    pub task_weighted_mean_interval_width_micro: Option<u128>,
+    /// Equal-weighted mean of per-cluster interval widths.
+    pub cluster_balanced_mean_interval_width_micro: Option<u128>,
     /// Equal-weighted cluster interval-coverage rate in PPM.
     pub cluster_balanced_interval_coverage_ppm: Option<u32>,
     pub invariant_observation_count: u64,
@@ -644,6 +652,7 @@ struct ClusterAccumulator {
     sign_correct_count: u64,
     interval_count: u64,
     interval_covered_count: u64,
+    interval_width_sum_micro: u128,
     invariant_observation_count: u64,
     invariant_false_change_count: u64,
 }
@@ -657,6 +666,7 @@ struct FamilyAccumulator {
     sign_correct_count: u64,
     interval_count: u64,
     interval_covered_count: u64,
+    task_interval_width_sum_micro: u128,
     invariant_observation_count: u64,
     invariant_false_change_count: u64,
     clusters: BTreeMap<String, ClusterAccumulator>,
@@ -1094,6 +1104,7 @@ pub fn evaluate_paired_interventions(
             sign_eligible: false,
             sign_correct: None,
             predicted_interval_covered: None,
+            predicted_interval_width_micro: None,
             invariant_observation_count: 0,
             invariant_false_change_count: 0,
         };
@@ -1143,6 +1154,10 @@ pub fn evaluate_paired_interventions(
                 sign_eligible.then(|| effect_sign(predicted_effect) == effect_sign(true_effect));
             let covered = true_effect >= i128::from(interval.lower_micro)
                 && true_effect <= i128::from(interval.upper_micro);
+            let interval_width_micro = u128::try_from(
+                i128::from(interval.upper_micro) - i128::from(interval.lower_micro),
+            )
+            .map_err(|_| PairedInterventionError::ArithmeticOverflow)?;
 
             let expected_invariant_ids = context
                 .expected_invariant_variable_ids
@@ -1189,6 +1204,7 @@ pub fn evaluate_paired_interventions(
             pair_result.sign_eligible = sign_eligible;
             pair_result.sign_correct = sign_correct;
             pair_result.predicted_interval_covered = Some(covered);
+            pair_result.predicted_interval_width_micro = Some(interval_width_micro);
             pair_result.invariant_observation_count = u64::try_from(pair.invariant_variables.len())
                 .map_err(|_| PairedInterventionError::ArithmeticOverflow)?;
             pair_result.invariant_false_change_count = invariant_false_change_count;
@@ -1226,6 +1242,14 @@ pub fn evaluate_paired_interventions(
                 increment(&mut family.interval_covered_count)?;
             }
             increment(&mut family.interval_count)?;
+            family.task_interval_width_sum_micro = family
+                .task_interval_width_sum_micro
+                .checked_add(pair_result.predicted_interval_width_micro.ok_or(
+                    PairedInterventionError::PairIntervalMissing {
+                        pair_id: pair.pair_id.clone(),
+                    },
+                )?)
+                .ok_or(PairedInterventionError::ArithmeticOverflow)?;
             family.task_contrast_error_sum_micro = family
                 .task_contrast_error_sum_micro
                 .checked_add(error)
@@ -1252,6 +1276,14 @@ pub fn evaluate_paired_interventions(
                 increment(&mut cluster.sign_correct_count)?;
             }
             increment(&mut cluster.interval_count)?;
+            cluster.interval_width_sum_micro = cluster
+                .interval_width_sum_micro
+                .checked_add(pair_result.predicted_interval_width_micro.ok_or(
+                    PairedInterventionError::PairIntervalMissing {
+                        pair_id: pair.pair_id.clone(),
+                    },
+                )?)
+                .ok_or(PairedInterventionError::ArithmeticOverflow)?;
             if pair_result.predicted_interval_covered == Some(true) {
                 increment(&mut cluster.interval_covered_count)?;
             }
@@ -1310,6 +1342,7 @@ pub fn evaluate_paired_interventions(
         let mut cluster_error_means = Vec::new();
         let mut cluster_sign_rates = Vec::new();
         let mut cluster_interval_rates = Vec::new();
+        let mut cluster_interval_width_means = Vec::new();
         let mut cluster_false_change_rates = Vec::new();
         for (cluster_id, cluster) in &accumulator.clusters {
             let mean_error = if cluster.completed_count > 0 {
@@ -1326,13 +1359,19 @@ pub fn evaluate_paired_interventions(
                         / u128::from(cluster.sign_eligible_count),
                 );
             }
-            if cluster.interval_count > 0 {
+            let mean_interval_width_micro = if cluster.interval_count > 0 {
+                let mean = cluster.interval_width_sum_micro
+                    / u128::from(cluster.interval_count);
+                cluster_interval_width_means.push(mean);
                 cluster_interval_rates.push(
                     u128::from(cluster.interval_covered_count)
                         * u128::from(PAIRED_INTERVENTION_SCORE_PPM)
                         / u128::from(cluster.interval_count),
                 );
-            }
+                Some(mean)
+            } else {
+                None
+            };
             if cluster.invariant_observation_count > 0 {
                 cluster_false_change_rates.push(
                     u128::from(cluster.invariant_false_change_count)
@@ -1357,6 +1396,8 @@ pub fn evaluate_paired_interventions(
                 sign_correct_count: cluster.sign_correct_count,
                 interval_count: cluster.interval_count,
                 interval_covered_count: cluster.interval_covered_count,
+                interval_width_sum_micro: cluster.interval_width_sum_micro,
+                mean_interval_width_micro,
                 invariant_observation_count: cluster.invariant_observation_count,
                 invariant_false_change_count: cluster.invariant_false_change_count,
             });
@@ -1373,6 +1414,22 @@ pub fn evaluate_paired_interventions(
             )
         } else {
             None
+        };
+        let task_weighted_mean_interval_width = if accumulator.interval_count > 0 {
+            Some(
+                accumulator.task_interval_width_sum_micro
+                    / u128::from(accumulator.interval_count),
+            )
+        } else {
+            None
+        };
+        let cluster_balanced_mean_interval_width = if cluster_interval_width_means.is_empty() {
+            None
+        } else {
+            Some(
+                cluster_interval_width_means.iter().sum::<u128>()
+                    / cluster_interval_width_means.len() as u128,
+            )
         };
         let avg_rates = |values: &[u128]| -> Result<Option<u32>, PairedInterventionError> {
             if values.is_empty() {
@@ -1407,6 +1464,8 @@ pub fn evaluate_paired_interventions(
             cluster_balanced_sign_accuracy_ppm: avg_rates(&cluster_sign_rates)?,
             interval_pair_count: accumulator.interval_count,
             interval_covered_pair_count: accumulator.interval_covered_count,
+            task_weighted_mean_interval_width_micro: task_weighted_mean_interval_width,
+            cluster_balanced_mean_interval_width_micro: cluster_balanced_mean_interval_width,
             cluster_balanced_interval_coverage_ppm: avg_rates(&cluster_interval_rates)?,
             invariant_observation_count: accumulator.invariant_observation_count,
             invariant_false_change_count: accumulator.invariant_false_change_count,
