@@ -490,6 +490,73 @@
           }
         }
       }
+    },
+    {
+      "if": {
+        "properties": {
+          "third_party_verification": {
+            "properties": {
+              "transparency_log_used": {
+                "const": false
+              }
+            },
+            "required": [
+              "transparency_log_used"
+            ]
+          }
+        },
+        "required": [
+          "third_party_verification"
+        ]
+      },
+      "then": {
+        "properties": {
+          "third_party_verification": {
+            "properties": {
+              "checks": {
+                "properties": {
+                  "transparency_inclusion_verified": {
+                    "const": false
+                  },
+                  "transparency_consistency_verified": {
+                    "const": false
+                  }
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    {
+      "if": {
+        "properties": {
+          "third_party_verification": {
+            "properties": {
+              "decision": {
+                "const": "qualified"
+              }
+            },
+            "required": [
+              "decision"
+            ]
+          }
+        },
+        "required": [
+          "third_party_verification"
+        ]
+      },
+      "then": {
+        "properties": {
+          "third_party_verification": {
+            "properties": {
+              "evidence_refs": {
+                "minItems": 1
+              }
+            }
+          }
+        }
+      }
     }
   ]
 }
