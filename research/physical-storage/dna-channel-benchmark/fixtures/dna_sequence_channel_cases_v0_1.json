@@ -1,0 +1,161 @@
+{
+  "schema_version": "symthaea-dna-sequence-channel-cases-v0.1",
+  "evidence_class": "synthetic_known_answer",
+  "evidence_boundary": "All sequences and changes below are synthetic fixtures. They are not estimates of physical synthesis or sequencing error rates.",
+  "alphabet": "ACGTN",
+  "scorer_only_labels": [
+    {
+      "case_id": "perfect",
+      "reference_sequence": "ACGTACGT",
+      "expected": {
+        "edit_distance": 0,
+        "substitutions": 0,
+        "insertions": 0,
+        "deletions": 0
+      }
+    },
+    {
+      "case_id": "single_substitution",
+      "reference_sequence": "ACGTACGT",
+      "reads": [
+        "ACGTTCGT"
+      ],
+      "expected": {
+        "edit_distance": 1,
+        "substitutions": 1,
+        "insertions": 0,
+        "deletions": 0
+      }
+    },
+    {
+      "case_id": "single_insertion",
+      "reference_sequence": "ACGTACGT",
+      "reads": [
+        "ACGTTACGT"
+      ],
+      "expected": {
+        "edit_distance": 1,
+        "substitutions": 0,
+        "insertions": 1,
+        "deletions": 0
+      }
+    },
+    {
+      "case_id": "single_deletion",
+      "reference_sequence": "ACGTACGT",
+      "reads": [
+        "ACGACGT"
+      ],
+      "expected": {
+        "edit_distance": 1,
+        "substitutions": 0,
+        "insertions": 0,
+        "deletions": 1
+      }
+    },
+    {
+      "case_id": "mixed_substitution_deletion",
+      "reference_sequence": "ACGTACGT",
+      "reads": [
+        "ATGTCGT"
+      ],
+      "expected": {
+        "edit_distance": 2,
+        "substitutions": 1,
+        "insertions": 0,
+        "deletions": 1
+      }
+    },
+    {
+      "case_id": "dropout",
+      "reference_sequence": "ACGTACGT",
+      "reads": [],
+      "expected": {
+        "dropout": true
+      }
+    },
+    {
+      "case_id": "abundance_and_duplicates",
+      "reference_sequence": "ACGTACGT",
+      "reads": [
+        {
+          "sequence": "ACGTACGT",
+          "read_count": 1
+        },
+        {
+          "sequence": "ACGTACGT",
+          "read_count": 4
+        },
+        {
+          "sequence": "ACGTTCGT",
+          "read_count": 2
+        }
+      ],
+      "expected": {
+        "distinct_read_records": 3,
+        "molecule_observations": 7,
+        "duplicate_observations": 4
+      }
+    },
+    {
+      "case_id": "gc_and_homopolymer_pass",
+      "reference_sequence": "ACGTACGT",
+      "sequence_constraints": {
+        "min_gc": 0.5,
+        "max_gc": 0.5,
+        "max_homopolymer": 2
+      },
+      "expected": {
+        "gc_fraction": 0.5,
+        "max_homopolymer": 1,
+        "valid": true
+      }
+    },
+    {
+      "case_id": "homopolymer_fail",
+      "reference_sequence": "AAAAAA",
+      "sequence_constraints": {
+        "min_gc": 0,
+        "max_gc": 1,
+        "max_homopolymer": 3
+      },
+      "expected": {
+        "gc_fraction": 0,
+        "max_homopolymer": 6,
+        "valid": false
+      }
+    }
+  ],
+  "inference_input_separation": "A real decoder receives read sequences, quality values, calibration and provenance. Reference sequences and expected edit labels reside only in scorer-side fixtures and are never supplied to inference.",
+  "soft_information_fixture": {
+    "type": "synthetic_probability_ordering_only",
+    "error_probabilities": [
+      0.01,
+      0.12,
+      0.83,
+      0.41,
+      0.03
+    ],
+    "minimum_error_probability": 0.1,
+    "expected_position_order": [
+      2,
+      3,
+      1
+    ],
+    "expected_progressive_sets": [
+      [
+        2
+      ],
+      [
+        2,
+        3
+      ],
+      [
+        2,
+        3,
+        1
+      ]
+    ],
+    "calibrated_physical_probability": false
+  }
+}
