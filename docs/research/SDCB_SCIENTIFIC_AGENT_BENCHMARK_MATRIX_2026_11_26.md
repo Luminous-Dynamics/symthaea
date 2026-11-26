@@ -11,7 +11,7 @@ Scientific-agent benchmarks test different capabilities and use incompatible sco
 | Benchmark | Evaluation focus | Published snapshot available by 26 Nov 2026 | Best SDCB use |
 |---|---|---|---|
 | **petri-bench** | Controlled experiments, hypothesis isolation, statistical inference, calibrated conclusions and process integrity in procedural mystery worlds | Sweep v2 page: 699 published episodes (579 model + 120 baseline), 30 tasks across five worlds, eight model directories with leaderboard rows, eight-call budget. Current model runs are incomplete; only fully completed tier rows receive an overall score. | Method rigor, controlled experimental behaviour, p-hacking/probe-only audit, evidence-log replay |
-| **ActiveSciBench / LLM-AutoSciLab** | Closed-loop mechanism discovery with budgeted oracle queries: enzyme kinetics and gene-regulatory networks | 57 ActiveSciBench-Chem tasks and 45 ActiveSciBench-GRN tasks. The project reports 35.1% symbolic accuracy on Chem and 31.1% exact graph recovery on GRN for its method, and reports 2–5× sample-efficiency gains over its strongest baselines. These are the authors' reported task-specific results. | Hypothesis-conditioned design, variable selection, recovery of mechanisms under finite experiment budgets |
+| **ActiveSciBench / LLM-AutoSciLab** | Closed-loop mechanism discovery with budgeted oracle queries: enzyme kinetics and gene-regulatory networks | 57 ActiveSciBench-Chem tasks and 45 ActiveSciBench-GRN tasks. The project reports 35.1% symbolic accuracy on Chem versus 31.6% for its Bayesian experimental-design comparator, and 31.1% exact graph recovery on GRN versus 6.7% for GIES. It also reports 72.5% GRN edge F1 versus 56.3% for GIES and 2–5× sample-efficiency gains over its strongest baselines. These are the authors' task-specific results, not directly comparable to other benchmark families. | Hypothesis-conditioned design, variable selection, recovery of mechanisms under finite experiment budgets |
 | **Autonomous Science Bench 0.1** | Whole AI-agent systems on laboratory-origin workflows: plan experiments, interpret returned data, improve decisions and deliver a final artifact | Six pilot tasks (two each in biology, chemistry and materials); ten configurations ran all six tasks with three trials per task. The current page reports GPT-6 Astra/Codex 72.2% resolution at $190.23 and 557 min, Opus 5.5/Claude Code 66.7% at $172.91 and 1,142 min. The authors warn that three trials per task make small gaps non-significant. | End-to-end campaign execution, tool/harness effects, cost and time-to-result, transition from replay to digital twin/live lab |
 | **ASI-Bench** | Project-level AI-for-science workflows across multiple domains and four guidance levels (B1–B4) | Public registry describes a 60-task seed42 set across 11 domains. Its leaderboard page reports a 26-ranked snapshot updated 10 Nov 2026; GPT-6.1 Sol/Codex is listed at 63.90 and GPT-6 Astra/Codex at 62.23. Treat the overall scores as benchmark-specific, not directly comparable to Petri/ASB. | Broad project execution, robustness to reducing prompt guidance, structured artifacts and provenance |
 | **AutoSciBench** | Automatically generated and iteratively refined scientific-agent benchmark tasks | Its October 2026 paper reports that generated tasks lowered average solver accuracy by 22.4 percentage points in computational biology and 25.5 points in materials science versus human-curated tasks, while receiving higher average task-quality ratings across the three evaluated domains. | Hidden task refresh, shortcut discovery, benchmark anti-saturation, adaptive challenge generation |
@@ -43,6 +43,38 @@ AutoSciBench's result is a warning against static task saturation. SDCB should r
 
 ASB and ASI-Bench explicitly measure the agent/harness/model or project workflow, not model weights in isolation. SDCB should therefore report model-only selector results and full agent-scaffold results separately, with tools, prompt guidance, sandbox, runtime and source-access assumptions frozen.
 
+### 4.5 From fixed calibration expiry to evidence-based measurement assurance
+
+Calibration cannot be represented faithfully by a universal time-to-live. NIST guidance states that calibration intervals should be determined by the instrument's required accuracy, observed stability, use and environment; it points to measurement-assurance practices such as in-use checks, cross-comparisons with reference standards, and control charts to characterize behaviour over time. NIST also makes a crucial distinction: metrological traceability is a property of a measurement result, supported by an unbroken calibration chain with uncertainty contributions, not a property conferred on an instrument merely because it was calibrated by a national metrology institute.
+
+The SDCB consequence is a shift from a Boolean `calibrated=true` or a generic expiry timer to an **evidence-updated measurement-assurance state**:
+
+- retain a hard capture-window guard for a proposal that depends on a particular calibration epoch;
+- separately estimate device drift and calibration validity from check standards, reference comparisons, environment, usage and control-chart evidence;
+- propagate calibration-chain uncertainty into the observation likelihood and downstream decision value;
+- treat cross-device agreement cautiously when devices share a standard, batch, environment, firmware, or common-cause failure;
+- bind each observation to the actual device, calibration epoch, uncertainty model and capture interval;
+- distinguish receipt authenticity, metrological traceability, and scientific validity.
+
+A clock-based validity window is therefore a safety constraint, not proof that an instrument remains accurate until its expiry time. Conversely, evidence from stable control measurements may support a different recalibration policy from one chosen by a generic fixed interval. SDCB should benchmark whether this evidence-based policy improves decisions without relaxing required traceability or hard quality limits.
+
+This direction connects to Bayesian adaptive calibration and optimal design, which jointly estimates calibration uncertainty and chooses subsequent experiments, and to recent Bayesian design work for calibrating model discrepancy. References are listed in Section 9.
+
+
+
+### 4.8 From synthetic-only assurance to real sensor calibration
+
+A real-data evaluation path is now specified in [SDCB Real-Sensor Calibration and Drift Benchmark Plan v1](SDCB_REAL_SENSOR_BENCHMARK_PLAN_V1.md).
+
+Two complementary public datasets have different roles:
+
+- **Inha Indoor-Sensor-Calibration-Dataset (2026):** paired low-cost/reference indoor-air measurements across five locations over six months, five variables, minute-level resampling, and door/window/occupancy/business-hours context. Its four author-defined scenarios are reference efficiency, location transfer, long-term drift, and event-conditioned calibration. Use it as the primary active reference-allocation and cross-location/drift benchmark. A single five-location university-lab dataset is not evidence of broad cross-building generalization.
+- **UCI Gas Sensor Array Drift:** 13,910 measurements from a 16-channel chemical sensor array across six gases and 36 months, arranged into ten chronological batches. Use it for forward-only channel drift and concentration/classification transfer. The 16 channels form one array; they must not be represented as 16 independent deployed devices. UCI marks the dataset research-only and excludes commercial use.
+
+The 2026 LiteSensor-Net/KD-DM study is a useful edge-classification comparator on the UCI drift task, reporting 92.63 ± 2.02% accuracy and macro-F1 0.898 for its base model, plus a chronological KD-DM gain over its uncompensated reference. Those are classifier/edge-deployment metrics, not experiment-selection or decision-value scores. Preserve the task boundary and use the published results only when the exact chronological protocol, implementation and split can be reproduced.
+
+The common-cause SDCB subtrack remains separate: the real datasets do not fully label shared reference-chain/power/firmware/environment errors. Use paired hidden perturbations with known common and local causes for those controls, and never mix counterfactual scores with the unmodified real-data calibration metrics.
+
 ## 5. SDCB's competitive positioning
 
 Do not claim to beat all scientific agents on a single number. Aim to establish a distinctive, defensible result:
@@ -66,6 +98,9 @@ That claim requires at least five separately reported result families:
 | Autonomous campaigns | ASB | agent policy with low/medium/high fidelity, resource-Pareto action | resolution, campaign progress, unmeasured-design learning, cost/time |
 | Project-level research | ASI-Bench / AstaBench | same methods wrapped in the exact required harness | B1–B4 autonomy, task artifact score, provenance, cost |
 | Fresh hidden evaluations | AutoSciBench-style generator | locked baselines and adaptive candidate | transfer to unseen mechanisms, shortcut resistance, task validity |
+| Measurement assurance / traceability (guidance, not a leaderboard) | NIST calibration and metrological-traceability guidance | control-standard checks, cross-device comparisons, calibration-state-aware likelihoods, joint EGBT instrument-state updates | traceability chain and uncertainty, drift detection, calibration false acceptance, device identity binding, measurement assurance quality |
+| Common-cause measurement assurance (research subtrack, not an upstream leaderboard) | NIST MAP practices; sensor-network calibration and correlation datasets | i.i.d. negative control, random-effects/hierarchical calibration, co-calibration, reference-first, robust common-state policy | false independent-confirmation rate, common/local state recovery, residual-correlation error, decision regret, measurement assurance and evidence integrity |
+| Real sensor calibration and drift | Inha 2026 indoor calibration dataset; UCI Gas Sensor Array Drift | published calibration models, static/affine/hierarchical calibration, fixed/random/EIG/EVSI/R-IDeA/SDCB reference selection | physical-unit RMSE/MAE, reference queries, leave-location-out transfer, forward drift, event calibration, resource cost |
 
 For every track, use matched task seeds, experiment and tool budgets, evidence access, action set and stop rules. Use task-family clustered bootstrap intervals and paired tests. Publish failures and consumed resources. Five seeds is the first minimum for synthetic families; real-lab workflows should use enough repeated campaigns to estimate variance, which may be substantially more than five.
 
@@ -89,6 +124,11 @@ These are project targets, not external standards or achieved results:
 - R-I/R-IDeA source-faithful score reference and separate linear proxy-training reference: draft PR #13741.
 - Robust multi-fidelity decision/Pareto reference: draft PR #13759.
 - Greedy R-I/R-IDeA design portfolio with sequential MMD² updates: draft PR #13760.
+- Instrument-aware two-stage calibration/science design: draft PR #13762.
+- Drift-aware Markov instrument-state and independent-device replication reference: draft PR #13793.
+- Evidence-gated joint scientific/instrument belief transition: draft PR #13801.
+- Shared common-cause measurement and reference-calibration decision oracle: draft PR #13804.
+- Evidence-gated joint science/common-cause/device belief transition: draft PR #13805.
 
 All current additions have authored Rust tests, but the toolchain is unavailable here and the draft workflows are skipped. No benchmark tournament, physical experiment, or SOTA result has been completed.
 
@@ -104,3 +144,44 @@ All current additions have authored Rust tests, but the toolchain is unavailable
 - Multi-fidelity Bayesian optimization best practices, Nature Computational Science (2025): https://www.nature.com/articles/s43588-025-00822-9
 - IJCAI 2026 adaptive experimental design: https://ijcai.org/proceedings/2026/904
 - AI Index 2026: https://hai.stanford.edu/assets/files/ai_index_report_2026.pdf
+- NIST, Recommended Calibration Interval: https://www.nist.gov/calibrations/recommended-calibration-interval
+- NIST, Metrological Traceability: https://www.nist.gov/metrology/metrological-traceability
+- NIST, Calibration Policies and Measurement Assurance Programs: https://www.nist.gov/calibrations/policies
+- NIST, Measurement Process Characterization and Control: https://www.itl.nist.gov/div898/handbook/mpc/section2/mpc21.htm
+- Measurement Uncertainty Evaluation for Sensor Network Metrology: https://www.mdpi.com/2673-8244/5/1/3
+- Modelling calibration uncertainty in networks of environmental sensors, Journal of the Royal Statistical Society Series C: https://academic.oup.com/jrsssc/article/72/5/1187/7250331
+- Modelling and determining correlations in sensor networks: https://doi.org/10.1016/j.measen.2024.101793
+- Automation in sensor network metrology: https://doi.org/10.1016/j.measen.2024.101799
+- Inha 2026 indoor sensor calibration dataset: https://github.com/inhaKDD/Indoor-Sensor-Calibration-Dataset
+- Yun et al., Low-Cost Sensor Calibration for Indoor Air Quality Monitoring (arXiv:2610.11236): https://arxiv.org/abs/2610.11236
+- UCI Gas Sensor Array Drift Dataset: https://archive.ics.uci.edu/dataset/224/gas%2Bsensor%2Barray%2Bdrift%2Bdataset
+- UCI Gas Sensor Array Drift at Different Concentrations: https://archive.ics.uci.edu/dataset/270/gas%2Bsensor%2Barray%2Bdrift%2Bdataset%2Bat%2Bdifferent%2Bconcentrations
+- Kim et al., Drift-Robust Lightweight Deep Learning on Open Gas Sensor Benchmarks, Molecules (2026): https://doi.org/10.3390/molecules31111884
+- Bayesian Adaptive Calibration and Optimal Design, NeurIPS 2024: https://papers.neurips.cc/paper_files/paper/2024/hash/673b9f8cba4ee9f15b88656a69761631-Abstract-Conference.html
+- Bayesian experimental design for model-discrepancy calibration, Journal of Computational Physics (2026): https://doi.org/10.1016/j.jcp.2025.11446
+
+### 4.6 From device count to common-cause-aware evidence
+
+Different device identities do not imply independent errors. Sensor-network metrology research documents correlations across sensors caused by shared ambient conditions, common reference instruments, and temporal error processes. It also distinguishes correlation in the measurand from correlation in sensor error—an important identifiability problem that needs reference measurements or controlled comparisons.
+
+The next SDCB reference therefore adds a shared latent environment/reference state (g) in addition to device-local states (c_d). A common Markov transition moves (g) between two experiment stages; all named devices observe the new shared state, so cross-device agreement can remain uninformative about the scientific hypothesis. A reference standard can directly measure (g), subject to the freshness of that reference measurement.
+
+The analytical negative control is deliberately sharp: science-A repeated, or science-A followed by science-B, each stays at decision value 0.50 under an unobserved shared XOR bias. Shared-reference calibration followed by science reaches 0.905 in the stable scenario and 0.743 when the shared state flips with probability 0.20. These are analytic fixture values, not physical or benchmark results.
+
+Comparator requirements now include:
+- i.i.d. sensor-noise fusion as a negative-control model;
+- same-device repeat and cross-device agreement;
+- random-effects/hierarchical common/local bias models;
+- Bayesian sensor-network calibration and co-calibration;
+- check-standard/control-chart policies;
+- matched EIG, EVSI, R-IDeA, multi-fidelity, and exact finite references.
+
+The next research extension should distinguish genuine correlation in the measured physical field from shared sensor error, and should include common reference-chain, batch, firmware, power, and environmental factors. The bounded binary common-state reference does not yet solve continuous or multiple-factor sensor-network calibration.
+
+### 4.7 From evidence provenance to joint evidence-state estimation
+
+Authenticating a measurement receipt and updating a scientific posterior are not enough when measurement errors have shared structure. The belief service must retain the common cause and each device's local state, or later observations can be interpreted against an obsolete or collapsed measurement model.
+
+The new common-cause EGBT reference extends the existing receipt-bound joint ledger from (p(h,c_1,\\ldots,c_D)) to (p(h,g,c_1,\\ldots,c_D)). Accepted observations bind the common-cause registry/ID/version as well as the device registry/ID/version, calibration context, capture interval, proposal, and global belief version. A reference-calibration receipt updates the shared state (g) while preserving scientific marginal belief when the prior warrants that; a subsequent science receipt updates (h) through the shared measurement state.
+
+This should remain a separate research reference until independent attestation, traceability, Markov state propagation, append-only event storage, and independent replay are qualified. Digest shape and a verifier boolean are not production cryptographic evidence.
