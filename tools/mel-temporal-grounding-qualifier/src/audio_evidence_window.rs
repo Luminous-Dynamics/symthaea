@@ -83,6 +83,14 @@ pub struct EvidenceContextItemV1 {
 
 #[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
 #[serde(deny_unknown_fields)]
+pub struct ClientRequestBodyV1 {
+    pub body_sha256: String,
+    pub byte_length: u64,
+    pub content_type: String,
+}
+
+#[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
+#[serde(deny_unknown_fields)]
 pub struct EvidenceContextV1 {
     pub prompt_sha256: String,
     pub adapter_sha256: String,
@@ -115,6 +123,7 @@ pub struct AudioEvidenceWindowManifestV1 {
     /// The byte-exact decoded PCM representation used for frame slicing.
     pub decoded_pcm: DecodedPcmArtifactV1,
     pub windows: Vec<EvidenceWindowV1>,
+    pub request_body: ClientRequestBodyV1,
     pub context: EvidenceContextV1,
 }
 
@@ -149,6 +158,9 @@ pub struct AudioEvidenceVerificationReportV1 {
     pub decoded_pcm_bytes_recomputed: bool,
     pub window_payloads_recomputed: bool,
     pub context_manifest_recomputed: bool,
+    pub request_body_sha256: String,
+    pub request_body_bytes_recomputed: bool,
+    pub request_body_delivery_attested: bool,
     pub verified_window_count: usize,
     pub verified_windows: Vec<VerifiedWindowV1>,
     /// Decoder/profile identifiers are supplied metadata until #13254 verifies
@@ -192,22 +204,32 @@ struct EvidenceContextDigestPayloadV1<'a> {
     adapter_sha256: &'a str,
     retrieval_policy_sha256: &'a str,
     items: &'a [EvidenceContextItemV1],
+    request_body_sha256: &'a str,
+    request_body_byte_length: u64,
+    request_body_content_type: &'a str,
 }
 
 pub fn verify_audio_evidence_manifest_json(
     manifest_json: &str,
     source_audio_bytes: &[u8],
     decoded_pcm_bytes: &[u8],
+    request_body_bytes: &[u8],
 ) -> Result<AudioEvidenceVerificationReportV1, String> {
     let manifest: AudioEvidenceWindowManifestV1 = serde_json::from_str(manifest_json)
         .map_err(|error| format!("invalid audio evidence manifest JSON: {error}"))?;
-    verify_audio_evidence_manifest(&manifest, source_audio_bytes, decoded_pcm_bytes)
+    verify_audio_evidence_manifest(
+        &manifest,
+        source_audio_bytes,
+        decoded_pcm_bytes,
+        request_body_bytes,
+    )
 }
 
 pub fn verify_audio_evidence_manifest(
     manifest: &AudioEvidenceWindowManifestV1,
     source_audio_bytes: &[u8],
     decoded_pcm_bytes: &[u8],
+    request_body_bytes: &[u8],
 ) -> Result<AudioEvidenceVerificationReportV1, String> {
     if manifest.schema != MANIFEST_SCHEMA_V1 {
         return Err(format!("unsupported audio evidence schema: {}", manifest.schema));
@@ -264,6 +286,17 @@ pub fn verify_audio_evidence_manifest(
     let decoded_pcm_sha256 = sha256_hex(decoded_pcm_bytes);
     if decoded_pcm_sha256 != manifest.decoded_pcm.pcm_sha256 {
         return Err("decoded PCM bytes do not match declared SHA-256".into());
+    }
+
+    require_text(&manifest.request_body.content_type, "request_body.content_type")?;
+    validate_digest(&manifest.request_body.body_sha256, "request_body.body_sha256")?;
+    if request_body_bytes.is_empty() {
+        return Err("client request-body bytes must not be empty".into());
+    }
+    validate_declared_length(request_body_bytes, manifest.request_body.byte_length, "request_body")?;
+    let request_body_sha256 = sha256_hex(request_body_bytes);
+    if request_body_sha256 != manifest.request_body.body_sha256 {
+        return Err("client request-body bytes do not match declared SHA-256".into());
     }
 
     if manifest.decoded_pcm.sample_rate_hz == 0 || manifest.decoded_pcm.channels == 0 {
@@ -393,6 +426,9 @@ pub fn verify_audio_evidence_manifest(
         decoded_pcm_bytes_recomputed: true,
         window_payloads_recomputed: true,
         context_manifest_recomputed: true,
+        request_body_sha256,
+        request_body_bytes_recomputed: true,
+        request_body_delivery_attested: false,
         verified_window_count: verified_windows.len(),
         verified_windows,
         rights_scope_authenticated: false,
@@ -479,6 +515,9 @@ fn context_digest(manifest: &AudioEvidenceWindowManifestV1) -> Result<String, St
         adapter_sha256: &manifest.context.adapter_sha256,
         retrieval_policy_sha256: &manifest.context.retrieval_policy_sha256,
         items: &manifest.context.items,
+        request_body_sha256: &manifest.request_body.body_sha256,
+        request_body_byte_length: manifest.request_body.byte_length,
+        request_body_content_type: &manifest.request_body.content_type,
     };
     canonical_json_sha256(&payload)
         .map_err(|error| format!("failed canonical context manifest encoding: {error}"))
