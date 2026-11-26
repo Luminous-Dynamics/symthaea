@@ -73,6 +73,7 @@ pub enum CaOcrcReasonV1 {
     LabelNotYetAvailable,
     ReportNotYetAvailable,
     LabelAvailabilityBeforeMeasurement,
+    LabelAvailableBeforePrediction,
     ActualDelayOutOfBounds,
     FeedbackRoundMismatch,
     PredictionNotFound,
@@ -200,6 +201,7 @@ pub struct CaOcrcEngineStateV1 {
     pub theorem_assumptions_intact: bool,
     pub guarantee_invalid_reasons: BTreeSet<String>,
     pub max_observed_occupancy: usize,
+    pub last_round_time_unix_seconds: Option<i64>,
 }
 
 #[derive(Clone, Debug, PartialEq, Serialize, Deserialize)]
@@ -283,8 +285,8 @@ fn policy_digest(policy: &CaOcrcPolicyV1) -> Result<String, CaOcrcErrorV1> {
     json_sha256(policy)
 }
 
-fn state_digest(state: &CaOcrcEngineStateV1) -> Result<String, CaOcrcErrorV1> {
-    json_sha256(state)
+fn engine_digest(engine: &CaOcrcEngineV1) -> Result<String, CaOcrcErrorV1> {
+    json_sha256(engine)
 }
 
 fn label_report_digest(
@@ -532,6 +534,17 @@ fn validate_engine(engine: &CaOcrcEngineV1) -> Result<(), CaOcrcErrorV1> {
     if engine.state.tracked.len() > engine.policy.tracking_capacity {
         return Err(CaOcrcErrorV1("CA-OCRC tracking set exceeds capacity".into()));
     }
+    if engine.predictions_by_round.len() != engine.sample_to_round.len() {
+        return Err(CaOcrcErrorV1("prediction history and sample index lengths differ".into()));
+    }
+    for (round, receipt) in &engine.predictions_by_round {
+        if *round != receipt.round
+            || prediction_receipt_digest(receipt)? != receipt.receipt_sha256
+            || engine.sample_to_round.get(&receipt.sample_id) != Some(round)
+        {
+            return Err(CaOcrcErrorV1("immutable prediction receipt ledger is inconsistent".into()));
+        }
+    }
     for (round, tracked) in &engine.state.tracked {
         if *round != tracked.prediction_receipt.round
             || tracked.proxy_expiry_round
@@ -594,6 +607,7 @@ pub fn create_ca_ocrc_engine_v1(
             theorem_assumptions_intact: delay_assumption_attested,
             guarantee_invalid_reasons,
             max_observed_occupancy: 0,
+            last_round_time_unix_seconds: None,
         },
         predictions_by_round: BTreeMap::new(),
         sample_to_round: BTreeMap::new(),
@@ -663,6 +677,9 @@ fn validate_feedback_against_prediction(
     }
     if feedback.label_available_at_unix_seconds < prediction.event_time_unix_seconds {
         reasons.push(CaOcrcReasonV1::LabelAvailabilityBeforeMeasurement);
+    }
+    if feedback.label_available_at_unix_seconds < prediction.prediction_at_unix_seconds {
+        reasons.push(CaOcrcReasonV1::LabelAvailableBeforePrediction);
     }
     if feedback.delivered_at_unix_seconds < feedback.label_available_at_unix_seconds
         || feedback.delivered_at_unix_seconds > current_time_unix_seconds
@@ -819,7 +836,16 @@ pub fn step_ca_ocrc_round_v1(
         ));
     }
 
-    let state_before = state_digest(&engine.state)?;
+    if engine
+        .state
+        .last_round_time_unix_seconds
+        .is_some_and(|previous| prediction.round_time_unix_seconds <= previous)
+    {
+        return Err(CaOcrcErrorV1(
+            "round wall-clock time must advance strictly with round index".into(),
+        ));
+    }
+    let state_before = engine_digest(engine)?;
     let threshold_before = engine.state.threshold;
     let mut candidate = engine.clone();
     let evicted_rounds = evict_expired(&mut candidate, prediction.round);
@@ -1088,12 +1114,13 @@ pub fn step_ca_ocrc_round_v1(
         return Err(CaOcrcErrorV1("CA-OCRC threshold update is non-finite".into()));
     }
     candidate.state.threshold = next_threshold;
+    candidate.state.last_round_time_unix_seconds = Some(prediction.round_time_unix_seconds);
     candidate.state.next_round = candidate
         .state
         .next_round
         .checked_add(1)
         .ok_or_else(|| CaOcrcErrorV1("CA-OCRC round counter overflow".into()))?;
-    let state_after = state_digest(&candidate.state)?;
+    let state_after = engine_digest(&candidate)?;
     let survival = proxy_survival_vector(&candidate.policy)?;
     let load_ell = proxy_tracking_load(&candidate.policy)?;
     let bound = if candidate.state.theorem_assumptions_intact
