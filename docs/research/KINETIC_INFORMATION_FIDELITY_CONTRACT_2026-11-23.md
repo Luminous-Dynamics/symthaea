@@ -1,0 +1,1169 @@
+# Kinetic information fidelity contract — v0.1
+
+**Date:** 23 November 2026  
+**Status:** Research specification; not yet implemented or experimentally qualified  
+**Scope:** Periodic 1D1V collisionless Vlasov–Poisson as the first common cohort  
+**Owners / related work:** [#12907](https://github.com/Luminous-Dynamics/symthaea/issues/12907), [#12910](https://github.com/Luminous-Dynamics/symthaea/issues/12910), [#12914](https://github.com/Luminous-Dynamics/symthaea/issues/12914), [#12921](https://github.com/Luminous-Dynamics/symthaea/issues/12921), [#12942](https://github.com/Luminous-Dynamics/symthaea/issues/12942), [#12976](https://github.com/Luminous-Dynamics/symthaea/issues/12976), [#12979](https://github.com/Luminous-Dynamics/symthaea/issues/12979), [#13104](https://github.com/Luminous-Dynamics/symthaea/issues/13104), [#13132](https://github.com/Luminous-Dynamics/symthaea/issues/13132), [#13138](https://github.com/Luminous-Dynamics/symthaea/issues/13138), [#13156](https://github.com/Luminous-Dynamics/symthaea/issues/13156), [#13169](https://github.com/Luminous-Dynamics/symthaea/issues/13169), [#13177](https://github.com/Luminous-Dynamics/symthaea/issues/13177), [#13414](https://github.com/Luminous-Dynamics/symthaea/issues/13414), [#13404](https://github.com/Luminous-Dynamics/symthaea/issues/13404)
+
+## Executive thesis
+
+A kinetic representation must be qualified against the physical questions it is expected to answer, not only against reconstruction of its current distribution.
+
+A representation can:
+- preserve the present density, flow, pressure and electric field;
+- fail to preserve the fine velocity-space phase information needed by a later pulse;
+- nevertheless be the cheapest valid choice for a workload that never asks that future question.
+
+Conversely, a globally accurate phase-space reconstruction can waste substantial compute preserving detail irrelevant to the declared observables.
+
+The benchmark must therefore report a **fidelity vector, a complete resource vector and a future-response envelope**. It must not collapse them into a single score that lets a strong result in one dimension conceal a failure in another.
+
+The central research hypothesis is:
+
+> A solver that preserves the required future response family at lower total cost, while declaring where it cannot provide that guarantee, is a better kinetic simulator for that workload than one optimized only for global state reconstruction.
+
+This is a testable research hypothesis, not an achieved result or a claim of universal kinetic sufficiency.
+
+## 1. The fidelity contract
+
+Every benchmark candidate declares which of the following contracts it supports. A candidate may legitimately support macroscopic fidelity while marking microscopic reconstruction as unsupported. Unsupported is not a zero score; it is **not qualified for that contract**.
+
+### 1.1 Microscopic-state fidelity
+
+Question: does the candidate preserve the phase-space state to the requested resolution?
+
+Measure, where the representation exposes a comparable distribution:
+- weighted relative phase-space norms on a common domain;
+- distribution and spectral discrepancies at multiple resolutions;
+- spatial and velocity spectral-tail occupancy;
+- filament orientation / phase information and velocity-window leakage;
+- mass, momentum, kinetic energy and field / total energy;
+- positivity or negative-mass diagnostics where a nonnegative distribution is part of the method's contract;
+- reconstruction, projection and compression residuals.
+
+Dense, Hermite, Legendre and tensor representations must be compared through a declared common diagnostic projection or a converged reference. Comparing unrelated native coefficient norms is not a physical comparison.
+
+Report **strong** and **weak / observable** state errors separately. A strong diagnostic may use a weighted phase-space norm such as
+
+\[
+\epsilon_{L^2,w} =
+\frac{\|f-\hat f\|_{L^2(w)}}{\|f\|_{L^2(w)}+\epsilon_0},
+\]
+
+while an observable-projection error uses a frozen family of test functionals \(\Psi\):
+
+\[
+\epsilon_{\Psi} =
+\max_{\psi\in\Psi}
+\left|\int (f-\hat f)\,\psi(x,v)\,dx\,dv\right|.
+\]
+
+An optional negative-Sobolev norm may be reported as a separate diagnostic when its domain, boundary conditions and exponent are declared. Do not substitute it for a physical quantity of interest. Weak error can hide fine phase-space filaments; the intervention-response tier tests whether those hidden structures matter to the future physical questions actually registered.
+
+A learned fluid closure that does not reconstruct f(x,v,t) is not assigned an invented microscopic error. Its microscopic status is **unsupported / unscored** unless a separate recovery mechanism is supplied and tested.
+
+### 1.2 Macroscopic-observable fidelity
+
+Question: does the candidate reproduce the specified physical observables and their trajectories?
+
+Each workload freezes its quantity-of-interest (QoI) registry before evaluation. For the first 1D1V cohorts this should include the applicable subset of:
+- complex electric-field modes, amplitude and phase;
+- damping or growth rate and frequency;
+- density, flow and pressure trajectories;
+- field energy, saturation level and bounce modulation;
+- declared integrated fluxes and balance residuals;
+- selected moments, spectra and synthetic diagnostics.
+
+The contract names the exact norm, time interval, normalization, sampling cadence, thresholds and reference convergence requirement for every QoI.
+
+**Do not require a learned effective closure flux to equal the pointwise kinetic flux unless that is explicitly part of the scientific task.** Record two distinct objects:
+1. the kinetic flux computed from the reference distribution;
+2. the effective closure flux needed by the reduced discretized moment system.
+
+A closure may reproduce the declared moment dynamics without reproducing the pointwise kinetic flux. That is a legitimate macroscopic result, but it does not establish microscopic fidelity or future-response preservation.
+
+### 1.3 Intervention-response fidelity
+
+Question: after a controlled future intervention, does the retained representation produce the same physical response as an independently converged reference?
+
+Define a preregistered intervention family
+
+\[
+u = (k_{\rm pulse},\phi_{\rm pulse},A,t_{\rm pulse},g_{\rm pulse}),
+\]
+
+where g describes the pulse shape / operator and the remaining entries identify spatial mode, phase, amplitude and application time.
+
+For each intervention, define the complex response map
+
+\[
+\mathcal R_f(u,t)
+\longrightarrow
+(k_{\rm response},\phi_{\rm response},
+ A_{\rm response},t_{\rm peak},w_{\rm peak},\ldots).
+\]
+
+The response contract includes the full registered waveform where needed, not just one peak. It also records branch identity and parentage for multi-pulse experiments.
+
+For matched signed interventions, use finite-amplitude parity estimators:
+
+\[
+C_k^{(1)}(A,t)=
+\frac{R_k(+A,t)-R_k(-A,t)}{2A},
+\]
+
+\[
+C_k^{(2)}(A,t)=
+\frac{R_k(+A,t)+R_k(-A,t)-2R_k(0,t)}
+{2A^2}.
+\]
+
+These are finite-amplitude estimates. They become estimates of asymptotic response coefficients only after an amplitude-convergence study demonstrates that higher-order contamination is controlled. Complex phase, mode identity, physical time and pulse identity must remain matched. A mismatch returns UNKNOWN; it must not be silently interpolated or associated with a different peak.
+
+At minimum, score separately:
+- complex amplitude error;
+- wrapped phase error;
+- peak-time and width error;
+- full response-waveform error;
+- missing, extra and mis-associated response branches;
+- control consistency (no-pulse, no-second-pulse, phase-mismatch, filtered-state and injected-noise controls).
+
+A successful two-pulse echo is not evidence of arbitrary future-response preservation. The guarantee is bounded by the declared intervention family, parameter support and tested horizon. Fixed registered suites should be supplemented with adversarial probe search: #13404 searches for admissible pulses that expose a response discrepancy missed by the ordinary suite. Such a search discovers empirical witnesses; it does not certify a continuous worst-case bound without an independent covering / regularity argument.
+
+### Task-conditioned kinetic equivalence
+
+This gives a more precise mathematical target than a universal "amount of kinetic information". For a checkpoint state f, candidate compressed state \(\hat f\), admissible intervention family \(\mathcal U\), QoI registry \(\mathcal Q\), physical horizon T and tolerances \(\tau_q\), define the normalized response distinguishability
+
+\[
+D_{\mathcal U,\mathcal Q,T}(f,\hat f)
+=
+\sup_{u\in\mathcal U}
+\max_{q\in\mathcal Q}
+\frac{
+d_q\!\left(
+q\!\left(\Phi^u_{t_0:T}(f)\right),
+q\!\left(\Phi^u_{t_0:T}(\hat f)\right)
+\right)
+}{\tau_q}.
+\]
+
+Here \(\Phi^u_{t_0:T}\) denotes evolution from the checkpoint under intervention u, and \(d_q\) is the frozen observable-specific trajectory/phase/waveform distance. The representation pair is *task-equivalent over this declared envelope* only if \(D\leq 1\), while also satisfying all mandatory physical-admissibility gates.
+
+This induces a task-conditioned equivalence relation (up to the declared tolerances): states that differ microscopically may be interchangeable for one QoI/intervention/horizon contract, yet distinguishable for another. This is the mathematical basis for legitimate observable-oriented compression: preserve the equivalence class needed by the task, not necessarily every microscopic degree of freedom.
+
+A finite probe set can only estimate a lower bound on the supremum through the largest verified discrepancy found. A confirmed adversarial witness with normalized discrepancy above 1 falsifies task-equivalence. Failure to find a witness does **not** establish \(D\leq 1\). A continuous worst-case pass requires a justified global upper bound (for example, a validated covering/regularity bound or interval method) over the declared intervention family. Without such a bound, label the result empirical probe coverage, not a certified supremum.
+
+### 1.4 Sensitivity fidelity
+
+For tasks that use inference, design or control, add a separate derivative contract for
+
+\[
+\nabla_\theta J,\qquad
+\frac{\partial \mathcal R}{\partial u},
+\]
+
+where J is a declared QoI and theta a declared parameter vector.
+
+Compare against analytic manufactured solutions, a justified discrete adjoint, or independently converged finite differences over multiple step sizes. Treat rank changes, clipping, active-set changes, representation switches and fallback boundaries as possible nondifferentiabilities. An unavailable or unqualified gradient is preferable to a fabricated one.
+
+Differentiability is not physical correctness: the derivative of an inaccurate trajectory can also be inaccurate.
+
+## 2. The three-axis tournament
+
+The tournament reports three independent axes.
+
+### Axis A — fidelity
+
+A vector, not a scalar:
+
+\[
+F=(F_{\rm micro},F_{\rm macro},F_{\rm response},F_{\rm sensitivity}).
+\]
+
+Each entry is PASS, FAIL, UNKNOWN or UNSUPPORTED for the exact declared contract. Keep each QoI and response branch visible. Do not average a failed critical observable into a good aggregate.
+
+### Axis B — total computational cost
+
+Count the complete work required to produce an admitted answer:
+
+\[
+C_{\rm total} =
+C_{\rm init}+C_{\rm advance}+C_{\rm solve}
++C_{\rm compress}+C_{\rm convert}+C_{\rm transition}
++C_{\rm observe}+C_{\rm I/O}+C_{\rm fallback}+C_{\rm recover}.
+\]
+
+Also report:
+- wall time (p50 / p95 across repeated runs);
+- peak host and device memory;
+- energy-to-solution when measurable;
+- data movement and host/device transfers;
+- initialization, training and compilation cost;
+- checkpointing, replay, diagnostics and serialization;
+- all failed and retried work.
+
+For a trained closure or learned operator, report both one-time training cost and amortized cost over a declared number of production rollouts. Do not compare a warmed, trained model against an untrained solver while hiding training cost.
+
+### Axis C — future observability
+
+The candidate declares an intervention-response envelope:
+
+\[
+\Omega_{\rm response} =
+\{(u,T): \text{the response contract passes for intervention }u
+\text{ through horizon }T\}.
+\]
+
+Report:
+- weighted coverage of the preregistered intervention set;
+- minimum coverage on critical intervention strata;
+- the longest independently qualified horizon per stratum;
+- response loss after each compression or transition;
+- cost to recover a richer state or fall back to a kinetic reference;
+- abstention / UNKNOWN rate outside the calibrated envelope.
+
+A useful descriptive efficiency is
+
+\[
+\mathrm{RPE} =
+\frac{\text{preregistered, qualified intervention--QoI weight}}
+{\text{total measured compute cost}}.
+\]
+
+Weights must be frozen before the tournament. RPE is a secondary summary, never a replacement for the three-axis Pareto frontier or the individual hard gates.
+
+For deployment comparison, add two operational metrics:
+
+```
+QST = sum of physical time increments whose entire interval is independently qualified
+      / declared physical simulation horizon
+
+QSP/J = sum of qualified physical simulation seconds
+        / total measured joules for the complete workflow
+```
+
+A time interval counts as qualified only when every mandatory physical, response, branch, boundary and geometric-structure gate passes. UNKNOWN intervals do not count as qualified time. Energy must include the solver, diagnostics, observation, representation changes, checkpointing, shadow overlap, fallback and recovery; amortize training / model construction over a declared rollout count and report both amortized and cold-start totals. If energy cannot be measured, report QSP per wall-clock second and core/GPU-hours separately rather than infer joules from runtime.
+
+The goal is not maximum simulated time at any cost. Report QSP/J alongside the full accuracy–latency–memory Pareto frontier, false-stay rate, false-handoff rate, hand-off lead-time sufficiency and rollback rate. An aggressive controller that accumulates more simulated time by crossing a hard gate must score worse, not better.
+
+**Important limit:** passing a finite intervention library establishes preservation only for that tested family and envelope. It does not prove that the complete microscopic state is uniquely recoverable or that every unregistered future intervention is safe.
+
+## 3. Validity horizon and the FNO lesson
+
+A model's validity is a function of physical time, not a permanent property of its architecture or training score.
+
+Define the qualified horizon as the largest preregistered horizon for which every mandatory contract gate remains within tolerance:
+
+\[
+H_{\rm valid} =
+\max\{T_j:\text{all mandatory gates pass through }T_j\}.
+\]
+
+Evaluate at frozen intermediate horizons as well as the final time. Report the first failure time and the trajectory segment that caused it. A late-time failure must not be hidden by an average over a successful early interval.
+
+The October 2026 neural-operator study is a direct motivation for this separation:
+
+- Burles, Camporeale and Pezzi report approximately 0.2% agreement in fitted Landau damping rate within the linear training window, with resolved moments reproduced well in that window.
+- The paper reports that late-time field-variable errors reach order unity after the train/test time split as the deeply damped signal approaches the numerical noise floor.
+- In its amplitude scan, interpolation across held-out amplitudes inside the training range is successful, while the two largest out-of-range amplitudes (0.2 and 0.3) depart from the kinetic damping rate.
+- In the nonlinear regime, the learned effective heat-flux divergence can differ from the kinetic heat-flux divergence by order unity while the retained moments remain much better reproduced.
+- Its present implementation is a one-dimensional spatial FNO using a 50-step history and 128-point fluid grid; generalization across wavenumber and temperature is not established, and the authors identify solver/discretization dependence and distributed patch-local deployment as open work.
+- The paper and its code/training data are openly available through [Zenodo record 22800112](https://doi.org/10.5281/zenodo.22800112).
+
+Sources:
+- [Burles, Camporeale & Pezzi (2026), Journal of Plasma Physics, DOI 10.1017/S0022377826102517](https://doi.org/10.1017/S0022377826102517)
+- [Cambridge full text](https://www.cambridge.org/core/journals/journal-of-plasma-physics/article/neural-operator-closure-for-landau-damping-in-electrostatic-plasma/80ADFCACF5B83E1AC270C5D1ECFA2EF0)
+
+The correct conclusion is not that the FNO is poor. It is that its excellent task-specific macroscopic result must be reported as such, and not promoted into a microscopic or arbitrary-horizon guarantee.
+
+## 4. Benchmark ladder
+
+Keep the initial equation cohort fixed: periodic 1D1V collisionless Vlasov–Poisson, with explicit normalization, spatial and velocity domains, initial conditions, timestep policy and reference convergence evidence.
+
+### Tier 0 — manufactured and analytic controls
+
+- homogeneous equilibrium;
+- exact free streaming / characteristics;
+- affine velocity shifts and scalings with known moment Jacobians;
+- manufactured Fourier perturbations;
+- representation round trips;
+- analytic first- and second-order signed-response fixtures;
+- gradient checks where a sensitivity contract is claimed.
+
+Purpose: falsify sign, phase, time alignment, conservation and projection defects before expensive nonlinear runs.
+
+### Tier 1 — linear Landau damping
+
+- amplitude sweeps in the linear regime;
+- complex fundamental mode amplitude, phase and damping rate;
+- time-window and output-cadence convergence;
+- timestep, spatial and velocity-domain refinement;
+- interpolation and extrapolation cohorts separated;
+- analytic dielectric / dispersion reference where applicable.
+
+### Tier 2 — nonlinear trapping and saturation
+
+- weak-to-strong amplitude scan through the trapping transition;
+- saturation and bounce modulation;
+- moment trajectories and kinetic/effective heat-flux distinction;
+- energy and invariant drift;
+- out-of-range amplitude and parameter challenges.
+
+### Tier 3 — signed two-pulse response
+
+- positive, zero and negative pulse cohorts;
+- cross-mode response matrix;
+- complex phase and amplitude;
+- amplitude convergence for first- and second-order terms;
+- no-second-pulse and phase-mismatch controls;
+- controlled filtering / hypercollision / truncation interventions;
+- independent spatial, velocity and timestep refinement.
+
+The existing [signed-response parity PR #13378](https://github.com/Luminous-Dynamics/symthaea/pull/13378) supplies the measurement primitive, not the completed physical experiment.
+
+### Tier 4 — finite multi-pulse response graph
+
+- three-pulse and finite echo-chain cohorts;
+- a preregistered interaction graph reviewed before scoring;
+- branch identity and lineage;
+- near-cancellation, overlapping branches and below-floor cases;
+- mode-range and time-resolution failure controls.
+
+Do not infer a universal nonlinear cascade formula from pairwise timing. The multi-pulse graph must be derived and independently validated for its specific cohort.
+
+### Tier 5 — heterogeneous kinetic structure
+
+- two-stream instability;
+- bump-on-tail;
+- passing beams and narrow resonances;
+- trapped-particle structures and plateaus;
+- velocity-tail and finite-window stress;
+- positivity / realizability challenges;
+- local component split/merge and representation-switch cycles.
+
+This tier tests the multi-component atlas in [#13177](https://github.com/Luminous-Dynamics/symthaea/issues/13177). A global rank/basis policy is a baseline, not the presumed winner.
+
+## 5. Competitor and industry comparison
+
+Only compare methods on matched equations, initial conditions, boundary conditions, normalization, QoI definitions, physical horizons and resource accounting. Unmatched results remain contextual evidence, not leaderboard entries.
+
+| Method | What its published/source record establishes | Fair challenge for this programme |
+|---|---|---|
+| Online FNO closure (2026) | Strong task-specific resolved-moment closure; non-Markovian memory; effective heat flux may differ from kinetic flux | Reproduce from public Zenodo assets; score train window, held-out horizon, interpolation, extrapolation, scheme transfer and pulse-response envelope separately |
+| ADEPT | Differentiable JAX/Diffrax plasma framework; the original compact hidden-variable closure reports about 14x on its own kinetic-closure task | Reproduce the original task separately; compare matched 1D1V cohorts and gradient costs without transferring the 14x headline to unrelated solvers |
+| VlasovTT.jl | Fully spectral tensor-train / MPS Vlasov–Poisson with tensor-cross interpolation and dense reference path | Match dense vs compressed path; sweep rank, truncation and TCI tolerance; include reconstruction, Poisson and conversion cost |
+| Structure-preserving decorated-particle Vlasov–Poisson (Quashie et al., arXiv 2026) | Scovel–Weinstein decorated particles add shape degrees of freedom while retaining a finite-dimensional Hamiltonian reduction inherited from the continuum; the paper compares with standard PIC and reports fewer decorated particles at comparable accuracy | Mandatory HRBKR / geometric-particle baseline: match field solver, time integrator, initial data and accuracy; measure particle count plus per-particle shape state, Hamiltonian defect, mass/momentum/energy and echo-response fidelity; count shape evolution and all-field cost |
+| Adaptive Hermite spectral method (2026) | Dynamically scaled Hermite coordinates with conservative projection designed to preserve mass, momentum, energy and L2 norm | Compare coefficient-tail indicators and conservative basis changes against response loss and a common dense reference |
+| Local solution-manifold decomposition ROM (Tsai et al.; arXiv 2023, CPC 2026) | Time-windowed and electric-energy-windowed local POD bases with a precomputed tensorial nonlinear update. The paper reports TW-ROM about 280× online speedup (56 s FOM vs 0.2 s ROM) with maximum 13% test final-state relative error; EW-ROM about 90× with 11% test error and 7.5% training error. TW tensor construction for 100 windows took 87.2 s, exceeding one FOM run; timings were on LLNL Quartz Intel Xeon CPUs with libROM. | Required collisionless 1D1V baseline; reproduce TW and EW separately, charge tensor/basis construction and amortization, match four-corner training design and windows, and test full trajectory/phase/echo response—not only final-state L2 or energy |
+| Parametric probabilistic manifold decomposition (Guo & Xiao, SISC 48(6), 2026) | Nonlinear probabilistic manifold embedding with parameter-aware latent kernel-ridge learning; paper reports improved unseen-parameter generalization vs POD+GPR on cylinder and backward-facing-step flow cases | General parametric-ROM comparator, not a plasma result. Reproduce exact original flow cases and POD+GPR baseline first; require calibrated posterior/latent uncertainty, whole-parameter holdouts, branch-aware response distortion and KIRD cost accounting. Current inspected public repo snapshot is `NOT_REPRODUCED`; see [source admission PR #13502](https://github.com/Luminous-Dynamics/symthaea/pull/13502) and [RPKMD issue #13501](https://github.com/Luminous-Dynamics/symthaea/issues/13501) |
+| Adaptive Fourier spectral VP (Cho & Russo 2026) | 6th-order 11-stage Hamiltonian splitting; two heuristic tail triggers (inner/outer windows at 0.8–0.9 / 0.9–1.0 Nyquist with C=10, R=1.2, or boundary-tail/global-peak tolerances 1e-6/1e-9/1e-12 with R=1.2); zero-padding preserves discrete mass and L2. During the fully resolved regime, the paper reports mass, L1, L2, energy and entropy preserved to machine precision. Once the memory limit prevents further expansion, unresolved filamentation degrades L1/L2/energy/entropy while mass remains invariant; this is not reported as an error at every zero-padding event. | Compare tail-only triggers with QoI/adjoint/response triggers under the same memory cap; include false refinement rate, trigger lead time before future-echo/QoI loss, all padded bytes and p95 cost. Measure minimum f/negative mass independently; test safe behavior at memory exhaustion, including validity-horizon termination, retained response information and explicit fallback rather than silently proceeding under-resolved |
+| High-field VPFP micro–macro Micro-ROM (Zhang & Hu 2026) | Retains density at full spatial order, applies POD–Galerkin only to the nonequilibrium fluctuation in f=M+εg; Chebyshev field maps and separable collision blocks give approximately velocity-grid-independent online cost and discrete mass conservation. At Nx=128, ε=1e-2, Nv=512 the paper reports 37.03× online speedup for rank 20 and 16.09× for rank 40 over 15 repeated runs to T=0.1 on Apple M1 Max; offline training and reconstruction are excluded. | Required baseline on a separate collisional high-field VPFP cohort; compare AP-limit fidelity, mass balance, fluctuation/QoI error, positivity/dissipation and complete offline/online/reconstruction cost; do not mix with collisionless VP Landau/echo cohorts |
+| NEOPIC (2026) | Particle-measure neural field operator; no mesh/deposition in its stated method; claims O(Np) evaluation and separates sampling, learning and time-stepping error | Compare on a particle-matched cohort; include particle-noise scaling, inference/training particle-count transfer, field error and complete particle-workflow cost |
+| Smilei 5.1 | Production PIC with GPU support and locally adaptive scalar/vectorized particle operators; published examples report workload-specific speedups | Use as an industry baseline only on matching physics and hardware; measure deposition/gather, communication and diagnostics |
+| WarpX 26.11 | Production AMReX PIC with GPU-aware particle sorting/deposition and profiling options | Measure full run and scaling; include sorting, deposition and communication, not only the field solve |
+| Dense spectral reference | High-resolution equation-matched reference for small 1D1V cohorts | Treat as reference, not as an assumed best production method |
+
+Primary sources:
+- [VlasovTT paper, JCP (2026), DOI 10.1016/j.jcp.2026.115330](https://doi.org/10.1016/j.jcp.2026.115330)
+- [Adaptive Hermite spectral method, arXiv:2605.17820](https://arxiv.org/abs/2605.17820)
+- [Structure-Preserving Decorated Particle Method for Vlasov–Poisson, Quashie et al., arXiv:2605.21794](https://arxiv.org/abs/2605.21794)
+- [The linearized Vlasov–Maxwell system as a Hamiltonian system, JCP 555 (2026), DOI 10.1016/j.jcp.2026.114765](https://doi.org/10.1016/j.jcp.2026.114765)
+- [NEOPIC, arXiv:2610.40528](https://arxiv.org/abs/2610.40528)
+- [Local reduced-order modeling / solution-manifold decomposition, arXiv:2310.18493](https://arxiv.org/abs/2310.18493); published as Computer Physics Communications 322 (2026), 110039, DOI 10.1016/j.cpc.2026.110039
+- [Adaptive Fourier spectral method for Vlasov–Poisson, arXiv:2607.12368](https://arxiv.org/abs/2607.12368)
+- [High-field VPFP micro–macro Micro-ROM, arXiv:2610.25569](https://arxiv.org/abs/2610.25569)
+- [Parametric Probabilistic Manifold Decomposition, Guo & Xiao, SISC 48(6) (2026), DOI 10.1137/26M185758X](https://doi.org/10.1137/26M185758X)
+- [PPMD source repository](https://github.com/apprenticeGuo/Parametric-Probabilistic-Manifold-Decomposition-for-Nonlinear-Model-Reduction) — inspected main commit `056e4879a033cfecb44d8fb11983125b99a562eb`; see [immutable source audit PR #13502](https://github.com/Luminous-Dynamics/symthaea/pull/13502).
+- [Vlasov–Poisson instability suppression objective study, JCP 115169 (1 Nov 2026), DOI 10.1016/j.jcp.2026.115169](https://doi.org/10.1016/j.jcp.2026.115169)
+- [Einkemmer et al., constrained Vlasov–Poisson field control, JCP 498 (2024), 112662](https://doi.org/10.1016/j.jcp.2023.112662)
+- [ADEPT repository](https://github.com/ergodicio/adept) and [solver documentation](https://ergodicio.github.io/adept/solvers.html)
+- [Smilei 5.1 GPU documentation](https://smileipic.github.io/Smilei/Understand/GPU_offloading.html), [adaptive vectorization documentation](https://smileipic.github.io/Smilei/Understand/vectorization.html)
+- [WarpX 26.11 parameters and profiling](https://warpx.readthedocs.io/en/26.11/usage/parameters.html)
+
+### What production PIC already adapts
+
+We should not claim that local adaptive execution itself is novel:
+
+- Smilei 5.1 already switches locally between scalar and vectorized particle operators by patch/species and particle occupancy. Its documentation reports workload- and architecture-dependent gains: roughly 1.9–2.8× in listed architecture tests and up to around 3× in some examples above the particle-per-cell crossover. This is established kernel/execution adaptivity, not a future-response fidelity guarantee.
+- WarpX 26.11 uses GPU particle sorting to improve memory locality and deposition; its documentation explicitly notes that the best choice and shared-memory deposition benefit depend on particle occupancy and GPU architecture.
+- NEOPIC goes further in the particle representation: it applies a learned field operator directly to empirical particle measures, claims O(Np) complexity, and derives separate sampling, learning and time-stepping error contributions.
+
+Our differentiation must therefore be **physical-information adaptivity**: choosing the cheapest state representation that preserves the declared future intervention/QoI envelope, with independent physical and response qualification. Kernel occupancy adaptation and response-aware representation adaptation should be measured as complementary layers, not presented as substitutes.
+
+The fair industry comparison should include at least two cost regimes: (1) identical hardware and matched physics for head-to-head comparisons; (2) each production framework's best documented hardware path, reported separately. Do not transfer speedups from one machine, particle occupancy or geometry to another.
+
+### VlasovTT reproduction guard
+
+The VlasovTT source-admission work in [PR #13395](https://github.com/Luminous-Dynamics/symthaea/pull/13395) correctly records a discrepancy: the unmodified Landau example sets amplitude 0.1, while the current paper-comparison notes record 0.01. Preserve the source-default run and paper-faithful run as separate profiles until the exact paper configuration is reconciled. Source pinning is not reproduction.
+
+## 6. Prospective benchmark targets
+
+These are research goals, not achieved results.
+
+| Metric | Initial target | Qualification note |
+|---|---:|---|
+| Linear Landau damping / growth-rate error | < 1% | On preregistered linear cases and declared fit window |
+| Echo complex-amplitude error | < 2% | Compare the complex coefficient, not magnitude alone |
+| Echo phase error | < 0.02 rad | Wrapped phase; report phase uncertainty |
+| Integrated flux / balance closure | < 0.1% | Only for a precisely defined discrete balance and converged reference |
+| Discrete Parseval closure | < 1e-10 | Arithmetic / transform consistency only; not a substitute for physical convergence |
+| False-safe representation decision | 95% one-sided upper bound < 1% | Count independent whole trajectories, not time samples |
+| Matched-contract workflow speedup | > 2x on selected cohorts | Only among methods that pass the same mandatory fidelity contract |
+| Registered response-branch association | 100% of admitted cases | Include missing/extra branches and an explicit below-floor state |
+| Unqualified representation transition accepted | 0 | A failed or UNKNOWN transition is never a pass |
+| Adaptation overhead | Reported; target below saved work | Include all split/merge, projection, monitoring and fallback cost |
+
+### Statistical requirement for the false-safe target
+
+With zero observed false-safe outcomes, a one-sided exact 95% binomial upper bound below 1% requires at least **299 independent representative trials**. If the claim is made separately for a critical stratum, the sample-size requirement applies to that stratum as well. Multiple timesteps from one trajectory are not independent trials. With nonzero failures, calculate the exact interval for the actual count; do not use the zero-failure shortcut.
+
+### Additional metrics
+
+- Response-preservation efficiency: qualified intervention/QoI weight per total compute cost.
+- Validity-horizon coverage: fraction of registered horizons passing every mandatory contract.
+- Adaptation overhead: transition, observation, projection and fallback cost divided by total cost.
+- Recovery cost: compute and memory needed to restore a richer representation after an unsupported request.
+- Selective risk: error among non-abstained cases, reported with coverage and UNKNOWN rate.
+
+## Support-stable particle-measure normalization
+
+New companion programme: [#13416 — support-stable particle-measure normalization and particle-count transfer](https://github.com/Luminous-Dynamics/symthaea/issues/13416).
+
+The NEOPIC preprint (Muralikrishnan et al., arXiv:2610.40528) is an important particle-measure competitor: its operator acts directly on empirical particle measures, avoids grid deposition/aliasing in its field input, reports O(Np) evaluation and separates sampling, learning and time-stepping error contributions. Its Appendix A.1 explicitly notes that the implemented per-sample min–max coordinate normalization depends on extreme particles, is Lipschitz in the maximum particle displacement rather than the average displacement used in the main error argument, and introduces particle-count dependence of the sample bounding box not covered by the fixed-normalization analysis.
+
+The exact NEOPIC arXiv v1 code path is pinned in [draft PR #13417](https://github.com/Luminous-Dynamics/symthaea/pull/13417): repository `srikrrish/operator_learning`, tag `neopic-arxiv-v1`, peeled commit `2cf6a15e0ddb6c408a4ef6d162c31faf1deb9431`, file `operator_learning/data/pic_dataset.py`, blob `dcb046656830dd8c5707e98bdd1d611c8376b412`. Its `normalize_per_sample` (lines 129–139) maps each unweighted sample to [0,1] using min/max over the particle-position axis, and the preprocessing applies it to each coordinate channel at lines 291–298. The paper writes the equivalent torus coordinate as `zeta=-pi+2*pi*xi` in [-pi,pi), and Appendix A.1 explains that the implementation uses `xi in [0,1]` with Fourier characters `exp(2*pi*i*k*xi)`. The same appendix notes that the learned linear lifting acts on `xi` itself rather than a periodic function, so seam-crossing can make the lifted feature discontinuous.
+
+Keep two tests separate: (A) the source-faithful unweighted sample-count/support perturbation; and (B) a weighted-measure extension where a negligible-mass extreme point changes the same position-only map because weights are ignored. The weighted extension is not the paper's native unweighted input interface. The tagged code's degenerate-support fallback sets the denominator to one, mapping a constant sample to zeros; the local Rust helper rejects degenerate support as UNKNOWN / unqualified. These are coordinate-map tests, not NEOPIC model-output or physical-simulation results.
+
+This is a well-defined qualification opportunity, not a claim that NEOPIC's main results fail. Reproduce its paper-faithful normalization in #12952, then separate (a) particle sampling variation, (b) normalization-induced coordinate-map variation and (c) learned field-operator error. Test independent samples / Np changes, single extreme particles, periodic seam translations, particle permutations and split/merge operations. Compare against known physical-domain normalization, support-aware alternatives and robust maps with explicit tail metadata.
+
+Fixed-domain normalization is valid when physical domain and origin are known. Robust quantiles can reduce outlier sensitivity but may discard rare physical tails; any such tail loss must be measured and cannot silently become a successful representation change. #13416 owns this normalization stability experiment; #12952 retains source-faithful NEOPIC reproduction, and #12944 owns active selection of expensive kinetic runs.
+
+Source: [NEOPIC, arXiv:2610.40528](https://arxiv.org/abs/2610.40528), particularly §§4.2 and 5 and Appendix A.1.
+
+## Topology-aware particle lifting (TAPL)
+
+New companion programme: [#13447 — qualify topology-aware particle lifting and periodic seam equivariance](https://github.com/Luminous-Dynamics/symthaea/issues/13447).
+
+The NEOPIC paper's Appendix A.1 identifies a separate geometry issue from sample-support normalization: Fourier features are periodic on the normalized torus, but the position lifting is a linear map on `xi in [0,1]`, not a periodic function. The authors note that a particle crossing the seam can therefore change its lifted features discontinuously. This is a specific, testable limitation of the linear-lift design, not a claim that its field outputs fail.
+
+TAPL compares:
+- the source-faithful linear lift;
+- per-coordinate `[cos(2*pi*xi), sin(2*pi*xi)]` torus features;
+- bounded multi-harmonic Fourier-character lifts;
+- periodic splines / circular bases;
+- open-boundary coordinate-plus-boundary-distance lifts;
+- a boundary-conditioned hybrid that selects the lift from an explicit physical boundary contract.
+
+The benchmark must separate periodic from open / mixed boundary cohorts. Periodic lifts should be seam-continuous and translation-equivariant; open-boundary lifts must not wrap the two faces together. The target is physically topology-aware particle operators, not merely adding sinusoidal features to a neural network.
+
+The first fixtures are analytic seam continuity / derivative tests, global periodic translations, particle permutation, and exact split/merge equivalence. Only then compare trained field operators on Landau damping, two-stream, and open-boundary cohorts at matched architecture and compute budget.
+
+The implementation PR #13405 now includes `WeightedFourierMeasureEmbedding`, which computes normalized complex empirical-measure moments (m_k=\sum_i (w_i/\sum_j w_j)e^{i2\pi kx_i}). The primitive is invariant to particle permutations, exact co-located split/merge, and global weight rescaling; a torus translation rotates each moment by (e^{i2\pi k\delta}). It uses max-scaled weight normalization, compensated summation, and bounded particle/harmonic work. A known-answer fixture is in `benchmarks/plasma/topology-lifting/fixtures/weighted-fourier-measure-known-answer-v0.1.json`.
+
+A finite Fourier band is not injective: two different measures can share the same first (K) moments. Treat it as a compact weak-observable embedding, not a lossless microscopic representation. The next experiment is to compare moment bandwidth (K) against future-response distortion and KIRD bytes, especially high-k filament and echo probes.
+
+
+
+## Kinetic Response Spectroscopy (KRS)
+
+New companion programme: [#13415 — phase-resolved kinetic response spectra and mixed-pulse kernels](https://github.com/Luminous-Dynamics/symthaea/issues/13415).
+
+KRS measures the kinetic state as a controlled multi-input / multi-output response system. In a stationary homogeneous equilibrium, a weak-pulse mode-to-mode transfer matrix can be compared against the analytic dielectric susceptibility / dispersion relation. At a phase-mixed or evolving checkpoint, do **not** assume time-translation invariance; measure a two-time causal kernel tied to the checkpoint and application time.
+
+KRS extends the signed response parity primitive and KRT response map with:
+- complex mode quadratures and cross-mode response matrices;
+- weak first-order impulse response and amplitude-convergence checks;
+- diagonal second-order finite-amplitude coefficients;
+- mixed second-order cross-pulse response from four signed combinations;
+- explicit pulse-order, phase, time and mode identity;
+- reference noise-floor and below-floor dispositions.
+
+For two distinct control coordinates a and b, the mixed coefficient is estimated by
+
+\[
+C_{ab}(a,b,t)=
+\frac{R(+a,+b,t)-R(+a,-b,t)-R(-a,+b,t)+R(-a,-b,t)}
+{4ab}.
+\]
+
+Keep it separate from each first-order contribution and diagonal quadratic term. This estimator does not make a generic nonlinear Volterra kernel identifiable from a finite set of pulses; it measures the registered mixed direction on the declared finite intervention basis.
+
+Ownership remains separated: #13138/#13169 own echo physics and branch graph; #13168 owns phase-aware sampled-trace primitives; #13156 owns risk calibration; #13404 owns adversarial witness search; #13414 owns response-balanced basis construction; #13132 owns qualified discrete adjoints/QoIs; #13104 owns representation tournament. KRS owns the phase-resolved response identification contract and estimators.
+
+The initial validation ladder is analytic Maxwellian susceptibility, manufactured complex MIMO fixtures, weak Landau response, phase-mixed two-time response and then finite-amplitude mixed-pulse cohorts. A pass on linear susceptibility is not evidence of nonlinear echo preservation.
+
+## Intervention-conditioned kinetic rate–distortion (KIRD)
+
+New companion programme: [#13420 — benchmark intervention-conditioned kinetic rate–distortion](https://github.com/Luminous-Dynamics/symthaea/issues/13420).
+
+This makes the storage axis representation-independent. Hermite order, TT rank, particle count, grid size and latent dimension are not interchangeable resources. Compare the **actual serialized state bytes** required to satisfy the same future-response contract.
+
+For task contract \((\mathcal U,\mathcal Q,T)\), define the empirical curve
+
+\[
+R_{\rm KIRD}(\epsilon;\mathcal U,\mathcal Q,T)
+=
+\inf_{\hat f:\,D_{\mathcal U,\mathcal Q,T}(f,\hat f)\leq\epsilon}
+\mathrm{bits}(\mathrm{serialize}(\hat f)),
+\]
+
+subject to all applicable physical-admissibility and structure-preservation gates. The distortion is the task-conditioned future-response discrepancy defined above, not merely present-state reconstruction error. A representation point is admissible only when its response gate and its relevant Hamiltonian / Poisson / invariant gates both pass; see #13448.
+
+Prior art is important:
+- Tulpule & Vaidya (2021), [Information-Theoretic Approach for Model Reduction Over Finite Time Horizon](https://arxiv.org/abs/2111.12539), develop finite-step KL-rate / information-transfer ideas for dynamical-system model reduction.
+- Wang et al. (2024), [Goal-Oriented State Information Compression for Linear Dynamical System Control](https://arxiv.org/abs/2407.10224), allocate compression resources to limit control-performance degradation.
+- Predictive rate–distortion / past–future information bottleneck methods quantify how much of the past must be retained to predict future observations.
+- Padovan (2026), [Non-Intrusive Balancing](https://arxiv.org/abs/2610.15219), is a mandatory model-reduction comparator, not a claim of novelty.
+
+Our plasma-specific extension is to condition distortion on the registered kinetic intervention family, complex response phase, QoIs and finite physical horizon, with physical admissibility as a hard constraint.
+
+Count separately:
+1. state-only serialized bytes per checkpoint, including all basis/rank/normalization/ownership metadata needed to decode;
+2. peak working-set memory during evolution and reconstruction;
+3. model / decoder assets, reported both unamortized and amortized over a declared number of rollouts;
+4. encoding, decoding, projection, observation, transition, fallback and energy costs.
+
+Generate separate R(D) curves for microscopic reconstruction, weak observable projections, macroscopic QoIs and future intervention responses. A fluid closure with no distribution reconstruction is UNSUPPORTED on microscopic distortion, but can still be scored on valid macro / response tiers. Compare at equal bytes and separately at equal latency / construction budgets.
+
+Use #13404 to seek adverse response witnesses and #13415 to provide phase-resolved response coefficients. A finite probe library yields empirical coverage and a lower bound on the supremum error; it cannot certify a continuous worst-case R(D) curve without a global covering / regularity argument.
+
+The target is a **task-conditioned storage frontier**: how many bytes must a representation retain to answer a specified family of future physical questions to a declared tolerance?
+
+## Response-balanced kinetic reduction (RBKR)
+
+New companion programme: [#13414 — build response-balanced kinetic reduction](https://github.com/Luminous-Dynamics/symthaea/issues/13414).
+
+The goal is to construct a task-conditioned reduced basis from state directions that are both reachable by the registered interventions and observable through future QoIs. This is a plasma-specific research extension, not a claim that balanced truncation or empirical Gramians are new.
+
+Padovan (2026), [Non-Intrusive Balancing for Data-Driven Model Reduction with Oblique Projections](https://arxiv.org/abs/2610.15219), is mandatory prior art and a comparator. The paper computes nonlinear empirical reachability and projected observability Gramians from forward simulation data, then forms balancing-based oblique projections. It reports up to two orders of magnitude lower forecast error than POD-based Operator Inference on its tested flow examples, including a three-dimensional wing flow with approximately 80 million degrees of freedom. We must reproduce or faithfully compare against the published algorithm before claiming any advantage.
+
+For a frozen trajectory, use the discrete tangent system
+
+\[
+\delta x_{k+1}=A_k\delta x_k+B_k\delta u_k,
+\qquad
+\delta y_k=C_k\delta x_k.
+\]
+
+A finite-horizon intervention reachability Gramian and QoI observability Gramian can be written schematically as
+
+\[
+W_c=\sum_j \Phi(T,j+1)B_jR_j^{-1}B_j^T\Phi(T,j+1)^T,
+\]
+
+\[
+W_o=\sum_k \Phi(k,0)^TC_k^TQ_kC_k\Phi(k,0),
+\]
+
+where R weights admissible intervention cost and Q weights the frozen observable registry. The exact indexing, tangent maps and adjoints must be derived for the actual discrete split and time integrator. Large kinetic state dimensions require matrix-free products, low-rank factors, randomized range finding or restricted trial spaces rather than dense state-by-state Gramians.
+
+The balanced spectrum is a candidate ranking of jointly reachable and observable directions, not a physical correctness certificate. Standard linear balanced-truncation bounds do not automatically transfer to nonlinear Vlasov–Poisson, finite-amplitude plasma echoes, rank changes or representation switches.
+
+RBKR must be tested against:
+- snapshot POD / SVD;
+- Hermite and mixed Hermite–Legendre coefficient-tail selection;
+- VlasovTT / MPS truncation;
+- adaptive Hermite conservative projections;
+- Padovan-style non-intrusive balanced oblique projections;
+- adjoint / goal-oriented residual estimates in #13132.
+
+The nonlinear extension must separately qualify tangent response, signed finite-amplitude response, second-order cross-pulse effects and finite pulse-graph branch association. A tangent Gramian cannot be assumed to capture nonlinear echo creation.
+
+Success means greater held-out intervention-response fidelity per retained byte/rank at matched total construction and simulation cost, without worsening mandatory physical gates. It does not mean a good singular-value capture plot, nor does it imply a universal nonlinear error bound.
+
+## Response-aware memory-bounded spectral adaptation (RAMBSA)
+
+New companion programme: [#13485 — benchmark response-aware spectral refinement under hard memory budgets](https://github.com/Luminous-Dynamics/symthaea/issues/13485).
+
+Cho & Russo's adaptive Fourier VP method (arXiv:2607.12368) provides a source-reported tail-trigger baseline. RAMBSA asks whether a future-QoI / intervention-response signal can detect a low-energy but consequential filament before the conventional tail threshold fires. The first policy primitive in [PR #13405](https://github.com/Luminous-Dynamics/symthaea/pull/13405) uses a transparent rule: refine if either the spectral-tail ratio or the normalized future-response upper bound reaches its threshold; an unresolved response estimate is not interpreted as zero risk. A response bound is actionable only when fresh, branch-stable and available before the refinement deadline; missing, stale, branch-unstable or late estimates remain UNKNOWN and trigger a conservative refinement attempt. Projected peak memory must explicitly include padded state and temporary buffers. If refinement cannot fit under the budget after reserved headroom, the result is BLOCKED_BY_MEMORY / UNKNOWN; an incomplete peak-memory estimate is rejected.
+
+The ten-case synthetic fixture is checked by Rust tests and Draft 2020-12 schema validation. It includes a matched-tail pair with identical spectral-tail measure but different future-response risk, tail-only trigger, missing/stale/branch-unstable/late response cases, blocked expansion, and both-triggered. It validates policy logic only; no spectral solver, echo trajectory or physical QoI result is claimed.
+
+## Asymptotic-preserving response-aware micro–macro reduction (AP-RAMMR)
+
+New companion programme: [#13483 — build response-aware asymptotic-preserving micro–macro reduction for high-field VPFP](https://github.com/Luminous-Dynamics/symthaea/issues/13483).
+
+The direct 2026 comparator is Zhang & Hu's high-field VPFP Micro-ROM (arXiv:2610.25569). It retains macroscopic density on the full spatial grid and reduces only the microscopic fluctuation; precomputed Chebyshev approximations handle field-dependent Maxwellian terms, and separable collision blocks reduce online dependence on velocity-grid resolution. The paper reports discrete mass conservation, formal recovery of a discretized high-field limit as epsilon tends to zero, and velocity-grid-independent online cost per step. These are source-reported properties and must be independently reproduced.
+
+This is a separate collisional / singularly perturbed cohort. It must not share the collisionless VP Landau / echo leaderboard. The benchmark freezes the nondimensionalization, epsilon definition and sequence, macro variables, exact discrete collision operator/nullspace, dissipation law, and target limiting model. The micro projector may only use constraints derived from that exact discrete operator. The first Rust increment in [PR #13405](https://github.com/Luminous-Dynamics/symthaea/pull/13405) is a weighted minimum-correction projector onto a caller-supplied moment-constraint nullspace; it does not select the physical invariants itself and does not constitute an AP solver.
+
+Required baselines include Zhang–Hu Micro-ROM, the 2023 APNN micro–macro and mass-conserving neural methods (arXiv:2308.05650), the 2025 micro–macro tensor neural surrogate hierarchy (arXiv:2512.24205), full-order VPFP, and matched POD/local-POD. The decisive result is not velocity-grid-independent timing alone: it is response-aware cost reduction while preserving the selected AP limit, required moments, positivity/realizability, collision dissipation and future QoI envelope.
+
+## Multi-rate kinetic observation–actuation co-design (MROAC)
+
+New companion programme: [#13484 — co-design multi-rate kinetic sensing and actuation under delay](https://github.com/Luminous-Dynamics/symthaea/issues/13484).
+
+The 2026 Vlasov–Poisson control study by Guerra et al. (JCP 115169) notes that diagnostic / actuation timescales around 25 ms may be mismatched with some instability timescales below 1 ms or even nanoseconds. That study examines static external-field optimization, not a complete real-time closed loop. In a different physical setting, Degrave et al. demonstrated deep-RL suppression of tearing instability on DIII-D using a multimodal dynamical model and real diagnostics/actuators (Nature 2024). This is meaningful experimental control evidence, but it does not validate transfer to electrostatic 1D1V Vlasov–Poisson.
+
+The next benchmark must jointly freeze measurement operators, sample periods, transport latency, timestamp age, jitter, noise, dropout policy, actuator update period, delivery delay, bandwidth, amplitude, slew limit, controller WCET and fallback. Deployment-scored controllers cannot observe hidden full state or command unavailable instantaneous fields. A full-state/zero-delay controller is retained only as an explicit oracle upper bound.
+
+The synthetic timing contract and schema are in [PR #13405](https://github.com/Luminous-Dynamics/symthaea/pull/13405). Its Rust auditor checks the raw age/deadline constraints and derives worst-case actuator command latency, minimum effective actuator bandwidth after digital Nyquist limits, minimum effective diagnostic bandwidth after sample-Nyquist limits, and conservative observation-to-actuation latency.
+
+**New timescale qualification:** the fixture now declares a target unstable-mode frequency and e-folding time. It reports:
+- diagnostic bandwidth multiple = minimum effective diagnostic bandwidth / target instability frequency;
+- actuator bandwidth multiple = minimum effective actuator bandwidth / target instability frequency;
+- loop-latency e-fold fraction = conservative observation-to-actuation latency / target instability e-fold time;
+- `interface_timescale_qualified` against a frozen minimum bandwidth multiple and maximum latency/e-fold fraction.
+
+The synthetic fixture uses 5 Hz, 100 ms, 20 Hz effective diagnostic and actuator bandwidth, and 71.5 ms loop latency: 4× bandwidth and 0.715 e-folds. It passes its illustrative 2× / 0.8 thresholds. Negative tests make the interface unqualified when the diagnostic sampling rate is too slow or the instability e-fold time is shortened to 50 ms. These are synthetic ratios only, not measured hardware performance.
+
+This is an **interface-timescale feasibility check**, not a closed-loop stability proof. The target mode frequency and growth time must come from the exact cohort's independently qualified dispersion relation / reference analysis. A successful optimizer is not a deployment result when the diagnostics cannot observe the mode quickly enough or the actuator cannot respond within the growth window.
+
+The next physical comparison is delay-aware observer + constrained MPC versus robust/tube MPC, RL and response-Gramian sensor/actuator co-design on the same mode/QoI subspace. Score observability, actuator authority, peak/integrated growth, delay margin, dropout robustness and sensor/compute/energy costs separately.
+
+
+### Exact scalar unstable-mode authority oracle
+
+A first analytic mode-level reference is now in [PR #13405](https://github.com/Luminous-Dynamics/symthaea/pull/13405), with schema and known-answer fixture under \`benchmarks/plasma/control-interface/\`.
+
+For the manufactured discrete unstable mode
+
+\[
+x_{k+1}=a x_k+b u_k,\qquad a=e^{\gamma\Delta t},
+\]
+
+with diagnostic samples \(y_k=cx_k+\eta_k\), \(\eta_k\sim(0,\sigma^2)\), the noise-whitened information about the initial mode amplitude is
+
+\[
+W_o=\sum_{k\in\mathcal S_{\rm arrived}}\frac{c^2}{\sigma^2}a^{2k},
+\]
+
+where \(\mathcal S_{\rm arrived}\) contains only samples delivered within the finite horizon.
+
+For delayed actuator impulses applied at steps \(k_j+d_a\), the finite-horizon scalar controllability Gramian is
+
+\[
+W_c=\sum_{j:\,k_j+d_a<H}b^2a^{2(H-1-k_j-d_a)}.
+\]
+
+The checked-in synthetic fixture has five available measurement samples and five delivered actuator commands, with \(W_o=2082.4542913757846\) and \(W_c=1.3015339321098656\). It also computes bandwidth ratios and total loop latency relative to the mode's e-folding time.
+
+These are exact scalar linear reference values, not a multi-mode Vlasov result or closed-loop stability proof. They make the next benchmark step measurable: replace the scalar mode with a coupled non-normal linearized kinetic mode block, compute its exact finite-horizon observability/controllability Gramians, and compare sparse sensor/actuator subsets on the same registered unstable/QoI subspace.
+
+The key separation is:
+- **timescale feasibility:** can diagnostics and actuators respond on the target mode's frequency/e-fold timescale?
+- **mode observability/authority:** do the actual sampled and delayed channels have non-zero, sufficiently strong information and actuation Gramian on that mode?
+- **closed-loop stability:** does a specified estimator/controller under those real channel schedules stabilize the dynamics under uncertainty?
+
+The first two are now independently measurable on the scalar synthetic fixture. Neither implies the third. The immediate next reference should be a coupled non-normal linear system with exact matrix-exponential / discrete finite-horizon Gramians, mode coupling and sensor/actuator subspace comparisons before a nonlinear kinetic controller is attempted.
+
+### Phase-aware two-quadrature mode oracle
+
+The implementation branch now adds a second, more faithful manufactured reference in [PR #13405](https://github.com/Luminous-Dynamics/symthaea/pull/13405). It represents one complex unstable mode by \(x=[\Re(a),\Im(a)]^T\) and discrete homogeneous evolution
+
+\[
+x_{k+1}=e^{\gamma\Delta t}R(2\pi f\Delta t)x_k.
+\]
+
+For a fixed noisy diagnostic row \(c^T\), the finite-horizon Fisher/observability matrix is
+
+\[
+W_o=\sum_{k\in\mathcal S_{\rm arrived}}\frac{(c^TA^k)^T(c^TA^k)}{\sigma^2},
+\]
+
+where the schedule includes only samples delivered within the horizon. For actuator input vector \(B\) and delivered impulses,
+
+\[
+W_c=\sum_{j:\,k_j+d_a<H} A^{q_j}BB^T(A^{q_j})^T,\quad
+q_j=H-1-k_j-d_a.
+\]
+
+The controller-interface gate uses the **minimum eigenvalue** of both Gramians. A large trace or maximum eigenvalue cannot hide an unobservable or uncontrollable quadrature.
+
+The known-answer fixture uses five observations and five commands, with \(W_o\)'s minimum eigenvalue about 275.028 and \(W_c\)'s about 0.7317, above its illustrative thresholds. The aliasing negative control sets a 50 Hz mode with 20 ms sensor/actuator update spacing: phase repeats at each observation/command, and both minimum eigenvalues collapse toward zero despite unchanged sample/command counts.
+
+This is a synthetic single-mode linear oracle only. The next extension is a coupled non-normal mode block with matrix-valued Gramians and exact discrete/reference comparison, followed by linearized Vlasov–Poisson mode subspaces. No nonlinear closed-loop stability result is claimed.
+
+
+
+## PPMD source-reproduction boundary
+
+The PPMD paper appeared online 23 November 2026 and reports a SIAM reproducibility badge. The public GitHub `main` snapshot inspected for this programme is commit `056e4879a033cfecb44d8fb11983125b99a562eb` dated 21 December 2025, with only `PPMD.ipynb`, `PPMD.py` and `README.md`; the Python module hard-codes local Windows VTU data roots and the inspected tree has no datasets or environment lock. This is a discrepancy to resolve, not grounds to reject the paper's reproducibility claim: the exact badge-linked archive or supplementary package may differ. Until that package, data checksums, configuration, versions and train/test split are pinned and replayed, classify PPMD as a paper comparator with status `NOT_REPRODUCED`, not an executed baseline. See [#13501](https://github.com/Luminous-Dynamics/symthaea/issues/13501) and [PR #13502](https://github.com/Luminous-Dynamics/symthaea/pull/13502).
+
+## Production PIC comparison: do not mistake execution adaptivity for response-aware representation
+
+The production comparison must acknowledge that **Smilei and WarpX already have sophisticated hardware- and workload-aware adaptation**.
+
+### Smilei 5.1
+
+The public documentation describes:
+- GPU offloading for supported Cartesian geometries in 1D/2D/3D, with supported GPU diagnostics and boundary/physics combinations stated explicitly;
+- SIMD-vectorized particle operators, with a measured break-even depending on particles per cell and architecture;
+- local adaptive vectorization: every configured number of timesteps, choose scalar or vectorized operators per patch and species using an empirical cost model based on particles per cell;
+- patch-level load balancing, particle sorting and field/particle communication.
+
+Sources: [Smilei GPU offloading](https://smileipic.github.io/Smilei/Understand/GPU_offloading.html), [SIMD and adaptive vectorization](https://smileipic.github.io/Smilei/Understand/vectorization.html), [namelist adaptive-vectorization options](https://smileipic.github.io/Smilei/Use/namelist.html).
+
+### WarpX 26.11
+
+The current parameter documentation describes:
+- AMR with per-level refinement ratios, including per-axis refinement;
+- GPU-default particle sorting intervals to improve memory locality;
+- sorting by cell for deposition on CUDA/HIP (or by bins), with cell sorting recommended for high particles-per-cell workloads;
+- charge-deposition buffers and fine/coarse-grid deposition/gather buffers around AMR patches;
+- in-situ full, time-averaged, back-transformed, boundary-scraping and reduced diagnostics.
+
+Sources: [WarpX 26.11 parameters](https://warpx.readthedocs.io/en/26.11/usage/parameters.html), [PICMI parameter reference](https://warpx.readthedocs.io/en/26.11/usage/python.html), [WarpX algorithm overview](https://warpx.readthedocs.io/en/26.11/theory/intro.html).
+
+### What the Luminous research must add
+
+Do not claim novelty for generic dynamic particle sorting, AMR, local SIMD selection, load balancing or generic adaptive time stepping. The specific research hypothesis is different:
+
+1. **Future-response adaptivity:** refine or retain phase-space directions that are weakly energetic now but necessary for a registered future intervention/QoI, such as an echo or mode-transfer response.
+2. **Evidence-qualified adaptation:** every representation transition carries an independent reference/response receipt; unresolved response means REFINE / UNKNOWN / full-order fallback, never “safe to coarsen.”
+3. **Structure-qualified adaptation:** Hamiltonian / Poisson, positivity, mass, momentum, energy, charge and applicable entropy/Casimir gates constrain transitions.
+4. **Task-conditioned information budgeting:** choose among Fourier, Hermite, TT, particle, probabilistic-manifold and hybrid states by actual serialized bytes and future-response distortion, not rank/dimension alone.
+
+The most credible industry-facing path is a **hybrid**:
+- WarpX/Smilei remain the full-order production engines, independent references and fallback;
+- Symthaea operates a multi-query response observer / representation selector / control-proposal layer around them;
+- every accepted reduced rollout has a validity horizon, physical contract, measured response coverage and full-cost ledger.
+
+### Matched industry benchmark protocol
+
+Before comparing performance, freeze identical:
+- equations and physics modules; boundary conditions; dimensionality and geometry;
+- initial distributions, particle seeds/weights, mesh/velocity domain, interpolation/deposition order and time integrator;
+- accuracy and conservation/structure tolerances;
+- hardware (CPU/GPU model, GPU count, memory), precision, compiler and MPI layout;
+- diagnostic and I/O cadence, checkpointing and output retention.
+
+Count the complete workflow: initialization, allocation, particle sorting, deposition/gather, field solve, communication, diagnostics, I/O, training/model assets, encode/decode, representation transitions, uncertainty/response checks and fallback. Report strong and weak scaling, peak memory, energy-to-solution and p50/p95 step/rollout time.
+
+A toy 1D1V solver must never be described as beating a production 3D PIC framework. It can establish a multi-query or matched 1D1V advantage first; production claims require a larger, physically matched cohort and independent reproduction.
+
+## Robust kinetic stabilization objectives
+
+New companion programme: [#13457 — optimize robust kinetic stabilization objectives](https://github.com/Luminous-Dynamics/symthaea/issues/13457).
+
+The November 2026 study by Guerra, Li, Yue & Zepeda-Núñez (JCP 115169) compares objectives for suppressing Vlasov–Poisson instability. Its numerical experiments report that time-integrated objectives can have smoother, more useful optimization landscapes around the target basin than objectives evaluated only at terminal time; electric-energy-only objectives can also exhibit flat unphysical minima outside that basin. This is a result for its tested control parameterization, not a universal convexity theorem.
+
+Our controller benchmark will compare terminal, time-integrated, modal-growth, phase-space/entropy and robust sampled-worst-case objectives, using dispersion-derived initialization, discrete adjoints and independent full-order replay. It must detect delayed instability and energy transfer to unregistered modes, and must count control energy / smoothness / amplitude constraints. #13452 is required before converting a finite perturbation campaign into a global robustness claim.
+
+## Intervention-Equivalent Kinetic State Quotients (IEKSQ)
+
+New companion programme: [#13503 — define intervention-equivalent kinetic state quotients](https://github.com/Luminous-Dynamics/symthaea/issues/13503).
+
+This connects task-conditioned compression to established predictive-state theory. Computational mechanics defines causal states by grouping histories that induce the same conditional distribution over futures; Predictive State Representations use action-conditional predictions of future observations as the state coordinates. Bisimulation formalizes when input/output behaviours are preserved under state abstraction. These are prior art, not claims of novelty:
+- [Computational mechanics / causal equivalence](https://pmc.ncbi.nlm.nih.gov/articles/PMC7517337/)
+- [Littman & Sutton, Predictive Representations of State, NeurIPS 2001](https://proceedings.neurips.cc/paper/2001/hash/1e4d36177d71bbb3558e43af9577d70e-Abstract.html)
+- [van der Schaft, Equivalence of Dynamical Systems by Bisimulation, IEEE TAC 2004](https://doi.org/10.1109/TAC.2004.838495)
+
+For a frozen \((\mathcal U,\mathcal Q,T,\mathcal I)\) contract, define the future response signature of a full kinetic state \(f\):
+
+\[
+G_f(u)=\{q_j(\Phi_t^u(f)): q_j\in\mathcal Q,\;0\le t\le T\}.
+\]
+
+Exact task-conditioned response equivalence is \(f\sim g\) iff \(G_f(u)=G_g(u)\) for all admissible intervention sequences \(u\in\mathcal U\), with both states satisfying the same physical structure/invariant class \(\mathcal I\). The quotient is task-specific: it changes when the intervention family, QoI registry, prediction horizon or structure contract changes.
+
+The approximate distance is a task-conditioned pseudometric over the frozen response axes. Crucially, the relation \(d(f,g)\le\epsilon\) is **not generally transitive**. Pairwise-compatible edges cannot be blindly unioned into equivalence classes. A valid approximate class needs an explicit whole-class diameter bound or a certified quotient / simulation relation. Missing responses, unresolved branches or different physical structure classes prohibit merging even if the observed response values are close.
+
+The first generic Rust primitive is in [PR #13405](https://github.com/Luminous-Dynamics/symthaea/pull/13405): \`KineticResponseSignature\` stores contract identity, structure-class identity, intervention/QoI axes, time grid, complex response values and branch IDs. Comparison returns RMS response distance, missing-value count, branch mismatches and structure compatibility separately. It is serializable as an evidence receipt. The checked-in [non-transitive synthetic triple](https://github.com/Luminous-Dynamics/symthaea/blob/main/benchmarks/plasma/state-equivalence/fixtures/nontransitive-response-triple-v0.1.json) demonstrates A≈B and B≈C but A≉C under the same tolerance. This is a manufactured semantic control, not a measured kinetic equivalence class.
+
+The next physical benchmark is a pair of phase-mixed states with nearly identical density / low-order moments but distinct response after a registered second pulse. Any claimed merge must be confirmed against independently refined full-order echo amplitude, phase, timing, waveform and branch identity, plus applicable invariant/structure gates. A finite probe suite remains empirical unless #13452's CIC assumptions provide a validated global cover.
+
+## Kinetic State Discrimination Design (KSDD)
+
+New companion programme: [#13598 — select interventions by expected information gain over kinetic state hypotheses](https://github.com/Luminous-Dynamics/symthaea/issues/13598).
+
+This is a third, distinct acquisition problem:
+- #12944 chooses which expensive new kinetic simulation to run to expand a model's qualified operating envelope;
+- #13404 searches for a discrepancy-maximizing intervention against one fixed candidate/reference state pair;
+- #13598 chooses the next intervention that best separates a finite posterior over competing state hypotheses / candidate quotient classes.
+
+For a finite hypothesis \(H\), candidate pulse \(u\), and registered complex response observation \(Y\), KSDD uses the Bayesian model-discrimination objective
+
+\[
+\operatorname{EIG}(u)=I(H;Y\mid u)
+=H(H)-\mathbb E_{Y\mid u}[H(H\mid Y,u)].
+\]
+
+The first reusable Rust primitive is in [PR #13405](https://github.com/Luminous-Dynamics/symthaea/pull/13405). It evaluates a finite set of complex response predictions under independent equal-variance Gaussian real/imaginary observation noise, integrates the expected information gain with deterministic \(9\times9\) Gauss–Hermite quadrature, and reports EIG in bits plus EIG per declared solver-cost second. Priors are max-scaled before normalization to avoid overflow; hypotheses, noise, evaluation cost and work budget are fail-closed.
+
+The checked-in synthetic known-answer cases cover identical predictions (zero information), phase-only separation, high-noise suppression and imbalanced priors. They are synthetic, not calibrated plasma likelihoods.
+
+Prior art is explicit:
+- Hainy et al. (2022), [Optimal Bayesian design for model discrimination via classification](https://doi.org/10.1007/s11222-022-10078-2), show how classifier-based model discrimination can reduce simulation requirements relative to ABC.
+- Doumbouya, Vidard & Zahm (2026), [Certified Bayesian optimal experimental design: from Expected Information Gain to Signal-to-Noise Ratio](https://arxiv.org/abs/2609.32282), derive conservative and incremental EIG bounds through Fisher/SNR structure under stated regularity assumptions.
+- T-optimal design, Bayesian model discrimination and causal active-intervention design are established foundations, not claims of novelty.
+
+The present implementation is deliberately narrow: one complex output coefficient, finite categorical hypotheses and homoscedastic independent Gaussian quadrature noise. Correlated QoIs, full waveforms, heteroscedastic noise, uncertain predictions, nonlinear branch switching and multi-fidelity reference discrepancy need explicit extension and independent calibration. An EIG-ranked intervention is a proposal, not a counterexample, physical certificate or global state-equivalence proof.
+
+## Invariant- and Response-Constrained Kinetic Projection (IRCKP)
+
+New programme: [#13629 — qualify positivity- and response-constrained kinetic representation transitions](https://github.com/Luminous-Dynamics/symthaea/issues/13629).
+
+The adaptive Fourier VP solver demonstrates that preserving mass and \(L^2\) under zero-padding does not guarantee positivity, \(L^1\) or entropy quality. IRCKP treats a basis change, truncation, interpolation, low-rank reconstruction or grid transfer as a physical operation that must pass its own transition contract.
+
+Mandatory prior art:
+- Kormann, Nazarov & Wen (2026), [Positivity-preserving dynamical low-rank methods for the Vlasov equation](https://arxiv.org/abs/2606.31662): positivity as a constraint with minimal quadratic-program correction; one scheme also preserves mass and momentum.
+- Issan et al. (2024), [Anti-symmetric and positivity preserving spectral VP](https://arxiv.org/abs/2312.05439): square-root transformed distribution and derived mass/momentum/energy conservation properties.
+- Kiechle, Chudzik & Helzel (2025), [Positivity-preserving Active Flux VP](https://doi.org/10.1016/j.jcp.2024.113693): third-order Active Flux with a positivity limiter.
+- Pagliantini, Delzanno & Markidis (2023), [Physics-based adaptive AW Hermite VP](https://doi.org/10.1016/j.jcp.2023.112252): conservative maps across velocity shift/scale changes.
+- Cho & Russo (2026), [Adaptive Fourier spectral VP](https://arxiv.org/abs/2607.12368): mandatory zero-padding / spectral-tail baseline.
+
+The 2026 Kormann–Nazarov–Wen method is now the key algorithmic QP comparator, not merely a positivity baseline:
+- PP-KL corrects K or L and exploits row-separable positivity constraints: N_x independent QPs with r variables, an active set of at most r, and O(r^3) per-row solve cost (O(N_x r^3) total).
+- MMC-PP-S corrects the low-rank core S to add global mass and momentum constraints. This breaks row separability and gives O(r^6) QP complexity.
+- In the paper's 1D1V two-stream experiment (N_x=N_v=128, r_max=20), reported total times are 90.28 s without correction, 122.91 s for PP-KL and 1,861.30 s for MMC-PP-S. The authors attribute the large difference to the global constraints and report roughly 50× correction-cost overhead for MMC-PP-S relative to PP-KL in that case.
+- The exact source is [arXiv:2606.31662](https://arxiv.org/abs/2606.31662), §§3–5. These are reported timings on the authors' CPU/MATLAB setup, not hardware-independent scaling laws.
+
+This creates a concrete paradigm target for [#13633 — structured response-constrained low-rank correction](https://github.com/Luminous-Dynamics/symthaea/issues/13633): retain the row-separable solve where possible; handle the small number of global moment and response constraints through matrix-free KKT products, a low-rank Schur complement, response-block decomposition and warm-started active sets. Compare against PP-KL and MMC-PP-S with identical physics and quantify the cost per added constraint.
+
+The full programme makes each transition jointly accountable for positivity, only those invariants actually conserved by the selected discrete reference, the correct entropy-production / energy-exchange law for collisional systems, and independently qualified future-response distortion. Collisionless VP and collisional high-field VPFP/VPL remain separate cohorts. Do not claim preservation of the infinite Vlasov Casimir family from a finite set of moments.
+
+The first implementation in [PR #13405](https://github.com/Luminous-Dynamics/symthaea/pull/13405) is deliberately narrow: \`project_nonnegative_preserving_mass\` solves the exact weighted one-equality projection
+
+\[
+\min_g \frac12\sum_i v_i(g_i-\tilde f_i)^2
+\quad\text{s.t.}\quad g_i\geq0,\quad\sum_i v_i g_i=M_{\rm target}.
+\]
+
+It uses the active-set form \(g_i=\max(0,\tilde f_i-\lambda)\), reporting the multiplier, positive-cell count, achieved mass, residual, minimum output and weighted correction norm. A negative-overshoot fixture \([-0.1,1.1]\mapsto[0,1]\) is schema-checked and replayed through a small CLI.
+
+A second manufactured primitive, \`solve_two_cell_positive_mass_response_projection\`, checks the trade-off directly. For a two-cell candidate [-0.1,1.1], target mass 1 and a separately registered linear response R(g)=g[0] with target 0.1, positivity-plus-mass alone returns [0,1] and misses the response target; the exact two-cell joint solve returns [0.1,0.9]. A target response that would force a negative cell is refused. This is a two-variable feasibility oracle, not a general multi-cell QP or nonlinear kinetic response model.
+
+A third reference-level artifact is now available for [#13633 — structured response-constrained low-rank correction](https://github.com/Luminous-Dynamics/symthaea/issues/13633): `solve_small_positive_mass_response_qp` performs exhaustive active-set enumeration up to 16 cells for positivity + weighted mass + one linear response equality. It solves the 2x2 dual system on each candidate free set, handles rank-deficient free sets when the response row is redundant with mass, and checks primal/dual feasibility, stationarity, complementarity and equality residuals. Its three-cell fixture has the known solution [0.1,0.4,0.5] with mass 1 and response R(g)=g[0]=0.1. This is a bounded correctness oracle for future structured KKT / Schur-complement methods, not a scalable solver.
+
+The first primitive preserves positivity and one discrete mass only; the second enforces positivity, mass and one scalar linear response only in a two-cell manufactured fixture. Neither preserves momentum, energy, \(L^1\), \(L^2\), entropy, the full Casimir family, Poisson residual or a physical future response. The next stages require multi-constraint feasibility/KKT evidence and independently measured post-transition response validation; infeasible low-rank transitions must be refused or trigger rank increase rather than silently clipping away the conflict.
+
+## Response-Weighted Spectral Refinement (RWSR)
+
+New companion programme: [#13628 — refine kinetic spectral resolution by future response sensitivity](https://github.com/Luminous-Dynamics/symthaea/issues/13628).
+
+The 2026 adaptive Fourier spectral solver (Cho & Russo, arXiv:2607.12368) is an important tail-aware baseline: it monitors high-frequency Fourier coefficients and expands the spectral grid via zero-padding rather than filtering. The paper proves discrete mass and L2 preservation for the refinement operation, and its experiments report mass, L1, L2, total energy and entropy preserved to machine precision while the computation remains fully resolved. The reported degradation occurs after the spectral grid reaches the hardware memory limit and cannot be expanded further: unresolved high-frequency filamentation then degrades L1/L2/energy/entropy while mass remains invariant. The paper does not report that every zero-padding event causes positivity loss. We should still measure min f and negative mass explicitly as independent admissibility diagnostics, and the adaptive controller must stop, fall back or mark the run UNKNOWN when the next required expansion cannot be funded. The method uses a sufficiently wide fixed velocity domain and refines spectral resolution rather than widening the velocity box.
+
+RWSR asks a different question from a spectral-tail trigger: which modes matter to future interventions and QoIs? For complex coefficient \(a_k\), response sensitivity \(G_{qk}\) and non-negative QoI weight \(w_q\), its conservative first-order mode loss indicator is
+
+\[
+b_k=|a_k|\sum_q w_q|G_{qk}|.
+\]
+
+The first reusable implementation is in [PR #13405](https://github.com/Luminous-Dynamics/symthaea/pull/13405): \`plan_response_weighted_refinement\` ranks known modes by this triangle-inequality response-loss bound per encoded byte and greedily discards only modes that fit within a registered cumulative loss budget. Missing response entries remain UNKNOWN and are retained. This is a deterministic greedy heuristic, not an optimal knapsack solution or a nonlinear global error bound.
+
+The checked-in [known-answer fixture](https://github.com/Luminous-Dynamics/symthaea/blob/main/benchmarks/plasma/adversarial-probes/fixtures/response-weighted-refinement-known-answer-v0.1.json) deliberately has a higher-energy mode with low future sensitivity and a lower-energy mode with high future sensitivity. The expected decision discards the former and retains the latter. It is a synthetic map, not a plasma result.
+
+Required comparisons: spectral-tail-only zero-padding; response-only mode ranking; adjoint/QoI-only refinement; hybrid tail + response + uncertainty; local time/energy-window ROM; adaptive Hermite; VlasovTT. Measure future echo amplitude/phase and waveform, invariant bundle (mass, positivity, L1, L2, entropy, energy as applicable), memory and complete adaptation/transition cost.
+
+## Predictive Validity Horizon and Qualified Handoff (PVHQH)
+
+New companion programme: [#13710 — predict representation validity horizon and trigger qualified pre-breach handoff](https://github.com/Luminous-Dynamics/symthaea/issues/13710).
+
+The objective is not merely to detect an out-of-distribution input after a reduced model fails. It is to predict when the currently qualified state representation may leave its task-conditioned future-response envelope and begin migration early enough to finish a safe transition.
+
+At each checkpoint, keep separate evidence for:
+- current normalized error upper bounds per fidelity tier;
+- mode/phase/branch association and uncertainty;
+- representation-native residuals (Hermite/Fourier tails, TT truncation, particle sampling, closure memory);
+- error-growth evidence, with explicit distinction between empirical trend and verified growth bound;
+- remaining declared simulation horizon;
+- target representation construction, serialization, reconstruction, overlap and independent qualification latency;
+- physical, boundary and geometric structure gates.
+
+Decision states are \`STAY_QUALIFIED\`, \`PREPARE_HANDOFF\`, \`HANDOFF_NOW\`, and \`UNKNOWN\`. Only a verified error-growth bound may authorize \`STAY_QUALIFIED\`. An empirical residual slope can raise a preparation warning, but cannot certify continued operation. Missing / stale evidence, unstable branch identity or a failed physical gate cannot be interpreted as a pass.
+
+The first Rust implementation is in [PR #13405](https://github.com/Luminous-Dynamics/symthaea/pull/13405), module \`validity_horizon\`: it computes a conservative time-to-tolerance from a supplied growth envelope, adds uncertainty growth, and compares it with hand-off lead time. It has manufactured tests for early preparation, current breach, failed physical gates, branch instability, missing/empirical evidence, zero growth and arithmetic overflow.
+
+This is only a decision primitive. The caller's \`VerifiedGrowthBound\` must be backed by external proof/evidence; the module does not authenticate it, execute a reference solver, perform a model transfer or establish that any current kinetic indicator predicts real response loss.
+
+Prior art includes adaptive hierarchical error estimates for online hyper-reduced ROMs (Ebrahimi & Yano, CMAME 449B, 118590, 2026), adaptive FOM/ROM switching with reduced error estimators (Riffaud, JCP 2025, 113677), utility-driven model selection for digital twins, and SACube multi-validity-frame switching (available online 9 Nov 2026). Our specific research question is whether the same principle can be made response-aware, branch-aware, structure-qualified and fail-closed for kinetic plasma trajectories.
+
+## Certified Intervention Coverage (CIC)
+
+New companion programme: [#13452 — certify compact intervention covers with validated response bounds](https://github.com/Luminous-Dynamics/symthaea/issues/13452).
+
+The contract continues to distinguish:
+- \`finite_empirical\`: the tested interventions passed, but the continuous supremum is unknown;
+- \`certified_global\`: a verified mathematical cover and response-regularity proof bound the entire declared compact intervention space.
+
+For a compact intervention metric space \((\mathcal U,d)\), let \(e(u)\) be the frozen normalized candidate/reference response error. If a verified global Lipschitz constant \(L\) satisfies
+
+\[
+|e(u)-e(v)|\leq L\,d(u,v)
+\]
+
+and the confirmed probe set \(P\) is a verified \(r\)-net of \(\mathcal U\), then
+
+\[
+\sup_{u\in\mathcal U}e(u)
+\leq
+\max_{p\in P}e(p)+Lr.
+\]
+
+Include separately justified reference, candidate and measurement uncertainty in \(\eta\):
+
+\[
+E_{\rm upper}=\max_{p\in P}\widehat e(p)+Lr+
+\eta_{\rm ref}+\eta_{\rm candidate}+\eta_{\rm measurement}.
+\]
+
+The first KIRD semantic implementation in [PR #13405](https://github.com/Luminous-Dynamics/symthaea/pull/13405) requires the cover metric, radius, verified Lipschitz constant, three uncertainty terms, maximum sampled error, conservative global bound, cover-set digest, branch-stability flag/evidence, proof digest and independent checker revision. It verifies the upper-bound arithmetic and refuses certification if branch identity is unstable or if a response PASS has a global bound above one.
+
+**Critical assumptions:** an empirical finite-difference slope is not a verified global Lipschitz bound. Phase uses geodesic circle distance; integer modes and intervention families are separate strata. Echo branch creation/cancellation or misassociation can make the response map non-smooth; partition into certified branch-stable regions, prove separate bounds, or return UNKNOWN. If any assumption is missing, the record remains \`finite_empirical\`.
+
+The checked-in [synthetic certified-cover fixture](https://github.com/Luminous-Dynamics/symthaea/blob/main/benchmarks/plasma/rate-distortion/fixtures/synthetic-kird-certified-cover-v0.1.json) uses \(U=[0,0.1]\), \(e(u)=0.5+2u\), one probe at zero, \(r=0.1\), \(L=2\), and \(\eta=0.05\), giving an upper bound of 0.75. This validates the arithmetic and semantic auditor only; it does not establish a Lipschitz property for nonlinear Vlasov–Poisson or any plasma echo.
+
+## Hamiltonian response-balanced kinetic reduction (HRBKR)
+
+New structural extension: [#13448 — combine response-balanced reduction with Hamiltonian structure preservation](https://github.com/Luminous-Dynamics/symthaea/issues/13448).
+
+The RBKR objective must not select future-response directions and then ignore whether the reduced evolution preserves the physical geometric structure. HRBKR makes response fidelity a constrained objective under Hamiltonian / Poisson-preserving projection, adaptive rank and qualified chart transitions.
+
+The initial benchmark uses a source-pinned finite-dimensional canonical particle Hamiltonian reference. For \(\dot z=J\nabla H(z)\), a reduced basis \(V\) must satisfy \(V^TJV=J_r\) and the reduced vector field must be derived consistently from the reduced Hamiltonian. For Eulerian Vlasov dynamics, the noncanonical Poisson bracket and selected Casimirs must be treated explicitly; a canonical symplectic constraint must not be applied by analogy. For collisional Vlasov–Poisson–Landau, qualify the correct metriplectic / discrete-gradient energy and entropy-production laws rather than claiming a conservative symplectic system.
+
+Prior art makes this a synthesis and extension, not a claim that geometric MOR is new:
+- Hesthaven, Pagliantini & Ripamonti (2024), adaptive symplectic MOR for particle Vlasov–Poisson, DOI 10.1090/mcom/3885: https://arxiv.org/abs/2201.05555
+- Pagliantini & Vismara (2025), fully adaptive structure-preserving hyper-reduction, DOI 10.1137/23M1601225: https://doi.org/10.1137/23M1601225
+- Pagliantini & Vismara (2026), adaptive hyper-reduction of non-sparse Vlasov–Poisson operators, JCP 549, 114609: https://arxiv.org/abs/2504.00604
+- Finn et al. (2026), discrete-gradient structure preservation for Vlasov–Poisson–Landau, JCP 554, 114749: https://doi.org/10.1016/j.jcp.2026.114749
+- Shao, Wang & Wu (2026), conservative adaptive Hermite projection: https://arxiv.org/abs/2605.17820
+- Padovan (2026), empirical response / reachability-observability balancing: https://arxiv.org/abs/2610.15219
+
+The decisive requirement is dual qualification: a low-byte state that preserves an echo but destroys Hamiltonian structure is not a pass; a symplectic state that discards an echo-sensitive direction is not a pass. Adaptive basis transitions need both a structure-transfer record and a future-response distortion record. The initial work is on manufactured oscillator / Hamiltonian fixtures, then a geometric particle Vlasov reference, and only later the noncanonical / collisional extension.
+
+## Revised quantitative reading of the October 2026 FNO result
+
+The benchmark should preserve the exact time- and regime-dependent findings from Burles, Camporeale and Pezzi, rather than collapsing them into a generic late-time-drift statement:
+
+- Within the linear training window, the fitted damping rate agrees with the kinetic value to within 0.2%; the paper reports every resolved moment's time-averaged relative L2 error at or below 1e-2, with density and pressure errors as low as about 1e-6.
+- In the held-out linear test window, the fitted damping-rate error is approximately 18%. The relative electric-field error crosses 10% about 1.4 plasma periods after the split, 50% at about 45 plasma periods and 100% at about 55 plasma periods after the split.
+- The amplitude scan succeeds for interpolation inside the training range and for tested amplitudes below its minimum training amplitude; the two largest out-of-range amplitudes, 0.2 and 0.3, depart sharply from the kinetic damping rate.
+- In the nonlinear trapping regime, heat-flux-divergence error reaches order unity as trapping begins, while resolved-moment errors grow more gradually. The paper explicitly distinguishes the effective learned heat flux from the kinetic heat flux and notes the learned closure is not required to match it pointwise.
+- The paper identifies RK-substage buffer semantics as an unresolved coupling and leaves a substage-consistent / solver-independent implementation as future work; this is owned by #12910.
+
+Primary source: [Burles, Camporeale & Pezzi (2026), Journal of Plasma Physics, DOI 10.1017/S0022377826102517](https://doi.org/10.1017/S0022377826102517). The source-faithful reproduction remains owned by #12907; this document supplies the comparison contract.
+
+## 7. Adaptive representation architecture
+
+The adaptive controller should choose from a representation portfolio, not assume one globally optimal state format.
+
+Candidate families:
+- dense Fourier / phase-space grids;
+- shifted and scaled Hermite;
+- bounded Legendre or mixed Hermite–Legendre;
+- tensor train / MPS;
+- particle measures and particle-field operators;
+- reduced fluid / learned closure, when only a macroscopic contract is requested.
+
+Each checkpoint carries a versioned contract receipt:
+- governing equation and normalization;
+- state / representation identity and parameterization;
+- declared fidelity tiers and QoI registry;
+- intervention family, support and horizon;
+- reference identity and convergence status;
+- native indicator vector and calibration domain;
+- conservation, positivity and realizability results where applicable;
+- last qualified time and expiry / requalification trigger;
+- complete resource ledger;
+- PASS / FAIL / UNKNOWN / UNSUPPORTED result per tier.
+
+### Representation transitions
+
+A switch is a scientific operation, not a free cast. It must preserve or explicitly relinquish:
+- the reconstructed total distribution;
+- declared discrete invariants;
+- QoI and sensitivity contracts;
+- the registered future-response envelope;
+- branch and component lineage;
+- uncertainty and resource provenance.
+
+If the destination representation cannot meet the current contract, the controller must either retain the source representation, use a qualified fallback, or return UNKNOWN. It must not silently downgrade the contract.
+
+### Research hypothesis: response-aware kinetic memory capsule
+
+Test whether a small residual representation can be retained alongside a cheap macroscopic or compressed state to preserve a declared response envelope. Candidate residuals include:
+- velocity-space spectral tails selected by measured transfer;
+- low-rank correction factors / tensor residuals;
+- Hermite or Legendre tail coefficients;
+- phase-aware sketches whose reconstruction error is calibrated against the registered intervention family.
+
+The capsule is not assumed sufficient. Its value must be measured by the intervention-response oracle, including adversarial pulses not used to tune it. If no compact capsule passes, the correct outcome is to retain more state or mark the future response unsupported.
+
+## 8. Evaluation protocol and anti-leakage rules
+
+1. Freeze physical cohorts, intervention families, reference revisions, QoI definitions, thresholds and resource measurement methods before candidate scoring.
+2. Split by complete trajectories, parameter families and intervention sequences. Never randomly split adjacent snapshots from one trajectory.
+3. Keep training, calibration, development and sealed test roles distinct.
+4. Use independently converged references. A candidate cannot certify itself using its own residual or native compression estimate alone.
+5. Evaluate each candidate at the same physical times and on the same diagnostic support.
+6. Separate interpolation, extrapolation, longer-horizon and cross-solver transfer.
+7. Retain every failure, retry, fallback, unsupported result and UNKNOWN.
+8. Do not rank unmatched hardware runs as a speed competition. Use paired same-machine runs when possible, then report each method's best documented production pathway separately.
+9. Report p50/p95, host/device memory, energy and all conversion/diagnostic/IO work.
+10. Publish the exact source revision, environment, configuration, seeds, input digests, output digests and analysis code.
+
+## 9. Work ownership and programme composition
+
+This specification is a shared metric/contract layer. It does not replace the existing source-reproduction, memory, closure-reliability, echo, representation or evidence issues.
+
+| Existing owner | Work retained there |
+|---|---|
+| [#12907](https://github.com/Luminous-Dynamics/symthaea/issues/12907) | Source/artifact admission and faithful reproduction of the 2025 offline FNO, 2026 online FNO, analytic Hammett–Perkins and eligible sparse-discovery baselines |
+| [#12910](https://github.com/Luminous-Dynamics/symthaea/issues/12910) | Runge–Kutta substage semantics, accepted-state versus provisional-stage memory and solver/time-step transfer |
+| [#12914](https://github.com/Luminous-Dynamics/symthaea/issues/12914) | Closure accuracy, physical-admissibility, epistemic/OOD and portability envelopes |
+| [#12921](https://github.com/Luminous-Dynamics/symthaea/issues/12921) | Explicit history versus prognostic hidden state versus continuous-time latent-memory tournament, including ADEPT-style and CfC/LTC candidates |
+| [#12942](https://github.com/Luminous-Dynamics/symthaea/issues/12942) | Portfolio-level registry and separation of physical task lanes |
+| [#12976](https://github.com/Luminous-Dynamics/symthaea/issues/12976) | Matched-budget full-workflow tournament and execution evidence receipts |
+| [#12979](https://github.com/Luminous-Dynamics/symthaea/issues/12979) | Fail-closed physical cohort comparability key and diagnostic-profile completeness |
+| [#13104](https://github.com/Luminous-Dynamics/symthaea/issues/13104) | Dense / TT / Hermite / particle / learned-operator representation competition |
+| [#13156](https://github.com/Luminous-Dynamics/symthaea/issues/13156) | Calibration of representation-native indicators against independently measured future-response loss |
+| [#13132](https://github.com/Luminous-Dynamics/symthaea/issues/13132) | Goal-oriented QoI and sensitivity allocation |
+| [#13138](https://github.com/Luminous-Dynamics/symthaea/issues/13138) and [#13169](https://github.com/Luminous-Dynamics/symthaea/issues/13169) | Two-pulse physical echo anchor and finite multi-pulse response graph |
+| [#13177](https://github.com/Luminous-Dynamics/symthaea/issues/13177) | Multi-component representation, conservative overlap, split/merge and lineage |
+| [#13404](https://github.com/Luminous-Dynamics/symthaea/issues/13404) | Adversarially search admissible interventions that expose future-response information loss; confirm witnesses independently and report empirical coverage rather than unsupported worst-case guarantees |
+
+The ICF nonlocal electron heat-flux programme in [#12938](https://github.com/Luminous-Dynamics/symthaea/issues/12938) remains a separate physical task. It can reuse the contract vocabulary, but its equations, reference data, observables and scorecard must not be pooled with periodic electrostatic Landau damping.
+
+## 10. Runner-independent work sequence
+
+The following work can proceed without waiting for long echo/recurrence workflows:
+
+1. **Close the measurement contract around #13378.** Add signed physical runs, zero-pulse baselines, complex response matrix, phase controls, amplitude sweeps and convergence analysis. The current PR adds the parity primitive; it does not yet supply those experiment results.
+2. **Reproduce the FNO comparator in the existing owner lanes.** [#12907](https://github.com/Luminous-Dynamics/symthaea/issues/12907) owns source/artifact admission and exact 2025/2026 reproductions; [#12910](https://github.com/Luminous-Dynamics/symthaea/issues/12910) owns RK-substage memory semantics; [#12914](https://github.com/Luminous-Dynamics/symthaea/issues/12914) owns accuracy/admissibility/OOD/portability envelopes; [#12921](https://github.com/Luminous-Dynamics/symthaea/issues/12921) owns the explicit-window versus latent-memory tournament. Use the public [Zenodo code and training data](https://doi.org/10.5281/zenodo.22800112), verify the record-level file manifest and licence, reproduce the published profiles first, then add response and longer-horizon cohorts.
+3. **Resolve and execute VlasovTT.** Keep source-default and paper-faithful profiles separate; execute upstream tests, dense path and compressed path before any modified settings.
+4. **Calibrate native memory indicators (#13156) and adversarial probes (#13404).** Fit each representation's own indicators to independently measured response loss; search for additional response-loss witnesses; confirm every witness with a separately refined reference; test held-out complete trajectories and intervention families.
+5. **Connect to goal-oriented adaptation (#13132).** Protect declared QoIs and gradients, while retaining mandatory physical-state gates.
+6. **Run representation ablations (#13104 / #13177).** Static dense, static TT, static Hermite, closure-only, micro-error-only adaptation, QoI-only adaptation and response-aware adaptation.
+7. **Publish matched Pareto results.** A method wins only on the subset where it passes the same declared contract.
+
+## 11. First falsifiable research claims
+
+The initial paper-quality claims should be modest and independently testable:
+
+- **C1 — Observable and microscopic fidelity are non-equivalent.** Exhibit at least one reduced closure that passes a declared macroscopic contract while failing or not supporting microscopic reconstruction.
+- **C2 — Current-state and weak-observable error do not fully predict future-response error.** Find two candidate states with similar present QoI / weak-projection errors but materially different registered pulse responses.
+- **C3 — Native indicators can predict response loss.** Show held-out calibration better than a field-amplitude-only baseline without a false-safe increase.
+- **C4 — Response-aware allocation can save compute.** At matched physical and response fidelity, demonstrate a Pareto improvement against fixed-resolution or global-state-error-only adaptation on at least one held-out cohort.
+- **C5 — Task-conditioned kinetic equivalence is useful.** Show that a compressed state can be interchangeable with its reference for one declared \((\mathcal U,\mathcal Q,T)\) contract yet be falsifiably distinguishable under a broader intervention family or horizon.
+- **C6 — The validity envelope is useful.** Predict when a representation must refine, recover, switch or abstain before a later intervention demonstrates the loss.
+
+Failure of any claim is useful: it narrows the conditions under which response-aware compression is justified.
+
+## 12. Claim ceiling
+
+This specification does not claim:
+- a universal scalar measure of kinetic information;
+- that a finite intervention library captures every possible future intervention;
+- that current Symthaea representations preserve arbitrary nonlinear echoes;
+- that the FNO, VlasovTT, ADEPT, NEOPIC, Smilei or WarpX have been reproduced by this specification;
+- that a 1D1V result beats production 2D/3D PIC;
+- that the prospective numerical targets have been achieved;
+- that an adaptive controller or response-preserving memory capsule is implemented.
+
+The immediate deliverable is a fair, falsifiable contract. Implementation and competitive claims follow only after independent evidence.
+
+## References
+
+1. Burles, S., Camporeale, E. & Pezzi, O. (2026). *A neural operator closure for Landau damping in electrostatic plasma*. Journal of Plasma Physics 92, E149. https://doi.org/10.1017/S0022377826102517
+2. Åsgrim, E. M., Pennati, L., Pasquale, M. & Markidis, S. (2026). *Tensor Network Compression for Fully Spectral Vlasov–Poisson Simulation*. Journal of Computational Physics. https://doi.org/10.1016/j.jcp.2026.115330
+3. Shao, S., Wang, Y. & Wu, J. (2026). *Solving Vlasov–Poisson system with an adaptive Hermite spectral method*. arXiv:2605.17820. https://arxiv.org/abs/2605.17820
+4. Muralikrishnan, S. et al. (2026). *NEOPIC: A Neural Operator Framework for Particle-based Kinetic Plasma Simulations*. arXiv:2610.40528. https://arxiv.org/abs/2610.40528
+5. Joglekar, A. S. & Thomas, A. G. R. (2023). *Machine learning of hidden variables in multiscale fluid simulation*. Machine Learning: Science and Technology 4, 035049. https://doi.org/10.1088/2632-2153/acf81a
+6. Burles, S. & Camporeale, E. (2026). *The machine learning approach to moment closure relations for plasma: a review*. Journal of Plasma Physics 92, E100. https://doi.org/10.1017/S0022377826102013
+7. Smilei 5.1 documentation. https://smileipic.github.io/Smilei/
+8. WarpX 26.11 documentation. https://warpx.readthedocs.io/en/26.11/
+
+
+## Coupled unstable-subspace authority (CUSA)
+
+New companion programme: [#13564 — qualify coupled unstable-mode observability and controllability](https://github.com/Luminous-Dynamics/symthaea/issues/13564).
+
+The scalar and single-complex-mode timing oracles are necessary but not sufficient for multi-mode kinetic control. A controller can have nonzero gain on every coordinate and still fail to observe or actuate the complete unstable invariant subspace. A set of measurements can also be individually informative while remaining linearly dependent.
+
+The first executable increment is in [PR #13405](https://github.com/Luminous-Dynamics/symthaea/pull/13405): a manufactured two-state discrete system
+
+\[
+x_{k+1}=Ax_k+Bu_k,\qquad y_{j,k}=C_jx_k+v_{j,k}
+\]
+
+with two diagnostic channels (independent noise variances), one actuator direction, sample/update strides and sensor/actuator delivery delays. It computes the finite-horizon noise-whitened observability Gramian and the controllability Gramian using only measurements/commands admitted by their actual arrival time. Both eigenvalues of the declared two-state subsystem must be unstable for this first oracle.
+
+Three schema-checked known-answer cases distinguish:
+1. distinct unstable growth factors, independent sensing and one actuator direction: observable and controllable;
+2. collinear diagnostic rows with a delay leaving only one admitted sample: controllable but unobservable;
+3. repeated unstable eigenspace, full sensing and a rank-one actuator direction: observable but uncontrollable.
+
+The report includes minimum/maximum Gramian eigenvalues, finite condition numbers where defined, sample/command counts, and separate observable / controllable / authority-qualified decisions. Non-finite Gramian/eigenvalue arithmetic is rejected.
+
+**Claim ceiling:** this is a manufactured finite-dimensional linear interface oracle. It does not establish observability or stabilizability of nonlinear Vlasov–Poisson, and its A/B/C matrices must eventually come from an independently qualified kinetic linearization or dispersion analysis. Closed-loop nonlinear replay remains a separate mandatory gate. A timing-contract pass cannot substitute for unstable-subspace authority; a linear authority pass cannot substitute for actuator physics or full-order stability.
+
+
+
+## Structure-informed delayed Vlasov–Maxwell feedback (SIM-VM)
+
+New companion programme: [#13570 — reproduce and extend structure-informed delayed Vlasov–Maxwell feedback](https://github.com/Luminous-Dynamics/symthaea/issues/13570).
+
+A new primary baseline is Lu & Wang (2026), [Structure-Informed Electromagnetic Feedback Control of the Vlasov–Maxwell System with Delayed Observations](https://arxiv.org/abs/2611.11787), submitted 9 Nov 2026.
+
+The paper uses a 1D2V periodic VM system and combines:
+- an energy-identity-derived field-cancellation baseline;
+- electric and magnetic actuation (magnetic force alone does no particle work and cannot directly regulate radial kinetic moments);
+- delayed macro observations \(J_1,J_2,\partial_xE_2,\partial_xB_3\) derived from Maxwell's equations;
+- a low-rank linear neural operator (LNO) residual correction over delayed field cancellation;
+- adjoint-state training and a semi-Lagrangian kinetic solver coupled to Yee/leapfrog transverse field updates.
+
+The paper tests two-stream and Weibel-type/current-filamentation instability. It trains over \(t\in[0,20]\), evaluates beyond training, uses a reference delay \(\tau_{\rm ref}=0.6\), and tests mismatched delays \(\tau\in\{0.2,0.4,0.8,1.0\}\). It reports that uncorrected residuals undercompensate at longer delay and can overcompensate at shorter delay; scaling the learned dissipation by \(\tau/\tau_{\rm ref}\) improves the tested mismatch cases. It compares gradient-informed observations against raw field components and LNO against a parameter-matched FNO: FNO was less sensitive in tested shorter-delay cases, while the corrected LNO was slightly stronger in the two-stream test and the FNO moderately stronger in the current-filamentation test.
+
+Two methodological caveats matter for our benchmark:
+1. The paper's approximate gradient freezes state-dependent feedback observations during each gradient evaluation, recomputing the trajectory after each update; it omits the exact derivative contribution through changes in the closed-loop observation trajectory.
+2. The authors explicitly leave noisy observations and regularized spatial-derivative estimation for future work because spatial gradients can amplify measurement noise.
+
+The first code increment in [PR #13405](https://github.com/Luminous-Dynamics/symthaea/pull/13405) is a deterministic Maxwell delay baseline with bounded nonuniform history integration. Given delayed fields and interval-mean currents/gradients over the exact window, it evaluates
+\[
+H_1=-E_{1,\rm delayed}+\tau\overline{J_1},\quad
+H_2=-E_{2,\rm delayed}+\tau(\overline{J_2}+\overline{\partial_x B_3}),\quad
+B_{\rm ext}=-B_{3,\rm delayed}+\tau\overline{\partial_x E_2}.
+\]
+This is the exact interval-integral cancellation identity when the supplied means are exact. The history integrator uses nonuniform-time trapezoidal quadrature, requires both window endpoints, shares a common spatial grid, and fails closed on incomplete history or work-budget overflow. It does not yet include a noisy derivative observer, learned residual, VM solve or closed-loop validation.
+
+The differentiated benchmark should now compare:
+- delayed cancellation only;
+- interval-integral Maxwell predictor;
+- paper-faithful endpoint-observation LNO residual;
+- parameter-matched FNO residual;
+- field-component-only versus current/gradient-informed observations;
+- regularized derivative observers under sensor noise and finite spatial resolution;
+- delay scaling \(\tau/\tau_{\rm ref}\), explicit delay-conditioned operators and variable-delay history-state models;
+- the paper's frozen-observation adjoint against an exact discrete closed-loop adjoint.
+
+Use delay normalized by the measured modal e-fold time and oscillation period, not only an absolute \(\tau\). Include stochastic jitter, sample age, derivative-noise amplification, bounded actuator magnitude/slew, mode transfer, full kinetic \(L^2\) error, electromagnetic energy, control work, Maxwell constraints and coupled unstable-subspace authority (#13564). A controller that lowers field energy while increasing the full kinetic perturbation is not a pass.
+
+
+
+## Additional particle and phase-space representation baselines
+
+Three additional particle methods change the competitive landscape and should be included in the same matched-cohort tournament.
+
+### Structure-preserving decorated particles
+
+Quashie, Burby, Christlieb & Tang (2026), [A Structure-Preserving Decorated Particle Method for the Vlasov–Poisson System](https://arxiv.org/abs/2605.21794), revisit the Scovel–Weinstein reduction. Their macro-particles carry extra shape degrees of freedom while retaining a finite-dimensional Hamiltonian structure inherited from Vlasov–Poisson. The abstract reports that fewer decorated particles can replace standard PIC macro-particles at comparable accuracy on the tested examples.
+
+Required comparison: standard PIC vs source-faithful decorated PIC vs response-aware decoration. Count particle markers, shape DOFs, Hamiltonian/Poisson structure, shape update, serialized state bytes, transition cost and future-response fidelity separately. The proposed extension is response-conditioned local shape/rank allocation and structure-qualified split/merge, not a claim that decorated particles are a new idea. New programme: [#13572](https://github.com/Luminous-Dynamics/symthaea/issues/13572).
+
+### Hierarchical sparse-grid Galerkin particle method
+
+Deluzet, Guillet & Narski (2026), [A hierarchical sparse-grid particle method for the Vlasov–Poisson system](https://arxiv.org/abs/2607.19898), formulate field deposition as a variational Galerkin projection onto hierarchical B-spline sparse-grid spaces rather than standard grid deposition. Their analysis separates grid bias and statistical particle noise; under mixed-derivative regularity, it gives an \(L^2\) density bias scaling of \(O(h^{p+1}|\log h|^{d-1})\) and an \(L^1\) statistical term of \(O(|\log h|^{(d-1)/2}(Nh)^{-1/2})\). This should be benchmarked on anisotropic / limited-regularity cohorts where sparse-grid assumptions and error decomposition matter.
+
+Required comparison: standard PIC deposition, sparse-grid Galerkin projection, and response-aware hierarchical refinement. Report grid bias, particle noise, support/geometry, refinement cost and physical response fidelity separately.
+
+### Entropic variance-reduced PIC
+
+Windhab, Adelmann & Sadr (2026), [VR-PIC: An entropic variance-reduction method for particle-in-cell solutions of the Vlasov–Poisson equation](https://arxiv.org/abs/2602.15041), introduce importance-weight variance reduction with a maximum-cross-entropy correction. Their paper describes a frozen-weight approximation during the velocity kick that is stable but biased, followed by a weight correction to restore conservation while limiting bias. This is an important low-signal baseline because particle noise can dominate weak kinetic responses.
+
+Required comparison: standard PIC, frozen-weight variance reduction, and entropically corrected weights. Measure variance reduction and bias separately, along with conservation drift, particle effective sample size, tail coverage and future-response distortion. A lower-variance estimator is not a win if its bias suppresses a weak but later echo-visible feature.
+
+### Consequence for the representation tournament
+
+The particle family is no longer one baseline. At minimum, the matched tournament must distinguish:
+- standard PIC (particle sampling/deposition baseline);
+- decorated particles (structure-preserving shape DOFs);
+- hierarchical sparse-grid Galerkin PIC (grid approximation + sampling decomposition);
+- entropic VR-PIC (variance/bias and weight evolution);
+- NEOPIC (particle-measure field operator and sample-coordinate normalization);
+- adaptive symplectic particle MOR / Hamiltonian hyper-reduction;
+- VlasovTT and adaptive Hermite/Fourier Eulerian alternatives.
+
+Compare only on matched physical equations, initial measures, time integration tolerance and observables. Keep their distinct error decompositions; do not compress all results into a single “effective particle count”.
+
