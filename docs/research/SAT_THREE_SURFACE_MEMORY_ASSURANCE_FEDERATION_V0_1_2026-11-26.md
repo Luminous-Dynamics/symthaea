@@ -12,9 +12,15 @@ Memory security is not one attack surface. The active October 2026 IETF agent-se
 2. **Cross-User/Cross-Session Memory Isolation (4.6.5):** one user's or session's memory must not be returned in another context. The method requires both a front-door interface test and a separate backing-store record-placement test.
 3. **Protection of Memory Data Integrity (4.6.8):** an adversary edits the persisted medium outside the agent's write path, then the restarted SUT reads the affected context.
 
-The November 2026 memory-at-rest method supplies the concrete T1-T10 procedure and C1-C3 controls for the third surface. It does not replace the other two metrics.
+The November 2026 memory-at-rest method supplies the concrete T1-T10 procedure and C1-C3 controls for the third surface. It does not replace the other two metrics. SAT now has separate research adapters and public development fixtures for the first two surfaces in [PR #13841](https://github.com/Luminous-Dynamics/symthaea/pull/13841); those artifacts are contract work, not executed benchmark results.
 
 These are active Internet-Drafts, not adopted IETF standards. SAT should treat them as versioned external protocols and pin the exact document revisions.
+
+
+
+### Explicit reuse of T6 without metric collapse
+
+The at-rest method's T6 operation is also the storage-placement test named by the isolation terminology: a genuine, unmodified donor record from context A is put into a B position while B identifiers remain. SAT may reference that same raw operation in both the at-rest integrity and placement-isolation reports only when each report independently satisfies its declared boundary, setup, read path, verdict and method requirements. Each native metric keeps its own denominator and score; no global composite counts the event twice. Front-door isolation remains a separate mandatory result.
 
 ## 2. The federation contract
 
