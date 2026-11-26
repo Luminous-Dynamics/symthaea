@@ -132,6 +132,7 @@ pub struct VerifiedWindowV1 {
 pub struct AudioEvidenceVerificationReportV1 {
     pub schema: &'static str,
     pub experiment_unit_id: String,
+    pub source_lineage_id: String,
     pub query_id: String,
     pub evidence_condition: EvidenceConditionV1,
     pub target_audio_sha256: String,
@@ -370,6 +371,7 @@ pub fn verify_audio_evidence_manifest(
     Ok(AudioEvidenceVerificationReportV1 {
         schema: REPORT_SCHEMA_V1,
         experiment_unit_id: manifest.experiment_unit_id.clone(),
+        source_lineage_id: manifest.source_lineage_id.clone(),
         query_id: manifest.query_id.clone(),
         evidence_condition: manifest.evidence_condition,
         target_audio_sha256: manifest.target_audio_sha256.clone(),
@@ -588,6 +590,7 @@ mod tests {
         assert!(report.decoded_pcm_bytes_recomputed);
         assert!(report.window_payloads_recomputed);
         assert!(report.context_manifest_recomputed);
+        assert_eq!(report.source_lineage_id, "synthetic-source-lineage-001");
         assert_eq!(report.verified_window_count, 2);
         assert_eq!(report.verified_windows[0].byte_offset, 4);
         assert_eq!(report.verified_windows[0].byte_length, 8);
