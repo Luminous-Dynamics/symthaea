@@ -162,13 +162,6 @@ struct UnitSegmentV1 {
 }
 
 #[derive(Debug, Clone, PartialEq)]
-struct UnitizingMatrixProfileV1 {
-    categories: Vec<CategoryV1>,
-    observed: Vec<Vec<f64>>,
-    expected: Vec<Vec<f64>>,
-}
-
-#[derive(Debug, Clone, PartialEq)]
 struct DisagreementPairV1 {
     observed: f64,
     expected: f64,
@@ -301,6 +294,10 @@ pub fn audit_unitizing_corpus(
                     });
                 }
                 GroundTruthStateV1::Ambiguous => {
+                    require_text(
+                        annotation.status_reason.as_deref().unwrap_or(""),
+                        &format!("items[{item_index}].annotations[{annotation_index}].status_reason"),
+                    )?;
                     validate_annotation_intervals(
                         &annotation.intervals,
                         item.artifact.total_frames,
@@ -318,6 +315,10 @@ pub fn audit_unitizing_corpus(
                     });
                 }
                 GroundTruthStateV1::NotEstimable => {
+                    require_text(
+                        annotation.status_reason.as_deref().unwrap_or(""),
+                        &format!("items[{item_index}].annotations[{annotation_index}].status_reason"),
+                    )?;
                     validate_annotation_intervals(
                         &annotation.intervals,
                         item.artifact.total_frames,
@@ -540,13 +541,6 @@ fn validate_annotation_intervals(
     Ok(())
 }
 
-#[derive(Debug, Clone, PartialEq)]
-struct LabeledIntervalV1 {
-    start_frame: u64,
-    end_frame: u64,
-    value: String,
-}
-
 fn build_partition(
     intervals: &[(u64, u64, String)],
     continuum_frames: u64,
@@ -686,7 +680,7 @@ fn compute_unitizing_profile(
         for segment in partition {
             let index = category_indices[&segment.category];
             let length = (segment.end_frame - segment.start_frame) as f64;
-            let correction = match segment.category {
+            let correction = match &segment.category {
                 CategoryV1::Gap => length,
                 CategoryV1::Value(_) => length * length,
             };
@@ -860,7 +854,7 @@ fn conditional_coding_profile(
             .filter(|(other_index, _)| *other_index != observer_index)
             .flat_map(|(_, other_partition)| {
                 other_partition.iter().filter_map(|segment| {
-                    matches!(segment.category, CategoryV1::Value(_))
+                    matches!(&segment.category, CategoryV1::Value(_))
                         .then_some((segment.start_frame, segment.end_frame))
                 })
             })
