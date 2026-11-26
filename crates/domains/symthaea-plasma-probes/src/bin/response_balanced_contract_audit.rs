@@ -62,6 +62,9 @@ fn audit(fixture: &Value) -> Result<(), String> {
     let spatial = field(cohort, "spatial_domain")?;
     let velocity = field(cohort, "velocity_domain")?;
     let maximum_time = number(cohort, "maximum_time")?;
+    if string(cohort, "state_metric_id")?.trim().is_empty() != Some(false) {
+        return Err("cohort state metric identifier is empty".to_owned());
+    }
     if maximum_time <= 0.0
         || number(spatial, "maximum")? <= number(spatial, "minimum")?
         || number(velocity, "maximum")? <= number(velocity, "minimum")?
@@ -83,6 +86,30 @@ fn audit(fixture: &Value) -> Result<(), String> {
     if solver_revision.trim().is_empty() {
         return Err("checkpoint solver revision is empty".to_owned());
     }
+
+    let linearization = field(fixture, "linearization_contract")?;
+    require_string(
+        linearization,
+        "status",
+        "synthetic_derivatives_not_computed",
+    )?;
+    require_string(linearization, "derivative_source", "not_computed_synthetic")?;
+    for key in [
+        "future_solver_transition_jacobians_required",
+        "pulse_map_state_jacobian_required",
+        "pulse_map_parameter_jacobian_required",
+        "split_solver_composition_order_required",
+        "independent_finite_difference_cross_check_required",
+    ] {
+        if !boolean(linearization, key)? {
+            return Err(format!("linearization requirement {key} cannot be disabled"));
+        }
+    }
+    require_string(
+        linearization,
+        "branch_change_disposition",
+        "UNKNOWN_OR_HANDOFF",
+    )?;
 
     let horizon = field(fixture, "prediction_horizon")?;
     let horizon_start = number(horizon, "start_time")?;
