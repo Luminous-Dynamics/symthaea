@@ -2121,6 +2121,105 @@ mod tests {
         assert!(prediction.context_similarity < 0.8);
         assert!(prediction.action_parameter_similarity > 0.99);
         assert_eq!(prediction.observation_count, 1);
+
+        let unknown_action = wm
+            .predict_state_without_family_label(
+                &before,
+                &ActionCategory::Configure,
+                &ContinuousHV::random(dim, 90),
+                &unseen_context,
+            )
+            .expect("unknown action returns an explicit identity fallback");
+        assert_eq!(
+            unknown_action.source,
+            ContextualPredictionSource::UnknownActionIdentityFallback
+        );
+    }
+
+    #[test]
+    fn family_label_free_prediction_is_order_invariant_and_deduplicates_clusters() {
+        let dim = 256;
+        let before = ContinuousHV::random(dim, 430);
+        let after = ContinuousHV::random(dim, 431);
+        let context = ContinuousHV::random(dim, 432);
+
+        let mut family_a = transition_episode(
+            "same-transition-family-a",
+            ActionCategory::Install,
+            ActionCategory::Install,
+            before.clone(),
+            context.clone(),
+            after.clone(),
+            TransitionOutcomeClass::Success,
+            "shared-independent-cluster",
+        );
+        family_a.environment_family_id = "same-transition-a".to_owned();
+        let mut family_b = transition_episode(
+            "same-transition-family-b",
+            ActionCategory::Install,
+            ActionCategory::Install,
+            before.clone(),
+            context.clone(),
+            after,
+            TransitionOutcomeClass::Failure,
+            "shared-independent-cluster",
+        );
+        family_b.environment_family_id = "same-transition-b".to_owned();
+
+        let mut forward = NixWorldModel::new(dim);
+        forward
+            .learn_episode(&family_a)
+            .expect("first family episode");
+        forward
+            .learn_episode(&family_b)
+            .expect("second family episode");
+
+        let mut reverse = NixWorldModel::new(dim);
+        reverse
+            .learn_episode(&family_b)
+            .expect("first reversed family episode");
+        reverse
+            .learn_episode(&family_a)
+            .expect("second reversed family episode");
+
+        let action_parameters = ContinuousHV::random(dim, 90);
+        let prediction_forward = forward
+            .predict_state_without_family_label(
+                &before,
+                &ActionCategory::Install,
+                &action_parameters,
+                &context,
+            )
+            .expect("forward family-order prediction");
+        let prediction_reverse = reverse
+            .predict_state_without_family_label(
+                &before,
+                &ActionCategory::Install,
+                &action_parameters,
+                &context,
+            )
+            .expect("reverse family-order prediction");
+
+        assert_eq!(
+            prediction_forward.source,
+            ContextualPredictionSource::ContextualDelta
+        );
+        assert_eq!(prediction_forward.observation_count, 2);
+        assert_eq!(prediction_forward.independent_cluster_count, 1);
+        assert_eq!(prediction_forward.outcome_counts.success, 1);
+        assert_eq!(prediction_forward.outcome_counts.failure, 1);
+        assert!(
+            (prediction_forward
+                .predicted_state
+                .similarity(&prediction_reverse.predicted_state)
+                - 1.0)
+                .abs()
+                < 1e-5
+        );
+        assert_eq!(
+            prediction_forward.independent_cluster_count,
+            prediction_reverse.independent_cluster_count
+        );
     }
 
     #[test]
