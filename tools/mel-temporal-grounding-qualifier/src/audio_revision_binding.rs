@@ -424,7 +424,9 @@ mod tests {
 
     #[test]
     fn verified_triplet_rejects_manifest_on_no_evidence_arm() {
-        let no_case = revision_case();
+        let mut no_case = revision_case();
+        no_case.evidence_condition = RevisionEvidenceConditionV1::NoEvidence;
+        no_case.evidence = None;
         let local_case = revision_case();
         let local_manifest = evidence_manifest();
         let (yoked_case, yoked_manifest, yoked_source, yoked_pcm) =
