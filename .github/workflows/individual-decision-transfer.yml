@@ -1,0 +1,41 @@
+name: Individual decision transfer evaluator
+
+on:
+  push:
+    branches:
+      - research/individual-decision-transfer-v0-1-20261125
+    paths:
+      - "research/temporal-evaluator/**"
+      - "docs/research/INDIVIDUAL_DECISION_TRANSFER_V0_1.md"
+      - "docs/research/fixtures/individual_decision_transfer_v0.1.json"
+      - ".github/workflows/individual-decision-transfer.yml"
+  pull_request:
+    types: [opened, synchronize, reopened, ready_for_review]
+    branches:
+      - research/randomized-decision-regret-v0-1-20261125
+    paths:
+      - "research/temporal-evaluator/**"
+      - "docs/research/INDIVIDUAL_DECISION_TRANSFER_V0_1.md"
+      - "docs/research/fixtures/individual_decision_transfer_v0.1.json"
+      - ".github/workflows/individual-decision-transfer.yml"
+
+permissions:
+  contents: read
+
+jobs:
+  rust-evaluator:
+    name: Rust 1.100.0 decision-transfer format / test / clippy
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    steps:
+      - uses: actions/checkout@v4
+      - name: Install pinned Rust toolchain
+        uses: dtolnay/rust-toolchain@1.100.0
+        with:
+          components: rustfmt, clippy
+      - name: Check formatting of the new evaluator module only
+        run: rustfmt --check --edition 2024 research/temporal-evaluator/src/individual_decision_transfer.rs
+      - name: Run evaluator tests
+        run: cargo test --manifest-path research/temporal-evaluator/Cargo.toml --locked --all-targets
+      - name: Run strict Clippy
+        run: cargo clippy --manifest-path research/temporal-evaluator/Cargo.toml --locked --all-targets -- -D warnings

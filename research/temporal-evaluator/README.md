@@ -64,3 +64,18 @@ The evaluator-side module `src/randomized_decision_regret.rs` extends decision-o
 - The module does not sample actions, calibrate a probability model, optimize a mixed policy, authenticate candidate execution, or establish safety.
 
 Fifteen unit tests cover a balanced mixture that halves worst-case expected regret relative to the deterministic comparator, support-risk separation, deterministic degeneration, exact probability mass, canonical action ordering, inadmissible actions, candidate-view identity, duplicate worlds, digest requirements and conservative rounding, empty/bounded inputs, action-set consistency, loss-range validation and asymmetric mixtures.
+
+
+## Individual counterfactual decision transfer
+
+The evaluator-side module `src/individual_decision_transfer.rs` measures whether a multi-action utility ranking from the history-conditioned latent readout or the imagined rollout selects an action with lower independently realized regret for the same individual.
+
+- Each scorecard declares the complete expected action set before evaluation and binds every action row to one individual, factual history, full branch-point snapshot, shared exogenous-forcing manifest, task/loss/split/model profiles and the same latent state.
+- Every row must have a unique action/run identity, a verified upstream pairing/trajectory reference, and an applied outcome. Missing action rows or non-applied branches reject; no outcome is silently removed or imputed as zero.
+- Utilities use one frozen integer scale (higher is better). Ties are resolved by lexicographically smallest action ID for selection; all exact realized top-1 actions and the complete epsilon-good set remain reported, including cases where every action is epsilon-good but no single action is uniquely optimal.
+- The certificate separates latent and rollout choices, realized regret, top-1/epsilon-good membership, the paired rollout-minus-latent regret difference, and pairwise ranking concordance/discordance/ties. Ranking ties are retained so Kendall tau-b can be reconstructed.
+- Output is canonicalized by action ID and echoes the complete frozen decision context plus per-action pairing/trajectory digest references. It contains per-individual rows only; no confidence interval or cross-individual inference is computed. #8578 remains the independent-cluster inference owner.
+
+This implements a known decision-transfer metric family already discussed in Okita (2026), rather than claiming the metric itself as novel. The Symthaea-specific increment is its bounded, typed and provenance-linked Rust evaluator. Digest references are not receipt authentication, and package separation is not a security boundary: validate the underlying artifacts and retain #9437 isolation before confirmatory use.
+
+Research contract: [INDIVIDUAL_DECISION_TRANSFER_V0_1.md](../../docs/research/INDIVIDUAL_DECISION_TRANSFER_V0_1.md). Semantic fixture: [individual_decision_transfer_v0.1.json](../../docs/research/fixtures/individual_decision_transfer_v0.1.json). Exact-head Rust 1.96 formatting, tests and strict Clippy are required before qualification.

@@ -523,12 +523,6 @@ fn validate_snapshot(snapshot: &DmcSnapshotManifest) -> Result<(), DmcRestoreErr
         return Err(DmcRestoreError::BranchPointStepMismatch);
     }
     if snapshot
-        .step_limit
-        .is_some_and(|step_limit| snapshot.environment_step_count >= step_limit)
-    {
-        return Err(DmcRestoreError::StepLimitAlreadyReached);
-    }
-    if snapshot
         .rest_operation_sha256
         .as_ref()
         .is_some_and(digest_is_empty)
