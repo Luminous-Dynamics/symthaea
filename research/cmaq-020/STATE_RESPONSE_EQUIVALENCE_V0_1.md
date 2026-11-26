@@ -40,6 +40,8 @@ The cluster ID is carried through to support #8578's cluster-level inference. A 
 
 These fields establish identity and custody only. In this dependency-free crate, SHA-256 fields are syntax-checked as 64-character hexadecimal strings; the crate does not recompute the digest from the external manifest/payload or authenticate its publisher. The runner/custody layer must independently recompute and compare each digest against the exact bytes and attach signed receipts. A SHA-256 digest alone does not prove the source data are true or establish independent generation. Source authenticity, evaluator isolation and signed receipts remain separate gates (#9437).
 
+Class count and singleton count are not memory-byte measurements. The confirming resource ledger must still charge vector payloads, codebooks, model/checkpoint assets, indices, provenance sidecars, replay data, update work and retrieval cost.
+
 ## Approximate response
 
 For key `k`, normalize the absolute response difference by the contract's positive tolerance `tau_k`. Pairwise approximate equivalence is:
@@ -54,6 +56,7 @@ This relation may be non-transitive. The fixture `a=0, b=8, c=16` with tolerance
 - Exact invariant signature comparison.
 - Candidate-assigned abstract labels.
 - False-merge and false-split counts.
+- Candidate abstraction class count and singleton-class count (coarse partition-cardinality diagnostics only).
 - Worst-case normalized pair distortion.
 - Strict rejection of missing/extra response cells, missing invariant fields, duplicate state IDs, out-of-contract domains, malformed digests, mixed candidate checkpoints, cluster/domain/family aliasing, invalid contracts, zero tolerances and invalid epsilon.
 - Deterministic test fixtures for true merges, false merges, false splits, invariant mismatch and non-transitive tolerance.
@@ -74,7 +77,7 @@ The evaluator now supports a deterministic, cost-aware next-counterexample selec
 
 This makes refinement cost observable instead of granting free access to the oracle's entire response table. The relative probe costs are contract inputs and must be frozen before held-out evaluation; they are not a dynamic estimate derived from the hidden response. The counterexample selector is a finite diagnostic tool, not a proof that all possible future interventions have been covered.
 
-Added deterministic tests cover: lowest-cost separating query selection, no disclosure of response values, invariant mismatch handling, ignored already-separated pairs, deterministic selection under input reordering, sequential refinement of multiple false merges, missing/zero probe-cost rejection, domain and digest validation, single-checkpoint enforcement, cluster/family consistency, and a copy/no-op negative control where identical no-op response cannot hide a state-distinguishing action.
+Added deterministic tests cover: lowest-cost separating query selection, no disclosure of response values, invariant mismatch handling, ignored already-separated pairs, deterministic selection under input reordering, sequential refinement of multiple false merges, missing/zero probe-cost rejection, domain and digest validation, single-checkpoint enforcement, cluster/family consistency, a copy/no-op negative control where identical no-op response cannot hide a state-distinguishing action, and partition cardinality/singleton reporting.
 
 
 ## External reliability anchors added to the evaluation matrix
