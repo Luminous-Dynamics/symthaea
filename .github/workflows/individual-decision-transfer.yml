@@ -24,13 +24,13 @@ permissions:
 
 jobs:
   rust-evaluator:
-    name: Rust 1.96 decision-transfer format / test / clippy
+    name: Rust 1.100.0 decision-transfer format / test / clippy
     runs-on: ubuntu-latest
     timeout-minutes: 20
     steps:
       - uses: actions/checkout@v4
       - name: Install pinned Rust toolchain
-        uses: dtolnay/rust-toolchain@1.96.0
+        uses: dtolnay/rust-toolchain@1.100.0
         with:
           components: rustfmt, clippy
       - name: Check formatting of the new evaluator module only
