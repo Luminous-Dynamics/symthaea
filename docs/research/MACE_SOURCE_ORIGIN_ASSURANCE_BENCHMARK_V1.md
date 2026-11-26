@@ -130,7 +130,21 @@ The official [Agent Memory Leaderboard Cycle 2 results](https://agentmemoryleade
 | Multimodal | Khipu 43.26 | MemoraX 53.68 |
 | Coding | InsightMem 63.33% | MemoraX 68.00% |
 
-These are separate tracks with different task sets and scoring definitions. Do not average them, compare them as a single ranking, or treat them as assurance scores. On the textual track, the largest observed commercial/open-source gaps include personalization and care, streaming, and epistemic safety/privacy; those are retrieval-and-memory parity priorities, distinct from MACE's source-origin assurance contribution.
+These are separate tracks with different task sets and scoring definitions. Do not average them, compare them as a single ranking, or treat them as assurance scores. The corresponding commercial/open-source gaps are 8.04 textual points, 10.42 multimodal points and 4.67 coding percentage points.
+
+For the textual capability table, the commercial leader MemoraX scores 54.70 on Personalization & Care, 63.11 on Streaming, 81.98 on Epistemic Safety & Privacy, 67.05 on Temporal & Event Sequencing, 70.85 on Explicit Fact Recall, 64.40 on Relational & Multi-hop Reasoning, and 78.10 on Memory Governance. The open-source leader Resurface scores 38.82, 49.65, 68.59, 57.76, 62.98, 58.94 and 76.55 respectively. The resulting gaps are:
+
+| Textual capability | Commercial advantage |
+|---|---:|
+| Personalization & care | 15.88 points |
+| Streaming | 13.46 points |
+| Epistemic safety & privacy | 13.39 points |
+| Temporal sequencing | 9.29 points |
+| Explicit fact recall | 7.87 points |
+| Relational / multi-hop reasoning | 5.46 points |
+| Memory governance | 1.55 points |
+
+These gaps suggest the most valuable memory-parity work is not just similarity retrieval: prioritize changing-preference tracking, continuous update latency, evidence-grounded epistemic safety and temporal state reconstruction. They are separate from source-origin assurance, and MACE has no external AML result yet.
 
 The external benchmark suite should be run as complementary instruments:
 
@@ -175,3 +189,25 @@ This turns provenance from a self-reported graph into an adversarially testable 
 - Distinguish authored tests, locally executed tests, hosted CI, matched benchmark runs, independent replication and field validation.
 
 This protocol is designed to make false independence and false completeness measurable, rather than allowing a signed, self-consistent lineage graph to be mistaken for verified provenance.
+
+
+## 9. Multi-operator origin corroboration
+
+The follow-on [MACE Source-Origin Witness Quorum V1](MACE_SOURCE_ORIGIN_WITNESS_QUORUM_V1.md) adds a policy-configurable per-node operator and failure-domain quorum over the fourth-authority source-origin result.
+
+Add these metrics:
+- **Per-node quorum coverage:** fraction of graph nodes with at least the required independently pinned operators and acquisition failure domains.
+- **Shared-observation acceptance:** cases where two operator receipts reuse the same acquisition-record digest.
+- **Source metadata disagreement:** witness disagreements over publisher identity or source revision.
+- **Ancestry disagreement detection:** any signed witness parent, derivation or common-cause set that differs from the graph.
+- **Majority-laundering rate:** cases in which the verifier accepts despite one valid signed witness reporting a known graph omission.
+- **Authority key/profile reuse:** reused keys across the qualifier, sufficiency evaluator, lineage resolver, source-origin authority and witness operators.
+
+Proposed targets are zero accepted shared acquisition records, zero accepted key/profile reuse, zero majority-laundered ancestry mismatches, and 100% per-node quorum coverage on supported cases. The system must abstain or return insufficient evidence when the minimum operator or failure-domain count is not met. A valid signed disagreement must remain visible and cannot be discarded as an outlier without a separately governed adjudication process.
+
+The 2-of-3 policy is not a universal truth oracle: operator identity, failure-domain independence, publisher metadata and source completeness remain explicit trust assumptions. The external acquisition operator registry and fetch adapters must be independently audited and tested.
+
+
+## External provenance interoperability
+
+The follow-on [MACE W3C PROV and SCITT Interoperability V1](MACE_PROV_SCITT_INTEROP_V1.md) defines a JSON-LD context and proposed mapping for interoperable graph export, plus a separate SCITT transparency integration path. This complements the source-origin assurance benchmark but does not change its ground-truth requirements: neither PROV representation nor transparency-log inclusion proves source truth or completeness.

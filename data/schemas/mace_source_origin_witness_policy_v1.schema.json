@@ -1,0 +1,43 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://luminousdynamics.io/schemas/mace_source_origin_witness_policy_v1.schema.json",
+  "title": "MACE Source-Origin Witness Policy V1",
+  "description": "Consumer-owned policy pinning independent source-origin observers, their trust profiles, and the minimum operator and acquisition-failure-domain quorum.",
+  "type": "object",
+  "additionalProperties": false,
+  "required": [
+    "schema_version",
+    "graph_sha256",
+    "minimum_operators",
+    "minimum_failure_domains",
+    "maximum_observation_age_secs",
+    "operators"
+  ],
+  "properties": {
+    "schema_version": { "const": "mace_source_origin_witness_policy_v1" },
+    "graph_sha256": { "type": "string", "pattern": "^[0-9a-f]{64}$" },
+    "minimum_operators": { "type": "integer", "minimum": 2, "maximum": 16 },
+    "minimum_failure_domains": { "type": "integer", "minimum": 2, "maximum": 16 },
+    "maximum_observation_age_secs": { "type": "integer", "minimum": 1, "maximum": 31536000 },
+    "operators": {
+      "type": "array",
+      "minItems": 2,
+      "maxItems": 16,
+      "items": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": [
+          "operator_id",
+          "failure_domain_sha256",
+          "verifier_profile_sha256"
+        ],
+        "properties": {
+          "operator_id": { "type": "string", "minLength": 1, "maxLength": 256 },
+          "failure_domain_sha256": { "type": "string", "pattern": "^[0-9a-f]{64}$" },
+          "verifier_profile_sha256": { "type": "string", "pattern": "^[0-9a-f]{64}$" }
+        }
+      }
+    }
+  },
+  "$comment": "Runtime requires operators to be sorted by operator_id, unique operator IDs and trust-profile digests, minimum_failure_domains <= minimum_operators <= operators.len(), and at least minimum_failure_domains distinct declared failure domains. Distinct strings are policy assertions, not proof of real-world organizational independence; the consumer must govern the operator/failure-domain registry and account for shared owners, networks, clouds, archives, credentials and upstream metadata."
+}
