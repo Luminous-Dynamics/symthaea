@@ -975,6 +975,7 @@ mod tests {
     use cmaq_020_state_response::{
         score_abstraction, ResponseKey, StateResponseContract, StateResponseRecord,
     };
+    use sha2::{Digest, Sha256};
     use std::collections::BTreeMap;
 
     #[test]
@@ -2427,7 +2428,7 @@ mod tests {
                 domain_id: "toy-nixos-domain".to_owned(),
                 environment_family_id: (*family).to_owned(),
                 environment_cluster_id: (*cluster).to_owned(),
-                source_state_sha256: blake3::hash(state_id.as_bytes()).to_hex().to_string(),
+                source_state_sha256: format!("{:x}", Sha256::digest(state_id.as_bytes())),
                 candidate_checkpoint_sha256: "c".repeat(64),
                 abstract_state_id,
                 invariant_signature: [("constant-invariant".to_owned(), 1)]
