@@ -178,4 +178,4 @@ The current branch delivers the typed in-memory state machine and its tests. It 
 - [Memora/FAMA](https://aclanthology.org/2026.findings-acl.1337/) — evaluates remembering, reasoning and recommending, and penalizes obsolete-memory reuse.
 - [MEMORA-Bench](https://aclanthology.org/2026.findings-emnlp.1211/) — 45-hour egocentric video embodied-memory suite for retrospective faithfulness and prospective planning.
 - [LongMemEval-V2](https://github.com/xiaowu0162/LongMemEval-V2) — 451 questions, five memory abilities, up to 115M-token haystacks.
-- [MEMOBench](https://aclanthology.org/2026.findings-emnlp.XXX/) — process-level Storage, Update and Compression checkpoints for history-dependent manipulation. **Anthology identifier requires confirmation before formal citation or execution.**
+- [MEMOBench](https://aclanthology.org/2026.findings-emnlp.333/) — process-level Storage, Update and Compression checkpoints for history-dependent manipulation. **Anthology identifier requires confirmation before formal citation or execution.**
