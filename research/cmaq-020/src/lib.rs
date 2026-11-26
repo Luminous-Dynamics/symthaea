@@ -613,6 +613,7 @@ mod tests {
         let left = record("state-a", "class-a", 0, 2);
         let mut right = record("state-b", "class-b", 0, 2);
         right.candidate_checkpoint_sha256 = "e".repeat(64);
+        assert!(assess_pair(&left, &right, &contract).is_err());
         assert!(score_abstraction(&[left, right], &contract).is_err());
         let left = record("state-a", "class-a", 0, 2);
         let mut right = record("state-b", "class-b", 0, 2);
