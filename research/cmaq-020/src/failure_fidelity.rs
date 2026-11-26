@@ -190,9 +190,9 @@ struct BoundaryPairCounts {
 /// stage accuracy also use all reference failures, so a predicted success on
 /// a reference failure cannot silently disappear from those metrics.
 ///
-/// Each boundary pair must share initial state, realized action, mechanism
-/// family, independent cluster and candidate checkpoint. Cluster summaries
-/// are descriptive; #8578 owns inferential resampling at the cluster level.
+/// Binary action-fork boundary pairs must share initial state, realized action,
+/// mechanism family, independent cluster and candidate checkpoint. Cluster
+/// summaries are descriptive; #8578 owns inferential resampling.
 pub fn score_failure_fidelity(
     records: &[FailureTraceRecord],
     contract: &FailureFidelityContract,
@@ -334,10 +334,11 @@ pub fn score_failure_fidelity(
 
 
 
-/// Rate-based paired boundary record. The reference success-side and
-/// failure-side are selected by the benchmark's evaluator manifest. Candidate
-/// counts come from independent rollouts of the same frozen candidate
-/// checkpoint and the same two scene/action variants.
+/// Rate-based scene-boundary pair. The reference success-side and failure-side
+/// are selected by the benchmark manifest. Both sides use one frozen reference
+/// policy/checkpoint, but its closed-loop action traces may differ because the
+/// scene variants differ. Candidate counts come from rollouts of one frozen
+/// candidate checkpoint.
 #[derive(Clone, Debug)]
 pub struct BoundaryRatePair {
     pub pair_id: String,
@@ -431,7 +432,25 @@ pub struct BoundaryRateClusterCounts {
 }
 
 #[derive(Clone, Debug, Default, PartialEq)]
+pub struct BoundaryRatePairMeasurement {
+    pub pair_id: String,
+    pub environment_cluster_id: String,
+    pub reference_success_side_rate_basis_points: f64,
+    pub predicted_success_side_rate_basis_points: f64,
+    pub reference_failure_side_rate_basis_points: f64,
+    pub predicted_failure_side_rate_basis_points: f64,
+    pub reference_gap_basis_points: f64,
+    pub predicted_gap_basis_points: f64,
+    pub absolute_gap_error_basis_points: f64,
+    pub reference_boundary_detected: bool,
+    pub predicted_boundary_detected: bool,
+    pub boundary_detection_correct: bool,
+    pub boundary_direction_correct: bool,
+}
+
+#[derive(Clone, Debug, Default, PartialEq)]
 pub struct BoundaryRateFidelityScore {
+    pub pair_measurements: Vec<BoundaryRatePairMeasurement>,
     pub pairs: usize,
     pub detected_reference_boundaries: usize,
     pub detected_predicted_boundaries: usize,
@@ -546,11 +565,29 @@ pub fn score_boundary_rate_pairs(
         score.detected_predicted_boundaries += predicted_detected as usize;
         score.correct_boundary_detection_pairs += detection_correct as usize;
         direction_matches += direction_match as usize;
-        success_error_sum += (predicted_success_rate - reference_success_rate).abs();
-        failure_error_sum += (predicted_failure_rate - reference_failure_rate).abs();
-        gap_error_sum += (predicted_gap - reference_gap).abs();
+        let success_side_error = (predicted_success_rate - reference_success_rate).abs();
+        let failure_side_error = (predicted_failure_rate - reference_failure_rate).abs();
+        let gap_error = (predicted_gap - reference_gap).abs();
+        success_error_sum += success_side_error;
+        failure_error_sum += failure_side_error;
+        gap_error_sum += gap_error;
         reference_gap_sum += reference_gap;
         predicted_gap_sum += predicted_gap;
+        score.pair_measurements.push(BoundaryRatePairMeasurement {
+            pair_id: pair.pair_id.clone(),
+            environment_cluster_id: pair.environment_cluster_id.clone(),
+            reference_success_side_rate_basis_points: reference_success_rate,
+            predicted_success_side_rate_basis_points: predicted_success_rate,
+            reference_failure_side_rate_basis_points: reference_failure_rate,
+            predicted_failure_side_rate_basis_points: predicted_failure_rate,
+            reference_gap_basis_points: reference_gap,
+            predicted_gap_basis_points: predicted_gap,
+            absolute_gap_error_basis_points: gap_error,
+            reference_boundary_detected: reference_detected,
+            predicted_boundary_detected: predicted_detected,
+            boundary_detection_correct: detection_correct,
+            boundary_direction_correct: direction_match,
+        });
 
         let cluster = score
             .clusters
@@ -664,6 +701,9 @@ mod tests {
         let pair = rate_pair("pair-1", "cluster-1");
         let score = score_boundary_rate_pairs(&[pair], &contract()).expect("valid rates");
         assert_eq!(score.pairs, 1);
+        assert_eq!(score.pair_measurements.len(), 1);
+        assert_eq!(score.pair_measurements[0].pair_id, "pair-1");
+        assert_eq!(score.pair_measurements[0].environment_cluster_id, "cluster-1");
         assert_eq!(score.detected_reference_boundaries, 1);
         assert_eq!(score.detected_predicted_boundaries, 1);
         assert_eq!(score.boundary_detection_accuracy, Some(1.0));
@@ -726,6 +766,10 @@ mod tests {
         let mut mixed_reference_policy = rate_pair("pair-5", "cluster-5");
         mixed_reference_policy.reference_policy_id = "fastwam".to_owned();
         assert!(score_boundary_rate_pairs(&[rate_pair("pair-6", "cluster-6"), mixed_reference_policy], &contract()).is_err());
+
+        let mut bad_reference_policy_digest = rate_pair("pair-7", "cluster-7");
+        bad_reference_policy_digest.reference_policy_checkpoint_sha256 = "invalid".to_owned();
+        assert!(score_boundary_rate_pairs(&[bad_reference_policy_digest], &contract()).is_err());
     }
 
 
@@ -752,6 +796,19 @@ mod tests {
         assert_eq!(score.clusters.len(), 2);
         assert_eq!(score.clusters["cluster-1"].pairs, 2);
         assert_eq!(score.clusters["cluster-2"].pairs, 1);
+    }
+
+
+
+    #[test]
+    fn failure_contract_rejects_invalid_boundary_threshold() {
+        let mut zero = contract();
+        zero.minimum_boundary_gap_basis_points = 0;
+        assert!(zero.validate().is_err());
+
+        let mut above_one_hundred_percent = contract();
+        above_one_hundred_percent.minimum_boundary_gap_basis_points = 10_001;
+        assert!(above_one_hundred_percent.validate().is_err());
     }
 
     #[test]
