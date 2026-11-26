@@ -368,8 +368,7 @@ pub fn plan_annotation_acquisition(
         .collect();
     let audit_source_set: BTreeSet<&str> = audit_source_ids.iter().map(String::as_str).collect();
 
-    let active_result =
-        select_active(&candidates, &eligible_active, &config, &audit_source_set)?;
+    let active_result = select_active(&candidates, &eligible_active, &config, &audit_source_set)?;
     let active_refinement = active_result.selections;
 
     let mut unmet_quotas = active_result.unmet;
@@ -424,7 +423,8 @@ pub fn plan_annotation_acquisition(
         });
     }
 
-    let total_spent = active_result.spent
+    let total_spent = active_result
+        .spent
         .checked_add(probability_result.spent)
         .ok_or_else(|| "total annotation budget usage overflow".to_string())?;
     if total_spent > config.total_budget_units {
@@ -497,7 +497,8 @@ pub fn plan_annotation_acquisition(
 
     // Keep this local counter observable in the debug/test report path; it is
     // also useful for assertions that source-work caps were honored.
-    if active_result.source_counts
+    if active_result
+        .source_counts
         .values()
         .any(|count| *count > config.maximum_active_items_per_source_work)
     {
