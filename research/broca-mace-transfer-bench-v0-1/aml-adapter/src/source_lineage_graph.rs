@@ -193,90 +193,11 @@ pub fn replay_source_lineage_graph_v1(
         if terminals.is_empty() {
             return Err(SourceLineageRejectV1::MissingRequirementEvidence);
         }
-
-        // root digest -> all evidence nodes on at least one path from a
-        // requirement-matching terminal to that root.
-        let mut root_paths = BTreeMap::<String, BTreeSet<String>>::new();
-        for terminal in terminals {
-            let mut stack = vec![terminal];
-            let mut closure_nodes = BTreeSet::new();
-            let mut terminal_roots = BTreeSet::new();
-            while let Some(id) = stack.pop() {
-                if !closure_nodes.insert(id.clone()) {
-                    continue;
-                }
-                let node = nodes.get(&id).ok_or(SourceLineageRejectV1::DanglingParent)?;
-                if node.parent_evidence_ids.is_empty() {
-                    terminal_roots.insert(source_root_identity_sha256(
-                        &node.source_id, &node.source_sha256,
-                    ));
-                } else {
-                    for parent in &node.parent_evidence_ids {
-                        stack.push(parent.clone());
-                    }
-                }
-            }
-            for root_digest in terminal_roots {
-                root_paths.entry(root_digest).or_default()
-                    .extend(closure_nodes.iter().cloned());
-            }
-        }
-        if root_paths.is_empty() {
-            return Err(SourceLineageRejectV1::UnresolvedAncestors);
-        }
-
-        let root_ids = root_paths.keys().cloned().collect::<Vec<_>>();
-        let mut union = UnionFind::new(root_ids.len());
-        let root_index = root_ids.iter().enumerate()
-            .map(|(index, root)| (root.clone(), index))
-            .collect::<BTreeMap<_, _>>();
-        let mut common_cause_owner = BTreeMap::<String, usize>::new();
-        for (root_digest, index) in &root_index {
-            for root_node in root_paths.get(root_digest).into_iter().flatten() {
-                let node = nodes.get(root_node).ok_or(SourceLineageRejectV1::InvalidGraph)?;
-                for group in &node.common_cause_group_sha256 {
-                    if let Some(previous) = common_cause_owner.insert(group.clone(), *index) {
-                        union.join(previous, *index);
-                    }
-                }
-            }
-        }
-
-        let mut grouped = BTreeMap::<usize, Vec<String>>::new();
-        for (digest, index) in &root_index {
-            grouped.entry(union.find(*index)).or_default().push(digest.clone());
-        }
-        for family_roots in grouped.values_mut() {
-            family_roots.sort();
-        }
-        for family_roots in grouped.values() {
-            let mut family_groups = BTreeSet::new();
-            let mut closure_nodes = BTreeSet::new();
-            for root in family_roots {
-                if let Some(path_nodes) = root_paths.get(root) {
-                    closure_nodes.extend(path_nodes.iter().cloned());
-                }
-                // Include every common-cause commitment on the root identity.
-                for root_node in root_paths.get(root).into_iter().flatten() {
-                    let node = nodes.get(root_node).ok_or(SourceLineageRejectV1::InvalidGraph)?;
-                    family_groups.extend(node.common_cause_group_sha256.iter().cloned());
-                }
-            }
-            let family_sha256 = root_family_sha256(family_roots, &family_groups);
-            let closure_sha256 = lineage_closure_sha256(
-                &requirement.requirement_id,
-                &family_sha256,
-                &closure_nodes,
-                &nodes,
-            )?;
-            replayed.push(ReplayedSourceRootFamilyV1 {
-                requirement_id: requirement.requirement_id.clone(),
-                root_family_sha256: family_sha256,
-                lineage_closure_sha256: closure_sha256,
-                source_root_count: family_roots.len(),
-                closure_node_count: closure_nodes.len(),
-            });
-        }
+        replayed.extend(replay_requirement_families(
+            &requirement.requirement_id,
+            &terminals,
+            &nodes,
+        )?);
     }
     replayed.sort_by(|a, b| {
         (&a.requirement_id, &a.root_family_sha256)
@@ -362,6 +283,98 @@ fn validate_graph_acyclic(
         return Err(SourceLineageRejectV1::GraphCycle);
     }
     Ok(())
+}
+
+fn replay_requirement_families(
+    requirement_id: &str,
+    terminals: &[String],
+    nodes: &BTreeMap<String, SourceLineageGraphNodeV1>,
+) -> Result<Vec<ReplayedSourceRootFamilyV1>, SourceLineageRejectV1> {
+    // root digest -> all evidence nodes on at least one path from a
+    // requirement-matching terminal to that root.
+    let mut root_paths = BTreeMap::<String, BTreeSet<String>>::new();
+    for terminal in terminals {
+        let mut stack = vec![terminal.clone()];
+        let mut closure_nodes = BTreeSet::new();
+        let mut terminal_roots = BTreeSet::new();
+        while let Some(id) = stack.pop() {
+            if !closure_nodes.insert(id.clone()) {
+                continue;
+            }
+            let node = nodes.get(&id).ok_or(SourceLineageRejectV1::DanglingParent)?;
+            if node.parent_evidence_ids.is_empty() {
+                terminal_roots.insert(source_root_identity_sha256(
+                    &node.source_id, &node.source_sha256,
+                ));
+            } else {
+                for parent in &node.parent_evidence_ids {
+                    stack.push(parent.clone());
+                }
+            }
+        }
+        for root_digest in terminal_roots {
+            root_paths.entry(root_digest).or_default()
+                .extend(closure_nodes.iter().cloned());
+        }
+    }
+    if root_paths.is_empty() {
+        return Err(SourceLineageRejectV1::UnresolvedAncestors);
+    }
+
+    let root_ids = root_paths.keys().cloned().collect::<Vec<_>>();
+    let mut union = UnionFind::new(root_ids.len());
+    let root_index = root_ids.iter().enumerate()
+        .map(|(index, root)| (root.clone(), index))
+        .collect::<BTreeMap<_, _>>();
+    let mut common_cause_owner = BTreeMap::<String, usize>::new();
+    for (root_digest, index) in &root_index {
+        for path_node_id in root_paths.get(root_digest).into_iter().flatten() {
+            let node = nodes.get(path_node_id).ok_or(SourceLineageRejectV1::InvalidGraph)?;
+            for group in &node.common_cause_group_sha256 {
+                if let Some(previous) = common_cause_owner.insert(group.clone(), *index) {
+                    union.join(previous, *index);
+                }
+            }
+        }
+    }
+
+    let mut grouped = BTreeMap::<usize, Vec<String>>::new();
+    for (digest, index) in &root_index {
+        grouped.entry(union.find(*index)).or_default().push(digest.clone());
+    }
+    let mut replayed = Vec::new();
+    for family_roots in grouped.values_mut() {
+        family_roots.sort();
+    }
+    for family_roots in grouped.values() {
+        let mut family_groups = BTreeSet::new();
+        let mut closure_nodes = BTreeSet::new();
+        for root in family_roots {
+            if let Some(path_nodes) = root_paths.get(root) {
+                closure_nodes.extend(path_nodes.iter().cloned());
+            }
+            for path_node_id in root_paths.get(root).into_iter().flatten() {
+                let node = nodes.get(path_node_id).ok_or(SourceLineageRejectV1::InvalidGraph)?;
+                family_groups.extend(node.common_cause_group_sha256.iter().cloned());
+            }
+        }
+        let family_sha256 = root_family_sha256(family_roots, &family_groups);
+        let closure_sha256 = lineage_closure_sha256(
+            requirement_id,
+            &family_sha256,
+            &closure_nodes,
+            nodes,
+        )?;
+        replayed.push(ReplayedSourceRootFamilyV1 {
+            requirement_id: requirement_id.to_owned(),
+            root_family_sha256: family_sha256,
+            lineage_closure_sha256: closure_sha256,
+            source_root_count: family_roots.len(),
+            closure_node_count: closure_nodes.len(),
+        });
+    }
+    replayed.sort_by(|a, b| a.root_family_sha256.cmp(&b.root_family_sha256));
+    Ok(replayed)
 }
 
 fn parse_graph(value: &Value) -> Result<SourceLineageGraphV1, SourceLineageRejectV1> {
