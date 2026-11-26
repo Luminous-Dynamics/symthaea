@@ -1034,10 +1034,15 @@ mod tests {
         candidate.process_snapshot_sha256 = digest('f');
         candidate.candidate_evidence_sha256 = candidate_digest(&candidate).unwrap();
         let report = evaluate_inverse_vm_shortlist_v1(&input(vec![candidate])).unwrap();
-        assert_eq!(report.evaluations[0].state, CandidateScreenStateV1::Rejected);
-        assert!(report.evaluations[0].reasons.contains(
-            &CandidateScreenReasonV1::ContextSnapshotMismatch
-        ));
+        assert_eq!(
+            report.evaluations[0].state,
+            CandidateScreenStateV1::Rejected
+        );
+        assert!(
+            report.evaluations[0]
+                .reasons
+                .contains(&CandidateScreenReasonV1::ContextSnapshotMismatch)
+        );
     }
 
     #[test]
@@ -1056,10 +1061,15 @@ mod tests {
         });
         duplicated.candidate_evidence_sha256 = candidate_digest(&duplicated).unwrap();
         let report = evaluate_inverse_vm_shortlist_v1(&input(vec![duplicated])).unwrap();
-        assert_eq!(report.evaluations[0].state, CandidateScreenStateV1::Rejected);
-        assert!(report.evaluations[0].reasons.contains(
-            &CandidateScreenReasonV1::DuplicateRecipeKnob
-        ));
+        assert_eq!(
+            report.evaluations[0].state,
+            CandidateScreenStateV1::Rejected
+        );
+        assert!(
+            report.evaluations[0]
+                .reasons
+                .contains(&CandidateScreenReasonV1::DuplicateRecipeKnob)
+        );
     }
 
     #[test]
