@@ -419,7 +419,8 @@ fn validate_synthetic_input(
                     != task.authority_snapshot.principal_id.as_deref()
                 || Some(json_string(&artifact, "subject_id", task, input)?)
                     != task.authority_snapshot.subject_id.as_deref()
-                || json_string(&artifact, "status", task, input)? != task.authority_snapshot.status.as_str()
+                || json_string(&artifact, "status", task, input)?
+                    != task.authority_snapshot.status.as_str()
             {
                 bail!(
                     "{}: consent fixture '{}' does not match the authority snapshot",
