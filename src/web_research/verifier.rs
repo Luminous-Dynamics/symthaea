@@ -425,7 +425,8 @@ mod tests {
                 url: format!("https://rust-lang.org/evidence/{index}"),
                 domain: "rust-lang.org".to_string(),
                 source_type: ResearchSource::Documentation,
-                relevant_text: "Highly relevant retrieval text, but no adjudicated relation".to_string(),
+                relevant_text: "Highly relevant retrieval text, but no adjudicated relation"
+                    .to_string(),
                 supports: None,
                 similarity: 1.0,
                 credibility: 1.0,
