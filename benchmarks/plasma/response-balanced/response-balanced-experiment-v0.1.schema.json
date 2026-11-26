@@ -23,7 +23,8 @@
     "provenance",
     "adjacent_methods",
     "linearization_contract",
-    "response_qualification"
+    "response_qualification",
+    "methodological_prior_art"
   ],
   "properties": {
     "schema_version": {
@@ -542,14 +543,16 @@
     },
     "adjacent_methods": {
       "type": "array",
-      "minItems": 4,
+      "minItems": 6,
       "uniqueItems": true,
       "items": {
         "enum": [
           "adaptive_opinf_port",
           "adaptive_nitrom_port",
           "adaptive_opinf_nitrom_hybrid_port",
-          "symmetry_augmented_kinetic_closure"
+          "symmetry_augmented_kinetic_closure",
+          "entropy_based_vlasov_poisson_dougherty_moment_port",
+          "adaptive_symplectic_particle_vlasov_rom_port"
         ]
       }
     },
@@ -632,6 +635,17 @@
         "nonlinear_full_order_response_required": {
           "const": true
         }
+      }
+    },
+    "methodological_prior_art": {
+      "type": "array",
+      "minItems": 2,
+      "uniqueItems": true,
+      "items": {
+        "enum": [
+          "semi_infinite_worst_case_scenario_generation",
+          "adaptive_symplectic_particle_vlasov_rom"
+        ]
       }
     }
   },
