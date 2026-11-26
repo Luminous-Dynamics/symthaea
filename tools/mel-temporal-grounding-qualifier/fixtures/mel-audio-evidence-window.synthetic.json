@@ -53,7 +53,8 @@
         "payload_sha256": "74cac05eac42e84ae16f372efbe5354a1fa5e03b39ae90df4a9dcd81a59fb792"
       }
     ],
-    "context_manifest_sha256": "ebb850dcbca848029eb03e4beb03f73fc30cd7e9ecf2032aead30eaf76b99b2d"
+    "context_manifest_sha256": "621c6faea6b381f98fb62adde3c71325c0d6b90dcc331aae54ba9649eccaa6a6"
   },
-  "query_text": "Identify every piano entrance in the supplied recording."
+  "query_text": "Identify every piano entrance in the supplied recording.",
+  "source_lineage_id": "synthetic-source-lineage-001"
 }
