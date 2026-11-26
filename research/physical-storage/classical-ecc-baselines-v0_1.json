@@ -177,12 +177,93 @@
       },
       "evidence_status": "documentation_reviewed_execution_pending",
       "notes": "Separate erasure-only comparison. Do not present throughput as an unknown-error correction result."
+    },
+    {
+      "baseline_id": "RUST-REED-SOLOMON-ENGINE-0.2.0",
+      "role": "erasure_only_performance_baseline",
+      "family": "systematic_vandermonde_erasure_matrix_simd",
+      "source": {
+        "repository": "stephenberry/reed-solomon-engine",
+        "revision": "656761fdaf64a49881386527ac1844e25c6dc1af",
+        "package": "reed-solomon-engine",
+        "version": "0.2.0",
+        "cargo_toml_blob_sha": "7c0ff8d29789e5fa588f26ee04974c461b8d4420",
+        "wire_format_blob_sha": "5099ce118da4907690c2ad76503065fb52dda5bd",
+        "license": "MIT OR Apache-2.0",
+        "documentation": "https://docs.rs/reed-solomon-engine/0.2.0/"
+      },
+      "code_parameters": {
+        "field": "GF(2^8)",
+        "primitive_polynomial_hex": "0x11d",
+        "symbol_representation": "bit i is coefficient of x^i",
+        "primitive_element_hex": "0x02",
+        "construction": "systematic Vandermonde, G = V * inverse(top-k rows of V), V[r][c] = r^c",
+        "data_shards": 4,
+        "parity_shards": 2,
+        "total_shards": 6,
+        "code_rate": 0.6666666667,
+        "known_answer_wire_format": "docs/WIRE_FORMAT.md and tests in upstream source",
+        "error_erasure_bound": "any two known whole-shard erasures for 4+2; no unknown-error correction"
+      },
+      "capabilities": {
+        "unknown_symbol_errors": false,
+        "known_symbol_erasures": true,
+        "soft_decision": false
+      },
+      "performance_features": {
+        "runtime_dependencies": 0,
+        "no_std": true,
+        "allocation_free_mode": true,
+        "simd_kernels": [
+          "NEON",
+          "AVX2",
+          "SSSE3"
+        ],
+        "scalar_reference": true,
+        "scalar_and_simd_byte_equivalence_tests_documented": true
+      },
+      "compatibility": {
+        "gf_polynomial_matches_custom_reference": true,
+        "parity_matrix_byte_compatibility_with_custom_mds": false,
+        "custom_reference_parity_rows": [
+          [
+            1,
+            1,
+            1,
+            1
+          ],
+          [
+            1,
+            2,
+            3,
+            4
+          ]
+        ],
+        "engine_vandermonde_parity_rows": [
+          [
+            27,
+            28,
+            18,
+            20
+          ],
+          [
+            28,
+            27,
+            20,
+            18
+          ]
+        ],
+        "note": "Same field and (k,m) geometry do not imply same parity bytes or wire-format compatibility. Compare as distinct 4+2 erasure formats unless an explicit versioned transform is supplied."
+      },
+      "evidence_status": "source_and_wire_format_reviewed_execution_pending",
+      "notes": "Useful erasure-only comparator for the exact 4+2 shard geometry and likely relevant to low-overhead target deployments. Its upstream performance claims are upstream-specific, not Luminous benchmark measurements."
     }
   ],
   "global_rules": [
     "Crate versions are candidate version pins, not a completed Cargo.lock/source-checksum lock.",
     "No external implementation is accepted as parameter-matched until field polynomial, basis, roots, shortening, symbol order and parity placement are independently reproduced.",
     "All decoders return candidate data only; out-of-band expected payload digests remain independent acceptance authority.",
-    "Report short-code, equal-rate long-code and erasure-only performance comparisons separately."
+    "Report short-code, equal-rate long-code and erasure-only performance comparisons separately.",
+    "reed-solomon-engine 0.2.0 shares GF(256) polynomial 0x11D and 4+2 shard geometry but has a different systematic Vandermonde parity matrix than the custom Symthaea array code; it is not byte-compatible and must be compared as a separate format."
   ]
 }
