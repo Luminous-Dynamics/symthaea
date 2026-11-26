@@ -167,6 +167,7 @@ pub fn audit_revision_with_audio_evidence(
 mod tests {
     use super::*;
 
+    use crate::audio_evidence_in_toto::build_audio_evidence_in_toto_statement;
     use crate::audio_evidence_window::recompute_audio_context_manifest_sha256;
     use crate::evidence_digest::sha256_hex;
     use crate::temporal_grounding::{
@@ -315,6 +316,67 @@ mod tests {
         );
         assert!(report.materialized_audio_bytes_bound_to_revision_case);
         assert!(!report.model_input_attested);
+    }
+
+    #[test]
+    fn unsigned_in_toto_statement_binds_recomputed_audio_and_revision_subjects() {
+        let output = build_audio_evidence_in_toto_statement(
+            &revision_case(),
+            &evidence_manifest(),
+            SOURCE_AUDIO,
+            PCM,
+        )
+        .unwrap();
+
+        assert_eq!(output.payload_type, "application/vnd.in-toto+json");
+        assert!(!output.dsse_envelope_created);
+        assert!(!output.signature_verified);
+        assert_eq!(
+            output.statement_payload_sha256,
+            sha256_hex(output.statement_json.as_bytes())
+        );
+
+        let statement: serde_json::Value =
+            serde_json::from_str(&output.statement_json).unwrap();
+        assert_eq!(
+            statement["_type"],
+            "https://in-toto.io/Statement/v1"
+        );
+        assert_eq!(
+            statement["predicateType"],
+            "https://luminousdynamics.io/attestations/mel/audio-evidence-materialization/v1"
+        );
+        let subjects = statement["subject"].as_array().unwrap();
+        let subject_names: Vec<_> = subjects
+            .iter()
+            .filter_map(|subject| subject["name"].as_str())
+            .collect();
+        assert!(subject_names.iter().any(|name| name.starts_with("target-audio/")));
+        assert!(subject_names.iter().any(|name| name.starts_with("source-audio/")));
+        assert!(subject_names.iter().any(|name| name == &"audio-window/window-001"));
+        assert!(subject_names.iter().any(|name| name == &"audio-window/window-002"));
+        assert!(subject_names.iter().any(|name| name.starts_with("audio-context-manifest/")));
+        assert!(subject_names.iter().any(|name| name.starts_with("audio-evidence-manifest/")));
+        assert!(subject_names.iter().any(|name| name.starts_with("temporal-revision-report/")));
+
+        assert_eq!(
+            statement["predicate"]["evidence_level"],
+            "DigestLinked"
+        );
+        assert_eq!(
+            statement["predicate"]["target_source_lineage_id"],
+            "synthetic-source-lineage-001"
+        );
+        assert_eq!(
+            statement["predicate"]["evidence_source_lineage_id"],
+            "synthetic-source-lineage-001"
+        );
+        assert_eq!(statement["predicate"]["target_audio_bytes_recomputed"], true);
+        assert_eq!(statement["predicate"]["source_audio_bytes_recomputed"], true);
+        assert_eq!(statement["predicate"]["window_payloads_recomputed"], true);
+        assert_eq!(statement["predicate"]["rights_scope_authenticated"], false);
+        assert_eq!(statement["predicate"]["runner_receipt_verified"], false);
+        assert_eq!(statement["predicate"]["model_input_attested"], false);
     }
 
     #[test]
