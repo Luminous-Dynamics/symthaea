@@ -41,7 +41,7 @@ jobs:
         with:
           # PR merge SHA includes the workspace-hardening base branch.
           ref: ${{ github.sha }}
-          persist-credentials: false
+          persist-credentials: true
           fetch-depth: 1
 
       - name: Install repository Rust toolchain
