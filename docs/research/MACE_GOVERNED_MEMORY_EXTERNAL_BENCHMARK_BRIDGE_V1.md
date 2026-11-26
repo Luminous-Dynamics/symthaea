@@ -229,3 +229,106 @@ Compare MACE to Mem0, Letta, A-Mem, Graphiti/Zep, MemoryOS and other systems thr
 
 Do not claim a general industry win from an architecture diagram or one benchmark. The defensible research claim is narrower: MACE is attempting to make provenance, authority, lifecycle and decision-value constraints enforceable across the complete evidence-to-action path, then measure whether that increases useful performance per unit cost without creating governance failures.
 
+## 12. Research update: non-regressive learning, claim-relative invalidation and metamemory
+
+This addendum supersedes the earlier sequencing where necessary. These benchmarks expose failure modes that map directly to the existing MACE temporal ledger, invalidation and feedback architecture.
+
+### 12.1 ServeLearnBench: adaptation must not destroy prior competence
+
+Official project and leaderboard:
+- https://infini-ai-lab.github.io/ServeLearnBench/
+- https://infini-ai-lab.github.io/ServeLearnBench/leaderboard.html
+- Code: https://github.com/Infini-AI-Lab/ServeLearnBench
+
+The public leaderboard identifies a results snapshot dated 2026-09-25 and says there is one run per model/method cell. Its leading entries include:
+- CH with Opus 5: Avg. Hidden 73.4, Avg. Fully Specified 96.2, API cost $2,449.
+- CH with GLM-5.3: 69.8, 96.7, $1,077.
+- Prime with GLM-5.3 Flash: 61.1, 95.2, $172.
+- CH with GPT-5.6 Terra: 55.8, 94.2, $239.
+
+These rows use different backbones and methods; they are not a matched model comparison. The relevant comparison is the Pareto frontier, with exact costs and task populations recorded.
+
+A more important result for MACE is negative transfer: the benchmark reports that on Fully Specified Retail tasks every learning harness falls below the Blind baseline's 98.9%, reaching 89.5–95.5% in the reported aggregate. The ability to learn hidden policies does not guarantee retention of already-correct behavior.
+
+**MACE paradigm shift: continual learning must be retention-constrained.**
+
+Track separately:
+- Hidden-task reward after each policy/environment change.
+- Fully Specified/stable-task reward before and after the update.
+- Stable-task regression and recovery time.
+- AULC10 or equivalent learning-speed curve.
+- Exploration diversity, discovery efficiency and cost.
+- Reversal handling when a previously learned policy becomes invalid.
+
+**Proposed MACE safety target:** no more than 1.0 absolute percentage point regression on the predeclared stable/fully-specified strata after a qualified update, while improving the hidden/changed strata. A run that exceeds the regression budget must trigger rollback, versioned specialization or explicit review. This is a proposed MACE criterion, not a ServeLearnBench requirement or current result.
+
+The objective is not simply reward-after-learning. It is:
+
+`adaptation gain subject to a retained-competence floor and bounded total cost`.
+
+Do not optimize a single scalar that permits gains on hidden tasks to compensate for serious regression in known tasks.
+
+### 12.2 Impact Is Not Invalidation: judge the claim, not the diff
+
+Paper: https://arxiv.org/abs/2609.25130  
+HTML: https://arxiv.org/html/2609.25130
+
+The public memory-benchmark registry records 10,369 candidate claims mined from 23 Python libraries, with truth changes verified across 184 changed values and 187 commits. The paper reports that five models asked whether a commit preserves behavior fired on 59–72% of real commits and reached precision 0.291–0.329, while asking whether one specific claim still holds reached precision 0.705–0.974 on the same diffs. The registry classifies this as paper-only; no official downloadable dataset/evaluator was identified in its 2026-10-11 review.
+
+This is directly relevant to MACE derived-memory invalidation. A file changed does not imply every claim sourced from it became false; a diff judged behavior-preserving does not prove every particular stored claim remains true.
+
+**MACE experiment:** make invalidation claim-relative and evidence-dependent:
+1. Bind each derived memory to its exact claim, test/assertion, source spans, dependency roots and derivation recipe.
+2. Ask whether that claim still holds after a change, rather than classifying the diff globally.
+3. Re-run the claim's executable check where possible.
+4. Distinguish `still_valid`, `invalidated`, `requires_revalidation` and `unknown`.
+5. Propagate invalidation only through the true dependency closure.
+6. Never treat missing tests, skipped CI or unknown execution as a passing claim.
+
+Report invalidation precision/recall, coverage, false invalidation rate, stale-claim escape rate, revalidation burden and time-to-correct-projection. This is a high-priority research comparator for PR #13736, but not an executable official comparison until its artifacts are released or reconstructed under an explicitly non-paper-comparable protocol.
+
+### 12.3 Knowing the Store: metamemory depends on truthful backend metadata
+
+Paper: https://arxiv.org/abs/2610.04794  
+Official code and data: https://github.com/ansh348/knowing-the-store
+
+The public registry describes 148 unique store questions, each evaluated against three minimally different store versions, for 444 scored items. Its counterfactual obligations include 88 supersession, 30 retraction and 30 expiry cases. The evaluation exposes value-free store summaries and tests whether a reader can tell what should not be used. It is classified as official-script in the registry snapshot.
+
+**MACE opportunity:** lifecycle state must be a machine-readable property supplied by the authoritative store, not a conclusion the language model guesses from content. Expose:
+- active/current, superseded, retracted/revoked, expired, quarantined and unresolved states;
+- versioned counts and per-record identifiers where the caller is authorized;
+- valid-time and observation-time boundaries;
+- exact metadata schema/version and completeness receipt;
+- correction/revocation and deletion events;
+- scope and use-purpose attributes.
+
+Run the official test, then add metamemory fault injection: omit a field, stale a count, contradict a record state, delay a revocation, or provide a wrong schema version. Measure both metadata-fault detection and downstream stale-use escape. A 100% metadata conformance goal is appropriate for controlled exact-schema tests; model-level question accuracy remains a separate metric.
+
+### 12.4 DyadMem: relationship-specific memory is not ordinary user profiling
+
+Paper and project: https://arxiv.org/abs/2610.03020
+
+The paper describes 3,065 episodes, 50,961 sessions and 61,210 QA instances, with session-level Capture and Update supervision, query-level Recall support, and Gold-Memory versus Full-Pipeline QA. It reports Full-Pipeline weaknesses including incomplete capture/recall and unsafe deletion. The public benchmark registry classifies the release as paper-only because it did not identify released episode/evaluator artifacts at its 2026-10-11 review; recheck before any attempted run.
+
+MACE should distinguish:
+- facts about a user;
+- preferences that may change;
+- relationship-specific interaction protocols;
+- collaborative commitments and role boundaries;
+- temporary working agreements;
+- inferred expectations, which must not silently become confirmed facts.
+
+This is a later research direction, not an immediate official reproduction target until artifacts and their licensing are verifiably available.
+
+### 12.5 Updated priority order
+
+1. **TimlMemBench:** first executable external qualification for lifecycle, scope, provenance, activation and restraint. The Rust protocol smoke adapter is a wiring aid only; it is not governed MACE.
+2. **StreamMemBench:** first executable longitudinal feedback/use test.
+3. **Knowing the Store:** executable metamemory/backend-state qualification and fault injection.
+4. **ServeLearnBench:** matched learning-versus-retention/cost frontier, with a predeclared stable-task regression floor.
+5. **COLLABMEM:** role-aware multi-agent evaluation when its exact official artifact release is available.
+6. **Impact Is Not Invalidation:** claim-relative invalidation research target; paper-only unless the official artifact appears.
+7. **UtilMem and MemUse:** integration and appropriate-use tests, respecting their separate release and judging protocols.
+8. **DyadMem and CMSC-E:** relationship-specific and cross-model semantic diagnostics after verifying reproducible artifacts.
+
+All results remain disaggregated. A gain in adaptation, recall, relational personalization or answer quality cannot compensate for critical scope, revocation, rights or unauthorized-disclosure failures.
