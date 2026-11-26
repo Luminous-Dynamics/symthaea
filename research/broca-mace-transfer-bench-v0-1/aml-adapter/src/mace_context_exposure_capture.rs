@@ -100,6 +100,7 @@ pub enum MaceExposureCaptureRejectV1 {
     InvalidIdentifier,
     InvalidDigest,
     EmptyModel,
+    ModelRevisionMismatch,
     EmptyMessages,
     TooManyMessages,
     EmptySegmentList,
@@ -283,7 +284,7 @@ pub fn capture_send_and_sign_mace_invocation_v1(
 ) -> Result<(MaceContextExposureReceiptV1, MaceProviderResponseV1), MaceExposureCaptureRejectV1> {
     validate_identifier(context.receipt_id)?;
     if request.model != expected.model_revision {
-        return Err(MaceExposureCaptureRejectV1::EmptyModel);
+        return Err(MaceExposureCaptureRejectV1::ModelRevisionMismatch);
     }
     validate_digest(context.candidate_decision_trace_sha256)?;
     if expected.arm == MaceMemoryArmV1::NoMemory && !context.admission_denials.is_empty() {
