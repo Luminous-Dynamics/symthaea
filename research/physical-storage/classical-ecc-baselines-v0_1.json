@@ -1,0 +1,188 @@
+{
+  "schema_version": "physical-storage-classical-ecc-baselines-v0.1",
+  "corpus_id": "PHYSICAL-STORAGE-CLASSICAL-ECC-BASELINES-V0.1",
+  "parent_issue": "https://github.com/Luminous-Dynamics/symthaea/issues/13750",
+  "evidence_class": "source_review_only",
+  "baseline_comparisons": [
+    {
+      "baseline_id": "SYMTHAEA-CUSTOM-MDS-6-4-3",
+      "role": "in_repo_reference",
+      "family": "custom_linear_mds_array",
+      "source": {
+        "repository": "Luminous-Dynamics/symthaea",
+        "branch": "research/physical-storage-error-erasure-001",
+        "path": "research/physical-storage/mds-reference/src/lib.rs",
+        "observed_blob_sha": "411c56f23da1fac9d0ee02defe8d83e46c6325bc"
+      },
+      "code_parameters": {
+        "field": "GF(2^8)",
+        "primitive_polynomial_hex": "0x11d",
+        "symbol_bits": 8,
+        "n": 6,
+        "k": 4,
+        "parity_symbols": 2,
+        "code_rate": 0.6666666667,
+        "minimum_distance": 3,
+        "error_erasure_bound": "2e + s < 3, independently per byte lane"
+      },
+      "capabilities": {
+        "unknown_symbol_errors": true,
+        "known_symbol_erasures": true,
+        "soft_decision": false
+      },
+      "evidence_status": "source_reviewed_execution_pending",
+      "notes": "Current custom systematic MDS array-code reference. Not a standards Reed-Solomon implementation."
+    },
+    {
+      "baseline_id": "RUST-REEDSOLOMON-0.2.0",
+      "role": "candidate_error_decoder",
+      "family": "systematic_reed_solomon",
+      "source": {
+        "package": "reedsolomon",
+        "version": "0.2.0",
+        "documentation": "https://docs.rs/reedsolomon/0.2.0/reedsolomon/",
+        "struct_documentation": "https://docs.rs/reedsolomon/0.2.0/reedsolomon/struct.ReedSolomon.html",
+        "source_documentation": "https://docs.rs/reedsolomon/0.2.0/src/reedsolomon/lib.rs.html"
+      },
+      "code_parameters": {
+        "field": "GF(2^8)",
+        "primitive_polynomial_hex": null,
+        "fcr": 112,
+        "symbol_bits": 8,
+        "max_codeword_symbols": 255,
+        "candidate_short_profile": {
+          "n": 6,
+          "k": 4,
+          "parity_symbols": 2,
+          "api_call": "ReedSolomon::new(2, 4)"
+        },
+        "candidate_equal_rate_profile": {
+          "n": 255,
+          "k": 170,
+          "parity_symbols": 85,
+          "api_call": "ReedSolomon::new(85, 170)"
+        },
+        "minimum_distance": null,
+        "error_erasure_bound": "documented error-only radius t=floor(parity_len/2); known-erasure API not documented"
+      },
+      "capabilities": {
+        "unknown_symbol_errors": true,
+        "known_symbol_erasures": null,
+        "soft_decision": false
+      },
+      "hazards": [
+        "Field polynomial and generator/root parameters require source audit before parameter matching.",
+        "Raw encode/decode requires exact parity_len, data_len and original_len agreement.",
+        "Documentation describes a silent same-n/same-FCR parity-parameter mismatch family.",
+        "The 17-byte CRC-checked framed header is not FEC-corrected."
+      ],
+      "evidence_status": "documentation_reviewed_execution_pending",
+      "notes": "Pure-Rust no-unsafe decoder documented as syndromes, inversionless Berlekamp-Massey, Chien and Forney, with post-correction syndrome verification. Documentation describes RS(255,223) as the default CCSDS profile; that does not make a custom parameter set a CCSDS code."
+    },
+    {
+      "baseline_id": "FEC-0.2.2",
+      "role": "candidate_error_erasure_decoder",
+      "family": "reed_solomon_error_erasure",
+      "source": {
+        "package": "fec",
+        "version": "0.2.2",
+        "module_documentation": "https://docs.rs/fec/0.2.2/fec/reed_solomon/",
+        "encoder_documentation": "https://docs.rs/fec/0.2.2/fec/reed_solomon/struct.Encoder.html",
+        "decoder_documentation": "https://docs.rs/fec/0.2.2/fec/reed_solomon/struct.Decoder.html"
+      },
+      "code_parameters": {
+        "field": "GF(2^8)",
+        "configurable_primitive_polynomial": true,
+        "candidate_polynomial_hex": "0x11d",
+        "candidate_equal_rate_profile": {
+          "n": 255,
+          "k": 170,
+          "parity_symbols": 85,
+          "code_rate": 0.6666666667,
+          "num_roots": 85
+        },
+        "candidate_shortened_profile": {
+          "source_message_symbols": 4,
+          "num_roots": 2,
+          "expected_emitted_symbols": 6,
+          "requires_executable_confirmation": true
+        },
+        "fcr": 1,
+        "generator_root_gap": 1,
+        "minimum_distance": "must be reconciled with crate documentation and executable behavior",
+        "error_erasure_bound": "documented as 2*errors + erasures < num_roots; verify edge condition against code theory and executable tests"
+      },
+      "capabilities": {
+        "unknown_symbol_errors": true,
+        "known_symbol_erasures": true,
+        "soft_decision": false
+      },
+      "hazards": [
+        "Decoder docs describe min_distance as num_roots and correction up to min_distance/2, but state decode_with_erasures succeeds only when 2*errors + erasures < num_roots; edge semantics require executable confirmation.",
+        "The docs warn that beyond-radius patterns can be miscorrected and report success; independent payload digest is mandatory.",
+        "The codeword is defined as 255 symbols; short-message shortening and emitted length must be proven before treating it as RS(6,4)."
+      ],
+      "evidence_status": "documentation_reviewed_boundary_tests_pending",
+      "notes": "Exposes primitive polynomial, first consecutive root, generator root gap and num_roots as constructor parameters. Its CCSDS constructor is a separate documented profile."
+    },
+    {
+      "baseline_id": "INTEL-ISA-L-ERASURE",
+      "role": "erasure_only_performance_baseline",
+      "family": "reed_solomon_matrix_erasure",
+      "source": {
+        "repository": "intel/isa-l",
+        "url": "https://github.com/intel/isa-l",
+        "revision": null
+      },
+      "code_parameters": {
+        "field": "GF(2^8)",
+        "reduction_byte_hex": "0x1d",
+        "equivalent_full_polynomial_hex": "0x11d",
+        "n": null,
+        "k": null,
+        "parity_symbols": null,
+        "code_rate": null,
+        "error_erasure_bound": "whole-block erasure recovery only; unknown symbol errors are not corrected"
+      },
+      "capabilities": {
+        "unknown_symbol_errors": false,
+        "known_symbol_erasures": true,
+        "soft_decision": false
+      },
+      "evidence_status": "source_reviewed_revision_unpinned",
+      "notes": "Only the erasure-throughput lane. Pin a release/commit and verify matrix and symbol ordering before use."
+    },
+    {
+      "baseline_id": "RUST-REED-SOLOMON-ERASURE-6.0.0",
+      "role": "erasure_only_performance_baseline",
+      "family": "reed_solomon_erasure",
+      "source": {
+        "package": "reed-solomon-erasure",
+        "version": "6.0.0",
+        "documentation": "https://docs.rs/reed-solomon-erasure/6.0.0/"
+      },
+      "code_parameters": {
+        "field": "GF(2^8)",
+        "primitive_polynomial_hex": null,
+        "n": null,
+        "k": null,
+        "parity_symbols": null,
+        "code_rate": null,
+        "error_erasure_bound": "whole-shard erasure reconstruction; caller must detect corruption and mark bad shards as missing"
+      },
+      "capabilities": {
+        "unknown_symbol_errors": false,
+        "known_symbol_erasures": true,
+        "soft_decision": false
+      },
+      "evidence_status": "documentation_reviewed_execution_pending",
+      "notes": "Separate erasure-only comparison. Do not present throughput as an unknown-error correction result."
+    }
+  ],
+  "global_rules": [
+    "Crate versions are candidate version pins, not a completed Cargo.lock/source-checksum lock.",
+    "No external implementation is accepted as parameter-matched until field polynomial, basis, roots, shortening, symbol order and parity placement are independently reproduced.",
+    "All decoders return candidate data only; out-of-band expected payload digests remain independent acceptance authority.",
+    "Report short-code, equal-rate long-code and erasure-only performance comparisons separately."
+  ]
+}
