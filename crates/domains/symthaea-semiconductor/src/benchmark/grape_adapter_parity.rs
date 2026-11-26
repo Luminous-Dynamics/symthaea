@@ -11,7 +11,10 @@ pub const GRAPE_ADAPTER_PARITY_SCHEMA_V1: &str = "luminous.semi-bench.grape-adap
 
 #[derive(Clone, Copy, Debug, Eq, PartialEq, Serialize, Deserialize)]
 #[serde(rename_all = "snake_case")]
-pub enum GrapeAdapterKindV1 { Nlms, Rls }
+pub enum GrapeAdapterKindV1 {
+    Nlms,
+    Rls,
+}
 
 #[derive(Clone, Debug, PartialEq, Serialize, Deserialize)]
 pub struct GrapeAdapterPolicyV1 {
@@ -32,7 +35,10 @@ pub struct GrapeFeatureAdapterStateV1 {
 }
 
 #[derive(Clone, Debug, PartialEq, Serialize, Deserialize)]
-pub struct GrapeContextStatsV1 { pub mean: f64, pub count: u64 }
+pub struct GrapeContextStatsV1 {
+    pub mean: f64,
+    pub count: u64,
+}
 
 #[derive(Clone, Debug, PartialEq, Serialize, Deserialize)]
 pub struct GrapeHierarchicalContextStateV1 {
@@ -70,7 +76,9 @@ fn validate_policy(policy: &GrapeAdapterPolicyV1) -> Result<(), GrapeAdapterPari
         || !policy.positive_definite_tolerance.is_finite()
         || policy.positive_definite_tolerance <= 0.0
     {
-        return Err(GrapeAdapterParityErrorV1("invalid GRAPE adapter policy".into()));
+        return Err(GrapeAdapterParityErrorV1(
+            "invalid GRAPE adapter policy".into(),
+        ));
     }
     Ok(())
 }
@@ -81,15 +89,21 @@ fn validate_covariance(
     tolerance: f64,
 ) -> Result<(), GrapeAdapterParityErrorV1> {
     if matrix.len() != n || matrix.iter().any(|row| row.len() != n) {
-        return Err(GrapeAdapterParityErrorV1("RLS covariance shape mismatch".into()));
+        return Err(GrapeAdapterParityErrorV1(
+            "RLS covariance shape mismatch".into(),
+        ));
     }
     for row in matrix {
-        for value in row { finite(*value, "RLS covariance")?; }
+        for value in row {
+            finite(*value, "RLS covariance")?;
+        }
     }
     for i in 0..n {
         for j in 0..n {
             if (matrix[i][j] - matrix[j][i]).abs() > tolerance {
-                return Err(GrapeAdapterParityErrorV1("RLS covariance is not symmetric".into()));
+                return Err(GrapeAdapterParityErrorV1(
+                    "RLS covariance is not symmetric".into(),
+                ));
             }
         }
     }
@@ -97,10 +111,14 @@ fn validate_covariance(
     for i in 0..n {
         for j in 0..=i {
             let mut value = matrix[i][j];
-            for k in 0..j { value -= lower[i][k] * lower[j][k]; }
+            for k in 0..j {
+                value -= lower[i][k] * lower[j][k];
+            }
             if i == j {
                 if value <= tolerance {
-                    return Err(GrapeAdapterParityErrorV1("RLS covariance is not positive definite".into()));
+                    return Err(GrapeAdapterParityErrorV1(
+                        "RLS covariance is not positive definite".into(),
+                    ));
                 }
                 lower[i][j] = value.sqrt();
             } else {
@@ -114,7 +132,9 @@ fn validate_covariance(
 impl GrapeFeatureAdapterStateV1 {
     pub fn predict(&self, x: &[f64]) -> Result<f64, GrapeAdapterParityErrorV1> {
         if x.len() != self.weights.len() || x.is_empty() || x.iter().any(|v| !v.is_finite()) {
-            return Err(GrapeAdapterParityErrorV1("feature adapter input is invalid".into()));
+            return Err(GrapeAdapterParityErrorV1(
+                "feature adapter input is invalid".into(),
+            ));
         }
         let result = self.weights.iter().zip(x).map(|(w, v)| w * v).sum::<f64>();
         finite(result, "feature adapter prediction")?;
@@ -129,10 +149,14 @@ impl GrapeFeatureAdapterStateV1 {
     ) -> Result<(), GrapeAdapterParityErrorV1> {
         validate_policy(policy)?;
         finite(error, "adapter error")?;
-        if self.kind != policy.adapter_kind || x.len() != self.weights.len() || x.is_empty()
+        if self.kind != policy.adapter_kind
+            || x.len() != self.weights.len()
+            || x.is_empty()
             || x.iter().any(|v| !v.is_finite())
         {
-            return Err(GrapeAdapterParityErrorV1("adapter kind or feature dimension mismatch".into()));
+            return Err(GrapeAdapterParityErrorV1(
+                "adapter kind or feature dimension mismatch".into(),
+            ));
         }
         let n = self.weights.len();
         let mut next = self.clone();
@@ -146,7 +170,10 @@ impl GrapeFeatureAdapterStateV1 {
                 }
             }
             GrapeAdapterKindV1::Rls => {
-                let p = self.covariance.as_ref().ok_or_else(|| GrapeAdapterParityErrorV1("RLS covariance missing".into()))?;
+                let p = self
+                    .covariance
+                    .as_ref()
+                    .ok_or_else(|| GrapeAdapterParityErrorV1("RLS covariance missing".into()))?;
                 validate_covariance(p, n, policy.positive_definite_tolerance)?;
                 let mut px = vec![0.0; n];
                 let mut x_p = vec![0.0; n];
@@ -156,10 +183,13 @@ impl GrapeFeatureAdapterStateV1 {
                         x_p[j] += x[i] * p[i][j];
                     }
                 }
-                let denom = policy.rls_forgetting_factor + x.iter().zip(&px).map(|(a,b)| a*b).sum::<f64>();
+                let denom = policy.rls_forgetting_factor
+                    + x.iter().zip(&px).map(|(a, b)| a * b).sum::<f64>();
                 finite(denom, "RLS denominator")?;
                 if denom <= policy.positive_definite_tolerance {
-                    return Err(GrapeAdapterParityErrorV1("RLS denominator is singular".into()));
+                    return Err(GrapeAdapterParityErrorV1(
+                        "RLS denominator is singular".into(),
+                    ));
                 }
                 let gain: Vec<f64> = px.iter().map(|v| v / denom).collect();
                 for (w, k) in next.weights.iter_mut().zip(&gain) {
@@ -173,7 +203,7 @@ impl GrapeFeatureAdapterStateV1 {
                     }
                 }
                 for i in 0..n {
-                    for j in (i+1)..n {
+                    for j in (i + 1)..n {
                         let v = 0.5 * (updated[i][j] + updated[j][i]);
                         updated[i][j] = v;
                         updated[j][i] = v;
@@ -189,7 +219,9 @@ impl GrapeFeatureAdapterStateV1 {
 }
 
 fn reliability(count: u64, minimum: u64) -> f64 {
-    if minimum == 0 { 1.0 } else {
+    if minimum == 0 {
+        1.0
+    } else {
         let n = count as f64;
         n / (n + minimum as f64)
     }
@@ -198,10 +230,19 @@ fn reliability(count: u64, minimum: u64) -> f64 {
 impl GrapeHierarchicalContextStateV1 {
     pub fn new(alpha: f64, minimum_support: u64) -> Result<Self, GrapeAdapterParityErrorV1> {
         if !alpha.is_finite() || !(0.0..=1.0).contains(&alpha) {
-            return Err(GrapeAdapterParityErrorV1("context EMA alpha invalid".into()));
+            return Err(GrapeAdapterParityErrorV1(
+                "context EMA alpha invalid".into(),
+            ));
         }
-        Ok(Self { ema_alpha: alpha, minimum_support, global_mean: 0.0, global_count: 0,
-            equipment: BTreeMap::new(), chamber: BTreeMap::new(), equipment_chamber: BTreeMap::new() })
+        Ok(Self {
+            ema_alpha: alpha,
+            minimum_support,
+            global_mean: 0.0,
+            global_count: 0,
+            equipment: BTreeMap::new(),
+            chamber: BTreeMap::new(),
+            equipment_chamber: BTreeMap::new(),
+        })
     }
 
     fn update_bucket(
@@ -211,30 +252,52 @@ impl GrapeHierarchicalContextStateV1 {
         alpha: f64,
     ) -> Result<(), GrapeAdapterParityErrorV1> {
         if let Some(stats) = bucket.get_mut(key) {
-            let count = stats.count.checked_add(1).ok_or_else(|| GrapeAdapterParityErrorV1("context count overflow".into()))?;
+            let count = stats
+                .count
+                .checked_add(1)
+                .ok_or_else(|| GrapeAdapterParityErrorV1("context count overflow".into()))?;
             let mean = (1.0 - alpha) * stats.mean + alpha * residual;
             finite(mean, "context mean")?;
             stats.mean = mean;
             stats.count = count;
         } else {
-            bucket.insert(key.into(), GrapeContextStatsV1 { mean: residual, count: 1 });
+            bucket.insert(
+                key.into(),
+                GrapeContextStatsV1 {
+                    mean: residual,
+                    count: 1,
+                },
+            );
         }
         Ok(())
     }
 
-    pub fn update(&mut self, key: Option<&str>, residual: f64) -> Result<(), GrapeAdapterParityErrorV1> {
+    pub fn update(
+        &mut self,
+        key: Option<&str>,
+        residual: f64,
+    ) -> Result<(), GrapeAdapterParityErrorV1> {
         finite(residual, "context residual")?;
         if key.is_some_and(|v| v.trim().is_empty()) {
-            return Err(GrapeAdapterParityErrorV1("context key cannot be empty".into()));
+            return Err(GrapeAdapterParityErrorV1(
+                "context key cannot be empty".into(),
+            ));
         }
         let mut next = self.clone();
-        next.global_count = next.global_count.checked_add(1).ok_or_else(|| GrapeAdapterParityErrorV1("global count overflow".into()))?;
+        next.global_count = next
+            .global_count
+            .checked_add(1)
+            .ok_or_else(|| GrapeAdapterParityErrorV1("global count overflow".into()))?;
         next.global_mean = (1.0 - next.ema_alpha) * next.global_mean + next.ema_alpha * residual;
         finite(next.global_mean, "global mean")?;
         if let Some(key) = key {
-            let (eqp, chm) = key.rsplit_once('_').map_or((key, ""), |(a,b)| (a,b));
-            if !eqp.is_empty() { Self::update_bucket(&mut next.equipment, eqp, residual, next.ema_alpha)?; }
-            if !chm.is_empty() { Self::update_bucket(&mut next.chamber, chm, residual, next.ema_alpha)?; }
+            let (eqp, chm) = key.rsplit_once('_').map_or((key, ""), |(a, b)| (a, b));
+            if !eqp.is_empty() {
+                Self::update_bucket(&mut next.equipment, eqp, residual, next.ema_alpha)?;
+            }
+            if !chm.is_empty() {
+                Self::update_bucket(&mut next.chamber, chm, residual, next.ema_alpha)?;
+            }
             Self::update_bucket(&mut next.equipment_chamber, key, residual, next.ema_alpha)?;
         }
         *self = next;
@@ -249,18 +312,28 @@ impl GrapeHierarchicalContextStateV1 {
         let mut weights = vec![reliability(self.global_count, self.minimum_support)];
         if let Some(key) = key {
             let (eqp, chm) = key.rsplit_once('_').map_or((key, ""), |(a,b)| (a,b));
-            if let Some(s) = self.equipment.get(eqp) { values.push(s.mean); weights.push(reliability(s.count, self.minimum_support)); }
-            if let Some(s) = self.chamber.get(chm).filter(|_| !chm.is_empty()) { values.push(s.mean); weights.push(reliability(s.count, self.minimum_support)); }
-            if let Some(s) = self.equipment_chamber.get(key) { values.push(s.mean); weights.push(reliability(s.count, self.minimum_support)); }
+            if let Some(s) = self.equipment.get(eqp) {
+                values.push(s.mean);
+                weights.push(reliability(s.count, self.minimum_support));
+            }
+            if let Some(s) = self.chamber.get(chm).filter(|_| !chm.is_empty()) {
+                values.push(s.mean);
+                weights.push(reliability(s.count, self.minimum_support));
+            }
+            if let Some(s) = self.equipment_chamber.get(key) {
+                values.push(s.mean);
+                weights.push(reliability(s.count, self.minimum_support));
+            }
         }
         let total = weights.iter().sum::<f64>();
-        if total <= 1.0e-12 { return Ok(0.0); }
-        let result = values.iter().zip(weights).map(|(v,w)| v*w).sum::<f64>() / total;
+        if total <= 1.0e-12 {
+            return Ok(0.0);
+        }
+        let result = values.iter().zip(weights).map(|(v, w)| v * w).sum::<f64>() / total;
         finite(result, "context correction")?;
         Ok(result)
     }
 }
-
 
 #[derive(Clone, Debug, PartialEq, Serialize, Deserialize)]
 pub struct GrapeTemporalResidualStateV1 {
@@ -270,13 +343,22 @@ pub struct GrapeTemporalResidualStateV1 {
 }
 
 impl GrapeTemporalResidualStateV1 {
-    pub fn new(ema_alpha: f64, activation_threshold: f64) -> Result<Self, GrapeAdapterParityErrorV1> {
+    pub fn new(
+        ema_alpha: f64,
+        activation_threshold: f64,
+    ) -> Result<Self, GrapeAdapterParityErrorV1> {
         finite(ema_alpha, "temporal EMA alpha")?;
         finite(activation_threshold, "temporal activation threshold")?;
         if !(0.0..=1.0).contains(&ema_alpha) || activation_threshold < 0.0 {
-            return Err(GrapeAdapterParityErrorV1("temporal policy is out of range".into()));
+            return Err(GrapeAdapterParityErrorV1(
+                "temporal policy is out of range".into(),
+            ));
         }
-        Ok(Self { ema_alpha, activation_threshold, residual_ema: 0.0 })
+        Ok(Self {
+            ema_alpha,
+            activation_threshold,
+            residual_ema: 0.0,
+        })
     }
 
     pub fn calibrate(
@@ -285,8 +367,11 @@ impl GrapeTemporalResidualStateV1 {
         percentile: f64,
     ) -> Result<(), GrapeAdapterParityErrorV1> {
         finite(percentile, "temporal percentile")?;
-        if !(0.0..=100.0).contains(&percentile) || training_residuals.iter().any(|v| !v.is_finite()) {
-            return Err(GrapeAdapterParityErrorV1("invalid temporal calibration input".into()));
+        if !(0.0..=100.0).contains(&percentile) || training_residuals.iter().any(|v| !v.is_finite())
+        {
+            return Err(GrapeAdapterParityErrorV1(
+                "invalid temporal calibration input".into(),
+            ));
         }
         if training_residuals.is_empty() {
             self.activation_threshold = self.activation_threshold.max(1.0e-6);
@@ -298,12 +383,17 @@ impl GrapeTemporalResidualStateV1 {
         let lo = pos.floor() as usize;
         let hi = pos.ceil() as usize;
         let fraction = pos - lo as f64;
-        self.activation_threshold = (values[lo] * (1.0 - fraction) + values[hi] * fraction).max(1.0e-6);
+        self.activation_threshold =
+            (values[lo] * (1.0 - fraction) + values[hi] * fraction).max(1.0e-6);
         Ok(())
     }
 
     pub fn correction(&self) -> f64 {
-        if self.residual_ema.abs() < self.activation_threshold { 0.0 } else { self.residual_ema }
+        if self.residual_ema.abs() < self.activation_threshold {
+            0.0
+        } else {
+            self.residual_ema
+        }
     }
 
     pub fn update(&mut self, residual: f64) -> Result<(), GrapeAdapterParityErrorV1> {
@@ -322,17 +412,29 @@ pub fn create_grape_feature_adapter_v1(
 ) -> Result<GrapeFeatureAdapterStateV1, GrapeAdapterParityErrorV1> {
     validate_policy(policy)?;
     if dimension == 0 || kind != policy.adapter_kind {
-        return Err(GrapeAdapterParityErrorV1("adapter dimension or kind is invalid".into()));
+        return Err(GrapeAdapterParityErrorV1(
+            "adapter dimension or kind is invalid".into(),
+        ));
     }
     let covariance = if kind == GrapeAdapterKindV1::Rls {
         let diagonal = policy.rls_ridge_initial;
-        Some((0..dimension).map(|row| {
-            (0..dimension).map(|col| if row == col { diagonal } else { 0.0 }).collect()
-        }).collect())
+        Some(
+            (0..dimension)
+                .map(|row| {
+                    (0..dimension)
+                        .map(|col| if row == col { diagonal } else { 0.0 })
+                        .collect()
+                })
+                .collect(),
+        )
     } else {
         None
     };
-    Ok(GrapeFeatureAdapterStateV1 { kind, weights: vec![0.0; dimension], covariance })
+    Ok(GrapeFeatureAdapterStateV1 {
+        kind,
+        weights: vec![0.0; dimension],
+        covariance,
+    })
 }
 
 #[cfg(test)]
@@ -387,9 +489,16 @@ mod tests {
                 ((i * 11 % 23) as f64 - 11.0) / 7.0,
                 ((i * 13 % 29) as f64 - 14.0) / 9.0,
             ];
-            adapter.update(&p, &x, ((i % 17) as f64 - 8.0) / 4.0).unwrap();
+            adapter
+                .update(&p, &x, ((i % 17) as f64 - 8.0) / 4.0)
+                .unwrap();
         }
-        validate_covariance(adapter.covariance.as_ref().unwrap(), 3, p.positive_definite_tolerance).unwrap();
+        validate_covariance(
+            adapter.covariance.as_ref().unwrap(),
+            3,
+            p.positive_definite_tolerance,
+        )
+        .unwrap();
     }
 
     #[test]
@@ -421,10 +530,13 @@ mod tests {
             (context.global_mean, reliability(context.global_count, 2)),
             (context.equipment["eqpA"].mean, reliability(2, 2)),
             (context.chamber["ch1"].mean, reliability(2, 2)),
-            (context.equipment_chamber["eqpA_ch1"].mean, reliability(1, 2)),
+            (
+                context.equipment_chamber["eqpA_ch1"].mean,
+                reliability(1, 2),
+            ),
         ];
-        let expected = weighted.iter().map(|(v,w)| v*w).sum::<f64>()
-            / weighted.iter().map(|(_,w)| w).sum::<f64>();
+        let expected = weighted.iter().map(|(v, w)| v * w).sum::<f64>()
+            / weighted.iter().map(|(_, w)| w).sum::<f64>();
         assert!((actual - expected).abs() < 1.0e-12);
     }
 
@@ -432,7 +544,10 @@ mod tests {
     fn unseen_context_falls_back_to_global_not_another_local_bucket() {
         let mut context = GrapeHierarchicalContextStateV1::new(0.1, 10).unwrap();
         context.update(Some("eqpA_ch1"), 8.0).unwrap();
-        assert_eq!(context.correction(Some("eqpB_ch9")).unwrap(), context.global_mean);
+        assert_eq!(
+            context.correction(Some("eqpB_ch9")).unwrap(),
+            context.global_mean
+        );
         assert!(!context.equipment.contains_key("eqpB"));
         assert!(!context.equipment_chamber.contains_key("eqpB_ch9"));
     }
