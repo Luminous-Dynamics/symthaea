@@ -114,7 +114,7 @@ pub fn edit_counts(reference: &[u8], observed: &[u8]) -> Result<EditCounts, DnaE
             let same = reference[i - 1] == observed[j - 1];
             let diagonal = dp[(i - 1) * cols + (j - 1)];
             let diagonal_op = if same { Op::Match } else { Op::Substitution };
-            let diagonal_cost = diagonal.cost + usize::from(!same);
+            let diagonal_cost = diagonal.cost + if same { 0 } else { 1 };
             let deletion_cost = dp[(i - 1) * cols + j].cost + 1;
             let insertion_cost = dp[i * cols + (j - 1)].cost + 1;
 
