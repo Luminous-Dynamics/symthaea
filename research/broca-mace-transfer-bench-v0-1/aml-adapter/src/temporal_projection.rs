@@ -780,6 +780,24 @@ mod tests {
     }
 
     #[test]
+    fn self_consistent_receipt_from_another_ledger_instance_is_rejected() {
+        let ledger = ledger();
+        let mut index = DerivedProjectionIndexV1::new("user-1", "session-1").unwrap();
+        index.register_projection(&ledger, spec("summary-v1", 1, &["event-1"], &[])).unwrap();
+
+        let mut other_ledger = StreamingSessionLedgerV1::new("user-1", "session-1").unwrap();
+        let foreign_receipt = other_ledger
+            .apply(append("event-1", 1, 100, "different source fact"), 1_000)
+            .unwrap().receipt;
+        assert!(foreign_receipt.verify_integrity());
+        assert_eq!(
+            index.apply_transition(&ledger, &foreign_receipt),
+            Err(TemporalProjectionRejectV1::InvalidTransitionReceipt)
+        );
+        assert_eq!(index.last_sequence(), 1);
+    }
+
+    #[test]
     fn projection_index_must_not_skip_unprocessed_session_sequences() {
         let mut ledger = ledger();
         let mut index = DerivedProjectionIndexV1::new("user-1", "session-1").unwrap();
