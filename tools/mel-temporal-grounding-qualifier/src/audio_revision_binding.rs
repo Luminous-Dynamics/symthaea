@@ -14,11 +14,33 @@ use crate::audio_evidence_window::{
 };
 use crate::evidence_digest::sha256_hex;
 use crate::temporal_revision::{
-    audit_revision_v2, EvidenceConditionV1 as RevisionEvidenceConditionV1,
+    audit_revision_v2, compare_matched_evidence_arms,
+    EvidenceConditionV1 as RevisionEvidenceConditionV1, MatchedEvidenceContrastV1,
     RevisionCaseV2, RevisionReportV1,
 };
 
 const REPORT_SCHEMA_V1: &str = "mel-audio-bound-revision-report-v1";
+
+pub struct AudioEvidenceRevisionArmInput<'a> {
+    pub revision_case: &'a RevisionCaseV2,
+    /// Must be None for NoEvidence and Some for LocalRetrieved/YokedRetrieved.
+    pub evidence_manifest: Option<&'a AudioEvidenceWindowManifestV1>,
+    pub source_audio_bytes: Option<&'a [u8]>,
+    pub decoded_pcm_bytes: Option<&'a [u8]>,
+}
+
+#[derive(Debug, Clone, PartialEq, Serialize)]
+pub struct VerifiedAudioEvidenceTripletReportV1 {
+    pub contrast: MatchedEvidenceContrastV1,
+    pub no_evidence_revision_report: RevisionReportV1,
+    pub local_audio_bound_report: AudioBoundRevisionAuditV1,
+    pub yoked_audio_bound_report: AudioBoundRevisionAuditV1,
+    pub no_evidence_arm_has_no_materialization: bool,
+    pub local_evidence_bytes_verified: bool,
+    pub yoked_evidence_bytes_verified: bool,
+    /// The byte/context binding is verified; model-internal consumption remains false.
+    pub model_input_attested: bool,
+}
 
 #[derive(Debug, Clone, PartialEq, Serialize)]
 pub struct AudioBoundRevisionAuditV1 {
@@ -35,6 +57,79 @@ pub struct AudioBoundRevisionAuditV1 {
     pub materialized_audio_bytes_bound_to_revision_case: bool,
     /// This remains false until a trusted model/runtime receipt is verified.
     pub model_input_attested: bool,
+}
+
+/// Verify an entire NoEvidence / LocalRetrieved / YokedRetrieved triplet
+/// before computing its paired evidence-ablation contrast. Unverified metadata
+/// alone cannot produce a confirmatory contrast through this API.
+pub fn audit_verified_audio_evidence_triplet(
+    no_evidence: AudioEvidenceRevisionArmInput<'_>,
+    local: AudioEvidenceRevisionArmInput<'_>,
+    yoked: AudioEvidenceRevisionArmInput<'_>,
+) -> Result<VerifiedAudioEvidenceTripletReportV1, String> {
+    let no_case = no_evidence.revision_case;
+    if no_case.evidence_condition != RevisionEvidenceConditionV1::NoEvidence
+        || no_case.evidence.is_some()
+        || no_evidence.evidence_manifest.is_some()
+        || no_evidence.source_audio_bytes.is_some()
+        || no_evidence.decoded_pcm_bytes.is_some()
+    {
+        return Err("NoEvidence arm must not include evidence references, manifests or bytes".into());
+    }
+    let no_evidence_revision_report = audit_revision_v2(no_case)?;
+
+    let local_case = local.revision_case;
+    let local_manifest = local
+        .evidence_manifest
+        .ok_or_else(|| "LocalRetrieved arm requires an audio evidence manifest".to_string())?;
+    let local_source = local
+        .source_audio_bytes
+        .ok_or_else(|| "LocalRetrieved arm requires raw source audio bytes".to_string())?;
+    let local_pcm = local
+        .decoded_pcm_bytes
+        .ok_or_else(|| "LocalRetrieved arm requires raw decoded PCM bytes".to_string())?;
+    if local_case.evidence_condition != RevisionEvidenceConditionV1::LocalRetrieved {
+        return Err("local arm revision condition must be LocalRetrieved".into());
+    }
+    let local_audio_bound_report =
+        audit_revision_with_audio_evidence(local_case, local_manifest, local_source, local_pcm)?;
+
+    let yoked_case = yoked.revision_case;
+    let yoked_manifest = yoked
+        .evidence_manifest
+        .ok_or_else(|| "YokedRetrieved arm requires an audio evidence manifest".to_string())?;
+    let yoked_source = yoked
+        .source_audio_bytes
+        .ok_or_else(|| "YokedRetrieved arm requires raw source audio bytes".to_string())?;
+    let yoked_pcm = yoked
+        .decoded_pcm_bytes
+        .ok_or_else(|| "YokedRetrieved arm requires raw decoded PCM bytes".to_string())?;
+    if yoked_case.evidence_condition != RevisionEvidenceConditionV1::YokedRetrieved {
+        return Err("yoked arm revision condition must be YokedRetrieved".into());
+    }
+    let yoked_audio_bound_report =
+        audit_revision_with_audio_evidence(yoked_case, yoked_manifest, yoked_source, yoked_pcm)?;
+
+    let contrast_reports =
+        compare_matched_evidence_arms(&[no_case.clone(), local_case.clone(), yoked_case.clone()])?;
+    if contrast_reports.len() != 1 {
+        return Err("verified evidence triplet must produce exactly one matched contrast".into());
+    }
+    let contrast = contrast_reports
+        .into_iter()
+        .next()
+        .ok_or_else(|| "verified evidence contrast unexpectedly missing".to_string())?;
+
+    Ok(VerifiedAudioEvidenceTripletReportV1 {
+        contrast,
+        no_evidence_revision_report,
+        local_audio_bound_report,
+        yoked_audio_bound_report,
+        no_evidence_arm_has_no_materialization: true,
+        local_evidence_bytes_verified: true,
+        yoked_evidence_bytes_verified: true,
+        model_input_attested: false,
+    })
 }
 
 pub fn audit_revision_with_audio_evidence(
