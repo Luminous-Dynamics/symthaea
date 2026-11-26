@@ -221,39 +221,6 @@ impl EpistemicConsciousness {
         self.integrator.graph_mut()
     }
 
-    /// Extract domain from URL
-    fn extract_domain(&self, url: &str) -> String {
-        url.split("://")
-            .nth(1)
-            .unwrap_or("")
-            .split('/')
-            .next()
-            .unwrap_or("")
-            .to_string()
-    }
-
-    /// Detect topic domain from query
-    fn detect_domain(&self, query: &str) -> String {
-        let lower = query.to_lowercase();
-
-        if lower.contains("programming")
-            || lower.contains("code")
-            || lower.contains("rust")
-            || lower.contains("python")
-        {
-            return "programming".to_string();
-        }
-
-        if lower.contains("nixos") || lower.contains("nix") || lower.contains("linux") {
-            return "systems".to_string();
-        }
-
-        if lower.contains("science") || lower.contains("research") {
-            return "science".to_string();
-        }
-
-        "general".to_string()
-    }
 }
 
 /// High-level epistemic statistics
