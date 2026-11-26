@@ -99,7 +99,7 @@ pub enum FiniteHorizonGramianError {
 /// One frozen physical trajectory / pulse scenario contributing to a task Gramian.
 ///
 /// All scenarios being aggregated must share the same task contract,
-/// checkpoint state, coordinate ordering, and state metric. The scenario
+/// checkpoint-state digest, coordinate/layout ID, and state metric. The scenario
 /// weight is normalized across the set and scales both Gramians. The caller
 /// should construct each pair with build_finite_horizon_gramians using the
 /// same checkpoint digest, then aggregate future-response factors across the
