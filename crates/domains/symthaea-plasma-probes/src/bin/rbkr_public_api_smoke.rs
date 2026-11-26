@@ -9,6 +9,7 @@
 //! integration boundary rather than only testing module-internal functions.
 
 use symthaea_plasma_probes::{
+    EmpiricalGramian,
     rbkr::{
         FiniteHorizonGramianConfig, RbkrConfig, ResponseBalancedBasis,
         ResponseGramianAggregationConfig, ResponseGramianScenario,
@@ -63,6 +64,31 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
     assert!(checkpoint_residual <= 1.0e-12);
     assert!(pulse_residual <= 1.0e-12);
     assert!(report.worst_case <= 1.0e-12);
+
+    // A separate rare-response scenario exercises the public robust greedy
+    // enrichment API from an external consumer crate.
+    let mut rare_reachability = EmpiricalGramian::new(2)?;
+    rare_reachability.add_direction(&[0.0, 1.0], 1.0)?;
+    let mut rare_observability = EmpiricalGramian::new(2)?;
+    rare_observability.add_direction(&[0.0, 1.0], 1.0)?;
+    let rare_scenario = ResponseGramianScenario {
+        scenario_id: "public-api-smoke-rare",
+        trajectory_sha256: "cccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccc",
+        task_contract_id: "public-api-smoke-v1",
+        checkpoint_id: "checkpoint-smoke",
+        checkpoint_sha256: "bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb",
+        state_coordinate_id: "vlasov-1d1v-layout-smoke",
+        state_metric_id: "nondimensional-smoke",
+        reachability: &rare_reachability,
+        observability: &rare_observability,
+        scenario_weight: 0.49,
+    };
+    let challenge = [scenario, rare_scenario];
+    let receipt = basis.enrich_from_worst_scenario(&challenge, RbkrConfig::new(2))?;
+    assert_eq!(receipt.scenario_id, "public-api-smoke-rare");
+    assert_eq!(receipt.new_order, 2);
+    assert!(receipt.post_response_residual < 1.0e-12);
+
     println!("rbkr_external_public_api_smoke=PASS");
     Ok(())
 }
