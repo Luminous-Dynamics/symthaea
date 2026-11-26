@@ -1,0 +1,27 @@
+name: WebResearch Claim-Specific Provenance
+
+on:
+  pull_request:
+    types: [opened, synchronize, reopened, ready_for_review]
+    paths:
+      - "src/web_research/integrator.rs"
+      - ".github/workflows/web-research-claim-provenance.yml"
+
+permissions:
+  contents: read
+
+jobs:
+  verify:
+    name: Rust 1.96 claim-specific provenance tests
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - name: Set up Rust
+        uses: dtolnay/rust-toolchain@stable
+        with:
+          toolchain: "1.96.0"
+          components: rustfmt
+      - name: Check touched Rust file
+        run: rustfmt +1.96.0 --edition 2024 --check src/web_research/integrator.rs
+      - name: Run claim-specific provenance tests
+        run: cargo test --manifest-path Cargo.toml --locked --no-default-features --features web_research_module --lib web_research::integrator::tests
