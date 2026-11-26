@@ -101,6 +101,7 @@ jobs:
           jq -e '
             .schema == "mel-audio-evidence-verification-report-v1"
             and .verified_window_count == 2
+            and .target_source_lineage_id == "synthetic-source-lineage-001"
             and .source_lineage_id == "synthetic-source-lineage-001"
             and .source_audio_bytes_recomputed == true
             and .decoded_pcm_bytes_recomputed == true
@@ -112,8 +113,8 @@ jobs:
             and .verified_windows[1].position == 1
             and .verified_windows[1].byte_offset == 20
             and .verified_windows[1].byte_length == 12
-            and .evidence_context_manifest_sha256 == "621c6faea6b381f98fb62adde3c71325c0d6b90dcc331aae54ba9649eccaa6a6"
-            and .full_manifest_sha256 == "bb2de684ebff527e256268969b8d08e60bc6e907844c44402b04fb21364f3e69"
+            and .evidence_context_manifest_sha256 == "0fe3a258449c9fa4b4625c1c91d155c51f95f7694f38472973382ef95504ed95"
+            and .full_manifest_sha256 == "70a121d88275034cf68428f20002c51d3cc6f83275e6e77bc80e5a1e3a5a8556"
             and .rights_scope_authenticated == false
             and .decoder_identity_authenticated == false
             and .model_runtime_identity_authenticated == false
