@@ -22,6 +22,10 @@ Symthaea is not just software - it's a research platform exploring fundamental q
 
 ---
 
+## WebResearch Evidence Integrity
+
+- [WebResearch Evidence Benchmark v1](WEB_RESEARCH_EVIDENCE_BENCHMARK_V1.md) — separates retrieval relevance, claim-source relation, claim truth and decision usability; includes external deep-research benchmarks, negative controls and evidence-integrity targets.
+
 ## Theoretical Foundations
 
 ### Integrated Information Theory (IIT)
