@@ -379,9 +379,10 @@ impl DerivedProjectionIndexV1 {
     /// dependencies. No downstream artifact is silently kept current.
     pub fn apply_transition(
         &mut self,
+        ledger: &StreamingSessionLedgerV1,
         transition: &StreamingSessionMutationReceiptV1,
     ) -> Result<ProjectionTransitionResultV1, TemporalProjectionRejectV1> {
-        if !transition.verify_integrity() {
+        if !ledger.verify_recorded_receipt(transition) {
             return Err(TemporalProjectionRejectV1::InvalidTransitionReceipt);
         }
         if transition.user_id != self.user_id || transition.session_id != self.session_id {
@@ -798,7 +799,7 @@ mod tests {
         let mut index = DerivedProjectionIndexV1::new("user-1", "session-1").unwrap();
         index.register_projection(&ledger, spec("summary-v1", 1, &["event-1"], &[])).unwrap();
         let transition = ledger.apply(correction(2), 1_100).unwrap().receipt;
-        let result = index.apply_transition(&transition).unwrap();
+        let result = index.apply_transition(&ledger, &transition).unwrap();
         assert!(result.receipt.verify_integrity());
         let mut altered = result.receipt.clone();
         altered.invalidated_projection_ids.clear();
@@ -818,7 +819,7 @@ mod tests {
             Ok(ProjectionRegisterStatusV1::Created)
         );
         let transition = ledger.apply(correction(2), 1_100).unwrap().receipt;
-        let result = index.apply_transition(&transition).unwrap();
+        let result = index.apply_transition(&ledger, &transition).unwrap();
         assert_eq!(result.receipt.invalidated_projection_ids, vec!["plan-v1", "summary-v1"]);
         assert_eq!(index.projection("summary-v1").unwrap().status(), DerivedProjectionStatusV1::Stale);
         assert_eq!(index.projection("plan-v1").unwrap().status(), DerivedProjectionStatusV1::Stale);
@@ -835,7 +836,7 @@ mod tests {
             spec("plan-v1", 1, &[], &["embedding-v1", "summary-v1"]),
         ).unwrap();
         let transition = ledger.apply(correction(2), 1_100).unwrap().receipt;
-        let result = index.apply_transition(&transition).unwrap();
+        let result = index.apply_transition(&ledger, &transition).unwrap();
         assert_eq!(
             result.receipt.invalidated_projection_ids,
             vec!["embedding-v1", "plan-v1", "summary-v1"]
@@ -871,7 +872,7 @@ mod tests {
             },
         };
         let receipt = ledger.apply(quarantine, 1_100).unwrap().receipt;
-        index.apply_transition(&receipt).unwrap();
+        index.apply_transition(&ledger, &receipt).unwrap();
         let revalidate = StreamingSessionMutationV1 {
             event_id: "event-3".into(),
             sequence: 3,
@@ -882,7 +883,7 @@ mod tests {
             },
         };
         let receipt = ledger.apply(revalidate, 1_200).unwrap().receipt;
-        index.apply_transition(&receipt).unwrap();
+        index.apply_transition(&ledger, &receipt).unwrap();
         assert_eq!(index.projection("summary-v1").unwrap().status(), DerivedProjectionStatusV1::Quarantined);
     }
 
@@ -901,7 +902,7 @@ mod tests {
             },
         };
         let receipt = ledger.apply(quarantine, 1_100).unwrap().receipt;
-        index.apply_transition(&receipt).unwrap();
+        index.apply_transition(&ledger, &receipt).unwrap();
         assert_eq!(index.projection("summary-v1").unwrap().status(), DerivedProjectionStatusV1::Quarantined);
 
         let erase = StreamingSessionMutationV1 {
@@ -916,7 +917,7 @@ mod tests {
         let receipt = ledger.apply(erase, 1_200).unwrap().receipt;
         assert!(receipt.invalidated_event_ids.is_empty());
         assert_eq!(receipt.affected_event_ids, vec!["event-1"]);
-        index.apply_transition(&receipt).unwrap();
+        index.apply_transition(&ledger, &receipt).unwrap();
         assert_eq!(index.projection("summary-v1").unwrap().status(), DerivedProjectionStatusV1::ErasureRequested);
     }
 
@@ -926,7 +927,7 @@ mod tests {
         let mut index = DerivedProjectionIndexV1::new("user-1", "session-1").unwrap();
         index.register_projection(&ledger, spec("summary-v1", 1, &["event-1"], &[])).unwrap();
         let transition = ledger.apply(correction(2), 1_100).unwrap().receipt;
-        index.apply_transition(&transition).unwrap();
+        index.apply_transition(&ledger, &transition).unwrap();
         assert_eq!(
             index.register_projection(&ledger, spec("summary-v2", 2, &["event-2"], &[])),
             Ok(ProjectionRegisterStatusV1::Created)
@@ -953,7 +954,7 @@ mod tests {
             },
         };
         let receipt = ledger.apply(revoke, 1_100).unwrap().receipt;
-        index.apply_transition(&receipt).unwrap();
+        index.apply_transition(&ledger, &receipt).unwrap();
         assert_eq!(index.projection("summary-v1").unwrap().status(), DerivedProjectionStatusV1::Revoked);
         assert_eq!(index.projection("answer-cache-v1").unwrap().status(), DerivedProjectionStatusV1::Revoked);
 
@@ -973,7 +974,7 @@ mod tests {
             },
         };
         let receipt = ledger.apply(erase, 1_100).unwrap().receipt;
-        index.apply_transition(&receipt).unwrap();
+        index.apply_transition(&ledger, &receipt).unwrap();
         assert_eq!(index.projection("embedding-v1").unwrap().status(), DerivedProjectionStatusV1::ErasureRequested);
         index.confirm_erasure("embedding-v1", &"f".repeat(64)).unwrap();
         assert_eq!(index.projection("embedding-v1").unwrap().status(), DerivedProjectionStatusV1::Erased);
@@ -996,8 +997,8 @@ mod tests {
         let mut index = DerivedProjectionIndexV1::new("user-1", "session-1").unwrap();
         index.register_projection(&ledger, spec("summary-v1", 1, &["event-1"], &[])).unwrap();
         let transition = ledger.apply(correction(2), 1_100).unwrap().receipt;
-        let first = index.apply_transition(&transition).unwrap();
-        let replay = index.apply_transition(&transition).unwrap();
+        let first = index.apply_transition(&ledger, &transition).unwrap();
+        let replay = index.apply_transition(&ledger, &transition).unwrap();
         assert_eq!(replay.status, ProjectionTransitionStatusV1::IdempotentReplay);
         assert_eq!(replay.receipt, first.receipt);
         let mut altered = transition.clone();
