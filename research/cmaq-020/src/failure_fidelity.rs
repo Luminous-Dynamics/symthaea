@@ -12,6 +12,8 @@ pub struct FailureFidelityContract {
     pub domain_ids: BTreeSet<String>,
     /// Number of registered execution stages; stage indices are zero-based.
     pub stage_count: u32,
+    /// Minimum success-rate separation (basis points) that counts as a detected boundary.
+    pub minimum_boundary_gap_basis_points: u32,
 }
 
 impl FailureFidelityContract {
@@ -29,6 +31,11 @@ impl FailureFidelityContract {
         }
         if self.stage_count == 0 {
             return Err("failure contract stage_count must be positive".to_owned());
+        }
+        if self.minimum_boundary_gap_basis_points == 0
+            || self.minimum_boundary_gap_basis_points > 10_000
+        {
+            return Err("minimum boundary gap must be between 1 and 10,000 basis points".to_owned());
         }
         Ok(())
     }
@@ -325,6 +332,220 @@ pub fn score_failure_fidelity(
     Ok(score)
 }
 
+
+
+/// Rate-based paired boundary record. The reference success-side and
+/// failure-side are selected by the benchmark's evaluator manifest. Candidate
+/// counts come from independent rollouts of the same frozen candidate
+/// checkpoint and the same two scene/action variants.
+#[derive(Clone, Debug)]
+pub struct BoundaryRatePair {
+    pub pair_id: String,
+    pub domain_id: String,
+    pub environment_family_id: String,
+    pub environment_cluster_id: String,
+    pub perturbation_dimension_id: String,
+    pub success_side_perturbation_units: i64,
+    pub failure_side_perturbation_units: i64,
+    pub initial_state_sha256: String,
+    pub realized_action_sha256: String,
+    pub candidate_checkpoint_sha256: String,
+    pub reference_success_side_successes: u32,
+    pub reference_success_side_trials: u32,
+    pub reference_failure_side_successes: u32,
+    pub reference_failure_side_trials: u32,
+    pub predicted_success_side_successes: u32,
+    pub predicted_success_side_trials: u32,
+    pub predicted_failure_side_successes: u32,
+    pub predicted_failure_side_trials: u32,
+}
+
+impl BoundaryRatePair {
+    fn validate(&self, contract: &FailureFidelityContract) -> Result<(), String> {
+        if self.pair_id.trim().is_empty()
+            || self.domain_id.trim().is_empty()
+            || self.environment_family_id.trim().is_empty()
+            || self.environment_cluster_id.trim().is_empty()
+            || self.perturbation_dimension_id.trim().is_empty()
+        {
+            return Err("boundary pair and domain/family/cluster/perturbation IDs must be non-empty".to_owned());
+        }
+        if !contract.domain_ids.contains(&self.domain_id) {
+            return Err("boundary pair domain is outside the frozen contract".to_owned());
+        }
+        if self.success_side_perturbation_units == self.failure_side_perturbation_units {
+            return Err("success-side and failure-side perturbations must differ".to_owned());
+        }
+        for (name, digest) in [
+            ("initial_state_sha256", &self.initial_state_sha256),
+            ("realized_action_sha256", &self.realized_action_sha256),
+            ("candidate_checkpoint_sha256", &self.candidate_checkpoint_sha256),
+        ] {
+            if !is_sha256(digest) {
+                return Err(format!("{name} must be a 64-character hexadecimal digest"));
+            }
+        }
+
+        for (label, successes, trials) in [
+            ("reference success side", self.reference_success_side_successes, self.reference_success_side_trials),
+            ("reference failure side", self.reference_failure_side_successes, self.reference_failure_side_trials),
+            ("predicted success side", self.predicted_success_side_successes, self.predicted_success_side_trials),
+            ("predicted failure side", self.predicted_failure_side_successes, self.predicted_failure_side_trials),
+        ] {
+            if trials == 0 {
+                return Err(format!("{label} must contain at least one rollout"));
+            }
+            if successes > trials {
+                return Err(format!("{label} successes cannot exceed trials"));
+            }
+        }
+        Ok(())
+    }
+
+    fn rate_basis_points(successes: u32, trials: u32) -> f64 {
+        successes as f64 * 10_000.0 / trials as f64
+    }
+}
+
+#[derive(Clone, Copy, Debug, Default, Eq, PartialEq)]
+pub struct BoundaryRateClusterCounts {
+    pub pairs: usize,
+    pub detected_reference_boundaries: usize,
+    pub detected_predicted_boundaries: usize,
+    pub correctly_detected_boundaries: usize,
+    pub direction_matches: usize,
+}
+
+#[derive(Clone, Debug, Default, PartialEq)]
+pub struct BoundaryRateFidelityScore {
+    pub pairs: usize,
+    pub detected_reference_boundaries: usize,
+    pub detected_predicted_boundaries: usize,
+    pub correct_boundary_detection_pairs: usize,
+    pub boundary_detection_accuracy: Option<f64>,
+    pub boundary_direction_accuracy: Option<f64>,
+    /// Mean absolute rate error, measured in basis points (100 bp = 1 pp).
+    pub success_side_rate_mae_basis_points: Option<f64>,
+    pub failure_side_rate_mae_basis_points: Option<f64>,
+    pub boundary_gap_mae_basis_points: Option<f64>,
+    pub reference_mean_gap_basis_points: Option<f64>,
+    pub predicted_mean_gap_basis_points: Option<f64>,
+    pub clusters: BTreeMap<String, BoundaryRateClusterCounts>,
+}
+
+/// Score replicated success/failure boundary pairs without collapsing
+/// rollouts to one binary label per side.
+///
+/// The minimum detectable boundary gap is frozen in the contract. The
+/// benchmark's success-side and failure-side labels are retained; the
+/// perturbation coordinate can increase or decrease depending on the factor.
+/// This score is separate from binary boundary-flip scoring above.
+pub fn score_boundary_rate_pairs(
+    pairs: &[BoundaryRatePair],
+    contract: &FailureFidelityContract,
+) -> Result<BoundaryRateFidelityScore, String> {
+    contract.validate()?;
+    if pairs.is_empty() {
+        return Err("at least one rate-based boundary pair is required".to_owned());
+    }
+
+    let mut pair_ids = BTreeSet::new();
+    let mut frozen_checkpoint: Option<&str> = None;
+    let mut cluster_metadata: BTreeMap<&str, (&str, &str)> = BTreeMap::new();
+    let threshold = contract.minimum_boundary_gap_basis_points as f64;
+    let mut score = BoundaryRateFidelityScore {
+        pairs: pairs.len(),
+        ..BoundaryRateFidelityScore::default()
+    };
+    let mut success_error_sum = 0.0;
+    let mut failure_error_sum = 0.0;
+    let mut gap_error_sum = 0.0;
+    let mut reference_gap_sum = 0.0;
+    let mut predicted_gap_sum = 0.0;
+    let mut direction_matches = 0_usize;
+
+    for pair in pairs {
+        pair.validate(contract)?;
+        if !pair_ids.insert(pair.pair_id.as_str()) {
+            return Err(format!("duplicate boundary pair ID: {}", pair.pair_id));
+        }
+        match frozen_checkpoint {
+            Some(checkpoint) if checkpoint != pair.candidate_checkpoint_sha256 => {
+                return Err("one boundary-rate evaluation must use exactly one frozen candidate checkpoint".to_owned());
+            }
+            None => frozen_checkpoint = Some(&pair.candidate_checkpoint_sha256),
+            _ => {}
+        }
+
+        let metadata = (pair.domain_id.as_str(), pair.environment_family_id.as_str());
+        match cluster_metadata.get(pair.environment_cluster_id.as_str()) {
+            Some(previous) if *previous != metadata => {
+                return Err("one boundary cluster cannot alias multiple domain/family identities".to_owned());
+            }
+            None => {
+                cluster_metadata.insert(pair.environment_cluster_id.as_str(), metadata);
+            }
+            _ => {}
+        }
+
+        let reference_success_rate = BoundaryRatePair::rate_basis_points(
+            pair.reference_success_side_successes,
+            pair.reference_success_side_trials,
+        );
+        let reference_failure_rate = BoundaryRatePair::rate_basis_points(
+            pair.reference_failure_side_successes,
+            pair.reference_failure_side_trials,
+        );
+        let predicted_success_rate = BoundaryRatePair::rate_basis_points(
+            pair.predicted_success_side_successes,
+            pair.predicted_success_side_trials,
+        );
+        let predicted_failure_rate = BoundaryRatePair::rate_basis_points(
+            pair.predicted_failure_side_successes,
+            pair.predicted_failure_side_trials,
+        );
+
+        let reference_gap = reference_success_rate - reference_failure_rate;
+        let predicted_gap = predicted_success_rate - predicted_failure_rate;
+        let reference_detected = reference_gap >= threshold;
+        let predicted_detected = predicted_gap >= threshold;
+        let detection_correct = reference_detected == predicted_detected;
+        let direction_match = (reference_gap > 0.0) == (predicted_gap > 0.0);
+
+        score.detected_reference_boundaries += usize::from(reference_detected);
+        score.detected_predicted_boundaries += usize::from(predicted_detected);
+        score.correct_boundary_detection_pairs += usize::from(detection_correct);
+        direction_matches += usize::from(direction_match);
+        success_error_sum += (predicted_success_rate - reference_success_rate).abs();
+        failure_error_sum += (predicted_failure_rate - reference_failure_rate).abs();
+        gap_error_sum += (predicted_gap - reference_gap).abs();
+        reference_gap_sum += reference_gap;
+        predicted_gap_sum += predicted_gap;
+
+        let cluster = score
+            .clusters
+            .entry(pair.environment_cluster_id.clone())
+            .or_default();
+        cluster.pairs += 1;
+        cluster.detected_reference_boundaries += usize::from(reference_detected);
+        cluster.detected_predicted_boundaries += usize::from(predicted_detected);
+        cluster.correctly_detected_boundaries += usize::from(detection_correct);
+        cluster.direction_matches += usize::from(direction_match);
+    }
+
+    let denominator = pairs.len() as f64;
+    score.boundary_detection_accuracy =
+        Some(score.correct_boundary_detection_pairs as f64 / denominator);
+    score.boundary_direction_accuracy = Some(direction_matches as f64 / denominator);
+    score.success_side_rate_mae_basis_points = Some(success_error_sum / denominator);
+    score.failure_side_rate_mae_basis_points = Some(failure_error_sum / denominator);
+    score.boundary_gap_mae_basis_points = Some(gap_error_sum / denominator);
+    score.reference_mean_gap_basis_points = Some(reference_gap_sum / denominator);
+    score.predicted_mean_gap_basis_points = Some(predicted_gap_sum / denominator);
+    Ok(score)
+}
+
+
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -336,6 +557,7 @@ mod tests {
             source_manifest_sha256: "b".repeat(64),
             domain_ids: ["robot-manipulation-v1".to_owned()].into_iter().collect(),
             stage_count: 5,
+            minimum_boundary_gap_basis_points: 2_000,
         }
     }
 
@@ -377,6 +599,109 @@ mod tests {
             stage_id: None,
             stage_index: None,
         })
+    }
+
+
+
+    fn rate_pair(pair_id: &str, cluster: &str) -> BoundaryRatePair {
+        BoundaryRatePair {
+            pair_id: pair_id.to_owned(),
+            domain_id: "robot-manipulation-v1".to_owned(),
+            environment_family_id: "contact-rich-pick-place".to_owned(),
+            environment_cluster_id: cluster.to_owned(),
+            perturbation_dimension_id: "position-x".to_owned(),
+            success_side_perturbation_units: 0,
+            failure_side_perturbation_units: 2,
+            initial_state_sha256: "c".repeat(64),
+            realized_action_sha256: "d".repeat(64),
+            candidate_checkpoint_sha256: "e".repeat(64),
+            reference_success_side_successes: 10,
+            reference_success_side_trials: 10,
+            reference_failure_side_successes: 2,
+            reference_failure_side_trials: 10,
+            predicted_success_side_successes: 10,
+            predicted_success_side_trials: 10,
+            predicted_failure_side_successes: 2,
+            predicted_failure_side_trials: 10,
+        }
+    }
+
+    #[test]
+    fn rate_boundary_pairs_score_per_side_rates_and_boundary_gap() {
+        let pair = rate_pair("pair-1", "cluster-1");
+        let score = score_boundary_rate_pairs(&[pair], &contract()).expect("valid rates");
+        assert_eq!(score.pairs, 1);
+        assert_eq!(score.detected_reference_boundaries, 1);
+        assert_eq!(score.detected_predicted_boundaries, 1);
+        assert_eq!(score.boundary_detection_accuracy, Some(1.0));
+        assert_eq!(score.boundary_direction_accuracy, Some(1.0));
+        assert_eq!(score.success_side_rate_mae_basis_points, Some(0.0));
+        assert_eq!(score.failure_side_rate_mae_basis_points, Some(0.0));
+        assert_eq!(score.boundary_gap_mae_basis_points, Some(0.0));
+        assert_eq!(score.reference_mean_gap_basis_points, Some(8_000.0));
+        assert_eq!(score.predicted_mean_gap_basis_points, Some(8_000.0));
+    }
+
+    #[test]
+    fn rate_boundary_can_be_detected_but_have_wrong_success_rate_magnitude() {
+        let mut pair = rate_pair("pair-1", "cluster-1");
+        pair.predicted_success_side_successes = 8;
+        pair.predicted_failure_side_successes = 4;
+        let score = score_boundary_rate_pairs(&[pair], &contract()).expect("valid rates");
+        assert_eq!(score.boundary_detection_accuracy, Some(1.0));
+        assert_eq!(score.success_side_rate_mae_basis_points, Some(2_000.0));
+        assert_eq!(score.failure_side_rate_mae_basis_points, Some(2_000.0));
+        assert_eq!(score.boundary_gap_mae_basis_points, Some(4_000.0));
+    }
+
+    #[test]
+    fn rate_boundary_detects_missing_or_reversed_failure_boundary() {
+        let mut pair = rate_pair("pair-1", "cluster-1");
+        pair.predicted_success_side_successes = 5;
+        pair.predicted_failure_side_successes = 5;
+        let score = score_boundary_rate_pairs(&[pair], &contract()).expect("valid rates");
+        assert_eq!(score.detected_reference_boundaries, 1);
+        assert_eq!(score.detected_predicted_boundaries, 0);
+        assert_eq!(score.boundary_detection_accuracy, Some(0.0));
+        assert_eq!(score.boundary_direction_accuracy, Some(0.0));
+    }
+
+    #[test]
+    fn rate_boundary_requires_positive_rollout_counts_and_valid_success_counts() {
+        let mut zero_trials = rate_pair("zero", "cluster-1");
+        zero_trials.predicted_success_side_trials = 0;
+        assert!(score_boundary_rate_pairs(&[zero_trials], &contract()).is_err());
+
+        let mut too_many_successes = rate_pair("too-many", "cluster-2");
+        too_many_successes.reference_failure_side_successes = 11;
+        assert!(score_boundary_rate_pairs(&[too_many_successes], &contract()).is_err());
+    }
+
+    #[test]
+    fn rate_boundary_requires_unique_pairs_valid_digests_and_one_checkpoint() {
+        let pair = rate_pair("pair-1", "cluster-1");
+        assert!(score_boundary_rate_pairs(&[pair.clone(), pair.clone()], &contract()).is_err());
+
+        let mut invalid_digest = rate_pair("pair-2", "cluster-2");
+        invalid_digest.realized_action_sha256 = "bad".to_owned();
+        assert!(score_boundary_rate_pairs(&[invalid_digest], &contract()).is_err());
+
+        let mut mixed_checkpoint = rate_pair("pair-3", "cluster-3");
+        mixed_checkpoint.candidate_checkpoint_sha256 = "f".repeat(64);
+        assert!(score_boundary_rate_pairs(&[rate_pair("pair-4", "cluster-4"), mixed_checkpoint], &contract()).is_err());
+    }
+
+    #[test]
+    fn rate_boundary_summaries_preserve_environment_clusters() {
+        let pairs = vec![
+            rate_pair("pair-1", "cluster-1"),
+            rate_pair("pair-2", "cluster-1"),
+            rate_pair("pair-3", "cluster-2"),
+        ];
+        let score = score_boundary_rate_pairs(&pairs, &contract()).expect("valid pairs");
+        assert_eq!(score.clusters.len(), 2);
+        assert_eq!(score.clusters["cluster-1"].pairs, 2);
+        assert_eq!(score.clusters["cluster-2"].pairs, 1);
     }
 
     #[test]
