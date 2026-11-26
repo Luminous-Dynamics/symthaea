@@ -1,0 +1,47 @@
+{
+  "schema_version": 1,
+  "profile": {
+    "profile_id": "basalt-runtime-v1",
+    "profile_version": 1,
+    "required_obligations": [
+      "payload-binding",
+      "signer-authorization"
+    ],
+    "optional_obligations": [
+      "diagnostic-provenance"
+    ]
+  },
+  "expected_binding": {
+    "claim_id": "runtime-claim-01",
+    "subject_digest": "sha256:subject-01",
+    "intended_use_id": "ci-promotion",
+    "context_digest": "sha256:context-01",
+    "policy_digest": "sha256:policy-01"
+  },
+  "capsule": {
+    "schema_version": 1,
+    "profile_id": "basalt-runtime-v1",
+    "profile_version": 1,
+    "binding": {
+      "claim_id": "runtime-claim-01",
+      "subject_digest": "sha256:other-subject",
+      "intended_use_id": "ci-promotion",
+      "context_digest": "sha256:context-01",
+      "policy_digest": "sha256:policy-01"
+    },
+    "obligations": [
+      {
+        "id": "payload-binding",
+        "outcome": "valid",
+        "reason_code": "verified",
+        "evidence_ref": "sha256:evidence-payload-01"
+      },
+      {
+        "id": "signer-authorization",
+        "outcome": "valid",
+        "reason_code": "verified",
+        "evidence_ref": "sha256:evidence-signer-01"
+      }
+    ]
+  }
+}
