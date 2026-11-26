@@ -5,6 +5,8 @@
 //! sufficiency answers whether the qualified set supports one exact decision.
 //! Neither receipt authorizes an action.
 
+use std::collections::BTreeSet;
+
 use serde_json::{Value, json};
 use sha2::{Digest, Sha256};
 
@@ -24,6 +26,16 @@ use crate::evidence_qualification_gate::{
 
 pub const DECISION_SUFFICIENCY_VERIFIER_ID_V1: &str =
     "mace-independent-decision-sufficiency-evaluator";
+
+/// One independently resolved source-root family and the receipt that
+/// commits to its transitive lineage/correlation analysis. The consumer checks
+/// identity, ordering and cardinality; the evaluator must independently verify
+/// the referenced provenance receipts before asserting family independence.
+#[derive(Clone, Debug, Eq, PartialEq)]
+pub struct DecisionSufficiencyRootFamilyV1 {
+    pub root_family_sha256: String,
+    pub provenance_receipt_sha256: String,
+}
 
 /// One explicit obligation that must be met before a particular decision can
 /// be considered sufficient. Independent-root counts refer to verified source
@@ -91,12 +103,16 @@ impl DecisionNeedV1 {
             || !(500_000..=999_999).contains(&self.minimum_confidence_level_ppm)
             || self.regret_tolerance_micros < 0
             || self.regret_tolerance_micros > 1_000_000_000_000
+            || self.maximum_cost_micros == 0
             || self.maximum_cost_micros > 1_000_000_000_000
             || self.maximum_evidence_age_seconds == 0
+            || self.maximum_evidence_age_seconds > 315_360_000
             || self.maximum_context_tokens == 0
+            || self.maximum_context_tokens > 1_000_000_000_000
             || self.maximum_tool_calls == 0
-            || self.maximum_cost_micros == 0
+            || self.maximum_tool_calls > 1_000_000
             || self.maximum_latency_ms == 0
+            || self.maximum_latency_ms > 86_400_000
             || self.requirements.is_empty()
             || self.requirements.len() > 1024
         {
@@ -112,7 +128,9 @@ impl DecisionNeedV1 {
                 || requirement.requirement_id.len() > 256
                 || !valid_sha256(&requirement.evidence_class_sha256)
                 || requirement.minimum_independent_root_families == 0
+                || requirement.minimum_independent_root_families > 10_000
                 || requirement.maximum_evidence_age_seconds == 0
+                || requirement.maximum_evidence_age_seconds > 315_360_000
                 || requirement.maximum_evidence_age_seconds > self.maximum_evidence_age_seconds
             {
                 return Err(DecisionSufficiencyRejectV1::InvalidDecisionNeed);
@@ -347,10 +365,15 @@ impl DecisionRequirementStatusV1 {
 #[derive(Clone, Debug, Eq, PartialEq)]
 pub struct DecisionSufficiencyRequirementV1 {
     pub requirement_id: String,
+    /// Must exactly match the consumer-owned DecisionNeed evidence class.
+    pub evidence_class_sha256: String,
     pub status: DecisionRequirementStatusV1,
-    /// One or more independently verifiable receipts supporting the
-    /// evaluator's assessment of this requirement.
+    /// Supporting evidence/assessment receipts. Empty is permitted for unmet
+    /// or unknown requirements, but never for a requirement marked met.
     pub basis_receipt_sha256: Vec<String>,
+    /// Sorted, unique root-family commitments with their independently
+    /// checked transitive-lineage receipt commitments.
+    pub independent_root_families: Vec<DecisionSufficiencyRootFamilyV1>,
 }
 
 #[derive(Clone, Debug, Eq, PartialEq)]
@@ -404,6 +427,8 @@ pub enum DecisionSufficiencyRejectV1 {
     RequirementOrderInvalid,
     DuplicateRequirement,
     EmptyBasis,
+    EvidenceClassMismatch,
+    InsufficientIndependentRootFamilies,
     SufficientRequirementsNotMet,
     SufficientRiskBoundInvalid,
     BindingMismatch,
@@ -509,30 +534,64 @@ impl DecisionSufficiencyReceiptV1 {
         let mut requirements = Vec::with_capacity(requirement_values.len());
         for item in requirement_values {
             let entry = item.as_object().ok_or(DecisionSufficiencyRejectV1::InvalidJson)?;
-            if entry.len() != 3
+            if entry.len() != 5
                 || entry.keys().any(|key| ![
-                    "requirement_id", "status", "basis_receipt_sha256"
+                    "requirement_id", "evidence_class_sha256", "status",
+                    "basis_receipt_sha256", "independent_root_families"
                 ].contains(&key.as_str()))
             {
                 return Err(DecisionSufficiencyRejectV1::InvalidJson);
             }
             let requirement_id = entry.get("requirement_id").and_then(Value::as_str)
                 .ok_or(DecisionSufficiencyRejectV1::InvalidJson)?.to_owned();
-            let status = entry.get("status").and_then(Value::as_str)
-                .ok_or(DecisionSufficiencyRejectV1::InvalidJson)?;
+            let evidence_class_sha256 = entry.get("evidence_class_sha256")
+                .and_then(Value::as_str).ok_or(DecisionSufficiencyRejectV1::InvalidJson)?
+                .to_owned();
+            let status = DecisionRequirementStatusV1::parse(
+                entry.get("status").and_then(Value::as_str)
+                    .ok_or(DecisionSufficiencyRejectV1::InvalidJson)?
+            )?;
             let basis_values = entry.get("basis_receipt_sha256").and_then(Value::as_array)
                 .ok_or(DecisionSufficiencyRejectV1::InvalidJson)?;
-            if basis_values.is_empty() || basis_values.len() > 256 {
+            if basis_values.len() > 256 {
+                return Err(DecisionSufficiencyRejectV1::InvalidReceipt);
+            }
+            if status == DecisionRequirementStatusV1::Met && basis_values.is_empty() {
                 return Err(DecisionSufficiencyRejectV1::EmptyBasis);
             }
             let basis_receipt_sha256 = basis_values.iter()
                 .map(|value| value.as_str().map(str::to_owned)
                     .ok_or(DecisionSufficiencyRejectV1::InvalidJson))
                 .collect::<Result<Vec<_>, _>>()?;
+            let family_values = entry.get("independent_root_families")
+                .and_then(Value::as_array).ok_or(DecisionSufficiencyRejectV1::InvalidJson)?;
+            if family_values.len() > 10_000 {
+                return Err(DecisionSufficiencyRejectV1::InvalidReceipt);
+            }
+            let mut independent_root_families = Vec::with_capacity(family_values.len());
+            for family_value in family_values {
+                let family = family_value.as_object()
+                    .ok_or(DecisionSufficiencyRejectV1::InvalidJson)?;
+                if family.len() != 2 || family.keys().any(|key| ![
+                    "root_family_sha256", "provenance_receipt_sha256"
+                ].contains(&key.as_str())) {
+                    return Err(DecisionSufficiencyRejectV1::InvalidJson);
+                }
+                independent_root_families.push(DecisionSufficiencyRootFamilyV1 {
+                    root_family_sha256: family.get("root_family_sha256")
+                        .and_then(Value::as_str).ok_or(DecisionSufficiencyRejectV1::InvalidJson)?
+                        .to_owned(),
+                    provenance_receipt_sha256: family.get("provenance_receipt_sha256")
+                        .and_then(Value::as_str).ok_or(DecisionSufficiencyRejectV1::InvalidJson)?
+                        .to_owned(),
+                });
+            }
             requirements.push(DecisionSufficiencyRequirementV1 {
                 requirement_id,
-                status: DecisionRequirementStatusV1::parse(status)?,
+                evidence_class_sha256,
+                status,
                 basis_receipt_sha256,
+                independent_root_families,
             });
         }
 
@@ -607,8 +666,13 @@ impl DecisionSufficiencyReceiptV1 {
             "status": self.status.as_str(),
             "requirements": self.requirements.iter().map(|requirement| json!({
                 "requirement_id": requirement.requirement_id,
+                "evidence_class_sha256": requirement.evidence_class_sha256,
                 "status": requirement.status.as_str(),
                 "basis_receipt_sha256": requirement.basis_receipt_sha256,
+                "independent_root_families": requirement.independent_root_families.iter().map(|family| json!({
+                    "root_family_sha256": family.root_family_sha256,
+                    "provenance_receipt_sha256": family.provenance_receipt_sha256,
+                })).collect::<Vec<_>>(),
             })).collect::<Vec<_>>(),
             "issued_at_unix": self.issued_at_unix,
             "expires_at_unix": self.expires_at_unix,
@@ -729,6 +793,7 @@ impl DecisionSufficiencyReceiptV1 {
         hasher.update((self.requirements.len() as u64).to_be_bytes());
         for requirement in &self.requirements {
             hash_field(&mut hasher, &requirement.requirement_id);
+            hash_field(&mut hasher, &requirement.evidence_class_sha256);
             hasher.update([match requirement.status {
                 DecisionRequirementStatusV1::Met => 1,
                 DecisionRequirementStatusV1::Unmet => 2,
@@ -737,6 +802,11 @@ impl DecisionSufficiencyReceiptV1 {
             hasher.update((requirement.basis_receipt_sha256.len() as u64).to_be_bytes());
             for digest in &requirement.basis_receipt_sha256 {
                 hash_field(&mut hasher, digest);
+            }
+            hasher.update((requirement.independent_root_families.len() as u64).to_be_bytes());
+            for family in &requirement.independent_root_families {
+                hash_field(&mut hasher, &family.root_family_sha256);
+                hash_field(&mut hasher, &family.provenance_receipt_sha256);
             }
         }
         hex_digest(&hasher.finalize())
@@ -789,13 +859,31 @@ impl DecisionSufficiencyReceiptV1 {
             {
                 return Err(DecisionSufficiencyRejectV1::InvalidIdentifier);
             }
-            if requirement.basis_receipt_sha256.is_empty()
-                || requirement.basis_receipt_sha256.len() > 256
+            let mut lineage_receipts = BTreeSet::new();
+            if requirement.independent_root_families.iter()
+                .any(|family| !lineage_receipts.insert(family.provenance_receipt_sha256.as_str()))
+            {
+                return Err(DecisionSufficiencyRejectV1::InvalidReceipt);
+            }
+            if requirement.basis_receipt_sha256.len() > 256 {
+                return Err(DecisionSufficiencyRejectV1::InvalidReceipt);
+            }
+            if requirement.status == DecisionRequirementStatusV1::Met
+                && requirement.basis_receipt_sha256.is_empty()
             {
                 return Err(DecisionSufficiencyRejectV1::EmptyBasis);
             }
-            if requirement.basis_receipt_sha256.windows(2).any(|pair| pair[0] >= pair[1])
+            if !valid_sha256(&requirement.evidence_class_sha256)
+                || requirement.basis_receipt_sha256.windows(2).any(|pair| pair[0] >= pair[1])
                 || requirement.basis_receipt_sha256.iter().any(|v| !valid_sha256(v))
+                || requirement.independent_root_families.len() > 10_000
+                || requirement.independent_root_families.windows(2).any(|pair| {
+                    pair[0].root_family_sha256 >= pair[1].root_family_sha256
+                })
+                || requirement.independent_root_families.iter().any(|family| {
+                    !valid_sha256(&family.root_family_sha256)
+                        || !valid_sha256(&family.provenance_receipt_sha256)
+                })
             {
                 return Err(DecisionSufficiencyRejectV1::InvalidDigest);
             }
@@ -819,6 +907,10 @@ impl DecisionSufficiencyReceiptV1 {
         if self.regret_upper_bound_micros.is_some_and(|v| v > 1_000_000_000_000)
             || self.regret_limit_micros.is_some_and(|v| v > 1_000_000_000_000)
             || self.observed_cost_micros.is_some_and(|v| v > 1_000_000_000_000)
+            || self.observed_latency_ms.is_some_and(|v| v > 86_400_000)
+            || self.observed_context_tokens.is_some_and(|v| v > 1_000_000_000_000)
+            || self.observed_tool_calls.is_some_and(|v| v > 1_000_000)
+            || self.maximum_evidence_age_seconds.is_some_and(|v| v > 315_360_000)
         {
             return Err(DecisionSufficiencyRejectV1::InvalidReceipt);
         }
@@ -1109,8 +1201,22 @@ fn validate_receipt_binding(
         || binding.required_requirement_ids.windows(2).any(|pair| pair[0] >= pair[1])
         || receipt.requirements.iter().map(|item| item.requirement_id.as_str())
             .ne(binding.required_requirement_ids.iter().map(String::as_str))
+        || receipt.requirements.len() != binding.decision_need.requirements.len()
     {
         return Err(DecisionSufficiencyRejectV1::BindingMismatch);
+    }
+    for (claim, required) in receipt.requirements.iter()
+        .zip(binding.decision_need.requirements.iter())
+    {
+        if claim.evidence_class_sha256 != required.evidence_class_sha256 {
+            return Err(DecisionSufficiencyRejectV1::EvidenceClassMismatch);
+        }
+        if claim.status == DecisionRequirementStatusV1::Met
+            && claim.independent_root_families.len()
+                < required.minimum_independent_root_families as usize
+        {
+            return Err(DecisionSufficiencyRejectV1::InsufficientIndependentRootFamilies);
+        }
     }
     if binding.risk_limit_ppm > 1_000_000
         || !(500_000..=999_999).contains(&binding.minimum_confidence_level_ppm)
@@ -1554,8 +1660,27 @@ mod tests {
             status,
             requirements: vec![DecisionSufficiencyRequirementV1 {
                 requirement_id: "minimum-independent-evidence".into(),
+                evidence_class_sha256: repeat('c'),
                 status: requirement_status,
-                basis_receipt_sha256: vec![repeat('c')],
+                basis_receipt_sha256: if requirement_status == DecisionRequirementStatusV1::Met {
+                    vec![repeat('c')]
+                } else {
+                    Vec::new()
+                },
+                independent_root_families: if requirement_status == DecisionRequirementStatusV1::Met {
+                    vec![
+                        DecisionSufficiencyRootFamilyV1 {
+                            root_family_sha256: repeat('1'),
+                            provenance_receipt_sha256: repeat('2'),
+                        },
+                        DecisionSufficiencyRootFamilyV1 {
+                            root_family_sha256: repeat('3'),
+                            provenance_receipt_sha256: repeat('4'),
+                        },
+                    ]
+                } else {
+                    Vec::new()
+                },
             }],
             risk_upper_bound_ppm: risk_upper,
             risk_limit_ppm: risk_limit,
@@ -1741,6 +1866,117 @@ mod tests {
                 &profile,
             ),
             Err(DecisionSufficiencyRejectV1::SufficientRequirementsNotMet)
+        );
+    }
+
+    #[test]
+    fn sufficient_receipt_with_too_few_independent_root_families_is_rejected() {
+        let qualified = qualified_batch(&repeat('f'));
+        let (binding, profile, _) = build_valid_assessment(
+            &qualified,
+            DecisionSufficiencyStatusV1::Sufficient,
+            DecisionRequirementStatusV1::Met,
+            Some(1000),
+            Some(5000),
+        );
+        let signing_key = SigningKey::from_bytes(&[73; 32]);
+        let evaluator_key_id = qualification_key_id_v1(&signing_key.verifying_key().to_bytes());
+        let mut assessment = receipt(
+            &qualified,
+            &binding,
+            &evaluator_key_id,
+            DecisionSufficiencyStatusV1::Sufficient,
+            DecisionRequirementStatusV1::Met,
+            Some(1000),
+            Some(5000),
+        );
+        assessment.requirements[0].independent_root_families.pop();
+        let envelope = signed_envelope(&assessment, &signing_key);
+        assert_eq!(
+            verify_decision_sufficiency_v1(
+                &qualified,
+                &qualification_binding(&qualified, &["evidence-1".to_owned()], 160),
+                &TestQualificationVerifier,
+                &binding,
+                &envelope,
+                &profile,
+            ),
+            Err(DecisionSufficiencyRejectV1::InsufficientIndependentRootFamilies)
+        );
+    }
+
+    #[test]
+    fn one_lineage_receipt_cannot_attest_multiple_root_families() {
+        let qualified = qualified_batch(&repeat('f'));
+        let (binding, profile, _) = build_valid_assessment(
+            &qualified,
+            DecisionSufficiencyStatusV1::Sufficient,
+            DecisionRequirementStatusV1::Met,
+            Some(1000),
+            Some(5000),
+        );
+        let signing_key = SigningKey::from_bytes(&[73; 32]);
+        let evaluator_key_id = qualification_key_id_v1(&signing_key.verifying_key().to_bytes());
+        let mut assessment = receipt(
+            &qualified,
+            &binding,
+            &evaluator_key_id,
+            DecisionSufficiencyStatusV1::Sufficient,
+            DecisionRequirementStatusV1::Met,
+            Some(1000),
+            Some(5000),
+        );
+        let first_receipt = assessment.requirements[0].independent_root_families[0]
+            .provenance_receipt_sha256.clone();
+        assessment.requirements[0].independent_root_families[1]
+            .provenance_receipt_sha256 = first_receipt;
+        let envelope = signed_envelope(&assessment, &signing_key);
+        assert_eq!(
+            verify_decision_sufficiency_v1(
+                &qualified,
+                &qualification_binding(&qualified, &["evidence-1".to_owned()], 160),
+                &TestQualificationVerifier,
+                &binding,
+                &envelope,
+                &profile,
+            ),
+            Err(DecisionSufficiencyRejectV1::InvalidReceipt)
+        );
+    }
+
+    #[test]
+    fn sufficient_receipt_with_wrong_evidence_class_is_rejected() {
+        let qualified = qualified_batch(&repeat('f'));
+        let (binding, profile, _) = build_valid_assessment(
+            &qualified,
+            DecisionSufficiencyStatusV1::Sufficient,
+            DecisionRequirementStatusV1::Met,
+            Some(1000),
+            Some(5000),
+        );
+        let signing_key = SigningKey::from_bytes(&[73; 32]);
+        let evaluator_key_id = qualification_key_id_v1(&signing_key.verifying_key().to_bytes());
+        let mut assessment = receipt(
+            &qualified,
+            &binding,
+            &evaluator_key_id,
+            DecisionSufficiencyStatusV1::Sufficient,
+            DecisionRequirementStatusV1::Met,
+            Some(1000),
+            Some(5000),
+        );
+        assessment.requirements[0].evidence_class_sha256 = repeat('d');
+        let envelope = signed_envelope(&assessment, &signing_key);
+        assert_eq!(
+            verify_decision_sufficiency_v1(
+                &qualified,
+                &qualification_binding(&qualified, &["evidence-1".to_owned()], 160),
+                &TestQualificationVerifier,
+                &binding,
+                &envelope,
+                &profile,
+            ),
+            Err(DecisionSufficiencyRejectV1::EvidenceClassMismatch)
         );
     }
 
