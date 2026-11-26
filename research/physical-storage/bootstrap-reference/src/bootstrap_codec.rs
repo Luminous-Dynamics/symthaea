@@ -400,6 +400,13 @@ pub fn decode_bootstrap_bundle(
     }
     let manifest_len = usize::try_from(take_u64(&framed, &mut cursor)?)
         .map_err(|_| BootstrapCodecError::LengthOverflow)?;
+    let unpadded_len = 12usize.checked_add(manifest_len)
+        .ok_or(BootstrapCodecError::LengthOverflow)?;
+    let expected_frame_len = unpadded_len.checked_add(3)
+        .ok_or(BootstrapCodecError::LengthOverflow)? / 4 * 4;
+    if expected_frame_len != framed.len() {
+        return Err(BootstrapCodecError::InvalidBundleLength);
+    }
     let manifest = take(&framed, &mut cursor, manifest_len)?;
     if framed[cursor..].iter().any(|byte| *byte != 0) {
         return Err(BootstrapCodecError::InvalidPadding);
@@ -444,6 +451,22 @@ mod tests {
         ]).unwrap();
         assert_eq!(encoded[4], from_hex("1c07081007196400"));
         assert_eq!(encoded[5], from_hex("130c17310011a4c4"));
+    }
+
+    #[test]
+    fn full_bundle_matches_frozen_six_shard_known_answer() {
+        let encoded = encode_bootstrap_bundle(&sample_objects()).unwrap();
+        let expected = [
+            "42535031000000000000005742534d31000100000001000601",
+            "001200000000000000088a2cbf9b800e7e46748d574a556a3d",
+            "1aba5b4c3ec959a75255aac5183fbfba69464d542d56317068",
+            "79736963616c2d666f726d61742d763150485953464d543100",
+            "2188621e5fa574c13d2f4ddf91da04b44749608a3c50302d54",
+            "95750474dbeb5f71573a43c4c48d493a1a7a46aadc46b486c3",
+        ];
+        for index in 0..6 {
+            assert_eq!(encoded.shards[index], from_hex(expected[index]));
+        }
     }
 
     #[test]
