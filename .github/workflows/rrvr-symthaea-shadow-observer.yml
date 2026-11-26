@@ -1,0 +1,41 @@
+name: Symthaea RRVR Shadow Observer v0.1
+
+on:
+  push:
+    branches:
+      - research/rrvr-observer-executable-v0-1
+    paths:
+      - "crates/domains/symthaea-rrvr-observer/**"
+      - "crates/domains/symthaea-manipulator/**"
+      - "crates/core/symthaea-core/**"
+      - ".github/workflows/rrvr-symthaea-shadow-observer.yml"
+  pull_request:
+    paths:
+      - "crates/domains/symthaea-rrvr-observer/**"
+      - "crates/domains/symthaea-manipulator/**"
+      - "crates/core/symthaea-core/**"
+      - ".github/workflows/rrvr-symthaea-shadow-observer.yml"
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  shadow-observer:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Install pinned Rust toolchain
+        uses: dtolnay/rust-toolchain@1.96.0
+        with:
+          components: rustfmt, clippy
+
+      - name: Check formatting
+        run: cargo fmt --check -p symthaea-rrvr-observer
+
+      - name: Run observer contract tests
+        run: cargo test -p symthaea-rrvr-observer
+
+      - name: Run strict Clippy
+        run: cargo clippy -p symthaea-rrvr-observer --all-targets -- -D warnings
