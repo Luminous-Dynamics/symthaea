@@ -571,12 +571,10 @@ pub fn deliver_delayed_aci_feedback_v1(
     let expected_next_feedback_step = engine
         .last_feedback_step
         .and_then(|step| step.checked_add(1))
-        .unwrap_or_else(|| {
-            if engine.prediction_stream_closed {
-                engine.next_prediction_step
-            } else {
-                engine.policy.feedback_delay_steps
-            }
+        .unwrap_or(if engine.prediction_stream_closed {
+            engine.next_prediction_step
+        } else {
+            engine.policy.feedback_delay_steps
         });
     let schedule_matches = delivery.feedback_step == expected_step
         && if engine.prediction_stream_closed {
@@ -1058,7 +1056,13 @@ mod tests {
         issue(&mut engine, "s2", "e2");
         close_delayed_aci_prediction_stream_v1(&mut engine).unwrap();
         assert!(engine.prediction_stream_closed);
-        assert!(issue(&mut engine, "s3", "e3").is_err());
+        assert!(
+            issue_delayed_aci_prediction_v1(
+                &mut engine,
+                &prediction("s3", "e3", engine.state.alpha_lanes[0]),
+            )
+            .is_err()
+        );
 
         let second = delivery(
             "s1",
