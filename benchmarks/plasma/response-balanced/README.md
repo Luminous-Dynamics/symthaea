@@ -33,7 +33,7 @@ Relevant prior art means we cannot claim empirical/nonlinear balancing as a new 
 - Kawano & Scherpen (2017), *Empirical Differential Balancing for Nonlinear Systems*, IFAC-PapersOnLine 50(1), 6326–6331. The prolonged system and its variational system permit trajectory-local empirical balancing without solving nonlinear Hamilton–Jacobi PDEs: https://doi.org/10.1016/j.ifacol.2017.08.920
 - The 2026 literature on bilinear-quadratic-output balanced truncation also makes clear that a state-dependent reduction need not preserve the original system structure automatically. RBKR must therefore impose positivity and the relevant kinetic structure as independent constraints, not infer them from biorthogonality: https://doi.org/10.1080/00207179.2026.2720284
 
-The candidate novelty is narrower and more defensible: a frozen, experiment-specific contract combining kinetic pulse families, future QoI response signatures, mixed finite-amplitude interactions, branch identity, explicit representation rate–distortion, and a conservative qualification/hand-off policy. The general notions of nonlinear balancing and input–output equivalence are not claimed as new.
+The candidate novelty is narrower and more defensible: a frozen, experiment-specific contract combining kinetic pulse families, future QoI response signatures, mixed finite-amplitude interactions, branch identity, explicit representation rate–distortion, and a conservative qualification/hand-off policy. The direct Tsai TW-ROM / EW-ROM baseline means neither time-windowed locality nor field-energy-windowed POD is new; RBKR must show additional held-out value beyond those two selectors. The general notions of nonlinear balancing and input–output equivalence are not claimed as new.
 
 Other required baselines and adjacent methods:
 
@@ -106,6 +106,13 @@ Y_{\ell,j}=\Phi(t_\ell,t_c)^TC_{\ell,j,:}^T\sqrt{Q_{\ell,j}}.
 The new `build_finite_horizon_gramians` primitive computes these factors without materializing dense state-by-state Gramians. It accepts varying input and QoI channel counts, validates matrix dimensions and finite weights, and has explicit factor-storage and propagation-work budgets. Its A/B/C sequences must be the exact discrete tangent/adjoint operators for the frozen solver (or explicitly labelled finite-difference estimates); it does not derive them. The orientation is deliberate: past intervention increments are propagated *forward* to the checkpoint, while future QoI sensitivities are pulled *backward* to it.
 
 The first Rust implementation lives in `crates/domains/symthaea-plasma-probes/src/rbkr.rs`. It computes the factor-space SVD using a deterministic one-sided Jacobi method, checks resource budgets, constructs biorthogonal bases, maps states, reconstructs states, projects a caller-supplied discrete A/B/C system, and builds finite-horizon checkpoint-centred Gramian factors.
+
+For a pulse family with several future trajectories, call the finite-horizon builder once per **training** pulse path, always using the same immutable checkpoint and state metric. Then call \`aggregate_response_gramians\` with task-contract ID, checkpoint ID, state-metric ID, and a declared scenario weight for each pair. This constructs
+\[
+W_c=\sum_s p_sW_{c,s},\qquad W_o=\sum_s p_sW_{o,s},
+\quad \sum_s p_s=1,
+\]
+in factor form. The API refuses mixed checkpoint, task-contract, or state-metric IDs and checks the aggregate factor-byte budget. K-RESP-1 builds the basis from training paths only; validation selects hyperparameters / qualification thresholds, and held-out paths remain blind challenges. Do not feed held-out response data into the balancing factors. The scenario average is not a worst-case guarantee: keep adversarial pulse paths outside the average and report their individual worst-case response errors and UNKNOWN cases.
 
 ### Status of the third object: representation / reconstruction contract
 
