@@ -1,0 +1,85 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://luminousdynamics.io/schemas/mace_source_origin_receipt_v1.schema.json",
+  "title": "MACE Source-Origin Receipt V1",
+  "description": "Fourth-authority DSSE predicate binding exact acquired source, payload and derivation bytes to every node in a replayed source-lineage graph.",
+  "type": "object",
+  "additionalProperties": false,
+  "required": [
+    "schema_version",
+    "run_id",
+    "query_invocation_id",
+    "graph_sha256",
+    "evidence_id",
+    "source_id",
+    "source_sha256",
+    "payload_sha256",
+    "evidence_class_sha256",
+    "parent_evidence_ids",
+    "derivation_receipt_sha256",
+    "common_cause_group_sha256",
+    "source_bytes_len",
+    "payload_bytes_len",
+    "derivation_receipt_bytes_len",
+    "status",
+    "issued_at_unix",
+    "expires_at_unix",
+    "issuer_profile_sha256",
+    "key_id"
+  ],
+  "properties": {
+    "schema_version": { "const": "mace_source_origin_receipt_v1" },
+    "run_id": { "type": "string", "minLength": 1, "maxLength": 256 },
+    "query_invocation_id": { "type": "string", "minLength": 1, "maxLength": 256 },
+    "graph_sha256": { "type": "string", "pattern": "^[0-9a-f]{64}$" },
+    "evidence_id": { "type": "string", "minLength": 1, "maxLength": 512 },
+    "source_id": { "type": "string", "minLength": 1, "maxLength": 1024 },
+    "source_sha256": { "type": "string", "pattern": "^[0-9a-f]{64}$" },
+    "payload_sha256": { "type": "string", "pattern": "^[0-9a-f]{64}$" },
+    "evidence_class_sha256": { "type": "string", "pattern": "^[0-9a-f]{64}$" },
+    "parent_evidence_ids": {
+      "type": "array",
+      "maxItems": 1024,
+      "uniqueItems": true,
+      "items": { "type": "string", "minLength": 1, "maxLength": 512 }
+    },
+    "derivation_receipt_sha256": {
+      "oneOf": [
+        { "type": "string", "pattern": "^[0-9a-f]{64}$" },
+        { "type": "null" }
+      ]
+    },
+    "common_cause_group_sha256": {
+      "type": "array",
+      "maxItems": 1024,
+      "uniqueItems": true,
+      "items": { "type": "string", "pattern": "^[0-9a-f]{64}$" }
+    },
+    "source_bytes_len": { "type": "integer", "minimum": 1, "maximum": 67108864 },
+    "payload_bytes_len": { "type": "integer", "minimum": 1, "maximum": 16777216 },
+    "derivation_receipt_bytes_len": { "type": "integer", "minimum": 0, "maximum": 8388608 },
+    "status": { "const": "origin_verified" },
+    "issued_at_unix": { "type": "integer", "minimum": 0 },
+    "expires_at_unix": { "type": "integer", "minimum": 1 },
+    "issuer_profile_sha256": { "type": "string", "pattern": "^[0-9a-f]{64}$" },
+    "key_id": { "type": "string", "minLength": 1, "maxLength": 256 }
+  },
+  "allOf": [
+    {
+      "if": { "properties": { "parent_evidence_ids": { "maxItems": 0 } } },
+      "then": {
+        "properties": {
+          "derivation_receipt_sha256": { "type": "null" },
+          "derivation_receipt_bytes_len": { "const": 0 }
+        }
+      },
+      "else": {
+        "properties": {
+          "derivation_receipt_sha256": { "type": "string", "pattern": "^[0-9a-f]{64}$" },
+          "derivation_receipt_bytes_len": { "minimum": 1 }
+        }
+      }
+    }
+  ],
+  "$comment": "Runtime additionally enforces lexicographic ordering of parent/common-cause arrays, exact graph-node coverage, exact source/payload/derivation byte hashes, exact graph and run binding, DSSE signature/profile validation, use-time expiry and four-authority key/profile separation. The independent source-origin verifier must itself verify publisher/transform-origin semantics; a valid MACE receipt proves which trusted verifier attested to the supplied bytes and metadata, not that every upstream dependency was disclosed."
+}
