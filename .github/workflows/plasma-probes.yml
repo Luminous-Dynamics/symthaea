@@ -37,6 +37,7 @@ on:
       - "benchmarks/plasma/positivity-projection/**"
       - "benchmarks/plasma/measure-stability/**"
       - "benchmarks/plasma/kinetic-information-return/**"
+      - "benchmarks/plasma/response-balanced/**"
       - ".github/workflows/plasma-probes.yml"
   workflow_dispatch:
 
@@ -64,6 +65,7 @@ jobs:
       - name: Check formatting without workspace discovery
         run: |
           rustfmt --edition 2024 --check crates/domains/symthaea-plasma-probes/src/lib.rs
+          rustfmt --edition 2024 --check crates/domains/symthaea-plasma-probes/src/rbkr.rs
           rustfmt --edition 2024 --check crates/domains/symthaea-plasma-probes/src/bin/kird_point_audit.rs
           rustfmt --edition 2024 --check crates/domains/symthaea-plasma-probes/src/bin/response_weighted_refinement_audit.rs
           rustfmt --edition 2024 --check crates/domains/symthaea-plasma-probes/src/bin/sensor_actuator_contract_audit.rs
