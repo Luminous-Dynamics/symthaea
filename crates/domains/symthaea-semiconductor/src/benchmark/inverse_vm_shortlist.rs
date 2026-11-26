@@ -878,7 +878,7 @@ mod tests {
             side_constraints: vec![SideConstraintV1 {
                 constraint_id: "uniformity".into(),
                 measurand_id: "uniformity".into(),
-                unit: "%",
+                unit: "%".into(),
                 allowed: NumericRangeV1 {
                     lower: 0.0,
                     upper: 3.0,
