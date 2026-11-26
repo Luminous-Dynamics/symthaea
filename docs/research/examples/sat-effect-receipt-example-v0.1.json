@@ -19,7 +19,7 @@
     "payload_digest": "sha256:ffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffff",
     "external_effect_id_digest": "sha256:6666666666666666666666666666666666666666666666666666666666666666",
     "external_version": "ledger-sequence:901",
-    "projection_digest": "sha256:2222222222222222222222222222222222222222222222222222222222222222"
+    "projection_digest": "sha256:1aafde6f570e11e8fdb2f0df027bee548f32a9f5e02ebfb886c8407e68320e51"
   },
   "source_attestations": [
     {
@@ -38,7 +38,7 @@
       "signed_at": "2026-11-26T06:00:02Z",
       "observed_at": "2026-11-26T06:00:03Z",
       "outcome": "applied",
-      "projection_digest": "sha256:2222222222222222222222222222222222222222222222222222222222222222",
+      "projection_digest": "sha256:1aafde6f570e11e8fdb2f0df027bee548f32a9f5e02ebfb886c8407e68320e51",
       "signature_envelope": {
         "format": "provider-native",
         "algorithm": "Ed25519",
@@ -72,7 +72,7 @@
       "signed_at": "2026-11-26T06:00:02Z",
       "observed_at": "2026-11-26T06:00:03Z",
       "outcome": "applied",
-      "projection_digest": "sha256:2222222222222222222222222222222222222222222222222222222222222222",
+      "projection_digest": "sha256:1aafde6f570e11e8fdb2f0df027bee548f32a9f5e02ebfb886c8407e68320e51",
       "signature_envelope": {
         "format": "provider-native",
         "algorithm": "Ed25519",
