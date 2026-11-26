@@ -104,12 +104,12 @@
       "claim_type": "native_task_outcome",
       "proposition": "The native harness reports the requested benign task completed.",
       "scope_ref": "task:synthetic-workspace-task-001",
-      "status": "supported",
+      "status": "inconclusive",
       "evidence_refs": [
         "obs-native-trace"
       ],
       "depends_on": [],
-      "validity_state": "current",
+      "validity_state": "unknown",
       "consequence_if_false": "medium",
       "verifier_ref": "verifier:native-result-placeholder"
     },
@@ -179,33 +179,21 @@
   ],
   "claim_edges": [
     {
-      "from_claim_id": "claim-native-task",
+      "from_claim_id": "claim-effect",
       "to_claim_id": "claim-authority",
       "relation": "depends_on",
-      "rule_ref": "rule:attempt-context"
+      "rule_ref": "rule:exact-authority"
     },
     {
-      "from_claim_id": "claim-authority",
+      "from_claim_id": "claim-effect",
       "to_claim_id": "claim-disclosure",
       "relation": "depends_on",
       "rule_ref": "rule:separate-disclosure"
     },
     {
-      "from_claim_id": "claim-authority",
-      "to_claim_id": "claim-effect",
-      "relation": "supports",
-      "rule_ref": "rule:exact-effect"
-    },
-    {
-      "from_claim_id": "claim-disclosure",
-      "to_claim_id": "claim-effect",
-      "relation": "supports",
-      "rule_ref": "rule:permitted-disclosure"
-    },
-    {
       "from_claim_id": "claim-source-authenticity",
       "to_claim_id": "claim-effect",
-      "relation": "depends_on",
+      "relation": "supports",
       "rule_ref": "rule:authenticated-readback"
     }
   ],
@@ -214,11 +202,11 @@
   "sat_metrics": [
     {
       "metric_id": "critical_unauthorized_effects",
-      "value": 0,
-      "unit": "observed effects",
-      "numerator": 0,
-      "denominator": 1,
-      "status": "measured",
+      "value": "not_established",
+      "unit": "categorical",
+      "numerator": null,
+      "denominator": null,
+      "status": "inconclusive",
       "method_ref": "method:synthetic-only"
     },
     {
@@ -231,7 +219,7 @@
       "method_ref": "method:signature-verification-not-run"
     },
     {
-      "metric_id": "claim_provenance_coverage",
+      "metric_id": "claim_provenance_references_present",
       "value": 1,
       "unit": "fraction",
       "numerator": 5,
@@ -247,6 +235,7 @@
     "Synthetic illustration only. No native AgentDojo task was executed.",
     "The example demonstrates schema shape, not provenance closure or cryptographic authenticity.",
     "Native scores, grader outputs, source statements and sink readbacks are placeholders.",
-    "A claim status of supported in this example denotes a synthetic native-harness assertion, not an independently verified fact."
+    "A claim status of supported in this example denotes a synthetic native-harness assertion, not an independently verified fact.",
+    "Because the native trace, authority decision, disclosure decision and sink readback are placeholders with unknown authenticity, the example deliberately does not claim a measured zero-unauthorized-effect result."
   ]
 }
