@@ -99,7 +99,7 @@ The reference verifier applies conservative base rules:
 - every piece of evidence supporting a critical claim must have verified authenticity and satisfied independence;
 - claim-specific evidence kinds must exist for authority, disclosure, effect correspondence, transparency continuity and witness-independence claims;
 - an effect-correspondence claim requires an independent sink read-back;
-- a supported claim cannot depend on a claim that is not both supported and current.
+- a supported claim cannot depend on a claim that is not both supported and current. Declared-state admissibility is propagated transitively: a dependent claim cannot pass merely because its premise is labelled `supported/current` if that premise fails its own evidence checks. The report exposes `supported_claims_passing_declared_state_checks`, not a trust or qualification score.
 
 These are baseline semantic checks. Adapter-specific policies may impose stronger requirements, including stricter source roles, time windows, trust roots, witness cut sets, and domain-specific effect projections. This module does not infer missing requirements from absence of evidence.
 
@@ -142,7 +142,7 @@ Exit codes:
 
 ## 8. Source-authored regression matrix
 
-The current implementation contains 18 unit tests covering:
+The current implementation contains 19 unit tests covering:
 - minimal valid graph and pinned golden root;
 - graph-array order invariance;
 - omitted versus explicit-empty invalidation triggers;
@@ -153,7 +153,7 @@ The current implementation contains 18 unit tests covering:
 - claim-dependency / typed-edge mismatch;
 - duplicate dependency edges;
 - critical evidence authenticity and independence;
-- supported claims with inconclusive dependencies;
+- supported claims with inconclusive dependencies and transitive invalid-premise propagation;
 - duplicate JSON keys;
 - non-integer numeric rejection;
 - UTF-16 ordering;
