@@ -1,0 +1,176 @@
+{
+  "schema": "mel-music-listen-bench-case-v1",
+  "benchmark_id": "MusicListenBench",
+  "benchmark_version": "1.0",
+  "split": "RenderedTest",
+  "triads": [
+    {
+      "item_id": "item-0",
+      "pair_id": "pair-0",
+      "source_lineage_sha256": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+      "task": "Melody",
+      "flip_factor": "NoteIdentity",
+      "stay_factor": "Hiss",
+      "model_identity_sha256": "cccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccc",
+      "system_prompt_sha256": "dddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddd",
+      "runtime_identity_sha256": "eeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeee",
+      "decoding_config_sha256": "ffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffff",
+      "clean": {
+        "variant_id": "0-clean",
+        "audio_sha256": "01010101010101010101010101010101010101010101010101010101010101010101010101010101010101010101010101010101010101010101010101010101",
+        "question": "Do these clips have the same queried musical property?",
+        "question_sha256": "8bf4d082f7c1d83d6d9e7b4d2f597b97df6212a88597dd572cb3403114cdc533",
+        "option_a_relation": "Same",
+        "option_b_relation": "Different",
+        "expected_relation": "Same",
+        "model_answer": "ChoiceA"
+      },
+      "flip": {
+        "variant_id": "0-flip",
+        "audio_sha256": "02020202020202020202020202020202020202020202020202020202020202020202020202020202020202020202020202020202020202020202020202020202",
+        "question": "Did the queried musical property change between the two clips?",
+        "question_sha256": "ccfd9f89b176d4ccdd23572882f6c079279b4755eec8fa482dd225249501739a",
+        "option_a_relation": "Same",
+        "option_b_relation": "Different",
+        "expected_relation": "Different",
+        "model_answer": "ChoiceB"
+      },
+      "stay": {
+        "variant_id": "0-stay",
+        "audio_sha256": "03030303030303030303030303030303030303030303030303030303030303030303030303030303030303030303030303030303030303030303030303030303",
+        "question": "Does the queried musical property remain the same despite the sound change?",
+        "question_sha256": "3f08b80bd56c0bd5311a0a7064749c1ac89b587fb7171c0e4e9def95876fdbdc",
+        "option_a_relation": "Same",
+        "option_b_relation": "Different",
+        "expected_relation": "Same",
+        "model_answer": "ChoiceA"
+      }
+    },
+    {
+      "item_id": "item-1",
+      "pair_id": "pair-1",
+      "source_lineage_sha256": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+      "task": "Harmony",
+      "flip_factor": "ChordThirdQuality",
+      "stay_factor": "RelativePitchPreservingTransposition",
+      "model_identity_sha256": "cccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccc",
+      "system_prompt_sha256": "dddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddd",
+      "runtime_identity_sha256": "eeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeee",
+      "decoding_config_sha256": "ffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffff",
+      "clean": {
+        "variant_id": "1-clean",
+        "audio_sha256": "04040404040404040404040404040404040404040404040404040404040404040404040404040404040404040404040404040404040404040404040404040404",
+        "question": "Do these clips have the same queried musical property?",
+        "question_sha256": "8bf4d082f7c1d83d6d9e7b4d2f597b97df6212a88597dd572cb3403114cdc533",
+        "option_a_relation": "Same",
+        "option_b_relation": "Different",
+        "expected_relation": "Same",
+        "model_answer": "ChoiceA"
+      },
+      "flip": {
+        "variant_id": "1-flip",
+        "audio_sha256": "05050505050505050505050505050505050505050505050505050505050505050505050505050505050505050505050505050505050505050505050505050505",
+        "question": "Did the queried musical property change between the two clips?",
+        "question_sha256": "ccfd9f89b176d4ccdd23572882f6c079279b4755eec8fa482dd225249501739a",
+        "option_a_relation": "Different",
+        "option_b_relation": "Same",
+        "expected_relation": "Different",
+        "model_answer": "ChoiceA"
+      },
+      "stay": {
+        "variant_id": "1-stay",
+        "audio_sha256": "06060606060606060606060606060606060606060606060606060606060606060606060606060606060606060606060606060606060606060606060606060606",
+        "question": "Does the queried musical property remain the same despite the sound change?",
+        "question_sha256": "3f08b80bd56c0bd5311a0a7064749c1ac89b587fb7171c0e4e9def95876fdbdc",
+        "option_a_relation": "Same",
+        "option_b_relation": "Different",
+        "expected_relation": "Same",
+        "model_answer": "ChoiceA"
+      }
+    },
+    {
+      "item_id": "item-2",
+      "pair_id": "pair-2",
+      "source_lineage_sha256": "bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb",
+      "task": "Timbre",
+      "flip_factor": "InstrumentFamily",
+      "stay_factor": "Eq",
+      "model_identity_sha256": "cccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccc",
+      "system_prompt_sha256": "dddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddd",
+      "runtime_identity_sha256": "eeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeee",
+      "decoding_config_sha256": "ffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffff",
+      "clean": {
+        "variant_id": "2-clean",
+        "audio_sha256": "07070707070707070707070707070707070707070707070707070707070707070707070707070707070707070707070707070707070707070707070707070707",
+        "question": "Do these clips have the same queried musical property?",
+        "question_sha256": "8bf4d082f7c1d83d6d9e7b4d2f597b97df6212a88597dd572cb3403114cdc533",
+        "option_a_relation": "Same",
+        "option_b_relation": "Different",
+        "expected_relation": "Same",
+        "model_answer": "ChoiceB"
+      },
+      "flip": {
+        "variant_id": "2-flip",
+        "audio_sha256": "08080808080808080808080808080808080808080808080808080808080808080808080808080808080808080808080808080808080808080808080808080808",
+        "question": "Did the queried musical property change between the two clips?",
+        "question_sha256": "ccfd9f89b176d4ccdd23572882f6c079279b4755eec8fa482dd225249501739a",
+        "option_a_relation": "Same",
+        "option_b_relation": "Different",
+        "expected_relation": "Different",
+        "model_answer": "ChoiceB"
+      },
+      "stay": {
+        "variant_id": "2-stay",
+        "audio_sha256": "09090909090909090909090909090909090909090909090909090909090909090909090909090909090909090909090909090909090909090909090909090909",
+        "question": "Does the queried musical property remain the same despite the sound change?",
+        "question_sha256": "3f08b80bd56c0bd5311a0a7064749c1ac89b587fb7171c0e4e9def95876fdbdc",
+        "option_a_relation": "Same",
+        "option_b_relation": "Different",
+        "expected_relation": "Same",
+        "model_answer": "ChoiceA"
+      }
+    },
+    {
+      "item_id": "item-3",
+      "pair_id": "pair-3",
+      "source_lineage_sha256": "bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb",
+      "task": "Rhythm",
+      "flip_factor": "PulseRate",
+      "stay_factor": "Room",
+      "model_identity_sha256": "cccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccc",
+      "system_prompt_sha256": "dddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddd",
+      "runtime_identity_sha256": "eeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeee",
+      "decoding_config_sha256": "ffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffff",
+      "clean": {
+        "variant_id": "3-clean",
+        "audio_sha256": "10101010101010101010101010101010101010101010101010101010101010101010101010101010101010101010101010101010101010101010101010101010",
+        "question": "Do these clips have the same queried musical property?",
+        "question_sha256": "8bf4d082f7c1d83d6d9e7b4d2f597b97df6212a88597dd572cb3403114cdc533",
+        "option_a_relation": "Same",
+        "option_b_relation": "Different",
+        "expected_relation": "Same",
+        "model_answer": "ChoiceA"
+      },
+      "flip": {
+        "variant_id": "3-flip",
+        "audio_sha256": "11111111111111111111111111111111111111111111111111111111111111111111111111111111111111111111111111111111111111111111111111111111",
+        "question": "Did the queried musical property change between the two clips?",
+        "question_sha256": "ccfd9f89b176d4ccdd23572882f6c079279b4755eec8fa482dd225249501739a",
+        "option_a_relation": "Same",
+        "option_b_relation": "Different",
+        "expected_relation": "Different",
+        "model_answer": "Unparseable"
+      },
+      "stay": {
+        "variant_id": "3-stay",
+        "audio_sha256": "12121212121212121212121212121212121212121212121212121212121212121212121212121212121212121212121212121212121212121212121212121212",
+        "question": "Does the queried musical property remain the same despite the sound change?",
+        "question_sha256": "3f08b80bd56c0bd5311a0a7064749c1ac89b587fb7171c0e4e9def95876fdbdc",
+        "option_a_relation": "Same",
+        "option_b_relation": "Different",
+        "expected_relation": "Same",
+        "model_answer": "ChoiceA"
+      }
+    }
+  ]
+}
