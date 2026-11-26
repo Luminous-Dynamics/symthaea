@@ -257,14 +257,18 @@ pub enum ContextualPredictionSource {
     /// Equally relevant family-specific buckets predict materially different deltas.
     /// The returned state is an identity placeholder; callers must treat this as UNKNOWN.
     AmbiguousContextUnknown,
+    /// Observable context matches, but independent cluster support is below the frozen minimum.
+    /// The returned state is an identity placeholder; callers must treat this as UNKNOWN.
+    InsufficientContextSupportUnknown,
     GlobalActionDeltaFallback,
     UnknownActionIdentityFallback,
 }
 
 /// Prediction diagnostics for the context-conditioned HDC-delta candidate.
 ///
-/// For `AmbiguousContextUnknown`, `predicted_state` is an identity placeholder,
-/// not a forecast; callers must abstain rather than plan from it.
+/// For `AmbiguousContextUnknown` and `InsufficientContextSupportUnknown`,
+/// `predicted_state` is an identity placeholder, not a forecast; callers must
+/// abstain rather than plan from it.
 /// `training_residual_mse` is a prequential training diagnostic, not a
 /// calibrated predictive interval or a held-out uncertainty guarantee.
 #[derive(Debug, Clone)]
@@ -294,6 +298,8 @@ struct ContextDeltaEntry {
 }
 
 const CONTEXT_MATCH_THRESHOLD: f32 = 0.8;
+/// Minimum distinct training clusters before a family-blind contextual forecast.
+const CONTEXTUAL_MIN_INDEPENDENT_CLUSTERS: usize = 3;
 
 /// A learned state transition delta.
 #[derive(Debug, Clone)]
@@ -840,6 +846,19 @@ impl NixWorldModel {
             return Ok(ContextualPrediction {
                 predicted_state: state.clone(),
                 source: ContextualPredictionSource::AmbiguousContextUnknown,
+                context_similarity: best_context_similarity.max(0.0) as f64,
+                action_parameter_similarity: best_action_similarity.max(0.0) as f64,
+                observation_count,
+                independent_cluster_count: independent_cluster_ids.len(),
+                training_residual_mse: None,
+                outcome_counts,
+            });
+        }
+
+        if independent_cluster_ids.len() < CONTEXTUAL_MIN_INDEPENDENT_CLUSTERS {
+            return Ok(ContextualPrediction {
+                predicted_state: state.clone(),
+                source: ContextualPredictionSource::InsufficientContextSupportUnknown,
                 context_similarity: best_context_similarity.max(0.0) as f64,
                 action_parameter_similarity: best_action_similarity.max(0.0) as f64,
                 observation_count,
@@ -2142,6 +2161,45 @@ mod tests {
     }
 
     #[test]
+    fn family_label_free_prediction_abstains_with_fewer_than_three_independent_clusters() {
+        let dim = 256;
+        let mut wm = NixWorldModel::new(dim);
+        let before = ContinuousHV::random(dim, 425);
+        let after = ContinuousHV::random(dim, 426);
+        let context = ContinuousHV::random(dim, 427);
+        let episode = transition_episode(
+            "single-context-cluster",
+            ActionCategory::Install,
+            ActionCategory::Install,
+            before.clone(),
+            context.clone(),
+            after,
+            TransitionOutcomeClass::Success,
+            "only-independent-cluster",
+        );
+        wm.learn_episode(&episode)
+            .expect("single training episode");
+
+        let prediction = wm
+            .predict_state_without_family_label(
+                &before,
+                &ActionCategory::Install,
+                &ContinuousHV::random(dim, 90),
+                &context,
+            )
+            .expect("under-supported context returns explicit UNKNOWN");
+        assert_eq!(
+            prediction.source,
+            ContextualPredictionSource::InsufficientContextSupportUnknown
+        );
+        assert_eq!(prediction.observation_count, 1);
+        assert_eq!(prediction.independent_cluster_count, 1);
+        assert!(
+            (prediction.predicted_state.similarity(&before) - 1.0).abs() < 1e-5
+        );
+    }
+
+    #[test]
     fn family_label_free_prediction_is_order_invariant_and_deduplicates_clusters() {
         let dim = 256;
         let before = ContinuousHV::random(dim, 430);
@@ -2207,10 +2265,14 @@ mod tests {
 
         assert_eq!(
             prediction_forward.source,
-            ContextualPredictionSource::ContextualDelta
+            ContextualPredictionSource::InsufficientContextSupportUnknown
+        );
+        assert!(
+            (prediction_forward.predicted_state.similarity(&before) - 1.0).abs() < 1e-5
         );
         assert_eq!(prediction_forward.observation_count, 2);
         assert_eq!(prediction_forward.independent_cluster_count, 1);
+        assert_eq!(prediction_forward.training_residual_mse, None);
         assert_eq!(prediction_forward.outcome_counts.success, 1);
         assert_eq!(prediction_forward.outcome_counts.failure, 1);
         assert!(
