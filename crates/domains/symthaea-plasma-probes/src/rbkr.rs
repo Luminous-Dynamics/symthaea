@@ -107,23 +107,26 @@ pub struct ResponseGramianScenario<'a> {
     pub scenario_weight: f64,
 }
 
-/// Storage limit for aggregating factorized Gramian families.
+/// Peak live-factor storage limit while aggregating factorized Gramian families.
+///
+/// The budget includes both the input scenario factors and the newly allocated
+/// aggregate factors, because aggregation does not consume or mutate inputs.
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
 pub struct ResponseGramianAggregationConfig {
-    pub maximum_total_factor_scalars: usize,
+    pub maximum_live_factor_scalars: usize,
 }
 
 impl ResponseGramianAggregationConfig {
-    pub fn new(maximum_total_factor_scalars: usize) -> Self {
+    pub fn new(maximum_live_factor_scalars: usize) -> Self {
         Self {
-            maximum_total_factor_scalars,
+            maximum_live_factor_scalars,
         }
     }
 }
 
 impl Default for ResponseGramianAggregationConfig {
     fn default() -> Self {
-        Self::new(16_000_000)
+        Self::new(32_000_000)
     }
 }
 
@@ -144,7 +147,7 @@ pub fn aggregate_response_gramians(
     config: ResponseGramianAggregationConfig,
 ) -> Result<(EmpiricalGramian, EmpiricalGramian), RbkrError> {
     let first = scenarios.first().ok_or(RbkrError::InvalidScenarioSet)?;
-    if config.maximum_total_factor_scalars == 0
+    if config.maximum_live_factor_scalars == 0
         || first.task_contract_id.trim().is_empty()
         || first.checkpoint_id.trim().is_empty()
         || first.state_metric_id.trim().is_empty()
@@ -205,7 +208,12 @@ pub fn aggregate_response_gramians(
         .checked_add(observe_factor_count)
         .and_then(|count| count.checked_mul(dimension))
         .ok_or(RbkrError::ScenarioFactorStorageBudgetExceeded)?;
-    if factor_scalars > config.maximum_total_factor_scalars {
+    // Both the input scenarios and the returned aggregate factors remain live
+    // during the operation, so peak scalar storage is bounded at 2 * factors.
+    let peak_live_factor_scalars = factor_scalars
+        .checked_mul(2)
+        .ok_or(RbkrError::ScenarioFactorStorageBudgetExceeded)?;
+    if peak_live_factor_scalars > config.maximum_live_factor_scalars {
         return Err(RbkrError::ScenarioFactorStorageBudgetExceeded);
     }
 
