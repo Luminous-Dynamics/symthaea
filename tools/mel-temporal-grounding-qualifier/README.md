@@ -102,3 +102,8 @@ Selection/session/annotation digests and effort telemetry remain unauthenticated
 
 
 Input schema: `schemas/mel-temporal-annotation-marginal-value-v1.schema.json`. It references the existing multi-annotator schema for both before and after panels. The after-panel must preserve the before-panel records in order and append exactly one new independent annotation.
+
+
+### Interpreting overlapping annotation-panel item counts
+
+In the multi-query reliability report, `present_items` and `absent_items` count items with at least one Present or Absent annotation, respectively. They are not mutually exclusive: one query can legitimately have both Present and Absent musician judgements. The explicit `items_with_present_annotations`, `items_with_absent_annotations`, and `mixed_present_absent_items` fields expose this overlap. Do not sum the first two as if they partition the dataset.
