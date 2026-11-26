@@ -58,7 +58,9 @@ OCR, transcripts, captions, descriptions and subtitles are first-class derivativ
 
 A provider upload is a distinct transfer event, not merely a field in the later inference request. Its receipt binds the exact upload body digest/length and encrypted body artifact, the canonical media payload digest/length, provider response ID/body digest, provider asset-ID digest, observer profile and signature.
 
-A subsequent inference request must bind the exact asset-reference span to the prior transfer ID and provider asset-ID digest. Transfer receipts are checked for run/tenant scope, sequence, replay, asset identity and lifecycle revalidation at the later use time. If the upload event cannot be independently resolved or the returned provider ID cannot be bound, the inference exposure is only a reference transmission.
+A subsequent inference request must bind the exact asset-reference span to the prior transfer ID and provider asset-ID digest. Transfer receipts carry an explicit transfer sequence, monotonic capture time and clock-profile digest; ordering is only compared inside the same pinned clock profile. Transfer receipts are checked for run/tenant scope, sequence, replay, asset identity and lifecycle revalidation at the later use time. If the upload event cannot be independently resolved or the returned provider ID cannot be bound, the inference exposure is only a reference transmission.
+
+The upload receipt's signature is domain-separated from the invocation receipt. The transfer signature covers SHA-256("MACE-MULTIMODAL-ASSET-TRANSFER-V1\\0" || JCS(transfer_receipt_without_signature)); the invocation receipt covers SHA-256("MACE-MULTIMODAL-CONTEXT-EXPOSURE-V1\\0" || JCS(receipt_without_signature)). Both observer signatures resolve through the independently pinned observer profile. A provider-ingress attestation, when present, is separately verified under a distinct provider trust profile and is never inferred from either observer signature.
 
 The provider asset ID is hashed in public receipts. Raw IDs, media bytes, transcripts and image contents must not be emitted into public JSONL.
 
@@ -76,12 +78,12 @@ The schema includes explicit counts and a structural zero-item constraint for th
 4. For inline payloads, decode the declared wire encoding with strict canonical rules and verify media payload digest, byte length and MIME/media-type consistency.
 5. For provider asset references, verify the reference span, linked transfer receipt, upload digest, provider asset-ID digest and monotonic sequence. Never count the reference string as media bytes.
 6. Verify any provider-ingress attestation under a distinct, independently pinned provider key/profile; do not accept an observer's self-assertion as provider evidence.
-7. Verify modality-specific dimensions, rational timebase, frame ordering, sample-rate/channel declarations, half-open sample ranges and media-part coverage.
+7. Verify modality/details consistency, image dimensions and region bounds, rational video timebase and frame ordering, audio sample-rate/channel declarations, non-empty half-open sample-frame ranges and media-part coverage.
 8. Verify all evidence IDs, source/authority/rights/scope/admissibility/currentness and transitive parent closure through existing MACE owners.
 9. Verify each derivative's transformation receipt and all required parent IDs; reject cycles, dangling edges, ambiguous aliases and revoked ancestry.
 10. Recompute the no-memory counts and reject any memory-derived content or reference in the true no-memory arm.
 
-JSON Schema cannot establish these cross-record, cryptographic, media-decoding, lineage or lifecycle invariants by itself. They are verifier and independent-fixture responsibilities.
+JSON Schema cannot establish these cross-record, cryptographic, media-decoding, lineage or lifecycle invariants by itself. It also cannot prove that a content path resolves to the declared span, that an audio end sample exceeds its start sample, or that a video frame belongs to the declared source; these are verifier and independent-fixture responsibilities.
 
 ## Deterministic and adversarial tests
 
@@ -116,6 +118,8 @@ For the official AML multimodal track, preserve the native leaderboard score as 
 - paired downstream task utility, regret and harmful memory dependence.
 
 The official AML Cycle 2 published on 2026-11-19 reports Khipu (open-source multimodal) at 43.26 overall, including 34.23 temporal reasoning, 38.45 continual learning, 11.04 personalization and 31.29 evidence governance; MemoraX (commercial/closed-source) reports 53.68 overall. These are native track scores and must not be compared to textual/coding scores or MACE causal utility. They motivate the modality-specific work; they are not MACE results.
+
+This extension is tracked by [issue #13744](https://github.com/Luminous-Dynamics/symthaea/issues/13744) and is stacked on [text producer PR #13725](https://github.com/Luminous-Dynamics/symthaea/pull/13725).
 
 ## Claim boundary
 
