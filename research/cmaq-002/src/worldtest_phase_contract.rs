@@ -6,20 +6,15 @@
 //! non-finite values fail closed before the generic trace diagnostic runs.
 
 use super::worldtest_exploration::{
-    evaluate_worldtest_exploration, ExplorationEvent, ExplorationTrace,
-    WorldTestExplorationCertificate, WorldTestExplorationError, WORLDTEST_RATIO_PPM,
+    ExplorationEvent, ExplorationTrace, WORLDTEST_RATIO_PPM, WorldTestExplorationCertificate,
+    WorldTestExplorationError, evaluate_worldtest_exploration,
 };
 use std::fmt;
 
 #[derive(Clone, Debug, Eq, PartialEq)]
 pub enum MaraExplorationEvent {
-    Action {
-        action_id: String,
-        reward_bits: u64,
-    },
-    Reset {
-        reward_bits: u64,
-    },
+    Action { action_id: String, reward_bits: u64 },
+    Reset { reward_bits: u64 },
     BeginTest,
 }
 
@@ -48,15 +43,33 @@ pub enum WorldTestPhaseContractError {
 impl fmt::Display for WorldTestPhaseContractError {
     fn fmt(&self, formatter: &mut fmt::Formatter<'_>) -> fmt::Result {
         match self {
-            Self::MissingBeginTestMarker => write!(formatter, "WorldTest trace is missing the terminal BeginTest marker"),
-            Self::MissingGoToTestAction => write!(formatter, "WorldTest exploration must include the candidate-issued go-to-test action"),
-            Self::GoToTestNotImmediatelyBeforeMarker => write!(formatter, "go-to-test must be the final charged exploration action immediately before BeginTest"),
-            Self::DuplicateGoToTestAction => write!(formatter, "WorldTest trace contains more than one go-to-test action"),
-            Self::NonFiniteExplorationReward { event_index, reward_bits } => write!(
+            Self::MissingBeginTestMarker => write!(
+                formatter,
+                "WorldTest trace is missing the terminal BeginTest marker"
+            ),
+            Self::MissingGoToTestAction => write!(
+                formatter,
+                "WorldTest exploration must include the candidate-issued go-to-test action"
+            ),
+            Self::GoToTestNotImmediatelyBeforeMarker => write!(
+                formatter,
+                "go-to-test must be the final charged exploration action immediately before BeginTest"
+            ),
+            Self::DuplicateGoToTestAction => write!(
+                formatter,
+                "WorldTest trace contains more than one go-to-test action"
+            ),
+            Self::NonFiniteExplorationReward {
+                event_index,
+                reward_bits,
+            } => write!(
                 formatter,
                 "exploration event {event_index} returned a non-finite reward (IEEE-754 bits {reward_bits:#018x})"
             ),
-            Self::NonZeroExplorationReward { event_index, reward_bits } => write!(
+            Self::NonZeroExplorationReward {
+                event_index,
+                reward_bits,
+            } => write!(
                 formatter,
                 "exploration event {event_index} returned a nonzero reward (IEEE-754 bits {reward_bits:#018x})"
             ),
@@ -148,12 +161,10 @@ pub fn evaluate_mara_worldtest_exploration(
 
     // go-to-test consumes one candidate interaction but is not part of the
     // environment-action sequence used to calculate reset-replay LCS.
-    certificate.exploration_action_count = certificate
-        .exploration_action_count
-        .checked_add(1)
-        .ok_or(WorldTestPhaseContractError::Trace(
-            WorldTestExplorationError::ArithmeticOverflow,
-        ))?;
+    certificate.exploration_action_count =
+        certificate.exploration_action_count.checked_add(1).ok_or(
+            WorldTestPhaseContractError::Trace(WorldTestExplorationError::ArithmeticOverflow),
+        )?;
     let total_interactions = u128::from(certificate.exploration_action_count)
         .checked_add(u128::from(certificate.reset_count))
         .ok_or(WorldTestPhaseContractError::Trace(
@@ -164,12 +175,10 @@ pub fn evaluate_mara_worldtest_exploration(
         .ok_or(WorldTestPhaseContractError::Trace(
             WorldTestExplorationError::ArithmeticOverflow,
         ))?;
-    certificate.reset_share_ppm = u32::try_from(
-        reset_numerator / total_interactions,
-    )
-    .map_err(|_| WorldTestPhaseContractError::Trace(
-        WorldTestExplorationError::ArithmeticOverflow,
-    ))?;
+    certificate.reset_share_ppm =
+        u32::try_from(reset_numerator / total_interactions).map_err(|_| {
+            WorldTestPhaseContractError::Trace(WorldTestExplorationError::ArithmeticOverflow)
+        })?;
 
     Ok(certificate)
 }
