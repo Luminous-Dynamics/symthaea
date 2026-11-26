@@ -319,6 +319,13 @@ Add a **memory-to-decision trajectory** scorecard with distinct stages:
 
 Score every stage separately. A system that retrieves the right fact but leaks it to the wrong role, uses it after revocation, fails to integrate it, or ignores later feedback should not receive credit for end-to-end memory success.
 
+### Proposed targets against current 2026 research baselines (not achieved)
+
+- **COLLABMEM:** first reproduce the reported TMS-GRAPH++ non-Oracle average of 69.6% under the paper's exact harness, then target at least 74.6% (a five-point absolute improvement) while separately reporting access-control, provenance, routing, conflict and compression scores. Do not trade away privacy/access correctness for a higher mean.
+- **DeepControl:** reproduce the reported Search-R1 comparisons on the same Qwen2.5-7B and Qwen2.5-3B setups before comparing. The paper reports +9.4 and +8.6 average points, respectively, across seven benchmarks. MACE's research target is to match or exceed that gain on the same task suite and budget while also recording source-root, lifecycle, rights and unsafe-use metrics that the search-control score does not establish.
+- **TimlMemBench / StreamMemBench / UtilMem:** establish an independently replayed matched baseline first; then target at least five absolute points of improvement on each predeclared primary metric without worsening the worst safety/governance stratum. The papers do not supply one directly comparable universal score for MACE, so use their official splits and metrics rather than fabricating an aggregate.
+- **MemUse:** optimize *appropriate* natural integration precision and task utility, not the raw mention rate. A memory that inserts irrelevant personal details more often is not better.
+
 ### Additional parity metrics
 
 | Metric | Definition |
