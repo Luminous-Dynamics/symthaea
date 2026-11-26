@@ -924,12 +924,9 @@ mod tests {
         assert!((reachable[1] - 1.0e-4).abs() < 1.0e-12);
         assert!((observable[1] - 10_000.0).abs() < 1.0e-8);
 
-        let basis = ResponseBalancedBasis::from_empirical_gramians(
-            &reach,
-            &observe,
-            RbkrConfig::new(1),
-        )
-        .unwrap();
+        let basis =
+            ResponseBalancedBasis::from_empirical_gramians(&reach, &observe, RbkrConfig::new(1))
+                .unwrap();
         assert!(basis.trial_basis()[0][0].abs() < 1.0e-12);
         assert!((basis.trial_basis()[0][1] - 0.01).abs() < 1.0e-10);
     }
