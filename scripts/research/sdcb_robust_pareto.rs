@@ -562,7 +562,10 @@ pub fn pareto_experiment_policies(
 
     let mut all = Vec::new();
     for candidate in candidates {
-        if candidate.experiment_id.trim().is_empty() || candidate.cost_units == 0 {
+        if candidate.experiment_id.trim().is_empty()
+            || candidate.experiment_id == "NO_EXPERIMENT_LOTTERY"
+            || candidate.cost_units == 0
+        {
             return Err(RobustParetoError::InvalidExperiment);
         }
         let outcomes = validate_likelihood_matrix(posterior, &candidate.outcome_likelihoods)?;
@@ -627,6 +630,10 @@ pub fn pareto_experiment_policies(
                 cost_units: candidate.cost_units,
             });
         }
+    }
+
+    if all.is_empty() {
+        return Err(RobustParetoError::NoFeasibleAction);
     }
 
     let mut frontier = Vec::new();
@@ -879,6 +886,20 @@ mod tests {
         let frontier = pareto_experiment_policies(&[0.5, 0.5], &model, &[candidate]).unwrap();
         assert!(frontier.iter().any(|p| p.experiment_id == "diagnostic-probe" && p.expected_objectives == vec![9.0, 9.0]));
         assert!(frontier.iter().any(|p| p.experiment_id == "NO_EXPERIMENT_LOTTERY" && p.expected_objectives == vec![5.0, 5.0]));
+    }
+    #[test]
+    fn pareto_policy_frontier_fails_closed_when_all_actions_are_unsafe() {
+        let mut model = pareto_model(true);
+        model.minimum_by_objective[1] = Some(2.0);
+        let candidate = ParetoExperimentCandidate {
+            experiment_id: "probe".into(),
+            cost_units: 1,
+            outcome_likelihoods: vec![vec![0.5, 0.5], vec![0.5, 0.5]],
+        };
+        assert_eq!(
+            pareto_experiment_policies(&[0.5, 0.5], &model, &[candidate]),
+            Err(RobustParetoError::NoFeasibleAction)
+        );
     }
     #[test]
     fn invalid_multiobjective_dimensions_are_rejected() {
