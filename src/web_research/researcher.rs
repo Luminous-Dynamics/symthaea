@@ -1265,20 +1265,69 @@ impl WebResearcher {
         }
 
         let content_sha256 = sha256_hex(&body);
+        if truncated {
+            let mut receipt = make_receipt(
+                candidate.query_rank,
+                Some(candidate.source_rank),
+                AcquisitionStage::PageFetch,
+                &candidate.query,
+                AcquisitionOutcome::FetchedTruncated,
+            );
+            receipt.requested_url = Some(candidate.url.clone());
+            receipt.final_url = Some(final_url);
+            receipt.http_status = Some(status.as_u16());
+            receipt.content_type = content_type;
+            receipt.captured_bytes = body.len();
+            receipt.content_sha256 = Some(content_sha256);
+            receipt.extractor_version = Some(EXTRACTOR_VERSION.to_string());
+            receipt.reason_code = Some("PAGE_BODY_TRUNCATED_AT_BUDGET".to_string());
+            receipt.reason = Some(format!(
+                "captured the first {} bytes; truncated content is not passed to claim verification",
+                self.config.max_content_length
+            ));
+            receipt.elapsed_ms = elapsed_ms(started);
+            return PageAcquisition {
+                candidate,
+                receipt,
+                extraction: None,
+            };
+        }
+
         let html = String::from_utf8_lossy(&body).into_owned();
         match self.extractor.extract(&html, &final_url) {
-            Ok(extraction) => {
-                let outcome = if truncated {
-                    AcquisitionOutcome::FetchedTruncated
-                } else {
-                    AcquisitionOutcome::Fetched
-                };
+            Ok(extraction) if extraction.body_text.trim().is_empty() => {
                 let mut receipt = make_receipt(
                     candidate.query_rank,
                     Some(candidate.source_rank),
                     AcquisitionStage::PageFetch,
                     &candidate.query,
-                    outcome,
+                    AcquisitionOutcome::ExtractionFailed,
+                );
+                receipt.requested_url = Some(candidate.url.clone());
+                receipt.final_url = Some(final_url);
+                receipt.http_status = Some(status.as_u16());
+                receipt.content_type = content_type;
+                receipt.captured_bytes = body.len();
+                receipt.content_sha256 = Some(content_sha256);
+                receipt.extractor_version = Some(EXTRACTOR_VERSION.to_string());
+                receipt.reason_code = Some("EMPTY_EXTRACTED_CONTENT".to_string());
+                receipt.reason = Some(
+                    "capture completed but the extractor produced no usable body text".to_string(),
+                );
+                receipt.elapsed_ms = elapsed_ms(started);
+                PageAcquisition {
+                    candidate,
+                    receipt,
+                    extraction: None,
+                }
+            }
+            Ok(extraction) => {
+                let mut receipt = make_receipt(
+                    candidate.query_rank,
+                    Some(candidate.source_rank),
+                    AcquisitionStage::PageFetch,
+                    &candidate.query,
+                    AcquisitionOutcome::Fetched,
                 );
                 receipt.requested_url = Some(candidate.url.clone());
                 receipt.final_url = Some(final_url);
@@ -1288,13 +1337,6 @@ impl WebResearcher {
                 receipt.content_sha256 = Some(content_sha256);
                 receipt.extractor_version = Some(EXTRACTOR_VERSION.to_string());
                 receipt.elapsed_ms = elapsed_ms(started);
-                if truncated {
-                    receipt.reason_code = Some("PAGE_BODY_TRUNCATED_AT_BUDGET".to_string());
-                    receipt.reason = Some(format!(
-                        "captured the first {} bytes; per-page content budget was reached",
-                        self.config.max_content_length
-                    ));
-                }
                 PageAcquisition {
                     candidate,
                     receipt,
