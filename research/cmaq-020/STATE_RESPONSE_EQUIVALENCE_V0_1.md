@@ -121,6 +121,26 @@ External anchors:
 These protocols must remain separate. Prediction of failure, recovery from failure, and downstream policy utility are different claims. No benchmark scores are pooled. Current CMAQ-020 failure-fidelity fixtures are synthetic known-answer tests only; no external benchmark adapter has been run.
 
 
+
+### Replicated failure boundaries, not binary-only outcomes
+
+WorldFailBench's released boundary subset contains 120 matched pairs with 10 reference rollouts per side (2,400 episodes). CMAQ-020 now has a separate rate-based boundary evaluator alongside the binary witness tests. Each pair records reference and candidate success counts/trial counts on the benchmark-designated success side and failure side, with shared initial-state/action/family/cluster/checkpoint identity.
+
+It reports per-side success-rate MAE, success/failure rate-gap error, boundary-presence accuracy at a preregistered minimum gap and gap-direction accuracy. The threshold belongs to the frozen contract and must be pinned to the task protocol before external comparisons. The current synthetic fixture uses 2,000 basis points only as a test value. This scorecard is not the original WorldFailBench scorer and is not yet an external dataset adapter.
+
+WorldFailBench reference failure annotations include an Unjudgable/indeterminate reason and unknown stage. CMAQ-020 represents those as explicit optional reason/stage fields rather than dropping the episode or inventing a known label. An indeterminate reference matched by an indeterminate prediction is preserved as such; guessing a specific reason or stage on an indeterminate reference is an error.
+
+### Dataset admission evidence
+
+- WorldFailBench paper scope: 7 world models, 32 tasks, 6,900 reference rollouts across LIBERO, RoboTwin and physical G1.
+- Documented public simulator subset: 5,000 RoboTwin + 1,500 LIBERO = 6,500 episodes.
+- Separate boundary subset: 120 pairs / 2,400 rollouts (10 per side); do not add these to the 6,500 base episodes without retaining the separate sampling design.
+- The extra 400 G1 reference rollouts in paper scope are not part of the documented public simulator counts.
+- The HF dataset card and dataset repository declare Apache-2.0; archive hash, file inventory and licenses for all linked assets still require local admission checks. The separate project site says its original evaluation code is not yet released.
+- LIBERO-RECOVER's current site advertises 2,178 scenarios / 3,184 human demonstrations, while its GitHub README advertises 4,803 failure scenes / 1,446 raw rollouts. Treat as a release-manifest discrepancy until exact revisions and denominators are reconciled.
+
+Published WorldFailBench RoboTwin results show Ref–Ref TFE/SFE/TPC/SPC of 0.061/0.094/0.814/0.903. Across the seven world-model rows, the best listed TFE is 0.159 (DW05), best TPC is 0.402 (DW05), and best world-model SPC is 0.095 (Ctrl). The reference SPC is 0.903. These are separate benchmark-specific metrics; they are not combined into one ranking. No Symthaea score is available yet.
+
 ## Benchmark validity is a promotion gate
 
 A high score on a weak benchmark is not evidence of general capability. Before using an external task suite for a SOTA comparison, run an explicit validity audit for:
