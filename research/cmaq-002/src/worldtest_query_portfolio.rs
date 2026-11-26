@@ -807,7 +807,15 @@ mod tests {
     fn missing_family_is_rejected() {
         let mut candidate = input(base_tasks());
         candidate.tasks.pop();
-        candidate.expected_task_ids.pop();
+        candidate.tasks.push(task(
+            "mfp-b",
+            4,
+            QueryFamily::MaskedFramePrediction,
+            24,
+            11,
+            TaskDisposition::Completed { score_ppm: 400_000 },
+        ));
+        candidate.expected_task_ids = vec!["mfp-a".into(), "cd-a".into(), "mfp-b".into()];
         assert!(matches!(
             evaluate_worldtest_query_portfolio(&candidate),
             Err(WorldTestPortfolioError::MissingQueryFamily { family: QueryFamily::Planning })
