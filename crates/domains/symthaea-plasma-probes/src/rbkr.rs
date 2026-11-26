@@ -662,14 +662,7 @@ mod tests {
     fn rectangular_factor_spaces_preserve_supported_state_rank() {
         // Three reachability factors and two observability factors create a
         // 2x3 cross-factor matrix. Its rank is two, the full state dimension.
-        let reach = gramian(
-            2,
-            &[
-                vec![1.0, 0.0],
-                vec![0.0, 1.0],
-                vec![1.0, 1.0],
-            ],
-        );
+        let reach = gramian(2, &[vec![1.0, 0.0], vec![0.0, 1.0], vec![1.0, 1.0]]);
         let observe = gramian(2, &[vec![1.0, 0.0], vec![0.0, 1.0]]);
         let basis =
             ResponseBalancedBasis::from_empirical_gramians(&reach, &observe, RbkrConfig::new(2))
