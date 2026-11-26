@@ -303,6 +303,15 @@ fn prediction_receipt_digest(
     json_sha256(&canonical)
 }
 
+fn round_input_digest(input: &CaOcrcRoundInputV1) -> Result<String, CaOcrcErrorV1> {
+    let mut canonical = input.clone();
+    canonical.feedbacks.sort_by(|a, b| {
+        (a.sample_id.as_str(), a.label_id.as_str(), a.label_revision)
+            .cmp(&(b.sample_id.as_str(), b.label_id.as_str(), b.label_revision))
+    });
+    json_sha256(&canonical)
+}
+
 fn round_report_digest(report: &CaOcrcRoundReportV1) -> Result<String, CaOcrcErrorV1> {
     let mut canonical = report.clone();
     canonical.report_sha256.clear();
@@ -1117,7 +1126,7 @@ pub fn step_ca_ocrc_round_v1(
         proxy_survival_at_max_delay: survival[candidate.policy.maximum_actual_delay_steps as usize],
         theorem_assumptions_intact: candidate.state.theorem_assumptions_intact,
         paper_risk_gap_bound: bound,
-        input_sha256: json_sha256(input)?,
+        input_sha256: round_input_digest(input)?,
         state_before_sha256: state_before,
         state_after_sha256: state_after,
         report_sha256: String::new(),
@@ -1481,6 +1490,92 @@ mod tests {
         assert_eq!(report.feedback_results[0].weighted_update_contribution, Some(-0.2));
         assert!((report.threshold_after - (0.5 + 0.05 * -0.2)).abs() < 1e-12);
         assert_eq!(report.tracking_occupancy_after, 1);
+    }
+
+    #[test]
+    fn zero_delay_feedback_is_processed_in_the_same_round_after_admission() {
+        let mut configured = policy(1, 2);
+        configured.proxy_delay_pmf = vec![0.0, 0.5, 0.0, 0.5];
+        let mut engine = create_ca_ocrc_engine_v1(
+            "ca-ocrc-zero-delay",
+            "fab-clock",
+            &digest('a'),
+            &digest('b'),
+            0.5,
+            configured,
+        )
+        .unwrap();
+
+        let report = step_ca_ocrc_round_v1(
+            &mut engine,
+            &input(
+                prediction(0, "same-round", CaOcrcSetKindV1::Interval, true, Some(0.1)),
+                vec![feedback(
+                    0,
+                    "same-round",
+                    "label-same-round",
+                    1,
+                    LabelConsumptionEligibilityV1::EligibleUnderDeclaredPolicy,
+                )],
+            ),
+        )
+        .unwrap();
+
+        assert_eq!(report.prediction_receipt.sampled_proxy_delay, 0);
+        assert!(report.prediction_receipt.admitted_to_tracking);
+        assert_eq!(report.feedback_results.len(), 1);
+        assert_eq!(
+            report.feedback_results[0].disposition,
+            CaOcrcFeedbackDispositionV1::Updated
+        );
+        assert_eq!(report.feedback_results[0].actual_delay_steps, Some(0));
+        assert_eq!(report.feedback_results[0].proxy_survival_probability, Some(1.0));
+        assert_eq!(report.tracking_occupancy_after, 0);
+        assert!((report.threshold_after - 0.495).abs() < 1.0e-12);
+    }
+
+    #[test]
+    fn simultaneous_feedback_updates_are_summed_once_and_order_independently() {
+        fn run(reverse: bool) -> String {
+            let mut engine = engine(2, 2);
+            for round in 0..2 {
+                let id = format!("s{round}");
+                step_ca_ocrc_round_v1(
+                    &mut engine,
+                    &input(
+                        prediction(round, &id, CaOcrcSetKindV1::Interval, true, Some(0.9)),
+                        Vec::new(),
+                    ),
+                )
+                .unwrap();
+            }
+            let mut feedbacks = vec![
+                feedback(2, "s0", "l0", 1, LabelConsumptionEligibilityV1::EligibleUnderDeclaredPolicy),
+                feedback(2, "s1", "l1", 1, LabelConsumptionEligibilityV1::EligibleUnderDeclaredPolicy),
+            ];
+            if reverse {
+                feedbacks.reverse();
+            }
+            let report = step_ca_ocrc_round_v1(
+                &mut engine,
+                &input(
+                    prediction(2, "s2", CaOcrcSetKindV1::Interval, true, Some(0.1)),
+                    feedbacks,
+                ),
+            )
+            .unwrap();
+            assert_eq!(report.feedback_results.len(), 2);
+            assert!(
+                report
+                    .feedback_results
+                    .iter()
+                    .all(|result| result.disposition == CaOcrcFeedbackDispositionV1::Updated)
+            );
+            assert!((report.weighted_feedback_sum - (-0.4)).abs() < 1.0e-12);
+            assert!((report.threshold_after - 0.48).abs() < 1.0e-12);
+            report.report_sha256
+        }
+        assert_eq!(run(false), run(true));
     }
 
     #[test]
