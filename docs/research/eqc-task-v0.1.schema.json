@@ -185,7 +185,8 @@
       "required": [
         "action",
         "resource_id",
-        "subject_id"
+        "subject_id",
+        "evaluated_at"
       ],
       "properties": {
         "action": {
@@ -214,6 +215,10 @@
             "missing",
             "not_applicable"
           ]
+        },
+        "evaluated_at": {
+          "type": "string",
+          "format": "date-time"
         }
       }
     },
