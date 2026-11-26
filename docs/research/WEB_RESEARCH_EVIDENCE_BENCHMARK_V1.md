@@ -71,6 +71,8 @@ Primary sources:
 - AutoSciBench: https://arxiv.org/abs/2610.05140
 - benchmarks.bio V1 leaderboard/methodology: https://benchmarks.bio/
 - Autonomous Science Bench live leaderboard: https://asb.open-ssi.org/leaderboard
+- DISCERN evidence-to-hypothesis paper and immutable reproducibility release: https://arxiv.org/abs/2609.33357 and https://huggingface.co/datasets/discern-bench-anon/discern-benchmark
+- Terminal-Bench Science official/public results aggregation: https://www.openresearch.sh/evals
 
 ### Paradigm shift: evidence-checkpointed, scientist-steerable research
 
@@ -231,7 +233,7 @@ ASI-Bench advertises a public 60-task seed42 catalog, but its leaderboard method
 
 ## 7. Composition with existing Symthaea work
 
-- [PR #13790](https://github.com/Luminous-Dynamics/symthaea/pull/13790): source relations remain neutral until explicit adjudication.
+- [PR #13842](https://github.com/Luminous-Dynamics/symthaea/pull/13842): source relations remain neutral until explicit adjudication.
 - [Issue #13796](https://github.com/Luminous-Dynamics/symthaea/issues/13796): provenance-bound claim/source adjudicator and benchmark.
 - [Issue #13791](https://github.com/Luminous-Dynamics/symthaea/issues/13791): independent outcome labels; no confidence-as-correctness loop.
 - [Issue #13792](https://github.com/Luminous-Dynamics/symthaea/issues/13792): claim-specific source graph edges and evidence versions.
@@ -240,8 +242,8 @@ ASI-Bench advertises a public 60-task seed42 catalog, but its leaderboard method
 - [Issue #13818](https://github.com/Luminous-Dynamics/symthaea/issues/13818): scientist-steerable, checkpointed research with independently replayable audit agents.
 - [PR #13851](https://github.com/Luminous-Dynamics/symthaea/pull/13851): bounded, receipt-bearing WebResearch acquisition; no retry or authenticity claim.
 - [Issue #13852](https://github.com/Luminous-Dynamics/symthaea/issues/13852): protocol-matched DISCERN evaluation from data integrity through adversarially reviewed hypotheses.
-- [PR #13819](https://github.com/Luminous-Dynamics/symthaea/pull/13819): claim-specific source-node graph wiring; does not adjudicate entailment.
-- [PR #13820](https://github.com/Luminous-Dynamics/symthaea/pull/13820): removes confidence-derived correctness feedback; independent outcome receipt types remain unfinished.
+- [PR #13843](https://github.com/Luminous-Dynamics/symthaea/pull/13843): claim-specific source-node graph wiring; does not adjudicate entailment.
+- [PR #13844](https://github.com/Luminous-Dynamics/symthaea/pull/13844): removes confidence-derived correctness feedback; independent outcome receipt types remain unfinished.
 - [Issue #8771](https://github.com/Luminous-Dynamics/symthaea/issues/8771): immutable benchmark anchors and sealed, adaptive scientific-task refreshes.
 - [PR #13665](https://github.com/Luminous-Dynamics/symthaea/pull/13665): typed public ResearchState evidence relation boundary.
 - [PR #13668](https://github.com/Luminous-Dynamics/symthaea/pull/13668): candidate-facing StateGuard B0 baseline.
