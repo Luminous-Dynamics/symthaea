@@ -26,6 +26,7 @@ const EXTRACTOR_VERSION: &str = "web-research-content-extractor-v1";
 
 #[derive(Debug)]
 struct SearchQueryAcquisition {
+    query: String,
     urls: Vec<String>,
     receipts: Vec<AcquisitionReceipt>,
     had_failure: bool,
@@ -369,20 +370,83 @@ impl WebResearcher {
         queries
     }
 
-    /// Fetch search results for a query
-    ///
-    /// Returns URLs to fetch. In production, this would use a search API.
-    /// Improved heuristic targeting high-quality technical domains.
-    async fn fetch_search_results(&self, query: &str) -> Result<Vec<String>> {
+    /// Search one planned query and retain a receipt for each attempted provider.
+    async fn fetch_search_results_with_receipts(
+        &self,
+        query: &str,
+        query_rank: usize,
+    ) -> SearchQueryAcquisition {
         let mut urls = Vec::new();
+        let mut receipts = Vec::new();
         let query_lower = query.to_lowercase();
         let encoded_query = urlencoding::encode(query);
 
-        // 0. External search provider (optional)
-        if let Ok(provider_urls) = self.search_with_provider(query).await {
-            urls.extend(provider_urls);
+        // External search provider.
+        if let Some(provider) = self.config.search_provider.as_deref() {
+            let started = Instant::now();
+            let requested_url = self.search_provider_endpoint();
+            match self.search_with_provider(query).await {
+                Ok(found) => {
+                    let supported = matches!(
+                        provider.trim().to_lowercase().as_str(),
+                        "serper" | "brave" | "searxng" | "searx"
+                    );
+                    let outcome = if !supported {
+                        AcquisitionOutcome::ProviderFailed
+                    } else if found.is_empty() {
+                        AcquisitionOutcome::NoResults
+                    } else {
+                        AcquisitionOutcome::ResultsFound
+                    };
+                    let reason = if supported {
+                        None
+                    } else {
+                        Some(format!("unsupported configured search provider: {provider}"))
+                    };
+                    let payload = serde_json::to_vec(&found).unwrap_or_default();
+                    let mut receipt = make_receipt(
+                        query_rank,
+                        None,
+                        AcquisitionStage::SearchProvider,
+                        query,
+                        outcome,
+                    );
+                    receipt.provider = Some(provider.to_string());
+                    receipt.requested_url = requested_url;
+                    receipt.captured_bytes = payload.len();
+                    receipt.content_sha256 = Some(sha256_hex(&payload));
+                    receipt.reason_code = if supported {
+                        None
+                    } else {
+                        Some("UNSUPPORTED_SEARCH_PROVIDER".to_string())
+                    };
+                    receipt.reason = reason;
+                    receipt.elapsed_ms = elapsed_ms(started);
+                    if !supported {
+                        receipt.outcome = AcquisitionOutcome::ProviderFailed;
+                    }
+                    urls.extend(found);
+                    receipts.push(receipt);
+                }
+                Err(error) => {
+                    let mut receipt = make_receipt(
+                        query_rank,
+                        None,
+                        AcquisitionStage::SearchProvider,
+                        query,
+                        AcquisitionOutcome::ProviderFailed,
+                    );
+                    receipt.provider = Some(provider.to_string());
+                    receipt.requested_url = requested_url;
+                    receipt.reason_code = Some("SEARCH_PROVIDER_FAILED".to_string());
+                    receipt.reason = Some(format!("{error:#}"));
+                    receipt.elapsed_ms = elapsed_ms(started);
+                    receipts.push(receipt);
+                }
+            }
         }
 
+        // arXiv API search.
         if self.config.enable_arxiv_api
             && (query_lower.contains("arxiv")
                 || query_lower.contains("paper")
@@ -393,11 +457,48 @@ impl WebResearcher {
                 || query_lower.contains("mamba")
                 || query_lower.contains("selective scan"))
         {
-            if let Ok(arxiv_urls) = self.search_arxiv_api(query).await {
-                urls.extend(arxiv_urls);
+            let started = Instant::now();
+            match self.search_arxiv_api(query).await {
+                Ok(found) => {
+                    let payload = serde_json::to_vec(&found).unwrap_or_default();
+                    let mut receipt = make_receipt(
+                        query_rank,
+                        None,
+                        AcquisitionStage::ArxivApi,
+                        query,
+                        if found.is_empty() {
+                            AcquisitionOutcome::NoResults
+                        } else {
+                            AcquisitionOutcome::ResultsFound
+                        },
+                    );
+                    receipt.provider = Some("arxiv".to_string());
+                    receipt.requested_url = Some(self.config.arxiv_endpoint.clone());
+                    receipt.captured_bytes = payload.len();
+                    receipt.content_sha256 = Some(sha256_hex(&payload));
+                    receipt.elapsed_ms = elapsed_ms(started);
+                    urls.extend(found);
+                    receipts.push(receipt);
+                }
+                Err(error) => {
+                    let mut receipt = make_receipt(
+                        query_rank,
+                        None,
+                        AcquisitionStage::ArxivApi,
+                        query,
+                        AcquisitionOutcome::ProviderFailed,
+                    );
+                    receipt.provider = Some("arxiv".to_string());
+                    receipt.requested_url = Some(self.config.arxiv_endpoint.clone());
+                    receipt.reason_code = Some("ARXIV_SEARCH_FAILED".to_string());
+                    receipt.reason = Some(format!("{error:#}"));
+                    receipt.elapsed_ms = elapsed_ms(started);
+                    receipts.push(receipt);
+                }
             }
         }
 
+        // OpenReview API search.
         if self.config.enable_openreview_api
             && (query_lower.contains("openreview")
                 || query_lower.contains("paper")
@@ -408,78 +509,251 @@ impl WebResearcher {
                 || query_lower.contains("mamba")
                 || query_lower.contains("selective scan"))
         {
-            if let Ok(or_urls) = self.search_openreview_api(query).await {
-                urls.extend(or_urls);
+            let started = Instant::now();
+            match self.search_openreview_api(query).await {
+                Ok(found) => {
+                    let payload = serde_json::to_vec(&found).unwrap_or_default();
+                    let mut receipt = make_receipt(
+                        query_rank,
+                        None,
+                        AcquisitionStage::OpenReviewApi,
+                        query,
+                        if found.is_empty() {
+                            AcquisitionOutcome::NoResults
+                        } else {
+                            AcquisitionOutcome::ResultsFound
+                        },
+                    );
+                    receipt.provider = Some("openreview".to_string());
+                    receipt.requested_url = Some(self.config.openreview_endpoint.clone());
+                    receipt.captured_bytes = payload.len();
+                    receipt.content_sha256 = Some(sha256_hex(&payload));
+                    receipt.elapsed_ms = elapsed_ms(started);
+                    urls.extend(found);
+                    receipts.push(receipt);
+                }
+                Err(error) => {
+                    let mut receipt = make_receipt(
+                        query_rank,
+                        None,
+                        AcquisitionStage::OpenReviewApi,
+                        query,
+                        AcquisitionOutcome::ProviderFailed,
+                    );
+                    receipt.provider = Some("openreview".to_string());
+                    receipt.requested_url = Some(self.config.openreview_endpoint.clone());
+                    receipt.reason_code = Some("OPENREVIEW_SEARCH_FAILED".to_string());
+                    receipt.reason = Some(format!("{error:#}"));
+                    receipt.elapsed_ms = elapsed_ms(started);
+                    receipts.push(receipt);
+                }
             }
         }
 
-        // 1. Target high-authority technical domains
+        // Domain-specific, deterministic fallback targets. These are explicitly
+        // recorded as local heuristic offers, not remote search results.
+        let mut seeded_urls = Vec::new();
         if query_lower.contains("rust") {
-            urls.push("https://doc.rust-lang.org/book/".to_string());
-            urls.push("https://docs.rs/".to_string());
-            urls.push(format!(
+            seeded_urls.push("https://doc.rust-lang.org/book/".to_string());
+            seeded_urls.push("https://docs.rs/".to_string());
+            seeded_urls.push(format!(
                 "https://github.com/search?q={}+language%3ARust",
                 encoded_query
             ));
         }
-
         if query_lower.contains("nix") || query_lower.contains("nixos") {
-            urls.push("https://nixos.org/manual/nixos/stable/".to_string());
-            urls.push("https://nixos.wiki/".to_string());
-            urls.push("https://search.nixos.org/packages".to_string());
+            seeded_urls.push("https://nixos.org/manual/nixos/stable/".to_string());
+            seeded_urls.push("https://nixos.wiki/".to_string());
+            seeded_urls.push("https://search.nixos.org/packages".to_string());
         }
-
         if query_lower.contains("hdc") || query_lower.contains("hypervector") {
-            urls.push("https://en.wikipedia.org/wiki/Hyperdimensional_computing".to_string());
-            urls.push("https://arxiv.org/abs/2112.15425".to_string()); // Standard HDC reference
+            seeded_urls.push("https://en.wikipedia.org/wiki/Hyperdimensional_computing".to_string());
+            seeded_urls.push("https://arxiv.org/abs/2112.15425".to_string());
         }
-
         if query_lower.contains("python") {
-            urls.push("https://docs.python.org/3/".to_string());
-            urls.push("https://pypi.org/".to_string());
+            seeded_urls.push("https://docs.python.org/3/".to_string());
+            seeded_urls.push("https://pypi.org/".to_string());
         }
-
         if query_lower.contains("science")
             || query_lower.contains("research")
             || query_lower.contains("paper")
         {
-            urls.push("https://arxiv.org/search/".to_string());
-            urls.push("https://scholar.google.com/".to_string());
+            seeded_urls.push("https://arxiv.org/search/".to_string());
+            seeded_urls.push("https://scholar.google.com/".to_string());
         }
-
         if query_lower.contains("kernel") || query_lower.contains("linux") {
-            urls.push("https://www.kernel.org/doc/html/latest/".to_string());
+            seeded_urls.push("https://www.kernel.org/doc/html/latest/".to_string());
         }
-
         if query_lower.contains("state space")
             || query_lower.contains("ssm")
             || query_lower.contains("liquid time")
             || query_lower.contains("mamba")
             || query_lower.contains("selective scan")
         {
-            urls.push(format!(
+            seeded_urls.push(format!(
                 "https://arxiv.org/search/?query={}&searchtype=all&source=header",
                 encoded_query
             ));
-            urls.push(format!(
+            seeded_urls.push(format!(
                 "https://openreview.net/search?term={}",
                 encoded_query
             ));
         }
+        if !seeded_urls.is_empty() {
+            let payload = serde_json::to_vec(&seeded_urls).unwrap_or_default();
+            let mut receipt = make_receipt(
+                query_rank,
+                None,
+                AcquisitionStage::HeuristicSeeds,
+                query,
+                AcquisitionOutcome::ResultsFound,
+            );
+            receipt.provider = Some("domain-seeded-targets-v1".to_string());
+            receipt.captured_bytes = payload.len();
+            receipt.content_sha256 = Some(sha256_hex(&payload));
+            receipts.push(receipt);
+            urls.extend(seeded_urls);
+        }
 
-        // 2. Fetch DuckDuckGo HTML results page and extract the true organic links
+        // DuckDuckGo HTML fallback.
         let ddg_url = format!("https://html.duckduckgo.com/html/?q={}", encoded_query);
-        println!("\x1b[34m    [🛰️ SEARCH] Querying fallback engine for organic links...\x1b[0m");
-
-        if let Ok(response) = self.client.get(&ddg_url).send().await {
-            if let Ok(html_text) = response.text().await {
-                let doc = scraper::Html::parse_document(&html_text);
-                if let Ok(selector) = scraper::Selector::parse("a.result__url") {
-                    for element in doc.select(&selector) {
-                        if let Some(href) = element.value().attr("href") {
-                            // Verify it is an absolute external target link
-                            if !href.contains("duckduckgo.com") && href.starts_with("http") {
-                                urls.push(href.to_string());
+        let started = Instant::now();
+        match self.client.get(&ddg_url).send().await {
+            Err(error) => {
+                let mut receipt = make_receipt(
+                    query_rank,
+                    None,
+                    AcquisitionStage::DuckDuckGo,
+                    query,
+                    if error.is_timeout() {
+                        AcquisitionOutcome::Timeout
+                    } else {
+                        AcquisitionOutcome::ProviderFailed
+                    },
+                );
+                receipt.provider = Some("duckduckgo-html".to_string());
+                receipt.requested_url = Some(ddg_url);
+                receipt.reason_code = Some(if error.is_timeout() {
+                    "SEARCH_TIMEOUT".to_string()
+                } else {
+                    "SEARCH_REQUEST_FAILED".to_string()
+                });
+                receipt.reason = Some(error.to_string());
+                receipt.elapsed_ms = elapsed_ms(started);
+                receipts.push(receipt);
+            }
+            Ok(response) => {
+                let status = response.status();
+                let final_url = response.url().to_string();
+                let content_type = response
+                    .headers()
+                    .get(reqwest::header::CONTENT_TYPE)
+                    .and_then(|value| value.to_str().ok())
+                    .map(str::to_string);
+                if !status.is_success() {
+                    let mut receipt = make_receipt(
+                        query_rank,
+                        None,
+                        AcquisitionStage::DuckDuckGo,
+                        query,
+                        AcquisitionOutcome::HttpError,
+                    );
+                    receipt.provider = Some("duckduckgo-html".to_string());
+                    receipt.requested_url = Some(ddg_url);
+                    receipt.final_url = Some(final_url);
+                    receipt.http_status = Some(status.as_u16());
+                    receipt.content_type = content_type;
+                    receipt.reason_code = Some("SEARCH_HTTP_ERROR".to_string());
+                    receipt.reason = Some(format!("DuckDuckGo returned HTTP {status}"));
+                    receipt.elapsed_ms = elapsed_ms(started);
+                    receipts.push(receipt);
+                } else {
+                    match response.text().await {
+                        Err(error) => {
+                            let mut receipt = make_receipt(
+                                query_rank,
+                                None,
+                                AcquisitionStage::DuckDuckGo,
+                                query,
+                                AcquisitionOutcome::ReadFailed,
+                            );
+                            receipt.provider = Some("duckduckgo-html".to_string());
+                            receipt.requested_url = Some(ddg_url);
+                            receipt.final_url = Some(final_url);
+                            receipt.http_status = Some(status.as_u16());
+                            receipt.content_type = content_type;
+                            receipt.reason_code = Some("SEARCH_BODY_READ_FAILED".to_string());
+                            receipt.reason = Some(error.to_string());
+                            receipt.elapsed_ms = elapsed_ms(started);
+                            receipts.push(receipt);
+                        }
+                        Ok(html_text) => {
+                            let mut found = Vec::new();
+                            match scraper::Selector::parse("a.result__url") {
+                                Err(error) => {
+                                    let mut receipt = make_receipt(
+                                        query_rank,
+                                        None,
+                                        AcquisitionStage::DuckDuckGo,
+                                        query,
+                                        AcquisitionOutcome::ExtractionFailed,
+                                    );
+                                    receipt.provider = Some("duckduckgo-html".to_string());
+                                    receipt.requested_url = Some(ddg_url);
+                                    receipt.final_url = Some(final_url);
+                                    receipt.http_status = Some(status.as_u16());
+                                    receipt.content_type = content_type;
+                                    receipt.captured_bytes = html_text.len();
+                                    receipt.content_sha256 = Some(sha256_hex(html_text.as_bytes()));
+                                    receipt.reason_code =
+                                        Some("SEARCH_RESULT_EXTRACTION_FAILED".to_string());
+                                    receipt.reason = Some(error.to_string());
+                                    receipt.elapsed_ms = elapsed_ms(started);
+                                    receipts.push(receipt);
+                                }
+                                Ok(selector) => {
+                                    let document = scraper::Html::parse_document(&html_text);
+                                    for element in document.select(&selector) {
+                                        if let Some(href) = element.value().attr("href") {
+                                            if !href.contains("duckduckgo.com")
+                                                && href.starts_with("http")
+                                            {
+                                                found.push(href.to_string());
+                                            }
+                                        }
+                                    }
+                                    let payload = serde_json::to_vec(&found).unwrap_or_default();
+                                    let mut receipt = make_receipt(
+                                        query_rank,
+                                        None,
+                                        AcquisitionStage::DuckDuckGo,
+                                        query,
+                                        if found.is_empty() {
+                                            AcquisitionOutcome::NoResults
+                                        } else {
+                                            AcquisitionOutcome::ResultsFound
+                                        },
+                                    );
+                                    receipt.provider = Some("duckduckgo-html".to_string());
+                                    receipt.requested_url = Some(ddg_url);
+                                    receipt.final_url = Some(final_url);
+                                    receipt.http_status = Some(status.as_u16());
+                                    receipt.content_type = content_type;
+                                    receipt.captured_bytes = html_text.len();
+                                    receipt.content_sha256 = Some(sha256_hex(html_text.as_bytes()));
+                                    receipt.reason = if found.is_empty() {
+                                        Some("search completed successfully with zero organic links".to_string())
+                                    } else {
+                                        None
+                                    };
+                                    receipt.elapsed_ms = elapsed_ms(started);
+                                    // The canonical URL-list digest is useful for replaying the
+                                    // parsed result; raw HTML digest is already captured above
+                                    // only when no parsed list is emitted. Keep the raw body digest.
+                                    let _ = payload;
+                                    receipts.push(receipt);
+                                    urls.extend(found);
+                                }
                             }
                         }
                     }
@@ -487,18 +761,44 @@ impl WebResearcher {
             }
         }
 
-        // 3. Always include Wikipedia and StackOverflow search
-        let wiki_query = query.replace(' ', "_");
-        urls.push(format!("https://en.wikipedia.org/wiki/{}", wiki_query));
-        urls.push(format!(
-            "https://stackoverflow.com/search?q={}",
-            encoded_query
-        ));
-
         let mut seen = HashSet::new();
         urls.retain(|url| seen.insert(url.clone()));
 
-        Ok(urls)
+        let had_failure = receipts
+            .iter()
+            .any(|receipt| receipt.outcome.is_incomplete());
+
+        SearchQueryAcquisition {
+            query: query.to_string(),
+            urls,
+            receipts,
+            had_failure,
+        }
+    }
+
+    fn search_provider_endpoint(&self) -> Option<String> {
+        let provider = self.config.search_provider.as_deref()?.trim().to_lowercase();
+        match provider.as_str() {
+            "serper" => Some(
+                self.config
+                    .search_endpoint
+                    .clone()
+                    .unwrap_or_else(|| "https://google.serper.dev/search".to_string()),
+            ),
+            "brave" => Some(
+                self.config
+                    .search_endpoint
+                    .clone()
+                    .unwrap_or_else(|| "https://api.search.brave.com/res/v1/web/search".to_string()),
+            ),
+            "searxng" | "searx" => Some(
+                self.config
+                    .search_endpoint
+                    .clone()
+                    .unwrap_or_else(|| "https://searx.be".to_string()),
+            ),
+            _ => None,
+        }
     }
 
     async fn search_with_provider(&self, query: &str) -> Result<Vec<String>> {
