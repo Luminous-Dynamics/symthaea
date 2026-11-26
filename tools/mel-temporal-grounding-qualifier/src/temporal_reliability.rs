@@ -209,6 +209,13 @@ struct CategoryCounts {
     not_estimable: usize,
 }
 
+fn checked_increment(value: &mut usize, label: &str) -> Result<(), String> {
+    *value = value
+        .checked_add(1)
+        .ok_or_else(|| format!("{label} overflow"))?;
+    Ok(())
+}
+
 fn nonresponse_reason_key(reason: AnnotationNonresponseReasonV1) -> &'static str {
     match reason {
         AnnotationNonresponseReasonV1::NotReturned => "NotReturned",
@@ -286,10 +293,66 @@ pub fn audit_reliability_corpus(
     let mut observed_disagreement_total = 0.0_f64;
     let mut source_lineages = BTreeSet::new();
     let mut total_annotation_records = 0_usize;
+    let mut assigned_rater_item_assignments = 0_usize;
+    let mut missing_rater_item_assignments = 0_usize;
+    let mut complete_items = 0_usize;
+    let mut items_with_nonresponse = 0_usize;
+    let mut missing_reason_counts = empty_missing_reason_counts();
+    let mut annotator_coverage: BTreeMap<String, AnnotatorCoverageV1> = BTreeMap::new();
     let mut unit_summaries = Vec::with_capacity(corpus.units.len());
 
     for unit in &corpus.units {
         source_lineages.insert(unit.source_lineage_sha256.as_str());
+        assigned_rater_item_assignments = assigned_rater_item_assignments
+            .checked_add(unit.assigned_annotator_ids_sha256.len())
+            .ok_or_else(|| "assigned rater-item assignment count overflow".to_string())?;
+        missing_rater_item_assignments = missing_rater_item_assignments
+            .checked_add(unit.nonresponses.len())
+            .ok_or_else(|| "missing rater-item assignment count overflow".to_string())?;
+        if unit.nonresponses.is_empty() {
+            complete_items = complete_items
+                .checked_add(1)
+                .ok_or_else(|| "complete item count overflow".to_string())?;
+        } else {
+            items_with_nonresponse = items_with_nonresponse
+                .checked_add(1)
+                .ok_or_else(|| "items-with-nonresponse count overflow".to_string())?;
+        }
+        for annotator_id in &unit.assigned_annotator_ids_sha256 {
+            let entry = annotator_coverage
+                .entry(annotator_id.clone())
+                .or_insert_with(|| AnnotatorCoverageV1 {
+                    annotator_id_sha256: annotator_id.clone(),
+                    assigned_items: 0,
+                    returned_annotations: 0,
+                    missing_annotations: 0,
+                    coverage_rate: None,
+                    missing_reason_counts: empty_missing_reason_counts(),
+                });
+            checked_increment(&mut entry.assigned_items, "annotator assigned-item count")?;
+        }
+        for annotation in &unit.annotations {
+            let entry = annotator_coverage
+                .get_mut(&annotation.annotator_id_sha256)
+                .ok_or_else(|| "validated annotation is absent from assigned roster".to_string())?;
+            checked_increment(&mut entry.returned_annotations, "annotator returned count")?;
+        }
+        for nonresponse in &unit.nonresponses {
+            let reason_key = nonresponse_reason_key(nonresponse.reason).to_owned();
+            let global_reason_count = missing_reason_counts
+                .get_mut(&reason_key)
+                .ok_or_else(|| "unknown missing annotation reason".to_string())?;
+            checked_increment(global_reason_count, "global missing reason count")?;
+            let entry = annotator_coverage
+                .get_mut(&nonresponse.annotator_id_sha256)
+                .ok_or_else(|| "validated nonresponse is absent from assigned roster".to_string())?;
+            checked_increment(&mut entry.missing_annotations, "annotator missing count")?;
+            let rater_reason_count = entry
+                .missing_reason_counts
+                .get_mut(&reason_key)
+                .ok_or_else(|| "unknown annotator missing reason".to_string())?;
+            checked_increment(rater_reason_count, "annotator missing reason count")?;
+        }
         let mut counts = CategoryCounts::default();
         for annotation in &unit.annotations {
             counts.increment(annotation.state);
@@ -405,6 +468,27 @@ pub fn audit_reliability_corpus(
         source_work_clusters: source_lineages.len(),
         total_annotation_records,
         minimum_annotations_per_unit: corpus.minimum_annotations_per_unit,
+        assigned_rater_item_assignments,
+        returned_rater_item_annotations: total_annotation_records,
+        missing_rater_item_assignments,
+        overall_annotation_coverage: rate(
+            total_annotation_records,
+            assigned_rater_item_assignments,
+        ),
+        complete_items,
+        items_with_nonresponse,
+        missing_reason_counts,
+        annotator_coverage: annotator_coverage
+            .into_values()
+            .map(|mut coverage| {
+                coverage.coverage_rate = rate(
+                    coverage.returned_annotations,
+                    coverage.assigned_items,
+                );
+                coverage
+            })
+            .collect(),
+        source_work_bootstrap_rater_panel_fixed: true,
         disposition_alpha,
         disposition_alpha_source_work_bootstrap: None,
         pairwise_temporal_source_work_bootstrap: Vec::new(),
@@ -823,9 +907,40 @@ fn validate_corpus(corpus: &TemporalReliabilityCorpusV1) -> Result<(), String> {
                 unit.unit_id, MAX_ANNOTATIONS_PER_UNIT_V1
             ));
         }
+        if unit.assigned_annotator_ids_sha256.len() < corpus.minimum_annotations_per_unit as usize
+            || unit.assigned_annotator_ids_sha256.len() > MAX_ANNOTATIONS_PER_UNIT_V1
+        {
+            return Err(format!(
+                "unit {} assigned roster must contain between the minimum panel size and {} raters",
+                unit.unit_id, MAX_ANNOTATIONS_PER_UNIT_V1
+            ));
+        }
+        if unit.nonresponses.len() > MAX_ANNOTATIONS_PER_UNIT_V1 {
+            return Err(format!(
+                "unit {} exceeds the maximum of {} nonresponse records",
+                unit.unit_id, MAX_ANNOTATIONS_PER_UNIT_V1
+            ));
+        }
+        let mut assigned_ids = BTreeSet::new();
+        for annotator_id in &unit.assigned_annotator_ids_sha256 {
+            validate_digest(annotator_id, "assigned_annotator_id_sha256")?;
+            if !assigned_ids.insert(annotator_id.as_str()) {
+                return Err(format!("unit {} repeats an assigned annotator ID", unit.unit_id));
+            }
+        }
+        let mut returned_ids = BTreeSet::new();
         let mut annotator_ids = BTreeSet::new();
         for annotation in &unit.annotations {
             validate_digest(&annotation.annotator_id_sha256, "annotator_id_sha256")?;
+            if !assigned_ids.contains(annotation.annotator_id_sha256.as_str()) {
+                return Err(format!(
+                    "unit {} annotation belongs to an annotator outside the assigned roster",
+                    unit.unit_id
+                ));
+            }
+            if !returned_ids.insert(annotation.annotator_id_sha256.as_str()) {
+                return Err(format!("unit {} repeats a returned annotation identity", unit.unit_id));
+            }
             validate_digest(&annotation.annotation_sha256, "annotation_sha256")?;
             if !annotator_ids.insert(annotation.annotator_id_sha256.as_str()) {
                 return Err(format!("unit {} repeats an annotator ID", unit.unit_id));
@@ -841,6 +956,37 @@ fn validate_corpus(corpus: &TemporalReliabilityCorpusV1) -> Result<(), String> {
                     unit.unit_id
                 ));
             }
+        }
+        let mut nonresponse_ids = BTreeSet::new();
+        for nonresponse in &unit.nonresponses {
+            validate_digest(
+                &nonresponse.annotator_id_sha256,
+                "nonresponse.annotator_id_sha256",
+            )?;
+            if !assigned_ids.contains(nonresponse.annotator_id_sha256.as_str()) {
+                return Err(format!(
+                    "unit {} nonresponse belongs to an annotator outside the assigned roster",
+                    unit.unit_id
+                ));
+            }
+            if returned_ids.contains(nonresponse.annotator_id_sha256.as_str()) {
+                return Err(format!(
+                    "unit {} annotator cannot have both an annotation and a nonresponse record",
+                    unit.unit_id
+                ));
+            }
+            if !nonresponse_ids.insert(nonresponse.annotator_id_sha256.as_str()) {
+                return Err(format!(
+                    "unit {} repeats a nonresponse record for one annotator",
+                    unit.unit_id
+                ));
+            }
+        }
+        if assigned_ids.len() != returned_ids.len() + nonresponse_ids.len() {
+            return Err(format!(
+                "unit {} has assigned raters without either a returned annotation or explicit nonresponse",
+                unit.unit_id
+            ));
         }
     }
     Ok(())
@@ -929,10 +1075,25 @@ fn summarize_unit(
         });
     }
 
+    let mut nonresponse_reason_counts = empty_missing_reason_counts();
+    for nonresponse in &unit.nonresponses {
+        let key = nonresponse_reason_key(nonresponse.reason).to_owned();
+        let value = nonresponse_reason_counts
+            .get_mut(&key)
+            .ok_or_else(|| "unknown unit nonresponse reason".to_string())?;
+        checked_increment(value, "unit nonresponse reason count")?;
+    }
+
     Ok(TemporalReliabilityUnitSummaryV1 {
         unit_id: unit.unit_id.clone(),
         source_lineage_sha256: unit.source_lineage_sha256.clone(),
+        assigned_annotator_ids_sha256: unit.assigned_annotator_ids_sha256.clone(),
+        assigned_annotator_count: unit.assigned_annotator_ids_sha256.len(),
         annotation_count: count,
+        nonresponse_count: unit.nonresponses.len(),
+        nonresponse_reason_counts,
+        annotations: unit.annotations.clone(),
+        nonresponses: unit.nonresponses.clone(),
         disposition_pair_count: pair_count,
         disposition_agreement_rate: rate(agreement_pairs, pair_count),
         pairwise_by_iou_threshold,
