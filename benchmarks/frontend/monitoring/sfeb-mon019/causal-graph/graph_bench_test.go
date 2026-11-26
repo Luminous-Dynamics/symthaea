@@ -38,7 +38,7 @@ func benchmarkGraph(inputCount int) (Graph,map[string]VerifierPin) {
 }
 
 func BenchmarkEvaluateValidGraph(b *testing.B) {
-	for _,size:=range []int{10,100,1000,10000,50000} {
+	for _,size:=range []int{10,100,1000,10000,50000,100000} {
 		b.Run(fmt.Sprintf("inputs_%d",size),func(b *testing.B){
 			graph,pins:=benchmarkGraph(size)
 			b.ReportAllocs()
