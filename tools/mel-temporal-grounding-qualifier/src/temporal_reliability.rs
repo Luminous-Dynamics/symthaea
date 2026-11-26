@@ -225,13 +225,17 @@ fn calculate_nominal_alpha(
         let scale = 1.0 / (annotation_count - 1) as f64;
         let states: Vec<_> = item.annotations.iter().map(|value| value.state).collect();
         for state in &states {
-            category_ratings[category_index(*state)] += 1;
+            let category = category_index(*state);
+            category_ratings[category] = category_ratings[category]
+                .checked_add(1)
+                .ok_or_else(|| "nominal alpha category count overflow".to_string())?;
         }
-        for left in &states {
-            for right in &states {
-                if left != right || left == right {
-                    coincidence[category_index(*left)][category_index(*right)] += scale;
+        for (left_index, left) in states.iter().enumerate() {
+            for (right_index, right) in states.iter().enumerate() {
+                if left_index == right_index {
+                    continue;
                 }
+                coincidence[category_index(*left)][category_index(*right)] += scale;
             }
         }
     }
@@ -259,11 +263,16 @@ fn calculate_nominal_alpha(
         / total_coincidences;
 
     let total_ratings = category_ratings.iter().sum::<usize>();
-    let same_category_pairs = category_ratings
-        .iter()
-        .map(|count| count.saturating_mul(count.saturating_sub(1)))
-        .sum::<usize>();
-    let all_pairs = total_ratings.saturating_mul(total_ratings.saturating_sub(1));
+    let same_category_pairs = category_ratings.iter().try_fold(0_usize, |sum, count| {
+        let pairs = count
+            .checked_mul(count.saturating_sub(1))
+            .ok_or_else(|| "nominal alpha category pair count overflow".to_string())?;
+        sum.checked_add(pairs)
+            .ok_or_else(|| "nominal alpha category pair total overflow".to_string())
+    })?;
+    let all_pairs = total_ratings
+        .checked_mul(total_ratings.saturating_sub(1))
+        .ok_or_else(|| "nominal alpha total pair count overflow".to_string())?;
     let expected_disagreement = (all_pairs > 0)
         .then(|| 1.0 - same_category_pairs as f64 / all_pairs as f64);
     let alpha = expected_disagreement
