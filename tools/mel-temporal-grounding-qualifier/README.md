@@ -57,7 +57,7 @@ See docs/research/MEL-GROUND-007-CORPUS-ANNOTATION-RELIABILITY-V1.md for the mat
 
 ## MusicListenBench paired CLEAN / FLIP / STAY adapter
 
-The music_listen_bench module imports no audio model. It validates a complete triad, recomputes the question SHA-256 over exact UTF-8 bytes, decodes variant-specific A/B choices into Same/Different musical relations, validates the expected CLEAN/STAY equality and FLIP opposition, and reports CLEAN accuracy, FLIP miss rate, STAY false-flip rate, CLEAN-correct-conditioned error rates, Acc_FS, joint exact rate, task slices and factor slices.
+The music_listen_bench module imports no audio model. It validates a complete triad and immutable dataset/scorer revision digests, enforces one model/prompt/runtime/decoding identity per run capsule, recomputes the question SHA-256 over exact UTF-8 bytes, decodes variant-specific A/B choices into Same/Different musical relations, validates the expected CLEAN/STAY equality and FLIP opposition, and reports CLEAN accuracy, FLIP miss rate, STAY false-flip rate, CLEAN-correct-conditioned error rates, Acc_FS, joint exact rate, A/B answer bias, task slices and factor slices.
 
 The strict case schema is at schemas/mel-music-listen-bench-case-v1.schema.json. Run the synthetic four-task case with:
 
