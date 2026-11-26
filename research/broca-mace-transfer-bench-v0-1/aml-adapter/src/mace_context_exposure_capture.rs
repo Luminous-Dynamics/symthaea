@@ -11,7 +11,9 @@
 //! The source map is only as trustworthy as the typed renderer input. This
 //! module cannot discover arbitrary untagged memory hidden in plain strings.
 
+use serde_json::Value;
 use sha2::{Digest, Sha256};
+use std::collections::BTreeMap;
 
 use crate::mace_context_exposure_receipt::{
     sign_mace_context_exposure_receipt_v1,
@@ -69,7 +71,15 @@ pub struct MaceRequestMessageV1 {
 
 #[derive(Clone, Debug, Eq, PartialEq)]
 pub struct MaceProviderNeutralRequestV1 {
+    /// Exact provider model selector sent in the serialized request. It must
+    /// match the independently pinned model_revision in the run manifest.
     pub model: String,
+    /// Additional provider request fields such as temperature, top_p,
+    /// response_format and tool schemas. These are non-memory fields; memory-
+    /// derived content must be expressed as typed message segments instead.
+    /// BTreeMap gives deterministic key order. Reserved model/messages keys
+    /// are rejected to prevent duplicate JSON members.
+    pub request_parameters: BTreeMap<String, Value>,
     pub messages: Vec<MaceRequestMessageV1>,
 }
 
@@ -234,7 +244,20 @@ pub fn serialize_mace_provider_request_with_exposure_map_v1(
         }
         body.extend_from_slice(br#""}"#);
     }
-    body.extend_from_slice(br#"]}"#);
+    body.extend_from_slice(b"]");
+    for (key, value) in &request.request_parameters {
+        validate_identifier(key)?;
+        if key == "model" || key == "messages" {
+            return Err(MaceExposureCaptureRejectV1::InvalidIdentifier);
+        }
+        body.push(b',');
+        append_json_string(&mut body, key);
+        body.push(b':');
+        let encoded_value = serde_json::to_vec(value)
+            .map_err(|_| MaceExposureCaptureRejectV1::InvalidCaptureContext)?;
+        body.extend_from_slice(&encoded_value);
+    }
+    body.push(b'}');
 
     if body.len() > MACE_CONTEXT_EXPOSURE_MAX_BODY_BYTES_V1 {
         return Err(MaceExposureCaptureRejectV1::RequestBodyTooLarge);
@@ -259,6 +282,9 @@ pub fn capture_send_and_sign_mace_invocation_v1(
     signer: &impl MaceExposureReceiptSignerV1,
 ) -> Result<(MaceContextExposureReceiptV1, MaceProviderResponseV1), MaceExposureCaptureRejectV1> {
     validate_identifier(context.receipt_id)?;
+    if request.model != expected.model_revision {
+        return Err(MaceExposureCaptureRejectV1::EmptyModel);
+    }
     validate_digest(context.candidate_decision_trace_sha256)?;
     if expected.arm == MaceMemoryArmV1::NoMemory && !context.admission_denials.is_empty() {
         return Err(MaceExposureCaptureRejectV1::MemoryInNoMemoryArm);
@@ -592,6 +618,7 @@ mod tests {
     fn maps_json_escaped_unicode_to_exact_utf8_byte_offsets() {
         let request = MaceProviderNeutralRequestV1 {
             model: "test-model".to_owned(),
+            request_parameters: BTreeMap::new(),
             messages: vec![MaceRequestMessageV1 {
                 role: MaceContextRoleV1::User,
                 segments: vec![
@@ -616,6 +643,7 @@ mod tests {
     fn repeated_identical_memory_text_keeps_distinct_source_offsets() {
         let request = MaceProviderNeutralRequestV1 {
             model: "test-model".to_owned(),
+            request_parameters: BTreeMap::new(),
             messages: vec![MaceRequestMessageV1 {
                 role: MaceContextRoleV1::Tool,
                 segments: vec![
@@ -638,6 +666,7 @@ mod tests {
     fn full_fake_transport_round_trip_uses_identical_sent_bytes() {
         let request = MaceProviderNeutralRequestV1 {
             model: "test-model".to_owned(),
+            request_parameters: BTreeMap::new(),
             messages: vec![MaceRequestMessageV1 {
                 role: MaceContextRoleV1::User,
                 segments: vec![
@@ -682,6 +711,7 @@ mod tests {
     fn true_no_memory_arm_rejects_typed_memory_segments() {
         let request = MaceProviderNeutralRequestV1 {
             model: "test-model".to_owned(),
+            request_parameters: BTreeMap::new(),
             messages: vec![MaceRequestMessageV1 {
                 role: MaceContextRoleV1::User,
                 segments: vec![MaceRequestSegmentV1 {
@@ -712,6 +742,7 @@ mod tests {
         }
         let request = MaceProviderNeutralRequestV1 {
             model: "test-model".to_owned(),
+            request_parameters: BTreeMap::new(),
             messages: vec![MaceRequestMessageV1 {
                 role: MaceContextRoleV1::User,
                 segments: vec![MaceRequestSegmentV1 { text: "plain".to_owned(), origin: MaceRequestSegmentOriginV1::NonMemory }],
