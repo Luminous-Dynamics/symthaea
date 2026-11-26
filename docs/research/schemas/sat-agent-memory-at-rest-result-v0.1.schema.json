@@ -1,0 +1,171 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://luminousdynamics.io/sat/schemas/agent-memory-at-rest-result/0.1",
+  "title": "SAT Agent Memory-at-Rest Per-Case Result v0.1",
+  "type": "object",
+  "additionalProperties": false,
+  "required": [
+    "schema_version",
+    "campaign_id",
+    "case_id",
+    "benchmark_method_revision",
+    "sut_digest",
+    "memory_component_digest",
+    "runtime_digest",
+    "store_backend_digest",
+    "configuration_digest",
+    "adversary_capability_profile",
+    "sut_process_state_during_edit",
+    "edit_landed",
+    "case_status",
+    "native_verdict",
+    "detection_point",
+    "observation_point_class",
+    "pre_store_snapshot_digest",
+    "post_edit_store_snapshot_digest",
+    "edit_script_digest",
+    "evidence_refs",
+    "limitations"
+  ],
+  "properties": {
+    "schema_version": {
+      "const": "sat-agent-memory-at-rest-result/v0.1"
+    },
+    "campaign_id": {
+      "type": "string",
+      "minLength": 1
+    },
+    "case_id": {
+      "type": "string",
+      "pattern": "^SAT-MAR-(T([1-9]|10)|C[1-3])$"
+    },
+    "benchmark_method_revision": {
+      "const": "draft-khandelwal-bpm-agent-memory-integrity-00"
+    },
+    "sut_digest": {
+      "$ref": "#/$defs/digest"
+    },
+    "memory_component_digest": {
+      "$ref": "#/$defs/digest"
+    },
+    "runtime_digest": {
+      "$ref": "#/$defs/digest"
+    },
+    "store_backend_digest": {
+      "$ref": "#/$defs/digest"
+    },
+    "configuration_digest": {
+      "$ref": "#/$defs/digest"
+    },
+    "adversary_capability_profile": {
+      "type": "string",
+      "enum": [
+        "write_store_no_keys",
+        "none"
+      ]
+    },
+    "sut_process_state_during_edit": {
+      "type": "string",
+      "enum": [
+        "stopped",
+        "running",
+        "not_applicable"
+      ]
+    },
+    "edit_landed": {
+      "type": [
+        "boolean",
+        "null"
+      ]
+    },
+    "case_status": {
+      "type": "string",
+      "enum": [
+        "applicable",
+        "error",
+        "not_applicable",
+        "not_run"
+      ]
+    },
+    "native_verdict": {
+      "type": "string",
+      "enum": [
+        "REJECTED",
+        "REPORTED",
+        "ACCEPTED",
+        "ERROR",
+        "NOT_APPLICABLE",
+        "NOT_OBSERVED"
+      ]
+    },
+    "detection_point": {
+      "type": "string",
+      "enum": [
+        "read",
+        "audit",
+        "none",
+        "not_applicable"
+      ]
+    },
+    "observation_point_class": {
+      "type": "string",
+      "enum": [
+        "a",
+        "b",
+        "c",
+        "not_applicable"
+      ]
+    },
+    "pre_store_snapshot_digest": {
+      "$ref": "#/$defs/digest"
+    },
+    "post_edit_store_snapshot_digest": {
+      "$ref": "#/$defs/digest"
+    },
+    "edit_script_digest": {
+      "$ref": "#/$defs/digest"
+    },
+    "sut_stop_event_ref": {
+      "type": "string",
+      "minLength": 1
+    },
+    "sut_restart_event_ref": {
+      "type": "string",
+      "minLength": 1
+    },
+    "read_result_ref": {
+      "type": "string",
+      "minLength": 1
+    },
+    "audit_result_ref": {
+      "type": "string",
+      "minLength": 1
+    },
+    "c3_diff_evidence_ref": {
+      "type": "string",
+      "minLength": 1
+    },
+    "exclusion_reason": {
+      "type": "string"
+    },
+    "evidence_refs": {
+      "type": "array",
+      "items": {
+        "type": "string"
+      },
+      "uniqueItems": true
+    },
+    "limitations": {
+      "type": "array",
+      "items": {
+        "type": "string"
+      }
+    }
+  },
+  "$defs": {
+    "digest": {
+      "type": "string",
+      "pattern": "^sha256:[0-9a-f]{64}$"
+    }
+  }
+}
