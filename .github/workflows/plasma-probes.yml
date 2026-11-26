@@ -66,6 +66,7 @@ jobs:
         run: |
           rustfmt --edition 2024 --check crates/domains/symthaea-plasma-probes/src/lib.rs
           rustfmt --edition 2024 --check crates/domains/symthaea-plasma-probes/src/rbkr.rs
+          rustfmt --edition 2024 --check crates/domains/symthaea-plasma-probes/src/bin/response_balanced_contract_audit.rs
           rustfmt --edition 2024 --check crates/domains/symthaea-plasma-probes/src/bin/kird_point_audit.rs
           rustfmt --edition 2024 --check crates/domains/symthaea-plasma-probes/src/bin/response_weighted_refinement_audit.rs
           rustfmt --edition 2024 --check crates/domains/symthaea-plasma-probes/src/bin/sensor_actuator_contract_audit.rs
@@ -99,6 +100,7 @@ jobs:
           cp crates/domains/symthaea-plasma-probes/src/bin/sensor_actuator_contract_audit.rs "${crate_dir}/src/bin/sensor_actuator_contract_audit.rs"
           cp crates/domains/symthaea-plasma-probes/src/bin/positive_mass_projection_audit.rs "${crate_dir}/src/bin/positive_mass_projection_audit.rs"
           cp crates/domains/symthaea-plasma-probes/src/bin/small_positive_response_qp_audit.rs "${crate_dir}/src/bin/small_positive_response_qp_audit.rs"
+          cp crates/domains/symthaea-plasma-probes/src/bin/response_balanced_contract_audit.rs "${crate_dir}/src/bin/response_balanced_contract_audit.rs"
           cp benchmarks/plasma/adversarial-probes/fixtures/synthetic-pulse-family-v0.1.json \
             "${tmp_root}/benchmarks/plasma/adversarial-probes/fixtures/"
           cp benchmarks/plasma/adversarial-probes/response-weighted-refinement-v0.1.schema.json \
@@ -861,6 +863,11 @@ jobs:
           print("response_balanced_split_and_coverage_validation=PASS")
           print("response_balanced_claim_boundary_validation=PASS")
           PY
+
+      - name: Run Rust K-RESP semantic contract auditor
+        run: |
+          cargo run --locked --manifest-path "${RUNNER_TEMP}/plasma-probe-validation/crates/domains/symthaea-plasma-probes/Cargo.toml" --bin response_balanced_contract_audit -- \
+            "${RUNNER_TEMP}/plasma-probe-validation/benchmarks/plasma/response-balanced/fixtures/synthetic-kresp1-experiment-v0.1.json"
 
       - name: Run strict Clippy
         run: cargo clippy --locked --manifest-path "${RUNNER_TEMP}/plasma-probe-validation/crates/domains/symthaea-plasma-probes/Cargo.toml" --all-targets -- -D warnings
