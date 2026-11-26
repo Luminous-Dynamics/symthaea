@@ -405,7 +405,7 @@
         "transfer_id": { "$ref": "#/$defs/id" },
         "evidence_id": { "$ref": "#/$defs/id" },
         "media_payload_sha256": { "$ref": "#/$defs/sha256" },
-        "media_payload_bytes": { "type": "integer", "minimum": 0 },
+        "media_payload_bytes": { "type": "integer", "minimum": 1 },
         "upload_request_body_sha256": { "$ref": "#/$defs/sha256" },
         "upload_request_body_bytes": { "type": "integer", "minimum": 1 },
         "upload_request_body_artifact": { "$ref": "#/$defs/artifact" },
