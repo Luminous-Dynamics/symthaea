@@ -1,0 +1,9 @@
+[package]
+name = "dna-channel-benchmark"
+version = "0.1.0"
+edition = "2024"
+license = "AGPL-3.0-or-later"
+publish = false
+description = "Deterministic DNA sequence-channel metrics and calibrated-soft-erasure scheduling reference"
+
+[workspace]

@@ -1,0 +1,180 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://github.com/Luminous-Dynamics/symthaea/blob/research/dna-codec-soft-decoding-001/research/physical-storage/dna-channel-benchmark/fixtures/dna_sequence_channel_cases_v0_1.schema.json",
+  "title": "Symthaea DNA sequence-channel scorer fixture v0.1",
+  "type": "object",
+  "additionalProperties": false,
+  "required": [
+    "schema_version",
+    "evidence_class",
+    "evidence_boundary",
+    "alphabet",
+    "case_grouping",
+    "scorer_only_labels",
+    "inference_input_separation",
+    "soft_information_fixture"
+  ],
+  "properties": {
+    "schema_version": {
+      "const": "symthaea-dna-sequence-channel-cases-v0.1"
+    },
+    "evidence_class": {
+      "const": "synthetic_known_answer"
+    },
+    "evidence_boundary": {
+      "type": "string",
+      "minLength": 1
+    },
+    "alphabet": {
+      "const": "ACGTN"
+    },
+    "case_grouping": {
+      "type": "string",
+      "minLength": 1
+    },
+    "scorer_only_labels": {
+      "type": "array",
+      "minItems": 1,
+      "items": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": [
+          "case_id",
+          "reference_sequence",
+          "reads",
+          "expected"
+        ],
+        "properties": {
+          "case_id": {
+            "type": "string",
+            "minLength": 1
+          },
+          "reference_sequence": {
+            "type": "string",
+            "pattern": "^[ACGTN]+$"
+          },
+          "reads": {
+            "type": "array",
+            "items": {
+              "type": "object",
+              "additionalProperties": false,
+              "required": [
+                "read_id",
+                "sequence",
+                "read_count",
+                "phred_quality"
+              ],
+              "properties": {
+                "read_id": {
+                  "type": "string",
+                  "minLength": 1
+                },
+                "sequence": {
+                  "type": "string",
+                  "pattern": "^[ACGTN]+$"
+                },
+                "read_count": {
+                  "type": "integer",
+                  "minimum": 1
+                },
+                "phred_quality": {
+                  "type": [
+                    "array",
+                    "null"
+                  ],
+                  "items": {
+                    "type": "integer",
+                    "minimum": 0,
+                    "maximum": 93
+                  }
+                }
+              }
+            }
+          },
+          "sequence_constraints": {
+            "type": "object",
+            "additionalProperties": false,
+            "required": [
+              "minimum_gc",
+              "maximum_gc",
+              "maximum_homopolymer"
+            ],
+            "properties": {
+              "minimum_gc": {
+                "type": "number",
+                "minimum": 0,
+                "maximum": 1
+              },
+              "maximum_gc": {
+                "type": "number",
+                "minimum": 0,
+                "maximum": 1
+              },
+              "maximum_homopolymer": {
+                "type": "integer",
+                "minimum": 1
+              }
+            }
+          },
+          "expected": {
+            "type": "object"
+          }
+        }
+      }
+    },
+    "inference_input_separation": {
+      "type": "string",
+      "minLength": 1
+    },
+    "soft_information_fixture": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "type",
+        "error_probabilities",
+        "minimum_error_probability",
+        "expected_position_order",
+        "expected_progressive_sets",
+        "calibrated_physical_probability"
+      ],
+      "properties": {
+        "type": {
+          "const": "synthetic_probability_ordering_only"
+        },
+        "error_probabilities": {
+          "type": "array",
+          "items": {
+            "type": "number",
+            "minimum": 0,
+            "maximum": 1
+          }
+        },
+        "minimum_error_probability": {
+          "type": "number",
+          "minimum": 0,
+          "maximum": 1
+        },
+        "expected_position_order": {
+          "type": "array",
+          "items": {
+            "type": "integer",
+            "minimum": 0
+          }
+        },
+        "expected_progressive_sets": {
+          "type": "array",
+          "items": {
+            "type": "array",
+            "items": {
+              "type": "integer",
+              "minimum": 0
+            }
+          }
+        },
+        "calibrated_physical_probability": {
+          "const": false
+        }
+      }
+    }
+  }
+}

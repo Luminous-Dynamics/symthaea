@@ -1,0 +1,165 @@
+{
+  "schema_version": "symthaea-dna-codec-baselines-v0.1",
+  "snapshot_date": "2026-11-26",
+  "evidence_note": "This register identifies reproduction targets and source snapshots. It does not claim reproduction, performance superiority, or platform-independent guarantees.",
+  "publications": [
+    {
+      "id": "gimpel_nature_communications_2026",
+      "title": "Comparison of state-of-the-art error-correction coding for sequence-based DNA data storage",
+      "venue": "Nature Communications 17, 3963",
+      "publication_date": "2026-03-14",
+      "doi": "10.1038/s41467-026-70548-3",
+      "evidence_class": "published_in_silico_and_in_vitro_comparison",
+      "dataset_accession": "ENA:PRJEB90546",
+      "archived_software_doi": "10.5281/zenodo.17391326",
+      "archived_notebooks_doi": "10.5281/zenodo.17391328",
+      "reported_in_vitro_densities_eb_per_g": {
+        "material_deposition_synthesis": 43,
+        "electrochemical_synthesis": 13
+      },
+      "reported_in_silico_realistic_workflow_feasibility_eb_per_g": 117,
+      "comparison_codecs": [
+        "DNA-Aeon",
+        "DNA Fountain",
+        "DNA-RS",
+        "Goldman",
+        "HEDGES",
+        "Yin-Yang"
+      ],
+      "interpretation": "Separate in-silico feasibility from the two different in-vitro synthesis demonstrations. The study's maximum isolated error/sequence-loss tolerance scenarios are not universal physical channel guarantees.",
+      "source": "https://doi.org/10.1038/s41467-026-70548-3"
+    },
+    {
+      "id": "ding_polus_bioinformatics_2026",
+      "title": "Polus: a context-aware enhancement framework for DNA storage via transformer-based soft-decision decoding",
+      "venue": "Bioinformatics 42(8), btag563",
+      "publication_date": "2026-08-03",
+      "doi": "10.1093/bioinformatics/btag563",
+      "evidence_class": "published_in_silico_soft_decision_benchmark",
+      "reported_in_silico_results": {
+        "dna_fountain_coverage_reduction_fraction": 0.389,
+        "effective_physical_density_relative_increase_fraction": 0.8,
+        "adaptive_resequencing_overhead_reduction_fraction": 0.999
+      },
+      "codecs_enhanced": [
+        "DNA Fountain",
+        "Yin-Yang",
+        "Derrick"
+      ],
+      "enhancement": "SeqFormer consensus and calibrated per-base confidence; low-confidence positions become progressive candidate erasures after hard-decision/CRC failure.",
+      "platform_scope": "Illumina-like and ONT-like in-silico error profiles; model calibration is platform-specific.",
+      "interpretation": "All percentage results are paper/setup-specific in-silico results. They are reproduction targets, not in-vitro physical measurements or Luminous Dynamics achievements.",
+      "source": "https://doi.org/10.1093/bioinformatics/btag563"
+    }
+  ],
+  "repositories": [
+    {
+      "id": "dt4dds_benchmark",
+      "repository": "https://github.com/fml-ethz/dt4dds-benchmark",
+      "observed_commit": "0928fd7f26709ce63fd4d0765c50db1be8af0f7d",
+      "observed_commit_date": "2025-08-28",
+      "publication_associated_archive_doi": "10.5281/zenodo.17391326",
+      "license": "GPL-3.0 (per publication-associated benchmark materials)",
+      "role": "standardized codec simulation, experimental workflow and evaluation framework",
+      "reproduction_rule": "Prefer the publication-associated Zenodo snapshot for paper reproduction; GitHub main is a separately recorded source state."
+    },
+    {
+      "id": "dt4dds_notebooks",
+      "repository": "https://github.com/fml-ethz/dt4dds-benchmark_notebooks",
+      "publication_associated_archive_doi": "10.5281/zenodo.17391328",
+      "role": "publication analysis notebooks",
+      "pin_status": "archived DOI known; exact repository commit must be pinned before execution"
+    },
+    {
+      "id": "polus",
+      "repository": "https://github.com/dinglulu/Polus",
+      "observed_commit": "656b58008e196dbad42c9b09f8ec1bf350ee8614",
+      "observed_commit_date": "2026-07-15",
+      "role": "soft-decision decoder, codec wrappers, simulation and evaluation",
+      "runtime_note": "README specifies Python 3.10, PyTorch 2.6 / CUDA 11.8, auxiliary C++ and HEDGES legacy environment. Keep isolated from Symthaea's trusted Rust runtime.",
+      "license": "not confirmed in this intake",
+      "reproduction_rule": "Pin models, weights, data assets, external submodules and all auxiliary tool versions before running."
+    },
+    {
+      "id": "seqformer",
+      "repository": "https://github.com/dinglulu/SeqFormer",
+      "observed_readme_blob_sha": "8abab8ef595d2ad547882cbc1f5712c728383080",
+      "role": "per-base consensus and calibrated error probability model",
+      "pin_status": "README was retrieved; repository commit SHA and model-weight digests remain pending",
+      "runtime_note": "README specifies Python 3.10 and PyTorch 2.6; do not import this stack into production Symthaea."
+    }
+  ],
+  "codecs": [
+    {
+      "id": "dna_aeon",
+      "name": "DNA-Aeon",
+      "inner_code": "arithmetic",
+      "outer_code": "fountain",
+      "baseline_status": "required_reproduction",
+      "source_publication": "Gimpel et al. 2026; original DNA-Aeon paper"
+    },
+    {
+      "id": "dna_fountain",
+      "name": "DNA Fountain",
+      "inner_code": "reed_solomon",
+      "outer_code": "fountain_LT",
+      "baseline_status": "required_reproduction",
+      "source_publication": "Gimpel et al. 2026; Erlich and Zielinski 2017"
+    },
+    {
+      "id": "dna_rs",
+      "name": "DNA-RS",
+      "inner_code": "reed_solomon",
+      "outer_code": "reed_solomon",
+      "baseline_status": "required_reproduction",
+      "source_publication": "Gimpel et al. 2026"
+    },
+    {
+      "id": "goldman",
+      "name": "Goldman",
+      "inner_code": "parity",
+      "outer_code": "repetition",
+      "baseline_status": "required_reproduction",
+      "source_publication": "Gimpel et al. 2026; Goldman et al. 2013"
+    },
+    {
+      "id": "hedges",
+      "name": "HEDGES",
+      "inner_code": "convolutional",
+      "outer_code": "reed_solomon",
+      "baseline_status": "required_reproduction",
+      "source_publication": "Gimpel et al. 2026; Chandak et al. 2020"
+    },
+    {
+      "id": "yin_yang",
+      "name": "Yin-Yang",
+      "inner_code": "constrained_bit_to_base_mapping",
+      "outer_code": "none_in_evaluated_implementation",
+      "baseline_status": "required_reproduction",
+      "source_publication": "Gimpel et al. 2026; Ping et al. 2022"
+    },
+    {
+      "id": "polus_sdd",
+      "name": "Polus / SeqFormer soft-decision enhancement",
+      "inner_code": "codec_agnostic_confidence_ranked_soft_erasures",
+      "outer_code": "existing_codec_specific",
+      "baseline_status": "required_reproduction",
+      "source_publication": "Ding et al. 2026"
+    }
+  ],
+  "consensus_methods": [
+    "iterative_majority",
+    "partial_order_alignment",
+    "BSAlign",
+    "BMALA",
+    "DivBMA",
+    "Hybrid",
+    "SeqFormer"
+  ],
+  "evidence_separation": {
+    "in_silico": "Deterministic or stochastic simulation only; synthetic probabilities are not physical measurements.",
+    "published_reproduction": "Re-run against source publication dataset and pinned code/weights with matching parameters.",
+    "in_vitro": "Measurements from physical synthesis/sequencing experiments with raw data, batch, platform and calibration lineage.",
+    "held_out": "Split by synthesis batch, library and sequencing run; never randomly split reads from the same oligo across train and test."
+  }
+}
