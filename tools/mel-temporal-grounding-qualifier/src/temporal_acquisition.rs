@@ -282,6 +282,21 @@ pub fn plan_annotation_acquisition_json(
     plan_annotation_acquisition(&dataset)
 }
 
+type ProbabilityAuditSelectionResult = (
+    Vec<AnnotationSelectionRecordV1>,
+    Vec<UnmetAnnotationQuotaV1>,
+    u64,
+    usize,
+    Vec<ProbabilityAuditStratumDesignV1>,
+);
+
+type ActiveSelectionResult = (
+    Vec<AnnotationSelectionRecordV1>,
+    Vec<UnmetAnnotationQuotaV1>,
+    u64,
+    BTreeMap<String, u32>,
+);
+
 #[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
 #[serde(deny_unknown_fields)]
 pub struct AnnotationAcquisitionDatasetV1 {
@@ -644,13 +659,13 @@ fn validate_candidates(candidates: &[AnnotationAcquisitionCandidateV1]) -> Resul
                 ));
             }
         }
-        if let Some(receipt) = candidate.authorization_receipt_sha256.as_deref() {
-            if !is_digest(receipt) {
-                return Err(format!(
-                    "candidate {} has an invalid authorization receipt digest",
-                    candidate.item_id
-                ));
-            }
+        if let Some(receipt) = candidate.authorization_receipt_sha256.as_deref()
+            && !is_digest(receipt)
+        {
+            return Err(format!(
+                "candidate {} has an invalid authorization receipt digest",
+                candidate.item_id
+            ));
         }
         if let Some((role, stratum)) = source_metadata.get(candidate.source_work_id_sha256.as_str())
         {
@@ -761,16 +776,7 @@ fn select_probability_audit(
     eligible: &[usize],
     config: &AnnotationAcquisitionConfigV1,
     rng: &mut u64,
-) -> Result<
-    (
-        Vec<AnnotationSelectionRecordV1>,
-        Vec<UnmetAnnotationQuotaV1>,
-        u64,
-        usize,
-        Vec<ProbabilityAuditStratumDesignV1>,
-    ),
-    String,
-> {
+) -> Result<ProbabilityAuditSelectionResult, String> {
     let mut by_stratum: BTreeMap<&str, BTreeMap<&str, Vec<usize>>> = BTreeMap::new();
     for index in eligible {
         let candidate = &candidates[*index];
@@ -959,15 +965,7 @@ fn select_active(
     eligible: &[usize],
     config: &AnnotationAcquisitionConfigV1,
     audit_sources: &BTreeSet<String>,
-) -> Result<
-    (
-        Vec<AnnotationSelectionRecordV1>,
-        Vec<UnmetAnnotationQuotaV1>,
-        u64,
-        BTreeMap<String, u32>,
-    ),
-    String,
-> {
+) -> Result<ActiveSelectionResult, String> {
     let quotas: BTreeMap<&str, &AnnotationStratumQuotaV1> = config
         .stratum_quotas
         .iter()
