@@ -47,9 +47,9 @@
       "additionalProperties": false,
       "required": [
         "boundary_kind",
-        "included_components",
         "excluded_components",
-        "bidirectional_verification_assessed"
+        "bidirectional_verification_assessed",
+        "component_groups"
       ],
       "properties": {
         "boundary_kind": {
