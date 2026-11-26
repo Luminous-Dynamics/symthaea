@@ -514,8 +514,14 @@ fn validate_mutation(mutation: &StreamingSessionMutationV1)
         });
     }
     match &mutation.kind {
-        StreamingMutationKindV1::Append { message }
-        | StreamingMutationKindV1::Correct { message, .. } => {
+        StreamingMutationKindV1::Append { message } => {
+            validate_message(message)?;
+            if message.timestamp_ms != mutation.effective_at_ms {
+                return Err(StreamingSessionRejectV1::InvalidMessageTime);
+            }
+        }
+        StreamingMutationKindV1::Correct { target_event_id, message } => {
+            validate_target(target_event_id)?;
             validate_message(message)?;
             if message.timestamp_ms != mutation.effective_at_ms {
                 return Err(StreamingSessionRejectV1::InvalidMessageTime);
@@ -765,6 +771,23 @@ mod tests {
             Err(StreamingSessionRejectV1::EventIdentityConflict)
         );
         assert_eq!(ledger.snapshot().messages[0].message.text, "first");
+    }
+
+    #[test]
+    fn malformed_correction_target_is_rejected_before_lookup() {
+        let mutation = StreamingSessionMutationV1 {
+            event_id: "event-1".into(),
+            sequence: 1,
+            effective_at_ms: 100,
+            kind: StreamingMutationKindV1::Correct {
+                target_event_id: " bad-target".into(),
+                message: message("turn-1", 100, "replacement"),
+            },
+        };
+        assert_eq!(
+            validate_mutation(&mutation),
+            Err(StreamingSessionRejectV1::InvalidEventId)
+        );
     }
 
     #[test]
