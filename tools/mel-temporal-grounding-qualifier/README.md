@@ -104,3 +104,12 @@ This integration prevents a byte-valid manifest from being reused with a differe
 The evidence-window contract now distinguishes two work identities: `target_source_lineage_id` is the work being queried, while `source_lineage_id` is the work from which the audio window was materialized. LocalRetrieved requires equal lineages and the exact target audio digest. YokedRetrieved requires a different lineage and a different audio digest. A different encoding or crop from the same work is not accepted as a yoked source. The verification report returns both lineage IDs separately.
 
 The revision binding also requires the selected frame-range/payload tuple to match **exactly one** manifest window. A manifest with duplicate matching windows is rejected as ambiguous rather than picking an arbitrary occurrence.
+
+
+## Unsigned in-toto Statement consumer for #13254
+
+The `audio_evidence_in_toto` module emits a standard in-toto Statement v1 JSON payload for the verified audio↔revision join. Its subjects bind the source-audio bytes, decoded PCM, every selected window, ordered context manifest, full evidence manifest, byte-verification report and temporal-revision report. The predicate records the experiment/source lineages, query, target/evidence audio identities, model/runtime/decoder configuration, window byte coordinates and each achieved assurance stage.
+
+The payload type is `application/vnd.in-toto+json`; the function returns the exact statement JSON bytes and their SHA-256 so the existing #13254 DSSE signer/verifier can consume them. The target audio appears as a `target-audio-reference` subject because a yoked evidence run may not have supplied the target's raw bytes to this verifier.
+
+This module deliberately sets `dsse_envelope_created=false` and `signature_verified=false`. It does not implement DSSE, Sigstore, key distribution, trust roots, signer-role policy or transparency verification. A signed runner/provider receipt must be produced and verified by #13254 before any stronger execution or model-input claim is allowed.
