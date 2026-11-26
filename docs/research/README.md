@@ -445,3 +445,6 @@ A falsifiable programme for spectral statistics, RH/prime-structure controls, ne
 - [Robust/Pareto harness README](../../scripts/research/SDCB_ROBUST_PARETO_README.md): compile instructions, limits and claim boundaries.
 
 **Evidence boundary:** 19 Rust test functions are authored but have not been compiled or executed. Independent numerical calculations match the frozen robust and Pareto fixtures. No external benchmark, Symthaea model, or physical system has been evaluated.
+### Existing Symthaea selector integration
+
+- [Existing selector integration map](SDCB_EXISTING_SELECTOR_INTEGRATION_MAP_2026_11_26.md): audit of the HDC prediction-disagreement selector, Spark EIG, Cell Foundry HDC/CfC planner, Nuclear heuristic, synthetic ISRU bake-off, and decision-relevant chaos benchmark.
