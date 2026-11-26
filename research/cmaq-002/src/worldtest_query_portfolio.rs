@@ -1,4 +1,5 @@
 //! Cross-query portfolio evaluation for shared WorldTest exploration histories.
+// Statistical summaries are cluster-aware: repeated task rows never become independent subjects.
 //!
 //! One frozen exploration history/checkpoint is evaluated against masked-frame
 //! prediction, change detection and planning tasks. The certificate retains a
