@@ -1,0 +1,101 @@
+{
+  "schema_version": "sat-agent-memory-profile-manifest/v0.1",
+  "campaign_id": "SAT-MAR-SYNTHETIC-PROFILE-001",
+  "benchmark_method_revision": "draft-khandelwal-bpm-agent-memory-integrity-00",
+  "profile_document_revision": "draft-hcf-bpm-agent-security-benchmark-profiles-00",
+  "infrastructure_profiles": [
+    "foundation_model",
+    "interaction_access_layer",
+    "execution_and_scheduling",
+    "underlying_infrastructure"
+  ],
+  "scenario_profiles": [
+    "personalized_long_term_memory_agent"
+  ],
+  "sut_boundary": {
+    "boundary_kind": "store_boundary",
+    "excluded_components": [
+      "unrelated external systems outside the declared SUT"
+    ],
+    "bidirectional_verification_assessed": false,
+    "component_groups": {
+      "foundation_model": [
+        "synthetic-model-runtime"
+      ],
+      "interaction_access_layer": [
+        "synthetic-user-input-gateway",
+        "synthetic-retrieval-interface",
+        "synthetic-content-parser"
+      ],
+      "execution_and_scheduling": [
+        "synthetic-session-context-manager",
+        "synthetic-long-term-memory-repository",
+        "synthetic-planner",
+        "synthetic-reasoning-cycle-controller"
+      ],
+      "underlying_infrastructure": [
+        "synthetic-tool-invocation-engine",
+        "synthetic-sandbox",
+        "synthetic-identity-permission-control",
+        "synthetic-host-runtime",
+        "synthetic-storage-database",
+        "synthetic-store-sidecars",
+        "synthetic-backup-restore-domain",
+        "synthetic-erasure-state"
+      ]
+    }
+  },
+  "configuration": {
+    "memory_store_technology": "synthetic-file-backed-record-store",
+    "memory_store_location_ref": "artifact://example.invalid/sat-memory/profile/storage-location",
+    "memory_subsystem_version": "synthetic-memory-adapter/0.1",
+    "store_backend_version": "synthetic-file-store/0.1",
+    "host_platform": "synthetic-linux-x86_64",
+    "retention_period": "P90D",
+    "deletion_mechanism": "SUT-owned-erasure-interface",
+    "isolation_model": {
+      "technology": "per-user namespaces",
+      "partition_keys": [
+        "user_id",
+        "session_id"
+      ]
+    },
+    "shared_with_other_agent_or_service": false,
+    "session_boundary": "session",
+    "initial_store_state_digest": "sha256:aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+    "evaluator_has_backing_store_write_access": true,
+    "record_trust_marker_or_signature": true,
+    "at_rest_encryption": {
+      "enabled": true,
+      "enabled_by_default": false
+    },
+    "record_signing": {
+      "enabled": false,
+      "enabled_by_default": false
+    },
+    "integrity_audit": {
+      "enabled": true,
+      "enabled_by_default": false,
+      "audit_interval_seconds": 3600
+    }
+  },
+  "coverage_declaration": {
+    "memory_poisoning_defense": {
+      "applicability": "applicable",
+      "measured_by_this_adapter": false
+    },
+    "cross_user_cross_session_isolation": {
+      "applicability": "applicable",
+      "measured_by_this_adapter": false
+    },
+    "data_deletion_right_to_be_forgotten": {
+      "applicability": "applicable",
+      "measured_by_this_adapter": false
+    },
+    "protection_of_memory_data_integrity": {
+      "applicability": "applicable",
+      "measured_by_this_adapter": true
+    }
+  },
+  "evaluation_scope": "metric_specific_partial"
+}

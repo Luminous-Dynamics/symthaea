@@ -1,0 +1,359 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://luminousdynamics.io/sat/schemas/agent-memory-profile-manifest/0.1",
+  "title": "SAT IETF Agent Memory Evaluation Profile Manifest v0.1",
+  "type": "object",
+  "additionalProperties": false,
+  "required": [
+    "schema_version",
+    "campaign_id",
+    "benchmark_method_revision",
+    "evaluation_scope",
+    "profile_document_revision",
+    "infrastructure_profiles",
+    "scenario_profiles",
+    "sut_boundary",
+    "configuration",
+    "coverage_declaration"
+  ],
+  "properties": {
+    "schema_version": {
+      "const": "sat-agent-memory-profile-manifest/v0.1"
+    },
+    "campaign_id": {
+      "type": "string",
+      "minLength": 1
+    },
+    "benchmark_method_revision": {
+      "const": "draft-khandelwal-bpm-agent-memory-integrity-00"
+    },
+    "profile_document_revision": {
+      "const": "draft-hcf-bpm-agent-security-benchmark-profiles-00"
+    },
+    "infrastructure_profiles": {
+      "const": [
+        "foundation_model",
+        "interaction_access_layer",
+        "execution_and_scheduling",
+        "underlying_infrastructure"
+      ]
+    },
+    "scenario_profiles": {
+      "const": [
+        "personalized_long_term_memory_agent"
+      ]
+    },
+    "sut_boundary": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "boundary_kind",
+        "excluded_components",
+        "bidirectional_verification_assessed",
+        "component_groups"
+      ],
+      "properties": {
+        "boundary_kind": {
+          "const": "store_boundary"
+        },
+        "excluded_components": {
+          "type": "array",
+          "uniqueItems": true,
+          "items": {
+            "type": "string",
+            "minLength": 1
+          }
+        },
+        "bidirectional_verification_assessed": {
+          "type": "boolean"
+        },
+        "component_groups": {
+          "type": "object",
+          "additionalProperties": false,
+          "required": [
+            "foundation_model",
+            "interaction_access_layer",
+            "execution_and_scheduling",
+            "underlying_infrastructure"
+          ],
+          "properties": {
+            "foundation_model": {
+              "type": "array",
+              "uniqueItems": true,
+              "minItems": 1,
+              "items": {
+                "type": "string",
+                "minLength": 1
+              }
+            },
+            "interaction_access_layer": {
+              "type": "array",
+              "uniqueItems": true,
+              "minItems": 1,
+              "items": {
+                "type": "string",
+                "minLength": 1
+              }
+            },
+            "execution_and_scheduling": {
+              "type": "array",
+              "uniqueItems": true,
+              "minItems": 1,
+              "items": {
+                "type": "string",
+                "minLength": 1
+              }
+            },
+            "underlying_infrastructure": {
+              "type": "array",
+              "uniqueItems": true,
+              "minItems": 1,
+              "items": {
+                "type": "string",
+                "minLength": 1
+              }
+            }
+          }
+        }
+      }
+    },
+    "configuration": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "memory_store_technology",
+        "memory_store_location_ref",
+        "memory_subsystem_version",
+        "store_backend_version",
+        "host_platform",
+        "retention_period",
+        "deletion_mechanism",
+        "isolation_model",
+        "shared_with_other_agent_or_service",
+        "session_boundary",
+        "initial_store_state_digest",
+        "evaluator_has_backing_store_write_access",
+        "record_trust_marker_or_signature",
+        "at_rest_encryption",
+        "record_signing",
+        "integrity_audit"
+      ],
+      "properties": {
+        "memory_store_technology": {
+          "type": "string",
+          "minLength": 1
+        },
+        "memory_store_location_ref": {
+          "type": "string",
+          "minLength": 1
+        },
+        "memory_subsystem_version": {
+          "type": "string",
+          "minLength": 1
+        },
+        "store_backend_version": {
+          "type": "string",
+          "minLength": 1
+        },
+        "host_platform": {
+          "type": "string",
+          "minLength": 1
+        },
+        "retention_period": {
+          "type": "string",
+          "minLength": 1
+        },
+        "deletion_mechanism": {
+          "type": "string",
+          "minLength": 1
+        },
+        "isolation_model": {
+          "type": "object",
+          "additionalProperties": false,
+          "required": [
+            "technology",
+            "partition_keys"
+          ],
+          "properties": {
+            "technology": {
+              "type": "string",
+              "minLength": 1
+            },
+            "partition_keys": {
+              "type": "array",
+              "uniqueItems": true,
+              "minItems": 1,
+              "items": {
+                "type": "string",
+                "minLength": 1
+              }
+            }
+          }
+        },
+        "shared_with_other_agent_or_service": {
+          "type": "boolean"
+        },
+        "session_boundary": {
+          "type": "string",
+          "enum": [
+            "user",
+            "thread",
+            "session",
+            "composite",
+            "other"
+          ]
+        },
+        "initial_store_state_digest": {
+          "$ref": "#/$defs/digest"
+        },
+        "evaluator_has_backing_store_write_access": {
+          "const": true
+        },
+        "record_trust_marker_or_signature": {
+          "type": "boolean"
+        },
+        "at_rest_encryption": {
+          "type": "object",
+          "additionalProperties": false,
+          "required": [
+            "enabled",
+            "enabled_by_default"
+          ],
+          "properties": {
+            "enabled": {
+              "type": "boolean"
+            },
+            "enabled_by_default": {
+              "type": "boolean"
+            }
+          }
+        },
+        "record_signing": {
+          "type": "object",
+          "additionalProperties": false,
+          "required": [
+            "enabled",
+            "enabled_by_default"
+          ],
+          "properties": {
+            "enabled": {
+              "type": "boolean"
+            },
+            "enabled_by_default": {
+              "type": "boolean"
+            }
+          }
+        },
+        "integrity_audit": {
+          "type": "object",
+          "additionalProperties": false,
+          "required": [
+            "enabled",
+            "enabled_by_default",
+            "audit_interval_seconds"
+          ],
+          "properties": {
+            "enabled": {
+              "type": "boolean"
+            },
+            "enabled_by_default": {
+              "type": "boolean"
+            },
+            "audit_interval_seconds": {
+              "type": [
+                "integer",
+                "null"
+              ],
+              "minimum": 1
+            }
+          }
+        }
+      }
+    },
+    "coverage_declaration": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "memory_poisoning_defense",
+        "cross_user_cross_session_isolation",
+        "data_deletion_right_to_be_forgotten",
+        "protection_of_memory_data_integrity"
+      ],
+      "properties": {
+        "memory_poisoning_defense": {
+          "type": "object",
+          "additionalProperties": false,
+          "required": [
+            "applicability",
+            "measured_by_this_adapter"
+          ],
+          "properties": {
+            "applicability": {
+              "const": "applicable"
+            },
+            "measured_by_this_adapter": {
+              "const": false
+            }
+          }
+        },
+        "cross_user_cross_session_isolation": {
+          "type": "object",
+          "additionalProperties": false,
+          "required": [
+            "applicability",
+            "measured_by_this_adapter"
+          ],
+          "properties": {
+            "applicability": {
+              "const": "applicable"
+            },
+            "measured_by_this_adapter": {
+              "const": false
+            }
+          }
+        },
+        "data_deletion_right_to_be_forgotten": {
+          "type": "object",
+          "additionalProperties": false,
+          "required": [
+            "applicability",
+            "measured_by_this_adapter"
+          ],
+          "properties": {
+            "applicability": {
+              "const": "applicable"
+            },
+            "measured_by_this_adapter": {
+              "const": false
+            }
+          }
+        },
+        "protection_of_memory_data_integrity": {
+          "type": "object",
+          "additionalProperties": false,
+          "required": [
+            "applicability",
+            "measured_by_this_adapter"
+          ],
+          "properties": {
+            "applicability": {
+              "const": "applicable"
+            },
+            "measured_by_this_adapter": {
+              "const": true
+            }
+          }
+        }
+      }
+    },
+    "evaluation_scope": {
+      "const": "metric_specific_partial"
+    }
+  },
+  "$defs": {
+    "digest": {
+      "type": "string",
+      "pattern": "^sha256:[0-9a-f]{64}$"
+    }
+  }
+}
