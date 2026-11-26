@@ -545,10 +545,8 @@ fn validate_synthetic_input(task: &Task, input: &InputRef, bytes: &[u8]) -> anyh
                 != "luminous.eqc.synthetic-challenge.v0.1"
                 || Some(json_string(&artifact, "challenge_id", task, input)?)
                     != task.request.challenge_id.as_deref()
-                || json_string(&artifact, "issuer_id", task, input)?
-                    != task.actor.actor_id.as_str()
-                || json_string(&artifact, "subject_id", task, input)?
-                    != task.subject.subject_id
+                || json_string(&artifact, "issuer_id", task, input)? != task.actor.actor_id.as_str()
+                || json_string(&artifact, "subject_id", task, input)? != task.subject.subject_id
                 || json_string(&artifact, "state", task, input)?
                     != task.request.challenge_state.as_deref().unwrap_or("")
             {
@@ -559,9 +557,7 @@ fn validate_synthetic_input(task: &Task, input: &InputRef, bytes: &[u8]) -> anyh
                 );
             }
             let consumed_at = json_string(&artifact, "consumed_at", task, input)?;
-            if !is_canonical_utc(consumed_at)
-                || consumed_at > task.request.evaluated_at
-            {
+            if !is_canonical_utc(consumed_at) || consumed_at > task.request.evaluated_at {
                 bail!(
                     "{}: consumed challenge fixture '{}' has invalid consumption time",
                     task.task_id,
@@ -571,7 +567,8 @@ fn validate_synthetic_input(task: &Task, input: &InputRef, bytes: &[u8]) -> anyh
         }
         other => bail!(
             "{}: unsupported synthetic input identifier '{}'",
-            task.task_id, other
+            task.task_id,
+            other
         ),
     }
     Ok(())
@@ -615,7 +612,11 @@ fn reference_disposition(task: &Task) -> &'static str {
         _ => format!("{}:{}", request.action, request.resource_id),
     };
 
-    if !authority.scopes.iter().any(|scope| scope == &required_scope) {
+    if !authority
+        .scopes
+        .iter()
+        .any(|scope| scope == &required_scope)
+    {
         return "deny";
     }
     "allow"
@@ -705,11 +706,8 @@ mod tests {
     fn public_seed_reference_passes_and_baselines_fail_their_controls() {
         let root = repository_root();
         let report =
-            validate_corpus_file(
-                &root.join("docs/research/eqc-seed-corpus-v0.1.json"),
-                &root,
-            )
-            .expect("seed validates");
+            validate_corpus_file(&root.join("docs/research/eqc-seed-corpus-v0.1.json"), &root)
+                .expect("seed validates");
         assert_eq!(report.task_count, 4);
         assert_eq!(report.reference_pass_count, 4);
         assert!(report.no_op_fails_positive_controls);
