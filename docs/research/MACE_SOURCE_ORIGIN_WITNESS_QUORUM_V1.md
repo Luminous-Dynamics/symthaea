@@ -100,7 +100,11 @@ In other words:
 
 No one standard supplies all four layers.
 
-## 7. Benchmark additions
+## 7. Provenance interoperability
+
+The companion [MACE W3C PROV and SCITT Interoperability V1](MACE_PROV_SCITT_INTEROP_V1.md) document provides a JSON-LD projection context and maps MACE graph nodes/edges to PROV entities, activities, agents and derivations. It also describes how each issuer can publish its own DSSE/in-toto statements to a SCITT-compatible transparency service. This is not yet an exporter or deployed SCITT client; transparency proves statement history/inclusion under its log assumptions, not statement truth.
+
+## 8. Benchmark additions
 
 Add a separate witness-quorum scorecard to the MACE assurance benchmark:
 
@@ -125,13 +129,13 @@ Run at least these ablations:
 
 The benchmark must score false acceptance and false rejection separately. If an observer is unavailable, a consumer may accept only when every graph node still satisfies the configured per-node quorum and failure-domain threshold; otherwise it must return insufficient evidence. A timeout is not an implicit witness.
 
-## 8. External memory benchmarks remain separate
+## 9. External memory benchmarks remain separate
 
 This quorum does not improve AML recall scores by itself. It addresses a different capability. MACE must still run the official Agent Memory Leaderboard tracks separately and compare agentic memory against AMA-Bench, MemoryArena, Memora/FAMA, MEMORA-Bench and LongMemEval-V2 with matched harnesses and budgets.
 
 The key opportunity is to connect memory-guided decisions to independently corroborated evidence. MemoryArena shows why recall-only evaluation is not sufficient: agents must acquire, consolidate and reuse experience across interdependent tasks. AMA-Bench separately emphasizes causal inference and state updates across trajectories. MACE should combine those memory capabilities with evidence provenance and decision-use assurance without averaging the benchmarks together.
 
-## 9. Validation status and next steps
+## 10. Validation status and next steps
 
 - Rust witness quorum module and public module export are authored.
 - Consumer policy and per-node witness receipt schemas are published.
