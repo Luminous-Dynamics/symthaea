@@ -69,6 +69,7 @@ pub enum CandidateScreenReasonV1 {
     ForwardEvaluationReceiptPredictionMismatch,
     ForwardEvaluationReceiptStatusMismatch,
     ForwardEvaluationReceiptNotYetAvailable,
+    ForwardEvaluationReceiptClockDomainMismatch,
     ForwardEvidenceUnknown,
     ForwardEvidenceRejected,
     MissingRequiredPrediction,
@@ -137,6 +138,8 @@ pub struct HistoricalSupportEvidenceV1 {
 pub struct ForwardEvaluationReceiptV1 {
     pub schema: String,
     pub evaluator_id: String,
+    pub clock_domain_id: String,
+    pub clock_mapping_sha256: String,
     pub process_snapshot_sha256: String,
     pub forward_model_sha256: String,
     pub model_qualification_report_sha256: Option<String>,
@@ -195,6 +198,8 @@ pub struct InverseVmShortlistInputV1 {
     pub process_snapshot_sha256: String,
     /// Decision knowledge frontier; forward receipts available later cannot be used.
     pub decision_at_unix_seconds: i64,
+    pub clock_domain_id: String,
+    pub clock_mapping_sha256: String,
     pub policy: InverseVmShortlistPolicyV1,
     pub candidates: Vec<InverseVmCandidateV1>,
 }
@@ -464,6 +469,13 @@ fn validate_forward_evaluation_receipt(
         reasons.push(CandidateScreenReasonV1::ForwardEvaluationReceiptSchemaMismatch);
     }
     require_text(&receipt.evaluator_id, "forward_receipt.evaluator_id")?;
+    require_text(&receipt.clock_domain_id, "forward_receipt.clock_domain_id")?;
+    if !valid_sha256(&receipt.clock_mapping_sha256)
+        || receipt.clock_mapping_sha256 != input.clock_mapping_sha256
+        || receipt.clock_domain_id != input.clock_domain_id
+    {
+        reasons.push(CandidateScreenReasonV1::ForwardEvaluationReceiptClockDomainMismatch);
+    }
     if !valid_sha256(&receipt.receipt_sha256)
         || forward_receipt_digest(receipt)? != receipt.receipt_sha256
     {
@@ -890,6 +902,12 @@ pub fn evaluate_inverse_vm_shortlist_v1(
         ));
     }
     require_text(&input.input_id, "input.input_id")?;
+    require_text(&input.clock_domain_id, "input.clock_domain_id")?;
+    if !valid_sha256(&input.clock_mapping_sha256) {
+        return Err(InverseVmShortlistErrorV1(
+            "decision clock mapping digest is malformed".into(),
+        ));
+    }
     if input.decision_at_unix_seconds < 0 {
         return Err(InverseVmShortlistErrorV1(
             "decision knowledge frontier must be a non-negative Unix timestamp".into(),
@@ -1134,6 +1152,8 @@ mod tests {
             input_id: "inverse-epi-input-001".into(),
             process_snapshot_sha256: digest('e'),
             decision_at_unix_seconds: 2_000,
+            clock_domain_id: "fab-clock".into(),
+            clock_mapping_sha256: digest('9'),
             policy: policy(),
             candidates,
         }
@@ -1219,6 +1239,22 @@ mod tests {
             tampered_report.evaluations[0]
                 .reasons
                 .contains(&CandidateScreenReasonV1::ForwardEvaluationReceiptDigestMismatch)
+        );
+    }
+
+    #[test]
+    fn forward_receipt_clock_domain_or_mapping_mismatch_is_rejected() {
+        let mut candidate = candidate("wrong-clock-map", 200.0, 50.0, (99.0, 101.0), 0.2);
+        let receipt = candidate.forward_evaluation_receipt.as_mut().unwrap();
+        receipt.clock_mapping_sha256 = digest('8');
+        receipt.receipt_sha256 = forward_receipt_digest(receipt).unwrap();
+        candidate.candidate_evidence_sha256 = candidate_digest(&candidate).unwrap();
+        let report = evaluate_inverse_vm_shortlist_v1(&input(vec![candidate])).unwrap();
+        assert_eq!(report.evaluations[0].state, CandidateScreenStateV1::Rejected);
+        assert!(
+            report.evaluations[0]
+                .reasons
+                .contains(&CandidateScreenReasonV1::ForwardEvaluationReceiptClockDomainMismatch)
         );
     }
 
@@ -1436,6 +1472,8 @@ mod tests {
             input_id: "diversity-minimum-test".into(),
             process_snapshot_sha256: digest('e'),
             decision_at_unix_seconds: 2_000,
+            clock_domain_id: "fab-clock".into(),
+            clock_mapping_sha256: digest('9'),
             policy,
             candidates: vec![a, b],
         };
