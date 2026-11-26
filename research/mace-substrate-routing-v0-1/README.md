@@ -25,7 +25,7 @@ Every successful plan explicitly requires canonical evidence resolution and curr
 - Temporal trajectory query: temporal HDC-LTC pattern lookup plus dependency-graph closure and raw-source resolution.
 - Broad structured recall distinguishes typed-content HDC, temporal HDC-LTC and event-ID HDC rather than treating them as one interchangeable HDC substrate.
 - Sequential action: bitemporal state; add procedural memory only when the caller declares that a qualified skill is required; always check skill preconditions.
-- Broad recall: choose one candidate substrate according to a fixed, auditable preference order. Structured queries prefer typed-content HDC, then temporal HDC-LTC, dense semantic, event-ID HDC, sparse lexical, lineage-verified hierarchical summary, then raw scan. Other queries prefer dense semantic, typed-content HDC, temporal HDC-LTC, event-ID HDC, sparse lexical, lineage-verified hierarchical summary, then raw scan. A selected summary requires dependency-graph parent closure plus raw-source resolution; if either is unavailable, the route is non-qualifying.
+- Broad recall: choose one candidate substrate according to a fixed, auditable preference order. Structured queries prefer typed-content HDC, then temporal HDC-LTC, dense semantic, event-ID HDC, sparse lexical, lineage-verified hierarchical summary, then raw scan. Other queries prefer dense semantic, typed-content HDC, temporal HDC-LTC, event-ID HDC, sparse lexical, lineage-verified hierarchical summary, then raw scan. A summary is eligible only when dependency-graph parent closure and raw-source resolution are both available. If either is unavailable, the router skips the summary and falls back to a standalone raw-source route when available; otherwise the plan is non-qualifying.
 
 The preference order is a transparent baseline, not an optimality claim. The next research increment should replace it with a held-out, cost-sensitive selector while preserving the same hard evidence and resource gates.
 
@@ -44,4 +44,4 @@ cargo fmt --check
 cargo test
 ```
 
-Tests are authored but have not been executed in this environment.
+Twenty-two deterministic unit tests are authored, covering route selection, temporal re-observation, summary ancestry, HDC substrate separation, component-wise budget enforcement, phase-cost accounting, amortization basis, overflow and catalogue-order determinism. Tests have not been executed in this environment.
