@@ -928,6 +928,48 @@ mod tests {
         );
     }
 
+    struct PinnedResourceExpiry {
+        expected_valid_until_unix: u64,
+    }
+    impl DecisionResourceReceiptVerifierV1 for PinnedResourceExpiry {
+        fn verify(
+            &self,
+            _decision_need_sha256: &str,
+            _query_option_id: &str,
+            _action_template_sha256: &str,
+            _resource_profile_sha256: &str,
+            _resource_receipt_sha256: &str,
+            _tool_calls: u32,
+            _estimated_latency_ns: u64,
+            _estimated_context_tokens: u64,
+            _estimated_inspected_bytes: u64,
+            _acquisition_cost_utility_units: u64,
+            resource_valid_until_unix: u64,
+            _now_unix: u64,
+        ) -> Result<(), DecisionResourceReceiptRejectV1> {
+            if resource_valid_until_unix == self.expected_valid_until_unix {
+                Ok(())
+            } else {
+                Err(DecisionResourceReceiptRejectV1::ProfileMismatch)
+            }
+        }
+    }
+
+    #[test]
+    fn resource_receipt_is_bound_to_its_validity_expiry() {
+        let policy = policy();
+        let mut option = informative_option();
+        let verifier = PinnedResourceExpiry {
+            expected_valid_until_unix: option.resource_valid_until_unix,
+        };
+        assert!(evaluate_robust_value_v1(&policy, &option, 10, &verifier).is_ok());
+        option.resource_valid_until_unix = 90;
+        assert_eq!(
+            evaluate_robust_value_v1(&policy, &option, 10, &verifier),
+            Err(DecisionValueRejectV1::ResourceReceiptRejected)
+        );
+    }
+
     #[test]
     fn informative_query_has_positive_evsi_after_cost() {
         let assessment = evaluate_expected_value_v1(
