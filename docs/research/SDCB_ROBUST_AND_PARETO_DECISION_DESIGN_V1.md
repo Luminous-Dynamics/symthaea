@@ -96,7 +96,7 @@ Two hypotheses are equally likely. There are three actions with two objectives: 
 
 The fast action has expected safety margin -1.5, which is above a declared average floor of -2. But it violates the floor under h1. RPSD excludes it because hard constraints are checked per plausible hypothesis, not only on the average.
 
-The remaining Pareto options are balanced (8,-1) and safe (6,0). An illustrative two-outcome, uninformative experiment can produce the intermediate policy vector (7,-0.5), but this does not make the measurement scientifically informative; the cost dimension and stop baseline must remain visible when comparing policies.
+The remaining Pareto options are balanced (8,-1) and safe (6,0). An uninformative two-outcome experiment can induce the intermediate vector (7,-0.5) by assigning different actions to its two outcomes. But because the outcome is independent of the hypothesis, the same action lottery can be executed without measuring anything. The implementation explicitly adds this zero-cost `NO_EXPERIMENT_LOTTERY` baseline; the paid uninformative measurement is dominated and is not presented as an information gain. A genuinely informative probe can remain on the frontier when its outcome/action correlation improves objective values beyond the corresponding free lottery.
 
 ## 6. Reference implementation
 
@@ -113,7 +113,7 @@ The standard-library-only Rust reference implements:
 
 Limits are deliberately explicit: robust ambiguity sets are capped at 8 scenarios, 5 actions, 4 outcomes and 8 experiment candidates; Pareto enumeration is capped at 8 actions, 6 objectives, 4 outcomes and 8 candidates. These bounds are safeguards against accidental combinatorial explosion, not performance claims.
 
-**17 Rust tests are authored. They have not been compiled or executed in this environment because rustc/cargo are unavailable.** Independent JavaScript calculations were used to check the two frozen examples; this is not Rust execution.
+**19 Rust tests are authored. They have not been compiled or executed in this environment because rustc/cargo are unavailable.** Independent JavaScript calculations were used to check the two frozen examples; this is not Rust execution.
 
 ## 7. Benchmarks and external comparisons
 
