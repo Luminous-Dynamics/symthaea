@@ -8,6 +8,8 @@
     "schema",
     "benchmark_id",
     "benchmark_version",
+    "dataset_revision_sha256",
+    "official_scorer_revision_sha256",
     "split",
     "triads"
   ],
@@ -34,6 +36,12 @@
       "items": {
         "$ref": "#/$defs/triad"
       }
+    },
+    "dataset_revision_sha256": {
+      "$ref": "#/$defs/digest"
+    },
+    "official_scorer_revision_sha256": {
+      "$ref": "#/$defs/digest"
     }
   },
   "$defs": {
