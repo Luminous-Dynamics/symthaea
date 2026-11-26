@@ -87,6 +87,22 @@ Here \(V_r^{(s)}\) and \(U_r^{(s)}\) are the retained right and left singular ve
 
 The first Rust implementation lives in `crates/domains/symthaea-plasma-probes/src/rbkr.rs`. It computes the factor-space SVD using a deterministic one-sided Jacobi method, checks resource budgets, constructs biorthogonal bases, maps states, reconstructs states, and projects a caller-supplied discrete A/B/C system.
 
+### Status of the proposed third object: representation / reconstruction
+
+The v0.1 routine is deliberately a two-Gramian implementation. It does not yet build a separate representation Gramian (W_r). The reconstruction metric is currently expected to be reflected in a shared nondimensionalized / whitened state coordinate system, while byte cost is enforced through explicit factor, basis, SVD, and work budgets. This is not equivalent to a fully optimized three-object reduction.
+
+A concrete next interface is a positive-definite reconstruction metric (M_r=L^T L). Balance in whitened coordinates (	ilde x=Lx), then map the bases back as
+[
+V_x=L^{-1}\tilde V,\qquad W_x=L^T\tilde W,
+]
+which preserves (W_x^T V_x=I). Storage cost should remain an explicit constrained term, not be smuggled into a quadratic metric:
+[
+\min_{V,W}\;\sup_{u\in\mathcal U,\;t\in[0,T]} D_{\mathcal C}(u,t;V,W)
+\quad\text{subject to}\quad
+\operatorname{bytes}(V,\text{decoder},\text{residual})\le B.
+]
+For finite-amplitude response, replace the local linear objective with held-out response signatures and a branch-aware remainder / uncertainty envelope. This is the proper path from two-Gramian v0.1 toward the user's three-object proposal.
+
 ### Critical assumptions
 
 - Both Gramians must use the same state coordinates and state metric. Apply declared nondimensionalization / metric whitening before forming factors; do not silently mix units or coordinates.
