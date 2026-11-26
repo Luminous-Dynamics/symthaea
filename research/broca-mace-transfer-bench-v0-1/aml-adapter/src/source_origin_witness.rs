@@ -456,6 +456,35 @@ fn verifier_map<'a>(
     Ok(map)
 }
 
+fn validate_witness_metadata_agreement(
+    witnesses: &[&VerifiedSourceOriginWitnessV1],
+) -> Result<(), SourceOriginWitnessRejectV1> {
+    let mut acquisition_records = BTreeSet::new();
+    let mut publisher_identity: Option<&str> = None;
+    let mut source_revision: Option<&str> = None;
+    for item in witnesses {
+        let receipt = &item.receipt;
+        if let Some(expected) = publisher_identity {
+            if expected != receipt.publisher_identity_sha256.as_str() {
+                return Err(SourceOriginWitnessRejectV1::ObservedSourceMismatch);
+            }
+        } else {
+            publisher_identity = Some(&receipt.publisher_identity_sha256);
+        }
+        if let Some(expected) = source_revision {
+            if expected != receipt.source_revision_sha256.as_str() {
+                return Err(SourceOriginWitnessRejectV1::ObservedSourceMismatch);
+            }
+        } else {
+            source_revision = Some(&receipt.source_revision_sha256);
+        }
+        if !acquisition_records.insert(receipt.acquisition_record_sha256.as_str()) {
+            return Err(SourceOriginWitnessRejectV1::SharedObservationRecord);
+        }
+    }
+    Ok(())
+}
+
 fn validate_per_node_quorum(
     graph: &VerifiedSourceLineageGraphV1,
     policy: &SourceOriginWitnessPolicyV1,
@@ -467,27 +496,13 @@ fn validate_per_node_quorum(
         let mut acquisition_records = BTreeSet::new();
         let mut publisher_identity: Option<&str> = None;
         let mut source_revision: Option<&str> = None;
-        for item in witnesses.iter().filter(|item| item.receipt.evidence_id == node.evidence_id) {
-            let receipt = &item.receipt;
-            operators.insert(receipt.operator_id.as_str());
-            domains.insert(receipt.failure_domain_sha256.as_str());
-            if let Some(expected) = publisher_identity {
-                if expected != receipt.publisher_identity_sha256 {
-                    return Err(SourceOriginWitnessRejectV1::ObservedSourceMismatch);
-                }
-            } else {
-                publisher_identity = Some(&receipt.publisher_identity_sha256);
-            }
-            if let Some(expected) = source_revision {
-                if expected != receipt.source_revision_sha256 {
-                    return Err(SourceOriginWitnessRejectV1::ObservedSourceMismatch);
-                }
-            } else {
-                source_revision = Some(&receipt.source_revision_sha256);
-            }
-            if !acquisition_records.insert(receipt.acquisition_record_sha256.as_str()) {
-                return Err(SourceOriginWitnessRejectV1::SharedObservationRecord);
-            }
+        let node_witnesses = witnesses.iter()
+            .filter(|item| item.receipt.evidence_id == node.evidence_id)
+            .collect::<Vec<_>>();
+        validate_witness_metadata_agreement(&node_witnesses)?;
+        for item in &node_witnesses {
+            operators.insert(item.receipt.operator_id.as_str());
+            domains.insert(item.receipt.failure_domain_sha256.as_str());
         }
         if operators.len() < policy.minimum_operators as usize {
             return Err(SourceOriginWitnessRejectV1::TooFewWitnesses);
@@ -956,7 +971,57 @@ mod tests {
 
     #[test]
     fn shared_acquisition_record_cannot_masquerade_as_two_independent_observations() {
-        let mut left = SourceOriginWitnessReceiptV1 {
+        let make = |operator_id: &str, acquisition_record: &str| {
+            VerifiedSourceOriginWitnessV1 {
+                receipt: SourceOriginWitnessReceiptV1 {
+                    run_id: "run-1".into(),
+                    query_invocation_id: "invocation-1".into(),
+                    graph_sha256: "a".repeat(64),
+                    source_origin_receipt_sha256: "b".repeat(64),
+                    operator_id: operator_id.into(),
+                    failure_domain_sha256: if operator_id == "archive-a" {
+                        "c".repeat(64)
+                    } else {
+                        "d".repeat(64)
+                    },
+                    evidence_id: "node-1".into(),
+                    source_id: "source-1".into(),
+                    source_sha256: "e".repeat(64),
+                    payload_sha256: "f".repeat(64),
+                    evidence_class_sha256: "1".repeat(64),
+                    observed_parent_evidence_ids: Vec::new(),
+                    derivation_receipt_sha256: None,
+                    common_cause_group_sha256: Vec::new(),
+                    publisher_identity_sha256: "2".repeat(64),
+                    acquisition_record_sha256: acquisition_record.into(),
+                    source_revision_sha256: "3".repeat(64),
+                    observed_at_unix: 10,
+                    issued_at_unix: 11,
+                    expires_at_unix: 20,
+                    status: "observed_consistent".into(),
+                    issuer_profile_sha256: "4".repeat(64),
+                    key_id: if operator_id == "archive-a" {
+                        "5".repeat(64)
+                    } else {
+                        "6".repeat(64)
+                    },
+                },
+                envelope_sha256: "7".repeat(64),
+                pae: Vec::new(),
+                signature: Vec::new(),
+            }
+        };
+        let left = make("archive-a", &"8".repeat(64));
+        let right = make("archive-b", &"8".repeat(64));
+        assert_eq!(
+            validate_witness_metadata_agreement(&[&left, &right]),
+            Err(SourceOriginWitnessRejectV1::SharedObservationRecord)
+        );
+    }
+
+    #[test]
+    fn publisher_and_revision_disagreement_are_not_averaged() {
+        let mut first = SourceOriginWitnessReceiptV1 {
             run_id: "run-1".into(),
             query_invocation_id: "invocation-1".into(),
             graph_sha256: "a".repeat(64),
@@ -981,22 +1046,39 @@ mod tests {
             issuer_profile_sha256: "4".repeat(64),
             key_id: "5".repeat(64),
         };
-        let mut right = left.clone();
-        right.operator_id = "archive-b".into();
-        right.failure_domain_sha256 = "6".repeat(64);
+        let mut second = first.clone();
+        second.operator_id = "archive-b".into();
+        second.acquisition_record_sha256 = "6".repeat(64);
+        second.key_id = "7".repeat(64);
+        second.publisher_identity_sha256 = "8".repeat(64);
         assert_eq!(
-            (left.acquisition_record_sha256.as_str(), right.acquisition_record_sha256.as_str()),
-            ("2".repeat(64).as_str(), "2".repeat(64).as_str())
+            validate_witness_metadata_agreement(&[
+                &VerifiedSourceOriginWitnessV1 {
+                    receipt: first.clone(), envelope_sha256: "9".repeat(64),
+                    pae: Vec::new(), signature: Vec::new(),
+                },
+                &VerifiedSourceOriginWitnessV1 {
+                    receipt: second.clone(), envelope_sha256: "a".repeat(64),
+                    pae: Vec::new(), signature: Vec::new(),
+                },
+            ]),
+            Err(SourceOriginWitnessRejectV1::ObservedSourceMismatch)
         );
-        right.acquisition_record_sha256 = left.acquisition_record_sha256.clone();
+        second.publisher_identity_sha256 = first.publisher_identity_sha256.clone();
+        second.source_revision_sha256 = "b".repeat(64);
         assert_eq!(
-            (left.operator_id.as_str(), right.operator_id.as_str()),
-            ("archive-a", "archive-b")
+            validate_witness_metadata_agreement(&[
+                &VerifiedSourceOriginWitnessV1 {
+                    receipt: first, envelope_sha256: "9".repeat(64),
+                    pae: Vec::new(), signature: Vec::new(),
+                },
+                &VerifiedSourceOriginWitnessV1 {
+                    receipt: second, envelope_sha256: "a".repeat(64),
+                    pae: Vec::new(), signature: Vec::new(),
+                },
+            ]),
+            Err(SourceOriginWitnessRejectV1::ObservedSourceMismatch)
         );
-        // A per-node quorum applies the uniqueness check to this exact condition.
-        let records = [left.acquisition_record_sha256.as_str(), right.acquisition_record_sha256.as_str()]
-            .into_iter().collect::<BTreeSet<_>>();
-        assert_eq!(records.len(), 1);
     }
 
     #[test]
