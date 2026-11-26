@@ -295,9 +295,9 @@ No later phase is implied by completing an earlier phase.
 
 ## 10. Adversarial qualification corpus
 
-The companion corpus begins with 50 synthetic cases across identity, scope, delegation, temporal validity, revocation, history integrity, cryptographic verification, source availability, independence, and operation replay.
+The companion corpus contains 50 descriptive synthetic scenario seeds across identity, scope, delegation, temporal validity, revocation, history integrity, cryptographic verification, source availability, independence, and operation replay. Each seed carries an expected disposition and required control, but its prose description is not yet a fully parameterized executable fixture.
 
-It includes positive controls as well as attacks. Expected dispositions are finite known-answer classifications, not statistical security estimates.
+It includes positive controls as well as attacks. These expected classifications are finite corpus labels, not statistical security estimates or claims about field failure rates.
 
 Mandatory cases include:
 - proposal authority used as execution authority;
