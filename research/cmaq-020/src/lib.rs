@@ -323,7 +323,9 @@ mod tests {
                 .exact_equivalent
         );
         assert_eq!(
-            score_abstraction(&[left, right], &contract).expect("valid fixture").false_merges,
+            score_abstraction(&[left, right], &contract)
+                .expect("valid fixture")
+                .false_merges,
             1
         );
     }
