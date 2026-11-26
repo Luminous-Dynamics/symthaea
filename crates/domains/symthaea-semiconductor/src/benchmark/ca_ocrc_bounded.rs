@@ -101,7 +101,7 @@ pub struct CaOcrcPolicyV1 {
     pub proxy_delay_pmf: Vec<f64>,
     /// External declaration/receipt supporting the arbitrary bounded-delay assumption.
     pub actual_delay_contract_sha256: String,
-    pub bounded_actual_delay_assumption_attested: bool,
+    pub bounded_actual_delay_assumption_declared: bool,
 }
 
 #[derive(Clone, Debug, PartialEq, Serialize, Deserialize)]
@@ -584,11 +584,11 @@ pub fn create_ca_ocrc_engine_v1(
     }
     validate_policy(&policy)?;
     let policy_sha256 = policy_digest(&policy)?;
-    let delay_assumption_attested = policy.bounded_actual_delay_assumption_attested;
+    let delay_assumption_attested = policy.bounded_actual_delay_assumption_declared;
     let mut guarantee_invalid_reasons = BTreeSet::new();
     if !delay_assumption_attested {
         guarantee_invalid_reasons
-            .insert("bounded_actual_delay_assumption_not_attested".to_string());
+            .insert("bounded_actual_delay_assumption_not_declared".to_string());
     }
     Ok(CaOcrcEngineV1 {
         schema: CA_OCRC_ENGINE_SCHEMA_V1.into(),
@@ -1259,7 +1259,7 @@ mod tests {
             tracking_capacity: k,
             proxy_delay_pmf: pmf,
             actual_delay_contract_sha256: digest('f'),
-            bounded_actual_delay_assumption_attested: true,
+            bounded_actual_delay_assumption_declared: true,
         }
     }
 
@@ -1778,6 +1778,69 @@ mod tests {
         .unwrap();
         assert_eq!(report.feedback_results[0].disposition, CaOcrcFeedbackDispositionV1::Rejected);
         assert_eq!(engine.state.threshold, before);
+    }
+
+    #[test]
+    fn label_must_not_be_available_before_the_prediction() {
+        let mut engine = engine(2, 2);
+        step_ca_ocrc_round_v1(
+            &mut engine,
+            &input(
+                prediction(0, "s0", CaOcrcSetKindV1::Interval, true, Some(0.9)),
+                Vec::new(),
+            ),
+        )
+        .unwrap();
+        let mut feedback = feedback(
+            1,
+            "s0",
+            "l0",
+            1,
+            LabelConsumptionEligibilityV1::EligibleUnderDeclaredPolicy,
+        );
+        feedback.label_available_at_unix_seconds = 1_800_000_005;
+        feedback.eligibility_report_available_at_unix_seconds = 1_800_000_070;
+        feedback.delivered_at_unix_seconds = 1_800_000_070;
+        let before = engine.state.threshold;
+        let report = step_ca_ocrc_round_v1(
+            &mut engine,
+            &input(
+                prediction(1, "s1", CaOcrcSetKindV1::Interval, true, Some(0.9)),
+                vec![feedback],
+            ),
+        )
+        .unwrap();
+        assert_eq!(
+            report.feedback_results[0].disposition,
+            CaOcrcFeedbackDispositionV1::Rejected
+        );
+        assert!(
+            report.feedback_results[0]
+                .reasons
+                .contains(&CaOcrcReasonV1::LabelAvailableBeforePrediction)
+        );
+        assert_eq!(engine.state.threshold, before);
+        assert!(!report.theorem_assumptions_intact);
+    }
+
+    #[test]
+    fn round_clock_must_advance_strictly() {
+        let mut engine = engine(2, 2);
+        step_ca_ocrc_round_v1(
+            &mut engine,
+            &input(
+                prediction(0, "s0", CaOcrcSetKindV1::Interval, true, Some(0.9)),
+                Vec::new(),
+            ),
+        )
+        .unwrap();
+        let before = engine_digest(&engine).unwrap();
+        let mut next = prediction(1, "s1", CaOcrcSetKindV1::Interval, true, Some(0.9));
+        next.round_time_unix_seconds = 1_800_000_010;
+        next.prediction_at_unix_seconds = 1_800_000_005;
+        next.event_time_unix_seconds = 1_800_000_000;
+        assert!(step_ca_ocrc_round_v1(&mut engine, &input(next, Vec::new())).is_err());
+        assert_eq!(engine_digest(&engine).unwrap(), before);
     }
 
     #[test]
