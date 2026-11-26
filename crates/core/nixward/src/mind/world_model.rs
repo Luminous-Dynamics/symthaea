@@ -972,6 +972,10 @@ impl Default for NixWorldModel {
 #[cfg(test)]
 mod tests {
     use super::*;
+    use cmaq_020_state_response::{
+        score_abstraction, ResponseKey, StateResponseContract, StateResponseRecord,
+    };
+    use std::collections::{BTreeMap, BTreeSet};
 
     #[test]
     fn test_learn_and_predict() {
@@ -2249,4 +2253,219 @@ mod tests {
             .is_err()
         );
     }
+    #[test]
+    fn cmaq_adapter_qualifies_query_sufficient_partition_from_real_nixward_hdc_predictions() {
+        const DIM: usize = 256;
+        let mut world_model = NixWorldModel::new(DIM);
+        let context_a = ContinuousHV::random(DIM, 700);
+        let context_b = ContinuousHV::random(DIM, 701);
+        let delta_a = ContinuousHV::from_vec(
+            std::iter::once(0.1)
+                .chain(std::iter::repeat_n(0.0, DIM - 1))
+                .collect(),
+        );
+        let delta_b = ContinuousHV::from_vec(
+            std::iter::once(0.5)
+                .chain(std::iter::repeat_n(0.0, DIM - 1))
+                .collect(),
+        );
+        let action_parameters = ContinuousHV::random(DIM, 90);
+
+        let state_with = |coordinate_zero: f32, nuisance: f32| {
+            let mut values = vec![0.0; DIM];
+            values[0] = coordinate_zero;
+            values[1] = nuisance;
+            ContinuousHV::from_vec(values)
+        };
+
+        // Three independent training clusters per family teach the actual
+        // NixWard contextual HDC-delta path two different action consequences.
+        for index in 0..3 {
+            let before_a = state_with(0.1, -0.8 + index as f32 * 0.05);
+            let after_a = before_a.add(&delta_a);
+            let mut episode_a = transition_episode(
+                &format!("cmaq022-family-a-{index}"),
+                ActionCategory::Install,
+                ActionCategory::Install,
+                before_a,
+                context_a.clone(),
+                after_a,
+                TransitionOutcomeClass::Success,
+                &format!("cmaq022-family-a-cluster-{index}"),
+            );
+            episode_a.environment_family_id = "mechanism-a".to_owned();
+            episode_a
+                .execution
+                .clone();
+            world_model
+                .learn_episode(&episode_a)
+                .expect("family A executed episode must train the HDC model");
+
+            let before_b = state_with(0.1, 0.55 + index as f32 * 0.05);
+            let after_b = before_b.add(&delta_b);
+            let mut episode_b = transition_episode(
+                &format!("cmaq022-family-b-{index}"),
+                ActionCategory::Install,
+                ActionCategory::Install,
+                before_b,
+                context_b.clone(),
+                after_b,
+                TransitionOutcomeClass::Success,
+                &format!("cmaq022-family-b-cluster-{index}"),
+            );
+            episode_b.environment_family_id = "mechanism-b".to_owned();
+            world_model
+                .learn_episode(&episode_b)
+                .expect("family B executed episode must train the HDC model");
+        }
+
+        let evaluation_states = [
+            (
+                "a-left",
+                "mechanism-a",
+                "evaluation-cluster-a-left",
+                state_with(0.1, -0.65),
+                context_a.clone(),
+                200_i64,
+            ),
+            (
+                "a-right",
+                "mechanism-a",
+                "evaluation-cluster-a-right",
+                state_with(0.1, -0.35),
+                context_a.clone(),
+                200_i64,
+            ),
+            (
+                "b-left",
+                "mechanism-b",
+                "evaluation-cluster-b-left",
+                state_with(0.1, 0.45),
+                context_b.clone(),
+                600_i64,
+            ),
+            (
+                "b-right",
+                "mechanism-b",
+                "evaluation-cluster-b-right",
+                state_with(0.1, 0.75),
+                context_b.clone(),
+                600_i64,
+            ),
+        ];
+
+        let key = ResponseKey::new("install", "coordinate_0_after_action", 1);
+        let mut contract = StateResponseContract {
+            contract_id: "cmaq-022-nixward-hdc-toy-v1".to_owned(),
+            contract_sha256: "a".repeat(64),
+            source_manifest_sha256: "b".repeat(64),
+            domain_ids: ["toy-nixos-domain".to_owned()].into_iter().collect(),
+            intervention_ids: ["install".to_owned()].into_iter().collect(),
+            query_ids: ["coordinate_0_after_action".to_owned()]
+                .into_iter()
+                .collect(),
+            horizons: [1].into_iter().collect(),
+            invariant_ids: ["constant-invariant".to_owned()].into_iter().collect(),
+            tolerance_units: BTreeMap::new(),
+            probe_cost_units: BTreeMap::new(),
+        };
+        contract.tolerance_units.insert(key.clone(), 1);
+        contract.probe_cost_units.insert(key.clone(), 1);
+        contract.validate().expect("frozen CMAQ response contract");
+
+        let quantize_query = |state: &ContinuousHV| {
+            (state.as_slice()[0] as f64 * 1000.0).round() as i64
+        };
+        let mut hdc_records = Vec::new();
+        let mut global_records = Vec::new();
+        let mut identity_records = Vec::new();
+        let mut full_state_records = Vec::new();
+
+        // Candidate prediction and abstraction-label construction happen before
+        // evaluator-only response values are attached to the records below.
+        for (state_id, family, cluster, before, context, reference_response) in
+            &evaluation_states
+        {
+            let hdc_prediction = world_model
+                .predict_state_without_family_label(
+                    before,
+                    &ActionCategory::Install,
+                    &action_parameters,
+                    context,
+                )
+                .expect("family-label-free NixWard prediction");
+            assert_eq!(
+                hdc_prediction.source,
+                ContextualPredictionSource::ContextualDelta,
+                "the toy fixture should produce an unambiguous contextual prediction"
+            );
+
+            let hdc_label = format!(
+                "coordinate_0:{}",
+                quantize_query(&hdc_prediction.predicted_state)
+            );
+            let full_state_label = hdc_prediction
+                .predicted_state
+                .as_slice()
+                .iter()
+                .map(|value| format!("{value:.6}"))
+                .collect::<Vec<_>>()
+                .join(",");
+
+            world_model.observe(before.clone());
+            let global_prediction = world_model.predict_state(&ActionCategory::Install);
+            let global_label = format!(
+                "coordinate_0:{}",
+                quantize_query(&global_prediction)
+            );
+            let identity_label =
+                format!("coordinate_0:{}", quantize_query(before));
+
+            let build_record = |abstract_state_id: String| StateResponseRecord {
+                state_id: (*state_id).to_owned(),
+                domain_id: "toy-nixos-domain".to_owned(),
+                environment_family_id: (*family).to_owned(),
+                environment_cluster_id: (*cluster).to_owned(),
+                source_state_sha256: format!("{:0<64}", state_id),
+                candidate_checkpoint_sha256: "c".repeat(64),
+                abstract_state_id,
+                invariant_signature: [("constant-invariant".to_owned(), 1)]
+                    .into_iter()
+                    .collect(),
+                // This is evaluator-only reference information; it is never
+                // passed into NixWorldModel or used to create candidate labels.
+                responses: [(key.clone(), *reference_response)].into_iter().collect(),
+            };
+
+            hdc_records.push(build_record(hdc_label));
+            global_records.push(build_record(global_label));
+            identity_records.push(build_record(identity_label));
+            full_state_records.push(build_record(full_state_label));
+        }
+
+        let hdc_score =
+            score_abstraction(&hdc_records, &contract).expect("score HDC query partition");
+        let global_score =
+            score_abstraction(&global_records, &contract).expect("score global-delta partition");
+        let identity_score =
+            score_abstraction(&identity_records, &contract).expect("score identity partition");
+        let full_state_score =
+            score_abstraction(&full_state_records, &contract).expect("score full-state partition");
+
+        // The HDC candidate merges nuisance-only variants while separating the
+        // two distinct future intervention responses. Full-state memorization
+        // over-splits; pooled global delta and identity/no-op both under-split.
+        assert_eq!(hdc_score.false_merges, 0);
+        assert_eq!(hdc_score.false_splits, 0);
+        assert_eq!(hdc_score.candidate_class_count, 2);
+
+        assert_eq!(global_score.false_merges, 4);
+        assert_eq!(identity_score.false_merges, 4);
+        assert_eq!(full_state_score.false_splits, 2);
+
+        assert!(hdc_score.false_merges < global_score.false_merges);
+        assert!(hdc_score.false_merges < identity_score.false_merges);
+        assert!(hdc_score.false_splits < full_state_score.false_splits);
+    }
+
 }
