@@ -112,6 +112,7 @@ These are project targets, not external standards or achieved results:
 - Drift-aware Markov instrument-state and independent-device replication reference: draft PR #13793.
 - Evidence-gated joint scientific/instrument belief transition: draft PR #13801.
 - Shared common-cause measurement and reference-calibration decision oracle: draft PR #13804.
+- Evidence-gated joint science/common-cause/device belief transition: draft PR #13805.
 
 All current additions have authored Rust tests, but the toolchain is unavailable here and the draft workflows are skipped. No benchmark tournament, physical experiment, or SOTA result has been completed.
 
@@ -154,4 +155,12 @@ Comparator requirements now include:
 - check-standard/control-chart policies;
 - matched EIG, EVSI, R-IDeA, multi-fidelity, and exact finite references.
 
-The next research extension should distinguish genuine correlation in the measured physical field from shared sensor error, and should include common reference-chain, batch, firmware, power, and environmental factors. The bounded binary common-state reference does not yet solve continuous or multiple-factor sensor-network calibration.9
+The next research extension should distinguish genuine correlation in the measured physical field from shared sensor error, and should include common reference-chain, batch, firmware, power, and environmental factors. The bounded binary common-state reference does not yet solve continuous or multiple-factor sensor-network calibration.
+
+### 4.7 From evidence provenance to joint evidence-state estimation
+
+Authenticating a measurement receipt and updating a scientific posterior are not enough when measurement errors have shared structure. The belief service must retain the common cause and each device's local state, or later observations can be interpreted against an obsolete or collapsed measurement model.
+
+The new common-cause EGBT reference extends the existing receipt-bound joint ledger from (p(h,c_1,ldots,c_D)) to (p(h,g,c_1,ldots,c_D)). Accepted observations bind the common-cause registry/ID/version as well as the device registry/ID/version, calibration context, capture interval, proposal, and global belief version. A reference-calibration receipt updates the shared state (g) while preserving scientific marginal belief when the prior warrants that; a subsequent science receipt updates (h) through the shared measurement state.
+
+This should remain a separate research reference until independent attestation, traceability, Markov state propagation, append-only event storage, and independent replay are qualified. Digest shape and a verifier boolean are not production cryptographic evidence.9
