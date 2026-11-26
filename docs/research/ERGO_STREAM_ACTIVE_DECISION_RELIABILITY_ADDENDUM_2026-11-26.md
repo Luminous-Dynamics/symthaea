@@ -549,22 +549,94 @@ Sources:
 These are research gates, not achieved Symthaea results. DCASE-native reproduction, OVO-S-native reproduction and internal cross-modal decision evaluation must be reported separately.
 
 
-## 11. Leaderboard freshness and the difference between measured SOTA and current industry capability
+## 11. OVO-S benchmark refresh: retrieval is not the primary bottleneck
 
-An external snapshot audit dated 24 November 2026 reports that OVO-S-Bench's highest listed score remains Gemini-3.1-Pro at 59.2, while the newest model release represented in the benchmark's tracked model table dates to April 2026. The same secondary audit lists several newer frontier models without OVO-S results, including GPT-6.2 Astra, GPT-6 Astra, Gemini 4 Carbon and Claude Fable 5.2.
+The current official OVO-S-Bench project page now reports 38 evaluated systems and includes Qwen3.5 models. This supersedes the earlier secondary-tracker note that described post-April model coverage as absent; the official table itself now includes Qwen3.5-397B-A17B, Qwen3.5-27B, Qwen3.5-9B and Qwen3.5-4B. Do not repeat the older claim that these models have no OVO-S scores.
 
-This does **not** show that those untested models would score higher. It shows that the leaderboard is not a complete snapshot of the frontier available on 26 November 2026. Therefore:
-- call 59.2 the strongest currently reported OVO-S-compatible result, not the strongest model available in the industry today;
-- distinguish official benchmark leaderboard entries from secondary tracker coverage and from untested model-release claims;
-- do not impute or predict a benchmark score for an untested model;
-- before a superiority claim, rerun the best accessible current models and the Symthaea candidates on the exact same OVO-S release, streaming prefix protocol, allowed frame rate, context, prompting/response contract and resource budget;
-- publish model revision, access date, serving configuration, failed/unsupported runs and per-level scores;
-- keep the published Gemini score as a reproducibility anchor even if newer matched runs supersede it.
+### 11.1 Current official leaderboard snapshot
 
-The same principle applies to OmniInteract, SPOT-Bench and DCASE: a published table is a dated measurement of submitted systems under a particular protocol, not an omniscient statement of the current field. Benchmark freshness is itself part of the evidence record.
+All values below are the official streaming-protocol multiple-choice accuracy table:
 
-The 59.2 overall / 54.9 L4 score and 86.6 streaming-human / 92.2 offline-human labels remain grounded in the official OVO-S project table. The model-coverage observation comes from a **secondary benchmark tracker**, and must be labelled as such rather than attributed to the benchmark authors.
+| Model | L1 | L2 | L3 | L4 | Overall |
+|---|---:|---:|---:|---:|---:|
+| Gemini-3.1-Pro | 61.9 | 64.0 | 55.9 | 54.9 | 59.2 |
+| Qwen3-VL-235B-A22B | 52.5 | 55.2 | 61.2 | 45.7 | 53.6 |
+| Qwen3.5-397B-A17B | 49.6 | 55.4 | 58.1 | 45.4 | 52.1 |
+| Qwen3.5-27B | 51.5 | 55.2 | 52.4 | 47.7 | 51.7 |
+| GPT-5.4 | 54.6 | 57.6 | 50.8 | 40.5 | 50.9 |
+| InternVL-3.5-241B-A28B | 55.6 | 55.7 | 51.6 | 40.5 | 50.9 |
+| Human (streaming) | 93.2 | 81.0 | 86.4 | 79.2 | 86.6 |
+| Human (offline) | 97.0 | 86.2 | 94.2 | 89.2 | 92.2 |
 
-Sources:
-- Official OVO-S leaderboard: https://github.com/InternLM/OVO-S-Bench
-- Secondary benchmark coverage snapshot (24 November 2026): https://www.benchmarkalmanac.com/benchmarks/ovo-s-bench/
+The best reported model remains Gemini-3.1-Pro at 59.2 overall / 54.9 L4; the strongest listed open baseline remains Qwen3-VL-235B-A22B at 53.6 / 45.7. The official streaming-human anchor is 86.6 / 79.2 L4. The table is a dated list of evaluated systems, not a guarantee that all currently available models have been tested. Never impute scores for untested systems.
+
+### 11.2 The important negative result: more recall is not enough
+
+The updated OVO-S project analysis reports:
+- L4 is the lowest-scoring level for 28 of 34 systems with L4 results, with an average 9.3-point gap from L1–L3.
+- Evidence Recall has near-zero per-query Pearson correlation with correctness for HERMES, StreamingTOM and FluxMem: (r\in[-0.07,0.00]).
+- An oracle-evidence sampler and doubling the frame budget each improve by no more than +0.3 points over uniform 128-frame sampling.
+- 13 of 15 streaming/spatially fine-tuned variants underperform their comparable general backbone overall; 13 of 15 regress on L4 (mean L4 change −6.1).
+- In the evaluated CoT error analysis, 60–80% of wrong traces for three model families are attributed to mis-grounded visual evidence.
+
+This materially changes the research priority. **Do not treat OVO-S as primarily a retrieval or frame-budget problem.** Better access to evidence does not guarantee that the system constructs a correct global map from it. We should prioritize grounded entity association, coordinate-frame consistency, trajectory integration, topology construction, loop-closure validation, map revision and downstream spatial decision quality.
+
+This does not mean that long-horizon memory is solved in general. OVO-S tests a particular spatial task family; 4DMemoryBench and EgoMemReason show important persistent-memory weaknesses under much longer temporal and multi-history conditions. Keep these benchmark lanes distinct.
+
+### 11.3 Revised architecture experiment
+
+The primary controlled experiment should hold evidence constant to isolate state construction:
+- Native causal stream (candidate's own admitted sampling policy).
+- Common sampled evidence (same 128-frame/prefix budget for every candidate).
+- Oracle evidence spans (same annotated evidence intervals for every candidate; diagnostic upper bound, never a deployable score).
+- Common map-state handoff (same downstream evaluator consumes every candidate's state projection).
+
+If models remain weak under common/oracle evidence, the limiting factor is not retrieval. The candidate must produce an explicit, revisable state with source-linked geometry and topology rather than a prose summary or an ungrounded chain of thought.
+
+Add direct score planes:
+- entity/landmark identity, false merge and false split;
+- camera/world transform and pose uncertainty;
+- trajectory and map alignment;
+- topological edge precision/recall, false adjacency and missed connectivity;
+- false loop closure and route-history reconstruction;
+- claim-to-source-span grounding and epistemic-origin integrity;
+- map revision under occlusion, late contradictory evidence and calibration changes;
+- downstream DecisionNeed-specific regret, risk/coverage and abstention.
+
+Spatial specialization is only admitted after paired matched-backbone factorial ablations. The current OVO-S results are a warning against assuming a spatial fine-tune is an improvement.
+
+### 11.4 Official source and coverage note
+
+Official OVO-S results and analysis: https://internlm.github.io/OVO-S-Bench/ and https://github.com/InternLM/OVO-S-Bench.
+
+The current official project page, rather than an older secondary tracker snapshot, is the source of the model list, per-level scores and diagnostic findings in this section.
+
+## 12. Long-horizon spatial memory is a separate challenge
+
+Newer benchmarks confirm that the field has not solved persistent multimodal memory; they do not invalidate the OVO-S finding that evidence recall alone is insufficient for allocentric mapping.
+
+### 12.1 4DMemoryBench
+
+4DMemory introduces LongVideo with approximately 887–900 hours of source video, 5,214 manually reviewed questions, multi-history queries and a maximum temporal extent of 97.98 hours. Its harness combines question-independent persistent memory, question-conditioned retrieval and specialist tools. The paper evaluates 13 API-served models with a separate Gemini-3.1-Pro media observer, which gives every evaluated model access to prepared media evidence. This observer-mediated setup must be reproduced and reported as such; it is not a same-input standalone model leaderboard.
+
+Under the paper's majority-judge Overall column, the leading entries include Muse Spark-1.1 at 77.79, Grok-4.6 at 75.55 and Gemini-3.7-Flash at 73.34. The paper also reports that the best observed Overall is lower than tool-invocation rates (at least 98.70% for 12/13 systems), showing that calling tools is not equivalent to successfully executing ordered evidence operations and answering correctly.
+
+Source: https://arxiv.org/abs/2610.32332
+
+### 12.2 EgoMemReason and LongSpace
+
+- **EgoMemReason:** 500 week-long egocentric questions across entity, event and behavior memory; the best reported system achieves 39.6% overall accuracy. Use it to measure multi-day state changes, event chronology and behavioral abstraction—not only spatial-map accuracy. https://arxiv.org/abs/2605.09874
+- **LongSpace-Bench / LongSpace (EMNLP 2026):** room-tour spatial memory with scene perception, spatial relations and long-horizon recall; LongSpace uses sequential chunks, early 3D structural cues and layer-aware memory. Reproduce its method as a spatial-memory comparator, but do not equate its offline/chunked protocol with OVO-S causal streaming. https://aclanthology.org/2026.emnlp-main.227/
+
+### 12.3 Revised benchmark portfolio
+
+| Research question | Primary benchmark | Diagnostic companions |
+|---|---|---|
+| Can the system construct an allocentric map from a causal prefix? | OVO-S-Bench | Spatial state construction fixtures / map-state evaluator |
+| Does a better memory help when the evidence spans hours or days and multiple histories? | 4DMemoryBench | EgoMemReason, LongSpace |
+| Can the system associate sounds with spatial sources and preserve acoustic fields? | DCASE 2026 Task 3 | OVO-S spatial map diagnostics |
+| Does the system act, wait or abstain at the right moment? | OmniInteract / SPOT / DIVE | #6675 sequential policy tournament |
+| Does compressed memory preserve future decisions? | MACE #13284 | Multi-DecisionNeed spatial sequences |
+
+Do not pool these into a single score. Keep their evidence access, model observer, temporal horizon, task semantics, judge and resource accounting explicit.
+
