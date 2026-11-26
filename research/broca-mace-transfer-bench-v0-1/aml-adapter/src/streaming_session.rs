@@ -127,6 +127,8 @@ pub struct StreamingSessionMutationReceiptV1 {
     pub resulting_state_sha256: String,
     /// Ordered by valid timestamp, then original ingestion sequence.
     pub visible_event_ids: Vec<String>,
+    /// Previously visible event IDs no longer visible after this transition.
+    pub invalidated_event_ids: Vec<String>,
     pub receipt_sha256: String,
 }
 
@@ -262,6 +264,7 @@ impl StreamingSessionLedgerV1 {
         observed_at_ms: u64,
     ) -> Result<StreamingSessionMutationReceiptV1, StreamingSessionRejectV1> {
         let previous_state_sha256 = self.state_sha256();
+        let previous_visible_event_ids = self.visible_event_ids();
         let event_id = mutation.event_id.clone();
         let sequence = mutation.sequence;
         let effective_at_ms = mutation.effective_at_ms;
@@ -374,6 +377,10 @@ impl StreamingSessionLedgerV1 {
 
         let resulting_state_sha256 = self.state_sha256();
         let visible_event_ids = self.visible_event_ids();
+        let visible_after = visible_event_ids.iter().collect::<BTreeSet<_>>();
+        let invalidated_event_ids = previous_visible_event_ids.into_iter()
+            .filter(|id| !visible_after.contains(id))
+            .collect::<Vec<_>>();
         let receipt_sha256 = receipt_digest(
             &event_id,
             sequence,
@@ -383,6 +390,7 @@ impl StreamingSessionLedgerV1 {
             &previous_state_sha256,
             &resulting_state_sha256,
             &visible_event_ids,
+            &invalidated_event_ids,
         );
         let receipt = StreamingSessionMutationReceiptV1 {
             event_id: event_id.clone(),
@@ -393,6 +401,7 @@ impl StreamingSessionLedgerV1 {
             previous_state_sha256,
             resulting_state_sha256,
             visible_event_ids,
+            invalidated_event_ids,
             receipt_sha256,
         };
         self.receipts.insert(event_id, receipt.clone());
@@ -678,6 +687,7 @@ fn receipt_digest(
     previous_state_sha256: &str,
     resulting_state_sha256: &str,
     visible_event_ids: &[String],
+    invalidated_event_ids: &[String],
 ) -> String {
     let mut h = Sha256::new();
     h.update(b"luminous:mace:streaming-session-receipt:v1\0");
@@ -690,6 +700,8 @@ fn receipt_digest(
     hash_field(&mut h, resulting_state_sha256);
     h.update((visible_event_ids.len() as u64).to_be_bytes());
     for id in visible_event_ids { hash_field(&mut h, id); }
+    h.update((invalidated_event_ids.len() as u64).to_be_bytes());
+    for id in invalidated_event_ids { hash_field(&mut h, id); }
     hex_digest(&h.finalize())
 }
 
@@ -803,6 +815,63 @@ mod tests {
             Err(StreamingSessionRejectV1::ClockRollback)
         );
         assert_eq!(ledger.last_sequence(), 1);
+    }
+
+    #[test]
+    fn correction_receipt_names_the_event_removed_from_the_active_projection() {
+        let mut ledger = ledger();
+        ledger.apply(append("event-1", 1, 100, "old fact"), 1_000).unwrap();
+        let correction = StreamingSessionMutationV1 {
+            event_id: "event-2".into(),
+            sequence: 2,
+            effective_at_ms: 100,
+            kind: StreamingMutationKindV1::Correct {
+                target_event_id: "event-1".into(),
+                message: message("turn-1", 100, "corrected fact"),
+            },
+        };
+        let receipt = ledger.apply(correction, 1_100).unwrap().receipt;
+        assert_eq!(receipt.visible_event_ids, vec!["event-2"]);
+        assert_eq!(receipt.invalidated_event_ids, vec!["event-1"]);
+    }
+
+    #[test]
+    fn quarantine_and_revocation_receipts_report_newly_hidden_events() {
+        let mut ledger = ledger();
+        ledger.apply(append("event-1", 1, 100, "fact"), 1_000).unwrap();
+        let quarantine = StreamingSessionMutationV1 {
+            event_id: "event-2".into(),
+            sequence: 2,
+            effective_at_ms: 200,
+            kind: StreamingMutationKindV1::Quarantine {
+                target_event_id: "event-1".into(),
+                reason_sha256: "b".repeat(64),
+            },
+        };
+        let receipt = ledger.apply(quarantine, 1_100).unwrap().receipt;
+        assert_eq!(receipt.invalidated_event_ids, vec!["event-1"]);
+        let revalidate = StreamingSessionMutationV1 {
+            event_id: "event-3".into(),
+            sequence: 3,
+            effective_at_ms: 300,
+            kind: StreamingMutationKindV1::Revalidate {
+                target_event_id: "event-1".into(),
+                validation_receipt_sha256: "c".repeat(64),
+            },
+        };
+        let receipt = ledger.apply(revalidate, 1_200).unwrap().receipt;
+        assert!(receipt.invalidated_event_ids.is_empty());
+        let revoke = StreamingSessionMutationV1 {
+            event_id: "event-4".into(),
+            sequence: 4,
+            effective_at_ms: 400,
+            kind: StreamingMutationKindV1::Revoke {
+                target_event_id: "event-1".into(),
+                revocation_receipt_sha256: "d".repeat(64),
+            },
+        };
+        let receipt = ledger.apply(revoke, 1_300).unwrap().receipt;
+        assert_eq!(receipt.invalidated_event_ids, vec!["event-1"]);
     }
 
     #[test]
