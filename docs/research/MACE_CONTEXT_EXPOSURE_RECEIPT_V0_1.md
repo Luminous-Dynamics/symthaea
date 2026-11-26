@@ -55,6 +55,21 @@ For source evidence that is sent verbatim, the transformation receipt is an iden
 
 This receipt establishes only the second statement, subject to the observer and transport trust assumptions. The first remains a retrieval diagnostic. The third must be estimated by #13141's randomized paired interventions and evaluator-only counterfactual replays. A model's `model_declared_support_event_ids` is retained as self-report only; it is not an authority or causal proof.
 
+## Causal identification: assignment is not the same as exposure
+
+The primary causal estimate in #13141 must remain **intention-to-treat (ITT)** over the randomized memory-access assignment. Do not restrict the primary analysis to invocations that happened to expose memory, or compare exposed and unexposed rows naively: actual exposure is a post-assignment mediator and may be associated with task difficulty, retrieval success, policy choices or failures.
+
+Use the receipt for treatment-compliance diagnostics:
+- assigned memory arm versus actual retrieved/admitted/exposed evidence;
+- zero-memory arm contamination and hidden memory-origin exposures;
+- missing/invalid exposure receipts and their attrition reasons;
+- dose distribution (memory-derived bytes/spans) by arm;
+- model-declared support versus the independently captured exposure set.
+
+For mechanism analysis, use pre-registered controlled counterfactual replays that change only the targeted memory item or derived lineage closure while holding the world cluster, initial state, model/policy revision, non-memory context, tool permissions, compute budget and evaluator fixed. Where provider/model nondeterminism prevents exact replay, use paired random seeds/common random numbers where supported and report the remaining variance. Any instrumental-variable or per-protocol estimate based on actual exposure needs explicit identification assumptions and must be labeled secondary.
+
+This separation avoids turning a receipt into an attribution claim. Random assignment estimates the effect of making memory available; the exposure receipt establishes what the model request actually contained; controlled counterfactuals help investigate which evidence caused an outcome difference. These are complementary, not interchangeable, forms of evidence.
+
 ## Trust and limits
 
 A valid Ed25519 signature proves that the configured signing key signed the receipt bytes. It does not, by itself, prove that the observer captured every request span or that the key is independent of the candidate process. The verifier must pin the observer profile outside the candidate-controlled memory/log/backup domain and qualify the capture implementation. The body artifact must be encrypted separately from the candidate memory store, with independently pinned storage, encryption, access, retention and custody profiles. Access to plaintext is limited to authorized evaluators/verifiers; public receipts expose only opaque artifact identity and commitments. Erasure must be reported separately from benchmark retention requirements: a retention hold for independent evaluation is not a permission to reuse the content as agent memory.
