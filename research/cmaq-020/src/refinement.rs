@@ -689,6 +689,37 @@ mod tests {
     }
 
     #[test]
+    fn pair_level_accounting_detects_error_migration_with_unchanged_totals() {
+        let contract = contract();
+        let before = vec![
+            record("a", "before-left", 0, 0, &"c".repeat(64), '1'),
+            record("b", "before-right", 0, 0, &"c".repeat(64), '2'),
+            record("c", "before-left", 10, 10, &"c".repeat(64), '3'),
+            record("d", "before-right", 10, 10, &"c".repeat(64), '4'),
+        ];
+        let probe = select_counterexample_probe(&before, &contract)
+            .expect("valid contract")
+            .expect("counterexample exists");
+        let after = vec![
+            record("a", "after-left", 0, 0, &"d".repeat(64), '1'),
+            record("b", "after-right", 0, 0, &"d".repeat(64), '2'),
+            record("c", "after-right", 10, 10, &"d".repeat(64), '3'),
+            record("d", "after-left", 10, 10, &"d".repeat(64), '4'),
+        ];
+
+        let effect = score_refinement_transition(&before, &after, &contract, &probe)
+            .expect("valid pair-level comparison");
+        assert_eq!(effect.before.false_merges, 2);
+        assert_eq!(effect.after.false_merges, 2);
+        assert_eq!(effect.false_merges_resolved, 2);
+        assert_eq!(effect.false_merges_added, 2);
+        assert_eq!(effect.before.false_splits, 2);
+        assert_eq!(effect.after.false_splits, 2);
+        assert_eq!(effect.false_splits_resolved, 0);
+        assert_eq!(effect.false_splits_added, 0);
+    }
+
+    #[test]
     fn candidate_must_bind_refinement_to_a_new_checkpoint() {
         let contract = contract();
         let before = vec![
