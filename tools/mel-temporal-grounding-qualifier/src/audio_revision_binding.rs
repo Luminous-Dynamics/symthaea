@@ -110,8 +110,11 @@ pub fn audit_verified_audio_evidence_triplet(
     let yoked_audio_bound_report =
         audit_revision_with_audio_evidence(yoked_case, yoked_manifest, yoked_source, yoked_pcm)?;
 
-    let contrast_reports =
-        compare_matched_evidence_arms(&[no_case.clone(), local_case.clone(), yoked_case.clone()])?;
+    let contrast_reports = compare_matched_evidence_arms(&[
+        (*no_case).clone(),
+        (*local_case).clone(),
+        (*yoked_case).clone(),
+    ])?;
     if contrast_reports.len() != 1 {
         return Err("verified evidence triplet must produce exactly one matched contrast".into());
     }
