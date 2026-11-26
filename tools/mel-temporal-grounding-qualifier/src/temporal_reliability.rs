@@ -1321,19 +1321,25 @@ mod tests {
         let annotations = vec![
             annotation(
                 '1',
-                item_key * 4 + 1,
+                item_key.wrapping_mul(4).wrapping_add(1),
                 state,
                 annotation_intervals.clone(),
                 None,
             ),
             annotation(
                 '2',
-                item_key * 4 + 2,
+                item_key.wrapping_mul(4).wrapping_add(2),
                 state,
                 annotation_intervals.clone(),
                 None,
             ),
-            annotation('3', item_key * 4 + 3, state, annotation_intervals, None),
+            annotation(
+                '3',
+                item_key.wrapping_mul(4).wrapping_add(3),
+                state,
+                annotation_intervals,
+                None,
+            ),
         ];
         MultiAnnotatorReliabilityItemV1 {
             item_id: id.into(),
