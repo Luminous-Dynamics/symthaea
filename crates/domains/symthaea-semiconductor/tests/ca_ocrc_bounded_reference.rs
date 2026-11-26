@@ -35,7 +35,7 @@ fn policy() -> CaOcrcPolicyV1 {
         // Thus F(0)=0.75, F(1)=F(2)=0.5, ell_F=1 <= K=2.
         proxy_delay_pmf: vec![0.25, 0.25, 0.0, 0.5],
         actual_delay_contract_sha256: digest('f'),
-        bounded_actual_delay_assumption_attested: true,
+        bounded_actual_delay_assumption_declared: true,
     }
 }
 
