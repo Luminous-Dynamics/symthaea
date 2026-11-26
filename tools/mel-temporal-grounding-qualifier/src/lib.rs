@@ -11,3 +11,5 @@ pub mod evidence_digest;
 pub mod temporal_grounding;
 
 pub mod auditory_invariance;
+
+pub mod musiclistenbench_import;
