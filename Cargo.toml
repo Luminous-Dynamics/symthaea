@@ -25,6 +25,9 @@ exclude = [
     # This directory contains only an empty examples/unused.rs placeholder, not a crate.
     # Exclude it from the broad crates/core/* workspace glob.
     "crates/core/symthaea",
+    # This directory currently contains only an IIT parity-test artifact and no crate manifest.
+    # Keep it out of workspace membership until the crate and test are rehomed together.
+    "crates/core/symthaea-iit",
     "crates/domains/symthaea-spore/fuzz",
     "crates/domains/spark-engine",
     "crates/domains/symthaea-lab",
