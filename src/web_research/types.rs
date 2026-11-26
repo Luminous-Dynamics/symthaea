@@ -120,9 +120,11 @@ impl AcquisitionOutcome {
 
 /// Append-only diagnostic for one search, page fetch or budget disposition.
 ///
-/// The content SHA-256 is the captured page-body digest for page fetches, or
-/// the canonical returned-URL list digest for search API calls. It is an
-/// integrity commitment, not source authentication or claim entailment.
+/// The content SHA-256 is the captured response-body digest for DuckDuckGo
+/// HTML and fetched pages. Configured JSON search adapters and heuristic seeds
+/// hash their canonical URL-list output, not the original provider response
+/// bytes. The digest and byte count are integrity/diagnostic commitments, not
+/// source authentication or proof of claim entailment.
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
 pub struct AcquisitionReceipt {
     pub attempt_id: String,
