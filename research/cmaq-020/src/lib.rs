@@ -602,8 +602,12 @@ mod tests {
         invalid_source.source_state_sha256 = "not-a-digest".to_owned();
         assert!(invalid_source.validate_against(&contract).is_err());
 
-        let mut invalid_contract = contract;
+        let mut invalid_contract = contract.clone();
         invalid_contract.source_manifest_sha256 = "bad".to_owned();
+        assert!(invalid_contract.validate().is_err());
+
+        invalid_contract.source_manifest_sha256 = "b".repeat(64);
+        invalid_contract.contract_sha256 = "bad".to_owned();
         assert!(invalid_contract.validate().is_err());
     }
 
@@ -670,7 +674,7 @@ mod tests {
     }
 
     #[test]
-    fn counterexample_probe_prefers_visible_invariant_mismatch() {
+    fn counterexample_probe_prefers_invariant_witness_without_value_disclosure() {
         let contract = contract();
         let left = record("state-a", "same-class", 0, 2);
         let right = record("state-b", "same-class", 0, 3);
