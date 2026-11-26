@@ -1,0 +1,15 @@
+[package]
+name = "symthaea-sat-memory-at-rest-lab"
+version = "0.1.0"
+edition = "2024"
+license = "AGPL-3.0-or-later"
+description = "Synthetic file-backed reference lab for SAT agent memory-at-rest integrity cases"
+
+[dependencies]
+serde = { workspace = true }
+serde_json = { workspace = true }
+sha2 = { workspace = true }
+
+[[bin]]
+name = "sat-memory-at-rest-lab"
+path = "src/main.rs"
