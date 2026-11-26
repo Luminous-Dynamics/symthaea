@@ -359,9 +359,9 @@ pub fn plan_annotation_acquisition(
     let (probability_audit, audit_unmet, audit_spent, audit_source_works, audit_design) =
         select_probability_audit(&candidates, &eligible_audit, &config, &mut random_state)?;
 
-    let audit_source_set: BTreeSet<_> = probability_audit
+    let audit_source_set: BTreeSet<String> = probability_audit
         .iter()
-        .map(|selection| selection.source_work_id_sha256.as_str())
+        .map(|selection| selection.source_work_id_sha256.clone())
         .collect();
 
     let (active_refinement, active_unmet, active_spent, active_source_counts) =
