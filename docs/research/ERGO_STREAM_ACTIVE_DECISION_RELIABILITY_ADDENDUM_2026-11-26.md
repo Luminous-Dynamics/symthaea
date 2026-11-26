@@ -401,6 +401,16 @@ Use the baseline ownership and source pins from #13261. Keep the following arms 
 
 The SEW-Bench/ASP paper's negative result is a required falsification control: its access-structured method improves the fixed-budget comparison over query-independent sampling, but does not beat verbatim-only on any evaluated backbone, and its compressed state was not independently useful in that setting. Conversely, OASIS reports gains from on-demand hierarchical event retrieval, and HERMES/StreamScout provide additional memory and active-access comparators. Reproduce each on its own task protocol before adapting it; do not transplant leaderboard numbers between tasks.
 
+The strongest current comparators make an important distinction: **adaptive access is already a competitive technique; it is not, by itself, the new contribution.** Our hypothesis must be stronger: preserve decision-relevant state, verify the evidence that warrants it, and adapt acquisition to residual decision regret.
+
+Reported native-protocol reference points:
+- **OASIS (CVPR 2026):** on Qwen3-VL-8B / StreamingBench, Real-Time All rises from 72.83 to 78.22; ACU 35.63 to 42.74; MCU 35.74 to 49.60; SQA 43.90 to 48.40. This supports a query-directed hierarchical retrieval arm, not a claim of spatial-map correctness. https://openaccess.thecvf.com/content/CVPR2026/papers/Liang_OASIS_On-Demand_Hierarchical_Event_Memory_for_Streaming_Video_Reasoning_CVPR_2026_paper.pdf
+- **HERMES (ACL 2026):** hierarchical KV-cache reuse reports up to 10× faster time-to-first-token, up to 68% fewer video tokens than uniform sampling, and up to 11.4% gains on streaming datasets. Its main comparator is cache/memory efficiency and real-time response, not evaluator-held spatial witness completeness. https://aclanthology.org/2026.acl-long.381/
+- **StreamScout (arXiv:2609.00291):** uses a staged glance → look-back → query-salient retrieval cascade with a learned stop/escalate boundary. Its abstract reports a 14.65-point improvement for Qwen3-VL-8B on OVO-Bench with 59% fewer tokens than uniform sampling and 1.04 s average answer time. OVO-Bench is not OVO-S-Bench; do not transfer the score. https://arxiv.org/abs/2609.00291
+- **SEW-Bench / ASP:** query-conditioned access is a strong control, but the paper reports that ASP does not beat its verbatim-only baseline on any evaluated backbone and triggers two preregistered falsification criteria. This prevents us from assuming that an extra compressed state is always worth maintaining. https://arxiv.org/abs/2608.22975
+
+The ErgoStream differentiation should therefore be tested against all three families: hierarchical cache compression (HERMES), on-demand event retrieval (OASIS), and learned stop/escalate access (StreamScout). Add a fourth arm: **decision-sufficient access**, in which the next memory expansion or sensor query is selected only when it can lower evaluator-confirmed downstream regret enough to justify its full cost, while the returned claim carries exact source evidence and remains revisable.
+
 ### 9.4 Scorecard and proposed gates
 
 Report a frontier, not a single composite score:
@@ -423,6 +433,23 @@ Prospective research gates (not achieved results):
 - no regression in false-unique, unsupported-spatial-claim or false-persistence rates.
 
 These targets align with MACE #13284's proposed qualification gates. They must be calibrated on development data and frozen before confirmatory evaluation. Use paired source/video-level clusters, not independent crops, for uncertainty estimates. Preserve every failed/invalid attempt and per-stratum denominator.
+
+
+### Stretch tier after first native reproductions
+
+These are deliberately harder second-stage targets. They are only meaningful once the relevant external baselines have been reproduced on the same dataset version, split, prefix, backbone or model-class budget, scorer and runtime contract:
+
+| Lane | Stretch target | Comparison condition |
+|---|---:|---|
+| OVO-S overall | ≥65.0 | Exceed Gemini-3.1-Pro 59.2 and the strongest reproduced open baseline; paired cluster interval must support the improvement |
+| OVO-S L4 | ≥60.0 | Exceed the reported 54.9 Gemini L4 result without a material L1–L3 regression |
+| OmniInteract overall | ≥0.50 IA-QTF1 | Official slot mix, full invalid-output and interruption accounting |
+| OmniInteract 1QnA | ≥0.15 IA-QTF1 | Continuous chain completion and context continuity |
+| SPOT-Bench | ≥28 T-F1@5 at 1 Hz | Full-stream scoring, including no-response periods |
+| DIVE | ≥75% response-window rate | False interventions and no-trigger controls remain within preregistered bounds |
+| Efficiency | ≥30% lower all-in measured cost | No more than 1 absolute task-score point loss against the strongest matched adaptive-access baseline |
+
+Do not target a number without its protocol. A score that exceeds a weak baseline, uses a larger model or frame budget, or silently excludes invalid attempts is not a SOTA result. A credible win is a paired improvement over the strongest compatible baseline with uncertainty bounds, complete cost accounting and unchanged integrity/safety gates.
 
 ### 9.5 Owner composition and first implementation slice
 
