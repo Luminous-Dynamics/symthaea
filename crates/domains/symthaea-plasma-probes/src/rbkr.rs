@@ -67,6 +67,10 @@ pub enum RbkrError {
     InvalidScenarioWeight,
     #[error("response Gramian aggregation factor-storage budget exceeded")]
     ScenarioFactorStorageBudgetExceeded,
+    #[error("response-residual CVaR level must be finite and in [0, 1)")]
+    InvalidCvarLevel,
+    #[error("scenario has no non-zero reachable-to-observable reference response")]
+    NoReferenceResponse,
 }
 
 /// Errors from finite-horizon linearized Gramian construction.
@@ -111,6 +115,29 @@ pub struct ResponseGramianScenario<'a> {
     pub scenario_weight: f64,
 }
 
+/// Linearized response residual for one immutable pulse scenario.
+#[derive(Clone, Debug, PartialEq)]
+pub struct ScenarioResponseResidual {
+    pub scenario_id: String,
+    pub trajectory_sha256: String,
+    pub normalized_weight: f64,
+    pub response_residual: f64,
+}
+
+/// Distribution summary of scenario-wise response residuals.
+///
+/// The worst-case value includes every supplied scenario, including scenarios
+/// with zero statistical weight. Weighted mean and CVaR use normalized
+/// non-negative scenario weights.
+#[derive(Clone, Debug, PartialEq)]
+pub struct ResponseResidualReport {
+    pub scenarios: Vec<ScenarioResponseResidual>,
+    pub weighted_mean: f64,
+    pub worst_case: f64,
+    pub cvar_alpha: f64,
+    pub cvar: f64,
+}
+
 /// Peak live-factor storage limit while aggregating factorized Gramian families.
 ///
 /// The budget includes both the input scenario factors and the newly allocated
@@ -132,6 +159,134 @@ impl Default for ResponseGramianAggregationConfig {
     fn default() -> Self {
         Self::new(32_000_000)
     }
+}
+
+/// Evaluate a balanced basis against individual scenario Gramians and summarize
+/// the weighted mean, worst-case residual, and upper-tail CVaR.
+///
+/// This function is intended for validation / held-out challenge cohorts. It
+/// does not modify the basis and does not promote held-out data into training.
+pub fn evaluate_response_scenario_residuals(
+    basis: &ResponseBalancedBasis,
+    scenarios: &[ResponseGramianScenario<'_>],
+    cvar_alpha: f64,
+) -> Result<ResponseResidualReport, RbkrError> {
+    if !cvar_alpha.is_finite() || !(0.0..1.0).contains(&cvar_alpha) {
+        return Err(RbkrError::InvalidCvarLevel);
+    }
+    let first = scenarios.first().ok_or(RbkrError::InvalidScenarioSet)?;
+    if first.task_contract_id.trim().is_empty()
+        || first.checkpoint_id.trim().is_empty()
+        || first.state_metric_id.trim().is_empty()
+    {
+        return Err(RbkrError::InvalidScenarioSet);
+    }
+
+    let mut scenario_ids = HashSet::with_capacity(scenarios.len());
+    let mut trajectory_digests = HashSet::with_capacity(scenarios.len());
+    let mut maximum_weight = 0.0_f64;
+    for scenario in scenarios {
+        if scenario.scenario_id.trim().is_empty()
+            || !scenario_ids.insert(scenario.scenario_id)
+            || !is_sha256_hex(scenario.trajectory_sha256)
+            || !trajectory_digests.insert(scenario.trajectory_sha256)
+        {
+            return Err(RbkrError::InvalidScenarioSet);
+        }
+        if scenario.task_contract_id != first.task_contract_id {
+            return Err(RbkrError::MixedScenarioContract);
+        }
+        if scenario.checkpoint_id != first.checkpoint_id {
+            return Err(RbkrError::MixedScenarioCheckpoint);
+        }
+        if scenario.state_metric_id != first.state_metric_id {
+            return Err(RbkrError::MixedScenarioStateMetric);
+        }
+        if !scenario.scenario_weight.is_finite() || scenario.scenario_weight < 0.0 {
+            return Err(RbkrError::InvalidScenarioWeight);
+        }
+        if scenario.reachability.dimension != basis.state_dimension
+            || scenario.observability.dimension != basis.state_dimension
+        {
+            return Err(RbkrError::StateDimensionMismatch);
+        }
+        if scenario.reachability.weighted_factors.is_empty()
+            || scenario.observability.weighted_factors.is_empty()
+        {
+            return Err(RbkrError::EmptyScenarioGramian);
+        }
+        maximum_weight = maximum_weight.max(scenario.scenario_weight);
+    }
+    if maximum_weight <= 0.0 {
+        return Err(RbkrError::InvalidScenarioWeight);
+    }
+
+    let mut scaled_total = 0.0_f64;
+    for scenario in scenarios {
+        scaled_total += scenario.scenario_weight / maximum_weight;
+    }
+    if !scaled_total.is_finite() || scaled_total <= 0.0 {
+        return Err(RbkrError::InvalidScenarioWeight);
+    }
+
+    let mut reports = Vec::with_capacity(scenarios.len());
+    let mut weighted_mean = 0.0_f64;
+    let mut worst_case = 0.0_f64;
+    for scenario in scenarios {
+        let normalized_weight = (scenario.scenario_weight / maximum_weight) / scaled_total;
+        let residual = basis.linearized_response_residual(
+            scenario.reachability,
+            scenario.observability,
+        )?;
+        weighted_mean += normalized_weight * residual;
+        if !weighted_mean.is_finite() {
+            return Err(RbkrError::NonFiniteArithmetic);
+        }
+        worst_case = worst_case.max(residual);
+        reports.push(ScenarioResponseResidual {
+            scenario_id: scenario.scenario_id.to_owned(),
+            trajectory_sha256: scenario.trajectory_sha256.to_owned(),
+            normalized_weight,
+            response_residual: residual,
+        });
+    }
+
+    let tail_mass = 1.0 - cvar_alpha;
+    let mut tail_remaining = tail_mass;
+    let mut tail_loss = 0.0_f64;
+    let mut ordered = reports.iter().collect::<Vec<_>>();
+    ordered.sort_by(|left, right| {
+        right
+            .response_residual
+            .total_cmp(&left.response_residual)
+            .then_with(|| left.scenario_id.cmp(&right.scenario_id))
+    });
+    for scenario in ordered {
+        if tail_remaining <= 0.0 {
+            break;
+        }
+        let included_weight = scenario.normalized_weight.min(tail_remaining);
+        tail_loss += included_weight * scenario.response_residual;
+        if !tail_loss.is_finite() {
+            return Err(RbkrError::NonFiniteArithmetic);
+        }
+        tail_remaining -= included_weight;
+    }
+    if tail_remaining > 1.0e-10 {
+        return Err(RbkrError::InvalidScenarioWeight);
+    }
+    let cvar = tail_loss / tail_mass;
+    if !cvar.is_finite() {
+        return Err(RbkrError::NonFiniteArithmetic);
+    }
+
+    Ok(ResponseResidualReport {
+        scenarios: reports,
+        weighted_mean,
+        worst_case,
+        cvar_alpha,
+        cvar,
+    })
 }
 
 /// Aggregate checkpoint-aligned Gramians over a registered future-response family.
@@ -879,6 +1034,69 @@ impl ResponseBalancedBasis {
             c: reduced_c,
         })
     }
+
+    /// Measure the local linearized input-to-output response lost by this
+    /// oblique projection for one frozen scenario.
+    ///
+    /// The residual is the Frobenius norm ratio of
+    /// Y^T (I - V W^T) X to Y^T X, where X/Y are weighted reachability /
+    /// observability factors. This is a finite-horizon linear diagnostic,
+    /// not a nonlinear echo-error bound.
+    pub fn linearized_response_residual(
+        &self,
+        reachability: &EmpiricalGramian,
+        observability: &EmpiricalGramian,
+    ) -> Result<f64, RbkrError> {
+        if reachability.dimension != self.state_dimension
+            || observability.dimension != self.state_dimension
+        {
+            return Err(RbkrError::StateDimensionMismatch);
+        }
+        if reachability.weighted_factors.is_empty()
+            || observability.weighted_factors.is_empty()
+        {
+            return Err(RbkrError::EmptyGramian);
+        }
+
+        let mut residual_norm = 0.0_f64;
+        let mut reference_norm = 0.0_f64;
+        for input_factor in &reachability.weighted_factors {
+            validate_factor(input_factor, self.state_dimension)?;
+            let reduced = self.reduce_state(input_factor)?;
+            let reconstructed = self.reconstruct_state(&reduced)?;
+            let residual = input_factor
+                .iter()
+                .zip(&reconstructed)
+                .map(|(full, projected)| {
+                    let value = full - projected;
+                    if value.is_finite() {
+                        Ok(value)
+                    } else {
+                        Err(RbkrError::NonFiniteArithmetic)
+                    }
+                })
+                .collect::<Result<Vec<_>, _>>()?;
+
+            for output_factor in &observability.weighted_factors {
+                validate_factor(output_factor, self.state_dimension)?;
+                let reference_response = checked_dot(output_factor, input_factor)?;
+                let residual_response = checked_dot(output_factor, &residual)?;
+                reference_norm = reference_norm.hypot(reference_response);
+                residual_norm = residual_norm.hypot(residual_response);
+                if !reference_norm.is_finite() || !residual_norm.is_finite() {
+                    return Err(RbkrError::NonFiniteArithmetic);
+                }
+            }
+        }
+        if reference_norm == 0.0 {
+            return Err(RbkrError::NoReferenceResponse);
+        }
+        let ratio = residual_norm / reference_norm;
+        if !ratio.is_finite() {
+            return Err(RbkrError::NonFiniteArithmetic);
+        }
+        Ok(ratio)
+    }
 }
 
 #[derive(Clone, Debug, PartialEq)]
@@ -1175,6 +1393,54 @@ mod tests {
             ),
             Err(FiniteHorizonGramianError::FactorStorageBudgetExceeded)
         );
+    }
+
+    #[test]
+    fn average_balancing_cannot_hide_worst_case_scenario_response_loss() {
+        let reach_a = gramian(2, &[vec![1.0, 0.0]]);
+        let observe_a = gramian(2, &[vec![1.0, 0.0]]);
+        let reach_b = gramian(2, &[vec![0.0, 1.0]]);
+        let observe_b = gramian(2, &[vec![0.0, 1.0]]);
+        let scenarios = [
+            ResponseGramianScenario {
+                scenario_id: "dominant-common-pulse",
+                trajectory_sha256: "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+                task_contract_id: "kresp1-contract-v1",
+                checkpoint_id: "checkpoint-a",
+                state_metric_id: "metric-v1",
+                reachability: &reach_a,
+                observability: &observe_a,
+                scenario_weight: 0.51,
+            },
+            ResponseGramianScenario {
+                scenario_id: "rare-adversarial-pulse",
+                trajectory_sha256: "bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb",
+                task_contract_id: "kresp1-contract-v1",
+                checkpoint_id: "checkpoint-a",
+                state_metric_id: "metric-v1",
+                reachability: &reach_b,
+                observability: &observe_b,
+                scenario_weight: 0.49,
+            },
+        ];
+        let (reach, observe) = aggregate_response_gramians(
+            &scenarios,
+            ResponseGramianAggregationConfig::default(),
+        )
+        .unwrap();
+        let basis = ResponseBalancedBasis::from_empirical_gramians(
+            &reach,
+            &observe,
+            RbkrConfig::new(1),
+        )
+        .unwrap();
+        let report = evaluate_response_scenario_residuals(&basis, &scenarios, 0.9).unwrap();
+
+        assert!(report.scenarios[0].response_residual < 1.0e-10);
+        assert!((report.scenarios[1].response_residual - 1.0).abs() < 1.0e-10);
+        assert!((report.weighted_mean - 0.49).abs() < 1.0e-10);
+        assert!((report.worst_case - 1.0).abs() < 1.0e-10);
+        assert!((report.cvar - 1.0).abs() < 1.0e-10);
     }
 
     #[test]
