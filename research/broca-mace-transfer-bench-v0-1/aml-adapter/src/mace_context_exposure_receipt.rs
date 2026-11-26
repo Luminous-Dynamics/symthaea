@@ -8,7 +8,9 @@
 use base64::engine::general_purpose::STANDARD as BASE64_STANDARD;
 use base64::Engine;
 use ed25519_dalek::{Signature, VerifyingKey};
-use serde::{Deserialize, Serialize};
+use serde::de::{self, MapAccess, Visitor};
+use serde::{Deserialize, Deserializer, Serialize};
+use std::fmt;
 use serde_json::value::RawValue;
 use sha2::{Digest, Sha256};
 use std::collections::{BTreeMap, BTreeSet};
@@ -337,10 +339,46 @@ struct CapturedProviderRequestV1<'a> {
     #[serde(borrow)]
     messages: Vec<CapturedProviderMessageV1<'a>>,
     #[serde(flatten)]
-    parameters: BTreeMap<String, serde_json::Value>,
+    parameters: CapturedProviderParametersV1,
+}
+
+struct CapturedProviderParametersV1(BTreeMap<String, serde_json::Value>);
+
+impl<'de> Deserialize<'de> for CapturedProviderParametersV1 {
+    fn deserialize<D>(deserializer: D) -> Result<Self, D::Error>
+    where
+        D: Deserializer<'de>,
+    {
+        struct ParametersVisitor;
+
+        impl<'de> Visitor<'de> for ParametersVisitor {
+            type Value = CapturedProviderParametersV1;
+
+            fn expecting(&self, formatter: &mut fmt::Formatter<'_>) -> fmt::Result {
+                formatter.write_str("a provider parameter object with unique keys")
+            }
+
+            fn visit_map<M>(self, mut map: M) -> Result<Self::Value, M::Error>
+            where
+                M: MapAccess<'de>,
+            {
+                let mut parameters = BTreeMap::new();
+                while let Some((key, value)) = map.next_entry::<String, serde_json::Value>()? {
+                    if parameters.contains_key(&key) {
+                        return Err(de::Error::custom("duplicate provider parameter key"));
+                    }
+                    parameters.insert(key, value);
+                }
+                Ok(CapturedProviderParametersV1(parameters))
+            }
+        }
+
+        deserializer.deserialize_map(ParametersVisitor)
+    }
 }
 
 #[derive(Deserialize)]
+#[serde(deny_unknown_fields)]
 struct CapturedProviderMessageV1<'a> {
     #[serde(borrow)]
     role: &'a str,
@@ -373,7 +411,7 @@ fn verify_provider_request_contract(
         return Err(MaceContextExposureRejectV1::WrongModelRevision);
     }
 
-    for (key, value) in &request.parameters {
+    for (key, value) in &request.parameters.0 {
         if MACE_STATIC_PROVIDER_NUMBER_PARAMETER_KEYS_V1.contains(&key.as_str()) {
             if !value.is_number() {
                 return Err(MaceContextExposureRejectV1::ProviderParameterTypeMismatch);
@@ -386,7 +424,7 @@ fn verify_provider_request_contract(
             return Err(MaceContextExposureRejectV1::UnclassifiedProviderParameterKey);
         }
     }
-    let parameter_bytes = serde_json::to_vec(&request.parameters)
+    let parameter_bytes = serde_json::to_vec(&request.parameters.0)
         .map_err(|_| MaceContextExposureRejectV1::InvalidRequestBody)?;
     let parameter_profile = sha256_hex(&parameter_bytes);
     if parameter_profile != expected.provider_parameter_profile_sha256
