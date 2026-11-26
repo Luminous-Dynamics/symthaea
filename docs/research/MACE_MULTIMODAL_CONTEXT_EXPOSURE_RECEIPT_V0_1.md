@@ -40,7 +40,7 @@ This extension inherits a known boundary issue in the current text producer: arb
 
 A qualified implementation must bind the provider-specific request-parameter profile to the independent run manifest, allowlist fields whose values are genuinely static configuration, and require every dynamic text/media-bearing field to use typed source mappings. Unknown or unclassified fields must make the invocation non-qualifiable. The true no-memory arm must inspect all serialized provider fields and upload/reference surfaces, not only the standard message content array.
 
-The request-body digest commits to all bytes, but a digest alone does not establish complete origin classification. The multimodal receipt therefore requires `provider_parameter_profile_sha256`, paired with the scalar-only, manifest-pinned parameter contract in [#13770](https://github.com/Luminous-Dynamics/symthaea/pull/13770). Dynamic text/media fields must use typed source mappings. The profile is a frozen configuration commitment, not source authentication; it must be declared static and non-memory-derived before the run.
+The request-body digest commits to all bytes, but a digest alone does not establish complete origin classification. The multimodal receipt therefore requires `provider_parameter_profile_sha256`, paired with the numeric/boolean-only, manifest-pinned generic parameter contract in [#13770](https://github.com/Luminous-Dynamics/symthaea/pull/13770). Free-form strings and dynamic text/media fields must use typed source mappings. The profile is a frozen configuration commitment, not source authentication; it must be declared static and non-memory-derived before the run.
 
 ## Media-specific lineage
 
