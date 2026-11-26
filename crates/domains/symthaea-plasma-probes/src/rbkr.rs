@@ -899,6 +899,42 @@ mod tests {
     }
 
     #[test]
+    fn finite_horizon_builder_propagates_past_inputs_and_future_adjoint_to_checkpoint() {
+        let identity = vec![vec![1.0, 0.0], vec![0.0, 1.0]];
+        let past_growth = vec![vec![1.0, 0.0], vec![0.0, 2.0]];
+        let future_growth = vec![vec![1.0, 0.0], vec![0.0, 10.0]];
+        let past_input = vec![vec![1.0, 0.0], vec![0.0, 0.005]];
+        let no_late_input = vec![vec![0.0, 0.0], vec![0.0, 0.0]];
+        let first_output = vec![vec![1.0, 0.0]];
+        let terminal_output = vec![vec![0.0, 1.0]];
+
+        let (reach, observe) = build_finite_horizon_gramians(
+            &[identity.clone(), past_growth],
+            &[past_input, no_late_input],
+            &[vec![1.0, 1.0], vec![1.0, 1.0]],
+            &[identity, future_growth],
+            &[first_output.clone(), first_output, terminal_output],
+            &[vec![0.0], vec![0.0], vec![100.0]],
+            FiniteHorizonGramianConfig::default(),
+        )
+        .unwrap();
+
+        let reachable = reach.apply(&[0.0, 1.0]).unwrap();
+        let observable = observe.apply(&[0.0, 1.0]).unwrap();
+        assert!((reachable[1] - 1.0e-4).abs() < 1.0e-12);
+        assert!((observable[1] - 10_000.0).abs() < 1.0e-8);
+
+        let basis = ResponseBalancedBasis::from_empirical_gramians(
+            &reach,
+            &observe,
+            RbkrConfig::new(1),
+        )
+        .unwrap();
+        assert!(basis.trial_basis()[0][0].abs() < 1.0e-12);
+        assert!((basis.trial_basis()[0][1] - 0.01).abs() < 1.0e-10);
+    }
+
+    #[test]
     fn finite_horizon_gramian_builder_refuses_invalid_axes_and_budgets() {
         let identity = vec![vec![1.0, 0.0], vec![0.0, 1.0]];
         let input = vec![vec![1.0], vec![0.0]];
