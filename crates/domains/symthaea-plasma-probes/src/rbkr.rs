@@ -879,7 +879,7 @@ mod tests {
             &[vec![1.0, 1.0]],
             &[future_transition],
             &[output_at_checkpoint, output_at_horizon],
-            &[vec![0.0], vec![1.0]],
+            &[vec![0.0], vec![100.0]],
             FiniteHorizonGramianConfig::default(),
         )
         .unwrap();
@@ -888,7 +888,7 @@ mod tests {
         let observable = observe.apply(&[0.0, 1.0]).unwrap();
         assert!((reachable[0] - 1.0).abs() < 1.0e-12);
         assert!(reachable[1].abs() < 1.0e-12);
-        assert!((observable[1] - 100.0).abs() < 1.0e-10);
+        assert!((observable[1] - 10_000.0).abs() < 1.0e-8);
 
         let basis =
             ResponseBalancedBasis::from_empirical_gramians(&reach, &observe, RbkrConfig::new(1))
