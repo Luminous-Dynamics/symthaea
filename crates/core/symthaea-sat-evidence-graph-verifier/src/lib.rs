@@ -1377,6 +1377,63 @@ mod tests {
     }
 
     #[test]
+    fn supported_dependency_chain_passes_when_every_premise_passes() {
+        let mut value = base();
+        value["claims"].as_array_mut().unwrap().push(json!({
+            "claim_id": "claim-2", "claim_type": "other", "proposition": "Second claim",
+            "scope_ref": "scope:test", "status": "supported", "evidence_refs": ["obs-1"],
+            "depends_on": ["claim-1"], "validity_state": "current", "consequence_if_false": "low"
+        }));
+        value["claims"].as_array_mut().unwrap().push(json!({
+            "claim_id": "claim-3", "claim_type": "other", "proposition": "Third claim",
+            "scope_ref": "scope:test", "status": "supported", "evidence_refs": ["obs-1"],
+            "depends_on": ["claim-2"], "validity_state": "current", "consequence_if_false": "low"
+        }));
+        value["claim_edges"] = json!([
+            {"from_claim_id":"claim-2","to_claim_id":"claim-1","relation":"depends_on","rule_ref":"rule:premise-1"},
+            {"from_claim_id":"claim-3","to_claim_id":"claim-2","relation":"depends_on","rule_ref":"rule:premise-2"}
+        ]);
+        seal(&mut value);
+        let report = verify_augmentation(&serde_json::to_string(&value).unwrap()).unwrap();
+        assert!(report.graph_integrity_passed, "{:?}", report.issues);
+        assert_eq!(report.supported_claim_count, 3);
+        assert_eq!(report.supported_claims_passing_declared_state_checks, 3);
+    }
+
+    #[test]
+    fn unsupported_premise_propagates_through_multiple_dependency_levels() {
+        let mut value = base();
+        value["claims"][0]["evidence_refs"] = json!(["obs-missing"]);
+        value["claims"].as_array_mut().unwrap().push(json!({
+            "claim_id": "claim-2", "claim_type": "other", "proposition": "Second claim",
+            "scope_ref": "scope:test", "status": "supported", "evidence_refs": ["obs-1"],
+            "depends_on": ["claim-1"], "validity_state": "current", "consequence_if_false": "low"
+        }));
+        value["claims"].as_array_mut().unwrap().push(json!({
+            "claim_id": "claim-3", "claim_type": "other", "proposition": "Third claim",
+            "scope_ref": "scope:test", "status": "supported", "evidence_refs": ["obs-1"],
+            "depends_on": ["claim-2"], "validity_state": "current", "consequence_if_false": "low"
+        }));
+        value["claim_edges"] = json!([
+            {"from_claim_id":"claim-2","to_claim_id":"claim-1","relation":"depends_on","rule_ref":"rule:premise-1"},
+            {"from_claim_id":"claim-3","to_claim_id":"claim-2","relation":"depends_on","rule_ref":"rule:premise-2"}
+        ]);
+        seal(&mut value);
+        let report = verify_augmentation(&serde_json::to_string(&value).unwrap()).unwrap();
+        assert!(has_issue(&report, "dangling_evidence_reference"));
+        assert_eq!(report.supported_claim_count, 3);
+        assert_eq!(report.supported_claims_passing_declared_state_checks, 0);
+        assert!(report.issues.iter().any(|entry| {
+            entry.code == "supported_claim_has_inadmissible_dependency"
+                && entry.path == "claims.claim-2.depends_on"
+        }));
+        assert!(report.issues.iter().any(|entry| {
+            entry.code == "supported_claim_has_inadmissible_dependency"
+                && entry.path == "claims.claim-3.depends_on"
+        }));
+    }
+
+    #[test]
     fn supported_claim_cannot_inherit_admissibility_from_invalid_supported_premise() {
         let mut value = base();
         value["claims"][0]["evidence_refs"] = json!(["obs-missing"]);
