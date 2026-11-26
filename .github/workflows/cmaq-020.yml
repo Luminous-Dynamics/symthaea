@@ -34,3 +34,34 @@ jobs:
       - name: Strict Clippy
         working-directory: research/cmaq-020
         run: cargo +1.100.0 clippy --locked --all-targets -- -D warnings
+      - name: Validate WorldFailBench adapter schema and synthetic fixture
+        run: |
+          python3 -m pip install --disable-pip-version-check "jsonschema==4.25.1"
+          python3 - <<'PY'
+          import copy
+          import json
+          from pathlib import Path
+          from jsonschema import Draft202012Validator, ValidationError
+
+          schema = json.loads(Path("research/cmaq-020/worldfailbench-boundary-rate-pair-v0.1.schema.json").read_text())
+          fixture = json.loads(Path("research/cmaq-020/fixtures/worldfailbench-boundary-rate-pair.example.json").read_text())
+          Draft202012Validator.check_schema(schema)
+          validator = Draft202012Validator(schema)
+          validator.validate(fixture)
+
+          invalid = copy.deepcopy(fixture)
+          invalid["scene_sides"]["failure_side"]["reference_trials"] = 0
+          errors = list(validator.iter_errors(invalid))
+          assert errors, "schema admitted a zero-trial failure-side rollout record"
+
+          invalid = copy.deepcopy(fixture)
+          invalid["reference_policy_checkpoint_sha256"] = "unresolved"
+          errors = list(validator.iter_errors(invalid))
+          assert errors, "schema admitted an unresolved reference-policy checkpoint digest"
+
+          invalid = copy.deepcopy(fixture)
+          invalid["scene_sides"]["failure_side"]["scene_sha256"] = invalid["scene_sides"]["success_side"]["scene_sha256"]
+          # Equality of side digests is a cross-field invariant enforced by the Rust API,
+          # not by this JSON Schema; leave it for the runtime/adapter contract.
+          print("WorldFailBench adapter JSON Schema and negative controls validated")
+          PY
