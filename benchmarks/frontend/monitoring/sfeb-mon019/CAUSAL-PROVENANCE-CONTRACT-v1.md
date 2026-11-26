@@ -28,7 +28,7 @@ Do not overload a generic `parent_id` or trace ID. Preserve at least:
 3. **Authority:** activity/action Q was permitted under a particular authority assertion at a particular boundary.
 4. **Observation/corroboration:** observer O independently observed state S or corroborated statement C.
 
-A temporal relation is separate. “A happened before B” does not establish that A caused B. A causal relationship must be asserted by a typed edge and supported by the relevant source evidence and scope.
+A temporal relation is separate. “A happened before B” does not establish that A caused B. A causal relationship must be asserted by a typed edge and supported by the relevant source evidence and scope. `Used`, `Generated`, `DerivedFrom`, `InformedBy` and `Precedes` participate in the causal/ordering DAG. `AttributedTo`, `AssociatedWith`, `AuthorizedBy`, `ObservedBy` and `Supersedes` are non-causal relations and must not be inserted into that DAG.
 
 ### 2.2 Provenance graph objects
 
@@ -317,6 +317,25 @@ MON-019 should consume standard representations and verified outputs; it must no
 8. Benchmark graph scales and matched vendor/standard adapters.
 9. Only after source completeness and exact effect are qualified, add Symtropy sensor/physical instrumentation.
 
+
+### 13.1 Executable causal-graph reference
+
+A standard-library Go reference package lives in `causal-graph/`. It checks typed Entity/Activity/Agent relationships, unique node/edge identities, evidence references, causal DAG acyclicity, generated/external-root semantics, per-activity capture manifests, equality among declared inputs, independently observed inputs and graph-linked `used` edges, verifier-backed collector/source identities, verifier-backed capture-manifest digests, and source/edge evidence against pinned verifier ID/version/build/trust-store metadata. External-root provenance requires a distinct `AttributedTo` relationship to a verifier-qualified source Agent. Attribution and observation are not causality.
+
+The causal/ordering DAG contains only `Used`, `Generated`, `DerivedFrom`, `InformedBy` and `Precedes`. `AuthorizedBy`, `AttributedTo`, `AssociatedWith`, `ObservedBy` and `Supersedes` are represented separately and do not create causal ordering merely by existing.
+
+Verifier reports are indexed once by subject before checking graph nodes, avoiding a repeated full report scan per node. Exploratory workload measurements and current local results are published in `BENCHMARKS-v0.1.md`. The benchmark measures in-memory semantic validation only.
+
+Local reconstructed-source preflight (not an exact remote-head checkout):
+
+- `go test -race -count=5 ./...`: PASS.
+- `go vet ./...`: PASS.
+- `go test -count=1 -cover ./...`: PASS, 92.0% statement coverage.
+- `go test -run=^$ -fuzz=FuzzDigestProfileIsolation -fuzztime=2s`: PASS, 67,017 executions in the recorded run.
+- 35 named tests plus one fuzz target.
+
+A 100,000-input fixture (approximately 100,004 nodes and 200,003 edges) validated in about 459 ms in the recorded three-iteration microbenchmark. It allocated about 180 MB. The benchmark is exploratory: it is not a stable latency distribution, end-to-end capture, cryptographic verification or comparison against an industry product. The exact remote branch was not cloned/replayed in the environment because GitHub DNS resolution failed.
+
 ## 14. Privacy, security and claim ceilings
 
 - Collect only evidence needed for the declared assurance claim.
@@ -331,17 +350,3 @@ MON-019 should consume standard representations and verified outputs; it must no
 
 This profile is a research framework, not a legal admissibility standard, regulatory certification, safety case or universal trust score.
 
-
-### 13.1 Executable causal-graph reference
-
-A standard-library Go reference package lives in `causal-graph/`. It checks typed Entity/Activity/Agent relationships, unique node/edge identities, evidence references, causal DAG acyclicity, generated/external-root semantics, per-activity capture manifests, equality among declared inputs, independently observed inputs and graph-linked `used` edges, verifier-backed collector/source identities, verifier-backed capture-manifest digests, and source/edge evidence against pinned verifier ID/version/build/trust-store metadata.
-
-Local draft-package preflight (source reconstructed from the committed implementation and gofmt'd locally; not an exact remote-head clone/replay):
-
-- `go test -race -count=5 ./...` — PASS.
-- `go vet ./...` — PASS.
-- `go test -count=1 -cover ./...` — PASS, 90.8% statement coverage.
-- `go test -run=^$ -fuzz=FuzzDigestProfileIsolation -fuzztime=2s` — PASS, 54,635 executions in the recorded run.
-- 29 named tests plus one fuzz target.
-
-This remains a semantic prototype. It does not authenticate verifier-report transport, run cryptography, deploy an egress collector, establish global completeness, assess factual truth, authorize actions, or prove destination/physical effects. A string identifying a collector is not itself an independently trusted collector; collector identity, capture-manifest signature and source identity are represented as separate verifier-qualified evidence.
