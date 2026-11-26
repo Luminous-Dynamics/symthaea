@@ -22,7 +22,8 @@
     "claim_boundary",
     "provenance",
     "adjacent_methods",
-    "linearization_contract"
+    "linearization_contract",
+    "response_qualification"
   ],
   "properties": {
     "schema_version": {
@@ -589,6 +590,47 @@
         },
         "branch_change_disposition": {
           "const": "UNKNOWN_OR_HANDOFF"
+        }
+      }
+    },
+    "response_qualification": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "checkpoint_state_residual_required",
+        "future_pulse_injection_residual_required",
+        "risk_summary_metrics",
+        "cvar_alpha",
+        "residual_threshold_status",
+        "nonlinear_full_order_response_required"
+      ],
+      "properties": {
+        "checkpoint_state_residual_required": {
+          "const": true
+        },
+        "future_pulse_injection_residual_required": {
+          "const": true
+        },
+        "risk_summary_metrics": {
+          "type": "array",
+          "minItems": 3,
+          "uniqueItems": true,
+          "items": {
+            "enum": [
+              "weighted_mean",
+              "worst_case",
+              "cvar"
+            ]
+          }
+        },
+        "cvar_alpha": {
+          "const": 0.9
+        },
+        "residual_threshold_status": {
+          "const": "calibrate_on_independently_converged_physical_reference"
+        },
+        "nonlinear_full_order_response_required": {
+          "const": true
         }
       }
     }
