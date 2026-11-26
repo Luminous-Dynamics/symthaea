@@ -20,6 +20,7 @@
     "source_audio",
     "decoded_pcm",
     "windows",
+    "request_body",
     "context"
   ],
   "properties": {
@@ -237,6 +238,29 @@
     "target_source_lineage_id": {
       "type": "string",
       "minLength": 1
+    },
+    "request_body": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "body_sha256",
+        "byte_length",
+        "content_type"
+      ],
+      "properties": {
+        "body_sha256": {
+          "type": "string",
+          "pattern": "^[0-9a-f]{64}$"
+        },
+        "byte_length": {
+          "type": "integer",
+          "minimum": 1
+        },
+        "content_type": {
+          "type": "string",
+          "minLength": 1
+        }
+      }
     }
   }
 }
