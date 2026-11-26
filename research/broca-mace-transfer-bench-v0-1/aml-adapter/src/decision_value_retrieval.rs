@@ -39,6 +39,7 @@ pub enum DecisionValueRejectV1 {
     UtilityOutOfRange,
     BudgetExceeded,
     TooManyOptions,
+    DuplicateOption,
     CalibrationReceiptRejected,
     ArithmeticOverflow,
 }
@@ -99,6 +100,9 @@ impl DecisionValuePolicyV1 {
             .any(|value| value.unsigned_abs() > MAX_UTILITY_ABS)
         {
             return Err(DecisionValueRejectV1::UtilityOutOfRange);
+        }
+        if self.action_allowed_by_state.iter().any(|row| !row.iter().any(|allowed| *allowed)) {
+            return Err(DecisionValueRejectV1::NoPermittedAction);
         }
         Ok(())
     }
@@ -397,7 +401,11 @@ pub fn choose_expected_value_query_v1(
         return Err(DecisionValueRejectV1::TooManyOptions);
     }
     let mut best: Option<ExpectedValueSelectionV1> = None;
+    let mut seen_options = BTreeSet::new();
     for option in options {
+        if !seen_options.insert(option.query_option_id.as_str()) {
+            return Err(DecisionValueRejectV1::DuplicateOption);
+        }
         let assessment = match evaluate_expected_value_v1(
             policy, prior, option, now_unix, calibration_verifier,
         ) {
@@ -544,7 +552,11 @@ pub fn choose_robust_value_query_v1(
         return Err(DecisionValueRejectV1::TooManyOptions);
     }
     let mut best: Option<RobustValueSelectionV1> = None;
+    let mut seen_options = BTreeSet::new();
     for option in options {
+        if !seen_options.insert(option.query_option_id.as_str()) {
+            return Err(DecisionValueRejectV1::DuplicateOption);
+        }
         let assessment = match evaluate_robust_value_v1(policy, option) {
             Ok(assessment) => assessment,
             Err(DecisionValueRejectV1::BudgetExceeded) => continue,
@@ -828,6 +840,42 @@ mod tests {
         ).unwrap();
         assert_eq!(assessment.gross_evsi_numerator_ppm2, 0);
         assert!(!assessment.worth_retrieving);
+    }
+
+    #[test]
+    fn expected_selector_chooses_highest_positive_net_evsi_and_stops_when_none_positive() {
+        let mut uninformative = informative_option();
+        uninformative.query_option_id = "weak-source".into();
+        uninformative.likelihood_ppm_by_state = vec![
+            vec![500_000, 500_000],
+            vec![500_000, 500_000],
+        ];
+        uninformative.possible_observation_by_state = vec![
+            vec![true, true],
+            vec![true, true],
+        ];
+        let informative = informative_option();
+        let selected = choose_expected_value_query_v1(
+            &policy(), &prior(), &[uninformative.clone(), informative.clone()],
+            10, &AcceptPinnedCalibration,
+        ).unwrap().expect("positive EVSI candidate");
+        assert_eq!(selected.query_option_id, "verify-source");
+        let mut expensive = informative;
+        expensive.query_option_id = "too-expensive".into();
+        expensive.acquisition_cost_utility_units = 100;
+        let stopped = choose_expected_value_query_v1(
+            &policy(), &prior(), &[expensive], 10, &AcceptPinnedCalibration,
+        ).unwrap();
+        assert!(stopped.is_none());
+    }
+
+    #[test]
+    fn query_selector_rejects_duplicate_option_identities() {
+        let option = informative_option();
+        assert_eq!(
+            choose_robust_value_query_v1(&policy(), &[option.clone(), option]),
+            Err(DecisionValueRejectV1::DuplicateOption)
+        );
     }
 
     #[test]
