@@ -7,13 +7,20 @@
 //! The world model can predict outcomes of actions (transition model) and
 //! generate expected observations from state (likelihood model).
 //!
-//! ## Transition Model (Hybrid HDC → CfC)
+//! ## Transition Model (current implementation)
 //!
-//! Phase 1: HDC delta vectors — each action type gets a learned delta.
-//!   Prediction: next_state ≈ current_state + action_delta
-//!   Composable: multi-step plans = sequential addition of deltas.
+//! The current transition baseline is HDC action-delta averaging:
+//! - Each action category stores a running-average state delta.
+//! - Prediction applies `current_state + action_delta`.
+//! - Unknown actions currently predict no change.
+//! - Multi-step predictions sequentially apply the learned additive deltas.
 //!
-//! Phase 2: CfC neural model (auto-activates after ~50 episodes).
+//! **CfC/HDC-LTC transition integration is not implemented in this module.**
+//! Although separate HDC-LTC components exist in `symthaea-core`, this
+//! `NixWorldModel` has no CfC model field, episode threshold, training path,
+//! inference path or CfC checkpoint. Do not infer an automatic activation after
+//! 50 episodes from this implementation. See issue #13766 for the integration
+//! and qualification plan.
 
 use super::predictive_hierarchy::PredictiveHierarchy;
 use std::collections::HashMap;
