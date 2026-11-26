@@ -22,6 +22,8 @@ The consumer now parses the exact immutable request artifact independently of th
 - Duplicate provider parameter members and unrecognized message fields are rejected, preventing parser-differential or untracked message-surface ambiguity.
 - A positive allowlisted numeric/boolean parameter-profile fixture verifies successful independent recomputation.
 - An escaped Unicode request fixture verifies source-span byte offsets against the borrowed raw JSON content.
+- A span that bisects a JSON escape or UTF-8 scalar is rejected.
+- Duplicate top-level `model` and `messages` envelope members are rejected.
 
 This is intentionally stricter than checking the request-body digest and trusting producer-supplied profile/span metadata. JSON Schema cannot prove these relationships.
 
@@ -60,7 +62,7 @@ These are deliberate interfaces to existing owners or separate deployment qualif
 
 ## Deterministic tests authored (not executed)
 
-Twenty-six Rust unit tests cover:
+Thirty Rust unit tests cover:
 1. valid signed receipt, body, span and evidence binding;
 2. wrong run binding;
 3. changed request-body rejection;
