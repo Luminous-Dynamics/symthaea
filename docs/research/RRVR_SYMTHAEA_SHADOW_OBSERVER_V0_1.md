@@ -39,6 +39,22 @@ Prefer reuse, but do not infer a capability from a crate name.
 
 Do not pull in the monolithic cognitive loop for the first integration merely because it is comprehensive. Begin with an isolated crate and small trait surfaces.
 
+### PredictiveHdcEncoder integration semantics
+
+The current `PredictiveHdcEncoder::encode(&str)` is an attention-modulated *text/primitive encoder*. It obtains an HDC representation through `TextEncoder`, detects semantic primitives, applies attention, and computes prediction error against a vector previously supplied by a separate upstream model through `set_prediction(Vec<f32>)`. It is therefore not a standalone robot sensor encoder or a temporal dynamics model. The first observer adapter must:
+
+- define a canonical, versioned representation for admissible symbolic/event descriptors; keep typed metric channels (position, velocity, force, timestamps and uncertainty) in their typed numeric representation rather than flattening precision-sensitive values into prose;
+- bind the supplied LTC/CfC prediction to the exact previous input window, model/checkpoint digest, horizon and decision cut;
+- inspect `last_prediction_degeneracy()` and keep `NoPrediction` / `ZeroPrediction` cycles out of genuine-surprise metrics; a max-error sentinel is not a detected physical anomaly;
+- treat `bits_saved_persist`, `bits_saved_zero` and `bits_kappa` as measurement-only diagnostics, not calibrated risk probabilities or evidence of forecast superiority;
+- reset prediction state at episode/attempt boundaries and prevent training/attention adaptation across held-out evaluation scenarios unless that online adaptation is explicitly part of the preregistration.
+
+This provides a credible first Symthaea role: semantic trajectory representation and prediction-error-conditioned attention, paired with a separately qualified temporal predictor. The temporal predictor still needs horizon-wise accuracy, calibration, OOD and selective-abstention evaluation against matched model-based and statistical baselines.
+
+### Causal reasoning boundary
+
+The existing causal-reasoning DAG/counterfactual primitives can help organize competing explanations and propose discriminating interventions. However, a graph edge or generated counterfactual is a hypothesis, not identified causality. Candidate causal claims must be bound to explicit interventions, assumptions, hidden-confounder limitations and independent outcome evidence; score them only against held-out intervention labels. No causal-reasoning output can promote evidence domain or authorize a physical action.
+
 ## 3. Architecture
 
 Immutable RRVR episode/evidence snapshot
