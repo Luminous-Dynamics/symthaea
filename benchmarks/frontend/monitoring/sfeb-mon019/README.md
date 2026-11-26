@@ -1,6 +1,6 @@
 # MON-019 — Causal Input-to-Effect Provenance
 
-**Status:** research contract, synthetic adversarial scenario seed corpus, and semantic prototype pending.
+**Status:** research contract and local semantic prototype; runtime instrumentation and independent qualification pending.
 
 MON-019 extends MON from action/effect evidence toward end-to-end causal assurance. It composes upstream source evidence, agent/tool invocations, transformations, authority, dispatch, destination commit, independent observation and later corrections into a verifiable causal graph.
 
@@ -14,6 +14,7 @@ Can an independent evaluator reconstruct the declared causal dependencies of a c
 - [SCENARIOS-v1.json](./SCENARIOS-v1.json) — synthetic known-answer scenario seed corpus.
 - [SCENARIOS-v1.schema.json](./SCENARIOS-v1.schema.json) — strict JSON Schema.
 - [causal-graph/](./causal-graph/) — standard-library Go graph-structure and bounded-manifest reference.
+- [BENCHMARKS-v0.1.md](./BENCHMARKS-v0.1.md) — exploratory graph-size measurements and prospective optimization targets.
 
 ## Standards and prior art
 
@@ -28,7 +29,7 @@ Can an independent evaluator reconstruct the declared causal dependencies of a c
 
 ## Local reference preflight
 
-The `causal-graph/` package has 29 named adversarial tests and one fuzz target. Local draft-package checks: race tests ×5, `go vet`, statement coverage 90.8%, and a 2-second digest-profile isolation fuzz run with 54,635 executions. These were run on a local reconstructed/gofmt'd copy of the source; the remote GitHub branch was not cloned/replayed in this environment, so this is not an exact-head hosted or checkout qualification.
+The `causal-graph/` package has 35 named adversarial tests and one fuzz target. Local preflight: race tests ×5 PASS, `go vet` PASS, statement coverage 92.0%, and a 2-second digest-profile isolation fuzz run with 67,017 executions. Exploratory graph benchmarks reach 100,000 input entities / about 200,000 edges in about 459 ms on the recorded host; see `BENCHMARKS-v0.1.md`. These checks were run on a locally reconstructed and gofmt'd copy of the public branch source because a fresh GitHub clone was unavailable; they are not exact-head checkout or hosted CI qualification.
 
 ## Claim ceiling
 
