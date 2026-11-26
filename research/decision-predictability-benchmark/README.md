@@ -92,3 +92,8 @@ Before this becomes the complete #12546 benchmark:
 Resource dimensions are comparable only when units, measurement boundaries, hardware and workloads match. This crate does not measure physical energy or hardware performance. Expected information gain about hidden state is reported separately from EVSI; a probe can reduce entropy without changing the optimal decision. The prior-free robust module is a different estimand again: it reports a guaranteed worst-case loss reduction over declared outcome-support sets, not an expectation.
 
 No output from this crate establishes SOTA, physical reliability, causal reconstruction or consciousness.
+
+
+## AERB lost-acknowledgement conformance example
+
+The example `examples/aerb_lost_ack.rs` exercises the existing prior-free robust evaluator on a synthetic command-effect ambiguity set. It contrasts a complete endpoint-journal observation with a weakly discriminating visual probe. The journal probe has a guaranteed worst-case loss reduction of 0.10 under the frozen illustrative loss table; the weak visual probe has zero robust decision value despite returning distinct outcomes. No prior probabilities are used, acquisition cost remains separate, and the example executes no physical probe. The example is run by the focused workflow. This is a conformance demonstration of the existing robust evaluator, not an AERB benchmark result or a physical reliability claim.
