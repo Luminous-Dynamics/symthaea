@@ -1,1 +1,438 @@
-{"$schema":"https://json-schema.org/draft/2020-12/schema","$id":"https://luminousdynamics.io/sat/schemas/effect-receipt/0.1","title":"SAT External Effect Receipt v0.1","type":"object","additionalProperties":false,"required":["schema_version","receipt_id","issued_at","run_id","manifest_digest","attempt_id","idempotency_key","intent_digest","effect_binding_digest","observed_outcome","source_attestations","trust_policy_digest","receipt_statement_digest","artifact_refs","limitations"],"properties":{"schema_version":{"const":"sat-effect-receipt/v0.1"},"receipt_id":{"type":"string","minLength":1},"issued_at":{"type":"string","format":"date-time"},"run_id":{"type":"string","format":"uuid"},"manifest_digest":{"type":"string","pattern":"^sha256:[0-9a-f]{64}$"},"attempt_id":{"type":"string","format":"uuid"},"idempotency_key":{"type":"string","minLength":8,"maxLength":256},"intent_digest":{"type":"string","pattern":"^sha256:[0-9a-f]{64}$"},"effect_binding_digest":{"type":"string","pattern":"^sha256:[0-9a-f]{64}$"},"observed_outcome":{"type":"string","enum":["applied","not_applied","partial","unknown","rejected"]},"observed_effect":{"type":"object","additionalProperties":false,"required":["projection_schema","sink_id","operation","resource_id","purpose","parameter_digest","payload_digest","external_effect_id_digest","external_version","projection_digest"],"properties":{"projection_schema":{"type":"string","minLength":1},"sink_id":{"type":"string","minLength":1},"operation":{"type":"string","minLength":1},"resource_id":{"type":"string","minLength":1},"purpose":{"type":"string","minLength":1},"parameter_digest":{"type":"string","pattern":"^sha256:[0-9a-f]{64}$"},"payload_digest":{"type":"string","pattern":"^sha256:[0-9a-f]{64}$"},"external_effect_id_digest":{"type":"string","pattern":"^sha256:[0-9a-f]{64}$"},"external_version":{"type":"string","minLength":1},"projection_digest":{"type":"string","pattern":"^sha256:[0-9a-f]{64}$"}}},"source_attestations":{"type":"array","minItems":1,"items":{"type":"object","additionalProperties":false,"required":["attestation_id","source_id","source_version","source_role","source_event_id","source_sequence","observed_at","outcome","projection_digest","signature_envelope","key_status_evidence_ref","timestamp_evidence_ref","trust_policy_digest","independence_basis_ref"],"properties":{"attestation_id":{"type":"string","minLength":1},"source_id":{"type":"string","minLength":1},"source_version":{"type":"string","minLength":1},"source_role":{"type":"string","enum":["connector_acknowledgement","authoritative_sink","independent_readback","independent_ledger","physical_sensor","destination_observer","other"]},"source_event_id":{"type":"string","minLength":1},"source_sequence":{"type":"integer","minimum":0},"observed_at":{"type":"string","format":"date-time"},"outcome":{"type":"string","enum":["applied","not_applied","partial","unknown","rejected"]},"projection_digest":{"oneOf":[{"type":"string","pattern":"^sha256:[0-9a-f]{64}$"},{"type":"null"}]},"signature_envelope":{"type":"object","additionalProperties":false,"required":["format","algorithm","signer_identity","key_id","signed_statement_digest","signature_ref"],"properties":{"format":{"type":"string","enum":["cose","jws","dsse","sigstore-bundle","provider-native","other"]},"algorithm":{"type":"string","minLength":1},"signer_identity":{"type":"string","minLength":1},"key_id":{"type":"string","minLength":1},"signed_statement_digest":{"type":"string","pattern":"^sha256:[0-9a-f]{64}$"},"signature_ref":{"type":"string","minLength":1}}},"key_status_evidence_ref":{"type":"string","minLength":1},"timestamp_evidence_ref":{"type":"string","minLength":1},"trust_policy_digest":{"type":"string","pattern":"^sha256:[0-9a-f]{64}$"},"independence_basis_ref":{"type":"string","minLength":1},"operator_identity_ref":{"type":"string","minLength":1},"infrastructure_domain_ref":{"type":"string","minLength":1},"conflicts_of_interest_ref":{"type":"string","minLength":1}}}},"trust_policy_digest":{"type":"string","pattern":"^sha256:[0-9a-f]{64}$"},"trust_policy_ref":{"type":"string","minLength":1},"receipt_statement_digest":{"type":"string","pattern":"^sha256:[0-9a-f]{64}$"},"transparency_receipt_ref":{"type":"string","minLength":1},"artifact_refs":{"type":"array","items":{"type":"string","minLength":1},"uniqueItems":true},"limitations":{"type":"array","items":{"type":"string"}},"privacy_profile":{"type":"string","enum":["commitments-only-v0.1","opaque-commitments-v0.1","restricted-evidence-bundle-v0.1"]}},"allOf":[{"if":{"properties":{"observed_outcome":{"enum":["applied","partial"]}},"required":["observed_outcome"]},"then":{"required":["observed_effect"],"properties":{"source_attestations":{"contains":{"properties":{"projection_digest":{"$ref":"#/$defs/digest"},"outcome":{"enum":["applied","partial"]}},"required":["projection_digest","outcome"]}}}}},{"if":{"properties":{"observed_outcome":{"enum":["not_applied","unknown","rejected"]}},"required":["observed_outcome"]},"then":{"not":{"required":["observed_effect"]}}}],"$defs":{"digest":{"type":"string","pattern":"^sha256:[0-9a-f]{64}$"}}}
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://luminousdynamics.io/sat/schemas/effect-receipt/0.1",
+  "title": "SAT External Effect Receipt v0.1",
+  "type": "object",
+  "additionalProperties": false,
+  "required": [
+    "schema_version",
+    "receipt_id",
+    "issued_at",
+    "run_id",
+    "manifest_digest",
+    "attempt_id",
+    "idempotency_key",
+    "intent_digest",
+    "effect_binding_digest",
+    "observed_outcome",
+    "source_attestations",
+    "trust_policy_digest",
+    "receipt_statement_digest",
+    "artifact_refs",
+    "limitations"
+  ],
+  "properties": {
+    "schema_version": {
+      "const": "sat-effect-receipt/v0.1"
+    },
+    "receipt_id": {
+      "type": "string",
+      "minLength": 1
+    },
+    "issued_at": {
+      "type": "string",
+      "format": "date-time"
+    },
+    "run_id": {
+      "type": "string",
+      "format": "uuid"
+    },
+    "manifest_digest": {
+      "type": "string",
+      "pattern": "^sha256:[0-9a-f]{64}$"
+    },
+    "attempt_id": {
+      "type": "string",
+      "format": "uuid"
+    },
+    "idempotency_key": {
+      "type": "string",
+      "minLength": 8,
+      "maxLength": 256
+    },
+    "intent_digest": {
+      "type": "string",
+      "pattern": "^sha256:[0-9a-f]{64}$"
+    },
+    "effect_binding_digest": {
+      "type": "string",
+      "pattern": "^sha256:[0-9a-f]{64}$"
+    },
+    "observed_outcome": {
+      "type": "string",
+      "enum": [
+        "applied",
+        "not_applied",
+        "partial",
+        "unknown",
+        "rejected"
+      ]
+    },
+    "observed_effect": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "projection_schema",
+        "sink_id",
+        "operation",
+        "resource_id",
+        "purpose",
+        "parameter_digest",
+        "payload_digest",
+        "external_effect_id_digest",
+        "external_version",
+        "projection_digest"
+      ],
+      "properties": {
+        "projection_schema": {
+          "type": "string",
+          "minLength": 1
+        },
+        "sink_id": {
+          "type": "string",
+          "minLength": 1
+        },
+        "operation": {
+          "type": "string",
+          "minLength": 1
+        },
+        "resource_id": {
+          "type": "string",
+          "minLength": 1
+        },
+        "purpose": {
+          "type": "string",
+          "minLength": 1
+        },
+        "parameter_digest": {
+          "type": "string",
+          "pattern": "^sha256:[0-9a-f]{64}$"
+        },
+        "payload_digest": {
+          "type": "string",
+          "pattern": "^sha256:[0-9a-f]{64}$"
+        },
+        "external_effect_id_digest": {
+          "type": "string",
+          "pattern": "^sha256:[0-9a-f]{64}$"
+        },
+        "external_version": {
+          "type": "string",
+          "minLength": 1
+        },
+        "projection_digest": {
+          "type": "string",
+          "pattern": "^sha256:[0-9a-f]{64}$"
+        }
+      }
+    },
+    "source_attestations": {
+      "type": "array",
+      "minItems": 1,
+      "items": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": [
+          "attestation_id",
+          "run_id",
+          "manifest_digest",
+          "attempt_id",
+          "idempotency_key",
+          "intent_digest",
+          "effect_binding_digest",
+          "source_id",
+          "source_version",
+          "source_role",
+          "source_event_id",
+          "source_sequence",
+          "signed_at",
+          "observed_at",
+          "outcome",
+          "projection_digest",
+          "signature_envelope",
+          "key_status_evidence_ref",
+          "timestamp_evidence_ref",
+          "trust_policy_digest",
+          "independence_basis_ref"
+        ],
+        "properties": {
+          "attestation_id": {
+            "type": "string",
+            "minLength": 1
+          },
+          "run_id": {
+            "type": "string",
+            "format": "uuid"
+          },
+          "manifest_digest": {
+            "type": "string",
+            "pattern": "^sha256:[0-9a-f]{64}$"
+          },
+          "attempt_id": {
+            "type": "string",
+            "format": "uuid"
+          },
+          "idempotency_key": {
+            "type": "string",
+            "minLength": 8,
+            "maxLength": 256
+          },
+          "intent_digest": {
+            "type": "string",
+            "pattern": "^sha256:[0-9a-f]{64}$"
+          },
+          "effect_binding_digest": {
+            "type": "string",
+            "pattern": "^sha256:[0-9a-f]{64}$"
+          },
+          "source_id": {
+            "type": "string",
+            "minLength": 1
+          },
+          "source_version": {
+            "type": "string",
+            "minLength": 1
+          },
+          "source_role": {
+            "type": "string",
+            "enum": [
+              "connector_acknowledgement",
+              "authoritative_sink",
+              "independent_readback",
+              "independent_ledger",
+              "physical_sensor",
+              "destination_observer",
+              "other"
+            ]
+          },
+          "source_event_id": {
+            "type": "string",
+            "minLength": 1
+          },
+          "source_sequence": {
+            "type": "integer",
+            "minimum": 0
+          },
+          "signed_at": {
+            "type": "string",
+            "format": "date-time"
+          },
+          "observed_at": {
+            "type": "string",
+            "format": "date-time"
+          },
+          "outcome": {
+            "type": "string",
+            "enum": [
+              "applied",
+              "not_applied",
+              "partial",
+              "unknown",
+              "rejected"
+            ]
+          },
+          "projection_digest": {
+            "oneOf": [
+              {
+                "type": "string",
+                "pattern": "^sha256:[0-9a-f]{64}$"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
+          "signature_envelope": {
+            "type": "object",
+            "additionalProperties": false,
+            "required": [
+              "format",
+              "algorithm",
+              "signer_identity",
+              "key_id",
+              "signed_statement_digest",
+              "statement_ref",
+              "signature_ref"
+            ],
+            "properties": {
+              "format": {
+                "type": "string",
+                "enum": [
+                  "cose",
+                  "jws",
+                  "dsse",
+                  "sigstore-bundle",
+                  "provider-native",
+                  "other"
+                ]
+              },
+              "algorithm": {
+                "type": "string",
+                "minLength": 1
+              },
+              "signer_identity": {
+                "type": "string",
+                "minLength": 1
+              },
+              "key_id": {
+                "type": "string",
+                "minLength": 1
+              },
+              "signed_statement_digest": {
+                "type": "string",
+                "pattern": "^sha256:[0-9a-f]{64}$"
+              },
+              "statement_ref": {
+                "type": "string",
+                "minLength": 1
+              },
+              "signature_ref": {
+                "type": "string",
+                "minLength": 1
+              }
+            }
+          },
+          "key_status_evidence_ref": {
+            "type": "string",
+            "minLength": 1
+          },
+          "timestamp_evidence_ref": {
+            "type": "string",
+            "minLength": 1
+          },
+          "trust_policy_digest": {
+            "type": "string",
+            "pattern": "^sha256:[0-9a-f]{64}$"
+          },
+          "independence_basis_ref": {
+            "type": "string",
+            "minLength": 1
+          },
+          "operator_identity_ref": {
+            "type": "string",
+            "minLength": 1
+          },
+          "infrastructure_domain_ref": {
+            "type": "string",
+            "minLength": 1
+          },
+          "conflicts_of_interest_ref": {
+            "type": "string",
+            "minLength": 1
+          }
+        }
+      }
+    },
+    "trust_policy_digest": {
+      "type": "string",
+      "pattern": "^sha256:[0-9a-f]{64}$"
+    },
+    "trust_policy_ref": {
+      "type": "string",
+      "minLength": 1
+    },
+    "receipt_statement_digest": {
+      "type": "string",
+      "pattern": "^sha256:[0-9a-f]{64}$"
+    },
+    "transparency_receipt_ref": {
+      "type": "string",
+      "minLength": 1
+    },
+    "artifact_refs": {
+      "type": "array",
+      "items": {
+        "type": "string",
+        "minLength": 1
+      },
+      "uniqueItems": true
+    },
+    "limitations": {
+      "type": "array",
+      "items": {
+        "type": "string"
+      }
+    },
+    "privacy_profile": {
+      "type": "string",
+      "enum": [
+        "commitments-only-v0.1",
+        "opaque-commitments-v0.1",
+        "restricted-evidence-bundle-v0.1"
+      ]
+    }
+  },
+  "allOf": [
+    {
+      "if": {
+        "properties": {
+          "observed_outcome": {
+            "enum": [
+              "applied",
+              "partial"
+            ]
+          }
+        },
+        "required": [
+          "observed_outcome"
+        ]
+      },
+      "then": {
+        "required": [
+          "observed_effect"
+        ],
+        "properties": {
+          "source_attestations": {
+            "contains": {
+              "properties": {
+                "projection_digest": {
+                  "type": "string",
+                  "pattern": "^sha256:[0-9a-f]{64}$"
+                },
+                "outcome": {
+                  "enum": [
+                    "applied",
+                    "partial"
+                  ]
+                }
+              },
+              "required": [
+                "projection_digest",
+                "outcome"
+              ]
+            }
+          }
+        }
+      }
+    },
+    {
+      "if": {
+        "properties": {
+          "observed_outcome": {
+            "enum": [
+              "not_applied",
+              "unknown",
+              "rejected"
+            ]
+          }
+        },
+        "required": [
+          "observed_outcome"
+        ]
+      },
+      "then": {
+        "not": {
+          "required": [
+            "observed_effect"
+          ]
+        }
+      }
+    }
+  ],
+  "$defs": {
+    "digest": {
+      "type": "string",
+      "pattern": "^sha256:[0-9a-f]{64}$"
+    }
+  }
+}
