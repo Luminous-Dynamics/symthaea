@@ -157,7 +157,7 @@ Use Bayesian EVSI only when priors, likelihoods and losses are defensible. For p
 
 A memory search should terminate when its expected marginal value is non-positive, the decision threshold is already met, or required evidence cannot be obtained within the budget. Abstention is a valid output, not a system failure.
 
-### Shift E — From persistent memory to demonstrable correction and forgetting
+### Shift E — From persistent memory to demonstrable correction, quarantine and forgetting
 
 Memory needs immutable history plus current admissibility, not mutable facts that overwrite their past. Model:
 - correction and supersession;
@@ -167,6 +167,8 @@ Memory needs immutable history plus current admissibility, not mutable facts tha
 - scope change and identity uncertainty.
 
 Historical truth and current decision-use validity are different claims. The system must prove that a retracted or invalidated fact is no longer used in consequential decisions, while retaining only the audit records it is permitted to retain.
+
+Do not conflate an epistemic uncertainty label with a rights-based erasure instruction. When lineage, freshness or contradiction is unresolved, place evidence in reversible quarantine for consequential decisions and trigger revalidation; do not silently erase it. Irreversible deletion is a separate rights/lifecycle operation with its own authority and audit semantics. This is important because a 2026 study of query-time memory filtering found hard-drop beneficial with perfect resolver labels but harmful under noisy label conditions, with false-drops causing greater degradation than false-keeps in its tested setup. That result is synthetic and benchmark-specific, but it is a strong reason to evaluate both error directions rather than assume aggressive removal is always safer.
 
 ### Shift F — From one monolithic agent to separation of duties
 
@@ -188,7 +190,7 @@ External benchmarks do not fully test the assurance claims above. Build a separa
 2. **Evidence lifecycle:** update, correction, expiry, revocation, deletion, rights withdrawal and policy changes.
 3. **Relational/causal memory:** multi-hop evidence chains, causal preconditions, state evolution, contradiction handling and counterfactual questions.
 4. **Decision sufficiency:** missing requirement, wrong evidence class, insufficient root families, risk beyond limit, regret beyond tolerance, stale calibration and resource-budget breach.
-5. **Selective retrieval:** answer with a sufficient subset, request more evidence when its value is positive, stop when marginal value is negative, abstain when unresolved.
+5. **Selective retrieval and filtering:** answer with a sufficient subset, request more evidence when its value is positive, stop when marginal value is negative, and abstain when unresolved. Inject resolver-label corruption at predeclared rates and compare hard-drop, reversible quarantine, retain-with-warning, and revalidation policies.
 6. **Agentic use:** multi-session tool/environment sequences where earlier observations change later decisions.
 7. **Adversarial authority:** signer rotation/revocation, trust-profile rollback, DSSE replay, changed subject/scope/action set, evaluator/qualifier key reuse, manipulated time and telemetry.
 8. **Erasure and privacy:** prove that deleted or rights-withdrawn material is no longer available to decision retrieval while distinguishing permitted tombstone/audit metadata.
@@ -200,6 +202,8 @@ External benchmarks do not fully test the assurance claims above. Build a separa
 | False-sufficient rate | Fraction of consequential cases marked sufficient despite a violated DecisionNeed requirement or risk/regret/resource bound | Zero on exhaustive protocol fixtures; on held-out evaluation target 0/3,000 with one-sided 95% upper confidence bound reported (approximately 0.1%) |
 | Independent-root overcount | Cases where dependent/correlated sources are counted as more independent roots than the reference graph | Zero on frozen known-common-cause challenge; unresolved ancestry counts as zero |
 | Stale-evidence use | Decisions using revoked, corrected, expired, deleted or otherwise inadmissible evidence | Zero on the deterministic lifecycle challenge |
+| False-drop rate | Valid, rights-eligible evidence suppressed from a supported decision because of an incorrect stale/invalid label | Report by resolver-label reliability; target at least 50% lower than hard-drop baseline without increasing stale-evidence use |
+| False-retain rate | Invalid/stale evidence incorrectly left admissible for consequential use | Zero on exhaustive lifecycle fixtures; held-out rate and consequence-weighted cost reported |
 | Evidence requirement macro-F1 | Five-way disposition of met/unmet/unknown/revalidate/invalidated or superseded as separately defined by the frozen task protocol | At least 0.95, with per-class precision/recall and no collapsing of unknown into met |
 | Calibration coverage | Empirical coverage of the declared one-sided risk bounds on held-out cases | 95% nominal bounds must meet or exceed their declared coverage overall and on every supported critical subgroup |
 | Regret | Paired realized decision loss versus the strongest matched baseline | At least 10% lower mean regret; paired 95% CI must exclude zero and critical-risk limits must not worsen |
@@ -270,3 +274,8 @@ MACE is not currently ahead of SOTA on external memory scores. Its defensible re
 - Memora/FAMA, *From Recall to Forgetting: Benchmarking Long-Term Memory for Personalized Agents*, Findings of ACL 2026: https://aclanthology.org/2026.findings-acl.1337/
 
 This programme does not claim an external victory. It states the comparisons, targets, evidence requirements and proof obligations needed to establish one.
+
+
+### Additional forgetting/filtering reference
+
+- Samarth Vinayaka, *When Should LLM Agents Forget? Memory Filtering Under Query-Critical Resolver Errors* (2026): https://aclanthology.org/2026.realm-1.16/. This is a separate synthetic study of query-time filtering, not the Memora/FAMA benchmark. MACE should use it to motivate calibrated reversible quarantine and paired false-drop/false-retain evaluation—not to infer universal error-cost ratios.
