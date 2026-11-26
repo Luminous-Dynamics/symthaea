@@ -352,6 +352,7 @@ pub fn route_mace_query_v1(
                     SubstrateKindV1::TypedHdc,
                     SubstrateKindV1::DenseSemantic,
                     SubstrateKindV1::SparseLexical,
+                    SubstrateKindV1::HierarchicalSummary,
                     SubstrateKindV1::RawTimeline,
                 ]
             } else {
@@ -359,6 +360,7 @@ pub fn route_mace_query_v1(
                     SubstrateKindV1::DenseSemantic,
                     SubstrateKindV1::TypedHdc,
                     SubstrateKindV1::SparseLexical,
+                    SubstrateKindV1::HierarchicalSummary,
                     SubstrateKindV1::RawTimeline,
                 ]
             };
@@ -367,20 +369,21 @@ pub fn route_mace_query_v1(
                 SubstrateKindV1::TypedHdc => RouteActionV1::AssociativeCandidateLookup,
                 SubstrateKindV1::DenseSemantic => RouteActionV1::SemanticCandidateLookup,
                 SubstrateKindV1::SparseLexical => RouteActionV1::ExactCandidateLookup,
+                SubstrateKindV1::HierarchicalSummary => RouteActionV1::ReadQualifiedSummary,
                 _ => RouteActionV1::ReadRawSource,
             };
             add_step(chosen, action, profiles, &mut selected, &mut steps)?;
             if chosen == SubstrateKindV1::HierarchicalSummary {
                 add_step(
-                    chosen,
-                    RouteActionV1::ReadQualifiedSummary,
+                    SubstrateKindV1::DependencyGraph,
+                    RouteActionV1::ExpandVerifiedParentClosure,
                     profiles,
                     &mut selected,
                     &mut steps,
                 )?;
                 add_step(
-                    SubstrateKindV1::DependencyGraph,
-                    RouteActionV1::ExpandVerifiedParentClosure,
+                    SubstrateKindV1::RawTimeline,
+                    RouteActionV1::ReadRawSource,
                     profiles,
                     &mut selected,
                     &mut steps,
@@ -586,6 +589,60 @@ mod tests {
         assert_eq!(
             plan.selected_substrates[0].kind,
             SubstrateKindV1::DenseSemantic
+        );
+    }
+
+    #[test]
+    fn summary_route_requires_parent_graph_and_raw_source_resolution() {
+        let req = request(QueryRegimeV1::BroadRecall);
+        let profiles = [
+            profile(SubstrateKindV1::DenseSemantic, cost(100, 1, 0)),
+            profile(SubstrateKindV1::TypedHdc, cost(100, 0, 0)),
+            profile(SubstrateKindV1::SparseLexical, cost(100, 0, 0)),
+            profile(SubstrateKindV1::HierarchicalSummary, cost(50, 0, 0)),
+            profile(SubstrateKindV1::DependencyGraph, cost(50, 0, 1)),
+            profile(SubstrateKindV1::RawTimeline, cost(50, 0, 0)),
+        ];
+        let mut req = req;
+        req.structured_content_query = false;
+        // Earlier fixed substrates are unavailable in this catalogue so the
+        // deterministic rule reaches the verified-summary fallback.
+        let profiles = [
+            profile(SubstrateKindV1::HierarchicalSummary, cost(50, 0, 0)),
+            profile(SubstrateKindV1::DependencyGraph, cost(50, 0, 1)),
+            profile(SubstrateKindV1::RawTimeline, cost(50, 0, 0)),
+        ];
+        let _ = profiles;
+        let plan = route_mace_query_v1(&req, &profiles).unwrap();
+        assert_eq!(
+            plan.selected_substrates.iter().map(|x| x.kind).collect::<Vec<_>>(),
+            vec![
+                SubstrateKindV1::HierarchicalSummary,
+                SubstrateKindV1::DependencyGraph,
+                SubstrateKindV1::RawTimeline,
+            ]
+        );
+        assert!(plan.steps.iter().any(|step| {
+            step.action == RouteActionV1::ReadQualifiedSummary
+        }));
+        assert!(plan.steps.iter().any(|step| {
+            step.action == RouteActionV1::ExpandVerifiedParentClosure
+        }));
+        assert!(plan.steps.iter().any(|step| {
+            step.action == RouteActionV1::ReadRawSource
+        }));
+    }
+
+    #[test]
+    fn summary_route_fails_closed_without_dependency_graph() {
+        let req = request(QueryRegimeV1::BroadRecall);
+        let profiles = [profile(
+            SubstrateKindV1::HierarchicalSummary,
+            cost(50, 0, 0),
+        )];
+        assert_eq!(
+            route_mace_query_v1(&req, &profiles),
+            Err(RouteRejectV1::RequiredSubstrateUnavailable)
         );
     }
 
