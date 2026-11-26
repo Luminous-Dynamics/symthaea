@@ -13,3 +13,17 @@ Align the experimental discipline with NIST's 2026 **TIDAL** research initiative
 Reference: https://www.nist.gov/programs-projects/super-intelligence-si-manufacturing
 
 This is a policy test fixture, not a production diagnosis, inspection booking, maintenance action or authority system. Symthaea may recommend a permissioned evidence request; only the asset owner may authorize it, and only the relevant verifier may admit the resulting evidence.
+
+## Fixture-level independent checks
+
+The decision fixture now references both the single-window and two-window Symtropy cases. It carries separate service obligations per window, an unweighted admissible model family, and distinct candidate investigations for physical throughput, same-source telemetry, stock quantity and authority/access.
+
+Run the independent standard-library fixture verifier:
+
+```sh
+python3 research/safrb-shared-pump-v0.1/verify_evidence_acquisition.py
+```
+
+It rejects unjustified model weights, correlated-dashboard independence promotion, non-binding measurements misrepresented as decision-relevant, post-deadline tests, horizon aggregation that hides a window breach, and authority escalation.
+
+**Claim ceiling:** this validates fixture semantics only. It does not implement a VoI/EVSI policy, calibrate likelihoods, estimate real costs, prove actual model coverage, book an inspection, or authorize operational action. The dedicated workflow is committed as a future conformance hook; no CI pass is claimed for this draft head.
