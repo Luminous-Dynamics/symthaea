@@ -936,15 +936,16 @@ pub fn evaluate_paired_interventions(
                 pair_id: pair.pair_id.clone(),
             });
         }
-        if let Some(existing) = cluster_families.insert(
-            pair.environment_cluster_id.clone(),
-            pair.environment_family_id.clone(),
-        ) {
-            if existing != pair.environment_family_id {
-                return Err(PairedInterventionError::EnvironmentClusterFamilyMismatch {
-                    cluster_id: pair.environment_cluster_id.clone(),
-                });
-            }
+        if cluster_families
+            .insert(
+                pair.environment_cluster_id.clone(),
+                pair.environment_family_id.clone(),
+            )
+            .is_some_and(|existing| existing != pair.environment_family_id)
+        {
+            return Err(PairedInterventionError::EnvironmentClusterFamilyMismatch {
+                cluster_id: pair.environment_cluster_id.clone(),
+            });
         }
         if !trimmed_nonempty(&pair.target_variable_id) {
             return Err(PairedInterventionError::EmptyTargetVariableId {
@@ -1021,14 +1022,14 @@ pub fn evaluate_paired_interventions(
         }
         let expected_disposition =
             pair_disposition_from_branches(pair.control.disposition, pair.treatment.disposition);
-        let disposition_matches = match (expected_disposition, pair.disposition) {
-            (PairDisposition::Completed, PairDisposition::Completed) => true,
-            (PairDisposition::Failed { .. }, PairDisposition::Failed { .. }) => true,
-            (PairDisposition::TimedOut { .. }, PairDisposition::TimedOut { .. }) => true,
-            (PairDisposition::Invalid { .. }, PairDisposition::Invalid { .. }) => true,
-            (PairDisposition::Abstained { .. }, PairDisposition::Abstained { .. }) => true,
-            _ => false,
-        };
+        let disposition_matches = matches!(
+            (expected_disposition, pair.disposition),
+            (PairDisposition::Completed, PairDisposition::Completed)
+                | (PairDisposition::Failed { .. }, PairDisposition::Failed { .. })
+                | (PairDisposition::TimedOut { .. }, PairDisposition::TimedOut { .. })
+                | (PairDisposition::Invalid { .. }, PairDisposition::Invalid { .. })
+                | (PairDisposition::Abstained { .. }, PairDisposition::Abstained { .. })
+        );
         if !disposition_matches {
             return Err(PairedInterventionError::BranchDispositionMismatch {
                 pair_id: pair.pair_id.clone(),
@@ -1442,7 +1443,7 @@ pub fn evaluate_paired_interventions(
         family_summaries,
         total_branch_interaction_count: total_branch_interactions,
         total_model_query_count: total_model_queries,
-        total_elapsed_us: total_elapsed_us,
+        total_elapsed_us,
         total_measured_energy_uj: total_energy_uj,
         all_expected_pairs_present: true,
         all_required_families_present: true,
