@@ -1,6 +1,5 @@
 use symthaea_semiconductor::benchmark::{
-    GrapeAdapterKindV1, GrapeAdapterPolicyV1, GrapeAdapterRuntimeV1, GrapeFeatureAdapterStateV1,
-    GrapeHierarchicalContextStateV1, GrapeRuntimePolicyV1, create_grape_feature_adapter_v1,
+    GrapeAdapterKindV1, GrapeAdapterPolicyV1, GrapeAdapterRuntimeV1, GrapeHierarchicalContextStateV1, GrapeRuntimePolicyV1, create_grape_feature_adapter_v1,
 };
 
 fn policy(kind: GrapeAdapterKindV1) -> GrapeAdapterPolicyV1 {
