@@ -220,7 +220,6 @@ impl EpistemicConsciousness {
     pub fn knowledge_graph_mut(&mut self) -> &mut KnowledgeGraph {
         self.integrator.graph_mut()
     }
-
 }
 
 /// High-level epistemic statistics
