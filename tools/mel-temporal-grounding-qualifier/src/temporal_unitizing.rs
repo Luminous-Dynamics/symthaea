@@ -1136,6 +1136,185 @@ mod tests {
     }
 
     #[test]
+    fn observer_order_and_exact_frame_rescaling_do_not_change_unitizing_coefficients() {
+        let original = published_book_example();
+        let baseline = compute_unitizing_profile(&original, 60).unwrap();
+
+        let mut reordered = original.clone();
+        reordered.reverse();
+        let reordered_profile = compute_unitizing_profile(&reordered, 60).unwrap();
+        assert!((baseline.u_alpha_nominal.unwrap() - reordered_profile.u_alpha_nominal.unwrap()).abs() < 1e-12);
+        assert!((baseline.u_alpha_binary.unwrap() - reordered_profile.u_alpha_binary.unwrap()).abs() < 1e-12);
+        assert!((baseline.cu_alpha_nominal.unwrap() - reordered_profile.cu_alpha_nominal.unwrap()).abs() < 1e-12);
+
+        let scale = 7_u64;
+        let scaled: Vec<Vec<UnitSegmentV1>> = original
+            .iter()
+            .map(|partition| {
+                partition
+                    .iter()
+                    .map(|segment| UnitSegmentV1 {
+                        start_frame: segment.start_frame * scale,
+                        end_frame: segment.end_frame * scale,
+                        category: segment.category.clone(),
+                    })
+                    .collect()
+            })
+            .collect();
+        let scaled_profile = compute_unitizing_profile(&scaled, 60 * scale).unwrap();
+        assert!((baseline.u_alpha_nominal.unwrap() - scaled_profile.u_alpha_nominal.unwrap()).abs() < 1e-12);
+        assert!((baseline.u_alpha_binary.unwrap() - scaled_profile.u_alpha_binary.unwrap()).abs() < 1e-12);
+        assert!((baseline.cu_alpha_nominal.unwrap() - scaled_profile.cu_alpha_nominal.unwrap()).abs() < 1e-12);
+    }
+
+    fn test_digest(ch: char) -> String {
+        ch.to_string().repeat(64)
+    }
+
+    fn test_annotation(
+        annotator: char,
+        receipt: char,
+        state: GroundTruthStateV1,
+        intervals: Vec<FrameIntervalV1>,
+        reason: Option<&str>,
+    ) -> IndependentTemporalAnnotationV1 {
+        IndependentTemporalAnnotationV1 {
+            annotator_id_sha256: test_digest(annotator),
+            annotation_sha256: test_digest(receipt),
+            state,
+            intervals,
+            status_reason: reason.map(str::to_owned),
+        }
+    }
+
+    fn test_item(
+        item_id: &str,
+        annotations: Vec<IndependentTemporalAnnotationV1>,
+    ) -> ReliabilityCorpusItemV1 {
+        ReliabilityCorpusItemV1 {
+            item_id: item_id.into(),
+            source_work_cluster_sha256: test_digest('1'),
+            query_id: format!("query-{item_id}"),
+            query_text: "Every piano entrance".into(),
+            artifact: AudioArtifactClockV1 {
+                audio_sha256: test_digest('a'),
+                sample_rate_hz: 48_000,
+                channels: 2,
+                total_frames: 1_000,
+            },
+            annotation_policy_version: "unitizing-test-policy-v1".into(),
+            annotations,
+        }
+    }
+
+    #[test]
+    fn corpus_report_preserves_original_intervals_and_exclusion_reasons() {
+        let event = FrameIntervalV1 {
+            start_frame: 100,
+            end_frame: 200,
+        };
+        let ambiguous_interval = FrameIntervalV1 {
+            start_frame: 90,
+            end_frame: 220,
+        };
+        let item = test_item(
+            "piano",
+            vec![
+                test_annotation('1', 'a', GroundTruthStateV1::Present, vec![event.clone()], None),
+                test_annotation('2', 'b', GroundTruthStateV1::Absent, Vec::new(), None),
+                test_annotation(
+                    '3',
+                    'c',
+                    GroundTruthStateV1::Ambiguous,
+                    vec![ambiguous_interval.clone()],
+                    Some("gradual onset has no stable event boundary"),
+                ),
+                test_annotation(
+                    '4',
+                    'd',
+                    GroundTruthStateV1::NotEstimable,
+                    Vec::new(),
+                    Some("masking prevents reliable event identification"),
+                ),
+            ],
+        );
+        let case = UnitizingCorpusCaseV1 {
+            schema: CASE_SCHEMA_V1.into(),
+            annotation_manifest_sha256: test_digest('f'),
+            minimum_eligible_unitizers_per_item: 2,
+            items: vec![item],
+        };
+        let report = audit_unitizing_corpus(&case).unwrap();
+        let result = &report.item_results[0];
+        assert_eq!(result.status, UnitizingItemStatusV1::Scored);
+        assert_eq!(result.eligible_unitizers, 2);
+        assert_eq!(result.excluded_ambiguous, 1);
+        assert_eq!(result.excluded_not_estimable, 1);
+        assert_eq!(result.query_text, "Every piano entrance");
+        assert_eq!(result.sample_rate_hz, 48_000);
+        assert_eq!(result.annotator_dispositions[0].intervals, vec![event]);
+        assert_eq!(result.annotator_dispositions[2].intervals, vec![ambiguous_interval]);
+        assert_eq!(
+            result.annotator_dispositions[2].exclusion_reason,
+            Some(UnitizingExclusionReasonV1::Ambiguous)
+        );
+        assert_eq!(
+            result.annotator_dispositions[2].status_reason.as_deref(),
+            Some("gradual onset has no stable event boundary")
+        );
+        assert!(report.unitizing_alpha_computed);
+        assert!(!report.consensus_ground_truth_created);
+        assert!(!report.annotation_receipts_authenticated);
+    }
+
+    #[test]
+    fn all_ambiguous_or_not_estimable_panel_is_not_reported_as_absence() {
+        let item = test_item(
+            "insufficient",
+            vec![
+                test_annotation(
+                    '1',
+                    'a',
+                    GroundTruthStateV1::Present,
+                    vec![FrameIntervalV1 {
+                        start_frame: 100,
+                        end_frame: 200,
+                    }],
+                    None,
+                ),
+                test_annotation(
+                    '2',
+                    'b',
+                    GroundTruthStateV1::Ambiguous,
+                    Vec::new(),
+                    Some("uncertain whether this is the target instrument"),
+                ),
+                test_annotation(
+                    '3',
+                    'c',
+                    GroundTruthStateV1::NotEstimable,
+                    Vec::new(),
+                    Some("audio quality is insufficient"),
+                ),
+            ],
+        );
+        let case = UnitizingCorpusCaseV1 {
+            schema: CASE_SCHEMA_V1.into(),
+            annotation_manifest_sha256: test_digest('f'),
+            minimum_eligible_unitizers_per_item: 2,
+            items: vec![item],
+        };
+        let report = audit_unitizing_corpus(&case).unwrap();
+        let result = &report.item_results[0];
+        assert_eq!(result.status, UnitizingItemStatusV1::InsufficientEligibleUnitizers);
+        assert_eq!(result.eligible_unitizers, 1);
+        assert_eq!(result.excluded_ambiguous, 1);
+        assert_eq!(result.excluded_not_estimable, 1);
+        assert!(result.coefficients.is_none());
+        assert!(!report.unitizing_alpha_computed);
+    }
+
+    #[test]
     fn same_rater_overlapping_or_unsorted_intervals_are_rejected() {
         let overlap = build_partition(
             &[(0, 10, "event".into()), (9, 15, "event".into())],
