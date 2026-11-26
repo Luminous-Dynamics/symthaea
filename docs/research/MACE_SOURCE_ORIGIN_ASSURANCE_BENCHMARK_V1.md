@@ -151,6 +151,8 @@ The external benchmark suite should be run as complementary instruments:
 - [AMA-Bench](https://proceedings.mlr.press/v306/zhao26bs.html) covers recall, causal inference, state updating and state abstraction over 205 trajectory samples and 2,460 QA pairs.
 - [MemoryArena](https://proceedings.mlr.press/v306/he26am.html) evaluates interdependent multi-session Memory-Agent-Environment tasks, where memory must guide later actions rather than merely answer recall questions.
 - [Memora/FAMA](https://aclanthology.org/2026.findings-acl.1337/) evaluates remembering, reasoning and recommending over long conversations and penalizes use of obsolete or invalidated memories.
+- [UtilMem](https://aclanthology.org/2026.emnlp-main.1639/) evaluates evidence utilization across 1,717 instances in five domains, including distributed/implicit evidence integration and similar-distractor resistance.
+- [MemUse](https://aclanthology.org/2026.emnlp-main.804/) studies natural integration of memory into conversations; its four-month, 40-user deployment found that direct memory-QA accuracy did not track user satisfaction.
 - [MEMORA-Bench](https://aclanthology.org/2026.findings-emnlp.1211/) tests embodied memory on 45 hours of egocentric video, including retrospective faithfulness and prospective planning.
 - [LongMemEval-V2](https://github.com/xiaowu0162/LongMemEval-V2) contains 451 curated questions over web and enterprise trajectories, with haystacks up to 115 million tokens; it measures answer accuracy and query latency.
 
@@ -282,3 +284,10 @@ Benchmark additions:
 - downstream independently measured outcome and counterfactual regret.
 
 Proposed targets: at least 10% lower paired decision regret than the strongest matched baseline; ≤1% unsafe actions at ≥80% supported coverage; zero hard-constraint violations; nominal calibration coverage; improved regret-vs-cost Pareto frontier; and zero strategy promotion without independent outcome receipts and held-out counterfactual qualification.
+
+
+## 14. Adaptive decision acquisition
+
+The follow-on [MACE Adaptive Decision Acquisition V1](MACE_ADAPTIVE_DECISION_ACQUISITION_V1.md) specifies a bounded policy DAG in which each evidence query is selected from the complete verified observation history. It adds conditional follow-up, correlated-source fan-out, contradiction preservation, rights/lifecycle change between queries, explicit fallback paths and stop/abstain behaviour. The machine-readable policy contract is `data/schemas/mace_adaptive_decision_policy_v1.schema.json`.
+
+This is a research protocol and schema, not an implemented executor. JSON Schema checks field shape only; an independent fail-closed validator must still prove graph reachability, acyclicity, bounded horizon, budget compliance, branch completeness, admissible terminal actions and receipt validity. The benchmark must compare single-query EVSI/robust scoring with adaptive policies under identical action spaces and total resource budgets. External evaluation should add UtilMem for evidence integration and MemUse for natural conversational integration; these remain separate from MACE's evidence-assurance metrics.
