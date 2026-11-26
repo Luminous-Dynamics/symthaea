@@ -499,6 +499,8 @@ fn validate_attempt_shape(attempt: &EffectAttempt) -> Result<(), EffectReceiptEr
     if attempt.idempotency_key.len() < 8 || attempt.idempotency_key.len() > 256 {
         return Err(EffectReceiptError::InvalidShape("attempt idempotency_key length is invalid".to_owned()));
     }
+    super::require_sorted_unique(&attempt.effect_binding.labels, "effect_binding.labels")
+        .map_err(|error| EffectReceiptError::InvalidShape(error.to_string()))?;
     if let Some(submitted_at) = &attempt.submitted_at {
         validate_timestamp(submitted_at, "attempt.submitted_at")?;
     }
@@ -697,7 +699,7 @@ mod tests {
             intent_digest: "sha256:bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb",
             authority_decision_digest: "sha256:cccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccc",
             disclosure_decision_digest: "sha256:dddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddd",
-            effect_binding_digest: "sha256:a0bbc153c2153cf9b007509c845e1ea013250f8b40722898a167bf88524f849e",
+            effect_binding_digest: "sha256:558cfd260809c2c99a32da1019c3bd360e4b2aca56f26f5008cf02144a0e3077",
             trust_policy_digest: "sha256:3333333333333333333333333333333333333333333333333333333333333333",
         }
     }
