@@ -13,11 +13,17 @@ use std::collections::{BTreeMap, BTreeSet, VecDeque};
 use serde_json::Value;
 use sha2::{Digest, Sha256};
 
-use crate::decision_sufficiency::DecisionNeedV1;
+use crate::decision_sufficiency::{
+    DecisionNeedV1, DecisionSufficiencyUseBindingV1, VerifiedDecisionSufficiencyV1,
+};
+use crate::evidence_qualification_gate::{
+    EvidenceQualificationBindingV1, EvidenceQualificationSignatureVerifierV1,
+};
 use crate::qualified_candidate_evidence::QualifiedCandidateEvidenceBatchV1;
 use crate::qualification_dsse::parse_strict_json_bounded;
+use crate::qualification_trust::PinnedEd25519QualificationVerifierV1;
 use crate::source_lineage_receipt::{
-    SourceLineageRejectV1, SourceLineageReplayCommitmentV1, VerifiedSourceLineageSetV1,
+    SourceLineageRejectV1, VerifiedSourceLineageSetV1,
 };
 
 const MAX_GRAPH_BYTES_V1: usize = 32 * 1024 * 1024;
@@ -92,9 +98,25 @@ impl VerifiedSourceLineageGraphV1 {
 pub fn replay_source_lineage_graph_v1(
     graph_json: &str,
     qualified: &QualifiedCandidateEvidenceBatchV1,
+    qualification_binding: &EvidenceQualificationBindingV1<'_>,
+    current_qualification_verifier: &impl EvidenceQualificationSignatureVerifierV1,
+    sufficiency: &VerifiedDecisionSufficiencyV1,
+    sufficiency_binding: &DecisionSufficiencyUseBindingV1<'_>,
+    current_evaluator_profile: &PinnedEd25519QualificationVerifierV1,
     decision_need: &DecisionNeedV1,
     lineage: &VerifiedSourceLineageSetV1,
+    current_lineage_profile: &PinnedEd25519QualificationVerifierV1,
 ) -> Result<VerifiedSourceLineageGraphV1, SourceLineageRejectV1> {
+    lineage.validate_at_use(
+        qualified,
+        qualification_binding,
+        current_qualification_verifier,
+        sufficiency,
+        sufficiency_binding,
+        current_evaluator_profile,
+        decision_need,
+        current_lineage_profile,
+    )?;
     if graph_json.len() > MAX_GRAPH_BYTES_V1 {
         return Err(SourceLineageRejectV1::InvalidGraph);
     }
