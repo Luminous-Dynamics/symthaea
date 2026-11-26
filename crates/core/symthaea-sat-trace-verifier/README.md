@@ -122,8 +122,8 @@ the attempt or receipt being checked. The module recomputes the domain-separated
 effect-binding digest over the restricted SAT v0.1 canonical JSON of the binding
 without its digest field. For applied/partial outcomes, it also recomputes the
 observed-effect projection digest over every projection field except
-`projection_digest`, then requires the matching source attestation projection
-and outcome. Labels must be unique and UTF-16 sorted. A receipt and all of its
+`projection_digest`, then requires every source attestation claiming an applied/partial outcome
+to carry that same projection digest and outcome. Labels must be unique and UTF-16 sorted. A receipt and all of its
 source attestations must bind to the same run, manifest, attempt, idempotency
 key, intent, effect binding and frozen trust-policy digest. The
 `receipt_statement_digest` is currently syntax-checked only; signed-statement
@@ -136,8 +136,8 @@ source-of-truth quality or physical-world truth. It always holds for
 authenticated reconciliation and never authorizes retry or mutation. A
 `not_applied` assertion is not a retry authorization.
 
-Nine Rust unit tests are source-authored for this module, including a regression
-that mutates an observed projection field while retaining its previous digest,
+Ten Rust unit tests are source-authored for this module, including regressions
+for observed projection mutation and cross-source projection disagreement,
 but have **not** been compiled or executed. The current authoring environment has no Cargo, rustc,
 rustfmt or Nix toolchain. CLI integration and exact-head test execution remain
 pending.
