@@ -44,7 +44,8 @@
         "normalization_id",
         "spatial_domain",
         "velocity_domain",
-        "time_unit"
+        "time_unit",
+        "maximum_time"
       ],
       "properties": {
         "equation": {
@@ -98,6 +99,10 @@
         "time_unit": {
           "type": "string",
           "minLength": 1
+        },
+        "maximum_time": {
+          "type": "number",
+          "exclusiveMinimum": 0
         }
       }
     },
