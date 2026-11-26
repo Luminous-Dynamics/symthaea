@@ -910,11 +910,21 @@ fn mean(values: &[f64]) -> Option<f64> {
     (!values.is_empty()).then(|| values.iter().sum::<f64>() / values.len() as f64)
 }
 
+fn percentile(values: &[f64], quantile: f64) -> Option<f64> {
+    if values.is_empty() || !quantile.is_finite() || !(0.0..=1.0).contains(&quantile) {
+        return None;
+    }
+    let mut sorted = values.to_vec();
+    sorted.sort_by(f64::total_cmp);
+    let index = ((sorted.len() - 1) as f64 * quantile).ceil() as usize;
+    sorted.get(index).copied()
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
     use crate::temporal_grounding::{
-        AudioArtifactClockV1, FrameIntervalV1, GroundingPredictionStateV1,
+        AudioArtifactClockV1, GroundingPredictionStateV1,
         TEMPORAL_GROUNDING_EVALUATOR_V1, TEMPORAL_GROUNDING_SCHEMA_V1,
     };
 
@@ -1395,7 +1405,7 @@ mod tests {
         invalid.cases[0].decision_confidence = f64::NAN;
         assert!(audit_selective_batch(&invalid).is_err());
 
-        let mut invalid = batch(vec![case(
+        let invalid = batch(vec![case(
             "bad-binding",
             GroundTruthStateV1::Present,
             vec![crate::temporal_grounding::FrameIntervalV1 {
