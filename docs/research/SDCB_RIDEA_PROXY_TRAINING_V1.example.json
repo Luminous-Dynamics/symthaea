@@ -1,0 +1,25 @@
+{
+  "schema_version": "1.0.0",
+  "episode_id": "ridea-proxy-margin-training-v1",
+  "features": [
+    [
+      1
+    ]
+  ],
+  "targets": [
+    0.1
+  ],
+  "current_predictions": [
+    0
+  ],
+  "initial_weights": [
+    0.05
+  ],
+  "config": {
+    "margin_tau": 0.5,
+    "margin_alpha": 2,
+    "l2": 0,
+    "learning_rate": 0.02,
+    "steps": 100
+  }
+}
