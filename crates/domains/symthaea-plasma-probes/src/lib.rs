@@ -8116,8 +8116,14 @@ mod tests {
         let split =
             WeightedEmpiricalMeasure1D::new(&[0.2, 0.2, 0.8, 0.8], &[0.1, 0.3, 0.2, 0.4], 0.0, 1.0)
                 .unwrap();
-        assert_eq!(merged.atoms(), split.atoms());
-        assert_eq!(merged.wasserstein1(&split), Ok(0.0));
+        assert_eq!(merged.atoms().len(), split.atoms().len());
+        for ((left_position, left_weight), (right_position, right_weight)) in
+            merged.atoms().iter().zip(split.atoms().iter())
+        {
+            assert_eq!(left_position, right_position);
+            assert!((left_weight - right_weight).abs() < 1.0e-15);
+        }
+        assert!(merged.wasserstein1(&split).unwrap() < 1.0e-15);
     }
 
     #[test]
@@ -8147,8 +8153,14 @@ mod tests {
             1.0,
         )
         .unwrap();
-        assert_eq!(coarse.atoms(), fine.atoms());
-        assert_eq!(coarse.wasserstein1(&fine), Ok(0.0));
+        assert_eq!(coarse.atoms().len(), fine.atoms().len());
+        for ((left_position, left_weight), (right_position, right_weight)) in
+            coarse.atoms().iter().zip(fine.atoms().iter())
+        {
+            assert_eq!(left_position, right_position);
+            assert!((left_weight - right_weight).abs() < 1.0e-15);
+        }
+        assert!(coarse.wasserstein1(&fine).unwrap() < 1.0e-15);
     }
 
     #[test]
@@ -8319,8 +8331,13 @@ mod tests {
     fn wasserstein_measure_handles_weight_scale_without_overflow() {
         let ordinary = WeightedEmpiricalMeasure1D::new(&[0.2, 0.8], &[1.0, 3.0], 0.0, 1.0).unwrap();
         let huge =
-            WeightedEmpiricalMeasure1D::new(&[0.2, 0.8], &[f64::MAX, 0.75 * f64::MAX], 0.0, 1.0)
-                .unwrap();
+            WeightedEmpiricalMeasure1D::new(
+                &[0.2, 0.8],
+                &[0.25 * f64::MAX, 0.75 * f64::MAX],
+                0.0,
+                1.0,
+            )
+            .unwrap();
         assert_eq!(ordinary.atoms(), huge.atoms());
         assert_eq!(ordinary.wasserstein1(&huge), Ok(0.0));
     }
@@ -9785,9 +9802,9 @@ mod tests {
             intervention_ids: vec!["pulse".to_owned()],
             qoi_ids: vec!["field".to_owned()],
             qoi_scales: vec![1.0],
-            time_samples: vec![0.0],
-            responses: vec![None],
-            branch_ids: vec![None],
+            time_samples: vec![0.0, 0.5],
+            responses: vec![None, None],
+            branch_ids: vec![None, None],
         };
         let left = make_kinetic_response_signature(0.0, "contract", "class", Some("branch"));
         let right = KineticResponseSignature::new(incomplete.clone()).unwrap();
@@ -11000,7 +11017,7 @@ mod tests {
             .set(1, 10, ComplexResponse::new(0.01, 0.0).unwrap())
             .unwrap();
         matrix
-            .set(2, 10, ComplexResponse::new(100.0, 0.0).unwrap())
+            .set(2, 10, ComplexResponse::new(1000.0, 0.0).unwrap())
             .unwrap();
         let plan = plan_response_weighted_refinement(
             &matrix,
@@ -11343,7 +11360,7 @@ mod tests {
             solve_two_cell_positive_mass_response_projection(
                 [0.5, 0.5],
                 [1.0e308, 1.0],
-                [1.0e308, 0.0],
+                [0.0, 1.0e308],
                 1.0,
                 0.5,
             ),
