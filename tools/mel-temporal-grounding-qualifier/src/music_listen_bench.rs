@@ -632,6 +632,9 @@ mod tests {
     const PROMPT: &str = "cccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccc";
     const RUNTIME: &str = "dddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddd";
     const DECODING: &str = "eeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeee";
+    const DATASET: &str = "9999999999999999999999999999999999999999999999999999999999999999";
+    const OFFICIAL_SCORER: &str =
+        "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa";
 
     fn variant(
         variant_id: &str,
@@ -719,6 +722,8 @@ mod tests {
             schema: CASE_SCHEMA_V1.into(),
             benchmark_id: "MusicListenBench".into(),
             benchmark_version: "1.0".into(),
+            dataset_revision_sha256: DATASET.into(),
+            official_scorer_revision_sha256: OFFICIAL_SCORER.into(),
             split: MusicListenSplitV1::RenderedTest,
             triads,
         }
