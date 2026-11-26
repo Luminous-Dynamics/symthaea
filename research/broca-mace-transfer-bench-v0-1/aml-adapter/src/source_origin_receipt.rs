@@ -725,13 +725,22 @@ mod tests {
         let (envelope_json, verifier) = signed_origin_fixture();
         let envelope = parse_dsse_envelope_v1(&envelope_json, DSSE_PAYLOAD_TYPE_V1)
             .expect("DSSE envelope");
-        let statement = parse_strict_json_bounded(&envelope.payload, MAX_ORIGIN_PAYLOAD_BYTES_V1)
+        let mut statement = parse_strict_json_bounded(&envelope.payload, MAX_ORIGIN_PAYLOAD_BYTES_V1)
             .expect("strict statement JSON");
-        let predicate = statement.get("predicate").expect("origin predicate");
-        let mut receipt = parse_source_origin_predicate(predicate).expect("typed receipt");
-        receipt.status = "origin_not_verified".to_owned();
+        let predicate = statement.get_mut("predicate").and_then(Value::as_object_mut)
+            .expect("origin predicate object");
+        predicate.insert("graph_sha256".to_owned(), Value::String("c".repeat(64)));
+        let receipt = parse_source_origin_predicate(
+            statement.get("predicate").expect("altered origin predicate"),
+        ).expect("validly shaped altered receipt");
+        let altered_payload = serde_json::to_vec(&statement).expect("altered statement JSON");
+        let altered_pae = crate::qualification_dsse::dsse_pae_v1(
+            DSSE_PAYLOAD_TYPE_V1, &altered_payload,
+        );
         assert_eq!(
-            validate_time_and_signature(&receipt, &envelope.pae, &envelope.signature, &verifier, 20),
+            validate_time_and_signature(
+                &receipt, &altered_pae, &envelope.signature, &verifier, 20,
+            ),
             Err(SourceOriginRejectV1::InvalidSignature)
         );
     }
