@@ -1,0 +1,286 @@
+{
+  "schema_version": "0.1",
+  "test_id": "NEOPIC-MINMAX-OUTLIER-GLOBAL-DRIFT-001",
+  "status": "synthetic_normalization_only",
+  "physical_cohort": {
+    "coordinate_domain": [
+      0,
+      1
+    ],
+    "domain_known": true,
+    "boundary": "nonperiodic_unit_interval",
+    "coordinate_unit": "L"
+  },
+  "normalization": {
+    "method": "neopic_arxiv_v1_per_sample_minmax",
+    "output_interval": [
+      0,
+      1
+    ],
+    "formula": "z(x) = (x-min(X))/(max(X)-min(X))",
+    "normalization_is_position_only": true,
+    "particle_weights_affect_extrema": false,
+    "source_tag": "neopic-arxiv-v1",
+    "annotated_tag_object_sha256": "8e872e5fa520843a9c9db4a68d43036a66355c19",
+    "peeled_commit_sha": "2cf6a15e0ddb6c408a4ef6d162c31faf1deb9431",
+    "source_file": "operator_learning/data/pic_dataset.py",
+    "source_file_blob_sha": "dcb046656830dd8c5707e98bdd1d611c8376b412",
+    "source_line_ranges": [
+      "129-139",
+      "141-152",
+      "415-423"
+    ],
+    "source_transform_matches_neopic": true,
+    "test_case_coverage": "source_faithful_unweighted_sample_case_plus_separate_weighted_measure_extension",
+    "paper_coordinate_description": "The paper writes the torus coordinate as zeta = -pi + 2*pi*xi in [-pi,pi), while Appendix A.1 states that the implementation normalizes xi=(x-a_X)/(b_X-a_X) in [0,1] and evaluates Fourier characters exp(2*pi*i*k*xi). These are equivalent periodic coordinates up to an origin shift.",
+    "paper_torus_coordinate_interval": [
+      -3.141592653589793,
+      3.141592653589793
+    ],
+    "implementation_coordinate_interval": [
+      0,
+      1
+    ],
+    "fourier_character": "exp(2*pi*i*k*xi)",
+    "linear_lifting_is_periodic": false,
+    "periodic_lift_seam_note": "Appendix A.1 states the linear lifting acts on xi itself rather than on a periodic function of xi, so particles crossing the periodic seam can change lifted features discontinuously.",
+    "code_application_lines": [
+      "291-298"
+    ]
+  },
+  "base_cloud": {
+    "positions": [
+      0.1,
+      0.3,
+      0.5,
+      0.7,
+      0.9
+    ],
+    "weights": [
+      0.2,
+      0.2,
+      0.2,
+      0.2,
+      0.2
+    ],
+    "normalized_positions": [
+      0,
+      0.25,
+      0.5,
+      0.75,
+      1
+    ]
+  },
+  "perturbed_cloud": {
+    "positions": [
+      0,
+      0.1,
+      0.3,
+      0.5,
+      0.7,
+      0.9
+    ],
+    "weights": [
+      1e-12,
+      0.1999999999998,
+      0.1999999999998,
+      0.1999999999998,
+      0.1999999999998,
+      0.1999999999998
+    ],
+    "normalized_positions": [
+      0,
+      0.1111111111111111,
+      0.3333333333333333,
+      0.5555555555555556,
+      0.7777777777777778,
+      1
+    ]
+  },
+  "matched_inlier_comparison": {
+    "physical_positions": [
+      0.1,
+      0.3,
+      0.5,
+      0.7,
+      0.9
+    ],
+    "normalized_before": [
+      0,
+      0.25,
+      0.5,
+      0.75,
+      1
+    ],
+    "normalized_after": [
+      0.1111111111111111,
+      0.3333333333333333,
+      0.5555555555555556,
+      0.7777777777777778,
+      1
+    ],
+    "signed_displacement": [
+      0.1111111111111111,
+      0.08333333333333333,
+      0.05555555555555555,
+      0.027777777777777776,
+      0
+    ],
+    "max_absolute_displacement": 0.1111111111111111,
+    "mean_absolute_displacement": 0.05555555555555555,
+    "max_absolute_displacement_coordinate_units": 0.1111111111111111,
+    "mean_absolute_displacement_coordinate_units": 0.05555555555555555
+  },
+  "interpretation": {
+    "empirical_measure_change": "There are two distinct examples: the source-faithful unweighted case adds one equally weighted particle; the weighted extension adds a 1e-12-mass support point while leaving original inlier mass essentially unchanged. The tagged normalization code ignores weights in both cases.",
+    "normalization_change": "The exact NEOPIC arXiv v1 transform independently maps each sample to [0,1]. In either example, support changes from [0.1,0.9] to [0,0.9], shifting every original inlier except the upper endpoint.",
+    "expected_disposition": "Detect and report normalization-induced global coordinate drift separately from sampling / learned-operator error.",
+    "scope_limit": "The normalization formula and [0,1] coordinate interval match the pinned NEOPIC arXiv v1 preprocessing. The paper expresses the same torus coordinate as [-pi,pi) and states that Fourier characters use exp(2*pi*i*k*xi). The source implementation's unweighted sample min/max and per-coordinate application are pinned. This remains a synthetic coordinate/lifting-input witness, not a learned field-output error, kinetic simulation or proof of failure in the published model."
+  },
+  "source_faithful_unweighted_case": {
+    "description": "Source-faithful unweighted particle-position sample: every listed particle contributes equally to the empirical measure.",
+    "base_cloud": {
+      "positions": [
+        0.1,
+        0.3,
+        0.5,
+        0.7,
+        0.9
+      ],
+      "normalized_positions": [
+        0,
+        0.25,
+        0.5,
+        0.75,
+        1
+      ],
+      "equal_particle_weights": [
+        0.2,
+        0.2,
+        0.2,
+        0.2,
+        0.2
+      ]
+    },
+    "augmented_cloud": {
+      "positions": [
+        0,
+        0.1,
+        0.3,
+        0.5,
+        0.7,
+        0.9
+      ],
+      "normalized_positions": [
+        0,
+        0.1111111111111111,
+        0.3333333333333333,
+        0.5555555555555556,
+        0.7777777777777778,
+        1
+      ],
+      "equal_particle_weights": [
+        0.16666666666666666,
+        0.16666666666666666,
+        0.16666666666666666,
+        0.16666666666666666,
+        0.16666666666666666,
+        0.16666666666666666
+      ]
+    },
+    "matched_original_particle_comparison": {
+      "physical_positions": [
+        0.1,
+        0.3,
+        0.5,
+        0.7,
+        0.9
+      ],
+      "normalized_before": [
+        0,
+        0.25,
+        0.5,
+        0.75,
+        1
+      ],
+      "normalized_after": [
+        0.1111111111111111,
+        0.3333333333333333,
+        0.5555555555555556,
+        0.7777777777777778,
+        1
+      ],
+      "signed_displacement": [
+        0.1111111111111111,
+        0.08333333333333333,
+        0.05555555555555555,
+        0.027777777777777776,
+        0
+      ],
+      "max_absolute_displacement": 0.1111111111111111,
+      "mean_absolute_displacement": 0.05555555555555555
+    },
+    "empirical_measure_note": "The unweighted empirical measure changes by adding one of six equally weighted particles and changing the sample count. This case demonstrates native per-sample support sensitivity, not negligible-mass invariance."
+  },
+  "weighted_measure_extension": {
+    "description": "Weighted empirical-measure extension. The tagged NEOPIC normalizer still receives only positions and ignores these weights; this case is not claimed to be the paper's native unweighted data interface.",
+    "base_cloud": {
+      "positions": [
+        0.1,
+        0.3,
+        0.5,
+        0.7,
+        0.9
+      ],
+      "weights": [
+        0.2,
+        0.2,
+        0.2,
+        0.2,
+        0.2
+      ]
+    },
+    "augmented_cloud": {
+      "positions": [
+        0,
+        0.1,
+        0.3,
+        0.5,
+        0.7,
+        0.9
+      ],
+      "weights": [
+        1e-12,
+        0.1999999999998,
+        0.1999999999998,
+        0.1999999999998,
+        0.1999999999998,
+        0.1999999999998
+      ]
+    },
+    "normalized_coordinates_of_original_particles_before": [
+      0,
+      0.25,
+      0.5,
+      0.75,
+      1
+    ],
+    "normalized_coordinates_of_original_particles_after": [
+      0.1111111111111111,
+      0.3333333333333333,
+      0.5555555555555556,
+      0.7777777777777778,
+      1
+    ],
+    "signed_displacement": [
+      0.1111111111111111,
+      0.08333333333333333,
+      0.05555555555555555,
+      0.027777777777777776,
+      0
+    ],
+    "max_absolute_displacement": 0.1111111111111111,
+    "mean_absolute_displacement": 0.05555555555555555,
+    "empirical_measure_note": "The added support point has mass 1e-12 and original inlier mass is otherwise preserved (before any optional final mass normalization). The position-only min-max map ignores this mass and remaps all inliers except the upper endpoint."
+  }
+}
