@@ -1906,6 +1906,45 @@ mod tests {
     }
 
     #[test]
+    fn one_lineage_receipt_cannot_attest_multiple_root_families() {
+        let qualified = qualified_batch(&repeat('f'));
+        let (binding, profile, _) = build_valid_assessment(
+            &qualified,
+            DecisionSufficiencyStatusV1::Sufficient,
+            DecisionRequirementStatusV1::Met,
+            Some(1000),
+            Some(5000),
+        );
+        let signing_key = SigningKey::from_bytes(&[73; 32]);
+        let evaluator_key_id = qualification_key_id_v1(&signing_key.verifying_key().to_bytes());
+        let mut assessment = receipt(
+            &qualified,
+            &binding,
+            &evaluator_key_id,
+            DecisionSufficiencyStatusV1::Sufficient,
+            DecisionRequirementStatusV1::Met,
+            Some(1000),
+            Some(5000),
+        );
+        let first_receipt = assessment.requirements[0].independent_root_families[0]
+            .provenance_receipt_sha256.clone();
+        assessment.requirements[0].independent_root_families[1]
+            .provenance_receipt_sha256 = first_receipt;
+        let envelope = signed_envelope(&assessment, &signing_key);
+        assert_eq!(
+            verify_decision_sufficiency_v1(
+                &qualified,
+                &qualification_binding(&qualified, &["evidence-1".to_owned()], 160),
+                &TestQualificationVerifier,
+                &binding,
+                &envelope,
+                &profile,
+            ),
+            Err(DecisionSufficiencyRejectV1::InvalidReceipt)
+        );
+    }
+
+    #[test]
     fn sufficient_receipt_with_wrong_evidence_class_is_rejected() {
         let qualified = qualified_batch(&repeat('f'));
         let (binding, profile, _) = build_valid_assessment(
