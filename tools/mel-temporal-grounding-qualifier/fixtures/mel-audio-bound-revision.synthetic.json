@@ -1,0 +1,93 @@
+{
+  "schema": "mel-temporal-revision-case-v2",
+  "case_id": "audio-bound-revision-case-001",
+  "experiment_unit_id": "mel-grounding-evidence-window-fixture-001",
+  "source_lineage_id": "synthetic-source-lineage-001",
+  "model_identity_sha256": "7777777777777777777777777777777777777777777777777777777777777777",
+  "prompt_sha256": "3333333333333333333333333333333333333333333333333333333333333333",
+  "adapter_sha256": "4444444444444444444444444444444444444444444444444444444444444444",
+  "runtime_identity_sha256": "8888888888888888888888888888888888888888888888888888888888888888",
+  "decoding_config_sha256": "9999999999999999999999999999999999999999999999999999999999999999",
+  "max_output_tokens": 512,
+  "actual_output_tokens": 128,
+  "max_wall_time_ms": 30000,
+  "elapsed_wall_time_ms": 4000,
+  "evidence_condition": "LocalRetrieved",
+  "evidence": {
+    "source_audio_sha256": "b12dbd7c993ac1f0ddf6c0cef16c605ce48da060738b83837e39bdadf9df83ef",
+    "source_sample_rate_hz": 48000,
+    "evidence_payload_sha256": "3fc77626f4c70d9e28aa4c1cd901fcf28a7a6a690788342dcb45884f5dc3acb0",
+    "retrieval_config_sha256": "5555555555555555555555555555555555555555555555555555555555555555",
+    "start_frame": 1,
+    "end_frame": 3
+  },
+  "actions": [
+    "Other"
+  ],
+  "truth": {
+    "schema_version": "mel-temporal-grounding-v1",
+    "query_id": "piano-entry-query-001",
+    "query_text": "Identify every piano entrance in the supplied recording.",
+    "artifact": {
+      "audio_sha256": "b12dbd7c993ac1f0ddf6c0cef16c605ce48da060738b83837e39bdadf9df83ef",
+      "sample_rate_hz": 48000,
+      "channels": 2,
+      "total_frames": 8
+    },
+    "annotation_policy_version": "synthetic-annotation-v1",
+    "annotation_set_sha256": "dddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddd",
+    "annotator_count": 2,
+    "state": "Present",
+    "intervals": [
+      {
+        "start_frame": 1,
+        "end_frame": 3
+      }
+    ],
+    "status_reason": null
+  },
+  "plan": {
+    "evaluator_version": "mel-temporal-grounding-evaluator-v1",
+    "minimum_interval_iou": 0.5
+  },
+  "draft_prediction": {
+    "schema_version": "mel-temporal-grounding-v1",
+    "query_id": "piano-entry-query-001",
+    "artifact": {
+      "audio_sha256": "b12dbd7c993ac1f0ddf6c0cef16c605ce48da060738b83837e39bdadf9df83ef",
+      "sample_rate_hz": 48000,
+      "channels": 2,
+      "total_frames": 8
+    },
+    "state": {
+      "Occurrences": {
+        "intervals": [
+          {
+            "start_frame": 1,
+            "end_frame": 3
+          }
+        ]
+      }
+    }
+  },
+  "final_prediction": {
+    "schema_version": "mel-temporal-grounding-v1",
+    "query_id": "piano-entry-query-001",
+    "artifact": {
+      "audio_sha256": "b12dbd7c993ac1f0ddf6c0cef16c605ce48da060738b83837e39bdadf9df83ef",
+      "sample_rate_hz": 48000,
+      "channels": 2,
+      "total_frames": 8
+    },
+    "state": {
+      "Occurrences": {
+        "intervals": [
+          {
+            "start_frame": 1,
+            "end_frame": 3
+          }
+        ]
+      }
+    }
+  }
+}
