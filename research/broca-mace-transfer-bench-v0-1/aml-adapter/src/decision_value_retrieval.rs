@@ -627,6 +627,7 @@ mod tests {
             _decision_need_sha256: &str,
             _calibration_profile_sha256: &str,
             _calibration_receipt_sha256: &str,
+            _probability_model_sha256: &str,
             _now_unix: u64,
         ) -> Result<(), CalibrationReceiptRejectV1> {
             Ok(())
@@ -640,6 +641,7 @@ mod tests {
             _decision_need_sha256: &str,
             _calibration_profile_sha256: &str,
             _calibration_receipt_sha256: &str,
+            _probability_model_sha256: &str,
             _now_unix: u64,
         ) -> Result<(), CalibrationReceiptRejectV1> {
             Err(CalibrationReceiptRejectV1::InvalidSignature)
