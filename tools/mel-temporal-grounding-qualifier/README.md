@@ -75,3 +75,18 @@ Run the synthetic CLI replay with:
     cargo +1.96.0 run --locked --manifest-path tools/mel-temporal-grounding-qualifier/Cargo.toml --bin mel-audio-evidence-window-audit -- tools/mel-temporal-grounding-qualifier/fixtures/mel-audio-evidence-window.synthetic.json tools/mel-temporal-grounding-qualifier/fixtures/mel-audio-evidence-source.synthetic.bin tools/mel-temporal-grounding-qualifier/fixtures/mel-audio-evidence-pcm.synthetic.hex
 
 The decoded PCM fixture is stored as hexadecimal text and decoded to raw bytes by the CLI before hashing. The source-audio fixture is read byte-for-byte. The report marks rights, decoder, model/runtime and runner receipt authentication false; request-body recomputation and model-internal input attestation also remain false. A digest reference is not legal authority, a signed execution receipt or proof of internal model consumption. Those stages must compose with #13254 and the selected backend's attestation capability.
+
+
+## Exact audio evidence-window verifier (MEL-GROUND-009)
+
+The `audio_evidence_window` module verifies a versioned manifest against actual source-audio bytes and decoded PCM bytes. It recomputes the source-file SHA-256, full decoded-PCM SHA-256, each selected half-open frame-window SHA-256, the ordered context-manifest digest, and the canonical full-manifest digest.
+
+The context commitment includes the exact query-text digest, target/source audio identities, rights-scope receipt reference, PCM sample rate/channel/frame/sample-format tuple, decoder/profile identifiers, window coordinates and payload digests, model/runtime/decoding identities, prompt/adapter/retrieval policy, and exact ordered window list. Frame-to-byte offsets use checked integer arithmetic over channels × bytes-per-sample.
+
+Run:
+
+    cargo +1.96.0 run --locked --manifest-path tools/mel-temporal-grounding-qualifier/Cargo.toml --bin mel-audio-evidence-window-audit -- tools/mel-temporal-grounding-qualifier/fixtures/mel-audio-evidence-window.synthetic.json tools/mel-temporal-grounding-qualifier/fixtures/mel-audio-evidence-source.synthetic.bin tools/mel-temporal-grounding-qualifier/fixtures/mel-audio-evidence-pcm.synthetic.hex
+
+The decoded PCM fixture is stored as hexadecimal text and decoded to raw bytes by the CLI before hashing. The source-audio fixture is read byte-for-byte.
+
+This is a byte/coordinate verification layer only. The report explicitly keeps rights-scope authentication, decoder identity authentication, model/runtime identity authentication, runner-receipt verification, request-body recomputation and model-input attestation false. The digests are content commitments, not signatures. The receipt/authentication bridge remains owned by #13254; capture closure remains #13348/#13349.
