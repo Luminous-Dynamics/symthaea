@@ -122,7 +122,25 @@ The quorum arm is a research baseline until a threshold or multi-signature proto
 
 ## 6. External benchmark positioning
 
-Agent Memory Leaderboard textual, multimodal and coding tracks remain separate and must be reported using each official scorer and its own denominator. AMA-Bench, MemoryArena, Memora/FAMA and MEMORA-Bench test different aspects of trajectory, action, forgetting and embodied memory; none alone establishes source-origin truth.
+The official [Agent Memory Leaderboard Cycle 2 results](https://agentmemoryleaderboard.ai/results/cycle-2/) (published November 19, 2026) provide the current parity reference:
+
+| Track | Open-source leader | Commercial leader |
+|---|---:|---:|
+| Textual | Resurface 61.22 | MemoraX 69.26 |
+| Multimodal | Khipu 43.26 | MemoraX 53.68 |
+| Coding | InsightMem 63.33% | MemoraX 68.00% |
+
+These are separate tracks with different task sets and scoring definitions. Do not average them, compare them as a single ranking, or treat them as assurance scores. On the textual track, the largest observed commercial/open-source gaps include personalization and care, streaming, and epistemic safety/privacy; those are retrieval-and-memory parity priorities, distinct from MACE's source-origin assurance contribution.
+
+The external benchmark suite should be run as complementary instruments:
+
+- [AMA-Bench](https://proceedings.mlr.press/v306/zhao26bs.html) covers recall, causal inference, state updating and state abstraction over 205 trajectory samples and 2,460 QA pairs.
+- [MemoryArena](https://proceedings.mlr.press/v306/he26am.html) evaluates interdependent multi-session Memory-Agent-Environment tasks, where memory must guide later actions rather than merely answer recall questions.
+- [Memora/FAMA](https://aclanthology.org/2026.findings-acl.1337/) evaluates remembering, reasoning and recommending over long conversations and penalizes use of obsolete or invalidated memories.
+- [MEMORA-Bench](https://aclanthology.org/2026.findings-emnlp.1211/) tests embodied memory on 45 hours of egocentric video, including retrospective faithfulness and prospective planning.
+- [LongMemEval-V2](https://github.com/xiaowu0162/LongMemEval-V2) contains 451 curated questions over web and enterprise trajectories, with haystacks up to 115 million tokens; it measures answer accuracy and query latency.
+
+These benchmarks probe different capabilities and must be run with their exact official harnesses, models, answerers, task splits and resource budgets. None alone establishes source-origin truth or causal independence.
 
 MACE therefore needs two scorecards:
 
