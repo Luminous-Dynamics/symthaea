@@ -8330,14 +8330,13 @@ mod tests {
     #[test]
     fn wasserstein_measure_handles_weight_scale_without_overflow() {
         let ordinary = WeightedEmpiricalMeasure1D::new(&[0.2, 0.8], &[1.0, 3.0], 0.0, 1.0).unwrap();
-        let huge =
-            WeightedEmpiricalMeasure1D::new(
-                &[0.2, 0.8],
-                &[0.25 * f64::MAX, 0.75 * f64::MAX],
-                0.0,
-                1.0,
-            )
-            .unwrap();
+        let huge = WeightedEmpiricalMeasure1D::new(
+            &[0.2, 0.8],
+            &[0.25 * f64::MAX, 0.75 * f64::MAX],
+            0.0,
+            1.0,
+        )
+        .unwrap();
         assert_eq!(ordinary.atoms(), huge.atoms());
         assert_eq!(ordinary.wasserstein1(&huge), Ok(0.0));
     }
