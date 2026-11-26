@@ -14,7 +14,9 @@
     "continuum_end_frame",
     "annotation_policy_version",
     "metric",
-    "annotations"
+    "annotations",
+    "source_reference",
+    "reference_outputs"
   ],
   "properties": {
     "schema": {
@@ -129,6 +131,75 @@
               }
             }
           }
+        }
+      }
+    },
+    "source_reference": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "title",
+        "version",
+        "date",
+        "section",
+        "example",
+        "continuum_length",
+        "provenance_note"
+      ],
+      "properties": {
+        "title": {
+          "type": "string",
+          "minLength": 1
+        },
+        "version": {
+          "type": "string",
+          "minLength": 1
+        },
+        "date": {
+          "type": "string",
+          "format": "date"
+        },
+        "section": {
+          "type": "string",
+          "minLength": 1
+        },
+        "example": {
+          "type": "string",
+          "minLength": 1
+        },
+        "continuum_length": {
+          "type": "integer",
+          "minimum": 1
+        },
+        "provenance_note": {
+          "type": "string",
+          "minLength": 1
+        }
+      }
+    },
+    "reference_outputs": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "status",
+        "reason"
+      ],
+      "properties": {
+        "status": {
+          "enum": [
+            "not-yet-transcribed",
+            "verified"
+          ]
+        },
+        "reason": {
+          "type": "string",
+          "minLength": 1
+        },
+        "coefficient_values": {
+          "type": "object"
+        },
+        "independent_runner_version": {
+          "type": "string"
         }
       }
     }
