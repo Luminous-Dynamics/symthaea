@@ -86,7 +86,10 @@ pub struct CandidateEpisode {
     pub episode_id: String,
     pub hypotheses: Vec<LinearHypothesis>,
     pub initial_state: Vec<f64>,
+    pub passive_sensor_index: usize,
     pub passive_input_sequence: Vec<f64>,
+    /// Candidate-visible observations from the passive prefix, including y[0].
+    pub passive_observation_trace: Vec<f64>,
     pub sensor_noise_bound: f64,
     pub maximum_absolute_input: f64,
     pub permitted_probes: Vec<Probe>,
@@ -138,6 +141,11 @@ pub fn validate_episode(e: &CandidateEpisode) -> Result<(), ActiveScienceError> 
         return Err(ActiveScienceError::InvalidEpisode);
     }
     let sensors = e.hypotheses[0].c.rows;
+    if e.passive_sensor_index >= sensors
+        || e.passive_observation_trace.len() != e.passive_input_sequence.len() + 1
+        || e.passive_observation_trace.iter().any(|v| !v.is_finite()) {
+        return Err(ActiveScienceError::InvalidEpisode);
+    }
     for (i,h) in e.hypotheses.iter().enumerate() {
         validate_hypothesis(h, n)?;
         if h.c.rows != sensors { return Err(ActiveScienceError::InvalidHypothesis); }
@@ -153,6 +161,15 @@ pub fn validate_episode(e: &CandidateEpisode) -> Result<(), ActiveScienceError> 
         if e.permitted_probes[..i].iter().any(|x| x.probe_id == p.probe_id) {
             return Err(ActiveScienceError::DuplicateIdentifier);
         }
+    }
+    let passive_has_candidate = e.hypotheses.iter().any(|h| {
+        predict_trace(h, &e.initial_state, e.passive_sensor_index, &e.passive_input_sequence)
+            .map(|predicted| predicted.iter().zip(&e.passive_observation_trace)
+                .all(|(a,b)| (a-b).abs() <= e.sensor_noise_bound + EPS))
+            .unwrap_or(false)
+    });
+    if !passive_has_candidate {
+        return Err(ActiveScienceError::InvalidEpisode);
     }
     Ok(())
 }
@@ -204,6 +221,41 @@ pub fn minimum_pairwise_margin(e: &CandidateEpisode, p: &Probe) -> Result<f64, A
 
 /// Exact one-probe maximin choice over finite permitted offers. Abstains if no
 /// affordable offer separates every candidate pair beyond the noise bound.
+/// Non-dominated one-probe offers across discrimination margin and the full
+/// componentwise resource vector. No resource dimensions are scalarized.
+pub fn pareto_discriminating_probes(e: &CandidateEpisode) -> Result<Vec<ProbeChoice>, ActiveScienceError> {
+    validate_episode(e)?;
+    let mut candidates = Vec::new();
+    for p in &e.permitted_probes {
+        if !p.cost.fits(e.remaining_budget) { continue; }
+        let margin = minimum_pairwise_margin(e, p)?;
+        if margin <= EPS { continue; }
+        candidates.push(ProbeChoice {
+            probe_id: p.probe_id.clone(),
+            minimum_pairwise_margin: margin,
+            cost: p.cost,
+        });
+    }
+    let mut frontier = Vec::new();
+    for (i, candidate) in candidates.iter().enumerate() {
+        let dominated = candidates.iter().enumerate().any(|(j, other)| {
+            if i == j { return false; }
+            let no_worse = other.minimum_pairwise_margin + EPS >= candidate.minimum_pairwise_margin
+                && other.cost.query_units <= candidate.cost.query_units
+                && other.cost.experiment_units <= candidate.cost.experiment_units
+                && other.cost.measurement_units <= candidate.cost.measurement_units;
+            let strictly_better = other.minimum_pairwise_margin > candidate.minimum_pairwise_margin + EPS
+                || other.cost.query_units < candidate.cost.query_units
+                || other.cost.experiment_units < candidate.cost.experiment_units
+                || other.cost.measurement_units < candidate.cost.measurement_units;
+            no_worse && strictly_better
+        });
+        if !dominated { frontier.push(candidate.clone()); }
+    }
+    frontier.sort_by(|a,b| a.probe_id.cmp(&b.probe_id));
+    Ok(frontier)
+}
+
 pub fn choose_discriminating_probe(e: &CandidateEpisode) -> Result<Option<ProbeChoice>, ActiveScienceError> {
     validate_episode(e)?;
     let mut best: Option<ProbeChoice> = None;
@@ -338,7 +390,8 @@ pub fn observational_equivalence_fixture()->CandidateEpisode {
     let h2=LinearHypothesis{hypothesis_id:"mechanism-basis-y".into(),a,b:vec![0.0,1.0],c};
     CandidateEpisode {
         schema_version:"sdcb-active-science-v2".into(), episode_id:"observational-equivalence-2state-v1".into(),
-        hypotheses:vec![h1,h2],initial_state:vec![0.0,0.0],passive_input_sequence:vec![0.0,0.0],
+        hypotheses:vec![h1,h2],initial_state:vec![0.0,0.0],passive_sensor_index:0,
+        passive_input_sequence:vec![0.0,0.0],passive_observation_trace:vec![0.0,0.0,0.0],
         sensor_noise_bound:0.05,maximum_absolute_input:1.0,
         permitted_probes:vec![
             Probe{probe_id:"no-op-sensor-x".into(),sensor_index:0,input_sequence:vec![0.0,0.0],
@@ -370,6 +423,56 @@ mod tests {
         let b=predict_trace(&e.hypotheses[1],&e.initial_state,p.sensor_index,&p.input_sequence).unwrap();
         assert_eq!(a,vec![0.0,1.0,0.0]); assert_eq!(b,vec![0.0,0.0,1.0]);
     }
+    #[test]
+    fn passive_prefix_contains_observed_data_that_preserves_both_models() {
+        let e = observational_equivalence_fixture();
+        validate_episode(&e).unwrap();
+        assert_eq!(e.passive_observation_trace, vec![0.0, 0.0, 0.0]);
+        for h in &e.hypotheses {
+            let predicted = predict_trace(h, &e.initial_state, e.passive_sensor_index, &e.passive_input_sequence).unwrap();
+            assert_eq!(predicted, e.passive_observation_trace);
+        }
+    }
+
+    #[test]
+    fn passive_prefix_inconsistent_with_every_candidate_is_rejected() {
+        let mut e = observational_equivalence_fixture();
+        e.passive_observation_trace[1] = 0.5;
+        assert_eq!(validate_episode(&e), Err(ActiveScienceError::InvalidEpisode));
+    }
+
+    #[test]
+    fn resource_aware_pareto_frontier_keeps_margin_cost_tradeoff() {
+        let mut e = observational_equivalence_fixture();
+        e.permitted_probes[1].input_sequence[0] = 0.25;
+        e.permitted_probes[1].cost.measurement_units = 1;
+        e.permitted_probes[2].cost.measurement_units = 2;
+        let frontier = pareto_discriminating_probes(&e).unwrap();
+        assert_eq!(frontier.len(), 2);
+        assert!(frontier.iter().any(|p| p.probe_id == "impulse-sensor-x" && p.cost.measurement_units == 1));
+        assert!(frontier.iter().any(|p| p.probe_id == "impulse-sensor-y" && p.cost.measurement_units == 2));
+    }
+
+    #[test]
+    fn three_and_four_state_rank_controls_are_exact_for_shift_systems() {
+        for n in [3usize, 4usize] {
+            let mut a = vec![vec![0.0; n]; n];
+            for i in 0..(n-1) { a[i][i+1] = 1.0; }
+            let mut b = vec![0.0; n];
+            b[n-1] = 1.0;
+            let mut c = vec![0.0; n];
+            c[0] = 1.0;
+            let h = LinearHypothesis {
+                hypothesis_id: format!("shift-{n}"),
+                a: Matrix::new(a).unwrap(),
+                b,
+                c: Matrix::new(vec![c]).unwrap(),
+            };
+            assert_eq!(observability_rank(&h, 0).unwrap(), n);
+            assert_eq!(controllability_rank(&h).unwrap(), n);
+        }
+    }
+
     #[test]
     fn maximin_selector_rejects_noop_and_selects_discriminating_probe() {
         let e=observational_equivalence_fixture(); let c=choose_discriminating_probe(&e).unwrap().unwrap();
