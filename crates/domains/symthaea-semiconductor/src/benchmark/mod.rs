@@ -3,6 +3,7 @@
 pub mod binary_metrics;
 pub mod calibration_requalification;
 pub mod delayed_aci_controller;
+pub mod ca_ocrc_bounded;
 pub mod dtco_manifest;
 pub mod gated_streaming_adapter;
 pub mod label_consumption_guard;
@@ -159,4 +160,18 @@ pub use delayed_aci_controller::{
     DelayedAciPredictionReceiptV1, DelayedAciReasonV1, DelayedAciStateV1,
     DelayedAciUpdateReceiptV1, close_delayed_aci_prediction_stream_v1,
     create_delayed_aci_engine_v1, deliver_delayed_aci_feedback_v1, issue_delayed_aci_prediction_v1,
+};
+
+pub use ca_ocrc_bounded::{
+    CA_OCRC_ENGINE_SCHEMA_V1, CA_OCRC_FEEDBACK_SCHEMA_V1, CA_OCRC_POLICY_SCHEMA_V1,
+    CA_OCRC_PREDICTION_RECEIPT_SCHEMA_V1, CA_OCRC_PREDICTION_SCHEMA_V1,
+    CA_OCRC_ROUND_INPUT_SCHEMA_V1, CA_OCRC_ROUND_REPORT_SCHEMA_V1,
+    CaOcrcEngineV1, CaOcrcErrorV1, CaOcrcFeedbackDispositionV1, CaOcrcFeedbackResultV1,
+    CaOcrcLabelFeedbackV1, CaOcrcPolicyV1, CaOcrcPredictionInputV1,
+    CaOcrcPredictionReceiptV1, CaOcrcPredictionSetV1, CaOcrcReasonV1,
+    CaOcrcRoundInputV1, CaOcrcRoundReportV1, CaOcrcSetKindV1,
+    CaOcrcTrackedEntryV1, CaOcrcEngineStateV1, close_ca_ocrc_feedback_horizon_v1,
+    create_ca_ocrc_engine_v1, optimal_arbitrary_delay_proxy_policy_v1,
+    proxy_survival_vector, proxy_tracking_load, seal_ca_ocrc_policy_v1,
+    step_ca_ocrc_round_v1,
 };
