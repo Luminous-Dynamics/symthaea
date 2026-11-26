@@ -1,0 +1,36 @@
+name: CMAQ-020 finite response-equivalence contract
+
+on:
+  pull_request:
+    paths:
+      - "research/cmaq-020/**"
+      - ".github/workflows/cmaq-020.yml"
+  push:
+    branches:
+      - main
+    paths:
+      - "research/cmaq-020/**"
+      - ".github/workflows/cmaq-020.yml"
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  response-equivalence:
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    steps:
+      - uses: actions/checkout@v4
+      - uses: dtolnay/rust-toolchain@1.100.0
+        with:
+          components: rustfmt, clippy
+      - name: Format
+        working-directory: research/cmaq-020
+        run: cargo +1.100.0 fmt --all -- --check
+      - name: Tests
+        working-directory: research/cmaq-020
+        run: cargo +1.100.0 test --locked
+      - name: Strict Clippy
+        working-directory: research/cmaq-020
+        run: cargo +1.100.0 clippy --locked --all-targets -- -D warnings
