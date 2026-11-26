@@ -58,6 +58,7 @@ pub enum SourceLineageRejectV1 {
     InvalidGraph,
     NotSufficient,
     GraphDigestMismatch,
+    GraphStatisticsMismatch,
     GraphCycle,
     DanglingParent,
     CandidateLineageMismatch,
