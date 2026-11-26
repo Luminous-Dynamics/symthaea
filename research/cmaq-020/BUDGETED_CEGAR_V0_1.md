@@ -63,7 +63,7 @@ The deterministic fixtures cover:
 - missing checkpoint advancement;
 - a candidate that receives a valid probe but makes no partition progress.
 
-These are unit tests of the protocol and scoring logic, not empirical model results.
+An error-migration fixture keeps aggregate false-merge and false-split counts unchanged while replacing the identities of the erroneous pairs; the pair-level ledger must report both the resolved old errors and the newly introduced ones. These are unit tests of the protocol and scoring logic, not empirical model results.
 
 ## Critical evaluation caveat: counterexample identity is an oracle hint
 
