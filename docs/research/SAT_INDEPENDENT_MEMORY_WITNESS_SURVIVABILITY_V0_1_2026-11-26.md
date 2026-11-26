@@ -40,6 +40,14 @@ The independence manifest must disclose, for every witness:
 
 Four endpoints, four key IDs or four VM instances under one administrator do not establish four independent witnesses. Publish common-cause cut sets and the number of independent administrative domains.
 
+## 3.1 Frozen witness profile and independence evidence
+
+Every campaign MUST bind a separate witness-profile manifest. The manifest declares exactly four operator records for the 3-of-4 reference profile and separately inventories operator, organization, administrative, identity-provider, key-custody, backup/restore and control-plane domains. It also pins witness software/policy digests, key IDs and algorithms, key status, freshness mode, trusted time profile, offline behavior, recovery policy and evidence-retention policy.
+
+The JSON Schema can enforce list lengths and uniqueness within each declared domain list, but standard JSON Schema cannot prove that those lists are an exact projection of the corresponding fields in the four operator records. A semantic verifier MUST compare the sets bidirectionally, reject missing/extra/duplicate operators, check every declared dependency edge references known operators, and derive common-cause cut sets. A human/independent governance review must inspect the evidence behind each operator/organization/domain declaration. Unique strings or key IDs are not independence proof.
+
+The public example `examples/sat-independent-memory-witness-profile-example-v0.1.json` is intentionally `synthetic_example` with `independence_assessment.status=not_assessed`. It contains no real endpoints, operator identities or credentials, and cannot qualify a real witness deployment.
+
 ## 4. State transition protocol under test
 
 ### 4.1 Canonical state commitment
