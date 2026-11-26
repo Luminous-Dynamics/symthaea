@@ -288,7 +288,7 @@ pub fn predict_trace(
     }
     let c = &h.c.data[sensor];
     let mut x = x0.to_vec();
-    let mut trace = vec![c.iter().zip(&x).map(|(a, b)| a * b).sum()];
+    let mut trace: Vec<f64> = vec![c.iter().zip(&x).map(|(a, b)| a * b).sum()];
     for u in inputs {
         let mut next = h.a.mul_vec(&x)?;
         for (v, b) in next.iter_mut().zip(&h.b) {
