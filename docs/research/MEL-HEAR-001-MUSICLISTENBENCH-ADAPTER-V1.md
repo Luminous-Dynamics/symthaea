@@ -19,7 +19,7 @@ An audio-ignoring model can score 50% by choosing a relation without listening. 
 
 ## 2. Input contract and semantic normalization
 
-A strict triad carries the benchmark ID/version/split, item and pair IDs, source-work lineage digest, task, FLIP/STAY factors, model/prompt/runtime/decoding digests, and three versioned variants.
+A strict run capsule pins MusicListenBench ID/version/split, an immutable dataset-manifest revision digest, and the official scorer revision digest. Every triad carries item/pair IDs, source-work lineage digest, task, FLIP/STAY factors, model/prompt/runtime/decoding digests, and three versioned variants. All triads in one capsule must share the same inference identities.
 
 Each variant includes the exact audio SHA-256, full question and SHA-256 of the exact UTF-8 question bytes, semantic interpretations of option A and option B (Same or Different), expected semantic relation, and model response (ChoiceA, ChoiceB, Unparseable or Abstain).
 
@@ -47,7 +47,7 @@ For a set of triads:
 - Acc_FS = 1 - (MR + FFR)/2.
 - Joint exact rate is the fraction where all three answers are correct.
 
-The report also exposes task slices, FLIP-factor miss rates, STAY-factor false-flip rates, source-lineage count, and whether the proposed 30-lineage confirmatory reporting floor is met. No bootstrap interval is calculated in V1.
+The report also exposes A/B answer counts and A-rate among answered outputs, task slices, FLIP-factor miss rates, STAY-factor false-flip rates, source-lineage count, and whether the proposed 30-lineage confirmatory reporting floor is met. No bootstrap interval is calculated in V1.
 
 ## 4. Synthetic fixture
 
