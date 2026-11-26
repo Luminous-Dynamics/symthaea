@@ -738,6 +738,59 @@ mod tests {
     }
 
     #[test]
+    fn delayed_ingest_is_retained_but_temporal_features_follow_source_sequence() {
+        let mut snapshot = fixture();
+        snapshot.observations[0].source_sequence = 20;
+        snapshot.observations[1].source_sequence = 10;
+        snapshot.observations[0].event_time.ticks_ns = 1_100;
+        snapshot.observations[0].acquired_time.ticks_ns = 1_101;
+        snapshot.observations[1].event_time.ticks_ns = 1_000;
+        snapshot.observations[1].acquired_time.ticks_ns = 1_001;
+        snapshot.admission_receipt.snapshot_sha256 =
+            compute_snapshot_sha256(&snapshot).expect("re-seal reordered fixture");
+
+        let report = observe(&snapshot, &ObserverConfig::default()).expect("delayed record is valid");
+        assert_eq!(report.ingest_order_reversal_n, 1);
+        assert_eq!(report.scheduled_observation_n, 2);
+        let representation = report.trajectory_representation.expect("source-ordered HDC");
+        assert_eq!(
+            representation.adjacent_state_similarities[0].earlier_observation_id,
+            "obs-002"
+        );
+        assert_eq!(
+            representation.adjacent_state_similarities[0].later_observation_id,
+            "obs-001"
+        );
+        let forecast = report.constant_velocity_forecast.expect("source-latest forecast");
+        assert_eq!(forecast.origin_observation_id, "obs-001");
+        assert!((forecast.joint_angles_rad[0] - 0.12).abs() < 1e-12);
+    }
+
+    #[test]
+    fn duplicate_source_sequence_is_rejected() {
+        let mut snapshot = fixture();
+        snapshot.observations[1].source_sequence = snapshot.observations[0].source_sequence;
+        snapshot.admission_receipt.snapshot_sha256 =
+            compute_snapshot_sha256(&snapshot).expect("re-seal fixture");
+        assert_eq!(
+            observe(&snapshot, &ObserverConfig::default()).unwrap_err(),
+            ObserverError::DuplicateSourceSequence
+        );
+    }
+
+    #[test]
+    fn mixed_source_streams_are_rejected_in_v0_1() {
+        let mut snapshot = fixture();
+        snapshot.observations[1].source_id = "independent-camera-1".to_owned();
+        snapshot.admission_receipt.snapshot_sha256 =
+            compute_snapshot_sha256(&snapshot).expect("re-seal fixture");
+        assert_eq!(
+            observe(&snapshot, &ObserverConfig::default()).unwrap_err(),
+            ObserverError::MixedObservationSources
+        );
+    }
+
+    #[test]
     fn snapshot_mutation_after_receipt_creation_is_rejected() {
         let mut snapshot = fixture();
         snapshot.observations[0].state.joint_angles[0] += 0.01;
