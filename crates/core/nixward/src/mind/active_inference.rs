@@ -15,7 +15,7 @@
 
 use super::episodic_memory::{EpisodeOutcome, NixEpisodicMemory};
 use super::goal_inference::{GoalInference, InferredGoal};
-use super::world_model::{ActionCategory, NixWorldModel};
+use super::world_model::{ActionCategory, NixWorldModel, TransitionPredictionDiagnostics};
 use crate::encoding::NixCodebook;
 use symthaea_core::hdc::ContinuousHV;
 
@@ -34,6 +34,14 @@ pub struct ScoredAction {
     pub episodic_valence: f64,
     /// Human-readable explanation of why this action was selected.
     pub rationale: String,
+}
+
+/// An existing action score paired with the transition evidence diagnostics
+/// that produced its predicted next state. This is observational metadata only.
+#[derive(Debug, Clone)]
+pub struct ScoredActionDiagnostics {
+    pub scored_action: ScoredAction,
+    pub transition_prediction: TransitionPredictionDiagnostics,
 }
 
 /// A plan of one or more actions to reach the goal state.
@@ -298,42 +306,44 @@ impl NixActiveInference {
         scored
     }
 
-    /// Score a single action against the goal state.
-    fn score_action(&self, action: &ActionCategory, goal_state: &ContinuousHV) -> ScoredAction {
-        // Predict the next state after this action
-        let predicted_next = self.world_model.predict_state(action);
+    /// Score a single action and return the existing score plus evidence support.
+    ///
+    /// This method preserves the current EFE formula exactly. The returned
+    /// support/residual information is diagnostic; it does not alter the score,
+    /// grant action authority or certify that the action is safe.
+    pub fn score_action_with_diagnostics(
+        &self,
+        action: &ActionCategory,
+        goal_state: &ContinuousHV,
+    ) -> ScoredActionDiagnostics {
+        let transition_prediction = self.world_model.predict_state_with_diagnostics(action);
+        let predicted_next = &transition_prediction.predicted_state;
 
         // Pragmatic value: how close to goal? (higher = better)
         let pragmatic = predicted_next.similarity(goal_state).max(0.0) as f64;
 
-        // Epistemic value: how much will we learn? (higher for less-observed actions)
+        // Preserve the existing count-based epistemic score unchanged.
         let epistemic = if self.world_model.has_learned(action) {
-            // Less to learn from well-known actions
             0.1
         } else {
-            // Maximum curiosity for unknown actions
             1.0
         };
 
-        // Episodic valence: past outcomes for similar states, filtered by action category
-        let action_str = format!("{:?}", action);
+        // Episodic valence: past outcome for similar states, filtered by action category.
+        let action_str = format!("{action:?}");
         let episodic = self
             .episodic_memory
             .predict_valence_for_action(self.world_model.system_state(), &action_str);
 
-        // Expected free energy (lower = better)
-        // EFE = -(pragmatic + curiosity * epistemic + episodic_weight * episodic)
+        // Expected free energy (lower = better).
         let mut efe =
             -(pragmatic + self.curiosity_weight * epistemic + self.episodic_weight * episodic);
 
-        // Gating Boundary / Safety Override: If past experience indicates catastrophic
-        // failure in similar states (valence < -0.7), apply a severe EFE penalty.
-        // This ensures dangerous actions are pruned/gated below safe alternatives.
         if episodic < -0.7 {
             efe += 10.0;
         }
 
-        ScoredAction {
+        let scored_action = ScoredAction {
             action: action.clone(),
             expected_free_energy: efe,
             pragmatic_value: pragmatic,
@@ -343,7 +353,39 @@ impl NixActiveInference {
                 "{action} scored from pragmatic={pragmatic:.3}, epistemic={epistemic:.3}, episodic={episodic:.3} (gated={})",
                 episodic < -0.7
             ),
+        };
+
+        ScoredActionDiagnostics {
+            scored_action,
+            transition_prediction,
         }
+    }
+
+    /// Score all standard actions with transition support diagnostics attached.
+    ///
+    /// Ordering uses the same ascending EFE comparison as the legacy candidate list.
+    pub fn score_candidates_with_diagnostics(
+        &self,
+        goal_state: &ContinuousHV,
+    ) -> Vec<ScoredActionDiagnostics> {
+        let mut scored: Vec<_> = Self::all_standard_actions()
+            .into_iter()
+            .map(|action| self.score_action_with_diagnostics(&action, goal_state))
+            .collect();
+
+        scored.sort_by(|left, right| {
+            left.scored_action
+                .expected_free_energy
+                .partial_cmp(&right.scored_action.expected_free_energy)
+                .unwrap_or(std::cmp::Ordering::Equal)
+        });
+        scored
+    }
+
+    /// Legacy score API, preserving the original score and ranking semantics.
+    fn score_action(&self, action: &ActionCategory, goal_state: &ContinuousHV) -> ScoredAction {
+        self.score_action_with_diagnostics(action, goal_state)
+            .scored_action
     }
 
     /// Observe the current encoded NixOS state.
@@ -590,6 +632,97 @@ mod tests {
                 window[1].expected_free_energy,
             );
         }
+    }
+
+
+    #[test]
+    fn unsupported_action_score_exposes_no_examples_without_changing_efe() {
+        let dim = symthaea_core::hdc::HDC_DIMENSION;
+        let mut engine = NixActiveInference::new();
+        let current = ContinuousHV::random(dim, 701);
+        let goal = ContinuousHV::random(dim, 702);
+        engine.observe_state(current.clone());
+
+        let audited = engine.score_action_with_diagnostics(&ActionCategory::Install, &goal);
+        assert_eq!(
+            audited.transition_prediction.support,
+            super::super::world_model::TransitionSupport::NoExamples
+        );
+        assert_eq!(audited.transition_prediction.observation_count, 0);
+        assert_eq!(audited.scored_action.epistemic_value, 1.0);
+        assert!((audited.transition_prediction.predicted_state.similarity(&current) - 1.0).abs() < 1e-5);
+
+        let legacy = engine.score_action(&ActionCategory::Install, &goal);
+        assert_eq!(legacy.expected_free_energy, audited.scored_action.expected_free_energy);
+        assert_eq!(legacy.pragmatic_value, audited.scored_action.pragmatic_value);
+        assert_eq!(legacy.epistemic_value, audited.scored_action.epistemic_value);
+        assert_eq!(legacy.episodic_valence, audited.scored_action.episodic_valence);
+    }
+
+    #[test]
+    fn supported_action_score_exposes_history_without_changing_efe() {
+        let dim = symthaea_core::hdc::HDC_DIMENSION;
+        let mut engine = NixActiveInference::new();
+        let goal = ContinuousHV::random(dim, 710);
+        let before = ContinuousHV::random(dim, 711);
+        let after = ContinuousHV::random(dim, 712);
+        for _ in 0..3 {
+            engine.world_model_mut().learn_transition(
+                &before,
+                ActionCategory::Install,
+                &after,
+            );
+        }
+
+        let audited = engine.score_action_with_diagnostics(&ActionCategory::Install, &goal);
+        assert_eq!(
+            audited.transition_prediction.support,
+            super::super::world_model::TransitionSupport::AtLeastThreeExamples
+        );
+        assert_eq!(audited.transition_prediction.observation_count, 3);
+        assert_eq!(audited.scored_action.epistemic_value, 0.1);
+
+        let legacy = engine.score_action(&ActionCategory::Install, &goal);
+        assert_eq!(legacy.expected_free_energy, audited.scored_action.expected_free_energy);
+    }
+
+    #[test]
+    fn diagnostic_candidate_list_preserves_legacy_efe_order_and_scores() {
+        let dim = symthaea_core::hdc::HDC_DIMENSION;
+        let mut engine = NixActiveInference::new();
+        engine.observe_state(ContinuousHV::random(dim, 720));
+        let goal = ContinuousHV::random(dim, 721);
+        let legacy = engine.score_candidates(&goal);
+        let audited = engine.score_candidates_with_diagnostics(&goal);
+
+        assert_eq!(legacy.len(), audited.len());
+        for (legacy_action, audited_action) in legacy.iter().zip(&audited) {
+            assert_eq!(legacy_action.action, audited_action.scored_action.action);
+            assert_eq!(
+                legacy_action.expected_free_energy,
+                audited_action.scored_action.expected_free_energy
+            );
+            assert_eq!(
+                legacy_action.pragmatic_value,
+                audited_action.scored_action.pragmatic_value
+            );
+            assert_eq!(
+                legacy_action.epistemic_value,
+                audited_action.scored_action.epistemic_value
+            );
+            assert_eq!(
+                legacy_action.episodic_valence,
+                audited_action.scored_action.episodic_valence
+            );
+            assert_eq!(
+                legacy_action.rationale,
+                audited_action.scored_action.rationale
+            );
+        }
+        assert!(audited.iter().all(|entry| {
+            entry.transition_prediction.support
+                == super::super::world_model::TransitionSupport::NoExamples
+        }));
     }
 
     #[test]
