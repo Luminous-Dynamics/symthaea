@@ -87,21 +87,47 @@ Here \(V_r^{(s)}\) and \(U_r^{(s)}\) are the retained right and left singular ve
 
 The first Rust implementation lives in `crates/domains/symthaea-plasma-probes/src/rbkr.rs`. It computes the factor-space SVD using a deterministic one-sided Jacobi method, checks resource budgets, constructs biorthogonal bases, maps states, reconstructs states, and projects a caller-supplied discrete A/B/C system.
 
-### Status of the proposed third object: representation / reconstruction
+### Status of the third object: representation / reconstruction contract
 
-The v0.1 routine is deliberately a two-Gramian implementation. It does not yet build a separate representation Gramian (W_r). The reconstruction metric is currently expected to be reflected in a shared nondimensionalized / whitened state coordinate system, while byte cost is enforced through explicit factor, basis, SVD, and work budgets. This is not equivalent to a fully optimized three-object reduction.
+The v0.1 routine is deliberately a two-Gramian implementation. It does not yet instantiate the programme's third object: representation and reconstruction information. Avoid calling that third object a third Gramian by default. It is a rate–distortion contract, and may contain several things: a declared reconstruction metric, a decoder/representation family, a byte budget, residual coding policy, and structural constraints. Also avoid a notation collision: in standard balanced projection, \(W_r\) denotes the reduced test basis; call the third programme object \(\mathcal R_r\).
 
-A concrete next interface is a positive-definite reconstruction metric (M_r=L^T L). Balance in whitened coordinates (	ilde x=Lx), then map the bases back as
-[
-V_x=L^{-1}\tilde V,\qquad W_x=L^T\tilde W,
-]
-which preserves (W_x^T V_x=I). Storage cost should remain an explicit constrained term, not be smuggled into a quadratic metric:
-[
-\min_{V,W}\;\sup_{u\in\mathcal U,\;t\in[0,T]} D_{\mathcal C}(u,t;V,W)
-\quad\text{subject to}\quad
-\operatorname{bytes}(V,\text{decoder},\text{residual})\le B.
-]
-For finite-amplitude response, replace the local linear objective with held-out response signatures and a branch-aware remainder / uncertainty envelope. This is the proper path from two-Gramian v0.1 toward the user's three-object proposal.
+For a candidate encoder \(E\), decoder \(D\), and oblique projection \(P=VW^T\), define reconstruction distortion
+\[
+J_{\rm rec}(E,D)=
+\mathbb E_{x\sim\mu_{\rm ref}}
+\left[
+(x-DE x)^T M_r (x-DE x)
+\right],
+\]
+where \(M_r\succeq0\) is a declared phase-space importance metric and \(\mu_{\rm ref}\) is a frozen reference distribution over checkpoints / states. The future-response term is
+\[
+J_{\rm resp}(V,W,D)=
+\sup_{u\in\mathcal U,\,t\in[0,T]}
+\|y_{\rm full}(u,t)-y_{\rm reduced}(u,t)\|_Q^2.
+\]
+The representation contract is not just these two losses: it also includes hard constraints
+\[
+\operatorname{bytes}(E,D,V,W,\text{residuals},\text{transitions})\le B,
+\qquad
+\mathcal I_j(\hat x)=\mathcal I_j(x)
+\]
+for applicable exact invariants, plus equation-specific inequalities / dissipation laws. A rate–distortion objective can then be written
+\[
+\min_{E,D,V,W}\;\alpha J_{\rm rec}+\beta J_{\rm resp}
+\quad\text{subject to byte, positivity, and structure constraints.}
+\]
+Reachability and observability define promising candidate directions; \(\mathcal R_r\) determines which candidate representation is actually affordable and reconstructible without erasing registered future responses. v0.1 implements only the first part of that decomposition.
+
+A useful research abstraction is **future-response equivalence**. For a frozen contract \(\mathcal C\), states \(x,x'\) are \((\epsilon,T)\)-equivalent only when
+\[
+\sup_{u\in\mathcal U,\,t\in[0,T]}
+\|y(x;u,t)-y(x';u,t)\|_Q\le\epsilon.
+\]
+This is stronger than matching current moments or the current field. It is a task-conditional quotient, not a claim of universal state equivalence. Finite probes justify only the covered intervention subset and certified coverage radius; an untested pulse family remains UNKNOWN.
+
+For \(M_r=L^T L\), coordinates \(\tilde x=Lx\) make the reconstruction norm Euclidean. If the reachability and observability factors are transformed consistently with the dynamics, exact balanced truncation is coordinate-covariant: the physical trial/test subspaces do not gain new information simply because the coordinates were whitened. Therefore the metric must enter as an explicit reconstruction constraint / rate–distortion objective (or through physically justified weighting in the measured factors), not as a cosmetic pre- and post-multiplication that claims to change the physics.
+
+For finite-amplitude response, replace the local linear objective with held-out response signatures, mixed-pulse interaction terms, and a branch-aware remainder / uncertainty envelope. This is the proper path from two-Gramian v0.1 toward the three-object research programme.
 
 ### Critical assumptions
 
