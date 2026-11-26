@@ -244,3 +244,5 @@ The `non_regressive_learning` module compares four independently verified runs: 
 The default proposed retention policy allows at most 100 basis points (1.00 percentage point) stable-stratum regression and requires no adaptation-stratum regression. An unverified run is inconclusive; a stable regression beyond budget rejects the update even when adaptation performance improves. The module produces an admission assessment only and does not deploy or roll back model state.
 
 Protocol and schema: [MACE Non-Regressive Learning Admission Gate V1](../../../docs/research/MACE_NON_REGRESSIVE_LEARNING_GATE_V1.md) and [mace_non_regressive_learning_gate_v1.schema.json](../../../data/schemas/mace_non_regressive_learning_gate_v1.schema.json). Seven deterministic tests are authored but not executed.
+
+The resulting assessment includes all four run IDs, raw run-receipt digests, task-set digests and candidate-state digests, in addition to the independent verification receipts. Admission requires a reconstructable, integrity-valid assessment; it is not an automatic deployment or rollback controller.

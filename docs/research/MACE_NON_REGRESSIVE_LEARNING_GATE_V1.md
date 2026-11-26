@@ -149,3 +149,10 @@ Production still requires:
 7. a reconciliation workflow for unknown deployment outcomes.
 
 The reference gate does not train, deploy or roll back a model.
+
+
+## 9. Assessment evidence capsule
+
+The final gate assessment carries the four exact run IDs, raw run-receipt digests, task-set digests and candidate-state digests, in stable-before/stable-after/adaptation-before/adaptation-after order. It also carries all four independent verifier identities and verification-receipt digests for any non-inconclusive result. The assessment digest commits to these fields and the exact score deltas and denominators.
+
+An inconclusive assessment still records the four run identities and raw receipt digests, but contains no verifier attestations and cannot admit the update. This keeps an unavailable verifier distinguishable from an accepted run while retaining enough identity to reconstruct the blocked comparison.
