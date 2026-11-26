@@ -1363,6 +1363,34 @@ mod tests {
     }
 
     #[test]
+    fn valid_effect_claim_requires_and_accepts_independent_sink_readback() {
+        let mut value = base();
+        value["claims"][0]["claim_type"] = json!("effect_correspondence");
+        value["observations"][0]["kind"] = json!("external_effect_readback");
+        value["observations"][0]["source_role"] = json!("independent_sink");
+        seal(&mut value);
+        let report = verify_augmentation(&serde_json::to_string(&value).unwrap()).unwrap();
+        assert!(report.graph_integrity_passed, "{:?}", report.issues);
+        assert_eq!(report.supported_claims_passing_declared_state_checks, 1);
+        assert!(!report.authenticity_verified);
+        assert!(!report.source_independence_verified);
+        assert!(!report.qualification_assessed);
+    }
+
+    #[test]
+    fn unknown_edge_relation_is_rejected() {
+        let mut value = base();
+        value["claim_edges"] = json!([{
+            "from_claim_id":"claim-1", "to_claim_id":"claim-1",
+            "relation":"trust_me", "rule_ref":"rule:invalid"
+        }]);
+        seal(&mut value);
+        let report = verify_augmentation(&serde_json::to_string(&value).unwrap()).unwrap();
+        assert!(has_issue(&report, "unknown_edge_relation"));
+        assert!(!report.graph_integrity_passed);
+    }
+
+    #[test]
     fn recorded_root_mutation_is_detected() {
         let mut value = base();
         seal(&mut value);
