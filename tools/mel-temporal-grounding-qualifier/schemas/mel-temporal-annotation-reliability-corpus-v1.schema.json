@@ -162,7 +162,9 @@
         "query_text",
         "artifact",
         "annotation_manifest_sha256",
-        "annotations"
+        "annotations",
+        "assigned_annotator_ids_sha256",
+        "nonresponses"
       ],
       "additionalProperties": false,
       "properties": {
@@ -194,6 +196,44 @@
             "$ref": "#/$defs/annotation"
           },
           "maxItems": 256
+        },
+        "assigned_annotator_ids_sha256": {
+          "type": "array",
+          "minItems": 2,
+          "maxItems": 256,
+          "uniqueItems": true,
+          "items": {
+            "$ref": "#/$defs/digest"
+          }
+        },
+        "nonresponses": {
+          "type": "array",
+          "maxItems": 256,
+          "items": {
+            "$ref": "#/$defs/nonresponse"
+          }
+        }
+      }
+    },
+    "nonresponse": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "annotator_id_sha256",
+        "reason"
+      ],
+      "properties": {
+        "annotator_id_sha256": {
+          "$ref": "#/$defs/digest"
+        },
+        "reason": {
+          "enum": [
+            "NotReturned",
+            "Declined",
+            "Withdrawn",
+            "TechnicalFailure",
+            "Incomplete"
+          ]
         }
       }
     }
