@@ -75,7 +75,8 @@ struct AudioEvidencePredicateV1 {
     decoder_identity_authenticated: bool,
     model_runtime_identity_authenticated: bool,
     runner_receipt_verified: bool,
-    request_body_recomputed: bool,
+    request_body_bytes_recomputed: bool,
+    request_body_delivery_attested: bool,
     model_input_attested: bool,
 }
 
@@ -144,6 +145,13 @@ pub fn build_audio_evidence_in_toto_statement(
             window.recomputed_sha256.clone(),
         ));
     }
+    subjects.push(subject(
+        format!(
+            "client-request-body/{}",
+            audit.audio_evidence_report.request_body_sha256
+        ),
+        audit.audio_evidence_report.request_body_sha256.clone(),
+    ));
     subjects.push(subject(
         format!(
             "audio-context-manifest/{}",
@@ -224,7 +232,12 @@ pub fn build_audio_evidence_in_toto_statement(
             .audio_evidence_report
             .model_runtime_identity_authenticated,
         runner_receipt_verified: audit.audio_evidence_report.runner_receipt_verified,
-        request_body_recomputed: audit.audio_evidence_report.request_body_recomputed,
+        request_body_bytes_recomputed: audit
+            .audio_evidence_report
+            .request_body_bytes_recomputed,
+        request_body_delivery_attested: audit
+            .audio_evidence_report
+            .request_body_delivery_attested,
         model_input_attested: audit.model_input_attested,
     };
 
