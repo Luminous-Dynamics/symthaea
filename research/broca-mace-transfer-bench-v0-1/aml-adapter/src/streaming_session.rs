@@ -125,7 +125,7 @@ pub enum StreamingInvalidationCauseV1 {
 }
 
 impl StreamingInvalidationCauseV1 {
-    fn tag(self) -> u8 {
+    pub(crate) fn tag(self) -> u8 {
         match self {
             Self::Correction => 1,
             Self::Quarantine => 2,
