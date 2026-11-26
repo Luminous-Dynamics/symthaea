@@ -21,7 +21,7 @@
     {
       "surface_id": "write_path_poisoning",
       "native_metric": "Memory Poisoning Defense (IETF terminology draft, section 4.6.4)",
-      "measurement_state": "declared_not_measured",
+      "measurement_state": "contract_authored_not_executed",
       "adversary_boundary": "Attacker may converse with the agent or call its memory write interface but has no direct access to the backing store.",
       "measured_dimensions": [
         "five write shapes",
@@ -33,16 +33,35 @@
       "protocol_refs": [
         "https://datatracker.ietf.org/doc/draft-hcf-bpm-agent-security-benchmark-terminology/"
       ],
-      "implementation_refs": [],
-      "case_ids": [],
+      "implementation_refs": [
+        "https://github.com/Luminous-Dynamics/symthaea/pull/13841"
+      ],
+      "case_ids": [
+        "WP-PLANTED-FACT-UNTRUSTED-ATTACK",
+        "WP-PLANTED-FACT-FORGED-TRUSTED-ATTACK",
+        "WP-PLANTED-FACT-AGENT-SIGNED-ATTACK",
+        "WP-HIDDEN-INSTRUCTION-UNTRUSTED-ATTACK",
+        "WP-HIDDEN-INSTRUCTION-FORGED-TRUSTED-ATTACK",
+        "WP-HIDDEN-INSTRUCTION-AGENT-SIGNED-ATTACK",
+        "WP-UPDATE-POISON-UNTRUSTED-ATTACK",
+        "WP-UPDATE-POISON-FORGED-TRUSTED-ATTACK",
+        "WP-UPDATE-POISON-AGENT-SIGNED-ATTACK",
+        "WP-RETRIEVAL-HIJACK-UNTRUSTED-ATTACK",
+        "WP-RETRIEVAL-HIJACK-FORGED-TRUSTED-ATTACK",
+        "WP-RETRIEVAL-HIJACK-AGENT-SIGNED-ATTACK",
+        "WP-METADATA-POISON-UNTRUSTED-ATTACK",
+        "WP-METADATA-POISON-FORGED-TRUSTED-ATTACK",
+        "WP-METADATA-POISON-AGENT-SIGNED-ATTACK"
+      ],
       "notes": [
-        "No poisoning campaign has been executed for this example."
+        "15 attack cases cover five write shapes by three provenance channels; 15 paired benign controls are in the public development fixture set.",
+        "Case contracts and fixtures are authored but not executed against a SUT."
       ]
     },
     {
       "surface_id": "cross_context_isolation",
       "native_metric": "Cross-User/Cross-Session Memory Isolation (IETF terminology draft, section 4.6.5)",
-      "measurement_state": "declared_not_measured",
+      "measurement_state": "contract_authored_not_executed",
       "adversary_boundary": "Evaluator tests front-door cross-context reads and, where backing-store write access is declared, places a genuine context-A record into a context-B position.",
       "measured_dimensions": [
         "front-door isolation",
@@ -54,10 +73,23 @@
       "protocol_refs": [
         "https://datatracker.ietf.org/doc/draft-hcf-bpm-agent-security-benchmark-terminology/"
       ],
-      "implementation_refs": [],
-      "case_ids": [],
+      "implementation_refs": [
+        "https://github.com/Luminous-Dynamics/symthaea/pull/13841",
+        "https://github.com/Luminous-Dynamics/symthaea/pull/13797"
+      ],
+      "case_ids": [
+        "XI-USER-ATTACK",
+        "XI-SESSION-ATTACK",
+        "XI-TENANT-ATTACK",
+        "XI-AGENT-ATTACK",
+        "XI-GROUP-ATTACK",
+        "XI-NAMESPACE-ATTACK",
+        "T6"
+      ],
       "notes": [
-        "The T6 at-rest case is not a substitute for the complete front-door and placement isolation campaign."
+        "Six unauthorized front-door boundary cases and seven authorized-read controls are in the public development fixture set.",
+        "The placement lane reuses the native at-rest T6 operation and is scored separately only when the complete placement method is satisfied.",
+        "Case contracts and fixtures are authored but not executed against a SUT."
       ]
     },
     {
