@@ -360,6 +360,12 @@ pub struct WebResearchConfig {
     /// Maximum distinct page sources fetched for one research query.
     #[serde(default = "default_max_sources_per_research")]
     pub max_sources_per_research: usize,
+    /// Maximum number of planned search queries executed for one research query.
+    #[serde(default = "default_max_search_queries_per_research")]
+    pub max_search_queries_per_research: usize,
+    /// End-to-end wall-clock budget for search and page acquisition (milliseconds).
+    #[serde(default = "default_max_research_duration_ms")]
+    pub max_research_duration_ms: u64,
     /// User agent string for HTTP requests
     pub user_agent: String,
     /// Enable epistemic verification of claims
@@ -392,6 +398,14 @@ fn default_max_sources_per_research() -> usize {
     20
 }
 
+fn default_max_search_queries_per_research() -> usize {
+    8
+}
+
+fn default_max_research_duration_ms() -> u64 {
+    60_000
+}
+
 impl Default for WebResearchConfig {
     fn default() -> Self {
         Self {
@@ -399,6 +413,8 @@ impl Default for WebResearchConfig {
             request_timeout_ms: 10_000,
             max_content_length: 100_000,
             max_sources_per_research: default_max_sources_per_research(),
+            max_search_queries_per_research: default_max_search_queries_per_research(),
+            max_research_duration_ms: default_max_research_duration_ms(),
             user_agent: "Symthaea-HLB/0.2 (Epistemic Research Agent)".to_string(),
             verify_claims: true,
             confidence_threshold: 0.3,
