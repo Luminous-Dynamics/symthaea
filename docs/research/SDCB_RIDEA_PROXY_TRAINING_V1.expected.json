@@ -1,0 +1,19 @@
+{
+  "schema_version": "1.0.0",
+  "fixture_id": "ridea-proxy-margin-training-v1",
+  "execution_kind": "independent_full_batch_gradient_descent_calculation",
+  "rust_compiled_or_executed": false,
+  "trained_weights": [
+    0.522543226828282
+  ],
+  "initial_loss": 0.8325,
+  "final_loss": 0.17854277853845701,
+  "mse": 0.17854277853845701,
+  "margin_penalty": 0,
+  "l2_penalty": 0,
+  "mean_disagreement": 0.522543226828282,
+  "minimum_disagreement": 0.522543226828282,
+  "maximum_disagreement": 0.522543226828282,
+  "steps_run": 100,
+  "interpretation": "The MSE fit is pulled away from the frozen current prediction until the declared margin tau is reached. This is a toy linear-feature proxy, not an upstream Pyro proxy reproduction."
+}
