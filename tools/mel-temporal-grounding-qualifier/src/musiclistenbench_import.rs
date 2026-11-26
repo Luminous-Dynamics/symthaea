@@ -67,7 +67,7 @@ struct OfficialRow {
     gold: String,
 }
 
-#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+#[derive(Debug, Clone, Copy, PartialEq, Eq, PartialOrd, Ord)]
 enum VariantConditionV1 {
     Clean,
     Flip,
@@ -585,6 +585,133 @@ fn manifest_fingerprint(files: &[(&str, &[u8])]) -> String {
         hasher.update(sha256_bytes(bytes));
     }
     format!("{:x}", hasher.finalize())
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn clean_flip_stay_item_ids_pair_by_exact_base_id() {
+        assert_eq!(
+            parse_variant_id("Q1_melody__test__100__000001__base").unwrap(),
+            (
+                "Q1_melody__test__100__000001".into(),
+                VariantConditionV1::Clean,
+                None,
+            )
+        );
+        assert_eq!(
+            parse_variant_id("Q1_melody__test__100__000001__flip__note_identity").unwrap(),
+            (
+                "Q1_melody__test__100__000001".into(),
+                VariantConditionV1::Flip,
+                Some("note_identity".into()),
+            )
+        );
+        assert_eq!(
+            parse_variant_id("Q1_melody__test__100__000001__stay__hiss").unwrap(),
+            (
+                "Q1_melody__test__100__000001".into(),
+                VariantConditionV1::Stay,
+                Some("hiss".into()),
+            )
+        );
+    }
+
+    #[test]
+    fn exact_released_question_templates_map_to_semantic_relations() {
+        for task in [
+            MusicalTaskV1::Melody,
+            MusicalTaskV1::Harmony,
+            MusicalTaskV1::Timbre,
+        ] {
+            assert_eq!(
+                option_relations(
+                    task,
+                    "Two melodic clips are joined by a brief silence. Same melody, or not? Only answer 'A' for the same, 'B' for different. Do not add any explanation. <audio>"
+                )
+                .unwrap(),
+                (MusicalRelationV1::Same, MusicalRelationV1::Different)
+            );
+        }
+        let faster_questions = [
+            "Which segment moves faster?",
+            "Which segment plays more rapidly?",
+            "Which part proceeds at a faster pace?",
+            "Which part has a faster rhythm?",
+            "Which clip carries more speed?",
+        ];
+        for question in faster_questions {
+            let full = format!("{question} Only answer 'A' for the first, 'B' for the second. <audio>");
+            assert_eq!(
+                option_relations(MusicalTaskV1::Rhythm, &full).unwrap(),
+                (MusicalRelationV1::ClipAFaster, MusicalRelationV1::ClipBFaster),
+                "{question}"
+            );
+        }
+        let slower_questions = [
+            "Which segment moves slower?",
+            "Which clip runs more leisurely?",
+            "Which audio feels slower?",
+            "Which part proceeds at a slower pace?",
+        ];
+        for question in slower_questions {
+            let full = format!("{question} Only answer 'A' for the first, 'B' for the second. <audio>");
+            assert_eq!(
+                option_relations(MusicalTaskV1::Rhythm, &full).unwrap(),
+                (MusicalRelationV1::ClipBFaster, MusicalRelationV1::ClipAFaster),
+                "{question}"
+            );
+        }
+    }
+
+    #[test]
+    fn gold_letter_decoding_produces_the_semantic_relation() {
+        assert_eq!(
+            answer_relation("A", MusicalRelationV1::ClipBFaster, MusicalRelationV1::ClipAFaster).unwrap(),
+            MusicalRelationV1::ClipBFaster
+        );
+        assert_eq!(
+            answer_relation("B", MusicalRelationV1::ClipBFaster, MusicalRelationV1::ClipAFaster).unwrap(),
+            MusicalRelationV1::ClipAFaster
+        );
+        assert!(answer_relation("C", MusicalRelationV1::Same, MusicalRelationV1::Different).is_err());
+    }
+
+    #[test]
+    fn official_submission_jsonl_preserves_metadata_and_invalid_answers() {
+        let jsonl = concat!(
+            "{\"meta\":{\"model\":\"test-model\",\"version\":\"v1\",\"readout\":\"generated\",\"used_training_split\":\"none\",\"date\":\"2026-11-26\"}}\n",
+            "{\"item_id\":\"Q1_melody__test__1__000000__base\",\"answer\":\"A\"}\n",
+            "{\"item_id\":\"Q1_melody__test__1__000000__flip__note_identity\",\"answer\":\"invalid\"}\n"
+        );
+        let submission = parse_submission(jsonl.as_bytes()).unwrap();
+        assert_eq!(submission.meta.model, "test-model");
+        assert_eq!(submission.raw_item_count, 2);
+        assert_eq!(
+            submission.answers["Q1_melody__test__1__000000__base"],
+            ModelAnswerV1::A
+        );
+        assert_eq!(
+            submission.answers["Q1_melody__test__1__000000__flip__note_identity"],
+            ModelAnswerV1::Unparseable
+        );
+    }
+
+    #[test]
+    fn manifest_fingerprint_is_ordered_by_declared_file_names() {
+        let a = manifest_fingerprint(&[("a.json", b"one"), ("b.json", b"two")]);
+        let b = manifest_fingerprint(&[("b.json", b"two"), ("a.json", b"one")]);
+        assert_ne!(a, b);
+        assert_eq!(a.len(), 64);
+    }
+
+    #[test]
+    fn unsafe_audio_paths_are_rejected_before_file_access() {
+        assert!(voice_path(&serde_json::json!({"voice":"../escape.wav"})).is_err());
+        assert!(voice_path(&serde_json::json!({"voice":"/tmp/escape.wav"})).is_err());
+    }
 }
 
 fn sha256_bytes(bytes: &[u8]) -> [u8; 32] {
