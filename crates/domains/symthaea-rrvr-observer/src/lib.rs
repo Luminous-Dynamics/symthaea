@@ -221,7 +221,22 @@ impl ObserverConfig {
     }
 
     pub fn profile_sha256(&self) -> Result<String, ObserverError> {
-        let bytes = serde_json::to_vec(self).map_err(|_| ObserverError::SerializationFailed)?;
+        #[derive(Serialize)]
+        struct ProfileMaterial<'a> {
+            observer_id: &'a str,
+            config: &'a ObserverConfig,
+            genesis_seed_profile: &'a str,
+            representation_profile_id: &'a str,
+            hdc_dimension: usize,
+        }
+        let material = ProfileMaterial {
+            observer_id: OBSERVER_ID,
+            config: self,
+            genesis_seed_profile: "rrvr-symthaea-shadow-observer-genesis-v0.1",
+            representation_profile_id: HDC_REPRESENTATION_PROFILE_ID,
+            hdc_dimension: HDC_DIMENSION,
+        };
+        let bytes = serde_json::to_vec(&material).map_err(|_| ObserverError::SerializationFailed)?;
         Ok(sha256_hex(&bytes))
     }
 }
@@ -258,9 +273,16 @@ pub struct AdjacentSimilarity {
 /// Descriptive trajectory representation only. Similarity is not an anomaly
 /// probability, a fault verdict or a measure of physical safety.
 #[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
+pub struct EncodedStateDigest {
+    pub observation_id: String,
+    pub hdc_vector_sha256: String,
+}
+
+#[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
 pub struct TrajectoryRepresentation {
     pub profile_id: String,
     pub dimension: usize,
+    pub encoded_state_digests: Vec<EncodedStateDigest>,
     pub adjacent_state_similarities: Vec<AdjacentSimilarity>,
     pub mean_adjacent_similarity: Option<f64>,
 }
@@ -400,8 +422,18 @@ pub fn observe(
     let genesis = GenesisSeed::from_phrase(GENESIS_PHRASE);
     let mut encoder = ManipulatorHdcEncoder::new(&genesis, config.hdc_levels);
     let mut encoded = Vec::with_capacity(snapshot.observations.len());
+    let mut encoded_state_digests = Vec::with_capacity(snapshot.observations.len());
     for row in &snapshot.observations {
-        encoded.push(encoder.encode(&row.state));
+        let vector = encoder.encode(&row.state);
+        let mut vector_bytes = Vec::with_capacity(vector.as_slice().len() * 4);
+        for value in vector.as_slice() {
+            vector_bytes.extend_from_slice(&value.to_bits().to_le_bytes());
+        }
+        encoded_state_digests.push(EncodedStateDigest {
+            observation_id: row.observation_id.clone(),
+            hdc_vector_sha256: sha256_hex(&vector_bytes),
+        });
+        encoded.push(vector);
     }
 
     let mut adjacent = Vec::with_capacity(encoded.len().saturating_sub(1));
@@ -428,6 +460,7 @@ pub fn observe(
     let trajectory_representation = TrajectoryRepresentation {
         profile_id: HDC_REPRESENTATION_PROFILE_ID.to_owned(),
         dimension: HDC_DIMENSION,
+        encoded_state_digests,
         adjacent_state_similarities: adjacent,
         mean_adjacent_similarity: mean_similarity,
     };
@@ -647,6 +680,11 @@ mod tests {
         assert_eq!(report.scheduled_observation_n, 2);
         let representation = report.trajectory_representation.expect("HDC features");
         assert_eq!(representation.dimension, HDC_DIMENSION);
+        assert_eq!(representation.encoded_state_digests.len(), 2);
+        assert!(representation
+            .encoded_state_digests
+            .iter()
+            .all(|digest| is_sha256(&digest.hdc_vector_sha256)));
         assert_eq!(representation.adjacent_state_similarities.len(), 1);
         let forecast = report.constant_velocity_forecast.expect("baseline forecast");
         assert_eq!(forecast.calibration_status, "uncalibrated_baseline");
