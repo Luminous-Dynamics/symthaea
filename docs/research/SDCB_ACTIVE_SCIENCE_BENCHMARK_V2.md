@@ -25,11 +25,11 @@ The Rust reference has no third-party dependencies. It defines:
 
 - bounded 2–4 dimensional discrete-time linear hypotheses, (x_{t+1}=Ax_t+Bu_t);
 - one scalar control channel and one or more candidate sensor rows (C);
-- finite probe offers with sensor index, input sequence and three separate integer resource dimensions (query, experiment and measurement);
+- candidate-visible passive observation prefix plus finite probe offers with sensor index, input sequence and three separate integer resource dimensions (query, experiment and measurement);
 - candidate-visible hypotheses/probes separated from evaluator-only true-hypothesis ID and noise seed;
 - deterministic simulation with bounded observation noise;
 - pairwise separation margin over the full candidate set;
-- exact one-probe maximin selection under componentwise budget admission, deterministic tie-breaking and abstention;
+- exact one-probe maximin selection plus a non-dominated margin/resource Pareto frontier, componentwise budget admission, deterministic tie-breaking and abstention;
 - bounded-noise candidate consistency sets;
 - observability and controllability rank controls;
 - fail-closed checks for duplicate IDs, malformed dimensions, non-finite inputs, budget violations, unknown probes, unknown evaluator truth and stale/misbound receipts.
@@ -41,9 +41,9 @@ The committed known-answer fixture contains two candidate mechanisms with the sa
 - bounded noise: (delta=0.05);
 - maximin separation margin: (1-2delta=0.9).
 
-The selector must reject the no-op probe, select the separating probe, and abstain when experiment budget is unavailable. The evaluator-only simulation then emits a bounded-noise receipt; the candidate consistency set must retain the true model and exclude the other model in this fixture.
+The candidate episode now includes the passive observation itself, not only the passive input schedule. Both hypotheses remain compatible with that baseline observation. The selector rejects the no-op probe, exposes the low-margin/low-measurement-cost versus high-margin/higher-cost trade-off on the Pareto frontier, and abstains when experiment budget is unavailable. Separate three- and four-state shift-system controls test full-rank observability and controllability. The evaluator-only simulation then emits a bounded-noise receipt; the candidate consistency set must retain the true model and exclude the other model in this fixture.
 
-**Authored coverage:** 18 Rust test functions, including 128 deterministic noise-seed checks. Rust formatting, compilation, tests and Clippy have not been run on this commit. The traces and margins above are hand-derived from the committed matrices, not CI or model results.
+**Authored coverage:** 22 Rust test functions, including 128 deterministic noise-seed checks. Rust formatting, compilation, tests and Clippy have not been run on this commit. The traces and margins above are hand-derived from the committed matrices, not CI or model results.
 
 ## 3. Important limits
 
