@@ -1,0 +1,516 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://luminousdynamics.io/schemas/connectome-edit-transaction-ledger-v0.1.schema.json",
+  "title": "Connectome proofreading edit transaction ledger v0.1",
+  "type": "object",
+  "additionalProperties": false,
+  "required": [
+    "schema_version",
+    "initial_snapshot_sha256",
+    "events",
+    "synthetic_only",
+    "expected_final_state"
+  ],
+  "$defs": {
+    "id": {
+      "type": "string",
+      "minLength": 1
+    },
+    "sha": {
+      "type": "string",
+      "pattern": "^[0-9a-f]{64}$"
+    },
+    "assertion": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "invariant_id",
+        "expected_sha256",
+        "observed_sha256"
+      ],
+      "properties": {
+        "invariant_id": {
+          "$ref": "#/$defs/id"
+        },
+        "expected_sha256": {
+          "$ref": "#/$defs/sha"
+        },
+        "observed_sha256": {
+          "$ref": "#/$defs/sha"
+        }
+      }
+    },
+    "assertions": {
+      "type": "array",
+      "minItems": 1,
+      "items": {
+        "$ref": "#/$defs/assertion"
+      }
+    },
+    "annotation": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "manifest_sha256",
+        "expected_annotation_state_sha256",
+        "observed_annotation_state_sha256"
+      ],
+      "properties": {
+        "manifest_sha256": {
+          "$ref": "#/$defs/sha"
+        },
+        "expected_annotation_state_sha256": {
+          "$ref": "#/$defs/sha"
+        },
+        "observed_annotation_state_sha256": {
+          "$ref": "#/$defs/sha"
+        }
+      }
+    },
+    "edit_submission": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "transaction_id",
+        "idempotency_key",
+        "parent_transaction_id",
+        "operation",
+        "affected_object_ids",
+        "operation_parameters_sha256",
+        "base_snapshot_sha256",
+        "patch_sha256",
+        "resulting_snapshot_sha256",
+        "reversible",
+        "inverse_patch_sha256",
+        "preconditions",
+        "postconditions",
+        "proposer_id",
+        "reviewer_id",
+        "verifier_id",
+        "review_disposition",
+        "verification_outcome",
+        "verifier_artifact_sha256",
+        "verifier_config_sha256",
+        "annotation_propagation"
+      ],
+      "properties": {
+        "transaction_id": {
+          "$ref": "#/$defs/id"
+        },
+        "idempotency_key": {
+          "$ref": "#/$defs/id"
+        },
+        "parent_transaction_id": {
+          "type": [
+            "string",
+            "null"
+          ]
+        },
+        "operation": {
+          "enum": [
+            "Merge",
+            "Split",
+            "AttachFragment",
+            "DetachFragment",
+            "AnnotationRemap"
+          ]
+        },
+        "affected_object_ids": {
+          "type": "array",
+          "minItems": 1,
+          "uniqueItems": true,
+          "items": {
+            "$ref": "#/$defs/id"
+          }
+        },
+        "operation_parameters_sha256": {
+          "$ref": "#/$defs/sha"
+        },
+        "base_snapshot_sha256": {
+          "$ref": "#/$defs/sha"
+        },
+        "patch_sha256": {
+          "$ref": "#/$defs/sha"
+        },
+        "resulting_snapshot_sha256": {
+          "type": [
+            "string",
+            "null"
+          ],
+          "pattern": "^[0-9a-f]{64}$"
+        },
+        "reversible": {
+          "type": "boolean"
+        },
+        "inverse_patch_sha256": {
+          "type": [
+            "string",
+            "null"
+          ],
+          "pattern": "^[0-9a-f]{64}$"
+        },
+        "preconditions": {
+          "$ref": "#/$defs/assertions"
+        },
+        "postconditions": {
+          "$ref": "#/$defs/assertions"
+        },
+        "proposer_id": {
+          "$ref": "#/$defs/id"
+        },
+        "reviewer_id": {
+          "$ref": "#/$defs/id"
+        },
+        "verifier_id": {
+          "$ref": "#/$defs/id"
+        },
+        "review_disposition": {
+          "enum": [
+            "Approved",
+            "Rejected"
+          ]
+        },
+        "verification_outcome": {
+          "enum": [
+            "Passed",
+            "Failed",
+            "Inconclusive"
+          ]
+        },
+        "verifier_artifact_sha256": {
+          "$ref": "#/$defs/sha"
+        },
+        "verifier_config_sha256": {
+          "$ref": "#/$defs/sha"
+        },
+        "annotation_propagation": {
+          "oneOf": [
+            {
+              "$ref": "#/$defs/annotation"
+            },
+            {
+              "type": "null"
+            }
+          ]
+        }
+      },
+      "allOf": [
+        {
+          "if": {
+            "properties": {
+              "reversible": {
+                "const": true
+              }
+            },
+            "required": [
+              "reversible"
+            ]
+          },
+          "then": {
+            "properties": {
+              "inverse_patch_sha256": {
+                "$ref": "#/$defs/sha"
+              }
+            }
+          }
+        },
+        {
+          "if": {
+            "properties": {
+              "reversible": {
+                "const": false
+              }
+            },
+            "required": [
+              "reversible"
+            ]
+          },
+          "then": {
+            "properties": {
+              "inverse_patch_sha256": {
+                "type": "null"
+              }
+            }
+          }
+        }
+      ]
+    },
+    "rollback_submission": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "rollback_id",
+        "idempotency_key",
+        "target_transaction_id",
+        "base_snapshot_sha256",
+        "inverse_patch_sha256",
+        "restored_snapshot_sha256",
+        "proposer_id",
+        "reviewer_id",
+        "verifier_id",
+        "review_disposition",
+        "verification_outcome",
+        "verifier_artifact_sha256",
+        "verifier_config_sha256",
+        "preconditions",
+        "postconditions",
+        "annotation_propagation"
+      ],
+      "properties": {
+        "rollback_id": {
+          "$ref": "#/$defs/id"
+        },
+        "idempotency_key": {
+          "$ref": "#/$defs/id"
+        },
+        "target_transaction_id": {
+          "$ref": "#/$defs/id"
+        },
+        "base_snapshot_sha256": {
+          "$ref": "#/$defs/sha"
+        },
+        "inverse_patch_sha256": {
+          "$ref": "#/$defs/sha"
+        },
+        "restored_snapshot_sha256": {
+          "$ref": "#/$defs/sha"
+        },
+        "proposer_id": {
+          "$ref": "#/$defs/id"
+        },
+        "reviewer_id": {
+          "$ref": "#/$defs/id"
+        },
+        "verifier_id": {
+          "$ref": "#/$defs/id"
+        },
+        "review_disposition": {
+          "enum": [
+            "Approved",
+            "Rejected"
+          ]
+        },
+        "verification_outcome": {
+          "enum": [
+            "Passed",
+            "Failed",
+            "Inconclusive"
+          ]
+        },
+        "verifier_artifact_sha256": {
+          "$ref": "#/$defs/sha"
+        },
+        "verifier_config_sha256": {
+          "$ref": "#/$defs/sha"
+        },
+        "preconditions": {
+          "$ref": "#/$defs/assertions"
+        },
+        "postconditions": {
+          "$ref": "#/$defs/assertions"
+        },
+        "annotation_propagation": {
+          "oneOf": [
+            {
+              "$ref": "#/$defs/annotation"
+            },
+            {
+              "type": "null"
+            }
+          ]
+        }
+      }
+    },
+    "decision": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "status",
+        "reason",
+        "resulting_snapshot_sha256"
+      ],
+      "properties": {
+        "status": {
+          "enum": [
+            "COMMITTED",
+            "REJECTED",
+            "QUARANTINED",
+            "ROLLED_BACK"
+          ]
+        },
+        "reason": {
+          "type": [
+            "string",
+            "null"
+          ]
+        },
+        "resulting_snapshot_sha256": {
+          "type": [
+            "string",
+            "null"
+          ],
+          "pattern": "^[0-9a-f]{64}$"
+        }
+      }
+    },
+    "event": {
+      "oneOf": [
+        {
+          "type": "object",
+          "additionalProperties": false,
+          "required": [
+            "event_type",
+            "sequence",
+            "submission",
+            "decision"
+          ],
+          "properties": {
+            "event_type": {
+              "const": "EDIT"
+            },
+            "sequence": {
+              "type": "integer",
+              "minimum": 1
+            },
+            "submission": {
+              "$ref": "#/$defs/edit_submission"
+            },
+            "decision": {
+              "$ref": "#/$defs/decision"
+            }
+          },
+          "allOf": [
+            {
+              "if": {
+                "properties": {
+                  "event_type": {
+                    "const": "EDIT"
+                  }
+                },
+                "required": [
+                  "event_type"
+                ]
+              },
+              "then": {
+                "properties": {
+                  "decision": {
+                    "properties": {
+                      "status": {
+                        "enum": [
+                          "COMMITTED",
+                          "REJECTED",
+                          "QUARANTINED"
+                        ]
+                      }
+                    }
+                  }
+                }
+              }
+            }
+          ]
+        },
+        {
+          "type": "object",
+          "additionalProperties": false,
+          "required": [
+            "event_type",
+            "sequence",
+            "submission",
+            "decision"
+          ],
+          "properties": {
+            "event_type": {
+              "const": "ROLLBACK"
+            },
+            "sequence": {
+              "type": "integer",
+              "minimum": 1
+            },
+            "submission": {
+              "$ref": "#/$defs/rollback_submission"
+            },
+            "decision": {
+              "$ref": "#/$defs/decision"
+            }
+          },
+          "allOf": [
+            {
+              "if": {
+                "properties": {
+                  "event_type": {
+                    "const": "ROLLBACK"
+                  }
+                },
+                "required": [
+                  "event_type"
+                ]
+              },
+              "then": {
+                "properties": {
+                  "decision": {
+                    "properties": {
+                      "status": {
+                        "enum": [
+                          "ROLLED_BACK",
+                          "REJECTED",
+                          "QUARANTINED"
+                        ]
+                      }
+                    }
+                  }
+                }
+              }
+            }
+          ]
+        }
+      ]
+    }
+  },
+  "properties": {
+    "schema_version": {
+      "const": "0.1"
+    },
+    "initial_snapshot_sha256": {
+      "$ref": "#/$defs/sha"
+    },
+    "events": {
+      "type": "array",
+      "items": {
+        "$ref": "#/$defs/event"
+      }
+    },
+    "synthetic_only": {
+      "const": true
+    },
+    "expected_final_state": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "current_snapshot_sha256",
+        "committed_transaction_ids",
+        "event_count",
+        "next_event_sequence"
+      ],
+      "properties": {
+        "current_snapshot_sha256": {
+          "$ref": "#/$defs/sha"
+        },
+        "committed_transaction_ids": {
+          "type": "array",
+          "uniqueItems": true,
+          "items": {
+            "$ref": "#/$defs/id"
+          }
+        },
+        "event_count": {
+          "type": "integer",
+          "minimum": 0
+        },
+        "next_event_sequence": {
+          "type": "integer",
+          "minimum": 1
+        }
+      }
+    }
+  }
+}
