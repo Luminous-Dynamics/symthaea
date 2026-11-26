@@ -150,6 +150,8 @@ func TestDigitalEffectNeedsExactScopeDigestReadbackAndAuthority(t *testing.T) {
 	if got := QualifyDigitalEffect(in).Result; got != ReadbackMissing { t.Fatalf("missing observer: %s", got) }
 	in = validDigitalInput(); in.ObserverPrincipal = in.SinkScope.Principal
 	if got := QualifyDigitalEffect(in).Result; got != Contradicted { t.Fatalf("same principal observer: %s", got) }
+	in = validDigitalInput(); in.ObserverScope.Principal = "spoofed-other-principal"
+	if got := QualifyDigitalEffect(in).Result; got != Contradicted { t.Fatalf("unbound observer principal: %s", got) }
 	in = validDigitalInput(); in.ObserverIndependent = false
 	if got := QualifyDigitalEffect(in).Result; got != NotIndependent { t.Fatalf("non-independent observer: %s", got) }
 	in = validDigitalInput(); in.AuthorityAtCommit = "unknown"
