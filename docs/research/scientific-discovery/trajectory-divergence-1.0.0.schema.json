@@ -1,0 +1,16 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://github.com/Luminous-Dynamics/symthaea/docs/research/scientific-discovery/trajectory-divergence-1.0.0.schema.json",
+  "title": "Symthaea Scientific Trajectory Divergence",
+  "type": "object",
+  "additionalProperties": false,
+  "required": ["schema","schema_version","authority","inputs","outputs","non_equivalences"],
+  "properties": {
+    "schema": {"const":"symthaea.research.scientific_discovery.trajectory_divergence"},
+    "schema_version": {"const":"1.0.0"},
+    "authority": {"const":"computational_discrimination_only"},
+    "inputs": {"type":"array","items":{"enum":["scientific_trajectory_forecast","predicted_continuous_hdc_state","common_prediction_horizon"]}},
+    "outputs": {"type":"array","items":{"enum":["pairwise_similarity","pairwise_divergence","deterministic_discriminating_trajectory_order"]}},
+    "non_equivalences": {"type":"array","items":{"type":"string"},"minItems":6}
+  }
+}
