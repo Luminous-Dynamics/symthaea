@@ -407,8 +407,18 @@ impl DerivedProjectionIndexV1 {
                 actual: transition.sequence,
             });
         }
-        if !transition.invalidated_event_ids.is_empty() && transition.invalidation_cause.is_none() {
+        if (!transition.invalidated_event_ids.is_empty()
+            || !transition.affected_event_ids.is_empty())
+            && transition.invalidation_cause.is_none()
+        {
             return Err(TemporalProjectionRejectV1::InvalidInvalidationCause);
+        }
+        if transition.invalidated_event_ids.iter().collect::<BTreeSet<_>>().len()
+            != transition.invalidated_event_ids.len()
+            || transition.affected_event_ids.iter().collect::<BTreeSet<_>>().len()
+                != transition.affected_event_ids.len()
+        {
+            return Err(TemporalProjectionRejectV1::InvalidTransitionReceipt);
         }
 
         let mut staged = self.clone();
@@ -429,9 +439,10 @@ impl DerivedProjectionIndexV1 {
         let mut pending = VecDeque::<(String, StreamingInvalidationCauseV1)>::new();
 
         if let Some(cause) = cause {
-            let invalidated = transition.invalidated_event_ids.iter().collect::<BTreeSet<_>>();
+            let affected = transition.affected_event_ids.iter().cloned()
+                .collect::<BTreeSet<_>>();
             for projection in self.projections.values() {
-                if projection.source_event_ids.iter().any(|id| invalidated.contains(id)) {
+                if projection.source_event_ids.iter().any(|id| affected.contains(id)) {
                     pending.push_back((projection.projection_id.clone(), cause));
                 }
             }
@@ -846,6 +857,40 @@ mod tests {
         let receipt = ledger.apply(revalidate, 1_200).unwrap().receipt;
         index.apply_transition(&receipt).unwrap();
         assert_eq!(index.projection("summary-v1").unwrap().status(), DerivedProjectionStatusV1::Quarantined);
+    }
+
+    #[test]
+    fn rights_erasure_after_quarantine_still_escalates_derived_projections() {
+        let mut ledger = ledger();
+        let mut index = DerivedProjectionIndexV1::new("user-1", "session-1").unwrap();
+        index.register_projection(&ledger, spec("summary-v1", 1, &["event-1"], &[])).unwrap();
+        let quarantine = StreamingSessionMutationV1 {
+            event_id: "event-2".into(),
+            sequence: 2,
+            effective_at_ms: 200,
+            kind: StreamingMutationKindV1::Quarantine {
+                target_event_id: "event-1".into(),
+                reason_sha256: "d".repeat(64),
+            },
+        };
+        let receipt = ledger.apply(quarantine, 1_100).unwrap().receipt;
+        index.apply_transition(&receipt).unwrap();
+        assert_eq!(index.projection("summary-v1").unwrap().status(), DerivedProjectionStatusV1::Quarantined);
+
+        let erase = StreamingSessionMutationV1 {
+            event_id: "event-3".into(),
+            sequence: 3,
+            effective_at_ms: 300,
+            kind: StreamingMutationKindV1::ErasureRequest {
+                target_event_id: "event-1".into(),
+                rights_receipt_sha256: "e".repeat(64),
+            },
+        };
+        let receipt = ledger.apply(erase, 1_200).unwrap().receipt;
+        assert!(receipt.invalidated_event_ids.is_empty());
+        assert_eq!(receipt.affected_event_ids, vec!["event-1"]);
+        index.apply_transition(&receipt).unwrap();
+        assert_eq!(index.projection("summary-v1").unwrap().status(), DerivedProjectionStatusV1::ErasureRequested);
     }
 
     #[test]
