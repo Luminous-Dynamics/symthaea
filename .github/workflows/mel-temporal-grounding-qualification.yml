@@ -163,11 +163,21 @@ jobs:
             .schema == "mel-music-listen-bench-report-v1"
             and .benchmark_id == "MusicListenBench"
             and .benchmark_version == "1.0"
+            and (.dataset_revision_sha256 | length) == 64
+            and (.official_scorer_revision_sha256 | length) == 64
             and .overall.triads == 4
             and .overall.clean.accuracy == 0.75
             and .overall.flip.accuracy == 0.75
             and .overall.stay.accuracy == 1.0
             and .overall.clean.incorrect == 1
+            and .overall.clean.choice_a == 3
+            and .overall.clean.choice_b == 1
+            and .overall.clean.choice_a_rate_among_answered == 0.75
+            and .overall.flip.choice_a == 1
+            and .overall.flip.choice_b == 2
+            and .overall.flip.choice_a_rate_among_answered > 0.33
+            and .overall.flip.choice_a_rate_among_answered < 0.34
+            and .overall.stay.choice_a_rate_among_answered == 1.0
             and .overall.flip.unparseable == 1
             and .overall.flip_miss_rate == 0.25
             and .overall.stay_false_flip_rate == 0.0
