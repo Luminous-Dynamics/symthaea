@@ -37,6 +37,8 @@ All four candidate partitions use the same held-out states and the same CMAQ res
 3. identity/no-op;
 4. full predicted HDC vector partition.
 
+The predictor requires at least three distinct matching training clusters before returning a contextual forecast. Here each training context has three independent clusters. Repeated samples and duplicate cluster IDs across family buckets do not inflate support; the family-blind predictor returns `InsufficientContextSupportUnknown` when de-duplicated support is below three. This is a deterministic engineering guardrail, not a calibrated confidence threshold.
+
 The test asserts:
 - contextual HDC gets 4/4 exact changed-query responses, 0 false merges, 0 false splits and 2 abstract classes;
 - pooled global delta gets 0/4 exact responses and 4 false merges;
