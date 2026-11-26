@@ -443,9 +443,7 @@ fn search_expected(
                     utility_numerator_ppm: utility_numerator,
                     cost_numerator_ppm: cost_numerator,
                 };
-                if candidate.policy.node_count() <= scenario.maximum_policy_nodes {
-                    consider_expected(&mut best, candidate);
-                }
+                consider_expected(&mut best, candidate);
             }
         }
     }
@@ -579,9 +577,7 @@ fn search_robust(
                     worst_regret,
                     worst_cost,
                 };
-                if candidate.policy.node_count() <= scenario.maximum_policy_nodes {
-                    consider_robust(&mut best, candidate);
-                }
+                consider_robust(&mut best, candidate);
             }
         }
     }
