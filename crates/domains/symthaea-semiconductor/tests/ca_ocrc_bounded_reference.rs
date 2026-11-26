@@ -220,7 +220,7 @@ fn reference_replay() -> (Vec<f64>, Vec<usize>, Vec<usize>) {
 #[test]
 fn production_round_engine_matches_independent_ca_ocrc_state_machine() {
     let mut engine = engine();
-    let rounds = [
+    let mut rounds = [
         round(prediction(0, "s0", 0.9), Vec::new()),
         round(prediction(1, "s1", 0.3), vec![feedback(1, "s1", "l1")]),
         round(prediction(2, "s2", 0.9), vec![feedback(2, "s0", "l0")]),
@@ -232,7 +232,10 @@ fn production_round_engine_matches_independent_ca_ocrc_state_machine() {
     let mut actual_occupancies = Vec::new();
     let mut actual_updates = Vec::new();
 
-    for input in &rounds {
+    for input in &mut rounds {
+        // CA-OCRC freezes the threshold in each prediction receipt. The
+        // next prediction must use the threshold produced by the prior round.
+        input.prediction.threshold_used = engine.state.threshold;
         let report = step_ca_ocrc_round_v1(&mut engine, input).unwrap();
         actual_thresholds.push(report.threshold_after);
         actual_occupancies.push(report.tracking_occupancy_after);
