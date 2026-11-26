@@ -308,7 +308,10 @@
           "placement_reference": {
             "const": null
           }
-        }
+        },
+        "required": [
+          "placement_reference"
+        ]
       }
     },
     {
