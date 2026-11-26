@@ -164,6 +164,20 @@ The required extension is therefore response spectroscopy over:
 
 Use amplitude-convergence studies before interpreting finite-amplitude coefficients as derivatives. Keep two-pulse and longer pulse graphs separate. The November 2026 Landau damping / plasma-echo review is relevant background: https://doi.org/10.1137/26M1938650
 
+## Active response acquisition and local atlas management
+
+The next research increment should connect the existing complex-response expected-information-gain (EIG) design, signed first-/second-order response coefficients, mixed-pulse coefficient, response-signature cluster audit, and validity-horizon primitive. This is a proposed control loop, not yet an integrated algorithm:
+
+1. **Freeze the contract**: equation, discrete solver revision, checkpoint digest, pulse family, admissible amplitudes/phases/modes/times, QoIs, response scales, horizon, state metric, and byte/compute budgets.
+2. **Acquire a seed set**: choose a small set of pulse paths with known physical controls and negative controls. Use EIG to select informative experiments about competing response branches, not just to maximize signal magnitude.
+3. **Build local factors**: derive intervention reachability directions and future QoI sensitivity directions from the same frozen discrete solver. Where adjoints are unavailable, label central finite differences and account for their full acquisition cost.
+4. **Balance a local candidate basis**: construct the trial/test spaces and record the full singular spectrum, numerical rank, biorthogonality defect, reconstruction distortion, byte cost, and residuals.
+5. **Challenge it actively**: select validation pulses near the current uncertainty/coverage boundary and held-out adversarial pulses that vary phase, amplitude, mode, delay, and order. Add a pulse only when its expected information gain or predicted worst-case response risk justifies its cost.
+6. **Handle branch changes structurally**: if response-branch identity is ambiguous, absent, or discontinuous, mark the affected cell UNKNOWN or split it into branch-labelled neighborhoods. Never average distinct echo branches into one smooth response target.
+7. **Qualify transitions and hand-off**: before moving a state between local bases, test positivity, equation-specific invariants/structure, future-response residual, transfer bytes, uncertainty growth, and hand-off latency. A failed or uncovered check requests full-order fallback; it does not silently enlarge the safe horizon.
+
+This gives a research objective beyond a static reduced basis: minimize the cost of maintaining a response-qualified representation over a sequence of checkpoints and future interventions. The active-design policy must be evaluated against random probing and fixed factorial designs at equal high-fidelity simulation budgets; no claim of fewer solver calls is allowed until that comparison is measured.
+
 The likely long-term design is a **local response-balanced atlas**, not one global basis: checkpoint-local subspaces are connected by explicit transitions, and each transition is requalified against positivity, the equation-specific invariant/structure contract, future response, memory, and the validity horizon. This is a research hypothesis, not an implemented atlas.
 
 ## First physics-facing experiment: K-RESP-1
