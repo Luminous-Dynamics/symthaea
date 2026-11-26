@@ -127,6 +127,6 @@ cargo test --manifest-path research/physical-storage/dna-channel-benchmark/Cargo
 
 cargo run --manifest-path research/physical-storage/dna-channel-benchmark/Cargo.toml
 
-python3 research/physical-storage/dna-channel-benchmark/oracle/verify_dna_metrics.py
+python3 research/physical-storage/dna-channel-benchmark/fixtures/dna_sequence_channel_cases_v0_1.schema.json and scorer fixture, plus research/physical-storage/dna-channel-benchmark/oracle/verify_dna_metrics.py
 
 No Rust toolchain pass is claimed until exact-head commands run. The independent Python oracle validates only deterministic metrics and ranking logic.
