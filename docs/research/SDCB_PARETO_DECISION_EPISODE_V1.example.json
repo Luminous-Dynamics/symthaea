@@ -1,0 +1,73 @@
+{
+  "schema_version": "1.0.0",
+  "episode_id": "rpsd-hard-safety-pareto-v1",
+  "prior": [
+    0.5,
+    0.5
+  ],
+  "action_ids": [
+    "fast",
+    "balanced",
+    "safe"
+  ],
+  "objective_ids": [
+    "throughput",
+    "safety_margin"
+  ],
+  "hypotheses": [
+    {
+      "hypothesis_id": "h1",
+      "utility_by_action": [
+        [
+          10,
+          -4
+        ],
+        [
+          8,
+          -1
+        ],
+        [
+          6,
+          0
+        ]
+      ]
+    },
+    {
+      "hypothesis_id": "h2",
+      "utility_by_action": [
+        [
+          10,
+          1
+        ],
+        [
+          8,
+          -1
+        ],
+        [
+          6,
+          0
+        ]
+      ]
+    }
+  ],
+  "minimum_by_objective": [
+    null,
+    -2
+  ],
+  "experiments": [
+    {
+      "experiment_id": "uninformative-randomized-measurement",
+      "cost_units": 1,
+      "outcome_likelihoods": [
+        [
+          0.5,
+          0.5
+        ],
+        [
+          0.5,
+          0.5
+        ]
+      ]
+    }
+  ]
+}

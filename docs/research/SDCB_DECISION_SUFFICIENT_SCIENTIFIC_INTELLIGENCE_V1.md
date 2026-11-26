@@ -229,11 +229,11 @@ The one-step decision-value module assumes supplied likelihoods and utilities. T
 Next research increments:
 
 1. Approximate or bounded-horizon policies that approach the exact small-instance oracle at larger candidate counts.
-2. Robust EVSI under posterior and likelihood misspecification.
-3. Multi-objective Pareto decision value without arbitrary scalarization.
-4. Safe experiment design with hard constraints, chance constraints, and intervention authority.
-5. Utility elicitation and preference uncertainty with human/domain-owner provenance.
-6. Adapter evaluation inside Beyond Accuracy, ActiveSciBench, and ACDB, subject to licenses and available interfaces.
+2. Expand the finite ambiguity-set and Pareto references in [RPSD v1](SDCB_ROBUST_AND_PARETO_DECISION_DESIGN_V1.md) into robust generalized-Bayesian updates, distributional ambiguity sets, and multi-objective sequential policies.
+3. Add safety-constrained experiment design with chance constraints, risk bounds, and explicit intervention authority.
+4. Utility elicitation and preference uncertainty with human/domain-owner provenance.
+5. Integrate the process-integrity dimensions of [petri-bench](SDCB_PETRI_BENCH_INTEROPERABILITY_2026_11_26.md), while preserving its upstream scoring and disclosed limitations.
+6. Adapter evaluation inside Beyond Accuracy, ActiveSciBench, ACDB and Autonomous Science Bench, subject to licenses and available interfaces.
 
 ## 13. References
 

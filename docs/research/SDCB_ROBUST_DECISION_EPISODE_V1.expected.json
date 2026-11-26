@@ -1,0 +1,51 @@
+{
+  "schema_version": "1.0.0",
+  "fixture_id": "rpsd-brittle-vs-robust-probe-v1",
+  "execution_kind": "independent_maximin_policy_reference",
+  "rust_compiled_or_executed": false,
+  "baseline": {
+    "action_id": "act-a",
+    "scenario_values": [
+      0.5,
+      0.5
+    ],
+    "worst_case_value": 0.5
+  },
+  "results": [
+    {
+      "experiment_id": "brittle",
+      "policy_actions_by_outcome": [
+        "act-a",
+        "act-a"
+      ],
+      "scenario_policy_values": [
+        0.5,
+        0.5
+      ],
+      "robust_post_experiment_value": 0.5,
+      "robust_gain": 0,
+      "cost_units": 1,
+      "net_robust_gain": -0.1
+    },
+    {
+      "experiment_id": "robust-probe",
+      "policy_actions_by_outcome": [
+        "act-a",
+        "act-b"
+      ],
+      "scenario_policy_values": [
+        0.7,
+        0.7
+      ],
+      "robust_post_experiment_value": 0.7,
+      "robust_gain": 0.2,
+      "cost_units": 1,
+      "net_robust_gain": 0.1
+    }
+  ],
+  "selection": {
+    "selected_experiment_id": "robust-probe",
+    "net_robust_gain": 0.1
+  },
+  "claim_ceiling": "finite_ambiguity_set_analytic_reference_only"
+}
