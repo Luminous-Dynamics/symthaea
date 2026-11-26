@@ -354,6 +354,26 @@ fn audit(fixture: &Value) -> Result<(), String> {
         }
     }
 
+    let response_qualification = field(fixture, "response_qualification")?;
+    if !boolean(response_qualification, "checkpoint_state_residual_required")?
+        || !boolean(response_qualification, "future_pulse_injection_residual_required")?
+        || !boolean(response_qualification, "nonlinear_full_order_response_required")?
+    {
+        return Err("both linearized response channels and nonlinear full-order response are mandatory".to_owned());
+    }
+    if number(response_qualification, "cvar_alpha")? != 0.9
+        || string(response_qualification, "residual_threshold_status")?
+            != "calibrate_on_independently_converged_physical_reference"
+    {
+        return Err("response-risk summary or calibration status is invalid".to_owned());
+    }
+    let risk_metrics = string_array(response_qualification, "risk_summary_metrics")?;
+    for metric in ["weighted_mean", "worst_case", "cvar"] {
+        if !risk_metrics.iter().any(|value| value == metric) {
+            return Err(format!("response risk metric {metric} is missing"));
+        }
+    }
+
     let resources = field(fixture, "resource_budget")?;
     for comparison in [
         "equal_rank",
