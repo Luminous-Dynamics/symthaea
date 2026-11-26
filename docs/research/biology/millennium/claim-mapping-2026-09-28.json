@@ -1,0 +1,272 @@
+{
+  "schema": "symthaea.research.millennium_biology.claim_mapping",
+  "schema_version": "1.0.0",
+  "mapping_generation": "BIO-MILLENNIUM-001B-2026-09-28-01",
+  "status": "source_bound_claim_mapping_profile",
+  "source_contract": {
+    "publisher": "FutureHouse / Edison Scientific",
+    "source_url": "https://millenniumproblems.bio/",
+    "announcement_url": "https://www.futurehouse.org/news/millennium-problems-for-biology",
+    "publication_date": "2026-09-23",
+    "retrieved_at": "2026-09-28",
+    "official_criteria_generation": "DESCI-BIO-001B-2026-09-28-01",
+    "source_authority": "external_source_only"
+  },
+  "purpose": "Map canonical Symthaea evidence classes to the minimum evidence ceiling needed to discuss each official challenge criterion without allowing lower-authority artifacts to satisfy higher-authority predicates.",
+  "authority_ceiling": {
+    "local_mapping_is_not_official_criterion": true,
+    "local_mapping_does_not_declare_solved": true,
+    "local_mapping_does_not_grant_experimental_authority": true,
+    "local_surrogate_is_not_official_evidence": true,
+    "model_agreement_is_not_independent_corroboration": true,
+    "formal_model_proof_is_not_physical_biological_evidence": true
+  },
+  "evidence_ladder": [
+    "HypothesisProposal",
+    "InSilicoPrediction",
+    "SimulationResult",
+    "RetrospectiveBenchmarkResult",
+    "ProspectiveCommittedPrediction",
+    "ExternalExperimentalObservation",
+    "IndependentReplication",
+    "OfficialChallengeCriterionEvidence"
+  ],
+  "transition_rules": {
+    "HypothesisProposal -> InSilicoPrediction": "requires a declared executable/model evaluation with immutable input and model lineage.",
+    "InSilicoPrediction -> RetrospectiveBenchmarkResult": "requires frozen target/outcome data and post-hoc evaluation; never grants prospective credit.",
+    "InSilicoPrediction -> ProspectiveCommittedPrediction": "requires commitment before answer/outcome exposure and immutable prediction identity.",
+    "ProspectiveCommittedPrediction -> ExternalExperimentalObservation": "requires independently instrumented external observation; prediction alone cannot create an observation.",
+    "ExternalExperimentalObservation -> IndependentReplication": "requires a separately attributable replication satisfying the applicable replication contract.",
+    "IndependentReplication -> OfficialChallengeCriterionEvidence": "only when the official source's complete criterion predicate and required evidence are satisfied; local confidence cannot substitute."
+  },
+  "non_promotion_fixtures": [
+    "A high-confidence model prediction cannot satisfy an experimental criterion.",
+    "A simulation result cannot satisfy a living-organism criterion unless the official source explicitly permits simulation for that criterion.",
+    "A retrospective rediscovery cannot receive prospective credit after candidate or scoring mutation.",
+    "Multiple models sharing training/data/structure ancestry are not independent replications.",
+    "A publication citation alone cannot be promoted to an experimental observation.",
+    "A formal proof of a model consequence cannot be promoted to proof that the biological model matches reality.",
+    "A partial-success artifact cannot be promoted to complete criterion evidence.",
+    "Missing provenance or unresolved exposure prevents prospective qualification."
+  ],
+  "criteria": [
+    {
+      "id": "MPB-2026-09-23-01",
+      "slug": "origins-of-life",
+      "minimum_official_evidence": "ExternalExperimentalObservation",
+      "completion_requires": "OfficialChallengeCriterionEvidence",
+      "local_computational_role": [
+        "HypothesisProposal",
+        "InSilicoPrediction",
+        "SimulationResult",
+        "ProspectiveCommittedPrediction"
+      ],
+      "explicit_nonpromotion": [
+        "simulation of emergence",
+        "plausibility score",
+        "model agreement"
+      ]
+    },
+    {
+      "id": "MPB-2026-09-23-02",
+      "slug": "cryopreservation",
+      "minimum_official_evidence": "ExternalExperimentalObservation",
+      "completion_requires": "OfficialChallengeCriterionEvidence",
+      "local_computational_role": [
+        "HypothesisProposal",
+        "InSilicoPrediction",
+        "ProspectiveCommittedPrediction"
+      ],
+      "explicit_nonpromotion": [
+        "simulation of viability",
+        "histological proxy without official endpoint coverage",
+        "model prediction"
+      ]
+    },
+    {
+      "id": "MPB-2026-09-23-03",
+      "slug": "reverse-translatase",
+      "minimum_official_evidence": "ExternalExperimentalObservation",
+      "completion_requires": "OfficialChallengeCriterionEvidence",
+      "local_computational_role": [
+        "HypothesisProposal",
+        "InSilicoPrediction",
+        "ProspectiveCommittedPrediction"
+      ],
+      "explicit_nonpromotion": [
+        "sequence prediction",
+        "in-silico translation",
+        "single-peptide demonstration when official sample/accuracy requirements are unmet"
+      ]
+    },
+    {
+      "id": "MPB-2026-09-23-04",
+      "slug": "improve-rubisco",
+      "minimum_official_evidence": "ExternalExperimentalObservation",
+      "completion_requires": "OfficialChallengeCriterionEvidence",
+      "local_computational_role": [
+        "HypothesisProposal",
+        "InSilicoPrediction",
+        "RetrospectiveBenchmarkResult",
+        "ProspectiveCommittedPrediction"
+      ],
+      "explicit_nonpromotion": [
+        "predicted kcat/Sc_o",
+        "single-objective score",
+        "missing paired controls"
+      ]
+    },
+    {
+      "id": "MPB-2026-09-23-05",
+      "slug": "quadruplet-cell",
+      "minimum_official_evidence": "ExternalExperimentalObservation",
+      "completion_requires": "OfficialChallengeCriterionEvidence",
+      "local_computational_role": [
+        "HypothesisProposal",
+        "InSilicoPrediction",
+        "SimulationResult",
+        "ProspectiveCommittedPrediction"
+      ],
+      "explicit_nonpromotion": [
+        "genome recoding simulation",
+        "partial quadruplet decoding",
+        "absence of detected triplet decoding without full official predicate"
+      ]
+    },
+    {
+      "id": "MPB-2026-09-23-06",
+      "slug": "somatic-limb-regeneration",
+      "minimum_official_evidence": "ExternalExperimentalObservation",
+      "completion_requires": "OfficialChallengeCriterionEvidence",
+      "local_computational_role": [
+        "HypothesisProposal",
+        "InSilicoPrediction",
+        "SimulationResult",
+        "ProspectiveCommittedPrediction"
+      ],
+      "explicit_nonpromotion": [
+        "morphogenesis simulation",
+        "non-mammalian regeneration",
+        "partial tissue regrowth",
+        "unblinded visual assessment"
+      ]
+    },
+    {
+      "id": "MPB-2026-09-23-07",
+      "slug": "bacterial-production-of-gene-therapies",
+      "minimum_official_evidence": "ExternalExperimentalObservation",
+      "completion_requires": "OfficialChallengeCriterionEvidence",
+      "local_computational_role": [
+        "HypothesisProposal",
+        "InSilicoPrediction",
+        "ProspectiveCommittedPrediction"
+      ],
+      "explicit_nonpromotion": [
+        "AAV-only partial success",
+        "sequence/capsid prediction",
+        "noninfectious particle production",
+        "simulation"
+      ]
+    },
+    {
+      "id": "MPB-2026-09-23-08",
+      "slug": "programmable-proteases",
+      "minimum_official_evidence": "ExternalExperimentalObservation",
+      "completion_requires": "OfficialChallengeCriterionEvidence",
+      "local_computational_role": [
+        "HypothesisProposal",
+        "InSilicoPrediction",
+        "RetrospectiveBenchmarkResult",
+        "ProspectiveCommittedPrediction"
+      ],
+      "explicit_nonpromotion": [
+        "in-silico specificity",
+        "peptide-only assay",
+        "post-evaluation redesign",
+        "failure to preserve preregistered target set"
+      ]
+    },
+    {
+      "id": "MPB-2026-09-23-09",
+      "slug": "cell-penetrating-protein-binders",
+      "minimum_official_evidence": "ExternalExperimentalObservation",
+      "completion_requires": "OfficialChallengeCriterionEvidence",
+      "local_computational_role": [
+        "HypothesisProposal",
+        "InSilicoPrediction",
+        "RetrospectiveBenchmarkResult",
+        "ProspectiveCommittedPrediction"
+      ],
+      "explicit_nonpromotion": [
+        "transfection-based entry",
+        "in-vitro binding alone",
+        "post-hoc target selection",
+        "cell entry without the official administration constraints"
+      ]
+    },
+    {
+      "id": "MPB-2026-09-23-10",
+      "slug": "protein-amplification-chain-reaction",
+      "minimum_official_evidence": "ExternalExperimentalObservation",
+      "completion_requires": "OfficialChallengeCriterionEvidence",
+      "local_computational_role": [
+        "HypothesisProposal",
+        "InSilicoPrediction",
+        "ProspectiveCommittedPrediction"
+      ],
+      "explicit_nonpromotion": [
+        "nucleic-acid-mediated amplification",
+        "reverse-translatase intermediate",
+        "single peptide result",
+        "sequence-insensitive amplification"
+      ]
+    },
+    {
+      "id": "MPB-2026-09-23-11",
+      "slug": "5-prime-polymerases",
+      "minimum_official_evidence": "ExternalExperimentalObservation",
+      "completion_requires": "OfficialChallengeCriterionEvidence",
+      "local_computational_role": [
+        "HypothesisProposal",
+        "InSilicoPrediction",
+        "SimulationResult",
+        "ProspectiveCommittedPrediction"
+      ],
+      "explicit_nonpromotion": [
+        "one polymerase direction",
+        "sequence-level analogy",
+        "simulation-only processivity/error claim",
+        "missing four-function panel"
+      ]
+    },
+    {
+      "id": "MPB-2026-09-23-12",
+      "slug": "new-nitrogenases",
+      "minimum_official_evidence": "ExternalExperimentalObservation",
+      "completion_requires": "OfficialChallengeCriterionEvidence",
+      "local_computational_role": [
+        "HypothesisProposal",
+        "InSilicoPrediction",
+        "RetrospectiveBenchmarkResult",
+        "ProspectiveCommittedPrediction"
+      ],
+      "explicit_nonpromotion": [
+        "QM-only N2 activation",
+        "sequence novelty alone",
+        "structure novelty alone",
+        "rate claim without required comparison and novelty evidence"
+      ]
+    }
+  ],
+  "integrity_requirements": {
+    "exact_criterion_generation_binding": true,
+    "exact_candidate_identity": true,
+    "exact_model_lineage_when_available": true,
+    "knowledge_exposure_cutoff": true,
+    "provenance_complete_result_identity": true,
+    "terminal_disposition_census": true,
+    "negative_and_null_results_retained": true,
+    "independent_scorer_when_claimed": true,
+    "external_execution_requires_human_or_institutional_authority": true
+  }
+}
