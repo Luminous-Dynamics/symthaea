@@ -103,3 +103,31 @@ That fixture has one eligible work and two eligible query items, both selected. 
 The Rust exhaustive oracle separately enumerates all three possible two-of-three source-work samples for a six-query finite population. It verifies that the average query-item HT total equals the true population total 3.0 and the average estimated query-item variance equals 1.5. It also verifies that the source-work-weighted HT mean is 0.5 and its average estimated total variance equals 0.375. This validates the estimator equations on synthetic finite populations, not a field result or authenticated human/model outcome.
 
 The report flags `observed_outcomes_authenticated=false` and `population_confidence_claim_permitted=false`. A design-based variance estimate is not a license to claim population generalization unless the sampling frame, selection receipts, scoring outputs, rights/consent, and measurement process are independently qualified.
+
+
+## Design-weighted selective risk/coverage
+
+The `temporal_selective_design` adapter composes the existing #13626 acquisition planner, #13648 selective decision outputs, and #13692 two-stage HT variance estimator. It accepts only one completed selective outcome for each selected ProbabilityAudit item. Active-refinement and unselected items are rejected. Each outcome is joined to the exact planner item/query/source-work and the same model/runtime/decoding/hardware/evaluator/scoring-plan identity tuple.
+
+The threshold list is frozen in a versioned plan with a canonical SHA-256 digest. V1 accepts only the predeclared `greater_or_equal` tie rule. A case is covered when its decision is Answer or ClaimAbsent and its confidence is at least the threshold. AbstainAmbiguous and AbstainNotEstimable remain uncovered. The selective error numerator contains only covered incorrect decisions; false absence claims are also reported separately.
+
+For each threshold, the adapter reports two separate estimands:
+- query-item-weighted coverage and selective risk;
+- equal-source-work contribution coverage and selective risk.
+
+For risk (R=T_E/T_C), V1 uses ratio linearization with (Z_i=E_i-RC_i), then estimates the design variance of the HT total of (Z_i) using the same first/second-order inclusion probability primitive as #13692. The source-work estimand applies the same calculation to (Z_i/N_w). Coverage variance is the HT variance of the covered total divided by the known population denominator squared. Risk is undefined when the estimated covered total is zero. Unsupported design variance remains unavailable, not zero.
+
+The 95% intervals are normal-approximation, proportion-clipped intervals; they are diagnostics, not guarantees of nominal coverage in small samples. The adapter emits threshold-specific intervals only. It does not compute an AURC confidence interval because covariance across thresholds is deferred. Thresholds must be selected using source-lineage-disjoint calibration data before opening the confirmatory audit.
+
+The synthetic one-work/two-item fixture demonstrates:
+- threshold 0: coverage 1.0, selective risk 0.5, false-absence rate 0.5;
+- threshold 0.7 or 0.9: coverage 0.5, selective risk 0.0, false-absence rate 0.0;
+- always-answer and random-retention baseline risk 0.5.
+
+That fixture is a complete census of one synthetic work, so its design variance is zero. The separate Rust tests exercise two-of-three work sampling and unequal work sizes. Neither fixture nor test establishes a field result or SOTA claim.
+
+Run the synthetic audit with:
+
+    cargo +1.96.0 run --locked --manifest-path tools/mel-temporal-grounding-qualifier/Cargo.toml --bin mel-selective-design-risk-audit -- tools/mel-temporal-grounding-qualifier/fixtures/mel-selective-design-risk.synthetic.json
+
+The output hard-codes `selective_outcomes_authenticated=false` and `population_confidence_claim_permitted=false`. A signed execution/scoring receipt and a qualified rights/consent frame remain necessary before a population performance claim.

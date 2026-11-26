@@ -120,15 +120,15 @@ pub struct DesignEstimatorReportV1 {
 }
 
 #[derive(Debug, Clone)]
-struct SampledItemV1<'a> {
-    selection: &'a AnnotationSelectionRecordV1,
-    outcome: f64,
-    source_work_size: usize,
-    first_order_probability: f64,
+pub(crate) struct SampledItemV1<'a> {
+    pub(crate) selection: &'a AnnotationSelectionRecordV1,
+    pub(crate) outcome: f64,
+    pub(crate) source_work_size: usize,
+    pub(crate) first_order_probability: f64,
 }
 
 #[derive(Debug, Clone, Copy)]
-enum EstimatorTargetV1 {
+pub(crate) enum EstimatorTargetV1 {
     QueryItem,
     SourceWorkMean,
 }
@@ -480,7 +480,7 @@ pub fn estimate_design_based_metric(
     })
 }
 
-fn estimate_stratum_variance(
+pub(crate) fn estimate_stratum_variance(
     design: &ProbabilityAuditStratumDesignV1,
     sample: &[SampledItemV1<'_>],
     target: EstimatorTargetV1,
@@ -572,7 +572,7 @@ fn second_order_inclusion_probability(
     Ok(source_probability)
 }
 
-fn probability_to_f64(
+pub(crate) fn probability_to_f64(
     probability: crate::temporal_acquisition::ProbabilityFractionV1,
 ) -> Result<f64, String> {
     if probability.denominator == 0 || probability.numerator == 0 {
