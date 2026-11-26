@@ -67,7 +67,7 @@ def main():
         "soft_erasure_ranking": ranked,
         "progressive_trials": trials,
         "read_observation_multiplicity": {
-            "read_records": 4, "molecule_observations": 7, "duplicates": 3
+            "read_records": 4, "read_observations": 7, "additional_read_copies": 3
         },
         "physical_error_probabilities_estimated": False,
         "biochemical_experiment_performed": False,
