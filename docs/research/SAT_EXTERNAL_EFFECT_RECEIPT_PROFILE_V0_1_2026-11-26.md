@@ -46,12 +46,12 @@ A connector success response is not independent read-back. Two different `source
 - `idempotency_key` to stable intent across safe retries;
 - `intent_digest` to the initiating intent;
 - `authority_decision_digest` and `disclosure_decision_digest` to separately recorded decisions;
-- `effect_binding` to `sink_id`, `action`, `resource_id`, `purpose`, `parameter_digest`, labels and a domain-separated binding digest;
+- `effect_binding` to `sink_id`, `action`, `resource_id`, `purpose`, `parameter_digest`, labels (unique and UTF-16 sorted) and a domain-separated binding digest;
 - `submitted_at` to the attempt's declared submission time.
 
 The stable idempotency key is not an attempt identifier. A safe retry preserves the intent, idempotency key and exact-effect binding while receiving a fresh `attempt_id`. A receipt for attempt A cannot settle attempt B, even when both share an idempotency key.
 
-The attempt's `effect_binding.binding_digest` is recomputed over the `effect_binding` object with the `binding_digest` field removed. The digest is `SHA-256(UTF8("SAT-EFFECT-ATTEMPT-BINDING-v0.1\n") || canonical_json(binding_without_digest))`, encoded as lowercase `sha256:` hex. The canonicalization follows the existing restricted SAT v0.1 JSON profile: duplicate keys and non-integer/unsafe numbers are rejected, object keys are sorted by UTF-16 code units, arrays retain order, and strings are not Unicode-normalized. This is a versioned SAT profile, not a claim of full RFC 8785 conformance. The example vector is `sha256:a0bbc153c2153cf9b007509c845e1ea013250f8b40722898a167bf88524f849e`.
+The attempt's `effect_binding.binding_digest` is recomputed over the `effect_binding` object with the `binding_digest` field removed. The digest is `SHA-256(UTF8("SAT-EFFECT-ATTEMPT-BINDING-v0.1\n") || canonical_json(binding_without_digest))`, encoded as lowercase `sha256:` hex. The canonicalization follows the existing restricted SAT v0.1 JSON profile: duplicate keys and non-integer/unsafe numbers are rejected, object keys are sorted by UTF-16 code units, arrays retain order, and strings are not Unicode-normalized. This is a versioned SAT profile, not a claim of full RFC 8785 conformance. The example vector is `sha256:558cfd260809c2c99a32da1019c3bd360e4b2aca56f26f5008cf02144a0e3077`.
 
 ### 3.2 External effect receipt
 
