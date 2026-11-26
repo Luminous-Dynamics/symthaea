@@ -528,8 +528,14 @@ impl NixWorldModel {
             || context.as_slice().len() != self.dim
             || action_parameters.as_slice().len() != self.dim
             || state.as_slice().iter().any(|value| !value.is_finite())
-            || context.as_slice().iter().any(|value| !value.is_finite())
-            || action_parameters.as_slice().iter().any(|value| !value.is_finite())
+            || context
+                .as_slice()
+                .iter()
+                .any(|value| !value.is_finite() || value.abs() > 1.0)
+            || action_parameters
+                .as_slice()
+                .iter()
+                .any(|value| !value.is_finite() || value.abs() > 1.0)
         {
             return Err("prediction state and context must match the model dimension and be finite".to_owned());
         }
@@ -1480,6 +1486,8 @@ mod tests {
         episode.independent_cluster_id = "cluster-b".to_owned();
         episode.execution = TransitionExecution::Executed {
             realized_action: ActionCategory::Install,
+            realized_action_sha256: "d".repeat(64),
+            realized_action_parameters: ContinuousHV::random(dim, 90),
             outcome: TransitionOutcomeClass::Failure,
             state_after: ContinuousHV::random(dim, 63),
             state_after_sha256: "e".repeat(64),
@@ -1531,6 +1539,42 @@ mod tests {
         assert!(prediction.training_residual_mse.is_none());
     }
 
+
+
+    #[test]
+    fn contextual_model_does_not_reuse_transition_for_different_action_parameters() {
+        let dim = 256;
+        let mut wm = NixWorldModel::new(dim);
+        let state = ContinuousHV::random(dim, 70);
+        let context = ContinuousHV::random(dim, 71);
+        let after = ContinuousHV::random(dim, 72);
+        let episode = transition_episode(
+            "parameterized-action",
+            ActionCategory::Configure,
+            ActionCategory::Configure,
+            state.clone(),
+            context.clone(),
+            after,
+            TransitionOutcomeClass::Success,
+            "cluster-1",
+        );
+        wm.learn_episode(&episode).expect("training episode");
+
+        let unseen_action_parameters = ContinuousHV::random(dim, 73);
+        let prediction = wm.predict_state_with_context(
+            &state,
+            &ActionCategory::Configure,
+            "nix-build-family",
+            &unseen_action_parameters,
+            &context,
+        ).expect("global baseline fallback is explicit");
+        assert_eq!(
+            prediction.source,
+            ContextualPredictionSource::GlobalActionDeltaFallback
+        );
+        assert!(prediction.action_parameter_similarity < 0.8);
+    }
+
     #[test]
     fn contextual_prediction_rejects_wrong_dimensions_and_non_finite_values() {
         let dim = 256;
@@ -1538,6 +1582,8 @@ mod tests {
         assert!(wm.predict_state_with_context(
             &ContinuousHV::zero(dim - 1),
             &ActionCategory::Install,
+            "nix-build-family",
+            &ContinuousHV::random(dim, 90),
             &ContinuousHV::zero(dim),
         ).is_err());
 
