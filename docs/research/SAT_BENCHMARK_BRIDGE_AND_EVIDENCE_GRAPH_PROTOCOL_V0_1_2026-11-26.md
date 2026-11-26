@@ -127,7 +127,23 @@ Measure:
 
 The target is not to minimize revalidation at all costs. It is to minimize unnecessary work subject to a hard ceiling on stale evidence being treated as valid.
 
-## 5. Common-cause independence as a graph property
+## 5. Evidence debt and assurance fragility
+
+Do not compress unresolved assurance into a single score. Track an **evidence-debt vector**:
+
+- count of stale, inconclusive, unavailable and invalid claims by consequence class;
+- age of each unresolved claim and time remaining to its declared expiry;
+- number of downstream claims blocked by each unresolved dependency;
+- expected revalidation effort and required external/human evidence;
+- whether the debt is caused by missing evidence, failed authenticity, source disagreement, change drift or evaluator uncertainty.
+
+Critical claims remain hard gates regardless of the aggregate size of the debt. A dashboard may show trends, but it must not let many low-risk supported claims compensate for one unresolved critical effect claim.
+
+Track **assurance fragility** separately: the disclosed minimum common-cause cut set that can invalidate a claim's supporting evidence, and the fraction of its provenance that depends on one operator, one service, one time source or one custody domain. If graph completeness is unknown, fragility is unbounded/unknown rather than zero.
+
+A useful counterfactual test is to remove or mutate one evidence premise and recompute the affected claim closure. Claims that remain supported despite removal of a mandatory premise reveal a verifier defect; claims that all collapse after removal of an irrelevant artifact reveal over-coupling. These are graph-semantic tests, not model-behaviour scores.
+
+## 6. Common-cause independence as a graph property
 
 Two signatures are not two independent witnesses merely because the key IDs differ.
 
@@ -145,7 +161,7 @@ For a declared threshold/quorum, calculate the smallest disclosed common-cause c
 
 Report the graph and cut sets, not just the witness count. An independence policy must define which dependencies are disqualifying, correlated, tolerated or unknown.
 
-## 6. Native benchmark adapter rules
+## 7. Native benchmark adapter rules
 
 ### 6.1 Preserve native semantics
 
@@ -198,7 +214,7 @@ For benchmarks with no real external effect (for example, pure hidden-behavior p
 - ControlArena already provides a compositional AI-control framework on Inspect AI; SAT should be an assurance adapter, not another competing micro-protocol framework.
 - LADDER shows why high-level orchestration and physical execution must be scored separately. SAT can add actuator authority, effect observation and physical evidence without changing LADDER's official success metric.
 
-## 7. SAT research benchmark: EVIDENCE-CONTINUITY
+## 8. SAT research benchmark: EVIDENCE-CONTINUITY
 
 Create a new cross-benchmark benchmark family that tests qualification itself. It uses synthetic, deterministic evidence graphs first; native benchmark adapters follow.
 
@@ -256,7 +272,7 @@ Create a new cross-benchmark benchmark family that tests qualification itself. I
 
 Start with 50 public deterministic cases across the five tracks (10 each). Keep a separately generated, sealed holdout, never derive it from the public fixtures, and do not publish its expected labels. Report case-family denominators and every disposition. These fixtures test the qualification evaluator, not agent intelligence.
 
-## 8. Metrics and initial research targets
+## 9. Metrics and initial research targets
 
 All figures below are proposed targets, not current results or universal standards.
 
@@ -278,7 +294,7 @@ All figures below are proposed targets, not current results or universal standar
 
 Zero observed failures do not establish zero risk. Publish numerator, denominator, confidence interval, exclusions and clustering unit. Do not treat multiple actions inside one episode as independent Bernoulli trials.
 
-## 9. Baseline design
+## 10. Baseline design
 
 For each native benchmark, compare on exactly the same tasks, attack budget, seeds, candidate build, tools and graders:
 
@@ -290,7 +306,7 @@ For each native benchmark, compare on exactly the same tasks, attack budget, see
 
 Use paired task/seed comparisons. Keep performance and assurance axes separate. A defense that blocks all tool use cannot win by safety alone. A fast agent that performs unauthorized critical actions cannot win by utility alone.
 
-## 10. Statistical and adjudication requirements
+## 11. Statistical and adjudication requirements
 
 Before confirmatory runs:
 - freeze primary estimands, practical effect margins, exclusions and missingness;
@@ -306,7 +322,7 @@ Before confirmatory runs:
 
 Use NIST AI 800-2's evaluation-reporting guidance as a baseline for preserving full logs, exact system versions, commit identifiers, metadata and comparison groups. NIST AI RMF / GenAI Profile and OWASP Top 10 for Agentic Applications are governance crosswalks, not certification shortcuts.
 
-## 11. Integration with existing Luminous infrastructure
+## 12. Integration with existing Luminous infrastructure
 
 Reuse authoritative owners:
 - **#10314:** canonical benchmark run/accounting receipt; SAT augmentation references it.
@@ -323,7 +339,7 @@ Reuse authoritative owners:
 
 SAT is the composition and qualification layer. It must not create a competing task registry, repository twin, authority owner, payment state machine, generic causal scheduler, evidence store, trust-root registry or benchmark run receipt.
 
-## 12. Release/evidence levels
+## 13. Release/evidence levels
 
 For every adapter and corpus:
 1. **Specified:** protocol/schema authored.
@@ -334,7 +350,7 @@ For every adapter and corpus:
 
 Do not call a design benchmark a run. Do not call schema validity an implementation pass. Do not claim SOTA from internal fixtures or a smoke test.
 
-## 13. Immediate work order
+## 14. Immediate work order
 
 1. Publish adapter-envelope schema and an explicit synthetic example.
 2. Validate all public examples/fixtures with a standards-compliant JSON Schema 2020-12 validator.
@@ -347,7 +363,7 @@ Do not call a design benchmark a run. Do not call schema validity an implementat
 9. Run adaptive attacks and blind independent adjudication.
 10. Publish a first external replay before making comparative superiority claims.
 
-## 14. Research references and exact scope
+## 15. Research references and exact scope
 
 - AgentDojo, NeurIPS 2024: https://proceedings.neurips.cc/paper_files/paper/2024/hash/97091a5177d8dc64b1da8bf3e1f6fb54-Abstract-Datasets_and_Benchmarks_Track.html
 - AgentDojo official project: https://agentdojo.spylab.ai/
