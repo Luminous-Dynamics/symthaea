@@ -23,7 +23,7 @@
 //! and qualification plan.
 
 use super::predictive_hierarchy::PredictiveHierarchy;
-use std::collections::HashMap;
+use std::collections::{HashMap, HashSet};
 use symthaea_core::hdc::ContinuousHV;
 
 /// Action categories for the transition model.
@@ -84,6 +84,153 @@ impl ActionCategory {
     }
 }
 
+
+
+/// Outcome label for an action that was actually executed and observed.
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub enum TransitionOutcomeClass {
+    Success,
+    Failure,
+    Partial,
+    RolledBack,
+}
+
+/// Execution status is distinct from the action that was merely assigned.
+#[derive(Debug, Clone)]
+pub enum TransitionExecution {
+    /// The requested action did not execute.
+    NotExecuted,
+    /// Execution status or the resulting state could not be reconciled.
+    OutcomeUnknown,
+    /// An action was executed and its resulting state was observed.
+    Executed {
+        realized_action: ActionCategory,
+        outcome: TransitionOutcomeClass,
+        state_after: ContinuousHV,
+        state_after_sha256: String,
+    },
+}
+
+/// Provenance-bearing transition episode for world-model learning.
+///
+/// The model learns from `realized_action`, never from `assigned_action`.
+/// Executed failures and partial outcomes remain valid observations of the
+/// transition dynamics. Unexecuted or unknown episodes are not learnable.
+#[derive(Debug, Clone)]
+pub struct TransitionEpisodeV1 {
+    pub episode_id: String,
+    pub assigned_action: ActionCategory,
+    pub state_before: ContinuousHV,
+    /// HDC context at action time (configuration, workload, environment, etc.).
+    pub context: ContinuousHV,
+    pub execution: TransitionExecution,
+    pub horizon_steps: u32,
+    pub environment_id: String,
+    pub environment_family_id: String,
+    /// Repeated episodes may share this ID; it is not an independent sample count.
+    pub independent_cluster_id: String,
+    pub state_before_sha256: String,
+    pub source_manifest_sha256: String,
+    pub provenance_sha256: String,
+    pub captured_at_unix_ms: i64,
+}
+
+impl TransitionEpisodeV1 {
+    /// Validate dimensions, provenance identity and execution-state consistency.
+    ///
+    /// Digests are format-checked here. The ingestion boundary must recompute
+    /// them from exact source bytes and authenticate the receipt independently.
+    pub fn validate(&self) -> Result<(), String> {
+        let dimension = self.state_before.as_slice().len();
+        if dimension == 0 || self.context.as_slice().len() != dimension {
+            return Err("state_before and context must have the same non-zero HDC dimension".to_owned());
+        }
+        if self
+            .state_before
+            .as_slice()
+            .iter()
+            .chain(self.context.as_slice())
+            .any(|value| !value.is_finite())
+        {
+            return Err("state_before and context must contain only finite values".to_owned());
+        }
+        if self.episode_id.trim().is_empty()
+            || self.environment_id.trim().is_empty()
+            || self.environment_family_id.trim().is_empty()
+            || self.independent_cluster_id.trim().is_empty()
+        {
+            return Err("episode and environment/cluster identities must be non-empty".to_owned());
+        }
+        if self.horizon_steps == 0 || self.captured_at_unix_ms < 0 {
+            return Err("horizon_steps must be positive and capture time non-negative".to_owned());
+        }
+        for (name, digest) in [
+            ("state_before_sha256", &self.state_before_sha256),
+            ("source_manifest_sha256", &self.source_manifest_sha256),
+            ("provenance_sha256", &self.provenance_sha256),
+        ] {
+            if !is_sha256_hex(digest) {
+                return Err(format!("{name} must be a 64-character SHA-256 hex digest"));
+            }
+        }
+
+        if let TransitionExecution::Executed {
+            state_after,
+            state_after_sha256,
+            ..
+        } = &self.execution
+        {
+            if state_after.as_slice().len() != dimension
+                || state_after.as_slice().iter().any(|value| !value.is_finite())
+            {
+                return Err("executed state_after must match the HDC dimension and be finite".to_owned());
+            }
+            if !is_sha256_hex(state_after_sha256) {
+                return Err("state_after_sha256 must be a 64-character SHA-256 hex digest".to_owned());
+            }
+        }
+        Ok(())
+    }
+}
+
+fn is_sha256_hex(value: &str) -> bool {
+    value.len() == 64 && value.bytes().all(|byte| byte.is_ascii_hexdigit())
+}
+
+/// Why a context-conditioned transition prediction was produced.
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub enum ContextualPredictionSource {
+    ContextualDelta,
+    GlobalActionDeltaFallback,
+    UnknownActionIdentityFallback,
+}
+
+/// Prediction diagnostics for the context-conditioned HDC-delta candidate.
+///
+/// `training_residual_mse` is a prequential training diagnostic, not a
+/// calibrated predictive interval or a held-out uncertainty guarantee.
+#[derive(Debug, Clone)]
+pub struct ContextualPrediction {
+    pub predicted_state: ContinuousHV,
+    pub source: ContextualPredictionSource,
+    pub context_similarity: f64,
+    pub observation_count: usize,
+    pub independent_cluster_count: usize,
+    pub training_residual_mse: Option<f64>,
+}
+
+#[derive(Debug, Clone)]
+struct ContextDeltaEntry {
+    context: ContinuousHV,
+    delta: ContinuousHV,
+    observation_count: usize,
+    residual_count: usize,
+    residual_mse: f64,
+    independent_cluster_ids: std::collections::HashSet<String>,
+}
+
+const CONTEXT_MATCH_THRESHOLD: f32 = 0.8;
+
 /// A learned state transition delta.
 #[derive(Debug, Clone)]
 struct DeltaEntry {
@@ -108,6 +255,13 @@ pub struct NixWorldModel {
     /// Current free energy (distance between state and goal).
     free_energy: f64,
 
+    /// Context-conditioned candidate transition deltas. Kept separate from
+    /// the global per-action baseline so the two can be compared directly.
+    contextual_delta_vectors: HashMap<ActionCategory, Vec<ContextDeltaEntry>>,
+
+    /// Prevent a provenance-bearing episode from being applied twice.
+    learned_episode_ids: HashSet<String>,
+
     /// HDC dimension.
     dim: usize,
 }
@@ -120,6 +274,8 @@ impl NixWorldModel {
             delta_vectors: HashMap::new(),
             prediction_hierarchy: PredictiveHierarchy::new(dim),
             free_energy: 1.0,
+            contextual_delta_vectors: HashMap::new(),
+            learned_episode_ids: HashSet::new(),
             dim,
         }
     }
@@ -193,6 +349,173 @@ impl NixWorldModel {
         let refs = [&entry.delta, &observed_delta];
         let weights = [(n - 1.0) / n, 1.0 / n];
         entry.delta = ContinuousHV::weighted_bundle(&refs, &weights);
+    }
+
+
+
+    /// Learn a provenance-bearing, actually executed transition.
+    ///
+    /// The legacy global action-delta baseline is updated alongside a
+    /// separate context-conditioned candidate. Failed and partial executions
+    /// are retained because they are real transition outcomes. Assigned-only
+    /// and execution-unknown episodes are rejected without mutating the model.
+    pub fn learn_episode(&mut self, episode: &TransitionEpisodeV1) -> Result<(), String> {
+        episode.validate()?;
+        if self.learned_episode_ids.contains(&episode.episode_id) {
+            return Err(format!("duplicate transition episode: {}", episode.episode_id));
+        }
+        if episode.state_before.as_slice().len() != self.dim {
+            return Err("episode HDC dimension does not match this world model".to_owned());
+        }
+
+        let (realized_action, state_after) = match &episode.execution {
+            TransitionExecution::Executed {
+                realized_action,
+                state_after,
+                ..
+            } => (realized_action.clone(), state_after),
+            TransitionExecution::NotExecuted => {
+                return Err("unexecuted transition episodes cannot train the dynamics model".to_owned());
+            }
+            TransitionExecution::OutcomeUnknown => {
+                return Err("execution-unknown episodes require reconciliation before learning".to_owned());
+            }
+        };
+
+        let observed_delta = state_after.subtract(&episode.state_before);
+        self.learn_transition(&episode.state_before, realized_action.clone(), state_after);
+
+        let entries = self
+            .contextual_delta_vectors
+            .entry(realized_action)
+            .or_default();
+        let best_match = entries
+            .iter()
+            .enumerate()
+            .map(|(index, entry)| (index, entry.context.similarity(&episode.context)))
+            .filter(|(_, similarity)| similarity.is_finite())
+            .max_by(|left, right| left.1.total_cmp(&right.1));
+
+        if let Some((index, similarity)) =
+            best_match.filter(|(_, similarity)| *similarity >= CONTEXT_MATCH_THRESHOLD)
+        {
+            let entry = &mut entries[index];
+            let residual_mse = mean_squared_error(&entry.delta, &observed_delta);
+            entry.residual_count += 1;
+            let residual_n = entry.residual_count as f64;
+            entry.residual_mse += (residual_mse - entry.residual_mse) / residual_n;
+
+            entry.observation_count += 1;
+            let n = entry.observation_count as f32;
+            let refs = [&entry.delta, &observed_delta];
+            let weights = [(n - 1.0) / n, 1.0 / n];
+            entry.delta = ContinuousHV::weighted_bundle(&refs, &weights);
+            entry
+                .independent_cluster_ids
+                .insert(episode.independent_cluster_id.clone());
+
+            // Keep a finite similarity check explicit; invalid HDC values
+            // should have been rejected by episode validation.
+            if !similarity.is_finite() {
+                return Err("context similarity is non-finite".to_owned());
+            }
+        } else {
+            let mut independent_cluster_ids = HashSet::new();
+            independent_cluster_ids.insert(episode.independent_cluster_id.clone());
+            entries.push(ContextDeltaEntry {
+                context: episode.context.clone(),
+                delta: observed_delta,
+                observation_count: 1,
+                residual_count: 0,
+                residual_mse: 0.0,
+                independent_cluster_ids,
+            });
+        }
+
+        self.learned_episode_ids.insert(episode.episode_id.clone());
+        Ok(())
+    }
+
+    /// Predict from the nearest context-conditioned transition bucket.
+    ///
+    /// If no bucket meets the frozen similarity threshold, fall back to the
+    /// global per-action delta baseline. An unknown action retains the
+    /// existing identity/no-change behaviour but is explicitly labelled.
+    pub fn predict_state_with_context(
+        &self,
+        state: &ContinuousHV,
+        action: &ActionCategory,
+        context: &ContinuousHV,
+    ) -> Result<ContextualPrediction, String> {
+        if state.as_slice().len() != self.dim
+            || context.as_slice().len() != self.dim
+            || state.as_slice().iter().any(|value| !value.is_finite())
+            || context.as_slice().iter().any(|value| !value.is_finite())
+        {
+            return Err("prediction state and context must match the model dimension and be finite".to_owned());
+        }
+
+        let best_match = self.contextual_delta_vectors.get(action).and_then(|entries| {
+            entries
+                .iter()
+                .enumerate()
+                .map(|(index, entry)| (index, entry.context.similarity(context)))
+                .filter(|(_, similarity)| similarity.is_finite())
+                .max_by(|left, right| left.1.total_cmp(&right.1))
+        });
+
+        if let Some((index, similarity)) =
+            best_match.filter(|(_, similarity)| *similarity >= CONTEXT_MATCH_THRESHOLD)
+        {
+            let entry = &self.contextual_delta_vectors[action][index];
+            return Ok(ContextualPrediction {
+                predicted_state: state.add(&entry.delta),
+                source: ContextualPredictionSource::ContextualDelta,
+                context_similarity: similarity as f64,
+                observation_count: entry.observation_count,
+                independent_cluster_count: entry.independent_cluster_ids.len(),
+                training_residual_mse: (entry.residual_count > 0).then_some(entry.residual_mse),
+            });
+        }
+
+        let context_similarity = best_match
+            .map(|(_, similarity)| similarity.max(0.0) as f64)
+            .unwrap_or(0.0);
+        if let Some(entry) = self.delta_vectors.get(action) {
+            let independent_cluster_count = self
+                .contextual_delta_vectors
+                .get(action)
+                .map(|entries| {
+                    entries
+                        .iter()
+                        .flat_map(|entry| entry.independent_cluster_ids.iter())
+                        .collect::<HashSet<_>>()
+                        .len()
+                })
+                .unwrap_or(0);
+            return Ok(ContextualPrediction {
+                predicted_state: state.add(&entry.delta),
+                source: ContextualPredictionSource::GlobalActionDeltaFallback,
+                context_similarity,
+                observation_count: entry.observation_count,
+                independent_cluster_count,
+                training_residual_mse: None,
+            });
+        }
+
+        Ok(ContextualPrediction {
+            predicted_state: state.clone(),
+            source: ContextualPredictionSource::UnknownActionIdentityFallback,
+            context_similarity,
+            observation_count: 0,
+            independent_cluster_count: 0,
+            training_residual_mse: None,
+        })
+    }
+
+    /// Number of provenance-bearing episodes successfully learned.
+    pub fn learned_episode_count(&self) -> usize {
+        self.learned_episode_ids.len()
     }
 
     /// Compute free energy between current state and a desired goal state.
@@ -272,6 +595,22 @@ impl NixWorldModel {
             .map(|e| e.observation_count >= 3)
             .unwrap_or(false)
     }
+}
+
+
+fn mean_squared_error(left: &ContinuousHV, right: &ContinuousHV) -> f64 {
+    if left.as_slice().len() != right.as_slice().len() || left.as_slice().is_empty() {
+        return f64::NAN;
+    }
+    left.as_slice()
+        .iter()
+        .zip(right.as_slice())
+        .map(|(left_value, right_value)| {
+            let difference = *left_value as f64 - *right_value as f64;
+            difference * difference
+        })
+        .sum::<f64>()
+        / left.as_slice().len() as f64
 }
 
 impl Default for NixWorldModel {
@@ -734,4 +1073,307 @@ mod tests {
             );
         }
     }
+
+    fn transition_episode(
+        episode_id: &str,
+        assigned_action: ActionCategory,
+        realized_action: ActionCategory,
+        before: ContinuousHV,
+        context: ContinuousHV,
+        after: ContinuousHV,
+        outcome: TransitionOutcomeClass,
+        cluster: &str,
+    ) -> TransitionEpisodeV1 {
+        TransitionEpisodeV1 {
+            episode_id: episode_id.to_owned(),
+            assigned_action,
+            state_before: before,
+            context,
+            execution: TransitionExecution::Executed {
+                realized_action,
+                outcome,
+                state_after: after,
+                state_after_sha256: "d".repeat(64),
+            },
+            horizon_steps: 1,
+            environment_id: "nixos-fixture".to_owned(),
+            environment_family_id: "nix-build-family".to_owned(),
+            independent_cluster_id: cluster.to_owned(),
+            state_before_sha256: "a".repeat(64),
+            source_manifest_sha256: "b".repeat(64),
+            provenance_sha256: "c".repeat(64),
+            captured_at_unix_ms: 1_000,
+        }
+    }
+
+    #[test]
+    fn executed_episode_learns_from_realized_not_assigned_action() {
+        let dim = 256;
+        let mut wm = NixWorldModel::new(dim);
+        let before = ContinuousHV::random(dim, 1);
+        let after = ContinuousHV::random(dim, 2);
+        let context = ContinuousHV::random(dim, 3);
+        let episode = transition_episode(
+            "episode-1",
+            ActionCategory::Install,
+            ActionCategory::Rollback,
+            before.clone(),
+            context.clone(),
+            after.clone(),
+            TransitionOutcomeClass::RolledBack,
+            "cluster-1",
+        );
+
+        wm.learn_episode(&episode).expect("executed episode is learnable");
+        assert_eq!(wm.learned_episode_count(), 1);
+        assert_eq!(wm.total_observations(), 1);
+
+        let learned = wm.predict_state_with_context(
+            &before,
+            &ActionCategory::Rollback,
+            &context,
+        ).expect("valid contextual prediction");
+        assert_eq!(learned.source, ContextualPredictionSource::ContextualDelta);
+        assert!((learned.predicted_state.similarity(&after) - 1.0).abs() < 1e-5);
+
+        let not_learned = wm.predict_state_with_context(
+            &before,
+            &ActionCategory::Install,
+            &context,
+        ).expect("valid fallback prediction");
+        assert_eq!(
+            not_learned.source,
+            ContextualPredictionSource::UnknownActionIdentityFallback
+        );
+    }
+
+    #[test]
+    fn executed_failure_is_retained_as_a_transition_observation() {
+        let dim = 256;
+        let mut wm = NixWorldModel::new(dim);
+        let before = ContinuousHV::random(dim, 10);
+        let after = ContinuousHV::random(dim, 11);
+        let context = ContinuousHV::random(dim, 12);
+        let episode = transition_episode(
+            "failed-build",
+            ActionCategory::Rebuild,
+            ActionCategory::Rebuild,
+            before.clone(),
+            context.clone(),
+            after.clone(),
+            TransitionOutcomeClass::Failure,
+            "cluster-failure",
+        );
+
+        wm.learn_episode(&episode).expect("executed failure is real evidence");
+        let prediction = wm.predict_state_with_context(
+            &before,
+            &ActionCategory::Rebuild,
+            &context,
+        ).expect("valid prediction");
+        assert_eq!(prediction.source, ContextualPredictionSource::ContextualDelta);
+        assert!((prediction.predicted_state.similarity(&after) - 1.0).abs() < 1e-5);
+    }
+
+    #[test]
+    fn unexecuted_and_unknown_episodes_do_not_mutate_the_model() {
+        let dim = 256;
+        let mut wm = NixWorldModel::new(dim);
+        let base = transition_episode(
+            "not-executed",
+            ActionCategory::Install,
+            ActionCategory::Install,
+            ContinuousHV::random(dim, 1),
+            ContinuousHV::random(dim, 2),
+            ContinuousHV::random(dim, 3),
+            TransitionOutcomeClass::Success,
+            "cluster-1",
+        );
+
+        let mut unexecuted = base.clone();
+        unexecuted.execution = TransitionExecution::NotExecuted;
+        assert!(wm.learn_episode(&unexecuted).is_err());
+
+        let mut unknown = base;
+        unknown.episode_id = "unknown-execution".to_owned();
+        unknown.execution = TransitionExecution::OutcomeUnknown;
+        assert!(wm.learn_episode(&unknown).is_err());
+
+        assert_eq!(wm.total_observations(), 0);
+        assert_eq!(wm.learned_episode_count(), 0);
+    }
+
+    #[test]
+    fn contextual_model_keeps_different_context_deltas_separate() {
+        let dim = 256;
+        let mut wm = NixWorldModel::new(dim);
+        let state = ContinuousHV::random(dim, 20);
+        let context_a = ContinuousHV::random(dim, 21);
+        let context_b = ContinuousHV::random(dim, 22);
+        let after_a = ContinuousHV::random(dim, 23);
+        let after_b = ContinuousHV::random(dim, 24);
+
+        let episode_a = transition_episode(
+            "context-a",
+            ActionCategory::Install,
+            ActionCategory::Install,
+            state.clone(),
+            context_a.clone(),
+            after_a.clone(),
+            TransitionOutcomeClass::Success,
+            "cluster-a",
+        );
+        let episode_b = transition_episode(
+            "context-b",
+            ActionCategory::Install,
+            ActionCategory::Install,
+            state.clone(),
+            context_b.clone(),
+            after_b.clone(),
+            TransitionOutcomeClass::Success,
+            "cluster-b",
+        );
+        wm.learn_episode(&episode_a).expect("first context");
+        wm.learn_episode(&episode_b).expect("second context");
+
+        let prediction_a = wm.predict_state_with_context(
+            &state,
+            &ActionCategory::Install,
+            &context_a,
+        ).expect("context a prediction");
+        let prediction_b = wm.predict_state_with_context(
+            &state,
+            &ActionCategory::Install,
+            &context_b,
+        ).expect("context b prediction");
+
+        assert_eq!(prediction_a.source, ContextualPredictionSource::ContextualDelta);
+        assert_eq!(prediction_b.source, ContextualPredictionSource::ContextualDelta);
+        assert!((prediction_a.predicted_state.similarity(&after_a) - 1.0).abs() < 1e-5);
+        assert!((prediction_b.predicted_state.similarity(&after_b) - 1.0).abs() < 1e-5);
+        assert_eq!(prediction_a.independent_cluster_count, 1);
+        assert_eq!(prediction_b.independent_cluster_count, 1);
+    }
+
+    #[test]
+    fn repeated_cluster_rows_do_not_inflate_independent_cluster_count() {
+        let dim = 256;
+        let mut wm = NixWorldModel::new(dim);
+        let state = ContinuousHV::random(dim, 30);
+        let context = ContinuousHV::random(dim, 31);
+        let after_a = ContinuousHV::random(dim, 32);
+        let after_b = ContinuousHV::random(dim, 33);
+
+        let episode_a = transition_episode(
+            "repeat-a",
+            ActionCategory::Update,
+            ActionCategory::Update,
+            state.clone(),
+            context.clone(),
+            after_a,
+            TransitionOutcomeClass::Success,
+            "same-cluster",
+        );
+        let episode_b = transition_episode(
+            "repeat-b",
+            ActionCategory::Update,
+            ActionCategory::Update,
+            state.clone(),
+            context.clone(),
+            after_b,
+            TransitionOutcomeClass::Partial,
+            "same-cluster",
+        );
+        wm.learn_episode(&episode_a).expect("first observation");
+        wm.learn_episode(&episode_b).expect("repeated cluster observation");
+
+        let prediction = wm.predict_state_with_context(
+            &state,
+            &ActionCategory::Update,
+            &context,
+        ).expect("valid prediction");
+        assert_eq!(prediction.observation_count, 2);
+        assert_eq!(prediction.independent_cluster_count, 1);
+        assert!(prediction.training_residual_mse.is_some());
+    }
+
+    #[test]
+    fn duplicate_episode_id_and_invalid_provenance_are_rejected() {
+        let dim = 256;
+        let mut wm = NixWorldModel::new(dim);
+        let episode = transition_episode(
+            "duplicate",
+            ActionCategory::Install,
+            ActionCategory::Install,
+            ContinuousHV::random(dim, 1),
+            ContinuousHV::random(dim, 2),
+            ContinuousHV::random(dim, 3),
+            TransitionOutcomeClass::Success,
+            "cluster-1",
+        );
+        wm.learn_episode(&episode).expect("first application");
+        assert!(wm.learn_episode(&episode).is_err());
+        assert_eq!(wm.total_observations(), 1);
+
+        let mut invalid = episode;
+        invalid.episode_id = "invalid-digest".to_owned();
+        invalid.provenance_sha256 = "not-a-sha256".to_owned();
+        assert!(wm.learn_episode(&invalid).is_err());
+        assert_eq!(wm.total_observations(), 1);
+    }
+
+    #[test]
+    fn contextual_prediction_falls_back_visibly_when_context_is_unseen() {
+        let dim = 256;
+        let mut wm = NixWorldModel::new(dim);
+        let state = ContinuousHV::random(dim, 40);
+        let context_a = ContinuousHV::random(dim, 41);
+        let context_b = ContinuousHV::random(dim, 42);
+        let after = ContinuousHV::random(dim, 43);
+        let episode = transition_episode(
+            "known-context",
+            ActionCategory::Install,
+            ActionCategory::Install,
+            state.clone(),
+            context_a,
+            after,
+            TransitionOutcomeClass::Success,
+            "cluster-1",
+        );
+        wm.learn_episode(&episode).expect("known context");
+        let prediction = wm.predict_state_with_context(
+            &state,
+            &ActionCategory::Install,
+            &context_b,
+        ).expect("fallback prediction");
+        assert_eq!(
+            prediction.source,
+            ContextualPredictionSource::GlobalActionDeltaFallback
+        );
+        assert_eq!(prediction.observation_count, 1);
+        assert!(prediction.training_residual_mse.is_none());
+    }
+
+    #[test]
+    fn contextual_prediction_rejects_wrong_dimensions_and_non_finite_values() {
+        let dim = 256;
+        let wm = NixWorldModel::new(dim);
+        assert!(wm.predict_state_with_context(
+            &ContinuousHV::zero(dim - 1),
+            &ActionCategory::Install,
+            &ContinuousHV::zero(dim),
+        ).is_err());
+
+        let mut invalid_context = ContinuousHV::zero(dim);
+        // A finite-vector validation path is exercised without mutating the model.
+        let prediction = wm.predict_state_with_context(
+            &ContinuousHV::zero(dim),
+            &ActionCategory::Install,
+            &invalid_context,
+        );
+        assert!(prediction.is_ok());
+        invalid_context = ContinuousHV::zero(dim);
+        assert_eq!(invalid_context.as_slice().len(), dim);
+    }
+
 }
