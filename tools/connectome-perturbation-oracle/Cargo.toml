@@ -1,0 +1,10 @@
+[package]
+name = "connectome-perturbation-oracle"
+version = "0.1.0"
+edition = "2024"
+license = "AGPL-3.0-or-later"
+publish = false
+description = "Deterministic synthetic known-answer oracle for connectome-constrained perturbation dynamics"
+
+# Standalone tool: intentionally outside the root workspace and dependency-free.
+[workspace]

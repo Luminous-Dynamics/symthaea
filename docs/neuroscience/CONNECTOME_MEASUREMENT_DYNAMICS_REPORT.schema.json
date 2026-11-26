@@ -1,0 +1,106 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://github.com/Luminous-Dynamics/symthaea/blob/main/docs/neuroscience/CONNECTOME_MEASUREMENT_DYNAMICS_REPORT.schema.json",
+  "title": "Connectome Measurement Dynamics Oracle Report",
+  "description": "Strict JSON report contract for pulse-order and calcium observation synthetic fixtures. Synthetic only.",
+  "type": "object",
+  "additionalProperties": false,
+  "required": [
+    "schema_version",
+    "evidence_class",
+    "claim_ceiling",
+    "cases"
+  ],
+  "properties": {
+    "schema_version": {
+      "const": 1
+    },
+    "evidence_class": {
+      "const": "synthetic_known_answer"
+    },
+    "claim_ceiling": {
+      "const": "SYNTHETIC_ONLY"
+    },
+    "cases": {
+      "type": "array",
+      "minItems": 2,
+      "maxItems": 2,
+      "items": {
+        "type": "object",
+        "additionalProperties": false
+      },
+      "allOf": [
+        {
+          "contains": {
+            "type": "object",
+            "required": [
+              "id",
+              "response_a_then_b",
+              "response_b_then_a",
+              "status"
+            ],
+            "properties": {
+              "id": {
+                "const": "pulse_order_dependence"
+              },
+              "response_a_then_b": {
+                "type": "array",
+                "minItems": 1,
+                "items": {
+                  "type": "number"
+                }
+              },
+              "response_b_then_a": {
+                "type": "array",
+                "minItems": 1,
+                "items": {
+                  "type": "number"
+                }
+              },
+              "status": {
+                "const": "PASS"
+              }
+            }
+          },
+          "minContains": 1,
+          "maxContains": 1
+        },
+        {
+          "contains": {
+            "type": "object",
+            "required": [
+              "id",
+              "latent",
+              "observed",
+              "status"
+            ],
+            "properties": {
+              "id": {
+                "const": "calcium_observation_kernel"
+              },
+              "latent": {
+                "type": "array",
+                "minItems": 1,
+                "items": {
+                  "type": "number"
+                }
+              },
+              "observed": {
+                "type": "array",
+                "minItems": 1,
+                "items": {
+                  "type": "number"
+                }
+              },
+              "status": {
+                "const": "PASS"
+              }
+            }
+          },
+          "minContains": 1,
+          "maxContains": 1
+        }
+      ]
+    }
+  }
+}
