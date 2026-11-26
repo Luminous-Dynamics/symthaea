@@ -177,7 +177,8 @@ impl LearningGateAssessmentV1 {
             && self.run_ids.iter().all(|id| valid_atom(id, 512))
             && self.run_ids.iter().collect::<std::collections::BTreeSet<_>>().len() == 4
             && self.run_receipt_sha256.iter().all(|digest| validate_digest(digest).is_ok())
-            && self.run_receipt_sha256.iter().collect::<std::collections::BTreeSet<_>>().len() == 4
+            && self.run_receipt_sha256.iter()
+                .collect::<std::collections::BTreeSet<_>>().len() == 4
             && self.task_set_sha256.iter().all(|digest| validate_digest(digest).is_ok())
             && self.task_set_sha256[0] == self.task_set_sha256[1]
             && self.task_set_sha256[2] == self.task_set_sha256[3]
@@ -206,8 +207,40 @@ impl LearningGateAssessmentV1 {
                     && self.stable_task_count > 0
                     && self.adaptation_task_count > 0
             };
+        let disposition_consistent =
+            if self.disposition == LearningGateDispositionV1::InconclusiveUnverifiedRun {
+                true
+            } else if self.maximum_stable_regression_basis_points <= 10_000
+                && self.minimum_adaptation_gain_basis_points <= 10_000
+            {
+                match (
+                    self.stable_delta_sum_basis_points,
+                    self.adaptation_delta_sum_basis_points,
+                ) {
+                    (Some(stable_delta), Some(adaptation_delta)) => {
+                        let stable_limit =
+                            i128::from(self.maximum_stable_regression_basis_points)
+                                * i128::from(self.stable_task_count);
+                        let adaptation_limit =
+                            i128::from(self.minimum_adaptation_gain_basis_points)
+                                * i128::from(self.adaptation_task_count);
+                        let expected = if stable_delta < -stable_limit {
+                            LearningGateDispositionV1::RejectedStableRegression
+                        } else if adaptation_delta < adaptation_limit {
+                            LearningGateDispositionV1::RejectedInsufficientAdaptationGain
+                        } else {
+                            LearningGateDispositionV1::AcceptedWithinRetentionBudget
+                        };
+                        self.disposition == expected
+                    }
+                    _ => false,
+                }
+            } else {
+                false
+            };
         run_vectors_valid
             && verifier_vectors_valid
+            && disposition_consistent
             && self.assessment_sha256 == assessment_digest(
                 self.disposition,
                 self.stable_delta_sum_basis_points,
@@ -226,22 +259,8 @@ impl LearningGateAssessmentV1 {
     }
 
     pub fn admits_learning_update(&self) -> bool {
-        let (Some(stable_delta), Some(adaptation_delta)) = (
-            self.stable_delta_sum_basis_points,
-            self.adaptation_delta_sum_basis_points,
-        ) else {
-            return false;
-        };
-        let maximum_stable_regression =
-            i128::from(self.maximum_stable_regression_basis_points)
-                * i128::from(self.stable_task_count);
-        let minimum_adaptation_gain =
-            i128::from(self.minimum_adaptation_gain_basis_points)
-                * i128::from(self.adaptation_task_count);
         self.disposition == LearningGateDispositionV1::AcceptedWithinRetentionBudget
             && self.verify_integrity()
-            && stable_delta >= -maximum_stable_regression
-            && adaptation_delta >= minimum_adaptation_gain
     }
 }
 
