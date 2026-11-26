@@ -1,60 +1,53 @@
 #!/usr/bin/env bash
-# Reproduce all benchmark results from:
-# "Binary-Field STARKs for Hyperdimensional Computing"
+# SPDX-License-Identifier: AGPL-3.0-or-later
 #
-# Requirements: Rust (stable), ~32GB RAM for full-scale Winterfell
-# Usage: cd papers/binius-hdc && bash reproduce.sh
+# Reproduce the standalone Binius HDC benchmark shipped in this public repo.
 #
-# This script runs ALL benchmarks and outputs paper-ready tables.
-# Expected runtime: ~3-5 minutes (including 16K Winterfell ~24s)
+# Scope:
+# - Runs the real Binius prover and verifier in crates/hdc-zkp-bench.
+# - The benchmark also prints an analytical prime-field comparator.
+# - It does NOT run a Winterfell prover, the historical health-attestation
+#   pipeline, or sibling-repository crates. Those are not part of this checkout.
+#
+# Usage: bash papers/theory-foundations/binius-hdc/reproduce.sh
+#
+# Timing and proof-size observations are machine/toolchain dependent. Record
+# the commit, rustc version, target, and hardware when publishing results.
 
 set -euo pipefail
 
-REPO_ROOT="$(cd "$(dirname "$0")/../.." && pwd)"
-ZKP_CORE="$REPO_ROOT/crates/mycelix-zkp-core"
-HDC_BENCH="$REPO_ROOT/crates/hdc-zkp-bench"
-HEALTH_ZKP="$REPO_ROOT/mycelix-health/crates/health-zkp"
+SCRIPT_DIR="$(cd -- "$(dirname -- "${BASH_SOURCE[0]}")" && pwd)"
+REPO_ROOT="$(cd -- "${SCRIPT_DIR}/../../.." && pwd)"
+BENCH_MANIFEST="${REPO_ROOT}/crates/hdc-zkp-bench/Cargo.toml"
+BENCH_LOCK="${REPO_ROOT}/crates/hdc-zkp-bench/Cargo.lock"
 
-echo "╔══════════════════════════════════════════════════════════════╗"
-echo "║  Reproducing: Binary-Field STARKs for HDC                   ║"
-echo "╚══════════════════════════════════════════════════════════════╝"
-echo ""
+if ! command -v cargo >/dev/null 2>&1; then
+  echo "error: cargo is required (install the Rust toolchain first)" >&2
+  exit 127
+fi
 
-# ── Table 2: XOR Binding Comparison (both backends, same scale) ──
-echo "=== Table 2: XOR Binding (Binius vs Winterfell) ==="
-echo "Running Binius 16,384-bit XOR + Winterfell 256-bit + 16,384-bit..."
-cd "$HDC_BENCH"
-RUSTFLAGS="-C target-cpu=native" cargo run --release 2>&1 | grep -E "AND constr|Proof size|Prover time|Verifier time|Verification|COMPARISON" | head -20
-echo ""
+if [[ ! -f "${BENCH_MANIFEST}" ]]; then
+  echo "error: standalone benchmark manifest not found: ${BENCH_MANIFEST}" >&2
+  exit 2
+fi
 
-echo "Running Winterfell 16,384-bit XOR (this takes ~24 seconds)..."
-cd "$ZKP_CORE"
-cargo test circuits::winterfell_xor::tests::test_benchmark_16384bit_xor \
-  --lib --features backend-winterfell -- --ignored --nocapture 2>&1 | \
-  grep -E "MEASURED|constraints|Prove|Verify|Proof"
-echo ""
+if [[ ! -f "${BENCH_LOCK}" ]]; then
+  echo "error: benchmark Cargo.lock not found: ${BENCH_LOCK}" >&2
+  echo "Refusing to resolve a fresh dependency graph; restore the committed lockfile." >&2
+  exit 2
+fi
 
-# ── Table 3: E2E Health Pipeline ──
-echo "=== Table 3: E2E Health Attestation Pipeline ==="
-cd "$HEALTH_ZKP"
-cargo test --test e2e_health_attestation --features verify-full \
-  --target x86_64-unknown-linux-gnu -- --nocapture 2>&1 | \
-  grep -E "PAPER METRICS|STARK|Dilithium|Total|Proof size|Signature|PASSED" | head -10
-echo ""
+echo "=== Symthaea public Binius HDC benchmark ==="
+echo "Repository: ${REPO_ROOT}"
+if command -v git >/dev/null 2>&1 && git -C "${REPO_ROOT}" rev-parse --verify HEAD >/dev/null 2>&1; then
+  echo "Commit:     $(git -C "${REPO_ROOT}" rev-parse HEAD)"
+fi
+rustc --version
+cargo --version
+echo
+echo "Scope: standalone Binius benchmark plus analytical comparator."
+echo "No Winterfell prover or cross-repository health pipeline is executed."
+echo
 
-# ── Table 4: All HDC Operations ──
-echo "=== Table 4: HDC Operation Summary ==="
-cd "$HDC_BENCH"
-RUSTFLAGS="-C target-cpu=native" cargo run --release 2>&1 | \
-  grep -E "AND constr|Proof size|Prover time|BUNDLING|HAMMING|CfC|SIGMOID|PASSED" | head -25
-echo ""
-
-# ── Unit test validation ──
-echo "=== Validation: All tests pass ==="
-cd "$ZKP_CORE"
-cargo test --lib --features full 2>&1 | grep "test result"
-echo ""
-
-echo "╔══════════════════════════════════════════════════════════════╗"
-echo "║  All benchmarks complete. See output above for paper tables. ║"
-echo "╚══════════════════════════════════════════════════════════════╝"
+cd "${REPO_ROOT}"
+cargo run --locked --release --manifest-path "${BENCH_MANIFEST}"
