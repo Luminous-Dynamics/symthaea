@@ -2405,7 +2405,7 @@ mod tests {
             );
 
             let hdc_response = quantize_query(&hdc_prediction.predicted_state);
-            hdc_exact_response_count += usize::from(hdc_response == *reference_response);
+            hdc_exact_response_count += (hdc_response == *reference_response) as usize;
             let hdc_label = format!("coordinate_0:{hdc_response}");
             let full_state_label = hdc_prediction
                 .predicted_state
@@ -2418,10 +2418,10 @@ mod tests {
             world_model.observe(before.clone());
             let global_prediction = world_model.predict_state(&ActionCategory::Install);
             let global_response = quantize_query(&global_prediction);
-            global_exact_response_count += usize::from(global_response == *reference_response);
+            global_exact_response_count += (global_response == *reference_response) as usize;
             let global_label = format!("coordinate_0:{global_response}");
             let identity_response = quantize_query(before);
-            identity_exact_response_count += usize::from(identity_response == *reference_response);
+            identity_exact_response_count += (identity_response == *reference_response) as usize;
             let identity_label = format!("coordinate_0:{identity_response}");
 
             let build_record = |abstract_state_id: String| StateResponseRecord {
