@@ -1,0 +1,234 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://luminousdynamics.io/schemas/mace_adaptive_reference_scenario_v1.schema.json",
+  "title": "MACE Adaptive Reference Scenario V1",
+  "description": "Finite joint-world input for the independent exhaustive adaptive-policy reference evaluator. Probabilities are used only by expected-value mode; robust mode ignores them.",
+  "type": "object",
+  "additionalProperties": false,
+  "required": [
+    "version",
+    "state_ids",
+    "worlds",
+    "actions",
+    "queries",
+    "maximum_horizon",
+    "maximum_policy_nodes",
+    "budgets"
+  ],
+  "properties": {
+    "version": {
+      "const": 1
+    },
+    "state_ids": {
+      "type": "array",
+      "minItems": 1,
+      "maxItems": 8,
+      "uniqueItems": true,
+      "items": {
+        "$ref": "#/$defs/id"
+      }
+    },
+    "worlds": {
+      "type": "array",
+      "minItems": 1,
+      "maxItems": 64,
+      "items": {
+        "$ref": "#/$defs/world"
+      }
+    },
+    "actions": {
+      "type": "array",
+      "minItems": 1,
+      "maxItems": 6,
+      "items": {
+        "$ref": "#/$defs/action"
+      }
+    },
+    "queries": {
+      "type": "array",
+      "minItems": 1,
+      "maxItems": 8,
+      "items": {
+        "$ref": "#/$defs/query"
+      }
+    },
+    "maximum_horizon": {
+      "type": "integer",
+      "minimum": 1,
+      "maximum": 4
+    },
+    "maximum_policy_nodes": {
+      "type": "integer",
+      "minimum": 1,
+      "maximum": 256
+    },
+    "budgets": {
+      "$ref": "#/$defs/budgets"
+    }
+  },
+  "$defs": {
+    "id": {
+      "type": "string",
+      "minLength": 1,
+      "maxLength": 128,
+      "pattern": "^[^\\\\u0000-\\\\u001F\\\\u007F]+$"
+    },
+    "world": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "world_id",
+        "state_id",
+        "possible",
+        "probability_ppm",
+        "observation_by_query"
+      ],
+      "properties": {
+        "world_id": {
+          "$ref": "#/$defs/id"
+        },
+        "state_id": {
+          "$ref": "#/$defs/id"
+        },
+        "possible": {
+          "type": "boolean"
+        },
+        "probability_ppm": {
+          "oneOf": [
+            {
+              "type": "integer",
+              "minimum": 0,
+              "maximum": 1000000
+            },
+            {
+              "type": "null"
+            }
+          ]
+        },
+        "observation_by_query": {
+          "type": "object",
+          "minProperties": 1,
+          "additionalProperties": {
+            "$ref": "#/$defs/id"
+          }
+        }
+      }
+    },
+    "action": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "action_id",
+        "utility_by_state",
+        "allowed_by_state"
+      ],
+      "properties": {
+        "action_id": {
+          "$ref": "#/$defs/id"
+        },
+        "utility_by_state": {
+          "type": "object",
+          "minProperties": 1,
+          "additionalProperties": {
+            "type": "integer",
+            "minimum": -1000000000000,
+            "maximum": 1000000000000
+          }
+        },
+        "allowed_by_state": {
+          "type": "object",
+          "minProperties": 1,
+          "additionalProperties": {
+            "type": "boolean"
+          }
+        }
+      }
+    },
+    "query": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "query_id",
+        "source_root_ids",
+        "tool_calls",
+        "latency_ns",
+        "context_tokens",
+        "inspected_bytes",
+        "cost_utility_units"
+      ],
+      "properties": {
+        "query_id": {
+          "$ref": "#/$defs/id"
+        },
+        "source_root_ids": {
+          "type": "array",
+          "minItems": 1,
+          "uniqueItems": true,
+          "items": {
+            "$ref": "#/$defs/id"
+          }
+        },
+        "tool_calls": {
+          "type": "integer",
+          "minimum": 1
+        },
+        "latency_ns": {
+          "type": "integer",
+          "minimum": 0
+        },
+        "context_tokens": {
+          "type": "integer",
+          "minimum": 0
+        },
+        "inspected_bytes": {
+          "type": "integer",
+          "minimum": 0
+        },
+        "cost_utility_units": {
+          "type": "integer",
+          "minimum": 0
+        }
+      }
+    },
+    "budgets": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "maximum_queries",
+        "maximum_tool_calls",
+        "maximum_latency_ns",
+        "maximum_context_tokens",
+        "maximum_inspected_bytes",
+        "maximum_cost_utility_units"
+      ],
+      "properties": {
+        "maximum_queries": {
+          "type": "integer",
+          "minimum": 0,
+          "maximum": 8
+        },
+        "maximum_tool_calls": {
+          "type": "integer",
+          "minimum": 0,
+          "maximum": 32
+        },
+        "maximum_latency_ns": {
+          "type": "integer",
+          "minimum": 0
+        },
+        "maximum_context_tokens": {
+          "type": "integer",
+          "minimum": 0
+        },
+        "maximum_inspected_bytes": {
+          "type": "integer",
+          "minimum": 0
+        },
+        "maximum_cost_utility_units": {
+          "type": "integer",
+          "minimum": 0
+        }
+      }
+    }
+  }
+}
