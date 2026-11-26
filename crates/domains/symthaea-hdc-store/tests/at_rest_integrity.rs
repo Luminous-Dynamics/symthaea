@@ -30,12 +30,16 @@ struct CaseResult {
 }
 
 fn seed_store(path: &Path) -> Vec<BinaryHV> {
+    seed_store_with_salt(path, 0)
+}
+
+fn seed_store_with_salt(path: &Path, salt: u64) -> Vec<BinaryHV> {
     let mut store = HdcStore::create(path, StoreConfig::default()).expect("create HdcStore");
     let vectors = SEED_IDS
         .iter()
         .enumerate()
         .map(|(index, id)| {
-            let vector = BinaryHV::random(0x4844_4353_544f_5200_u64 + index as u64);
+            let vector = BinaryHV::random(0x4844_4353_544f_5200_u64 + salt + index as u64);
             store.append(*id, &vector).expect("append seeded vector");
             vector
         })
@@ -258,7 +262,7 @@ fn hdc_store_at_rest_integrity_baseline_t1_to_t10() {
         },
         detection_point: "read",
         reason: "C3_verified_latest_live_marker_removed_header_left_unchanged",
-        edit_landed: true,
+        edit_landed: Some(true),
     });
 
     // T3: remove a middle entry's live marker without repairing the header.
@@ -296,11 +300,14 @@ fn hdc_store_at_rest_integrity_baseline_t1_to_t10() {
     seed_store(&t5_path);
     let forged = BinaryHV::random(0x464f_5247_4544_0005);
     append_forged_record(&t5_path, 900, &forged);
-    let t5_observed = read_record(&t5_path, 900).expect("T5 reader");
-    let t5_landed = t5_observed.as_deref() == Some(forged.0.as_slice());
+    let t5_observed = read_record(&t5_path, 900);
+    let t5_served = matches!(
+        t5_observed,
+        Ok(Some(ref observed)) if observed.as_slice() == forged.0.as_slice()
+    );
     results.push(CaseResult {
         case: "T5_forged_insertion",
-        verdict: if t5_landed { "ACCEPTED" } else { "REJECTED" },
+        verdict: if t5_served { "ACCEPTED" } else { "REJECTED" },
         detection_point: "read",
         reason: "C3_verified_new_valid_format_record_and_checksums",
         edit_landed: Some(true),
@@ -309,8 +316,9 @@ fn hdc_store_at_rest_integrity_baseline_t1_to_t10() {
     // T6: two independent files model two contexts. Copy a donor payload only.
     let t6_a = root.path().join("t6-context-a.hdc");
     let t6_b = root.path().join("t6-context-b.hdc");
-    let t6_a_seed = seed_store(&t6_a);
-    let t6_b_seed = seed_store(&t6_b);
+    let t6_a_seed = seed_store_with_salt(&t6_a, 0xA11A_0000);
+    let t6_b_seed = seed_store_with_salt(&t6_b, 0xB22B_0000);
+    assert_ne!(t6_a_seed[1].0, t6_b_seed[1].0);
     let t6_before = read_all(&t6_b);
     let t6_payload_offset = entry_offset(1) + ENTRY_HV_OFFSET as u64;
     write_at(&t6_b, t6_payload_offset, &t6_a_seed[1].0);
@@ -321,13 +329,16 @@ fn hdc_store_at_rest_integrity_baseline_t1_to_t10() {
         t6_payload_offset as usize,
         t6_a_seed[1].0.len(),
     );
-    let t6_observed = read_record(&t6_b, SEED_IDS[1])
-        .expect("T6 read path")
-        .expect("victim ID remains present");
-    let t6_landed = t6_observed == t6_a_seed[1].0 && t6_observed != t6_b_seed[1].0;
+    let t6_read = read_record(&t6_b, SEED_IDS[1]);
+    let t6_served_donor = matches!(
+        t6_read,
+        Ok(Some(ref observed))
+            if observed.as_slice() == t6_a_seed[1].0.as_slice()
+                && observed.as_slice() != t6_b_seed[1].0.as_slice()
+    );
     results.push(CaseResult {
         case: "T6_cross_context_payload_replay",
-        verdict: if t6_landed { "ACCEPTED" } else { "REJECTED" },
+        verdict: if t6_served_donor { "ACCEPTED" } else { "REJECTED" },
         detection_point: "read",
         reason: "C3_verified_donor_payload_in_victim_slot_with_victim_ID",
         edit_landed: Some(true),
@@ -346,13 +357,16 @@ fn hdc_store_at_rest_integrity_baseline_t1_to_t10() {
         t7_payload_offset as usize,
         t7_seed[0].0.len(),
     );
-    let t7_observed = read_record(&t7_path, SEED_IDS[4])
-        .expect("T7 read path")
-        .expect("latest ID remains present");
-    let t7_landed = t7_observed == t7_seed[0].0 && t7_observed != t7_seed[4].0;
+    let t7_read = read_record(&t7_path, SEED_IDS[4]);
+    let t7_served_older = matches!(
+        t7_read,
+        Ok(Some(ref observed))
+            if observed.as_slice() == t7_seed[0].0.as_slice()
+                && observed.as_slice() != t7_seed[4].0.as_slice()
+    );
     results.push(CaseResult {
         case: "T7_rollback_replay",
-        verdict: if t7_landed { "ACCEPTED" } else { "REJECTED" },
+        verdict: if t7_served_older { "ACCEPTED" } else { "REJECTED" },
         detection_point: "read",
         reason: "C3_verified_older_payload_replaced_latest_payload",
         edit_landed: Some(true),
@@ -383,7 +397,6 @@ fn hdc_store_at_rest_integrity_baseline_t1_to_t10() {
     }
     assert!(read_record(&t9_path, 66).expect("T9 post-write read").is_some());
     restore_store_family(&t9_snapshot, &t9_path);
-    assert_exact_seed(&t9_path, &t9_seed);
     assert_eq!(
         read_all(&t9_path),
         read_all(&t9_snapshot.join("store.hdc")),
@@ -401,13 +414,13 @@ fn hdc_store_at_rest_integrity_baseline_t1_to_t10() {
             assert_eq!(fs::read(restored).unwrap(), fs::read(saved).unwrap());
         }
     }
-    let t9_landed = read_all_ids(&t9_path).expect("T9 restored read") == SEED_IDS;
+    let t9_landed = matches!(read_all_ids(&t9_path), Ok(ids) if ids == SEED_IDS);
     results.push(CaseResult {
         case: "T9_whole_store_rollback",
         verdict: if t9_landed { "ACCEPTED" } else { "REJECTED" },
         detection_point: "read",
         reason: "C3_verified_data_and_LSH_sidecars_restored_to_pre_write_snapshot",
-        edit_landed: t9_landed,
+        edit_landed: Some(true),
     });
 
     // T10: restore the complete pre-erasure store after a successful SUT delete.
@@ -444,14 +457,17 @@ fn hdc_store_at_rest_integrity_baseline_t1_to_t10() {
             assert_eq!(fs::read(restored).unwrap(), fs::read(saved).unwrap());
         }
     }
-    let t10_observed = read_record(&t10_path, SEED_IDS[2]).expect("T10 restored read");
-    let t10_landed = t10_observed.as_deref() == Some(t10_seed[2].0.as_slice());
+    let t10_observed = read_record(&t10_path, SEED_IDS[2]);
+    let t10_landed = matches!(
+        t10_observed,
+        Ok(Some(ref observed)) if observed.as_slice() == t10_seed[2].0.as_slice()
+    );
     results.push(CaseResult {
         case: "T10_erasure_resurrection",
         verdict: if t10_landed { "ACCEPTED" } else { "REJECTED" },
         detection_point: "read",
         reason: "C3_verified_SUT_delete_then_pre_erasure_data_and_LSH_restore",
-        edit_landed: t10_landed,
+        edit_landed: Some(true),
     });
 
     assert_eq!(results.len(), 10);
