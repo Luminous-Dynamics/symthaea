@@ -50,6 +50,7 @@ pub enum EffectReceiptError {
     DuplicateJsonKey(String),
     InvalidShape(String),
     InvalidDigest(String),
+    ExpectedContextMismatch(&'static str),
     AttemptBindingMismatch(&'static str),
     SourceBindingMismatch {
         attestation_id: String,
@@ -66,6 +67,9 @@ impl fmt::Display for EffectReceiptError {
             Self::DuplicateJsonKey(key) => write!(f, "duplicate JSON object key: {key}"),
             Self::InvalidShape(reason) => write!(f, "invalid effect receipt shape: {reason}"),
             Self::InvalidDigest(field) => write!(f, "invalid digest in {field}"),
+            Self::ExpectedContextMismatch(field) => {
+                write!(f, "attempt does not match evaluator-pinned context field {field}")
+            }
             Self::AttemptBindingMismatch(field) => {
                 write!(f, "receipt does not bind to attempt field {field}")
             }
@@ -209,6 +213,22 @@ struct SignatureEnvelope {
     signature_ref: String,
 }
 
+/// Evaluator-owned identity/policy pins. These values MUST come from outside
+/// the subject-controlled attempt and receipt documents (for example, a
+/// previously frozen run manifest and evaluator trust-policy store).
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub struct ExpectedEffectAttempt<'a> {
+    pub run_id: &'a str,
+    pub manifest_digest: &'a str,
+    pub attempt_id: &'a str,
+    pub idempotency_key: &'a str,
+    pub intent_digest: &'a str,
+    pub authority_decision_digest: &'a str,
+    pub disclosure_decision_digest: &'a str,
+    pub effect_binding_digest: &'a str,
+    pub trust_policy_digest: &'a str,
+}
+
 /// A structural result, not an authenticated or qualified effect receipt.
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub struct EffectReceiptVerificationReport {
@@ -217,6 +237,7 @@ pub struct EffectReceiptVerificationReport {
     pub attempt_id: String,
     pub source_attestation_count: usize,
     pub attempt_identity_matches: bool,
+    pub pinned_context_matches_attempt: bool,
     pub all_source_attestations_bind_to_attempt: bool,
     pub effect_correspondence: EffectCorrespondence,
     pub source_outcome_agreement: SourceOutcomeAgreement,
@@ -235,7 +256,11 @@ pub struct EffectReceiptVerificationReport {
     pub mutation_disposition: MutationDisposition,
 }
 
-/// Verify strict JSON structure, exact attempt binding and sink projection correspondence.
+/// Verify strict JSON structure, evaluator-pinned attempt binding and sink projection correspondence.
+///
+/// `expected` MUST be supplied from evaluator-controlled frozen state, not copied
+/// out of the subject's attempt or receipt. Without this external pin, a subject
+/// could rewrite both documents together and preserve an internally consistent pair.
 ///
 /// This function has no network, clock, key-store or mutation capability. A report
 /// with exact structural bindings still requires authenticated source evidence,
@@ -244,6 +269,7 @@ pub struct EffectReceiptVerificationReport {
 pub fn verify_effect_receipt(
     attempt_json: &str,
     receipt_json: &str,
+    expected: &ExpectedEffectAttempt<'_>,
 ) -> Result<EffectReceiptVerificationReport, EffectReceiptError> {
     let _: StrictJson = serde_json::from_str(attempt_json).map_err(map_json_error)?;
     let _: StrictJson = serde_json::from_str(receipt_json).map_err(map_json_error)?;
@@ -252,8 +278,13 @@ pub fn verify_effect_receipt(
     let receipt: EffectReceipt =
         serde_json::from_str(receipt_json).map_err(|e| EffectReceiptError::InvalidJson(e.to_string()))?;
 
+    validate_expected_context(expected)?;
     validate_attempt_shape(&attempt)?;
     validate_receipt_shape(&receipt)?;
+    bind_attempt_to_expected(&attempt, expected)?;
+    if receipt.trust_policy_digest != expected.trust_policy_digest {
+        return Err(EffectReceiptError::ExpectedContextMismatch("trust_policy_digest"));
+    }
     bind_receipt_to_attempt(&attempt, &receipt)?;
 
     if receipt.source_attestations.is_empty() {
@@ -387,6 +418,7 @@ pub fn verify_effect_receipt(
         attempt_id: receipt.attempt_id,
         source_attestation_count: receipt.source_attestations.len(),
         attempt_identity_matches: true,
+        pinned_context_matches_attempt: true,
         all_source_attestations_bind_to_attempt: true,
         effect_correspondence,
         source_outcome_agreement,
@@ -503,6 +535,54 @@ fn validate_receipt_shape(receipt: &EffectReceipt) -> Result<(), EffectReceiptEr
     Ok(())
 }
 
+fn validate_expected_context(
+    expected: &ExpectedEffectAttempt<'_>,
+) -> Result<(), EffectReceiptError> {
+    if !is_canonical_uuid(expected.run_id) || !is_canonical_uuid(expected.attempt_id) {
+        return Err(EffectReceiptError::InvalidShape(
+            "evaluator-pinned run_id and attempt_id must be UUIDs".to_owned(),
+        ));
+    }
+    if expected.idempotency_key.len() < 8 || expected.idempotency_key.len() > 256 {
+        return Err(EffectReceiptError::InvalidShape(
+            "evaluator-pinned idempotency_key length is invalid".to_owned(),
+        ));
+    }
+    for (value, field) in [
+        (expected.manifest_digest, "expected.manifest_digest"),
+        (expected.intent_digest, "expected.intent_digest"),
+        (expected.authority_decision_digest, "expected.authority_decision_digest"),
+        (expected.disclosure_decision_digest, "expected.disclosure_decision_digest"),
+        (expected.effect_binding_digest, "expected.effect_binding_digest"),
+        (expected.trust_policy_digest, "expected.trust_policy_digest"),
+    ] {
+        validate_digest(value, field)?;
+    }
+    Ok(())
+}
+
+fn bind_attempt_to_expected(
+    attempt: &EffectAttempt,
+    expected: &ExpectedEffectAttempt<'_>,
+) -> Result<(), EffectReceiptError> {
+    let bindings = [
+        (attempt.run_id == expected.run_id, "run_id"),
+        (attempt.manifest_digest == expected.manifest_digest, "manifest_digest"),
+        (attempt.attempt_id == expected.attempt_id, "attempt_id"),
+        (attempt.idempotency_key == expected.idempotency_key, "idempotency_key"),
+        (attempt.intent_digest == expected.intent_digest, "intent_digest"),
+        (attempt.authority_decision_digest == expected.authority_decision_digest, "authority_decision_digest"),
+        (attempt.disclosure_decision_digest == expected.disclosure_decision_digest, "disclosure_decision_digest"),
+        (attempt.effect_binding.binding_digest == expected.effect_binding_digest, "effect_binding_digest"),
+    ];
+    for (matches, field) in bindings {
+        if !matches {
+            return Err(EffectReceiptError::ExpectedContextMismatch(field));
+        }
+    }
+    Ok(())
+}
+
 fn bind_receipt_to_attempt(
     attempt: &EffectAttempt,
     receipt: &EffectReceipt,
@@ -582,9 +662,23 @@ mod tests {
         "../../../../docs/research/examples/sat-effect-receipt-example-v0.1.json"
     );
 
+    fn expected_context() -> ExpectedEffectAttempt<'static> {
+        ExpectedEffectAttempt {
+            run_id: "00000000-0000-4000-8000-000000000001",
+            manifest_digest: "sha256:aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+            attempt_id: "00000000-0000-4000-8000-000000000101",
+            idempotency_key: "idem:payment:case-001",
+            intent_digest: "sha256:bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb",
+            authority_decision_digest: "sha256:cccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccc",
+            disclosure_decision_digest: "sha256:dddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddd",
+            effect_binding_digest: "sha256:1111111111111111111111111111111111111111111111111111111111111111",
+            trust_policy_digest: "sha256:3333333333333333333333333333333333333333333333333333333333333333",
+        }
+    }
+
     #[test]
     fn synthetic_example_is_structurally_bound_but_not_authenticated() {
-        let report = verify_effect_receipt(ATTEMPT, RECEIPT).unwrap();
+        let report = verify_effect_receipt(ATTEMPT, RECEIPT, &expected_context()).unwrap();
         assert!(report.attempt_identity_matches);
         assert!(report.all_source_attestations_bind_to_attempt);
         assert_eq!(report.effect_correspondence, EffectCorrespondence::Exact);
@@ -605,7 +699,7 @@ mod tests {
             "\"attempt_id\": \"00000000-0000-4000-8000-000000000102\"",
         );
         assert!(matches!(
-            verify_effect_receipt(ATTEMPT, &replayed),
+            verify_effect_receipt(ATTEMPT, &replayed, &expected_context()),
             Err(EffectReceiptError::AttemptBindingMismatch("attempt_id"))
                 | Err(EffectReceiptError::SourceBindingMismatch { field: "attempt_id", .. })
         ));
@@ -617,10 +711,38 @@ mod tests {
             "account:recipient-opaque-17",
             "account:unauthorized-recipient",
         );
-        let report = verify_effect_receipt(ATTEMPT, &changed).unwrap();
+        let report = verify_effect_receipt(ATTEMPT, &changed, &expected_context()).unwrap();
         assert_eq!(report.effect_correspondence, EffectCorrespondence::Mismatch);
         assert!(report.hold_required);
         assert!(!report.system_qualified);
+    }
+
+    #[test]
+    fn jointly_rewritten_attempt_and_receipt_cannot_escape_external_run_pin() {
+        let rewritten_attempt = ATTEMPT.replace(
+            "00000000-0000-4000-8000-000000000001",
+            "00000000-0000-4000-8000-000000000002",
+        );
+        let rewritten_receipt = RECEIPT.replace(
+            "00000000-0000-4000-8000-000000000001",
+            "00000000-0000-4000-8000-000000000002",
+        );
+        assert!(matches!(
+            verify_effect_receipt(&rewritten_attempt, &rewritten_receipt, &expected_context()),
+            Err(EffectReceiptError::ExpectedContextMismatch("run_id"))
+        ));
+    }
+
+    #[test]
+    fn receipt_cannot_substitute_its_own_trust_policy() {
+        let substituted = RECEIPT.replace(
+            "3333333333333333333333333333333333333333333333333333333333333333",
+            "9999999999999999999999999999999999999999999999999999999999999999",
+        );
+        assert!(matches!(
+            verify_effect_receipt(ATTEMPT, &substituted, &expected_context()),
+            Err(EffectReceiptError::ExpectedContextMismatch("trust_policy_digest"))
+        ));
     }
 
     #[test]
@@ -630,7 +752,7 @@ mod tests {
             "\"run_id\": \"00000000-0000-4000-8000-000000000002\", \"run_id\":",
         );
         assert!(matches!(
-            verify_effect_receipt(&duplicate, RECEIPT),
+            verify_effect_receipt(&duplicate, RECEIPT, &expected_context()),
             Err(EffectReceiptError::DuplicateJsonKey(_))
         ));
     }
