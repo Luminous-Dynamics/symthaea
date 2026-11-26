@@ -37,11 +37,14 @@ Each event contains:
 - source-local sequence number;
 - exact event-record digest and payload/profile context.
 
-Each source identity contains:
-- source ID;
+Each source sequence domain contains:
+- source ID that uniquely identifies one monotonic sequence incarnation (not merely a reusable service name);
 - control-root identifier;
-- identity-record digest;
-- independently pinned verifier report.
+- source identity-record digest;
+- a separate control-root membership evidence digest;
+- independently pinned verifier reports for both the source identity and control-root membership.
+
+A source restart or sequence reset must receive a new sequence-domain ID. The administrative control-root identifier may remain the same across incarnations. The control-root label is not accepted as caller-provided metadata: its membership digest and verifier report must bind the source sequence-domain identity to that root. A new incarnation sharing an old administrative root is not automatically independent of the old incarnation.
 
 Each event record must be bound to an exact digest and a pinned verifier result. A self-reported sequence number or a caller-supplied source name is not evidence.
 
@@ -51,6 +54,9 @@ If two events belong to the same authenticated source ID, MON-020 may infer orde
 - each event record's signature/attestation is independently verified;
 - the sequence value is included in the exact signed/attested event record;
 - source identity and verifier implementation are pinned;
+- control-root membership evidence is separately verified under a pinned verifier profile;
+- the sequence-domain ID identifies a single monotonic incarnation and is not reused after reset;
+- event digests bind to the exact event ID and event-record profile;
 - source sequence values are unique within the captured input set.
 
 A repeated sequence number assigned to different event IDs is divergence. Same sequence domain with equal/reversed ordering cannot satisfy a required precedence relation.
@@ -76,16 +82,17 @@ A future profile may support stronger message-level handoff proofs, distributed 
 
 The v0.1 oracle enforces:
 
-1. An entity generation event precedes every use event of that entity.
-2. Entity generation precedes its invalidation event.
-3. Every use precedes entity invalidation.
-4. An activity start precedes each generation/use/invalidation event associated with that activity.
-5. Every internal activity event precedes the activity end.
-6. Activity start precedes activity end.
-7. The event-order proof graph is acyclic.
-8. Source-local sequence reuse across different event IDs is divergence.
-9. Conflicting witness evidence or order cycles are divergence, not silently resolved.
-10. Missing cross-source ordering evidence is indeterminate, not guessed from time proximity.
+1. Every used or invalidated entity has exactly one authenticated generation event in the v0.1 event set; missing generation is indeterminate.
+2. An entity generation event precedes every use event of that entity.
+3. Entity generation precedes its invalidation event.
+4. Every use precedes entity invalidation.
+5. An activity start precedes each generation/use/invalidation event associated with that activity.
+6. Every internal activity event precedes the activity end.
+7. Activity start precedes activity end.
+8. The event-order proof graph is acyclic.
+9. Source-local sequence reuse across different event IDs is divergence.
+10. Conflicting witness evidence or order cycles are divergence, not silently resolved.
+11. Missing cross-source ordering evidence is indeterminate, not guessed from time proximity.
 
 The initial package focuses on these event kinds; PROV derivation-generation, agent lifetime, delegation ordering and invalidation lineage remain subsequent profile extensions.
 
@@ -111,6 +118,8 @@ W3C PROV Constraints specifies that an entity must not be used before its genera
 Assume event sources may be faulty or malicious. Required attacks include:
 - event sequence reset or reuse;
 - source identity substitution;
+- unverified or substituted control-root membership;
+- source restart/sequence reset reusing an old sequence-domain ID;
 - same source ID with conflicting event keys;
 - cross-source order inferred from numeric sequence values;
 - use-before-generation with a still-acyclic graph;
@@ -134,6 +143,36 @@ Assume event sources may be faulty or malicious. Required attacks include:
 
 Targets are prospective, not achieved results. Finite-case zero failures are not a universal security guarantee.
 
-## 11. Claim ceiling
+
+## 12. Executable reference and local preflight
+
+The standard-library Go package in `event-order/` consumes normalized verifier reports. It independently checks source identity, separate control-root membership, event-record digest binding, witness digest/event identity binding, source-local sequence uniqueness, same-source order, independent cross-source handoff, generation-before-use, generation/use-before-invalidation, activity start/end boundaries and order-graph acyclicity. It does not perform cryptographic verification itself.
+
+Local reconstructed-source preflight (not an exact remote checkout replay):
+
+- `go test -race -count=5 ./...`: PASS.
+- `go vet ./...`: PASS.
+- `go test -count=1 -cover ./...`: PASS, 89.5% statement coverage.
+- `go test -run=^$ -fuzz=FuzzSequenceOrder -fuzztime=2s`: PASS, 67,732 executions in the recorded run.
+- 22 named tests plus one fuzz target.
+
+The 23-case JSON scenario file remains descriptive seed data, not yet fully parameterized executable fixtures. The remote branch was not cloned/replayed locally because GitHub DNS resolution was unavailable. Hosted CI, JSON Schema validator execution, upstream cryptographic vectors and independent holdout review remain pending.
+
+Exploratory Go microbenchmarks (Go 1.23.2, Linux amd64, Intel Xeon Platinum 8573C; three iterations per point):
+
+| Workload | Events / witnesses | ns/op | MB allocated/op |
+|---|---:|---:|---:|
+| Same-source ordering | 24 events | 109,263 | 0.076 |
+| Same-source ordering | 204 events | 947,060 | 0.671 |
+| Same-source ordering | 2,004 events | 13,638,079 | 7.555 |
+| Same-source ordering | 20,004 events | 153,026,250 | 84.555 |
+| Cross-source handoffs | 10 witnesses | 99,876 | 0.084 |
+| Cross-source handoffs | 100 witnesses | 901,064 | 0.734 |
+| Cross-source handoffs | 1,000 witnesses | 12,866,927 | 8.498 |
+| Cross-source handoffs | 5,000 witnesses | 66,858,275 | 46.499 |
+
+These measurements include only in-memory semantic checks and synthetic normalized verifier reports. They do not include actual signature verification, remote source collection, independent witness services, event-stream completeness, network, storage, PostgreSQL/Holochain, action effects or physical instrumentation. Three iterations are directional only and do not support stable p95/p99 claims.
+
+## 13. Claim ceiling
 
 MON-020 does not prove event sources are truthful, complete, or correct beyond the declared capture boundary. A signed source can sign false content. A sequence can be internally consistent while the source omitted events. Cross-source witness independence is only as strong as the verified control-root inventory. No cryptography is implemented by this reference package; it consumes normalized verifier reports. No destination or physical effect is established.
