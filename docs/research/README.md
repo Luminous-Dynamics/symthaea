@@ -468,3 +468,10 @@ A falsifiable programme for spectral statistics, RH/prime-structure controls, ne
 - [Rust exact reference](../../scripts/research/sdcb_multifidelity.rs) and [README](../../scripts/research/SDCB_MULTIFIDELITY_README.md): reuses RPSD's robust finite decision oracle rather than duplicating it.
 
 **Evidence boundary:** 13 tests authored, not compiled/executed. All fidelity likelihood matrices in this reference are supplied fixture assumptions; no real source calibration or external MFBO comparison has been run.
+### Greedy R-I / R-IDeA design portfolios
+
+- [Portfolio design protocol](SDCB_RIDEA_PORTFOLIO_DESIGN_V1.md): recompute source-faithful MMD² representativeness after each selected design.
+- [Portfolio schema](SDCB_RIDEA_PORTFOLIO_V1.schema.json), [example](SDCB_RIDEA_PORTFOLIO_V1.example.json), and [expected result](SDCB_RIDEA_PORTFOLIO_V1.expected.json).
+- [Rust greedy portfolio reference](../../scripts/research/sdcb_ridea_portfolio.rs) and [README](../../scripts/research/SDCB_RIDEA_PORTFOLIO_README.md).
+
+**Evidence boundary:** 12 Rust tests authored but not compiled/executed. EIG and proxy predictions remain frozen; this is design-only greedy batch selection, not a fully adaptive posterior policy.
