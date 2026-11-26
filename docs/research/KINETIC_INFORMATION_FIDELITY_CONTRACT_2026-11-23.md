@@ -338,6 +338,7 @@ Only compare methods on matched equations, initial conditions, boundary conditio
 | Online FNO closure (2026) | Strong task-specific resolved-moment closure; non-Markovian memory; effective heat flux may differ from kinetic flux | Reproduce from public Zenodo assets; score train window, held-out horizon, interpolation, extrapolation, scheme transfer and pulse-response envelope separately |
 | ADEPT | Differentiable JAX/Diffrax plasma framework; the original compact hidden-variable closure reports about 14x on its own kinetic-closure task | Reproduce the original task separately; compare matched 1D1V cohorts and gradient costs without transferring the 14x headline to unrelated solvers |
 | VlasovTT.jl | Fully spectral tensor-train / MPS Vlasov–Poisson with tensor-cross interpolation and dense reference path | Match dense vs compressed path; sweep rank, truncation and TCI tolerance; include reconstruction, Poisson and conversion cost |
+| Structure-preserving decorated-particle Vlasov–Poisson (Quashie et al., arXiv 2026) | Scovel–Weinstein decorated particles add shape degrees of freedom while retaining a finite-dimensional Hamiltonian reduction inherited from the continuum; the paper compares with standard PIC and reports fewer decorated particles at comparable accuracy | Mandatory HRBKR / geometric-particle baseline: match field solver, time integrator, initial data and accuracy; measure particle count plus per-particle shape state, Hamiltonian defect, mass/momentum/energy and echo-response fidelity; count shape evolution and all-field cost |
 | Adaptive Hermite spectral method (2026) | Dynamically scaled Hermite coordinates with conservative projection designed to preserve mass, momentum, energy and L2 norm | Compare coefficient-tail indicators and conservative basis changes against response loss and a common dense reference |
 | Local solution-manifold decomposition ROM (Tsai et al.; arXiv 2023, CPC 2026) | Time-windowed and electric-energy-windowed local POD bases with a precomputed tensorial nonlinear update. The paper reports TW-ROM about 280× online speedup (56 s FOM vs 0.2 s ROM) with maximum 13% test final-state relative error; EW-ROM about 90× with 11% test error and 7.5% training error. TW tensor construction for 100 windows took 87.2 s, exceeding one FOM run; timings were on LLNL Quartz Intel Xeon CPUs with libROM. | Required collisionless 1D1V baseline; reproduce TW and EW separately, charge tensor/basis construction and amortization, match four-corner training design and windows, and test full trajectory/phase/echo response—not only final-state L2 or energy |
 | Parametric probabilistic manifold decomposition (Guo & Xiao, SISC 48(6), 2026) | Nonlinear probabilistic manifold embedding with parameter-aware latent kernel-ridge learning; paper reports improved unseen-parameter generalization vs POD+GPR on cylinder and backward-facing-step flow cases | General parametric-ROM comparator, not a plasma result. Reproduce exact original flow cases and POD+GPR baseline first; require calibrated posterior/latent uncertainty, whole-parameter holdouts, branch-aware response distortion and KIRD cost accounting. Current inspected public repo snapshot is `NOT_REPRODUCED`; see [source admission PR #13502](https://github.com/Luminous-Dynamics/symthaea/pull/13502) and [RPKMD issue #13501](https://github.com/Luminous-Dynamics/symthaea/issues/13501) |
@@ -351,6 +352,8 @@ Only compare methods on matched equations, initial conditions, boundary conditio
 Primary sources:
 - [VlasovTT paper, JCP (2026), DOI 10.1016/j.jcp.2026.115330](https://doi.org/10.1016/j.jcp.2026.115330)
 - [Adaptive Hermite spectral method, arXiv:2605.17820](https://arxiv.org/abs/2605.17820)
+- [Structure-Preserving Decorated Particle Method for Vlasov–Poisson, Quashie et al., arXiv:2605.21794](https://arxiv.org/abs/2605.21794)
+- [The linearized Vlasov–Maxwell system as a Hamiltonian system, JCP 555 (2026), DOI 10.1016/j.jcp.2026.114765](https://doi.org/10.1016/j.jcp.2026.114765)
 - [NEOPIC, arXiv:2610.40528](https://arxiv.org/abs/2610.40528)
 - [Local reduced-order modeling / solution-manifold decomposition, arXiv:2310.18493](https://arxiv.org/abs/2310.18493); published as Computer Physics Communications 322 (2026), 110039, DOI 10.1016/j.cpc.2026.110039
 - [Adaptive Fourier spectral method for Vlasov–Poisson, arXiv:2607.12368](https://arxiv.org/abs/2607.12368)
@@ -829,6 +832,29 @@ The first reusable implementation is in [PR #13405](https://github.com/Luminous-
 The checked-in [known-answer fixture](https://github.com/Luminous-Dynamics/symthaea/blob/main/benchmarks/plasma/adversarial-probes/fixtures/response-weighted-refinement-known-answer-v0.1.json) deliberately has a higher-energy mode with low future sensitivity and a lower-energy mode with high future sensitivity. The expected decision discards the former and retains the latter. It is a synthetic map, not a plasma result.
 
 Required comparisons: spectral-tail-only zero-padding; response-only mode ranking; adjoint/QoI-only refinement; hybrid tail + response + uncertainty; local time/energy-window ROM; adaptive Hermite; VlasovTT. Measure future echo amplitude/phase and waveform, invariant bundle (mass, positivity, L1, L2, entropy, energy as applicable), memory and complete adaptation/transition cost.
+
+## Predictive Validity Horizon and Qualified Handoff (PVHQH)
+
+New companion programme: [#13710 — predict representation validity horizon and trigger qualified pre-breach handoff](https://github.com/Luminous-Dynamics/symthaea/issues/13710).
+
+The objective is not merely to detect an out-of-distribution input after a reduced model fails. It is to predict when the currently qualified state representation may leave its task-conditioned future-response envelope and begin migration early enough to finish a safe transition.
+
+At each checkpoint, keep separate evidence for:
+- current normalized error upper bounds per fidelity tier;
+- mode/phase/branch association and uncertainty;
+- representation-native residuals (Hermite/Fourier tails, TT truncation, particle sampling, closure memory);
+- error-growth evidence, with explicit distinction between empirical trend and verified growth bound;
+- remaining declared simulation horizon;
+- target representation construction, serialization, reconstruction, overlap and independent qualification latency;
+- physical, boundary and geometric structure gates.
+
+Decision states are \`STAY_QUALIFIED\`, \`PREPARE_HANDOFF\`, \`HANDOFF_NOW\`, and \`UNKNOWN\`. Only a verified error-growth bound may authorize \`STAY_QUALIFIED\`. An empirical residual slope can raise a preparation warning, but cannot certify continued operation. Missing / stale evidence, unstable branch identity or a failed physical gate cannot be interpreted as a pass.
+
+The first Rust implementation is in [PR #13405](https://github.com/Luminous-Dynamics/symthaea/pull/13405), module \`validity_horizon\`: it computes a conservative time-to-tolerance from a supplied growth envelope, adds uncertainty growth, and compares it with hand-off lead time. It has manufactured tests for early preparation, current breach, failed physical gates, branch instability, missing/empirical evidence, zero growth and arithmetic overflow.
+
+This is only a decision primitive. The caller's \`VerifiedGrowthBound\` must be backed by external proof/evidence; the module does not authenticate it, execute a reference solver, perform a model transfer or establish that any current kinetic indicator predicts real response loss.
+
+Prior art includes adaptive hierarchical error estimates for online hyper-reduced ROMs (Ebrahimi & Yano, CMAME 449B, 118590, 2026), adaptive FOM/ROM switching with reduced error estimators (Riffaud, JCP 2025, 113677), utility-driven model selection for digital twins, and SACube multi-validity-frame switching (available online 9 Nov 2026). Our specific research question is whether the same principle can be made response-aware, branch-aware, structure-qualified and fail-closed for kinetic plasma trajectories.
 
 ## Certified Intervention Coverage (CIC)
 
