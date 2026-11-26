@@ -1,0 +1,354 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://luminousdynamics.io/schemas/cmaq-011-task-manifest-v0.1.json",
+  "title": "CMAQ-011 Task Manifest",
+  "type": "object",
+  "additionalProperties": false,
+  "required": [
+    "schema_version",
+    "benchmark_id",
+    "track",
+    "status",
+    "task",
+    "split",
+    "budget",
+    "baselines",
+    "metrics_required",
+    "claim_ceiling",
+    "integrity"
+  ],
+  "properties": {
+    "schema_version": {
+      "const": "cmaq-011-task-manifest-v0.1"
+    },
+    "benchmark_id": {
+      "const": "cmaq-011"
+    },
+    "track": {
+      "enum": [
+        "vector_control",
+        "visual_embodied"
+      ]
+    },
+    "status": {
+      "type": "string"
+    },
+    "task": {
+      "type": "object",
+      "required": [
+        "suite",
+        "environment_id",
+        "episode_horizon_base_simulator_steps",
+        "simulator_steps_per_action",
+        "reward_aggregation",
+        "episode_horizon"
+      ],
+      "properties": {
+        "suite": {
+          "type": "string",
+          "minLength": 1
+        },
+        "environment_id": {
+          "type": "string",
+          "minLength": 1
+        },
+        "environment_package_version": {
+          "type": [
+            "string",
+            "null"
+          ]
+        },
+        "physics_engine_version": {
+          "type": [
+            "string",
+            "null"
+          ]
+        },
+        "source_revision": {
+          "type": [
+            "string",
+            "null"
+          ]
+        },
+        "wrapper_stack": {
+          "type": "array",
+          "items": {
+            "type": "string"
+          }
+        },
+        "reward_definition_digest": {
+          "type": [
+            "string",
+            "null"
+          ]
+        },
+        "observation_transform_digest": {
+          "type": [
+            "string",
+            "null"
+          ]
+        },
+        "action_transform_digest": {
+          "type": [
+            "string",
+            "null"
+          ]
+        },
+        "episode_horizon": {
+          "type": [
+            "integer",
+            "null"
+          ],
+          "minimum": 1
+        },
+        "reset_distribution_digest": {
+          "type": [
+            "string",
+            "null"
+          ]
+        },
+        "episode_horizon_base_simulator_steps": {
+          "type": [
+            "integer",
+            "null"
+          ],
+          "minimum": 1
+        },
+        "simulator_steps_per_action": {
+          "type": [
+            "integer",
+            "null"
+          ],
+          "minimum": 1
+        },
+        "reward_aggregation": {
+          "enum": [
+            "single_step",
+            "sum_within_action_repeat",
+            "discounted_sum",
+            "task_native",
+            "unknown"
+          ]
+        }
+      },
+      "additionalProperties": false
+    },
+    "split": {
+      "type": "object",
+      "required": [
+        "name",
+        "task_parameter_family_ids",
+        "seed_manifest_sha256",
+        "hidden_from_tuning"
+      ],
+      "properties": {
+        "name": {
+          "type": "string"
+        },
+        "task_parameter_family_ids": {
+          "type": "array",
+          "items": {
+            "type": "string"
+          }
+        },
+        "seed_manifest_sha256": {
+          "type": [
+            "string",
+            "null"
+          ],
+          "pattern": "^([a-fA-F0-9]{64})$|^$"
+        },
+        "hidden_from_tuning": {
+          "type": "boolean"
+        }
+      },
+      "additionalProperties": false
+    },
+    "budget": {
+      "type": "object",
+      "properties": {
+        "max_candidate_action_sequences_per_decision": {
+          "type": [
+            "integer",
+            "null"
+          ],
+          "minimum": 1
+        },
+        "max_rollout_horizon": {
+          "type": [
+            "integer",
+            "null"
+          ],
+          "minimum": 1
+        },
+        "max_environment_queries_per_decision": {
+          "type": [
+            "integer",
+            "null"
+          ],
+          "minimum": 1
+        },
+        "max_model_queries_per_decision": {
+          "type": [
+            "integer",
+            "null"
+          ],
+          "minimum": 1
+        },
+        "wallclock_budget_ms_per_decision": {
+          "type": [
+            "number",
+            "null"
+          ],
+          "exclusiveMinimum": 0
+        },
+        "peak_memory_bytes": {
+          "type": [
+            "integer",
+            "null"
+          ],
+          "minimum": 1
+        },
+        "training_compute_excluded": {
+          "type": "boolean"
+        }
+      },
+      "required": [
+        "training_compute_excluded"
+      ],
+      "additionalProperties": false
+    },
+    "baselines": {
+      "type": "array",
+      "minItems": 1,
+      "items": {
+        "type": "object",
+        "required": [
+          "id",
+          "kind"
+        ],
+        "properties": {
+          "id": {
+            "type": "string"
+          },
+          "kind": {
+            "type": "string"
+          }
+        },
+        "additionalProperties": false
+      }
+    },
+    "metrics_required": {
+      "type": "array",
+      "minItems": 1,
+      "uniqueItems": true,
+      "items": {
+        "type": "string"
+      }
+    },
+    "claim_ceiling": {
+      "type": "string"
+    },
+    "integrity": {
+      "type": "object",
+      "required": [
+        "network_access",
+        "allowed_network_domains",
+        "available_agent_tools",
+        "hidden_qualification",
+        "agent_can_access_hidden_targets",
+        "agent_can_write_scoring_artifacts",
+        "task_prompt_sha256",
+        "evaluator_source_sha256",
+        "scoring_verifier_sha256",
+        "independent_verifier_id",
+        "outcome_verification",
+        "transcript_audit",
+        "negative_controls"
+      ],
+      "properties": {
+        "network_access": {
+          "enum": [
+            "disabled",
+            "allowlisted",
+            "unrestricted"
+          ]
+        },
+        "allowed_network_domains": {
+          "type": "array",
+          "items": {
+            "type": "string"
+          }
+        },
+        "available_agent_tools": {
+          "type": "array",
+          "minItems": 1,
+          "items": {
+            "type": "string"
+          }
+        },
+        "hidden_qualification": {
+          "type": "boolean"
+        },
+        "agent_can_access_hidden_targets": {
+          "type": "boolean"
+        },
+        "agent_can_write_scoring_artifacts": {
+          "type": "boolean"
+        },
+        "task_prompt_sha256": {
+          "type": [
+            "string",
+            "null"
+          ],
+          "pattern": "^([a-fA-F0-9]{64})$|^$"
+        },
+        "evaluator_source_sha256": {
+          "type": [
+            "string",
+            "null"
+          ],
+          "pattern": "^([a-fA-F0-9]{64})$|^$"
+        },
+        "scoring_verifier_sha256": {
+          "type": [
+            "string",
+            "null"
+          ],
+          "pattern": "^([a-fA-F0-9]{64})$|^$"
+        },
+        "independent_verifier_id": {
+          "type": [
+            "string",
+            "null"
+          ]
+        },
+        "outcome_verification": {
+          "enum": [
+            "environment_side",
+            "human",
+            "mixed",
+            "self_reported"
+          ]
+        },
+        "transcript_audit": {
+          "enum": [
+            "disabled",
+            "sampled",
+            "all",
+            "risk_triggered"
+          ]
+        },
+        "negative_controls": {
+          "type": "array",
+          "minItems": 1,
+          "uniqueItems": true,
+          "items": {
+            "type": "string"
+          }
+        }
+      },
+      "additionalProperties": false
+    }
+  }
+}

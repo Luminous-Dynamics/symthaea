@@ -1,0 +1,106 @@
+{
+  "schema_version": "cmaq-011-external-baseline-lock-v0.1",
+  "baseline_id": "mrsq",
+  "name": "MRS.Q: The Surprising Difficulty of Search in Model-Based Reinforcement Learning",
+  "paper_url": "https://proceedings.mlr.press/v306/chang26a.html",
+  "repository_url": "https://github.com/facebookresearch/MRSQ",
+  "source_commit": "b12abaf309833f28619dfd87f4251074abed3ae3",
+  "source_commit_url": "https://github.com/facebookresearch/MRSQ/commit/b12abaf309833f28619dfd87f4251074abed3ae3",
+  "source_commit_date": "2026-02-17T21:14:56Z",
+  "license": "CC BY-NC 4.0",
+  "integration_policy": "External baseline only. Do not vendor or redistribute its code in this repository without separate license review.",
+  "default_run_settings": {
+    "algorithm": "MRSQ",
+    "seed": 0,
+    "evaluation_episodes": 10,
+    "default_device": "cuda, falling back to CPU if CUDA is unavailable",
+    "gym": {
+      "total_timesteps": 1000000,
+      "evaluation_frequency": 5000,
+      "num_parallel_environments": 1
+    },
+    "dmc": {
+      "total_timesteps": 500000,
+      "evaluation_frequency": 5000,
+      "num_parallel_environments": 1
+    },
+    "humanoid_bench": {
+      "total_timesteps": 1000000,
+      "evaluation_frequency": 5000,
+      "num_parallel_environments": 1
+    },
+    "mpc": {
+      "horizon": 3,
+      "num_samples": 512,
+      "num_policy_trajectories": 24,
+      "num_elites": 64,
+      "iterations": 6
+    }
+  },
+  "checked_in_upstream_final_reference_points": {
+    "note": "Final rows read from results/gym_results.txt and results/dmc_results.txt at the pinned commit. Ten seed values each. These are author-supplied upstream artifacts, not a reproduction by Symthaea.",
+    "Gym-HalfCheetah-v4": {
+      "file_url": "https://github.com/facebookresearch/MRSQ/blob/b12abaf309833f28619dfd87f4251074abed3ae3/results/gym_results.txt",
+      "final_training_steps": 1000000,
+      "seed_values": [
+        13710.646,
+        15171.703,
+        13628.254,
+        15519.599,
+        15145.154,
+        15331.132,
+        13350.142,
+        15516.793,
+        13925.797,
+        15190.819
+      ],
+      "mean": 14649.0039,
+      "median": 15158.4285,
+      "sample_stddev": 876.9740735311833,
+      "min": 13350.142,
+      "max": 15519.599
+    },
+    "Dmc-quadruped-walk": {
+      "file_url": "https://github.com/facebookresearch/MRSQ/blob/b12abaf309833f28619dfd87f4251074abed3ae3/results/dmc_results.txt",
+      "final_training_steps": 500000,
+      "seed_values": [
+        971.266,
+        953.5,
+        956.252,
+        971.599,
+        958.748,
+        945.467,
+        963.194,
+        961.443,
+        710.456,
+        962.742
+      ],
+      "mean": 935.4667,
+      "median": 960.0955,
+      "sample_stddev": 79.44509980700158,
+      "min": 710.456,
+      "max": 971.599
+    }
+  },
+  "reproduction_requirements": [
+    "Pin Gymnasium/MuJoCo, dm-control and all wrappers/physics versions",
+    "Match reward transformations, termination, observation preprocessing and action scaling",
+    "Run the same number of training timesteps and evaluation episodes",
+    "Use matched seed manifests and equal environment interaction budgets",
+    "Record hardware, device, wall-clock, inference/search cost and peak memory",
+    "Retain raw per-episode outcomes, checkpoints and exact config/source digests"
+  ],
+  "claim_ceiling": "upstream_reference_artifacts_only_not_reproduced",
+  "environment_wrapper_defaults": {
+    "dmc_source_file": "MRSQ/env_preprocessing.py",
+    "dmc_source_blob_sha": "b8e7ca7ec00b774621855b7efc8f5d6e700a9b74",
+    "action_repeat": 2,
+    "base_simulator_steps_per_action": 2,
+    "max_episode_controller_steps": 500,
+    "max_episode_base_simulator_steps": 1000,
+    "action_scaling": "dm_control action_scale wrapper with range [-1, 1]",
+    "reward_aggregation": "sum reward from each underlying dm_control step within one repeated action",
+    "observation_transform": "flatten OrderedDict observation values in their iteration order",
+    "note": "Defaults are derived from DmcHyperparameters.action_repeat=2 and DmcPreprocessing.step/max_ep_timesteps at this exact source revision. Verify environment kwargs and task-specific semantics in the adapter."
+  }
+}

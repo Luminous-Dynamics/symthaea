@@ -1,0 +1,149 @@
+{
+  "schema_version": "cmaq-011-baseline-catalog-v0.1",
+  "status": "external-reference-locks-not-reproduced",
+  "policy": "All listed projects remain external baselines. Pin code, checkpoints, task wrappers, reward transforms and runtime before executing. Do not copy code into Symthaea. Upstream reference scores are not local reproductions. The WIMLE source is MIT-licensed and remains an isolated external runtime; MRS.Q remains CC BY-NC 4.0 and is not vendored.",
+  "baselines": [
+    {
+      "id": "mrsq",
+      "role": "search-based model-based RL; direct baseline for model-search exploitability",
+      "algorithm_type": "latent world model + MPC search + pessimistic ensemble value aggregation",
+      "paper_url": "https://proceedings.mlr.press/v306/chang26a.html",
+      "repository_url": "https://github.com/facebookresearch/MRSQ",
+      "commit": "b12abaf309833f28619dfd87f4251074abed3ae3",
+      "commit_date": "2026-02-17T21:14:56Z",
+      "license": "CC BY-NC 4.0",
+      "exact_settings": {
+        "gym_timesteps": 1000000,
+        "dmc_timesteps": 500000,
+        "humanoid_bench_timesteps": 1000000,
+        "evaluation_episodes": 10,
+        "mpc_horizon": 3,
+        "candidate_samples": 512,
+        "policy_trajectories": 24,
+        "elites": 64,
+        "mpc_iterations": 6,
+        "device_default": "cuda; implementation falls back to CPU if CUDA is unavailable"
+      },
+      "reference_artifacts": {
+        "Gym-HalfCheetah-v4": {
+          "source": "results/gym_results.txt",
+          "training_steps": 1000000,
+          "seeds": [
+            13710.646,
+            15171.703,
+            13628.254,
+            15519.599,
+            15145.154,
+            15331.132,
+            13350.142,
+            15516.793,
+            13925.797,
+            15190.819
+          ],
+          "mean": 14649.0039,
+          "sample_sd": 876.9740735311833
+        },
+        "Dmc-quadruped-walk": {
+          "source": "results/dmc_results.txt",
+          "training_steps": 500000,
+          "seeds": [
+            971.266,
+            953.5,
+            956.252,
+            971.599,
+            958.748,
+            945.467,
+            963.194,
+            961.443,
+            710.456,
+            962.742
+          ],
+          "mean": 935.4667,
+          "sample_sd": 79.44509980700158
+        }
+      },
+      "caveat": "Checked-in author results, not local reproduction. Environment and reward settings must be reproduced before matching."
+    },
+    {
+      "id": "wimle",
+      "role": "uncertainty-aware stochastic world-model control; especially relevant DMC and HumanoidBench comparator",
+      "algorithm_type": "IMLE multi-modal transition model ensemble with aleatoric/epistemic uncertainty and uncertainty-weighted synthetic transitions",
+      "paper_url": "https://arxiv.org/abs/2602.14351",
+      "project_url": "https://mehranagh20.github.io/wimle/",
+      "repository_url": "https://github.com/mehranagh20/wimle",
+      "commit": "be730d6e7cd1538ca5519b8f505feff126b92938",
+      "commit_date": "2026-04-01T22:26:51Z",
+      "license": "MIT",
+      "task_coverage": "40 continuous-control tasks across DeepMind Control Suite, HumanoidBench and MyoSuite. Exact task list and training horizon overrides are locked in wimle-baseline.lock.json.",
+      "upstream_result_artifacts": "results/wimle.csv; results/wimle.pkl; results/np_results/{dmc,hb,myo}/. Upstream README describes 100 evaluation points every 10,000 environment steps (1M total per run).",
+      "caveat": "Paper-reported results and checked-in upstream arrays are reference artifacts, not local reproductions. Its native DMC wrapper uses one dm_control step per action and a 1,000-step episode; MRS.Q defaults to action_repeat=2 and sums reward across two underlying steps. Use a paper-native reproduction track and a separately labelled wrapper-normalized head-to-head. Compare only on actual shared tasks. WIMLE's isolated JAX/CUDA runtime must be version-pinned."
+    },
+    {
+      "id": "td-mpc2",
+      "role": "scalable multi-domain world-model control",
+      "algorithm_type": "latent model predictive control with actor-critic",
+      "paper_url": "https://openreview.net/forum?id=Oxh5CstDJU",
+      "repository_url": "https://github.com/nicklashansen/tdmpc2",
+      "website": "https://www.tdmpc2.com/",
+      "commit": "332f19e4aba4bffe2dc736f45ea7f7bdc585903a",
+      "commit_date": "2026-10-20T23:32:30Z",
+      "license": "MIT",
+      "task_coverage": "104 continuous-control tasks across DMControl, Meta-World, ManiSkill2 and MyoSuite; multi-task 80-task model also reported.",
+      "reference_scale": "317M parameter multi-task model; 300+ checkpoints advertised by upstream",
+      "caveat": "Single-task and multi-task evaluation differ. Record model size, checkpoint digest, task domain, observation modality and replay/training budget. Do not use aggregate benchmark score as direct comparator."
+    },
+    {
+      "id": "dreamerv3",
+      "role": "generalist world-model policy-learning baseline",
+      "algorithm_type": "recurrent latent world model + imagined trajectories + actor-critic",
+      "paper_url": "https://www.nature.com/articles/s41586-025-08744-2",
+      "repository_url": "https://github.com/danijar/dreamerv3",
+      "commit": "e01491fad6434b2245a3b8ca201dd7faedcc458c",
+      "commit_date": "2026-10-04T05:02:53Z",
+      "license": "MIT",
+      "reference_scale": "Nature paper evaluates 150+ tasks across 8 domains under fixed hyperparameters; five seeds for most benchmarks, with stated exceptions.",
+      "runtime": "Linux/macOS; Python 3.11+; JAX backend.",
+      "caveat": "GitHub implementation states it is a reimplementation based on DreamerV2 code and not the official Google/DeepMind implementation. Lock paper and implementation separately."
+    },
+    {
+      "id": "td7",
+      "role": "strong model-free control baseline; isolates whether model-based planning adds value",
+      "algorithm_type": "model-free state-action representation learning for online/offline RL",
+      "paper_url": "https://arxiv.org/abs/2302.01302",
+      "repository_url": "https://github.com/sfujim/TD7",
+      "commit": "c1c280de1513f474488061b4cf39642b75dd84bd",
+      "commit_date": "2023-09-12T17:22:13Z",
+      "license": "MIT",
+      "upstream_software_versions": "Gym 0.25.0; MuJoCo 2.3.3; PyTorch 2.0.0; Python 3.9.13",
+      "caveat": "Model-free comparator only; legacy environment stack means adapter/wrapper equivalence must be verified, not assumed."
+    }
+  ],
+  "decision_advantage_contract": {
+    "primary_question": "Does a predictive model improve action choice over an equally trained/direct policy when task, candidate actions, training data and evaluation interactions are matched?",
+    "paired_arms": [
+      "direct_policy_without_planner",
+      "same_policy_plus_predictive_planner",
+      "same_policy_plus_sham_or_shuffled_model",
+      "same_policy_plus_oracle_environment_model",
+      "strong_model_free_control"
+    ],
+    "metrics": [
+      "closed_loop_success_delta",
+      "paired_return_delta",
+      "counterfactual_action_regret_reduction",
+      "action_rank_correlation",
+      "planner_induced_failure_rate",
+      "prediction_to_action_conversion_rate",
+      "inference_and_simulator_query_cost",
+      "risk_adjusted_return_cvar95"
+    ],
+    "requirements": [
+      "Use identical policy checkpoints where the ablation permits.",
+      "Keep action candidate set and evaluation seeds paired.",
+      "Report model and planner costs separately.",
+      "Include shuffled/wrong-model negative control.",
+      "Do not credit a world model for gains caused only by a different policy or extra training budget."
+    ]
+  },
+  "claim_ceiling": "pinned external references and protocol proposal; none of these baselines are locally reproduced in this PR"
+}
