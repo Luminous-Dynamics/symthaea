@@ -1318,17 +1318,18 @@ mod tests {
         } else {
             Vec::new()
         };
+        let annotator_key = item_key.wrapping_mul(4);
         let annotations = vec![
             annotation(
                 '1',
-                item_key * 4 + 1,
+                annotator_key.wrapping_add(1),
                 state,
                 annotation_intervals.clone(),
                 None,
             ),
             annotation(
                 '2',
-                item_key * 4 + 2,
+                annotator_key.wrapping_add(2),
                 state,
                 annotation_intervals.clone(),
                 None,
