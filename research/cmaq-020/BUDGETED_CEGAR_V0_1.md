@@ -28,7 +28,7 @@ The source and receipt digests are only syntax-checked here. The runner must has
 
 ## Budget ledger
 
-`ProbeBudgetLedger` is scoped to one contract and one candidate session. Cost comes only from the frozen `probe_cost_units` value; the candidate cannot lower or override it. The ledger:
+`ProbeBudgetLedger` is scoped to one frozen contract and one candidate session. It binds to the contract ID, canonical contract SHA-256 and source-manifest SHA-256; reusing a human-readable contract ID with a different contract or source manifest is rejected. Cost comes only from the frozen `probe_cost_units` value; the candidate cannot lower or override it. The ledger:
 - uses checked integer addition;
 - rejects a probe that would exceed the registered budget;
 - rejects reused receipt digests;
