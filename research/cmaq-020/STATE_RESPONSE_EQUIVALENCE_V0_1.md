@@ -95,6 +95,31 @@ Relevant references:
 - ContactWorld: https://contact-world.github.io/
 - World-model benchmark taxonomy: https://world-model-benchmarks.github.io/World-Model-Benchmarks/
 
+
+## Failure fidelity is a separate qualification axis
+
+A predicted state may match the final task-success label while getting the failure itself wrong. A world model can hallucinate a successful lift after missed contact, or reproduce failure but place it at the wrong execution stage. CMAQ-020 therefore adds the executable [failure-fidelity scorecard](FAILURE_FIDELITY_V0_1.md) in `src/failure_fidelity.rs`.
+
+It reports separately:
+- false-success rate among reference failures;
+- failure capture recall;
+- failure reason accuracy;
+- execution-stage accuracy;
+- false-failure rate among reference successes;
+- boundary-flip detection across matched lower/upper perturbations;
+- exact two-sided boundary outcome accuracy;
+- per-independent-cluster counts.
+
+A model that correctly predicts "failure" for the wrong reason does not get full credit. A model that detects a boundary flip but puts the failure on the wrong side does not get full boundary credit. The evaluator refuses incomplete boundary pairs, mixed candidate checkpoints and pairs that do not share exact initial-state/action/family/cluster identity.
+
+External anchors:
+- WorldFailBench tests failure reason, stage and boundary across LIBERO, RoboTwin and real G1 manipulation. https://arxiv.org/abs/2610.33565
+- MiraBench tests physics adherence, action following and optimism bias. https://arxiv.org/abs/2605.29360
+- AMD's 20 October 2026 BWM study reports 82.5% fake-success on simulator failures before failure-data fine-tuning, reduced to 26.3% on its held-out RoboTwin adjust_bottle cases; it also reports unresolved same-start action-fork errors. https://www.amd.com/en/developer/resources/technical-articles/2026/rl-inside-world-models.html
+- LIBERO-RECOVER tests retry, action adaptation, object-state recovery and environmental recovery. https://arxiv.org/abs/2609.05178
+
+These protocols must remain separate. Prediction of failure, recovery from failure, and downstream policy utility are different claims. No benchmark scores are pooled. Current CMAQ-020 failure-fidelity fixtures are synthetic known-answer tests only; no external benchmark adapter has been run.
+
 ## Next experimental matrix
 
 Compare full history/full state, symbolic/tabular mechanism state, linear projection, matched recurrent latent state, HDC-only, CfC/LTC-only, HDC+CfC/LTC factorized state, and retrieval-backed event references. Match exploration, task split, query adapter, compute, interaction budget and all-in memory (model, codebook, index, journal, provenance sidecar and replay data).
