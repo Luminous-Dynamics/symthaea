@@ -21,7 +21,8 @@
     "resource_budget",
     "claim_boundary",
     "provenance",
-    "adjacent_methods"
+    "adjacent_methods",
+    "linearization_contract"
   ],
   "properties": {
     "schema_version": {
@@ -46,7 +47,8 @@
         "spatial_domain",
         "velocity_domain",
         "time_unit",
-        "maximum_time"
+        "maximum_time",
+        "state_metric_id"
       ],
       "properties": {
         "equation": {
@@ -104,6 +106,10 @@
         "maximum_time": {
           "type": "number",
           "exclusiveMinimum": 0
+        },
+        "state_metric_id": {
+          "type": "string",
+          "minLength": 1
         }
       }
     },
@@ -539,6 +545,46 @@
           "adaptive_opinf_nitrom_hybrid_port",
           "symmetry_augmented_kinetic_closure"
         ]
+      }
+    },
+    "linearization_contract": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "status",
+        "derivative_source",
+        "future_solver_transition_jacobians_required",
+        "pulse_map_state_jacobian_required",
+        "pulse_map_parameter_jacobian_required",
+        "split_solver_composition_order_required",
+        "independent_finite_difference_cross_check_required",
+        "branch_change_disposition"
+      ],
+      "properties": {
+        "status": {
+          "const": "synthetic_derivatives_not_computed"
+        },
+        "derivative_source": {
+          "const": "not_computed_synthetic"
+        },
+        "future_solver_transition_jacobians_required": {
+          "const": true
+        },
+        "pulse_map_state_jacobian_required": {
+          "const": true
+        },
+        "pulse_map_parameter_jacobian_required": {
+          "const": true
+        },
+        "split_solver_composition_order_required": {
+          "const": true
+        },
+        "independent_finite_difference_cross_check_required": {
+          "const": true
+        },
+        "branch_change_disposition": {
+          "const": "UNKNOWN_OR_HANDOFF"
+        }
       }
     }
   },
