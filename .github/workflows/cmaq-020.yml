@@ -81,6 +81,12 @@ jobs:
           components: rustfmt, clippy
       - name: Check NixWard adapter formatting
         run: rustfmt +1.100.0 --check --edition 2024 crates/core/nixward/src/mind/world_model.rs crates/core/nixward/src/mind/mod.rs
+      - name: Diagnose and materialize workspace lock resolution
+        run: |
+          cargo +1.100.0 metadata --format-version 1 > /dev/null
+          echo "Cargo.lock diff produced by current workspace graph:"
+          git diff --stat -- Cargo.lock
+          git diff -- Cargo.lock | head -n 240
       - name: Run NixWard × CMAQ adapter tests
         run: cargo +1.100.0 test --locked -p nixward --lib "mind::world_model"
       - name: Run strict NixWard library Clippy
