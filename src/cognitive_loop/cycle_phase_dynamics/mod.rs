@@ -2158,6 +2158,23 @@ impl CognitiveLoopService {
         // Store action index for JEPA and other downstream consumers
         self.fep.last_action_idx = fep_action_idx as u8;
 
+        // Bind the selected FEP action to the source observation staged during
+        // planning. This freezes the action-conditioned prediction before the
+        // next observation can arrive and be used as the training target.
+        #[cfg(feature = "jepa")]
+        if let Some(ref mut jepa) = self.jepa_engine {
+            match jepa.condition_pending_transition(self.fep.last_action_idx) {
+                Ok(true) => {
+                    self.substrate_manager.jepa_energy +=
+                        jepa.config().effective_energy_per_forward();
+                }
+                Ok(false) => {}
+                Err(error) => {
+                    tracing::warn!(%error, "JEPA action conditioning skipped");
+                }
+            }
+        }
+
         // ── Cross-manifold prediction error → attention reallocation ──
         // Rao & Ballard (1999): large prediction errors between visual and cognitive
         // streams indicate world-model mismatch → re-engage attention, update model.

@@ -738,6 +738,26 @@ impl CognitiveLoopService {
         #[cfg(feature = "jepa")]
         let jepa_input_dim = config.cfc_config.input_dim;
 
+        #[cfg(feature = "jepa")]
+        let jepa_engine = if config.enable_jepa {
+            let seed = config
+                .genesis_phrase
+                .as_ref()
+                .map(|phrase| {
+                    symthaea_core::genesis::GenesisSeed::from_phrase(phrase)
+                        .domain("cognitive_loop::jepa")
+                        .r#gen::<u64>()
+                })
+                .unwrap_or(0x4A45_5041_2026_1101);
+            let jepa_config = symthaea_jepa::JepaConfig {
+                input_dim: jepa_input_dim,
+                ..symthaea_jepa::JepaConfig::default()
+            };
+            Some(symthaea_jepa::JepaEngine::new(jepa_config, seed))
+        } else {
+            None
+        };
+
         let mut episodic_persistence =
             super::episodic_persistence_manager::EpisodicPersistenceManager::new(
                 phi_episodic_replay,
@@ -1068,7 +1088,7 @@ impl CognitiveLoopService {
             // and cls_evolution_harness.rs module docs.
             threshold_overrides: super::threshold_overrides::ThresholdOverrides::from_env(),
             #[cfg(feature = "jepa")]
-            jepa_engine: None,
+            jepa_engine,
             #[cfg(feature = "neural_validation")]
             cortical_history: std::collections::VecDeque::with_capacity(1000),
             convergence_cycle: 0,
@@ -1252,6 +1272,23 @@ impl CognitiveLoopService {
 #[cfg(test)]
 mod tests {
     use super::super::{CognitiveLoopConfig, CognitiveLoopService};
+
+    #[cfg(feature = "jepa")]
+    #[test]
+    fn jepa_engine_is_opt_in_and_uses_the_configured_cfc_input_dimension() {
+        let default_service = CognitiveLoopService::new(CognitiveLoopConfig::default()).unwrap();
+        assert!(default_service.jepa_engine.is_none());
+
+        let mut config = CognitiveLoopConfig::default();
+        config.enable_jepa = true;
+        let expected_input_dim = config.cfc_config.input_dim;
+        let enabled_service = CognitiveLoopService::new(config).unwrap();
+        let engine = enabled_service
+            .jepa_engine
+            .as_ref()
+            .expect("enable_jepa=true must construct a JEPA engine");
+        assert_eq!(engine.config().input_dim, expected_input_dim);
+    }
 
     #[test]
     fn constructor_opens_memory_db_path() {

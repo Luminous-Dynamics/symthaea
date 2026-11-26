@@ -685,6 +685,15 @@ pub struct CognitiveLoopConfig {
     /// Default: false (desktop). Set true for mobile profiles.
     pub enable_thermal_adaptation: bool,
 
+    // ── JEPA observed-transition learning ────────────────────────────────
+    /// Enable the optional JEPA latent action-transition learner.
+    ///
+    /// When enabled, it predicts from the current CfC input plus the FEP-selected
+    /// action and trains against the next observed CfC input. Disabled by default.
+    #[cfg(feature = "jepa")]
+    #[serde(default)]
+    pub enable_jepa: bool,
+
     // ── Federation ──────────────────────────────────────────────────────
     /// Enable federated learning coordinator (requires async runtime).
     pub federation_enabled: bool,
@@ -1096,6 +1105,8 @@ impl Default for CognitiveLoopConfig {
             substrate_transition_alpha: super::thresholds::SUBSTRATE_TRANSITION_ALPHA_DEFAULT
                 as f32,
             enable_thermal_adaptation: true,
+            #[cfg(feature = "jepa")]
+            enable_jepa: false,
             federation_enabled: false,
             federation_round_interval_ms: 30_000,
             #[cfg(feature = "vision-manifold")]
@@ -2159,6 +2170,8 @@ mod tests {
     #[test]
     fn dependency_default_no_warnings() {
         let c = CognitiveLoopConfig::default();
+        #[cfg(feature = "jepa")]
+        assert!(!c.enable_jepa, "JEPA must remain opt-in by default");
         let warnings = c.validate_dependencies();
         assert!(
             warnings.is_empty(),
@@ -2190,6 +2203,30 @@ mod tests {
         assert_eq!(restored.temporal_backend, original.temporal_backend);
         assert_eq!(restored.enable_gwt, original.enable_gwt);
         assert_eq!(restored.enable_prefrontal, original.enable_prefrontal);
+        #[cfg(feature = "jepa")]
+        assert_eq!(restored.enable_jepa, original.enable_jepa);
+    }
+
+    #[cfg(feature = "jepa")]
+    #[test]
+    fn jepa_enable_flag_defaults_off_for_older_serialized_configs() {
+        let mut value = serde_json::to_value(CognitiveLoopConfig::default()).unwrap();
+        value
+            .as_object_mut()
+            .expect("config serializes to an object")
+            .remove("enable_jepa");
+        let restored: CognitiveLoopConfig = serde_json::from_value(value).unwrap();
+        assert!(!restored.enable_jepa);
+    }
+
+    #[cfg(feature = "jepa")]
+    #[test]
+    fn jepa_enable_flag_roundtrips_when_explicitly_enabled() {
+        let mut config = CognitiveLoopConfig::default();
+        config.enable_jepa = true;
+        let value = serde_json::to_value(&config).unwrap();
+        let restored: CognitiveLoopConfig = serde_json::from_value(value).unwrap();
+        assert!(restored.enable_jepa);
     }
 
     #[test]
