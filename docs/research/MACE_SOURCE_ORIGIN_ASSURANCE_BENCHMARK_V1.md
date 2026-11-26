@@ -2,7 +2,7 @@
 
 **Snapshot:** 2026-11-26  
 **Status:** Proposed benchmark protocol. All numeric thresholds are targets, not achieved results.  
-**Relationship:** Complements [MACE 2026 Benchmark Parity and Decision-Assurance Programme](MACE_2026_BENCHMARK_PARITY_AND_ASSURANCE_PLAN.md) and the source-origin verifier in [MACE Source-Origin Attestation V1](MACE_SOURCE_ORIGIN_ATTESTATION_V1.md).
+**Relationship:** Complements [MACE 2026 Benchmark Parity and Decision-Assurance Programme](https://github.com/Luminous-Dynamics/symthaea/pull/13701) and the source-origin verifier in [MACE Source-Origin Attestation V1](MACE_SOURCE_ORIGIN_ATTESTATION_V1.md).
 
 ## 1. Research question
 
