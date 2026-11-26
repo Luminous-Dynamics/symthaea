@@ -9,7 +9,7 @@ This crate is deliberately narrower than a full SAT qualifier. Its report expose
 - claim-edge endpoint integrity;
 - agreement between each claim's `depends_on` set and its typed `depends_on` edges;
 - acyclicity of the dependency subgraph;
-- conservative admissibility requirements for claims marked `supported`;
+- conservative admissibility requirements for claims marked `supported`, propagated through the complete dependency DAG;
 - deterministic graph normalization and the domain-separated evidence-graph root;
 - the v0.1 vocabularies for observation kinds, source roles, claim types/states and edge relations.
 
@@ -51,7 +51,7 @@ Observations and claims are sorted by their IDs using UTF-16 code-unit ordering.
 
 Input is capped at 32 MiB, 100,000 observations, 100,000 claims and 250,000 claim edges; dependency cycles use iterative topological processing rather than recursive traversal. Full JSON Schema validation must be performed separately before semantic verification.
 
-These checks are conservative graph semantics, not universal truth conditions. The verifier only checks the submitted authenticity/independence state labels; it does not independently establish those states. A source that self-labels its observation `verified` is not authenticated by this crate. Adapter-specific policies may impose stronger requirements. The verifier reports `json_schema_validation_performed=false` and `qualification_assessed=false` unconditionally. Validate the pinned JSON Schema separately before relying on the graph result.
+These checks are conservative graph semantics, not universal truth conditions. The verifier only checks the submitted authenticity/independence state labels; it does not independently establish those states. A source that self-labels its observation `verified` is not authenticated by this crate. Adapter-specific policies may impose stronger requirements. The verifier reports `json_schema_validation_performed=false`, `authenticity_verified=false`, `source_independence_verified=false` and `qualification_assessed=false` unconditionally. `supported_claims_passing_declared_state_checks` requires every transitive premise to pass the same declared-state checks; it does not authenticate those premises. Validate the pinned JSON Schema separately before relying on the graph result.
 
 ## Exit codes
 
