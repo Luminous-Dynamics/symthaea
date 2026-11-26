@@ -10,6 +10,9 @@ This file separates current industry/research systems by the claims their evalua
 | World-action models | DreamZero, Cosmos Policy, LingBot-VA, Fast-WAM | Video and action prediction jointly or through inverse/representation-only action pathways | Same robot/task, same action interface, same controller budget; report action fidelity, executed success and false-success under failure separately. |
 | Multi-embodiment latent world models | RoboJEPA (8B) | JEPA latent prediction over 12 robot embodiments; reports compute scaling of imagination error and downstream planning | Include as a high-capacity latent-prediction arm on compatible robot tasks; compare scaling and planning, not raw latent loss against HDC similarity. |
 | Contact-rich visual/tactile models | ContactWorld | Twelve manipulation tasks, six sensing modalities, planning and real-world contact tasks | Compare representation structure and cross-modal compatibility; point cloud / tactile force-field arms must be matched to the same task and planner. |
+| Failure fidelity / diagnosis | WorldFailBench | Failure reason, execution stage and success↔failure boundary under scene changes; LIBERO, RoboTwin and physical G1 manipulation | Score false-success separately from reason/stage fidelity and two-sided boundary localization; preserve matched initial state, realized action and environment cluster. |
+| Failure-conditioned world-model training | AMD Learning to Fail / BWM on RoboTwin adjust_bottle | Tests whether failure rollouts repair fake success and whether in-world RL survives replay in the simulator | Reproduce only on the same task/model/policy interface; include success-only control, multiple seeds, shared-start action forks and closed-loop replay mismatch. |
+| Recovery after failure | LIBERO-RECOVER | Retry, action adaptation, object-state recovery and environmental recovery across 1,000+ scenarios | Evaluate recovery as downstream policy utility, separately from whether the world model predicted the failure correctly. |
 | Action-conditioned reliability | MiraBench | Physics adherence, action-following fidelity and optimism-bias/failure calibration, with human judgments | Add failure-inducing actions, missed contacts, partial execution and false-success rate to our action-response panel. |
 | Executable consequence evaluation | ScratchWorld | Replay-verified changed fields and values, causal traces and counterfactual outcomes in executable programs | Include no-change/copy controls and value-aware changed-field correctness so persistence overlap cannot masquerade as consequence prediction. |
 | Closed-loop world-model utility | World-In-World, WorldArena 2.0 | Interactive task success, model use as an environment, and embodied/visuo-tactile evaluation | Treat as later closed-loop tracks after simulator, action interface and custody are reproduced. |
@@ -27,7 +30,17 @@ This file separates current industry/research systems by the claims their evalua
 - **ScratchWorld:** uses replay-verified executable worlds and emphasizes value-aware changed-field scoring. It is a useful guard against copy-the-input and no-change baselines. https://arxiv.org/abs/2606.31689
 - **World-model benchmark survey:** its November 2026 corpus covers 130 benchmarks and separates target, protocol, metric and data. It records 98 open-loop tracks and 13 closed-loop tracks; 99 use prediction-level metrics and 14 use downstream outcome metrics, with overlaps across categories. https://world-model-benchmarks.github.io/World-Model-Benchmarks/
 
-## 3. Matched experiment protocol
+## 3. Failure fidelity and recovery
+
+- **WorldFailBench (October 2026):** evaluates observable failure reasons, execution stages and success/failure boundaries in LIBERO, RoboTwin and physical G1 manipulation; seven tested world models show substantial failure-fidelity gaps. This is a failure-diagnostic benchmark, not just a task-success leaderboard. https://arxiv.org/abs/2610.33565
+- **AMD Learning to Fail (20 October 2026):** on RoboTwin 2.0 adjust_bottle, BWM's base checkpoint rendered 82.5% of simulator failures as successes; failure-rollout fine-tuning reduced the reported held-out fake-success rate to 26.3%. This is one task/model/policy setup; the paper also finds same-start action-fork outcomes remain difficult. https://www.amd.com/en/developer/resources/technical-articles/2026/rl-inside-world-models.html
+- **LIBERO-RECOVER (September 2026):** separates retry, action adaptation, object-state recovery and environmental recovery across 1,000+ failure-recovery scenarios. It measures a downstream policy capability and must not be confused with failure-prediction fidelity. https://arxiv.org/abs/2609.05178
+
+Use [FAILURE_FIDELITY_V0_1.md](FAILURE_FIDELITY_V0_1.md) for the executable scorecard. It separates false success, false failure, reason accuracy, stage accuracy, boundary-flip detection and exact two-sided boundary outcome accuracy. It requires evaluator-owned reference outcomes and cluster-linked replay evidence.
+
+These results show why a world model can have a plausible final success rate while still misleading an RL policy or a deployment reviewer: it may invent a lift after missed contact, place a failure at the wrong execution stage, or move the success/failure boundary under the wrong scene perturbation. The current NixWard transition candidate's typed episode path is intended to preserve realized execution outcomes and failure dispositions; it has not yet been evaluated on any of these external benchmarks.
+
+## 4. Matched experiment protocol
 
 Every claim of superiority must pin and report:
 
@@ -41,7 +54,7 @@ Every claim of superiority must pin and report:
 
 Do not pool LIBERO success, RoboCasa success, RoboArena Elo, ContactWorld planning rates, MiraBench reliability and CMAQ response-distortion metrics into one score.
 
-## 4. Symthaea-specific architecture tournament
+## 5. Symthaea-specific architecture tournament
 
 Start with an identical source history and action budget. Candidate arms:
 
@@ -57,7 +70,7 @@ Start with an identical source history and action budget. Candidate arms:
 
 For each arm, preserve the same registered `(U,Q,T,I,D)` contract. Measure response fidelity, false merges, false splits, invariant violations, selective uncertainty, causal-effect contrast, false-success optimism, closed-loop task success, recovery, all-in storage and inference cost.
 
-## 5. What would count as beating the field?
+## 6. What would count as beating the field?
 
 A credible Symthaea advantage should be a preregistered Pareto improvement, not a cherry-picked score:
 
@@ -69,6 +82,6 @@ Proposed stretch gate for the state-abstraction lane: at least 25% lower all-in 
 
 A simple baseline is allowed to win. If HDC/CfC does not outperform the per-action delta or symbolic/recurrent baselines under matched cost, the correct result is that the more complex representation has not earned its complexity.
 
-## 6. Current Symthaea claim boundary
+## 7. Current Symthaea claim boundary
 
 CMAQ-020's Rust evaluator currently measures a finite response-grid abstraction and selects cost-aware counterexample witnesses. It does not yet run HDC, CfC/LTC, a robot policy, ScratchWorld, MiraBench, ContactWorld, Cosmos Policy or RoboJEPA. The HDC-delta NixWard model is only a source-inspected candidate baseline. External benchmark reproduction and source-data admission remain separate work.
