@@ -9,5 +9,7 @@ description = "Research-only deterministic regime-aware memory substrate router 
 [lib]
 path = "src/lib.rs"
 
+[workspace]
+
 [dependencies]
 
