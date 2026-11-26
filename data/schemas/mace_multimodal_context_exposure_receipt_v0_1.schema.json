@@ -24,6 +24,7 @@
     "transport_adapter_profile_sha256",
     "observer_profile_sha256",
     "captured_at_monotonic_ns",
+    "clock_profile_sha256",
     "signature"
   ],
   "properties": {
@@ -53,6 +54,7 @@
     "transport_adapter_profile_sha256": { "$ref": "#/$defs/sha256" },
     "observer_profile_sha256": { "$ref": "#/$defs/sha256" },
     "captured_at_monotonic_ns": { "type": "integer", "minimum": 0 },
+    "clock_profile_sha256": { "$ref": "#/$defs/sha256" },
     "signature": { "$ref": "#/$defs/signature" }
   },
   "allOf": [
@@ -231,7 +233,7 @@
         "modality": { "enum": ["image", "video_frame", "audio_segment", "derived_text"] },
         "media_type": { "type": "string", "minLength": 1, "maxLength": 128 },
         "media_payload_sha256": { "$ref": "#/$defs/sha256" },
-        "media_payload_bytes": { "type": "integer", "minimum": 0 },
+        "media_payload_bytes": { "type": "integer", "minimum": 1 },
         "context_role": { "enum": ["system", "developer", "user", "assistant", "tool"] },
         "message_index": { "type": "integer", "minimum": 0 },
         "part_index": { "type": "integer", "minimum": 0 },
@@ -261,8 +263,24 @@
       },
       "allOf": [
         {
+          "if": { "properties": { "modality": { "const": "image" } }, "required": ["modality"] },
+          "then": { "properties": { "media_details": { "properties": { "kind": { "const": "image" } } } } }
+        },
+        {
+          "if": { "properties": { "modality": { "const": "video_frame" } }, "required": ["modality"] },
+          "then": { "properties": { "media_details": { "properties": { "kind": { "const": "video_frame" } } } } }
+        },
+        {
+          "if": { "properties": { "modality": { "const": "audio_segment" } }, "required": ["modality"] },
+          "then": { "properties": { "media_details": { "properties": { "kind": { "const": "audio_segment" } } } } }
+        },
+        {
+          "if": { "properties": { "modality": { "const": "derived_text" } }, "required": ["modality"] },
+          "then": { "properties": { "media_details": { "properties": { "kind": { "const": "derived_text" } } } } }
+        },
+        {
           "if": { "properties": { "transfer_mode": { "const": "provider_asset_reference" } }, "required": ["transfer_mode"] },
-          "then": { "required": ["asset_transfer_id", "provider_asset_id_sha256"] }
+          "then": { "required": ["provider_asset_id_sha256"] }
         },
         {
           "if": { "properties": { "provider_ingress_status": { "const": "provider_ingress_attested" } }, "required": ["provider_ingress_status"] },
@@ -273,8 +291,18 @@
           "then": { "required": ["asset_transfer_id"] }
         },
         {
+          "if": {
+            "properties": {
+              "transfer_mode": { "const": "provider_asset_reference" },
+              "provider_ingress_status": { "enum": ["upload_acknowledged", "provider_ingress_attested"] }
+            },
+            "required": ["transfer_mode", "provider_ingress_status"]
+          },
+          "then": { "required": ["asset_transfer_id"] }
+        },
+        {
           "if": { "properties": { "transfer_mode": { "const": "inline_request_body" } }, "required": ["transfer_mode"] },
-          "then": { "properties": { "provider_ingress_status": { "const": "not_independently_observed" } } }
+          "then": { "properties": { "provider_ingress_status": { "enum": ["not_independently_observed", "provider_ingress_attested"] } } }
         }
       ]
     },
@@ -343,7 +371,7 @@
         "kind": { "const": "derived_text" },
         "derivative_kind": { "enum": ["ocr", "transcript", "caption", "description", "subtitle", "other"] },
         "text_payload_sha256": { "$ref": "#/$defs/sha256" },
-        "text_payload_bytes": { "type": "integer", "minimum": 0 },
+        "text_payload_bytes": { "type": "integer", "minimum": 1 },
         "parent_media_evidence_ids": {
           "type": "array",
           "minItems": 1,
@@ -367,7 +395,9 @@
         "provider_response_body_sha256",
         "provider_asset_id_sha256",
         "upload_acknowledged",
+        "transfer_sequence",
         "captured_at_monotonic_ns",
+        "clock_profile_sha256",
         "observer_profile_sha256",
         "signature"
       ],
@@ -384,7 +414,9 @@
         "provider_asset_id_sha256": { "$ref": "#/$defs/sha256" },
         "upload_acknowledged": { "const": true },
         "provider_ingress_attestation_sha256": { "$ref": "#/$defs/sha256" },
+        "transfer_sequence": { "type": "integer", "minimum": 0 },
         "captured_at_monotonic_ns": { "type": "integer", "minimum": 0 },
+        "clock_profile_sha256": { "$ref": "#/$defs/sha256" },
         "observer_profile_sha256": { "$ref": "#/$defs/sha256" },
         "signature": { "$ref": "#/$defs/signature" }
       }
