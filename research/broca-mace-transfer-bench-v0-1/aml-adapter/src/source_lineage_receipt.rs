@@ -56,6 +56,7 @@ pub enum SourceLineageRejectV1 {
     DuplicateReceipt,
     BindingMismatch,
     InvalidGraph,
+    NotSufficient,
     GraphDigestMismatch,
     GraphCycle,
     DanglingParent,
@@ -174,6 +175,9 @@ impl VerifiedSourceLineageSetV1 {
             sufficiency_binding,
             current_evaluator_profile,
         ).map_err(SourceLineageRejectV1::Sufficiency)?;
+        if !sufficiency.is_sufficient() {
+            return Err(SourceLineageRejectV1::NotSufficient);
+        }
         let now_unix = sufficiency_binding.now_unix;
         let sufficiency_receipt = sufficiency.receipt();
         let need_digest = decision_need.digest()
