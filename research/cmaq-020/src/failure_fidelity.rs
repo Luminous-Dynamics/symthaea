@@ -972,6 +972,36 @@ mod tests {
         assert!(score_boundary_rate_pairs(&[pair], &contract()).is_err());
     }
 
+
+
+    #[test]
+    fn primary_boundary_summary_weights_clusters_equally_and_preserves_pair_weighted_diagnostic() {
+        let pair_a = rate_pair("cluster-a-pair", "cluster-a");
+        let mut pair_b1 = rate_pair("cluster-b-pair-1", "cluster-b");
+        pair_b1.predicted_success_side_successes = 9;
+        pair_b1.predicted_failure_side_successes = 3;
+        let mut pair_b2 = pair_b1.clone();
+        pair_b2.pair_id = "cluster-b-pair-2".to_owned();
+        let mut pair_b3 = pair_b1.clone();
+        pair_b3.pair_id = "cluster-b-pair-3".to_owned();
+
+        let score = score_boundary_rate_pairs(
+            &[pair_a, pair_b1, pair_b2, pair_b3],
+            &contract(),
+        )
+        .expect("valid cluster-stratified pairs");
+
+        assert_eq!(score.clusters.len(), 2);
+        assert_eq!(score.clusters["cluster-a"].pairs, 1);
+        assert_eq!(score.clusters["cluster-b"].pairs, 3);
+        assert_eq!(score.success_side_rate_mae_basis_points, Some(500.0));
+        assert_eq!(score.pair_weighted_success_side_rate_mae_basis_points, Some(750.0));
+        assert_eq!(
+            score.clusters["cluster-b"].success_side_rate_mae_basis_points,
+            Some(1_000.0)
+        );
+    }
+
     #[test]
     fn rate_boundary_summaries_preserve_environment_clusters() {
         let pairs = vec![
