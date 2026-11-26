@@ -1,0 +1,31 @@
+{
+  "schema_version": "1.0.0",
+  "fixture_id": "sdcb-continuous-common-cause-budget-two-v1",
+  "latent_ids": [
+    "scientific_parameter",
+    "shared_reference_bias"
+  ],
+  "prior_variances": [1.0, 1.0],
+  "science_index": 0,
+  "budget_units": 2,
+  "actions": [
+    {
+      "id": "science-device-a",
+      "cost_units": 1,
+      "loadings": [1.0, 1.0],
+      "noise_variance": 0.01
+    },
+    {
+      "id": "science-device-b",
+      "cost_units": 1,
+      "loadings": [1.0, 1.0],
+      "noise_variance": 0.01
+    },
+    {
+      "id": "shared-reference",
+      "cost_units": 1,
+      "loadings": [0.0, 1.0],
+      "noise_variance": 0.01
+    }
+  ]
+}

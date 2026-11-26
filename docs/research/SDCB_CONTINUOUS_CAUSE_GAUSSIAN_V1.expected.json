@@ -1,0 +1,40 @@
+{
+  "schema_version": "1.0.0",
+  "fixture_id": "sdcb-continuous-common-cause-budget-two-v1",
+  "execution_kind": "independent_closed_form_precision_matrix_calculation",
+  "rust_compiled_or_executed": false,
+  "expected_report": {
+    "selected_action_ids": [
+      "science-device-a",
+      "shared-reference"
+    ],
+    "selected_cost_units": 2,
+    "budget_units": 2,
+    "prior_science_variance": 1.0,
+    "posterior_science_variance": 0.01951266867294437,
+    "science_variance_reduction_fraction": 0.9804873313270556,
+    "prior_marginal_variances": [1.0, 1.0],
+    "posterior_marginal_variances": [
+      0.01951266867294437,
+      0.009804873313270556
+    ],
+    "joint_information_gain_nats": 4.619998128441846,
+    "subsets_evaluated": 8
+  },
+  "analytical_controls": {
+    "two_science_channels_only": {
+      "posterior_science_variance": 0.5012468827930175,
+      "formula": "201 / 401"
+    },
+    "one_science_plus_shared_reference": {
+      "posterior_science_variance": 0.01951266867294437,
+      "formula": "201 / 10301"
+    },
+    "one_science_only": {
+      "posterior_science_variance": 0.5024875621890548,
+      "formula": "101 / 201"
+    },
+    "joint_information_gain": "0.5 * ln(10301)"
+  },
+  "claim_boundary": "The fixture is an exact linear-Gaussian design calculation. It is not a compiled Rust result, physical sensor evaluation, or proof of reference traceability."
+}
