@@ -1892,7 +1892,7 @@ mod tests {
         let envelope_b = signed_source_lineage_envelope(
             &resolver_key,
             &resolver_profile_sha256,
-            &qualified.qualified_candidate_set_sha256(),
+            qualified.qualified_candidate_set_sha256(),
             &need_sha256,
             qualified.run_id(),
             qualified.query_invocation_id(),
@@ -1932,7 +1932,7 @@ mod tests {
             &TestQualificationVerifier,
             &verified_sufficiency,
             &binding,
-            &evaluator_profile,
+            &evaluator_profile_value,
             need,
             &lineage_inputs,
             &resolver_profile_sha256,
@@ -1945,7 +1945,7 @@ mod tests {
             &TestQualificationVerifier,
             &verified_sufficiency,
             &binding,
-            &evaluator_profile,
+            &evaluator_profile_value,
             need,
             &resolver_profile,
         ).expect("all three authorities remain valid at one use-time sample");
