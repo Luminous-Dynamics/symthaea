@@ -1073,8 +1073,14 @@ mod tests {
         assert!(authorization_blocked > 0);
         assert_eq!(authorization_blocked + posterior_safety_blocked, 6);
         assert!(safe.iter().all(|query| robustly_safe_probe(&worlds, &posterior, *query)));
-        for query in all_queries().into_iter().filter(|query| !safe.contains(query)) {
-            assert!(!robustly_safe_probe(&worlds, &posterior, query));
+        for query in all_queries() {
+            let posterior_safe = robustly_safe_probe(&worlds, &posterior, query);
+            let authorized = externally_authorized_probe(query);
+            assert_eq!(
+                safe.contains(&query),
+                authorized && posterior_safe,
+                "probe eligibility mismatch for {query:?}: authorization={authorized}, posterior_safe={posterior_safe}"
+            );
         }
     }
 
