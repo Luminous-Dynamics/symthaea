@@ -1302,6 +1302,85 @@ impl WebResearcher {
     }
 }
 
+fn now_unix_ms() -> u64 {
+    SystemTime::now()
+        .duration_since(UNIX_EPOCH)
+        .ok()
+        .and_then(|duration| u64::try_from(duration.as_millis()).ok())
+        .unwrap_or(u64::MAX)
+}
+
+fn elapsed_ms(started: Instant) -> u64 {
+    u64::try_from(started.elapsed().as_millis()).unwrap_or(u64::MAX)
+}
+
+fn sha256_hex(bytes: &[u8]) -> String {
+    format!("{:x}", Sha256::digest(bytes))
+}
+
+fn make_receipt(
+    query_rank: usize,
+    source_rank: Option<usize>,
+    stage: AcquisitionStage,
+    query: &str,
+    outcome: AcquisitionOutcome,
+) -> AcquisitionReceipt {
+    let stage_id = match stage {
+        AcquisitionStage::SearchProvider => "search-provider",
+        AcquisitionStage::ArxivApi => "arxiv",
+        AcquisitionStage::OpenReviewApi => "openreview",
+        AcquisitionStage::DuckDuckGo => "duckduckgo",
+        AcquisitionStage::HeuristicSeeds => "heuristic-seeds",
+        AcquisitionStage::PageFetch => "page-fetch",
+    };
+    let rank_id = source_rank
+        .map(|rank| rank.to_string())
+        .unwrap_or_else(|| "query".to_string());
+    AcquisitionReceipt {
+        attempt_id: format!("q{query_rank}-{stage_id}-{rank_id}"),
+        query_rank,
+        source_rank,
+        stage,
+        provider: None,
+        query: query.to_string(),
+        requested_url: None,
+        final_url: None,
+        http_status: None,
+        content_type: None,
+        captured_bytes: 0,
+        content_sha256: None,
+        outcome,
+        reason_code: None,
+        reason: None,
+        elapsed_ms: 0,
+        captured_at_unix_ms: now_unix_ms(),
+        extractor_version: None,
+    }
+}
+
+/// Run indexed futures with a hard in-flight limit, then restore input order.
+async fn bounded_map_ordered<T, U, F, Fut>(
+    items: Vec<(usize, T)>,
+    concurrency: usize,
+    map: F,
+) -> Vec<(usize, U)>
+where
+    F: Fn(usize, T) -> Fut,
+    Fut: Future<Output = U>,
+{
+    let limit = concurrency.max(1);
+    let mut results = stream::iter(items)
+        .map(|(rank, item)| {
+            let future = map(rank, item);
+            async move { (rank, future.await) }
+        })
+        .buffer_unordered(limit)
+        .collect::<Vec<_>>()
+        .await;
+    results.sort_by_key(|(rank, _)| *rank);
+    results
+}
+
 fn extract_links(json: &Value, path: &[&str], key: &str) -> Vec<String> {
     let mut cursor = json;
     for segment in path {
