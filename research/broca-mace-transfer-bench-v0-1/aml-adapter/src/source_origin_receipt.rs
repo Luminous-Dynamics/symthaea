@@ -698,7 +698,7 @@ mod tests {
         };
         let wrong_source = SourceOriginArtifactInputV1 {
             evidence_id: "derived-1",
-            source_bytes: b"tampered source",
+            source_bytes: b"immutablf source bytes",
             payload_bytes: payload,
             derivation_receipt_bytes: Some(derivation),
         };
@@ -708,7 +708,7 @@ mod tests {
         );
         let wrong_payload = SourceOriginArtifactInputV1 {
             source_bytes: source,
-            payload_bytes: b"tampered payload",
+            payload_bytes: b"derived evidence payloae",
             ..wrong_source
         };
         assert_eq!(
@@ -718,7 +718,7 @@ mod tests {
         let wrong_derivation = SourceOriginArtifactInputV1 {
             source_bytes: source,
             payload_bytes: payload,
-            derivation_receipt_bytes: Some(b"tampered transformation"),
+            derivation_receipt_bytes: Some(b"transformation receipx"),
             ..wrong_source
         };
         assert_eq!(
