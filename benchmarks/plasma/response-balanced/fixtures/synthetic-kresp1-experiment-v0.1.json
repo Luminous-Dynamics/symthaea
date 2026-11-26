@@ -1,0 +1,300 @@
+{
+  "schema_version": "0.1",
+  "record_status": "synthetic_experiment_contract_only",
+  "experiment_id": "RBKR-KRESP1-1D1V-SYNTHETIC",
+  "source_pulse_family_contract_id": "AKPD-SYNTHETIC-PULSE-FAMILY-001",
+  "cohort": {
+    "equation": "periodic_1d1v_collisionless_vlasov_poisson",
+    "normalization_id": "synthetic-contract-design-only",
+    "spatial_domain": {
+      "minimum": -3.141592653589793,
+      "maximum": 3.141592653589793,
+      "periodic": true
+    },
+    "velocity_domain": {
+      "minimum": -6,
+      "maximum": 6,
+      "velocity_unit": "v_th"
+    },
+    "time_unit": "omega_pe^-1"
+  },
+  "frozen_checkpoint": {
+    "checkpoint_id": "synthetic-phase-mixed-checkpoint",
+    "step": 0,
+    "time": 4,
+    "state_sha256": "0000000000000000000000000000000000000000000000000000000000000000",
+    "phase_mixing_complete": true,
+    "second_pulse_not_yet_applied": true,
+    "solver_revision": "synthetic-no-solver-run"
+  },
+  "pulse_family": {
+    "operator_id": "sinusoidal_velocity_kick_v1",
+    "amplitude_semantics": "maximum_absolute_delta_v",
+    "application_semantics": "instantaneous_canonical_velocity_kick",
+    "allowed_spatial_mode": {
+      "minimum": 1,
+      "maximum": 4
+    },
+    "allowed_phase_rad": {
+      "minimum": -3.141592653589793,
+      "maximum": 3.141592653589793
+    },
+    "allowed_kick_amplitude": {
+      "minimum": 0,
+      "maximum": 0.02,
+      "unit": "v_th"
+    },
+    "maximum_application_time": 20
+  },
+  "split": {
+    "held_out_axes": [
+      "pulse_phase",
+      "kick_amplitude",
+      "spatial_mode",
+      "pulse_separation",
+      "pulse_order"
+    ],
+    "training": [
+      {
+        "trial_id": "train-mode2-pair",
+        "pulses": [
+          {
+            "pulse_id": "tr-a1",
+            "spatial_mode": 2,
+            "kick_amplitude": 0.01,
+            "phase_rad": 0.3,
+            "application_time": 4
+          },
+          {
+            "pulse_id": "tr-a2",
+            "spatial_mode": 2,
+            "kick_amplitude": 0.012,
+            "phase_rad": -0.4,
+            "application_time": 10
+          }
+        ]
+      },
+      {
+        "trial_id": "train-mode1-to2",
+        "pulses": [
+          {
+            "pulse_id": "tr-b1",
+            "spatial_mode": 1,
+            "kick_amplitude": 0.01,
+            "phase_rad": 0.5,
+            "application_time": 4
+          },
+          {
+            "pulse_id": "tr-b2",
+            "spatial_mode": 2,
+            "kick_amplitude": 0.008,
+            "phase_rad": -0.2,
+            "application_time": 8
+          }
+        ]
+      }
+    ],
+    "validation": [
+      {
+        "trial_id": "validation-nearby-phase",
+        "pulses": [
+          {
+            "pulse_id": "va-c1",
+            "spatial_mode": 2,
+            "kick_amplitude": 0.009,
+            "phase_rad": 0.8,
+            "application_time": 4
+          },
+          {
+            "pulse_id": "va-c2",
+            "spatial_mode": 2,
+            "kick_amplitude": 0.01,
+            "phase_rad": -0.7,
+            "application_time": 8.5
+          }
+        ]
+      }
+    ],
+    "held_out": [
+      {
+        "trial_id": "heldout-phase",
+        "pulses": [
+          {
+            "pulse_id": "ho-p1",
+            "spatial_mode": 2,
+            "kick_amplitude": 0.01,
+            "phase_rad": 1.7,
+            "application_time": 4
+          },
+          {
+            "pulse_id": "ho-p2",
+            "spatial_mode": 2,
+            "kick_amplitude": 0.01,
+            "phase_rad": -1.7,
+            "application_time": 10
+          }
+        ]
+      },
+      {
+        "trial_id": "heldout-amplitude",
+        "pulses": [
+          {
+            "pulse_id": "ho-a1",
+            "spatial_mode": 2,
+            "kick_amplitude": 0.018,
+            "phase_rad": 0.3,
+            "application_time": 4
+          },
+          {
+            "pulse_id": "ho-a2",
+            "spatial_mode": 2,
+            "kick_amplitude": 0.018,
+            "phase_rad": -0.4,
+            "application_time": 10
+          }
+        ]
+      },
+      {
+        "trial_id": "heldout-mode",
+        "pulses": [
+          {
+            "pulse_id": "ho-m1",
+            "spatial_mode": 4,
+            "kick_amplitude": 0.01,
+            "phase_rad": 0.3,
+            "application_time": 4
+          },
+          {
+            "pulse_id": "ho-m2",
+            "spatial_mode": 4,
+            "kick_amplitude": 0.01,
+            "phase_rad": -0.4,
+            "application_time": 10
+          }
+        ]
+      },
+      {
+        "trial_id": "heldout-separation",
+        "pulses": [
+          {
+            "pulse_id": "ho-d1",
+            "spatial_mode": 2,
+            "kick_amplitude": 0.01,
+            "phase_rad": 0.3,
+            "application_time": 4
+          },
+          {
+            "pulse_id": "ho-d2",
+            "spatial_mode": 2,
+            "kick_amplitude": 0.01,
+            "phase_rad": -0.4,
+            "application_time": 15
+          }
+        ]
+      },
+      {
+        "trial_id": "heldout-order",
+        "pulses": [
+          {
+            "pulse_id": "ho-o1",
+            "spatial_mode": 2,
+            "kick_amplitude": 0.01,
+            "phase_rad": -0.4,
+            "application_time": 4
+          },
+          {
+            "pulse_id": "ho-o2",
+            "spatial_mode": 1,
+            "kick_amplitude": 0.01,
+            "phase_rad": 0.3,
+            "application_time": 10
+          }
+        ]
+      }
+    ]
+  },
+  "observables": [
+    {
+      "qoi_id": "electric_field_k2_complex",
+      "kind": "complex_field_coefficient",
+      "unit": "normalized_field",
+      "normalization_scale": 1,
+      "priority": 1
+    },
+    {
+      "qoi_id": "distribution_weighted_l2",
+      "kind": "distribution_norm",
+      "unit": "dimensionless",
+      "normalization_scale": 1,
+      "priority": 0.5
+    },
+    {
+      "qoi_id": "echo_peak_time",
+      "kind": "echo_peak_time",
+      "unit": "omega_pe^-1",
+      "normalization_scale": 1,
+      "priority": 0.5
+    },
+    {
+      "qoi_id": "echo_branch",
+      "kind": "branch_identity",
+      "unit": "categorical",
+      "normalization_scale": 1,
+      "priority": 1
+    }
+  ],
+  "prediction_horizon": {
+    "start_time": 4,
+    "end_time": 30,
+    "unit": "omega_pe^-1"
+  },
+  "reference_convergence": {
+    "minimum_spatial_refinement_levels": 2,
+    "minimum_velocity_refinement_levels": 2,
+    "minimum_time_refinement_levels": 2,
+    "domain_extension_required": true,
+    "independent_reference_confirmation_required": true,
+    "convergence_observables": [
+      "electric_field_k2_complex",
+      "distribution_weighted_l2",
+      "echo_peak_time"
+    ]
+  },
+  "comparators": [
+    "snapshot_pod",
+    "padovan_nonintrusive_balancing",
+    "adaptive_hermite",
+    "adaptive_fourier",
+    "tensor_network_vlasov_poisson",
+    "non_markovian_fno_closure",
+    "full_order_reference"
+  ],
+  "success_targets": {
+    "status": "prospective_only_not_achieved",
+    "linear_damping_or_growth_relative_error": 0.01,
+    "complex_echo_amplitude_relative_error": 0.02,
+    "wrapped_echo_phase_error_radians": 0.02,
+    "all_targets_are_prospective": true
+  },
+  "resource_budget": {
+    "maximum_reference_steps": 1000000,
+    "maximum_wall_time_seconds": 3600,
+    "maximum_memory_bytes": 8589934592,
+    "comparison_modes": [
+      "equal_rank",
+      "equal_stored_bytes",
+      "equal_end_to_end_wall_time"
+    ]
+  },
+  "claim_boundary": {
+    "physical_solver_executed": false,
+    "physical_response_measured": false,
+    "competitive_ranking_claimed": false,
+    "independent_reference_converged": false
+  },
+  "provenance": {
+    "fixture_class": "synthetic_schema_test_only",
+    "generator_seed": 7,
+    "source_record_refs": []
+  }
+}
