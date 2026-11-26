@@ -16,6 +16,8 @@ use serde::Deserialize;
 use std::collections::HashSet;
 use std::fmt;
 
+const EFFECT_BINDING_DOMAIN: &str = "SAT-EFFECT-ATTEMPT-BINDING-v0.1\\n";
+
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Deserialize)]
 #[serde(rename_all = "snake_case")]
 pub enum EffectOutcome {
@@ -272,8 +274,8 @@ pub fn verify_effect_receipt(
     receipt_json: &str,
     expected: &ExpectedEffectAttempt<'_>,
 ) -> Result<EffectReceiptVerificationReport, EffectReceiptError> {
-    let _: StrictJson = serde_json::from_str(attempt_json).map_err(map_json_error)?;
-    let _: StrictJson = serde_json::from_str(receipt_json).map_err(map_json_error)?;
+    let attempt_raw: StrictJson = serde_json::from_str(attempt_json).map_err(map_json_error)?;
+    let _receipt_raw: StrictJson = serde_json::from_str(receipt_json).map_err(map_json_error)?;
     let attempt: EffectAttempt =
         serde_json::from_str(attempt_json).map_err(|e| EffectReceiptError::InvalidJson(e.to_string()))?;
     let receipt: EffectReceipt =
@@ -281,6 +283,7 @@ pub fn verify_effect_receipt(
 
     validate_expected_context(expected)?;
     validate_attempt_shape(&attempt)?;
+    validate_effect_binding_digest(&attempt_raw, &attempt)?;
     validate_receipt_shape(&receipt)?;
     bind_attempt_to_expected(&attempt, expected)?;
     if receipt.trust_policy_digest != expected.trust_policy_digest {
@@ -513,6 +516,28 @@ fn validate_attempt_shape(attempt: &EffectAttempt) -> Result<(), EffectReceiptEr
     Ok(())
 }
 
+fn validate_effect_binding_digest(
+    attempt_raw: &StrictJson,
+    attempt: &EffectAttempt,
+) -> Result<(), EffectReceiptError> {
+    let binding_without_digest = attempt_raw
+        .get("effect_binding")
+        .and_then(|binding| binding.without_key("binding_digest"))
+        .ok_or_else(|| {
+            EffectReceiptError::InvalidShape(
+                "attempt.effect_binding must be an object".to_owned(),
+            )
+        })?;
+    if super::digest_json(EFFECT_BINDING_DOMAIN, &binding_without_digest)
+        != attempt.effect_binding.binding_digest
+    {
+        return Err(EffectReceiptError::InvalidDigest(
+            "attempt.effect_binding.binding_digest",
+        ));
+    }
+    Ok(())
+}
+
 fn validate_receipt_shape(receipt: &EffectReceipt) -> Result<(), EffectReceiptError> {
     if receipt.schema_version != "sat-effect-receipt/v0.1" {
         return Err(EffectReceiptError::InvalidShape("unsupported receipt schema_version".to_owned()));
@@ -672,7 +697,7 @@ mod tests {
             intent_digest: "sha256:bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb",
             authority_decision_digest: "sha256:cccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccc",
             disclosure_decision_digest: "sha256:dddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddd",
-            effect_binding_digest: "sha256:1111111111111111111111111111111111111111111111111111111111111111",
+            effect_binding_digest: "sha256:a0bbc153c2153cf9b007509c845e1ea013250f8b40722898a167bf88524f849e",
             trust_policy_digest: "sha256:3333333333333333333333333333333333333333333333333333333333333333",
         }
     }
