@@ -7,7 +7,7 @@
 
 The Agent Memory Leaderboard Cycle 2 textual results show a 13.46-point commercial advantage in streaming and a 9.29-point advantage in temporal sequencing between the leading commercial and open-source systems. Personalization/care and epistemic safety/privacy gaps are 15.88 and 13.39 points respectively. These are not source-assurance scores; they point to a different memory-engineering problem: a memory system must update its representation as the world and the user's preferences change, without returning stale or superseded state.
 
-MACE already has a raw-session BM25 reference adapter and a LongMemEval-V2 trajectory parser. Those preserve raw source material and support retrieval experiments, but they are not a transactional, event-sourced session state machine. The new `streaming_session` module adds that missing state-transition core.
+MACE already has a raw-session BM25 reference adapter and a LongMemEval-V2 trajectory parser. Those preserve raw source material and support retrieval experiments, but they are not a transactional, event-sourced session state machine. The new `streaming_session` module adds that missing state-transition core. This lines up with the strongest recent research signal: AMA-Bench emphasizes causal/state memory over trajectories, MemoryArena couples memory updates to future interdependent tasks, Memora/FAMA penalizes obsolete-memory reuse, and the new MEMOBench isolates Storage/Update/Compression at executable embodied checkpoints. A ledger is an enabling primitive, not a benchmark result by itself.
 
 ## 2. Paradigm shift: memory as a bitemporal event ledger
 
@@ -98,6 +98,8 @@ These tests are authored but not compiled or executed. The current environment h
 
 ## 7. Benchmark programme for streaming and temporal memory
 
+The official [AML Cycle 2 results](https://agentmemoryleaderboard.ai/results/cycle-2/) report 49.65 Streaming for the open-source textual leader and 63.11 for the commercial textual leader, a 13.46-point gap. Temporal & Event Sequencing scores are 57.76 and 67.05 respectively, a 9.29-point gap. The textual overall scores are 61.22 and 69.26; all these are reported within the textual track and should not be mixed with multimodal or coding scores.
+
 The new module should be tested on both the official Agent Memory Leaderboard Streaming and Temporal & Event Sequencing tasks and a separate lifecycle benchmark. Do not infer that an event ledger improves AML scores until the official harness is executed.
 
 ### Required baselines
@@ -166,3 +168,14 @@ The next engineering increments are:
 8. matched AML Streaming/Temporal benchmark runs.
 
 The current branch delivers the typed in-memory state machine and its tests. It does not yet deliver those production services.
+
+
+## 10. Research references
+
+- [Agent Memory Leaderboard Cycle 2 official results](https://agentmemoryleaderboard.ai/results/cycle-2/) — streaming and temporal capability breakdown; published November 19, 2026.
+- [AMA-Bench](https://proceedings.mlr.press/v306/zhao26bs.html) — 205 real/curated trajectory samples, 2,460 QA pairs, four capabilities; its AMA-Agent reports 57.22% and +11.16 points versus its strongest baseline.
+- [MemoryArena](https://proceedings.mlr.press/v306/he26am.html) — interdependent multi-session memory-agent-environment tasks.
+- [Memora/FAMA](https://aclanthology.org/2026.findings-acl.1337/) — evaluates remembering, reasoning and recommending, and penalizes obsolete-memory reuse.
+- [MEMORA-Bench](https://aclanthology.org/2026.findings-emnlp.1211/) — 45-hour egocentric video embodied-memory suite for retrospective faithfulness and prospective planning.
+- [LongMemEval-V2](https://github.com/xiaowu0162/LongMemEval-V2) — 451 questions, five memory abilities, up to 115M-token haystacks.
+- [MEMOBench](https://aclanthology.org/2026.findings-emnlp.XXX/) — process-level Storage, Update and Compression checkpoints for history-dependent manipulation. **Anthology identifier requires confirmation before formal citation or execution.**
