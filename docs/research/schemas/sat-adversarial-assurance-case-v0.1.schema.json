@@ -118,7 +118,8 @@
                   "exfiltrate",
                   "reorder",
                   "change_component",
-                  "reuse_identity"
+                  "reuse_identity",
+                  "withhold"
                 ]
               },
               "target": {
