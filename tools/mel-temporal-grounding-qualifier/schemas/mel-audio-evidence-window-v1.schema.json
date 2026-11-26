@@ -63,7 +63,8 @@
       "additionalProperties": false,
       "required": [
         "audio_sha256",
-        "byte_length"
+        "byte_length",
+        "rights_scope_receipt_sha256"
       ],
       "properties": {
         "audio_sha256": {
@@ -73,6 +74,10 @@
         "byte_length": {
           "type": "integer",
           "minimum": 0
+        },
+        "rights_scope_receipt_sha256": {
+          "type": "string",
+          "pattern": "^[0-9a-f]{64}$"
         }
       }
     },
