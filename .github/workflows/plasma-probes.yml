@@ -931,6 +931,10 @@ jobs:
               lambda value: value["claim_boundary"].__setitem__("physical_response_measured", True),
           )
           expect_rejection(
+              "pulse-jacobian-bypass",
+              lambda value: value["linearization_contract"].__setitem__("pulse_map_parameter_jacobian_required", False),
+          )
+          expect_rejection(
               "split-id-duplication",
               lambda value: value["split"]["held_out"][0].__setitem__("trial_id", value["split"]["training"][0]["trial_id"]),
           )
