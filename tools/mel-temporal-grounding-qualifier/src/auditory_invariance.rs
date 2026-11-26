@@ -119,6 +119,8 @@ pub enum DatasetSplitV1 {
 #[derive(Debug, Clone, PartialEq, Serialize)]
 pub struct VariantOutcomeV1 {
     pub variant_id: String,
+    pub audio_sha256: String,
+    pub question_sha256: String,
     pub expected_relation: MusicalRelationV1,
     pub predicted_relation: Option<MusicalRelationV1>,
     pub model_answer: ModelAnswerV1,
@@ -192,7 +194,9 @@ pub struct AuditoryInvarianceReportV1 {
     pub dataset_revision_sha256: String,
     pub split: DatasetSplitV1,
     pub model_identity_sha256: String,
+    pub system_prompt_sha256: String,
     pub runtime_identity_sha256: String,
+    pub decoding_config_sha256: String,
     pub pair_count: usize,
     pub source_lineage_clusters: usize,
     pub recommended_confirmatory_source_floor: usize,
@@ -275,7 +279,9 @@ pub fn audit_auditory_invariance(
         dataset_revision_sha256: run.dataset_revision_sha256.clone(),
         split: run.split,
         model_identity_sha256: run.model_identity_sha256.clone(),
+        system_prompt_sha256: run.system_prompt_sha256.clone(),
         runtime_identity_sha256: run.runtime_identity_sha256.clone(),
+        decoding_config_sha256: run.decoding_config_sha256.clone(),
         pair_count: results.len(),
         source_lineage_clusters: source_lineages.len(),
         recommended_confirmatory_source_floor: CONFIRMATORY_SOURCE_FLOOR,
@@ -442,6 +448,8 @@ fn score_variant(variant: &AuditoryVariantV1) -> VariantOutcomeV1 {
     };
     VariantOutcomeV1 {
         variant_id: variant.variant_id.clone(),
+        audio_sha256: variant.audio_sha256.clone(),
+        question_sha256: variant.question_sha256.clone(),
         expected_relation: variant.expected_relation,
         predicted_relation,
         model_answer: variant.model_answer,
