@@ -1841,13 +1841,13 @@ mod tests {
         let qualification_binding = qualification_binding(&qualified, &candidate_ids, 160);
 
         let evaluator_key = SigningKey::from_bytes(&[73; 32]);
-        let evaluator_profile = evaluator_profile(
+        let evaluator_profile_value = evaluator_profile(
             &evaluator_key,
             QualificationKeyStatusV1::Active,
             1,
             DECISION_SUFFICIENCY_VERIFIER_ID_V1,
         );
-        let evaluator_profile_sha256 = evaluator_profile.profile_sha256().to_owned();
+        let evaluator_profile_sha256 = evaluator_profile_value.profile_sha256().to_owned();
         let evaluator_profile_pin = evaluator_profile_sha256.clone();
         let evaluator_profile_pin: &'static str =
             Box::leak(evaluator_profile_pin.into_boxed_str());
@@ -1881,7 +1881,7 @@ mod tests {
         let envelope_a = signed_source_lineage_envelope(
             &resolver_key,
             &resolver_profile_sha256,
-            &qualified.qualified_candidate_set_sha256(),
+            qualified.qualified_candidate_set_sha256(),
             &need_sha256,
             qualified.run_id(),
             qualified.query_invocation_id(),
@@ -1911,7 +1911,7 @@ mod tests {
             &TestQualificationVerifier,
             &binding,
             &evaluator_envelope,
-            &evaluator_profile,
+            &evaluator_profile_value,
         ).expect("independent evaluator receipt");
 
         let lineage_inputs = vec![
