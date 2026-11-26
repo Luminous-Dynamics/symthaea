@@ -118,7 +118,7 @@ Report false-hold, false-block and collateral-deletion rates beside clean-task u
 
 Public development fixtures should be easy to reproduce. Confirmatory results require evaluator-owned holdouts and a separately operated evaluator.
 
-Recommended adaptive budgets are 1, 3, 5, 10 and 15 attacker rounds, with the exact rounds and feedback exposed to the attacker recorded. Include unseen attack families, new contexts, different root issuers, derived-memory paths and storage backends in holdouts. A static seed list alone is not sufficient against adaptive attackers.
+Recommended adaptive budgets are 1, 3, 5, 10 and 15 attacker rounds, with the exact rounds and feedback exposed to the attacker recorded. Include unseen attack families, new contexts, different root issuers, derived-memory paths and storage backends in holdouts. A static seed list alone is not sufficient against adaptive attackers. The 2026 *Adaptive Adversaries* study reports a 21-scenario agent-security experiment in which first-turn-only scoring yielded 0–1% attack success, versus 5.4–14.0% under a 15-round adaptive budget. That benchmark is not memory-specific and its default scaffold does not execute external actions; use it only as evidence that multi-round adaptation can expose failures missed by round-one scoring, not as a SAT baseline or memory-security result.
 
 The evaluator must own expected SUT identity, profile manifest, source labels, expected mutations, snapshots, case classification and sealed labels. Preserve raw evidence, tool versions, exact commands, run IDs and digests. Independent replay should recompute every native score from per-case results and test whether any mandatory premise was removed without invalidating dependent claims.
 
@@ -137,6 +137,7 @@ SAT should complement these benchmarks, not replace their native tasks or grader
 | MemoryDojo | Long-horizon, multi-session propagation trajectories | Evaluate delayed propagation and session-boundary persistence |
 | Agent Memory Leaderboard | Native textual, coding and multimodal capability tracks | Measure clean memory utility and resource overhead separately from security |
 | AgentDojo / AuditBench | Their own tool-agent security and auditor tasks | Reuse as adjacent system/auditor tests, not as substitutes for memory-specific metrics |
+| Adaptive Adversaries | 21 held-out scenarios with live multi-round attacker adaptation (up to 15 rounds); its memoryless fresh-session defender setup and lack of external actions make it adjacent, not memory-specific. | Reuse its adaptive attacker/evaluator design pattern across persistent-memory sessions, while defining memory-specific persistence, retrieval and sink checks |
 
 ### Current external comparison points
 
@@ -206,4 +207,5 @@ This federation increment intentionally owns no second memory writer, trust root
 - [MPBench: From Untrusted Input to Trusted Memory](https://arxiv.org/abs/2606.04329), 2026-06-03.
 - [Agent Memory Leaderboard Cycle 2 official results](https://agentmemoryleaderboard.ai/results/cycle-2/), 2026-11-19.
 - [AgentDojo (NeurIPS 2024)](https://proceedings.neurips.cc/paper_files/paper/2024/hash/97091a5177d8dc64b1da8bf3e1f6fb54-Abstract-Datasets_and_Benchmarks_Track.html).
+- [Adaptive Adversaries: A Multi-Turn, Multi-LLM Benchmark for LLM Agent Security](https://arxiv.org/abs/2607.18063), 2026-07-20.
 - [AuditBench](https://alignment.anthropic.com/2026/auditbench/), 2026-03-10.
