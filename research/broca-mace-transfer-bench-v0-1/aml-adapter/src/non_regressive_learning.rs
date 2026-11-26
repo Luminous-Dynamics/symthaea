@@ -675,6 +675,31 @@ mod tests {
         }
     }
 
+
+    struct ReusedReceiptVerifier;
+
+    impl LearningRunVerifierV1 for ReusedReceiptVerifier {
+        fn verify_run(&self, _run: &LearningRunSnapshotV1) -> Option<LearningRunVerificationReceiptV1> {
+            Some(LearningRunVerificationReceiptV1 {
+                verifier_id: "fixture-verifier".into(),
+                verification_receipt_sha256: "f".repeat(64),
+            })
+        }
+    }
+
+    #[test]
+    fn the_same_verification_receipt_cannot_attest_all_four_runs() {
+        let (sb, sa, ab, aa) = four_runs(&[9_000, 9_000], &[6_000, 6_000]);
+        assert_eq!(
+            evaluate_non_regressive_learning_v1(
+                &sb, &sa, &ab, &aa,
+                LearningRetentionPolicyV1::default(),
+                Some(&ReusedReceiptVerifier),
+            ),
+            Err(LearningGateRejectV1::DuplicateVerificationReceipt)
+        );
+    }
+
     #[test]
     fn accepts_learning_with_stable_regression_exactly_at_one_percentage_point() {
         let (sb, sa, ab, aa) = four_runs(&[8_900, 8_900], &[6_000, 6_000]);
