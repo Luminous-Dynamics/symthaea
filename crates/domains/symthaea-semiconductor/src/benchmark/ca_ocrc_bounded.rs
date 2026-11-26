@@ -98,6 +98,9 @@ pub struct CaOcrcPolicyV1 {
     pub tracking_capacity: usize,
     /// PMF indexed by proxy delay + 1: index 0 means -1, index d+1 means d.
     pub proxy_delay_pmf: Vec<f64>,
+    /// External declaration/receipt supporting the arbitrary bounded-delay assumption.
+    pub actual_delay_contract_sha256: String,
+    pub bounded_actual_delay_assumption_attested: bool,
 }
 
 #[derive(Clone, Debug, PartialEq, Serialize, Deserialize)]
@@ -194,7 +197,6 @@ pub struct CaOcrcEngineStateV1 {
     pub tracked: BTreeMap<u64, CaOcrcTrackedEntryV1>,
     pub accepted_label_revisions: BTreeSet<String>,
     pub seen_feedback_attempt_digests: BTreeSet<String>,
-    pub feedback_received_sample_ids: BTreeSet<String>,
     pub theorem_assumptions_intact: bool,
     pub guarantee_invalid_reasons: BTreeSet<String>,
     pub max_observed_occupancy: usize,
@@ -318,7 +320,7 @@ fn validate_pmf(policy: &CaOcrcPolicyV1) -> Result<(), CaOcrcErrorV1> {
         .map_err(|_| CaOcrcErrorV1("maximum delay exceeds addressable memory".into()))?
         .checked_add(2)
         .ok_or_else(|| CaOcrcErrorV1("proxy PMF length overflow".into()))?;
-    if policy.maximum_actual_delay_steps > i64::MAX as u64 {
+    if policy.maximum_actual_delay_steps >= i64::MAX as u64 {
         return Err(CaOcrcErrorV1("maximum delay exceeds signed proxy-delay range".into()));
     }
     if policy.proxy_delay_pmf.len() != expected_len {
@@ -450,6 +452,7 @@ fn validate_policy(policy: &CaOcrcPolicyV1) -> Result<(), CaOcrcErrorV1> {
     }
     require_text(&policy.policy_id, "policy.policy_id")?;
     if policy.revision == 0
+        || !valid_sha256(&policy.actual_delay_contract_sha256)
         || !policy.target_risk_alpha.is_finite()
         || !(0.0..1.0).contains(&policy.target_risk_alpha)
         || !policy.learning_rate_eta.is_finite()
@@ -573,9 +576,12 @@ pub fn create_ca_ocrc_engine_v1(
             tracked: BTreeMap::new(),
             accepted_label_revisions: BTreeSet::new(),
             seen_feedback_attempt_digests: BTreeSet::new(),
-            feedback_received_sample_ids: BTreeSet::new(),
-            theorem_assumptions_intact: true,
-            guarantee_invalid_reasons: BTreeSet::new(),
+            theorem_assumptions_intact: policy.bounded_actual_delay_assumption_attested,
+            guarantee_invalid_reasons: if policy.bounded_actual_delay_assumption_attested {
+                BTreeSet::new()
+            } else {
+                BTreeSet::from(["bounded_actual_delay_assumption_not_attested".into()])
+            },
             max_observed_occupancy: 0,
         },
         predictions_by_round: BTreeMap::new(),
@@ -805,18 +811,6 @@ pub fn step_ca_ocrc_round_v1(
     let state_before = state_digest(&engine.state)?;
     let threshold_before = engine.state.threshold;
     let mut candidate = engine.clone();
-    for previous in candidate.predictions_by_round.values() {
-        if previous.physical_measurement_selected
-            && previous.prediction_set.kind == CaOcrcSetKindV1::Interval
-            && !candidate.state.feedback_received_sample_ids.contains(&previous.sample_id)
-            && previous
-                .round
-                .checked_add(candidate.policy.maximum_actual_delay_steps)
-                .is_some_and(|deadline| deadline < prediction.round)
-        {
-            mark_assumption_invalid(&mut candidate, "qualified_feedback_missing_after_bounded_delay");
-        }
-    }
     let evicted_rounds = evict_expired(&mut candidate, prediction.round);
 
     let trivial_loss = match prediction.prediction_set.kind {
@@ -833,6 +827,7 @@ pub fn step_ca_ocrc_round_v1(
         )?
     };
     let admitted = sampled_proxy_delay >= 0
+        && prediction.physical_measurement_selected
         && candidate.state.tracked.len() < candidate.policy.tracking_capacity;
     if !prediction.physical_measurement_selected && trivial_loss.is_none() {
         mark_assumption_invalid(&mut candidate, "physical_measurement_not_selected");
@@ -955,13 +950,19 @@ pub fn step_ca_ocrc_round_v1(
         };
         let tracked = candidate.state.tracked.get(&origin_round).cloned();
         let Some(tracked_entry) = tracked else {
+            let actual_delay = prediction.round.saturating_sub(origin_round);
+            let mut reasons = vec![CaOcrcReasonV1::PredictionNotTracked];
+            if actual_delay > candidate.policy.maximum_actual_delay_steps {
+                reasons.push(CaOcrcReasonV1::ActualDelayOutOfBounds);
+                mark_assumption_invalid(&mut candidate, "actual_delay_exceeded_declared_bound");
+            }
             let result = make_feedback_result(
                 feedback,
                 Some(origin_round),
-                Some(prediction.round.saturating_sub(origin_round)),
+                Some(actual_delay),
                 Some(prediction_receipt.sampled_proxy_delay),
                 CaOcrcFeedbackDispositionV1::NotTracked,
-                vec![CaOcrcReasonV1::PredictionNotTracked],
+                reasons,
                 None,
                 None,
                 None,
@@ -1141,8 +1142,15 @@ pub fn close_ca_ocrc_feedback_horizon_v1(
         .keys()
         .copied()
         .collect();
-    if !unresolved.is_empty() {
-        mark_assumption_invalid(engine, "feedback_unresolved_at_horizon_end");
+    let unresolved_selected: BTreeSet<u64> = engine
+        .state
+        .tracked
+        .iter()
+        .filter(|(_, entry)| entry.prediction_receipt.physical_measurement_selected)
+        .map(|(round, _)| *round)
+        .collect();
+    if !unresolved_selected.is_empty() {
+        mark_assumption_invalid(engine, "tracked_feedback_unresolved_at_horizon_end");
     }
     Ok(unresolved)
 }
@@ -1216,6 +1224,8 @@ mod tests {
             maximum_actual_delay_steps: d_max,
             tracking_capacity: k,
             proxy_delay_pmf: pmf,
+            actual_delay_contract_sha256: digest('f'),
+            bounded_actual_delay_assumption_attested: true,
         }
     }
 
