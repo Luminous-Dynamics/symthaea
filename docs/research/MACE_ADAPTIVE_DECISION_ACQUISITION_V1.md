@@ -323,6 +323,8 @@ The Rust module currently authors 15 deterministic test functions covering:
 - zero-probability/unsupported-world handling.
 
 These tests are authored only. They have not been compiled or run; hosted CI is not reported as passing. The reference can be used as an independent expected-result oracle for a later optimized executor and for cross-language implementations.
+For the published four-world example, an independent brute-force policy enumeration yields the conditional tree `route → A: check-a; B: check-b`. Its exact expected-value numerators correspond to expected utility 10, expected query cost 1 and expected net utility 9 units; the probability-free worst-case regret-plus-cost is 1 utility unit. These are synthetic fixture values used to pin implementation correctness, not external benchmark scores.
+
 
 
 
