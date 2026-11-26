@@ -1976,6 +1976,95 @@ mod tests {
     }
 
     #[test]
+    fn source_planner_records_within_query_and_cross_query_duplicates() {
+        let results = vec![
+            (
+                0,
+                SearchQueryAcquisition {
+                    query: "first query".to_string(),
+                    urls: vec![
+                        "https://source.example/a".to_string(),
+                        "https://source.example/a".to_string(),
+                        "https://source.example/b".to_string(),
+                    ],
+                    receipts: Vec::new(),
+                    had_failure: false,
+                },
+            ),
+            (
+                1,
+                SearchQueryAcquisition {
+                    query: "second query".to_string(),
+                    urls: vec![
+                        "https://source.example/b".to_string(),
+                        "https://source.example/c".to_string(),
+                    ],
+                    receipts: Vec::new(),
+                    had_failure: false,
+                },
+            ),
+        ];
+
+        let plan = plan_page_candidates(results, 5);
+        assert_eq!(
+            plan.candidates
+                .iter()
+                .map(|candidate| candidate.url.as_str())
+                .collect::<Vec<_>>(),
+            vec![
+                "https://source.example/a",
+                "https://source.example/b",
+                "https://source.example/c"
+            ]
+        );
+        assert!(!plan.acquisition_incomplete);
+        assert_eq!(
+            plan.receipts
+                .iter()
+                .filter(|receipt| receipt.outcome == AcquisitionOutcome::DuplicateSuppressed)
+                .count(),
+            2
+        );
+        assert!(plan.receipts.iter().all(|receipt| {
+            receipt.outcome != AcquisitionOutcome::BudgetExceeded
+        }));
+        assert_eq!(plan.receipts[0].query_rank, 0);
+        assert_eq!(plan.receipts[0].source_rank, Some(1));
+        assert_eq!(plan.receipts[1].query_rank, 1);
+        assert_eq!(plan.receipts[1].source_rank, Some(0));
+    }
+
+    #[test]
+    fn source_planner_marks_global_cap_rejections_incomplete() {
+        let results = vec![(
+            0,
+            SearchQueryAcquisition {
+                query: "single query".to_string(),
+                urls: vec![
+                    "https://source.example/a".to_string(),
+                    "https://source.example/b".to_string(),
+                    "https://source.example/c".to_string(),
+                ],
+                receipts: Vec::new(),
+                had_failure: false,
+            },
+        )];
+
+        let plan = plan_page_candidates(results, 2);
+        assert_eq!(plan.candidates.len(), 2);
+        assert!(plan.acquisition_incomplete);
+        assert_eq!(plan.receipts.len(), 1);
+        assert_eq!(
+            plan.receipts[0].outcome,
+            AcquisitionOutcome::BudgetExceeded
+        );
+        assert_eq!(
+            plan.receipts[0].reason_code.as_deref(),
+            Some("MAX_SOURCES_PER_RESEARCH")
+        );
+    }
+
+    #[test]
     fn acquisition_receipt_ids_bind_query_stage_and_source_rank() {
         let search = make_receipt(
             2,
