@@ -147,7 +147,7 @@ Run matched task/seed pairs across arms. Freeze model revision, system and devel
 - **Stage E — independent campaign:** sealed tests, adaptive attackers, benign controls, independent evaluator and preregistered statistics.
 - **Stage F — field assurance:** production sink integrations, incident/rollback handling, drift monitoring, time-bounded qualification and change-triggered requalification.
 
-Every published claim records exact repository SHA, manifest, policy, fixture set, test runner and evidence artifacts. A skipped workflow is `skipped`; an authored test not run is `not executed`.
+Every published claim records exact repository SHA, manifest, policy, fixture set, test runner and evidence artifacts. The new Rust module contains source-authored unit tests but has not been compiled or executed; no source-level result is promoted above contract-authored. A skipped workflow is `skipped`; an authored test not run is `not executed`.
 
 ## 9. Integration ownership
 
@@ -163,7 +163,7 @@ No duplicate authorization state machine, payment state machine or robot safety 
 
 ## 10. Immediate implementation order
 
-1. Add receipt/attempt parsing and cross-binding to the current Rust verifier, with authenticity and source independence explicitly `unknown`/`unverified`.
+1. **Source authored (execution pending):** `effect_receipt.rs` adds strict JSON parsing, run/manifest/attempt/idempotency/intent/effect-binding cross-binding for every source attestation, and structural sink-projection comparison. It always holds for authenticated reconciliation and hard-codes signature, transparency, independence, retry authorization and qualification outputs to false.
 2. Implement typed reconciliation and prior-attempt/source-sequence state, then execute the 40 fixture catalog.
 3. Add offline evidence bundle resolution and COSE/DSSE signature verification as separate adapters.
 4. Implement SCITT RFC 9942/9943 and Rekor proof adapters; persist checkpoint pins outside subject-controlled storage.
