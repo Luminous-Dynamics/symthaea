@@ -630,7 +630,7 @@ mod tests {
             invocation_sequence: 0, decision_need_sha256: D1, candidate_policy_sha256: D2,
             source_registry_root_sha256: D3, lineage_profile_sha256: D4,
             lifecycle_profile_sha256: D5, renderer_profile_sha256: D6,
-            transport_adapter_profile_sha256: D7, provider_parameter_profile_sha256: "44136fa355b3678a1146ad16f7e8649e94fb4fc21fe77e8310c060f61caaff8a", model_revision: "model-v1",
+            transport_adapter_profile_sha256: D7, provider_parameter_profile_sha256: "44136fa355b3678a1146ad16f7e8649e94fb4fc21fe77e8310c060f61caaff8a", model_revision: "test-model",
             clock_profile_sha256: D8, observer_profile_sha256: D9,
             storage_profile_sha256: D1, encryption_profile_sha256: D2,
             access_policy_sha256: D3, retention_policy_sha256: D4,
@@ -769,6 +769,40 @@ mod tests {
         assert_eq!(parsed["model"], "test-model");
         assert_eq!(parsed["temperature"], serde_json::json!(2));
         assert_eq!(parsed["top_p"], serde_json::json!(7));
+    }
+
+    #[test]
+    fn rejects_unpinned_provider_parameter_profile_before_artifact_or_transport() {
+        let mut request_parameters = BTreeMap::new();
+        request_parameters.insert(
+            "instructions".to_owned(),
+            MaceProviderStaticParameterV1::String("unexpected dynamic instruction".to_owned()),
+        );
+        let request = MaceProviderNeutralRequestV1 {
+            model: "test-model".to_owned(),
+            request_parameters,
+            messages: vec![MaceRequestMessageV1 {
+                role: MaceContextRoleV1::User,
+                segments: vec![MaceRequestSegmentV1 {
+                    text: "plain".to_owned(),
+                    origin: MaceRequestSegmentOriginV1::NonMemory,
+                }],
+            }],
+        };
+        assert_eq!(
+            capture_send_and_sign_mace_invocation_v1(
+                &request, &expected(),
+                MaceExposureCaptureContextV1 {
+                    receipt_id: "receipt-parameter-drift",
+                    captured_at_monotonic_ns: 42,
+                    candidate_decision_trace_sha256: D8,
+                    admission_denials: vec![],
+                    model_declared_support_event_ids: vec![],
+                },
+                &TestArtifactStore, &TestTransport, &signer(),
+            ).unwrap_err(),
+            MaceExposureCaptureRejectV1::RequestParameterProfileMismatch
+        );
     }
 
     #[test]
