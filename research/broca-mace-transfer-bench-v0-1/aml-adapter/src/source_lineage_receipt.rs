@@ -55,6 +55,7 @@ pub enum SourceLineageRejectV1 {
     NotYetValid,
     Expired,
     InvalidSignature,
+    UnknownOrRevokedSigner,
     Sufficiency(DecisionSufficiencyRejectV1),
 }
 
@@ -164,12 +165,17 @@ impl VerifiedSourceLineageSetV1 {
         }
 
         for item in &self.receipts {
-            validate_lineage_receipt_binding(
+            validate_lineage_binding_at_use(
                 &item.receipt,
                 qualified,
                 sufficiency_receipt,
                 decision_need,
             )?;
+            if item.receipt.key_id == qualified.qualification_signer_key_id()
+                || item.receipt.key_id == sufficiency_receipt.key_id
+            {
+                return Err(SourceLineageRejectV1::SharedAuthority);
+            }
             if now_unix < item.receipt.issued_at_unix {
                 return Err(SourceLineageRejectV1::NotYetValid);
             }
@@ -280,6 +286,11 @@ pub fn verify_source_lineage_receipts_v1(
             lineage_profile,
             now_unix,
         )?;
+        if item.receipt.key_id == qualified.qualification_signer_key_id()
+            || item.receipt.key_id == receipt.key_id
+        {
+            return Err(SourceLineageRejectV1::SharedAuthority);
+        }
         verified.push(item);
     }
     verified.sort_by(|left, right| {
@@ -311,6 +322,14 @@ fn expected_lineage_pairs(
         {
             return Err(SourceLineageRejectV1::BindingMismatch);
         }
+        if claim.status == crate::decision_sufficiency::DecisionRequirementStatusV1::Met
+            && claim.independent_root_families.len()
+                < need.minimum_independent_root_families as usize
+        {
+            return Err(SourceLineageRejectV1::Sufficiency(
+                DecisionSufficiencyRejectV1::InsufficientIndependentRootFamilies,
+            ));
+        }
         for family in &claim.independent_root_families {
             expected.push((
                 claim.requirement_id.clone(),
@@ -336,6 +355,12 @@ fn verify_one_source_lineage_receipt_v1(
     profile: &PinnedEd25519QualificationVerifierV1,
     now_unix: u64,
 ) -> Result<VerifiedSourceLineageReceiptV1, SourceLineageRejectV1> {
+    if profile.verifier_id() != SOURCE_LINEAGE_VERIFIER_ID_V1 {
+        return Err(SourceLineageRejectV1::WrongVerifierRole);
+    }
+    if profile.profile_sha256() != binding.expected_profile_sha256 {
+        return Err(SourceLineageRejectV1::ProfileMismatch);
+    }
     if envelope_json.len() > MAX_LINEAGE_ENVELOPE_BYTES_V1 {
         return Err(SourceLineageRejectV1::InvalidEnvelope);
     }
@@ -373,7 +398,7 @@ fn verify_one_source_lineage_receipt_v1(
 
     let predicate = statement.get("predicate").ok_or(SourceLineageRejectV1::InvalidJson)?;
     let receipt = parse_lineage_predicate(predicate)?;
-    validate_lineage_receipt_binding(&receipt, binding)?;
+    validate_lineage_binding_expected(&receipt, binding)?;
     if envelope.key_id_hint.as_ref().is_some_and(|hint| hint != &receipt.key_id) {
         return Err(SourceLineageRejectV1::PayloadBindingMismatch);
     }
@@ -476,7 +501,7 @@ fn parse_lineage_predicate(value: &Value) -> Result<SourceLineageReceiptV1, Sour
     Ok(receipt)
 }
 
-fn validate_lineage_receipt_binding(
+fn validate_lineage_binding_expected(
     receipt: &SourceLineageReceiptV1,
     binding: &ExpectedLineageBindingV1<'_>,
 ) -> Result<(), SourceLineageRejectV1> {
@@ -494,7 +519,7 @@ fn validate_lineage_receipt_binding(
     Ok(())
 }
 
-fn validate_lineage_receipt_binding(
+fn validate_lineage_binding_at_use(
     receipt: &SourceLineageReceiptV1,
     qualified: &QualifiedCandidateEvidenceBatchV1,
     sufficiency: &DecisionSufficiencyReceiptV1,
@@ -529,7 +554,7 @@ fn map_signature_error(
 ) -> SourceLineageRejectV1 {
     use crate::evidence_qualification_gate::EvidenceQualificationRejectV1 as E;
     match error {
-        E::RevokedKey | E::UnknownKey => SourceLineageRejectV1::SharedAuthority,
+        E::RevokedKey | E::UnknownKey => SourceLineageRejectV1::UnknownOrRevokedSigner,
         E::TrustProfileDigestMismatch => SourceLineageRejectV1::ProfileMismatch,
         E::KeyNotYetValid => SourceLineageRejectV1::NotYetValid,
         E::KeyExpired => SourceLineageRejectV1::Expired,
