@@ -19,7 +19,6 @@ use crate::mace_context_exposure_receipt::{
     sign_mace_context_exposure_receipt_v1,
     MaceContextCaptureV1,
     MaceContextExposureReceiptV1,
-    MaceContextExposureRejectV1,
     MaceContextRoleV1,
     MaceExposureAdmissionDenialV1,
     MaceExposureKindV1,
@@ -99,7 +98,6 @@ impl MaceSerializedProviderRequestV1 {
 pub enum MaceExposureCaptureRejectV1 {
     InvalidIdentifier,
     InvalidDigest,
-    EmptyModel,
     ModelRevisionMismatch,
     EmptyMessages,
     TooManyMessages,
