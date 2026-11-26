@@ -211,6 +211,10 @@ Run external suites unchanged as complementary evaluation:
 - [Memora / FAMA](https://aclanthology.org/2026.findings-acl.1337/) for long-horizon remembering, reasoning, recommending and obsolete-memory penalties.
 - [UtilMem](https://aclanthology.org/2026.emnlp-main.1639/) for integration of distributed implicit/noisy evidence and resilience to similar distractors.
 - [MemUse](https://aclanthology.org/2026.emnlp-main.804/) for naturally integrating relevant memory into conversational responses rather than answering explicit memory questions only.
+- [COLLABMEM](https://aclanthology.org/2026.emnlp-main.1194/) for role-aware sharing, access control, routing, provenance and conflict resolution across collaborating agents.
+- [TimlMemBench](https://aclanthology.org/2026.findings-emnlp.507/) for governed activation, revocation, supersession, scope and relevance; use both canonical-pool and raw-native evaluation.
+- [StreamMemBench](https://aclanthology.org/2026.findings-emnlp.992/) for streaming evidence use, feedback incorporation and follow-up reuse.
+- [DeepControl](https://aclanthology.org/2026.findings-emnlp.52/) as an algorithmic comparator for adaptive retrieval continuation and granularity control. Its reported +9.4/+8.6 average-point gains over Search-R1 on Qwen2.5-7B/3B are paper-specific, not directly comparable MACE results.
 - [MEMORA-Bench](https://aclanthology.org/2026.findings-emnlp.1211/) for embodied memory and prospective planning from egocentric video.
 - [MEMOBench](https://aclanthology.org/2026.findings-emnlp.333/) for process-level storage, update and compression during robotic manipulation.
 
