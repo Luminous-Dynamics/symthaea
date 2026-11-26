@@ -1,13 +1,15 @@
 use serde::Serialize;
 use sha2::{Digest, Sha256};
 use symthaea_semiconductor::benchmark::{
-    FORWARD_EVALUATION_RECEIPT_SCHEMA_V1, CandidateScreenReasonV1, CandidateScreenStateV1,
-    ForwardEvaluationReceiptV1, ForwardEvidenceStateV1, HistoricalSupportEvidenceV1,
+    FORWARD_EVALUATION_RECEIPT_SCHEMA_V1, HISTORICAL_SUPPORT_RECEIPT_SCHEMA_V1,
+    CandidateScreenReasonV1, CandidateScreenStateV1, ForwardEvaluationReceiptV1,
+    ForwardEvidenceStateV1, HistoricalSupportEvidenceV1, HistoricalSupportReceiptV1,
     INVERSE_VM_SHORTLIST_INPUT_SCHEMA_V1, INVERSE_VM_SHORTLIST_POLICY_SCHEMA_V1,
     InverseVmCandidateV1, InverseVmShortlistInputV1, InverseVmShortlistPolicyV1,
     MetrologyTargetV1, NumericRangeV1, PredictedMetricIntervalV1, RecipeKnobConstraintV1,
     RecipeSettingV1, SideConstraintV1, evaluate_inverse_vm_shortlist_v1,
-    seal_forward_evaluation_receipt_v1, seal_inverse_vm_candidate_v1,
+    seal_forward_evaluation_receipt_v1, seal_historical_support_receipt_v1,
+    seal_inverse_vm_candidate_v1,
 };
 
 fn digest(ch: char) -> String {
@@ -77,6 +79,33 @@ fn policy() -> InverseVmShortlistPolicyV1 {
     }
 }
 
+fn support_receipt(
+    process_snapshot_sha256: &str,
+    forward_settings: &[RecipeSettingV1],
+    neighbour_ids: &[String],
+    distance: f64,
+) -> HistoricalSupportReceiptV1 {
+    let mut sorted_neighbours = neighbour_ids.to_vec();
+    sorted_neighbours.sort();
+    let mut receipt = HistoricalSupportReceiptV1 {
+        schema: HISTORICAL_SUPPORT_RECEIPT_SCHEMA_V1.into(),
+        evaluator_id: "independent-support-evaluator.v1".into(),
+        process_snapshot_sha256: process_snapshot_sha256.into(),
+        support_manifest_sha256: digest('c'),
+        support_policy_sha256: digest('d'),
+        recipe_settings_sha256: sorted_recipe_digest(forward_settings),
+        neighbour_ids_sha256: json_digest(&sorted_neighbours),
+        normalized_distance: distance,
+        clock_domain_id: "fab-clock".into(),
+        clock_mapping_sha256: digest('9'),
+        evaluated_at_unix_seconds: 80,
+        available_at_unix_seconds: 90,
+        receipt_sha256: String::new(),
+    };
+    receipt.receipt_sha256 = seal_historical_support_receipt_v1(&receipt).unwrap();
+    receipt
+}
+
 fn candidate(available_at: i64) -> InverseVmCandidateV1 {
     let settings = vec![
         RecipeSettingV1 { knob_id: "rf_power".into(), unit: "W".into(), value: 220.0 },
@@ -105,6 +134,7 @@ fn candidate(available_at: i64) -> InverseVmCandidateV1 {
             neighbour_ids: vec!["neighbour-1".into(), "neighbour-2".into()],
             normalized_distance: 0.25,
             support_policy_sha256: digest('d'),
+            receipt: None,
         }),
         forward_model_sha256: digest('b'),
         forward_evidence_state: ForwardEvidenceStateV1::Qualified,
@@ -112,6 +142,13 @@ fn candidate(available_at: i64) -> InverseVmCandidateV1 {
         predicted_metrics: metrics,
         candidate_evidence_sha256: String::new(),
     };
+    let support_receipt = support_receipt(
+        &value.process_snapshot_sha256,
+        &value.recipe_settings,
+        &value.historical_support.as_ref().unwrap().neighbour_ids,
+        0.25,
+    );
+    value.historical_support.as_mut().unwrap().receipt = Some(support_receipt);
     let mut receipt = ForwardEvaluationReceiptV1 {
         schema: FORWARD_EVALUATION_RECEIPT_SCHEMA_V1.into(),
         evaluator_id: "independent-forward-evaluator.v1".into(),
@@ -161,6 +198,25 @@ fn independently_built_receipt_is_eligible_only_before_the_decision_frontier() {
             .contains(&CandidateScreenReasonV1::ForwardEvaluationReceiptNotYetAvailable)
     );
     assert!(late.top_k_candidate_ids.is_empty());
+}
+
+#[test]
+fn independently_built_support_receipt_binds_candidate_recipe_and_neighbour_set() {
+    let timely = evaluate_inverse_vm_shortlist_v1(&input(candidate(99), 100)).unwrap();
+    assert_eq!(timely.evaluations[0].state, CandidateScreenStateV1::Feasible);
+    assert!(!timely.historical_support_receipt_authenticity_proven);
+
+    let mut altered = candidate(99);
+    altered.historical_support.as_mut().unwrap().neighbour_ids[0] =
+        "different-neighbour".into();
+    altered.candidate_evidence_sha256 = seal_inverse_vm_candidate_v1(&altered).unwrap();
+    let report = evaluate_inverse_vm_shortlist_v1(&input(altered, 100)).unwrap();
+    assert_eq!(report.evaluations[0].state, CandidateScreenStateV1::Rejected);
+    assert!(
+        report.evaluations[0]
+            .reasons
+            .contains(&CandidateScreenReasonV1::HistoricalSupportReceiptNeighbourMismatch)
+    );
 }
 
 #[test]
