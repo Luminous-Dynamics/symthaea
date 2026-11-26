@@ -230,12 +230,16 @@ pub struct VerificationReport {
     pub edge_count: usize,
     pub dependency_acyclic: bool,
     pub supported_claim_count: usize,
-    pub admissible_supported_claim_count: usize,
+    pub supported_claims_passing_declared_state_checks: usize,
     pub computed_graph_root_digest: String,
     pub recorded_graph_root_digest: String,
     pub graph_root_matches: bool,
     pub semantic_valid: bool,
     pub graph_integrity_passed: bool,
+    /// Always false: this crate does not verify source signatures or issuer key status.
+    pub authenticity_verified: bool,
+    /// Always false: declared independence labels are not a common-cause proof.
+    pub source_independence_verified: bool,
     /// Always false: graph verification is not system qualification.
     pub qualification_assessed: bool,
     pub qualification_boundary: String,
@@ -1080,12 +1084,14 @@ pub fn verify_augmentation(input: &str) -> Result<VerificationReport, String> {
         edge_count: augmentation.claim_edges.len(),
         dependency_acyclic,
         supported_claim_count,
-        admissible_supported_claim_count,
+        supported_claims_passing_declared_state_checks: admissible_supported_claim_count,
         computed_graph_root_digest,
         recorded_graph_root_digest: augmentation.evidence_graph_root_digest,
         graph_root_matches,
         semantic_valid,
         graph_integrity_passed,
+        authenticity_verified: false,
+        source_independence_verified: false,
         qualification_assessed: false,
         qualification_boundary: "Graph structure and restricted root commitment only; not cryptographic authenticity, independence proof, effect truth or system qualification.".to_owned(),
         issues,
@@ -1155,7 +1161,7 @@ mod tests {
         let report = verify_augmentation(&serde_json::to_string(&value).unwrap()).unwrap();
         assert!(report.graph_integrity_passed, "{:?}", report.issues);
         assert_eq!(report.supported_claim_count, 1);
-        assert_eq!(report.admissible_supported_claim_count, 1);
+        assert_eq!(report.supported_claims_passing_declared_state_checks, 1);
         assert_eq!(
             report.computed_graph_root_digest,
             "sha256:e2b677dd4ad89972b5a306558a4f1fd32680749cfafd9aeb3a25102343851b82"
