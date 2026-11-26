@@ -206,7 +206,9 @@ impl WebResearcher {
 
         let mut source_candidates = Vec::new();
         let mut seen_urls = HashSet::new();
-        let mut acquisition_incomplete = false;
+        let mut acquisition_incomplete = acquisition_receipts
+            .iter()
+            .any(|receipt: &AcquisitionReceipt| receipt.outcome.is_incomplete());
 
         for (query_rank, search_result) in search_results {
             acquisition_incomplete |= search_result.had_failure;
@@ -214,6 +216,20 @@ impl WebResearcher {
 
             for (source_rank, url) in search_result.urls.into_iter().enumerate() {
                 if !seen_urls.insert(url.clone()) {
+                    let mut receipt = make_receipt(
+                        query_rank,
+                        Some(source_rank),
+                        AcquisitionStage::PageFetch,
+                        &search_result.query,
+                        AcquisitionOutcome::DuplicateSuppressed,
+                    );
+                    receipt.requested_url = Some(url);
+                    receipt.reason_code = Some("DUPLICATE_SOURCE_URL".to_string());
+                    receipt.reason = Some(
+                        "the same URL was already scheduled from an earlier planned query"
+                            .to_string(),
+                    );
+                    acquisition_receipts.push(receipt);
                     continue;
                 }
 
