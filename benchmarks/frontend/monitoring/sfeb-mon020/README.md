@@ -1,6 +1,6 @@
 # MON-020 — Provenance Event-Order Assurance
 
-**Status:** research contract and local Go semantic prototype; runtime source adapters pending.
+**Status:** research contract and local Go semantic prototype; runtime source adapters and independent qualification pending.
 
 MON-020 addresses a subtle gap in ordinary DAG checks: an acyclic provenance graph can still describe an impossible history if an entity is used before it was generated. It qualifies the event order behind provenance relationships using authenticated source-local sequence domains and independently witnessed cross-source order.
 
@@ -13,7 +13,8 @@ Can an independent verifier establish the required order between generation, use
 - [EVENT-ORDER-CONTRACT-v1.md](./EVENT-ORDER-CONTRACT-v1.md) — semantics, proof model, threat model and benchmarks.
 - [SCENARIOS-v1.json](./SCENARIOS-v1.json) — synthetic adversarial seed corpus.
 - [SCENARIOS-v1.schema.json](./SCENARIOS-v1.schema.json) — strict JSON Schema.
-- [event-order/](./event-order/) — standard-library Go event-order oracle and tests.
+- [event-order/](./event-order/) — standard-library Go event-order oracle, adversarial tests and scale benchmarks.
+- [BENCHMARKS-v0.1.md](./BENCHMARKS-v0.1.md) — local same-source and cross-source order measurements.
 
 ## Standards and prior art
 
