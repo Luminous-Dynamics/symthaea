@@ -1112,6 +1112,7 @@ pub fn evaluate_inverse_vm_shortlist_v1(
         physical_experiment_authorized: false,
         equipment_control_authority: false,
         forward_evaluation_receipt_authenticity_proven: false,
+        historical_support_receipt_authenticity_proven: false,
         report_sha256: String::new(),
     };
     report.report_sha256 = report_digest(&report)?;
@@ -1245,8 +1246,8 @@ mod tests {
             ],
             candidate_evidence_sha256: String::new(),
         };
-        let support = value.historical_support.as_mut().unwrap();
-        support.receipt = Some(support_receipt(&value, support_distance));
+        let receipt = support_receipt(&value, support_distance);
+        value.historical_support.as_mut().unwrap().receipt = Some(receipt);
         value.forward_evaluation_receipt = Some(forward_receipt(&value));
         value.candidate_evidence_sha256 = candidate_digest(&value).unwrap();
         value
