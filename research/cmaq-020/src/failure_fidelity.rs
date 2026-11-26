@@ -727,7 +727,9 @@ mod tests {
 
     #[test]
     fn rate_boundary_pairs_score_per_side_rates_and_boundary_gap() {
-        let pair = rate_pair("pair-1", "cluster-1");
+        let mut pair = rate_pair("pair-1", "cluster-1");
+        pair.success_side_action_trace_sha256 = Some("1".repeat(64));
+        pair.failure_side_action_trace_sha256 = Some("2".repeat(64));
         let score = score_boundary_rate_pairs(&[pair], &contract()).expect("valid rates");
         assert_eq!(score.pairs, 1);
         assert_eq!(score.pair_measurements.len(), 1);
@@ -735,6 +737,14 @@ mod tests {
         assert_eq!(score.pair_measurements[0].environment_cluster_id, "cluster-1");
         assert_eq!(score.pair_measurements[0].pair_source_manifest_sha256, "b".repeat(64));
         assert_eq!(score.pair_measurements[0].candidate_checkpoint_sha256, "e".repeat(64));
+        assert_eq!(
+            score.pair_measurements[0].success_side_action_trace_sha256,
+            Some("1".repeat(64))
+        );
+        assert_eq!(
+            score.pair_measurements[0].failure_side_action_trace_sha256,
+            Some("2".repeat(64))
+        );
         assert_eq!(score.detected_reference_boundaries, 1);
         assert_eq!(score.detected_predicted_boundaries, 1);
         assert_eq!(score.boundary_detection_accuracy, Some(1.0));
@@ -814,6 +824,10 @@ mod tests {
         let mut invalid_manifest = rate_pair("invalid-manifest", "cluster-2");
         invalid_manifest.pair_source_manifest_sha256 = "not-a-digest".to_owned();
         assert!(score_boundary_rate_pairs(&[invalid_manifest], &contract()).is_err());
+
+        let mut invalid_action_trace = rate_pair("invalid-trace", "cluster-8");
+        invalid_action_trace.success_side_action_trace_sha256 = Some("not-a-digest".to_owned());
+        assert!(score_boundary_rate_pairs(&[invalid_action_trace], &contract()).is_err());
     }
 
     #[test]
