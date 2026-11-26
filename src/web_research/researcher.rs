@@ -1549,4 +1549,79 @@ mod tests {
             researcher.calculate_similarity("The weather is nice today", "rust programming");
         assert!(sim_low < 0.5);
     }
+
+    #[test]
+    fn acquisition_outcomes_distinguish_zero_results_from_failures() {
+        assert!(!AcquisitionOutcome::NoResults.is_incomplete());
+        assert!(!AcquisitionOutcome::ResultsFound.is_incomplete());
+        assert!(!AcquisitionOutcome::Fetched.is_incomplete());
+        assert!(AcquisitionOutcome::Timeout.is_incomplete());
+        assert!(AcquisitionOutcome::HttpError.is_incomplete());
+        assert!(AcquisitionOutcome::FetchedTruncated.is_incomplete());
+        assert!(AcquisitionOutcome::BudgetExceeded.is_incomplete());
+    }
+
+    #[test]
+    fn default_source_budget_is_explicit_and_bounded() {
+        let config = WebResearchConfig::default();
+        assert_eq!(config.max_concurrent_requests, 5);
+        assert_eq!(config.max_sources_per_research, 20);
+        assert_eq!(config.max_content_length, 100_000);
+    }
+
+    #[tokio::test]
+    async fn bounded_map_respects_limit_and_restores_planned_order() {
+        use std::sync::atomic::{AtomicUsize, Ordering};
+        use std::sync::Arc;
+
+        let active = Arc::new(AtomicUsize::new(0));
+        let peak = Arc::new(AtomicUsize::new(0));
+        let jobs = (0..12).map(|rank| (rank, rank)).collect::<Vec<_>>();
+        let active_for_map = Arc::clone(&active);
+        let peak_for_map = Arc::clone(&peak);
+
+        let completed = bounded_map_ordered(jobs, 3, move |rank, value| {
+            let active = Arc::clone(&active_for_map);
+            let peak = Arc::clone(&peak_for_map);
+            async move {
+                let current = active.fetch_add(1, Ordering::SeqCst) + 1;
+                peak.fetch_max(current, Ordering::SeqCst);
+                tokio::time::sleep(Duration::from_millis((12 - rank) as u64)).await;
+                active.fetch_sub(1, Ordering::SeqCst);
+                (rank, value)
+            }
+        })
+        .await;
+
+        assert_eq!(
+            completed,
+            (0..12).map(|rank| (rank, (rank, rank))).collect::<Vec<_>>()
+        );
+        assert!(peak.load(Ordering::SeqCst) <= 3);
+        assert!(peak.load(Ordering::SeqCst) > 1);
+        assert_eq!(active.load(Ordering::SeqCst), 0);
+    }
+
+    #[test]
+    fn acquisition_receipt_ids_bind_query_stage_and_source_rank() {
+        let search = make_receipt(
+            2,
+            None,
+            AcquisitionStage::DuckDuckGo,
+            "example query",
+            AcquisitionOutcome::NoResults,
+        );
+        let page = make_receipt(
+            2,
+            Some(4),
+            AcquisitionStage::PageFetch,
+            "example query",
+            AcquisitionOutcome::Fetched,
+        );
+
+        assert_eq!(search.attempt_id, "q2-duckduckgo-query");
+        assert_eq!(page.attempt_id, "q2-page-fetch-4");
+        assert_ne!(search.attempt_id, page.attempt_id);
+        assert!(search.captured_at_unix_ms > 0);
+    }
 }
