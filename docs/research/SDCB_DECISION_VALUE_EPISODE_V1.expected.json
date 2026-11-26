@@ -1,0 +1,119 @@
+{
+  "schema_version": "1.0.0",
+  "receipt_type": "sdcb_decision_value_reference_result_v1",
+  "fixture_id": "dssi-eig-vs-evsi-counterexample-v1",
+  "execution_kind": "independent_numerical_reference_calculation",
+  "rust_compiled_or_executed": false,
+  "prior": [
+    0.3,
+    0.3,
+    0.4
+  ],
+  "action_ids": [
+    "act-a",
+    "act-b"
+  ],
+  "utility_by_hypothesis": [
+    [
+      1,
+      0
+    ],
+    [
+      1,
+      0
+    ],
+    [
+      0,
+      1
+    ]
+  ],
+  "current_decision": {
+    "action_id": "act-a",
+    "expected_value": 0.6
+  },
+  "decision_equivalence_classes": [
+    {
+      "hypothesis_ids": [
+        "h1",
+        "h2"
+      ],
+      "posterior_mass": 0.6,
+      "utility_by_action": [
+        1,
+        0
+      ]
+    },
+    {
+      "hypothesis_ids": [
+        "h3"
+      ],
+      "posterior_mass": 0.4,
+      "utility_by_action": [
+        0,
+        1
+      ]
+    }
+  ],
+  "experiment_results": [
+    {
+      "experiment_id": "irrelevant-hypothesis-split",
+      "outcome_probabilities": [
+        0.5,
+        0.5
+      ],
+      "outcome_posteriors": [
+        [
+          0.6,
+          0,
+          0.4
+        ],
+        [
+          0,
+          0.6,
+          0.4
+        ]
+      ],
+      "expected_post_experiment_value": 0.6,
+      "gross_evsi": 0,
+      "expected_information_gain_nats": 0.41588830833596724
+    },
+    {
+      "experiment_id": "decision-boundary-probe",
+      "outcome_probabilities": [
+        0.56,
+        0.44
+      ],
+      "outcome_posteriors": [
+        [
+          0.42857142857142855,
+          0.42857142857142855,
+          0.14285714285714285
+        ],
+        [
+          0.13636363636363635,
+          0.13636363636363635,
+          0.7272727272727273
+        ]
+      ],
+      "expected_post_experiment_value": 0.8,
+      "gross_evsi": 0.2,
+      "expected_information_gain_nats": 0.18552737671418507
+    }
+  ],
+  "selection": {
+    "cases": [
+      {
+        "cost_rate_utility_per_unit": 0,
+        "selected_experiment_id": "decision-boundary-probe",
+        "net_evsi": 0.2
+      },
+      {
+        "cost_rate_utility_per_unit": 0.21,
+        "selected_experiment_id": null,
+        "net_evsi": null
+      }
+    ],
+    "explanation": "At 0.21 utility per cost unit, the decision-relevant experiment's 0.2 gross EVSI does not cover its cost."
+  },
+  "claim_ceiling": "analytic_fixture_only"
+}

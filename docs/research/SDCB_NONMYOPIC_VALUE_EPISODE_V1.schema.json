@@ -1,0 +1,118 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "SDCB_NONMYOPIC_VALUE_EPISODE_V1.schema.json",
+  "title": "SDCB non-myopic decision-value episode v1",
+  "type": "object",
+  "additionalProperties": false,
+  "required": [
+    "schema_version",
+    "episode_id",
+    "action_ids",
+    "hypotheses",
+    "experiments",
+    "budget_units",
+    "max_experiments",
+    "cost_rate_per_unit"
+  ],
+  "properties": {
+    "schema_version": {
+      "const": "1.0.0"
+    },
+    "episode_id": {
+      "type": "string",
+      "minLength": 1
+    },
+    "action_ids": {
+      "type": "array",
+      "minItems": 1,
+      "uniqueItems": true,
+      "items": {
+        "type": "string",
+        "minLength": 1
+      }
+    },
+    "hypotheses": {
+      "type": "array",
+      "minItems": 2,
+      "items": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": [
+          "hypothesis_id",
+          "prior_probability",
+          "utility_by_action"
+        ],
+        "properties": {
+          "hypothesis_id": {
+            "type": "string",
+            "minLength": 1
+          },
+          "prior_probability": {
+            "type": "number",
+            "minimum": 0,
+            "maximum": 1
+          },
+          "utility_by_action": {
+            "type": "array",
+            "minItems": 1,
+            "items": {
+              "type": "number"
+            }
+          }
+        }
+      }
+    },
+    "experiments": {
+      "type": "array",
+      "minItems": 1,
+      "maxItems": 8,
+      "items": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": [
+          "experiment_id",
+          "cost_units",
+          "outcome_likelihoods"
+        ],
+        "properties": {
+          "experiment_id": {
+            "type": "string",
+            "minLength": 1
+          },
+          "cost_units": {
+            "type": "integer",
+            "minimum": 1
+          },
+          "outcome_likelihoods": {
+            "type": "array",
+            "minItems": 2,
+            "items": {
+              "type": "array",
+              "minItems": 1,
+              "maxItems": 4,
+              "items": {
+                "type": "number",
+                "minimum": 0,
+                "maximum": 1
+              }
+            }
+          }
+        }
+      }
+    },
+    "budget_units": {
+      "type": "integer",
+      "minimum": 0
+    },
+    "max_experiments": {
+      "type": "integer",
+      "minimum": 0,
+      "maximum": 4
+    },
+    "cost_rate_per_unit": {
+      "type": "number",
+      "minimum": 0
+    }
+  },
+  "$comment": "Semantic checks must enforce unique hypothesis/experiment IDs, prior sum = 1, utility row width = action count, likelihood matrix rows = hypotheses, consistent outcome widths, and likelihood row sums = 1."
+}

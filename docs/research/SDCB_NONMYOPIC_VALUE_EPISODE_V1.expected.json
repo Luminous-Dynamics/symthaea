@@ -1,0 +1,45 @@
+{
+  "schema_version": "1.0.0",
+  "fixture_id": "dssi-nonmyopic-two-step-v1",
+  "execution_kind": "independent_adaptive_dynamic_programming_reference",
+  "rust_compiled_or_executed": false,
+  "current_decision": {
+    "action_id": "act-a",
+    "expected_value": 0.8
+  },
+  "myopic_evaluations": [
+    {
+      "experiment_id": "screen-a",
+      "gross_evsi": 0
+    },
+    {
+      "experiment_id": "screen-b",
+      "gross_evsi": 0
+    }
+  ],
+  "myopic_evsi_choice": null,
+  "non_myopic_policy": {
+    "budget_units": 2,
+    "max_experiments": 2,
+    "expected_terminal_value": 0.85,
+    "expected_improvement_over_stop": 0.05,
+    "first_experiment_id": "screen-a",
+    "tie_break": "lexicographic_experiment_id",
+    "adaptive_follow_up": "The second experiment is selected after observing the first outcome; some branches stop and others run the remaining experiment."
+  },
+  "controls": [
+    {
+      "budget_units": 1,
+      "max_experiments": 2,
+      "cost_rate_per_unit": 0,
+      "expected_value": 0.8
+    },
+    {
+      "budget_units": 2,
+      "max_experiments": 2,
+      "cost_rate_per_unit": 0.03,
+      "expected_value": 0.814
+    }
+  ],
+  "claim_ceiling": "analytic_small_finite_policy_fixture_only"
+}

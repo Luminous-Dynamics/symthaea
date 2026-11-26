@@ -415,3 +415,23 @@ A falsifiable programme for spectral statistics, RH/prime-structure controls, ne
 - [Reference harness README](../../scripts/research/SDCB_BELIEF_TRANSITION_README.md): independent compile/run instructions and trust boundaries.
 
 **Evidence boundary:** 23 Rust unit tests are authored; compilation and execution have not been performed in this environment. The reference code does not authenticate signatures, source custody, or physical sensors.
+
+### Decision-Sufficient Scientific Intelligence
+
+- [Decision-Sufficient Scientific Intelligence v1](SDCB_DECISION_SUFFICIENT_SCIENTIFIC_INTELLIGENCE_V1.md): task-relative decision sufficiency, EVSI, counterexample, benchmark protocol and research targets.
+- [Decision-value episode schema](SDCB_DECISION_VALUE_EPISODE_V1.schema.json): machine-readable finite decision/experiment episode contract.
+- [EIG-versus-EVSI example](SDCB_DECISION_VALUE_EPISODE_V1.example.json): frozen three-hypothesis counterexample.
+- [Expected analytic result](SDCB_DECISION_VALUE_EPISODE_V1.expected.json): independent calculation with posteriors, EIG, EVSI, and cost-aware choices.
+- [Decision-value Rust reference](../../scripts/research/sdcb_decision_value.rs): Bayes action, decision-equivalence partition, expected information gain, EVSI and net-EVSI selection.
+- [Decision-value harness README](../../scripts/research/SDCB_DECISION_VALUE_README.md): compile instructions, example, coverage and limits.
+
+**Evidence boundary:** 15 Rust unit tests are authored but not compiled/executed in this environment. The reference is one-step, finite, and assumes supplied likelihoods and utilities. It is not a Symthaea model result or an SOTA comparison.
+### Non-myopic adaptive experiment oracle
+
+- [Non-myopic oracle source](../../scripts/research/sdcb_nonmyopic_oracle.rs): exact adaptive Bellman recursion for small finite experiment sets (11 additional tests; the combined target includes 25).
+- [Non-myopic oracle README](../../scripts/research/SDCB_NONMYOPIC_ORACLE_README.md): compile instructions, exact-search limits and trust boundaries.
+- [Non-myopic episode schema](SDCB_NONMYOPIC_VALUE_EPISODE_V1.schema.json): constrained adaptive decision episode.
+- [Non-myopic example](SDCB_NONMYOPIC_VALUE_EPISODE_V1.example.json): two zero-myopic-EVSI probes with a positive two-step policy value.
+- [Non-myopic expected result](SDCB_NONMYOPIC_VALUE_EPISODE_V1.expected.json): expected value 0.85 versus stop value 0.80, checked by independent dynamic-programming calculation.
+
+**Evidence boundary:** 10 additional Rust test functions are authored but not compiled/executed. The exact oracle is intentionally bounded to 8 candidates, 4 steps, and 4 outcomes.
