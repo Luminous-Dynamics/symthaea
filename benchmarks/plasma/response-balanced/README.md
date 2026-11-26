@@ -38,6 +38,8 @@ The candidate novelty is narrower and more defensible: a frozen, experiment-spec
 Other required baselines and adjacent methods:
 
 - Snapshot POD / SVD.
+- **Time-windowed POD (TW-ROM) and electric-field-energy-windowed POD (EW-ROM)**: Tsai et al. (2026), *Local reduced-order modeling for electrostatic plasmas by physics-informed solution manifold decomposition*, Computer Physics Communications 322, 110039. Their 1D1V Vlasov–Poisson ROM combines temporal/field-energy solution-manifold windows with a tensorial nonlinear update; the two-stream EW-ROM reports approximately 90× speedup over its Eulerian reference with maximum relative error 7.5% on training and 11% on test data. This is a mandatory direct comparator for the proposed local atlas, not a method to dismiss as static POD: https://doi.org/10.1016/j.cpc.2026.110039
+- Conservative fluid–kinetic ROM: Issan et al. (MORe 2024), which retains the macroscopic equations and reports mass, momentum and energy conservation to machine precision; include where its spectral cohort can be matched: https://opaliss.github.io/opalissan/MORE24.pdf
 - Adaptive Hermite Vlasov reduction with dynamically scaled basis and conservative projections: Shao, Wang & Wu (2026), https://arxiv.org/abs/2605.17820
 - Tensor-network Vlasov–Poisson compression: Åsgrim et al. (2026), https://arxiv.org/abs/2602.13092
 - Adaptive Fourier Vlasov–Poisson with wavenumber-domain expansion: Cho & Russo (2026), https://arxiv.org/abs/2607.12368
