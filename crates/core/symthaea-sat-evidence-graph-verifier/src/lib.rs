@@ -385,6 +385,21 @@ fn sort_graph_array(
 }
 
 fn normalize_graph_payload(raw: &StrictJson, issues: &mut Vec<VerificationIssue>) -> Result<StrictJson, String> {
+    for (field, limit) in [
+        ("observations", MAX_OBSERVATIONS),
+        ("claims", MAX_CLAIMS),
+        ("claim_edges", MAX_CLAIM_EDGES),
+    ] {
+        let count = raw
+            .get(field)
+            .and_then(StrictJson::array)
+            .ok_or_else(|| format!("graph member {field} must be an array"))?
+            .len();
+        if count > limit {
+            return Err(format!("graph member {field} has {count} entries; limit is {limit}"));
+        }
+    }
+
     let required = [
         "schema_version",
         "augmentation_id",
