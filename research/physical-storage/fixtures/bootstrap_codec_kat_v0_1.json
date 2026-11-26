@@ -1,0 +1,308 @@
+{
+  "schema_version": "physical-storage-bootstrap-codec-kat-v0.1",
+  "corpus_id": "PHYSICAL-STORAGE-BOOTSTRAP-CODEC-KAT-001",
+  "evidence_class": "synthetic_known_answer_vector",
+  "implementation_status": "Rust reference authored; Rust tests pending toolchain/CI execution",
+  "field": {
+    "name": "GF(2^8)",
+    "primitive_polynomial_hex": "0x11d",
+    "reduction_xor_after_shift_hex": "0x1d",
+    "symbol_order": "unsigned byte"
+  },
+  "code": {
+    "data_shards": 4,
+    "parity_shards": 2,
+    "total_shards": 6,
+    "minimum_distance": 3,
+    "rate": "4/6",
+    "generator_matrix": [
+      [
+        1,
+        0,
+        0,
+        0
+      ],
+      [
+        0,
+        1,
+        0,
+        0
+      ],
+      [
+        0,
+        0,
+        1,
+        0
+      ],
+      [
+        0,
+        0,
+        0,
+        1
+      ],
+      [
+        1,
+        1,
+        1,
+        1
+      ],
+      [
+        1,
+        2,
+        3,
+        4
+      ]
+    ],
+    "recovery_contract": "Any four surviving shards reconstruct the four data shards when erasure locations are known. No unknown-error correction claim.",
+    "digest_authority": "External independent SHA-256 verifier; codec only transports expected digest bytes."
+  },
+  "parity_only_vector": {
+    "data_shards_utf8": [
+      "PHYSFMT1",
+      "CODEV001",
+      "LAYOUT01",
+      "CALIB001"
+    ],
+    "expected_parity_shard_4_hex": "1c07081007196400",
+    "expected_parity_shard_5_hex": "130c17310011a4c4"
+  },
+  "bundle_vector": {
+    "object_records": [
+      {
+        "object_id": "FMT-V1",
+        "semantic_type": 1,
+        "version": "physical-format-v1",
+        "content_utf8": "PHYSFMT1",
+        "expected_content_sha256": "8a2cbf9b800e7e46748d574a556a3d1aba5b4c3ec959a75255aac5183fbfba69"
+      }
+    ],
+    "canonical_manifest_byte_length": 87,
+    "canonical_manifest_hex": "42534d31000100000001000601001200000000000000088a2cbf9b800e7e46748d574a556a3d1aba5b4c3ec959a75255aac5183fbfba69464d542d5631706879736963616c2d666f726d61742d763150485953464d5431",
+    "framed_bundle_byte_length_after_padding": 100,
+    "framed_bundle_hex": "42535031000000000000005742534d31000100000001000601001200000000000000088a2cbf9b800e7e46748d574a556a3d1aba5b4c3ec959a75255aac5183fbfba69464d542d5631706879736963616c2d666f726d61742d763150485953464d543100",
+    "data_shard_byte_length": 25,
+    "data_shards_hex": [
+      "42535031000000000000005742534d31000100000001000601",
+      "001200000000000000088a2cbf9b800e7e46748d574a556a3d",
+      "1aba5b4c3ec959a75255aac5183fbfba69464d542d56317068",
+      "79736963616c2d666f726d61742d763150485953464d543100"
+    ],
+    "all_six_shards_hex": [
+      "42535031000000000000005742534d31000100000001000601",
+      "001200000000000000088a2cbf9b800e7e46748d574a556a3d",
+      "1aba5b4c3ec959a75255aac5183fbfba69464d542d56317068",
+      "79736963616c2d666f726d61742d763150485953464d543100",
+      "2188621e5fa574c13d2f4ddf91da04b44749608a3c50302d54",
+      "95750474dbeb5f71573a43c4c48d493a1a7a46aadc46b486c3"
+    ],
+    "padding_byte_hex": "00",
+    "expected_decode_object_exact": true
+  },
+  "two_erasure_cases": [
+    {
+      "erased_shards": [
+        0,
+        1
+      ],
+      "expected": "exact_reconstruction",
+      "expected_recovered_indices": [
+        0,
+        1
+      ]
+    },
+    {
+      "erased_shards": [
+        0,
+        2
+      ],
+      "expected": "exact_reconstruction",
+      "expected_recovered_indices": [
+        0,
+        2
+      ]
+    },
+    {
+      "erased_shards": [
+        0,
+        3
+      ],
+      "expected": "exact_reconstruction",
+      "expected_recovered_indices": [
+        0,
+        3
+      ]
+    },
+    {
+      "erased_shards": [
+        0,
+        4
+      ],
+      "expected": "exact_reconstruction",
+      "expected_recovered_indices": [
+        0,
+        4
+      ]
+    },
+    {
+      "erased_shards": [
+        0,
+        5
+      ],
+      "expected": "exact_reconstruction",
+      "expected_recovered_indices": [
+        0,
+        5
+      ]
+    },
+    {
+      "erased_shards": [
+        1,
+        2
+      ],
+      "expected": "exact_reconstruction",
+      "expected_recovered_indices": [
+        1,
+        2
+      ]
+    },
+    {
+      "erased_shards": [
+        1,
+        3
+      ],
+      "expected": "exact_reconstruction",
+      "expected_recovered_indices": [
+        1,
+        3
+      ]
+    },
+    {
+      "erased_shards": [
+        1,
+        4
+      ],
+      "expected": "exact_reconstruction",
+      "expected_recovered_indices": [
+        1,
+        4
+      ]
+    },
+    {
+      "erased_shards": [
+        1,
+        5
+      ],
+      "expected": "exact_reconstruction",
+      "expected_recovered_indices": [
+        1,
+        5
+      ]
+    },
+    {
+      "erased_shards": [
+        2,
+        3
+      ],
+      "expected": "exact_reconstruction",
+      "expected_recovered_indices": [
+        2,
+        3
+      ]
+    },
+    {
+      "erased_shards": [
+        2,
+        4
+      ],
+      "expected": "exact_reconstruction",
+      "expected_recovered_indices": [
+        2,
+        4
+      ]
+    },
+    {
+      "erased_shards": [
+        2,
+        5
+      ],
+      "expected": "exact_reconstruction",
+      "expected_recovered_indices": [
+        2,
+        5
+      ]
+    },
+    {
+      "erased_shards": [
+        3,
+        4
+      ],
+      "expected": "exact_reconstruction",
+      "expected_recovered_indices": [
+        3,
+        4
+      ]
+    },
+    {
+      "erased_shards": [
+        3,
+        5
+      ],
+      "expected": "exact_reconstruction",
+      "expected_recovered_indices": [
+        3,
+        5
+      ]
+    },
+    {
+      "erased_shards": [
+        4,
+        5
+      ],
+      "expected": "exact_reconstruction",
+      "expected_recovered_indices": [
+        4,
+        5
+      ]
+    }
+  ],
+  "negative_controls": [
+    {
+      "case_id": "THREE_ERASURES",
+      "erased_shards": [
+        0,
+        1,
+        2
+      ],
+      "expected": "not_enough_shards",
+      "available_shards": 3
+    },
+    {
+      "case_id": "INCONSISTENT_SURPLUS_SURVIVOR",
+      "erased_shards": [
+        5
+      ],
+      "corrupt_shard": 0,
+      "corrupt_byte_offset": 0,
+      "xor_mask_hex": "01",
+      "expected": "reject_inconsistent_survivor",
+      "expected_detected_shard": 4
+    },
+    {
+      "case_id": "NONZERO_CANONICAL_PADDING",
+      "erased_shards": [
+        4,
+        5
+      ],
+      "corrupt_shard": 3,
+      "corrupt_byte_offset": 24,
+      "xor_mask_hex": "01",
+      "expected": "reject_invalid_padding"
+    }
+  ],
+  "independent_oracle": {
+    "method": "Independent GF(256) multiplication, exponentiation, Gaussian elimination and re-encoding; not the Rust implementation under test.",
+    "row_subset_checks": "All 15 four-row subsets of the declared 6x4 generator matrix were inverted successfully.",
+    "pair_recovery": "All 15 two-erasure patterns reconstruct the original four data shards exactly.",
+    "limitation": "This does not execute Cargo tests, prove Rust compilation, validate a production reader, or constitute physical-media evidence."
+  }
+}
