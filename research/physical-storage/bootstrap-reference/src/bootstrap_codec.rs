@@ -244,7 +244,7 @@ pub fn encode_bootstrap_manifest(
     for object in ordered {
         let id = object.object_id.as_bytes();
         let version = object.version.as_bytes();
-        if id.is_empty() || id.iter().all(u8::is_ascii_whitespace) {
+        if id.is_empty() || id.iter().all(|byte| byte.is_ascii_whitespace()) {
             return Err(BootstrapCodecError::EmptyObjectId);
         }
         if version.is_empty() {
@@ -275,7 +275,7 @@ pub fn encode_bootstrap_manifest(
 fn take<'a>(input: &'a [u8], cursor: &mut usize, length: usize)
     -> Result<&'a [u8], BootstrapCodecError>
 {
-    let end = cursor.checked_add(length).ok_or(BootstrapCodecError::LengthOverflow)?;
+    let end = (*cursor).checked_add(length).ok_or(BootstrapCodecError::LengthOverflow)?;
     let value = input.get(*cursor..end).ok_or(BootstrapCodecError::Truncated)?;
     *cursor = end;
     Ok(value)
@@ -301,7 +301,7 @@ pub fn decode_bootstrap_manifest(
     input: &[u8],
 ) -> Result<Vec<BootstrapObject>, BootstrapCodecError> {
     let mut cursor = 0usize;
-    if take(input, &mut cursor, 4)? != MANIFEST_MAGIC {
+    if take(input, &mut cursor, 4)? != &MANIFEST_MAGIC[..] {
         return Err(BootstrapCodecError::InvalidMagic);
     }
     if take_u16(input, &mut cursor)? != FORMAT_VERSION {
@@ -309,6 +309,11 @@ pub fn decode_bootstrap_manifest(
     }
     let count = usize::try_from(take_u32(input, &mut cursor)?)
         .map_err(|_| BootstrapCodecError::LengthOverflow)?;
+    // Every record needs at least 47 bytes: fixed framing plus one-byte ID
+    // and version. Bound allocation by the actual input before trusting count.
+    if count > input.len().saturating_sub(cursor) / 47 {
+        return Err(BootstrapCodecError::Truncated);
+    }
     let mut objects = Vec::with_capacity(count);
     let mut previous_id: Option<Vec<u8>> = None;
 
@@ -324,7 +329,7 @@ pub fn decode_bootstrap_manifest(
         let version_bytes = take(input, &mut cursor, version_len)?.to_vec();
         let content = take(input, &mut cursor, content_len)?.to_vec();
 
-        if id_bytes.is_empty() || id_bytes.iter().all(u8::is_ascii_whitespace) {
+        if id_bytes.is_empty() || id_bytes.iter().all(|byte| byte.is_ascii_whitespace()) {
             return Err(BootstrapCodecError::EmptyObjectId);
         }
         if version_bytes.is_empty() {
@@ -390,7 +395,7 @@ pub fn decode_bootstrap_bundle(
         framed.extend_from_slice(shard);
     }
     let mut cursor = 0usize;
-    if take(&framed, &mut cursor, 4)? != BUNDLE_MAGIC {
+    if take(&framed, &mut cursor, 4)? != &BUNDLE_MAGIC[..] {
         return Err(BootstrapCodecError::InvalidMagic);
     }
     let manifest_len = usize::try_from(take_u64(&framed, &mut cursor)?)
