@@ -96,6 +96,7 @@ pub struct AudioEvidenceWindowManifestV1 {
     pub schema: String,
     pub experiment_unit_id: String,
     pub query_id: String,
+    pub query_text: String,
     pub query_text_sha256: String,
     pub model_identity_sha256: String,
     pub runtime_identity_sha256: String,
@@ -154,9 +155,19 @@ struct EvidenceContextDigestPayloadV1<'a> {
     experiment_unit_id: &'a str,
     query_id: &'a str,
     query_text_sha256: &'a str,
+    evidence_condition: EvidenceConditionV1,
     target_audio_sha256: &'a str,
     source_audio_sha256: &'a str,
+    source_audio_byte_length: u64,
     decoded_pcm_sha256: &'a str,
+    decoded_pcm_byte_length: u64,
+    sample_rate_hz: u32,
+    channels: u16,
+    total_frames: u64,
+    sample_format: PcmSampleFormatV1,
+    decoder_identity_sha256: &'a str,
+    decode_profile_sha256: &'a str,
+    windows: &'a [EvidenceWindowV1],
     model_identity_sha256: &'a str,
     runtime_identity_sha256: &'a str,
     decoding_config_sha256: &'a str,
@@ -186,7 +197,11 @@ pub fn verify_audio_evidence_manifest(
     }
     require_text(&manifest.experiment_unit_id, "experiment_unit_id")?;
     require_text(&manifest.query_id, "query_id")?;
+    require_text(&manifest.query_text, "query_text")?;
     validate_digest(&manifest.target_audio_sha256, "target_audio_sha256")?;
+    if sha256_hex(manifest.query_text.as_bytes()) != manifest.query_text_sha256 {
+        return Err("query text bytes do not match declared SHA-256".into());
+    }
     validate_digest(&manifest.query_text_sha256, "query_text_sha256")?;
     validate_digest(&manifest.model_identity_sha256, "model_identity_sha256")?;
     validate_digest(&manifest.runtime_identity_sha256, "runtime_identity_sha256")?;
@@ -392,9 +407,19 @@ fn context_digest(manifest: &AudioEvidenceWindowManifestV1) -> Result<String, St
         experiment_unit_id: &manifest.experiment_unit_id,
         query_id: &manifest.query_id,
         query_text_sha256: &manifest.query_text_sha256,
+        evidence_condition: manifest.evidence_condition,
         target_audio_sha256: &manifest.target_audio_sha256,
         source_audio_sha256: &manifest.source_audio.audio_sha256,
+        source_audio_byte_length: manifest.source_audio.byte_length,
         decoded_pcm_sha256: &manifest.decoded_pcm.pcm_sha256,
+        decoded_pcm_byte_length: manifest.decoded_pcm.byte_length,
+        sample_rate_hz: manifest.decoded_pcm.sample_rate_hz,
+        channels: manifest.decoded_pcm.channels,
+        total_frames: manifest.decoded_pcm.total_frames,
+        sample_format: manifest.decoded_pcm.sample_format,
+        decoder_identity_sha256: &manifest.decoded_pcm.decoder_identity_sha256,
+        decode_profile_sha256: &manifest.decoded_pcm.decode_profile_sha256,
+        windows: &manifest.windows,
         model_identity_sha256: &manifest.model_identity_sha256,
         runtime_identity_sha256: &manifest.runtime_identity_sha256,
         decoding_config_sha256: &manifest.decoding_config_sha256,
@@ -455,7 +480,8 @@ mod tests {
             schema: MANIFEST_SCHEMA_V1.into(),
             experiment_unit_id: "mel-grounding-evidence-window-fixture-001".into(),
             query_id: "piano-entry-query-001".into(),
-            query_text_sha256: "6666666666666666666666666666666666666666666666666666666666666666".into(),
+            query_text: "Identify every piano entrance in the supplied recording.".into(),
+            query_text_sha256: sha256_hex(b"Identify every piano entrance in the supplied recording."),
             model_identity_sha256: "7777777777777777777777777777777777777777777777777777777777777777".into(),
             runtime_identity_sha256: "8888888888888888888888888888888888888888888888888888888888888888".into(),
             decoding_config_sha256: "9999999999999999999999999999999999999999999999999999999999999999".into(),
@@ -588,6 +614,12 @@ mod tests {
     #[test]
     fn context_digest_detects_changed_query_model_runtime_or_decode_context() {
         let mut input = manifest();
+        input.query_text = "different query".into();
+        input.query_text_sha256 = sha256_hex(input.query_text.as_bytes());
+        input.context.context_manifest_sha256 = context_digest(&input).unwrap();
+        assert!(verify_audio_evidence_manifest(&input, SOURCE_AUDIO, PCM).is_err());
+
+        input = manifest();
         input.query_text_sha256 =
             "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa".into();
         assert!(verify_audio_evidence_manifest(&input, SOURCE_AUDIO, PCM).is_err());
