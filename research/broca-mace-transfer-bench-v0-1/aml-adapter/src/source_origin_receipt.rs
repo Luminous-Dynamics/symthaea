@@ -632,6 +632,109 @@ fn sha256_hex(bytes: &[u8]) -> String {
 #[cfg(test)]
 mod tests {
     use super::*;
+    use ed25519_dalek::{Signer, SigningKey};
+    use crate::qualification_trust::{
+        qualification_key_id_v1, QualificationKeyStatusV1, QualificationTrustKeyV1,
+        QualificationTrustProfileV1,
+    };
+
+    fn signed_origin_fixture() -> (String, PinnedEd25519QualificationVerifierV1) {
+        let signing_key = SigningKey::from_bytes(&[7u8; 32]);
+        let public_key = signing_key.verifying_key().to_bytes();
+        let key_id = qualification_key_id_v1(&public_key);
+        let profile = QualificationTrustProfileV1 {
+            schema_version: 1,
+            verifier_id: SOURCE_ORIGIN_VERIFIER_ID_V1.to_owned(),
+            profile_version: 1,
+            keys: vec![QualificationTrustKeyV1 {
+                key_id: key_id.clone(),
+                public_key,
+                status: QualificationKeyStatusV1::Active,
+                not_before_unix: 1,
+                not_after_unix: 1_000,
+            }],
+        };
+        let profile_sha256 = profile.profile_sha256().expect("valid origin profile");
+        let verifier = PinnedEd25519QualificationVerifierV1::from_pinned_profile(
+            &profile, &profile_sha256, 1,
+        ).expect("pinned origin profile");
+
+        let source_bytes = b"source fixture";
+        let payload_bytes = b"payload fixture";
+        let predicate = serde_json::json!({
+            "schema_version": "mace_source_origin_receipt_v1",
+            "run_id": "run-1",
+            "query_invocation_id": "invocation-1",
+            "graph_sha256": "a".repeat(64),
+            "evidence_id": "evidence-1",
+            "source_id": "source-1",
+            "source_sha256": sha256_hex(source_bytes),
+            "payload_sha256": sha256_hex(payload_bytes),
+            "evidence_class_sha256": "b".repeat(64),
+            "parent_evidence_ids": [],
+            "derivation_receipt_sha256": null,
+            "common_cause_group_sha256": [],
+            "source_bytes_len": source_bytes.len(),
+            "payload_bytes_len": payload_bytes.len(),
+            "derivation_receipt_bytes_len": 0,
+            "status": "origin_verified",
+            "issued_at_unix": 10,
+            "expires_at_unix": 50,
+            "issuer_profile_sha256": profile_sha256,
+            "key_id": key_id
+        });
+        let statement = serde_json::json!({
+            "_type": IN_TOTO_STATEMENT_TYPE_V1,
+            "subject": [{
+                "name": "urn:luminous:mace:source-origin-node:v1:evidence-1",
+                "digest": { "sha256": sha256_hex(source_bytes) }
+            }],
+            "predicateType": MACE_SOURCE_ORIGIN_PREDICATE_TYPE_V1,
+            "predicate": predicate
+        });
+        let payload = serde_json::to_vec(&statement).expect("statement JSON");
+        let pae = crate::qualification_dsse::dsse_pae_v1(DSSE_PAYLOAD_TYPE_V1, &payload);
+        let signature = signing_key.sign(&pae).to_bytes();
+        let envelope = crate::qualification_dsse::encode_dsse_envelope_v1(
+            &payload, &key_id, &signature,
+        ).expect("DSSE envelope");
+        (envelope, verifier)
+    }
+
+    #[test]
+    fn signed_origin_dsse_verifies_and_expires_at_the_exact_boundary() {
+        let (envelope_json, verifier) = signed_origin_fixture();
+        let envelope = parse_dsse_envelope_v1(&envelope_json, DSSE_PAYLOAD_TYPE_V1)
+            .expect("DSSE envelope");
+        let statement = parse_strict_json_bounded(&envelope.payload, MAX_ORIGIN_PAYLOAD_BYTES_V1)
+            .expect("strict statement JSON");
+        let predicate = statement.get("predicate").expect("origin predicate");
+        let receipt = parse_source_origin_predicate(predicate).expect("typed origin receipt");
+        assert_eq!(
+            validate_time_and_signature(&receipt, &envelope.pae, &envelope.signature, &verifier, 20),
+            Ok(())
+        );
+        assert_eq!(
+            validate_time_and_signature(&receipt, &envelope.pae, &envelope.signature, &verifier, 50),
+            Err(SourceOriginRejectV1::Expired)
+        );
+    }
+
+    #[test]
+    fn modified_signed_payload_is_rejected_by_ed25519_verification() {
+        let (envelope_json, verifier) = signed_origin_fixture();
+        let envelope = parse_dsse_envelope_v1(&envelope_json, DSSE_PAYLOAD_TYPE_V1)
+            .expect("DSSE envelope");
+        let statement = parse_strict_json_bounded(&envelope.payload, MAX_ORIGIN_PAYLOAD_BYTES_V1)
+            .expect("strict statement JSON");
+        let predicate = statement.get("predicate").expect("origin predicate");
+        let mut receipt = parse_source_origin_predicate(predicate).expect("typed receipt");
+        receipt.status = "origin_not_verified".to_owned();
+        assert_eq!(
+            validate_time_and_signature(&receipt, &envelope.pae, &envelope.signature, &verifier, 20),
+            Err(SourceOriginRejectV1::InvalidSignature)
+        );
+    }
 
     #[test]
     fn exact_source_and_payload_bytes_are_domain_independent_hashes() {
