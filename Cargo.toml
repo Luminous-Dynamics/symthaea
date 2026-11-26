@@ -2,6 +2,7 @@
 resolver = "2"
 members = [
     "xtask",
+    "research/cmaq-020",
     "crates/core/*",
     "crates/domains/*",
     "crates/bridges/*",
@@ -22,6 +23,12 @@ exclude = [
     "crates/core/nixward-web",
     "crates/core/symthaea-zkproof/methods",
     "crates/core/symthaea-zkproof/host",
+    # Incomplete source-only adapter; recovery and manifest ownership remain tracked in #9361/#7291.
+    "crates/core/symthaea-observation-attestation",
+    # Loose example placeholder, not a crate; the actual symthaea package is the workspace root.
+    "crates/core/symthaea",
+    # README-only evidence verifier; package recovery/deferment is tracked in #10791/#13758/#13834.
+    "crates/domains/symthaea-rea-evidence-verifier",
     "crates/domains/symthaea-spore/fuzz",
     "crates/domains/spark-engine",
     "crates/domains/symthaea-lab",

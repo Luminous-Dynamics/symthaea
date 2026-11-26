@@ -73,6 +73,8 @@ http-body-util = { version = "0.1", optional = true }
 tempfile = "3.10"
 criterion = { version = "0.5", features = ["html_reports"] }
 proptest = "1.4"
+sha2 = { workspace = true }
+cmaq-020-state-response = { path = "../../../research/cmaq-020" }
 
 [[bench]]
 name = "hdc_benchmarks"

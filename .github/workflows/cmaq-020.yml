@@ -32,13 +32,13 @@ jobs:
           components: rustfmt, clippy
       - name: Format
         working-directory: research/cmaq-020
-        run: cargo +1.100.0 fmt --all -- --check
+        run: cargo +1.100.0 fmt -p cmaq-020-state-response -- --check
       - name: Tests
         working-directory: research/cmaq-020
-        run: cargo +1.100.0 test --locked
+        run: cargo +1.100.0 test --locked -p cmaq-020-state-response
       - name: Strict Clippy
         working-directory: research/cmaq-020
-        run: cargo +1.100.0 clippy --locked --all-targets -- -D warnings
+        run: cargo +1.100.0 clippy --locked -p cmaq-020-state-response --all-targets -- -D warnings
       - name: Validate WorldFailBench adapter schema and synthetic fixture
         run: |
           python3 -m pip install --disable-pip-version-check "jsonschema==4.25.1"
@@ -81,6 +81,12 @@ jobs:
           components: rustfmt, clippy
       - name: Check NixWard adapter formatting
         run: rustfmt +1.100.0 --check --edition 2024 crates/core/nixward/src/mind/world_model.rs crates/core/nixward/src/mind/mod.rs
+      - name: Diagnose and materialize workspace lock resolution
+        run: |
+          cargo +1.100.0 metadata --format-version 1 > /dev/null
+          echo "Cargo.lock diff produced by current workspace graph:"
+          git diff --stat -- Cargo.lock
+          git diff -- Cargo.lock | head -n 240
       - name: Run NixWard × CMAQ adapter tests
         run: cargo +1.100.0 test --locked -p nixward --lib "mind::world_model"
       - name: Run strict NixWard library Clippy

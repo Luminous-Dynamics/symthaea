@@ -3918,6 +3918,10 @@ dependencies = [
 ]
 
 [[package]]
+name = "cmaq-020-state-response"
+version = "0.1.0"
+
+[[package]]
 name = "cobs"
 version = "0.3.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -12777,6 +12781,7 @@ version = "0.1.0"
 dependencies = [
  "anyhow",
  "blake3",
+ "cmaq-020-state-response",
  "chrono",
  "clap",
  "clap_complete",
@@ -12799,6 +12804,7 @@ dependencies = [
  "rusqlite",
  "serde",
  "serde_json",
+ "sha2",
  "strsim",
  "symthaea-core",
  "tempfile",
