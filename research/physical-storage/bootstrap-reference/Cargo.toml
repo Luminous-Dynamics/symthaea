@@ -1,0 +1,12 @@
+[package]
+name = "bootstrap-survivability-reference"
+version = "0.1.0"
+edition = "2024"
+rust-version = "1.85"
+license = "MIT"
+description = "Zero-dependency fail-closed bootstrap survivability semantics for physical archives"
+
+[lib]
+path = "src/lib.rs"
+
+[dependencies]
