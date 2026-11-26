@@ -771,6 +771,36 @@ mod tests {
     }
 
     #[test]
+    fn uninformative_positive_cost_query_is_not_selected() {
+        let mut scenario = adaptive_scenario();
+        scenario.queries = vec![query("noop", &["same-root"], 1)];
+        for world in &mut scenario.worlds {
+            world.observation_by_query = BTreeMap::from([("noop".into(), "same-observation".into())]);
+        }
+        let result = evaluate_expected_reference_v1(&scenario).unwrap();
+        assert_eq!(result.expected_net_utility_numerator_ppm, 0);
+        assert!(matches!(result.policy, ReferencePolicyNodeV1::Terminal { action_id } if action_id == "abstain"));
+    }
+
+    #[test]
+    fn contradictory_observation_classes_remain_separate_policy_branches() {
+        let mut scenario = adaptive_scenario();
+        scenario.queries = vec![query("resolve-conflict", &["source-family"], 1)];
+        for world in &mut scenario.worlds {
+            let observation = if world.state_id == "good" { "supports-proceed" } else { "contradicts-proceed" };
+            world.observation_by_query = BTreeMap::from([("resolve-conflict".into(), observation.into())]);
+        }
+        scenario.maximum_horizon = 1;
+        let result = evaluate_expected_reference_v1(&scenario).unwrap();
+        let ReferencePolicyNodeV1::Query { query_id, branches } = result.policy else {
+            panic!("decision-relevant contradictory outcomes must remain explicit");
+        };
+        assert_eq!(query_id, "resolve-conflict");
+        assert!(branches.iter().any(|branch| branch.observation_id == "supports-proceed"));
+        assert!(branches.iter().any(|branch| branch.observation_id == "contradicts-proceed"));
+    }
+
+    #[test]
     fn duplicate_source_roots_do_not_create_independent_information() {
         let mut scenario = adaptive_scenario();
         scenario.queries[1].source_root_ids = vec!["root-a".into()];
@@ -876,6 +906,17 @@ mod tests {
         let left = evaluate_expected_reference_v1(&first).unwrap();
         let right = evaluate_expected_reference_v1(&second).unwrap();
         assert_eq!(left.expected_net_utility_numerator_ppm, right.expected_net_utility_numerator_ppm);
+        assert_eq!(left.policy.canonical_key(), right.policy.canonical_key());
+    }
+
+    #[test]
+    fn robust_policy_selection_is_invariant_to_query_enumeration_order() {
+        let first = adaptive_scenario();
+        let mut second = first.clone();
+        second.queries.reverse();
+        let left = evaluate_robust_reference_v1(&first).unwrap();
+        let right = evaluate_robust_reference_v1(&second).unwrap();
+        assert_eq!(left.worst_case_regret_utility_units, right.worst_case_regret_utility_units);
         assert_eq!(left.policy.canonical_key(), right.policy.canonical_key());
     }
 
