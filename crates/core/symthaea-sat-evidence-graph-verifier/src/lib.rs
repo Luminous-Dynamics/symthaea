@@ -1377,6 +1377,27 @@ mod tests {
     }
 
     #[test]
+    fn supported_claim_cannot_inherit_admissibility_from_invalid_supported_premise() {
+        let mut value = base();
+        value["claims"][0]["evidence_refs"] = json!(["obs-missing"]);
+        value["claims"].as_array_mut().unwrap().push(json!({
+            "claim_id": "claim-2", "claim_type": "other", "proposition": "Dependent claim",
+            "scope_ref": "scope:test", "status": "supported", "evidence_refs": ["obs-1"],
+            "depends_on": ["claim-1"], "validity_state": "current", "consequence_if_false": "low"
+        }));
+        value["claim_edges"] = json!([{
+            "from_claim_id": "claim-2", "to_claim_id": "claim-1",
+            "relation": "depends_on", "rule_ref": "rule:invalid-premise"
+        }]);
+        seal(&mut value);
+        let report = verify_augmentation(&serde_json::to_string(&value).unwrap()).unwrap();
+        assert!(has_issue(&report, "dangling_evidence_reference"));
+        assert!(has_issue(&report, "supported_claim_has_inadmissible_dependency"));
+        assert_eq!(report.supported_claim_count, 2);
+        assert_eq!(report.supported_claims_passing_declared_state_checks, 0);
+    }
+
+    #[test]
     fn duplicate_json_object_keys_are_rejected_before_typed_parse() {
         let input = r#"{"schema_version":"sat-benchmark-augmentation/v0.1","schema_version":"attacker"}"#;
         let error = verify_augmentation(input).unwrap_err();
