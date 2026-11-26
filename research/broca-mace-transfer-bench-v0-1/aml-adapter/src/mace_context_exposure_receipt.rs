@@ -143,6 +143,7 @@ pub struct MaceContextExposureReceiptV1 {
     pub lifecycle_profile_sha256: String,
     pub renderer_profile_sha256: String,
     pub transport_adapter_profile_sha256: String,
+    pub provider_parameter_profile_sha256: String,
     pub model_revision: String,
     pub capture: MaceContextCaptureV1,
     pub exposures: Vec<MaceMemoryExposureSpanV1>,
@@ -170,6 +171,7 @@ pub struct MaceExpectedExposureBindingV1<'a> {
     pub lifecycle_profile_sha256: &'a str,
     pub renderer_profile_sha256: &'a str,
     pub transport_adapter_profile_sha256: &'a str,
+    pub provider_parameter_profile_sha256: &'a str,
     pub model_revision: &'a str,
     pub clock_profile_sha256: &'a str,
     pub observer_profile_sha256: &'a str,
@@ -185,7 +187,7 @@ pub enum MaceContextExposureRejectV1 {
     WrongRun, WrongPairBlock, WrongWorldCluster, WrongQuery, WrongArm,
     WrongInvocationSequence, WrongDecisionNeed, WrongCandidatePolicy,
     WrongSourceRegistry, WrongLineageProfile, WrongLifecycleProfile,
-    WrongRendererProfile, WrongTransportProfile, WrongModelRevision,
+    WrongRendererProfile, WrongTransportProfile, WrongProviderParameterProfile, WrongModelRevision,
     WrongClockProfile, WrongObserverProfile, InvalidDigest, InvalidCapturePoint,
     InvalidMediaType, IncompleteRequestCapture, IncompleteOriginEnumeration,
     UntrackedOriginSpans, InvalidArtifactReference, ArtifactCustodyMismatch,
@@ -338,6 +340,7 @@ fn verify_receipt_bindings(
     if receipt.lifecycle_profile_sha256 != expected.lifecycle_profile_sha256 { return Err(MaceContextExposureRejectV1::WrongLifecycleProfile); }
     if receipt.renderer_profile_sha256 != expected.renderer_profile_sha256 { return Err(MaceContextExposureRejectV1::WrongRendererProfile); }
     if receipt.transport_adapter_profile_sha256 != expected.transport_adapter_profile_sha256 { return Err(MaceContextExposureRejectV1::WrongTransportProfile); }
+    if receipt.provider_parameter_profile_sha256 != expected.provider_parameter_profile_sha256 { return Err(MaceContextExposureRejectV1::WrongProviderParameterProfile); }
     if receipt.model_revision != expected.model_revision { return Err(MaceContextExposureRejectV1::WrongModelRevision); }
     if receipt.clock_profile_sha256 != expected.clock_profile_sha256 { return Err(MaceContextExposureRejectV1::WrongClockProfile); }
     if receipt.observer_profile_sha256 != expected.observer_profile_sha256 { return Err(MaceContextExposureRejectV1::WrongObserverProfile); }
@@ -377,7 +380,7 @@ fn verify_receipt_shapes(
         receipt.decision_need_sha256.as_str(), receipt.candidate_policy_sha256.as_str(),
         receipt.source_registry_root_sha256.as_str(), receipt.lineage_profile_sha256.as_str(),
         receipt.lifecycle_profile_sha256.as_str(), receipt.renderer_profile_sha256.as_str(),
-        receipt.transport_adapter_profile_sha256.as_str(), receipt.clock_profile_sha256.as_str(),
+        receipt.transport_adapter_profile_sha256.as_str(), receipt.provider_parameter_profile_sha256.as_str(), receipt.clock_profile_sha256.as_str(),
         receipt.observer_profile_sha256.as_str(), receipt.capture.provider_request_body_sha256.as_str(),
         receipt.capture.request_body_artifact.plaintext_sha256.as_str(),
         receipt.capture.request_body_artifact.ciphertext_sha256.as_str(),
@@ -644,7 +647,7 @@ mod tests {
             invocation_sequence: 0, decision_need_sha256: D1, candidate_policy_sha256: D2,
             source_registry_root_sha256: D3, lineage_profile_sha256: D4,
             lifecycle_profile_sha256: D5, renderer_profile_sha256: D6,
-            transport_adapter_profile_sha256: D7, model_revision: "model-pinned-1",
+            transport_adapter_profile_sha256: D7, provider_parameter_profile_sha256: "44136fa355b3678a1146ad16f7e8649e94fb4fc21fe77e8310c060f61caaff8a", model_revision: "model-pinned-1",
             clock_profile_sha256: D8, observer_profile_sha256: D9,
             storage_profile_sha256: D1, encryption_profile_sha256: D2,
             access_policy_sha256: D3, retention_policy_sha256: D4,
@@ -666,7 +669,7 @@ mod tests {
             decision_need_sha256: D1.to_owned(), candidate_policy_sha256: D2.to_owned(),
             source_registry_root_sha256: D3.to_owned(), lineage_profile_sha256: D4.to_owned(),
             lifecycle_profile_sha256: D5.to_owned(), renderer_profile_sha256: D6.to_owned(),
-            transport_adapter_profile_sha256: D7.to_owned(), model_revision: "model-pinned-1".to_owned(),
+            transport_adapter_profile_sha256: D7.to_owned(), provider_parameter_profile_sha256: "44136fa355b3678a1146ad16f7e8649e94fb4fc21fe77e8310c060f61caaff8a".to_owned(), model_revision: "model-pinned-1".to_owned(),
             capture: MaceContextCaptureV1 {
                 capture_point: "serialized_request_before_network_send".to_owned(),
                 request_media_type: "application/json".to_owned(),
