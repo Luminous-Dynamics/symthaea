@@ -1798,7 +1798,7 @@ mod tests {
             1,
             LabelConsumptionEligibilityV1::EligibleUnderDeclaredPolicy,
         );
-        feedback.label_available_at_unix_seconds = 1_800_000_005;
+        feedback.label_available_at_unix_seconds = 1_800_000_004;
         feedback.eligibility_report_available_at_unix_seconds = 1_800_000_070;
         feedback.delivered_at_unix_seconds = 1_800_000_070;
         let before = engine.state.threshold;
