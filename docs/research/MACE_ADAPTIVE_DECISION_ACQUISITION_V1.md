@@ -326,6 +326,6 @@ These tests are authored only. They have not been compiled or run; hosted CI is 
 
 
 
-## 10. Limits
+## 11. Limits
 
 This proposal does not prove source truth, full ancestry completeness, independence of declared operators, calibrated likelihood quality, safe real-world action or secure erasure. Those remain separate qualification obligations. The schema validates shape, not trust. A valid policy graph is not a valid evidence graph, and a valid evidence graph is not an action permit.
