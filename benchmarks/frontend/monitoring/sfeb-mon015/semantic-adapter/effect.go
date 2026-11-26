@@ -534,9 +534,10 @@ func QualifyDigitalEffect(in DigitalEffectInput) DigitalEffectReport {
 		r.Finding = "observer_scope_mismatch"
 		return r
 	}
-	if in.ObserverPrincipal == "" || in.ObserverPrincipal == in.SinkScope.Principal {
+	if in.ObserverPrincipal == "" || in.ObserverScope.Principal == "" ||
+		in.ObserverPrincipal != in.ObserverScope.Principal || in.ObserverPrincipal == in.SinkScope.Principal {
 		r.Result = Contradicted
-		r.Finding = "observer_principal_not_distinct"
+		r.Finding = "observer_principal_not_distinct_or_unbound"
 		return r
 	}
 	if in.ObserverRevision != in.SinkRevision {
