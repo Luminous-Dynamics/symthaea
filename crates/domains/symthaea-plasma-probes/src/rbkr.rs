@@ -733,9 +733,9 @@ mod tests {
     fn non_finite_state_and_invalid_operator_shapes_are_rejected() {
         let reach = gramian(2, &[vec![1.0, 0.2], vec![0.1, 1.0]]);
         let observe = gramian(2, &[vec![0.7, 0.1], vec![0.2, 1.1]]);
-        let basis = ResponseBalancedBasis::from_empirical_gramians(
-            &reach, &observe, RbkrConfig::new(1),
-        ).unwrap();
+        let basis =
+            ResponseBalancedBasis::from_empirical_gramians(&reach, &observe, RbkrConfig::new(1))
+                .unwrap();
         assert_eq!(
             basis.reconstruct_state(&[f64::NAN]),
             Err(RbkrError::ReducedVectorDimensionMismatch)
