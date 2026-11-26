@@ -14,7 +14,7 @@ Crate export:
 
 ## What is implemented
 
-- A provider-neutral request model with ordered messages and typed content segments.
+- A provider-neutral request model with a pinned model selector, deterministic non-memory request parameters, ordered messages and typed content segments. The literal request model selector must equal the independently pinned model revision; parameter keys are deterministic and reserved message/model keys are rejected.
 - Each segment is either non-memory content or memory content with canonical evidence identity, payload digest, exposure kind, parent IDs, dependency closure, transformation, source, authority, admissibility and current-lifecycle commitments.
 - A deterministic JSON serializer that writes the request exactly once.
 - UTF-8 byte offsets are captured while serializing each typed memory-origin segment. It does not search the final prompt for repeated strings or use pre-serialization character offsets.
@@ -29,7 +29,7 @@ The returned request body is sent through the transport without a second seriali
 
 ## Authored tests (not executed)
 
-Five deterministic tests cover:
+Seven deterministic tests cover:
 1. UTF-8/Unicode plus quote, backslash and newline escaping with exact offsets.
 2. Repeated identical memory strings from distinct evidence IDs retaining distinct offsets.
 3. Full fake-transport → artifact commitment → observer signing → consumer verifier round trip, including same-request-byte digest binding.
