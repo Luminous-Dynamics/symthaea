@@ -1,0 +1,36 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://luminousdynamics.io/sat/schemas/effect-attempt/0.1",
+  "title": "SAT External Effect Attempt v0.1",
+  "type": "object",
+  "additionalProperties": false,
+  "required": ["schema_version", "run_id", "manifest_digest", "attempt_id", "idempotency_key", "intent_digest", "authority_decision_digest", "disclosure_decision_digest", "effect_binding", "submitted_at"],
+  "properties": {
+    "schema_version": {"const": "sat-effect-attempt/v0.1"},
+    "run_id": {"type": "string", "format": "uuid"},
+    "manifest_digest": {"type": "string", "pattern": "^sha256:[0-9a-f]{64}$"},
+    "attempt_id": {"type": "string", "format": "uuid"},
+    "idempotency_key": {"type": "string", "minLength": 8, "maxLength": 256},
+    "intent_digest": {"type": "string", "pattern": "^sha256:[0-9a-f]{64}$"},
+    "authority_decision_digest": {"type": "string", "pattern": "^sha256:[0-9a-f]{64}$"},
+    "disclosure_decision_digest": {"type": "string", "pattern": "^sha256:[0-9a-f]{64}$"},
+    "effect_class": {"type": "string", "enum": ["financial_transfer", "cloud_mutation", "data_disclosure", "physical_actuation", "enterprise_action", "other"]},
+    "effect_binding": {
+      "type": "object", "additionalProperties": false,
+      "required": ["sink_id", "action", "resource_id", "purpose", "parameter_digest", "payload_digest", "labels", "binding_digest"],
+      "properties": {
+        "sink_id": {"type": "string", "minLength": 1},
+        "action": {"type": "string", "minLength": 1},
+        "resource_id": {"type": "string", "minLength": 1},
+        "purpose": {"type": "string", "minLength": 1},
+        "parameter_digest": {"type": "string", "pattern": "^sha256:[0-9a-f]{64}$"},
+        "payload_digest": {"type": "string", "pattern": "^sha256:[0-9a-f]{64}$"},
+        "labels": {"type": "array", "items": {"type": "string", "minLength": 1}, "uniqueItems": true},
+        "binding_digest": {"type": "string", "pattern": "^sha256:[0-9a-f]{64}$"}
+      }
+    },
+    "submitted_at": {"type": "string", "format": "date-time"},
+    "attempt_context_ref": {"type": "string", "minLength": 1},
+    "limitations": {"type": "array", "items": {"type": "string"}}
+  }
+}

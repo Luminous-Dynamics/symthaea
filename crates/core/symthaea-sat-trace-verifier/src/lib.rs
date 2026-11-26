@@ -21,6 +21,7 @@ use std::collections::{HashMap, HashSet};
 use std::fmt::{self, Write as _};
 
 pub mod checkpoint;
+pub mod effect_receipt;
 
 const MAX_SAFE_INTEGER: u64 = 9_007_199_254_740_991;
 const MANIFEST_DOMAIN: &str = "SAT-MANIFEST-v0.1\n";

@@ -85,3 +85,59 @@ A successful trace verification is not an overall SAT qualification and must
 never be described as proof of safety. The report always states that signature
 verification was not performed. Unresolved external effects are returned as a
 hold condition; the verifier never performs retries or mutations.
+
+## External effect receipt reconciliation (v0.1 source-authored; execution pending)
+
+The `effect_receipt` module exposes a read-only structural verifier for one frozen
+attempt and its source attestations. It requires evaluator-owned pins supplied
+separately from subject-controlled JSON:
+
+```rust
+use symthaea_sat_trace_verifier::effect_receipt::{
+    verify_effect_receipt, ExpectedEffectAttempt,
+};
+
+let expected = ExpectedEffectAttempt {
+    run_id: evaluator_run_id,
+    manifest_digest: evaluator_manifest_digest,
+    attempt_id: evaluator_attempt_id,
+    idempotency_key: evaluator_idempotency_key,
+    intent_digest: evaluator_intent_digest,
+    authority_decision_digest: evaluator_authority_digest,
+    disclosure_decision_digest: evaluator_disclosure_digest,
+    effect_binding_digest: evaluator_effect_binding_digest,
+    trust_policy_digest: evaluator_trust_policy_digest,
+};
+
+let report = verify_effect_receipt(attempt_json, receipt_json, &expected)?;
+assert!(!report.signatures_verified);
+assert!(!report.transparency_verified);
+assert!(!report.source_independence_verified);
+assert!(!report.retry_authorized);
+assert!(!report.system_qualified);
+```
+
+The expected context MUST come from evaluator-controlled frozen state, not from
+the attempt or receipt being checked. The module recomputes the domain-separated
+effect-binding digest over the restricted SAT v0.1 canonical JSON of the binding
+without its digest field. For applied/partial outcomes, it also recomputes the
+observed-effect projection digest over every projection field except
+`projection_digest`, then requires every source attestation claiming an applied/partial outcome
+to carry that same projection digest and outcome. Labels must be unique and UTF-16 sorted. A receipt and all of its
+source attestations must bind to the same run, manifest, attempt, idempotency
+key, intent, effect binding and frozen trust-policy digest. The
+`receipt_statement_digest` is currently syntax-checked only; signed-statement
+payload definition and authentication are not implemented.
+
+This module reports structural attempt binding and observed projection
+correspondence only. It does not verify a COSE/JWS/DSSE signature, key status,
+revocation, SCITT/Rekor inclusion or consistency proof, witness independence,
+source-of-truth quality or physical-world truth. It always holds for
+authenticated reconciliation and never authorizes retry or mutation. A
+`not_applied` assertion is not a retry authorization.
+
+Ten Rust unit tests are source-authored for this module, including regressions
+for observed projection mutation and cross-source projection disagreement,
+but have **not** been compiled or executed. The current authoring environment has no Cargo, rustc,
+rustfmt or Nix toolchain. CLI integration and exact-head test execution remain
+pending.
