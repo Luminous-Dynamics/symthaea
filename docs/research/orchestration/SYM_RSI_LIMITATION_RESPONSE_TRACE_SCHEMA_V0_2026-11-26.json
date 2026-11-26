@@ -409,6 +409,123 @@
           }
         }
       }
+    },
+    {
+      "if": {
+        "properties": {
+          "status": {
+            "enum": [
+              "OPEN",
+              "RESPONSE_PLANNED"
+            ]
+          }
+        }
+      },
+      "then": {
+        "properties": {
+          "execution": {
+            "properties": {
+              "status": {
+                "const": "NOT_STARTED"
+              }
+            }
+          },
+          "adjudication": {
+            "properties": {
+              "status": {
+                "const": "PENDING"
+              },
+              "authority_ref": {
+                "const": null
+              },
+              "reviewed_at": {
+                "const": null
+              },
+              "evidence_ref": {
+                "const": null
+              }
+            }
+          }
+        }
+      }
+    },
+    {
+      "if": {
+        "properties": {
+          "status": {
+            "const": "EXECUTED"
+          }
+        }
+      },
+      "then": {
+        "properties": {
+          "execution": {
+            "properties": {
+              "status": {
+                "enum": [
+                  "COMPLETED",
+                  "FAILED"
+                ]
+              }
+            }
+          },
+          "adjudication": {
+            "properties": {
+              "status": {
+                "const": "PENDING"
+              },
+              "authority_ref": {
+                "const": null
+              },
+              "reviewed_at": {
+                "const": null
+              },
+              "evidence_ref": {
+                "const": null
+              }
+            }
+          }
+        }
+      }
+    },
+    {
+      "if": {
+        "properties": {
+          "status": {
+            "const": "WAIVED_WITH_REASON"
+          }
+        }
+      },
+      "then": {
+        "properties": {
+          "required_response": {
+            "const": "JUSTIFIED_NO_CHANGE"
+          },
+          "execution": {
+            "properties": {
+              "status": {
+                "const": "NOT_REQUIRED"
+              }
+            }
+          },
+          "adjudication": {
+            "properties": {
+              "status": {
+                "const": "WAIVED"
+              },
+              "authority_ref": {
+                "type": "string"
+              },
+              "reviewed_at": {
+                "type": "string"
+              },
+              "evidence_ref": {
+                "type": "string"
+              }
+            }
+          }
+        }
+      }
     }
   ]
 }
