@@ -42,11 +42,11 @@ Each source sequence domain contains:
 - control-root identifier;
 - source identity-record digest;
 - a separate control-root membership evidence digest;
-- independently pinned verifier reports for both the source identity and control-root membership.
+- independently pinned verifier reports for both the source identity and control-root membership; the reports must include normalized source/control-root claims under the pinned claims profile.
 
 A source restart or sequence reset must receive a new sequence-domain ID. The administrative control-root identifier may remain the same across incarnations. The control-root label is not accepted as caller-provided metadata: its membership digest and verifier report must bind the source sequence-domain identity to that root. A new incarnation sharing an old administrative root is not automatically independent of the old incarnation.
 
-Each event record must be bound to an exact digest and a pinned verifier result. A self-reported sequence number or a caller-supplied source name is not evidence.
+Each event record must be bound to an exact digest and a pinned verifier result that also returns the normalized event fields under a pinned `mon020-normalized-evidence-v1` claims profile. MON compares the verifier-normalized event kind, entity/activity ID, source sequence domain and sequence number against the fields it uses for ordering. A valid signature over bytes is insufficient when the parsed event projection is not bound to those bytes. A self-reported sequence number or a caller-supplied source name is not evidence.
 
 ## 4. Same-source sequence order
 
