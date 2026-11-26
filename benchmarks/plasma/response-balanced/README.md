@@ -53,7 +53,20 @@ Hedayat et al.'s adaptive OpInf, adaptive NiTROM, and hybrid OpInf–NiTROM are 
 
 These methods solve different reduction problems. A closure that predicts selected moments is not a microscopic distribution reconstruction method; a particle-field operator is not automatically a state-space ROM; a high-order tensor representation is not necessarily an intervention-balanced representation. Report unsupported metrics as UNSUPPORTED rather than forcing unlike methods onto one score.
 
-Production comparators such as Smilei and Gkeyll should be included in solver throughput, physics validation, hardware scaling, and total-cost comparisons where the model cohort permits it. They are not assumed to be interchangeable ROM baselines. Smilei documents GPU support, adaptive vectorization, and supercomputer scaling; Gkeyll provides continuum Vlasov–Maxwell and Vlasov–Poisson solvers. See https://smileipic.github.io/Smilei/ and https://gkeyll.readthedocs.io/en/latest/
+## Production solver comparison and industry baseline
+
+The production solver is a reference / throughput comparator, not a reduced-model baseline.
+
+- **Gkeyll** is the preferred continuum reference candidate for K-RESP-1. Its modal discontinuous-Galerkin Vlasov solvers cover Vlasov–Poisson and Vlasov–Maxwell from 1x1v through 3x3v; the current documentation lists MPI, CUDA, and NCCL support. Use it to establish the high-fidelity distribution and field trajectories, then refine spatial and velocity resolution and time step independently. Documentation: https://gkeyll.readthedocs.io/en/latest/
+- **Smilei** is a high-performance particle-in-cell comparator. Its 5.1 documentation lists AMD and NVIDIA GPU support, but the GPU feature matrix is bounded (for example, Cartesian geometries and selected interpolation orders / diagnostics). Compare it on field and moment observables with statistical uncertainty and noise controls; do not compare a noisy PIC particle sample to a deterministic continuum distribution using an unqualified pointwise L2 metric. Documentation: https://smileipic.github.io/Smilei/
+- The direct 1D1V ROM tournament should use the same continuum equation, normalization, initial state, pulse maps, time horizon, boundary conditions, QoIs, and convergence checks. A reported speedup against one Eulerian configuration is not an industry-wide ranking.
+
+Report two distinct comparison tiers:
+
+1. **Matched continuum ROM tier:** Gkeyll (or another independently converged continuum Vlasov–Poisson reference), POD, Tsai TW-ROM/EW-ROM, Padovan non-intrusive balancing, RBKR, and applicable adaptive / structure-preserving methods. Match the numerical cohort and evaluate equal-rank, equal-stored-byte, and equal end-to-end wall-time frontiers.
+2. **Cross-solver production tier:** Smilei PIC versus continuum reference on common field / moment QoIs, including particle count, sampling-noise confidence intervals, GPU/CPU model, precision, MPI layout, diagnostic cost, and time-to-solution. This tier evaluates deployment trade-offs, not identical full-distribution representations.
+
+The industry objective is not to beat the largest production solver at its native full-resolution task. It is to establish a regime where a qualified reduced model answers repeated, registered future-intervention queries faster and with lower memory / energy while meeting the same physical response tolerances and preserving a fail-closed full-order fallback.
 
 ## Linearized construction
 
