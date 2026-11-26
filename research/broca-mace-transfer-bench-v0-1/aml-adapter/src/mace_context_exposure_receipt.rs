@@ -1025,11 +1025,11 @@ mod tests {
     #[test]
     fn rejects_free_form_string_request_parameters() {
         let (mut receipt, key, _) = fixture();
-        let body = br#"{"model":"model-pinned-1","messages":[{"role":"user","content":"context"}],"instructions":"hidden memory text"}"#;
+        let body = br#"{"model":"model-pinned-1","messages":[{"role":"user","content":"context"}],"temperature":"hidden memory text"}"#;
         refresh_body_binding(&mut receipt, body, &key);
         assert_eq!(
             verify_fixture(&receipt, body.to_vec(), &key, &expected(), &AcceptEvidence).unwrap_err(),
-            MaceContextExposureRejectV1::ProviderParameterNotScalar
+            MaceContextExposureRejectV1::ProviderParameterTypeMismatch
         );
     }
 
@@ -1040,7 +1040,7 @@ mod tests {
         refresh_body_binding(&mut receipt, body, &key);
         assert_eq!(
             verify_fixture(&receipt, body.to_vec(), &key, &expected(), &AcceptEvidence).unwrap_err(),
-            MaceContextExposureRejectV1::ProviderParameterNotScalar
+            MaceContextExposureRejectV1::UnclassifiedProviderParameterKey
         );
     }
 
