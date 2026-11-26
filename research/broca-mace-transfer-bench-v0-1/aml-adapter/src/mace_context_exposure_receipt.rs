@@ -9,8 +9,9 @@ use base64::engine::general_purpose::STANDARD as BASE64_STANDARD;
 use base64::Engine;
 use ed25519_dalek::{Signature, VerifyingKey};
 use serde::{Deserialize, Serialize};
+use serde_json::value::RawValue;
 use sha2::{Digest, Sha256};
-use std::collections::BTreeSet;
+use std::collections::{BTreeMap, BTreeSet};
 
 pub const MACE_CONTEXT_EXPOSURE_SCHEMA_V1: &str = "mace_context_exposure_receipt_v0_1";
 pub const MACE_CONTEXT_EXPOSURE_DOMAIN_V1: &[u8] = b"MACE-CONTEXT-EXPOSURE-V1\0";
@@ -197,6 +198,8 @@ pub enum MaceContextExposureRejectV1 {
     InvalidAdmissionStatus, DuplicateDeniedEvidence, DeniedEvidenceExposed,
     InvalidResponseBinding, InvalidSignatureAlgorithm, InvalidSignatureEncoding,
     InvalidObserverKeyId, UnknownObserverKey, SignatureMismatch,
+    InvalidRequestBody, ProviderParameterNotScalar, ExposureOutsideMessageContent,
+    ExposureRoleMismatch,
     EvidenceAdmissionRejected, MemoryExposureInNoMemoryArm,
     ObserverSigningFailed, CanonicalizationFailed,
 }
@@ -296,12 +299,121 @@ pub fn parse_and_verify_mace_context_exposure_receipt_v1(
         return Err(MaceContextExposureRejectV1::BodyDigestMismatch);
     }
 
+    verify_provider_request_contract(&receipt, &body, expected)?;
     verify_span_coverage(&receipt, &body)?;
     for exposure in &receipt.exposures {
         admission_verifier.verify_admitted_exposure(exposure, expected)
             .map_err(|_| MaceContextExposureRejectV1::EvidenceAdmissionRejected)?;
     }
     Ok(VerifiedMaceContextExposureReceiptV1 { receipt })
+}
+
+
+#[derive(Deserialize)]
+struct CapturedProviderRequestV1<'a> {
+    #[serde(borrow)]
+    model: &'a str,
+    #[serde(borrow)]
+    messages: Vec<CapturedProviderMessageV1<'a>>,
+    #[serde(flatten)]
+    parameters: BTreeMap<String, serde_json::Value>,
+}
+
+#[derive(Deserialize)]
+struct CapturedProviderMessageV1<'a> {
+    #[serde(borrow)]
+    role: &'a str,
+    #[serde(borrow)]
+    content: &'a RawValue,
+}
+
+fn context_role_name_v1(role: MaceContextRoleV1) -> &'static str {
+    match role {
+        MaceContextRoleV1::System => "system",
+        MaceContextRoleV1::Developer => "developer",
+        MaceContextRoleV1::User => "user",
+        MaceContextRoleV1::Assistant => "assistant",
+        MaceContextRoleV1::Tool => "tool",
+    }
+}
+
+/// Independently parses the captured provider request. It recomputes the
+/// provider-parameter profile from the exact body and proves each claimed
+/// exposure range lies inside the indexed message's serialized content string.
+fn verify_provider_request_contract(
+    receipt: &MaceContextExposureReceiptV1,
+    body: &[u8],
+    expected: &MaceExpectedExposureBindingV1<'_>,
+) -> Result<(), MaceContextExposureRejectV1> {
+    let request: CapturedProviderRequestV1<'_> =
+        serde_json::from_slice(body).map_err(|_| MaceContextExposureRejectV1::InvalidRequestBody)?;
+
+    if request.model != expected.model_revision {
+        return Err(MaceContextExposureRejectV1::WrongModelRevision);
+    }
+
+    for value in request.parameters.values() {
+        if !matches!(
+            value,
+            serde_json::Value::String(_)
+                | serde_json::Value::Number(_)
+                | serde_json::Value::Bool(_)
+        ) {
+            return Err(MaceContextExposureRejectV1::ProviderParameterNotScalar);
+        }
+    }
+    let parameter_bytes = serde_json::to_vec(&request.parameters)
+        .map_err(|_| MaceContextExposureRejectV1::InvalidRequestBody)?;
+    let parameter_profile = sha256_hex(&parameter_bytes);
+    if parameter_profile != expected.provider_parameter_profile_sha256
+        || parameter_profile != receipt.provider_parameter_profile_sha256
+    {
+        return Err(MaceContextExposureRejectV1::WrongProviderParameterProfile);
+    }
+
+    let mut content_ranges = Vec::with_capacity(request.messages.len());
+    for message in &request.messages {
+        let _: String = serde_json::from_str(message.content.get())
+            .map_err(|_| MaceContextExposureRejectV1::InvalidRequestBody)?;
+        let raw = message.content.get().as_bytes();
+        if raw.len() < 2 || raw.first() != Some(&b'"') || raw.last() != Some(&b'"') {
+            return Err(MaceContextExposureRejectV1::InvalidRequestBody);
+        }
+        let body_base = body.as_ptr() as usize;
+        let raw_base = raw.as_ptr() as usize;
+        let raw_offset = raw_base
+            .checked_sub(body_base)
+            .ok_or(MaceContextExposureRejectV1::InvalidRequestBody)?;
+        let content_start = raw_offset
+            .checked_add(1)
+            .ok_or(MaceContextExposureRejectV1::InvalidRequestBody)?;
+        let content_end = raw_offset
+            .checked_add(raw.len() - 1)
+            .ok_or(MaceContextExposureRejectV1::InvalidRequestBody)?;
+        if content_end > body.len() || content_start > content_end {
+            return Err(MaceContextExposureRejectV1::InvalidRequestBody);
+        }
+        content_ranges.push((content_start as u64, content_end as u64, message.role));
+    }
+
+    for exposure in &receipt.exposures {
+        let index = usize::try_from(exposure.message_index)
+            .map_err(|_| MaceContextExposureRejectV1::InvalidRequestBody)?;
+        let (content_start, content_end, actual_role) = content_ranges
+            .get(index)
+            .copied()
+            .ok_or(MaceContextExposureRejectV1::ExposureOutsideMessageContent)?;
+        if actual_role != context_role_name_v1(exposure.context_role) {
+            return Err(MaceContextExposureRejectV1::ExposureRoleMismatch);
+        }
+        if exposure.span_start_byte < content_start
+            || exposure.span_end_byte > content_end
+            || exposure.span_start_byte >= exposure.span_end_byte
+        {
+            return Err(MaceContextExposureRejectV1::ExposureOutsideMessageContent);
+        }
+    }
+    Ok(())
 }
 
 fn verify_receipt_bindings(
@@ -589,7 +701,7 @@ mod tests {
     use super::*;
     use ed25519_dalek::{Signer, SigningKey};
 
-    const BODY: &[u8] = br#"{"messages":[{"role":"user","content":"context"}]}"#;
+    const BODY: &[u8] = br#"{"model":"model-pinned-1","messages":[{"role":"user","content":"context"}]}"#;
     const D1: &str = "1111111111111111111111111111111111111111111111111111111111111111";
     const D2: &str = "2222222222222222222222222222222222222222222222222222222222222222";
     const D3: &str = "3333333333333333333333333333333333333333333333333333333333333333";
