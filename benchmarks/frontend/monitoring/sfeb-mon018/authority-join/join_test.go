@@ -52,11 +52,21 @@ func TestNotYetEffective(t *testing.T) { b, o := fixture(); *o.CommitAt = 99; wa
 func TestExclusiveExpiry(t *testing.T) {
 	b, o := fixture(); *o.CommitAt = 1000; b.Coverage.ObservedAt = 1010; want(t, b, o, Denied)
 }
+func attachRevocationEvidence(b *Bundle) {
+	id := "revocation-1"
+	d := dg(id, "rev", "revocation-event")
+	b.Grants[0].RevocationID = id
+	b.Grants[0].RevocationDigest = &d
+	b.Reports = append(b.Reports, VerifierReport{"revocation", id, Verified, d, "v1", "1.0", "build1", "roots1", 400, 900})
+}
 func TestRevokedAtCommit(t *testing.T) {
-	b, o := fixture(); b.Grants[0].RevokedAt = ip(500); want(t, b, o, Denied)
+	b, o := fixture(); b.Grants[0].RevokedAt = ip(500); attachRevocationEvidence(&b); want(t, b, o, Denied)
+}
+func TestRevocationWithoutEvidenceIndeterminate(t *testing.T) {
+	b, o := fixture(); b.Grants[0].RevokedAt = ip(700); want(t, b, o, Indeterminate)
 }
 func TestLaterRevocationKeepsEarlierHistory(t *testing.T) {
-	b, o := fixture(); b.Grants[0].RevokedAt = ip(700); want(t, b, o, Qualified)
+	b, o := fixture(); b.Grants[0].RevokedAt = ip(700); attachRevocationEvidence(&b); want(t, b, o, Qualified)
 }
 func TestUnknownCommitTime(t *testing.T) { b, o := fixture(); o.CommitAt = nil; want(t, b, o, Indeterminate) }
 func TestIncompleteCapture(t *testing.T) { b, o := fixture(); b.Coverage.Complete = false; want(t, b, o, Indeterminate) }
