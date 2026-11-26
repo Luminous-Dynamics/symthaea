@@ -13,6 +13,7 @@ use serde_json::Value;
 use sha2::{Digest, Sha256};
 use std::collections::HashSet;
 use std::future::Future;
+use std::sync::atomic::{AtomicU64, Ordering};
 use std::time::{Duration, Instant, SystemTime, UNIX_EPOCH};
 
 use super::extractor::{ContentExtractor, ContentType, ExtractedContent};
@@ -1472,12 +1473,14 @@ impl WebResearcher {
     }
 }
 
+static NEXT_ACQUISITION_ATTEMPT_ID: AtomicU64 = AtomicU64::new(1);
+
 fn now_unix_ms() -> u64 {
     SystemTime::now()
         .duration_since(UNIX_EPOCH)
         .ok()
         .and_then(|duration| u64::try_from(duration.as_millis()).ok())
-        .unwrap_or(u64::MAX)
+        .unwrap_or(0)
 }
 
 fn elapsed_ms(started: Instant) -> u64 {
@@ -1506,8 +1509,12 @@ fn make_receipt(
     let rank_id = source_rank
         .map(|rank| rank.to_string())
         .unwrap_or_else(|| "query".to_string());
+    let captured_at_unix_ms = now_unix_ms();
+    let sequence = NEXT_ACQUISITION_ATTEMPT_ID.fetch_add(1, Ordering::Relaxed);
     AcquisitionReceipt {
-        attempt_id: format!("q{query_rank}-{stage_id}-{rank_id}"),
+        attempt_id: format!(
+            "a{captured_at_unix_ms}-{sequence}-q{query_rank}-{stage_id}-{rank_id}"
+        ),
         query_rank,
         source_rank,
         stage,
@@ -1523,7 +1530,7 @@ fn make_receipt(
         reason_code: None,
         reason: None,
         elapsed_ms: 0,
-        captured_at_unix_ms: now_unix_ms(),
+        captured_at_unix_ms,
         extractor_version: None,
     }
 }
@@ -1770,8 +1777,8 @@ mod tests {
             AcquisitionOutcome::Fetched,
         );
 
-        assert_eq!(search.attempt_id, "q2-duckduckgo-query");
-        assert_eq!(page.attempt_id, "q2-page-fetch-4");
+        assert!(search.attempt_id.contains("q2-duckduckgo-query"));
+        assert!(page.attempt_id.contains("q2-page-fetch-4"));
         assert_ne!(search.attempt_id, page.attempt_id);
         assert!(search.captured_at_unix_ms > 0);
     }
