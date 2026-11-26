@@ -141,6 +141,7 @@ pub enum LearningGateRejectV1 {
     InvalidRetentionPolicy,
     InvalidVerifierReceipt,
     DuplicateVerificationReceipt,
+    DuplicateRunReceipt,
     ArithmeticOverflow,
 }
 
@@ -176,8 +177,14 @@ impl LearningGateAssessmentV1 {
             && self.run_ids.iter().all(|id| valid_atom(id, 512))
             && self.run_ids.iter().collect::<std::collections::BTreeSet<_>>().len() == 4
             && self.run_receipt_sha256.iter().all(|digest| validate_digest(digest).is_ok())
+            && self.run_receipt_sha256.iter().collect::<std::collections::BTreeSet<_>>().len() == 4
             && self.task_set_sha256.iter().all(|digest| validate_digest(digest).is_ok())
-            && self.candidate_state_sha256.iter().all(|digest| validate_digest(digest).is_ok());
+            && self.task_set_sha256[0] == self.task_set_sha256[1]
+            && self.task_set_sha256[2] == self.task_set_sha256[3]
+            && self.candidate_state_sha256.iter().all(|digest| validate_digest(digest).is_ok())
+            && self.candidate_state_sha256[0] == self.candidate_state_sha256[2]
+            && self.candidate_state_sha256[1] == self.candidate_state_sha256[3]
+            && self.candidate_state_sha256[0] != self.candidate_state_sha256[1];
         let verifier_vectors_valid =
             if self.disposition == LearningGateDispositionV1::InconclusiveUnverifiedRun {
                 self.verifier_ids.is_empty()
@@ -290,6 +297,15 @@ pub fn evaluate_non_regressive_learning_v1(
         adaptation_before,
         adaptation_after,
     ])?;
+    let unique_run_receipts = [
+        &stable_before.run_receipt_sha256,
+        &stable_after.run_receipt_sha256,
+        &adaptation_before.run_receipt_sha256,
+        &adaptation_after.run_receipt_sha256,
+    ].iter().collect::<std::collections::BTreeSet<_>>();
+    if unique_run_receipts.len() != 4 {
+        return Err(LearningGateRejectV1::DuplicateRunReceipt);
+    }
     validate_task_pair(stable_before, stable_after)?;
     validate_task_pair(adaptation_before, adaptation_after)?;
 
@@ -636,7 +652,13 @@ mod tests {
             task_set_sha256: String::new(),
             comparison_group_sha256: "4".repeat(64),
             candidate_state_sha256: candidate.to_owned(),
-            run_receipt_sha256: "5".repeat(64),
+            run_receipt_sha256: match id {
+                "stable-before" => "5".repeat(64),
+                "stable-after" => "6".repeat(64),
+                "adapt-before" => "7".repeat(64),
+                "adapt-after" => "8".repeat(64),
+                _ => "0".repeat(64),
+            },
             task_scores,
         };
         result.task_set_sha256 = result.computed_task_set_sha256();
@@ -759,6 +781,20 @@ mod tests {
                 &sb, &sa, &ab, &aa, LearningRetentionPolicyV1::default(), Some(&FixtureRunVerifier),
             ),
             Err(LearningGateRejectV1::TaskPopulationMismatch)
+        );
+    }
+
+    #[test]
+    fn raw_run_receipt_cannot_be_replayed_across_run_ids() {
+        let (sb, mut sa, ab, aa) = four_runs(&[9_000, 9_000], &[6_000, 6_000]);
+        sa.run_receipt_sha256 = sb.run_receipt_sha256.clone();
+        assert_eq!(
+            evaluate_non_regressive_learning_v1(
+                &sb, &sa, &ab, &aa,
+                LearningRetentionPolicyV1::default(),
+                Some(&FixtureRunVerifier),
+            ),
+            Err(LearningGateRejectV1::DuplicateRunReceipt)
         );
     }
 

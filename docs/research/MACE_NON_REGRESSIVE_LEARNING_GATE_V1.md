@@ -94,14 +94,14 @@ Skipped, invalid, timed-out or unavailable tasks must be represented according t
 
 ## 5. Deterministic test coverage
 
-Eight authored tests cover:
+Nine authored tests cover:
 1. acceptance at exactly the default 1 percentage-point stable regression boundary;
 2. rejection beyond the stable regression budget even when adaptation improves;
 3. rejection when adaptation does not improve under a zero minimum-gain policy;
 4. missing verifier produces an inconclusive result;
 5. changed task populations cannot be compared as paired learning;
 6. protocol/grader drift is rejected;
-7. duplicate run IDs and out-of-range task scores are rejected;\n8. one verification receipt cannot be reused to attest all four runs.
+7. duplicate run IDs and out-of-range task scores are rejected;\n8. one verification receipt cannot be reused to attest all four runs;\n9. one raw run receipt cannot be replayed across run IDs.
 
 These tests are authored but not compiled or executed in this environment.
 
