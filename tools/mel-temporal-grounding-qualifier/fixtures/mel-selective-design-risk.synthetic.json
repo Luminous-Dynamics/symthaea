@@ -113,7 +113,8 @@
       "decision_confidence_ppm": 900000,
       "decision_correct": true,
       "unconditional_answer_correct": true,
-      "false_absence_claim": false
+      "false_absence_claim": false,
+      "recording_sha256": "bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb"
     },
     {
       "item_id": "work-a-query-2",
@@ -133,7 +134,9 @@
       "decision_confidence_ppm": 600000,
       "decision_correct": false,
       "unconditional_answer_correct": false,
-      "false_absence_claim": true
+      "false_absence_claim": true,
+      "recording_sha256": "bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb"
     }
-  ]
+  ],
+  "synthetic_demonstration": true
 }
