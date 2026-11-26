@@ -1008,7 +1008,11 @@ pub fn step_ca_ocrc_round_v1(
             feedback_results.push(result);
             continue;
         };
-        let Some(prediction_receipt) = candidate.predictions_by_round.get(&origin_round) else {
+        let Some(prediction_receipt) = candidate
+            .predictions_by_round
+            .get(&origin_round)
+            .cloned()
+        else {
             let result = make_feedback_result(
                 feedback,
                 Some(origin_round),
