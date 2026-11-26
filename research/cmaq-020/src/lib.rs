@@ -249,7 +249,7 @@ fn validate_record_set(
             return Err(format!("duplicate state ID: {}", record.state_id));
         }
         match frozen_checkpoint {
-            Some(checkpoint) if checkpoint != record.candidate_checkpoint_sha256 => {
+            Some(checkpoint) if checkpoint != record.candidate_checkpoint_sha256.as_str() => {
                 return Err("one evaluation must use exactly one frozen candidate checkpoint".to_owned());
             }
             None => frozen_checkpoint = Some(&record.candidate_checkpoint_sha256),
