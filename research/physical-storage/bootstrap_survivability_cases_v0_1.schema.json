@@ -1,0 +1,374 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://github.com/Luminous-Dynamics/symthaea/blob/research/physical-storage-bootstrap-survivability-001/research/physical-storage/bootstrap_survivability_cases_v0_1.schema.json",
+  "title": "Physical Storage Bootstrap Survivability Cases v0.1",
+  "type": "object",
+  "additionalProperties": false,
+  "required": [
+    "schema_version",
+    "corpus_id",
+    "evidence_class",
+    "grid",
+    "bootstrap_code",
+    "reserved_roles",
+    "bootstrap_objects",
+    "fault_cases"
+  ],
+  "properties": {
+    "schema_version": {
+      "const": "physical-storage-bootstrap-survivability-v0.1"
+    },
+    "corpus_id": {
+      "type": "string",
+      "pattern": "^[A-Z0-9][A-Z0-9._-]{2,127}$"
+    },
+    "evidence_class": {
+      "const": "synthetic_semantic_fixture"
+    },
+    "grid": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "x",
+        "y",
+        "z",
+        "tile_order",
+        "source_layout_ref"
+      ],
+      "properties": {
+        "x": {
+          "const": 4
+        },
+        "y": {
+          "const": 4
+        },
+        "z": {
+          "const": 3
+        },
+        "tile_order": {
+          "const": "z-major, then y, then x"
+        },
+        "source_layout_ref": {
+          "type": "string",
+          "minLength": 1
+        }
+      }
+    },
+    "reserved_roles": {
+      "type": "array",
+      "minItems": 6,
+      "maxItems": 6,
+      "items": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": [
+          "tile",
+          "role",
+          "fixture_convention_only"
+        ],
+        "properties": {
+          "tile": {
+            "type": "integer",
+            "minimum": 0,
+            "maximum": 47
+          },
+          "role": {
+            "enum": [
+              "bootstrap_control",
+              "spare"
+            ]
+          },
+          "fixture_convention_only": {
+            "const": true
+          }
+        }
+      }
+    },
+    "bootstrap_objects": {
+      "type": "array",
+      "minItems": 4,
+      "items": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": [
+          "object_id",
+          "semantic_type",
+          "version",
+          "canonical_digest_sha256",
+          "required",
+          "physical_tiles",
+          "external_capsule_ref",
+          "failure_domain_refs"
+        ],
+        "properties": {
+          "object_id": {
+            "type": "string",
+            "minLength": 1
+          },
+          "semantic_type": {
+            "enum": [
+              "format_identity",
+              "code_definition",
+              "physical_layout",
+              "calibration",
+              "index_address",
+              "known_answer_vector",
+              "reader_bootstrap",
+              "capsule_reference"
+            ]
+          },
+          "version": {
+            "type": "string",
+            "minLength": 1
+          },
+          "canonical_digest_sha256": {
+            "type": "string",
+            "pattern": "^[a-fA-F0-9]{64}$"
+          },
+          "required": {
+            "type": "boolean"
+          },
+          "physical_tiles": {
+            "type": "array",
+            "uniqueItems": true,
+            "items": {
+              "type": "integer",
+              "minimum": 0,
+              "maximum": 47
+            }
+          },
+          "external_capsule_ref": {
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "failure_domain_refs": {
+            "type": "array",
+            "items": {
+              "type": "string"
+            }
+          }
+        }
+      }
+    },
+    "fault_cases": {
+      "type": "array",
+      "minItems": 20,
+      "items": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": [
+          "case_id",
+          "fault_type",
+          "erased_control_tiles",
+          "corrupted_object_ids",
+          "wrong_object_id",
+          "capsule_available",
+          "offline_required",
+          "payload_faulted",
+          "failure_domain_state",
+          "expected_bootstrap_disposition",
+          "expected_payload_disposition",
+          "expected_full_archive_disposition",
+          "candidate_visible_inputs",
+          "scorer_only_inputs",
+          "rationale"
+        ],
+        "properties": {
+          "case_id": {
+            "type": "string",
+            "minLength": 1
+          },
+          "fault_type": {
+            "enum": [
+              "none",
+              "single_control_erasure",
+              "two_control_erasures",
+              "whole_control_plane_loss",
+              "calibration_corruption",
+              "stale_calibration",
+              "wrong_reader_calibration",
+              "wrong_but_valid_format",
+              "wrong_code_parameters",
+              "wrong_layout",
+              "index_collision",
+              "known_answer_loss",
+              "reader_bootstrap_loss",
+              "capsule_unavailable",
+              "payload_only_fault",
+              "metadata_only_fault",
+              "provenance_unresolved",
+              "common_cause_loss",
+              "unknown_failure_domain",
+              "digest_mismatch",
+              "signature_corruption"
+            ]
+          },
+          "erased_control_tiles": {
+            "type": "array",
+            "uniqueItems": true,
+            "items": {
+              "type": "integer",
+              "minimum": 0,
+              "maximum": 47
+            }
+          },
+          "corrupted_object_ids": {
+            "type": "array",
+            "uniqueItems": true,
+            "items": {
+              "type": "string"
+            }
+          },
+          "wrong_object_id": {
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "capsule_available": {
+            "type": "boolean"
+          },
+          "offline_required": {
+            "type": "boolean"
+          },
+          "payload_faulted": {
+            "type": "boolean"
+          },
+          "failure_domain_state": {
+            "enum": [
+              "independent_declared",
+              "shared_declared",
+              "unknown",
+              "not_applicable"
+            ]
+          },
+          "expected_bootstrap_disposition": {
+            "enum": [
+              "bootstrap_passed",
+              "bootstrap_recovered",
+              "bootstrap_failed",
+              "bootstrap_incomplete",
+              "bootstrap_not_evaluated"
+            ]
+          },
+          "expected_payload_disposition": {
+            "enum": [
+              "payload_exact",
+              "payload_recovered",
+              "payload_failed",
+              "payload_uncorrectable",
+              "payload_not_evaluated"
+            ]
+          },
+          "expected_full_archive_disposition": {
+            "enum": [
+              "full_recovery_pass",
+              "full_recovery_fail",
+              "full_recovery_incomplete",
+              "not_evaluated"
+            ]
+          },
+          "candidate_visible_inputs": {
+            "type": "array",
+            "items": {
+              "type": "string"
+            }
+          },
+          "scorer_only_inputs": {
+            "type": "array",
+            "items": {
+              "type": "string"
+            }
+          },
+          "rationale": {
+            "type": "string",
+            "minLength": 1
+          }
+        }
+      }
+    },
+    "bootstrap_code": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "format_id",
+        "field",
+        "primitive_polynomial_hex",
+        "data_shards",
+        "parity_shards",
+        "total_shards",
+        "correction_bound",
+        "systematic_generator_rows",
+        "data_tile_order",
+        "parity_tile_order",
+        "canonicalization"
+      ],
+      "properties": {
+        "format_id": {
+          "const": "bootstrap-mds-6-4-v1"
+        },
+        "field": {
+          "const": "GF(2^8)"
+        },
+        "primitive_polynomial_hex": {
+          "const": "0x11d"
+        },
+        "data_shards": {
+          "const": 4
+        },
+        "parity_shards": {
+          "const": 2
+        },
+        "total_shards": {
+          "const": 6
+        },
+        "correction_bound": {
+          "const": "up to two known shard erasures; no unknown-error claim in v0.1"
+        },
+        "systematic_generator_rows": {
+          "type": "array",
+          "minItems": 6,
+          "maxItems": 6,
+          "items": {
+            "type": "array",
+            "minItems": 4,
+            "maxItems": 4,
+            "items": {
+              "type": "integer",
+              "minimum": 0,
+              "maximum": 255
+            }
+          }
+        },
+        "data_tile_order": {
+          "type": "array",
+          "minItems": 4,
+          "maxItems": 4,
+          "uniqueItems": true,
+          "items": {
+            "type": "integer",
+            "minimum": 0,
+            "maximum": 47
+          }
+        },
+        "parity_tile_order": {
+          "type": "array",
+          "minItems": 2,
+          "maxItems": 2,
+          "uniqueItems": true,
+          "items": {
+            "type": "integer",
+            "minimum": 0,
+            "maximum": 47
+          }
+        },
+        "canonicalization": {
+          "type": "string",
+          "minLength": 1
+        }
+      }
+    }
+  }
+}

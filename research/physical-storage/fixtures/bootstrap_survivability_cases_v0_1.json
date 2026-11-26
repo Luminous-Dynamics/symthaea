@@ -1,0 +1,1012 @@
+{
+  "schema_version": "physical-storage-bootstrap-survivability-v0.1",
+  "corpus_id": "PHYSICAL-STORAGE-BOOTSTRAP-SURVIVABILITY-CASES-V0.1",
+  "evidence_class": "synthetic_semantic_fixture",
+  "grid": {
+    "x": 4,
+    "y": 4,
+    "z": 3,
+    "tile_order": "z-major, then y, then x",
+    "source_layout_ref": "https://github.com/Luminous-Dynamics/symthaea/blob/research/physical-storage-layout-search-001/research/physical-storage/layout-search/src/main.rs"
+  },
+  "reserved_roles": [
+    {
+      "tile": 0,
+      "role": "bootstrap_control",
+      "fixture_convention_only": true
+    },
+    {
+      "tile": 15,
+      "role": "bootstrap_control",
+      "fixture_convention_only": true
+    },
+    {
+      "tile": 16,
+      "role": "bootstrap_control",
+      "fixture_convention_only": true
+    },
+    {
+      "tile": 31,
+      "role": "bootstrap_control",
+      "fixture_convention_only": true
+    },
+    {
+      "tile": 32,
+      "role": "spare",
+      "fixture_convention_only": true
+    },
+    {
+      "tile": 47,
+      "role": "spare",
+      "fixture_convention_only": true
+    }
+  ],
+  "bootstrap_objects": [
+    {
+      "object_id": "FMT-V1",
+      "semantic_type": "format_identity",
+      "version": "physical-format-v1",
+      "canonical_digest_sha256": "1111111111111111111111111111111111111111111111111111111111111111",
+      "required": true,
+      "physical_tiles": [
+        0
+      ],
+      "external_capsule_ref": "capsule://synthetic/FMT-V1",
+      "failure_domain_refs": [
+        "media-control-set-A"
+      ]
+    },
+    {
+      "object_id": "CODE-MDS643-V1",
+      "semantic_type": "code_definition",
+      "version": "mds-6-4-3-v1",
+      "canonical_digest_sha256": "2222222222222222222222222222222222222222222222222222222222222222",
+      "required": true,
+      "physical_tiles": [
+        15
+      ],
+      "external_capsule_ref": "capsule://synthetic/CODE-MDS643-V1",
+      "failure_domain_refs": [
+        "media-control-set-A"
+      ]
+    },
+    {
+      "object_id": "LAYOUT-4X4X3-V1",
+      "semantic_type": "physical_layout",
+      "version": "grid-4x4x3-v1",
+      "canonical_digest_sha256": "3333333333333333333333333333333333333333333333333333333333333333",
+      "required": true,
+      "physical_tiles": [
+        16
+      ],
+      "external_capsule_ref": "capsule://synthetic/LAYOUT-4X4X3-V1",
+      "failure_domain_refs": [
+        "media-control-set-A"
+      ]
+    },
+    {
+      "object_id": "CAL-READER-A-V1",
+      "semantic_type": "calibration",
+      "version": "reader-A-cal-v1",
+      "canonical_digest_sha256": "4444444444444444444444444444444444444444444444444444444444444444",
+      "required": true,
+      "physical_tiles": [
+        31
+      ],
+      "external_capsule_ref": "capsule://synthetic/CAL-READER-A-V1",
+      "failure_domain_refs": [
+        "reader-calibration-A"
+      ]
+    },
+    {
+      "object_id": "INDEX-OBJECTS-V1",
+      "semantic_type": "index_address",
+      "version": "index-v1",
+      "canonical_digest_sha256": "5555555555555555555555555555555555555555555555555555555555555555",
+      "required": true,
+      "physical_tiles": [],
+      "external_capsule_ref": "capsule://synthetic/INDEX-OBJECTS-V1",
+      "failure_domain_refs": [
+        "capsule-index-A"
+      ]
+    },
+    {
+      "object_id": "KAT-RECOVERY-V1",
+      "semantic_type": "known_answer_vector",
+      "version": "kat-v1",
+      "canonical_digest_sha256": "6666666666666666666666666666666666666666666666666666666666666666",
+      "required": true,
+      "physical_tiles": [],
+      "external_capsule_ref": "capsule://synthetic/KAT-RECOVERY-V1",
+      "failure_domain_refs": [
+        "capsule-kat-A"
+      ]
+    },
+    {
+      "object_id": "READER-BOOTSTRAP-V1",
+      "semantic_type": "reader_bootstrap",
+      "version": "reader-bootstrap-v1",
+      "canonical_digest_sha256": "7777777777777777777777777777777777777777777777777777777777777777",
+      "required": true,
+      "physical_tiles": [],
+      "external_capsule_ref": "capsule://synthetic/READER-BOOTSTRAP-V1",
+      "failure_domain_refs": [
+        "capsule-reader-A"
+      ]
+    },
+    {
+      "object_id": "CAPSULE-REF-V1",
+      "semantic_type": "capsule_reference",
+      "version": "capsule-descriptor-v1",
+      "canonical_digest_sha256": "8888888888888888888888888888888888888888888888888888888888888888",
+      "required": true,
+      "physical_tiles": [],
+      "external_capsule_ref": "capsule://synthetic/CAPSULE-REF-V1",
+      "failure_domain_refs": [
+        "capsule-reference-A"
+      ]
+    }
+  ],
+  "fault_cases": [
+    {
+      "case_id": "BOOT-000-PRISTINE",
+      "fault_type": "none",
+      "erased_control_tiles": [],
+      "corrupted_object_ids": [],
+      "wrong_object_id": null,
+      "capsule_available": true,
+      "offline_required": false,
+      "payload_faulted": false,
+      "failure_domain_state": "not_applicable",
+      "expected_bootstrap_disposition": "bootstrap_passed",
+      "expected_payload_disposition": "payload_exact",
+      "expected_full_archive_disposition": "full_recovery_pass",
+      "candidate_visible_inputs": [
+        "physical_reader_observations",
+        "public_format_descriptor",
+        "visible_control_records"
+      ],
+      "scorer_only_inputs": [
+        "original_payload_bytes",
+        "expected_payload_sha256",
+        "expected_control_object_digests",
+        "fault_ground_truth"
+      ],
+      "rationale": "All required control objects are current; the payload is pristine; scorer digests match."
+    },
+    {
+      "case_id": "BOOT-SINGLE-ERASURE-0",
+      "fault_type": "single_control_erasure",
+      "erased_control_tiles": [
+        0
+      ],
+      "corrupted_object_ids": [],
+      "wrong_object_id": null,
+      "capsule_available": true,
+      "offline_required": false,
+      "payload_faulted": false,
+      "failure_domain_state": "not_applicable",
+      "expected_bootstrap_disposition": "bootstrap_recovered",
+      "expected_payload_disposition": "payload_exact",
+      "expected_full_archive_disposition": "full_recovery_pass",
+      "candidate_visible_inputs": [
+        "physical_reader_observations",
+        "public_format_descriptor",
+        "visible_control_records"
+      ],
+      "scorer_only_inputs": [
+        "original_payload_bytes",
+        "expected_payload_sha256",
+        "expected_control_object_digests",
+        "fault_ground_truth"
+      ],
+      "rationale": "One of four required control positions is erased; the synthetic 6,4 control code uses two reserved spare symbols and recovers this single erasure."
+    },
+    {
+      "case_id": "BOOT-SINGLE-ERASURE-15",
+      "fault_type": "single_control_erasure",
+      "erased_control_tiles": [
+        15
+      ],
+      "corrupted_object_ids": [],
+      "wrong_object_id": null,
+      "capsule_available": true,
+      "offline_required": false,
+      "payload_faulted": false,
+      "failure_domain_state": "not_applicable",
+      "expected_bootstrap_disposition": "bootstrap_recovered",
+      "expected_payload_disposition": "payload_exact",
+      "expected_full_archive_disposition": "full_recovery_pass",
+      "candidate_visible_inputs": [
+        "physical_reader_observations",
+        "public_format_descriptor",
+        "visible_control_records"
+      ],
+      "scorer_only_inputs": [
+        "original_payload_bytes",
+        "expected_payload_sha256",
+        "expected_control_object_digests",
+        "fault_ground_truth"
+      ],
+      "rationale": "One of four required control positions is erased; the synthetic 6,4 control code uses two reserved spare symbols and recovers this single erasure."
+    },
+    {
+      "case_id": "BOOT-SINGLE-ERASURE-16",
+      "fault_type": "single_control_erasure",
+      "erased_control_tiles": [
+        16
+      ],
+      "corrupted_object_ids": [],
+      "wrong_object_id": null,
+      "capsule_available": true,
+      "offline_required": false,
+      "payload_faulted": false,
+      "failure_domain_state": "not_applicable",
+      "expected_bootstrap_disposition": "bootstrap_recovered",
+      "expected_payload_disposition": "payload_exact",
+      "expected_full_archive_disposition": "full_recovery_pass",
+      "candidate_visible_inputs": [
+        "physical_reader_observations",
+        "public_format_descriptor",
+        "visible_control_records"
+      ],
+      "scorer_only_inputs": [
+        "original_payload_bytes",
+        "expected_payload_sha256",
+        "expected_control_object_digests",
+        "fault_ground_truth"
+      ],
+      "rationale": "One of four required control positions is erased; the synthetic 6,4 control code uses two reserved spare symbols and recovers this single erasure."
+    },
+    {
+      "case_id": "BOOT-SINGLE-ERASURE-31",
+      "fault_type": "single_control_erasure",
+      "erased_control_tiles": [
+        31
+      ],
+      "corrupted_object_ids": [],
+      "wrong_object_id": null,
+      "capsule_available": true,
+      "offline_required": false,
+      "payload_faulted": false,
+      "failure_domain_state": "not_applicable",
+      "expected_bootstrap_disposition": "bootstrap_recovered",
+      "expected_payload_disposition": "payload_exact",
+      "expected_full_archive_disposition": "full_recovery_pass",
+      "candidate_visible_inputs": [
+        "physical_reader_observations",
+        "public_format_descriptor",
+        "visible_control_records"
+      ],
+      "scorer_only_inputs": [
+        "original_payload_bytes",
+        "expected_payload_sha256",
+        "expected_control_object_digests",
+        "fault_ground_truth"
+      ],
+      "rationale": "One of four required control positions is erased; the synthetic 6,4 control code uses two reserved spare symbols and recovers this single erasure."
+    },
+    {
+      "case_id": "BOOT-PAIR-ERASURE-0-15",
+      "fault_type": "two_control_erasures",
+      "erased_control_tiles": [
+        0,
+        15
+      ],
+      "corrupted_object_ids": [],
+      "wrong_object_id": null,
+      "capsule_available": true,
+      "offline_required": false,
+      "payload_faulted": false,
+      "failure_domain_state": "not_applicable",
+      "expected_bootstrap_disposition": "bootstrap_recovered",
+      "expected_payload_disposition": "payload_exact",
+      "expected_full_archive_disposition": "full_recovery_pass",
+      "candidate_visible_inputs": [
+        "physical_reader_observations",
+        "public_format_descriptor",
+        "visible_control_records"
+      ],
+      "scorer_only_inputs": [
+        "original_payload_bytes",
+        "expected_payload_sha256",
+        "expected_control_object_digests",
+        "fault_ground_truth"
+      ],
+      "rationale": "Two control erasures are within the declared synthetic 6,4 metadata-code erasure budget. The result is a finite code-contract fixture, not physical control availability evidence."
+    },
+    {
+      "case_id": "BOOT-PAIR-ERASURE-0-16",
+      "fault_type": "two_control_erasures",
+      "erased_control_tiles": [
+        0,
+        16
+      ],
+      "corrupted_object_ids": [],
+      "wrong_object_id": null,
+      "capsule_available": true,
+      "offline_required": false,
+      "payload_faulted": false,
+      "failure_domain_state": "not_applicable",
+      "expected_bootstrap_disposition": "bootstrap_recovered",
+      "expected_payload_disposition": "payload_exact",
+      "expected_full_archive_disposition": "full_recovery_pass",
+      "candidate_visible_inputs": [
+        "physical_reader_observations",
+        "public_format_descriptor",
+        "visible_control_records"
+      ],
+      "scorer_only_inputs": [
+        "original_payload_bytes",
+        "expected_payload_sha256",
+        "expected_control_object_digests",
+        "fault_ground_truth"
+      ],
+      "rationale": "Two control erasures are within the declared synthetic 6,4 metadata-code erasure budget. The result is a finite code-contract fixture, not physical control availability evidence."
+    },
+    {
+      "case_id": "BOOT-PAIR-ERASURE-0-31",
+      "fault_type": "two_control_erasures",
+      "erased_control_tiles": [
+        0,
+        31
+      ],
+      "corrupted_object_ids": [],
+      "wrong_object_id": null,
+      "capsule_available": true,
+      "offline_required": false,
+      "payload_faulted": false,
+      "failure_domain_state": "not_applicable",
+      "expected_bootstrap_disposition": "bootstrap_recovered",
+      "expected_payload_disposition": "payload_exact",
+      "expected_full_archive_disposition": "full_recovery_pass",
+      "candidate_visible_inputs": [
+        "physical_reader_observations",
+        "public_format_descriptor",
+        "visible_control_records"
+      ],
+      "scorer_only_inputs": [
+        "original_payload_bytes",
+        "expected_payload_sha256",
+        "expected_control_object_digests",
+        "fault_ground_truth"
+      ],
+      "rationale": "Two control erasures are within the declared synthetic 6,4 metadata-code erasure budget. The result is a finite code-contract fixture, not physical control availability evidence."
+    },
+    {
+      "case_id": "BOOT-PAIR-ERASURE-15-16",
+      "fault_type": "two_control_erasures",
+      "erased_control_tiles": [
+        15,
+        16
+      ],
+      "corrupted_object_ids": [],
+      "wrong_object_id": null,
+      "capsule_available": true,
+      "offline_required": false,
+      "payload_faulted": false,
+      "failure_domain_state": "not_applicable",
+      "expected_bootstrap_disposition": "bootstrap_recovered",
+      "expected_payload_disposition": "payload_exact",
+      "expected_full_archive_disposition": "full_recovery_pass",
+      "candidate_visible_inputs": [
+        "physical_reader_observations",
+        "public_format_descriptor",
+        "visible_control_records"
+      ],
+      "scorer_only_inputs": [
+        "original_payload_bytes",
+        "expected_payload_sha256",
+        "expected_control_object_digests",
+        "fault_ground_truth"
+      ],
+      "rationale": "Two control erasures are within the declared synthetic 6,4 metadata-code erasure budget. The result is a finite code-contract fixture, not physical control availability evidence."
+    },
+    {
+      "case_id": "BOOT-PAIR-ERASURE-15-31",
+      "fault_type": "two_control_erasures",
+      "erased_control_tiles": [
+        15,
+        31
+      ],
+      "corrupted_object_ids": [],
+      "wrong_object_id": null,
+      "capsule_available": true,
+      "offline_required": false,
+      "payload_faulted": false,
+      "failure_domain_state": "not_applicable",
+      "expected_bootstrap_disposition": "bootstrap_recovered",
+      "expected_payload_disposition": "payload_exact",
+      "expected_full_archive_disposition": "full_recovery_pass",
+      "candidate_visible_inputs": [
+        "physical_reader_observations",
+        "public_format_descriptor",
+        "visible_control_records"
+      ],
+      "scorer_only_inputs": [
+        "original_payload_bytes",
+        "expected_payload_sha256",
+        "expected_control_object_digests",
+        "fault_ground_truth"
+      ],
+      "rationale": "Two control erasures are within the declared synthetic 6,4 metadata-code erasure budget. The result is a finite code-contract fixture, not physical control availability evidence."
+    },
+    {
+      "case_id": "BOOT-PAIR-ERASURE-16-31",
+      "fault_type": "two_control_erasures",
+      "erased_control_tiles": [
+        16,
+        31
+      ],
+      "corrupted_object_ids": [],
+      "wrong_object_id": null,
+      "capsule_available": true,
+      "offline_required": false,
+      "payload_faulted": false,
+      "failure_domain_state": "not_applicable",
+      "expected_bootstrap_disposition": "bootstrap_recovered",
+      "expected_payload_disposition": "payload_exact",
+      "expected_full_archive_disposition": "full_recovery_pass",
+      "candidate_visible_inputs": [
+        "physical_reader_observations",
+        "public_format_descriptor",
+        "visible_control_records"
+      ],
+      "scorer_only_inputs": [
+        "original_payload_bytes",
+        "expected_payload_sha256",
+        "expected_control_object_digests",
+        "fault_ground_truth"
+      ],
+      "rationale": "Two control erasures are within the declared synthetic 6,4 metadata-code erasure budget. The result is a finite code-contract fixture, not physical control availability evidence."
+    },
+    {
+      "case_id": "BOOT-ALL-CONTROL-LOST",
+      "fault_type": "whole_control_plane_loss",
+      "erased_control_tiles": [
+        0,
+        15,
+        16,
+        31,
+        32,
+        47
+      ],
+      "corrupted_object_ids": [],
+      "wrong_object_id": null,
+      "capsule_available": false,
+      "offline_required": true,
+      "payload_faulted": false,
+      "failure_domain_state": "not_applicable",
+      "expected_bootstrap_disposition": "bootstrap_failed",
+      "expected_payload_disposition": "payload_exact",
+      "expected_full_archive_disposition": "full_recovery_fail",
+      "candidate_visible_inputs": [
+        "physical_reader_observations",
+        "public_format_descriptor",
+        "visible_control_records"
+      ],
+      "scorer_only_inputs": [
+        "original_payload_bytes",
+        "expected_payload_sha256",
+        "expected_control_object_digests",
+        "fault_ground_truth"
+      ],
+      "rationale": "All in-media control and spare positions are unavailable and the external capsule is absent."
+    },
+    {
+      "case_id": "BOOT-CALIBRATION-RECORD-CORRUPT",
+      "fault_type": "calibration_corruption",
+      "erased_control_tiles": [],
+      "corrupted_object_ids": [
+        "CAL-READER-A-V1"
+      ],
+      "wrong_object_id": null,
+      "capsule_available": true,
+      "offline_required": false,
+      "payload_faulted": false,
+      "failure_domain_state": "not_applicable",
+      "expected_bootstrap_disposition": "bootstrap_recovered",
+      "expected_payload_disposition": "payload_exact",
+      "expected_full_archive_disposition": "full_recovery_pass",
+      "candidate_visible_inputs": [
+        "physical_reader_observations",
+        "public_format_descriptor",
+        "visible_control_records"
+      ],
+      "scorer_only_inputs": [
+        "original_payload_bytes",
+        "expected_payload_sha256",
+        "expected_control_object_digests",
+        "fault_ground_truth"
+      ],
+      "rationale": "One corrupted calibration object is reconstructed from its declared redundant control representation, then checked against the scorer-held canonical digest."
+    },
+    {
+      "case_id": "BOOT-CALIBRATION-STALE",
+      "fault_type": "stale_calibration",
+      "erased_control_tiles": [],
+      "corrupted_object_ids": [],
+      "wrong_object_id": "CAL-READER-A-V1",
+      "capsule_available": true,
+      "offline_required": false,
+      "payload_faulted": false,
+      "failure_domain_state": "not_applicable",
+      "expected_bootstrap_disposition": "bootstrap_failed",
+      "expected_payload_disposition": "payload_exact",
+      "expected_full_archive_disposition": "full_recovery_fail",
+      "candidate_visible_inputs": [
+        "physical_reader_observations",
+        "public_format_descriptor",
+        "visible_control_records"
+      ],
+      "scorer_only_inputs": [
+        "original_payload_bytes",
+        "expected_payload_sha256",
+        "expected_control_object_digests",
+        "fault_ground_truth"
+      ],
+      "rationale": "A digest-valid but expired calibration cannot be made current by ECC or hash verification."
+    },
+    {
+      "case_id": "BOOT-WRONG-READER-CALIBRATION",
+      "fault_type": "wrong_reader_calibration",
+      "erased_control_tiles": [],
+      "corrupted_object_ids": [],
+      "wrong_object_id": "CAL-READER-A-V1",
+      "capsule_available": true,
+      "offline_required": false,
+      "payload_faulted": false,
+      "failure_domain_state": "not_applicable",
+      "expected_bootstrap_disposition": "bootstrap_failed",
+      "expected_payload_disposition": "payload_exact",
+      "expected_full_archive_disposition": "full_recovery_fail",
+      "candidate_visible_inputs": [
+        "physical_reader_observations",
+        "public_format_descriptor",
+        "visible_control_records"
+      ],
+      "scorer_only_inputs": [
+        "original_payload_bytes",
+        "expected_payload_sha256",
+        "expected_control_object_digests",
+        "fault_ground_truth"
+      ],
+      "rationale": "Calibration is for another reader/firmware identity; intact bytes do not establish applicability."
+    },
+    {
+      "case_id": "BOOT-WRONG-VALID-FORMAT",
+      "fault_type": "wrong_but_valid_format",
+      "erased_control_tiles": [],
+      "corrupted_object_ids": [],
+      "wrong_object_id": "FMT-V1",
+      "capsule_available": true,
+      "offline_required": false,
+      "payload_faulted": false,
+      "failure_domain_state": "not_applicable",
+      "expected_bootstrap_disposition": "bootstrap_failed",
+      "expected_payload_disposition": "payload_exact",
+      "expected_full_archive_disposition": "full_recovery_fail",
+      "candidate_visible_inputs": [
+        "physical_reader_observations",
+        "public_format_descriptor",
+        "visible_control_records"
+      ],
+      "scorer_only_inputs": [
+        "original_payload_bytes",
+        "expected_payload_sha256",
+        "expected_control_object_digests",
+        "fault_ground_truth"
+      ],
+      "rationale": "A descriptor from another valid archive is syntactically correct but conflicts with the independently expected format identity."
+    },
+    {
+      "case_id": "BOOT-WRONG-CODE-PARAMETERS",
+      "fault_type": "wrong_code_parameters",
+      "erased_control_tiles": [],
+      "corrupted_object_ids": [],
+      "wrong_object_id": "CODE-MDS643-V1",
+      "capsule_available": true,
+      "offline_required": false,
+      "payload_faulted": false,
+      "failure_domain_state": "not_applicable",
+      "expected_bootstrap_disposition": "bootstrap_failed",
+      "expected_payload_disposition": "payload_exact",
+      "expected_full_archive_disposition": "full_recovery_fail",
+      "candidate_visible_inputs": [
+        "physical_reader_observations",
+        "public_format_descriptor",
+        "visible_control_records"
+      ],
+      "scorer_only_inputs": [
+        "original_payload_bytes",
+        "expected_payload_sha256",
+        "expected_control_object_digests",
+        "fault_ground_truth"
+      ],
+      "rationale": "A valid but wrong field polynomial/generator/code profile must not be silently used to decode the payload."
+    },
+    {
+      "case_id": "BOOT-WRONG-LAYOUT",
+      "fault_type": "wrong_layout",
+      "erased_control_tiles": [],
+      "corrupted_object_ids": [],
+      "wrong_object_id": "LAYOUT-4X4X3-V1",
+      "capsule_available": true,
+      "offline_required": false,
+      "payload_faulted": false,
+      "failure_domain_state": "not_applicable",
+      "expected_bootstrap_disposition": "bootstrap_failed",
+      "expected_payload_disposition": "payload_exact",
+      "expected_full_archive_disposition": "full_recovery_fail",
+      "candidate_visible_inputs": [
+        "physical_reader_observations",
+        "public_format_descriptor",
+        "visible_control_records"
+      ],
+      "scorer_only_inputs": [
+        "original_payload_bytes",
+        "expected_payload_sha256",
+        "expected_control_object_digests",
+        "fault_ground_truth"
+      ],
+      "rationale": "The descriptor maps logical shards to a different valid physical layout."
+    },
+    {
+      "case_id": "BOOT-INDEX-COLLISION",
+      "fault_type": "index_collision",
+      "erased_control_tiles": [],
+      "corrupted_object_ids": [],
+      "wrong_object_id": "INDEX-OBJECTS-V1",
+      "capsule_available": true,
+      "offline_required": false,
+      "payload_faulted": false,
+      "failure_domain_state": "not_applicable",
+      "expected_bootstrap_disposition": "bootstrap_failed",
+      "expected_payload_disposition": "payload_exact",
+      "expected_full_archive_disposition": "full_recovery_fail",
+      "candidate_visible_inputs": [
+        "physical_reader_observations",
+        "public_format_descriptor",
+        "visible_control_records"
+      ],
+      "scorer_only_inputs": [
+        "original_payload_bytes",
+        "expected_payload_sha256",
+        "expected_control_object_digests",
+        "fault_ground_truth"
+      ],
+      "rationale": "Two distinct objects resolve to the same address; no object may be overwritten or falsely counted as restored."
+    },
+    {
+      "case_id": "BOOT-KNOWN-ANSWER-LOST",
+      "fault_type": "known_answer_loss",
+      "erased_control_tiles": [],
+      "corrupted_object_ids": [
+        "KAT-RECOVERY-V1"
+      ],
+      "wrong_object_id": null,
+      "capsule_available": true,
+      "offline_required": false,
+      "payload_faulted": false,
+      "failure_domain_state": "not_applicable",
+      "expected_bootstrap_disposition": "bootstrap_recovered",
+      "expected_payload_disposition": "payload_exact",
+      "expected_full_archive_disposition": "full_recovery_pass",
+      "candidate_visible_inputs": [
+        "physical_reader_observations",
+        "public_format_descriptor",
+        "visible_control_records"
+      ],
+      "scorer_only_inputs": [
+        "original_payload_bytes",
+        "expected_payload_sha256",
+        "expected_control_object_digests",
+        "fault_ground_truth"
+      ],
+      "rationale": "Known-answer test vectors are recovered from redundant metadata and independently verified before reader qualification."
+    },
+    {
+      "case_id": "BOOT-READER-BOOTSTRAP-LOSS-CAPSULE-AVAILABLE",
+      "fault_type": "reader_bootstrap_loss",
+      "erased_control_tiles": [],
+      "corrupted_object_ids": [],
+      "wrong_object_id": "READER-BOOTSTRAP-V1",
+      "capsule_available": true,
+      "offline_required": false,
+      "payload_faulted": false,
+      "failure_domain_state": "not_applicable",
+      "expected_bootstrap_disposition": "bootstrap_recovered",
+      "expected_payload_disposition": "payload_exact",
+      "expected_full_archive_disposition": "full_recovery_pass",
+      "candidate_visible_inputs": [
+        "physical_reader_observations",
+        "public_format_descriptor",
+        "visible_control_records"
+      ],
+      "scorer_only_inputs": [
+        "original_payload_bytes",
+        "expected_payload_sha256",
+        "expected_control_object_digests",
+        "fault_ground_truth"
+      ],
+      "rationale": "External capsule supplies the version-pinned reader bootstrap, whose identity and digest are checked."
+    },
+    {
+      "case_id": "BOOT-CAPSULE-OFFLINE-UNAVAILABLE",
+      "fault_type": "capsule_unavailable",
+      "erased_control_tiles": [],
+      "corrupted_object_ids": [],
+      "wrong_object_id": null,
+      "capsule_available": false,
+      "offline_required": true,
+      "payload_faulted": false,
+      "failure_domain_state": "not_applicable",
+      "expected_bootstrap_disposition": "bootstrap_incomplete",
+      "expected_payload_disposition": "payload_exact",
+      "expected_full_archive_disposition": "full_recovery_incomplete",
+      "candidate_visible_inputs": [
+        "physical_reader_observations",
+        "public_format_descriptor",
+        "visible_control_records"
+      ],
+      "scorer_only_inputs": [
+        "original_payload_bytes",
+        "expected_payload_sha256",
+        "expected_control_object_digests",
+        "fault_ground_truth"
+      ],
+      "rationale": "Offline recovery is required but the external capsule is unavailable and the minimal in-media stub does not contain all required reader metadata."
+    },
+    {
+      "case_id": "BOOT-PAYLOAD-ONLY-FAILURE",
+      "fault_type": "payload_only_fault",
+      "erased_control_tiles": [],
+      "corrupted_object_ids": [],
+      "wrong_object_id": null,
+      "capsule_available": true,
+      "offline_required": false,
+      "payload_faulted": true,
+      "failure_domain_state": "not_applicable",
+      "expected_bootstrap_disposition": "bootstrap_passed",
+      "expected_payload_disposition": "payload_uncorrectable",
+      "expected_full_archive_disposition": "full_recovery_fail",
+      "candidate_visible_inputs": [
+        "physical_reader_observations",
+        "public_format_descriptor",
+        "visible_control_records"
+      ],
+      "scorer_only_inputs": [
+        "original_payload_bytes",
+        "expected_payload_sha256",
+        "expected_control_object_digests",
+        "fault_ground_truth"
+      ],
+      "rationale": "Bootstrap is intact but payload is outside the declared recovery bound. Bootstrap success cannot authorize a full archive recovery."
+    },
+    {
+      "case_id": "BOOT-METADATA-ONLY-RECOVERABLE",
+      "fault_type": "metadata_only_fault",
+      "erased_control_tiles": [],
+      "corrupted_object_ids": [
+        "INDEX-OBJECTS-V1"
+      ],
+      "wrong_object_id": null,
+      "capsule_available": true,
+      "offline_required": false,
+      "payload_faulted": false,
+      "failure_domain_state": "not_applicable",
+      "expected_bootstrap_disposition": "bootstrap_recovered",
+      "expected_payload_disposition": "payload_exact",
+      "expected_full_archive_disposition": "full_recovery_pass",
+      "candidate_visible_inputs": [
+        "physical_reader_observations",
+        "public_format_descriptor",
+        "visible_control_records"
+      ],
+      "scorer_only_inputs": [
+        "original_payload_bytes",
+        "expected_payload_sha256",
+        "expected_control_object_digests",
+        "fault_ground_truth"
+      ],
+      "rationale": "Payload remains exact while index metadata is recovered and verified from redundant metadata."
+    },
+    {
+      "case_id": "BOOT-PROVENANCE-UNRESOLVED",
+      "fault_type": "provenance_unresolved",
+      "erased_control_tiles": [],
+      "corrupted_object_ids": [],
+      "wrong_object_id": null,
+      "capsule_available": true,
+      "offline_required": false,
+      "payload_faulted": false,
+      "failure_domain_state": "not_applicable",
+      "expected_bootstrap_disposition": "bootstrap_incomplete",
+      "expected_payload_disposition": "payload_exact",
+      "expected_full_archive_disposition": "full_recovery_incomplete",
+      "candidate_visible_inputs": [
+        "physical_reader_observations",
+        "public_format_descriptor",
+        "visible_control_records"
+      ],
+      "scorer_only_inputs": [
+        "original_payload_bytes",
+        "expected_payload_sha256",
+        "expected_control_object_digests",
+        "fault_ground_truth"
+      ],
+      "rationale": "Control bytes and payload match, but provenance authority is unresolved; integrity alone cannot satisfy authenticity/authority requirements."
+    },
+    {
+      "case_id": "BOOT-COMMON-CAUSE-FAILURE",
+      "fault_type": "common_cause_loss",
+      "erased_control_tiles": [
+        0,
+        15,
+        16,
+        31,
+        32,
+        47
+      ],
+      "corrupted_object_ids": [],
+      "wrong_object_id": null,
+      "capsule_available": false,
+      "offline_required": true,
+      "payload_faulted": false,
+      "failure_domain_state": "shared_declared",
+      "expected_bootstrap_disposition": "bootstrap_failed",
+      "expected_payload_disposition": "payload_exact",
+      "expected_full_archive_disposition": "full_recovery_fail",
+      "candidate_visible_inputs": [
+        "physical_reader_observations",
+        "public_format_descriptor",
+        "visible_control_records"
+      ],
+      "scorer_only_inputs": [
+        "original_payload_bytes",
+        "expected_payload_sha256",
+        "expected_control_object_digests",
+        "fault_ground_truth"
+      ],
+      "rationale": "Nominally separate control copies share the failed site/power/reader domain; they cannot be counted as independent."
+    },
+    {
+      "case_id": "BOOT-UNKNOWN-FAILURE-DOMAIN",
+      "fault_type": "unknown_failure_domain",
+      "erased_control_tiles": [],
+      "corrupted_object_ids": [],
+      "wrong_object_id": null,
+      "capsule_available": true,
+      "offline_required": false,
+      "payload_faulted": false,
+      "failure_domain_state": "unknown",
+      "expected_bootstrap_disposition": "bootstrap_incomplete",
+      "expected_payload_disposition": "payload_exact",
+      "expected_full_archive_disposition": "full_recovery_incomplete",
+      "candidate_visible_inputs": [
+        "physical_reader_observations",
+        "public_format_descriptor",
+        "visible_control_records"
+      ],
+      "scorer_only_inputs": [
+        "original_payload_bytes",
+        "expected_payload_sha256",
+        "expected_control_object_digests",
+        "fault_ground_truth"
+      ],
+      "rationale": "Unknown common-cause relationships are not silently promoted to independent recovery paths."
+    },
+    {
+      "case_id": "BOOT-DIGEST-MISMATCH",
+      "fault_type": "digest_mismatch",
+      "erased_control_tiles": [],
+      "corrupted_object_ids": [
+        "FMT-V1"
+      ],
+      "wrong_object_id": null,
+      "capsule_available": true,
+      "offline_required": false,
+      "payload_faulted": false,
+      "failure_domain_state": "not_applicable",
+      "expected_bootstrap_disposition": "bootstrap_failed",
+      "expected_payload_disposition": "payload_exact",
+      "expected_full_archive_disposition": "full_recovery_fail",
+      "candidate_visible_inputs": [
+        "physical_reader_observations",
+        "public_format_descriptor",
+        "visible_control_records"
+      ],
+      "scorer_only_inputs": [
+        "original_payload_bytes",
+        "expected_payload_sha256",
+        "expected_control_object_digests",
+        "fault_ground_truth"
+      ],
+      "rationale": "The bootstrap record digest differs from the scorer-held canonical digest, so even a parseable format record is rejected."
+    },
+    {
+      "case_id": "BOOT-SIGNATURE-CORRUPT",
+      "fault_type": "signature_corruption",
+      "erased_control_tiles": [],
+      "corrupted_object_ids": [],
+      "wrong_object_id": "CAPSULE-REF-V1",
+      "capsule_available": true,
+      "offline_required": false,
+      "payload_faulted": false,
+      "failure_domain_state": "not_applicable",
+      "expected_bootstrap_disposition": "bootstrap_incomplete",
+      "expected_payload_disposition": "payload_exact",
+      "expected_full_archive_disposition": "full_recovery_incomplete",
+      "candidate_visible_inputs": [
+        "physical_reader_observations",
+        "public_format_descriptor",
+        "visible_control_records"
+      ],
+      "scorer_only_inputs": [
+        "original_payload_bytes",
+        "expected_payload_sha256",
+        "expected_control_object_digests",
+        "fault_ground_truth"
+      ],
+      "rationale": "Package fixity or signature verification is unresolved; do not infer source authenticity from a readable descriptor."
+    }
+  ],
+  "bootstrap_code": {
+    "format_id": "bootstrap-mds-6-4-v1",
+    "field": "GF(2^8)",
+    "primitive_polynomial_hex": "0x11d",
+    "data_shards": 4,
+    "parity_shards": 2,
+    "total_shards": 6,
+    "correction_bound": "up to two known shard erasures; no unknown-error claim in v0.1",
+    "systematic_generator_rows": [
+      [
+        1,
+        0,
+        0,
+        0
+      ],
+      [
+        0,
+        1,
+        0,
+        0
+      ],
+      [
+        0,
+        0,
+        1,
+        0
+      ],
+      [
+        0,
+        0,
+        0,
+        1
+      ],
+      [
+        1,
+        1,
+        1,
+        1
+      ],
+      [
+        1,
+        2,
+        3,
+        4
+      ]
+    ],
+    "data_tile_order": [
+      0,
+      15,
+      16,
+      31
+    ],
+    "parity_tile_order": [
+      32,
+      47
+    ],
+    "canonicalization": "Canonical bootstrap bundle is serialized into four equal-length, zero-padded data shard streams in the declared data_tile_order; two parity streams use the final generator rows. The four in-media data records are format identity, code definition, physical layout and reader calibration. Index, known-answer vectors, reader bootstrap and capsule reference remain separately recorded external-package objects in this synthetic fixture. A real package must define canonical bytes, lengths, padding and digest rules before using this profile."
+  }
+}
