@@ -128,3 +128,16 @@ The current index is in-memory. Production requires:
 8. end-to-end concurrency, crash-recovery and propagation-latency benchmarks.
 
 The reference module provides deterministic contracts for those services. It does not claim they are deployed.
+
+
+## 9. Claim-relative revalidation
+
+A correction or source revision first invalidates dependent projections through the dependency graph. This is deliberately conservative: a stale summary, embedding or plan must not remain current while the source is being assessed.
+
+The separate `claim_relative_invalidation` module evaluates one proposition against the exact recorded source transition. It distinguishes a claim that fails independent revalidation from one that still holds after a correction. A passing result returns `PreservedNeedsRebuild`; it never restores the prior derived artifact. A new projection must be generated under a new ID against the current source and dependency set.
+
+Quarantine, revocation and rights erasure remain hard overrides. Missing, skipped, infrastructure-failed, inconclusive or self-reported checks never count as passing evidence. The verifier is injected and must independently check the claim binding, source revision, test artifact, execution receipt and result digest.
+
+This separation directly addresses the claim-relative invalidation question raised by *Impact Is Not Invalidation*: a changed source is a reason to re-check claims, not a universal proof that every dependent proposition is false. The public paper artifact is not yet available for a paper-comparable reproduction in this snapshot. See [MACE Claim-Relative Invalidation V1](MACE_CLAIM_RELATIVE_INVALIDATION_V1.md) for the policy, schema, test matrix and external benchmark plan.
+
+The module adds nine authored deterministic tests. They are not compiled or executed here.

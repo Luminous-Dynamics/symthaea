@@ -159,3 +159,14 @@ The `temporal_projection` module is exported alongside the streaming ledger. It 
 The index propagates invalidation through all descendants, emits a self-committing projection-invalidation receipt, refuses new projections built from non-current parents, and supports rebuilds under new IDs. Source revalidation does not revive old projections. Rights-erasure acknowledgements clear the in-memory projection content/dependency commitments but do not prove deletion from external stores.
 
 Protocol: [MACE Derived-Memory Invalidation V1](../../../docs/research/MACE_DERIVED_MEMORY_INVALIDATION_V1.md). Twelve deterministic projection-index tests are authored; none have been executed.
+
+
+## Claim-relative derived-memory revalidation
+
+The `claim_relative_invalidation` module complements transitive projection invalidation with claim-specific revalidation after a correction. A source transition first makes dependent projections non-current. A specific claim can then be checked against the exact source-transition receipt, source revision commitments, test artifact and verifier policy.
+
+Only an independently verified claim-check result can classify a corrected claim as `PreservedNeedsRebuild` or `Invalidated`. Missing, skipped, self-reported, unavailable or inconclusive evidence remains `RevalidationRequired`. Quarantine, revocation and rights-erasure are hard overrides and cannot be undone by a passing functional test.
+
+A preserved claim never reactivates its old summary, embedding, plan or cache. It only permits a fresh projection with a new ID and current dependencies. The evidence verifier is an injected trust boundary; this reference module is not a test runner or cryptographic verifier.
+
+Protocol and schema: [MACE Claim-Relative Invalidation V1](../../../docs/research/MACE_CLAIM_RELATIVE_INVALIDATION_V1.md) and [mace_claim_relative_revalidation_v1.schema.json](../../../data/schemas/mace_claim_relative_revalidation_v1.schema.json). Nine deterministic tests are authored and not yet executed.
