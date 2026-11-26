@@ -8,6 +8,7 @@
     "schema",
     "experiment_unit_id",
     "query_id",
+    "query_text",
     "query_text_sha256",
     "model_identity_sha256",
     "runtime_identity_sha256",
@@ -217,6 +218,10 @@
           "pattern": "^[0-9a-f]{64}$"
         }
       }
+    },
+    "query_text": {
+      "type": "string",
+      "minLength": 1
     }
   }
 }
