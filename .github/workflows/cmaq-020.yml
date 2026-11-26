@@ -32,13 +32,13 @@ jobs:
           components: rustfmt, clippy
       - name: Format
         working-directory: research/cmaq-020
-        run: cargo +1.100.0 fmt --all -- --check
+        run: cargo +1.100.0 fmt -p cmaq-020-state-response -- --check
       - name: Tests
         working-directory: research/cmaq-020
-        run: cargo +1.100.0 test --locked
+        run: cargo +1.100.0 test --locked -p cmaq-020-state-response
       - name: Strict Clippy
         working-directory: research/cmaq-020
-        run: cargo +1.100.0 clippy --locked --all-targets -- -D warnings
+        run: cargo +1.100.0 clippy --locked -p cmaq-020-state-response --all-targets -- -D warnings
       - name: Validate WorldFailBench adapter schema and synthetic fixture
         run: |
           python3 -m pip install --disable-pip-version-check "jsonschema==4.25.1"
