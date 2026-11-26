@@ -164,7 +164,7 @@ No duplicate authorization state machine, payment state machine or robot safety 
 ## 10. Immediate implementation order
 
 1. **Source authored (execution pending):** `effect_receipt.rs` adds strict JSON parsing, run/manifest/attempt/idempotency/intent/effect-binding cross-binding for every source attestation, and structural sink-projection comparison. It always holds for authenticated reconciliation and hard-codes signature, transparency, independence, retry authorization and qualification outputs to false.
-2. Implement typed reconciliation and prior-attempt/source-sequence state, then execute the 40 fixture catalog.
+2. Implement typed reconciliation and prior-attempt/source-sequence state, then execute the 46-case fixture catalog.
 3. Add offline evidence bundle resolution and COSE/DSSE signature verification as separate adapters.
 4. Implement SCITT RFC 9942/9943 and Rekor proof adapters; persist checkpoint pins outside subject-controlled storage.
 5. Implement common-cause independence policy and source-specific read-back adapters.
