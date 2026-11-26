@@ -1,0 +1,45 @@
+{
+  "schema_version": "1.0.0",
+  "fixture_id": "sdcb-identifiability-observational-equivalence-v1",
+  "execution_kind": "independent_closed_form_finite_calculation",
+  "rust_compiled_or_executed": false,
+  "expected_report": {
+    "world_a_id": "science-present-common-offset-zero",
+    "world_b_id": "science-absent-common-offset-one",
+    "observationally_equivalent": true,
+    "max_observational_total_variation": 0.0,
+    "max_intervention_total_variation": 0.9,
+    "intervention_breaks_equivalence": true,
+    "baseline_utility": 0.6,
+    "best_feasible_utility": 0.95,
+    "selected_action_id": "isolate-common-cause-then-repeat-science",
+    "decision_gain": 0.35,
+    "action_scores": [
+      {
+        "action_id": "science-device-a",
+        "total_variation": 0.0,
+        "bayes_accuracy": 0.5,
+        "expected_utility": 0.6
+      },
+      {
+        "action_id": "science-device-b",
+        "total_variation": 0.0,
+        "bayes_accuracy": 0.5,
+        "expected_utility": 0.6
+      },
+      {
+        "action_id": "isolate-common-cause-then-repeat-science",
+        "total_variation": 0.9,
+        "bayes_accuracy": 0.95,
+        "expected_utility": 0.95
+      }
+    ]
+  },
+  "analytical_checks": {
+    "intervention_total_variation": "0.5 * (abs(0.95 - 0.05) + abs(0.05 - 0.95)) = 0.90",
+    "intervention_bayes_accuracy": "0.5 * (1 + 0.90) = 0.95",
+    "intervention_decision_utility": "0.95",
+    "baseline_utility": "max(0.50, 0.50, 0.60) = 0.60"
+  },
+  "claim_boundary": "This is a constructed categorical paired-world fixture, not an executed Rust result or physical intervention measurement."
+}
