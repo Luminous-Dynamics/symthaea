@@ -475,3 +475,6 @@ A falsifiable programme for spectral statistics, RH/prime-structure controls, ne
 - [Rust greedy portfolio reference](../../scripts/research/sdcb_ridea_portfolio.rs) and [README](../../scripts/research/SDCB_RIDEA_PORTFOLIO_README.md).
 
 **Evidence boundary:** 14 Rust tests authored but not compiled/executed. EIG and proxy predictions remain frozen; this is design-only greedy batch selection, not a fully adaptive posterior policy.
+### Scientific-agent benchmark ecosystem
+
+- [Scientific-agent benchmark matrix (26 Nov 2026)](SDCB_SCIENTIFIC_AGENT_BENCHMARK_MATRIX_2026_11_26.md): current Petri v2, ActiveSciBench, Autonomous Science Bench, ASI-Bench, AutoSciBench and AstaBench comparison with a multi-track SOTA strategy.
