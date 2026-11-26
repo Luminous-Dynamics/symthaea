@@ -13,7 +13,7 @@ The source uses only the Rust standard library.
 
 ## Implemented
 
-- Biased empirical MMD squared using an RBF kernel and caller-supplied bandwidth.
+- Biased empirical MMD squared using an RBF kernel and caller-supplied bandwidth; the R-I ratio uses this squared value directly, matching the released upstream implementation.
 - R-I robust representativeness ratio multiplied by supplied expected information gain.
 - R-IDeA DeA sigmoid using supplied current-model and proxy predictions.
 - Raw R-I, R-IDeA, and score-per-cost outputs; cost ranking is explicitly a project extension.
@@ -28,8 +28,8 @@ The source uses only the Rust standard library.
 
 ## Frozen fixture
 
-Target support {0,1,2}, history {0,2}, RBF sigma 1.0. Adding candidate x=1 reduces MMD from 0.1984961 to 0 and yields R-IDeA 0.7046377. A higher-EIG x=4 candidate increases MMD and receives negative R-I/R-IDeA. These are arithmetic fixture values, not an external experiment.
+Target support {0,1,2}, history {0,2}, RBF sigma 1.0. Baseline biased MMD² is 0.0394007. Adding candidate x=1 reduces MMD² to zero and yields R-IDeA 0.7046377. A higher-EIG x=4 candidate increases MMD² to 0.2197536 and receives negative R-I/R-IDeA. The released code uses raw MMD² in its ratio; this reference matches that executable behaviour. These are arithmetic fixture values, not an external experiment.
 
 ## Validation boundary
 
-17 Rust test functions are authored. They have not been compiled or executed in the current environment. JSON schemas/examples are parsed and semantically checked separately; that is not a Rust test pass or full benchmark reproduction.
+18 Rust test functions are authored. They have not been compiled or executed in the current environment. JSON schemas/examples are parsed and semantically checked separately; that is not a Rust test pass or full benchmark reproduction.
