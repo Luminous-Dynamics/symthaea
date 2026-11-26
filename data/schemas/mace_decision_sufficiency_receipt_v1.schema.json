@@ -224,13 +224,12 @@
     },
     "key_id": {
       "type": "string",
-      "minLength": 1,
-      "maxLength": 256
+      "pattern": "^[0-9a-f]{64}$"
     },
     "signature": {
       "type": "array",
-      "minItems": 1,
-      "maxItems": 4096,
+      "minItems": 64,
+      "maxItems": 64,
       "items": {
         "type": "integer",
         "minimum": 0,
@@ -316,5 +315,5 @@
       }
     }
   ],
-  "$comment": "Requirement entries must be sorted by requirement_id. Each evidence_class_sha256 must equal the consumer DecisionNeed requirement. independent_root_families must be sorted by root_family_sha256 with unique family identities; runtime enforces ordering and the DecisionNeed-specific minimum count. Each provenance_receipt_sha256 identifies the independently evaluated transitive lineage/common-cause proof. The consumer checks the signed commitments and cardinality; it does not independently reproduce the evaluator's source-family analysis."
+  "$comment": "Requirement entries must be sorted by requirement_id. Each evidence_class_sha256 must equal the consumer DecisionNeed requirement. independent_root_families must be sorted by root_family_sha256 with unique family identities; runtime enforces ordering and the DecisionNeed-specific minimum count. Each provenance_receipt_sha256 identifies the independently evaluated transitive lineage/common-cause proof. The consumer checks the signed commitments and cardinality; it does not independently reproduce the evaluator's source-family analysis. The runtime requires exactly 64 Ed25519 signature bytes and a SHA-256-derived 64-character key ID. Requirement roots are signed evaluator claims; family identities are ordered and unique at runtime."
 }
