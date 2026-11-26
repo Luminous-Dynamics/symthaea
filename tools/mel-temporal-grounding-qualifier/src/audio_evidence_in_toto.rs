@@ -41,6 +41,7 @@ struct AudioEvidencePredicateV1 {
     query_text_sha256: String,
     evidence_condition: EvidenceConditionV1,
     target_audio_sha256: String,
+    target_audio_bytes_recomputed: bool,
     source_audio_sha256: String,
     decoded_pcm_sha256: String,
     model_identity_sha256: String,
@@ -107,7 +108,14 @@ pub fn build_audio_evidence_in_toto_statement(
     let audio_report_sha256 = canonical_json_sha256(&audit.audio_evidence_report)
         .map_err(|error| format!("failed canonical audio-evidence report digest: {error}"))?;
 
-    let mut subjects = Vec::with_capacity(5 + audit.audio_evidence_report.verified_windows.len());
+    let mut subjects = Vec::with_capacity(6 + audit.audio_evidence_report.verified_windows.len());
+    subjects.push(subject(
+        format!(
+            "target-audio/{}",
+            audit.audio_evidence_report.target_audio_sha256
+        ),
+        audit.audio_evidence_report.target_audio_sha256.clone(),
+    ));
     subjects.push(subject(
         format!("source-audio/{}", audit.audio_evidence_report.source_audio_sha256),
         audit.audio_evidence_report.source_audio_sha256.clone(),
@@ -158,6 +166,9 @@ pub fn build_audio_evidence_in_toto_statement(
         query_text_sha256: evidence_manifest.query_text_sha256.clone(),
         evidence_condition: audit.audio_evidence_report.evidence_condition,
         target_audio_sha256: audit.audio_evidence_report.target_audio_sha256.clone(),
+        target_audio_bytes_recomputed: audit.audio_evidence_report.target_audio_sha256
+            == audit.audio_evidence_report.source_audio_sha256
+            && audit.audio_evidence_report.source_audio_bytes_recomputed,
         source_audio_sha256: audit.audio_evidence_report.source_audio_sha256.clone(),
         decoded_pcm_sha256: audit.audio_evidence_report.decoded_pcm_sha256.clone(),
         model_identity_sha256: evidence_manifest.model_identity_sha256.clone(),
