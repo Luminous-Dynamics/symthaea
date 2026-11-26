@@ -57,6 +57,35 @@ The two boundary metrics are intentionally distinct. A candidate may correctly p
 
 No aggregate reliability scalar is emitted. Each denominator and cluster summary remains visible. Undefined rates remain absent when the corresponding reference denominator is zero.
 
+
+## Replicated success/failure boundary rates
+
+The binary lower/upper boundary pair in the unit fixtures is not sufficient for the released WorldFailBench boundary subset, which contains multiple rollouts on each side. The evaluator now has a separate `BoundaryRatePair` API for replicated side rates.
+
+Each pair binds:
+- pair/domain/environment-family/independent-cluster IDs;
+- perturbation dimension and the two side perturbation values;
+- common initial-state, realized-action and candidate-checkpoint digests;
+- reference success counts and trial counts for both the success-labelled and failure-labelled scene variants;
+- candidate-predicted success counts and trial counts for both variants.
+
+The counts preserve repeated rollouts; they do not turn them into independent environment samples. The independent unit remains the source cluster/pairing structure declared by the manifest.
+
+For each side, the evaluator calculates success rate in basis points. It reports separately:
+- success-side rate MAE;
+- failure-side rate MAE;
+- error in the success-side minus failure-side rate gap;
+- whether the reference boundary exceeds the contract's frozen minimum gap;
+- whether the candidate predicts a boundary of at least that size;
+- boundary-presence agreement and gap-direction agreement;
+- per-cluster pair counts and boundary-detection summaries.
+
+The minimum detectable gap is preregistered in `FailureFidelityContract.minimum_boundary_gap_basis_points`. The current synthetic fixture uses 2,000 basis points (20 percentage points) as an example only; an external benchmark adapter must pin the threshold and side semantics to the benchmark protocol before evaluating a candidate. This is a scorecard option, not a replacement for WorldFailBench's published boundary metric.
+
+The scorecard does **not** assume the success side corresponds to a smaller numeric perturbation. The dataset's position, orientation and size dimensions can have different directions; labels in the evaluator manifest determine which scene is the success side and which is the failure side.
+
+The current API still does not reproduce the original WorldFailBench boundary scoring code. Its site describes that evaluation code as not yet released. The adapter must preserve dataset side metadata, policy variants, task/pair identities, all 10 rollout outcomes per side and the benchmark's factor-specific reporting. Do not compare a one-pair mean rate score directly against the paper's published aggregate.
+
 ## Statistical and evidence rules
 
 - The independent environment-generation cluster is the inferential unit, not the number of episodes.
