@@ -32,4 +32,4 @@ Target support {0,1,2}, history {0,2}, RBF sigma 1.0. Adding candidate x=1 reduc
 
 ## Validation boundary
 
-16 Rust test functions are authored. They have not been compiled or executed in the current environment. JSON schemas/examples are parsed and semantically checked separately; that is not a Rust test pass or full benchmark reproduction.
+17 Rust test functions are authored. They have not been compiled or executed in the current environment. JSON schemas/examples are parsed and semantically checked separately; that is not a Rust test pass or full benchmark reproduction.
