@@ -61,6 +61,18 @@ The training residual is measured against the bucket mean *before* incorporating
 
 Outcome counts are reported separately from transition-state prediction. A future reliability model may predict success/failure calibration, but this first increment only retains the labels; it does not claim a calibrated success predictor.
 
+## Family-label-free retrieval and ambiguity-aware UNKNOWN
+
+The follow-on candidate adds `predict_state_without_family_label`. Unlike the known-family API, it accepts no environment-family ID and compares only candidate-visible context and realized-action-parameter HDC signatures across stored buckets.
+
+- If the best observable context/parameter match is unique, it uses that bucket's transition delta.
+- If equally good matches imply materially different deltas (mean squared delta difference above the frozen `1e-6` threshold), it returns `AmbiguousContextUnknown`. The accompanying `predicted_state` is only an identity placeholder; callers must abstain and must not use it for planning.
+- If equally good matches imply equivalent deltas, it returns the common candidate prediction and aggregates their outcome and independent-cluster diagnostics without using family identity to choose a bucket.
+- If no contextual bucket meets the `0.8` similarity threshold, it exposes the global per-action fallback; unknown actions retain the identity fallback.
+- Tie selection is deterministic and ordered only by candidate-visible delta/similarity values, not family identity or insertion order.
+
+This is a retrieval-and-abstention policy, not a causal mechanism identifier. If a hidden mechanism changes while context and action-parameter observations remain identical, the inputs do not identify which mechanism is active. The correct output is ambiguity when stored evidence disagrees, not a fabricated confident answer. The thresholds are initial engineering constants and require sensitivity analysis.
+
 ## Tests added
 
 - assigned action differs from realized action: only the realized action is learned;
@@ -76,6 +88,10 @@ Outcome counts are reported separately from transition-state prediction. A futur
 - duplicate episode IDs, malformed digests, invalid dimensions and non-finite HDC values are rejected;
 - outcome counters and residual diagnostics are reported without treating them as calibrated uncertainty.
 
+- family-label-free context retrieval across known buckets;
+- UNKNOWN when equally matched family buckets imply conflicting deltas;
+- global-delta fallback for an unseen context under the family-label-free API;
+
 ## Research matrix and next tests
 
 Compare with identical source histories, environment splits and action budgets:
@@ -84,7 +100,7 @@ Compare with identical source histories, environment splits and action budgets:
 2. global per-action mean delta;
 3. context-only delta;
 4. action-parameter-only delta;
-5. context + action-parameter HDC delta;
+5. context + action-parameter HDC delta (known-family and family-label-free/UNKNOWN variants);
 6. symbolic/SCM mechanism and parameter baseline;
 7. matched RSSM/recurrent dynamics baseline;
 8. HDC-LTC/CfC only after a real, explicitly wired transition field, training path and inference path exist.
@@ -106,7 +122,7 @@ Use independent environment clusters for inference. Repeated transition episodes
 
 ## Held-out-family limitation
 
-The current contextual bucket is stratified by `environment_family_id`, and `predict_state_with_context` requires that ID at inference. The known-family test therefore measures retrieval when the family is supplied and has appeared in training; it is not a zero-shot mechanism-family transfer result. The unseen-family test confirms that the current API falls back to the pooled global delta. A separate family-label-free retrieval path must use only observable context/action features and return an explicit ambiguous/unknown result when equally matched families imply incompatible deltas.
+The current contextual bucket is stratified by `environment_family_id`, and `predict_state_with_context` requires that ID at inference. The known-family test therefore measures retrieval when the family is supplied and has appeared in training; it is not a zero-shot mechanism-family transfer result. The unseen-family test confirms that the current API falls back to the pooled global delta. The family-label-free retrieval path described above uses only observable context/action features and returns an explicit ambiguous/unknown result when equally matched families imply incompatible deltas.
 
 ## Claim boundary
 
