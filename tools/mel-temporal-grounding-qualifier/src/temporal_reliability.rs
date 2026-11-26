@@ -11,10 +11,10 @@ use serde::{Deserialize, Serialize};
 
 use crate::temporal_consensus::IndependentTemporalAnnotationV1;
 use crate::temporal_grounding::{
-    score_temporal_grounding, validate_temporal_ground_truth, AudioArtifactClockV1,
-    GroundingPredictionStateV1, GroundTruthStateV1,
-    TemporalGroundTruthV1, TemporalGroundingPlanV1, TemporalGroundingPredictionV1,
-    TEMPORAL_GROUNDING_EVALUATOR_V1, TEMPORAL_GROUNDING_SCHEMA_V1,
+    AudioArtifactClockV1, GroundTruthStateV1, GroundingPredictionStateV1,
+    TEMPORAL_GROUNDING_EVALUATOR_V1, TEMPORAL_GROUNDING_SCHEMA_V1, TemporalGroundTruthV1,
+    TemporalGroundingPlanV1, TemporalGroundingPredictionV1, score_temporal_grounding,
+    validate_temporal_ground_truth,
 };
 
 const CASE_SCHEMA_V1: &str = "mel-temporal-reliability-corpus-v1";
@@ -103,9 +103,15 @@ pub fn audit_reliability_corpus(
     case: &ReliabilityCorpusCaseV1,
 ) -> Result<TemporalAnnotationReliabilityReportV1, String> {
     if case.schema != CASE_SCHEMA_V1 {
-        return Err(format!("unsupported reliability corpus schema: {}", case.schema));
+        return Err(format!(
+            "unsupported reliability corpus schema: {}",
+            case.schema
+        ));
     }
-    validate_digest(&case.annotation_manifest_sha256, "annotation_manifest_sha256")?;
+    validate_digest(
+        &case.annotation_manifest_sha256,
+        "annotation_manifest_sha256",
+    )?;
     if case.minimum_annotators_per_item < 2 {
         return Err("minimum_annotators_per_item must be at least two".into());
     }
@@ -143,7 +149,10 @@ pub fn audit_reliability_corpus(
             ));
         }
         if item.annotations.len() > u16::MAX as usize {
-            return Err(format!("item {} exceeds supported annotation count", item.item_id));
+            return Err(format!(
+                "item {} exceeds supported annotation count",
+                item.item_id
+            ));
         }
         total_annotation_records = total_annotation_records
             .checked_add(item.annotations.len())
@@ -273,8 +282,8 @@ fn calculate_nominal_alpha(
     let all_pairs = total_ratings
         .checked_mul(total_ratings.saturating_sub(1))
         .ok_or_else(|| "nominal alpha total pair count overflow".to_string())?;
-    let expected_disagreement = (all_pairs > 0)
-        .then(|| 1.0 - same_category_pairs as f64 / all_pairs as f64);
+    let expected_disagreement =
+        (all_pairs > 0).then(|| 1.0 - same_category_pairs as f64 / all_pairs as f64);
     let alpha = expected_disagreement
         .filter(|value| *value > f64::EPSILON)
         .map(|expected| 1.0 - observed_disagreement / expected);
@@ -328,15 +337,17 @@ fn calculate_pairwise_event_agreement(
                     let left_prediction = annotation_to_prediction(item, left);
                     let right_prediction = annotation_to_prediction(item, right);
                     let left_as_truth_right_as_prediction =
-                        score_temporal_grounding(&left_truth, &right_prediction, &plan)
-                            .map_err(|issues| {
+                        score_temporal_grounding(&left_truth, &right_prediction, &plan).map_err(
+                            |issues| {
                                 format!("left-to-right reliability scoring failed: {issues:?}")
-                            })?;
+                            },
+                        )?;
                     let right_as_truth_left_as_prediction =
-                        score_temporal_grounding(&right_truth, &left_prediction, &plan)
-                            .map_err(|issues| {
+                        score_temporal_grounding(&right_truth, &left_prediction, &plan).map_err(
+                            |issues| {
                                 format!("right-to-left reliability scoring failed: {issues:?}")
-                            })?;
+                            },
+                        )?;
                     if let (Some(left_f1), Some(right_f1)) = (
                         left_as_truth_right_as_prediction.f1,
                         right_as_truth_left_as_prediction.f1,
@@ -515,19 +526,28 @@ mod tests {
                             '1',
                             'a',
                             GroundTruthStateV1::Present,
-                            vec![FrameIntervalV1 { start_frame: 100, end_frame: 200 }],
+                            vec![FrameIntervalV1 {
+                                start_frame: 100,
+                                end_frame: 200,
+                            }],
                         ),
                         annotation(
                             '2',
                             'b',
                             GroundTruthStateV1::Present,
-                            vec![FrameIntervalV1 { start_frame: 102, end_frame: 202 }],
+                            vec![FrameIntervalV1 {
+                                start_frame: 102,
+                                end_frame: 202,
+                            }],
                         ),
                         annotation(
                             '3',
                             'c',
                             GroundTruthStateV1::Present,
-                            vec![FrameIntervalV1 { start_frame: 110, end_frame: 210 }],
+                            vec![FrameIntervalV1 {
+                                start_frame: 110,
+                                end_frame: 210,
+                            }],
                         ),
                     ],
                 ),
@@ -537,12 +557,7 @@ mod tests {
                     'b',
                     vec![
                         annotation('1', 'd', GroundTruthStateV1::Absent, Vec::new()),
-                        annotation(
-                            '2',
-                            'e',
-                            GroundTruthStateV1::Ambiguous,
-                            Vec::new(),
-                        ),
+                        annotation('2', 'e', GroundTruthStateV1::Ambiguous, Vec::new()),
                     ],
                 ),
                 item(
@@ -574,8 +589,12 @@ mod tests {
         assert_eq!(report.source_work_clusters, 3);
         assert_eq!(report.total_annotation_records, 9);
         assert_eq!(report.disposition_alpha.ratings, 9);
-        assert!((report.disposition_alpha.observed_disagreement.unwrap() - 4.0 / 9.0).abs() < 1e-12);
-        assert!((report.disposition_alpha.expected_disagreement.unwrap() - 13.0 / 18.0).abs() < 1e-12);
+        assert!(
+            (report.disposition_alpha.observed_disagreement.unwrap() - 4.0 / 9.0).abs() < 1e-12
+        );
+        assert!(
+            (report.disposition_alpha.expected_disagreement.unwrap() - 13.0 / 18.0).abs() < 1e-12
+        );
         assert!((report.disposition_alpha.alpha.unwrap() - 5.0 / 13.0).abs() < 1e-12);
         assert!(!report.unitizing_alpha_computed);
         assert!(!report.consensus_ground_truth_created);
@@ -605,7 +624,10 @@ mod tests {
         for item in &mut input.items {
             for annotation in &mut item.annotations {
                 annotation.state = GroundTruthStateV1::Present;
-                annotation.intervals = vec![FrameIntervalV1 { start_frame: 100, end_frame: 200 }];
+                annotation.intervals = vec![FrameIntervalV1 {
+                    start_frame: 100,
+                    end_frame: 200,
+                }];
             }
         }
         let report = audit_reliability_corpus(&input).unwrap();
