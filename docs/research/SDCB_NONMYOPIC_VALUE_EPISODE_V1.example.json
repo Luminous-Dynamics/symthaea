@@ -1,0 +1,75 @@
+{
+  "schema_version": "1.0.0",
+  "episode_id": "dssi-nonmyopic-two-step-v1",
+  "action_ids": [
+    "act-a",
+    "act-b"
+  ],
+  "hypotheses": [
+    {
+      "hypothesis_id": "h1",
+      "prior_probability": 0.4,
+      "utility_by_action": [
+        1,
+        0
+      ]
+    },
+    {
+      "hypothesis_id": "h2",
+      "prior_probability": 0.4,
+      "utility_by_action": [
+        1,
+        0
+      ]
+    },
+    {
+      "hypothesis_id": "h3",
+      "prior_probability": 0.2,
+      "utility_by_action": [
+        0,
+        1
+      ]
+    }
+  ],
+  "experiments": [
+    {
+      "experiment_id": "screen-a",
+      "cost_units": 1,
+      "outcome_likelihoods": [
+        [
+          0.75,
+          0.25
+        ],
+        [
+          1,
+          0
+        ],
+        [
+          0.5,
+          0.5
+        ]
+      ]
+    },
+    {
+      "experiment_id": "screen-b",
+      "cost_units": 1,
+      "outcome_likelihoods": [
+        [
+          0.5,
+          0.5
+        ],
+        [
+          0.5,
+          0.5
+        ],
+        [
+          1,
+          0
+        ]
+      ]
+    }
+  ],
+  "budget_units": 2,
+  "max_experiments": 2,
+  "cost_rate_per_unit": 0
+}
