@@ -1,0 +1,25 @@
+[package]
+name = "hardsec-graph-audit-harness"
+version = "0.1.0"
+edition = "2024"
+publish = false
+autobins = false
+autotests = false
+autoexamples = false
+
+# Isolated nested workspace compiles the exact tracked streaming graph auditor
+# without traversing the incomplete root workspace member glob.
+[workspace]
+
+[features]
+default = []
+hardsec-graph-audit = ["dep:sha2"]
+
+[dependencies]
+serde_json = "=1.0.150"
+sha2 = { version = "=0.10.9", optional = true }
+
+[[example]]
+name = "hardsec_graph_path_retention_audit"
+path = "../../examples/hardsec_graph_path_retention_audit.rs"
+required-features = ["hardsec-graph-audit"]
