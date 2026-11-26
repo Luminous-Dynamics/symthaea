@@ -1,6 +1,6 @@
 # Paired Intervention Contrast Evaluator v0.1
 
-**Status:** Rust evaluator and 22 deterministic tests authored; exact-head Rust 1.100.0 formatting, 109-test crate suite, strict Clippy, custody and MARA phase/reward qualification passed at `383e4432495571313615edbd3f0c5145990ad3c9` (26 November 2026). Underpowered families and all-failed families remain visible in the certificate, with an explicit unmet cluster-floor flag and no inferential estimate.  
+**Status:** Rust evaluator and 22 deterministic tests authored; Rust 1.100.0 formatting, 109-test crate suite, strict Clippy, custody/hostile mutations and MARA phase/reward qualification passed at source head `383e4432495571313615edbd3f0c5145990ad3c9`. The protocol-documentation head `605113b1ef13d7090986b38477b5054256c14250` also passed both focused workflows: run 45779188302 (WorldTest/custody) and run 45779188359 (active causal). Underpowered and all-failed families remain visible with an explicit unmet cluster-floor flag and no inferential estimate.  
 **Research owner:** [#13720 — CMAQ-019](https://github.com/Luminous-Dynamics/symthaea/issues/13720).  
 **Transfer context:** [#13719 — frozen mechanism transfer](https://github.com/Luminous-Dynamics/symthaea/pull/13719).  
 **Statistical inference:** #8578.  
