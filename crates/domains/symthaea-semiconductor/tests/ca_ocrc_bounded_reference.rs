@@ -171,7 +171,7 @@ fn reference_replay() -> (Vec<f64>, Vec<usize>, Vec<usize>) {
         // 1. Expire only when i + dbar_i < t; equality remains tracked.
         let expired: Vec<u64> = tracked
             .iter()
-            .filter(|(origin, proxy)| **origin + **proxy as u64 < round_index)
+            .filter(|(origin, proxy)| **origin + (**proxy as u64) < round_index)
             .map(|(origin, _)| *origin)
             .collect();
         for origin in expired {
