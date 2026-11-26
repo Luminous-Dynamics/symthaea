@@ -135,7 +135,7 @@ A SAT third-party verifier must validate more than a Merkle inclusion proof or a
 
 RFC 9162 consistency proofs demonstrate that a tree head extends a prior tree; they do not force the log to reveal its newest head or prevent split views alone. Likewise, a valid signature proves a key signed a checkpoint, not that the key is still authorized, that the head is fresh, or that all clients saw the same view.
 
-SAT should report separate subclaims: `inclusion_verified`, `consistency_verified`, `signature_verified`, `freshness_verified`, `view_consistency_verified`, `quorum_independence_assessed`, and `current_state_reconciled`. The verifier's top-level state is qualified only when every mandatory subclaim for the declared profile is satisfied. Unknown is not pass.
+SAT should report separate subclaims: `inclusion_verified`, `consistency_verified`, `signature_verified`, `freshness_verified`, `view_consistency_verified`, `quorum_independence_assessed`, and `current_state_reconciled`. The verifier's top-level state is qualified only when every mandatory subclaim for the declared profile is satisfied. Unknown is not pass. The witness result receipt now has a distinct `third_party_verification` object binding the independent verifier identity/build digest, assessment scope, nonce challenge digest, response-set digest, transparency-log usage, each subclaim and its evidence references. A `qualified` SAT L5 result is structurally allowed only for an independent evaluator with a complete assessment and all required checks true; a subject component or an unperformed check cannot self-award qualification.
 
 ## 5. Fault-injection campaign
 
