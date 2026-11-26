@@ -52,6 +52,18 @@ pub enum RbkrError {
         "linear C matrix must be finite, non-empty, and have the state dimension as its column count"
     )]
     InvalidCOperator,
+    #[error("response Gramian scenario set or coordinate contract is invalid")]
+    InvalidScenarioSet,
+    #[error("response Gramian scenarios use different task contracts")]
+    MixedScenarioContract,
+    #[error("response Gramian scenarios use different checkpoints")]
+    MixedScenarioCheckpoint,
+    #[error("response Gramian scenarios use different state metrics")]
+    MixedScenarioStateMetric,
+    #[error("response Gramian scenario weight must be finite and non-negative")]
+    InvalidScenarioWeight,
+    #[error("response Gramian aggregation factor-storage budget exceeded")]
+    ScenarioFactorStorageBudgetExceeded,
 }
 
 /// Errors from finite-horizon linearized Gramian construction.
@@ -73,6 +85,149 @@ pub enum FiniteHorizonGramianError {
     PropagationWorkBudgetExceeded,
     #[error("finite-horizon Gramian construction produced invalid factors")]
     InvalidGramianFactor,
+}
+
+/// One frozen physical trajectory / pulse scenario contributing to a task Gramian.
+///
+/// All scenarios being aggregated must share the same task contract,
+/// checkpoint state, coordinate ordering, and state metric. The scenario
+/// weight is normalized across the set and scales both Gramians. The caller
+/// should construct each pair with build_finite_horizon_gramians using the
+/// same checkpoint digest, then aggregate future-response factors across the
+/// registered intervention family.
+#[derive(Clone, Copy, Debug)]
+pub struct ResponseGramianScenario<'a> {
+    pub task_contract_id: &'a str,
+    pub checkpoint_id: &'a str,
+    pub state_metric_id: &'a str,
+    pub reachability: &'a EmpiricalGramian,
+    pub observability: &'a EmpiricalGramian,
+    pub scenario_weight: f64,
+}
+
+/// Storage limit for aggregating factorized Gramian families.
+#[derive(Clone, Copy, Debug, PartialEq, Eq)]
+pub struct ResponseGramianAggregationConfig {
+    pub maximum_total_factor_scalars: usize,
+}
+
+impl ResponseGramianAggregationConfig {
+    pub fn new(maximum_total_factor_scalars: usize) -> Self {
+        Self {
+            maximum_total_factor_scalars,
+        }
+    }
+}
+
+impl Default for ResponseGramianAggregationConfig {
+    fn default() -> Self {
+        Self::new(16_000_000)
+    }
+}
+
+/// Aggregate checkpoint-aligned Gramians over a registered future-response family.
+///
+/// Each scenario carries its own linearized A/B/C response trajectory but must
+/// share the exact checkpoint, state coordinates/metric, and task contract.
+/// This forms the weighted sums
+///
+/// Wc = sum_s p_s Wc_s and Wo = sum_s p_s Wo_s,
+///
+/// without materializing either dense matrix. Scenario weights are normalized
+/// to sum to one. This is an empirical family average, not a worst-case bound:
+/// adversarial/worst-case pulses must remain in a separate challenge set and
+/// be evaluated independently.
+pub fn aggregate_response_gramians(
+    scenarios: &[ResponseGramianScenario<'_>],
+    config: ResponseGramianAggregationConfig,
+) -> Result<(EmpiricalGramian, EmpiricalGramian), RbkrError> {
+    let first = scenarios.first().ok_or(RbkrError::InvalidScenarioSet)?;
+    if config.maximum_total_factor_scalars == 0
+        || first.task_contract_id.trim().is_empty()
+        || first.checkpoint_id.trim().is_empty()
+        || first.state_metric_id.trim().is_empty()
+    {
+        return Err(RbkrError::InvalidScenarioSet);
+    }
+
+    let dimension = first.reachability.dimension;
+    if dimension == 0 || first.observability.dimension != dimension {
+        return Err(RbkrError::StateDimensionMismatch);
+    }
+
+    let mut total_weight = 0.0_f64;
+    let mut reach_factor_count = 0_usize;
+    let mut observe_factor_count = 0_usize;
+    for scenario in scenarios {
+        if scenario.task_contract_id != first.task_contract_id {
+            return Err(RbkrError::MixedScenarioContract);
+        }
+        if scenario.checkpoint_id != first.checkpoint_id {
+            return Err(RbkrError::MixedScenarioCheckpoint);
+        }
+        if scenario.state_metric_id != first.state_metric_id {
+            return Err(RbkrError::MixedScenarioStateMetric);
+        }
+        if scenario.reachability.dimension != dimension
+            || scenario.observability.dimension != dimension
+        {
+            return Err(RbkrError::StateDimensionMismatch);
+        }
+        if !scenario.scenario_weight.is_finite() || scenario.scenario_weight < 0.0 {
+            return Err(RbkrError::InvalidScenarioWeight);
+        }
+        total_weight += scenario.scenario_weight;
+        if !total_weight.is_finite() {
+            return Err(RbkrError::InvalidScenarioWeight);
+        }
+        if scenario.scenario_weight == 0.0 {
+            continue;
+        }
+        reach_factor_count = reach_factor_count
+            .checked_add(scenario.reachability.weighted_factors.len())
+            .ok_or(RbkrError::ScenarioFactorStorageBudgetExceeded)?;
+        observe_factor_count = observe_factor_count
+            .checked_add(scenario.observability.weighted_factors.len())
+            .ok_or(RbkrError::ScenarioFactorStorageBudgetExceeded)?;
+    }
+    if total_weight <= 0.0 {
+        return Err(RbkrError::InvalidScenarioWeight);
+    }
+
+    let factor_scalars = reach_factor_count
+        .checked_add(observe_factor_count)
+        .and_then(|count| count.checked_mul(dimension))
+        .ok_or(RbkrError::ScenarioFactorStorageBudgetExceeded)?;
+    if factor_scalars > config.maximum_total_factor_scalars {
+        return Err(RbkrError::ScenarioFactorStorageBudgetExceeded);
+    }
+
+    let mut reachability =
+        EmpiricalGramian::new(dimension).map_err(|_| RbkrError::StateDimensionMismatch)?;
+    let mut observability =
+        EmpiricalGramian::new(dimension).map_err(|_| RbkrError::StateDimensionMismatch)?;
+    for scenario in scenarios {
+        if scenario.scenario_weight == 0.0 {
+            continue;
+        }
+        let normalized_weight = scenario.scenario_weight / total_weight;
+        for factor in &scenario.reachability.weighted_factors {
+            validate_factor(factor, dimension)?;
+            reachability
+                .add_direction(factor, normalized_weight)
+                .map_err(|_| RbkrError::NonFiniteArithmetic)?;
+        }
+        for factor in &scenario.observability.weighted_factors {
+            validate_factor(factor, dimension)?;
+            observability
+                .add_direction(factor, normalized_weight)
+                .map_err(|_| RbkrError::NonFiniteArithmetic)?;
+        }
+    }
+    if reachability.weighted_factors.is_empty() || observability.weighted_factors.is_empty() {
+        return Err(RbkrError::EmptyGramian);
+    }
+    Ok((reachability, observability))
 }
 
 /// Resource limits for exact finite-horizon LTV Gramian factor construction.
@@ -972,6 +1127,82 @@ mod tests {
                 FiniteHorizonGramianConfig::new(1, 100),
             ),
             Err(FiniteHorizonGramianError::FactorStorageBudgetExceeded)
+        );
+    }
+
+    #[test]
+    fn response_scenario_aggregation_weights_families_at_one_checkpoint() {
+        let reach_a = gramian(2, &[vec![1.0, 0.0]]);
+        let observe_a = gramian(2, &[vec![0.5, 0.0]]);
+        let reach_b = gramian(2, &[vec![0.0, 1.0]]);
+        let observe_b = gramian(2, &[vec![0.0, 2.0]]);
+        let scenarios = [
+            ResponseGramianScenario {
+                task_contract_id: "kresp1-contract-v1",
+                checkpoint_id: "checkpoint-sha256-abc",
+                state_metric_id: "nondimensional-state-metric-v1",
+                reachability: &reach_a,
+                observability: &observe_a,
+                scenario_weight: 0.25,
+            },
+            ResponseGramianScenario {
+                task_contract_id: "kresp1-contract-v1",
+                checkpoint_id: "checkpoint-sha256-abc",
+                state_metric_id: "nondimensional-state-metric-v1",
+                reachability: &reach_b,
+                observability: &observe_b,
+                scenario_weight: 0.75,
+            },
+        ];
+
+        let (reach, observe) = aggregate_response_gramians(
+            &scenarios,
+            ResponseGramianAggregationConfig::default(),
+        )
+        .unwrap();
+        assert!((reach.quadratic_form(&[1.0, 0.0]).unwrap() - 0.25).abs() < 1.0e-12);
+        assert!((reach.quadratic_form(&[0.0, 1.0]).unwrap() - 0.75).abs() < 1.0e-12);
+        assert!((observe.quadratic_form(&[1.0, 0.0]).unwrap() - 0.0625).abs() < 1.0e-12);
+        assert!((observe.quadratic_form(&[0.0, 1.0]).unwrap() - 3.0).abs() < 1.0e-12);
+
+        let basis = ResponseBalancedBasis::from_empirical_gramians(
+            &reach,
+            &observe,
+            RbkrConfig::new(1),
+        )
+        .unwrap();
+        assert!(basis.biorthogonality_defect() < 1.0e-8);
+    }
+
+    #[test]
+    fn response_scenario_aggregation_rejects_coordinate_mixing_and_budget_overrun() {
+        let reach = gramian(2, &[vec![1.0, 0.0]]);
+        let observe = gramian(2, &[vec![1.0, 0.0]]);
+        let base = ResponseGramianScenario {
+            task_contract_id: "kresp1-contract-v1",
+            checkpoint_id: "checkpoint-a",
+            state_metric_id: "metric-v1",
+            reachability: &reach,
+            observability: &observe,
+            scenario_weight: 1.0,
+        };
+        let other_checkpoint = ResponseGramianScenario {
+            checkpoint_id: "checkpoint-b",
+            ..base
+        };
+        assert_eq!(
+            aggregate_response_gramians(
+                &[base, other_checkpoint],
+                ResponseGramianAggregationConfig::default(),
+            ),
+            Err(RbkrError::MixedScenarioCheckpoint)
+        );
+        assert_eq!(
+            aggregate_response_gramians(
+                &[base],
+                ResponseGramianAggregationConfig::new(1),
+            ),
+            Err(RbkrError::ScenarioFactorStorageBudgetExceeded)
         );
     }
 
