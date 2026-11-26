@@ -291,6 +291,7 @@ pub enum PairedInterventionError {
     EmptyDigest { field: &'static str },
     EmptyExpectedPairSet,
     TooManyPairs { requested: usize, maximum: usize },
+    ZeroMinimumIndependentClusters,
     TooFewIndependentClusters { family: InterventionFamily, observed: u64, required: u64 },
     MissingPairs { pair_ids: Vec<String> },
     UnexpectedPair { pair_id: String },
@@ -337,6 +338,9 @@ impl fmt::Display for PairedInterventionError {
             Self::EmptyDigest { field } => write!(formatter, "required provenance digest {field} is empty"),
             Self::EmptyExpectedPairSet => write!(formatter, "paired-intervention expected pair set must not be empty"),
             Self::TooManyPairs { requested, maximum } => write!(formatter, "paired-intervention pair count {requested} exceeds maximum {maximum}"),
+            Self::ZeroMinimumIndependentClusters => {
+                write!(formatter, "minimum independent cluster count must be nonzero")
+            }
             Self::TooFewIndependentClusters { family, observed, required } => write!(
                 formatter,
                 "intervention family {} has {observed} completed clusters; {required} required",
@@ -498,7 +502,7 @@ fn validate_context(context: &PairedInterventionContext) -> Result<BTreeMap<Inte
         }
     }
     if context.minimum_independent_clusters_per_family == 0 {
-        return Err(PairedInterventionError::ArithmeticOverflow);
+        return Err(PairedInterventionError::ZeroMinimumIndependentClusters);
     }
 
     let mut invariant_ids = BTreeSet::new();
@@ -1485,6 +1489,16 @@ mod tests {
         assert!(matches!(
             evaluate_paired_interventions(&input),
             Err(PairedInterventionError::MissingRequiredEnergyMeasurement { .. })
+        ));
+    }
+
+    #[test]
+    fn intervention_target_cannot_be_in_the_invariant_variable_set() {
+        let mut input = base_input();
+        input.context.expected_invariant_variable_ids = vec!["mass".to_owned()];
+        assert!(matches!(
+            evaluate_paired_interventions(&input),
+            Err(PairedInterventionError::TargetVariableDeclaredInvariant { .. })
         ));
     }
 
