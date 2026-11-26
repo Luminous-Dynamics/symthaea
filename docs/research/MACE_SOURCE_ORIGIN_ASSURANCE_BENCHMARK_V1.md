@@ -252,3 +252,10 @@ The [MACE Derived-Memory Invalidation V1](MACE_DERIVED_MEMORY_INVALIDATION_V1.md
 - erasure acknowledgements across every derived store and external storage domain.
 
 Proposed targets are 100% direct and transitive invalidation on exhaustive fixtures, zero stale projection acceptance, zero unrelated false invalidation, zero old-projection resurrection after source revalidation, and complete downstream erasure receipts before any erasure-complete claim. Report false invalidation and rebuild cost alongside stale-use; indiscriminately invalidating every memory is not an acceptable way to obtain zero stale-use.
+
+
+## 12. Derived projection closure and invalidation
+
+The [MACE Derived-Memory Invalidation V1](MACE_DERIVED_MEMORY_INVALIDATION_V1.md) reference models derived memory as a dependency graph. Extend the benchmark to test the **complete downstream closure** after source corrections, quarantine, revocation and rights erasure. A memory system must not simply update the raw conversation while leaving stale summaries, embeddings, preferences, plans or answer caches available.
+
+Add pairwise and transitive graph fixtures, diamond dependencies and shared projection parents. Require all descendants to transition out of Current, preserve unrelated projections, and prevent automatic resurrection after source revalidation. New versions must bind current source-event IDs, current parent projection IDs and independent derivation receipts. Report false invalidation, rebuild latency, rebuild tokens and update cost as well as stale-use rate.
