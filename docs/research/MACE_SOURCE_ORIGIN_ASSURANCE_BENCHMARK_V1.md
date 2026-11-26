@@ -259,3 +259,26 @@ Proposed targets are 100% direct and transitive invalidation on exhaustive fixtu
 The [MACE Derived-Memory Invalidation V1](MACE_DERIVED_MEMORY_INVALIDATION_V1.md) reference models derived memory as a dependency graph. Extend the benchmark to test the **complete downstream closure** after source corrections, quarantine, revocation and rights erasure. A memory system must not simply update the raw conversation while leaving stale summaries, embeddings, preferences, plans or answer caches available.
 
 Add pairwise and transitive graph fixtures, diamond dependencies and shared projection parents. Require all descendants to transition out of Current, preserve unrelated projections, and prevent automatic resurrection after source revalidation. New versions must bind current source-event IDs, current parent projection IDs and independent derivation receipts. Report false invalidation, rebuild latency, rebuild tokens and update cost as well as stale-use rate.
+
+
+## 13. Decision-value retrieval and value of information
+
+The follow-on [MACE Decision-Value Retrieval V1](MACE_DECISION_VALUE_RETRIEVAL_V1.md) adds two separate retrieval-selection modes:
+
+- **EVSI:** calibrated expected value of sample information, where each query's prior/likelihood model is bound by an independently verified calibration receipt.
+- **Robust minimax regret reduction:** probability-free scoring over conservative possible-state/observation support sets.
+
+Both modes enforce consumer-owned hard action constraints and require independently verified resource-profile receipts for tool calls, latency, context tokens, inspected bytes and utility cost. They only select queries with positive net value; otherwise they stop. Neither mode authorizes action or promotes a reusable retrieval strategy.
+
+Benchmark additions:
+- matched comparison against no-retrieval, BM25, dense, hybrid RRF, graph/causal, fixed top-k and full-context baselines;
+- decision-flipping evidence and missing-requirement cases;
+- redundant/shared-root sources and common-cause scenarios;
+- miscalibrated, stale and shifted probability models;
+- probability-free robust support tasks;
+- resource/cost/latency/token budget sweeps;
+- hard action prohibitions and abstention;
+- sequential marginal-value stopping;
+- downstream independently measured outcome and counterfactual regret.
+
+Proposed targets: at least 10% lower paired decision regret than the strongest matched baseline; ≤1% unsafe actions at ≥80% supported coverage; zero hard-constraint violations; nominal calibration coverage; improved regret-vs-cost Pareto frontier; and zero strategy promotion without independent outcome receipts and held-out counterfactual qualification.
