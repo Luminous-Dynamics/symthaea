@@ -163,6 +163,83 @@ Set confirmatory repetitions through a preregistered precision/power analysis th
 
 Require a positive effect on a preregistered primary endpoint against the strongest simple controller, with no integrity or protected-capability regression. A gain on one campaign does not establish general orchestration intelligence.
 
+## Limitation-to-method-response obligations (v0 extension, 2026-11-26)
+
+The DISCERN L2 results expose a failure that ordinary issue recognition does not catch: a researcher may name a confound or limitation yet leave the contaminated analysis and conclusion unchanged. An L3 agent may accept an adversarial critique without producing a more evidence-faithful hypothesis. This protocol therefore requires every consequential limitation to become an explicit **response obligation** in the existing prospective action trace.
+
+Schema fragment:
+- `SYM_RSI_LIMITATION_RESPONSE_TRACE_SCHEMA_V0_2026-11-26.json`
+
+It references existing authority records only. It must not duplicate the ResearchState, evidence graph, action-offer list, executor receipt store, auditor identity registry or adjudication authority.
+
+### Required binding
+
+Each limitation obligation binds:
+- the exact serialized ResearchState SHA-256;
+- the exact evidence-prefix SHA-256;
+- the active decision ID and, where applicable, scoped-claim digest;
+- origin of the observation: policy self-detected, independent auditor, domain expert, executor observation or benchmark control;
+- typed limitation class, affected claim/evidence IDs, severity and consequence;
+- required response and the exact currently permitted upstream action-offer ID (or null when no action is permitted);
+- prospective predicted outcome, decision consequence, success condition and reversal condition;
+- after execution, the upstream action receipt and the exact post-action ResearchState/evidence-prefix digests;
+- independent adjudication disposition and authority reference when the obligation is marked adjudicated or waived.
+
+### Response semantics
+
+The required responses are action intents, not executable commands or permissions:
+- `REANALYZE`, `ADD_CONTROL`, `REPLICATE`, `SENSITIVITY_ANALYSIS`, `REVISE_SCOPE`, `SEEK_INDEPENDENT_ADJUDICATION`, `ABSTAIN`, `JUSTIFIED_NO_CHANGE`.
+
+A non-material limitation may justify no method change, but that decision must explain why the limitation does not change the target estimate/claim and must have a prospective success/reversal condition. It is not acceptable to silently discard a detected limitation.
+
+A critical limitation that invalidates the analysis cannot be marked resolved by prose alone. It needs an executed permitted response and the resulting state/evidence receipt, or a separately authorized abstention/stop decision. A model's own confidence cannot adjudicate its response. A reviewer concession is not proof that the revised claim is more accurate.
+
+### Lifecycle and non-promotion
+
+1. **OPEN** — limitation identified and bound to the current state/prefix.
+2. **RESPONSE_PLANNED** — response intent and prospective predictions recorded against an existing permitted action offer or a justified no-change/abstention.
+3. **EXECUTED** — actual action receipt and post-state/evidence-prefix digests recorded; failures remain visible.
+4. **ADJUDICATED** — an independent authority marks the consequence resolved, not resolved, unresolved or waived.
+5. **WAIVED_WITH_REASON** — only for a justified no-change response with an explicit independent authority and reason.
+
+Creating an obligation never mutates ResearchState, grants a new offer or schedules a tool. It is consumed by #11015's existing policy trace and action owners. After the executor returns, the policy must read the new typed ResearchState; the obligation cannot be closed against the stale pre-action state.
+
+### Required controls
+
+Add cases for:
+- issue recognized, but analysis/result unchanged;
+- confound identified and appropriate reanalysis or control executed;
+- scope mismatch handled by narrowing the claim rather than inventing a method;
+- low power handled by replication or a justified uncertainty/abstention;
+- non-identifiable alternatives handled by a genuinely discriminating experiment or explicit unresolved set;
+- non-material limitation with justified `JUSTIFIED_NO_CHANGE`;
+- valid auditor objection accepted and method revised;
+- invalid auditor objection rejected with exact evidence-backed rationale;
+- accepted critique that worsens evidence fidelity (must not count as success);
+- action execution fails or times out (obligation remains unresolved and the failed receipt stays visible);
+- state/evidence-prefix changes between planning and execution (stale plan is rejected/replanned);
+- candidate attempts to self-adjudicate or mark its own obligation resolved.
+
+### Metrics
+
+Report separately:
+- limitation detection precision/recall and severity-weighted recall;
+- response appropriateness by limitation class;
+- recognition-without-response rate;
+- method-change / claim-change / justified-no-change rates;
+- proportion of executed responses that satisfy the frozen prospective success condition;
+- independently adjudicated resolution rate;
+- post-response evidence fidelity and claim calibration;
+- justified abstention, unjustified abstention and premature commitment;
+- valid critique acceptance, invalid critique rejection and revision regression;
+- action cost, wall time and human-review burden.
+
+The primary endpoint is not “limitations mentioned” or “criticisms accepted.” It is **whether valid limitations are translated into the correct, evidence-bound methodological response, and whether that response improves or preserves independently adjudicated evidence fidelity**.
+
+### External target and claim ceiling
+
+The DISCERN adapter/evaluation is tracked in [#13852](https://github.com/Luminous-Dynamics/symthaea/issues/13852). This v0 schema fragment is a trace-contract proposal; it is not yet wired into the production policy or validated by a Rust implementation. Passing synthetic fixtures would establish schema/trace conformance only, not scientific judgment or general autonomous discovery.
+
 ## Ownership composition
 
 - #10877 — research taste and interpretation;
