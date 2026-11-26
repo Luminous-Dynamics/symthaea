@@ -20,7 +20,8 @@
     "mode": "fresh_quorum_required",
     "max_checkpoint_age_seconds": null,
     "trusted_time_profile_digest": null,
-    "offline_behavior": "hold_reads_and_writes"
+    "offline_behavior": "hold_reads_and_writes",
+    "freshness_mechanism": "nonce_bound_quorum_challenge"
   },
   "operators": [
     {
@@ -43,7 +44,13 @@
         "valid_from": null,
         "valid_until": null
       },
-      "governance_evidence_ref": "synthetic-only://operator-1"
+      "governance_evidence_ref": "synthetic-only://operator-1",
+      "durability_profile": {
+        "commit_durable_before_receipt": true,
+        "anti_rollback_mechanism": "unknown",
+        "witness_backup_policy_digest": "sha256:dddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddd",
+        "rollback_detection_evidence_ref": "synthetic-only://anti-rollback-not-assessed"
+      }
     },
     {
       "operator_id": "synthetic-operator-2",
@@ -65,7 +72,13 @@
         "valid_from": null,
         "valid_until": null
       },
-      "governance_evidence_ref": "synthetic-only://operator-2"
+      "governance_evidence_ref": "synthetic-only://operator-2",
+      "durability_profile": {
+        "commit_durable_before_receipt": true,
+        "anti_rollback_mechanism": "unknown",
+        "witness_backup_policy_digest": "sha256:dddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddd",
+        "rollback_detection_evidence_ref": "synthetic-only://anti-rollback-not-assessed"
+      }
     },
     {
       "operator_id": "synthetic-operator-3",
@@ -87,7 +100,13 @@
         "valid_from": null,
         "valid_until": null
       },
-      "governance_evidence_ref": "synthetic-only://operator-3"
+      "governance_evidence_ref": "synthetic-only://operator-3",
+      "durability_profile": {
+        "commit_durable_before_receipt": true,
+        "anti_rollback_mechanism": "unknown",
+        "witness_backup_policy_digest": "sha256:dddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddd",
+        "rollback_detection_evidence_ref": "synthetic-only://anti-rollback-not-assessed"
+      }
     },
     {
       "operator_id": "synthetic-operator-4",
@@ -109,7 +128,13 @@
         "valid_from": null,
         "valid_until": null
       },
-      "governance_evidence_ref": "synthetic-only://operator-4"
+      "governance_evidence_ref": "synthetic-only://operator-4",
+      "durability_profile": {
+        "commit_durable_before_receipt": true,
+        "anti_rollback_mechanism": "unknown",
+        "witness_backup_policy_digest": "sha256:dddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddd",
+        "rollback_detection_evidence_ref": "synthetic-only://anti-rollback-not-assessed"
+      }
     }
   ],
   "independence_domains": {
