@@ -644,12 +644,12 @@ mod tests {
         let manifest = manifest();
         assert_eq!(
             manifest.context.context_manifest_sha256,
-            "0fe3a258449c9fa4b4625c1c91d155c51f95f7694f38472973382ef95504ed95"
+            "288760a0b5e96a9fc87bb801bbf9fb6422e73d283be2706afe7118de8e808a32"
         );
         let report = verify_audio_evidence_manifest(&manifest, SOURCE_AUDIO, PCM, REQUEST_BODY).unwrap();
         assert_eq!(
             report.full_manifest_sha256,
-            "70a121d88275034cf68428f20002c51d3cc6f83275e6e77bc80e5a1e3a5a8556"
+            "45b5cd466db599d301dc5c479d66d07ff0bfd733bfa1d5f5ec123f6100bb1e0e"
         );
         assert!(report.source_audio_bytes_recomputed);
         assert!(report.decoded_pcm_bytes_recomputed);
