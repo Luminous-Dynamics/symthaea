@@ -570,7 +570,15 @@ mod tests {
     #[test]
     fn exact_source_pcm_window_and_context_digests_verify() {
         let manifest = manifest();
+        assert_eq!(
+            manifest.context.context_manifest_sha256,
+            "ebb850dcbca848029eb03e4beb03f73fc30cd7e9ecf2032aead30eaf76b99b2d"
+        );
         let report = verify_audio_evidence_manifest(&manifest, SOURCE_AUDIO, PCM).unwrap();
+        assert_eq!(
+            report.full_manifest_sha256,
+            "ef353ee4e8a637c16bba2f501f387679821e6e88cebe78494d977aea992489c0"
+        );
         assert!(report.source_audio_bytes_recomputed);
         assert!(report.decoded_pcm_bytes_recomputed);
         assert!(report.window_payloads_recomputed);
