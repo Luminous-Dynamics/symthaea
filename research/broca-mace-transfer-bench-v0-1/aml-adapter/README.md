@@ -235,3 +235,12 @@ isolation, canonical-pool handling, gold-field rejection, duplicate-session
 rejection, close semantics and deterministic lexical tie-breaking. They have not been run in
 this environment.
 
+
+
+## Non-regressive learning admission gate
+
+The `non_regressive_learning` module compares four independently verified runs: stable and adaptation strata before and after a learning update. It requires identical benchmark release, split, grader, evaluation protocol, comparison group and paired task IDs. It uses integer per-task basis-point scores and retains exact score sums and denominators.
+
+The default proposed retention policy allows at most 100 basis points (1.00 percentage point) stable-stratum regression and requires no adaptation-stratum regression. An unverified run is inconclusive; a stable regression beyond budget rejects the update even when adaptation performance improves. The module produces an admission assessment only and does not deploy or roll back model state.
+
+Protocol and schema: [MACE Non-Regressive Learning Admission Gate V1](../../../docs/research/MACE_NON_REGRESSIVE_LEARNING_GATE_V1.md) and [mace_non_regressive_learning_gate_v1.schema.json](../../../data/schemas/mace_non_regressive_learning_gate_v1.schema.json). Seven deterministic tests are authored but not executed.
