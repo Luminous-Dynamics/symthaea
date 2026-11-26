@@ -73,13 +73,12 @@ impl DerivedProjectionStatusV1 {
 
     fn severity(self) -> u8 {
         match self {
-            Self::Current => 0,
+            Self::Current | Self::Rebuilt => 0,
             Self::Stale => 1,
             Self::Quarantined => 2,
             Self::Revoked => 3,
             Self::ErasureRequested => 4,
-            Self::Rebuilt => 5,
-            Self::Erased => 6,
+            Self::Erased => 5,
         }
     }
 }
@@ -182,6 +181,23 @@ pub struct ProjectionInvalidationReceiptV1 {
     pub invalidated_projection_ids: Vec<String>,
     pub entries: Vec<ProjectionInvalidationEntryV1>,
     pub receipt_sha256: String,
+}
+
+impl ProjectionInvalidationReceiptV1 {
+    pub fn verify_integrity(&self) -> bool {
+        self.invalidated_projection_ids == self.entries.iter()
+            .map(|entry| entry.projection_id.clone()).collect::<Vec<_>>()
+            && self.receipt_sha256 == projection_invalidation_digest(
+                &self.user_id,
+                &self.session_id,
+                &self.mutation_event_id,
+                self.mutation_sequence,
+                &self.source_transition_receipt_sha256,
+                &self.previous_index_sha256,
+                &self.resulting_index_sha256,
+                &self.entries,
+            )
+    }
 }
 
 #[derive(Clone, Copy, Debug, Eq, PartialEq)]
@@ -303,6 +319,16 @@ impl DerivedProjectionIndexV1 {
             return Err(TemporalProjectionRejectV1::SequenceGap {
                 expected: ledger.last_sequence(),
                 actual: spec.built_at_sequence,
+            });
+        }
+        if self.projections.is_empty() && self.last_sequence == 0 {
+            // Bootstrap an index from the exact current session snapshot.
+            // Later gaps cannot be skipped because they may contain invalidations.
+            self.last_sequence = ledger.last_sequence();
+        } else if self.last_sequence != ledger.last_sequence() {
+            return Err(TemporalProjectionRejectV1::SequenceGap {
+                expected: self.last_sequence,
+                actual: ledger.last_sequence(),
             });
         }
 
@@ -727,6 +753,33 @@ mod tests {
                 message: message("turn-1", 100, "corrected source fact"),
             },
         }
+    }
+
+    #[test]
+    fn projection_index_must_not_skip_unprocessed_session_sequences() {
+        let mut ledger = ledger();
+        let mut index = DerivedProjectionIndexV1::new("user-1", "session-1").unwrap();
+        // Registering the first projection bootstraps the index at sequence one.
+        index.register_projection(&ledger, spec("summary-v1", 1, &["event-1"], &[])).unwrap();
+        ledger.apply(append("event-2", 2, 200, "new fact"), 1_100).unwrap();
+        let result = index.register_projection(&ledger, spec("summary-v2", 2, &["event-2"], &[]));
+        assert_eq!(
+            result,
+            Err(TemporalProjectionRejectV1::SequenceGap { expected: 1, actual: 2 })
+        );
+    }
+
+    #[test]
+    fn projection_invalidation_receipt_is_self_committing() {
+        let mut ledger = ledger();
+        let mut index = DerivedProjectionIndexV1::new("user-1", "session-1").unwrap();
+        index.register_projection(&ledger, spec("summary-v1", 1, &["event-1"], &[])).unwrap();
+        let transition = ledger.apply(correction(2), 1_100).unwrap().receipt;
+        let result = index.apply_transition(&transition).unwrap();
+        assert!(result.receipt.verify_integrity());
+        let mut altered = result.receipt.clone();
+        altered.invalidated_projection_ids.clear();
+        assert!(!altered.verify_integrity());
     }
 
     #[test]
