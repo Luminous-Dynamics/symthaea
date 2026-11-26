@@ -181,6 +181,9 @@ pub fn replay_source_lineage_graph_v1(
     let edge_count = nodes.values().try_fold(0u64, |total, node| {
         total.checked_add(node.parent_evidence_ids.len() as u64)
     }).ok_or(SourceLineageRejectV1::InvalidGraph)?;
+    if edge_count > 100_000_000 {
+        return Err(SourceLineageRejectV1::InvalidGraph);
+    }
     if expected_commitments.iter().any(|item| {
         item.source_node_count != nodes.len() as u64
             || item.dependency_edge_count != edge_count
