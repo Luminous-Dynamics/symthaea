@@ -300,5 +300,11 @@
     "fixture_class": "synthetic_schema_test_only",
     "generator_seed": 7,
     "source_record_refs": []
-  }
+  },
+  "adjacent_methods": [
+    "adaptive_opinf_port",
+    "adaptive_nitrom_port",
+    "adaptive_opinf_nitrom_hybrid_port",
+    "symmetry_augmented_kinetic_closure"
+  ]
 }
