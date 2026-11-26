@@ -221,7 +221,7 @@ pub enum MaceContextExposureRejectV1 {
     InvalidResponseBinding, InvalidSignatureAlgorithm, InvalidSignatureEncoding,
     InvalidObserverKeyId, UnknownObserverKey, SignatureMismatch,
     InvalidRequestBody, UnclassifiedProviderParameterKey,
-    ProviderParameterTypeMismatch, ExposureOutsideMessageContent,
+    ProviderParameterTypeMismatch, InvalidSpanEncoding, ExposureOutsideMessageContent,
     ExposureRoleMismatch,
     EvidenceAdmissionRejected, MemoryExposureInNoMemoryArm,
     ObserverSigningFailed, CanonicalizationFailed,
@@ -654,6 +654,15 @@ fn verify_span_coverage(
         if sha256_hex(&body[start..end]) != span.exposed_span_sha256 {
             return Err(MaceContextExposureRejectV1::SpanDigestMismatch);
         }
+        // A valid memory span must begin and end at complete UTF-8 / JSON
+        // string-content boundaries. A digest over half of an escape sequence
+        // or a partial multi-byte scalar is not a valid exposed text segment.
+        let mut quoted_fragment = Vec::with_capacity(end - start + 2);
+        quoted_fragment.push(b'"');
+        quoted_fragment.extend_from_slice(&body[start..end]);
+        quoted_fragment.push(b'"');
+        serde_json::from_slice::<String>(&quoted_fragment)
+            .map_err(|_| MaceContextExposureRejectV1::InvalidSpanEncoding)?;
     }
     Ok(())
 }
@@ -1130,6 +1139,59 @@ mod tests {
         refresh_body_binding(&mut receipt, body, &key);
         assert!(
             verify_fixture(&receipt, body.to_vec(), &key, &expected(), &AcceptEvidence).is_ok()
+        );
+    }
+
+    #[test]
+    fn rejects_span_that_splits_a_json_escape_sequence() {
+        let (mut receipt, key, _) = fixture();
+        let body = br#"{"model":"model-pinned-1","messages":[{"role":"user","content":"prefix\\ncontext"}]}"#;
+        let escape_start = body.windows(2).position(|window| window == b"\\\\n").unwrap() as u64;
+        receipt.exposures[0].span_start_byte = escape_start;
+        receipt.exposures[0].span_end_byte = escape_start + 1;
+        receipt.exposures[0].exposed_span_sha256 = hash(b"\\");
+        refresh_body_binding(&mut receipt, body, &key);
+        assert_eq!(
+            verify_fixture(&receipt, body.to_vec(), &key, &expected(), &AcceptEvidence).unwrap_err(),
+            MaceContextExposureRejectV1::InvalidSpanEncoding
+        );
+    }
+
+    #[test]
+    fn rejects_span_that_splits_a_utf8_scalar() {
+        let (mut receipt, key, _) = fixture();
+        let body = br#"{"model":"model-pinned-1","messages":[{"role":"user","content":"prefix 😀 context"}]}"#;
+        let emoji_start = body.windows(4).position(|window| window == "😀".as_bytes()).unwrap() as u64;
+        receipt.exposures[0].span_start_byte = emoji_start + 1;
+        receipt.exposures[0].span_end_byte = emoji_start + 2;
+        receipt.exposures[0].exposed_span_sha256 =
+            hash(&body[(emoji_start + 1) as usize..(emoji_start + 2) as usize]);
+        refresh_body_binding(&mut receipt, body, &key);
+        assert_eq!(
+            verify_fixture(&receipt, body.to_vec(), &key, &expected(), &AcceptEvidence).unwrap_err(),
+            MaceContextExposureRejectV1::InvalidSpanEncoding
+        );
+    }
+
+    #[test]
+    fn rejects_duplicate_top_level_model_members() {
+        let (mut receipt, key, _) = fixture();
+        let body = br#"{"model":"model-pinned-1","model":"model-pinned-1","messages":[{"role":"user","content":"context"}]}"#;
+        refresh_body_binding(&mut receipt, body, &key);
+        assert_eq!(
+            verify_fixture(&receipt, body.to_vec(), &key, &expected(), &AcceptEvidence).unwrap_err(),
+            MaceContextExposureRejectV1::InvalidRequestBody
+        );
+    }
+
+    #[test]
+    fn rejects_duplicate_top_level_message_members() {
+        let (mut receipt, key, _) = fixture();
+        let body = br#"{"model":"model-pinned-1","messages":[{"role":"user","content":"context"}],"messages":[{"role":"user","content":"other"}]}"#;
+        refresh_body_binding(&mut receipt, body, &key);
+        assert_eq!(
+            verify_fixture(&receipt, body.to_vec(), &key, &expected(), &AcceptEvidence).unwrap_err(),
+            MaceContextExposureRejectV1::InvalidRequestBody
         );
     }
 
