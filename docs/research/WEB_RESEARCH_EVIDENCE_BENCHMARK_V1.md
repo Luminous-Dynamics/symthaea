@@ -269,6 +269,7 @@ LifeSciBench's reported artifact-heavy pass rate is 28.1% for GPT-Rosalind, vers
 - [Issue #13794](https://github.com/Luminous-Dynamics/symthaea/issues/13794): complete acquisition receipts and bounded concurrency.
 - [Issue #13800](https://github.com/Luminous-Dynamics/symthaea/issues/13800): prevent public convenience constructors from minting unprovenanced `HighConfidence` claims.
 - [Issue #13818](https://github.com/Luminous-Dynamics/symthaea/issues/13818): scientist-steerable, checkpointed research with independently replayable audit agents.
+- [PR #11015](https://github.com/Luminous-Dynamics/symthaea/pull/11015): evidence-prefix-bound prospective orchestration traces; the 2026-11-26 extension adds limitation-to-method-response obligations and lifecycle fixtures.
 - [PR #13854](https://github.com/Luminous-Dynamics/symthaea/pull/13854): bounded, receipt-bearing WebResearch acquisition stacked on the fail-closed verifier and no-confidence-self-label fixes; no retry or authenticity claim.
 - [Issue #13852](https://github.com/Luminous-Dynamics/symthaea/issues/13852): protocol-matched DISCERN evaluation from data integrity through adversarially reviewed hypotheses.
 - [PR #13843](https://github.com/Luminous-Dynamics/symthaea/pull/13843): claim-specific source-node graph wiring; does not adjudicate entailment.
