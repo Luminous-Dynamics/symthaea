@@ -169,8 +169,6 @@ pub struct AudioEvidenceVerificationReportV1 {
     pub decoder_identity_authenticated: bool,
     pub model_runtime_identity_authenticated: bool,
     pub runner_receipt_verified: bool,
-    /// This V1 adapter binds a context manifest, not the exact HTTP/API body.
-    pub request_body_recomputed: bool,
     /// Input delivered to an adapter is not proof of model-internal consumption.
     pub model_input_attested: bool,
 }
@@ -435,7 +433,6 @@ pub fn verify_audio_evidence_manifest(
         decoder_identity_authenticated: false,
         model_runtime_identity_authenticated: false,
         runner_receipt_verified: false,
-        request_body_recomputed: false,
         model_input_attested: false,
     })
 }
@@ -668,7 +665,8 @@ mod tests {
         assert!(!report.decoder_identity_authenticated);
         assert!(!report.model_runtime_identity_authenticated);
         assert!(!report.runner_receipt_verified);
-        assert!(!report.request_body_recomputed);
+        assert!(report.request_body_bytes_recomputed);
+        assert!(!report.request_body_delivery_attested);
         assert!(!report.model_input_attested);
     }
 
