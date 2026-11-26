@@ -18,6 +18,7 @@ on:
       - "benchmarks/plasma/positivity-projection/**"
       - "benchmarks/plasma/measure-stability/**"
       - "benchmarks/plasma/kinetic-information-return/**"
+      - "benchmarks/plasma/response-balanced/**"
       - ".github/workflows/plasma-probes.yml"
   pull_request:
     branches: [main]
