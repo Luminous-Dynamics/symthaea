@@ -1,0 +1,59 @@
+{
+  "$comment": "Synthetic analytic example only; no biological likelihood calibration is implied.",
+  "schema_version": "connectome-open-world-eig-v1",
+  "unresolved_hypothesis_id": "OTHER_OR_UNRESOLVED",
+  "ranked_experiments": [
+    {
+      "experiment_id": "robust",
+      "score": {
+        "experiment_id": "robust",
+        "cost": 1,
+        "unresolved_prior_mass": 0.1,
+        "worst_case_scenario_id": "calibration-b",
+        "best_case_scenario_id": "calibration-a",
+        "worst_case_information_gain_bits": 0.10683819069237677,
+        "best_case_information_gain_bits": 0.2502647146013741,
+        "worst_case_information_gain_bits_per_cost": 0.10683819069237677,
+        "best_case_information_gain_bits_per_cost": 0.2502647146013741,
+        "scenario_scores": [
+          {
+            "scenario_id": "calibration-a",
+            "information_gain_bits": 0.2502647146013741,
+            "information_gain_bits_per_cost": 0.2502647146013741
+          },
+          {
+            "scenario_id": "calibration-b",
+            "information_gain_bits": 0.10683819069237677,
+            "information_gain_bits_per_cost": 0.10683819069237677
+          }
+        ]
+      }
+    },
+    {
+      "experiment_id": "optimistic-brittle",
+      "score": {
+        "experiment_id": "optimistic-brittle",
+        "cost": 1,
+        "unresolved_prior_mass": 0.1,
+        "worst_case_scenario_id": "uninformative-shared-misspecification",
+        "best_case_scenario_id": "perfect-named",
+        "worst_case_information_gain_bits": 0,
+        "best_case_information_gain_bits": 0.9,
+        "worst_case_information_gain_bits_per_cost": 0,
+        "best_case_information_gain_bits_per_cost": 0.9,
+        "scenario_scores": [
+          {
+            "scenario_id": "perfect-named",
+            "information_gain_bits": 0.9,
+            "information_gain_bits_per_cost": 0.9
+          },
+          {
+            "scenario_id": "uninformative-shared-misspecification",
+            "information_gain_bits": 0,
+            "information_gain_bits_per_cost": 0
+          }
+        ]
+      }
+    }
+  ]
+}

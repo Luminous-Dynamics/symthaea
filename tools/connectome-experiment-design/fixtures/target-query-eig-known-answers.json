@@ -1,0 +1,64 @@
+{
+  "schema_version": "connectome-target-query-eig-v1",
+  "query": {
+    "id": "increase-functional-output",
+    "hypothesis_ids": [
+      "mechanism_a",
+      "mechanism_b",
+      "mechanism_no_effect",
+      "OTHER_OR_UNRESOLVED"
+    ],
+    "answer_by_hypothesis": [
+      "positive",
+      "positive",
+      "negative",
+      "unresolved"
+    ]
+  },
+  "ranked_experiments": [
+    {
+      "experiment_id": "outcome-discriminator",
+      "score": {
+        "experiment_id": "outcome-discriminator",
+        "query_id": "increase-functional-output",
+        "cost": 1,
+        "unresolved_prior_mass": 0.1,
+        "worst_case_scenario_id": "declared-likelihood",
+        "best_case_scenario_id": "declared-likelihood",
+        "worst_case_information_gain_bits": 0.4359459879959464,
+        "best_case_information_gain_bits": 0.4359459879959464,
+        "worst_case_information_gain_bits_per_cost": 0.4359459879959464,
+        "best_case_information_gain_bits_per_cost": 0.4359459879959464,
+        "scenario_scores": [
+          {
+            "scenario_id": "declared-likelihood",
+            "information_gain_bits": 0.4359459879959464,
+            "information_gain_bits_per_cost": 0.4359459879959464
+          }
+        ]
+      }
+    },
+    {
+      "experiment_id": "mechanism-discriminator",
+      "score": {
+        "experiment_id": "mechanism-discriminator",
+        "query_id": "increase-functional-output",
+        "cost": 1,
+        "unresolved_prior_mass": 0.1,
+        "worst_case_scenario_id": "declared-likelihood",
+        "best_case_scenario_id": "declared-likelihood",
+        "worst_case_information_gain_bits": 0,
+        "best_case_information_gain_bits": 0,
+        "worst_case_information_gain_bits_per_cost": 0,
+        "best_case_information_gain_bits_per_cost": 0,
+        "scenario_scores": [
+          {
+            "scenario_id": "declared-likelihood",
+            "information_gain_bits": 0,
+            "information_gain_bits_per_cost": 0
+          }
+        ]
+      }
+    }
+  ]
+}
