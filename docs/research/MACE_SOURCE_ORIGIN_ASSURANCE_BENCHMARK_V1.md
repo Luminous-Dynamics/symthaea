@@ -291,3 +291,46 @@ Proposed targets: at least 10% lower paired decision regret than the strongest m
 The follow-on [MACE Adaptive Decision Acquisition V1](MACE_ADAPTIVE_DECISION_ACQUISITION_V1.md) specifies a bounded policy DAG in which each evidence query is selected from the complete verified observation history. It adds conditional follow-up, correlated-source fan-out, contradiction preservation, rights/lifecycle change between queries, explicit fallback paths and stop/abstain behaviour. The machine-readable policy contract is `data/schemas/mace_adaptive_decision_policy_v1.schema.json`. Example EVSI and robust policies are provided in `data/fixtures/mace_adaptive_decision_policy_evsi_v1.example.json` and `data/fixtures/mace_adaptive_decision_policy_robust_v1.example.json`; their digest-shaped fields are placeholders, not signed receipts.
 
 This is a research protocol and schema, not an implemented executor. JSON Schema checks field shape only; an independent fail-closed validator must still prove graph reachability, acyclicity, bounded horizon, budget compliance, branch completeness, admissible terminal actions and receipt validity. The benchmark must compare single-query EVSI/robust scoring with adaptive policies under identical action spaces and total resource budgets. External evaluation should add UtilMem for evidence integration and MemUse for natural conversational integration; these remain separate from MACE's evidence-assurance metrics.
+
+
+## 15. 2026 evidence-use, streaming and collaborative-memory benchmark extensions
+
+Recent EMNLP 2026 work reinforces that memory should be tested as a governed process, not merely a searchable store. Add the following official benchmarks as separate, unmodified scorecards:
+
+- **[COLLABMEM](https://aclanthology.org/2026.emnlp-main.1194/):** tests six collaborative memory competencies including sharing, consistency, access control, routing, conflict resolution and compression. Its published corpus includes 58 hand-authored core scenarios (1,118 probes) and a scaled set of 174 scenarios (3,359 probes). Its matched memory-only setup fixes the trace, target role, answerer, judge and gold event. MACE should use it to test whether role/tenant scope, provenance and authority boundaries survive multi-agent handoff.
+- **[TimlMemBench](https://aclanthology.org/2026.findings-emnlp.507/):** tests governed activation and retention when a memory is revoked, superseded, scoped or irrelevant. The current release reports 208 reviewed samples, 1,566 sessions, 1,715 questions and 1,821 governance/activation cases. Use both its canonical-pool control and raw-native evaluation; do not evaluate only from a prebuilt memory pool.
+- **[StreamMemBench](https://aclanthology.org/2026.findings-emnlp.992/):** uses two-step streaming tasks to distinguish evidence recall, initial evidence use, feedback incorporation and follow-up reuse. Add a MACE-specific extension where a correction or user feedback changes the evidence lineage between the first and second task.
+- **[UtilMem](https://aclanthology.org/2026.emnlp-main.1639/):** tests integrating distributed, implicit and noisy evidence and resisting semantically similar distractors. Its 1,717 instances span five domains. Separate evidence access from correct synthesis and downstream task utility.
+- **[MemUse](https://aclanthology.org/2026.emnlp-main.804/):** tests natural integration of memory in conversation rather than explicit recall questions. In its four-month, 40-user deployment, Direct QA accuracy ranged from 19.7% to 70.1% across memory conditions without a corresponding satisfaction change; a system scoring 78.8% on Direct QA referenced 7.9% of those facts in conversation. Treat the user study as evidence about metric validity, not a universal satisfaction target.
+- **[DeepControl](https://aclanthology.org/2026.findings-emnlp.52/):** a close algorithmic comparator for adaptive search extent and retrieval granularity. Its paper reports +9.4 and +8.6 average-point improvements over Search-R1 for Qwen2.5-7B and Qwen2.5-3B across seven benchmarks. It is not a direct head-to-head MACE result; reproduce its baseline under matched model, benchmark and budget conditions.
+
+### How MACE should compete rather than copy
+
+DeepControl demonstrates that learned continuation/granularity control can improve search-augmented reasoning. MACE's differentiator should be a different, testable guarantee: a policy is only scored over observations whose source roots, rights, freshness, resource receipts and current dependencies remain qualified. The independent finite-world oracle in [MACE Adaptive Decision Acquisition V1](MACE_ADAPTIVE_DECISION_ACQUISITION_V1.md) provides exact reference results on tiny joint-world scenarios before the optimized or learned policy is evaluated.
+
+Add a **memory-to-decision trajectory** scorecard with distinct stages:
+1. evidence stored or observed;
+2. evidence retrieved and correctly routed to the authorized role;
+3. evidence provenance and rights revalidated;
+4. distributed evidence integrated with contradictions preserved;
+5. the decision improves, remains unchanged for a justified reason, or safely abstains;
+6. user/agent feedback is incorporated into future tasks;
+7. corrections/revocations are propagated through derived memory before reuse.
+
+Score every stage separately. A system that retrieves the right fact but leaks it to the wrong role, uses it after revocation, fails to integrate it, or ignores later feedback should not receive credit for end-to-end memory success.
+
+### Additional parity metrics
+
+| Metric | Definition |
+|---|---|
+| Role-scope leakage | Unauthorized observations or memory assets exposed to a non-permitted role/tenant |
+| Provenance-preserving handoff | Correctly routed memory retains origin, writer, scope and lifecycle references |
+| Governed activation precision/recall | Correctly use current, relevant, authorized memory while withholding revoked, superseded or out-of-scope material |
+| Natural integration rate | Fraction of relevant opportunities where evidence is appropriately incorporated without explicit recall prompting |
+| Feedback-to-follow-up reuse | Correct use of feedback on a subsequent related task |
+| Evidence synthesis quality | Correct synthesis across distributed evidence while resisting distractors and preserving disagreement |
+| Adaptive retrieval cost | All-in cost for the evidence-acquisition path at matched terminal regret |
+| Lifecycle race correctness | No use of evidence invalidated between acquisition and terminal decision |
+
+Targets for deterministic governance, role-leakage and lifecycle controls remain zero accepted violations in exhaustive fixtures. For non-deterministic external benchmarks, publish coverage, risk and confidence intervals rather than imposing a universal zero-error claim from small samples.
+
