@@ -10,6 +10,7 @@ This file separates current industry/research systems by the claims their evalua
 | World-action models | DreamZero, Cosmos Policy, LingBot-VA, Fast-WAM | Video and action prediction jointly or through inverse/representation-only action pathways | Same robot/task, same action interface, same controller budget; report action fidelity, executed success and false-success under failure separately. |
 | Multi-embodiment latent world models | RoboJEPA (8B) | JEPA latent prediction over 12 robot embodiments; reports compute scaling of imagination error and downstream planning | Include as a high-capacity latent-prediction arm on compatible robot tasks; compare scaling and planning, not raw latent loss against HDC similarity. |
 | Contact-rich visual/tactile models | ContactWorld | Twelve manipulation tasks, six sensing modalities, planning and real-world contact tasks | Compare representation structure and cross-modal compatibility; point cloud / tactile force-field arms must be matched to the same task and planner. |
+| Benchmark validity audit | What Are We Actually Benchmarking in Robot Manipulation? (June 2026) | Shortcut solvability, statistical significance, creeping overfitting and data-source dependence across LIBERO, CALVIN, SimplerEnv, RoboCasa and RoboTwin 2.0 | Audit each selected testbed before leaderboard comparison; require simple probe baselines, held-out initial-state perturbations, source isolation and cluster-level uncertainty. |
 | Failure fidelity / diagnosis | WorldFailBench | Failure reason, execution stage and success↔failure boundary under scene changes; LIBERO, RoboTwin and physical G1 manipulation | Score false-success separately from reason/stage fidelity and two-sided boundary localization; preserve matched initial state, realized action and environment cluster. |
 | Failure-conditioned world-model training | AMD Learning to Fail / BWM on RoboTwin adjust_bottle | Tests whether failure rollouts repair fake success and whether in-world RL survives replay in the simulator | Reproduce only on the same task/model/policy interface; include success-only control, multiple seeds, shared-start action forks and closed-loop replay mismatch. |
 | Recovery after failure | LIBERO-RECOVER | Retry, action adaptation, object-state recovery and environmental recovery across 1,000+ scenarios | Evaluate recovery as downstream policy utility, separately from whether the world model predicted the failure correctly. |
@@ -30,7 +31,22 @@ This file separates current industry/research systems by the claims their evalua
 - **ScratchWorld:** uses replay-verified executable worlds and emphasizes value-aware changed-field scoring. It is a useful guard against copy-the-input and no-change baselines. https://arxiv.org/abs/2606.31689
 - **World-model benchmark survey:** its November 2026 corpus covers 130 benchmarks and separates target, protocol, metric and data. It records 98 open-loop tracks and 13 closed-loop tracks; 99 use prediction-level metrics and 14 use downstream outcome metrics, with overlaps across categories. https://world-model-benchmarks.github.io/World-Model-Benchmarks/
 
-## 3. Failure fidelity and recovery
+## 3. Benchmark validity audit
+
+A benchmark result is evidence only if the benchmark's own protocol resists shortcut solving, has enough independent samples to detect the claimed effect, does not overfit the declared training range, and controls data-source dependence. The June 2026 audit of robot manipulation benchmarks identifies these as four distinct failure modes and supplies corresponding diagnostics.
+
+CMAQ-020 should require, before adopting a benchmark as a headline comparison:
+
+1. **Shortcut probe:** a low-capacity model, no-language encoder, copy/no-op policy or simple heuristic must not achieve near-leaderboard scores without solving the intended capability.
+2. **Statistical audit:** paired, independent environment clusters with intervals and enough power to distinguish the target improvement; raw episode count is not independent sample count.
+3. **Range/generalization audit:** perturb initial poses, object configurations, nuisance variables and mechanism parameters outside the narrow training distribution; preserve an explicit in-range/out-of-range split.
+4. **Data-source audit:** pin training/test sources, revisions, asset digests and overlap scans; demonstrate that the test set is not a near-duplicate or source artifact of training data.
+
+Reference: [What Are We Actually Benchmarking in Robot Manipulation?](https://arxiv.org/abs/2606.04233)
+
+No benchmark should be promoted to a SOTA claim because its leaderboard score is high if these audits fail. Report the audit outcome as a separate validity assessment rather than silently subtracting points from the benchmark score.
+
+## 4. Failure fidelity and recovery
 
 - **WorldFailBench (October 2026):** evaluates observable failure reasons, execution stages and success/failure boundaries in LIBERO, RoboTwin and physical G1 manipulation; seven tested world models show substantial failure-fidelity gaps. This is a failure-diagnostic benchmark, not just a task-success leaderboard. https://arxiv.org/abs/2610.33565
 - **AMD Learning to Fail (20 October 2026):** on RoboTwin 2.0 adjust_bottle, BWM's base checkpoint rendered 82.5% of simulator failures as successes; failure-rollout fine-tuning reduced the reported held-out fake-success rate to 26.3%. This is one task/model/policy setup; the paper also finds same-start action-fork outcomes remain difficult. https://www.amd.com/en/developer/resources/technical-articles/2026/rl-inside-world-models.html
@@ -40,7 +56,7 @@ Use [FAILURE_FIDELITY_V0_1.md](FAILURE_FIDELITY_V0_1.md) for the executable scor
 
 These results show why a world model can have a plausible final success rate while still misleading an RL policy or a deployment reviewer: it may invent a lift after missed contact, place a failure at the wrong execution stage, or move the success/failure boundary under the wrong scene perturbation. The current NixWard transition candidate's typed episode path is intended to preserve realized execution outcomes and failure dispositions; it has not yet been evaluated on any of these external benchmarks.
 
-## 4. Matched experiment protocol
+## 5. Matched experiment protocol
 
 Every claim of superiority must pin and report:
 
@@ -54,7 +70,7 @@ Every claim of superiority must pin and report:
 
 Do not pool LIBERO success, RoboCasa success, RoboArena Elo, ContactWorld planning rates, MiraBench reliability and CMAQ response-distortion metrics into one score.
 
-## 5. Symthaea-specific architecture tournament
+## 6. Symthaea-specific architecture tournament
 
 Start with an identical source history and action budget. Candidate arms:
 
@@ -70,7 +86,7 @@ Start with an identical source history and action budget. Candidate arms:
 
 For each arm, preserve the same registered `(U,Q,T,I,D)` contract. Measure response fidelity, false merges, false splits, invariant violations, selective uncertainty, causal-effect contrast, false-success optimism, closed-loop task success, recovery, all-in storage and inference cost.
 
-## 6. What would count as beating the field?
+## 7. What would count as beating the field?
 
 A credible Symthaea advantage should be a preregistered Pareto improvement, not a cherry-picked score:
 
@@ -82,6 +98,6 @@ Proposed stretch gate for the state-abstraction lane: at least 25% lower all-in 
 
 A simple baseline is allowed to win. If HDC/CfC does not outperform the per-action delta or symbolic/recurrent baselines under matched cost, the correct result is that the more complex representation has not earned its complexity.
 
-## 7. Current Symthaea claim boundary
+## 8. Current Symthaea claim boundary
 
 CMAQ-020's Rust evaluator currently measures a finite response-grid abstraction and selects cost-aware counterexample witnesses. It does not yet run HDC, CfC/LTC, a robot policy, ScratchWorld, MiraBench, ContactWorld, Cosmos Policy or RoboJEPA. The HDC-delta NixWard model is only a source-inspected candidate baseline. External benchmark reproduction and source-data admission remain separate work.
