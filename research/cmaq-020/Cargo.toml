@@ -1,0 +1,9 @@
+[package]
+name = "cmaq-020-state-response"
+version = "0.1.0"
+edition = "2024"
+publish = false
+license = "AGPL-3.0-or-later"
+description = "Finite-contract intervention-response equivalence and state-abstraction evaluator"
+
+[workspace]
