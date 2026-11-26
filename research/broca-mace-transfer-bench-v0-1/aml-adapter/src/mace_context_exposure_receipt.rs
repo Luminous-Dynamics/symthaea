@@ -1094,6 +1094,28 @@ mod tests {
     }
 
     #[test]
+    fn rejects_duplicate_provider_parameter_members() {
+        let (mut receipt, key, _) = fixture();
+        let body = br#"{"model":"model-pinned-1","messages":[{"role":"user","content":"context"}],"temperature":0.2,"temperature":0.9}"#;
+        refresh_body_binding(&mut receipt, body, &key);
+        assert_eq!(
+            verify_fixture(&receipt, body.to_vec(), &key, &expected(), &AcceptEvidence).unwrap_err(),
+            MaceContextExposureRejectV1::InvalidRequestBody
+        );
+    }
+
+    #[test]
+    fn rejects_untracked_message_fields() {
+        let (mut receipt, key, _) = fixture();
+        let body = br#"{"model":"model-pinned-1","messages":[{"role":"user","content":"context","metadata":"hidden"}]}"#;
+        refresh_body_binding(&mut receipt, body, &key);
+        assert_eq!(
+            verify_fixture(&receipt, body.to_vec(), &key, &expected(), &AcceptEvidence).unwrap_err(),
+            MaceContextExposureRejectV1::InvalidRequestBody
+        );
+    }
+
+    #[test]
     fn rejects_model_selector_in_body_that_differs_from_pinned_revision() {
         let (mut receipt, key, _) = fixture();
         let body = br#"{"model":"model-pinned-2","messages":[{"role":"user","content":"context"}]}"#;
