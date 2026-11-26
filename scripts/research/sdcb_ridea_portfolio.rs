@@ -17,7 +17,9 @@ use ridea_reference::{
 };
 
 const EPS: f64 = 1e-12;
-const MAX_PORTFOLIO_CANDIDATES: usize = 64;
+const MAX_PORTFOLIO_CANDIDATES: usize = 16;
+const MAX_PORTFOLIO_SAMPLES: usize = 128;
+const MAX_PORTFOLIO_STEPS: usize = 16;
 
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub enum PortfolioError {
@@ -91,6 +93,12 @@ fn validate_inputs(
     if history.is_empty() || target.is_empty() {
         return Err(PortfolioError::InvalidHistoryOrTarget);
     }
+    if history.len() > MAX_PORTFOLIO_SAMPLES
+        || target.len() > MAX_PORTFOLIO_SAMPLES
+        || history.len().saturating_add(candidates.len()) > MAX_PORTFOLIO_SAMPLES
+    {
+        return Err(PortfolioError::SearchSpaceTooLarge);
+    }
     let dimension = history[0].len();
     if dimension == 0
         || history.iter().chain(target).any(|row| {
@@ -150,6 +158,9 @@ pub fn greedy_ridea_portfolio(
     budget_units: u64,
     max_experiments: usize,
 ) -> Result<RideaPortfolioResult, PortfolioError> {
+    if max_experiments > MAX_PORTFOLIO_STEPS {
+        return Err(PortfolioError::SearchSpaceTooLarge);
+    }
     validate_inputs(initial_history, target_distribution, candidates, config)?;
 
     let initial_mmd2 =
