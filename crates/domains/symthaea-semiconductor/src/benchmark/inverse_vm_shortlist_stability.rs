@@ -217,7 +217,9 @@ fn validate_same_decision_context(
     }
 
     for (candidate_id, baseline_candidate) in &baseline_candidates {
-        let scenario_candidate = scenario_candidates[candidate_id];
+        let scenario_candidate = scenario_candidates
+            .get(candidate_id.as_str())
+            .expect("scenario candidate inventory was checked");
         if recipe_settings_digest(baseline_candidate)? != recipe_settings_digest(scenario_candidate)? {
             return Err(InverseVmStabilityErrorV1(format!(
                 "scenario {candidate_id} changed the candidate recipe vector"
