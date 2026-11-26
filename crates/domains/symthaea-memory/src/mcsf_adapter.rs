@@ -232,7 +232,7 @@ mod tests {
         assert_eq!(hits[0].memory_id, "memory-b");
         assert_eq!(hits[0].similarity_micros, 1_000_000);
         assert_eq!(
-            hits[0].content_digest_blake3,
+            hits[0].content_digest_sha256,
             sha256_hex(records[0].content.as_bytes())
         );
     }
