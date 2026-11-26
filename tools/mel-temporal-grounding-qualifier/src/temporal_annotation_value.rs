@@ -821,7 +821,9 @@ mod tests {
         );
         assert_eq!(report.decision_profile.profile_id, "profile-v1");
         assert_eq!(
-            report.decision_profile.minimum_pairwise_present_event_f1_ppm,
+            report
+                .decision_profile
+                .minimum_pairwise_present_event_f1_ppm,
             900_000
         );
         assert_eq!(report.annotation_record_count_delta, 1);
