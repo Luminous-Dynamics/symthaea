@@ -637,7 +637,7 @@ mod tests {
         let report = evaluate_selection_adjusted_population_risk_v1(&data).unwrap();
         let audit = report.independent_audit_estimate.unwrap();
         assert_eq!(audit.audit_sample_count, 0);
-        assert_eq!(report.population_risk_exactly_identified, false);
+        assert!(!report.population_risk_exactly_identified);
         assert_eq!(report.partial_identification_upper, 0.75);
         assert!(audit.hoeffding_upper >= report.partial_identification_lower);
     }
