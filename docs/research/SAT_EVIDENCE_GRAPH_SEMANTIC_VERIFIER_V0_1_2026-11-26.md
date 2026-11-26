@@ -35,7 +35,7 @@ The report always includes:
 - a structured issue list;
 - a separate semantic-validity result and root-match result.
 
-A passing graph verification is not cryptographic authentication, external-world effect verification, a safety certification or system qualification.
+A passing graph verification is not cryptographic authentication, external-world effect verification, a safety certification or system qualification. The verifier reads the submitted authenticity and independence state labels; it does not independently prove them. Its `authenticity_verified`, `source_independence_verified` and `qualification_assessed` report fields are always false.
 
 ## 3. Canonical graph-root profile
 
