@@ -1,0 +1,316 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://luminousdynamics.io/schemas/symthaea/rrvr-observer-report-v0.1.schema.json",
+  "title": "RRVR Symthaea Shadow Observer Report v0.1",
+  "type": "object",
+  "additionalProperties": false,
+  "required": [
+    "schema_version",
+    "observer_id",
+    "snapshot_id",
+    "benchmark_id",
+    "scenario_id",
+    "task_id",
+    "attempt_id",
+    "trajectory_cluster_id",
+    "evidence_domain",
+    "evidence_ledger_id",
+    "decision_cut_sequence",
+    "snapshot_sha256",
+    "observer_profile_sha256",
+    "scheduled_observation_n",
+    "admitted_observation_n",
+    "ingest_order_reversal_n",
+    "stale_observation_n",
+    "unknown_observation_n",
+    "disputed_observation_n",
+    "disposition",
+    "abstentions",
+    "trajectory_representation",
+    "constant_velocity_forecast",
+    "claim_ceiling"
+  ],
+  "properties": {
+    "schema_version": {
+      "const": "0.1"
+    },
+    "observer_id": {
+      "const": "symthaea-rrvr-shadow-observer-v0.1"
+    },
+    "snapshot_id": {
+      "type": "string",
+      "minLength": 1
+    },
+    "benchmark_id": {
+      "type": "string",
+      "minLength": 1
+    },
+    "scenario_id": {
+      "type": "string",
+      "minLength": 1
+    },
+    "task_id": {
+      "type": "string",
+      "minLength": 1
+    },
+    "attempt_id": {
+      "type": "string",
+      "minLength": 1
+    },
+    "trajectory_cluster_id": {
+      "type": "string",
+      "minLength": 1
+    },
+    "evidence_domain": {
+      "enum": [
+        "process_model",
+        "simulator",
+        "hardware_in_loop",
+        "physical"
+      ]
+    },
+    "evidence_ledger_id": {
+      "type": "string",
+      "minLength": 1
+    },
+    "decision_cut_sequence": {
+      "type": "integer",
+      "minimum": 0
+    },
+    "snapshot_sha256": {
+      "$ref": "#/$defs/sha256"
+    },
+    "observer_profile_sha256": {
+      "$ref": "#/$defs/sha256"
+    },
+    "scheduled_observation_n": {
+      "type": "integer",
+      "minimum": 1
+    },
+    "admitted_observation_n": {
+      "type": "integer",
+      "minimum": 0
+    },
+    "ingest_order_reversal_n": {
+      "type": "integer",
+      "minimum": 0
+    },
+    "stale_observation_n": {
+      "type": "integer",
+      "minimum": 0
+    },
+    "unknown_observation_n": {
+      "type": "integer",
+      "minimum": 0
+    },
+    "disputed_observation_n": {
+      "type": "integer",
+      "minimum": 0
+    },
+    "disposition": {
+      "enum": [
+        "baseline_only",
+        "abstain"
+      ]
+    },
+    "abstentions": {
+      "type": "array",
+      "items": {
+        "$ref": "#/$defs/abstention"
+      }
+    },
+    "trajectory_representation": {
+      "type": [
+        "object",
+        "null"
+      ],
+      "$ref": "#/$defs/trajectory_representation"
+    },
+    "constant_velocity_forecast": {
+      "type": [
+        "object",
+        "null"
+      ],
+      "$ref": "#/$defs/forecast"
+    },
+    "claim_ceiling": {
+      "type": "string",
+      "minLength": 1
+    }
+  },
+  "$defs": {
+    "sha256": {
+      "type": "string",
+      "pattern": "^[a-f0-9]{64}$"
+    },
+    "abstention": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "observation_id",
+        "reason"
+      ],
+      "properties": {
+        "observation_id": {
+          "type": [
+            "string",
+            "null"
+          ]
+        },
+        "reason": {
+          "enum": [
+            "stale_observation",
+            "unknown_observation",
+            "disputed_observation",
+            "insufficient_observations"
+          ]
+        }
+      }
+    },
+    "encoded_state_digest": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "observation_id",
+        "source_sequence",
+        "hdc_vector_sha256"
+      ],
+      "properties": {
+        "observation_id": {
+          "type": "string"
+        },
+        "source_sequence": {
+          "type": "integer",
+          "minimum": 0
+        },
+        "hdc_vector_sha256": {
+          "$ref": "#/$defs/sha256"
+        }
+      }
+    },
+    "adjacent_similarity": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "source_id",
+        "earlier_observation_id",
+        "later_observation_id",
+        "cosine_similarity"
+      ],
+      "properties": {
+        "source_id": {
+          "type": "string"
+        },
+        "earlier_observation_id": {
+          "type": "string"
+        },
+        "later_observation_id": {
+          "type": "string"
+        },
+        "cosine_similarity": {
+          "type": "number",
+          "minimum": -1,
+          "maximum": 1
+        }
+      }
+    },
+    "trajectory_representation": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "profile_id",
+        "dimension",
+        "encoded_state_digests",
+        "adjacent_state_similarities",
+        "mean_adjacent_similarity"
+      ],
+      "properties": {
+        "profile_id": {
+          "const": "symthaea-manipulator-hdc-v1"
+        },
+        "dimension": {
+          "const": 16384
+        },
+        "encoded_state_digests": {
+          "type": "array",
+          "items": {
+            "$ref": "#/$defs/encoded_state_digest"
+          }
+        },
+        "adjacent_state_similarities": {
+          "type": "array",
+          "items": {
+            "$ref": "#/$defs/adjacent_similarity"
+          }
+        },
+        "mean_adjacent_similarity": {
+          "type": [
+            "number",
+            "null"
+          ],
+          "minimum": -1,
+          "maximum": 1
+        }
+      }
+    },
+    "forecast": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "model_id",
+        "calibration_status",
+        "horizon_ns",
+        "origin_observation_id",
+        "origin_clock_domain_id",
+        "origin_acquired_at_ns",
+        "target_acquired_at_ns",
+        "joint_angles_rad",
+        "joint_velocities_rad_s",
+        "gripper_opening"
+      ],
+      "properties": {
+        "model_id": {
+          "const": "constant-velocity-joint-angle-v0.1"
+        },
+        "calibration_status": {
+          "const": "uncalibrated_baseline"
+        },
+        "horizon_ns": {
+          "type": "integer",
+          "minimum": 1
+        },
+        "origin_observation_id": {
+          "type": "string"
+        },
+        "origin_clock_domain_id": {
+          "type": "string"
+        },
+        "origin_acquired_at_ns": {
+          "type": "integer"
+        },
+        "target_acquired_at_ns": {
+          "type": "integer"
+        },
+        "joint_angles_rad": {
+          "type": "array",
+          "minItems": 7,
+          "maxItems": 7,
+          "items": {
+            "type": "number"
+          }
+        },
+        "joint_velocities_rad_s": {
+          "type": "array",
+          "minItems": 7,
+          "maxItems": 7,
+          "items": {
+            "type": "number"
+          }
+        },
+        "gripper_opening": {
+          "type": "number"
+        }
+      }
+    }
+  }
+}
