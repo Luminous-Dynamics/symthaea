@@ -1,0 +1,229 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "title": "BASALT scoped etcd compare-and-advance benchmark v1",
+  "type": "object",
+  "additionalProperties": false,
+  "required": [
+    "suite_id",
+    "benchmark_version",
+    "claim_ceiling",
+    "implementation_status",
+    "comparison_arms",
+    "scenarios",
+    "metrics",
+    "workload_matrix",
+    "benchmark_policy"
+  ],
+  "properties": {
+    "suite_id": {
+      "const": "basalt-scoped-etcd-cas-benchmark-v1"
+    },
+    "benchmark_version": {
+      "const": 1
+    },
+    "claim_ceiling": {
+      "type": "string",
+      "minLength": 1
+    },
+    "implementation_status": {
+      "enum": [
+        "specification_only",
+        "reference_model",
+        "etcd_adapter"
+      ]
+    },
+    "comparison_arms": {
+      "type": "array",
+      "minItems": 2,
+      "maxItems": 5,
+      "uniqueItems": true,
+      "items": {
+        "type": "string",
+        "enum": [
+          "global_counter_key",
+          "scoped_compare_keys",
+          "in_memory_reference_model",
+          "sqlite_local_baseline"
+        ]
+      }
+    },
+    "scenarios": {
+      "type": "array",
+      "minItems": 12,
+      "maxItems": 60,
+      "items": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": [
+          "id",
+          "class",
+          "mutation",
+          "expected",
+          "safety_gate"
+        ],
+        "properties": {
+          "id": {
+            "type": "string",
+            "pattern": "^SCAS-[0-9]{3}$"
+          },
+          "class": {
+            "enum": [
+              "positive",
+              "conflict",
+              "recovery",
+              "rollback",
+              "freshness",
+              "metamorphic"
+            ]
+          },
+          "mutation": {
+            "type": "string",
+            "minLength": 1
+          },
+          "expected": {
+            "type": "string",
+            "minLength": 1
+          },
+          "safety_gate": {
+            "const": true
+          }
+        }
+      }
+    },
+    "metrics": {
+      "type": "array",
+      "minItems": 8,
+      "maxItems": 32,
+      "items": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": [
+          "id",
+          "class",
+          "unit",
+          "target"
+        ],
+        "properties": {
+          "id": {
+            "type": "string",
+            "minLength": 1
+          },
+          "class": {
+            "enum": [
+              "safety",
+              "efficiency",
+              "diagnostic"
+            ]
+          },
+          "unit": {
+            "type": "string",
+            "minLength": 1
+          },
+          "target": {
+            "type": "string",
+            "minLength": 1
+          }
+        }
+      }
+    },
+    "workload_matrix": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "clients",
+        "source_lineages",
+        "log_origins",
+        "retry_rates_percent",
+        "read_write_mix_percent"
+      ],
+      "properties": {
+        "clients": {
+          "type": "array",
+          "minItems": 4,
+          "items": {
+            "type": "integer",
+            "minimum": 1
+          }
+        },
+        "source_lineages": {
+          "type": "array",
+          "minItems": 3,
+          "items": {
+            "type": "integer",
+            "minimum": 1
+          }
+        },
+        "log_origins": {
+          "type": "array",
+          "minItems": 3,
+          "items": {
+            "type": "integer",
+            "minimum": 1
+          }
+        },
+        "retry_rates_percent": {
+          "type": "array",
+          "minItems": 2,
+          "items": {
+            "type": "integer",
+            "minimum": 0,
+            "maximum": 100
+          }
+        },
+        "read_write_mix_percent": {
+          "type": "array",
+          "minItems": 2,
+          "items": {
+            "type": "integer",
+            "minimum": 0,
+            "maximum": 100
+          }
+        }
+      }
+    },
+    "benchmark_policy": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "safety_before_efficiency",
+        "no_global_counter_required_in_scoped_arm",
+        "store_revision_is_audit_watermark",
+        "receipt_create_revision_is_original_acceptance_revision",
+        "same_log_cursor_contention_is_expected",
+        "raft_global_order_not_claimed_parallel",
+        "exact_retry_after_later_writes",
+        "authority_restore_requires_external_witness",
+        "publish_raw_measurements"
+      ],
+      "properties": {
+        "safety_before_efficiency": {
+          "const": true
+        },
+        "no_global_counter_required_in_scoped_arm": {
+          "const": true
+        },
+        "store_revision_is_audit_watermark": {
+          "const": true
+        },
+        "receipt_create_revision_is_original_acceptance_revision": {
+          "const": true
+        },
+        "same_log_cursor_contention_is_expected": {
+          "const": true
+        },
+        "raft_global_order_not_claimed_parallel": {
+          "const": true
+        },
+        "exact_retry_after_later_writes": {
+          "const": true
+        },
+        "authority_restore_requires_external_witness": {
+          "const": true
+        },
+        "publish_raw_measurements": {
+          "const": true
+        }
+      }
+    }
+  }
+}

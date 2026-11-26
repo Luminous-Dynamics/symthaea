@@ -1,0 +1,275 @@
+{
+  "suite_id": "basalt-scoped-etcd-cas-benchmark-v1",
+  "benchmark_version": 1,
+  "title": "BASALT scoped etcd compare-and-advance contention and recovery benchmark",
+  "claim_ceiling": "Specification and deterministic scenario plan only. No etcd adapter, cluster test, witness integration or performance result is claimed.",
+  "implementation_status": "specification_only",
+  "comparison_arms": [
+    "global_counter_key",
+    "scoped_compare_keys",
+    "in_memory_reference_model",
+    "sqlite_local_baseline"
+  ],
+  "scenarios": [
+    {
+      "id": "SCAS-001",
+      "class": "positive",
+      "mutation": "Two distinct source lineages use distinct log origins and begin from the same observed store snapshot; transactions compare only their own source/log and unchanged policy keys",
+      "expected": "Both commits succeed sequentially in etcd; neither conflicts solely because the other source committed; both receive distinct store revisions",
+      "safety_gate": true
+    },
+    {
+      "id": "SCAS-002",
+      "class": "conflict",
+      "mutation": "Two source lineages attempt to advance the same log-origin checkpoint from the same prior cursor",
+      "expected": "Exactly one transaction succeeds; the loser compares against changed log cursor, rereads linearly and re-verifies",
+      "safety_gate": true
+    },
+    {
+      "id": "SCAS-003",
+      "class": "conflict",
+      "mutation": "Same source lineage and generation receive two different immutable receipt digests",
+      "expected": "At most one is accepted; the other is typed generation equivocation",
+      "safety_gate": true
+    },
+    {
+      "id": "SCAS-004",
+      "class": "recovery",
+      "mutation": "Receipt A committed at create_revision r1; unrelated receipts advance the global store to rN; exact retry of A occurs",
+      "expected": "Return A's original create_revision r1 and original acceptance context; do not return rN as A's acceptance revision",
+      "safety_gate": true
+    },
+    {
+      "id": "SCAS-005",
+      "class": "conflict",
+      "mutation": "Existing receipt key digest is presented with conflicting source, generation or seal identity",
+      "expected": "Reject immutable identity mismatch as receipt collision/equivocation",
+      "safety_gate": true
+    },
+    {
+      "id": "SCAS-006",
+      "class": "freshness",
+      "mutation": "Signer-policy pointer mod_revision changes after proof verification but before compare-and-advance",
+      "expected": "CAS comparison fails; old-policy decision is not committed",
+      "safety_gate": true
+    },
+    {
+      "id": "SCAS-007",
+      "class": "freshness",
+      "mutation": "Witness roster or witness-policy pointer advances while the candidate is being verified",
+      "expected": "CAS comparison fails or a fresh policy re-evaluation returns unknown; no stale witness quorum accepted",
+      "safety_gate": true
+    },
+    {
+      "id": "SCAS-008",
+      "class": "recovery",
+      "mutation": "CAS commits the immutable receipt, source cursor and log cursor, but client response is dropped",
+      "expected": "Linearizable exact receipt lookup returns the accepted record and original create_revision; no second advancement",
+      "safety_gate": true
+    },
+    {
+      "id": "SCAS-009",
+      "class": "recovery",
+      "mutation": "Client receives indeterminate timeout and exact receipt key is absent on linearizable lookup",
+      "expected": "Do not infer commit from a cursor or global revision; take new snapshot and re-verify before retry",
+      "safety_gate": true
+    },
+    {
+      "id": "SCAS-010",
+      "class": "rollback",
+      "mutation": "Whole etcd cluster is restored from an older internally consistent snapshot",
+      "expected": "Independent monitor/witness detects lower authority checkpoint or verdict remains anti_rollback_unknown",
+      "safety_gate": true
+    },
+    {
+      "id": "SCAS-011",
+      "class": "freshness",
+      "mutation": "Client supplies serializable member-local stale Range response as evidence of current source/log/policy state",
+      "expected": "Reject freshness promotion; result is unknown until linearizable snapshot is obtained",
+      "safety_gate": true
+    },
+    {
+      "id": "SCAS-012",
+      "class": "metamorphic",
+      "mutation": "An unrelated global key advances while all exact relevant source/log/policy scopes remain unchanged",
+      "expected": "Scoped design does not invalidate the claim or trigger application-level conflict; freshness still requires a new linearizable scope read",
+      "safety_gate": true
+    },
+    {
+      "id": "SCAS-013",
+      "class": "recovery",
+      "mutation": "Leader election or network partition interrupts multi-key compare-and-advance",
+      "expected": "No partial receipt/source/log write; client classifies commit as conflict/unavailable/indeterminate and recovers by exact receipt lookup",
+      "safety_gate": true
+    },
+    {
+      "id": "SCAS-014",
+      "class": "rollback",
+      "mutation": "Receipt key is deleted and recreated or archived without preserving original creation revision",
+      "expected": "Reject deletion/recreation policy or require a verified immutable archive preserving original acceptance revision and proof material",
+      "safety_gate": true
+    },
+    {
+      "id": "SCAS-015",
+      "class": "rollback",
+      "mutation": "Source or log cursor key is deleted and recreated with version reset",
+      "expected": "Detect prohibited lineage reset using independent provisioning/authority evidence; no silent generation bootstrap",
+      "safety_gate": true
+    },
+    {
+      "id": "SCAS-016",
+      "class": "rollback",
+      "mutation": "Restore an older etcd snapshot using --bump-revision and --mark-compacted so the store revision appears monotonic or advances beyond the externally observed revision",
+      "expected": "Independent monitor compares authenticated authority-incarnation identity and accepted-state commitment/predecessor chain; restored state is rejected or unknown even when its numeric revision is larger",
+      "safety_gate": true
+    }
+  ],
+  "metrics": [
+    {
+      "id": "partial_multi_key_commits",
+      "class": "safety",
+      "unit": "count",
+      "target": "0"
+    },
+    {
+      "id": "source_generation_equivocation_acceptances",
+      "class": "safety",
+      "unit": "count",
+      "target": "0"
+    },
+    {
+      "id": "stale_policy_commits",
+      "class": "safety",
+      "unit": "count",
+      "target": "0"
+    },
+    {
+      "id": "stale_serializable_read_promotions",
+      "class": "safety",
+      "unit": "count",
+      "target": "0"
+    },
+    {
+      "id": "exact_retry_wrong_original_revision",
+      "class": "safety",
+      "unit": "count",
+      "target": "0"
+    },
+    {
+      "id": "authority_snapshot_restore_promotions_without_witness",
+      "class": "safety",
+      "unit": "count",
+      "target": "0"
+    },
+    {
+      "id": "missing_receipt_after_indeterminate_commit_false_success",
+      "class": "safety",
+      "unit": "count",
+      "target": "0"
+    },
+    {
+      "id": "app_level_compare_conflict_rate",
+      "class": "efficiency",
+      "unit": "percent",
+      "target": "measure by key scope and comparison arm"
+    },
+    {
+      "id": "accepted_transaction_throughput",
+      "class": "efficiency",
+      "unit": "transactions_per_second",
+      "target": "measure; compare arms under matched cluster and hardware"
+    },
+    {
+      "id": "accepted_transaction_latency_p50_p95_p99",
+      "class": "efficiency",
+      "unit": "milliseconds",
+      "target": "measure and publish all percentiles"
+    },
+    {
+      "id": "retries_per_successful_commit",
+      "class": "efficiency",
+      "unit": "count",
+      "target": "measure by source/log concurrency profile"
+    },
+    {
+      "id": "same_log_hot_key_wait",
+      "class": "diagnostic",
+      "unit": "milliseconds",
+      "target": "measure; shared log cursor serialization is expected"
+    },
+    {
+      "id": "exact_receipt_lookup_latency_p50_p95_p99",
+      "class": "efficiency",
+      "unit": "milliseconds",
+      "target": "measure; return original create_revision"
+    },
+    {
+      "id": "cache_rebuild_time",
+      "class": "efficiency",
+      "unit": "milliseconds",
+      "target": "measure across 1k, 10k, 100k receipts"
+    },
+    {
+      "id": "raft_cluster_cpu_disk_network",
+      "class": "diagnostic",
+      "unit": "per-transaction normalized resource vector",
+      "target": "publish raw measurements and topology"
+    },
+    {
+      "id": "witness_rollback_detection_delay",
+      "class": "safety",
+      "unit": "milliseconds",
+      "target": "measure; never promote before detection"
+    },
+    {
+      "id": "revision_bumped_restore_false_freshness",
+      "class": "safety",
+      "unit": "count",
+      "target": "0"
+    }
+  ],
+  "workload_matrix": {
+    "clients": [
+      1,
+      2,
+      8,
+      16,
+      32,
+      64,
+      128
+    ],
+    "source_lineages": [
+      1,
+      10,
+      100,
+      1000
+    ],
+    "log_origins": [
+      1,
+      10,
+      100
+    ],
+    "retry_rates_percent": [
+      0,
+      1,
+      10,
+      50
+    ],
+    "read_write_mix_percent": [
+      10,
+      50,
+      90
+    ]
+  },
+  "benchmark_policy": {
+    "safety_before_efficiency": true,
+    "no_global_counter_required_in_scoped_arm": true,
+    "store_revision_is_audit_watermark": true,
+    "receipt_create_revision_is_original_acceptance_revision": true,
+    "same_log_cursor_contention_is_expected": true,
+    "raft_global_order_not_claimed_parallel": true,
+    "exact_retry_after_later_writes": true,
+    "authority_restore_requires_external_witness": true,
+    "publish_raw_measurements": true
+  }
+}
