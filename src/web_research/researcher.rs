@@ -86,73 +86,178 @@ impl WebResearcher {
     /// This is the main entry point for epistemic research.
     /// Returns a research result with verified claims.
     pub async fn research_and_verify(&self, query: &str) -> Result<WebResearchResult> {
-        // Build search queries
-        let search_queries = self.plan_queries(query);
+        let report = self.research_and_verify_with_receipts(query).await?;
+        Ok(report.result)
+    }
 
-        // Fetch and extract from multiple sources
+    /// Research with a complete acquisition report.
+    ///
+    /// Search and page requests are bounded by one configured in-flight limit
+    /// per phase. Completion order is discarded: results and receipts are
+    /// emitted in planned query/source order. Retrieval failures remain
+    /// visible and can never be mistaken for a successful zero-result search.
+    pub async fn research_and_verify_with_receipts(
+        &self,
+        query: &str,
+    ) -> Result<WebResearchReport> {
+        let search_queries = self.plan_queries(query);
+        let concurrency = self.config.max_concurrent_requests;
+        let mut acquisition_receipts = Vec::new();
+
+        if concurrency == 0 {
+            for (query_rank, search_query) in search_queries.iter().enumerate() {
+                let mut receipt = make_receipt(
+                    query_rank,
+                    None,
+                    AcquisitionStage::SearchProvider,
+                    search_query,
+                    AcquisitionOutcome::BudgetExceeded,
+                );
+                receipt.reason_code = Some("ZERO_CONCURRENCY_BUDGET".to_string());
+                receipt.reason = Some(
+                    "max_concurrent_requests is zero; no network request was attempted"
+                        .to_string(),
+                );
+                acquisition_receipts.push(receipt);
+            }
+            return Ok(WebResearchReport {
+                result: WebResearchResult::with_status(ResearchStatus::RetrievalIncomplete),
+                acquisition_receipts,
+            });
+        }
+
+        // Search queries are concurrent, but their results are restored to
+        // the planned query order before page candidates are constructed.
+        let indexed_queries: Vec<(usize, String)> =
+            search_queries.into_iter().enumerate().collect();
+        let mut search_results = bounded_map_ordered(
+            indexed_queries,
+            concurrency,
+            |query_rank, search_query| {
+                self.fetch_search_results_with_receipts(&search_query, query_rank)
+            },
+        )
+        .await;
+        search_results.sort_by_key(|(query_rank, _)| *query_rank);
+
+        let mut source_candidates = Vec::new();
+        let mut seen_urls = HashSet::new();
+        let mut acquisition_incomplete = false;
+
+        for (query_rank, search_result) in search_results {
+            acquisition_incomplete |= search_result.had_failure;
+            acquisition_receipts.extend(search_result.receipts);
+
+            for (source_rank, url) in search_result.urls.into_iter().enumerate() {
+                if !seen_urls.insert(url.clone()) {
+                    continue;
+                }
+
+                if source_candidates.len() >= self.config.max_sources_per_research {
+                    let mut receipt = make_receipt(
+                        query_rank,
+                        Some(source_rank),
+                        AcquisitionStage::PageFetch,
+                        &search_result.query,
+                        AcquisitionOutcome::BudgetExceeded,
+                    );
+                    receipt.requested_url = Some(url);
+                    receipt.reason_code = Some("MAX_SOURCES_PER_RESEARCH".to_string());
+                    receipt.reason = Some(format!(
+                        "source cap of {} was reached before this URL was fetched",
+                        self.config.max_sources_per_research
+                    ));
+                    acquisition_receipts.push(receipt);
+                    acquisition_incomplete = true;
+                    continue;
+                }
+
+                source_candidates.push(PageCandidate {
+                    query_rank,
+                    source_rank,
+                    query: search_result.query.clone(),
+                    url,
+                });
+            }
+        }
+
+        // Page retrieval is globally bounded for this phase. The mapper
+        // restores query/source rank after unordered completion.
+        let mut page_results = bounded_map_ordered(
+            source_candidates
+                .into_iter()
+                .enumerate()
+                .collect::<Vec<_>>(),
+            concurrency,
+            |_ordinal, candidate| self.fetch_and_extract_with_receipt(candidate),
+        )
+        .await;
+        page_results.sort_by_key(|(_, page)| {
+            (page.candidate.query_rank, page.candidate.source_rank)
+        });
+
         let mut all_sources: Vec<SourceEvidence> = Vec::new();
         let mut all_claims: Vec<String> = Vec::new();
         let mut primary_content = String::new();
         let mut primary_title = String::new();
 
-        let mut visited_urls = std::collections::HashSet::new();
+        for (_, page) in page_results {
+            acquisition_incomplete |= page.receipt.outcome.is_incomplete();
+            acquisition_receipts.push(page.receipt.clone());
 
-        for search_query in &search_queries {
-            match self.fetch_search_results(search_query).await {
-                Ok(urls) => {
-                    for url in urls.iter().take(self.config.max_concurrent_requests) {
-                        // Skip if this URL has already been processed during this loop cycle
-                        if !visited_urls.insert(url.clone()) {
-                            continue;
-                        }
-                        println!(
-                            "\x1b[34m    [🛰️ CRAWL] Fetching semantic layer from: {}\x1b[0m",
-                            url
-                        );
-                        if let Ok(extraction) = self.fetch_and_extract(url).await {
-                            println!(
-                                "\x1b[32m    [🧠 EXTRACT] Harvested {} raw claims (Structural Quality: {:.2})\x1b[0m",
-                                extraction.claims.len(),
-                                extraction.quality
-                            );
-                            // Build source evidence
-                            let source = SourceEvidence {
-                                url: url.clone(),
-                                domain: self.extract_domain(url),
-                                source_type: self
-                                    .classify_source(url, extraction.metadata.content_type),
-                                relevant_text: extraction.summary.clone(),
-                                // Retrieval relevance is not claim-level entailment.
-                                // Only a separately qualified relation classifier may
-                                // mark this source as supporting or contradicting.
-                                supports: None,
-                                similarity: self.calculate_similarity(&extraction.body_text, query),
-                                credibility: extraction.quality,
-                            };
+            let Some(extraction) = page.extraction else {
+                continue;
+            };
 
-                            all_sources.push(source);
-                            all_claims.extend(extraction.claims);
+            let source_url = page
+                .receipt
+                .final_url
+                .clone()
+                .unwrap_or_else(|| page.candidate.url.clone());
 
-                            if primary_content.is_empty() && extraction.quality > 0.5 {
-                                primary_content = extraction.body_text;
-                                primary_title = extraction.title;
-                            }
-                        }
-                    }
-                }
-                Err(_) => continue,
+            println!(
+                "\x1b[32m    [🧠 EXTRACT] Harvested {} raw claims (Structural Quality: {:.2}) from {}\x1b[0m",
+                extraction.claims.len(),
+                extraction.quality,
+                source_url
+            );
+
+            let source = SourceEvidence {
+                url: source_url.clone(),
+                domain: self.extract_domain(&source_url),
+                source_type: self.classify_source(&source_url, extraction.metadata.content_type),
+                relevant_text: extraction.summary.clone(),
+                // Retrieval relevance is not claim-level entailment. Only a
+                // qualified relation adjudicator may set supports/refutes.
+                supports: None,
+                similarity: self.calculate_similarity(&extraction.body_text, query),
+                credibility: extraction.quality,
+            };
+
+            all_sources.push(source);
+            all_claims.extend(extraction.claims);
+
+            if primary_content.is_empty() && extraction.quality > 0.5 {
+                primary_content = extraction.body_text;
+                primary_title = extraction.title;
             }
         }
 
-        // Handle no results
         if all_sources.is_empty() {
-            return Ok(WebResearchResult::with_status(ResearchStatus::NoResults));
+            let status = if acquisition_incomplete {
+                ResearchStatus::RetrievalIncomplete
+            } else {
+                ResearchStatus::NoResults
+            };
+            return Ok(WebResearchReport {
+                result: WebResearchResult::with_status(status),
+                acquisition_receipts,
+            });
         }
 
-        // Verify claims
+        // Verify only claims from successfully captured and extracted pages.
         let mut verified_claims: Vec<VerifiedClaim> = Vec::new();
         for claim in all_claims.iter().take(10) {
-            // Hardened script/boilerplate filter matrix
             let claim_lower = claim.to_lowercase();
             if claim_lower.contains("@type")
                 || claim_lower.contains("breadcrumb")
@@ -164,6 +269,7 @@ impl WebResearcher {
             {
                 continue;
             }
+
             let context = VerificationContext {
                 sources: all_sources.clone(),
                 query: query.to_string(),
@@ -184,32 +290,37 @@ impl WebResearcher {
             });
         }
 
-        // Calculate overall confidence
         let overall_confidence = if verified_claims.is_empty() {
             0.3
         } else {
-            verified_claims.iter().map(|c| c.confidence).sum::<f32>() / verified_claims.len() as f32
+            verified_claims.iter().map(|claim| claim.confidence).sum::<f32>()
+                / verified_claims.len() as f32
         };
-
-        // Determine overall epistemic status
         let epistemic_status = self.aggregate_epistemic_status(&verified_claims);
-
-        // Generate summary
         let summary = self.generate_summary(&primary_content, query);
 
-        Ok(WebResearchResult {
+        let result = WebResearchResult {
             title: primary_title,
-            url: all_sources.first().map_or(String::new(), |s| s.url.clone()),
+            url: all_sources.first().map_or(String::new(), |source| source.url.clone()),
             content: primary_content,
             summary,
             source_type: all_sources
                 .first()
-                .map_or(ResearchSource::Web, |s| s.source_type),
+                .map_or(ResearchSource::Web, |source| source.source_type),
             relevance: self.calculate_average_relevance(&all_sources),
             confidence: overall_confidence,
             epistemic_status,
-            status: ResearchStatus::Success,
+            status: if acquisition_incomplete {
+                ResearchStatus::PartialSuccess
+            } else {
+                ResearchStatus::Success
+            },
             claims: verified_claims,
+        };
+
+        Ok(WebResearchReport {
+            result,
+            acquisition_receipts,
         })
     }
 
