@@ -1,0 +1,207 @@
+{
+  "schema_version": 1,
+  "replication_id": "creamer-c-elegans-connectome-lds-v1",
+  "replication_status": "INCOMPLETE_REQUIRES_ARTIFACTS",
+  "code_repository": "https://github.com/Nondairy-Creamer/Creamer_LDS_2026",
+  "code_revision": "bba43302d50a4947804d98b01779856e648237cc",
+  "source_files": [
+    {
+      "path": "README.md",
+      "git_blob_sha1": "c7eb0b45a2cdc6b1f4d4e011a4c1278591dacc26"
+    },
+    {
+      "path": "setup.py",
+      "git_blob_sha1": "90fa56b26ad686ff82f4c78133b40cb44743d847"
+    },
+    {
+      "path": "main.py",
+      "git_blob_sha1": "ac7740d9f9dc216d6bebebee051b9ae091ed4c11"
+    },
+    {
+      "path": "submission_params/exp_test.yml",
+      "git_blob_sha1": "4d9233eca20b614b3723273f33d742d4b8f646c3"
+    },
+    {
+      "path": "submission_params/slurm_example.yml",
+      "git_blob_sha1": "c27c249c3c33c81bb996828f201b9872f30439ff"
+    },
+    {
+      "path": "ssm_classes.py",
+      "git_blob_sha1": "ba6ff122c2fb45683490666d3df51a881f4f05db"
+    },
+    {
+      "path": "inference_utilities.py",
+      "git_blob_sha1": "20201350ac43a7613e2fd836721157a12b4fd86d"
+    },
+    {
+      "path": "run_inference.py",
+      "git_blob_sha1": "e1e4ca8b090f70104c277beaf9fb024face18c64"
+    },
+    {
+      "path": "loading_utilities.py",
+      "git_blob_sha1": "c2c5a87e2e6b97fc54732678b44b82803c19023f"
+    },
+    {
+      "path": "quick_start_examples/predict_stams.py",
+      "git_blob_sha1": "57d0651b1858d9a28f9833afe9dd9393e2858b46"
+    },
+    {
+      "path": "analysis_utilities.py",
+      "git_blob_sha1": "2c70f867b9d6ae5addbcec98f2959671c2aee36d"
+    }
+  ],
+  "manuscript_claims": [
+    {
+      "source_record": "BIORXIV_V4_ABSTRACT",
+      "source_url": "https://www.biorxiv.org/content/10.1101/2024.09.22.614271v4",
+      "reported_percentage": 82,
+      "mapping_status": "VERSION_MAPPING_UNRESOLVED",
+      "archived_pdf_sha256": null
+    },
+    {
+      "source_record": "PUBMED_PMC_INDEXED_PREPRINT_RECORD",
+      "source_url": "https://pmc.ncbi.nlm.nih.gov/articles/PMC12485687/",
+      "reported_percentage": 92,
+      "mapping_status": "VERSION_MAPPING_UNRESOLVED",
+      "archived_pdf_sha256": null
+    }
+  ],
+  "configurations": [
+    {
+      "config_path": "submission_params/exp_test.yml",
+      "git_blob_sha1": "4d9233eca20b614b3723273f33d742d4b8f646c3",
+      "role": "DEFAULT_DEVELOPMENT_OR_TEST",
+      "mask_kind": "not_synaptic",
+      "num_data_sets": 10,
+      "num_train_steps": 10,
+      "paper_eligible": false,
+      "eligibility_reason": "The no-argument main.py path selects this reduced test configuration. not_synaptic permits non-anatomical pair weights and does not represent the stated connectome-constrained synaptic mask.",
+      "resolved_config_sha256": null
+    },
+    {
+      "config_path": "submission_params/slurm_example.yml",
+      "git_blob_sha1": "c27c249c3c33c81bb996828f201b9872f30439ff",
+      "role": "CANDIDATE_FULL_PAPER_CONFIG",
+      "mask_kind": "synaptic",
+      "num_data_sets": 80,
+      "num_train_steps": 200,
+      "paper_eligible": false,
+      "eligibility_reason": "Candidate full configuration only; must be checked against the archived manuscript, supplement and original run artifacts before promotion.",
+      "resolved_config_sha256": null
+    }
+  ],
+  "activity_dataset": {
+    "provider": "OSF",
+    "url": "https://osf.io/qxhjd/",
+    "download_state": "NOT_MATERIALIZED",
+    "files": [],
+    "recording_count_reported": 110,
+    "sha256_inventory": null
+  },
+  "connectome_sources": [
+    {
+      "file_name": "white_1986_jsh.csv",
+      "provider": "NemaNode",
+      "source_download_date_reported": "2025-11-01",
+      "download_state": "NOT_MATERIALIZED",
+      "sha256": null,
+      "size_bytes": null
+    },
+    {
+      "file_name": "white_1986_n2u.csv",
+      "provider": "NemaNode",
+      "source_download_date_reported": "2025-11-01",
+      "download_state": "NOT_MATERIALIZED",
+      "sha256": null,
+      "size_bytes": null
+    },
+    {
+      "file_name": "witvliet_2020_7.csv",
+      "provider": "NemaNode",
+      "source_download_date_reported": "2025-11-01",
+      "download_state": "NOT_MATERIALIZED",
+      "sha256": null,
+      "size_bytes": null
+    },
+    {
+      "file_name": "witvliet_2020_8.csv",
+      "provider": "NemaNode",
+      "source_download_date_reported": "2025-11-01",
+      "download_state": "NOT_MATERIALIZED",
+      "sha256": null,
+      "size_bytes": null
+    }
+  ],
+  "split": {
+    "strategy": "WORM_LEVEL_SORTED_DISCOVERY_PLUS_EXPLICIT_HOLDOUS",
+    "recording_discovery_order": "LEXICOGRAPHIC_PATH_ORDER",
+    "total_recordings_expected": 110,
+    "training_recordings_expected": 80,
+    "test_recordings_expected": 30,
+    "training_recording_ids": [],
+    "test_recording_ids": [],
+    "hold_out_mode": "worm",
+    "hold_out_start": 0.9,
+    "neuron_frequency_threshold": 0.1,
+    "blacklisted_cells": [
+      "AWCL",
+      "AWCR"
+    ],
+    "eligibility_derived_from_training_only": true,
+    "recording_inventory_sha256": null,
+    "cell_eligibility_sha256": null,
+    "split_manifest_sha256": null
+  },
+  "model": {
+    "model_class": "LATENT_LINEAR_GAUSSIAN_STATE_SPACE",
+    "synaptic_mask_semantics": "chemical_or_gap_junction_adjacency_plus_identity",
+    "fit_mask_true_means_estimated": true,
+    "dynamics_lags": 1,
+    "dynamics_input_lags": 45,
+    "emissions_input_lags": 1,
+    "training_steps": 200,
+    "random_seed": null,
+    "mask_support_sha256": null,
+    "combined_connectome_sha256": null
+  },
+  "metric_contract": {
+    "scoring_script_path": "quick_start_examples/predict_stams.py",
+    "scoring_script_git_blob_sha1": "57d0651b1858d9a28f9833afe9dd9393e2858b46",
+    "stimulus_triggered_average_window_seconds": [
+      15,
+      30
+    ],
+    "reported_metric_families": [
+      "STAM",
+      "CORRELATION"
+    ],
+    "diagonal_pairs_excluded": true,
+    "pair_eligibility_sha256": null,
+    "reproducibility_ceiling_sha256": null,
+    "metric_definition_sha256": null
+  },
+  "environment": {
+    "python_version": null,
+    "mpi_implementation": null,
+    "package_lock_sha256": null,
+    "hardware_description": null,
+    "environment_manifest_sha256": null
+  },
+  "outputs": {
+    "runs_performed": 0,
+    "reproduction_report_sha256": null,
+    "connectome_constrained_score": null,
+    "fully_connected_score": null,
+    "shuffled_constrained_score": null,
+    "test_test_ceiling": null,
+    "reproduction_claim": "NOT_RUN"
+  },
+  "limitations": [
+    "This example is a source audit manifest, not a completed replication.",
+    "The 82% and 92% abstract values have unresolved version-to-claim mapping.",
+    "Activity recordings and the four anatomical CSV files have not been downloaded or byte-hashed.",
+    "The Slurm example is a candidate full configuration and has not been proven to be the exact paper configuration.",
+    "Actual train/test recording IDs, training-derived cell eligibility, mask support and metric pair denominators are not yet materialized.",
+    "No model fit, score calculation, paper reproduction or Symthaea comparison has been run."
+  ]
+}
