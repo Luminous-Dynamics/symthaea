@@ -481,10 +481,10 @@ pub fn plan_annotation_acquisition(
 
     // The active selector must never use any source work that entered the
     // probability audit. This second check protects future edits to either arm.
-    let active_sources: BTreeSet<_> = report
+    let active_sources: BTreeSet<String> = report
         .active_refinement
         .iter()
-        .map(|selection| selection.source_work_id_sha256.as_str())
+        .map(|selection| selection.source_work_id_sha256.clone())
         .collect();
     if !active_sources.is_disjoint(&audit_source_set) {
         return Err("active and probability-audit source-work sets overlap".into());
@@ -960,7 +960,7 @@ fn select_active(
     candidates: &[AnnotationAcquisitionCandidateV1],
     eligible: &[usize],
     config: &AnnotationAcquisitionConfigV1,
-    audit_sources: &BTreeSet<&str>,
+    audit_sources: &BTreeSet<String>,
 ) -> Result<
     (
         Vec<AnnotationSelectionRecordV1>,
