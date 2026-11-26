@@ -79,7 +79,16 @@ The inspected Mycelix TypeScript CapabilityManager is in-memory and its generate
 
 Do not treat that implementation as an authoritative cryptographic evidence source for consequential MON actions. This is a specific limitation of the inspected implementation, not a claim about every Mycelix identity component.
 
-### 3.4 Mycelix maturity
+### 3.4 Credential verification and revocation lineage
+
+Two existing Mycelix issues are especially relevant and should be reused rather than duplicated:
+
+- [Issue #108 — trust-tier authority can outrun cryptographic proof verification](https://github.com/Luminous-Dynamics/mycelix/issues/108) documents a case where structural admission of proof bytes was incorrectly allowed to influence a consequential trust consumer. Its repair sequence distinguishes structurally admitted proof, cryptographically verified proof, and a consuming domain's permission to rely on the result. It also identifies a Holochain update-lineage hazard: a link may continue to point to an original credential action while revocation is stored in a later update. A current-state resolver must follow the update lineage rather than treat the linked historical record as current.
+- [Issue #5736 — issuer-key lifecycle and cryptographic credential verification](https://github.com/Luminous-Dynamics/mycelix/issues/5736) documents ephemeral issuer-key creation, incomplete signed preimages and an earlier verifier that checked framing rather than the signature. The corrected historical/subset profile is explicitly UNVERIFIED pending real key resolution, full-field signature verification, lifecycle and interoperability tests.
+
+MON must preserve these distinctions at its adapter boundary. A source record may be structurally valid but cryptographically unverified; a signature may verify while the credential is revoked or stale; a currently valid credential may still lack action-specific authority. These are separate claims.
+
+### 3.5 Mycelix maturity
 
 The Mycelix repository describes itself as a pre-alpha research project and distinguishes unit-test coverage from multi-agent integration maturity and deployed functionality. MON-018 therefore begins with read-only source fixtures and a versioned adapter contract. Runtime authority activation is a separate qualification gate.
 
