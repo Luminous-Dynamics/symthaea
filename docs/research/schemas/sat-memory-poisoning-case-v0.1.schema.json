@@ -314,6 +314,93 @@
           }
         }
       }
+    },
+    {
+      "if": {
+        "properties": {
+          "channel": {
+            "const": "untrusted_source_label"
+          }
+        },
+        "required": [
+          "channel"
+        ]
+      },
+      "then": {
+        "properties": {
+          "source_claim": {
+            "properties": {
+              "source_label": {
+                "const": "untrusted"
+              },
+              "signature_state": {
+                "const": "absent"
+              },
+              "signer_role": {
+                "const": "attacker_source"
+              }
+            }
+          }
+        }
+      }
+    },
+    {
+      "if": {
+        "properties": {
+          "channel": {
+            "const": "forged_trusted_label_invalid_signature"
+          }
+        },
+        "required": [
+          "channel"
+        ]
+      },
+      "then": {
+        "properties": {
+          "source_claim": {
+            "properties": {
+              "source_label": {
+                "const": "trusted"
+              },
+              "signature_state": {
+                "const": "invalid"
+              },
+              "signer_role": {
+                "const": "forged_issuer"
+              }
+            }
+          }
+        }
+      }
+    },
+    {
+      "if": {
+        "properties": {
+          "channel": {
+            "const": "agent_laundered_valid_signature"
+          }
+        },
+        "required": [
+          "channel"
+        ]
+      },
+      "then": {
+        "properties": {
+          "source_claim": {
+            "properties": {
+              "source_label": {
+                "const": "trusted"
+              },
+              "signature_state": {
+                "const": "valid"
+              },
+              "signer_role": {
+                "const": "agent_memory_writer"
+              }
+            }
+          }
+        }
+      }
     }
   ]
 }
