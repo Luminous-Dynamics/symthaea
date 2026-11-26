@@ -172,21 +172,37 @@ impl EpistemicConsciousness {
         current_phi < self.phi_threshold as f64
     }
 
-    /// Perform autonomous research on a query.
+    /// Perform autonomous research on a query using the compatibility result API.
     ///
-    /// Research confidence is a prediction, not an observed correctness label.
-    /// The result is integrated for downstream use, but it never updates
-    /// source reliability or domain expertise by self-labeling its claims.
+    /// For callers that need acquisition diagnostics, use
+    /// [Self::research_with_receipts] and retain its complete report.
     pub async fn research(&mut self, query: &str) -> anyhow::Result<WebResearchResult> {
-        let result = self.researcher.research_and_verify(query).await?;
-        self.integrate_research_result(result).await
+        let report = self.research_with_receipts(query).await?;
+        Ok(report.result)
+    }
+
+    /// Perform research and return its full acquisition report to the caller.
+    ///
+    /// The report includes every recorded search/fetch/budget disposition,
+    /// including failures and timeouts. Integration is performed on the
+    /// successful/partial result without treating confidence as an outcome
+    /// label. Independent adjudication remains a separate feedback path.
+    pub async fn research_with_receipts(
+        &mut self,
+        query: &str,
+    ) -> anyhow::Result<WebResearchReport> {
+        let report = self
+            .researcher
+            .research_and_verify_with_receipts(query)
+            .await?;
+        let result = self.integrate_research_result(report.result).await?;
+        Ok(WebResearchReport {
+            result,
+            acquisition_receipts: report.acquisition_receipts,
+        })
     }
 
     /// Integrate a research result without treating its own confidence as truth.
-    ///
-    /// Independent, provenance-bound outcome adjudication is a separate input
-    /// path. Until that path supplies a qualified outcome, meta-learning state
-    /// remains unchanged by this research result.
     async fn integrate_research_result(
         &mut self,
         result: WebResearchResult,
