@@ -158,4 +158,4 @@ The `temporal_projection` module is exported alongside the streaming ledger. It 
 
 The index propagates invalidation through all descendants, emits a self-committing projection-invalidation receipt, refuses new projections built from non-current parents, and supports rebuilds under new IDs. Source revalidation does not revive old projections. Rights-erasure acknowledgements clear the in-memory projection content/dependency commitments but do not prove deletion from external stores.
 
-Protocol: [MACE Derived-Memory Invalidation V1](../../../docs/research/MACE_DERIVED_MEMORY_INVALIDATION_V1.md). Eleven deterministic projection-index tests are authored; none have been executed.
+Protocol: [MACE Derived-Memory Invalidation V1](../../../docs/research/MACE_DERIVED_MEMORY_INVALIDATION_V1.md). Twelve deterministic projection-index tests are authored; none have been executed.
