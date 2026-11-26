@@ -94,7 +94,8 @@
         "required": [
           "input_id",
           "artifact_path",
-          "classification"
+          "classification",
+          "sha256"
         ],
         "properties": {
           "input_id": {
