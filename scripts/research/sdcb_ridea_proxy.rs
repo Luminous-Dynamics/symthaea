@@ -385,7 +385,7 @@ mod tests {
     fn gradient_matches_finite_difference_away_from_hinge_kink() {
         let x = vec![vec![1.0], vec![2.0]];
         let y = vec![0.2, 0.4];
-        let f = vec![1.0, 1.5];
+        let f = vec![0.15, 0.4];
         let w = vec![0.1];
         let mut cfg = config();
         cfg.margin_tau = 0.5;
