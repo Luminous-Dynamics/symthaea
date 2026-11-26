@@ -1,0 +1,205 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://github.com/Luminous-Dynamics/symthaea/blob/main/docs/research/energy_telemetry_envelope.schema.json",
+  "title": "Privacy-preserving aggregate electrical telemetry envelope",
+  "description": "Aggregate-only telemetry contract. Schema validity does not prove meter authenticity, cohort size, differential privacy, legal compliance, or anonymity.",
+  "type": "object",
+  "additionalProperties": false,
+  "required": [
+    "schema_version",
+    "batch_id",
+    "created_at_utc",
+    "window",
+    "aggregation",
+    "recipient_class",
+    "dp_release"
+  ],
+  "properties": {
+    "schema_version": {
+      "const": "privacy-preserving-energy-telemetry/v1"
+    },
+    "batch_id": {
+      "type": "string",
+      "pattern": "^[a-f0-9]{32}$",
+      "description": "Random per-batch identifier. Never a meter, household, account, or stable device identifier."
+    },
+    "created_at_utc": { "$ref": "#/$defs/utcTimestamp" },
+    "window": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["start_utc", "end_utc", "duration_seconds"],
+      "properties": {
+        "start_utc": { "$ref": "#/$defs/utcTimestamp" },
+        "end_utc": { "$ref": "#/$defs/utcTimestamp" },
+        "duration_seconds": {
+          "type": "integer",
+          "minimum": 300,
+          "maximum": 86400
+        }
+      }
+    },
+    "aggregation": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "scope",
+        "region_token",
+        "cohort_size",
+        "minimum_cohort_size",
+        "energy_wh_total",
+        "method",
+        "coverage_fraction",
+        "measurement_quality"
+      ],
+      "properties": {
+        "scope": {
+          "enum": ["distribution_area", "microgrid"]
+        },
+        "region_token": {
+          "type": "string",
+          "pattern": "^[A-Za-z0-9_-]{8,64}$",
+          "description": "Opaque group-level region token only. Not a meter identifier or precise coordinate."
+        },
+        "cohort_size": {
+          "type": "integer",
+          "minimum": 20
+        },
+        "minimum_cohort_size": {
+          "type": "integer",
+          "minimum": 20
+        },
+        "energy_wh_total": {
+          "type": "integer",
+          "minimum": 0,
+          "maximum": 1000000000000000
+        },
+        "method": {
+          "enum": [
+            "trusted_edge_aggregation",
+            "secure_aggregation",
+            "secure_aggregation_with_dp"
+          ]
+        },
+        "coverage_fraction": {
+          "type": "number",
+          "minimum": 0,
+          "maximum": 1
+        },
+        "measurement_quality": {
+          "enum": ["validated", "partial", "estimated"]
+        }
+      }
+    },
+    "recipient_class": {
+      "enum": ["grid_operations", "approved_research", "public_reporting"]
+    },
+    "dp_release": {
+      "oneOf": [
+        { "type": "null" },
+        { "$ref": "#/$defs/dpRelease" }
+      ]
+    }
+  },
+  "$defs": {
+    "utcTimestamp": {
+      "type": "string",
+      "format": "date-time",
+      "pattern": "Z$",
+      "description": "ISO 8601 UTC timestamp; a Z suffix is required."
+    },
+    "dpRelease": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "mechanism",
+        "epsilon",
+        "delta",
+        "budget_policy_id",
+        "budget_receipt_sha256"
+      ],
+      "properties": {
+        "mechanism": {
+          "enum": ["discrete_laplace", "gaussian"]
+        },
+        "epsilon": {
+          "type": "number",
+          "exclusiveMinimum": 0,
+          "maximum": 1
+        },
+        "delta": {
+          "type": "number",
+          "minimum": 0,
+          "maximum": 0.000001
+        },
+        "budget_policy_id": {
+          "type": "string",
+          "pattern": "^[A-Za-z0-9._:-]{1,128}$"
+        },
+        "budget_receipt_sha256": {
+          "type": "string",
+          "pattern": "^[a-f0-9]{64}$"
+        }
+      }
+    }
+  },
+  "allOf": [
+    {
+      "if": {
+        "properties": {
+          "recipient_class": {
+            "enum": ["approved_research", "public_reporting"]
+          }
+        },
+        "required": ["recipient_class"]
+      },
+      "then": {
+        "properties": {
+          "aggregation": {
+            "properties": {
+              "method": { "const": "secure_aggregation_with_dp" }
+            }
+          },
+          "dp_release": { "$ref": "#/$defs/dpRelease" }
+        }
+      }
+    },
+    {
+      "if": {
+        "properties": {
+          "aggregation": {
+            "properties": {
+              "method": { "const": "secure_aggregation_with_dp" }
+            },
+            "required": ["method"]
+          }
+        },
+        "required": ["aggregation"]
+      },
+      "then": {
+        "properties": {
+          "dp_release": { "$ref": "#/$defs/dpRelease" }
+        }
+      }
+    },
+    {
+      "if": {
+        "properties": {
+          "aggregation": {
+            "properties": {
+              "method": {
+                "enum": ["trusted_edge_aggregation", "secure_aggregation"]
+              }
+            },
+            "required": ["method"]
+          }
+        },
+        "required": ["aggregation"]
+      },
+      "then": {
+        "properties": {
+          "dp_release": { "type": "null" }
+        }
+      }
+    }
+  ]
+}
