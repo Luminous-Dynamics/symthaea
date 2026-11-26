@@ -194,13 +194,13 @@ The likely long-term design is a **local response-balanced atlas**, not one glob
 
 ## First physics-facing experiment: K-RESP-1
 
-The first target experiment is a frozen-checkpoint, two-pulse 1D1V collisionless Vlasov–Poisson echo cohort using the existing `sinusoidal_velocity_kick_v1` contract. To avoid checkpoint leakage, every training, validation and held-out path begins from the same post-phase-mixing checkpoint before either pulse. The first tournament therefore tests how well each representation predicts future pulse sequences from a common state; a later atlas experiment will vary the conditioning history and qualify separate checkpoint-local bases. The experiment contract is machine-readable:
+The first target experiment is a frozen-checkpoint, two-pulse 1D1V collisionless Vlasov–Poisson echo cohort using the existing `sinusoidal_velocity_kick_v1` contract. Every path shares the same first pulse and the same post-phase-mixing, post-first-pulse checkpoint; only the second pulse varies across training, validation and held-out paths. This places the first pulse's reachable directions in the checkpoint-centred reachability Gramian and tests whether the reduced state preserves the response to unseen second pulses. A later atlas experiment will vary first-pulse histories and qualify separate checkpoint-local bases. The experiment contract is machine-readable:
 
 - [K-RESP-1 Draft 2020-12 schema](response-balanced-experiment-v0.1.schema.json)
 - [Synthetic K-RESP-1 split and cohort fixture](fixtures/synthetic-kresp1-experiment-v0.1.json)
 - [Source pulse-family contract](../adversarial-probes/fixtures/synthetic-pulse-family-v0.1.json)
 
-The synthetic fixture has two training pulse paths, one validation path, and five held-out paths covering phase, amplitude, spatial mode, pulse separation, and pulse order. CI checks that every pulse occurs strictly after the shared checkpoint and that both the first and second pulses remain unapplied at checkpoint time. It is deliberately only a schema/split fixture: no solver was run, no echo was measured, no reference was converged, and no method ranking is claimed.
+The synthetic fixture has two training pulse paths, one validation path, and five held-out second-pulse paths covering phase, amplitude, spatial mode, separation, and a combined out-of-training-range case. CI checks that the first pulse is identical across every split, the checkpoint lies strictly after the first pulse and before the second pulse, and pulse identities and split assignments do not leak. It is deliberately only a schema/split fixture: no solver was run, no echo was measured, no reference was converged, and no method ranking is claimed.
 
 The executable workflow checks that train/validation/test identifiers are disjoint, pulse identities are unique, pulses are time-ordered and within the declared admissible family, the held-out paths actually exercise unseen parameter values, required comparators are present, and all physical targets remain prospective. The actual physics cohort must replace the synthetic checkpoint and solver provenance with immutable solver revisions, exact state digests, grid/time refinements, and independently reproduced response measurements before any physical claim is admitted.
 
@@ -224,7 +224,7 @@ The executable workflow checks that train/validation/test identifiers are disjoi
 
 ### 3. Phase mixing and two-pulse echo
 
-- Freeze checkpoints after phase mixing and before the second pulse.
+- Freeze a checkpoint after the common first pulse and before the second pulse.
 - Test held-out pulse mode, phase, amplitude, time separation, and observation horizon.
 - Compare complex echo amplitude, wrapped phase, waveform, timing, and branch association.
 - Ablate individual balanced directions and compare against energy-ranked POD directions.
