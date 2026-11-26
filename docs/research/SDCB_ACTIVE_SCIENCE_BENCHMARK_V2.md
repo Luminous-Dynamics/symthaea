@@ -41,15 +41,15 @@ The committed known-answer fixture contains two candidate mechanisms with the sa
 - bounded noise: (delta=0.05);
 - maximin separation margin: (1-2delta=0.9).
 
-The candidate episode now includes the passive observation itself, not only the passive input schedule. Both hypotheses remain compatible with that baseline observation. The selector rejects the no-op probe, exposes the low-margin/low-measurement-cost versus high-margin/higher-cost trade-off on the Pareto frontier, and abstains when experiment budget is unavailable. Separate three- and four-state shift-system controls test full-rank observability and controllability. The evaluator-only simulation then emits a bounded-noise receipt; the candidate consistency set must retain the true model and exclude the other model in this fixture.
+The candidate episode now includes the passive observation itself, not only the passive input schedule. Both hypotheses remain compatible with that baseline observation. The selector rejects the no-op probe, exposes the low-margin/low-measurement-cost versus high-margin/higher-cost trade-off on the Pareto frontier, and abstains when experiment budget is unavailable. A deterministic 2–4-state shift-system family tests the same equivalence/intervention behavior at each dimension; separate rank controls verify full-rank observability and controllability where constructed. The evaluator-only simulation then emits a bounded-noise receipt; the candidate consistency set must retain the true model and exclude the other model in this fixture.
 
-**Authored coverage:** 22 Rust test functions, including 128 deterministic noise-seed checks. Rust formatting, compilation, tests and Clippy have not been run on this commit. The traces and margins above are hand-derived from the committed matrices, not CI or model results.
+**Authored coverage:** 23 Rust test functions, including 128 deterministic noise-seed checks. Rust formatting, compilation, tests and Clippy have not been run on this commit. The traces and margins above are hand-derived from the committed matrices, not CI or model results.
 
 ## 3. Important limits
 
 This is a reference evaluator seam, not a complete benchmark runner or production adapter.
 
-- The current fixture is a two-state, single-input system. The types and validation permit 2–4 states, but a broad generated 2–4-state corpus is not yet present.
+- The deterministic shift-system generator now creates two-, three- and four-state observational-equivalence episodes. This is an analytic family, not yet a broad nonlinear or randomized corpus.
 - Candidate hypotheses are supplied explicitly. Open-world discovery, hypothesis generation, model-family expansion and an `OTHER_UNRESOLVED` hypothesis remain future work.
 - The exact maximin selector optimizes one probe's worst pairwise trace separation. It is not Bayesian EVSI, robust EVSI, multi-step planning or a policy-tree oracle.
 - The observation receipt has episode/probe identity and a bounded-noise field, but no signature, custody chain, authenticated sensor identity or cryptographic commitment. Production receipts must come from the independently governed evidence verifier.
