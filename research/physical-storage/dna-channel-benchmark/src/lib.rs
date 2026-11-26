@@ -254,20 +254,20 @@ pub fn progressive_erasure_sets(
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub struct ReadBatchSummary {
     pub distinct_read_records: usize,
-    pub molecule_observations: usize,
-    pub duplicate_observations: usize,
+    pub read_observations: usize,
+    pub additional_read_copies: usize,
     pub dropped_oligo: bool,
 }
 
-/// Count record and molecule multiplicity without treating duplicates as
-/// independent evidence. Each read count is the number of molecule observations
-/// represented by one distinct read record and should be provenance-backed.
+/// Count distinct read records and observed read multiplicity without treating
+/// repeated reads as independent evidence. Counts do not identify distinct
+/// molecules unless the upstream library provides validated UMI/molecule lineage.
 pub fn summarize_read_batch(read_counts: &[usize], dropped_oligo: bool) -> ReadBatchSummary {
-    let molecule_observations = read_counts.iter().copied().sum::<usize>();
+    let read_observations = read_counts.iter().copied().sum::<usize>();
     ReadBatchSummary {
         distinct_read_records: read_counts.len(),
-        molecule_observations,
-        duplicate_observations: molecule_observations.saturating_sub(read_counts.len()),
+        read_observations,
+        additional_read_copies: read_observations.saturating_sub(read_counts.len()),
         dropped_oligo,
     }
 }
@@ -363,11 +363,11 @@ mod tests {
     }
 
     #[test]
-    fn read_duplicates_are_not_counted_as_independent_records() {
+    fn read_multiplicity_is_not_molecule_count() {
         let summary = summarize_read_batch(&[1, 4, 2], false);
         assert_eq!(summary.distinct_read_records, 3);
-        assert_eq!(summary.molecule_observations, 7);
-        assert_eq!(summary.duplicate_observations, 4);
+        assert_eq!(summary.read_observations, 7);
+        assert_eq!(summary.additional_read_copies, 4);
     }
 
     #[test]
