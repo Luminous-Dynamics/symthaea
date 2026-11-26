@@ -53,3 +53,18 @@ Run the synthetic corpus with:
     cargo +1.96.0 run --locked --manifest-path tools/mel-temporal-grounding-qualifier/Cargo.toml --bin mel-temporal-reliability-audit -- tools/mel-temporal-grounding-qualifier/fixtures/mel-temporal-reliability-corpus.synthetic.json
 
 See docs/research/MEL-GROUND-007-CORPUS-ANNOTATION-RELIABILITY-V1.md for the mathematical definition and claim limits.
+
+
+## Corrected multi-rater unitizing alpha-u
+
+The temporal_unitizing module implements the corrected Krippendorff 2019 fourth-edition §12.6 u-alpha family for independent partitions of a continuous audio timeline. It reports overall nominal u-alpha, gap-vs-event binary u-alpha, coding-conditional c-u-alpha, and per-value alpha/overlap coverage. It retains gaps explicitly and never builds consensus labels.
+
+The implementation target is not the withdrawn simplified first-printing c_u-alpha equation. Its golden test reproduces the 2019 fourth-edition Figure 12.11 reference vector (three observers, continuum length 60): nominal u-alpha ≈0.510, binary u-alpha ≈0.413, and coding-conditional c-u-alpha ≈0.72835.
+
+For audio, each corpus item is one event query/category over the exact full-recording sample-frame timeline. Present intervals must be sorted, non-overlapping and half-open; Absent maps to a full-gap unitization; Ambiguous and NotEstimable are retained and excluded with explicit reasons. Distinct polyphonic categories require separate query-items.
+
+Run the synthetic unitizing corpus with:
+
+    cargo +1.96.0 run --locked --manifest-path tools/mel-temporal-grounding-qualifier/Cargo.toml --bin mel-temporal-unitizing-audit -- tools/mel-temporal-grounding-qualifier/fixtures/mel-temporal-unitizing-alpha-u.synthetic.json
+
+The corpus summary is descriptive and unweighted by item; source-work summaries remain separate. It does not pool unrelated recordings into one coefficient or compute confidence intervals. See docs/research/MEL-GROUND-008-UNITIZING-ALPHA-U-V1.md for formulas, reference vectors and claim boundaries.
