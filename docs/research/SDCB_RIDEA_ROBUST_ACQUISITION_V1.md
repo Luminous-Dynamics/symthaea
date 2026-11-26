@@ -65,13 +65,13 @@ The Rust file implements the paper's scoring layer for a finite candidate pool:
 - explicit computational bounds of 512 samples per empirical distribution, 64 dimensions, and 64 candidates;
 - fail-closed validation for malformed samples, dimensions, non-finite predictions, invalid scales, duplicate IDs and zero baseline MMD.
 
-The reference does **not** train g, infer EIG, construct a posterior, or assess downstream decision value. EIG is supplied by a separate method. The proxy is also supplied by an upstream model. This keeps the equation reference small and makes the missing pieces explicit.
+The acquisition scorer in `sdcb_ridea.rs` does **not** itself train g, infer EIG, construct a posterior, or assess downstream decision value. EIG is supplied by a separate method. A separate `sdcb_ridea_proxy.rs` now provides a transparent linear-feature trainer for the released MSE + hinge-margin + L2 proxy objective. It is a reference approximation of that loss, not the authors' original Pyro/model-specific proxy architecture. Its feature map and initialization are caller-supplied; held-out proxy quality must be evaluated before its predictions are used by the R-IDeA scorer.
 
 ### Important boundaries
 
 1. **R-IDeA is not EVSI.** EIG measures information about a parameter/hypothesis. EVSI measures expected improvement in a declared decision. Report them separately; a high R-IDeA score does not prove an experiment changes the best action.
 2. **R-IDeA is not a finite ambiguity-set maximin guarantee.** RPSD evaluates the worst scenario in a declared finite set. R-IDeA targets generalization under design-distribution shift and model misspecification using a proxy model.
-3. **R-IDeA does not certify truth.** The proxy g can be wrong; the reference only calculates the prescribed acquisition score.
+3. **R-IDeA does not certify truth.** The proxy g can be wrong; the reference only calculates the prescribed acquisition score. The linear proxy trainer checks the optimization objective, not whether g is best-in-class or well-calibrated.
 4. **Paper notation vs released code.** The paper displays an MMD ratio, while the published `compute_mmd` helper returns the biased squared estimator and the acquisition code uses that directly. We pin this code-level choice in the reference and keep the sqrt-MMD utility distinct.
 5. **R-IDeA does not certify generalization.** The proxy g may be poorly trained or misspecified; only a held-out evaluation can show whether the acquisition actually improves target-distribution loss.
 6. **MMD² denominator.** If baseline biased empirical MMD²(history, target) is zero, the released-code ratio is undefined. The reference returns `ZeroBaselineMmd`; it does not silently fall back to EIG.
@@ -150,4 +150,4 @@ Treat these as orthogonal criteria first and publish their joint Pareto frontier
 
 ## 8. Claim boundary
 
-The Rust source contains 18 authored unit tests, but it has not been compiled or executed in this environment. Its proxy predictions and EIG are caller-supplied. It does not train models, run an upstream R-IDeA reproduction, test Symthaea HDC/CfC, authenticate physical observations, or demonstrate SOTA performance.
+The R-I/R-IDeA scorer contains 18 authored tests, and the separate linear proxy trainer contains 13. Neither has been compiled or executed in this environment. The scorer still takes EIG and proxy predictions as inputs; the proxy helper produces a simplified linear-feature g but does not reproduce the original Pyro architecture or the paper's experimental results. It does not train models, run an upstream R-IDeA reproduction, test Symthaea HDC/CfC, authenticate physical observations, or demonstrate SOTA performance.
