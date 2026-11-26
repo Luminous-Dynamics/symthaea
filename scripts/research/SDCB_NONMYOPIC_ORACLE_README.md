@@ -9,7 +9,7 @@ rustc --edition=2024 --test scripts/research/sdcb_nonmyopic_oracle.rs -o /tmp/sd
 /tmp/sdcb-nonmyopic
 ```
 
-The source includes sdcb_decision_value.rs and therefore also runs its 15 one-step reference tests in addition to the 10 non-myopic oracle tests (25 total when this file is compiled with --test).
+The source includes sdcb_decision_value.rs and therefore also runs its 15 one-step reference tests in addition to the 11 non-myopic oracle tests (26 total when this file is compiled with --test).
 
 ## Exact search limits
 
