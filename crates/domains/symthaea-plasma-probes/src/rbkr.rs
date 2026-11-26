@@ -61,6 +61,8 @@ pub enum RbkrError {
     MixedScenarioCheckpoint,
     #[error("response Gramian scenarios use different state metrics")]
     MixedScenarioStateMetric,
+    #[error("response Gramian scenarios use different state coordinate systems")]
+    MixedScenarioCoordinates,
     #[error("positive-weight scenario is missing reachability or observability factors")]
     EmptyScenarioGramian,
     #[error("response Gramian scenario weight must be finite and non-negative")]
@@ -109,6 +111,10 @@ pub struct ResponseGramianScenario<'a> {
     pub trajectory_sha256: &'a str,
     pub task_contract_id: &'a str,
     pub checkpoint_id: &'a str,
+    /// SHA-256 of the exact checkpoint state shared by all scenarios.
+    pub checkpoint_sha256: &'a str,
+    /// Coordinate ordering / layout fingerprint, separate from the metric.
+    pub state_coordinate_id: &'a str,
     pub state_metric_id: &'a str,
     pub reachability: &'a EmpiricalGramian,
     pub observability: &'a EmpiricalGramian,
@@ -177,6 +183,8 @@ pub fn evaluate_response_scenario_residuals(
     let first = scenarios.first().ok_or(RbkrError::InvalidScenarioSet)?;
     if first.task_contract_id.trim().is_empty()
         || first.checkpoint_id.trim().is_empty()
+        || !is_sha256_hex(first.checkpoint_sha256)
+        || first.state_coordinate_id.trim().is_empty()
         || first.state_metric_id.trim().is_empty()
     {
         return Err(RbkrError::InvalidScenarioSet);
@@ -196,8 +204,14 @@ pub fn evaluate_response_scenario_residuals(
         if scenario.task_contract_id != first.task_contract_id {
             return Err(RbkrError::MixedScenarioContract);
         }
-        if scenario.checkpoint_id != first.checkpoint_id {
+        if scenario.checkpoint_id != first.checkpoint_id
+            || !is_sha256_hex(scenario.checkpoint_sha256)
+            || scenario.checkpoint_sha256 != first.checkpoint_sha256
+        {
             return Err(RbkrError::MixedScenarioCheckpoint);
+        }
+        if scenario.state_coordinate_id != first.state_coordinate_id {
+            return Err(RbkrError::MixedScenarioCoordinates);
         }
         if scenario.state_metric_id != first.state_metric_id {
             return Err(RbkrError::MixedScenarioStateMetric);
@@ -309,6 +323,8 @@ pub fn aggregate_response_gramians(
     if config.maximum_live_factor_scalars == 0
         || first.task_contract_id.trim().is_empty()
         || first.checkpoint_id.trim().is_empty()
+        || !is_sha256_hex(first.checkpoint_sha256)
+        || first.state_coordinate_id.trim().is_empty()
         || first.state_metric_id.trim().is_empty()
     {
         return Err(RbkrError::InvalidScenarioSet);
@@ -1500,6 +1516,8 @@ mod tests {
                 trajectory_sha256: "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
                 task_contract_id: "kresp1-contract-v1",
                 checkpoint_id: "checkpoint-a",
+                checkpoint_sha256: "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+                state_coordinate_id: "vlasov-1d1v-phase-space-layout-v1",
                 state_metric_id: "metric-v1",
                 reachability: &reach_a,
                 observability: &observe_a,
@@ -1510,6 +1528,8 @@ mod tests {
                 trajectory_sha256: "bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb",
                 task_contract_id: "kresp1-contract-v1",
                 checkpoint_id: "checkpoint-a",
+                checkpoint_sha256: "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+                state_coordinate_id: "vlasov-1d1v-phase-space-layout-v1",
                 state_metric_id: "metric-v1",
                 reachability: &reach_b,
                 observability: &observe_b,
@@ -1548,6 +1568,8 @@ mod tests {
                 trajectory_sha256: "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
                 task_contract_id: "kresp1-contract-v1",
                 checkpoint_id: "checkpoint-sha256-abc",
+                checkpoint_sha256: "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+                state_coordinate_id: "vlasov-1d1v-phase-space-layout-v1",
                 state_metric_id: "nondimensional-state-metric-v1",
                 reachability: &reach_a,
                 observability: &observe_a,
@@ -1558,6 +1580,8 @@ mod tests {
                 trajectory_sha256: "bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb",
                 task_contract_id: "kresp1-contract-v1",
                 checkpoint_id: "checkpoint-sha256-abc",
+                checkpoint_sha256: "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+                state_coordinate_id: "vlasov-1d1v-phase-space-layout-v1",
                 state_metric_id: "nondimensional-state-metric-v1",
                 reachability: &reach_b,
                 observability: &observe_b,
@@ -1605,6 +1629,8 @@ mod tests {
                 trajectory_sha256: "1111111111111111111111111111111111111111111111111111111111111111",
                 task_contract_id: "kresp1-contract-v1",
                 checkpoint_id: "checkpoint-a",
+                checkpoint_sha256: "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+                state_coordinate_id: "vlasov-1d1v-phase-space-layout-v1",
                 state_metric_id: "metric-v1",
                 reachability: &positive_reach,
                 observability: &positive_observe,
@@ -1615,6 +1641,8 @@ mod tests {
                 trajectory_sha256: "2222222222222222222222222222222222222222222222222222222222222222",
                 task_contract_id: "kresp1-contract-v1",
                 checkpoint_id: "checkpoint-a",
+                checkpoint_sha256: "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+                state_coordinate_id: "vlasov-1d1v-phase-space-layout-v1",
                 state_metric_id: "metric-v1",
                 reachability: &zero_weight_reach,
                 observability: &zero_weight_observe,
@@ -1645,6 +1673,8 @@ mod tests {
                 trajectory_sha256: "eeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeee",
                 task_contract_id: "kresp1-contract-v1",
                 checkpoint_id: "checkpoint-a",
+                checkpoint_sha256: "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+                state_coordinate_id: "vlasov-1d1v-phase-space-layout-v1",
                 state_metric_id: "metric-v1",
                 reachability: &reach_a,
                 observability: &observe_a,
@@ -1655,6 +1685,8 @@ mod tests {
                 trajectory_sha256: "ffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffff",
                 task_contract_id: "kresp1-contract-v1",
                 checkpoint_id: "checkpoint-a",
+                checkpoint_sha256: "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+                state_coordinate_id: "vlasov-1d1v-phase-space-layout-v1",
                 state_metric_id: "metric-v1",
                 reachability: &reach_b,
                 observability: &observe_b,
@@ -1691,6 +1723,8 @@ mod tests {
             trajectory_sha256: "dddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddd",
             task_contract_id: "kresp1-contract-v1",
             checkpoint_id: "checkpoint-a",
+            checkpoint_sha256: "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+            state_coordinate_id: "vlasov-1d1v-phase-space-layout-v1",
             state_metric_id: "metric-v1",
             reachability: &empty_reach,
             observability: &observe,
@@ -1711,6 +1745,8 @@ mod tests {
             trajectory_sha256: "cccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccc",
             task_contract_id: "kresp1-contract-v1",
             checkpoint_id: "checkpoint-a",
+            checkpoint_sha256: "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+            state_coordinate_id: "vlasov-1d1v-phase-space-layout-v1",
             state_metric_id: "metric-v1",
             reachability: &reach,
             observability: &observe,
@@ -1718,6 +1754,8 @@ mod tests {
         };
         let other_checkpoint = ResponseGramianScenario {
             checkpoint_id: "checkpoint-b",
+            checkpoint_sha256: "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+            state_coordinate_id: "vlasov-1d1v-phase-space-layout-v1",
             ..base
         };
         assert_eq!(
@@ -1726,6 +1764,28 @@ mod tests {
                 ResponseGramianAggregationConfig::default(),
             ),
             Err(RbkrError::MixedScenarioCheckpoint)
+        );
+        let other_checkpoint_digest = ResponseGramianScenario {
+            checkpoint_sha256: "bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb",
+            ..base
+        };
+        assert_eq!(
+            aggregate_response_gramians(
+                &[base, other_checkpoint_digest],
+                ResponseGramianAggregationConfig::default(),
+            ),
+            Err(RbkrError::MixedScenarioCheckpoint)
+        );
+        let other_coordinates = ResponseGramianScenario {
+            state_coordinate_id: "vlasov-1d1v-permuted-layout-v1",
+            ..base
+        };
+        assert_eq!(
+            aggregate_response_gramians(
+                &[base, other_coordinates],
+                ResponseGramianAggregationConfig::default(),
+            ),
+            Err(RbkrError::MixedScenarioCoordinates)
         );
         assert_eq!(
             aggregate_response_gramians(&[base], ResponseGramianAggregationConfig::new(1),),
