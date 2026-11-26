@@ -7,6 +7,7 @@ pub mod label_consumption_guard;
 pub mod metrology_audit;
 pub mod metrology_qualification_gate;
 pub mod metrology_semantics;
+pub mod observable_regime_router_guard;
 pub mod mf_acquisition;
 pub mod pair_manifest;
 pub mod process_event_graph;
