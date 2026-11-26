@@ -18613,6 +18613,20 @@ dependencies = [
 ]
 
 [[package]]
+name = "symthaea-dishwasher-design"
+version = "0.1.0"
+dependencies = [
+ "symthaea-thermofluids",
+]
+
+[[package]]
+name = "symthaea-dishwasher-scheduler"
+version = "0.1.0"
+dependencies = [
+ "symthaea-dishwasher-design",
+]
+
+[[package]]
 name = "symthaea-domotic"
 version = "0.1.0"
 dependencies = [

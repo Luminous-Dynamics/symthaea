@@ -1,0 +1,11 @@
+[package]
+name = "symthaea-dishwasher-design"
+version = "0.1.0"
+edition = "2024"
+rust-version = "1.94"
+description = "First-principles thermal, hydraulic and Pareto models for dishwasher design research"
+license = "AGPL-3.0-or-later"
+repository = "https://github.com/Luminous-Dynamics/symthaea"
+
+[dependencies]
+symthaea-thermofluids = { path = "../symthaea-thermofluids" }
