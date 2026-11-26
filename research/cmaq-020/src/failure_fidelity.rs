@@ -811,6 +811,16 @@ mod tests {
         let mut bad_reference_policy_digest = rate_pair("pair-7", "cluster-7");
         bad_reference_policy_digest.reference_policy_checkpoint_sha256 = "invalid".to_owned();
         assert!(score_boundary_rate_pairs(&[bad_reference_policy_digest], &contract()).is_err());
+
+        let mut mixed_reference_policy_checkpoint = rate_pair("pair-8", "cluster-9");
+        mixed_reference_policy_checkpoint.reference_policy_checkpoint_sha256 = "1".repeat(64);
+        assert!(
+            score_boundary_rate_pairs(
+                &[rate_pair("pair-9", "cluster-10"), mixed_reference_policy_checkpoint],
+                &contract()
+            )
+            .is_err()
+        );
     }
 
 
