@@ -21,6 +21,7 @@ on:
       - "research/cmaq-002/src/worldtest_exploration.rs"
       - "research/cmaq-002/src/worldtest_phase_contract.rs"
       - "research/cmaq-002/src/worldtest_query_portfolio.rs"
+      - "research/cmaq-002/src/worldtest_mechanism_transfer.rs"
       - "research/cmaq-002/src/main.rs"
       - "research/cmaq-002/worldtest-*"
       - "research/cmaq-002/WORLDTEST_QUERY_PORTFOLIO_V0_1.md"
@@ -52,6 +53,9 @@ jobs:
           )
           if [[ -f research/cmaq-002/src/worldtest_query_portfolio.rs ]]; then
             files+=(research/cmaq-002/src/worldtest_query_portfolio.rs)
+          fi
+          if [[ -f research/cmaq-002/src/worldtest_mechanism_transfer.rs ]]; then
+            files+=(research/cmaq-002/src/worldtest_mechanism_transfer.rs)
           fi
           rustfmt --check --edition 2024 "${files[@]}"
 
