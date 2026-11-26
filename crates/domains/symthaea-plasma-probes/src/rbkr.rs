@@ -355,8 +355,14 @@ pub fn aggregate_response_gramians(
         if scenario.task_contract_id != first.task_contract_id {
             return Err(RbkrError::MixedScenarioContract);
         }
-        if scenario.checkpoint_id != first.checkpoint_id {
+        if scenario.checkpoint_id != first.checkpoint_id
+            || !is_sha256_hex(scenario.checkpoint_sha256)
+            || scenario.checkpoint_sha256 != first.checkpoint_sha256
+        {
             return Err(RbkrError::MixedScenarioCheckpoint);
+        }
+        if scenario.state_coordinate_id != first.state_coordinate_id {
+            return Err(RbkrError::MixedScenarioCoordinates);
         }
         if scenario.state_metric_id != first.state_metric_id {
             return Err(RbkrError::MixedScenarioStateMetric);
