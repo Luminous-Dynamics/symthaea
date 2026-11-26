@@ -20,6 +20,12 @@ impl ResponseKey {
 #[derive(Clone, Debug)]
 pub struct StateResponseContract {
     pub contract_id: String,
+    /// SHA-256 of the canonical frozen contract payload (excluding this field).
+    pub contract_sha256: String,
+    /// SHA-256 of the source dataset/generator manifest used by the evaluator.
+    pub source_manifest_sha256: String,
+    /// Registered domains admitted by this exact contract.
+    pub domain_ids: BTreeSet<String>,
     pub intervention_ids: BTreeSet<String>,
     pub query_ids: BTreeSet<String>,
     pub horizons: BTreeSet<u32>,
@@ -28,6 +34,11 @@ pub struct StateResponseContract {
     pub tolerance_units: BTreeMap<ResponseKey, u64>,
     /// Positive relative cost to acquire each registered intervention response.
     pub probe_cost_units: BTreeMap<ResponseKey, u64>,
+}
+
+
+fn is_sha256(value: &str) -> bool {
+    value.len() == 64 && value.bytes().all(|byte| byte.is_ascii_hexdigit())
 }
 
 impl StateResponseContract {
@@ -49,6 +60,15 @@ impl StateResponseContract {
     pub fn validate(&self) -> Result<(), String> {
         if self.contract_id.trim().is_empty() {
             return Err("contract_id must be non-empty".to_owned());
+        }
+        if !is_sha256(&self.contract_sha256) {
+            return Err("contract_sha256 must be a 64-character hexadecimal digest".to_owned());
+        }
+        if !is_sha256(&self.source_manifest_sha256) {
+            return Err("source_manifest_sha256 must be a 64-character hexadecimal digest".to_owned());
+        }
+        if self.domain_ids.is_empty() || self.domain_ids.iter().any(|domain| domain.trim().is_empty()) {
+            return Err("domain_ids must be non-empty and contain no empty IDs".to_owned());
         }
         if self.intervention_ids.is_empty()
             || self.intervention_ids.iter().any(|id| id.trim().is_empty())
@@ -94,6 +114,15 @@ impl StateResponseContract {
 #[derive(Clone, Debug)]
 pub struct StateResponseRecord {
     pub state_id: String,
+    /// Domain identity; must be admitted by the frozen contract.
+    pub domain_id: String,
+    /// Environment/mechanism family and independent cluster identities.
+    pub environment_family_id: String,
+    pub environment_cluster_id: String,
+    /// Digest of the exact state snapshot from which this record was derived.
+    pub source_state_sha256: String,
+    /// Frozen candidate checkpoint digest used to produce this state's abstraction.
+    pub candidate_checkpoint_sha256: String,
     /// Candidate-assigned abstraction label. It is not trusted as evaluator truth.
     pub abstract_state_id: String,
     /// Evaluator-owned invariant values/class identity.
@@ -104,8 +133,22 @@ pub struct StateResponseRecord {
 
 impl StateResponseRecord {
     pub fn validate_against(&self, contract: &StateResponseContract) -> Result<(), String> {
-        if self.state_id.trim().is_empty() || self.abstract_state_id.trim().is_empty() {
-            return Err("state and abstraction IDs must be non-empty".to_owned());
+        if self.state_id.trim().is_empty()
+            || self.abstract_state_id.trim().is_empty()
+            || self.domain_id.trim().is_empty()
+            || self.environment_family_id.trim().is_empty()
+            || self.environment_cluster_id.trim().is_empty()
+        {
+            return Err("state, abstraction, domain, family and cluster IDs must be non-empty".to_owned());
+        }
+        if !contract.domain_ids.contains(&self.domain_id) {
+            return Err(format!("state {} uses a domain outside the frozen contract", self.state_id));
+        }
+        if !is_sha256(&self.source_state_sha256) {
+            return Err(format!("state {} has an invalid source-state digest", self.state_id));
+        }
+        if !is_sha256(&self.candidate_checkpoint_sha256) {
+            return Err(format!("state {} has an invalid candidate-checkpoint digest", self.state_id));
         }
         let supplied_invariants: BTreeSet<_> = self.invariant_signature.keys().cloned().collect();
         if supplied_invariants != contract.invariant_ids {
@@ -177,6 +220,52 @@ pub fn approximate_response_equivalent(
         && assessment.normalized_worst_case_distortion <= epsilon)
 }
 
+
+fn validate_record_set(
+    records: &[StateResponseRecord],
+    contract: &StateResponseContract,
+) -> Result<(), String> {
+    contract.validate()?;
+    if records.is_empty() {
+        return Err("at least one state record is required".to_owned());
+    }
+
+    let mut state_ids = BTreeSet::new();
+    let mut frozen_checkpoint: Option<&str> = None;
+    let mut cluster_metadata: BTreeMap<&str, (&str, &str)> = BTreeMap::new();
+
+    for record in records {
+        record.validate_against(contract)?;
+        if !state_ids.insert(record.state_id.as_str()) {
+            return Err(format!("duplicate state ID: {}", record.state_id));
+        }
+        match frozen_checkpoint {
+            Some(checkpoint) if checkpoint != record.candidate_checkpoint_sha256 => {
+                return Err("one evaluation must use exactly one frozen candidate checkpoint".to_owned());
+            }
+            None => frozen_checkpoint = Some(&record.candidate_checkpoint_sha256),
+            _ => {}
+        }
+        let metadata = (
+            record.domain_id.as_str(),
+            record.environment_family_id.as_str(),
+        );
+        match cluster_metadata.get(record.environment_cluster_id.as_str()) {
+            Some(previous) if *previous != metadata => {
+                return Err(format!(
+                    "environment cluster {} is reused across domains or environment families",
+                    record.environment_cluster_id
+                ));
+            }
+            None => {
+                cluster_metadata.insert(record.environment_cluster_id.as_str(), metadata);
+            }
+            _ => {}
+        }
+    }
+    Ok(())
+}
+
 /// Score the candidate's state partition against evaluator-owned response
 /// equivalence. Every unordered state pair is one comparison; task rows or
 /// intervention cells are not counted as independent statistical units.
@@ -184,18 +273,7 @@ pub fn score_abstraction(
     records: &[StateResponseRecord],
     contract: &StateResponseContract,
 ) -> Result<AbstractionScore, String> {
-    contract.validate()?;
-    if records.is_empty() {
-        return Err("at least one state record is required".to_owned());
-    }
-
-    let mut state_ids = BTreeSet::new();
-    for record in records {
-        record.validate_against(contract)?;
-        if !state_ids.insert(record.state_id.clone()) {
-            return Err(format!("duplicate state ID: {}", record.state_id));
-        }
-    }
+    validate_record_set(records, contract)?;
 
     let mut score = AbstractionScore::default();
     for left_index in 0..records.len() {
@@ -254,18 +332,10 @@ pub fn select_counterexample_probe(
     records: &[StateResponseRecord],
     contract: &StateResponseContract,
 ) -> Result<Option<CounterexampleProbe>, String> {
-    contract.validate()?;
-    if records.is_empty() {
-        return Err("at least one state record is required".to_owned());
-    }
+    validate_record_set(records, contract)?;
 
-    let mut state_ids = BTreeSet::new();
     let mut groups: BTreeMap<String, Vec<&StateResponseRecord>> = BTreeMap::new();
     for record in records {
-        record.validate_against(contract)?;
-        if !state_ids.insert(record.state_id.clone()) {
-            return Err(format!("duplicate state ID: {}", record.state_id));
-        }
         groups
             .entry(record.abstract_state_id.clone())
             .or_default()
@@ -354,6 +424,9 @@ mod tests {
             .collect();
         let mut result = StateResponseContract {
             contract_id: "fixture-contract-v1".to_owned(),
+            contract_sha256: "a".repeat(64),
+            source_manifest_sha256: "b".repeat(64),
+            domain_ids: ["rigid-object-v1".to_owned()].into_iter().collect(),
             intervention_ids,
             query_ids,
             horizons,
@@ -389,6 +462,11 @@ mod tests {
             .collect();
         StateResponseRecord {
             state_id: state_id.to_owned(),
+            domain_id: "rigid-object-v1".to_owned(),
+            environment_family_id: "family-a".to_owned(),
+            environment_cluster_id: format!("cluster-{state_id}"),
+            source_state_sha256: "c".repeat(64),
+            candidate_checkpoint_sha256: "d".repeat(64),
             abstract_state_id: abstract_state_id.to_owned(),
             invariant_signature,
             responses,
@@ -502,6 +580,60 @@ mod tests {
     }
 
 
+
+
+    #[test]
+    fn domain_scope_and_source_digests_are_mandatory() {
+        let contract = contract();
+        let mut out_of_domain = record("state-a", "class-a", 0, 2);
+        out_of_domain.domain_id = "unknown-domain".to_owned();
+        assert!(out_of_domain.validate_against(&contract).is_err());
+
+        let mut invalid_source = record("state-b", "class-b", 0, 2);
+        invalid_source.source_state_sha256 = "not-a-digest".to_owned();
+        assert!(invalid_source.validate_against(&contract).is_err());
+
+        let mut invalid_contract = contract;
+        invalid_contract.source_manifest_sha256 = "bad".to_owned();
+        assert!(invalid_contract.validate().is_err());
+    }
+
+    #[test]
+    fn one_evaluation_cannot_mix_candidate_checkpoints() {
+        let contract = contract();
+        let left = record("state-a", "class-a", 0, 2);
+        let mut right = record("state-b", "class-b", 0, 2);
+        right.candidate_checkpoint_sha256 = "e".repeat(64);
+        assert!(score_abstraction(&[left, right], &contract).is_err());
+        let left = record("state-a", "class-a", 0, 2);
+        let mut right = record("state-b", "class-b", 0, 2);
+        right.candidate_checkpoint_sha256 = "e".repeat(64);
+        assert!(select_counterexample_probe(&[left, right], &contract).is_err());
+    }
+
+    #[test]
+    fn independent_cluster_cannot_alias_domains_or_environment_families() {
+        let contract = contract();
+        let left = record("state-a", "class-a", 0, 2);
+        let mut right = record("state-b", "class-b", 1, 2);
+        right.environment_cluster_id = left.environment_cluster_id.clone();
+        right.environment_family_id = "family-b".to_owned();
+        assert!(score_abstraction(&[left, right], &contract).is_err());
+    }
+
+    #[test]
+    fn valid_domain_checkpoint_and_cluster_provenance_are_retained() {
+        let contract = contract();
+        let mut left = record("state-a", "class-a", 0, 2);
+        let mut right = record("state-b", "class-b", 0, 2);
+        right.environment_cluster_id = left.environment_cluster_id.clone();
+        // States in one independent cluster may share a domain and family.
+        right.environment_family_id = left.environment_family_id.clone();
+        let score = score_abstraction(&[left.clone(), right.clone()], &contract)
+            .expect("same checkpoint and cluster identity");
+        assert_eq!(score.compared_pairs, 1);
+        left.domain_id = "rigid-object-v1".to_owned();
+    }
 
     #[test]
     fn counterexample_probe_returns_a_query_without_leaking_response_values() {
