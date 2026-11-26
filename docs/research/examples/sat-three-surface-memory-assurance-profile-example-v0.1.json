@@ -1,0 +1,145 @@
+{
+  "schema_version": "sat-three-surface-memory-assurance-profile/v0.1",
+  "profile_id": "SAT-THREE-SURFACE-EXAMPLE-2026-11-26",
+  "subject": {
+    "sut_name": "synthetic-example-only",
+    "sut_version": "not-a-real-system",
+    "memory_component": "illustrative-memory-stack",
+    "status": "synthetic_example"
+  },
+  "evaluation_profile": {
+    "infrastructure_profiles": [
+      "foundation_model",
+      "interaction_access_layer",
+      "execution_and_scheduling",
+      "underlying_infrastructure"
+    ],
+    "scenario_profile": "personalized_long_term_memory_agent",
+    "sut_boundary": "composite_agent_and_memory_store"
+  },
+  "surfaces": [
+    {
+      "surface_id": "write_path_poisoning",
+      "native_metric": "Memory Poisoning Defense (IETF terminology draft, section 4.6.4)",
+      "measurement_state": "declared_not_measured",
+      "adversary_boundary": "Attacker may converse with the agent or call its memory write interface but has no direct access to the backing store.",
+      "measured_dimensions": [
+        "five write shapes",
+        "three write channels when supported",
+        "surfaced outcome",
+        "acted-on outcome",
+        "write-time/read-time/pre-action interception point"
+      ],
+      "protocol_refs": [
+        "https://datatracker.ietf.org/doc/draft-hcf-bpm-agent-security-benchmark-terminology/"
+      ],
+      "implementation_refs": [],
+      "case_ids": [],
+      "notes": [
+        "No poisoning campaign has been executed for this example."
+      ]
+    },
+    {
+      "surface_id": "cross_context_isolation",
+      "native_metric": "Cross-User/Cross-Session Memory Isolation (IETF terminology draft, section 4.6.5)",
+      "measurement_state": "declared_not_measured",
+      "adversary_boundary": "Evaluator tests front-door cross-context reads and, where backing-store write access is declared, places a genuine context-A record into a context-B position.",
+      "measured_dimensions": [
+        "front-door isolation",
+        "backing-store placement isolation",
+        "intended sharing policy",
+        "user boundary",
+        "session boundary"
+      ],
+      "protocol_refs": [
+        "https://datatracker.ietf.org/doc/draft-hcf-bpm-agent-security-benchmark-terminology/"
+      ],
+      "implementation_refs": [],
+      "case_ids": [],
+      "notes": [
+        "The T6 at-rest case is not a substitute for the complete front-door and placement isolation campaign."
+      ]
+    },
+    {
+      "surface_id": "at_rest_integrity",
+      "native_metric": "Protection of Memory Data Integrity / draft-khandelwal-bpm-agent-memory-integrity-00",
+      "measurement_state": "contract_authored_not_executed",
+      "adversary_boundary": "Attacker may modify persisted store media while the SUT is stopped but has no code execution in the agent process or access to in-memory-only keys.",
+      "measured_dimensions": [
+        "T1-T10 storage mutations",
+        "C1 no-op reload",
+        "C2 genuine write after restart",
+        "C3 edit-landed confirmation",
+        "read-time versus audit-time detection"
+      ],
+      "protocol_refs": [
+        "https://datatracker.ietf.org/doc/draft-khandelwal-bpm-agent-memory-integrity/",
+        "https://datatracker.ietf.org/doc/draft-hcf-bpm-agent-security-benchmark-terminology/"
+      ],
+      "implementation_refs": [
+        "https://github.com/Luminous-Dynamics/symthaea/pull/13797",
+        "https://github.com/Luminous-Dynamics/symthaea/pull/13803"
+      ],
+      "case_ids": [
+        "T1",
+        "T2",
+        "T3",
+        "T4",
+        "T5",
+        "T6",
+        "T7",
+        "T8",
+        "T9",
+        "T10"
+      ],
+      "control_ids": [
+        "C1",
+        "C2",
+        "C3"
+      ],
+      "native_score": null,
+      "notes": [
+        "The adapter and synthetic emulator are source artifacts only; no real SUT result or executed Rust test is claimed."
+      ]
+    }
+  ],
+  "related_dimensions": [
+    {
+      "dimension_id": "data_deletion_completeness",
+      "measurement_state": "not_measured",
+      "relationship": "T10 only tests stale-backup erasure resurrection; complete deletion also covers caches, replicas and archived backups."
+    },
+    {
+      "dimension_id": "memory_lifecycle_poisoning_and_repair",
+      "measurement_state": "referenced_not_run",
+      "relationship": "Reuse the MACE lifecycle research and external poisoning benchmarks; do not duplicate their native tasks or imply a benchmark run."
+    },
+    {
+      "dimension_id": "clean_memory_utility",
+      "measurement_state": "not_measured",
+      "relationship": "Use native capability benchmarks and matched benign controls; do not add utility to a security aggregate."
+    },
+    {
+      "dimension_id": "external_effect_consequence",
+      "measurement_state": "not_measured",
+      "relationship": "An agent action or attempted tool call is not proof of a sink-side external effect; use independently reconciled effect evidence."
+    }
+  ],
+  "aggregation_policy": {
+    "emit_global_security_score": false,
+    "preserve_native_scores": true,
+    "report_surfaces_separately": true,
+    "double_counting_rule": "A single event may be referenced by more than one metric only when each metric's full setup, boundary, adversary, controls and decision rule are separately satisfied; each metric retains its own denominator.",
+    "comparability_requires": [
+      "same infrastructure and scenario profiles",
+      "same SUT boundary and declared sharing policy",
+      "same SUT, memory backend, version and configuration",
+      "same native protocol and evaluator revision"
+    ]
+  },
+  "notes": [
+    "This is a synthetic profile example, not a result.",
+    "Internet-Drafts are work in progress and are not adopted standards.",
+    "No surface may be inferred passed from another surface."
+  ]
+}
