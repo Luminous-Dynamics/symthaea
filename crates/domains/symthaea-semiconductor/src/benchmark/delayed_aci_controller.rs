@@ -1059,11 +1059,8 @@ mod tests {
         let next_lane = (engine.next_prediction_step % engine.policy.feedback_delay_steps) as usize;
         let next_alpha = engine.state.alpha_lanes[next_lane];
         assert!(
-            issue_delayed_aci_prediction_v1(
-                &mut engine,
-                &prediction("s3", "e3", next_alpha),
-            )
-            .is_err()
+            issue_delayed_aci_prediction_v1(&mut engine, &prediction("s3", "e3", next_alpha),)
+                .is_err()
         );
 
         let second = delivery(
