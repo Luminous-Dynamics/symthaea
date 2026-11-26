@@ -176,7 +176,7 @@ No aggregate score can compensate for false causal transfer, false-sufficiency, 
 
 - Symtropy #7556: independent Jacobi-SVD rank audit and MATH-SYNC v1.1 reproduction delta. Exact-head Rust 1.96 workflow passed for the currently recorded PR head; this is bounded rank-diagnostic qualification, not full MATH-SYNC reproduction.
 - Symtropy #7558: one-step decision-sufficient minimax probe selector. Exact-head Rust 1.96 formatting, tests and strict Clippy passed on its recorded head; this is a candidate policy reference, not empirical acquisition superiority.
-- Symtropy #7557: evaluator-only decision-sufficiency and probe-claim scorer. The first workflow exposed a dependency path error before compilation; the path has been corrected and a new exact-head run is pending.
+- Symtropy #7577: evaluator-only decision-sufficiency and probe-claim scorer. Exact-head workflow #45856103031 passed Rust 1.96 formatting, all 7 evaluator tests, and strict Clippy at head `91fe21319657bf833fc071003ca8de249cd10ab7`. This is a finite reference evaluator, not process isolation or blind episode integration.
 - Symtropy #7555: active disambiguation research contract.
 - Symtropy #7516: AV-SyncBench adapter/reproduction owner.
 - Symtropy #7518 / #7529: MATH-SYNC reproduction and active calibration ownership.
@@ -241,3 +241,104 @@ Report separately:
 - terminal decision regret and false-sufficiency / false-unique rates.
 
 Do not compare VAP frame-efficiency, SEW retrieval accuracy, TRACE QA accuracy, SPOT Timeliness-F1, DIVE response-window rate, AV-SyncBench pairwise accuracy or MATH-SYNC clock RMSE as though they were measurements of the same variable. They are different tasks and different estimands.
+
+
+## 8. Fresh streaming frontier audit: online interaction and spatial persistence
+
+A further November 2026 review adds two important external comparators that sharpen the next engineering priorities. Their task contracts differ; the numbers below must remain on their native scorecards.
+
+### 8.1 OmniInteract: online response policy is a first-class capability
+
+**OmniInteract** (EMNLP 2026, https://aclanthology.org/2026.emnlp-main.490/) evaluates native online inference over unbroken audio-visual streams, without future content. It contains 250 videos and 1,430 temporally grounded response slots: 1,062 1Q1A slots spanning real-time, proactive and nested interaction, plus 368 1QnA slots for continuous monitoring and step guidance. Each slot specifies a trigger, response window and target answer.
+
+The paper evaluates correctness, response timing, invalid outputs, interruption handling and context continuity. Its reported best overall Interaction-Aware Quality-Timeliness F1 (IA-QTF1) is 0.368; best 1QnA IA-QTF1 is only 0.052. This is a strong indication that continuous multi-step engagement is a harder capability than single responses. These are paper-reported benchmark results, not an ErgoStream result.
+
+**Required ErgoStream treatment**
+- Run both 1Q1A and 1QnA tracks; do not let good single-turn performance hide weak continuous task completion.
+- Preserve invalid outputs, interruptions, premature answers, late answers, missed triggers and context discontinuities in denominators.
+- Score response quality, timing, interruption behavior and chain completion separately before reporting the native IA-QTF1.
+- Keep the candidate online and causal: no future frames, answer slots, hidden trigger labels or target responses.
+- Compose intervention decisions through Symthaea #5169 and the existing AV-STREAM #12837 path; do not implement a parallel turn controller.
+
+### 8.2 OVO-S-Bench: persistent spatial understanding is not solved by retrieval
+
+**OVO-S-Bench** (EMNLP 2026 Oral, official implementation: https://github.com/InternLM/OVO-S-Bench) provides a hierarchical streaming spatial-intelligence benchmark. Its released version contains 1,680 questions over 348 source videos from nine datasets, organized into 30 task types and four cumulative levels. The mean observed prefix at query time is 8.8 minutes; median evidence spans are 2.0 seconds (L1), 36.8 seconds (L2), 2.0 seconds (L3), and 278.7 seconds (L4).
+
+The four levels separate:
+- **L1 — instantaneous egocentric perception:** current-view distances, scale, clearance and local spatial relations.
+- **L2 — spatiotemporal context:** recall of spatial evidence that appeared earlier but is no longer visible.
+- **L3 — spatial simulation and reasoning:** reorientation, removal consequences, feasibility and route planning.
+- **L4 — allocentric mapping:** global direction, topology and trajectory-map alignment across viewpoints.
+
+The published comparison reports 38 evaluated systems. Gemini-3.1-Pro reaches 59.2 overall, Qwen3-VL-235B-A22B 53.6, human streaming 86.6 and human offline 92.2. L4 is the weakest level for 28 of 34 systems in the reported analysis. The strongest open model trails streaming human performance by roughly 33 points. These scores use OVO-S-Bench's own streaming protocol and are not directly comparable to OmniInteract, SPOT-Bench or DIVE.
+
+**The critical negative results matter as much as the leaderboard:**
+- Across HERMES, StreamingTOM and FluxMem, evidence recall has near-zero per-query correlation with correctness (reported Pearson r from -0.07 to 0.00).
+- An oracle evidence sampler and doubling the frame budget each improve accuracy by no more than 0.3 points over the reported uniform 128-frame baseline.
+- 13 of 15 evaluated specialized streaming/spatial variants trail their comparable general backbone on overall accuracy; L4 is especially vulnerable to regressions.
+
+This directly falsifies a simplistic "more memory + more frames = better understanding" strategy. Memory retrieval and frame selection remain useful components, but they are not substitutes for spatial state estimation, map construction, geometric reasoning, temporal consistency and grounded evidence use.
+
+The official protocol truncates each video at the annotated query timestamp. Most systems receive 128 uniformly sampled frames from that prefix; systems with native sequential ingestion are evaluated at their published streaming rate. Any reproduction must pin which protocol path each arm uses, document the frame/compute budget, and avoid treating a sampled-prefix model as a native continuous-stream model.
+
+### 8.3 Revised architecture hypothesis: evidence-indexed spatial state
+
+The next architecture experiment should connect existing owners rather than introduce another memory or controller subsystem:
+
+```
+causally arriving modality-native observations
+  -> source/time-qualified event and entity hypotheses
+  -> uncertain local egocentric state
+  -> persistent allocentric/topological spatial state
+  -> evidence-indexed event memory (references, not replacement truth)
+  -> decision-sufficient probe / acquisition proposal
+  -> existing sequential acquisition and turn-control owners
+  -> answer, intervene, wait, revise, or abstain
+```
+
+Test the following hypotheses independently:
+1. Persistent allocentric/topological state improves L4 mapping and cross-viewpoint consistency beyond flat frame retrieval.
+2. Evidence-indexed memory improves long-horizon query support only when each recalled claim resolves to the original source interval and survives contradictory/revision evidence.
+3. Active acquisition improves decision quality only when it reduces evaluator-confirmed decision regret or response misses at a matched resource budget; evidence-recall or entropy gains alone are insufficient.
+4. HDC retrieval, CfC/LTC continuous state, explicit metric/topological maps and dense visual features each earn their place through matched ablations. No substrate receives an assumed advantage.
+5. An interaction controller that models both response windows and no-response dead time improves timeliness without increasing unsolicited or incorrect interventions.
+
+Implementation ownership stays with:
+- Symthaea #3934 / #8152 for visual/world-state and representation comparisons;
+- Symthaea #10644 / #9075 / #9177 for temporal retrieval, valid-time/known-at semantics and evidence context;
+- Symthaea #5169 for floor, stop, yield and interruption semantics;
+- Symthaea #12837 for continuous audiovisual benchmark integration;
+- Symtropy #6675 for sequential acquire/wait/repeat/stop/answer/abstain policy tournaments and exact finite-horizon oracles;
+- Symtropy #7555 / #7558 / #7577 for decision-sufficient hypotheses, candidate selection and evaluator qualification.
+
+### 8.4 New benchmark lanes and prospective targets
+
+The following targets are proposed research gates, not achieved results or claims about current Symthaea capability. They are meaningful only after the exact native benchmark protocol, model revisions, input budgets, scoring code and data permissions are pinned.
+
+| Benchmark lane | Current external reference | Prospective target | Qualification condition |
+|---|---:|---:|---|
+| OVO-S overall spatial streaming | Gemini-3.1-Pro 59.2; Qwen3-VL-235B-A22B 53.6 | ≥62.0 overall | Same prefix-only information and documented frame/streaming budget; no hidden future frames |
+| OVO-S allocentric L4 | Gemini-3.1-Pro 54.9 | ≥55.0 L4 | No material L1/L2 regression; include map/trajectory counterfactuals and evidence-span correctness |
+| OmniInteract overall IA-QTF1 | 0.368 | ≥0.45 | Official 1Q1A/1QnA denominators, invalid-output and interruption accounting |
+| OmniInteract continuous 1QnA IA-QTF1 | 0.052 | ≥0.12 | Full chain completion, context continuity and response-window scoring |
+| SPOT-Bench T-F1@5 at 1 Hz | Ctrl-SPOT 20.9 | ≥25.0 | Full-stream predictions, dead-time, false response and missed event accounting |
+| DIVE response-window rate | Best reported average ≤53.77% | ≥70% | Keep response quality, participation and timing distinct; report false intervention and no-trigger controls |
+| Resource frontier | Benchmark-specific; not pooled | ≥20% lower measured acquisition/processing cost at a preregistered non-inferiority margin | Matched model quality, hardware, context, frame/audio budget and end-to-end accounting |
+
+A target crossing one leaderboard score is not enough. Require paired source/video-level uncertainty, repeated seeds where applicable, no leakage, a frozen evaluation plan, and no increase in unsupported claims, false event persistence, false interventions, false-sufficiency or unsafe abstention behavior. Where the benchmark cannot be run under the same model/input protocol, report it as a non-comparable external reference rather than a ranking.
+
+### 8.5 Immediate execution order
+
+1. Keep the small synthetic evaluator and exact-head policy tests as the fast local gate; no remote CI dependency is required to continue design work.
+2. Build an OVO-S adapter/receipt contract first (model revision, prefix cutoff, 128-frame or native-streaming path, query ID, answer, score, failure, latency, resource record). Run a small smoke subset only after checking dataset access and source-video terms.
+3. Add an allocentric L4 diagnostic breakdown and explicit evidence-span provenance checks; do not modify the upstream scoring function.
+4. Add OmniInteract response-window, interruption and 1QnA chain receipts to the AV-STREAM evaluation contract; use its official metrics unchanged.
+5. Extend the existing #6675 tournament with candidate policy traces from #7558 and evaluator qualification from #7577 only at the adapter boundary. Do not copy its scheduler, oracle or turn controller into another package.
+6. Before choosing a Symthaea model architecture, run the matched baseline ladder: best-practical modular pipeline, pinned end-to-end multimodal model, native continuous path, hybrid path, and active hybrid. Include memory-disabled, HDC-disabled, no-map, no-active-sensing and no-response-controller ablations.
+
+### Sources
+
+- OmniInteract (EMNLP 2026): https://aclanthology.org/2026.emnlp-main.490/
+- OVO-S-Bench official implementation, benchmark protocol and leaderboard: https://github.com/InternLM/OVO-S-Bench
+- SPOT-Bench official project and leaderboard: https://dibschat.github.io/SPOT-Bench/
+- DIVE: https://arxiv.org/abs/2610.28405
