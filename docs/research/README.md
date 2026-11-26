@@ -29,6 +29,14 @@ Symthaea is not just software - it's a research platform exploring fundamental q
 - [Robust and Pareto-Aware Scientific Decision Design v1](SDCB_ROBUST_AND_PARETO_DECISION_DESIGN_V1.md) — ambiguity-set robust EVSI, Pareto policies and hard constraints.
 - [Evidence-Gated Belief Transitions v1](SDCB_EVIDENCE_GATED_BELIEF_TRANSITION_V1.md) — verified observations as atomic model-state transitions.
 
+## Scientific Decision and Active Research
+
+- [Active Scientific Intelligence v2](SDCB_ACTIVE_SCIENCE_BENCHMARK_V2.md) — identifiability, observability, intervention selection, bounded-noise receipts and open-world abstention.
+- [Selector Tournament v1](SDCB_SELECTOR_TOURNAMENT_V1.md) — matched comparisons of existing Symthaea selectors and exact evaluator oracles without changing baseline semantics.
+- [Decision-Sufficient Scientific Intelligence v1](SDCB_DECISION_SUFFICIENT_SCIENTIFIC_INTELLIGENCE_V1.md) — EIG versus EVSI and finite-horizon decision value.
+- [Robust and Pareto-Aware Scientific Decision Design v1](SDCB_ROBUST_AND_PARETO_DECISION_DESIGN_V1.md) — ambiguity-set robust EVSI, Pareto policies and hard constraints.
+- [Evidence-Gated Belief Transitions v1](SDCB_EVIDENCE_GATED_BELIEF_TRANSITION_V1.md) — verified observations as atomic model-state transitions.
+
 ## Theoretical Foundations
 
 ### Integrated Information Theory (IIT)
