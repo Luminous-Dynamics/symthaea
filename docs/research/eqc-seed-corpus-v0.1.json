@@ -42,7 +42,8 @@
       "request": {
         "action": "patient.read",
         "resource_id": "patient-record-001",
-        "subject_id": "synthetic-patient-001"
+        "subject_id": "synthetic-patient-001",
+        "evaluated_at": "2026-11-26T01:00:00Z"
       },
       "negative_controls": [],
       "expected": {
@@ -109,7 +110,8 @@
       "request": {
         "action": "patient.read",
         "resource_id": "patient-record-002",
-        "subject_id": "synthetic-patient-002"
+        "subject_id": "synthetic-patient-002",
+        "evaluated_at": "2026-11-26T01:00:00Z"
       },
       "negative_controls": [
         "wrong_subject"
@@ -178,7 +180,8 @@
       "request": {
         "action": "patient.read",
         "resource_id": "patient-record-001",
-        "subject_id": "synthetic-patient-001"
+        "subject_id": "synthetic-patient-001",
+        "evaluated_at": "2026-11-26T01:00:00Z"
       },
       "negative_controls": [
         "revoked_authority"
@@ -249,7 +252,8 @@
         "resource_id": "challenge-001",
         "subject_id": "synthetic-subject-001",
         "challenge_id": "synthetic-challenge-001",
-        "challenge_state": "consumed"
+        "challenge_state": "consumed",
+        "evaluated_at": "2026-11-26T01:00:00Z"
       },
       "negative_controls": [
         "replayed_challenge",
