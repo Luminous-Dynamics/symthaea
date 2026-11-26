@@ -1,66 +1,86 @@
-# RFC 9942 receipt binding: security qualification note v1
+# RFC 9942 receipt binding: security qualification note v1.1
 
-**Status:** research qualification note; not a cryptographic verifier or RFC erratum.
+**Status:** research qualification note; not a cryptographic verifier, RFC erratum or statement that all RFC 9942 VDS profiles share the same position issue.
 
-## Why this gate exists
+## 1. Profile distinction
 
-RFC 9942 is a published IETF Standards Track RFC. For the RFC 9162 SHA-256 inclusion proof profile, the protected COSE header carries the signature algorithm and VDS identifier, while the inclusion proof is carried in the unprotected header. The proof structure includes `tree-size`, `leaf-index` and the inclusion path. The signed payload is the Merkle Tree Hash/root.
+RFC 9942 is a published IETF Standards Track RFC defining COSE receipts for multiple verifiable data structures. The relevant profile in the original MON-009 note is `RFC9162_SHA256`, whose inclusion proof carries `tree-size`, `leaf-index` and the inclusion path in the unprotected header while the COSE signature authenticates the signed Merkle root.
 
-That distinction matters. A valid COSE signature authenticates the signed root; it does not, by itself, authenticate every position-related value carried only in the unprotected proof structure.
+Do not generalize that structure to every RFC 9942 VDS profile.
 
-A November 17, 2026 SCITT Decision Provenance Internet-Draft -03 records a concrete interoperability/security concern: the same inclusion path can be accepted with multiple tree-size/leaf-index pairs. It states that a receipt read alone establishes inclusion under the signed root, but does not establish the exact log size or position. The draft recommends binding size to authenticated signed data (for example, a signed tree head) and requiring evidence that binds or uniquely determines the occurrence's index. This is an Internet-Draft observation, not a published RFC correction; implementations must check the live RFC errata and current IETF discussion before claiming conformance.
+## 2. Reported RFC9162_SHA256 position/size issue
 
-## MON-009 qualification rule
+Errata 9316 and 9317 against RFC 9942 were reported on 18 November 2026. The 25 November 2026 Internet-Draft `draft-jones-scitt-pain-point-resolutions-00` says that the errata status had not been re-verified at the time it was written. It describes an IETF 127 hackathon observation: one receipt was accepted for the issued tree-size/leaf-index pair and 31 other pairs among 8,255 edited pairs. The same draft notes that with tree size held fixed, no other leaf-index verified. The described issue is therefore about position and size binding, not a claim that arbitrary membership proofs are forgeable.
 
-MON-009 MUST distinguish these claims:
+This is a reported standards issue and an Internet-Draft analysis, not a published RFC correction or a verified current errata disposition. Re-check the live RFC Editor errata record and IETF discussion before making a conformance claim.
 
-1. **Root authenticity:** the COSE signature validates under a trusted log key and authenticates the root payload.
-2. **Membership under a root:** the inclusion proof verifies against that authenticated root under the profile's hash-tree rules.
-3. **Authenticated tree size:** a separately authenticated checkpoint/tree head binds the same log identity, root and tree size. An unprotected `tree-size` value is not sufficient.
-4. **Authenticated leaf position:** the verifier proves the claimed index under the authenticated tree size. It must establish that the proof uniquely determines that index under authenticated inputs, or consume an explicitly signed/profile-defined index binding.
-5. **Append-only history / non-equivocation:** the verifier checks consistency against a previously persisted trusted checkpoint and, where required, independent witnesses. A single valid inclusion receipt does not establish these properties on its own.
+## 3. MON-009 qualification rule for RFC9162_SHA256
 
-The verifier output must expose the strongest achieved level. It MUST NOT promote root authenticity or membership-only evidence into an exact-position, append-only, timestamp, or global non-equivocation claim.
+MON-009 MUST distinguish:
 
-## Fail-closed outcomes
+1. **Root authenticity:** the COSE signature validates under a trusted log key and authenticates the signed root payload.
+2. **Membership under a root:** the inclusion proof verifies against that root using the RFC9162_SHA256 rules.
+3. **Authenticated size:** the claimed size is bound to an authenticated checkpoint/tree head for the same log identity. Do not treat an unprotected `tree-size` value as a signed fact.
+4. **Exact position:** the claimed index is established under the authenticated size according to the applicable proof semantics; do not claim an index merely because a receipt signature validates.
+5. **Append-only history / non-equivocation:** consistency is verified from persisted trusted state; independent witnesses are used when the deployment requires protection against split views.
 
-- Missing or invalid receipt signature: `invalid_signature`.
-- Valid signature but no independently authenticated size checkpoint: `membership_only_position_unverified`.
-- Checkpoint root or log identity mismatch: `checkpoint_mismatch`.
-- Unprotected size differs from the authenticated checkpoint: `unprotected_metadata_mismatch`.
-- Index is not uniquely established under the authenticated size: `position_unverified`.
-- Consistency proof or witness comparison fails: `log_history_contradiction`.
-- Required trust root, checkpoint, proof or witness is unavailable: `indeterminate`, never success.
+The output MUST expose the strongest verified level. It MUST NOT promote root authenticity or membership-only evidence into exact position, append-only history, timestamp, completeness or global non-equivocation claims.
 
-A profile may choose a stricter policy and reject a membership-only receipt entirely where exact position is required. It must not silently infer the missing guarantees.
+## 4. Separate MMR profile
 
-## Required adversarial vectors
+The SCITT working group adopted `draft-ietf-scitt-receipts-mmr-profile-00` as a WG document on 21 November 2026. It is an active Internet-Draft, not a published RFC, and defines a distinct MMR VDS profile.
 
-The adapter conformance suite MUST include:
+For that MMR profile:
+- the protected `vds` identifies the hash function and node value size and must match the trusted VDS;
+- an empty inclusion path can represent a peak and does not itself bind an exact leaf index; applications needing position binding must use an unambiguous domain-separated leaf construction and bind the position as required;
+- a consistency receipt MUST carry protected `tree-size-2`; a missing field is rejected and its value must equal the last consistency proof's target size;
+- the verifier must check the first proof's `tree-size-1` against its persisted trusted size and validate all proof shapes, path counts, right-peaks, accumulator reconstruction and the signature over the reconstructed detached payload.
 
-- mutate `tree-size` while preserving signed root and inclusion path;
-- mutate `leaf-index` while preserving signed root and inclusion path;
-- replay a receipt against a checkpoint with a different size or log identity;
-- same root with a mismatched checkpoint signature/key;
-- ambiguous index under an authenticated tree size;
-- valid membership with no position claim;
-- valid inclusion but failed consistency proof from the persisted checkpoint;
-- split-view checkpoints presented to independent witnesses;
-- checkpoint rollback, stale root and key-rotation/revocation cases.
+The MMR protected consistency `tree-size-2` is a profile-specific consistency-target binding. It is not a generic tree-size field to be assumed on every inclusion receipt, and the MMR proof structure must not be conflated with RFC9162_SHA256.
 
-Vectors must be generated from official RFC 9942 / RFC 9162 examples and independently reviewed implementations. Synthetic vectors are supplemental, not substitutes. Use maintained COSE and transparency-log libraries; do not invent a new receipt encoding or private header labels and call it interoperable.
+The detailed MMR qualification requirements and mutation cases are in MON-009's `TRANSPARENCY-PROFILE-QUALIFICATION-v1.md`.
 
-## Relationship to MON-009
+## 5. Fail-closed outcomes
 
-The destination receipt and MON-009 sink ledger establish destination-side mutation evidence. A SCITT/COSE receipt establishes transparency-service claims about signed statements. They are different evidence layers. The verifier must bind the exact sink/observation statement bytes to the registered statement, validate the receipt, and then qualify root, size, position, consistency and witness status separately.
+- Missing/invalid COSE signature: `invalid_signature`.
+- Valid signature but required checkpoint or authenticated size missing: `membership_only_position_unverified` or `indeterminate`, according to policy.
+- VDS/log identity mismatch: `checkpoint_mismatch`.
+- RFC9162 unprotected size/index does not match independently authenticated profile state: `unprotected_metadata_mismatch` or `position_unverified`.
+- MMR protected/unprotected consistency target mismatch or missing protected target: reject the consistency receipt.
+- Proof shape, consistency path, right-peaks, accumulator or witness comparison fails: `log_history_contradiction`.
+- Required trust root, checkpoint, proof or witness unavailable: `indeterminate`, never success.
 
-This does not turn a transparency receipt into proof that the physical or external world reached the intended state. MON-009 still requires independently authorized readback from the destination/effect boundary.
+## 6. Required adversarial vectors
+
+### RFC9162_SHA256
+
+- mutate tree size while preserving signed root and inclusion path;
+- mutate leaf index with fixed and changed tree size;
+- replay against a checkpoint with a different log identity or tree size;
+- signed-root mismatch, stale key, key rotation and revocation;
+- valid membership with failed consistency from persisted checkpoint;
+- split-view checkpoints presented to independent witnesses.
+
+### MMR profile -00
+
+- empty path presented as an exact-position proof;
+- leaf value / interior-node preimage confusion without domain separation;
+- missing protected consistency `tree-size-2`;
+- protected/unprotected `tree-size-2` mismatch;
+- wrong/unsupported VDS identifier or node value size;
+- first `tree-size-1` not equal to trusted size;
+- incorrect path count, path length or right-peak count;
+- valid signature over a detached accumulator not recomputed from the proof;
+- rollback, fork and trust-anchor reset cases.
+
+Official vectors and independently authored implementations are mandatory for interoperability claims. Synthetic mutations are supplemental.
 
 ## References
 
-- RFC 9942, *CBOR Object Signing and Encryption (COSE) Receipts*, especially Sections 5.2 and 5.2.1: https://www.rfc-editor.org/rfc/rfc9942
+- RFC 9942, *CBOR Object Signing and Encryption (COSE) Receipts*: https://www.rfc-editor.org/rfc/rfc9942
 - RFC 9162, *Certificate Transparency Version 2.0*: https://www.rfc-editor.org/rfc/rfc9162
-- draft-lemonnier-scitt-decision-provenance-03, published November 17, 2026, especially its receipt-size discussion: https://datatracker.ietf.org/doc/html/draft-lemonnier-scitt-decision-provenance-03
-- RFC 9943, *An Architecture for Trustworthy and Transparent Digital Supply Chains*: https://www.rfc-editor.org/rfc/rfc9943
+- Reported Errata 9316 and 9317 against RFC 9942 (reported 18 Nov 2026; status not re-verified in the cited draft): https://www.rfc-editor.org/errata_search.php?rfc=9942
+- Jones, *Resolution of SCITT and W3C Verification Ambiguities via Detached Evidence Profiles*, draft-jones-scitt-pain-point-resolutions-00 (25 Nov 2026): https://datatracker.ietf.org/doc/draft-jones-scitt-pain-point-resolutions/00/
+- SCITT WG, *COSE Receipts for MMRs*, draft-ietf-scitt-receipts-mmr-profile-00 (21 Nov 2026): https://datatracker.ietf.org/doc/draft-ietf-scitt-receipts-mmr-profile/00/
 
-**Limit:** this note specifies qualification requirements. No COSE receipt parser, cryptographic verifier, tree implementation, witness service or official-vector conformance result is claimed here.
+**Limit:** these documents specify qualification requirements. No COSE receipt parser, cryptographic verifier, RFC9162 tree implementation, MMR implementation, witness service or official-vector conformance result is claimed here.
