@@ -34,8 +34,22 @@ fn manifest() -> RegimeRouterTrainingManifestV1 {
         clock_mapping_sha256: digest('d'),
         manifest_sha256: String::new(),
     };
-    value.manifest_sha256 = seal_regime_router_training_manifest_v1(&value).unwrap();
+    value.manifest_sha256 = independent_manifest_digest(&value);
+    assert_eq!(
+        value.manifest_sha256,
+        seal_regime_router_training_manifest_v1(&value).unwrap()
+    );
     value
+}
+
+fn independent_manifest_digest(
+    manifest: &RegimeRouterTrainingManifestV1,
+) -> String {
+    let mut canonical = manifest.clone();
+    canonical.manifest_sha256.clear();
+    canonical.allowed_feature_ids.sort();
+    canonical.forbidden_target_feature_ids.sort();
+    json_digest(&canonical)
 }
 
 fn feature(
