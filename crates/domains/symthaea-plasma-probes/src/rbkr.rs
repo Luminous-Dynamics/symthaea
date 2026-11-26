@@ -54,6 +54,252 @@ pub enum RbkrError {
     InvalidCOperator,
 }
 
+/// Errors from finite-horizon linearized Gramian construction.
+#[derive(Clone, Debug, Error, PartialEq, Eq)]
+pub enum FiniteHorizonGramianError {
+    #[error("finite-horizon trajectory axes are inconsistent")]
+    InvalidTrajectoryAxes,
+    #[error("finite-horizon state, input, or output matrix has an invalid shape or non-finite value")]
+    InvalidTrajectoryMatrix,
+    #[error("input cost must be finite and strictly positive")]
+    InvalidInputCost,
+    #[error("QoI weight must be finite and non-negative")]
+    InvalidQoiWeight,
+    #[error("finite-horizon factor storage budget exceeded")]
+    FactorStorageBudgetExceeded,
+    #[error("finite-horizon propagation work budget exceeded")]
+    PropagationWorkBudgetExceeded,
+    #[error("finite-horizon Gramian construction produced invalid factors")]
+    InvalidGramianFactor,
+}
+
+/// Resource limits for exact finite-horizon LTV Gramian factor construction.
+#[derive(Clone, Copy, Debug, PartialEq, Eq)]
+pub struct FiniteHorizonGramianConfig {
+    pub maximum_factor_scalars: usize,
+    pub maximum_propagation_scalar_operations: usize,
+}
+
+impl FiniteHorizonGramianConfig {
+    pub fn new(maximum_factor_scalars: usize, maximum_propagation_scalar_operations: usize) -> Self {
+        Self {
+            maximum_factor_scalars,
+            maximum_propagation_scalar_operations,
+        }
+    }
+}
+
+impl Default for FiniteHorizonGramianConfig {
+    fn default() -> Self {
+        Self::new(8_000_000, 100_000_000)
+    }
+}
+
+/// Construct finite-horizon, checkpoint-centred Gramians for a frozen
+/// time-varying discrete linearization.
+///
+/// The past system obeys x[k+1] = A_past[k] x[k] + B_past[k] u[k].
+/// Each diagonal input-cost entry R[k,j] is positive. The reachability
+/// factors are Phi(checkpoint,k+1) B_past[k][:,j] / sqrt(R[k,j]).
+///
+/// The future system starts at the checkpoint. A_future[k] maps sample k to
+/// k+1; C_future[k] observes sample k, including the checkpoint and terminal
+/// sample. Each non-negative QoI weight Q[k,j] scales one output sensitivity.
+/// The observability factors are Phi(k,checkpoint)^T C_future[k][j,:]^T
+/// multiplied by sqrt(Q[k,j]).
+///
+/// Both Gramians therefore use the same checkpoint-state coordinates:
+/// reachability is propagated from past interventions to the checkpoint,
+/// while future QoI sensitivities are pulled back to the checkpoint. Input
+/// and output channel counts may vary by time sample.
+///
+/// Operators must come from one frozen discrete solver revision, or be
+/// explicitly labelled finite-difference estimates. This routine does not
+/// derive physical derivatives, execute Vlasov dynamics, or certify nonlinear
+/// response preservation.
+pub fn build_finite_horizon_gramians(
+    past_a: &[Vec<Vec<f64>>],
+    past_b: &[Vec<Vec<f64>>],
+    input_costs: &[Vec<f64>],
+    future_a: &[Vec<Vec<f64>>],
+    future_c: &[Vec<Vec<f64>>],
+    qoi_weights: &[Vec<f64>],
+    config: FiniteHorizonGramianConfig,
+) -> Result<(EmpiricalGramian, EmpiricalGramian), FiniteHorizonGramianError> {
+    let dimension = past_a
+        .first()
+        .or_else(|| future_a.first())
+        .map(Vec::len)
+        .ok_or(FiniteHorizonGramianError::InvalidTrajectoryAxes)?;
+    if dimension == 0
+        || past_a.is_empty()
+        || past_a.len() != past_b.len()
+        || past_a.len() != input_costs.len()
+        || future_c.len() != future_a.len().saturating_add(1)
+        || future_c.len() != qoi_weights.len()
+        || config.maximum_factor_scalars == 0
+        || config.maximum_propagation_scalar_operations == 0
+    {
+        return Err(FiniteHorizonGramianError::InvalidTrajectoryAxes);
+    }
+
+    validate_square_sequence(past_a, dimension)?;
+    validate_square_sequence(future_a, dimension)?;
+
+    let mut factor_count = 0_usize;
+    let mut propagation_count = 0_usize;
+    for (step, (matrix, costs)) in past_b.iter().zip(input_costs).enumerate() {
+        let input_count = matrix.first().map(Vec::len).unwrap_or(0);
+        if matrix.len() != dimension
+            || input_count == 0
+            || matrix.iter().any(|row| {
+                row.len() != input_count || row.iter().any(|value| !value.is_finite())
+            })
+            || costs.len() != input_count
+        {
+            return Err(FiniteHorizonGramianError::InvalidTrajectoryMatrix);
+        }
+        for cost in costs {
+            if !cost.is_finite() || *cost <= 0.0 || !(1.0 / cost).is_finite() {
+                return Err(FiniteHorizonGramianError::InvalidInputCost);
+            }
+        }
+        factor_count = factor_count
+            .checked_add(input_count)
+            .ok_or(FiniteHorizonGramianError::FactorStorageBudgetExceeded)?;
+        propagation_count = propagation_count
+            .checked_add(
+                input_count
+                    .checked_mul(past_a.len() - step - 1)
+                    .ok_or(FiniteHorizonGramianError::PropagationWorkBudgetExceeded)?,
+            )
+            .ok_or(FiniteHorizonGramianError::PropagationWorkBudgetExceeded)?;
+    }
+
+    for (sample, (matrix, weights)) in future_c.iter().zip(qoi_weights).enumerate() {
+        if matrix.iter().any(|row| {
+            row.len() != dimension || row.iter().any(|value| !value.is_finite())
+        }) || weights.len() != matrix.len()
+        {
+            return Err(FiniteHorizonGramianError::InvalidTrajectoryMatrix);
+        }
+        for weight in weights {
+            if !weight.is_finite() || *weight < 0.0 {
+                return Err(FiniteHorizonGramianError::InvalidQoiWeight);
+            }
+        }
+        let active_outputs = weights.iter().filter(|weight| **weight > 0.0).count();
+        factor_count = factor_count
+            .checked_add(active_outputs)
+            .ok_or(FiniteHorizonGramianError::FactorStorageBudgetExceeded)?;
+        propagation_count = propagation_count
+            .checked_add(
+                active_outputs
+                    .checked_mul(sample)
+                    .ok_or(FiniteHorizonGramianError::PropagationWorkBudgetExceeded)?,
+            )
+            .ok_or(FiniteHorizonGramianError::PropagationWorkBudgetExceeded)?;
+    }
+
+    let factor_scalars = factor_count
+        .checked_mul(dimension)
+        .ok_or(FiniteHorizonGramianError::FactorStorageBudgetExceeded)?;
+    if factor_scalars > config.maximum_factor_scalars {
+        return Err(FiniteHorizonGramianError::FactorStorageBudgetExceeded);
+    }
+    let scalar_work = propagation_count
+        .checked_mul(dimension)
+        .and_then(|value| value.checked_mul(dimension))
+        .and_then(|value| value.checked_mul(2))
+        .ok_or(FiniteHorizonGramianError::PropagationWorkBudgetExceeded)?;
+    if scalar_work > config.maximum_propagation_scalar_operations {
+        return Err(FiniteHorizonGramianError::PropagationWorkBudgetExceeded);
+    }
+
+    let mut reachability = EmpiricalGramian::new(dimension)
+        .map_err(|_| FiniteHorizonGramianError::InvalidTrajectoryAxes)?;
+    for (step, (matrix, costs)) in past_b.iter().zip(input_costs).enumerate() {
+        for input in 0..costs.len() {
+            let mut direction = matrix.iter().map(|row| row[input]).collect::<Vec<_>>();
+            for transition in (step + 1)..past_a.len() {
+                direction = matrix_vector(&past_a[transition], &direction)?;
+            }
+            reachability
+                .add_direction(&direction, 1.0 / costs[input])
+                .map_err(|_| FiniteHorizonGramianError::InvalidGramianFactor)?;
+        }
+    }
+
+    let mut observability = EmpiricalGramian::new(dimension)
+        .map_err(|_| FiniteHorizonGramianError::InvalidTrajectoryAxes)?;
+    for (sample, (matrix, weights)) in future_c.iter().zip(qoi_weights).enumerate() {
+        for (qoi, weight) in weights.iter().enumerate() {
+            if *weight == 0.0 {
+                continue;
+            }
+            let mut direction = matrix[qoi].clone();
+            for transition in (0..sample).rev() {
+                direction = transpose_matrix_vector(&future_a[transition], &direction)?;
+            }
+            observability
+                .add_direction(&direction, *weight)
+                .map_err(|_| FiniteHorizonGramianError::InvalidGramianFactor)?;
+        }
+    }
+
+    Ok((reachability, observability))
+}
+
+fn validate_square_sequence(
+    matrices: &[Vec<Vec<f64>>],
+    dimension: usize,
+) -> Result<(), FiniteHorizonGramianError> {
+    if matrices.iter().any(|matrix| {
+        matrix.len() != dimension
+            || matrix.iter().any(|row| {
+                row.len() != dimension || row.iter().any(|value| !value.is_finite())
+            })
+    }) {
+        return Err(FiniteHorizonGramianError::InvalidTrajectoryMatrix);
+    }
+    Ok(())
+}
+
+fn matrix_vector(
+    matrix: &[Vec<f64>],
+    vector: &[f64],
+) -> Result<Vec<f64>, FiniteHorizonGramianError> {
+    matrix
+        .iter()
+        .map(|row| {
+            let mut sum = 0.0;
+            for (left, right) in row.iter().zip(vector) {
+                sum += left * right;
+                if !sum.is_finite() {
+                    return Err(FiniteHorizonGramianError::InvalidTrajectoryMatrix);
+                }
+            }
+            Ok(sum)
+        })
+        .collect()
+}
+
+fn transpose_matrix_vector(
+    matrix: &[Vec<f64>],
+    vector: &[f64],
+) -> Result<Vec<f64>, FiniteHorizonGramianError> {
+    let mut result = vec![0.0; vector.len()];
+    for (row_index, row) in matrix.iter().enumerate() {
+        for column_index in 0..vector.len() {
+            result[column_index] += row[column_index] * vector[row_index];
+            if !result[column_index].is_finite() {
+                return Err(FiniteHorizonGramianError::InvalidTrajectoryMatrix);
+            }
+        }
+    }
+    Ok(result)
+}
+
 /// Numerical and resource controls for deterministic RBKR construction.
 #[derive(Clone, Copy, Debug, PartialEq)]
 pub struct RbkrConfig {
@@ -611,6 +857,85 @@ mod tests {
             result.add_direction(factor, 1.0).unwrap();
         }
         result
+    }
+
+    #[test]
+    fn finite_horizon_ltv_gramians_pull_future_qoi_to_shared_checkpoint() {
+        let identity = vec![vec![1.0, 0.0], vec![0.0, 1.0]];
+        let future_transition = vec![vec![1.0, 0.0], vec![0.0, 10.0]];
+        let past_b = vec![vec![1.0, 0.0], vec![0.0, 0.1]];
+        let output_at_checkpoint = vec![vec![1.0, 0.0]];
+        let output_at_horizon = vec![vec![0.0, 1.0]];
+
+        let (reach, observe) = build_finite_horizon_gramians(
+            &[identity],
+            &[past_b],
+            &[vec![1.0, 1.0]],
+            &[future_transition],
+            &[output_at_checkpoint, output_at_horizon],
+            &[vec![0.0], vec![1.0]],
+            FiniteHorizonGramianConfig::default(),
+        )
+        .unwrap();
+
+        let reachable = reach.apply(&[1.0, 0.0]).unwrap();
+        let observable = observe.apply(&[0.0, 1.0]).unwrap();
+        assert!((reachable[0] - 1.0).abs() < 1.0e-12);
+        assert!(reachable[1].abs() < 1.0e-12);
+        assert!((observable[1] - 100.0).abs() < 1.0e-10);
+
+        let basis = ResponseBalancedBasis::from_empirical_gramians(
+            &reach,
+            &observe,
+            RbkrConfig::new(1),
+        )
+        .unwrap();
+        assert!(basis.trial_basis()[0][0].abs() < 1.0e-12);
+        assert!((basis.trial_basis()[0][1] - 0.01).abs() < 1.0e-10);
+        assert!(basis.biorthogonality_defect() < 1.0e-8);
+    }
+
+    #[test]
+    fn finite_horizon_gramian_builder_refuses_invalid_axes_and_budgets() {
+        let identity = vec![vec![1.0, 0.0], vec![0.0, 1.0]];
+        let input = vec![vec![1.0], vec![0.0]];
+        let output = vec![vec![1.0, 0.0]];
+        assert_eq!(
+            build_finite_horizon_gramians(
+                &[identity.clone()],
+                &[input.clone()],
+                &[vec![1.0]],
+                &[],
+                &[],
+                &[],
+                FiniteHorizonGramianConfig::default(),
+            ),
+            Err(FiniteHorizonGramianError::InvalidTrajectoryAxes)
+        );
+        assert_eq!(
+            build_finite_horizon_gramians(
+                &[identity.clone()],
+                &[input.clone()],
+                &[vec![0.0]],
+                &[],
+                &[output.clone()],
+                &[vec![1.0]],
+                FiniteHorizonGramianConfig::default(),
+            ),
+            Err(FiniteHorizonGramianError::InvalidInputCost)
+        );
+        assert_eq!(
+            build_finite_horizon_gramians(
+                &[identity],
+                &[input],
+                &[vec![1.0]],
+                &[],
+                &[output],
+                &[vec![1.0]],
+                FiniteHorizonGramianConfig::new(1, 100),
+            ),
+            Err(FiniteHorizonGramianError::FactorStorageBudgetExceeded)
+        );
     }
 
     #[test]
