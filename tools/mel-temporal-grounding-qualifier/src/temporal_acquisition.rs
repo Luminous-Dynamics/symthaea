@@ -324,7 +324,10 @@ pub fn plan_annotation_acquisition(
     let mut eligible_audit = Vec::new();
 
     for (index, candidate) in candidates.iter().enumerate() {
-        let reasons = hard_rejections(candidate, quotas.get(candidate.source_stratum_id.as_str()).copied());
+        let reasons = hard_rejections(
+            candidate,
+            quotas.get(candidate.source_stratum_id.as_str()).copied(),
+        );
         if !reasons.is_empty() {
             rejected_candidates.push(RejectedAnnotationCandidateV1 {
                 item_id: candidate.item_id.clone(),
@@ -353,25 +356,16 @@ pub fn plan_annotation_acquisition(
     }
 
     let mut random_state = config.seed;
-    let (
-        probability_audit,
-        audit_unmet,
-        audit_spent,
-        audit_source_works,
-        audit_design,
-    ) = select_probability_audit(&candidates, &eligible_audit, &config, &mut random_state)?;
+    let (probability_audit, audit_unmet, audit_spent, audit_source_works, audit_design) =
+        select_probability_audit(&candidates, &eligible_audit, &config, &mut random_state)?;
 
     let audit_source_set: BTreeSet<_> = probability_audit
         .iter()
         .map(|selection| selection.source_work_id_sha256.as_str())
         .collect();
 
-    let (active_refinement, active_unmet, active_spent, active_source_counts) = select_active(
-        &candidates,
-        &eligible_active,
-        &config,
-        &audit_source_set,
-    )?;
+    let (active_refinement, active_unmet, active_spent, active_source_counts) =
+        select_active(&candidates, &eligible_active, &config, &audit_source_set)?;
 
     let mut unmet_quotas = active_unmet;
     unmet_quotas.extend(audit_unmet);
@@ -509,7 +503,10 @@ pub fn plan_annotation_acquisition(
 
 fn validate_config(config: &AnnotationAcquisitionConfigV1) -> Result<(), String> {
     if config.schema != PLANNER_SCHEMA_V1 {
-        return Err(format!("unsupported acquisition planner schema: {}", config.schema));
+        return Err(format!(
+            "unsupported acquisition planner schema: {}",
+            config.schema
+        ));
     }
     require_text(&config.planner_id, "planner_id")?;
     if config.seed == 0 {
@@ -532,13 +529,22 @@ fn validate_config(config: &AnnotationAcquisitionConfigV1) -> Result<(), String>
         return Err("active and audit budgets exceed the total budget".into());
     }
     for (label, value) in [
-        ("model_error_threshold_ppm", config.model_error_threshold_ppm),
-        ("human_disagreement_threshold_ppm", config.human_disagreement_threshold_ppm),
+        (
+            "model_error_threshold_ppm",
+            config.model_error_threshold_ppm,
+        ),
+        (
+            "human_disagreement_threshold_ppm",
+            config.human_disagreement_threshold_ppm,
+        ),
         (
             "occurrence_count_disagreement_threshold_ppm",
             config.occurrence_count_disagreement_threshold_ppm,
         ),
-        ("minimum_prediction_coverage_ppm", config.minimum_prediction_coverage_ppm),
+        (
+            "minimum_prediction_coverage_ppm",
+            config.minimum_prediction_coverage_ppm,
+        ),
     ] {
         if value > PPM_SCALE {
             return Err(format!("{label} must be within 0..=1,000,000"));
@@ -549,7 +555,10 @@ fn validate_config(config: &AnnotationAcquisitionConfigV1) -> Result<(), String>
     for quota in &config.stratum_quotas {
         require_text(&quota.source_stratum_id, "quota.source_stratum_id")?;
         if !strata.insert(quota.source_stratum_id.as_str()) {
-            return Err(format!("duplicate source stratum quota: {}", quota.source_stratum_id));
+            return Err(format!(
+                "duplicate source stratum quota: {}",
+                quota.source_stratum_id
+            ));
         }
         if quota.active_minimum_items > quota.active_maximum_items {
             return Err(format!(
@@ -594,10 +603,16 @@ fn validate_candidates(candidates: &[AnnotationAcquisitionCandidateV1]) -> Resul
             "cohort_assignment_manifest_sha256",
         )?;
         if !item_ids.insert(candidate.item_id.as_str()) {
-            return Err(format!("duplicate acquisition item ID: {}", candidate.item_id));
+            return Err(format!(
+                "duplicate acquisition item ID: {}",
+                candidate.item_id
+            ));
         }
         if !query_ids.insert(candidate.query_id.as_str()) {
-            return Err(format!("duplicate acquisition query ID: {}", candidate.query_id));
+            return Err(format!(
+                "duplicate acquisition query ID: {}",
+                candidate.query_id
+            ));
         }
         if candidate.maximum_annotation_count == 0
             || candidate.current_annotation_count > candidate.maximum_annotation_count
@@ -608,7 +623,10 @@ fn validate_candidates(candidates: &[AnnotationAcquisitionCandidateV1]) -> Resul
             ));
         }
         if candidate.annotation_cost_units == 0 {
-            return Err(format!("candidate {} has zero annotation cost", candidate.item_id));
+            return Err(format!(
+                "candidate {} has zero annotation cost",
+                candidate.item_id
+            ));
         }
         for (label, value) in [
             ("model_error_ppm", candidate.model_error_ppm),
@@ -634,7 +652,8 @@ fn validate_candidates(candidates: &[AnnotationAcquisitionCandidateV1]) -> Resul
                 ));
             }
         }
-        if let Some((role, stratum)) = source_metadata.get(candidate.source_work_id_sha256.as_str()) {
+        if let Some((role, stratum)) = source_metadata.get(candidate.source_work_id_sha256.as_str())
+        {
             if *role != candidate.cohort_role || *stratum != candidate.source_stratum_id {
                 return Err(format!(
                     "source work {} crosses cohort roles or source strata",
@@ -764,11 +783,7 @@ fn select_probability_audit(
     }
     for works in by_stratum.values_mut() {
         for items in works.values_mut() {
-            items.sort_by(|left, right| {
-                candidates[*left]
-                    .item_id
-                    .cmp(&candidates[*right].item_id)
-            });
+            items.sort_by(|left, right| candidates[*left].item_id.cmp(&candidates[*right].item_id));
         }
     }
 
@@ -833,9 +848,8 @@ fn select_probability_audit(
         let requested = quota.audit_source_work_count as usize;
         let source_items = by_stratum.get(stratum);
         let eligible_sources = source_items.map_or(0, |works| works.len());
-        let eligible_query_items = source_items.map_or(0, |works| {
-            works.values().map(Vec::len).sum::<usize>()
-        });
+        let eligible_query_items =
+            source_items.map_or(0, |works| works.values().map(Vec::len).sum::<usize>());
         let (selected_sources, worst_case_reserved_cost_units) = sample_size_by_stratum
             .get(stratum)
             .copied()
@@ -852,11 +866,12 @@ fn select_probability_audit(
                 }
 
                 for source_id in source_ids.into_iter().take(selected_sources) {
-                    let items = source_items
-                        .get(source_id)
-                        .ok_or_else(|| "selected audit source work has no candidate items".to_string())?;
+                    let items = source_items.get(source_id).ok_or_else(|| {
+                        "selected audit source work has no candidate items".to_string()
+                    })?;
                     let eligible_items_in_source_work = items.len();
-                    let selected_items_in_source_work = (config.audit_items_per_source_work as usize)
+                    let selected_items_in_source_work = (config.audit_items_per_source_work
+                        as usize)
                         .min(eligible_items_in_source_work);
 
                     let mut item_indices = items.clone();
@@ -1050,8 +1065,7 @@ fn select_active(
                     .get(stratum)
                     .copied()
                     .ok_or_else(|| "active candidate has no stratum quota".to_string())?;
-                if stratum_counts.get(*stratum).copied().unwrap_or(0)
-                    >= quota.active_maximum_items
+                if stratum_counts.get(*stratum).copied().unwrap_or(0) >= quota.active_maximum_items
                 {
                     continue;
                 }
@@ -1069,8 +1083,9 @@ fn select_active(
                 });
                 if let Some(index) = next {
                     let candidate = &candidates[index];
-                    let (_, reason) = active_priority(candidate, config)
-                        .ok_or_else(|| "selected active candidate has no priority reason".to_string())?;
+                    let (_, reason) = active_priority(candidate, config).ok_or_else(|| {
+                        "selected active candidate has no priority reason".to_string()
+                    })?;
                     add_active_selection(
                         index,
                         candidates,
@@ -1131,8 +1146,7 @@ fn active_candidate_fits(
         .unwrap_or(0);
     source_count < config.maximum_active_items_per_source_work
         && stratum_count < quota.active_maximum_items
-        && candidate.annotation_cost_units
-            <= config.active_budget_units.saturating_sub(spent)
+        && candidate.annotation_cost_units <= config.active_budget_units.saturating_sub(spent)
 }
 
 fn add_active_selection(
@@ -1389,17 +1403,87 @@ mod tests {
         );
         active_a3.prediction_coverage_ppm = 500_000;
         let candidates = vec![
-            candidate("active-a1", 'a', "stratum-a", AnnotationCohortRoleV1::Development, 700_000, 50_000),
-            candidate("active-a2", 'b', "stratum-a", AnnotationCohortRoleV1::Development, 100_000, 800_000),
+            candidate(
+                "active-a1",
+                'a',
+                "stratum-a",
+                AnnotationCohortRoleV1::Development,
+                700_000,
+                50_000,
+            ),
+            candidate(
+                "active-a2",
+                'b',
+                "stratum-a",
+                AnnotationCohortRoleV1::Development,
+                100_000,
+                800_000,
+            ),
             active_a3,
-            candidate("active-b1", 'd', "stratum-b", AnnotationCohortRoleV1::ActiveRefinement, 900_000, 20_000),
-            candidate("active-b2", 'e', "stratum-b", AnnotationCohortRoleV1::ActiveRefinement, 100_000, 700_000),
-            candidate("audit-a1", 'f', "stratum-a", AnnotationCohortRoleV1::ConfirmatoryAudit, 0, 0),
-            candidate("audit-a2", 'g', "stratum-a", AnnotationCohortRoleV1::ConfirmatoryAudit, 0, 0),
-            candidate("audit-a3", 'h', "stratum-a", AnnotationCohortRoleV1::ConfirmatoryAudit, 0, 0),
-            candidate("audit-b1", 'i', "stratum-b", AnnotationCohortRoleV1::ConfirmatoryAudit, 0, 0),
-            candidate("audit-b2", 'j', "stratum-b", AnnotationCohortRoleV1::ConfirmatoryAudit, 0, 0),
-            candidate("audit-b3", 'k', "stratum-b", AnnotationCohortRoleV1::ConfirmatoryAudit, 0, 0),
+            candidate(
+                "active-b1",
+                'd',
+                "stratum-b",
+                AnnotationCohortRoleV1::ActiveRefinement,
+                900_000,
+                20_000,
+            ),
+            candidate(
+                "active-b2",
+                'e',
+                "stratum-b",
+                AnnotationCohortRoleV1::ActiveRefinement,
+                100_000,
+                700_000,
+            ),
+            candidate(
+                "audit-a1",
+                'f',
+                "stratum-a",
+                AnnotationCohortRoleV1::ConfirmatoryAudit,
+                0,
+                0,
+            ),
+            candidate(
+                "audit-a2",
+                'g',
+                "stratum-a",
+                AnnotationCohortRoleV1::ConfirmatoryAudit,
+                0,
+                0,
+            ),
+            candidate(
+                "audit-a3",
+                'h',
+                "stratum-a",
+                AnnotationCohortRoleV1::ConfirmatoryAudit,
+                0,
+                0,
+            ),
+            candidate(
+                "audit-b1",
+                'i',
+                "stratum-b",
+                AnnotationCohortRoleV1::ConfirmatoryAudit,
+                0,
+                0,
+            ),
+            candidate(
+                "audit-b2",
+                'j',
+                "stratum-b",
+                AnnotationCohortRoleV1::ConfirmatoryAudit,
+                0,
+                0,
+            ),
+            candidate(
+                "audit-b3",
+                'k',
+                "stratum-b",
+                AnnotationCohortRoleV1::ConfirmatoryAudit,
+                0,
+                0,
+            ),
         ];
         AnnotationAcquisitionDatasetV1 {
             dataset_id: "synthetic-acquisition-dataset".into(),
@@ -1413,7 +1497,10 @@ mod tests {
         let dataset = synthetic_dataset();
         let first = plan_annotation_acquisition(&dataset).unwrap();
         let second = plan_annotation_acquisition(&dataset).unwrap();
-        assert_eq!(first.selection_receipt_sha256, second.selection_receipt_sha256);
+        assert_eq!(
+            first.selection_receipt_sha256,
+            second.selection_receipt_sha256
+        );
         assert_eq!(first.active_refinement, second.active_refinement);
         assert_eq!(first.probability_audit, second.probability_audit);
         assert!(first.source_work_sets_are_disjoint);
@@ -1427,12 +1514,14 @@ mod tests {
                 && item.item_given_source_work_probability.is_some()
         }));
         assert!(first.active_refinement.iter().all(|item| {
-            item.item_inclusion_probability.is_none()
-                && item.priority_band.is_some()
+            item.item_inclusion_probability.is_none() && item.priority_band.is_some()
         }));
         assert_eq!(first.budget_usage.active_spent_units, 20);
         assert_eq!(first.active_refinement.len(), 4);
-        assert_eq!(first.budget_usage.probability_audit_selected_source_works, 4);
+        assert_eq!(
+            first.budget_usage.probability_audit_selected_source_works,
+            4
+        );
         assert_eq!(first.budget_usage.probability_audit_spent_units, 20);
         assert_eq!(first.probability_audit.len(), 4);
         assert!(first.probability_audit.iter().all(|item| {
@@ -1481,12 +1570,14 @@ mod tests {
     #[test]
     fn source_work_cap_and_source_disjointness_are_enforced() {
         let report = plan_annotation_acquisition(&synthetic_dataset()).unwrap();
-        let active_sources: BTreeSet<_> = report.active_refinement
+        let active_sources: BTreeSet<_> = report
+            .active_refinement
             .iter()
             .map(|item| item.source_work_id_sha256.as_str())
             .collect();
         assert_eq!(active_sources.len(), report.active_refinement.len());
-        let audit_sources: BTreeSet<_> = report.probability_audit
+        let audit_sources: BTreeSet<_> = report
+            .probability_audit
             .iter()
             .map(|item| item.source_work_id_sha256.as_str())
             .collect();
@@ -1501,7 +1592,12 @@ mod tests {
         dataset.candidates[2].authorization_receipt_sha256 = None;
         let report = plan_annotation_acquisition(&dataset).unwrap();
         assert_eq!(report.rejected_candidates.len(), 3);
-        assert!(report.rejected_candidates.iter().all(|item| !item.reasons.is_empty()));
+        assert!(
+            report
+                .rejected_candidates
+                .iter()
+                .all(|item| !item.reasons.is_empty())
+        );
         assert!(!report.authorization_receipts_authenticated);
     }
 
@@ -1526,8 +1622,7 @@ mod tests {
         // draw has conditional probability 2/3 for f and 1 for h.
         dataset.candidates[6].source_work_id_sha256 =
             dataset.candidates[5].source_work_id_sha256.clone();
-        dataset.candidates[6].recording_sha256 =
-            dataset.candidates[5].recording_sha256.clone();
+        dataset.candidates[6].recording_sha256 = dataset.candidates[5].recording_sha256.clone();
         let mut third = candidate(
             "audit-a4",
             'f',
@@ -1553,23 +1648,22 @@ mod tests {
             assert_eq!(item.eligible_source_works_in_stratum, Some(2));
             assert_eq!(item.selected_source_works_in_stratum, Some(1));
             let conditional = item.item_given_source_work_probability.unwrap();
-            let expected = if item.source_work_id_sha256
-                == dataset.candidates[5].source_work_id_sha256
-            {
-                assert_eq!(item.eligible_items_in_source_work, Some(3));
-                assert_eq!(item.selected_items_in_source_work, Some(2));
-                ProbabilityFractionV1 {
-                    numerator: 2,
-                    denominator: 3,
-                }
-            } else {
-                assert_eq!(item.eligible_items_in_source_work, Some(1));
-                assert_eq!(item.selected_items_in_source_work, Some(1));
-                ProbabilityFractionV1 {
-                    numerator: 1,
-                    denominator: 1,
-                }
-            };
+            let expected =
+                if item.source_work_id_sha256 == dataset.candidates[5].source_work_id_sha256 {
+                    assert_eq!(item.eligible_items_in_source_work, Some(3));
+                    assert_eq!(item.selected_items_in_source_work, Some(2));
+                    ProbabilityFractionV1 {
+                        numerator: 2,
+                        denominator: 3,
+                    }
+                } else {
+                    assert_eq!(item.eligible_items_in_source_work, Some(1));
+                    assert_eq!(item.selected_items_in_source_work, Some(1));
+                    ProbabilityFractionV1 {
+                        numerator: 1,
+                        denominator: 1,
+                    }
+                };
             assert_eq!(conditional, expected);
             let item_probability = item.item_inclusion_probability.unwrap();
             let expected_item_probability = if expected.denominator == 3 {
@@ -1597,8 +1691,7 @@ mod tests {
             dataset.config.stratum_quotas[1].audit_source_work_count = 1;
             dataset.candidates[6].source_work_id_sha256 =
                 dataset.candidates[5].source_work_id_sha256.clone();
-            dataset.candidates[6].recording_sha256 =
-                dataset.candidates[5].recording_sha256.clone();
+            dataset.candidates[6].recording_sha256 = dataset.candidates[5].recording_sha256.clone();
             dataset.candidates[6].annotation_cost_units = 1;
             let mut third = candidate(
                 "audit-a4",
@@ -1655,7 +1748,9 @@ mod tests {
         assert!(plan_annotation_acquisition(&dataset).is_err());
 
         let mut dataset = synthetic_dataset();
-        dataset.candidates[0].inter_annotator_reliability_report_sha256.clear();
+        dataset.candidates[0]
+            .inter_annotator_reliability_report_sha256
+            .clear();
         assert!(plan_annotation_acquisition(&dataset).is_err());
 
         let mut dataset = synthetic_dataset();
