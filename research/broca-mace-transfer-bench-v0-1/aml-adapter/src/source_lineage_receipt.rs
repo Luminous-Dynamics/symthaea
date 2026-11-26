@@ -118,6 +118,8 @@ pub struct SourceLineageReplayCommitmentV1 {
     pub root_family_sha256: String,
     pub source_graph_sha256: String,
     pub lineage_closure_sha256: String,
+    pub source_node_count: u64,
+    pub dependency_edge_count: u64,
 }
 
 #[derive(Clone, Debug, Eq, PartialEq)]
@@ -149,6 +151,8 @@ impl VerifiedSourceLineageSetV1 {
             root_family_sha256: item.receipt.root_family_sha256.clone(),
             source_graph_sha256: item.receipt.source_graph_sha256.clone(),
             lineage_closure_sha256: item.receipt.lineage_closure_sha256.clone(),
+            source_node_count: item.receipt.source_node_count,
+            dependency_edge_count: item.receipt.dependency_edge_count,
         }).collect()
     }
 
