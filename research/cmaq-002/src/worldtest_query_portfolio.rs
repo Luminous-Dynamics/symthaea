@@ -38,6 +38,14 @@ impl QueryFamily {
             Self::Planning => "planning",
         }
     }
+
+    const fn index(self) -> usize {
+        match self {
+            Self::MaskedFramePrediction => 0,
+            Self::ChangeDetection => 1,
+            Self::Planning => 2,
+        }
+    }
 }
 
 #[derive(Clone, Debug, Eq, PartialEq)]
@@ -116,6 +124,11 @@ pub struct WorldTestQueryTask {
     pub task_id: String,
     pub run_id: u64,
     pub query_family: QueryFamily,
+    /// Evaluator-assigned structural/generator family for split integrity.
+    pub environment_family_id: String,
+    /// Independent environment-generation cluster; task rows sharing this ID
+    /// are repeated observations, not independent statistical subjects.
+    pub environment_cluster_id: String,
     pub challenge_program_sha256: [u8; 32],
     pub metric_profile_sha256: [u8; 32],
     pub candidate_artifact_sha256: [u8; 32],
@@ -163,6 +176,8 @@ pub struct WorldTestPortfolioTaskResult {
     pub task_id: String,
     pub run_id: u64,
     pub query_family: QueryFamily,
+    pub environment_family_id: String,
+    pub environment_cluster_id: String,
     pub score_ppm: u32,
     pub disposition: TaskDisposition,
     pub challenge_program_sha256: [u8; 32],
@@ -174,8 +189,22 @@ pub struct WorldTestPortfolioTaskResult {
 }
 
 #[derive(Clone, Debug, Eq, PartialEq)]
+pub struct WorldTestEnvironmentClusterSummary {
+    pub environment_cluster_id: String,
+    pub environment_family_id: String,
+    pub task_count: u64,
+    /// Counts follow QueryFamily::ALL order.
+    pub query_family_task_counts: [u64; WORLDTEST_PORTFOLIO_QUERY_FAMILY_COUNT],
+}
+
+#[derive(Clone, Debug, Eq, PartialEq)]
 pub struct WorldTestQueryPortfolioCertificate {
     pub context: WorldTestPortfolioContext,
+    /// Counts are based on evaluator-assigned identities, not task-row count.
+    pub environment_family_count: u64,
+    pub independent_environment_cluster_count: u64,
+    /// Sorted by environment_cluster_id; each cluster contributes once.
+    pub environment_cluster_summaries: Vec<WorldTestEnvironmentClusterSummary>,
     pub task_count: u64,
     /// Sorted by task ID for deterministic replay.
     pub task_results: Vec<WorldTestPortfolioTaskResult>,
@@ -203,6 +232,13 @@ pub enum WorldTestPortfolioError {
     TooManyTasks { requested: usize, maximum: usize },
     TooFewTasksForFamilies { requested: usize },
     EmptyTaskId,
+    EmptyEnvironmentFamilyId { task_id: String },
+    EmptyEnvironmentClusterId { task_id: String },
+    EnvironmentClusterFamilyMismatch {
+        environment_cluster_id: String,
+        first_family_id: String,
+        conflicting_family_id: String,
+    },
     DuplicateExpectedTaskId { task_id: String },
     DuplicateTaskId { task_id: String },
     DuplicateRunId { run_id: u64 },
@@ -234,6 +270,12 @@ impl fmt::Display for WorldTestPortfolioError {
             Self::TooManyTasks { requested, maximum } => write!(formatter, "WorldTest portfolio task count {requested} exceeds maximum {maximum}"),
             Self::TooFewTasksForFamilies { requested } => write!(formatter, "WorldTest portfolio needs at least one task per query family, received {requested}"),
             Self::EmptyTaskId => write!(formatter, "WorldTest task IDs must be nonempty and trimmed"),
+            Self::EmptyEnvironmentFamilyId { task_id } => write!(formatter, "task {task_id} has an empty or untrimmed environment family ID"),
+            Self::EmptyEnvironmentClusterId { task_id } => write!(formatter, "task {task_id} has an empty or untrimmed environment cluster ID"),
+            Self::EnvironmentClusterFamilyMismatch { environment_cluster_id, first_family_id, conflicting_family_id } => write!(
+                formatter,
+                "environment cluster {environment_cluster_id} is assigned to both family {first_family_id} and family {conflicting_family_id}"
+            ),
             Self::DuplicateExpectedTaskId { task_id } => write!(formatter, "expected task set repeats ID {task_id}"),
             Self::DuplicateTaskId { task_id } => write!(formatter, "portfolio repeats task ID {task_id}"),
             Self::DuplicateRunId { run_id } => write!(formatter, "portfolio repeats task run ID {run_id}"),
@@ -413,6 +455,9 @@ pub fn evaluate_worldtest_query_portfolio(
     tasks.sort_by(|left, right| left.task_id.cmp(&right.task_id));
     let mut observed_ids = BTreeSet::new();
     let mut run_ids = BTreeSet::new();
+    let mut environment_family_ids = BTreeSet::<String>::new();
+    let mut environment_clusters =
+        BTreeMap::<String, WorldTestEnvironmentClusterSummary>::new();
     let mut family_summaries: BTreeMap<QueryFamily, QueryFamilyPortfolioSummary> =
         QueryFamily::ALL.into_iter().map(|family| (family, empty_family_summary(family))).collect();
 
@@ -435,6 +480,38 @@ pub fn evaluate_worldtest_query_portfolio(
         if !run_ids.insert(task.run_id) {
             return Err(WorldTestPortfolioError::DuplicateRunId { run_id: task.run_id });
         }
+        if task.environment_family_id.trim().is_empty()
+            || task.environment_family_id.trim() != task.environment_family_id.as_str()
+        {
+            return Err(WorldTestPortfolioError::EmptyEnvironmentFamilyId {
+                task_id: task.task_id.clone(),
+            });
+        }
+        if task.environment_cluster_id.trim().is_empty()
+            || task.environment_cluster_id.trim() != task.environment_cluster_id.as_str()
+        {
+            return Err(WorldTestPortfolioError::EmptyEnvironmentClusterId {
+                task_id: task.task_id.clone(),
+            });
+        }
+        environment_family_ids.insert(task.environment_family_id.clone());
+        let cluster = environment_clusters
+            .entry(task.environment_cluster_id.clone())
+            .or_insert_with(|| WorldTestEnvironmentClusterSummary {
+                environment_cluster_id: task.environment_cluster_id.clone(),
+                environment_family_id: task.environment_family_id.clone(),
+                task_count: 0,
+                query_family_task_counts: [0; WORLDTEST_PORTFOLIO_QUERY_FAMILY_COUNT],
+            });
+        if cluster.environment_family_id != task.environment_family_id {
+            return Err(WorldTestPortfolioError::EnvironmentClusterFamilyMismatch {
+                environment_cluster_id: task.environment_cluster_id.clone(),
+                first_family_id: cluster.environment_family_id.clone(),
+                conflicting_family_id: task.environment_family_id.clone(),
+            });
+        }
+        increment(&mut cluster.task_count)?;
+        increment(&mut cluster.query_family_task_counts[task.query_family.index()])?;
         if !expected_ids.contains(&task.task_id) {
             return Err(WorldTestPortfolioError::UnexpectedTasks { task_ids: vec![task.task_id.clone()] });
         }
@@ -552,10 +629,21 @@ pub fn evaluate_worldtest_query_portfolio(
     let max_mean = family_rows.iter().map(|row| row.mean_score_ppm).max()
         .ok_or(WorldTestPortfolioError::MissingQueryFamily { family: QueryFamily::MaskedFramePrediction })?;
 
+    let environment_family_count = u64::try_from(environment_family_ids.len())
+        .map_err(|_| WorldTestPortfolioError::ArithmeticOverflow)?;
+    let environment_cluster_summaries = environment_clusters
+        .into_values()
+        .collect::<Vec<_>>();
+    let independent_environment_cluster_count =
+        u64::try_from(environment_cluster_summaries.len())
+            .map_err(|_| WorldTestPortfolioError::ArithmeticOverflow)?;
+
     let task_results = tasks.into_iter().map(|task| WorldTestPortfolioTaskResult {
         task_id: task.task_id,
         run_id: task.run_id,
         query_family: task.query_family,
+        environment_family_id: task.environment_family_id,
+        environment_cluster_id: task.environment_cluster_id,
         score_ppm: task.disposition.score_ppm(),
         disposition: task.disposition,
         challenge_program_sha256: task.challenge_program_sha256,
@@ -568,6 +656,9 @@ pub fn evaluate_worldtest_query_portfolio(
 
     Ok(WorldTestQueryPortfolioCertificate {
         context: context.clone(),
+        environment_family_count,
+        independent_environment_cluster_count,
+        environment_cluster_summaries,
         task_count: u64::try_from(task_results.len()).map_err(|_| WorldTestPortfolioError::ArithmeticOverflow)?,
         task_results,
         family_summaries: family_rows,
@@ -635,6 +726,8 @@ mod tests {
             task_id: task_id.to_owned(),
             run_id,
             query_family: family,
+            environment_family_id: "world-generator-v1".to_owned(),
+            environment_cluster_id: format!("cluster-{run_id}"),
             challenge_program_sha256: digest(challenge),
             metric_profile_sha256: digest(profile),
             candidate_artifact_sha256: digest(1),
@@ -884,5 +977,66 @@ mod tests {
         assert_eq!(result.family_summaries[2].task_count,2);
         assert_eq!(result.family_summaries[2].score_sum_ppm,300_000);
         assert_eq!(result.family_summaries[2].mean_score_ppm,150_000);
+    }
+
+    #[test]
+    fn repeated_tasks_share_one_independent_environment_cluster() {
+        let mut tasks = base_tasks();
+        tasks[1].environment_cluster_id = tasks[0].environment_cluster_id.clone();
+        let result = evaluate_worldtest_query_portfolio(&input(tasks)).unwrap();
+
+        assert_eq!(result.task_count, 3);
+        assert_eq!(result.environment_family_count, 1);
+        assert_eq!(result.independent_environment_cluster_count, 2);
+        assert_eq!(result.environment_cluster_summaries.len(), 2);
+        assert_eq!(
+            result.environment_cluster_summaries[0].environment_cluster_id,
+            "cluster-1"
+        );
+        assert_eq!(result.environment_cluster_summaries[0].task_count, 2);
+        assert_eq!(
+            result.environment_cluster_summaries[0].query_family_task_counts,
+            [1, 1, 0]
+        );
+        assert_eq!(
+            result.task_results[0].environment_cluster_id,
+            result.task_results[1].environment_cluster_id
+        );
+    }
+
+    #[test]
+    fn empty_environment_family_identity_is_rejected() {
+        let mut tasks = base_tasks();
+        tasks[1].environment_family_id = "  ".to_owned();
+        assert!(matches!(
+            evaluate_worldtest_query_portfolio(&input(tasks)),
+            Err(WorldTestPortfolioError::EmptyEnvironmentFamilyId { task_id })
+                if task_id == "cd-a"
+        ));
+    }
+
+    #[test]
+    fn untrimmed_environment_cluster_identity_is_rejected() {
+        let mut tasks = base_tasks();
+        tasks[1].environment_cluster_id = " cluster-2".to_owned();
+        assert!(matches!(
+            evaluate_worldtest_query_portfolio(&input(tasks)),
+            Err(WorldTestPortfolioError::EmptyEnvironmentClusterId { task_id })
+                if task_id == "cd-a"
+        ));
+    }
+
+    #[test]
+    fn one_environment_cluster_cannot_claim_multiple_environment_families() {
+        let mut tasks = base_tasks();
+        tasks[1].environment_cluster_id = tasks[0].environment_cluster_id.clone();
+        tasks[1].environment_family_id = "different-generator-v1".to_owned();
+        assert!(matches!(
+            evaluate_worldtest_query_portfolio(&input(tasks)),
+            Err(WorldTestPortfolioError::EnvironmentClusterFamilyMismatch {
+                environment_cluster_id,
+                ..
+            }) if environment_cluster_id == "cluster-1"
+        ));
     }
 }
