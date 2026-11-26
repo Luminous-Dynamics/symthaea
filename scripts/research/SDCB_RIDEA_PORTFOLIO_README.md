@@ -19,6 +19,10 @@ The source uses the sibling R-IDeA score module, `sdcb_ridea.rs`.
 - Respects total cost and experiment-count limits.
 - Stops explicitly when the empirical target is covered, budget is exhausted, no positive score remains, or the pool is empty.
 
+## Search bounds
+
+The exhaustive reference is capped at 16 candidates, 16 selections, and 128 combined history/candidate design samples (target distribution ≤128); it inherits the R-IDeA 64-dimension cap.
+
 ## Important limitation
 
 EIG, current-model prediction and proxy prediction are frozen inputs for the whole portfolio. The planner does not observe results or update the posterior. It is a greedy design-only batch selector, not a fully adaptive sequential R-IDeA agent; it does not calculate joint EIG.
