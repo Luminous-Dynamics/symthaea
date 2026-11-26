@@ -1,0 +1,11 @@
+[package]
+name = "mace-001"
+version = "0.1.0"
+edition = "2024"
+publish = false
+license = "AGPL-3.0-or-later"
+description = "Dependency-free evaluator for the MACE causal experience-transfer benchmark"
+
+[dependencies]
+
+[workspace]

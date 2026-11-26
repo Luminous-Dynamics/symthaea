@@ -1,0 +1,173 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://luminousdynamics.io/schemas/mace-evaluator-oracle-v0.1.schema.json",
+  "title": "MACE Evaluator Oracle v0.1",
+  "description": "Evaluator-only expected outcomes, scenario families and intervention-pair metadata. Never mount this file into an agent context or prompt.",
+  "type": "object",
+  "additionalProperties": false,
+  "required": [
+    "schema_version",
+    "oracles"
+  ],
+  "properties": {
+    "schema_version": {
+      "const": "mace-evaluator-oracles-v0.1"
+    },
+    "oracles": {
+      "type": "array",
+      "minItems": 1,
+      "items": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": [
+          "case_id",
+          "family",
+          "pair",
+          "evaluator_oracle"
+        ],
+        "properties": {
+          "case_id": {
+            "type": "string",
+            "pattern": "^MACE-[0-9]{3}$"
+          },
+          "family": {
+            "enum": [
+              "observational_confounding",
+              "controlled_intervention",
+              "regime_shift",
+              "outcome_misattribution"
+            ]
+          },
+          "pair": {
+            "type": "object",
+            "additionalProperties": false,
+            "required": [
+              "pair_id",
+              "role"
+            ],
+            "properties": {
+              "pair_id": {
+                "type": "string"
+              },
+              "role": {
+                "enum": [
+                  "anchor",
+                  "irrelevant_control"
+                ]
+              }
+            }
+          },
+          "evaluator_oracle": {
+            "type": "object",
+            "additionalProperties": false,
+            "required": [
+              "causal_status",
+              "expected_transfer",
+              "expected_action",
+              "expected_completion_state",
+              "reason_codes",
+              "expected_write",
+              "expected_maintain",
+              "expected_retrieve",
+              "expected_use"
+            ],
+            "properties": {
+              "causal_status": {
+                "enum": [
+                  "not_identified",
+                  "identified",
+                  "regime_shifted",
+                  "outcome_unverified"
+                ]
+              },
+              "expected_transfer": {
+                "enum": [
+                  "record_association_only",
+                  "reuse_qualified_transition",
+                  "requalify_before_reuse",
+                  "mark_outcome_unknown"
+                ]
+              },
+              "expected_action": {
+                "type": "string"
+              },
+              "expected_completion_state": {
+                "enum": [
+                  "not_applicable",
+                  "verified_effect",
+                  "not_effect_verified",
+                  "unknown_pending_reconciliation"
+                ]
+              },
+              "reason_codes": {
+                "type": "array",
+                "items": {
+                  "type": "string"
+                }
+              },
+              "identified_effect": {
+                "type": [
+                  "object",
+                  "null"
+                ],
+                "properties": {
+                  "variable": {
+                    "type": "string"
+                  },
+                  "direction": {
+                    "enum": [
+                      "positive",
+                      "negative",
+                      "zero",
+                      "non_monotone",
+                      "unknown"
+                    ]
+                  },
+                  "preconditions": {
+                    "type": "array",
+                    "items": {
+                      "type": "string"
+                    }
+                  }
+                }
+              },
+              "expected_write": {
+                "enum": [
+                  "store_association_only",
+                  "store_qualified_transition",
+                  "store_transition_with_regime",
+                  "store_outcome_unknown"
+                ]
+              },
+              "expected_maintain": {
+                "enum": [
+                  "preserve_uncertainty",
+                  "retain_with_preconditions",
+                  "mark_stale_on_regime_change",
+                  "retain_unknown_until_reconciled"
+                ]
+              },
+              "expected_retrieve": {
+                "enum": [
+                  "retrieve_association_evidence",
+                  "retrieve_preconditioned_transition",
+                  "retrieve_with_regime_warning",
+                  "retrieve_execution_conflict",
+                  "retrieve_more_evidence"
+                ]
+              },
+              "expected_use": {
+                "enum": [
+                  "do_not_generalize_causal_effect",
+                  "reuse_if_preconditions_hold",
+                  "requalify_before_action",
+                  "reconcile_before_retry"
+                ]
+              }
+            }
+          }
+        }
+      }
+    }
+  }
+}
