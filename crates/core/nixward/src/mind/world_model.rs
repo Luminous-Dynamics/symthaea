@@ -98,25 +98,25 @@ pub enum TransitionOutcome {
 /// automatically update the model.
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub struct TransitionEpisodeV1 {
-    pub episode_id: String,
-    pub domain_id: String,
-    pub context_id: String,
-    pub environment_family_id: String,
-    pub environment_cluster_id: String,
-    pub action: ActionCategory,
-    pub action_profile_id: String,
+    episode_id: String,
+    domain_id: String,
+    context_id: String,
+    environment_family_id: String,
+    environment_cluster_id: String,
+    action: ActionCategory,
+    action_profile_id: String,
     /// BLAKE3 digest of canonical action parameters, computed by the caller.
-    pub action_parameters_blake3: String,
+    action_parameters_blake3: String,
     /// BLAKE3 digest of canonical before-state hypervector bytes.
-    pub before_state_blake3: String,
+    before_state_blake3: String,
     /// BLAKE3 digest of canonical after-state hypervector bytes, when observed.
-    pub after_state_blake3: Option<String>,
-    pub outcome: TransitionOutcome,
+    after_state_blake3: Option<String>,
+    outcome: TransitionOutcome,
     /// Registered observation horizon for this episode.
-    pub observation_horizon_ms: u64,
-    pub observed_at_unix_ms: u64,
+    observation_horizon_ms: u64,
+    observed_at_unix_ms: u64,
     /// BLAKE3 digest of the execution/observation receipt, when supplied.
-    pub execution_receipt_blake3: Option<String>,
+    execution_receipt_blake3: Option<String>,
 }
 
 fn valid_blake3_hex(value: &str) -> bool {
@@ -187,6 +187,23 @@ impl TransitionEpisodeV1 {
         };
         episode.validate()?;
         Ok(episode)
+    }
+
+    pub fn episode_id(&self) -> &str { &self.episode_id }
+    pub fn domain_id(&self) -> &str { &self.domain_id }
+    pub fn context_id(&self) -> &str { &self.context_id }
+    pub fn environment_family_id(&self) -> &str { &self.environment_family_id }
+    pub fn environment_cluster_id(&self) -> &str { &self.environment_cluster_id }
+    pub fn action(&self) -> &ActionCategory { &self.action }
+    pub fn action_profile_id(&self) -> &str { &self.action_profile_id }
+    pub fn action_parameters_blake3(&self) -> &str { &self.action_parameters_blake3 }
+    pub fn before_state_blake3(&self) -> &str { &self.before_state_blake3 }
+    pub fn after_state_blake3(&self) -> Option<&str> { self.after_state_blake3.as_deref() }
+    pub fn outcome(&self) -> TransitionOutcome { self.outcome }
+    pub fn observation_horizon_ms(&self) -> u64 { self.observation_horizon_ms }
+    pub fn observed_at_unix_ms(&self) -> u64 { self.observed_at_unix_ms }
+    pub fn execution_receipt_blake3(&self) -> Option<&str> {
+        self.execution_receipt_blake3.as_deref()
     }
 
     pub fn validate(&self) -> Result<(), String> {
