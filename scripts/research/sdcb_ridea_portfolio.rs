@@ -346,7 +346,7 @@ mod tests {
     fn a_high_eig_outlier_does_not_win_over_representative_designs() {
         let result = greedy_ridea_portfolio(
             &history(), &target(), &candidates(), &config(),
-            AcquisitionKind::RepresentativeInformativeDeAmplifying, 1, 1,
+            AcquisitionKind::RepresentativeInformativeDeAmplifying, 2, 1,
         ).unwrap();
         assert_eq!(result.selected_candidate_ids, vec!["cover-a"]);
         assert!(result.steps[0].score.expected_information_gain < 1.30);
