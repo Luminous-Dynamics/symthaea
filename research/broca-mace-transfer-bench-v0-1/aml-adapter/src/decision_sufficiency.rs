@@ -1352,7 +1352,12 @@ mod tests {
         project_qualified_candidate_evidence_v1,
     };
     use crate::qualification_dsse::{
+        DSSE_PAYLOAD_TYPE_V1, IN_TOTO_STATEMENT_TYPE_V1,
         encode_dsse_envelope_v1, dsse_pae_v1, in_toto_qualification_payload_v1,
+    };
+    use crate::source_lineage_receipt::{
+        MACE_SOURCE_LINEAGE_PREDICATE_TYPE_V1, SOURCE_LINEAGE_VERIFIER_ID_V1,
+        SourceLineageEnvelopeInputV1, verify_source_lineage_receipts_v1,
     };
     use crate::qualification_trust::{
         PinnedEd25519QualificationVerifierV1, QualificationKeyStatusV1,
@@ -1740,6 +1745,63 @@ mod tests {
         encode_dsse_envelope_v1(&payload, &receipt.key_id, &signature).unwrap()
     }
 
+    fn signed_source_lineage_envelope(
+        signing_key: &SigningKey,
+        profile_sha256: &str,
+        qualified_evidence_set_sha256: &str,
+        decision_need_sha256: &str,
+        run_id: &str,
+        query_invocation_id: &str,
+        requirement_id: &str,
+        evidence_class_sha256: &str,
+        root_family_sha256: &str,
+    ) -> String {
+        let key_id = qualification_key_id_v1(&signing_key.verifying_key().to_bytes());
+        let predicate = json!({
+            "schema_version": "mace_source_lineage_receipt_v1",
+            "run_id": run_id,
+            "query_invocation_id": query_invocation_id,
+            "qualified_evidence_set_sha256": qualified_evidence_set_sha256,
+            "decision_need_sha256": decision_need_sha256,
+            "requirement_id": requirement_id,
+            "evidence_class_sha256": evidence_class_sha256,
+            "root_family_sha256": root_family_sha256,
+            "source_graph_sha256": repeat('a'),
+            "lineage_closure_sha256": repeat('b'),
+            "source_node_count": 2,
+            "dependency_edge_count": 1,
+            "unresolved_ancestor_count": 0,
+            "status": "independent",
+            "issued_at_unix": 100,
+            "expires_at_unix": 500,
+            "issuer_profile_sha256": profile_sha256,
+            "key_id": key_id,
+        });
+        let subject_name = format!(
+            "urn:luminous:mace:source-root-family:v1:{}",
+            root_family_sha256
+        );
+        let statement = json!({
+            "_type": IN_TOTO_STATEMENT_TYPE_V1,
+            "subject": [{
+                "name": subject_name,
+                "digest": {"sha256": root_family_sha256}
+            }],
+            "predicateType": MACE_SOURCE_LINEAGE_PREDICATE_TYPE_V1,
+            "predicate": predicate,
+        });
+        let payload = serde_json::to_vec(&statement).unwrap();
+        let pae = dsse_pae_v1(DSSE_PAYLOAD_TYPE_V1, &payload);
+        let signature = signing_key.sign(&pae).to_bytes();
+        encode_dsse_envelope_v1(&payload, &key_id, &signature).unwrap()
+    }
+
+    fn raw_envelope_sha256(envelope: &str) -> String {
+        let mut hasher = Sha256::new();
+        hasher.update(envelope.as_bytes());
+        hex_digest(&hasher.finalize())
+    }
+
     fn build_valid_assessment<'a>(
         qualified: &'a QualifiedCandidateEvidenceBatchV1,
         status: DecisionSufficiencyStatusV1,
@@ -1770,6 +1832,123 @@ mod tests {
         );
         let envelope = signed_envelope(&assessment, &signing_key);
         (binding, profile, envelope)
+    }
+
+    #[test]
+    fn three_authority_lineage_chain_verifies_and_revalidates_at_use() {
+        let qualified = qualified_batch(&repeat('f'));
+        let candidate_ids = vec!["evidence-1".to_owned()];
+        let qualification_binding = qualification_binding(&qualified, &candidate_ids, 160);
+
+        let evaluator_key = SigningKey::from_bytes(&[73; 32]);
+        let evaluator_profile = evaluator_profile(
+            &evaluator_key,
+            QualificationKeyStatusV1::Active,
+            1,
+            DECISION_SUFFICIENCY_VERIFIER_ID_V1,
+        );
+        let evaluator_profile_sha256 = evaluator_profile.profile_sha256().to_owned();
+        let evaluator_profile_pin = evaluator_profile_sha256.clone();
+        let evaluator_profile_pin: &'static str =
+            Box::leak(evaluator_profile_pin.into_boxed_str());
+        let binding = use_binding(&qualified, evaluator_profile_pin, 160);
+        let evaluator_key_id =
+            qualification_key_id_v1(&evaluator_key.verifying_key().to_bytes());
+        let mut assessment = receipt(
+            &qualified,
+            &binding,
+            &evaluator_key_id,
+            DecisionSufficiencyStatusV1::Sufficient,
+            DecisionRequirementStatusV1::Met,
+            Some(1000),
+            Some(5000),
+        );
+
+        let resolver_key = SigningKey::from_bytes(&[99; 32]);
+        let resolver_profile = evaluator_profile(
+            &resolver_key,
+            QualificationKeyStatusV1::Active,
+            1,
+            SOURCE_LINEAGE_VERIFIER_ID_V1,
+        );
+        let resolver_profile_sha256 = resolver_profile.profile_sha256().to_owned();
+        let root_a = assessment.requirements[0].independent_root_families[0]
+            .root_family_sha256.clone();
+        let root_b = assessment.requirements[0].independent_root_families[1]
+            .root_family_sha256.clone();
+        let need = test_decision_need();
+        let need_sha256 = need.digest().unwrap();
+        let envelope_a = signed_source_lineage_envelope(
+            &resolver_key,
+            &resolver_profile_sha256,
+            &qualified.qualified_candidate_set_sha256(),
+            &need_sha256,
+            qualified.run_id(),
+            qualified.query_invocation_id(),
+            "minimum-independent-evidence",
+            &need.requirements[0].evidence_class_sha256,
+            &root_a,
+        );
+        let envelope_b = signed_source_lineage_envelope(
+            &resolver_key,
+            &resolver_profile_sha256,
+            &qualified.qualified_candidate_set_sha256(),
+            &need_sha256,
+            qualified.run_id(),
+            qualified.query_invocation_id(),
+            "minimum-independent-evidence",
+            &need.requirements[0].evidence_class_sha256,
+            &root_b,
+        );
+        assessment.requirements[0].independent_root_families[0]
+            .provenance_receipt_sha256 = raw_envelope_sha256(&envelope_a);
+        assessment.requirements[0].independent_root_families[1]
+            .provenance_receipt_sha256 = raw_envelope_sha256(&envelope_b);
+        let evaluator_envelope = signed_envelope(&assessment, &evaluator_key);
+        let verified_sufficiency = verify_decision_sufficiency_v1(
+            &qualified,
+            &qualification_binding,
+            &TestQualificationVerifier,
+            &binding,
+            &evaluator_envelope,
+            &evaluator_profile,
+        ).expect("independent evaluator receipt");
+
+        let lineage_inputs = vec![
+            SourceLineageEnvelopeInputV1 {
+                requirement_id: "minimum-independent-evidence",
+                root_family_sha256: &root_a,
+                envelope_json: &envelope_a,
+            },
+            SourceLineageEnvelopeInputV1 {
+                requirement_id: "minimum-independent-evidence",
+                root_family_sha256: &root_b,
+                envelope_json: &envelope_b,
+            },
+        ];
+        let verified_lineage = verify_source_lineage_receipts_v1(
+            &qualified,
+            &qualification_binding,
+            &TestQualificationVerifier,
+            &verified_sufficiency,
+            &binding,
+            &evaluator_profile,
+            need,
+            &lineage_inputs,
+            &resolver_profile_sha256,
+            &resolver_profile,
+        ).expect("third-authority lineage receipts");
+        assert_eq!(verified_lineage.len(), 2);
+        verified_lineage.validate_at_use(
+            &qualified,
+            &qualification_binding,
+            &TestQualificationVerifier,
+            &verified_sufficiency,
+            &binding,
+            &evaluator_profile,
+            need,
+            &resolver_profile,
+        ).expect("all three authorities remain valid at one use-time sample");
     }
 
     #[test]
