@@ -92,7 +92,7 @@ impl EpisodeIdentity {
             &self.hypothesis_set_digest,
             &self.device_registry_digest,
             &self.common_cause_registry_digest,
-        ].iter().any(|d| !valid_digest(d))
+        ].iter().any(|d| !valid_digest(d.as_str()))
         {
             return Err(Error::InvalidDigest);
         }
