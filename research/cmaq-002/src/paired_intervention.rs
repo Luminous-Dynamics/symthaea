@@ -1682,6 +1682,8 @@ mod tests {
                 summary.cluster_balanced_interval_coverage_ppm,
                 Some(1_000_000)
             );
+            assert_eq!(summary.task_weighted_mean_interval_width_micro, Some(20));
+            assert_eq!(summary.cluster_balanced_mean_interval_width_micro, Some(20));
             assert_eq!(summary.cluster_balanced_false_change_rate_ppm, Some(0));
         }
         let null = result
@@ -1749,6 +1751,51 @@ mod tests {
             .unwrap();
         assert_eq!(null.sign_eligible_pair_count, 0);
         assert_eq!(null.cluster_balanced_sign_accuracy_ppm, None);
+    }
+
+    #[test]
+    fn interval_sharpness_is_reported_separately_from_coverage() {
+        let mut input = base_input();
+        let pair_id = input
+            .pairs
+            .iter()
+            .find(|row| {
+                row.family == InterventionFamily::Directional
+                    && row.environment_cluster_id.ends_with("cluster-1")
+            })
+            .unwrap()
+            .pair_id
+            .clone();
+        let pair = input
+            .pairs
+            .iter_mut()
+            .find(|row| row.pair_id == pair_id)
+            .unwrap();
+        pair.predicted_effect_interval = Some(PredictedEffectInterval {
+            lower_micro: 0,
+            upper_micro: 2_000,
+        });
+        let result = evaluate_paired_interventions(&input).unwrap();
+        let row = result.pair_results.iter().find(|row| row.pair_id == pair_id).unwrap();
+        assert_eq!(row.predicted_interval_covered, Some(true));
+        assert_eq!(row.predicted_interval_width_micro, Some(2_000));
+        let directional = result
+            .family_summaries
+            .iter()
+            .find(|row| row.family == InterventionFamily::Directional)
+            .unwrap();
+        assert_eq!(
+            directional.cluster_balanced_interval_coverage_ppm,
+            Some(1_000_000)
+        );
+        assert_eq!(
+            directional.cluster_balanced_mean_interval_width_micro,
+            Some(1_010)
+        );
+        assert_eq!(
+            directional.task_weighted_mean_interval_width_micro,
+            Some(1_010)
+        );
     }
 
     #[test]
