@@ -98,3 +98,23 @@ func TestSameSourceReverseWitnessDivergence(t *testing.T){
 	want(t,in,p,Divergent)
 }
 func FuzzSequenceOrder(f *testing.F){f.Add(uint64(2),uint64(3));f.Fuzz(func(t *testing.T,a,b uint64){if a==0||b==0{return};if a==b{return};if (a<b)!=(b>a){t.Fatal("sequence ordering is not antisymmetric")}})}
+
+func TestConflictingVerifierReportsDivergent(t *testing.T) {
+	in, p := base()
+	r := in.Reports[len(in.Reports)-1]
+	r.InputDigest.Value = "changed"
+	in.Reports = append(in.Reports, r)
+	want(t, in, p, Divergent)
+}
+func TestStaleVerifierReportIndeterminate(t *testing.T) {
+	in, p := base()
+	in.Reports[0].FreshUntil = 100
+	want(t, in, p, Indeterminate)
+}
+func TestOrderWitnessEvidenceMissingIndeterminate(t *testing.T) {
+	in, p := base()
+	moveActivityBToDB(&in)
+	d := dig("handoff", "g-before-u", "order-witness")
+	in.Witnesses = []OrderWitness{{ID: "handoff-1", BeforeEventID: "gen-x", AfterEventID: "use-x", WitnessSourceID: "observer", EvidenceDigest: d}}
+	want(t, in, p, Indeterminate)
+}
