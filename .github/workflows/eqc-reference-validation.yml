@@ -8,9 +8,10 @@ on:
       - "docs/research/eqc-task-v0.1.schema.json"
       - "docs/research/eqc-run-receipt-v0.1.schema.json"
       - "docs/research/eqc-seed-corpus-v0.1.json"
+      - "docs/research/eqc-fixtures/**"
       - ".github/workflows/eqc-reference-validation.yml"
   push:
-    branches: [main]
+    branches: [main, feat/eqc-rust-reference-evaluator-2026-11-26]
     paths:
       - "xtask/src/eqc.rs"
       - "xtask/src/main.rs"
