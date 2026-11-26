@@ -112,6 +112,21 @@ pub struct ObservationReceipt {
     pub declared_noise_bound: f64,
 }
 
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub enum CandidateSetDisposition {
+    UniqueCandidate(String),
+    MultipleCandidates(Vec<String>),
+    NoCandidateFits,
+}
+
+pub fn candidate_set_disposition(compatible_ids: &[String]) -> CandidateSetDisposition {
+    match compatible_ids {
+        [] => CandidateSetDisposition::NoCandidateFits,
+        [only] => CandidateSetDisposition::UniqueCandidate(only.clone()),
+        many => CandidateSetDisposition::MultipleCandidates(many.to_vec()),
+    }
+}
+
 #[derive(Debug, Clone, PartialEq)]
 pub struct ProbeChoice {
     pub probe_id: String,
@@ -487,6 +502,52 @@ mod tests {
             assert!((minimum_pairwise_margin(&e, probe).unwrap() - 0.9).abs() < EPS);
             assert_eq!(observability_rank(&e.hypotheses[0], 0).unwrap(), n);
         }
+    }
+
+    #[test]
+    fn passive_observation_preserves_multiple_candidate_models() {
+        let e = observational_equivalence_fixture();
+        let secret = EvaluatorSecret { true_hypothesis_id: "mechanism-basis-x".into(), noise_seed: 7 };
+        let receipt = execute_reference_probe(&e, &secret, "no-op-sensor-x").unwrap();
+        let probe = find_probe(&e, "no-op-sensor-x").unwrap();
+        let compatible = consistent_hypotheses(&e, probe, &receipt).unwrap();
+        assert_eq!(candidate_set_disposition(&compatible), CandidateSetDisposition::MultipleCandidates(
+            vec!["mechanism-basis-x".into(), "mechanism-basis-y".into()]
+        ));
+    }
+
+    #[test]
+    fn separating_observation_yields_one_candidate() {
+        let e = observational_equivalence_fixture();
+        let secret = EvaluatorSecret { true_hypothesis_id: "mechanism-basis-y".into(), noise_seed: 42 };
+        let receipt = execute_reference_probe(&e, &secret, "impulse-sensor-x").unwrap();
+        let probe = find_probe(&e, "impulse-sensor-x").unwrap();
+        let compatible = consistent_hypotheses(&e, probe, &receipt).unwrap();
+        assert_eq!(candidate_set_disposition(&compatible),
+            CandidateSetDisposition::UniqueCandidate("mechanism-basis-y".into()));
+    }
+
+    #[test]
+    fn no_candidate_fit_requires_model_revision_or_abstention() {
+        let e = observational_equivalence_fixture();
+        let other = LinearHypothesis {
+            hypothesis_id: "unlisted-mechanism".into(),
+            a: e.hypotheses[0].a.clone(),
+            b: vec![0.5, 0.5],
+            c: e.hypotheses[0].c.clone(),
+        };
+        let probe = find_probe(&e, "impulse-sensor-x").unwrap();
+        let trace = predict_trace(&other, &e.initial_state, probe.sensor_index, &probe.input_sequence).unwrap();
+        let receipt = ObservationReceipt {
+            episode_id: e.episode_id.clone(),
+            probe_id: probe.probe_id.clone(),
+            sensor_index: probe.sensor_index,
+            observed_trace: trace,
+            declared_noise_bound: e.sensor_noise_bound,
+        };
+        let compatible = consistent_hypotheses(&e, probe, &receipt).unwrap();
+        assert!(compatible.is_empty());
+        assert_eq!(candidate_set_disposition(&compatible), CandidateSetDisposition::NoCandidateFits);
     }
 
     #[test]
