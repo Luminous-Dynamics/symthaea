@@ -426,6 +426,7 @@ mod tests {
                 evidence_manifest: Some(&local_manifest),
                 source_audio_bytes: Some(SOURCE_AUDIO),
                 decoded_pcm_bytes: Some(PCM),
+                request_body_bytes: Some(REQUEST_BODY),
             },
             AudioEvidenceRevisionArmInput {
                 revision_case: &yoked_case,
@@ -483,6 +484,7 @@ mod tests {
                     evidence_manifest: Some(&yoked_manifest),
                     source_audio_bytes: Some(&yoked_source),
                     decoded_pcm_bytes: Some(&yoked_pcm),
+                    request_body_bytes: Some(YOKED_REQUEST_BODY),
                 },
             )
             .is_err()
@@ -507,6 +509,7 @@ mod tests {
                     evidence_manifest: None,
                     source_audio_bytes: None,
                     decoded_pcm_bytes: None,
+                    request_body_bytes: None,
                 },
                 AudioEvidenceRevisionArmInput {
                     revision_case: &local_case,
@@ -519,6 +522,7 @@ mod tests {
                     evidence_manifest: Some(&yoked_manifest),
                     source_audio_bytes: Some(&yoked_source),
                     decoded_pcm_bytes: Some(&yoked_pcm),
+                    request_body_bytes: Some(YOKED_REQUEST_BODY),
                 },
             )
             .is_err()
@@ -532,6 +536,7 @@ mod tests {
             &evidence_manifest(),
             SOURCE_AUDIO,
             PCM,
+            REQUEST_BODY,
         )
         .unwrap();
         assert_eq!(report.revision_report.final_score.f1, Some(1.0));
@@ -575,6 +580,7 @@ mod tests {
             &manifest,
             yoked_source,
             &yoked_pcm,
+            YOKED_REQUEST_BODY,
         )
         .unwrap();
         assert_eq!(report.audio_evidence_report.evidence_condition, AudioEvidenceConditionV1::YokedRetrieved);
@@ -594,6 +600,7 @@ mod tests {
             &manifest,
             yoked_source,
             &yoked_pcm,
+            YOKED_REQUEST_BODY,
         )
         .unwrap();
         let statement: serde_json::Value =
@@ -617,6 +624,7 @@ mod tests {
             &evidence_manifest(),
             SOURCE_AUDIO,
             PCM,
+            REQUEST_BODY,
         )
         .unwrap();
 
