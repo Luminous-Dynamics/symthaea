@@ -1,0 +1,197 @@
+# SDCB scientific measurement intelligence roadmap — 2026 Q4
+
+**Purpose:** consolidate the exact-reference, measurement-assurance, identifiability, continuous common-cause, and real-data evaluation work into one executable research programme.
+
+**Claim boundary:** the current portfolio consists of bounded research references and evaluation plans. It is not yet a validated physical measurement platform or an autonomous laboratory system.
+
+## 1. Research thesis
+
+A scientific agent must distinguish:
+
+1. the physical quantity or mechanism being investigated;
+2. the measurement system's shared and local uncertainty;
+3. the available experiments' ability to distinguish rival explanations;
+4. the downstream decision value of collecting more evidence;
+5. whether a particular evidence receipt is authentic, context-valid, and safe to apply.
+
+The intended architecture is:
+
+**scientific hypotheses + measurement graph → candidate experiment design → budget/identifiability gate → authorized execution → independent receipt verification → measurement-assurance gate → atomic belief transition → independent replay.**
+
+The central rule is that agreement between channels is not independent confirmation unless the relevant shared causes and provenance relationships have been accounted for.
+
+## 2. Public research stack
+
+| Contribution | Research capability | What it does not yet establish |
+|---|---|---|
+| #13762 | Exact finite instrument-aware sequential experiment design | Physical calibration, production selector |
+| #13793 | Exact finite multi-device Markov drift and replication reference | Shared common-cause transitions or OU dynamics |
+| #13802 | Real-sensor calibration/drift plan and measurement-assurance benchmark matrix | Raw-data benchmark execution |
+| #13804 | Exact finite two-stage shared-cause experiment-selection oracle | Continuous factors or compiled Rust result |
+| #13805 | Evidence-gated joint science/common/device posterior transition | Cryptographic authenticity or dynamic common-state propagation |
+| #13831 | Paired-world observational-equivalence and intervention-separation oracle | General causal discovery or sequential intervention trees |
+| #13848 | Continuous linear-Gaussian shared-factor measurement subset oracle | Full prior/residual covariance, dynamic drift, or physical validation |
+
+The PRs are research drafts. A mergeable GitHub state is not test evidence. Authored tests, independent analytical checks, local execution, hosted CI, and physical validation must remain distinct evidence levels.
+
+## 3. Paradigm shifts
+
+### 3.1 Measurement graph before sensor fusion
+
+Use an explicit dependency graph for:
+- physical measurands and spatial/temporal field dependence;
+- environment and acquisition-system factors;
+- calibration and reference-chain ancestry;
+- batch, operator, preparation, firmware, power and clock factors;
+- device-local bias and drift;
+- residual measurement noise.
+
+This graph prevents two different structures from being collapsed into one correlation coefficient. Correlation in the measurand is not the same as correlation in sensor error.
+
+### 3.2 Identifiability before confidence
+
+Before raising confidence in a scientific claim, maintain a set of plausible competing measurement/science worlds. Ask whether their predicted observation distributions differ under the current candidate experiment set. If not, confidence must not be manufactured by repetition or channel count.
+
+### 3.3 Target decision value before generic information gain
+
+Choose the quantity of interest and terminal action first. Report joint information gain as a diagnostic, but optimize target-parameter uncertainty or expected downstream utility when that is the scientific objective.
+
+### 3.4 Measurement assurance as a state, not a timestamp
+
+Calibration validity should depend on evidence about the specific instrument, standard, environment, use, stability and uncertainty budget. Keep contractual or safety capture-window rules as hard constraints, but do not mistake an arbitrary TTL for a measurement-assurance argument.
+
+### 3.5 Evidence receipts as part of scientific state
+
+A posterior transition must be bound to the exact task, model, hypothesis set, device/reference graph, calibration context, evidence versions, observation digest, verifier and cost. Invalid evidence must leave the entire scientific and measurement state unchanged.
+
+## 4. Next engineering increments
+
+### M0 — compile and exact-head verification
+
+- Obtain a Rust 2024 toolchain in a reproducible Nix/CI environment.
+- Run rustfmt, strict Clippy, and every test on the exact PR head.
+- Recompute JSON/schema/known-answer fixtures with a second implementation.
+- Record full SHAs and distinguish local from hosted execution.
+- Add adversarial negative controls before describing a reference as ready for merge.
+
+### M1 — full-covariance continuous Gaussian model
+
+Extend #13848 from independent Gaussian priors to a validated symmetric positive-definite prior covariance and, separately, an explicit residual covariance matrix.
+
+Represent a finite temporal OU/AR(1) process as correlated time-indexed latent states. Do not claim OU dynamics when the code only has independent per-time states.
+
+Required controls:
+- correlated prior states;
+- shared versus local factor attribution;
+- residual-correlation misspecification;
+- ill-conditioning and near-collinear science/factor loadings;
+- covariance symmetry, positive-definiteness and numerical stability;
+- matched exact small-matrix oracle.
+
+### M2 — sequential and robust design
+
+Extend #13831 and #13804 into exact two-stage contingent experiment trees:
+- second action selected from first outcome;
+- multiple paired causal worlds;
+- calibration refresh/reset actions;
+- common-cause state transition between stages;
+- hard pathwise and expected budgets kept separate;
+- abstention and partial-identifiability outcomes;
+- robust maximin over a frozen set of plausible covariance/noise scenarios.
+
+Keep finite exact policy enumeration as an evaluator; do not imply that a scalable policy is exact.
+
+### M3 — dynamic EGBT measurement state
+
+Propagate the global science posterior, shared-cause states, device-local states, calibration/reference ancestry, and evidence versions through time. Include stale-context handling, atomic update/reject semantics, verifier revocation, and independent replay.
+
+Keep three claims independent:
+1. receipt authenticity;
+2. measurement validity and uncertainty;
+3. scientific/model validity and identifiability.
+
+### M4 — real-data tournament
+
+- Reproduce Inha's published S1–S4 calibration baselines and splits.
+- Hold the calibration predictor fixed while comparing selection policies.
+- Hold the selection policy fixed while comparing calibration/uncertainty models.
+- Add a separately labelled synthetic common-cause intervention track with known ground truth.
+- Use UCI chronological batches only for their supported drift/channel tasks until dataset licence wording is clarified.
+- Do not infer physical common-cause mechanisms from unlabelled residual correlation.
+
+### M5 — HDC/CfC policy integration
+
+Use Symthaea's HDC/CfC systems to propose candidate experiments, approximate belief states, and generalize across candidate sets. Train against the exact finite oracles and test on held-out causal mechanisms, reference ancestries, device cohorts and time periods.
+
+The learned policy must not override:
+- exact finite negative-control results;
+- hard resource/safety budgets;
+- evidence acceptance rules;
+- abstention when the supplied model cannot discriminate the hypotheses.
+
+## 5. Benchmark programme
+
+Run three competitions, with a factorial decomposition:
+
+| Competition | Main question | Representative comparators |
+|---|---|---|
+| Prediction/calibration | How accurately and cheaply does the calibration model predict reference measurements? | Inha baselines: iTransformer, TimeXer, DLinear, XLinear, TimeMixer, SenDaL, TESLA, authors' model |
+| Experiment selection | Which measurements best reduce target scientific uncertainty or regret at matched cost? | Random/fixed, EIG, D-optimal, A-optimal, c-optimal, EVSI, hierarchical calibration, robust maximin, SDCB |
+| Evidence assurance | Are measurements correctly bound, independently verified, and replayable? | Stale/wrong-chain/duplicate/revoked controls, invalid-receipt mutation tests, replay |
+
+Mandatory factorial experiments:
+- fixed calibration model, change only selection policy;
+- fixed selection policy, change only uncertainty/calibration model;
+- cross both to measure interaction.
+
+## 6. Competitive gates
+
+Proposed research targets, not achievements or industry standards:
+
+- 100% agreement with exact finite oracles on frozen known-answer cases.
+- Zero hard-budget violations.
+- Zero invalid, stale, wrong-chain, or duplicate receipt acceptance in frozen controls.
+- Zero false independent-confirmation claims in shared-cause negative controls.
+- Non-inferiority on genuine independent-sensor controls.
+- At least 10% lower target scientific posterior variance per equal cost than matched i.i.d./hypothesis-only EIG on held-out shared-cause tasks, with paired confidence intervals excluding zero.
+- Approximate-policy regret no greater than 2% against exact small-instance oracles on the declared evaluation set.
+- Nominal 90% and 95% interval coverage assessed by task family, not just pooled.
+- Reproduced external calibration results before claiming an empirical SOTA comparison.
+- At least one independently executed, licensed real-data result before claiming a real-world benefit.
+
+Do not aggregate all measures into one score. Publish Pareto curves for scientific quality, reference cost, latency, memory, energy and assurance failures.
+
+## 7. What comparison with the field must acknowledge
+
+- NIST does not prescribe one universal recalibration interval; it points to application accuracy requirements, instrument stability, environmental effects, measurement-assurance programmes and control-chart evidence.
+- Metrological traceability requires an unbroken calibration chain with uncertainty contributions. A device label or a green status flag does not create traceability.
+- Published sensor-network studies already model space-time-correlated sensor errors and show that i.i.d. assumptions can change uncertainty calculations.
+- Recent optimal-design work already demonstrates that correlated observation noise can change optimal sampling schedules.
+- The Inha 2026 benchmark already evaluates reference-efficient calibration, unseen-location transfer, long-term drift, event-conditioned shifts, and edge deployment.
+
+Therefore, do not claim that SDCB invents correlated sensor models, calibration networks, optimal experiment design, or intervention-based identifiability. The testable differentiation is their integration with target-decision-aware selection, paired-world abstention, exact evaluator oracles, reference ancestry, and evidence-bound posterior transitions.
+
+## 8. External references and dataset caveats
+
+- NIST, [Recommended Calibration Interval](https://www.nist.gov/calibrations/recommended-calibration-interval).
+- NIST Technical Note 2156, [Metrological Traceability](https://www.nist.gov/metrology/metrological-traceability).
+- Kok et al. (2025), [Modelling and determining correlations in sensor networks](https://doi.org/10.1016/j.measen.2024.101793).
+- Qi & Baker (2026), [Optimal experimental design with observation noise](https://doi.org/10.1016/j.mbs.2025.109571).
+- Yun et al. (2026), [Low-cost indoor sensor calibration dataset and benchmark](https://arxiv.org/abs/2610.11236).
+
+The Inha study uses five locations in one building and fixed-interval event metadata; its S4 results vary by event. It is not five independent laboratories and does not identify the physical source of common residuals.
+
+The UCI Gas Sensor Array Drift pages contain conflicting licence descriptions: narrative text says research-only/no commercial use, while a structured field says CC BY 4.0. Treat as unresolved pending written clarification; no commercial-use or redistribution claim is authorized by this roadmap.
+
+## 9. Operational claim vocabulary
+
+Every public report must label each result as one of:
+- **Specified:** mathematical or protocol definition only.
+- **Analytically checked:** independent calculation of a known-answer fixture.
+- **Structurally checked:** fetched committed artifacts and schema/shape validation.
+- **Locally executed:** exact-head code was run locally with reproducible toolchain evidence.
+- **Hosted CI passed:** required workflows passed on the exact head.
+- **Externally reproduced:** independent implementation or evaluator reproduced the result.
+- **Physically validated:** declared real measurement procedure was executed with traceable evidence.
+
+Never promote a result to a stronger class because a branch is mergeable, a workflow is skipped, or an approximate policy agrees on one fixture.
