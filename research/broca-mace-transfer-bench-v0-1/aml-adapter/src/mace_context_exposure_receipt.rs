@@ -845,6 +845,18 @@ mod tests {
             MaceContextExposureRejectV1::MemoryExposureInNoMemoryArm);
     }
     #[test]
+    fn rejects_provider_parameter_profile_substitution() {
+        let (mut receipt, key, body) = fixture();
+        receipt.provider_parameter_profile_sha256 = D8.to_owned();
+        let digest = exposure_signature_digest_v1(&receipt).unwrap();
+        receipt.signature.signature_base64 = BASE64_STANDARD.encode(key.sign(&digest).to_bytes());
+        assert_eq!(
+            verify_fixture(&receipt, body, &key, &expected(), &AcceptEvidence).unwrap_err(),
+            MaceContextExposureRejectV1::WrongProviderParameterProfile
+        );
+    }
+
+    #[test]
     fn rejects_duplicate_and_unknown_fields() {
         let (receipt, _, _) = fixture();
         let json = serde_json::to_string(&receipt).unwrap();
