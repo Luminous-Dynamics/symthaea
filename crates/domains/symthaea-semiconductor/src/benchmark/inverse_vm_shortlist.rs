@@ -17,6 +17,8 @@ pub const INVERSE_VM_SHORTLIST_POLICY_SCHEMA_V1: &str =
     "luminous.semi-bench.inverse-vm-shortlist-policy.v1";
 pub const INVERSE_VM_SHORTLIST_REPORT_SCHEMA_V1: &str =
     "luminous.semi-bench.inverse-vm-shortlist-report.v1";
+pub const FORWARD_EVALUATION_RECEIPT_SCHEMA_V1: &str =
+    "luminous.semi-bench.inverse-vm-forward-evaluation-receipt.v1";
 
 #[derive(Clone, Copy, Debug, Eq, PartialEq, Serialize, Deserialize)]
 #[serde(rename_all = "snake_case")]
@@ -59,6 +61,14 @@ pub enum CandidateScreenReasonV1 {
     DuplicateSupportNeighbour,
     InvalidSupportNeighbourId,
     ForwardModelDigestMismatch,
+    ForwardEvaluationReceiptMissing,
+    ForwardEvaluationReceiptSchemaMismatch,
+    ForwardEvaluationReceiptDigestMismatch,
+    ForwardEvaluationReceiptContextMismatch,
+    ForwardEvaluationReceiptRecipeMismatch,
+    ForwardEvaluationReceiptPredictionMismatch,
+    ForwardEvaluationReceiptStatusMismatch,
+    ForwardEvaluationReceiptNotYetAvailable,
     ForwardEvidenceUnknown,
     ForwardEvidenceRejected,
     MissingRequiredPrediction,
@@ -124,6 +134,21 @@ pub struct HistoricalSupportEvidenceV1 {
 }
 
 #[derive(Clone, Debug, PartialEq, Serialize, Deserialize)]
+pub struct ForwardEvaluationReceiptV1 {
+    pub schema: String,
+    pub evaluator_id: String,
+    pub process_snapshot_sha256: String,
+    pub forward_model_sha256: String,
+    pub model_qualification_report_sha256: Option<String>,
+    pub recipe_settings_sha256: String,
+    pub predicted_metrics_sha256: String,
+    pub evidence_state: ForwardEvidenceStateV1,
+    pub evaluated_at_unix_seconds: i64,
+    pub available_at_unix_seconds: i64,
+    pub receipt_sha256: String,
+}
+
+#[derive(Clone, Debug, PartialEq, Serialize, Deserialize)]
 pub struct InverseVmCandidateV1 {
     pub candidate_id: String,
     pub process_snapshot_sha256: String,
@@ -131,6 +156,7 @@ pub struct InverseVmCandidateV1 {
     pub historical_support: Option<HistoricalSupportEvidenceV1>,
     pub forward_model_sha256: String,
     pub forward_evidence_state: ForwardEvidenceStateV1,
+    pub forward_evaluation_receipt: Option<ForwardEvaluationReceiptV1>,
     pub predicted_metrics: Vec<PredictedMetricIntervalV1>,
     pub candidate_evidence_sha256: String,
 }
@@ -167,6 +193,8 @@ pub struct InverseVmShortlistInputV1 {
     pub schema: String,
     pub input_id: String,
     pub process_snapshot_sha256: String,
+    /// Decision knowledge frontier; forward receipts available later cannot be used.
+    pub decision_at_unix_seconds: i64,
     pub policy: InverseVmShortlistPolicyV1,
     pub candidates: Vec<InverseVmCandidateV1>,
 }
@@ -239,6 +267,39 @@ fn range_is_valid(range: &NumericRangeV1) -> bool {
 
 fn range_contains(outer: &NumericRangeV1, inner_lower: f64, inner_upper: f64) -> bool {
     inner_lower >= outer.lower && inner_upper <= outer.upper
+}
+
+fn recipe_settings_digest(
+    settings: &[RecipeSettingV1],
+) -> Result<String, InverseVmShortlistErrorV1> {
+    let mut canonical = settings.to_vec();
+    canonical.sort_by(|left, right| left.knob_id.cmp(&right.knob_id));
+    json_sha256(&canonical)
+}
+
+fn predicted_metrics_digest(
+    metrics: &[PredictedMetricIntervalV1],
+) -> Result<String, InverseVmShortlistErrorV1> {
+    let mut canonical = metrics.to_vec();
+    canonical.sort_by(|left, right| left.measurand_id.cmp(&right.measurand_id));
+    json_sha256(&canonical)
+}
+
+fn forward_receipt_digest(
+    receipt: &ForwardEvaluationReceiptV1,
+) -> Result<String, InverseVmShortlistErrorV1> {
+    let mut canonical = receipt.clone();
+    canonical.receipt_sha256.clear();
+    json_sha256(&canonical)
+}
+
+/// Seals a forward-evaluation receipt after the evaluator has frozen the
+/// process snapshot, model, recipe vector and prediction interval outputs.
+/// A content digest provides replayable identity, not issuer authentication.
+pub fn seal_forward_evaluation_receipt_v1(
+    receipt: &ForwardEvaluationReceiptV1,
+) -> Result<String, InverseVmShortlistErrorV1> {
+    forward_receipt_digest(receipt)
 }
 
 fn candidate_digest(candidate: &InverseVmCandidateV1) -> Result<String, InverseVmShortlistErrorV1> {
@@ -386,6 +447,68 @@ fn normalized_recipe_distance(
     }
 }
 
+fn validate_forward_evaluation_receipt(
+    input: &InverseVmShortlistInputV1,
+    candidate: &InverseVmCandidateV1,
+) -> Result<Vec<CandidateScreenReasonV1>, InverseVmShortlistErrorV1> {
+    let mut reasons = Vec::new();
+    let Some(receipt) = candidate.forward_evaluation_receipt.as_ref() else {
+        reasons.push(CandidateScreenReasonV1::ForwardEvaluationReceiptMissing);
+        return Ok(reasons);
+    };
+
+    if receipt.schema != FORWARD_EVALUATION_RECEIPT_SCHEMA_V1 {
+        reasons.push(CandidateScreenReasonV1::ForwardEvaluationReceiptSchemaMismatch);
+    }
+    require_text(&receipt.evaluator_id, "forward_receipt.evaluator_id")?;
+    if !valid_sha256(&receipt.receipt_sha256)
+        || forward_receipt_digest(receipt)? != receipt.receipt_sha256
+    {
+        reasons.push(CandidateScreenReasonV1::ForwardEvaluationReceiptDigestMismatch);
+    }
+
+    let recipe_digest = recipe_settings_digest(&candidate.recipe_settings)?;
+    let metrics_digest = predicted_metrics_digest(&candidate.predicted_metrics)?;
+    if receipt.process_snapshot_sha256 != input.process_snapshot_sha256
+        || receipt.process_snapshot_sha256 != candidate.process_snapshot_sha256
+        || receipt.forward_model_sha256 != candidate.forward_model_sha256
+    {
+        reasons.push(CandidateScreenReasonV1::ForwardEvaluationReceiptContextMismatch);
+    }
+    if receipt.recipe_settings_sha256 != recipe_digest {
+        reasons.push(CandidateScreenReasonV1::ForwardEvaluationReceiptRecipeMismatch);
+    }
+    if receipt.predicted_metrics_sha256 != metrics_digest {
+        reasons.push(CandidateScreenReasonV1::ForwardEvaluationReceiptPredictionMismatch);
+    }
+    if receipt.evidence_state != candidate.forward_evidence_state {
+        reasons.push(CandidateScreenReasonV1::ForwardEvaluationReceiptStatusMismatch);
+    }
+    if receipt.evaluated_at_unix_seconds < 0
+        || receipt.available_at_unix_seconds < receipt.evaluated_at_unix_seconds
+    {
+        reasons.push(CandidateScreenReasonV1::ForwardEvaluationReceiptContextMismatch);
+    }
+    if receipt.available_at_unix_seconds > input.decision_at_unix_seconds {
+        reasons.push(CandidateScreenReasonV1::ForwardEvaluationReceiptNotYetAvailable);
+    }
+    match receipt.evidence_state {
+        ForwardEvidenceStateV1::Qualified => {
+            if receipt
+                .model_qualification_report_sha256
+                .as_deref()
+                .is_none_or(|digest| !valid_sha256(digest))
+            {
+                reasons.push(CandidateScreenReasonV1::ForwardEvaluationReceiptDigestMismatch);
+            }
+        }
+        ForwardEvidenceStateV1::Unknown | ForwardEvidenceStateV1::Rejected => {}
+    }
+    reasons.sort();
+    reasons.dedup();
+    Ok(reasons)
+}
+
 fn screen_candidate(
     input: &InverseVmShortlistInputV1,
     candidate: &InverseVmCandidateV1,
@@ -501,6 +624,21 @@ fn screen_candidate(
     {
         reasons.push(CandidateScreenReasonV1::ForwardModelDigestMismatch);
         state = CandidateScreenStateV1::Rejected;
+    }
+    let forward_receipt_reasons = validate_forward_evaluation_receipt(input, candidate)?;
+    for reason in forward_receipt_reasons {
+        let receipt_is_late =
+            reason == CandidateScreenReasonV1::ForwardEvaluationReceiptNotYetAvailable;
+        reasons.push(reason);
+        if state != CandidateScreenStateV1::Rejected {
+            state = if receipt_is_late
+                || reason == CandidateScreenReasonV1::ForwardEvaluationReceiptMissing
+            {
+                CandidateScreenStateV1::Unknown
+            } else {
+                CandidateScreenStateV1::Rejected
+            };
+        }
     }
     match candidate.forward_evidence_state {
         ForwardEvidenceStateV1::Qualified => {}
@@ -938,6 +1076,7 @@ mod tests {
             }),
             forward_model_sha256: digest('b'),
             forward_evidence_state: ForwardEvidenceStateV1::Qualified,
+            forward_evaluation_receipt: None,
             predicted_metrics: vec![
                 PredictedMetricIntervalV1 {
                     measurand_id: "epi_thickness".into(),
@@ -954,8 +1093,27 @@ mod tests {
             ],
             candidate_evidence_sha256: String::new(),
         };
+        value.forward_evaluation_receipt = Some(forward_receipt(&value));
         value.candidate_evidence_sha256 = candidate_digest(&value).unwrap();
         value
+    }
+
+    fn forward_receipt(candidate: &InverseVmCandidateV1) -> ForwardEvaluationReceiptV1 {
+        let mut receipt = ForwardEvaluationReceiptV1 {
+            schema: FORWARD_EVALUATION_RECEIPT_SCHEMA_V1.into(),
+            evaluator_id: "forward-evaluator.v1".into(),
+            process_snapshot_sha256: candidate.process_snapshot_sha256.clone(),
+            forward_model_sha256: candidate.forward_model_sha256.clone(),
+            model_qualification_report_sha256: Some(digest('f')),
+            recipe_settings_sha256: recipe_settings_digest(&candidate.recipe_settings).unwrap(),
+            predicted_metrics_sha256: predicted_metrics_digest(&candidate.predicted_metrics).unwrap(),
+            evidence_state: candidate.forward_evidence_state,
+            evaluated_at_unix_seconds: 100,
+            available_at_unix_seconds: 110,
+            receipt_sha256: String::new(),
+        };
+        receipt.receipt_sha256 = forward_receipt_digest(&receipt).unwrap();
+        receipt
     }
 
     fn input(candidates: Vec<InverseVmCandidateV1>) -> InverseVmShortlistInputV1 {
@@ -963,6 +1121,7 @@ mod tests {
             schema: INVERSE_VM_SHORTLIST_INPUT_SCHEMA_V1.into(),
             input_id: "inverse-epi-input-001".into(),
             process_snapshot_sha256: digest('e'),
+            decision_at_unix_seconds: 2_000,
             policy: policy(),
             candidates,
         }
@@ -1149,6 +1308,7 @@ mod tests {
             schema: INVERSE_VM_SHORTLIST_INPUT_SCHEMA_V1.into(),
             input_id: "diversity-minimum-test".into(),
             process_snapshot_sha256: digest('e'),
+            decision_at_unix_seconds: 2_000,
             policy,
             candidates: vec![a, b],
         };
