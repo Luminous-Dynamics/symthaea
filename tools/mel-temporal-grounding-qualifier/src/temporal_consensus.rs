@@ -271,10 +271,14 @@ pub fn audit_multi_annotator_case(
             })?;
         let fully_correct_for_this_annotation = fully_correct(&score);
 
-        let start_errors: Vec<_> = score.matches.iter()
+        let start_errors: Vec<_> = score
+            .matches
+            .iter()
             .map(|matched| matched.start_error_frames.unsigned_abs() as f64)
             .collect();
-        let end_errors: Vec<_> = score.matches.iter()
+        let end_errors: Vec<_> = score
+            .matches
+            .iter()
             .map(|matched| matched.end_error_frames.unsigned_abs() as f64)
             .collect();
         results.push(AnnotatorGroundingResultV1 {
@@ -344,18 +348,16 @@ fn pairwise_annotation_concordance(
                 let right_truth = annotation_to_truth(case, right);
                 let left_as_prediction = annotation_to_prediction(case, left);
                 let right_as_prediction = annotation_to_prediction(case, right);
-                let left_score = score_temporal_grounding(
-                    &left_truth,
-                    &right_as_prediction,
-                    &case.plan,
-                )
-                .map_err(|issues| format!("left-to-right annotation comparison failed: {issues:?}"))?;
-                let right_score = score_temporal_grounding(
-                    &right_truth,
-                    &left_as_prediction,
-                    &case.plan,
-                )
-                .map_err(|issues| format!("right-to-left annotation comparison failed: {issues:?}"))?;
+                let left_score =
+                    score_temporal_grounding(&left_truth, &right_as_prediction, &case.plan)
+                        .map_err(|issues| {
+                            format!("left-to-right annotation comparison failed: {issues:?}")
+                        })?;
+                let right_score =
+                    score_temporal_grounding(&right_truth, &left_as_prediction, &case.plan)
+                        .map_err(|issues| {
+                            format!("right-to-left annotation comparison failed: {issues:?}")
+                        })?;
                 (Some(left_score), Some(right_score))
             } else {
                 (None, None)
@@ -839,8 +841,20 @@ mod tests {
         ];
         let input = case(
             vec![
-                annotation('1', 'a', GroundTruthStateV1::Present, intervals.clone(), None),
-                annotation('2', 'b', GroundTruthStateV1::Present, intervals.clone(), None),
+                annotation(
+                    '1',
+                    'a',
+                    GroundTruthStateV1::Present,
+                    intervals.clone(),
+                    None,
+                ),
+                annotation(
+                    '2',
+                    'b',
+                    GroundTruthStateV1::Present,
+                    intervals.clone(),
+                    None,
+                ),
             ],
             prediction(intervals),
         );
@@ -855,8 +869,14 @@ mod tests {
         assert_eq!(pair.mean_matched_interval_iou, Some(1.0));
         assert_eq!(pair.exact_occurrence_count_agreement, Some(true));
         assert_eq!(report.summary.pairwise_annotation_pairs, 1);
-        assert_eq!(report.summary.pairwise_disposition_agreement_rate, Some(1.0));
-        assert_eq!(report.summary.pairwise_present_symmetric_event_f1, Some(1.0));
+        assert_eq!(
+            report.summary.pairwise_disposition_agreement_rate,
+            Some(1.0)
+        );
+        assert_eq!(
+            report.summary.pairwise_present_symmetric_event_f1,
+            Some(1.0)
+        );
         assert!(!report.pairwise_inter_annotator_agreement_computed);
     }
 
@@ -964,13 +984,7 @@ mod tests {
                     }],
                     None,
                 ),
-                annotation(
-                    '2',
-                    'b',
-                    GroundTruthStateV1::Absent,
-                    Vec::new(),
-                    None,
-                ),
+                annotation('2', 'b', GroundTruthStateV1::Absent, Vec::new(), None),
                 annotation(
                     '3',
                     'c',
@@ -1004,7 +1018,10 @@ mod tests {
                 .iter()
                 .all(|pair| pair.symmetric_present_event_f1.is_none())
         );
-        assert_eq!(report.summary.pairwise_disposition_agreement_rate, Some(0.0));
+        assert_eq!(
+            report.summary.pairwise_disposition_agreement_rate,
+            Some(0.0)
+        );
     }
 
     #[test]
