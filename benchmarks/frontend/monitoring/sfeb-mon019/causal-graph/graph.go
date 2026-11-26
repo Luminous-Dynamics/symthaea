@@ -27,6 +27,7 @@ const (
 	AuthorizedBy EdgeKind = "authorized_by"
 	InformedBy EdgeKind = "informed_by"
 	AssociatedWith EdgeKind = "associated_with"
+	AttributedTo EdgeKind = "attributed_to"
 	ObservedBy EdgeKind = "observed_by"
 	Precedes EdgeKind = "precedes"
 	Supersedes EdgeKind = "supersedes"
@@ -133,6 +134,7 @@ func edgeTypeValid(e Edge, nodes map[string]Node) bool {
 	case AuthorizedBy: return a.Kind==Entity && b.Kind==Activity
 	case InformedBy,Precedes: return a.Kind==Activity && b.Kind==Activity
 	case AssociatedWith: return a.Kind==Activity && b.Kind==Agent
+	case AttributedTo: return a.Kind==Entity && b.Kind==Agent
 	default: return false
 	}
 }
@@ -195,14 +197,27 @@ func Evaluate(g Graph,pins map[string]VerifierPin) Result {
 		if !ok || ev.Kind!=Entity { return result(Indeterminate,"edge evidence entity missing: "+e.ID,checked...) }
 		if !ev.RequiresVerification { return result(Indeterminate,"edge evidence lacks a required authenticated source-verifier claim: "+e.ID,checked...) }
 		edges[e.ID]=e
-		if e.Kind!=Supersedes { adj[e.From]=append(adj[e.From],e.To) }
+		if e.Kind!=Supersedes && e.Kind!=AttributedTo { adj[e.From]=append(adj[e.From],e.To) }
 		if e.Kind==Used { incomingUsed[e.To]=append(incomingUsed[e.To],e.From) }
 		if e.Kind==Generated { generatedBy[e.To]++ }
 	}
 	checked=append(checked,"edge-endpoints","edge-evidence-references")
+	attributedTo:=map[string]string{}
+	for _,e:=range g.Edges {
+		if e.Kind==AttributedTo {
+			if prior,ok:=attributedTo[e.From];ok && prior!=e.To { return result(Divergent,"entity attributed to conflicting source agents: "+e.From,checked...) }
+			attributedTo[e.From]=e.To
+		}
+	}
 	for id,n:=range nodes {
 		if n.Kind==Entity {
 			if generatedBy[id]>1 { return result(Divergent,"immutable entity has conflicting generation edges: "+id,checked...) }
+			if n.ExternalRoot {
+				agent,ok:=nodes[n.SourceID]
+				if !nonempty(n.SourceID) || !ok || agent.Kind!=Agent || !agent.RequiresVerification || attributedTo[id]!=n.SourceID {
+					return result(Indeterminate,"external entity lacks a verifier-qualified source attribution: "+id,checked...)
+				}
+			}
 			if generatedBy[id]==0 && !n.ExternalRoot {
 				used:=false
 				for _,e:=range g.Edges { if e.Kind==Used&&e.From==id { used=true;break } }
