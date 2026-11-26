@@ -1,0 +1,70 @@
+{
+  "schema_version": "1.0.0",
+  "fixture_id": "rpsd-hard-safety-pareto-v1",
+  "execution_kind": "independent_pareto_reference_calculation",
+  "rust_compiled_or_executed": false,
+  "expected_actions": [
+    {
+      "action_id": "balanced",
+      "expected_objectives": [
+        8,
+        -1
+      ]
+    },
+    {
+      "action_id": "safe",
+      "expected_objectives": [
+        6,
+        0
+      ]
+    }
+  ],
+  "excluded_actions": [
+    {
+      "action_id": "fast",
+      "posterior_average": [
+        10,
+        -1.5
+      ],
+      "minimum_safety_margin_over_hypotheses": -4,
+      "required_minimum": -2,
+      "reason": "violates hard bound under h1 even though the posterior mean clears the threshold"
+    }
+  ],
+  "experiment_policy_frontier": [
+    {
+      "actions_by_outcome": [
+        "balanced",
+        "balanced"
+      ],
+      "expected_objectives": [
+        8,
+        -1
+      ],
+      "cost_units": 1
+    },
+    {
+      "actions_by_outcome": [
+        "balanced",
+        "safe"
+      ],
+      "expected_objectives": [
+        7,
+        -0.5
+      ],
+      "cost_units": 1
+    },
+    {
+      "actions_by_outcome": [
+        "safe",
+        "safe"
+      ],
+      "expected_objectives": [
+        6,
+        0
+      ],
+      "cost_units": 1
+    }
+  ],
+  "claim_ceiling": "finite_pareto_and_hard_constraint_fixture_only"
+}
