@@ -10,6 +10,7 @@ on:
       - research/mel-annotator-reliability-v1-20261125
       - research/mel-annotation-acquisition-v1-20261125
       - research/mel-annotation-audit-estimator-v1-20261125
+      - research/mel-annotation-marginal-value-v1-20261126
     paths:
       - "crates/domains/symthaea-muse/src/temporal_grounding.rs"
       - "crates/domains/symthaea-muse/src/evidence_digest.rs"
@@ -65,13 +66,11 @@ jobs:
         with:
           components: rustfmt, clippy
 
-      - name: Bootstrap canonical Rust 1.96 formatting
-        run: |
-          set -euo pipefail
-          cargo +1.96.0 fmt --manifest-path tools/mel-temporal-grounding-qualifier/Cargo.toml
-          cargo +1.96.0 fmt --manifest-path tools/mel-temporal-grounding-qualifier/Cargo.toml --check
+      - name: Normalize exact-source formatting on branch push
+        if: github.event_name == 'push'
+        run: cargo +1.96.0 fmt --manifest-path tools/mel-temporal-grounding-qualifier/Cargo.toml
 
-      - name: Commit formatter-normalized source on push
+      - name: Commit canonical formatting on branch push
         if: github.event_name == 'push'
         shell: bash
         run: |
@@ -81,10 +80,11 @@ jobs:
             git config user.name "github-actions[bot]"
             git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
             git commit -m "MEL: apply canonical Rust 1.96 formatting"
-            git push origin "HEAD:${GITHUB_REF_NAME}"
+            git push origin "HEAD:refs/heads/${GITHUB_REF_NAME}"
           fi
-          test -z "$(git status --porcelain)"
-          printf 'tested_head_after_format=%s\n' "$(git rev-parse HEAD)"
+
+      - name: Check committed exact-source formatting
+        run: cargo +1.96.0 fmt --manifest-path tools/mel-temporal-grounding-qualifier/Cargo.toml --check
 
       - name: Verify committed lock and workspace resolution
         shell: bash
@@ -158,6 +158,26 @@ jobs:
         run: |
           set -euo pipefail
           cargo +1.96.0 run --locked --manifest-path tools/mel-temporal-grounding-qualifier/Cargo.toml --bin mel-temporal-reliability-audit -- tools/mel-temporal-grounding-qualifier/fixtures/mel-temporal-reliability-six-items.synthetic.json > "$RUNNER_TEMP/temporal-reliability-report.json"
+          jq '{
+            summary: {
+              dataset_items: .summary.dataset_items,
+              source_work_clusters: .summary.source_work_clusters,
+              unique_annotator_identities: .summary.unique_annotator_identities,
+              nominal_state_agreement_pairs: .summary.nominal_state_agreement_pairs,
+              present_absent_disagreement_pairs: .summary.present_absent_disagreement_pairs,
+              present_present_interval_pairs: .summary.present_present_interval_pairs,
+              state_reliability: .summary.state_reliability,
+              boundary_tolerance_agreement: .summary.boundary_tolerance_agreement
+            },
+            model_grounding_summary: .model_grounding_summary,
+            pairwise_results: (.pairwise_results | length),
+            bootstrap: {
+              source_work_clusters: .bootstrap.source_work_clusters,
+              boundary_tolerance_agreement: .bootstrap.boundary_tolerance_agreement,
+              confirmatory_source_cluster_floor_met: .bootstrap.confirmatory_source_cluster_floor_met
+            },
+            population_confidence_claim_permitted: .population_confidence_claim_permitted
+          }' "$RUNNER_TEMP/temporal-reliability-report.json"
           jq -e '
             .schema == "mel-multi-annotator-reliability-report-v1"
             and .summary.dataset_items == 6
@@ -166,8 +186,11 @@ jobs:
             and .model_grounding_summary.query_items == 6
             and .model_grounding_summary.present_items == 3
             and .model_grounding_summary.one_to_many_items == 3
-            and .model_grounding_summary.absent_items == 3
-            and .model_grounding_summary.prediction_coverage == 1.0
+            and .model_grounding_summary.absent_items == 4
+            and .model_grounding_summary.items_with_present_annotations == 3
+            and .model_grounding_summary.items_with_absent_annotations == 4
+            and .model_grounding_summary.mixed_present_absent_items == 1
+            and .model_grounding_summary.source_work_macro_prediction_coverage == 1.0
             and .model_grounding_summary.model_confidence_calibration_computed == false
             and (.model_grounding_by_item | length) == 6
             and .model_grounding_by_item[0].prediction.query_id == .model_grounding_by_item[0].query_id
@@ -228,6 +251,40 @@ jobs:
             and .synthetic_consensus_ground_truth_created == false
             and .population_confidence_interval_computed == false
           ' "$RUNNER_TEMP/multi-annotator-report.json" > /dev/null
+
+      - name: Replay marginal annotation value controls when module is present
+        if: hashFiles('tools/mel-temporal-grounding-qualifier/src/temporal_annotation_value.rs') != ''
+        shell: bash
+        run: |
+          set -euo pipefail
+          cargo +1.96.0 run --locked --manifest-path tools/mel-temporal-grounding-qualifier/Cargo.toml --bin mel-annotation-marginal-value-audit -- tools/mel-temporal-grounding-qualifier/fixtures/mel-annotation-marginal-value-aligned.synthetic.json > "$RUNNER_TEMP/marginal-value-aligned.json"
+          jq -e '
+            .schema == "mel-temporal-annotation-marginal-value-report-v1"
+            and .before.frozen_decision_state == "NeedsReview"
+            and .after.frozen_decision_state == "SufficientlySupportedPresent"
+            and .decision_transition == "NeedsReview->SufficientlySupportedPresent"
+            and .disposition_entropy_delta_bits == 0.0
+            and .after.pairwise_present_symmetric_event_f1 == 1.0
+            and .active_listening_minutes == 2.0
+            and .active_review_minutes == 4.0
+            and .elapsed_wall_minutes == 5.0
+            and .annotation_record_count_delta == 1
+            and .selection_receipt_authenticated == false
+            and .session_receipt_authenticated == false
+            and .population_estimate_computed == false
+            and .single_marginal_value_score_created == false
+          ' "$RUNNER_TEMP/marginal-value-aligned.json" > /dev/null
+
+          cargo +1.96.0 run --locked --manifest-path tools/mel-temporal-grounding-qualifier/Cargo.toml --bin mel-annotation-marginal-value-audit -- tools/mel-temporal-grounding-qualifier/fixtures/mel-annotation-marginal-value-ambiguous.synthetic.json > "$RUNNER_TEMP/marginal-value-ambiguous.json"
+          jq -e '
+            .before.disposition_entropy_bits == 0.0
+            and .after.disposition_entropy_bits > 0.0
+            and .after.ambiguous_annotations == 1
+            and .after.absent_annotations == 0
+            and .after.frozen_decision_state == "NeedsReview"
+            and .disposition_entropy_delta_bits > 0.0
+            and .synthetic_consensus_ground_truth_created == false
+          ' "$RUNNER_TEMP/marginal-value-ambiguous.json" > /dev/null
 
       - name: Replay paired temporal revision when module is present
         if: hashFiles('tools/mel-temporal-grounding-qualifier/src/temporal_revision.rs') != ''
@@ -296,6 +353,17 @@ jobs:
             cp docs/research/MEL-GROUND-009-TWO-STAGE-DESIGN-BASED-ANNOTATION-ESTIMATOR-V1.md "$evidence/"
             if [[ -f "$RUNNER_TEMP/two-stage-design-estimator-report.json" ]]; then
               cp "$RUNNER_TEMP/two-stage-design-estimator-report.json" "$evidence/"
+            fi
+          fi
+          if [[ -f tools/mel-temporal-grounding-qualifier/src/temporal_annotation_value.rs ]]; then
+            cp tools/mel-temporal-grounding-qualifier/src/temporal_annotation_value.rs "$evidence/"
+            cp tools/mel-temporal-grounding-qualifier/src/bin/mel-annotation-marginal-value-audit.rs "$evidence/"
+            cp tools/mel-temporal-grounding-qualifier/schemas/mel-temporal-annotation-marginal-value-v1.schema.json "$evidence/"
+            cp tools/mel-temporal-grounding-qualifier/fixtures/mel-annotation-marginal-value-aligned.synthetic.json "$evidence/"
+            cp tools/mel-temporal-grounding-qualifier/fixtures/mel-annotation-marginal-value-ambiguous.synthetic.json "$evidence/"
+            if [[ -f "$RUNNER_TEMP/marginal-value-aligned.json" ]]; then
+              cp "$RUNNER_TEMP/marginal-value-aligned.json" "$evidence/"
+              cp "$RUNNER_TEMP/marginal-value-ambiguous.json" "$evidence/"
             fi
           fi
           if [[ -f tools/mel-temporal-grounding-qualifier/src/temporal_consensus.rs ]]; then

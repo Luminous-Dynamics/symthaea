@@ -282,6 +282,21 @@ pub fn plan_annotation_acquisition_json(
     plan_annotation_acquisition(&dataset)
 }
 
+type ProbabilityAuditSelectionResult = (
+    Vec<AnnotationSelectionRecordV1>,
+    Vec<UnmetAnnotationQuotaV1>,
+    u64,
+    usize,
+    Vec<ProbabilityAuditStratumDesignV1>,
+);
+
+type ActiveSelectionResult = (
+    Vec<AnnotationSelectionRecordV1>,
+    Vec<UnmetAnnotationQuotaV1>,
+    u64,
+    BTreeMap<String, u32>,
+);
+
 #[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
 #[serde(deny_unknown_fields)]
 pub struct AnnotationAcquisitionDatasetV1 {
@@ -359,9 +374,9 @@ pub fn plan_annotation_acquisition(
     let (probability_audit, audit_unmet, audit_spent, audit_source_works, audit_design) =
         select_probability_audit(&candidates, &eligible_audit, &config, &mut random_state)?;
 
-    let audit_source_set: BTreeSet<_> = probability_audit
+    let audit_source_set: BTreeSet<String> = probability_audit
         .iter()
-        .map(|selection| selection.source_work_id_sha256.as_str())
+        .map(|selection| selection.source_work_id_sha256.clone())
         .collect();
 
     let (active_refinement, active_unmet, active_spent, active_source_counts) =
@@ -481,10 +496,10 @@ pub fn plan_annotation_acquisition(
 
     // The active selector must never use any source work that entered the
     // probability audit. This second check protects future edits to either arm.
-    let active_sources: BTreeSet<_> = report
+    let active_sources: BTreeSet<String> = report
         .active_refinement
         .iter()
-        .map(|selection| selection.source_work_id_sha256.as_str())
+        .map(|selection| selection.source_work_id_sha256.clone())
         .collect();
     if !active_sources.is_disjoint(&audit_source_set) {
         return Err("active and probability-audit source-work sets overlap".into());
@@ -644,13 +659,13 @@ fn validate_candidates(candidates: &[AnnotationAcquisitionCandidateV1]) -> Resul
                 ));
             }
         }
-        if let Some(receipt) = candidate.authorization_receipt_sha256.as_deref() {
-            if !is_digest(receipt) {
-                return Err(format!(
-                    "candidate {} has an invalid authorization receipt digest",
-                    candidate.item_id
-                ));
-            }
+        if let Some(receipt) = candidate.authorization_receipt_sha256.as_deref()
+            && !is_digest(receipt)
+        {
+            return Err(format!(
+                "candidate {} has an invalid authorization receipt digest",
+                candidate.item_id
+            ));
         }
         if let Some((role, stratum)) = source_metadata.get(candidate.source_work_id_sha256.as_str())
         {
@@ -761,16 +776,7 @@ fn select_probability_audit(
     eligible: &[usize],
     config: &AnnotationAcquisitionConfigV1,
     rng: &mut u64,
-) -> Result<
-    (
-        Vec<AnnotationSelectionRecordV1>,
-        Vec<UnmetAnnotationQuotaV1>,
-        u64,
-        usize,
-        Vec<ProbabilityAuditStratumDesignV1>,
-    ),
-    String,
-> {
+) -> Result<ProbabilityAuditSelectionResult, String> {
     let mut by_stratum: BTreeMap<&str, BTreeMap<&str, Vec<usize>>> = BTreeMap::new();
     for index in eligible {
         let candidate = &candidates[*index];
@@ -880,24 +886,22 @@ fn select_probability_audit(
                         item_indices.swap(index, selected);
                     }
 
-                    let source_probability = ProbabilityFractionV1 {
-                        numerator: selected_sources as u64,
-                        denominator: eligible_sources as u64,
-                    };
-                    let conditional_probability = ProbabilityFractionV1 {
-                        numerator: selected_items_in_source_work as u64,
-                        denominator: eligible_items_in_source_work as u64,
-                    };
+                    let source_probability = reduced_probability_fraction(
+                        selected_sources as u64,
+                        eligible_sources as u64,
+                    )?;
+                    let conditional_probability = reduced_probability_fraction(
+                        selected_items_in_source_work as u64,
+                        eligible_items_in_source_work as u64,
+                    )?;
                     let inclusion_numerator = (selected_sources as u64)
                         .checked_mul(selected_items_in_source_work as u64)
                         .ok_or_else(|| "audit item inclusion numerator overflow".to_string())?;
                     let inclusion_denominator = (eligible_sources as u64)
                         .checked_mul(eligible_items_in_source_work as u64)
                         .ok_or_else(|| "audit item inclusion denominator overflow".to_string())?;
-                    let inclusion_probability = ProbabilityFractionV1 {
-                        numerator: inclusion_numerator,
-                        denominator: inclusion_denominator,
-                    };
+                    let inclusion_probability =
+                        reduced_probability_fraction(inclusion_numerator, inclusion_denominator)?;
 
                     for item_index in item_indices.into_iter().take(selected_items_in_source_work) {
                         let candidate = &candidates[item_index];
@@ -906,13 +910,15 @@ fn select_probability_audit(
                             SelectionStreamV1::ProbabilityAudit,
                             None,
                             SelectionReasonV1::UniformSourceWorkProbabilityDraw,
-                            Some(source_probability),
-                            Some(conditional_probability),
-                            Some(inclusion_probability),
-                            Some(eligible_sources),
-                            Some(selected_sources),
-                            Some(eligible_items_in_source_work),
-                            Some(selected_items_in_source_work),
+                            SelectionDesignMetadataV1 {
+                                source_work_probability: Some(source_probability),
+                                item_given_source_probability: Some(conditional_probability),
+                                item_probability: Some(inclusion_probability),
+                                eligible_source_works_in_stratum: Some(eligible_sources),
+                                selected_source_works_in_stratum: Some(selected_sources),
+                                eligible_items_in_source_work: Some(eligible_items_in_source_work),
+                                selected_items_in_source_work: Some(selected_items_in_source_work),
+                            },
                         ));
                         spent = spent
                             .checked_add(candidate.annotation_cost_units)
@@ -956,35 +962,68 @@ fn select_probability_audit(
     Ok((selections, unmet, spent, selected_source_count, design))
 }
 
+#[derive(Debug, Default)]
+struct ActiveSelectionState {
+    selected: BTreeSet<usize>,
+    selections: Vec<AnnotationSelectionRecordV1>,
+    spent: u64,
+    source_counts: BTreeMap<String, u32>,
+    stratum_counts: BTreeMap<String, u32>,
+}
+
+impl ActiveSelectionState {
+    fn add(
+        &mut self,
+        index: usize,
+        candidates: &[AnnotationAcquisitionCandidateV1],
+        band: ActivePriorityBandV1,
+        reason: SelectionReasonV1,
+    ) -> Result<(), String> {
+        if !self.selected.insert(index) {
+            return Err("active selector attempted to schedule a duplicate candidate".into());
+        }
+        let candidate = &candidates[index];
+        self.spent = self
+            .spent
+            .checked_add(candidate.annotation_cost_units)
+            .ok_or_else(|| "active budget usage overflow".to_string())?;
+        *self
+            .source_counts
+            .entry(candidate.source_work_id_sha256.clone())
+            .or_default() += 1;
+        *self
+            .stratum_counts
+            .entry(candidate.source_stratum_id.clone())
+            .or_default() += 1;
+        self.selections.push(selection_record(
+            candidate,
+            SelectionStreamV1::ActiveRefinement,
+            Some(band),
+            reason,
+            SelectionDesignMetadataV1::default(),
+        ));
+        Ok(())
+    }
+}
+
 fn select_active(
     candidates: &[AnnotationAcquisitionCandidateV1],
     eligible: &[usize],
     config: &AnnotationAcquisitionConfigV1,
-    audit_sources: &BTreeSet<&str>,
-) -> Result<
-    (
-        Vec<AnnotationSelectionRecordV1>,
-        Vec<UnmetAnnotationQuotaV1>,
-        u64,
-        BTreeMap<String, u32>,
-    ),
-    String,
-> {
+    audit_sources: &BTreeSet<String>,
+) -> Result<ActiveSelectionResult, String> {
     let quotas: BTreeMap<&str, &AnnotationStratumQuotaV1> = config
         .stratum_quotas
         .iter()
         .map(|quota| (quota.source_stratum_id.as_str(), quota))
         .collect();
-    let mut selected = BTreeSet::new();
-    let mut selections = Vec::new();
-    let mut spent = 0_u64;
-    let mut source_counts: BTreeMap<String, u32> = BTreeMap::new();
-    let mut stratum_counts: BTreeMap<String, u32> = BTreeMap::new();
+    let mut state = ActiveSelectionState::default();
 
     // First satisfy per-stratum minimums. Items without a model/disagreement
     // priority can enter only under an explicit minimum-coverage quota.
     for quota in &config.stratum_quotas {
-        while stratum_counts
+        while state
+            .stratum_counts
             .get(&quota.source_stratum_id)
             .copied()
             .unwrap_or(0)
@@ -996,7 +1035,7 @@ fn select_active(
                 .filter(|index| {
                     let candidate = &candidates[*index];
                     candidate.source_stratum_id == quota.source_stratum_id
-                        && !selected.contains(index)
+                        && !state.selected.contains(index)
                         && !audit_sources.contains(candidate.source_work_id_sha256.as_str())
                 })
                 .collect();
@@ -1006,9 +1045,9 @@ fn select_active(
                     *index,
                     candidates,
                     config,
-                    &source_counts,
-                    &stratum_counts,
-                    spent,
+                    &state.source_counts,
+                    &state.stratum_counts,
+                    state.spent,
                     quota,
                 )
             }) else {
@@ -1019,17 +1058,7 @@ fn select_active(
                 ActivePriorityBandV1::CoverageGap,
                 SelectionReasonV1::StratumMinimumQuota,
             ));
-            add_active_selection(
-                index,
-                candidates,
-                band,
-                reason,
-                &mut selected,
-                &mut selections,
-                &mut spent,
-                &mut source_counts,
-                &mut stratum_counts,
-            )?;
+            state.add(index, candidates, band, reason)?;
         }
     }
 
@@ -1043,7 +1072,7 @@ fn select_active(
     ] {
         let mut by_stratum: BTreeMap<&str, Vec<usize>> = BTreeMap::new();
         for index in eligible {
-            if selected.contains(index)
+            if state.selected.contains(index)
                 || audit_sources.contains(candidates[*index].source_work_id_sha256.as_str())
                 || active_priority(&candidates[*index], config).map(|value| value.0) != Some(band)
             {
@@ -1065,19 +1094,20 @@ fn select_active(
                     .get(stratum)
                     .copied()
                     .ok_or_else(|| "active candidate has no stratum quota".to_string())?;
-                if stratum_counts.get(*stratum).copied().unwrap_or(0) >= quota.active_maximum_items
+                if state.stratum_counts.get(*stratum).copied().unwrap_or(0)
+                    >= quota.active_maximum_items
                 {
                     continue;
                 }
                 let next = items.iter().copied().find(|index| {
-                    !selected.contains(index)
+                    !state.selected.contains(index)
                         && active_candidate_fits(
                             *index,
                             candidates,
                             config,
-                            &source_counts,
-                            &stratum_counts,
-                            spent,
+                            &state.source_counts,
+                            &state.stratum_counts,
+                            state.spent,
                             quota,
                         )
                 });
@@ -1086,17 +1116,7 @@ fn select_active(
                     let (_, reason) = active_priority(candidate, config).ok_or_else(|| {
                         "selected active candidate has no priority reason".to_string()
                     })?;
-                    add_active_selection(
-                        index,
-                        candidates,
-                        band,
-                        reason,
-                        &mut selected,
-                        &mut selections,
-                        &mut spent,
-                        &mut source_counts,
-                        &mut stratum_counts,
-                    )?;
+                    state.add(index, candidates, band, reason)?;
                     progress = true;
                 }
             }
@@ -1110,7 +1130,8 @@ fn select_active(
         .stratum_quotas
         .iter()
         .filter_map(|quota| {
-            let selected_count = stratum_counts
+            let selected_count = state
+                .stratum_counts
                 .get(&quota.source_stratum_id)
                 .copied()
                 .unwrap_or(0);
@@ -1123,7 +1144,7 @@ fn select_active(
         })
         .collect();
 
-    Ok((selections, unmet, spent, source_counts))
+    Ok((state.selections, unmet, state.spent, state.source_counts))
 }
 
 fn active_candidate_fits(
@@ -1147,46 +1168,6 @@ fn active_candidate_fits(
     source_count < config.maximum_active_items_per_source_work
         && stratum_count < quota.active_maximum_items
         && candidate.annotation_cost_units <= config.active_budget_units.saturating_sub(spent)
-}
-
-fn add_active_selection(
-    index: usize,
-    candidates: &[AnnotationAcquisitionCandidateV1],
-    band: ActivePriorityBandV1,
-    reason: SelectionReasonV1,
-    selected: &mut BTreeSet<usize>,
-    selections: &mut Vec<AnnotationSelectionRecordV1>,
-    spent: &mut u64,
-    source_counts: &mut BTreeMap<String, u32>,
-    stratum_counts: &mut BTreeMap<String, u32>,
-) -> Result<(), String> {
-    if !selected.insert(index) {
-        return Err("active selector attempted to schedule a duplicate candidate".into());
-    }
-    let candidate = &candidates[index];
-    *spent = spent
-        .checked_add(candidate.annotation_cost_units)
-        .ok_or_else(|| "active budget usage overflow".to_string())?;
-    *source_counts
-        .entry(candidate.source_work_id_sha256.clone())
-        .or_default() += 1;
-    *stratum_counts
-        .entry(candidate.source_stratum_id.clone())
-        .or_default() += 1;
-    selections.push(selection_record(
-        candidate,
-        SelectionStreamV1::ActiveRefinement,
-        Some(band),
-        reason,
-        None,
-        None,
-        None,
-        None,
-        None,
-        None,
-        None,
-    ));
-    Ok(())
 }
 
 fn active_candidate_cmp(
@@ -1231,11 +1212,8 @@ fn active_candidate_cmp(
         .then_with(|| a.item_id.cmp(&b.item_id))
 }
 
-fn selection_record(
-    candidate: &AnnotationAcquisitionCandidateV1,
-    stream: SelectionStreamV1,
-    priority_band: Option<ActivePriorityBandV1>,
-    reason: SelectionReasonV1,
+#[derive(Debug, Clone, Default)]
+struct SelectionDesignMetadataV1 {
     source_work_probability: Option<ProbabilityFractionV1>,
     item_given_source_probability: Option<ProbabilityFractionV1>,
     item_probability: Option<ProbabilityFractionV1>,
@@ -1243,6 +1221,14 @@ fn selection_record(
     selected_source_works_in_stratum: Option<usize>,
     eligible_items_in_source_work: Option<usize>,
     selected_items_in_source_work: Option<usize>,
+}
+
+fn selection_record(
+    candidate: &AnnotationAcquisitionCandidateV1,
+    stream: SelectionStreamV1,
+    priority_band: Option<ActivePriorityBandV1>,
+    reason: SelectionReasonV1,
+    design: SelectionDesignMetadataV1,
 ) -> AnnotationSelectionRecordV1 {
     AnnotationSelectionRecordV1 {
         item_id: candidate.item_id.clone(),
@@ -1260,14 +1246,37 @@ fn selection_record(
         occurrence_count_disagreement_ppm: candidate.occurrence_count_disagreement_ppm,
         prediction_coverage_ppm: candidate.prediction_coverage_ppm,
         boundary_dispersion_ms: candidate.boundary_dispersion_ms,
-        source_work_inclusion_probability: source_work_probability,
-        item_given_source_work_probability: item_given_source_probability,
-        item_inclusion_probability: item_probability,
-        eligible_source_works_in_stratum,
-        selected_source_works_in_stratum,
-        eligible_items_in_source_work,
-        selected_items_in_source_work,
+        source_work_inclusion_probability: design.source_work_probability,
+        item_given_source_work_probability: design.item_given_source_probability,
+        item_inclusion_probability: design.item_probability,
+        eligible_source_works_in_stratum: design.eligible_source_works_in_stratum,
+        selected_source_works_in_stratum: design.selected_source_works_in_stratum,
+        eligible_items_in_source_work: design.eligible_items_in_source_work,
+        selected_items_in_source_work: design.selected_items_in_source_work,
     }
+}
+
+fn reduced_probability_fraction(
+    numerator: u64,
+    denominator: u64,
+) -> Result<ProbabilityFractionV1, String> {
+    if denominator == 0 {
+        return Err("probability fraction denominator must be positive".into());
+    }
+    let divisor = greatest_common_divisor(numerator, denominator);
+    Ok(ProbabilityFractionV1 {
+        numerator: numerator / divisor,
+        denominator: denominator / divisor,
+    })
+}
+
+fn greatest_common_divisor(mut left: u64, mut right: u64) -> u64 {
+    while right != 0 {
+        let remainder = left % right;
+        left = right;
+        right = remainder;
+    }
+    left.max(1)
 }
 
 fn unbiased_index(state: &mut u64, upper_bound: usize) -> usize {
@@ -1322,7 +1331,7 @@ mod tests {
     use super::*;
 
     fn digest(byte: char) -> String {
-        byte.to_string().repeat(64)
+        format!("{:064x}", byte as u32)
     }
 
     fn config() -> AnnotationAcquisitionConfigV1 {
@@ -1638,17 +1647,33 @@ mod tests {
         assert!(report.probability_audit.len() >= 2);
         assert!(report.probability_audit.len() <= 3);
         for item in &report.probability_audit {
+            let (expected_source_probability, expected_source_count) =
+                match item.source_stratum_id.as_str() {
+                    "stratum-a" => (
+                        ProbabilityFractionV1 {
+                            numerator: 1,
+                            denominator: 2,
+                        },
+                        2,
+                    ),
+                    "stratum-b" => (
+                        ProbabilityFractionV1 {
+                            numerator: 1,
+                            denominator: 3,
+                        },
+                        3,
+                    ),
+                    other => panic!("unexpected audit stratum: {other}"),
+                };
+            let source_probability = item.source_work_inclusion_probability.unwrap();
+            assert_eq!(source_probability, expected_source_probability);
             assert_eq!(
-                item.source_work_inclusion_probability.unwrap(),
-                ProbabilityFractionV1 {
-                    numerator: 1,
-                    denominator: 2,
-                }
+                item.eligible_source_works_in_stratum,
+                Some(expected_source_count)
             );
-            assert_eq!(item.eligible_source_works_in_stratum, Some(2));
             assert_eq!(item.selected_source_works_in_stratum, Some(1));
             let conditional = item.item_given_source_work_probability.unwrap();
-            let expected =
+            let expected_conditional =
                 if item.source_work_id_sha256 == dataset.candidates[5].source_work_id_sha256 {
                     assert_eq!(item.eligible_items_in_source_work, Some(3));
                     assert_eq!(item.selected_items_in_source_work, Some(2));
@@ -1664,19 +1689,13 @@ mod tests {
                         denominator: 1,
                     }
                 };
-            assert_eq!(conditional, expected);
+            assert_eq!(conditional, expected_conditional);
             let item_probability = item.item_inclusion_probability.unwrap();
-            let expected_item_probability = if expected.denominator == 3 {
-                ProbabilityFractionV1 {
-                    numerator: 1,
-                    denominator: 3,
-                }
-            } else {
-                ProbabilityFractionV1 {
-                    numerator: 1,
-                    denominator: 2,
-                }
-            };
+            let expected_item_probability = reduced_probability_fraction(
+                source_probability.numerator * conditional.numerator,
+                source_probability.denominator * conditional.denominator,
+            )
+            .unwrap();
             assert_eq!(item_probability, expected_item_probability);
         }
     }

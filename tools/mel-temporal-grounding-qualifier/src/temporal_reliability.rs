@@ -183,9 +183,15 @@ pub struct ModelGroundingItemReliabilityV1 {
 pub struct ModelGroundingDatasetSummaryV1 {
     pub query_items: usize,
     pub source_work_clusters: usize,
+    /// Backwards-compatible alias: items containing at least one Present annotation.
     pub present_items: usize,
     pub one_to_many_items: usize,
+    /// Backwards-compatible alias: items containing at least one Absent annotation.
     pub absent_items: usize,
+    pub items_with_present_annotations: usize,
+    pub items_with_absent_annotations: usize,
+    /// Items that contain both Present and Absent annotations.
+    pub mixed_present_absent_items: usize,
     pub source_work_macro_present_mean_f1: Option<f64>,
     pub source_work_macro_present_exact_count_accuracy: Option<f64>,
     pub source_work_macro_one_to_many_count_gated_f1: Option<f64>,
@@ -330,10 +336,7 @@ fn validate_dataset(dataset: &MultiAnnotatorReliabilityDatasetV1) -> Result<(), 
         return Err("bootstrap seed must be nonzero".into());
     }
     if dataset.boundary_tolerances_ms.is_empty()
-        || dataset
-            .boundary_tolerances_ms
-            .iter()
-            .any(|value| *value == 0)
+        || dataset.boundary_tolerances_ms.contains(&0)
         || dataset
             .boundary_tolerances_ms
             .windows(2)
@@ -612,12 +615,19 @@ fn summarize_model_grounding(
         .iter()
         .filter(|item| item.summary.absent_annotators > 0)
         .count();
+    let mixed_present_absent_items = items
+        .iter()
+        .filter(|item| item.summary.present_annotators > 0 && item.summary.absent_annotators > 0)
+        .count();
     ModelGroundingDatasetSummaryV1 {
         query_items: items.len(),
         source_work_clusters: clusters.len(),
         present_items,
         one_to_many_items,
         absent_items,
+        items_with_present_annotations: present_items,
+        items_with_absent_annotations: absent_items,
+        mixed_present_absent_items,
         source_work_macro_present_mean_f1: mean_item_metric(items, |summary| {
             summary.present_mean_f1
         }),
@@ -1178,10 +1188,6 @@ fn bool_to_f64(value: bool) -> f64 {
     if value { 1.0 } else { 0.0 }
 }
 
-fn rate(numerator: usize, denominator: usize) -> Option<f64> {
-    (denominator > 0).then(|| numerator as f64 / denominator as f64)
-}
-
 fn mean(values: &[f64]) -> Option<f64> {
     (!values.is_empty()).then(|| values.iter().sum::<f64>() / values.len() as f64)
 }
@@ -1321,19 +1327,25 @@ mod tests {
         let annotations = vec![
             annotation(
                 '1',
-                item_key * 4 + 1,
+                item_key.wrapping_mul(4).wrapping_add(1),
                 state,
                 annotation_intervals.clone(),
                 None,
             ),
             annotation(
                 '2',
-                item_key * 4 + 2,
+                item_key.wrapping_mul(4).wrapping_add(2),
                 state,
                 annotation_intervals.clone(),
                 None,
             ),
-            annotation('3', item_key * 4 + 3, state, annotation_intervals, None),
+            annotation(
+                '3',
+                item_key.wrapping_mul(4).wrapping_add(3),
+                state,
+                annotation_intervals,
+                None,
+            ),
         ];
         MultiAnnotatorReliabilityItemV1 {
             item_id: id.into(),
@@ -1522,7 +1534,9 @@ mod tests {
         assert_eq!(pair.exact_occurrence_count_agreement, Some(true));
         assert_eq!(pair.interval_f1_symmetric, Some(1.0));
         assert!(pair.matched_iou_symmetric.unwrap() < 1.0);
-        assert_eq!(pair.start_boundary_mae_ms, Some(25.0));
+        // Only one of the two events is shifted: the mean is across both
+        // events in both scoring directions (25, 0, 25, 0) = 12.5 ms.
+        assert_eq!(pair.start_boundary_mae_ms, Some(12.5));
     }
 
     #[test]
