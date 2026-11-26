@@ -321,16 +321,19 @@ impl DerivedProjectionIndexV1 {
                 actual: spec.built_at_sequence,
             });
         }
-        if self.projections.is_empty() && self.last_sequence == 0 {
-            // Bootstrap an index from the exact current session snapshot.
-            // Later gaps cannot be skipped because they may contain invalidations.
-            self.last_sequence = ledger.last_sequence();
-        } else if self.last_sequence != ledger.last_sequence() {
-            return Err(TemporalProjectionRejectV1::SequenceGap {
-                expected: self.last_sequence,
-                actual: ledger.last_sequence(),
-            });
-        }
+        let bootstrap_sequence = if self.projections.is_empty() && self.last_sequence == 0 {
+            // Bootstrap from the exact current session snapshot, but commit the
+            // sequence only after every dependency check below succeeds.
+            Some(ledger.last_sequence())
+        } else {
+            if self.last_sequence != ledger.last_sequence() {
+                return Err(TemporalProjectionRejectV1::SequenceGap {
+                    expected: self.last_sequence,
+                    actual: ledger.last_sequence(),
+                });
+            }
+            None
+        };
 
         let active_events = ledger.snapshot().messages.into_iter()
             .map(|item| item.event_id).collect::<BTreeSet<_>>();
@@ -348,6 +351,9 @@ impl DerivedProjectionIndexV1 {
             }
         }
 
+        if let Some(sequence) = bootstrap_sequence {
+            self.last_sequence = sequence;
+        }
         self.projections.insert(spec.projection_id.clone(), DerivedMemoryProjectionV1 {
             projection_id: spec.projection_id,
             kind: spec.kind,
@@ -461,6 +467,7 @@ impl DerivedProjectionIndexV1 {
             }
         }
 
+        self.last_sequence = transition.sequence;
         let resulting_index_sha256 = self.state_sha256();
         let entries = entries.into_values().collect::<Vec<_>>();
         let invalidated_projection_ids = entries.iter()
@@ -490,7 +497,6 @@ impl DerivedProjectionIndexV1 {
         };
         self.applied_mutations.insert(transition.event_id.clone(), transition.receipt_sha256.clone());
         self.transition_receipts.insert(transition.event_id.clone(), receipt.clone());
-        self.last_sequence = transition.sequence;
         Ok(receipt)
     }
 
