@@ -825,6 +825,27 @@ mod tests {
     }
 
     #[test]
+    fn diamond_dependency_graph_invalidates_every_descendant_once() {
+        let mut ledger = ledger();
+        let mut index = DerivedProjectionIndexV1::new("user-1", "session-1").unwrap();
+        index.register_projection(&ledger, spec("summary-v1", 1, &["event-1"], &[])).unwrap();
+        index.register_projection(&ledger, spec("embedding-v1", 1, &["event-1"], &[])).unwrap();
+        index.register_projection(
+            &ledger,
+            spec("plan-v1", 1, &[], &["embedding-v1", "summary-v1"]),
+        ).unwrap();
+        let transition = ledger.apply(correction(2), 1_100).unwrap().receipt;
+        let result = index.apply_transition(&transition).unwrap();
+        assert_eq!(
+            result.receipt.invalidated_projection_ids,
+            vec!["embedding-v1", "plan-v1", "summary-v1"]
+        );
+        assert_eq!(result.receipt.entries.len(), 3);
+        assert!(result.receipt.verify_integrity());
+        assert!(index.projections().all(|item| item.status() == DerivedProjectionStatusV1::Stale));
+    }
+
+    #[test]
     fn unrelated_source_event_does_not_invalidate_projection() {
         let mut ledger = ledger();
         let mut index = DerivedProjectionIndexV1::new("user-1", "session-1").unwrap();
