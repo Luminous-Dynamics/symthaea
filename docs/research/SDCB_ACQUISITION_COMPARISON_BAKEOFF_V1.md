@@ -174,3 +174,6 @@ These are deliberately modest first milestones. They become claims only after ac
 ## 9. Claim boundary
 
 This document is an evaluation protocol. None of the method comparisons above has been executed by Symthaea. Existing selectors and R-IDeA reference code are not SOTA results. No actual physical ISRU, cell-fabrication, nuclear, or chaotic-systems experiment is claimed.
+### External benchmark execution lanes
+
+Use the [scientific-agent benchmark matrix](SDCB_SCIENTIFIC_AGENT_BENCHMARK_MATRIX_2026_11_26.md) to choose the right external anchor: Petri for method integrity, ActiveSciBench for budgeted mechanism discovery, Autonomous Science Bench for laboratory-origin campaigns, ASI-Bench/AstaBench for project workflows, and AutoSciBench-style generated hidden tasks for anti-saturation. Preserve native scores and report SDCB metrics in parallel.
