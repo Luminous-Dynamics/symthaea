@@ -12,7 +12,7 @@ func benchmarkGraph(inputCount int) (Graph,map[string]VerifierPin) {
 	for _,n:=range g.Nodes { if n.ID!="source-input" { nodes=append(nodes,n) } }
 	g.Nodes=nodes
 	edges:=g.Edges[:0]
-	for _,e:=range g.Edges { if e.ID!="use-1" { edges=append(edges,e) } }
+	for _,e:=range g.Edges { if e.ID!="use-1" && e.ID!="attribute-input" { edges=append(edges,e) } }
 	g.Edges=edges
 	reports:=g.Reports[:0]
 	for _,r:=range g.Reports { if r.SubjectID!="source-input" { reports=append(reports,r) } }
@@ -26,8 +26,9 @@ func benchmarkGraph(inputCount int) (Graph,map[string]VerifierPin) {
 	for i:=0;i<inputCount;i++ {
 		id:=fmt.Sprintf("input-%08d",i)
 		d:=digest(id,fmt.Sprintf("value-%08d",i),"source-response")
-		g.Nodes=append(g.Nodes,Node{ID:id,Kind:Entity,Digest:&d,ExternalRoot:true,RequiresVerification:true})
+		g.Nodes=append(g.Nodes,Node{ID:id,Kind:Entity,Digest:&d,ExternalRoot:true,RequiresVerification:true,SourceID:"source-a"})
 		g.Edges=append(g.Edges,Edge{ID:fmt.Sprintf("use-%08d",i),Kind:Used,From:id,To:"tool-call",EvidenceID:"invocation-record"})
+		g.Edges=append(g.Edges,Edge{ID:fmt.Sprintf("attribute-%08d",i),Kind:AttributedTo,From:id,To:"source-a",EvidenceID:id})
 		declaredInputs=append(declaredInputs,id)
 		m.ObservedInputs=append(m.ObservedInputs,id)
 		g.Reports=append(g.Reports,mk(id,d))
