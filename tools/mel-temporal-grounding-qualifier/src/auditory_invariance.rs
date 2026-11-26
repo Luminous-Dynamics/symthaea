@@ -254,8 +254,14 @@ pub fn audit_auditory_invariance(
     let mut task_groups: BTreeMap<MusicalTaskV1, Vec<AuditoryPairResultV1>> = BTreeMap::new();
     let mut factor_groups: BTreeMap<StayFactorV1, Vec<AuditoryPairResultV1>> = BTreeMap::new();
     for result in &results {
-        task_groups.entry(result.task).or_default().push(result.clone());
-        factor_groups.entry(result.stay_factor).or_default().push(result.clone());
+        task_groups
+            .entry(result.task)
+            .or_default()
+            .push(result.clone());
+        factor_groups
+            .entry(result.stay_factor)
+            .or_default()
+            .push(result.clone());
     }
     let by_task = task_groups
         .into_iter()
@@ -335,7 +341,10 @@ fn validate_pair(pair: &AuditoryPairV1, index: usize) -> Result<(), String> {
             return Err(format!("pair {} repeats a variant_id", pair.pair_id));
         }
         if !audio_digests.insert(variant.audio_sha256.as_str()) {
-            return Err(format!("pair {} reuses an audio digest across variants", pair.pair_id));
+            return Err(format!(
+                "pair {} reuses an audio digest across variants",
+                pair.pair_id
+            ));
         }
         if variant_index > 0 && variant.question.trim().is_empty() {
             return Err(format!("pair {} contains an empty question", pair.pair_id));
@@ -365,10 +374,15 @@ fn validate_variant(
     require_text(&variant.variant_id, &format!("{label}.variant_id"))?;
     validate_digest(&variant.audio_sha256, &format!("{label}.audio_sha256"))?;
     require_text(&variant.question, &format!("{label}.question"))?;
-    validate_digest(&variant.question_sha256, &format!("{label}.question_sha256"))?;
+    validate_digest(
+        &variant.question_sha256,
+        &format!("{label}.question_sha256"),
+    )?;
     let observed_question_digest = format!("{:x}", Sha256::digest(variant.question.as_bytes()));
     if observed_question_digest != variant.question_sha256 {
-        return Err(format!("{label}.question_sha256 does not match the supplied question text"));
+        return Err(format!(
+            "{label}.question_sha256 does not match the supplied question text"
+        ));
     }
     let pair_is_valid = match task {
         MusicalTaskV1::Melody | MusicalTaskV1::Harmony | MusicalTaskV1::Timbre => {
@@ -381,8 +395,13 @@ fn validate_variant(
         MusicalTaskV1::Rhythm => {
             matches!(
                 (variant.option_a_relation, variant.option_b_relation),
-                (MusicalRelationV1::ClipAFaster, MusicalRelationV1::ClipBFaster)
-                    | (MusicalRelationV1::ClipBFaster, MusicalRelationV1::ClipAFaster)
+                (
+                    MusicalRelationV1::ClipAFaster,
+                    MusicalRelationV1::ClipBFaster
+                ) | (
+                    MusicalRelationV1::ClipBFaster,
+                    MusicalRelationV1::ClipAFaster
+                )
             )
         }
     };
@@ -410,7 +429,9 @@ fn validate_factor_scope(
             | (MusicalTaskV1::Rhythm, FlipFactorV1::PulseRate)
     );
     if !flip_matches {
-        return Err(format!("FLIP factor {flip:?} is incompatible with task {task:?}"));
+        return Err(format!(
+            "FLIP factor {flip:?} is incompatible with task {task:?}"
+        ));
     }
     if stay == StayFactorV1::Transposition
         && !matches!(task, MusicalTaskV1::Melody | MusicalTaskV1::Harmony)
@@ -763,11 +784,19 @@ mod tests {
         assert_eq!(report.by_task.len(), 2);
         assert_eq!(report.by_stay_factor.len(), 2);
         assert_eq!(
-            report.by_task.iter().map(|item| item.metrics.pairs).sum::<usize>(),
+            report
+                .by_task
+                .iter()
+                .map(|item| item.metrics.pairs)
+                .sum::<usize>(),
             report.pair_count
         );
         assert_eq!(
-            report.by_stay_factor.iter().map(|item| item.metrics.pairs).sum::<usize>(),
+            report
+                .by_stay_factor
+                .iter()
+                .map(|item| item.metrics.pairs)
+                .sum::<usize>(),
             report.pair_count
         );
     }
