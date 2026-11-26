@@ -28,6 +28,7 @@ The main question is not which selector gets the largest internal score. It is w
 | B11 | Pareto/hard-constraint policy | `scripts/research/sdcb_robust_pareto.rs` | Non-dominated objectives plus per-hypothesis hard constraints |
 | B12 | qLogNEHVI / qParEGO / novelty-aware evolutionary MOBO | Upstream implementations, where task assumptions fit | Established multi-objective baselines; pin release and optimizer budget |\n| B13 | Multi-fidelity BO / qMFMES | Upstream implementation with fidelity-dependent likelihood/cost model | Compare low/medium/high fidelity selection and calibration under equal resource envelopes |
 | B14 | Robust multi-fidelity decision reference | `scripts/research/sdcb_multifidelity.rs` | Finite maximin decision gain across fidelity scenarios plus componentwise resource caps/Pareto frontier |
+| B15 | Greedy R-I/R-IDeA portfolio | `scripts/research/sdcb_ridea_portfolio.rs` | Recompute MMD² representativeness after each batch selection; frozen EIG/proxy means this is not an adaptive posterior policy |
 
 Do not compare internal scores directly across methods. A variance score, EIG in bits, EIG in nats, EVSI in loss units, R-IDeA score and worst-case utility are different quantities.
 
