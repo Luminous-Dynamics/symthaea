@@ -211,6 +211,10 @@ Run external suites unchanged as complementary evaluation:
 - [Memora / FAMA](https://aclanthology.org/2026.findings-acl.1337/) for long-horizon remembering, reasoning, recommending and obsolete-memory penalties.
 - [UtilMem](https://aclanthology.org/2026.emnlp-main.1639/) for integration of distributed implicit/noisy evidence and resilience to similar distractors.
 - [MemUse](https://aclanthology.org/2026.emnlp-main.804/) for naturally integrating relevant memory into conversational responses rather than answering explicit memory questions only.
+- [COLLABMEM](https://aclanthology.org/2026.emnlp-main.1194/) for role-aware sharing, access control, routing, provenance and conflict resolution across collaborating agents.
+- [TimlMemBench](https://aclanthology.org/2026.findings-emnlp.507/) for governed activation, revocation, supersession, scope and relevance; use both canonical-pool and raw-native evaluation.
+- [StreamMemBench](https://aclanthology.org/2026.findings-emnlp.992/) for streaming evidence use, feedback incorporation and follow-up reuse.
+- [DeepControl](https://aclanthology.org/2026.findings-emnlp.52/) as an algorithmic comparator for adaptive retrieval continuation and granularity control. Its reported +9.4/+8.6 average-point gains over Search-R1 on Qwen2.5-7B/3B are paper-specific, not directly comparable MACE results.
 - [MEMORA-Bench](https://aclanthology.org/2026.findings-emnlp.1211/) for embodied memory and prospective planning from egocentric video.
 - [MEMOBench](https://aclanthology.org/2026.findings-emnlp.333/) for process-level storage, update and compression during robotic manipulation.
 
@@ -256,6 +260,74 @@ Ablate the history digest, source-root graph, conditional model, resource attest
 
 The initial benchmark should be small enough to exhaustively enumerate all policy paths and state/outcome combinations. This gives MACE a trustworthy reference before optimizing runtime or adding learned policies.
 
-## 10. Limits
+## 10. Independent finite-world reference evaluator
+
+The crate now exports `adaptive_policy_reference`, an independent reference evaluator for small finite acquisition worlds. It is deliberately separate from `decision_value_retrieval`: it does not call the production evaluator, reuse its EVSI likelihood calculation, or accept candidate-reported scores.
+
+### World representation
+
+A scenario contains:
+- a finite sorted state set and consumer-owned action utility/admissibility tables;
+- latent worlds, each mapping every candidate query to one deterministic observation;
+- an optional exact probability mass per possible world for EVSI;
+- conservative possible/not-possible support for robust evaluation;
+- query source-root IDs and per-query tool, latency, token, byte and utility-cost units;
+- finite horizon and per-path budgets.
+
+The joint-world table is the important independence boundary. Two queries over mirrored pages can have different query IDs but the same root IDs and correlated observation assignments across worlds. Their dependence is represented in the complete joint outcome table; the evaluator does not multiply marginal query likelihoods under a false conditional-independence assumption. Stochastic observations can be represented by multiple latent worlds with the same decision state and different observation assignments. The evaluator does not infer or prove causal dependence from root IDs on its own: the scenario builder must provide a defensible joint-world table and independently grounded root-family labels.
+
+### Expected-value objective
+
+For a terminal action chosen in each leaf, the evaluator computes the exact fixed-point numerator:
+
+[
+J_{EV}(pi)=sum_{w in W} p_wleft[U(a_pi(h_w),s_w)-C_pi(w)ight],
+]
+
+where (h_w) is the observation history for world (w), and (C_pi(w)) is the accumulated query cost on that world's path. The denominator is exactly 1,000,000; values are compared before rounding. Probability mass on possible worlds must sum to 1,000,000. Impossible worlds must have zero or absent mass.
+
+### Probability-free robust objective
+
+Robust mode ignores all probability fields and evaluates the consumer-declared conservative possible-world support. If that support omits a real state or outcome, the minimax guarantee does not apply:
+
+[
+J_R(pi)=max_{w in W_{possible}}
+left[
+max_{a:,allowed(a,s_w)} U(a,s_w)
+-U(a_pi(h_w),s_w)+C_pi(w)
+ight].
+]
+
+It selects the policy with minimum worst-case regret-plus-cost. Every terminal action must be admissible in every state still compatible with that observation history. No probability estimate is synthesized.
+
+### Search and limits
+
+The reference uses exact recursive backward induction over each reachable history, trying every eligible query and every consumer-permitted terminal action. Query outcomes partition the active joint worlds; each branch is solved independently because resource budgets are per path and the objective separates over disjoint observation histories. Equal scores prefer fewer policy nodes and then a canonical lexical policy representation.
+
+The search rejects scenarios exceeding the fixed small-world limits (8 states, 64 worlds, 6 actions, 8 queries, horizon 4) or the search-history cap. A returned policy exceeding the declared node cap is explicitly rejected as `PolicyTooLarge`; the reference does not silently substitute a different, potentially suboptimal smaller policy. The reference is not designed for production-scale search and has no learned proposal mechanism.
+
+### Deterministic adversarial fixtures
+
+The evaluator's portable input contract is [mace_adaptive_reference_scenario_v1.schema.json](../../data/schemas/mace_adaptive_reference_scenario_v1.schema.json), with a worked [finite joint-world example](../../data/fixtures/mace_adaptive_reference_scenario_v1.example.json). The schema validates JSON shape and primitive bounds; the Rust validator additionally enforces cross-table key coverage, uniqueness and probability-mass invariants. The example contains no production trust material or signatures.
+
+The Rust module currently authors 15 deterministic test functions covering:
+- conditional routing to different follow-up queries;
+- exact EVSI and robust evaluation over joint worlds;
+- duplicate source roots with mirrored observations;
+- revocation between the initial observation and terminal choice;
+- action prohibition across unresolved possible worlds;
+- per-path query, cost and resource ceilings;
+- malformed expected-value probability mass;
+- query enumeration-order invariance;
+- bounded search and policy-size rejection;
+- zero-probability/unsupported-world handling.
+
+These tests are authored only. They have not been compiled or run; hosted CI is not reported as passing. The reference can be used as an independent expected-result oracle for a later optimized executor and for cross-language implementations.
+For the published four-world example, an independent brute-force policy enumeration yields the conditional tree `route → A: check-a; B: check-b`. Its exact expected-value numerators correspond to expected utility 10, expected query cost 1 and expected net utility 9 units; the probability-free worst-case regret-plus-cost is 1 utility unit. These are synthetic fixture values used to pin implementation correctness, not external benchmark scores.
+
+
+
+
+## 11. Limits
 
 This proposal does not prove source truth, full ancestry completeness, independence of declared operators, calibrated likelihood quality, safe real-world action or secure erasure. Those remain separate qualification obligations. The schema validates shape, not trust. A valid policy graph is not a valid evidence graph, and a valid evidence graph is not an action permit.

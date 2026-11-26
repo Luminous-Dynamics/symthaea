@@ -30,6 +30,7 @@ pub mod source_origin_witness;
 pub mod streaming_session;
 pub mod temporal_projection;
 pub mod decision_value_retrieval;
+pub mod adaptive_policy_reference;
 pub mod acquisition_receipt_v2;
 
 use std::collections::BTreeMap;

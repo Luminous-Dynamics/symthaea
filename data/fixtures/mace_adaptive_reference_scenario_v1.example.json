@@ -1,0 +1,122 @@
+{
+  "version": 1,
+  "state_ids": [
+    "bad",
+    "good"
+  ],
+  "worlds": [
+    {
+      "world_id": "a-bad",
+      "state_id": "bad",
+      "possible": true,
+      "probability_ppm": 250000,
+      "observation_by_query": {
+        "route": "A",
+        "check-a": "bad",
+        "check-b": "unknown"
+      }
+    },
+    {
+      "world_id": "a-good",
+      "state_id": "good",
+      "possible": true,
+      "probability_ppm": 250000,
+      "observation_by_query": {
+        "route": "A",
+        "check-a": "good",
+        "check-b": "unknown"
+      }
+    },
+    {
+      "world_id": "b-bad",
+      "state_id": "bad",
+      "possible": true,
+      "probability_ppm": 250000,
+      "observation_by_query": {
+        "route": "B",
+        "check-a": "unknown",
+        "check-b": "bad"
+      }
+    },
+    {
+      "world_id": "b-good",
+      "state_id": "good",
+      "possible": true,
+      "probability_ppm": 250000,
+      "observation_by_query": {
+        "route": "B",
+        "check-a": "unknown",
+        "check-b": "good"
+      }
+    }
+  ],
+  "actions": [
+    {
+      "action_id": "abstain",
+      "utility_by_state": {
+        "bad": 0,
+        "good": 0
+      },
+      "allowed_by_state": {
+        "bad": true,
+        "good": true
+      }
+    },
+    {
+      "action_id": "proceed",
+      "utility_by_state": {
+        "bad": -20,
+        "good": 20
+      },
+      "allowed_by_state": {
+        "bad": true,
+        "good": true
+      }
+    }
+  ],
+  "queries": [
+    {
+      "query_id": "check-a",
+      "source_root_ids": [
+        "root-a"
+      ],
+      "tool_calls": 1,
+      "latency_ns": 10,
+      "context_tokens": 10,
+      "inspected_bytes": 10,
+      "cost_utility_units": 1
+    },
+    {
+      "query_id": "check-b",
+      "source_root_ids": [
+        "root-b"
+      ],
+      "tool_calls": 1,
+      "latency_ns": 10,
+      "context_tokens": 10,
+      "inspected_bytes": 10,
+      "cost_utility_units": 1
+    },
+    {
+      "query_id": "route",
+      "source_root_ids": [
+        "root-route"
+      ],
+      "tool_calls": 1,
+      "latency_ns": 10,
+      "context_tokens": 10,
+      "inspected_bytes": 10,
+      "cost_utility_units": 0
+    }
+  ],
+  "maximum_horizon": 2,
+  "maximum_policy_nodes": 16,
+  "budgets": {
+    "maximum_queries": 2,
+    "maximum_tool_calls": 2,
+    "maximum_latency_ns": 100,
+    "maximum_context_tokens": 100,
+    "maximum_inspected_bytes": 100,
+    "maximum_cost_utility_units": 10
+  }
+}
