@@ -127,9 +127,14 @@ impl FailureTraceRecord {
         if !contract.domain_ids.contains(&self.domain_id) {
             return Err("failure record domain is outside the frozen contract".to_owned());
         }
+        if self.reference_policy_id.trim().is_empty() {
+            return Err("reference policy ID must be non-empty".to_owned());
+        }
         for (name, digest) in [
-            ("initial_state_sha256", &self.initial_state_sha256),
-            ("realized_action_sha256", &self.realized_action_sha256),
+            ("pair_source_manifest_sha256", &self.pair_source_manifest_sha256),
+            ("success_side_scene_sha256", &self.success_side_scene_sha256),
+            ("failure_side_scene_sha256", &self.failure_side_scene_sha256),
+            ("reference_policy_checkpoint_sha256", &self.reference_policy_checkpoint_sha256),
             ("candidate_checkpoint_sha256", &self.candidate_checkpoint_sha256),
         ] {
             if !is_sha256(digest) {
@@ -204,6 +209,7 @@ pub fn score_failure_fidelity(
 
     let mut record_ids = BTreeSet::new();
     let mut frozen_checkpoint: Option<&str> = None;
+    let mut frozen_reference_policy: Option<(&str, &str)> = None;
     let mut cluster_metadata: BTreeMap<&str, (&str, &str)> = BTreeMap::new();
     let mut boundary_groups: BTreeMap<&str, Vec<&FailureTraceRecord>> = BTreeMap::new();
     let mut score = FailureFidelityScore {
@@ -347,8 +353,15 @@ pub struct BoundaryRatePair {
     pub perturbation_dimension_id: String,
     pub success_side_perturbation_units: i64,
     pub failure_side_perturbation_units: i64,
-    pub initial_state_sha256: String,
-    pub realized_action_sha256: String,
+    /// Digest of the pair manifest and its source metadata.
+    pub pair_source_manifest_sha256: String,
+    /// Canonical scene snapshot digests for the two perturbed variants.
+    pub success_side_scene_sha256: String,
+    pub failure_side_scene_sha256: String,
+    /// Reference policy configuration used for both sides of this pair.
+    pub reference_policy_id: String,
+    pub reference_policy_checkpoint_sha256: String,
+    /// Frozen world-model candidate being evaluated.
     pub candidate_checkpoint_sha256: String,
     pub reference_success_side_successes: u32,
     pub reference_success_side_trials: u32,
@@ -386,6 +399,9 @@ impl BoundaryRatePair {
             }
         }
 
+        if self.success_side_scene_sha256 == self.failure_side_scene_sha256 {
+            return Err("success-side and failure-side scene digests must differ".to_owned());
+        }
         for (label, successes, trials) in [
             ("reference success side", self.reference_success_side_successes, self.reference_success_side_trials),
             ("reference failure side", self.reference_failure_side_successes, self.reference_failure_side_trials),
@@ -474,6 +490,21 @@ pub fn score_boundary_rate_pairs(
                 return Err("one boundary-rate evaluation must use exactly one frozen candidate checkpoint".to_owned());
             }
             None => frozen_checkpoint = Some(&pair.candidate_checkpoint_sha256),
+            _ => {}
+        }
+        match frozen_reference_policy {
+            Some((policy_id, checkpoint))
+                if policy_id != pair.reference_policy_id
+                    || checkpoint != pair.reference_policy_checkpoint_sha256 =>
+            {
+                return Err("one boundary-rate evaluation must use exactly one reference policy/checkpoint; split policy configurations into separate evaluations".to_owned());
+            }
+            None => {
+                frozen_reference_policy = Some((
+                    &pair.reference_policy_id,
+                    &pair.reference_policy_checkpoint_sha256,
+                ));
+            }
             _ => {}
         }
 
@@ -580,8 +611,11 @@ mod tests {
             domain_id: "robot-manipulation-v1".to_owned(),
             environment_family_id: "contact-rich-pick-place".to_owned(),
             environment_cluster_id: cluster.to_owned(),
-            initial_state_sha256: "c".repeat(64),
-            realized_action_sha256: "d".repeat(64),
+            pair_source_manifest_sha256: "b".repeat(64),
+            success_side_scene_sha256: "c".repeat(64),
+            failure_side_scene_sha256: "d".repeat(64),
+            reference_policy_id: "pi05-data-50".to_owned(),
+            reference_policy_checkpoint_sha256: "f".repeat(64),
             candidate_checkpoint_sha256: "e".repeat(64),
             boundary_pair_id: None,
             boundary_side: None,
@@ -683,12 +717,29 @@ mod tests {
         assert!(score_boundary_rate_pairs(&[pair.clone(), pair.clone()], &contract()).is_err());
 
         let mut invalid_digest = rate_pair("pair-2", "cluster-2");
-        invalid_digest.realized_action_sha256 = "bad".to_owned();
+        invalid_digest.pair_source_manifest_sha256 = "bad".to_owned();
         assert!(score_boundary_rate_pairs(&[invalid_digest], &contract()).is_err());
 
         let mut mixed_checkpoint = rate_pair("pair-3", "cluster-3");
         mixed_checkpoint.candidate_checkpoint_sha256 = "f".repeat(64);
         assert!(score_boundary_rate_pairs(&[rate_pair("pair-4", "cluster-4"), mixed_checkpoint], &contract()).is_err());
+
+        let mut mixed_reference_policy = rate_pair("pair-5", "cluster-5");
+        mixed_reference_policy.reference_policy_id = "fastwam".to_owned();
+        assert!(score_boundary_rate_pairs(&[rate_pair("pair-6", "cluster-6"), mixed_reference_policy], &contract()).is_err());
+    }
+
+
+
+    #[test]
+    fn rate_boundary_rejects_identical_side_scenes_and_invalid_pair_manifest() {
+        let mut identical_scenes = rate_pair("same-scene", "cluster-1");
+        identical_scenes.failure_side_scene_sha256 = identical_scenes.success_side_scene_sha256.clone();
+        assert!(score_boundary_rate_pairs(&[identical_scenes], &contract()).is_err());
+
+        let mut invalid_manifest = rate_pair("invalid-manifest", "cluster-2");
+        invalid_manifest.pair_source_manifest_sha256 = "not-a-digest".to_owned();
+        assert!(score_boundary_rate_pairs(&[invalid_manifest], &contract()).is_err());
     }
 
     #[test]
