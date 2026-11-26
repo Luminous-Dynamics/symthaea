@@ -249,8 +249,12 @@ fn candidate_digest(candidate: &InverseVmCandidateV1) -> Result<String, InverseV
 
 fn policy_digest(policy: &InverseVmShortlistPolicyV1) -> Result<String, InverseVmShortlistErrorV1> {
     let mut canonical = policy.clone();
-    canonical.recipe_knob_constraints.sort_by(|a, b| a.knob_id.cmp(&b.knob_id));
-    canonical.side_constraints.sort_by(|a, b| a.constraint_id.cmp(&b.constraint_id));
+    canonical
+        .recipe_knob_constraints
+        .sort_by(|a, b| a.knob_id.cmp(&b.knob_id));
+    canonical
+        .side_constraints
+        .sort_by(|a, b| a.constraint_id.cmp(&b.constraint_id));
     json_sha256(&canonical)
 }
 
@@ -277,7 +281,9 @@ pub fn seal_inverse_vm_shortlist_policy_v1(
 
 fn validate_policy(policy: &InverseVmShortlistPolicyV1) -> Result<(), InverseVmShortlistErrorV1> {
     if policy.schema != INVERSE_VM_SHORTLIST_POLICY_SCHEMA_V1 {
-        return Err(InverseVmShortlistErrorV1("shortlist policy schema is unsupported".into()));
+        return Err(InverseVmShortlistErrorV1(
+            "shortlist policy schema is unsupported".into(),
+        ));
     }
     require_text(&policy.policy_id, "policy.policy_id")?;
     if policy.revision == 0
@@ -466,7 +472,11 @@ fn screen_candidate(
                 reasons.push(CandidateScreenReasonV1::DuplicateSupportNeighbour);
                 state = CandidateScreenStateV1::Rejected;
             }
-            if support.neighbour_ids.iter().any(|neighbour_id| neighbour_id.trim().is_empty()) {
+            if support
+                .neighbour_ids
+                .iter()
+                .any(|neighbour_id| neighbour_id.trim().is_empty())
+            {
                 reasons.push(CandidateScreenReasonV1::InvalidSupportNeighbourId);
                 state = CandidateScreenStateV1::Rejected;
             }
@@ -508,8 +518,14 @@ fn screen_candidate(
 
     let mut predictions = BTreeMap::new();
     for metric in &candidate.predicted_metrics {
-        require_text(&metric.measurand_id, "candidate.predicted_metric.measurand_id")?;
-        if predictions.insert(metric.measurand_id.as_str(), metric).is_some() {
+        require_text(
+            &metric.measurand_id,
+            "candidate.predicted_metric.measurand_id",
+        )?;
+        if predictions
+            .insert(metric.measurand_id.as_str(), metric)
+            .is_some()
+        {
             reasons.push(CandidateScreenReasonV1::DuplicatePredictedMeasurand);
             state = CandidateScreenStateV1::Rejected;
         }
@@ -534,8 +550,8 @@ fn screen_candidate(
             state = CandidateScreenStateV1::Rejected;
         } else {
             let midpoint = (prediction.lower + prediction.upper) / 2.0;
-            let target_span = (policy.target.acceptable.upper - policy.target.acceptable.lower)
-                .max(f64::EPSILON);
+            let target_span =
+                (policy.target.acceptable.upper - policy.target.acceptable.lower).max(f64::EPSILON);
             target_error = (midpoint - policy.target.target_value).abs() / target_span;
             normalized_width = (prediction.upper - prediction.lower) / target_span;
             if normalized_width > policy.maximum_interval_width_fraction {
@@ -563,11 +579,7 @@ fn screen_candidate(
                 state = CandidateScreenStateV1::Rejected;
             }
             Some(prediction)
-                if !range_contains(
-                    &constraint.allowed,
-                    prediction.lower,
-                    prediction.upper,
-                ) =>
+                if !range_contains(&constraint.allowed, prediction.lower, prediction.upper) =>
             {
                 reasons.push(CandidateScreenReasonV1::SideConstraintIntervalNotContained);
                 state = CandidateScreenStateV1::Rejected;
@@ -587,8 +599,7 @@ fn screen_candidate(
         Some(
             policy.target_error_weight * target_error
                 + policy.interval_width_weight * normalized_width
-                + policy.support_distance_weight
-                    * support_distance
+                + policy.support_distance_weight * support_distance
                     / policy.maximum_normalized_support_distance,
         )
     } else {
@@ -646,9 +657,7 @@ fn build_shortlist(
                     )
                 })
                 .fold(f64::INFINITY, f64::min);
-            if !selected.is_empty()
-                && min_distance < policy.minimum_recipe_diversity_distance
-            {
+            if !selected.is_empty() && min_distance < policy.minimum_recipe_diversity_distance {
                 continue;
             }
             let diversity_bonus = if selected.is_empty() {
@@ -733,11 +742,15 @@ pub fn evaluate_inverse_vm_shortlist_v1(
     input: &InverseVmShortlistInputV1,
 ) -> Result<InverseVmShortlistReportV1, InverseVmShortlistErrorV1> {
     if input.schema != INVERSE_VM_SHORTLIST_INPUT_SCHEMA_V1 {
-        return Err(InverseVmShortlistErrorV1("shortlist input schema is unsupported".into()));
+        return Err(InverseVmShortlistErrorV1(
+            "shortlist input schema is unsupported".into(),
+        ));
     }
     require_text(&input.input_id, "input.input_id")?;
     if !valid_sha256(&input.process_snapshot_sha256) {
-        return Err(InverseVmShortlistErrorV1("process snapshot digest is malformed".into()));
+        return Err(InverseVmShortlistErrorV1(
+            "process snapshot digest is malformed".into(),
+        ));
     }
     validate_policy(&input.policy)?;
 
@@ -847,12 +860,18 @@ mod tests {
                 RecipeKnobConstraintV1 {
                     knob_id: "rf_power".into(),
                     unit: "W".into(),
-                    allowed: NumericRangeV1 { lower: 100.0, upper: 500.0 },
+                    allowed: NumericRangeV1 {
+                        lower: 100.0,
+                        upper: 500.0,
+                    },
                 },
                 RecipeKnobConstraintV1 {
                     knob_id: "pressure".into(),
                     unit: "mTorr".into(),
-                    allowed: NumericRangeV1 { lower: 10.0, upper: 100.0 },
+                    allowed: NumericRangeV1 {
+                        lower: 10.0,
+                        upper: 100.0,
+                    },
                 },
             ],
             side_constraints_complete: true,
@@ -860,13 +879,19 @@ mod tests {
                 constraint_id: "uniformity".into(),
                 measurand_id: "uniformity".into(),
                 unit: "%",
-                allowed: NumericRangeV1 { lower: 0.0, upper: 3.0 },
+                allowed: NumericRangeV1 {
+                    lower: 0.0,
+                    upper: 3.0,
+                },
             }],
             target: MetrologyTargetV1 {
                 measurand_id: "epi_thickness".into(),
                 unit: "nm".into(),
                 target_value: 100.0,
-                acceptable: NumericRangeV1 { lower: 98.0, upper: 102.0 },
+                acceptable: NumericRangeV1 {
+                    lower: 98.0,
+                    upper: 102.0,
+                },
             },
             required_forward_model_sha256: digest('b'),
             support_manifest_sha256: digest('c'),
@@ -883,13 +908,27 @@ mod tests {
         }
     }
 
-    fn candidate(id: &str, rf: f64, pressure: f64, pred: (f64, f64), support_distance: f64) -> InverseVmCandidateV1 {
+    fn candidate(
+        id: &str,
+        rf: f64,
+        pressure: f64,
+        pred: (f64, f64),
+        support_distance: f64,
+    ) -> InverseVmCandidateV1 {
         let mut value = InverseVmCandidateV1 {
             candidate_id: id.into(),
             process_snapshot_sha256: digest('e'),
             recipe_settings: vec![
-                RecipeSettingV1 { knob_id: "rf_power".into(), unit: "W".into(), value: rf },
-                RecipeSettingV1 { knob_id: "pressure".into(), unit: "mTorr".into(), value: pressure },
+                RecipeSettingV1 {
+                    knob_id: "rf_power".into(),
+                    unit: "W".into(),
+                    value: rf,
+                },
+                RecipeSettingV1 {
+                    knob_id: "pressure".into(),
+                    unit: "mTorr".into(),
+                    value: pressure,
+                },
             ],
             historical_support: Some(HistoricalSupportEvidenceV1 {
                 support_manifest_sha256: digest('c'),
@@ -939,11 +978,10 @@ mod tests {
         let report = evaluate_inverse_vm_shortlist_v1(&input).unwrap();
         assert_eq!(report.state, ShortlistEvaluationStateV1::Complete);
         assert_eq!(report.feasible_candidate_count, 3);
-        assert_eq!(report.top_k_candidate_ids, vec![
-            "a".to_string(),
-            "c".to_string(),
-            "b".to_string(),
-        ]);
+        assert_eq!(
+            report.top_k_candidate_ids,
+            vec!["a".to_string(), "c".to_string(), "b".to_string(),]
+        );
         assert!(verify_inverse_vm_shortlist_v1(&input, &report).unwrap());
         assert!(!report.candidate_generation_executed);
         assert!(!report.recipe_write_executed);
@@ -956,10 +994,15 @@ mod tests {
         let input = input(vec![candidate("bad", 900.0, 50.0, (99.0, 101.0), 0.2)]);
         let report = evaluate_inverse_vm_shortlist_v1(&input).unwrap();
         assert!(report.top_k_candidate_ids.is_empty());
-        assert_eq!(report.evaluations[0].state, CandidateScreenStateV1::Rejected);
-        assert!(report.evaluations[0].reasons.contains(
-            &CandidateScreenReasonV1::RecipeValueOutsideHardBound
-        ));
+        assert_eq!(
+            report.evaluations[0].state,
+            CandidateScreenStateV1::Rejected
+        );
+        assert!(
+            report.evaluations[0]
+                .reasons
+                .contains(&CandidateScreenReasonV1::RecipeValueOutsideHardBound)
+        );
     }
 
     #[test]
@@ -967,9 +1010,11 @@ mod tests {
         let input = input(vec![candidate("ood", 200.0, 50.0, (100.0, 100.1), 1.2)]);
         let report = evaluate_inverse_vm_shortlist_v1(&input).unwrap();
         assert!(report.top_k_candidate_ids.is_empty());
-        assert!(report.evaluations[0].reasons.contains(
-            &CandidateScreenReasonV1::HistoricalSupportOutsideEnvelope
-        ));
+        assert!(
+            report.evaluations[0]
+                .reasons
+                .contains(&CandidateScreenReasonV1::HistoricalSupportOutsideEnvelope)
+        );
     }
 
     #[test]
@@ -978,10 +1023,15 @@ mod tests {
         wide_target.candidate_evidence_sha256 = candidate_digest(&wide_target).unwrap();
         let input = input(vec![wide_target]);
         let report = evaluate_inverse_vm_shortlist_v1(&input).unwrap();
-        assert_eq!(report.evaluations[0].state, CandidateScreenStateV1::Rejected);
-        assert!(report.evaluations[0].reasons.contains(
-            &CandidateScreenReasonV1::TargetIntervalNotContained
-        ));
+        assert_eq!(
+            report.evaluations[0].state,
+            CandidateScreenStateV1::Rejected
+        );
+        assert!(
+            report.evaluations[0]
+                .reasons
+                .contains(&CandidateScreenReasonV1::TargetIntervalNotContained)
+        );
     }
 
     #[test]
@@ -1010,7 +1060,10 @@ mod tests {
         candidate.historical_support.as_mut().unwrap().neighbour_ids[0] = " ".into();
         candidate.candidate_evidence_sha256 = candidate_digest(&candidate).unwrap();
         let report = evaluate_inverse_vm_shortlist_v1(&input(vec![candidate])).unwrap();
-        assert_eq!(report.evaluations[0].state, CandidateScreenStateV1::Rejected);
+        assert_eq!(
+            report.evaluations[0].state,
+            CandidateScreenStateV1::Rejected
+        );
         assert!(
             report.evaluations[0]
                 .reasons
