@@ -155,7 +155,7 @@ impl VerifiedSourceLineageSetV1 {
         if current_lineage_profile.verifier_id() != SOURCE_LINEAGE_VERIFIER_ID_V1 {
             return Err(SourceLineageRejectV1::WrongVerifierRole);
         }
-        if current_lineage_profile.profile_sha256() != self.lineage_profile_sha256 {
+        if current_lineage_profile.profile_sha256() != self.lineage_profile_sha256.as_str() {
             return Err(SourceLineageRejectV1::ProfileMismatch);
         }
         if current_lineage_profile.profile_sha256()
@@ -166,7 +166,7 @@ impl VerifiedSourceLineageSetV1 {
             return Err(SourceLineageRejectV1::SharedAuthority);
         }
         if sufficiency.receipt_sha256() != self.sufficiency_receipt_sha256
-            || qualified.qualified_candidate_set_sha256() != self.qualified_evidence_set_sha256
+            || qualified.qualified_candidate_set_sha256() != self.qualified_evidence_set_sha256.as_str()
             || sufficiency_receipt.qualified_evidence_set_sha256 != self.qualified_evidence_set_sha256
             || need_digest != self.decision_need_sha256
             || sufficiency_receipt.decision_need_sha256 != self.decision_need_sha256
@@ -582,9 +582,9 @@ fn validate_lineage_binding_at_use(
         .ok_or(SourceLineageRejectV1::BindingMismatch)?;
     if receipt.run_id != qualified.run_id()
         || receipt.query_invocation_id != qualified.query_invocation_id()
-        || receipt.qualified_evidence_set_sha256 != qualified.qualified_candidate_set_sha256()
+        || receipt.qualified_evidence_set_sha256.as_str() != qualified.qualified_candidate_set_sha256()
         || receipt.qualified_evidence_set_sha256 != sufficiency.qualified_evidence_set_sha256
-        || receipt.decision_need_sha256 != need_digest
+        || receipt.decision_need_sha256.as_str() != need_digest.as_str()
         || receipt.decision_need_sha256 != sufficiency.decision_need_sha256
         || receipt.evidence_class_sha256 != requirement.evidence_class_sha256
         || !sufficiency.requirements.iter().any(|claim| {
