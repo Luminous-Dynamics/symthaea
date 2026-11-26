@@ -41,4 +41,6 @@ pub use neural_bridge::{
 pub use ollama_bridge::{OllamaBridge, OllamaBridgeConfig, OllamaResponse};
 pub use predictive_hierarchy::{PredictionLevel, PredictiveHierarchy};
 pub use working_memory::{MemoryItem, MemorySource, SavedWorkingMemory, WorkingMemory};
-pub use world_model::{ActionCategory, NixWorldModel};
+pub use world_model::{
+    ActionCategory, NixWorldModel, TransitionPredictionDiagnostics, TransitionSupport,
+};
