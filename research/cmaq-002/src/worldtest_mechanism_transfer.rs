@@ -663,7 +663,9 @@ pub fn evaluate_mechanism_transfer(
                 query_family,
                 task_count: cell.task_count,
                 independent_cluster_count: cluster_count,
-                minimum_independent_clusters_required: input.context.minimum_independent_clusters_per_cell,
+                minimum_independent_clusters_required: input
+                    .context
+                    .minimum_independent_clusters_per_cell,
                 cluster_floor_met: cluster_count
                     >= input.context.minimum_independent_clusters_per_cell,
                 completed_count: cell.dispositions.completed,
@@ -734,8 +736,7 @@ pub fn evaluate_mechanism_transfer(
     let cell_mean_gap_ppm = maximum_cell_mean_score_ppm
         .checked_sub(minimum_cell_mean_score_ppm)
         .ok_or(MechanismTransferError::ArithmeticOverflow)?;
-    let all_cell_cluster_floors_met =
-        cell_summaries.iter().all(|cell| cell.cluster_floor_met);
+    let all_cell_cluster_floors_met = cell_summaries.iter().all(|cell| cell.cluster_floor_met);
 
     Ok(MechanismTransferCertificate {
         context: input.context.clone(),
