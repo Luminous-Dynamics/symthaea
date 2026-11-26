@@ -2,7 +2,7 @@
 
 Standard-library Go semantic reference for qualifying required event order in a provenance history.
 
-It verifies normalized reports for source identities, event records and cross-source order witnesses against pinned verifier ID/version/build/trust-store values. It derives source-local order from authenticated strictly increasing source sequence values. For cross-source requirements, it requires an exact-event-bound witness with a control root distinct from both endpoint sources.
+It verifies normalized reports for source identities, separate control-root membership evidence, event records and cross-source order witnesses against pinned verifier ID/version/build/trust-store values. The source ID names one monotonic sequence incarnation; a reset requires a new ID. A used or invalidated entity without exactly one authenticated generation event remains indeterminate. It derives source-local order from authenticated strictly increasing source sequence values. For cross-source requirements, it requires an exact-event-bound witness with a control root distinct from both endpoint sources.
 
 It enforces:
 - generation before use and invalidation;
