@@ -874,5 +874,57 @@ jobs:
           cargo run --locked --manifest-path "${RUNNER_TEMP}/plasma-probe-validation/crates/domains/symthaea-plasma-probes/Cargo.toml" --bin response_balanced_contract_audit -- \
             "${RUNNER_TEMP}/plasma-probe-validation/benchmarks/plasma/response-balanced/fixtures/synthetic-kresp1-experiment-v0.1.json"
 
+      - name: Challenge Rust K-RESP auditor with negative controls
+        run: |
+          python3 - <<'PY'
+          import copy
+          import json
+          import subprocess
+          import tempfile
+          from pathlib import Path
+
+          root = Path("${{ runner.temp }}/plasma-probe-validation")
+          fixture_path = root / "benchmarks/plasma/response-balanced/fixtures/synthetic-kresp1-experiment-v0.1.json"
+          fixture = json.loads(fixture_path.read_text())
+          binaries = list(root.glob("**/debug/response_balanced_contract_audit"))
+          assert binaries, "compiled Rust semantic auditor binary was not found"
+          binary = binaries[0]
+
+          def expect_rejection(name, mutate):
+              invalid = copy.deepcopy(fixture)
+              mutate(invalid)
+              with tempfile.TemporaryDirectory(prefix="kresp1-negative-") as directory:
+                  path = Path(directory) / (name + ".json")
+                  path.write_text(json.dumps(invalid, sort_keys=True))
+                  result = subprocess.run([str(binary), str(path)], capture_output=True, text=True)
+              assert result.returncode != 0, f"Rust semantic auditor accepted negative control {name}: {result.stdout} {result.stderr}"
+              print(f"response_balanced_negative_control_{name}=PASS")
+
+          expect_rejection(
+              "first-pulse-history-leak",
+              lambda value: value["split"]["held_out"][0]["pulses"][0].__setitem__("phase_rad", 0.9),
+          )
+          expect_rejection(
+              "checkpoint-crossing",
+              lambda value: value["split"]["held_out"][0]["pulses"][1].__setitem__("application_time", 5.5),
+          )
+          expect_rejection(
+              "out-of-family-amplitude",
+              lambda value: value["split"]["held_out"][0]["pulses"][1].__setitem__("kick_amplitude", 0.03),
+          )
+          def remove_heldout_separation_coverage(value):
+              for trial in value["split"]["held_out"]:
+                  trial["pulses"][1]["application_time"] = 10.0
+          expect_rejection("no-unseen-separation", remove_heldout_separation_coverage)
+          expect_rejection(
+              "physical-claim-laundering",
+              lambda value: value["claim_boundary"].__setitem__("physical_response_measured", True),
+          )
+          expect_rejection(
+              "split-id-duplication",
+              lambda value: value["split"]["held_out"][0].__setitem__("trial_id", value["split"]["training"][0]["trial_id"]),
+          )
+          PY
+
       - name: Run strict Clippy
         run: cargo clippy --locked --manifest-path "${RUNNER_TEMP}/plasma-probe-validation/crates/domains/symthaea-plasma-probes/Cargo.toml" --all-targets -- -D warnings
