@@ -65,6 +65,9 @@ fn audit(fixture: &Value) -> Result<(), String> {
     if string(cohort, "state_metric_id")?.trim().is_empty() {
         return Err("cohort state metric identifier is empty".to_owned());
     }
+    if string(cohort, "state_coordinate_id")?.trim().is_empty() {
+        return Err("cohort state coordinate identifier is empty".to_owned());
+    }
     if maximum_time <= 0.0
         || number(spatial, "maximum")? <= number(spatial, "minimum")?
         || number(velocity, "maximum")? <= number(velocity, "minimum")?
