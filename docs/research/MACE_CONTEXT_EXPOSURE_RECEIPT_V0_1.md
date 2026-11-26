@@ -43,7 +43,7 @@ The receipt binds:
 8. The provider response digest and the candidate decision-trace digest.
 9. A signature from the configured context-observer identity, verified against an independently pinned observer profile.
 
-The `span_start_byte` is inclusive and `span_end_byte` is exclusive, measured in UTF-8 bytes of the exact serialized request body whose digest is `provider_request_body_sha256`. The verifier must retrieve the immutable request-body artifact through the independently pinned storage profile, validate its custody receipt and ciphertext digest, decrypt under the authorized evidence-access policy, verify plaintext digest and byte length against the capture fields, recompute each span digest, reject bounds errors and unexplained overlaps, and ensure that every memory-origin span is enumerated exactly once. The artifact ID must resolve immutably; a mutable URL or a digest without recoverable bytes is insufficient for later independent verification.
+The `span_start_byte` is inclusive and `span_end_byte` is exclusive, measured in UTF-8 bytes of the exact serialized request body whose digest is `provider_request_body_sha256`. The verifier must retrieve the immutable request-body artifact through the independently pinned storage profile, validate its custody receipt and ciphertext digest, decrypt under the authorized evidence-access policy, verify plaintext digest and byte length against the capture fields, recompute each span digest, reject bounds errors and all overlapping spans, and ensure that every memory-origin span is enumerated exactly once. Version 0.1 deliberately requires a disjoint byte-span partition for memory-origin content; renderers must split adjacent/overlapping source mappings into non-overlapping output spans. Supporting explicitly declared overlap groups requires a later schema revision. The artifact ID must resolve immutably; a mutable URL or a digest without recoverable bytes is insufficient for later independent verification.
 
 For source evidence that is sent verbatim, the transformation receipt is an identity-transform receipt. For summaries, merged chunks, cached answers, tool projections or model-generated derivatives, the transformation receipt must bind the exact output digest and all required parent IDs/digests. Unknown ancestry is not an admissible substitute.
 
@@ -100,7 +100,7 @@ Cross-record invariants (unique invocation sequence, no missing calls, one-to-on
 ## Negative controls
 
 - Retrieved but not admitted; admitted but not rendered; rendered but removed before send.
-- Truncated, duplicated, reordered, overlapping or incorrectly offset spans.
+- Truncated, duplicated, reordered, overlapping or incorrectly offset spans; v0.1 rejects all overlaps.
 - Missing, mutable, inaccessible or wrong-custody request-body artifact; ciphertext/plaintext digest mismatch; artifact length mismatch.
 - A span hash that does not match the captured request body.
 - A summary with a missing, swapped or retracted parent.
