@@ -26,6 +26,8 @@ pub struct StateResponseContract {
     pub invariant_ids: BTreeSet<String>,
     /// Positive integer response tolerance for each registered response key.
     pub tolerance_units: BTreeMap<ResponseKey, u64>,
+    /// Positive relative cost to acquire each registered intervention response.
+    pub probe_cost_units: BTreeMap<ResponseKey, u64>,
 }
 
 impl StateResponseContract {
@@ -77,6 +79,13 @@ impl StateResponseContract {
             .any(|tolerance| *tolerance == 0)
         {
             return Err("response tolerances must be positive".to_owned());
+        }
+        let supplied_probe_costs: BTreeSet<_> = self.probe_cost_units.keys().cloned().collect();
+        if supplied_probe_costs != expected {
+            return Err("probe-cost keys must exactly cover the intervention × query × horizon contract".to_owned());
+        }
+        if self.probe_cost_units.values().any(|cost| *cost == 0) {
+            return Err("response probe costs must be positive".to_owned());
         }
         Ok(())
     }
@@ -216,6 +225,114 @@ pub fn score_abstraction(
     Ok(score)
 }
 
+
+#[derive(Clone, Debug, Eq, Ord, PartialEq, PartialOrd)]
+pub enum CounterexampleDimension {
+    Invariant { invariant_id: String },
+    Response { key: ResponseKey },
+}
+
+/// An evaluator-selected separating query. It deliberately contains no
+/// evaluator response value, target label or hidden state field value.
+#[derive(Clone, Debug, Eq, PartialEq)]
+pub struct CounterexampleProbe {
+    pub contract_id: String,
+    pub left_state_id: String,
+    pub right_state_id: String,
+    pub dimension: CounterexampleDimension,
+    /// None means the witness is an already-visible invariant mismatch.
+    pub probe_cost_units: Option<u64>,
+}
+
+/// Find the cheapest deterministic counterexample among states that the
+/// candidate currently assigns to the same abstraction class.
+///
+/// The evaluator returns only the separating invariant/query identity. It
+/// never exposes the response values used to find the counterexample.
+pub fn select_counterexample_probe(
+    records: &[StateResponseRecord],
+    contract: &StateResponseContract,
+) -> Result<Option<CounterexampleProbe>, String> {
+    contract.validate()?;
+    if records.is_empty() {
+        return Err("at least one state record is required".to_owned());
+    }
+
+    let mut state_ids = BTreeSet::new();
+    let mut groups: BTreeMap<String, Vec<&StateResponseRecord>> = BTreeMap::new();
+    for record in records {
+        record.validate_against(contract)?;
+        if !state_ids.insert(record.state_id.clone()) {
+            return Err(format!("duplicate state ID: {}", record.state_id));
+        }
+        groups
+            .entry(record.abstract_state_id.clone())
+            .or_default()
+            .push(record);
+    }
+
+    let mut candidates = Vec::new();
+    for group in groups.values_mut() {
+        group.sort_by(|left, right| left.state_id.cmp(&right.state_id));
+        for left_index in 0..group.len() {
+            for right_index in (left_index + 1)..group.len() {
+                let left = group[left_index];
+                let right = group[right_index];
+
+                if let Some((invariant_id, _)) = left
+                    .invariant_signature
+                    .iter()
+                    .find(|(key, value)| right.invariant_signature.get(*key) != Some(*value))
+                {
+                    candidates.push(CounterexampleProbe {
+                        contract_id: contract.contract_id.clone(),
+                        left_state_id: left.state_id.clone(),
+                        right_state_id: right.state_id.clone(),
+                        dimension: CounterexampleDimension::Invariant {
+                            invariant_id: invariant_id.clone(),
+                        },
+                        probe_cost_units: None,
+                    });
+                    continue;
+                }
+
+                let cheapest_witness = left
+                    .responses
+                    .iter()
+                    .filter_map(|(key, left_value)| {
+                        let right_value = right.responses.get(key)?;
+                        if left_value == right_value {
+                            return None;
+                        }
+                        Some((contract.probe_cost_units[key], key))
+                    })
+                    .min_by(|(left_cost, left_key), (right_cost, right_key)| {
+                        left_cost.cmp(right_cost).then_with(|| left_key.cmp(right_key))
+                    });
+
+                if let Some((cost, key)) = cheapest_witness {
+                    candidates.push(CounterexampleProbe {
+                        contract_id: contract.contract_id.clone(),
+                        left_state_id: left.state_id.clone(),
+                        right_state_id: right.state_id.clone(),
+                        dimension: CounterexampleDimension::Response { key: key.clone() },
+                        probe_cost_units: Some(cost),
+                    });
+                }
+            }
+        }
+    }
+
+    candidates.sort_by(|left, right| {
+        left.probe_cost_units
+            .cmp(&right.probe_cost_units)
+            .then_with(|| left.left_state_id.cmp(&right.left_state_id))
+            .then_with(|| left.right_state_id.cmp(&right.right_state_id))
+            .then_with(|| left.dimension.cmp(&right.dimension))
+    });
+    Ok(candidates.into_iter().next())
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -241,9 +358,11 @@ mod tests {
             horizons,
             invariant_ids,
             tolerance_units: BTreeMap::new(),
+            probe_cost_units: BTreeMap::new(),
         };
         for key in result.expected_keys() {
-            result.tolerance_units.insert(key, 10);
+            result.tolerance_units.insert(key.clone(), 10);
+            result.probe_cost_units.insert(key, 5);
         }
         result
     }
@@ -379,6 +498,126 @@ mod tests {
         let left = record("same-id", "compressed-a", 0, 2);
         let right = record("same-id", "compressed-b", 0, 2);
         assert!(score_abstraction(&[left, right], &contract).is_err());
+    }
+
+
+
+    #[test]
+    fn counterexample_probe_returns_a_query_without_leaking_response_values() {
+        let mut contract = contract();
+        let expected_keys = contract.expected_keys();
+        for key in expected_keys {
+            contract.probe_cost_units.insert(key, 5);
+        }
+        let cheapest = ResponseKey::new("push_right", "rotation", 5);
+        contract.probe_cost_units.insert(cheapest.clone(), 1);
+        let left = record("state-a", "same-class", 0, 2);
+        let right = record("state-b", "same-class", 1, 2);
+
+        let probe = select_counterexample_probe(&[left, right], &contract)
+            .expect("valid contract")
+            .expect("counterexample exists");
+        assert_eq!(probe.contract_id, contract.contract_id);
+        assert_eq!(probe.left_state_id, "state-a");
+        assert_eq!(probe.right_state_id, "state-b");
+        assert_eq!(
+            probe.dimension,
+            CounterexampleDimension::Response { key: cheapest }
+        );
+        assert_eq!(probe.probe_cost_units, Some(1));
+    }
+
+    #[test]
+    fn counterexample_probe_prefers_visible_invariant_mismatch() {
+        let contract = contract();
+        let left = record("state-a", "same-class", 0, 2);
+        let right = record("state-b", "same-class", 0, 3);
+        let probe = select_counterexample_probe(&[left, right], &contract)
+            .expect("valid contract")
+            .expect("invariant witness exists");
+        assert_eq!(
+            probe.dimension,
+            CounterexampleDimension::Invariant {
+                invariant_id: "mass_class".to_owned()
+            }
+        );
+        assert_eq!(probe.probe_cost_units, None);
+    }
+
+    #[test]
+    fn counterexample_probe_ignores_pairs_already_in_separate_classes() {
+        let contract = contract();
+        let left = record("state-a", "class-a", 0, 2);
+        let right = record("state-b", "class-b", 1, 2);
+        assert!(
+            select_counterexample_probe(&[left, right], &contract)
+                .expect("valid contract")
+                .is_none()
+        );
+    }
+
+    #[test]
+    fn counterexample_probe_is_deterministic_across_input_order() {
+        let contract = contract();
+        let left = record("state-a", "same-class", 0, 2);
+        let middle = record("state-b", "same-class", 1, 2);
+        let right = record("state-c", "same-class", 2, 2);
+        let forward = select_counterexample_probe(
+            &[left.clone(), middle.clone(), right.clone()],
+            &contract,
+        )
+        .expect("valid contract");
+        let reverse =
+            select_counterexample_probe(&[right, middle, left], &contract).expect("valid contract");
+        assert_eq!(forward, reverse);
+    }
+
+    #[test]
+    fn counterexample_refinement_can_remove_a_false_merge_one_pair_at_a_time() {
+        let contract = contract();
+        let left = record("state-a", "class-0", 0, 2);
+        let middle = record("state-b", "class-0", 1, 2);
+        let right = record("state-c", "class-0", 2, 2);
+        let first = select_counterexample_probe(
+            &[left.clone(), middle.clone(), right.clone()],
+            &contract,
+        )
+        .expect("valid contract")
+        .expect("first counterexample");
+        assert_eq!((first.left_state_id.as_str(), first.right_state_id.as_str()), ("state-a", "state-b"));
+
+        let mut refined_middle = middle;
+        refined_middle.abstract_state_id = "class-1".to_owned();
+        let second = select_counterexample_probe(
+            &[left.clone(), refined_middle.clone(), right.clone()],
+            &contract,
+        )
+        .expect("valid contract")
+        .expect("remaining counterexample");
+        assert_eq!((second.left_state_id.as_str(), second.right_state_id.as_str()), ("state-a", "state-c"));
+
+        let mut refined_right = right;
+        refined_right.abstract_state_id = "class-2".to_owned();
+        assert!(
+            select_counterexample_probe(
+                &[left, refined_middle, refined_right],
+                &contract
+            )
+            .expect("valid contract")
+            .is_none()
+        );
+    }
+
+    #[test]
+    fn contract_rejects_missing_or_zero_probe_costs() {
+        let mut missing = contract();
+        missing.probe_cost_units.pop_first();
+        assert!(missing.validate().is_err());
+
+        let mut zero = contract();
+        let key = zero.expected_keys().into_iter().next().expect("nonempty");
+        zero.probe_cost_units.insert(key, 0);
+        assert!(zero.validate().is_err());
     }
 
     #[test]
