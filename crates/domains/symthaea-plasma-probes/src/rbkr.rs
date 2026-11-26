@@ -73,6 +73,8 @@ pub enum RbkrError {
     InvalidCvarLevel,
     #[error("scenario has no non-zero reachable-to-observable reference response")]
     NoReferenceResponse,
+    #[error("no numerically significant response direction is available for enrichment")]
+    ResponseEnrichmentUnavailable,
 }
 
 /// Errors from finite-horizon linearized Gramian construction.
@@ -136,6 +138,18 @@ pub struct ScenarioResponseResidual {
 /// with zero statistical weight. Weighted mean and CVaR use normalized
 /// non-negative scenario weights.
 #[derive(Clone, Debug, PartialEq)]
+/// Auditable result of one worst-scenario response enrichment step.
+#[derive(Clone, Debug, PartialEq)]
+pub struct ResponseEnrichmentReceipt {
+    pub scenario_id: String,
+    pub trajectory_sha256: String,
+    pub previous_order: usize,
+    pub new_order: usize,
+    pub pre_response_residual: f64,
+    pub post_response_residual: f64,
+    pub added_transfer_singular_value: f64,
+}
+
 pub struct ResponseResidualReport {
     pub scenarios: Vec<ScenarioResponseResidual>,
     pub weighted_mean: f64,
@@ -753,6 +767,7 @@ pub struct ResponseBalancedBasis {
     trial_basis: Vec<Vec<f64>>,
     test_basis: Vec<Vec<f64>>,
     balanced_singular_values: Vec<f64>,
+    response_enrichment_singular_values: Vec<f64>,
     biorthogonality_defect: f64,
 }
 
@@ -934,6 +949,7 @@ impl ResponseBalancedBasis {
             trial_basis,
             test_basis,
             balanced_singular_values: singular_values,
+            response_enrichment_singular_values: Vec::new(),
             biorthogonality_defect: defect,
         })
     }
@@ -957,6 +973,12 @@ impl ResponseBalancedBasis {
     /// Descending empirical balanced singular values, including discarded modes.
     pub fn balanced_singular_values(&self) -> &[f64] {
         &self.balanced_singular_values
+    }
+
+    /// Singular values of the worst-scenario residual directions added after
+    /// the initial average-Gramian balanced basis.
+    pub fn response_enrichment_singular_values(&self) -> &[f64] {
+        &self.response_enrichment_singular_values
     }
 
     pub fn biorthogonality_defect(&self) -> f64 {
@@ -1054,6 +1076,314 @@ impl ResponseBalancedBasis {
             a: reduced_a,
             b: reduced_b,
             c: reduced_c,
+        })
+    }
+
+    /// Enrich this basis with the leading unrepresented input-output direction
+    /// from one scenario.
+    ///
+    /// Let P = V W^T and M = Y^T (I-P) X. If M = U Sigma V_r^T, the update
+    /// appends
+    ///
+    /// x_new = (I-P) X V_r[:,0] / sqrt(sigma_0)
+    /// y_new = (I-P^T) Y U[:,0] / sqrt(sigma_0).
+    ///
+    /// Since P is an oblique projector and the residual directions are
+    /// orthogonal to the existing trial/test spaces in the Petrov-Galerkin
+    /// pairing, the new pair is biorthogonal to the previous basis and has
+    /// unit mutual pairing in exact arithmetic. The implementation verifies
+    /// this numerically before committing the update.
+    ///
+    /// config.retained_order is the maximum allowed final basis order. The
+    /// singular-value cutoff is relative to the Frobenius norm of Y^T X.
+    /// This is a greedy scenario-specific enrichment, not a global min-max
+    /// optimum or a nonlinear response guarantee.
+    pub fn enrich_from_scenario(
+        &mut self,
+        reachability: &EmpiricalGramian,
+        observability: &EmpiricalGramian,
+        config: RbkrConfig,
+    ) -> Result<f64, RbkrError> {
+        config.validate()?;
+        let dimension = self.state_dimension;
+        if reachability.dimension != dimension || observability.dimension != dimension {
+            return Err(RbkrError::StateDimensionMismatch);
+        }
+        if reachability.weighted_factors.is_empty() || observability.weighted_factors.is_empty() {
+            return Err(RbkrError::EmptyGramian);
+        }
+        let current_order = self.reduced_order();
+        if current_order >= config.retained_order {
+            return Err(RbkrError::ResponseEnrichmentUnavailable);
+        }
+
+        let reach_count = reachability.weighted_factors.len();
+        let observe_count = observability.weighted_factors.len();
+        let cross_entries = reach_count
+            .checked_mul(observe_count)
+            .ok_or(RbkrError::CrossGramianBudgetExceeded)?;
+        if cross_entries > config.maximum_cross_gramian_entries {
+            return Err(RbkrError::CrossGramianBudgetExceeded);
+        }
+        let response_work = cross_entries
+            .checked_mul(dimension)
+            .and_then(|value| value.checked_mul(2))
+            .ok_or(RbkrError::CrossGramianWorkBudgetExceeded)?;
+        let projection_work = dimension
+            .checked_mul(
+                reach_count
+                    .checked_add(observe_count)
+                    .ok_or(RbkrError::BasisBudgetExceeded)?,
+            )
+            .and_then(|value| {
+                current_order
+                    .checked_mul(2)
+                    .and_then(|rank| rank.checked_add(4))
+                    .and_then(|factor| value.checked_mul(factor))
+            })
+            .ok_or(RbkrError::CrossGramianWorkBudgetExceeded)?;
+        let total_cross_work = response_work
+            .checked_add(projection_work)
+            .ok_or(RbkrError::CrossGramianWorkBudgetExceeded)?;
+        if total_cross_work > config.maximum_cross_gramian_scalar_operations {
+            return Err(RbkrError::CrossGramianWorkBudgetExceeded);
+        }
+
+        let right_entries = reach_count
+            .checked_mul(reach_count)
+            .ok_or(RbkrError::SvdStorageBudgetExceeded)?;
+        let svd_entries = cross_entries
+            .checked_add(right_entries)
+            .ok_or(RbkrError::SvdStorageBudgetExceeded)?;
+        if svd_entries > config.maximum_svd_storage_entries {
+            return Err(RbkrError::SvdStorageBudgetExceeded);
+        }
+        let pairs = reach_count
+            .checked_mul(reach_count.saturating_sub(1))
+            .and_then(|value| value.checked_div(2))
+            .ok_or(RbkrError::JacobiWorkBudgetExceeded)?;
+        let per_pair_work = observe_count
+            .checked_mul(16)
+            .and_then(|value| reach_count.checked_mul(8).and_then(|right| value.checked_add(right)))
+            .and_then(|value| value.checked_add(64))
+            .ok_or(RbkrError::JacobiWorkBudgetExceeded)?;
+        let jacobi_work = pairs
+            .checked_mul(per_pair_work)
+            .and_then(|value| value.checked_mul(config.maximum_jacobi_sweeps))
+            .ok_or(RbkrError::JacobiWorkBudgetExceeded)?;
+        if jacobi_work > config.maximum_jacobi_scalar_operations {
+            return Err(RbkrError::JacobiWorkBudgetExceeded);
+        }
+
+        let next_order = current_order
+            .checked_add(1)
+            .ok_or(RbkrError::BasisBudgetExceeded)?;
+        let basis_scalars = dimension
+            .checked_mul(next_order)
+            .and_then(|value| value.checked_mul(2))
+            .ok_or(RbkrError::BasisBudgetExceeded)?;
+        let basis_work = dimension
+            .checked_mul(
+                reach_count
+                    .checked_add(observe_count)
+                    .ok_or(RbkrError::BasisBudgetExceeded)?,
+            )
+            .and_then(|value| value.checked_mul(next_order))
+            .ok_or(RbkrError::BasisBudgetExceeded)?;
+        if basis_scalars > config.maximum_basis_scalars
+            || basis_work > config.maximum_basis_scalar_operations
+        {
+            return Err(RbkrError::BasisBudgetExceeded);
+        }
+
+        // Build M = Y^T (I-P) X and its unprojected scale ||Y^T X||_F.
+        let mut residual_cross = vec![vec![0.0; reach_count]; observe_count];
+        let mut reference_norm = 0.0_f64;
+        for (column_index, input_factor) in reachability.weighted_factors.iter().enumerate() {
+            validate_factor(input_factor, dimension)?;
+            let coordinates = self.reduce_state(input_factor)?;
+            let projected = self.reconstruct_state(&coordinates)?;
+            let mut residual = vec![0.0; dimension];
+            for state_index in 0..dimension {
+                residual[state_index] = input_factor[state_index] - projected[state_index];
+                if !residual[state_index].is_finite() {
+                    return Err(RbkrError::NonFiniteArithmetic);
+                }
+            }
+            for (row_index, output_factor) in
+                observability.weighted_factors.iter().enumerate()
+            {
+                validate_factor(output_factor, dimension)?;
+                let reference = checked_dot(output_factor, input_factor)?;
+                let lost = checked_dot(output_factor, &residual)?;
+                reference_norm = reference_norm.hypot(reference);
+                residual_cross[row_index][column_index] = lost;
+                if !reference_norm.is_finite() || !lost.is_finite() {
+                    return Err(RbkrError::NonFiniteArithmetic);
+                }
+            }
+        }
+        if reference_norm == 0.0 {
+            return Err(RbkrError::NoReferenceResponse);
+        }
+
+        let (rotated_cross, right_vectors) = one_sided_jacobi_svd(
+            residual_cross,
+            config.maximum_jacobi_sweeps,
+            config.jacobi_tolerance,
+        )?;
+        let (leading_column, sigma_squared) = (0..reach_count)
+            .map(|column_index| {
+                column_squared_norm(&rotated_cross, column_index)
+                    .map(|squared| (column_index, squared))
+            })
+            .collect::<Result<Vec<_>, _>>()?
+            .into_iter()
+            .max_by(|left, right| left.1.total_cmp(&right.1))
+            .ok_or(RbkrError::ResponseEnrichmentUnavailable)?;
+        let sigma = sigma_squared.sqrt();
+        if !sigma.is_finite()
+            || sigma <= reference_norm * config.relative_singular_value_cutoff
+        {
+            return Err(RbkrError::ResponseEnrichmentUnavailable);
+        }
+
+        let inverse_sigma = 1.0 / sigma;
+        if !inverse_sigma.is_finite() {
+            return Err(RbkrError::NonFiniteArithmetic);
+        }
+        let right_vector = (0..reach_count)
+            .map(|index| right_vectors[index][leading_column])
+            .collect::<Vec<_>>();
+        let left_vector = (0..observe_count)
+            .map(|index| rotated_cross[index][leading_column] * inverse_sigma)
+            .collect::<Vec<_>>();
+
+        // x = (I-P) X v.
+        let mut raw_trial = vec![0.0; dimension];
+        for (coefficient, factor) in right_vector.iter().zip(&reachability.weighted_factors) {
+            for (slot, value) in raw_trial.iter_mut().zip(factor) {
+                *slot += coefficient * value;
+                if !slot.is_finite() {
+                    return Err(RbkrError::NonFiniteArithmetic);
+                }
+            }
+        }
+        let trial_coordinates = self.reduce_state(&raw_trial)?;
+        let projected_trial = self.reconstruct_state(&trial_coordinates)?;
+        let mut residual_trial = vec![0.0; dimension];
+        for index in 0..dimension {
+            residual_trial[index] = raw_trial[index] - projected_trial[index];
+        }
+
+        // y = (I-P^T) Y u.
+        let mut raw_test = vec![0.0; dimension];
+        for (coefficient, factor) in left_vector.iter().zip(&observability.weighted_factors) {
+            for (slot, value) in raw_test.iter_mut().zip(factor) {
+                *slot += coefficient * value;
+                if !slot.is_finite() {
+                    return Err(RbkrError::NonFiniteArithmetic);
+                }
+            }
+        }
+        let mut projected_dual = vec![0.0; dimension];
+        for (trial, test) in self.trial_basis.iter().zip(&self.test_basis) {
+            let coefficient = checked_dot(trial, &raw_test)?;
+            for (slot, value) in projected_dual.iter_mut().zip(test) {
+                *slot += coefficient * value;
+                if !slot.is_finite() {
+                    return Err(RbkrError::NonFiniteArithmetic);
+                }
+            }
+        }
+        let mut residual_test = vec![0.0; dimension];
+        for index in 0..dimension {
+            residual_test[index] = raw_test[index] - projected_dual[index];
+        }
+
+        let pairing = checked_dot(&residual_test, &residual_trial)?;
+        if !pairing.is_finite() || pairing <= 0.0 {
+            return Err(RbkrError::BiorthogonalityFailure);
+        }
+        let normalization = 1.0 / pairing.sqrt();
+        if !normalization.is_finite() {
+            return Err(RbkrError::NonFiniteArithmetic);
+        }
+        let new_trial = residual_trial
+            .iter()
+            .map(|value| value * normalization)
+            .collect::<Vec<_>>();
+        let new_test = residual_test
+            .iter()
+            .map(|value| value * normalization)
+            .collect::<Vec<_>>();
+        if new_trial.iter().chain(&new_test).any(|value| !value.is_finite()) {
+            return Err(RbkrError::NonFiniteArithmetic);
+        }
+
+        let mut candidate_trial_basis = self.trial_basis.clone();
+        let mut candidate_test_basis = self.test_basis.clone();
+        candidate_trial_basis.push(new_trial);
+        candidate_test_basis.push(new_test);
+        let defect = pairing_defect(&candidate_trial_basis, &candidate_test_basis)?;
+        if defect > config.biorthogonality_tolerance {
+            return Err(RbkrError::BiorthogonalityFailure);
+        }
+
+        self.trial_basis = candidate_trial_basis;
+        self.test_basis = candidate_test_basis;
+        self.response_enrichment_singular_values.push(sigma);
+        self.biorthogonality_defect = defect;
+        Ok(sigma)
+    }
+
+    /// Greedily enrich from the scenario with the largest current transfer
+    /// residual. Use a development / challenge pool only; do not select a
+    /// final sealed holdout scenario for basis construction.
+    ///
+    /// The selected scenario is evaluated before and after enrichment, and
+    /// the basis update is rolled back if its own response residual increases.
+    /// The result is a deterministic greedy step, not a global min-max proof.
+    pub fn enrich_from_worst_scenario(
+        &mut self,
+        scenarios: &[ResponseGramianScenario<'_>],
+        config: RbkrConfig,
+    ) -> Result<ResponseEnrichmentReceipt, RbkrError> {
+        config.validate()?;
+        let report = evaluate_response_scenario_residuals(self, scenarios, 0.9)?;
+        let worst_index = report
+            .scenarios
+            .iter()
+            .enumerate()
+            .max_by(|left, right| {
+                left.1
+                    .response_residual
+                    .total_cmp(&right.1.response_residual)
+                    .then_with(|| right.1.scenario_id.cmp(&left.1.scenario_id))
+            })
+            .map(|(index, _)| index)
+            .ok_or(RbkrError::InvalidScenarioSet)?;
+        let selected = scenarios[worst_index];
+        let pre_residual = report.scenarios[worst_index].response_residual;
+        let previous_order = self.reduced_order();
+        let backup = self.clone();
+        let added_singular_value =
+            self.enrich_from_scenario(selected.reachability, selected.observability, config)?;
+        let post_residual =
+            self.linearized_response_residual(selected.reachability, selected.observability)?;
+        if post_residual > pre_residual + config.biorthogonality_tolerance {
+            *self = backup;
+            return Err(RbkrError::ResponseEnrichmentUnavailable);
+        }
+
+        Ok(ResponseEnrichmentReceipt {
+            scenario_id: selected.scenario_id.to_owned(),
+            trajectory_sha256: selected.trajectory_sha256.to_owned(),
+            previous_order,
+            new_order: self.reduced_order(),
+            pre_response_residual: pre_residual,
+            post_response_residual: post_residual,
+            added_transfer_singular_value: added_singular_value,
         })
     }
 
@@ -1508,6 +1838,70 @@ mod tests {
 
         assert!(preserved < 1.0e-12);
         assert!((lost - 1.0).abs() < 1.0e-12);
+    }
+
+    #[test]
+    fn worst_scenario_enrichment_adds_a_biorthogonal_response_direction() {
+        let reach_a = gramian(2, &[vec![1.0, 0.0]]);
+        let observe_a = gramian(2, &[vec![1.0, 0.0]]);
+        let reach_b = gramian(2, &[vec![0.0, 1.0]]);
+        let observe_b = gramian(2, &[vec![0.0, 1.0]]);
+        let scenarios = [
+            ResponseGramianScenario {
+                scenario_id: "common-response",
+                trajectory_sha256: "1111111111111111111111111111111111111111111111111111111111111111",
+                task_contract_id: "kresp1-contract-v1",
+                checkpoint_id: "checkpoint-greedy",
+                checkpoint_sha256: "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+                state_coordinate_id: "vlasov-1d1v-layout-v1",
+                state_metric_id: "metric-v1",
+                reachability: &reach_a,
+                observability: &observe_a,
+                scenario_weight: 0.51,
+            },
+            ResponseGramianScenario {
+                scenario_id: "rare-response",
+                trajectory_sha256: "2222222222222222222222222222222222222222222222222222222222222222",
+                task_contract_id: "kresp1-contract-v1",
+                checkpoint_id: "checkpoint-greedy",
+                checkpoint_sha256: "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+                state_coordinate_id: "vlasov-1d1v-layout-v1",
+                state_metric_id: "metric-v1",
+                reachability: &reach_b,
+                observability: &observe_b,
+                scenario_weight: 0.49,
+            },
+        ];
+        let (reach, observe) = aggregate_response_gramians(
+            &scenarios,
+            ResponseGramianAggregationConfig::default(),
+        )
+        .unwrap();
+        let mut basis = ResponseBalancedBasis::from_empirical_gramians(
+            &reach,
+            &observe,
+            RbkrConfig::new(1),
+        )
+        .unwrap();
+        let before = evaluate_response_scenario_residuals(&basis, &scenarios, 0.9).unwrap();
+        assert!(before.scenarios[0].response_residual < 1.0e-10);
+        assert!((before.scenarios[1].response_residual - 1.0).abs() < 1.0e-10);
+
+        let receipt = basis
+            .enrich_from_worst_scenario(&scenarios, RbkrConfig::new(2))
+            .unwrap();
+        assert_eq!(receipt.scenario_id, "rare-response");
+        assert_eq!(receipt.previous_order, 1);
+        assert_eq!(receipt.new_order, 2);
+        assert!((receipt.pre_response_residual - 1.0).abs() < 1.0e-10);
+        assert!(receipt.post_response_residual < 1.0e-10);
+        assert!(receipt.added_transfer_singular_value > 0.0);
+        assert!(basis.biorthogonality_defect() < 1.0e-8);
+        assert_eq!(basis.response_enrichment_singular_values().len(), 1);
+
+        let after = evaluate_response_scenario_residuals(&basis, &scenarios, 0.9).unwrap();
+        assert!(after.worst_case < 1.0e-10);
+        assert!(after.cvar < 1.0e-10);
     }
 
     #[test]
