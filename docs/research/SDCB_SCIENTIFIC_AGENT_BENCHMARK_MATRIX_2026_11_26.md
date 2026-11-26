@@ -84,6 +84,7 @@ That claim requires at least five separately reported result families:
 | Project-level research | ASI-Bench / AstaBench | same methods wrapped in the exact required harness | B1–B4 autonomy, task artifact score, provenance, cost |
 | Fresh hidden evaluations | AutoSciBench-style generator | locked baselines and adaptive candidate | transfer to unseen mechanisms, shortcut resistance, task validity |
 | Measurement assurance / traceability (guidance, not a leaderboard) | NIST calibration and metrological-traceability guidance | control-standard checks, cross-device comparisons, calibration-state-aware likelihoods, joint EGBT instrument-state updates | traceability chain and uncertainty, drift detection, calibration false acceptance, device identity binding, measurement assurance quality |
+| Common-cause measurement assurance (research subtrack, not an upstream leaderboard) | NIST MAP practices; sensor-network calibration and correlation datasets | i.i.d. negative control, random-effects/hierarchical calibration, co-calibration, reference-first, robust common-state policy | false independent-confirmation rate, common/local state recovery, residual-correlation error, decision regret, measurement assurance and evidence integrity |
 
 For every track, use matched task seeds, experiment and tool budgets, evidence access, action set and stop rules. Use task-family clustered bootstrap intervals and paired tests. Publish failures and consumed resources. Five seeds is the first minimum for synthetic families; real-lab workflows should use enough repeated campaigns to estimate variance, which may be substantially more than five.
 
@@ -110,6 +111,7 @@ These are project targets, not external standards or achieved results:
 - Instrument-aware two-stage calibration/science design: draft PR #13762.
 - Drift-aware Markov instrument-state and independent-device replication reference: draft PR #13793.
 - Evidence-gated joint scientific/instrument belief transition: draft PR #13801.
+- Shared common-cause measurement and reference-calibration decision oracle: draft PR #13804.
 
 All current additions have authored Rust tests, but the toolchain is unavailable here and the draft workflows are skipped. No benchmark tournament, physical experiment, or SOTA result has been completed.
 
@@ -127,5 +129,29 @@ All current additions have authored Rust tests, but the toolchain is unavailable
 - AI Index 2026: https://hai.stanford.edu/assets/files/ai_index_report_2026.pdf
 - NIST, Recommended Calibration Interval: https://www.nist.gov/calibrations/recommended-calibration-interval
 - NIST, Metrological Traceability: https://www.nist.gov/metrology/metrological-traceability
+- NIST, Calibration Policies and Measurement Assurance Programs: https://www.nist.gov/calibrations/policies
+- NIST, Measurement Process Characterization and Control: https://www.itl.nist.gov/div898/handbook/mpc/section2/mpc21.htm
+- Measurement Uncertainty Evaluation for Sensor Network Metrology: https://www.mdpi.com/2673-8244/5/1/3
+- Modelling calibration uncertainty in networks of environmental sensors, Journal of the Royal Statistical Society Series C: https://academic.oup.com/jrsssc/article/72/5/1187/7250331
+- Modelling and determining correlations in sensor networks: https://doi.org/10.1016/j.measen.2024.101793
+- Automation in sensor network metrology: https://doi.org/10.1016/j.measen.2024.101799
 - Bayesian Adaptive Calibration and Optimal Design, NeurIPS 2024: https://papers.neurips.cc/paper_files/paper/2024/hash/673b9f8cba4ee9f15b88656a69761631-Abstract-Conference.html
-- Bayesian experimental design for model-discrepancy calibration, Journal of Computational Physics (2026): https://doi.org/10.1016/j.jcp.2025.114469
+- Bayesian experimental design for model-discrepancy calibration, Journal of Computational Physics (2026): https://doi.org/10.1016/j.jcp.2025.11446
+
+### 4.6 From device count to common-cause-aware evidence
+
+Different device identities do not imply independent errors. Sensor-network metrology research documents correlations across sensors caused by shared ambient conditions, common reference instruments, and temporal error processes. It also distinguishes correlation in the measurand from correlation in sensor error—an important identifiability problem that needs reference measurements or controlled comparisons.
+
+The next SDCB reference therefore adds a shared latent environment/reference state (g) in addition to device-local states (c_d). A common Markov transition moves (g) between two experiment stages; all named devices observe the new shared state, so cross-device agreement can remain uninformative about the scientific hypothesis. A reference standard can directly measure (g), subject to the freshness of that reference measurement.
+
+The analytical negative control is deliberately sharp: science-A repeated, or science-A followed by science-B, each stays at decision value 0.50 under an unobserved shared XOR bias. Shared-reference calibration followed by science reaches 0.905 in the stable scenario and 0.743 when the shared state flips with probability 0.20. These are analytic fixture values, not physical or benchmark results.
+
+Comparator requirements now include:
+- i.i.d. sensor-noise fusion as a negative-control model;
+- same-device repeat and cross-device agreement;
+- random-effects/hierarchical common/local bias models;
+- Bayesian sensor-network calibration and co-calibration;
+- check-standard/control-chart policies;
+- matched EIG, EVSI, R-IDeA, multi-fidelity, and exact finite references.
+
+The next research extension should distinguish genuine correlation in the measured physical field from shared sensor error, and should include common reference-chain, batch, firmware, power, and environmental factors. The bounded binary common-state reference does not yet solve continuous or multiple-factor sensor-network calibration.9
