@@ -130,7 +130,21 @@ The official [Agent Memory Leaderboard Cycle 2 results](https://agentmemoryleade
 | Multimodal | Khipu 43.26 | MemoraX 53.68 |
 | Coding | InsightMem 63.33% | MemoraX 68.00% |
 
-These are separate tracks with different task sets and scoring definitions. Do not average them, compare them as a single ranking, or treat them as assurance scores. On the textual track, the largest observed commercial/open-source gaps include personalization and care, streaming, and epistemic safety/privacy; those are retrieval-and-memory parity priorities, distinct from MACE's source-origin assurance contribution.
+These are separate tracks with different task sets and scoring definitions. Do not average them, compare them as a single ranking, or treat them as assurance scores. The corresponding commercial/open-source gaps are 8.04 textual points, 10.42 multimodal points and 4.67 coding percentage points.
+
+For the textual capability table, the commercial leader MemoraX scores 54.70 on Personalization & Care, 63.11 on Streaming, 81.98 on Epistemic Safety & Privacy, 67.05 on Temporal & Event Sequencing, 70.85 on Explicit Fact Recall, 64.40 on Relational & Multi-hop Reasoning, and 78.10 on Memory Governance. The open-source leader Resurface scores 38.82, 49.65, 68.59, 57.76, 62.98, 58.94 and 76.55 respectively. The resulting gaps are:
+
+| Textual capability | Commercial advantage |
+|---|---:|
+| Personalization & care | 15.88 points |
+| Streaming | 13.46 points |
+| Epistemic safety & privacy | 13.39 points |
+| Temporal sequencing | 9.29 points |
+| Explicit fact recall | 7.87 points |
+| Relational / multi-hop reasoning | 5.46 points |
+| Memory governance | 1.55 points |
+
+These gaps suggest the most valuable memory-parity work is not just similarity retrieval: prioritize changing-preference tracking, continuous update latency, evidence-grounded epistemic safety and temporal state reconstruction. They are separate from source-origin assurance, and MACE has no external AML result yet.
 
 The external benchmark suite should be run as complementary instruments:
 
