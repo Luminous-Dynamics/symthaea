@@ -973,16 +973,12 @@ fn select_active(
         .iter()
         .map(|quota| (quota.source_stratum_id.as_str(), quota))
         .collect();
-    let mut selected = BTreeSet::new();
-    let mut selections = Vec::new();
-    let mut spent = 0_u64;
-    let mut source_counts: BTreeMap<String, u32> = BTreeMap::new();
-    let mut stratum_counts: BTreeMap<String, u32> = BTreeMap::new();
+    let mut state = ActiveSelectionState::default();
 
     // First satisfy per-stratum minimums. Items without a model/disagreement
     // priority can enter only under an explicit minimum-coverage quota.
     for quota in &config.stratum_quotas {
-        while stratum_counts
+        while state.stratum_counts
             .get(&quota.source_stratum_id)
             .copied()
             .unwrap_or(0)
@@ -994,7 +990,7 @@ fn select_active(
                 .filter(|index| {
                     let candidate = &candidates[*index];
                     candidate.source_stratum_id == quota.source_stratum_id
-                        && !selected.contains(index)
+                        && !state.selected.contains(index)
                         && !audit_sources.contains(candidate.source_work_id_sha256.as_str())
                 })
                 .collect();
@@ -1004,9 +1000,9 @@ fn select_active(
                     *index,
                     candidates,
                     config,
-                    &source_counts,
-                    &stratum_counts,
-                    spent,
+                    &state.source_counts,
+                    &state.stratum_counts,
+                    state.spent,
                     quota,
                 )
             }) else {
@@ -1017,17 +1013,7 @@ fn select_active(
                 ActivePriorityBandV1::CoverageGap,
                 SelectionReasonV1::StratumMinimumQuota,
             ));
-            add_active_selection(
-                index,
-                candidates,
-                band,
-                reason,
-                &mut selected,
-                &mut selections,
-                &mut spent,
-                &mut source_counts,
-                &mut stratum_counts,
-            )?;
+            state.add(index, candidates, band, reason)?;
         }
     }
 
@@ -1041,7 +1027,7 @@ fn select_active(
     ] {
         let mut by_stratum: BTreeMap<&str, Vec<usize>> = BTreeMap::new();
         for index in eligible {
-            if selected.contains(index)
+            if state.selected.contains(index)
                 || audit_sources.contains(candidates[*index].source_work_id_sha256.as_str())
                 || active_priority(&candidates[*index], config).map(|value| value.0) != Some(band)
             {
@@ -1063,38 +1049,28 @@ fn select_active(
                     .get(stratum)
                     .copied()
                     .ok_or_else(|| "active candidate has no stratum quota".to_string())?;
-                if stratum_counts.get(*stratum).copied().unwrap_or(0) >= quota.active_maximum_items
+                if state.stratum_counts.get(*stratum).copied().unwrap_or(0) >= quota.active_maximum_items
                 {
                     continue;
                 }
                 let next = items.iter().copied().find(|index| {
-                    !selected.contains(index)
+                    !state.selected.contains(index)
                         && active_candidate_fits(
                             *index,
                             candidates,
                             config,
-                            &source_counts,
-                            &stratum_counts,
-                            spent,
+                            &state.source_counts,
+                            &state.stratum_counts,
+                            state.spent,
                             quota,
                         )
                 });
                 if let Some(index) = next {
                     let candidate = &candidates[index];
                     let (_, reason) = active_priority(candidate, config).ok_or_else(|| {
-                        "selected active candidate has no priority reason".to_string()
+                        "state.selected active candidate has no priority reason".to_string()
                     })?;
-                    add_active_selection(
-                        index,
-                        candidates,
-                        band,
-                        reason,
-                        &mut selected,
-                        &mut selections,
-                        &mut spent,
-                        &mut source_counts,
-                        &mut stratum_counts,
-                    )?;
+                    state.add(index, candidates, band, reason)?;
                     progress = true;
                 }
             }
@@ -1108,21 +1084,27 @@ fn select_active(
         .stratum_quotas
         .iter()
         .filter_map(|quota| {
-            let selected_count = stratum_counts
+            let state.selected_count = state.stratum_counts
                 .get(&quota.source_stratum_id)
                 .copied()
                 .unwrap_or(0);
-            (selected_count < quota.active_minimum_items).then(|| UnmetAnnotationQuotaV1 {
+            (state.selected_count < quota.active_minimum_items).then(|| UnmetAnnotationQuotaV1 {
                 source_stratum_id: quota.source_stratum_id.clone(),
                 stream: QuotaStreamV1::ActiveRefinement,
                 requested: quota.active_minimum_items,
-                selected: selected_count,
+                state.selected: state.selected_count,
             })
         })
         .collect();
 
-    Ok((selections, unmet, spent, source_counts))
+    Ok(ActiveSelectionResult {
+        selections: state.selections,
+        unmet,
+        spent: state.spent,
+        source_counts: state.source_counts,
+    })
 }
+
 
 fn active_candidate_fits(
     index: usize,
@@ -1145,40 +1127,6 @@ fn active_candidate_fits(
     source_count < config.maximum_active_items_per_source_work
         && stratum_count < quota.active_maximum_items
         && candidate.annotation_cost_units <= config.active_budget_units.saturating_sub(spent)
-}
-
-fn add_active_selection(
-    index: usize,
-    candidates: &[AnnotationAcquisitionCandidateV1],
-    band: ActivePriorityBandV1,
-    reason: SelectionReasonV1,
-    selected: &mut BTreeSet<usize>,
-    selections: &mut Vec<AnnotationSelectionRecordV1>,
-    spent: &mut u64,
-    source_counts: &mut BTreeMap<String, u32>,
-    stratum_counts: &mut BTreeMap<String, u32>,
-) -> Result<(), String> {
-    if !selected.insert(index) {
-        return Err("active selector attempted to schedule a duplicate candidate".into());
-    }
-    let candidate = &candidates[index];
-    *spent = spent
-        .checked_add(candidate.annotation_cost_units)
-        .ok_or_else(|| "active budget usage overflow".to_string())?;
-    *source_counts
-        .entry(candidate.source_work_id_sha256.clone())
-        .or_default() += 1;
-    *stratum_counts
-        .entry(candidate.source_stratum_id.clone())
-        .or_default() += 1;
-    selections.push(selection_record(
-        candidate,
-        SelectionStreamV1::ActiveRefinement,
-        Some(band),
-        reason,
-        SelectionDesignMetadataV1::default(),
-    ));
-    Ok(())
 }
 
 fn active_candidate_cmp(
