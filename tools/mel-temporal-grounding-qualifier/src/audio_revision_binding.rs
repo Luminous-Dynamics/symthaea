@@ -148,6 +148,8 @@ pub fn audit_revision_with_audio_evidence(
 mod tests {
     use super::*;
 
+    use crate::audio_evidence_window::recompute_audio_context_manifest_sha256;
+    use crate::evidence_digest::sha256_hex;
     use crate::temporal_grounding::{
         AudioArtifactClockV1, FrameIntervalV1, GroundTruthStateV1,
         GroundingPredictionStateV1, TemporalGroundTruthV1, TemporalGroundingPlanV1,
@@ -250,6 +252,36 @@ mod tests {
         assert!(report.prompt_adapter_policy_binding_verified);
         assert!(report.selected_window_binding_verified);
         assert_eq!(report.audio_evidence_report.verified_window_count, 2);
+        assert!(!report.model_input_attested);
+    }
+
+    #[test]
+    fn yoked_audio_bytes_bind_to_the_target_query_without_relabeling_target_identity() {
+        let mut case = revision_case();
+        case.evidence_condition = RevisionEvidenceConditionV1::YokedRetrieved;
+        let mut manifest = evidence_manifest();
+        let yoked_source = b"MEL-GROUND-009 synthetic yoked source audio v1\n";
+        let yoked_digest = sha256_hex(yoked_source);
+        manifest.evidence_condition = AudioEvidenceConditionV1::YokedRetrieved;
+        manifest.source_audio.audio_sha256 = yoked_digest.clone();
+        manifest.source_audio.byte_length = yoked_source.len() as u64;
+        manifest.context.context_manifest_sha256 =
+            recompute_audio_context_manifest_sha256(&manifest).unwrap();
+        case.evidence.as_mut().unwrap().source_audio_sha256 = yoked_digest;
+
+        let report = audit_revision_with_audio_evidence(
+            &case,
+            &manifest,
+            yoked_source,
+            PCM,
+        )
+        .unwrap();
+        assert_eq!(report.audio_evidence_report.evidence_condition, AudioEvidenceConditionV1::YokedRetrieved);
+        assert_ne!(
+            report.audio_evidence_report.source_audio_sha256,
+            report.audio_evidence_report.target_audio_sha256
+        );
+        assert!(report.materialized_audio_bytes_bound_to_revision_case);
         assert!(!report.model_input_attested);
     }
 
