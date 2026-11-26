@@ -26,7 +26,8 @@ The main question is not which selector gets the largest internal score. It is w
 | B9 | Exact non-myopic policy | `scripts/research/sdcb_nonmyopic_oracle.rs` | Small finite-horizon dynamic-programming oracle; non-deployable upper bound |
 | B10 | Finite-scenario robust EVSI | `scripts/research/sdcb_robust_pareto.rs` | Shared action policy across hidden plausible scenarios; maximin, not an average |
 | B11 | Pareto/hard-constraint policy | `scripts/research/sdcb_robust_pareto.rs` | Non-dominated objectives plus per-hypothesis hard constraints |
-| B12 | qLogNEHVI / qParEGO / novelty-aware evolutionary MOBO | Upstream implementations, where task assumptions fit | Established multi-objective baselines; pin release and optimizer budget |\n| B13 | Multi-fidelity BO / qMFMES | Upstream implementation with fidelity-dependent likelihood/cost model | Compare low/medium/high fidelity selection and calibration under equal resource envelopes |
+| B12 | qLogNEHVI / qParEGO / novelty-aware evolutionary MOBO | Upstream implementations, where task assumptions fit | Established multi-objective baselines; pin release and optimizer budget |
+| B13 | Multi-fidelity BO / qMFMES | Upstream implementation with fidelity-dependent likelihood/cost model | Compare low/medium/high fidelity selection and calibration under equal resource envelopes |
 | B14 | Robust multi-fidelity decision reference | `scripts/research/sdcb_multifidelity.rs` | Finite maximin decision gain across fidelity scenarios plus componentwise resource caps/Pareto frontier |
 | B15 | Greedy R-I/R-IDeA portfolio | `scripts/research/sdcb_ridea_portfolio.rs` | Recompute MMD² representativeness after each batch selection; frozen EIG/proxy means this is not an adaptive posterior policy |
 | B16 | MF-OSEMO / MF-JESMOC | Upstream multi-objective multi-fidelity implementations | Compare Pareto-front entropy/cost behavior under matched fidelity models, constraints and resource budgets |
