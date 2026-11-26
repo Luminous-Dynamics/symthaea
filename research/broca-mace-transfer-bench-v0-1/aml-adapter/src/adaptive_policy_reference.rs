@@ -86,11 +86,11 @@ pub struct ReferenceBudgetsV1 {
 #[derive(Clone, Debug, Eq, PartialEq)]
 pub struct ReferenceScenarioV1 {
     pub state_ids: Vec<String>,
-    /// Must be sorted by world_id. Each row is a joint outcome assignment.
+    /// World IDs are unique; each row is a joint outcome assignment.
     pub worlds: Vec<ReferenceWorldV1>,
-    /// Must be sorted by action_id.
+    /// Action IDs are unique; input enumeration order does not affect ties.
     pub actions: Vec<ReferenceActionV1>,
-    /// Must be sorted by query_id.
+    /// Query IDs are unique; input enumeration order does not affect ties.
     pub queries: Vec<ReferenceQueryV1>,
     pub maximum_horizon: u32,
     pub maximum_policy_nodes: usize,
@@ -229,6 +229,11 @@ fn sorted_unique(values: &[String]) -> bool {
     values.windows(2).all(|pair| pair[0] < pair[1])
 }
 
+fn unique_ids<'a>(values: impl IntoIterator<Item = &'a str>) -> bool {
+    let mut seen = BTreeSet::new();
+    values.into_iter().all(|value| valid_id(value) && seen.insert(value))
+}
+
 impl ReferenceScenarioV1 {
     pub fn validate(&self, expected_value_mode: bool) -> Result<(), ReferenceRejectV1> {
         if self.state_ids.is_empty()
@@ -249,12 +254,10 @@ impl ReferenceScenarioV1 {
         }
         if !sorted_unique(&self.state_ids)
             || self.state_ids.iter().any(|value| !valid_id(value))
-            || !self.worlds.windows(2).all(|pair| pair[0].world_id < pair[1].world_id)
-            || self.worlds.iter().any(|world| !valid_id(&world.world_id) || !valid_id(&world.state_id))
-            || !self.actions.windows(2).all(|pair| pair[0].action_id < pair[1].action_id)
-            || self.actions.iter().any(|action| !valid_id(&action.action_id))
-            || !self.queries.windows(2).all(|pair| pair[0].query_id < pair[1].query_id)
-            || self.queries.iter().any(|query| !valid_id(&query.query_id))
+            || !unique_ids(self.worlds.iter().map(|world| world.world_id.as_str()))
+            || self.worlds.iter().any(|world| !valid_id(&world.state_id))
+            || !unique_ids(self.actions.iter().map(|action| action.action_id.as_str()))
+            || !unique_ids(self.queries.iter().map(|query| query.query_id.as_str()))
         {
             return Err(ReferenceRejectV1::InvalidIdentifier);
         }
@@ -432,17 +435,17 @@ fn search_expected(
                 });
             }
             if complete && !branches.is_empty() {
-                consider_expected(
-                    &mut best,
-                    ExpectedCandidateV1 {
-                        policy: ReferencePolicyNodeV1::Query {
-                            query_id: query.query_id.clone(),
-                            branches,
-                        },
-                        utility_numerator_ppm: utility_numerator,
-                        cost_numerator_ppm: cost_numerator,
+                let candidate = ExpectedCandidateV1 {
+                    policy: ReferencePolicyNodeV1::Query {
+                        query_id: query.query_id.clone(),
+                        branches,
                     },
-                );
+                    utility_numerator_ppm: utility_numerator,
+                    cost_numerator_ppm: cost_numerator,
+                };
+                if candidate.policy.node_count() <= scenario.maximum_policy_nodes {
+                    consider_expected(&mut best, candidate);
+                }
             }
         }
     }
@@ -568,17 +571,17 @@ fn search_robust(
                 });
             }
             if complete && !branches.is_empty() {
-                consider_robust(
-                    &mut best,
-                    RobustCandidateV1 {
-                        policy: ReferencePolicyNodeV1::Query {
-                            query_id: query.query_id.clone(),
-                            branches,
-                        },
-                        worst_regret,
-                        worst_cost,
+                let candidate = RobustCandidateV1 {
+                    policy: ReferencePolicyNodeV1::Query {
+                        query_id: query.query_id.clone(),
+                        branches,
                     },
-                );
+                    worst_regret,
+                    worst_cost,
+                };
+                if candidate.policy.node_count() <= scenario.maximum_policy_nodes {
+                    consider_robust(&mut best, candidate);
+                }
             }
         }
     }
@@ -603,7 +606,6 @@ fn action_allowed_for_worlds(
     scenario: &ReferenceScenarioV1,
     world_indices: &[usize],
 ) -> bool {
-    let _ = scenario;
     !world_indices.is_empty()
         && world_indices.iter().all(|index| {
             action.allowed_by_state[&scenario.worlds[*index].state_id]
