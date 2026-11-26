@@ -15,7 +15,6 @@ use sha2::{Digest, Sha256};
 
 use crate::mace_context_exposure_receipt::{
     sign_mace_context_exposure_receipt_v1,
-    MaceAdmissionDenialReasonV1,
     MaceContextCaptureV1,
     MaceContextExposureReceiptV1,
     MaceContextExposureRejectV1,
@@ -131,6 +130,7 @@ pub trait MaceRequestBodyArtifactWriterV1 {
 /// The transport must send the exact supplied byte slice without re-serializing
 /// it. The fake transport echoes the received-body digest so tests can verify
 /// capture/send identity. A real adapter must preserve the same invariant.
+#[derive(Clone, Debug, Eq, PartialEq)]
 pub struct MaceProviderResponseV1 {
     pub provider_request_id: Option<String>,
     pub provider_response_id: String,
@@ -185,7 +185,7 @@ pub fn serialize_mace_provider_request_with_exposure_map_v1(
                 return Err(MaceExposureCaptureRejectV1::TooManySegments);
             }
             if segment.text.is_empty() {
-                if matches!(segment.origin, MaceRequestSegmentOriginV1::Memory(_)) {
+                if matches!(&segment.origin, MaceRequestSegmentOriginV1::Memory(_)) {
                     return Err(MaceExposureCaptureRejectV1::EmptyMemorySegment);
                 }
                 continue;
@@ -260,6 +260,9 @@ pub fn capture_send_and_sign_mace_invocation_v1(
 ) -> Result<(MaceContextExposureReceiptV1, MaceProviderResponseV1), MaceExposureCaptureRejectV1> {
     validate_identifier(context.receipt_id)?;
     validate_digest(context.candidate_decision_trace_sha256)?;
+    if expected.arm == MaceMemoryArmV1::NoMemory && !context.admission_denials.is_empty() {
+        return Err(MaceExposureCaptureRejectV1::MemoryInNoMemoryArm);
+    }
     validate_digest(expected.clock_profile_sha256)?;
     validate_digest(expected.observer_profile_sha256)?;
 
@@ -472,8 +475,6 @@ mod tests {
         MaceExpectedExposureBindingV1,
         VerifiedMaceContextExposureReceiptV1,
     };
-    use base64::engine::general_purpose::STANDARD as BASE64_STANDARD;
-    use base64::Engine;
     use ed25519_dalek::{SigningKey, VerifyingKey};
 
     const D1: &str = "1111111111111111111111111111111111111111111111111111111111111111";
@@ -522,13 +523,9 @@ mod tests {
         }
     }
 
-    struct TestSigner { key: SigningKey }
+    struct TestSigner { key: SigningKey, id: String }
     impl MaceExposureReceiptSignerV1 for TestSigner {
-        fn key_id(&self) -> &str {
-            // Stored independently in the signer for production. This test
-            // uses a static key ID so its borrowed return remains stable.
-            D9
-        }
+        fn key_id(&self) -> &str { &self.id }
         fn sign_digest(&self, digest: &[u8; 32])
             -> Result<[u8; 64], MaceContextExposureRejectV1> {
             use ed25519_dalek::Signer;
@@ -543,10 +540,14 @@ mod tests {
             Ok(self.body.clone())
         }
     }
-    struct TestKeyResolver { key: VerifyingKey }
+    struct TestKeyResolver { key: VerifyingKey, profile: String }
     impl MaceExposureObserverKeyResolverV1 for TestKeyResolver {
-        fn resolve_key(&self, _: &str, _: &str)
+        fn resolve_key(&self, profile: &str, key_id: &str)
             -> Result<VerifyingKey, MaceContextExposureRejectV1> {
+            let expected_id = crate::mace_context_exposure_receipt::ed25519_spki_key_id_v1(&self.key);
+            if profile != self.profile || key_id != expected_id {
+                return Err(MaceContextExposureRejectV1::UnknownObserverKey);
+            }
             Ok(self.key.clone())
         }
     }
@@ -581,7 +582,11 @@ mod tests {
             admissibility_receipt_sha256: D6.to_owned(), lifecycle_revalidation_receipt_sha256: D7.to_owned(),
         }
     }
-    fn signer() -> TestSigner { TestSigner { key: SigningKey::from_bytes(&[8u8;32]) } }
+    fn signer() -> TestSigner {
+        let key = SigningKey::from_bytes(&[8u8; 32]);
+        let id = crate::mace_context_exposure_receipt::ed25519_spki_key_id_v1(&key.verifying_key());
+        TestSigner { key, id }
+    }
 
     #[test]
     fn maps_json_escaped_unicode_to_exact_utf8_byte_offsets() {
@@ -661,7 +666,10 @@ mod tests {
             serialized.body().to_vec()
         };
         let body_resolver = TestArtifactResolver { body };
-        let keys = TestKeyResolver { key: signer.key.verifying_key() };
+        let keys = TestKeyResolver {
+            key: signer.key.verifying_key(),
+            profile: expected.observer_profile_sha256.to_owned(),
+        };
         let verified: VerifiedMaceContextExposureReceiptV1 =
             parse_and_verify_mace_context_exposure_receipt_v1(
                 &serde_json::to_vec(&receipt).unwrap(), &expected,
