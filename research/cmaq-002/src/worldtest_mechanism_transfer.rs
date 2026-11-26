@@ -1,4 +1,5 @@
 //! Cross-query transfer across held-out environment mechanisms.
+// A sub-floor cell remains visible and is explicitly ineligible for confirmatory inference.
 // All transfer cells share one frozen source checkpoint; target adaptation is a separate protocol.
 //!
 //! This is the frozen-transfer (zero-shot reuse) track. It evaluates the same
