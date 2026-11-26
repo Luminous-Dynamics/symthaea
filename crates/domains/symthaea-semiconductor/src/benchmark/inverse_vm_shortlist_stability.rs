@@ -600,13 +600,14 @@ mod tests {
         stressed.candidates[0].predicted_metrics[0].lower = 97.0;
         stressed.candidates[0].candidate_evidence_sha256 =
             seal_inverse_vm_candidate_v1(&stressed.candidates[0]).unwrap();
-        let forward = stressed.candidates[0].forward_evaluation_receipt.as_mut().unwrap();
-        let candidate = &stressed.candidates[0];
-        forward.predicted_metrics_sha256 = {
-            let mut metrics = candidate.predicted_metrics.clone();
-            metrics.sort_by(|a, b| a.measurand_id.cmp(&b.measurand_id));
-            digest_bytes(&metrics)
-        };
+        let mut metrics = stressed.candidates[0].predicted_metrics.clone();
+        metrics.sort_by(|a, b| a.measurand_id.cmp(&b.measurand_id));
+        let metrics_digest = digest_bytes(&metrics);
+        let forward = stressed.candidates[0]
+            .forward_evaluation_receipt
+            .as_mut()
+            .unwrap();
+        forward.predicted_metrics_sha256 = metrics_digest;
         forward.receipt_sha256 = seal_forward_evaluation_receipt_v1(forward).unwrap();
         stressed.candidates[0].candidate_evidence_sha256 =
             seal_inverse_vm_candidate_v1(&stressed.candidates[0]).unwrap();
