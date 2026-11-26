@@ -8,16 +8,43 @@
 //! entry point for autonomous web research.
 
 use anyhow::{Context, Result};
+use futures::{stream, StreamExt};
 use serde_json::Value;
+use sha2::{Digest, Sha256};
 use std::collections::HashSet;
-use std::time::Duration;
+use std::future::Future;
+use std::time::{Duration, Instant, SystemTime, UNIX_EPOCH};
 
-use super::extractor::{ContentExtractor, ContentType};
+use super::extractor::{ContentExtractor, ContentType, ExtractedContent};
 use super::types::{
-    EpistemicStatus, ResearchSource, ResearchStatus, VerifiedClaim, WebResearchConfig,
-    WebResearchResult,
+    AcquisitionOutcome, AcquisitionReceipt, AcquisitionStage, EpistemicStatus, ResearchSource,
+    ResearchStatus, VerifiedClaim, WebResearchConfig, WebResearchReport, WebResearchResult,
 };
 use super::verifier::{EpistemicVerifier, SourceEvidence, VerificationContext};
+
+const EXTRACTOR_VERSION: &str = "web-research-content-extractor-v1";
+
+#[derive(Debug)]
+struct SearchQueryAcquisition {
+    urls: Vec<String>,
+    receipts: Vec<AcquisitionReceipt>,
+    had_failure: bool,
+}
+
+#[derive(Debug, Clone)]
+struct PageCandidate {
+    query_rank: usize,
+    source_rank: usize,
+    query: String,
+    url: String,
+}
+
+#[derive(Debug)]
+struct PageAcquisition {
+    candidate: PageCandidate,
+    receipt: AcquisitionReceipt,
+    extraction: Option<ExtractedContent>,
+}
 
 /// Research orchestrator for autonomous web research
 #[derive(Debug)]
