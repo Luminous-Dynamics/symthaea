@@ -153,6 +153,13 @@ impl PinnedEd25519QualificationVerifierV1 {
     pub fn verifier_id(&self) -> &str { &self.verifier_id }
     pub fn profile_version(&self) -> u64 { self.profile_version }
 
+    /// Return every provisioned key ID, including revoked keys, in stable order.
+    /// This lets composite trust policies reject key reuse across authorities
+    /// even when a particular key did not sign the current receipt batch.
+    pub(crate) fn key_ids(&self) -> Vec<String> {
+        self.keys.keys().cloned().collect()
+    }
+
     /// Verify arbitrary DSSE PAE bytes under this exact pinned profile.
     /// The caller remains responsible for enforcing the expected payload type
     /// and exact statement binding before calling this method.
