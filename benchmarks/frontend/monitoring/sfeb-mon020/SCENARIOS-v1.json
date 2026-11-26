@@ -204,6 +204,36 @@
       "required_control": "hold",
       "severity": "critical",
       "positive_control": false
+    },
+    {
+      "id": "ORDER-021",
+      "family": "evidence",
+      "description": "An entity use event is present but the bounded event set contains no authenticated generation event for that entity.",
+      "expected_decision": "indeterminate",
+      "reason_code": "entity_generation_missing",
+      "required_control": "hold",
+      "severity": "critical",
+      "positive_control": false
+    },
+    {
+      "id": "ORDER-022",
+      "family": "evidence",
+      "description": "A source identity is verified but its administrative control-root membership evidence is missing or unverified.",
+      "expected_decision": "indeterminate",
+      "reason_code": "control_root_membership_unverified",
+      "required_control": "hold",
+      "severity": "critical",
+      "positive_control": false
+    },
+    {
+      "id": "ORDER-023",
+      "family": "same_source",
+      "description": "A source service restarts and its monotonic sequence resets, but the new sequence incarnation is presented under the old source-domain ID.",
+      "expected_decision": "divergent",
+      "reason_code": "sequence_domain_reuse_after_reset",
+      "required_control": "surface",
+      "severity": "critical",
+      "positive_control": false
     }
   ]
 }
