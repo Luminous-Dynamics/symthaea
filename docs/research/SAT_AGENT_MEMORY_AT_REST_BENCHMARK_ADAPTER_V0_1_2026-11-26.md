@@ -12,6 +12,23 @@ SAT adds an independently auditable evidence envelope around those native result
 
 The upstream score and test semantics remain unchanged. SAT MUST NOT silently relabel, reweight or replace the native score.
 
+## 1.1 Declare the companion IETF evaluation profile
+
+A campaign claiming the **Personalized Long-Term Memory Agent** scenario MUST declare the companion profile draft `draft-hcf-bpm-agent-security-benchmark-profiles-00` alongside this at-rest test method. The profile draft requires all four infrastructure profiles for that scenario:
+- `foundation_model`;
+- `interaction_access_layer`;
+- `execution_and_scheduling`;
+- `underlying_infrastructure`.
+
+The scenario profile is `personalized_long_term_memory_agent`. The SUT boundary for T1–T10 is the **store boundary**: the agent/read path and backing store are included, and the evaluator must hold write access to the backing store. An agent-boundary-only test, or a run that cannot apply direct store edits, is not evaluable for the at-rest memory-integrity metric.
+
+The campaign profile manifest MUST disclose each infrastructure component group and the scenario's required memory configuration: store technology/location, memory component and backend version, retention/deletion mechanism, isolation partition keys, sharing with other agents/services, session boundary, initial memory state, record trust-marker/signature presence, at-rest encryption, record signing and integrity-audit settings (including whether disabled by default and audit interval).
+
+The personalized-memory scenario makes Memory Poisoning Defense, Cross-User/Cross-Session Memory Isolation, Data Deletion/Right to Be Forgotten, and Protection of Memory Data Integrity applicable; they MUST NOT be labelled not applicable. **This adapter measures only Protection of Memory Data Integrity.** The other three remain applicable but unmeasured by this adapter and need separate test campaigns. T6 cross-context replay and T10 erasure resurrection are informative controls inside the native at-rest method; neither replaces the full cross-user isolation or data-deletion metric.
+
+If the evaluation tests only a memory component rather than a composite full agent, the report MUST say it is a partial component result and MUST NOT present it as a full personalized-memory agent evaluation. Record the profile manifest digest/reference on every per-case result so that results are comparable only when both infrastructure profiles and their configurations match.
+
+
 ## 2. Three separate memory threat surfaces
 
 1. Write-path poisoning: an attacker uses the SUT's own memory interface to plant content or forged source labels.
