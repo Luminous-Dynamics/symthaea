@@ -17,6 +17,7 @@ use std::collections::HashSet;
 use std::fmt;
 
 const EFFECT_BINDING_DOMAIN: &str = "SAT-EFFECT-ATTEMPT-BINDING-v0.1\n";
+const EFFECT_PROJECTION_DOMAIN: &str = "SAT-EFFECT-OBSERVED-PROJECTION-v0.1\n";
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Deserialize)]
 #[serde(rename_all = "snake_case")]
@@ -275,7 +276,7 @@ pub fn verify_effect_receipt(
     expected: &ExpectedEffectAttempt<'_>,
 ) -> Result<EffectReceiptVerificationReport, EffectReceiptError> {
     let attempt_raw: StrictJson = serde_json::from_str(attempt_json).map_err(map_json_error)?;
-    let _receipt_raw: StrictJson = serde_json::from_str(receipt_json).map_err(map_json_error)?;
+    let receipt_raw: StrictJson = serde_json::from_str(receipt_json).map_err(map_json_error)?;
     let attempt: EffectAttempt =
         serde_json::from_str(attempt_json).map_err(|e| EffectReceiptError::InvalidJson(e.to_string()))?;
     let receipt: EffectReceipt =
@@ -285,6 +286,7 @@ pub fn verify_effect_receipt(
     validate_attempt_shape(&attempt)?;
     validate_effect_binding_digest(&attempt_raw, &attempt)?;
     validate_receipt_shape(&receipt)?;
+    validate_observed_projection_digest(&receipt_raw, &receipt)?;
     bind_attempt_to_expected(&attempt, expected)?;
     if receipt.trust_policy_digest != expected.trust_policy_digest {
         return Err(EffectReceiptError::ExpectedContextMismatch("trust_policy_digest"));
@@ -540,6 +542,38 @@ fn validate_effect_binding_digest(
     Ok(())
 }
 
+fn validate_observed_projection_digest(
+    receipt_raw: &StrictJson,
+    receipt: &EffectReceipt,
+) -> Result<(), EffectReceiptError> {
+    match (&receipt.observed_outcome, receipt.observed_effect.as_ref()) {
+        (EffectOutcome::Applied | EffectOutcome::Partial, Some(observed)) => {
+            let projection_without_digest = receipt_raw
+                .get("observed_effect")
+                .and_then(|projection| projection.without_key("projection_digest"))
+                .ok_or_else(|| {
+                    EffectReceiptError::InvalidShape(
+                        "receipt.observed_effect must be an object".to_owned(),
+                    )
+                })?;
+            if super::digest_json(EFFECT_PROJECTION_DOMAIN, &projection_without_digest)
+                != observed.projection_digest
+            {
+                return Err(EffectReceiptError::InvalidDigest(
+                    "receipt.observed_effect.projection_digest",
+                ));
+            }
+            Ok(())
+        }
+        (EffectOutcome::Applied | EffectOutcome::Partial, None) => {
+            Err(EffectReceiptError::InvalidShape(
+                "applied or partial outcome requires observed_effect".to_owned(),
+            ))
+        }
+        _ => Ok(()),
+    }
+}
+
 fn validate_receipt_shape(receipt: &EffectReceipt) -> Result<(), EffectReceiptError> {
     if receipt.schema_version != "sat-effect-receipt/v0.1" {
         return Err(EffectReceiptError::InvalidShape("unsupported receipt schema_version".to_owned()));
@@ -719,6 +753,17 @@ mod tests {
         assert!(!report.source_independence_verified);
         assert!(!report.retry_authorized);
         assert!(!report.system_qualified);
+    }
+
+    #[test]
+    fn observed_projection_digest_commits_every_projection_field() {
+        let changed = RECEIPT.replace("ledger-sequence:901", "ledger-sequence:902");
+        assert!(matches!(
+            verify_effect_receipt(ATTEMPT, &changed, &expected_context()),
+            Err(EffectReceiptError::InvalidDigest(
+                "receipt.observed_effect.projection_digest"
+            ))
+        ));
     }
 
     #[test]
