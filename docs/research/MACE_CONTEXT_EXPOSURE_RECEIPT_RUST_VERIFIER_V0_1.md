@@ -10,6 +10,18 @@ Export: `aml_adapter::mace_context_exposure_receipt`
 
 The module consumes the receipt contract proposed in [PR #13709](https://github.com/Luminous-Dynamics/symthaea/pull/13709) and the MON-005 adapter crate dependency set. It uses the existing serde, serde_json, serde_json_canonicalizer, sha2, base64 and ed25519-dalek dependencies.
 
+## Independent request-body contract verification
+
+The consumer now parses the exact immutable request artifact independently of the receipt producer. It verifies that:
+
+- The request body's actual `model` selector equals the independently pinned model revision.
+- The request has at least one message, and every message has a recognized role and a JSON-string content field.
+- Every generic top-level provider parameter is a number or boolean. Free-form strings, nulls, arrays and nested objects fail closed; provider-specific dynamic fields require an adapter that source-maps their content.
+- The generic numeric/boolean parameter map is reserialized deterministically and its SHA-256 profile is recomputed from the exact captured body. This recomputed digest must equal both the receipt and independent run-manifest pin.
+- Every exposed span's `message_index` resolves to an actual message, its claimed role matches the parsed role, and its half-open byte interval is contained inside that message's exact serialized `content` string. The consumer uses the borrowed raw JSON string slice, not a search for matching text.
+
+This is intentionally stricter than checking the request-body digest and trusting producer-supplied profile/span metadata. JSON Schema cannot prove these relationships.
+
 ## Provider parameter profile binding
 
 The verifier binds `provider_parameter_profile_sha256` from the signed receipt to the independent run manifest. The value is the SHA-256 commitment to the canonical JSON serialization of the deterministic, lexicographically ordered provider parameter map. The capture adapter limits generic parameters to numbers and booleans; free-form strings, nested objects and arrays are not accepted through this untyped path.
@@ -59,7 +71,12 @@ Fifteen Rust unit tests cover:
 11. unavailable request-body artifact;
 12. memory contamination of the no-memory arm;
 13. duplicate and unknown JSON member rejection;
-14. provider-parameter profile substitution rejection.
+14. provider-parameter profile substitution rejection;
+15. independent request-body parameter-profile recomputation;
+16. free-form string and nested provider-parameter rejection;
+17. model selector verification against the captured body;
+18. exposure containment within the indexed message content;
+19. message-role binding.
 
 (The list is numbered by category; the exact source-level test count should be reconfirmed after any later test additions.)
 
