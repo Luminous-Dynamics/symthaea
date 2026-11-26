@@ -39,9 +39,9 @@ The receipt binds:
 4. The SHA-256 of the exact UTF-8 provider request body captured after serialization and immediately before network send.
 5. An immutable content-addressed artifact reference for the exact request-body bytes, binding plaintext digest/length, ciphertext digest, storage/encryption/access/retention profiles and an independent custody receipt. The raw request body is not copied into the signed receipt or public benchmark records; it is retained as an encrypted evidence artifact with least-privilege access and a declared retention policy.
 6. Every memory-originated byte span in that body, mapped to a canonical evidence ID, payload digest, dependency closure, transformation receipt, source/authority/admissibility receipts and current-at-use revalidation receipt.
-6. Explicit admission denials, so retrieval success cannot be confused with admissibility.
-7. The provider response digest and the candidate decision-trace digest.
-8. A signature from the configured context-observer identity, verified against an independently pinned observer profile.
+7. Explicit admission denials, so retrieval success cannot be confused with admissibility.
+8. The provider response digest and the candidate decision-trace digest.
+9. A signature from the configured context-observer identity, verified against an independently pinned observer profile.
 
 The `span_start_byte` is inclusive and `span_end_byte` is exclusive, measured in UTF-8 bytes of the exact serialized request body whose digest is `provider_request_body_sha256`. The verifier must retrieve the immutable request-body artifact through the independently pinned storage profile, validate its custody receipt and ciphertext digest, decrypt under the authorized evidence-access policy, verify plaintext digest and byte length against the capture fields, recompute each span digest, reject bounds errors and unexplained overlaps, and ensure that every memory-origin span is enumerated exactly once. The artifact ID must resolve immutably; a mutable URL or a digest without recoverable bytes is insufficient for later independent verification.
 
