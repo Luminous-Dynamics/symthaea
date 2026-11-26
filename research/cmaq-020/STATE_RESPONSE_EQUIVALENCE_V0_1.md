@@ -100,6 +100,10 @@ Score response fidelity, false merge/split, invariants, selective uncertainty, d
 
 The confirming design crosses the 5 × 3 CMAQ-018 mechanism/query matrix and reuses CMAQ-019 paired-intervention outcomes. Independent environment/mechanism cluster is the inferential unit (#8578). Hidden oracle separation remains blocked on #9437.
 
+## Comparator map
+
+See [`WORLD_MODEL_COMPARATORS_2026.md`](WORLD_MODEL_COMPARATORS_2026.md) for the protocol-by-protocol benchmark and industry comparator map, including WAMs, RoboJEPA, Cosmos Policy, ContactWorld, MiraBench, ScratchWorld, direct VLA controls and matched resource rules.
+
 ## External positioning
 
 - WorldTest / AutumnBench: exploration and query-transfer lane.
