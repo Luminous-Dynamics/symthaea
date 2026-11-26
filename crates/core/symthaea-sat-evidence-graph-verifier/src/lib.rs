@@ -595,24 +595,24 @@ fn check_supported_claims(
             }
         }
 
-        let required_kind: Option<&str> = match claim.claim_type.as_str() {
-            "authority" => Some("authority_decision"),
-            "disclosure" => Some("disclosure_decision"),
-            "effect_correspondence" => Some("external_effect_readback"),
-            "transparency_continuity" => Some("transparency_receipt"),
-            "witness_independence" => Some("witness_attestation"),
-            _ => None,
-        };
-        if let Some(required_kind) = required_kind {
-            if !observed_kinds.contains(required_kind) {
-                issue(
-                    issues,
-                    "missing_claim_type_evidence",
-                    format!("{base_path}.evidence_refs"),
-                    format!("claim type {} requires observation kind {required_kind}", claim.claim_type),
-                );
-                admissible = false;
+        let has_required_kind = match claim.claim_type.as_str() {
+            "authority" => observed_kinds.contains("authority_decision"),
+            "disclosure" => observed_kinds.contains("disclosure_decision"),
+            "effect_correspondence" => observed_kinds.contains("external_effect_readback"),
+            "transparency_continuity" => {
+                observed_kinds.contains("transparency_receipt") || observed_kinds.contains("checkpoint")
             }
+            "witness_independence" => observed_kinds.contains("witness_attestation"),
+            _ => true,
+        };
+        if !has_required_kind {
+            issue(
+                issues,
+                "missing_claim_type_evidence",
+                format!("{base_path}.evidence_refs"),
+                format!("claim type {} lacks its required observation kind", claim.claim_type),
+            );
+            admissible = false;
         }
         if claim.claim_type == "effect_correspondence" {
             let has_independent_sink = claim.evidence_refs.iter().any(|reference| {
@@ -772,7 +772,7 @@ pub fn verify_augmentation(input: &str) -> Result<VerificationReport, String> {
     }
 
     let mut edge_keys = HashSet::new();
-    let mut edge_dependency_pairs = HashSet::new();
+    let mut edge_dependency_counts: HashMap<(String, String), usize> = HashMap::new();
     let mut adjacency: HashMap<String, Vec<String>> = HashMap::new();
     for (index, edge) in augmentation.claim_edges.iter().enumerate() {
         if !claim_ids.contains(&edge.from_claim_id) {
@@ -806,7 +806,9 @@ pub fn verify_augmentation(input: &str) -> Result<VerificationReport, String> {
             );
         }
         if edge.relation == "depends_on" {
-            edge_dependency_pairs.insert((edge.from_claim_id.clone(), edge.to_claim_id.clone()));
+            *edge_dependency_counts
+                .entry((edge.from_claim_id.clone(), edge.to_claim_id.clone()))
+                .or_insert(0) += 1;
             adjacency
                 .entry(edge.from_claim_id.clone())
                 .or_default()
@@ -822,16 +824,23 @@ pub fn verify_augmentation(input: &str) -> Result<VerificationReport, String> {
         }
     }
     for (from, to) in &claim_dependency_pairs {
-        if !edge_dependency_pairs.contains(&(from.clone(), to.clone())) {
-            issue(
+        match edge_dependency_counts.get(&(from.clone(), to.clone())).copied().unwrap_or(0) {
+            0 => issue(
                 &mut issues,
                 "missing_dependency_edge",
                 format!("claims.{from}.depends_on"),
                 format!("dependency {from} -> {to} lacks a corresponding claim_edges entry"),
-            );
+            ),
+            1 => {}
+            _ => issue(
+                &mut issues,
+                "duplicate_dependency_edge",
+                format!("claim_edges.{from}.{to}"),
+                format!("dependency {from} -> {to} is represented by more than one typed edge"),
+            ),
         }
     }
-    for (from, to) in &edge_dependency_pairs {
+    for (from, to) in edge_dependency_counts.keys() {
         if !claim_dependency_pairs.contains(&(from.clone(), to.clone())) {
             issue(
                 &mut issues,
@@ -873,7 +882,7 @@ pub fn verify_augmentation(input: &str) -> Result<VerificationReport, String> {
 
     let semantic_valid = issues
         .iter()
-        .all(|entry| entry.code != "graph_root_mismatch" && entry.code != "invalid_graph_root_digest");
+        .all(|entry| entry.code != "graph_root_mismatch");
     let verified = semantic_valid && graph_root_matches && valid_sha256(&augmentation.evidence_graph_root_digest);
     let _top_level_metadata = (
         &augmentation.created_at,
