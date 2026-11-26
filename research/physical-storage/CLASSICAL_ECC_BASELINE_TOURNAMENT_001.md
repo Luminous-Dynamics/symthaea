@@ -145,3 +145,21 @@ The upstream performance claims (including SIMD speedups and decode scaling) are
 References:
 - https://docs.rs/reed-solomon-engine/0.2.0/
 - https://github.com/stephenberry/reed-solomon-engine
+
+
+## 9. Independent 4+2 wire-vector check (synthetic mathematical execution)
+
+A source-derived, independently implemented GF(256) oracle has now been used to create `research/physical-storage/fixtures/classical_ecc_4_2_wire_vectors_v0_1.json`.
+
+The known-answer input uses the four five-byte data shards from the `reed-solomon-engine` documentation example: `alpha`, `bravo`, `charl`, `delta`. The concatenated original payload SHA-256 is:
+
+`d9e7a8a28af922df41b6d9dacc24a041f9fe9b9bdd476ccd58718057e0e89dfb`
+
+The independent polynomial-multiplication / Gaussian-elimination implementation generated:
+
+- Custom Symthaea parity shards: `04131c1803`, `8db9bcdf92`.
+- Engine Vandermonde parity shards from its published matrix definition: `25e5333903`, `3e916a7707`.
+
+It then independently reconstructed the four original data shards from **all 15 possible four-of-six surviving-shard subsets** for each format (15/15 custom; 15/15 engine). The data payload digest remained identical. The distinct parity vectors independently demonstrate that equal field polynomial and (k,m) do not imply byte-compatible wire formats.
+
+This result is a source-derived mathematical oracle execution only. It is not a Cargo test, an execution of the upstream crate, an upstream KAT match or a performance measurement. The next implementation step remains to run the same vectors through the exact pinned crate and compare against its upstream test vectors.
