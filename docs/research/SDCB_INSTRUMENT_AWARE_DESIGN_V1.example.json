@@ -1,0 +1,37 @@
+{
+  "schema_version": "1.0.0",
+  "fixture_id": "instrument-channel-confounding-two-stage-v1",
+  "description": "Binary scientific hypothesis confounded with a persistent binary instrument offset; calibration and science experiments share a two-unit budget.",
+  "science_hypotheses": ["h0", "h1"],
+  "instrument_states": ["offset-0", "offset-1"],
+  "joint_prior_order": "hypothesis-major; joint_index = hypothesis_index * instrument_state_count + instrument_state_index",
+  "joint_prior": [0.25, 0.25, 0.25, 0.25],
+  "actions": ["choose-h0", "choose-h1"],
+  "scenarios": [
+    { "scenario_id": "nominal", "calibration_accuracy": 0.95, "science_accuracy": 0.95, "utility_by_hypothesis": [[1, 0], [0, 1]] },
+    { "scenario_id": "plausible-noise-shift", "calibration_accuracy": 0.90, "science_accuracy": 0.90, "utility_by_hypothesis": [[1, 0], [0, 1]] }
+  ],
+  "experiments": [
+    {
+      "experiment_id": "calibration-standard",
+      "role": "reference_calibration",
+      "cost_units": 1,
+      "likelihoods_by_scenario": [
+        [[0.95, 0.05], [0.05, 0.95], [0.95, 0.05], [0.05, 0.95]],
+        [[0.90, 0.10], [0.10, 0.90], [0.90, 0.10], [0.10, 0.90]]
+      ]
+    },
+    {
+      "experiment_id": "science-measurement",
+      "role": "scientific_measurement",
+      "cost_units": 1,
+      "likelihoods_by_scenario": [
+        [[0.95, 0.05], [0.05, 0.95], [0.05, 0.95], [0.95, 0.05]],
+        [[0.90, 0.10], [0.10, 0.90], [0.10, 0.90], [0.90, 0.10]]
+      ]
+    }
+  ],
+  "outcome_order": ["0", "1"],
+  "resource_budget_units": 2,
+  "conditional_independence_assumption": "Observation noise is independent conditional on the joint scientific/instrument state and scenario; the instrument state persists across both stages."
+}

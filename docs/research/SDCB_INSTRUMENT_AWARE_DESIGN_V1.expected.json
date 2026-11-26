@@ -1,0 +1,30 @@
+{
+  "schema_version": "1.0.0",
+  "fixture_id": "instrument-channel-confounding-two-stage-v1",
+  "execution_kind": "independent_exact_finite_policy_enumeration",
+  "rust_compiled_or_executed": false,
+  "best_policy": {
+    "first_experiment_id": "calibration-standard",
+    "second_experiments_by_first_outcome": ["science-measurement", "science-measurement"],
+    "actions_by_outcome_pair": ["choose-h0", "choose-h1", "choose-h1", "choose-h0"],
+    "scenario_values": [0.905, 0.82],
+    "worst_case_value": 0.82,
+    "baseline_action_id": "choose-h0",
+    "baseline_worst_case_value": 0.5,
+    "robust_gain": 0.32,
+    "expected_cost_by_scenario": [2.0, 2.0],
+    "maximum_path_cost": 2
+  },
+  "negative_control": {
+    "first_experiment_id": "science-measurement",
+    "second_experiments_by_first_outcome": ["science-measurement", "science-measurement"],
+    "best_achievable_scenario_value": 0.5,
+    "reason": "The persistent unknown XOR offset remains confounded with the scientific hypothesis when the same instrument channel is repeated without calibration."
+  },
+  "analytic_checks": {
+    "nominal_value": "0.95^2 + 0.05^2 = 0.905",
+    "shifted_value": "0.90^2 + 0.10^2 = 0.82",
+    "all_policy_branches_within_budget": true,
+    "same_contingent_policy_used_across_scenarios": true
+  }
+}

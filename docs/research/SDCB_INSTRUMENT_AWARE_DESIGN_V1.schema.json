@@ -1,0 +1,48 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://github.com/Luminous-Dynamics/symthaea/blob/research/sdcb-instrument-aware-design-v1/docs/research/SDCB_INSTRUMENT_AWARE_DESIGN_V1.schema.json",
+  "title": "SDCB instrument-aware sequential design episode v1",
+  "description": "Bounded binary-outcome episode for a two-stage policy over a joint scientific-hypothesis and persistent instrument-state prior. Cross-field dimensions and calibration non-leakage are enforced by the Rust reference.",
+  "type": "object",
+  "additionalProperties": false,
+  "required": ["schema_version", "fixture_id", "description", "science_hypotheses", "instrument_states", "joint_prior_order", "joint_prior", "actions", "scenarios", "experiments", "outcome_order", "resource_budget_units", "conditional_independence_assumption"],
+  "properties": {
+    "schema_version": { "const": "1.0.0" },
+    "fixture_id": { "type": "string", "minLength": 1 },
+    "description": { "type": "string", "minLength": 1 },
+    "science_hypotheses": { "type": "array", "minItems": 1, "maxItems": 4, "items": { "type": "string", "minLength": 1 }, "uniqueItems": true },
+    "instrument_states": { "type": "array", "minItems": 2, "maxItems": 4, "items": { "type": "string", "minLength": 1 }, "uniqueItems": true },
+    "joint_prior_order": { "const": "hypothesis-major; joint_index = hypothesis_index * instrument_state_count + instrument_state_index" },
+    "joint_prior": { "type": "array", "minItems": 2, "maxItems": 8, "items": { "type": "number", "minimum": 0, "maximum": 1 } },
+    "actions": { "type": "array", "minItems": 1, "maxItems": 3, "items": { "type": "string", "minLength": 1 }, "uniqueItems": true },
+    "scenarios": {
+      "type": "array", "minItems": 1, "maxItems": 4,
+      "items": {
+        "type": "object", "additionalProperties": false,
+        "required": ["scenario_id", "calibration_accuracy", "science_accuracy", "utility_by_hypothesis"],
+        "properties": {
+          "scenario_id": { "type": "string", "minLength": 1 },
+          "calibration_accuracy": { "type": "number", "minimum": 0, "maximum": 1 },
+          "science_accuracy": { "type": "number", "minimum": 0, "maximum": 1 },
+          "utility_by_hypothesis": { "type": "array", "minItems": 1, "maxItems": 4, "items": { "type": "array", "minItems": 1, "maxItems": 3, "items": { "type": "number" } } }
+        }
+      }
+    },
+    "experiments": {
+      "type": "array", "minItems": 2, "maxItems": 3,
+      "items": {
+        "type": "object", "additionalProperties": false,
+        "required": ["experiment_id", "role", "cost_units", "likelihoods_by_scenario"],
+        "properties": {
+          "experiment_id": { "type": "string", "minLength": 1 },
+          "role": { "enum": ["reference_calibration", "scientific_measurement"] },
+          "cost_units": { "type": "integer", "minimum": 1 },
+          "likelihoods_by_scenario": { "type": "array", "minItems": 1, "maxItems": 4, "items": { "type": "array", "minItems": 2, "maxItems": 8, "items": { "type": "array", "minItems": 2, "maxItems": 2, "items": { "type": "number", "minimum": 0, "maximum": 1 } } } }
+        }
+      }
+    },
+    "outcome_order": { "const": ["0", "1"] },
+    "resource_budget_units": { "type": "integer", "minimum": 1 },
+    "conditional_independence_assumption": { "type": "string", "minLength": 1 }
+  }
+}
