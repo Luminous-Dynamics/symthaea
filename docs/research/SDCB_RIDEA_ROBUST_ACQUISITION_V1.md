@@ -74,9 +74,9 @@ The reference does **not** train g, infer EIG, construct a posterior, or assess 
 3. **R-IDeA does not certify truth.** The proxy g can be wrong; the reference only calculates the prescribed acquisition score.
 4. **Paper notation vs released code.** The paper displays an MMD ratio, while the published `compute_mmd` helper returns the biased squared estimator and the acquisition code uses that directly. We pin this code-level choice in the reference and keep the sqrt-MMD utility distinct.
 5. **R-IDeA does not certify generalization.** The proxy g may be poorly trained or misspecified; only a held-out evaluation can show whether the acquisition actually improves target-distribution loss.
-4. **MMD denominator.** If baseline MMD(history, target) is zero, the ratio is undefined. The reference returns `ZeroBaselineMmd`; it does not silently fall back to EIG.
-6. **Kernel and hyperparameters.** RBF bandwidth, representativeness weight lambda, threshold tau and sigmoid scale kappa affect rankings. The code exposes them and does not claim a universally correct setting. It restricts lambda to [0,1] as a conservative reference configuration; this is an implementation guard, not a claim that the paper's equation mathematically requires that interval.
-7. **Cost.** The original R-I/R-IDeA formulas do not divide by cost. The reference additionally reports R-IDeA per cost unit as a separate project ranking view; raw R-IDeA remains available.
+6. **MMD² denominator.** If baseline biased empirical MMD²(history, target) is zero, the released-code ratio is undefined. The reference returns `ZeroBaselineMmd`; it does not silently fall back to EIG.
+7. **Kernel and hyperparameters.** RBF bandwidth, representativeness weight lambda, threshold tau and sigmoid scale kappa affect rankings. The code exposes them and does not claim a universally correct setting. It restricts lambda to [0,1] as a conservative reference configuration; this is an implementation guard, not a claim that the paper's equation mathematically requires that interval.
+8. **Cost.** The original R-I/R-IDeA formulas do not divide by cost. The reference additionally reports R-IDeA per cost unit as a separate project ranking view; raw R-IDeA remains available.
 
 ## 4. Frozen counterexample
 
