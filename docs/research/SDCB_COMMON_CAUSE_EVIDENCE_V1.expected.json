@@ -1,0 +1,133 @@
+{
+  "schema_version": "1.0.0",
+  "fixture_id": "shared-common-cause-joint-belief-update-v1",
+  "execution_kind": "independent_exact_joint_bayes_update",
+  "rust_compiled_or_executed": false,
+  "accepted_reference_transition": {
+    "from_version": 0,
+    "to_version": 1,
+    "common_cause_id": "lab-environment-main",
+    "common_cause_version_before": 0,
+    "common_cause_version_after": 1,
+    "device_id": "shared-reference",
+    "device_version_before": 0,
+    "device_version_after": 1,
+    "predictive_probability": 0.5,
+    "observed_outcome": 0,
+    "scientific_marginal_before": [
+      0.5,
+      0.5
+    ],
+    "scientific_marginal_after": [
+      0.5,
+      0.5
+    ],
+    "common_cause_marginal_before": [
+      0.5,
+      0.5
+    ],
+    "common_cause_marginal_after": [
+      0.95,
+      0.05
+    ],
+    "device_marginal_before": [
+      1,
+      0
+    ],
+    "device_marginal_after": [
+      1,
+      0
+    ],
+    "prior_joint": [
+      0.25,
+      0.25,
+      0,
+      0,
+      0,
+      0,
+      0,
+      0,
+      0.25,
+      0.25,
+      0,
+      0,
+      0,
+      0,
+      0,
+      0
+    ],
+    "posterior_joint": [
+      0.475,
+      0.025,
+      0,
+      0,
+      0,
+      0,
+      0,
+      0,
+      0.475,
+      0.025,
+      0,
+      0,
+      0,
+      0,
+      0,
+      0
+    ],
+    "budget_before": 5,
+    "budget_after": 4,
+    "capture_interval_ms": [
+      12000,
+      13000
+    ]
+  },
+  "follow_on_science_transition": {
+    "requires_new_proposal_and_receipt": true,
+    "prior_version": 1,
+    "common_cause_version": 1,
+    "device_id": "science-a",
+    "device_version_before": 0,
+    "device_version_after": 1,
+    "observation_outcome": 0,
+    "predictive_probability": 0.5,
+    "scientific_marginal_after": [
+      0.905,
+      0.095
+    ],
+    "common_cause_marginal_after": [
+      0.95,
+      0.05
+    ],
+    "joint_posterior": [
+      0.9025,
+      0.0025,
+      0,
+      0,
+      0,
+      0,
+      0,
+      0,
+      0.0475,
+      0.0475,
+      0,
+      0,
+      0,
+      0,
+      0,
+      0
+    ],
+    "budget_before": 4,
+    "budget_after": 3
+  },
+  "atomicity_controls": [
+    "wrong common-cause identity rejects without mutation",
+    "stale common-cause evidence version rejects without mutation",
+    "stale device evidence version rejects without mutation",
+    "expired calibration interval rejects without mutation",
+    "calibration likelihood leakage rejects without mutation",
+    "unverified receipt rejects without mutation",
+    "duplicate experiment rejects without mutation",
+    "over-budget receipt rejects without mutation"
+  ],
+  "trust_boundary": "Digest shape and verifier test seam only; no signature, custody, physical calibration, common-cause model correctness, or scientific correctness proof."
+}

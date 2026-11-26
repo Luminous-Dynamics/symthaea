@@ -1,0 +1,132 @@
+{
+  "schema_version": "1.0.0",
+  "identity": {
+    "run_id": "run-common-001",
+    "task_id": "shared-reference-control",
+    "task_digest": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+    "system_digest": "bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb",
+    "hypothesis_set_digest": "cccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccc",
+    "device_registry_digest": "dddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddd",
+    "common_cause_registry_digest": "eeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeee"
+  },
+  "hypothesis_ids": [
+    "h0",
+    "h1"
+  ],
+  "device_ids": [
+    "science-a",
+    "shared-reference"
+  ],
+  "common_cause_id": "lab-environment-main",
+  "joint_prior": [
+    0.25,
+    0.25,
+    0,
+    0,
+    0,
+    0,
+    0,
+    0,
+    0.25,
+    0.25,
+    0,
+    0,
+    0,
+    0,
+    0,
+    0
+  ],
+  "budget_units": 5,
+  "proposal": {
+    "identity": {
+      "run_id": "run-common-001",
+      "task_id": "shared-reference-control",
+      "task_digest": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+      "system_digest": "bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb",
+      "hypothesis_set_digest": "cccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccc",
+      "device_registry_digest": "dddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddd",
+      "common_cause_registry_digest": "eeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeee"
+    },
+    "experiment_id": "reference-001",
+    "proposal_digest": "ffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffff",
+    "prior_version": 0,
+    "hypothesis_ids": [
+      "h0",
+      "h1"
+    ],
+    "device_ids": [
+      "science-a",
+      "shared-reference"
+    ],
+    "common_cause_id": "lab-environment-main",
+    "common_cause_version": 0,
+    "device_id": "shared-reference",
+    "device_evidence_version": 0,
+    "calibration_epoch": 9,
+    "calibration_context_digest": "1111111111111111111111111111111111111111111111111111111111111111",
+    "calibration_valid_from_ms": 10000,
+    "calibration_valid_until_ms": 20000,
+    "role": "shared_reference_calibration",
+    "cost_units": 1,
+    "outcome_likelihoods": [
+      [
+        0.95,
+        0.05
+      ],
+      [
+        0.05,
+        0.95
+      ],
+      [
+        0.05,
+        0.95
+      ],
+      [
+        0.95,
+        0.05
+      ],
+      [
+        0.95,
+        0.05
+      ],
+      [
+        0.05,
+        0.95
+      ],
+      [
+        0.05,
+        0.95
+      ],
+      [
+        0.95,
+        0.05
+      ]
+    ]
+  },
+  "receipt": {
+    "identity": {
+      "run_id": "run-common-001",
+      "task_id": "shared-reference-control",
+      "task_digest": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+      "system_digest": "bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb",
+      "hypothesis_set_digest": "cccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccc",
+      "device_registry_digest": "dddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddd",
+      "common_cause_registry_digest": "eeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeee"
+    },
+    "experiment_id": "reference-001",
+    "proposal_digest": "ffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffff",
+    "observation_digest": "2222222222222222222222222222222222222222222222222222222222222222",
+    "verifier_id": "independent-verifier-fixture",
+    "observed_outcome": 0,
+    "cost_units": 1,
+    "common_cause_id": "lab-environment-main",
+    "common_cause_version": 0,
+    "device_id": "shared-reference",
+    "device_evidence_version": 0,
+    "calibration_epoch": 9,
+    "calibration_context_digest": "1111111111111111111111111111111111111111111111111111111111111111",
+    "capture_start_ms": 12000,
+    "capture_end_ms": 13000,
+    "independently_verified": true
+  }
+}
