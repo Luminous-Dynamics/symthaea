@@ -71,6 +71,7 @@ struct InTotoStatementV1 {
     #[serde(rename = "_type")]
     statement_type: &'static str,
     subject: Vec<InTotoSubjectV1>,
+    #[serde(rename = "predicateType")]
     predicate_type: &'static str,
     predicate: AudioEvidencePredicateV1,
 }
