@@ -18,7 +18,8 @@
     "acted_on",
     "protection_stage",
     "observation_class",
-    "evidence_refs"
+    "evidence_refs",
+    "outcome_scope"
   ],
   "properties": {
     "schema_version": {
@@ -127,6 +128,67 @@
         "properties": {
           "acted_on": {
             "const": null
+          }
+        }
+      }
+    },
+    {
+      "if": {
+        "properties": {
+          "outcome_scope": {
+            "const": "agent_and_memory"
+          }
+        },
+        "required": [
+          "outcome_scope"
+        ]
+      },
+      "then": {
+        "properties": {
+          "acted_on": {
+            "type": "boolean"
+          }
+        }
+      }
+    },
+    {
+      "if": {
+        "properties": {
+          "surfaced_as_trusted": {
+            "const": true
+          }
+        },
+        "required": [
+          "surfaced_as_trusted"
+        ]
+      },
+      "then": {
+        "properties": {
+          "surfaced_to_context": {
+            "const": true
+          }
+        }
+      }
+    },
+    {
+      "if": {
+        "properties": {
+          "acted_on": {
+            "const": true
+          }
+        },
+        "required": [
+          "acted_on"
+        ]
+      },
+      "then": {
+        "properties": {
+          "surfaced_to_context": {
+            "const": true
+          },
+          "mock_action_receipt_ref": {
+            "type": "string",
+            "minLength": 1
           }
         }
       }
