@@ -40,6 +40,8 @@ pub enum DecisionValueRejectV1 {
     BudgetExceeded,
     TooManyOptions,
     DuplicateOption,
+    InvalidCalibration,
+    PolicyDigestMismatch,
     CalibrationReceiptRejected,
     ArithmeticOverflow,
 }
@@ -69,6 +71,25 @@ pub struct DecisionValuePolicyV1 {
 }
 
 impl DecisionValuePolicyV1 {
+    /// Canonical digest over the complete utility table and hard action matrix.
+    pub fn calculated_utility_profile_sha256(&self) -> String {
+        let mut h = Sha256::new();
+        h.update(b"luminous:mace:decision-utility-profile:v1\\0");
+        h.update((self.state_ids.len() as u64).to_be_bytes());
+        for state in &self.state_ids { hash_field(&mut h, state); }
+        h.update((self.action_ids.len() as u64).to_be_bytes());
+        for action in &self.action_ids { hash_field(&mut h, action); }
+        for row in &self.utility_by_state_action {
+            h.update((row.len() as u64).to_be_bytes());
+            for utility in row { h.update(utility.to_be_bytes()); }
+        }
+        for row in &self.action_allowed_by_state {
+            h.update((row.len() as u64).to_be_bytes());
+            for allowed in row { h.update([u8::from(*allowed)]); }
+        }
+        hex_digest(&h.finalize())
+    }
+
     pub fn validate(&self) -> Result<(), DecisionValueRejectV1> {
         if !valid_sha256(&self.decision_need_sha256)
             || !valid_sha256(&self.utility_profile_sha256)
@@ -103,6 +124,9 @@ impl DecisionValuePolicyV1 {
         }
         if self.action_allowed_by_state.iter().any(|row| !row.iter().any(|allowed| *allowed)) {
             return Err(DecisionValueRejectV1::NoPermittedAction);
+        }
+        if self.utility_profile_sha256 != self.calculated_utility_profile_sha256() {
+            return Err(DecisionValueRejectV1::PolicyDigestMismatch);
         }
         Ok(())
     }
@@ -713,9 +737,9 @@ mod tests {
     }
 
     fn policy() -> DecisionValuePolicyV1 {
-        DecisionValuePolicyV1 {
+        let mut policy = DecisionValuePolicyV1 {
             decision_need_sha256: "a".repeat(64),
-            utility_profile_sha256: "b".repeat(64),
+            utility_profile_sha256: String::new(),
             state_ids: vec!["risky".into(), "safe".into()],
             action_ids: vec!["abstain".into(), "proceed".into()],
             utility_by_state_action: vec![
@@ -731,7 +755,9 @@ mod tests {
             maximum_context_tokens: 1_000,
             maximum_inspected_bytes: 10_000,
             maximum_acquisition_cost_utility_units: 100,
-        }
+        };
+        policy.utility_profile_sha256 = policy.calculated_utility_profile_sha256();
+        policy
     }
 
     fn informative_option() -> DecisionRetrievalOptionV1 {
