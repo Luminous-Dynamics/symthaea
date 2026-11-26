@@ -96,3 +96,12 @@ A sufficient status is rejected unless every requirement is marked met with its 
 At every subsequent use, callers must revalidate the original qualification using a fresh qualifier verifier and the sufficiency receipt using a fresh evaluator verifier at the same trusted current time. A sufficient receipt cannot revive expired or revoked qualification. The result is never an action permit.
 
 This is a consumer-side verification library. It does not implement the independent sufficiency evaluator, calibration pipeline, independent telemetry measurement, held-out regret calculation, live action authorization, consume-once execution, or outcome receipt. The verifier confirms what the separate evaluator signed; it does not prove the evaluator's underlying risk model or measurements.
+
+
+## Independent source-origin verification
+
+The `source_origin_receipt` module adds a fourth, separately pinned DSSE authority after lineage-graph replay. It requires exact source bytes, evidence-payload bytes and derivation-receipt bytes for **every** replayed graph node, including ancestors. The consumer recomputes each SHA-256 and verifies one origin attestation per node, bound to the exact graph digest, node identity, parent list, derivation receipt, common-cause groups and measured byte lengths. It rejects missing/extra/duplicate nodes, changed bytes, stale signatures and reuse of the qualifier, evaluator or lineage authority profile/key.
+
+This is a consumer-side verifier, not a fetcher or publisher-trust oracle. The origin service must independently acquire source records, validate publisher/transform metadata and attest to the exact bytes. The client verifies byte integrity and the pinned service's assertion; content hashes alone do not prove authorship, accuracy, freshness or complete disclosure of all upstream dependencies. At use time, re-run the three earlier authority checks and graph replay, re-acquire the exact bytes, then call `VerifiedSourceOriginSetV1::validate_at_use` at the same trusted time. This result is still not an action permit.
+
+Protocol: [MACE Source-Origin Attestation V1](../../../docs/research/MACE_SOURCE_ORIGIN_ATTESTATION_V1.md). Schema: [mace_source_origin_receipt_v1.schema.json](../../../data/schemas/mace_source_origin_receipt_v1.schema.json). Assurance evaluation: [MACE Source-Origin and Provenance Assurance Benchmark V1](../../../docs/research/MACE_SOURCE_ORIGIN_ASSURANCE_BENCHMARK_V1.md). This increment is authored but not compiled or executed here; no production service or benchmark score is claimed.

@@ -145,6 +145,11 @@ impl VerifiedSourceLineageSetV1 {
         &self.lineage_profile_sha256
     }
 
+    /// Signer identities for all source-lineage statements in this verified set.
+    pub(crate) fn signer_key_ids(&self) -> Vec<String> {
+        self.receipts.iter().map(|item| item.receipt.key_id.clone()).collect()
+    }
+
     /// Immutable commitments exposed for an independent graph replay step.
     pub fn replay_commitments(&self) -> Vec<SourceLineageReplayCommitmentV1> {
         self.receipts.iter().map(|item| SourceLineageReplayCommitmentV1 {

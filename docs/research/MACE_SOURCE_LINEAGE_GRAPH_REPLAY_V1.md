@@ -1,6 +1,6 @@
 # MACE Source-Lineage Graph Replay V1
 
-**Status:** Consumer-side structural graph replay is implemented as a Rust module on the `mace/source-lineage-graph-replay` branch. The graph manifest schema is published with this change. Tests are authored but have not been run. This is not source-origin authentication or proof that an operator disclosed every real-world dependency.
+**Status:** Consumer-side structural graph replay is on the `mace/source-origin-attestation-v1` branch with a follow-on source-origin receipt verifier. The graph and origin code are draft; Rust tests/builds have not been run. This does not deploy the source fetcher or origin authority and does not prove that every real-world dependency was disclosed.
 
 ## 1. What it closes
 
@@ -59,7 +59,7 @@ Graph replay proves consistency of the disclosed graph. It does **not** prove:
 - that two sources have no hidden upstream dependency;
 - that a source publisher or evidence owner is authentic.
 
-Those require source-origin receipts, immutable content retrieval, and independent source metadata acquisition. An independent graph verifier can recompute a graph only after the source records and derivation metadata are authenticated independently of the resolver and evaluator. The root graph is not made true by being self-consistently hashed.
+Those require source-origin receipts, immutable content retrieval, and independent source metadata acquisition. The follow-on [MACE Source-Origin Attestation V1](MACE_SOURCE_ORIGIN_ATTESTATION_V1.md) now adds a separately pinned fourth verifier that re-hashes exact source, payload and derivation-receipt bytes for every graph node, including ancestors, and checks a signed per-node origin receipt. It remains a consumer-side verification interface rather than a deployed fetch service. The independent origin operator must still acquire source metadata outside the lineage resolver/evaluator and establish publisher/transform trust; hashes and a signed verifier assertion do not prove that all real-world dependencies were disclosed. The root graph is not made true by being self-consistently hashed.
 
 ## 6. Tests authored
 
