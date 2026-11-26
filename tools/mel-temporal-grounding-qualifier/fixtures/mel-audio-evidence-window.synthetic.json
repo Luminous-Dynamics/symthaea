@@ -10,7 +10,8 @@
   "target_audio_sha256": "b12dbd7c993ac1f0ddf6c0cef16c605ce48da060738b83837e39bdadf9df83ef",
   "source_audio": {
     "audio_sha256": "b12dbd7c993ac1f0ddf6c0cef16c605ce48da060738b83837e39bdadf9df83ef",
-    "byte_length": 47
+    "byte_length": 47,
+    "rights_scope_receipt_sha256": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa"
   },
   "decoded_pcm": {
     "pcm_sha256": "630dcd2966c4336691125448bbb25b4ff412a49c732db2c8abc1b8581bd710dd",
@@ -52,7 +53,7 @@
         "payload_sha256": "74cac05eac42e84ae16f372efbe5354a1fa5e03b39ae90df4a9dcd81a59fb792"
       }
     ],
-    "context_manifest_sha256": "587a02b45b5a4334fde276e956f4b9f391804ecba7536d66188da9c693726f54"
+    "context_manifest_sha256": "ebb850dcbca848029eb03e4beb03f73fc30cd7e9ecf2032aead30eaf76b99b2d"
   },
   "query_text": "Identify every piano entrance in the supplied recording."
 }
