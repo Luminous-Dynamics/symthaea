@@ -179,13 +179,22 @@ impl LearningGateAssessmentV1 {
             && self.candidate_state_sha256.iter().all(|digest| validate_digest(digest).is_ok());
         let verifier_vectors_valid =
             if self.disposition == LearningGateDispositionV1::InconclusiveUnverifiedRun {
-                self.verifier_ids.is_empty() && self.verification_receipt_sha256.is_empty()
+                self.verifier_ids.is_empty()
+                    && self.verification_receipt_sha256.is_empty()
+                    && self.stable_delta_sum_basis_points.is_none()
+                    && self.adaptation_delta_sum_basis_points.is_none()
+                    && self.stable_task_count == 0
+                    && self.adaptation_task_count == 0
             } else {
                 self.verifier_ids.len() == 4
                     && self.verification_receipt_sha256.len() == 4
                     && self.verifier_ids.iter().all(|id| valid_atom(id, 512))
                     && self.verification_receipt_sha256.iter()
                         .all(|digest| validate_digest(digest).is_ok())
+                    && self.stable_delta_sum_basis_points.is_some()
+                    && self.adaptation_delta_sum_basis_points.is_some()
+                    && self.stable_task_count > 0
+                    && self.adaptation_task_count > 0
             };
         run_vectors_valid
             && verifier_vectors_valid
@@ -207,8 +216,22 @@ impl LearningGateAssessmentV1 {
     }
 
     pub fn admits_learning_update(&self) -> bool {
+        let (Some(stable_delta), Some(adaptation_delta)) = (
+            self.stable_delta_sum_basis_points,
+            self.adaptation_delta_sum_basis_points,
+        ) else {
+            return false;
+        };
+        let maximum_stable_regression =
+            i128::from(self.maximum_stable_regression_basis_points)
+                * i128::from(self.stable_task_count);
+        let minimum_adaptation_gain =
+            i128::from(self.minimum_adaptation_gain_basis_points)
+                * i128::from(self.adaptation_task_count);
         self.disposition == LearningGateDispositionV1::AcceptedWithinRetentionBudget
             && self.verify_integrity()
+            && stable_delta >= -maximum_stable_regression
+            && adaptation_delta >= minimum_adaptation_gain
     }
 }
 
@@ -648,6 +671,12 @@ mod tests {
         assert_eq!(result.disposition, LearningGateDispositionV1::AcceptedWithinRetentionBudget);
         assert_eq!(result.stable_delta_sum_basis_points, Some(-200));
         assert_eq!(result.adaptation_delta_sum_basis_points, Some(2_000));
+        assert_eq!(result.run_ids, vec![
+            "stable-before", "stable-after", "adapt-before", "adapt-after",
+        ]);
+        assert_eq!(result.run_receipt_sha256.len(), 4);
+        assert_eq!(result.task_set_sha256.len(), 4);
+        assert_eq!(result.candidate_state_sha256.len(), 4);
         assert!(result.admits_learning_update());
     }
 
