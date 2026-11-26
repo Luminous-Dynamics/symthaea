@@ -873,8 +873,8 @@ mod tests {
             action_ids: vec!["choose-h1".into(), "choose-h2".into()],
             objective_ids: vec!["performance-1".into(), "performance-2".into()],
             utility_by_hypothesis: vec![
-                vec![vec![10.0, 0.0], vec![0.0, 10.0]],
-                vec![vec![0.0, 10.0], vec![10.0, 0.0]],
+                vec![vec![10.0, 8.0], vec![0.0, 0.0]],
+                vec![vec![0.0, 0.0], vec![8.0, 10.0]],
             ],
             minimum_by_objective: vec![None, None],
         };
@@ -884,8 +884,8 @@ mod tests {
             outcome_likelihoods: vec![vec![0.9, 0.1], vec![0.1, 0.9]],
         };
         let frontier = pareto_experiment_policies(&[0.5, 0.5], &model, &[candidate]).unwrap();
-        assert!(frontier.iter().any(|p| p.experiment_id == "diagnostic-probe" && p.expected_objectives == vec![9.0, 9.0]));
-        assert!(frontier.iter().any(|p| p.experiment_id == "NO_EXPERIMENT_LOTTERY" && p.expected_objectives == vec![5.0, 5.0]));
+        assert!(frontier.iter().any(|p| p.experiment_id == "diagnostic-probe" && p.expected_objectives == vec![8.1, 8.1]));
+        assert!(frontier.iter().any(|p| p.experiment_id == "NO_EXPERIMENT_LOTTERY" && p.expected_objectives == vec![4.5, 4.5]));
     }
     #[test]
     fn pareto_policy_frontier_fails_closed_when_all_actions_are_unsafe() {
