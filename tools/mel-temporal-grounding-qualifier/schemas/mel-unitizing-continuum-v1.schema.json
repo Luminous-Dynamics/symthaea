@@ -1,0 +1,207 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://github.com/Luminous-Dynamics/symthaea/blob/main/tools/mel-temporal-grounding-qualifier/schemas/mel-unitizing-continuum-v1.schema.json",
+  "title": "MEL unitizing continuum input v1",
+  "type": "object",
+  "additionalProperties": false,
+  "required": [
+    "schema",
+    "continuum_id",
+    "query_id",
+    "query_text",
+    "artifact",
+    "continuum_start_frame",
+    "continuum_end_frame",
+    "annotation_policy_version",
+    "metric",
+    "annotations",
+    "source_reference",
+    "reference_outputs"
+  ],
+  "properties": {
+    "schema": {
+      "const": "mel-unitizing-continuum-v1"
+    },
+    "continuum_id": {
+      "type": "string",
+      "minLength": 1
+    },
+    "query_id": {
+      "type": "string",
+      "minLength": 1
+    },
+    "query_text": {
+      "type": "string",
+      "minLength": 1
+    },
+    "artifact": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "audio_sha256",
+        "sample_rate_hz",
+        "channels",
+        "total_frames"
+      ],
+      "properties": {
+        "audio_sha256": {
+          "type": "string",
+          "pattern": "^[0-9a-f]{64}$"
+        },
+        "sample_rate_hz": {
+          "type": "integer",
+          "minimum": 1
+        },
+        "channels": {
+          "type": "integer",
+          "minimum": 1
+        },
+        "total_frames": {
+          "type": "integer",
+          "minimum": 1
+        }
+      }
+    },
+    "continuum_start_frame": {
+      "type": "integer",
+      "minimum": 0
+    },
+    "continuum_end_frame": {
+      "type": "integer",
+      "minimum": 1
+    },
+    "annotation_policy_version": {
+      "type": "string",
+      "minLength": 1
+    },
+    "metric": {
+      "enum": [
+        "nominal",
+        "interval",
+        "ordinal",
+        "ratio"
+      ]
+    },
+    "annotations": {
+      "type": "array",
+      "minItems": 2,
+      "items": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": [
+          "annotator_id_sha256",
+          "annotation_sha256",
+          "units"
+        ],
+        "properties": {
+          "annotator_id_sha256": {
+            "type": "string",
+            "pattern": "^[0-9a-f]{64}$"
+          },
+          "annotation_sha256": {
+            "type": "string",
+            "pattern": "^[0-9a-f]{64}$"
+          },
+          "units": {
+            "type": "array",
+            "items": {
+              "type": "object",
+              "additionalProperties": false,
+              "required": [
+                "start_frame",
+                "end_frame",
+                "value"
+              ],
+              "properties": {
+                "start_frame": {
+                  "type": "integer",
+                  "minimum": 0
+                },
+                "end_frame": {
+                  "type": "integer",
+                  "minimum": 1
+                },
+                "value": {
+                  "type": [
+                    "string",
+                    "number",
+                    "boolean"
+                  ]
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "source_reference": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "title",
+        "version",
+        "date",
+        "section",
+        "example",
+        "continuum_length",
+        "provenance_note"
+      ],
+      "properties": {
+        "title": {
+          "type": "string",
+          "minLength": 1
+        },
+        "version": {
+          "type": "string",
+          "minLength": 1
+        },
+        "date": {
+          "type": "string",
+          "format": "date"
+        },
+        "section": {
+          "type": "string",
+          "minLength": 1
+        },
+        "example": {
+          "type": "string",
+          "minLength": 1
+        },
+        "continuum_length": {
+          "type": "integer",
+          "minimum": 1
+        },
+        "provenance_note": {
+          "type": "string",
+          "minLength": 1
+        }
+      }
+    },
+    "reference_outputs": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "status",
+        "reason"
+      ],
+      "properties": {
+        "status": {
+          "enum": [
+            "not-yet-transcribed",
+            "verified"
+          ]
+        },
+        "reason": {
+          "type": "string",
+          "minLength": 1
+        },
+        "coefficient_values": {
+          "type": "object"
+        },
+        "independent_runner_version": {
+          "type": "string"
+        }
+      }
+    }
+  }
+}

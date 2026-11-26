@@ -1,0 +1,129 @@
+{
+  "schema": "mel-unitizing-continuum-v1",
+  "continuum_id": "ualpha-v11-alex-paul-suzan-reference",
+  "query_id": "reference-unitizing-valued-units",
+  "query_text": "Reference implementation example from the uAlpha v1.1 manual; values are the source's coded categories.",
+  "artifact": {
+    "audio_sha256": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+    "sample_rate_hz": 1,
+    "channels": 1,
+    "total_frames": 60
+  },
+  "continuum_start_frame": 0,
+  "continuum_end_frame": 60,
+  "annotation_policy_version": "reference-fixture-uAlpha-v1.1-manual-2016-11-29",
+  "metric": "nominal",
+  "annotations": [
+    {
+      "annotator_id_sha256": "1111111111111111111111111111111111111111111111111111111111111111",
+      "annotation_sha256": "bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb",
+      "units": [
+        {
+          "start_frame": 2,
+          "end_frame": 9,
+          "value": "1"
+        },
+        {
+          "start_frame": 11,
+          "end_frame": 17,
+          "value": "2"
+        },
+        {
+          "start_frame": 24,
+          "end_frame": 30,
+          "value": "5"
+        },
+        {
+          "start_frame": 32,
+          "end_frame": 36,
+          "value": "6"
+        },
+        {
+          "start_frame": 36,
+          "end_frame": 44,
+          "value": "6"
+        },
+        {
+          "start_frame": 44,
+          "end_frame": 60,
+          "value": "7"
+        }
+      ]
+    },
+    {
+      "annotator_id_sha256": "2222222222222222222222222222222222222222222222222222222222222222",
+      "annotation_sha256": "cccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccc",
+      "units": [
+        {
+          "start_frame": 2,
+          "end_frame": 9,
+          "value": "1"
+        },
+        {
+          "start_frame": 11,
+          "end_frame": 17,
+          "value": "3"
+        },
+        {
+          "start_frame": 19,
+          "end_frame": 25,
+          "value": "5"
+        },
+        {
+          "start_frame": 32,
+          "end_frame": 44,
+          "value": "6"
+        }
+      ]
+    },
+    {
+      "annotator_id_sha256": "3333333333333333333333333333333333333333333333333333333333333333",
+      "annotation_sha256": "dddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddd",
+      "units": [
+        {
+          "start_frame": 2,
+          "end_frame": 9,
+          "value": "1"
+        },
+        {
+          "start_frame": 11,
+          "end_frame": 17,
+          "value": "4"
+        },
+        {
+          "start_frame": 21,
+          "end_frame": 27,
+          "value": "5"
+        },
+        {
+          "start_frame": 32,
+          "end_frame": 36,
+          "value": "6"
+        },
+        {
+          "start_frame": 36,
+          "end_frame": 40,
+          "value": "6"
+        },
+        {
+          "start_frame": 40,
+          "end_frame": 44,
+          "value": "6"
+        }
+      ]
+    }
+  ],
+  "source_reference": {
+    "title": "Krippendorff's Alpha-reliabilities for Uniting a Continuum — Software Users' Manual",
+    "version": "uAlpha v1.1",
+    "date": "2016-11-29",
+    "section": "8.1 Unitizing format",
+    "example": "AlexPaulSuzan.csv",
+    "continuum_length": 60,
+    "provenance_note": "This fixture transcribes the published manual example with anonymized coder IDs and a synthetic artifact clock. It is a software-reference dataset, not an audio recording and not a musician annotation set."
+  },
+  "reference_outputs": {
+    "status": "not-yet-transcribed",
+    "reason": "The manual documents the example and the coefficient family but this commit does not invent the numeric output values. A compatible uAlpha v1.1 run and independently checked values are required before the fixture can be a numerical acceptance oracle."
+  }
+}
