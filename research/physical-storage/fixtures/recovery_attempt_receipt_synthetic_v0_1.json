@@ -1,0 +1,118 @@
+{
+  "schema_version": "symthaea-independent-recovery-receipt-v0.1",
+  "receipt_id": "SYNTHETIC-CHALLENGE-RECEIPT-001",
+  "capsule_id": "SYNTHETIC-RECOVERY-CAPSULE-001",
+  "challenge_mode": "synthetic_fixture",
+  "evidence_class": "synthetic_fixture",
+  "qualification_stage": "fixture_only",
+  "package_validation": {
+    "bagit_validator": null,
+    "bagit_version": "1.0",
+    "payload_manifest_result": "not_run",
+    "tag_manifest_result": "not_run",
+    "descriptor_schema_result": "not_run",
+    "path_safety_result": "not_run",
+    "validator_receipt_ref": null
+  },
+  "reader_path": {
+    "physical_reader_present": false,
+    "reader_id": null,
+    "adapter_id": null,
+    "adapter_source_digest_sha256": null,
+    "raw_observation_digest_sha256": null,
+    "calibration_refs": [],
+    "network_disabled": false,
+    "vendor_runtime_withheld": false
+  },
+  "decoder_runs": [
+    {
+      "implementation_id": "decoder-reference-a",
+      "source_ref": "capsule/decoder-a/README.md",
+      "source_commit": null,
+      "source_digest_sha256": "2d4255a51077d6de53a3d7fe3ac552843c971d09fa8ee5cff03d6a2fff0c191e",
+      "build_recipe_ref": null,
+      "dependency_lock_digest_sha256": null,
+      "runtime_environment_digest_sha256": null,
+      "execution_status": "not_run",
+      "network_disabled": false,
+      "vendor_runtime_withheld": false,
+      "output_byte_length": null,
+      "output_sha256": null,
+      "recovered_payload_ref": null
+    },
+    {
+      "implementation_id": "decoder-reference-b",
+      "source_ref": "capsule/decoder-b/README.md",
+      "source_commit": null,
+      "source_digest_sha256": "7f985dc89c921b4f035603b2ecb3b188634f44be3ac8222391817e3dbf473e9f",
+      "build_recipe_ref": null,
+      "dependency_lock_digest_sha256": null,
+      "runtime_environment_digest_sha256": null,
+      "execution_status": "not_run",
+      "network_disabled": false,
+      "vendor_runtime_withheld": false,
+      "output_byte_length": null,
+      "output_sha256": null,
+      "recovered_payload_ref": null
+    }
+  ],
+  "scorer_reference": {
+    "visibility": "scorer_only",
+    "expected_byte_length": 57,
+    "expected_digest_algorithm": "sha256",
+    "expected_payload_digest": "83c2524b06326495b0a1df40f1556295c1f19802230343b5c9a4216edd85b5b3",
+    "reference_payload_ref": "capsule/data/payload/hello.txt",
+    "scorer_identity": null,
+    "scorer_source_digest_sha256": null
+  },
+  "output_comparison": {
+    "decoder_outputs_byte_identical": null,
+    "all_outputs_match_expected_digest": null,
+    "exact_payload_match": null,
+    "independent_digest_recomputed": false,
+    "mismatch_handling": "not_run"
+  },
+  "independence_assessment": {
+    "status": "unassessed",
+    "assessor_ref": null,
+    "source_lineage_reviewed": false,
+    "common_code_reviewed": false,
+    "shared_dependencies": [],
+    "dependency_profile_status": "unavailable",
+    "dependency_profile_ref": null
+  },
+  "negative_controls": [
+    {
+      "control_id": "payload_bit_flip",
+      "expected_outcome": "reject",
+      "observed_outcome": "not_run",
+      "result": "not_run"
+    },
+    {
+      "control_id": "missing_manifest_entry",
+      "expected_outcome": "fail_closed",
+      "observed_outcome": "not_run",
+      "result": "not_run"
+    },
+    {
+      "control_id": "decoder_disagreement",
+      "expected_outcome": "quarantine",
+      "observed_outcome": "not_run",
+      "result": "not_run"
+    }
+  ],
+  "resource_measurements": {
+    "system_boundary": null,
+    "wall_clock_seconds": null,
+    "peak_memory_bytes": null,
+    "energy_joules": null,
+    "measurement_method_ref": null
+  },
+  "provenance": {
+    "created_at": "2026-11-26T14:57:00+02:00",
+    "host_environment_ref": null,
+    "runner_identity": null,
+    "receipt_digest_sha256": null,
+    "notes": "Synthetic receipt structure only. No BagIt validator, decoder build, reader replacement or physical recovery was performed."
+  }
+}
