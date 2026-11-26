@@ -1,0 +1,49 @@
+package cdccheck
+
+import "testing"
+func ptr(v LSN)*LSN{return &v}
+func base()(Profile,SlotState,Manifest){
+	cp:=LSN(0x100);restart:=LSN(0x80);flush:=LSN(0x100)
+	p:=Profile{SystemIdentifier:"sys-1",DatabaseOID:42,DatabaseName:"app",SlotName:"mon_slot",OutputPlugin:"pgoutput",PluginProfileDigest:"plugin-v1",SchemaProfileDigest:"schema-v1",SourceEpoch:"epoch-1",TimelineID:1,ConsistentPoint:&cp,SnapshotName:"snap-1",SnapshotDigest:"snapshot-digest"}
+	s:=SlotState{SlotType:"logical",DatabaseOID:42,DatabaseName:"app",SlotName:"mon_slot",OutputPlugin:"pgoutput",WALStatus:"reserved",RestartLSN:&restart,ConfirmedFlushLSN:&flush,SafeWALSize:ptrI(1<<30),CatalogXmin:"100",Xmin:"100"}
+	m:=Manifest{SourceEpoch:"epoch-1",TimelineID:1,SlotName:"mon_slot",DatabaseOID:42,PluginProfileDigest:"plugin-v1",SchemaProfileDigest:"schema-v1",StartExclusiveLSN:cp,TerminalLSN:0x140,SnapshotConsistentPoint:cp,SnapshotDigest:"snapshot-digest",Events:[]DecodedEvent{{ID:"e1",XID:"10",CommitLSN:0x110,Ordinal:1,PayloadDigest:"d1"},{ID:"e2",XID:"11",CommitLSN:0x130,Ordinal:1,PayloadDigest:"d2"}},Complete:true,EvidenceThroughLSN:0x140,AcknowledgementRequestedLSN:0x140,Witnessed:true,ManifestDigest:"manifest-digest"}
+	return p,s,m
+}
+func ptrI(v int64)*int64{return &v}
+func want(t *testing.T,r Result,d Decision){t.Helper();if r.Decision!=d{t.Fatalf("got %s (%s), want %s",r.Decision,r.Reason,d)}}
+func TestLSNParseAndRoundTrip(t *testing.T){for _,x:=range []string{"0/0","0/16B6C50","A/F"}{v,e:=ParseLSN(x);if e!=nil{t.Fatal(e)};if _,e=ParseLSN(v.String());e!=nil{t.Fatal(e)}}}
+func TestLSNRejectMalformed(t *testing.T){for _,x:=range []string{"","A","A/B/C","-1/0","0/xyz"}{if _,e:=ParseLSN(x);e==nil{t.Fatalf("accepted %q",x)}}}
+func TestInitialSnapshotQualified(t *testing.T){p,s,_:=base();want(t,ValidateInitialSnapshot(p,s,0x100,"snapshot-digest"),Qualified)}
+func TestSnapshotMismatchDenied(t *testing.T){p,s,_:=base();want(t,ValidateInitialSnapshot(p,s,0x101,"snapshot-digest"),Denied)}
+func TestDatabaseMismatchDenied(t *testing.T){p,s,_:=base();s.DatabaseOID++;want(t,ValidateInitialSnapshot(p,s,0x100,"snapshot-digest"),Denied)}
+func TestTemporarySlotDenied(t *testing.T){p,s,_:=base();s.Temporary=true;want(t,ValidateInitialSnapshot(p,s,0x100,"snapshot-digest"),Denied)}
+func TestInvalidatedSlotDenied(t *testing.T){p,s,_:=base();s.InvalidationReason="wal_removed";want(t,ValidateInitialSnapshot(p,s,0x100,"snapshot-digest"),Denied)}
+func TestUnreservedWALIndeterminate(t *testing.T){p,s,_:=base();s.WALStatus="unreserved";want(t,ValidateInitialSnapshot(p,s,0x100,"snapshot-digest"),Indeterminate)}
+func TestCaptureQualified(t *testing.T){p,s,m:=base();want(t,ValidateCapture(p,s,m),Qualified)}
+func TestDroppedEventIndeterminate(t *testing.T){p,s,m:=base();m.DroppedEvents=1;want(t,ValidateCapture(p,s,m),Indeterminate)}
+func TestOverflowIndeterminate(t *testing.T){p,s,m:=base();m.QueueOverflowCount=1;want(t,ValidateCapture(p,s,m),Indeterminate)}
+func TestAckAheadDurableDenied(t *testing.T){p,s,m:=base();m.AcknowledgementRequestedLSN=0x150;want(t,ValidateCapture(p,s,m),Denied)}
+func TestConfirmedFlushAheadDurableDenied(t *testing.T){p,s,m:=base();s.ConfirmedFlushLSN=ptr(0x150);want(t,ValidateCapture(p,s,m),Denied)}
+func TestEvidenceWatermarkMustEqualTerminal(t *testing.T){p,s,m:=base();m.EvidenceThroughLSN=0x130;want(t,ValidateCapture(p,s,m),Indeterminate)}
+func TestRestartLSNUnknownIndeterminate(t *testing.T){p,s,m:=base();s.RestartLSN=nil;want(t,ValidateCapture(p,s,m),Indeterminate)}
+func TestRestartLSNAfterRequiredStartIndeterminate(t *testing.T){p,s,m:=base();s.RestartLSN=ptr(0x120);want(t,ValidateCapture(p,s,m),Indeterminate)}
+func TestLSNGapsAllowed(t *testing.T){p,s,m:=base();m.Events[1].CommitLSN=0x138;want(t,ValidateCapture(p,s,m),Qualified)}
+func TestLSNRegressionDenied(t *testing.T){p,s,m:=base();m.Events[1].CommitLSN=0x108;want(t,ValidateCapture(p,s,m),Denied)}
+func TestSameLSNOrdinalRegressionDenied(t *testing.T){p,s,m:=base();m.Events[1].CommitLSN=m.Events[0].CommitLSN;m.Events[1].XID=m.Events[0].XID;m.Events[1].Ordinal=1;m.Events[0].Ordinal=2;want(t,ValidateCapture(p,s,m),Denied)}
+func TestSameLSNDifferentXIDAllowed(t *testing.T){p,s,m:=base();m.Events[1].CommitLSN=m.Events[0].CommitLSN;m.Events[1].XID="11";want(t,ValidateCapture(p,s,m),Qualified)}
+func TestSameEventIDConflictingPayloadDivergent(t *testing.T){p,s,m:=base();m.Events[1].ID=m.Events[0].ID;m.Events[1].PayloadDigest="conflict";want(t,ValidateCapture(p,s,m),Divergent)}
+func TestDuplicateIDChangedLSNDivergent(t *testing.T){p,s,m:=base();e:=m.Events[1];e.CommitLSN++;m.Events=append(m.Events,e);want(t,ValidateCapture(p,s,m),Divergent)}
+func TestExactReplayDuplicateAccepted(t *testing.T){p,s,m:=base();m.Events=append(m.Events,m.Events[1]);want(t,ValidateCapture(p,s,m),Qualified)}
+func TestUnsealedManifestIndeterminate(t *testing.T){p,s,m:=base();m.Witnessed=false;want(t,ValidateCapture(p,s,m),Indeterminate)}
+func TestPluginProfileChangedDenied(t *testing.T){p,s,m:=base();m.PluginProfileDigest="changed";want(t,ValidateCapture(p,s,m),Denied)}
+func TestReplayOverlapQualified(t *testing.T){_,_,m:=base();n:=m;n.Events=append([]DecodedEvent(nil),m.Events...);n.StartExclusiveLSN=0x120;n.TerminalLSN=0x160;n.EvidenceThroughLSN=0x160;n.AcknowledgementRequestedLSN=0x160;n.Events=append(n.Events,DecodedEvent{ID:"e3",XID:"12",CommitLSN:0x150,Ordinal:1,PayloadDigest:"d3"});want(t,ValidateReplay(m,n),Qualified)}
+func TestReplayGapIndeterminate(t *testing.T){_,_,m:=base();n:=m;n.StartExclusiveLSN=0x150;n.TerminalLSN=0x160;want(t,ValidateReplay(m,n),Indeterminate)}
+func TestReplayConflictingEventDivergent(t *testing.T){_,_,m:=base();n:=m;n.Events=append([]DecodedEvent(nil),m.Events...);n.StartExclusiveLSN=0x120;n.TerminalLSN=0x160;n.Events[1].CommitLSN++;want(t,ValidateReplay(m,n),Divergent)}
+func TestReplayTerminalRegressionIndeterminate(t *testing.T){_,_,m:=base();n:=m;n.StartExclusiveLSN=0x120;n.TerminalLSN=0x130;n.EvidenceThroughLSN=0x130;want(t,ValidateReplay(m,n),Indeterminate)}
+func failoverFixture() (Profile,Manifest,Failover){p,_,m:=base();replay:=LSN(0x150);restart:=LSN(0x80);s:=SlotState{SlotType:"logical",DatabaseOID:p.DatabaseOID,DatabaseName:p.DatabaseName,SlotName:p.SlotName,OutputPlugin:p.OutputPlugin,WALStatus:"reserved",Failover:true,Synced:true,OnStandby:true,RestartLSN:&restart,StandbyReplayLSN:&replay};n:=p;n.SourceEpoch="epoch-2";n.TimelineID=2;f:=Failover{Prior:p,Next:n,StandbySlot:s,OldPrimaryFenced:true,TimelineHistoryDigest:"timeline-history",HandoffManifestDigest:"handoff",HandoffWitnessed:true};return p,m,f}
+func TestFailoverQualified(t *testing.T){_,m,f:=failoverFixture();want(t,ValidateFailover(f,m.EvidenceThroughLSN),Qualified)}
+func TestFailoverSlotNotSyncedDenied(t *testing.T){_,m,f:=failoverFixture();f.StandbySlot.Synced=false;want(t,ValidateFailover(f,m.EvidenceThroughLSN),Denied)}
+func TestFailoverStandbyBehindIndeterminate(t *testing.T){_,m,f:=failoverFixture();f.StandbySlot.StandbyReplayLSN=ptr(0x130);want(t,ValidateFailover(f,m.EvidenceThroughLSN),Indeterminate)}
+func TestFailoverOldPrimaryNotFencedIndeterminate(t *testing.T){_,m,f:=failoverFixture();f.OldPrimaryFenced=false;want(t,ValidateFailover(f,m.EvidenceThroughLSN),Indeterminate)}
+func TestFailoverWrongStandbySlotDenied(t *testing.T){_,m,f:=failoverFixture();f.StandbySlot.DatabaseOID++;want(t,ValidateFailover(f,m.EvidenceThroughLSN),Denied)}
+func FuzzLSNParse(f *testing.F){f.Add("0/0");f.Add("A/FFFF");f.Fuzz(func(t *testing.T,s string){v,e:=ParseLSN(s);if e==nil&&v.String()==""{t.Fatal("empty normalized LSN")}})}
