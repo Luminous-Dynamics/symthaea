@@ -215,6 +215,7 @@ pub struct InverseVmShortlistReportV1 {
     pub schema: String,
     pub input_id: String,
     pub process_snapshot_sha256: String,
+    pub decision_at_unix_seconds: i64,
     pub policy_sha256: String,
     pub constraint_source_sha256: String,
     pub state: ShortlistEvaluationStateV1,
@@ -227,6 +228,8 @@ pub struct InverseVmShortlistReportV1 {
     pub recipe_write_executed: bool,
     pub physical_experiment_authorized: bool,
     pub equipment_control_authority: bool,
+    /// Forward receipts are content-bound but not issuer-authenticated in this version.
+    pub forward_evaluation_receipt_authenticity_proven: bool,
     pub report_sha256: String,
 }
 
@@ -854,6 +857,7 @@ fn unknown_report(
         schema: INVERSE_VM_SHORTLIST_REPORT_SCHEMA_V1.into(),
         input_id: input.input_id.clone(),
         process_snapshot_sha256: input.process_snapshot_sha256.clone(),
+        decision_at_unix_seconds: input.decision_at_unix_seconds,
         policy_sha256: policy_digest(&input.policy)?,
         constraint_source_sha256: input.policy.recipe_constraint_source_sha256.clone(),
         state: ShortlistEvaluationStateV1::Unknown,
@@ -866,6 +870,7 @@ fn unknown_report(
         recipe_write_executed: false,
         physical_experiment_authorized: false,
         equipment_control_authority: false,
+        forward_evaluation_receipt_authenticity_proven: false,
         report_sha256: String::new(),
     };
     report.report_sha256 = report_digest(&report)?;
@@ -885,6 +890,11 @@ pub fn evaluate_inverse_vm_shortlist_v1(
         ));
     }
     require_text(&input.input_id, "input.input_id")?;
+    if input.decision_at_unix_seconds < 0 {
+        return Err(InverseVmShortlistErrorV1(
+            "decision knowledge frontier must be a non-negative Unix timestamp".into(),
+        ));
+    }
     if !valid_sha256(&input.process_snapshot_sha256) {
         return Err(InverseVmShortlistErrorV1(
             "process snapshot digest is malformed".into(),
@@ -1125,6 +1135,105 @@ mod tests {
             policy: policy(),
             candidates,
         }
+    }
+
+    #[test]
+    fn missing_forward_evaluation_receipt_is_unknown() {
+        let mut candidate = candidate("missing-forward-receipt", 200.0, 50.0, (99.0, 101.0), 0.2);
+        candidate.forward_evaluation_receipt = None;
+        candidate.candidate_evidence_sha256 = candidate_digest(&candidate).unwrap();
+        let report = evaluate_inverse_vm_shortlist_v1(&input(vec![candidate])).unwrap();
+        assert_eq!(report.evaluations[0].state, CandidateScreenStateV1::Unknown);
+        assert!(
+            report.evaluations[0]
+                .reasons
+                .contains(&CandidateScreenReasonV1::ForwardEvaluationReceiptMissing)
+        );
+        assert!(report.top_k_candidate_ids.is_empty());
+        assert!(!report.forward_evaluation_receipt_authenticity_proven);
+    }
+
+    #[test]
+    fn forward_evaluation_receipt_after_decision_frontier_is_unknown() {
+        let mut input = input(vec![candidate("late-forward-receipt", 200.0, 50.0, (99.0, 101.0), 0.2)]);
+        input.decision_at_unix_seconds = 105;
+        let report = evaluate_inverse_vm_shortlist_v1(&input).unwrap();
+        assert_eq!(report.evaluations[0].state, CandidateScreenStateV1::Unknown);
+        assert!(
+            report.evaluations[0]
+                .reasons
+                .contains(&CandidateScreenReasonV1::ForwardEvaluationReceiptNotYetAvailable)
+        );
+        assert!(report.top_k_candidate_ids.is_empty());
+    }
+
+    #[test]
+    fn forward_receipt_recipe_or_prediction_mutation_is_rejected() {
+        let mut wrong_recipe = candidate("wrong-recipe-receipt", 200.0, 50.0, (99.0, 101.0), 0.2);
+        wrong_recipe.recipe_settings[0].value += 1.0;
+        wrong_recipe.candidate_evidence_sha256 = candidate_digest(&wrong_recipe).unwrap();
+        let recipe_report = evaluate_inverse_vm_shortlist_v1(&input(vec![wrong_recipe])).unwrap();
+        assert_eq!(recipe_report.evaluations[0].state, CandidateScreenStateV1::Rejected);
+        assert!(
+            recipe_report.evaluations[0]
+                .reasons
+                .contains(&CandidateScreenReasonV1::ForwardEvaluationReceiptRecipeMismatch)
+        );
+
+        let mut wrong_prediction = candidate("wrong-prediction-receipt", 200.0, 50.0, (99.0, 101.0), 0.2);
+        wrong_prediction.predicted_metrics[0].upper = 100.5;
+        wrong_prediction.candidate_evidence_sha256 = candidate_digest(&wrong_prediction).unwrap();
+        let prediction_report =
+            evaluate_inverse_vm_shortlist_v1(&input(vec![wrong_prediction])).unwrap();
+        assert_eq!(prediction_report.evaluations[0].state, CandidateScreenStateV1::Rejected);
+        assert!(
+            prediction_report.evaluations[0]
+                .reasons
+                .contains(&CandidateScreenReasonV1::ForwardEvaluationReceiptPredictionMismatch)
+        );
+    }
+
+    #[test]
+    fn forward_receipt_context_and_digest_tampering_are_rejected() {
+        let mut wrong_context = candidate("wrong-forward-context", 200.0, 50.0, (99.0, 101.0), 0.2);
+        let receipt = wrong_context.forward_evaluation_receipt.as_mut().unwrap();
+        receipt.process_snapshot_sha256 = digest('f');
+        receipt.receipt_sha256 = forward_receipt_digest(receipt).unwrap();
+        wrong_context.candidate_evidence_sha256 = candidate_digest(&wrong_context).unwrap();
+        let context_report = evaluate_inverse_vm_shortlist_v1(&input(vec![wrong_context])).unwrap();
+        assert_eq!(context_report.evaluations[0].state, CandidateScreenStateV1::Rejected);
+        assert!(
+            context_report.evaluations[0]
+                .reasons
+                .contains(&CandidateScreenReasonV1::ForwardEvaluationReceiptContextMismatch)
+        );
+
+        let mut tampered = candidate("tampered-forward", 200.0, 50.0, (99.0, 101.0), 0.2);
+        tampered.forward_evaluation_receipt.as_mut().unwrap().receipt_sha256 = digest('0');
+        tampered.candidate_evidence_sha256 = candidate_digest(&tampered).unwrap();
+        let tampered_report = evaluate_inverse_vm_shortlist_v1(&input(vec![tampered])).unwrap();
+        assert_eq!(tampered_report.evaluations[0].state, CandidateScreenStateV1::Rejected);
+        assert!(
+            tampered_report.evaluations[0]
+                .reasons
+                .contains(&CandidateScreenReasonV1::ForwardEvaluationReceiptDigestMismatch)
+        );
+    }
+
+    #[test]
+    fn qualification_digest_is_required_for_forward_receipt_marked_qualified() {
+        let mut candidate = candidate("missing-qual-digest", 200.0, 50.0, (99.0, 101.0), 0.2);
+        candidate.forward_evaluation_receipt.as_mut().unwrap().model_qualification_report_sha256 = None;
+        let receipt = candidate.forward_evaluation_receipt.as_mut().unwrap();
+        receipt.receipt_sha256 = forward_receipt_digest(receipt).unwrap();
+        candidate.candidate_evidence_sha256 = candidate_digest(&candidate).unwrap();
+        let report = evaluate_inverse_vm_shortlist_v1(&input(vec![candidate])).unwrap();
+        assert_eq!(report.evaluations[0].state, CandidateScreenStateV1::Rejected);
+        assert!(
+            report.evaluations[0]
+                .reasons
+                .contains(&CandidateScreenReasonV1::ForwardEvaluationReceiptDigestMismatch)
+        );
     }
 
     #[test]
