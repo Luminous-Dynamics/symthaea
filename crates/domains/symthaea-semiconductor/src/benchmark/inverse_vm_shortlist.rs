@@ -280,6 +280,8 @@ fn validate_policy(policy: &InverseVmShortlistPolicyV1) -> Result<(), InverseVmS
     }
     require_text(&policy.policy_id, "policy.policy_id")?;
     if policy.revision == 0
+        || policy.recipe_knob_constraints.is_empty()
+        || policy.minimum_support_neighbours == 0
         || !valid_sha256(&policy.recipe_constraint_source_sha256)
         || !valid_sha256(&policy.required_forward_model_sha256)
         || !valid_sha256(&policy.support_manifest_sha256)
@@ -401,7 +403,9 @@ fn screen_candidate(
 
     if !policy.recipe_constraints_complete || !policy.side_constraints_complete {
         reasons.push(CandidateScreenReasonV1::ConstraintSourceUnavailable);
-        state = CandidateScreenStateV1::Unknown;
+        if state != CandidateScreenStateV1::Rejected {
+            state = CandidateScreenStateV1::Unknown;
+        }
     }
 
     let mut seen_knobs = BTreeSet::new();
@@ -637,6 +641,11 @@ fn build_shortlist(
                     )
                 })
                 .fold(f64::INFINITY, f64::min);
+            if !selected.is_empty()
+                && min_distance < policy.minimum_recipe_diversity_distance
+            {
+                continue;
+            }
             let diversity_bonus = if selected.is_empty() {
                 0.0
             } else {
@@ -922,7 +931,11 @@ mod tests {
         let report = evaluate_inverse_vm_shortlist_v1(&input).unwrap();
         assert_eq!(report.state, ShortlistEvaluationStateV1::Complete);
         assert_eq!(report.feasible_candidate_count, 3);
-        assert_eq!(report.top_k_candidate_ids.len(), 3);
+        assert_eq!(report.top_k_candidate_ids, vec![
+            "a".to_string(),
+            "c".to_string(),
+            "b".to_string(),
+        ]);
         assert!(verify_inverse_vm_shortlist_v1(&input, &report).unwrap());
         assert!(!report.candidate_generation_executed);
         assert!(!report.recipe_write_executed);
@@ -1038,6 +1051,25 @@ mod tests {
         let left = evaluate_inverse_vm_shortlist_v1(&first).unwrap();
         let right = evaluate_inverse_vm_shortlist_v1(&second).unwrap();
         assert_eq!(left.report_sha256, right.report_sha256);
+    }
+
+    #[test]
+    fn minimum_diversity_distance_can_leave_shortlist_shorter_than_k() {
+        let a = candidate("a", 200.0, 50.0, (99.0, 101.0), 0.2);
+        let b = candidate("b", 201.0, 50.1, (99.0, 101.0), 0.2);
+        let mut policy = policy();
+        policy.top_k = 2;
+        policy.minimum_recipe_diversity_distance = 0.10;
+        let input = InverseVmShortlistInputV1 {
+            schema: INVERSE_VM_SHORTLIST_INPUT_SCHEMA_V1.into(),
+            input_id: "diversity-minimum-test".into(),
+            process_snapshot_sha256: digest('e'),
+            policy,
+            candidates: vec![a, b],
+        };
+        let report = evaluate_inverse_vm_shortlist_v1(&input).unwrap();
+        assert_eq!(report.feasible_candidate_count, 2);
+        assert_eq!(report.top_k_candidate_ids.len(), 1);
     }
 
     #[test]
