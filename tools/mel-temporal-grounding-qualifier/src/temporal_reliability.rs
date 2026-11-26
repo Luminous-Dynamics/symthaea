@@ -650,11 +650,7 @@ fn nominal_alpha_for_units(units: &[&TemporalReliabilityUnitV1]) -> Result<Optio
     Ok(Some(1.0 - observed / expected))
 }
 
-fn bootstrap_cluster_means(
-    cluster_values: &[f64],
-    replicates: usize,
-    state: &mut u64,
-) -> Vec<f64> {
+fn bootstrap_cluster_means(cluster_values: &[f64], replicates: usize, state: &mut u64) -> Vec<f64> {
     let cluster_count = cluster_values.len();
     if cluster_count == 0 || replicates == 0 {
         return Vec::new();
