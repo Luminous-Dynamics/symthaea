@@ -493,9 +493,6 @@ fn validate_per_node_quorum(
     for node in graph.node_bindings() {
         let mut operators = BTreeSet::new();
         let mut domains = BTreeSet::new();
-        let mut acquisition_records = BTreeSet::new();
-        let mut publisher_identity: Option<&str> = None;
-        let mut source_revision: Option<&str> = None;
         let node_witnesses = witnesses.iter()
             .filter(|item| item.receipt.evidence_id == node.evidence_id)
             .collect::<Vec<_>>();
