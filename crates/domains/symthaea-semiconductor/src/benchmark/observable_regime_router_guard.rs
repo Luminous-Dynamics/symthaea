@@ -143,6 +143,7 @@ pub struct RegimeRoutingReceiptV1 {
     pub clock_mapping_sha256: String,
     pub router_artifact_sha256: String,
     pub training_manifest_sha256: String,
+    pub input_sha256: String,
     pub consumed_feature_set_sha256: String,
     pub reasons: Vec<RegimeRoutingReasonV1>,
     pub deployable_router_eligible: bool,
@@ -344,6 +345,8 @@ pub fn evaluate_regime_routing_v1(
 
     if allowed.len() != manifest.allowed_feature_ids.len()
         || forbidden.len() != manifest.forbidden_target_feature_ids.len()
+        || manifest.allowed_feature_ids.iter().any(|id| id.trim().is_empty())
+        || manifest.forbidden_target_feature_ids.iter().any(|id| id.trim().is_empty())
     {
         reasons.push(RegimeRoutingReasonV1::DuplicateFeatureId);
         rejected = true;
@@ -371,11 +374,13 @@ pub fn evaluate_regime_routing_v1(
             rejected = true;
             continue;
         }
-        if !allowed.contains(feature.feature_id.as_str()) {
+        let retrospective_target_feature = input.purpose == RegimeRoutingPurposeV1::RetrospectiveOracle
+            && feature.source_kind == RegimeFeatureSourceKindV1::TargetDerived;
+        if !allowed.contains(feature.feature_id.as_str()) && !retrospective_target_feature {
             reasons.push(RegimeRoutingReasonV1::FeatureNotInTrainingAllowlist);
             rejected = true;
         }
-        if forbidden.contains(feature.feature_id.as_str()) {
+        if forbidden.contains(feature.feature_id.as_str()) && !retrospective_target_feature {
             reasons.push(RegimeRoutingReasonV1::FeatureForbiddenByTrainingManifest);
             rejected = true;
         }
@@ -503,6 +508,7 @@ pub fn evaluate_regime_routing_v1(
         clock_mapping_sha256: input.clock_mapping_sha256.clone(),
         router_artifact_sha256: input.router_artifact_sha256.clone(),
         training_manifest_sha256: manifest.manifest_sha256.clone(),
+        input_sha256,
         consumed_feature_set_sha256: feature_set_digest(&input.consumed_features)?,
         reasons,
         deployable_router_eligible: state == RegimeRoutingStateV1::Eligible,
@@ -511,9 +517,6 @@ pub fn evaluate_regime_routing_v1(
         training_manifest_issuer_authenticity_proven: false,
         receipt_sha256: String::new(),
     };
-    // Bind the full canonical input digest as a reserved reason-independent
-    // envelope field to prevent a route from being detached from its features.
-    receipt.consumed_feature_set_sha256 = json_sha256(&(input_sha256, receipt.consumed_feature_set_sha256.clone()))?;
     receipt.receipt_sha256 = receipt_digest(&receipt)?;
     Ok(receipt)
 }
@@ -732,6 +735,33 @@ mod tests {
                 .reasons
                 .contains(&RegimeRoutingReasonV1::RetrospectiveTargetFeatureUsed)
         );
+    }
+
+    #[test]
+    fn retrospective_target_value_is_stratification_only_not_a_model_input() {
+        let input = input(
+            RegimeRoutingPurposeV1::RetrospectiveOracle,
+            vec![
+                feature(
+                    "avg_removal_rate_bin",
+                    RegimeFeatureSourceKindV1::TargetDerived,
+                    101,
+                    102,
+                ),
+                feature(
+                    "stage",
+                    RegimeFeatureSourceKindV1::ObservableProcessContext,
+                    80,
+                    90,
+                ),
+            ],
+        );
+        let receipt = evaluate_regime_routing_v1(&input).unwrap();
+        assert_eq!(receipt.state, RegimeRoutingStateV1::RetrospectiveOnly);
+        assert!(receipt.retrospective_oracle_only);
+        assert!(!receipt.deployable_router_eligible);
+        assert!(!receipt.reasons.contains(&RegimeRoutingReasonV1::FeatureNotInTrainingAllowlist));
+        assert!(!receipt.reasons.contains(&RegimeRoutingReasonV1::FeatureForbiddenByTrainingManifest));
     }
 
     #[test]
