@@ -14,8 +14,7 @@ use std::collections::{BTreeMap, BTreeSet};
 use thiserror::Error;
 
 use super::label_consumption_guard::{
-    LabelConsumptionEligibilityReportV1, LabelConsumptionEligibilityV1,
-    LabelEvidenceFrontierV1,
+    LabelConsumptionEligibilityReportV1, LabelConsumptionEligibilityV1, LabelEvidenceFrontierV1,
 };
 
 pub const CA_OCRC_POLICY_SCHEMA_V1: &str = "luminous.semi-bench.ca-ocrc-policy.v1";
@@ -297,9 +296,7 @@ fn label_report_digest(
     json_sha256(&canonical)
 }
 
-fn prediction_receipt_digest(
-    receipt: &CaOcrcPredictionReceiptV1,
-) -> Result<String, CaOcrcErrorV1> {
+fn prediction_receipt_digest(receipt: &CaOcrcPredictionReceiptV1) -> Result<String, CaOcrcErrorV1> {
     let mut canonical = receipt.clone();
     canonical.receipt_sha256.clear();
     json_sha256(&canonical)
@@ -308,8 +305,11 @@ fn prediction_receipt_digest(
 fn round_input_digest(input: &CaOcrcRoundInputV1) -> Result<String, CaOcrcErrorV1> {
     let mut canonical = input.clone();
     canonical.feedbacks.sort_by(|a, b| {
-        (a.sample_id.as_str(), a.label_id.as_str(), a.label_revision)
-            .cmp(&(b.sample_id.as_str(), b.label_id.as_str(), b.label_revision))
+        (a.sample_id.as_str(), a.label_id.as_str(), a.label_revision).cmp(&(
+            b.sample_id.as_str(),
+            b.label_id.as_str(),
+            b.label_revision,
+        ))
     });
     json_sha256(&canonical)
 }
@@ -332,7 +332,9 @@ fn validate_pmf(policy: &CaOcrcPolicyV1) -> Result<(), CaOcrcErrorV1> {
         .checked_add(2)
         .ok_or_else(|| CaOcrcErrorV1("proxy PMF length overflow".into()))?;
     if policy.maximum_actual_delay_steps >= i64::MAX as u64 {
-        return Err(CaOcrcErrorV1("maximum delay exceeds signed proxy-delay range".into()));
+        return Err(CaOcrcErrorV1(
+            "maximum delay exceeds signed proxy-delay range".into(),
+        ));
     }
     if policy.proxy_delay_pmf.len() != expected_len {
         return Err(CaOcrcErrorV1(
@@ -361,8 +363,13 @@ fn validate_pmf(policy: &CaOcrcPolicyV1) -> Result<(), CaOcrcErrorV1> {
             "proxy-delay distribution violates the CA-OCRC underload condition ell_F <= K".into(),
         ));
     }
-    if survival.iter().any(|value| !value.is_finite() || *value < 0.0 || *value > 1.0) {
-        return Err(CaOcrcErrorV1("proxy survival probability is invalid".into()));
+    if survival
+        .iter()
+        .any(|value| !value.is_finite() || *value < 0.0 || *value > 1.0)
+    {
+        return Err(CaOcrcErrorV1(
+            "proxy survival probability is invalid".into(),
+        ));
     }
     if survival[policy.maximum_actual_delay_steps as usize] <= 0.0 {
         return Err(CaOcrcErrorV1(
@@ -393,7 +400,9 @@ pub fn proxy_tracking_load(policy: &CaOcrcPolicyV1) -> Result<f64, CaOcrcErrorV1
 
 fn sample_proxy_delay(policy: &CaOcrcPolicyV1, draw: f64) -> Result<i64, CaOcrcErrorV1> {
     if !draw.is_finite() || !(0.0..1.0).contains(&draw) {
-        return Err(CaOcrcErrorV1("proxy uniform draw must be finite in [0,1)".into()));
+        return Err(CaOcrcErrorV1(
+            "proxy uniform draw must be finite in [0,1)".into(),
+        ));
     }
     let mut cumulative = 0.0;
     for (index, probability) in policy.proxy_delay_pmf.iter().enumerate() {
@@ -406,10 +415,7 @@ fn sample_proxy_delay(policy: &CaOcrcPolicyV1, draw: f64) -> Result<i64, CaOcrcE
     Ok(policy.proxy_delay_pmf.len() as i64 - 2)
 }
 
-fn prediction_loss(
-    set: &CaOcrcPredictionSetV1,
-    label_value: f64,
-) -> Result<f64, CaOcrcErrorV1> {
+fn prediction_loss(set: &CaOcrcPredictionSetV1, label_value: f64) -> Result<f64, CaOcrcErrorV1> {
     if !label_value.is_finite() {
         return Err(CaOcrcErrorV1("label value must be finite".into()));
     }
@@ -426,7 +432,11 @@ fn prediction_loss(
             if !lower.is_finite() || !upper.is_finite() || lower > upper {
                 return Err(CaOcrcErrorV1("prediction interval is invalid".into()));
             }
-            Ok(if (lower..=upper).contains(&label_value) { 0.0 } else { 1.0 })
+            Ok(if (lower..=upper).contains(&label_value) {
+                0.0
+            } else {
+                1.0
+            })
         }
     }
 }
@@ -473,7 +483,9 @@ fn validate_policy(policy: &CaOcrcPolicyV1) -> Result<(), CaOcrcErrorV1> {
         || policy.maximum_actual_delay_steps == 0
         || policy.tracking_capacity == 0
     {
-        return Err(CaOcrcErrorV1("CA-OCRC policy numeric parameter is invalid".into()));
+        return Err(CaOcrcErrorV1(
+            "CA-OCRC policy numeric parameter is invalid".into(),
+        ));
     }
     validate_pmf(policy)
 }
@@ -532,17 +544,23 @@ fn validate_engine(engine: &CaOcrcEngineV1) -> Result<(), CaOcrcErrorV1> {
         return Err(CaOcrcErrorV1("CA-OCRC threshold is non-finite".into()));
     }
     if engine.state.tracked.len() > engine.policy.tracking_capacity {
-        return Err(CaOcrcErrorV1("CA-OCRC tracking set exceeds capacity".into()));
+        return Err(CaOcrcErrorV1(
+            "CA-OCRC tracking set exceeds capacity".into(),
+        ));
     }
     if engine.predictions_by_round.len() != engine.sample_to_round.len() {
-        return Err(CaOcrcErrorV1("prediction history and sample index lengths differ".into()));
+        return Err(CaOcrcErrorV1(
+            "prediction history and sample index lengths differ".into(),
+        ));
     }
     for (round, receipt) in &engine.predictions_by_round {
         if *round != receipt.round
             || prediction_receipt_digest(receipt)? != receipt.receipt_sha256
             || engine.sample_to_round.get(&receipt.sample_id) != Some(round)
         {
-            return Err(CaOcrcErrorV1("immutable prediction receipt ledger is inconsistent".into()));
+            return Err(CaOcrcErrorV1(
+                "immutable prediction receipt ledger is inconsistent".into(),
+            ));
         }
     }
     for (round, tracked) in &engine.state.tracked {
@@ -552,7 +570,9 @@ fn validate_engine(engine: &CaOcrcEngineV1) -> Result<(), CaOcrcErrorV1> {
                     .checked_add(tracked.prediction_receipt.sampled_proxy_delay as u64)
                     .ok_or_else(|| CaOcrcErrorV1("proxy expiry round overflow".into()))?
         {
-            return Err(CaOcrcErrorV1("CA-OCRC tracked entry is inconsistent".into()));
+            return Err(CaOcrcErrorV1(
+                "CA-OCRC tracked entry is inconsistent".into(),
+            ));
         }
     }
     Ok(())
@@ -580,7 +600,9 @@ pub fn create_ca_ocrc_engine_v1(
         || initial_threshold < 0.0
         || initial_threshold > policy.bounded_score_upper
     {
-        return Err(CaOcrcErrorV1("engine identity or initial threshold is invalid".into()));
+        return Err(CaOcrcErrorV1(
+            "engine identity or initial threshold is invalid".into(),
+        ));
     }
     validate_policy(&policy)?;
     let policy_sha256 = policy_digest(&policy)?;
@@ -737,11 +759,10 @@ fn validate_feedback_against_prediction(
     if feedback.unit != prediction.prediction_set.unit {
         reasons.push(CaOcrcReasonV1::UnitMismatch);
     }
-    if engine
-        .state
-        .accepted_label_revisions
-        .contains(&format!("{}:{}", feedback.label_id, feedback.label_revision))
-    {
+    if engine.state.accepted_label_revisions.contains(&format!(
+        "{}:{}",
+        feedback.label_id, feedback.label_revision
+    )) {
         reasons.push(CaOcrcReasonV1::DuplicateAcceptedLabelRevision);
     }
 
@@ -762,10 +783,7 @@ fn validate_feedback_against_prediction(
     Ok((loss, actual_delay, contribution))
 }
 
-fn evict_expired(
-    engine: &mut CaOcrcEngineV1,
-    round: u64,
-) -> Vec<u64> {
+fn evict_expired(engine: &mut CaOcrcEngineV1, round: u64) -> Vec<u64> {
     let expired: Vec<u64> = engine
         .state
         .tracked
@@ -788,36 +806,47 @@ pub fn step_ca_ocrc_round_v1(
 ) -> Result<CaOcrcRoundReportV1, CaOcrcErrorV1> {
     validate_engine(engine)?;
     if input.schema != CA_OCRC_ROUND_INPUT_SCHEMA_V1 {
-        return Err(CaOcrcErrorV1("CA-OCRC round input schema is unsupported".into()));
+        return Err(CaOcrcErrorV1(
+            "CA-OCRC round input schema is unsupported".into(),
+        ));
     }
     let prediction = &input.prediction;
     if prediction.schema != CA_OCRC_PREDICTION_SCHEMA_V1 {
-        return Err(CaOcrcErrorV1("CA-OCRC prediction schema is unsupported".into()));
+        return Err(CaOcrcErrorV1(
+            "CA-OCRC prediction schema is unsupported".into(),
+        ));
     }
     if prediction.round != engine.state.next_round {
-        return Err(CaOcrcErrorV1("CA-OCRC rounds must be contiguous and monotonic".into()));
+        return Err(CaOcrcErrorV1(
+            "CA-OCRC rounds must be contiguous and monotonic".into(),
+        ));
     }
     require_text(&prediction.sample_id, "prediction.sample_id")?;
-    require_text(&prediction.measurement_event_id, "prediction.measurement_event_id")?;
+    require_text(
+        &prediction.measurement_event_id,
+        "prediction.measurement_event_id",
+    )?;
     require_text(&prediction.clock_domain_id, "prediction.clock_domain_id")?;
     if prediction.clock_domain_id != engine.clock_domain_id
         || prediction.global_model_artifact_sha256 != engine.global_model_artifact_sha256
         || prediction.interval_method_sha256 != engine.interval_method_sha256
     {
-        return Err(CaOcrcErrorV1("prediction clock/model/interval identity mismatch".into()));
+        return Err(CaOcrcErrorV1(
+            "prediction clock/model/interval identity mismatch".into(),
+        ));
     }
     if prediction.event_time_unix_seconds > prediction.prediction_at_unix_seconds
         || prediction.prediction_at_unix_seconds > prediction.round_time_unix_seconds
         || !prediction.threshold_used.is_finite()
         || prediction.threshold_used != engine.state.threshold
     {
-        return Err(CaOcrcErrorV1("prediction chronology or threshold mismatch".into()));
+        return Err(CaOcrcErrorV1(
+            "prediction chronology or threshold mismatch".into(),
+        ));
     }
     validate_prediction_set(&prediction.prediction_set)?;
     if engine.sample_to_round.contains_key(&prediction.sample_id)
-        || engine
-            .predictions_by_round
-            .contains_key(&prediction.round)
+        || engine.predictions_by_round.contains_key(&prediction.round)
     {
         return Err(CaOcrcErrorV1("duplicate sample or prediction round".into()));
     }
@@ -860,7 +889,9 @@ pub fn step_ca_ocrc_round_v1(
     } else {
         sample_proxy_delay(
             &candidate.policy,
-            prediction.proxy_uniform_draw.expect("validated nontrivial draw"),
+            prediction
+                .proxy_uniform_draw
+                .expect("validated nontrivial draw"),
         )?
     };
     let admitted = sampled_proxy_delay >= 0
@@ -920,20 +951,27 @@ pub fn step_ca_ocrc_round_v1(
 
     let mut feedbacks = input.feedbacks.clone();
     feedbacks.sort_by(|a, b| {
-        (a.sample_id.as_str(), a.label_id.as_str(), a.label_revision)
-            .cmp(&(b.sample_id.as_str(), b.label_id.as_str(), b.label_revision))
+        (a.sample_id.as_str(), a.label_id.as_str(), a.label_revision).cmp(&(
+            b.sample_id.as_str(),
+            b.label_id.as_str(),
+            b.label_revision,
+        ))
     });
     let mut feedback_results = Vec::with_capacity(feedbacks.len());
     let mut contribution_sum = 0.0_f64;
 
     for feedback in &feedbacks {
         if feedback.schema != CA_OCRC_FEEDBACK_SCHEMA_V1 {
-            return Err(CaOcrcErrorV1("CA-OCRC feedback schema is unsupported".into()));
+            return Err(CaOcrcErrorV1(
+                "CA-OCRC feedback schema is unsupported".into(),
+            ));
         }
         require_text(&feedback.sample_id, "feedback.sample_id")?;
         require_text(&feedback.label_id, "feedback.label_id")?;
         if feedback.label_revision == 0 {
-            return Err(CaOcrcErrorV1("feedback label revision must be positive".into()));
+            return Err(CaOcrcErrorV1(
+                "feedback label revision must be positive".into(),
+            ));
         }
         let feedback_attempt_digest = json_sha256(feedback)?;
         if !candidate
@@ -1085,10 +1123,10 @@ pub fn step_ca_ocrc_round_v1(
         }
         let survival = proxy_survival_vector(&candidate.policy)?[delay as usize];
         contribution_sum += contribution;
-        candidate.state.accepted_label_revisions.insert(format!(
-            "{}:{}",
-            feedback.label_id, feedback.label_revision
-        ));
+        candidate
+            .state
+            .accepted_label_revisions
+            .insert(format!("{}:{}", feedback.label_id, feedback.label_revision));
         candidate.state.tracked.remove(&origin_round);
         let result = make_feedback_result(
             feedback,
@@ -1111,7 +1149,9 @@ pub fn step_ca_ocrc_round_v1(
         + weighted_feedback_sum;
     let next_threshold = threshold_before + candidate.policy.learning_rate_eta * update_term;
     if !update_term.is_finite() || !next_threshold.is_finite() {
-        return Err(CaOcrcErrorV1("CA-OCRC threshold update is non-finite".into()));
+        return Err(CaOcrcErrorV1(
+            "CA-OCRC threshold update is non-finite".into(),
+        ));
     }
     candidate.state.threshold = next_threshold;
     candidate.state.last_round_time_unix_seconds = Some(prediction.round_time_unix_seconds);
@@ -1170,12 +1210,7 @@ pub fn close_ca_ocrc_feedback_horizon_v1(
     engine: &mut CaOcrcEngineV1,
 ) -> Result<Vec<u64>, CaOcrcErrorV1> {
     validate_engine(engine)?;
-    let unresolved: Vec<u64> = engine
-        .state
-        .tracked
-        .keys()
-        .copied()
-        .collect();
+    let unresolved: Vec<u64> = engine.state.tracked.keys().copied().collect();
     let unresolved_selected: BTreeSet<u64> = engine
         .state
         .tracked
@@ -1197,12 +1232,16 @@ pub fn optimal_arbitrary_delay_proxy_policy_v1(
     learning_horizon: u64,
 ) -> Result<(Vec<f64>, f64, f64), CaOcrcErrorV1> {
     if maximum_actual_delay_steps == 0 || tracking_capacity == 0 || learning_horizon == 0 {
-        return Err(CaOcrcErrorV1("optimizer requires positive d_max, K and horizon".into()));
+        return Err(CaOcrcErrorV1(
+            "optimizer requires positive d_max, K and horizon".into(),
+        ));
     }
     let d_max = maximum_actual_delay_steps as f64;
     let upper = (tracking_capacity as f64 / d_max).min(1.0);
     if upper <= 0.0 || !upper.is_finite() {
-        return Err(CaOcrcErrorV1("optimizer proxy-probability range is empty".into()));
+        return Err(CaOcrcErrorV1(
+            "optimizer proxy-probability range is empty".into(),
+        ));
     }
     let objective = |p: f64| {
         let ratio = d_max * p / tracking_capacity as f64;
@@ -1338,8 +1377,8 @@ mod tests {
             calibration_certificate_id: "cert-1".into(),
             frontier: LabelEvidenceFrontierV1::CurrentAtK1,
             eligibility: status,
-            downstream_consumption_allowed:
-                status == LabelConsumptionEligibilityV1::EligibleUnderDeclaredPolicy,
+            downstream_consumption_allowed: status
+                == LabelConsumptionEligibilityV1::EligibleUnderDeclaredPolicy,
             reasons: Vec::new(),
             label_sha256: payload.clone(),
             measurement_sha256: digest('d'),
@@ -1501,7 +1540,13 @@ mod tests {
             ),
         )
         .unwrap();
-        let feedback = feedback(1, "s0", "l0", 1, LabelConsumptionEligibilityV1::EligibleUnderDeclaredPolicy);
+        let feedback = feedback(
+            1,
+            "s0",
+            "l0",
+            1,
+            LabelConsumptionEligibilityV1::EligibleUnderDeclaredPolicy,
+        );
         // 0.9 maps to proxy delay 2; actual delay 1; F(1) = 0.5.
         let report = step_ca_ocrc_round_v1(
             &mut engine,
@@ -1511,10 +1556,19 @@ mod tests {
             ),
         )
         .unwrap();
-        assert_eq!(report.feedback_results[0].disposition, CaOcrcFeedbackDispositionV1::Updated);
+        assert_eq!(
+            report.feedback_results[0].disposition,
+            CaOcrcFeedbackDispositionV1::Updated
+        );
         assert_eq!(report.feedback_results[0].bounded_loss, Some(0.0));
-        assert_eq!(report.feedback_results[0].proxy_survival_probability, Some(0.5));
-        assert_eq!(report.feedback_results[0].weighted_update_contribution, Some(-0.2));
+        assert_eq!(
+            report.feedback_results[0].proxy_survival_probability,
+            Some(0.5)
+        );
+        assert_eq!(
+            report.feedback_results[0].weighted_update_contribution,
+            Some(-0.2)
+        );
         assert!((report.threshold_after - (0.5 + 0.05 * -0.2)).abs() < 1e-12);
         assert_eq!(report.tracking_occupancy_after, 1);
     }
@@ -1556,7 +1610,10 @@ mod tests {
             CaOcrcFeedbackDispositionV1::Updated
         );
         assert_eq!(report.feedback_results[0].actual_delay_steps, Some(0));
-        assert_eq!(report.feedback_results[0].proxy_survival_probability, Some(1.0));
+        assert_eq!(
+            report.feedback_results[0].proxy_survival_probability,
+            Some(1.0)
+        );
         assert_eq!(report.tracking_occupancy_after, 0);
         assert!((report.threshold_after - 0.495).abs() < 1.0e-12);
     }
@@ -1577,8 +1634,20 @@ mod tests {
                 .unwrap();
             }
             let mut feedbacks = vec![
-                feedback(2, "s0", "l0", 1, LabelConsumptionEligibilityV1::EligibleUnderDeclaredPolicy),
-                feedback(2, "s1", "l1", 1, LabelConsumptionEligibilityV1::EligibleUnderDeclaredPolicy),
+                feedback(
+                    2,
+                    "s0",
+                    "l0",
+                    1,
+                    LabelConsumptionEligibilityV1::EligibleUnderDeclaredPolicy,
+                ),
+                feedback(
+                    2,
+                    "s1",
+                    "l1",
+                    1,
+                    LabelConsumptionEligibilityV1::EligibleUnderDeclaredPolicy,
+                ),
             ];
             if reverse {
                 feedbacks.reverse();
@@ -1624,7 +1693,13 @@ mod tests {
             ),
         )
         .unwrap();
-        let feedback = feedback(2, "s0", "l0", 1, LabelConsumptionEligibilityV1::EligibleUnderDeclaredPolicy);
+        let feedback = feedback(
+            2,
+            "s0",
+            "l0",
+            1,
+            LabelConsumptionEligibilityV1::EligibleUnderDeclaredPolicy,
+        );
         let report = step_ca_ocrc_round_v1(
             &mut engine,
             &input(
@@ -1633,9 +1708,15 @@ mod tests {
             ),
         )
         .unwrap();
-        assert_eq!(report.feedback_results[0].disposition, CaOcrcFeedbackDispositionV1::Updated);
+        assert_eq!(
+            report.feedback_results[0].disposition,
+            CaOcrcFeedbackDispositionV1::Updated
+        );
         assert_eq!(report.feedback_results[0].actual_delay_steps, Some(2));
-        assert_eq!(report.feedback_results[0].proxy_survival_probability, Some(0.5));
+        assert_eq!(
+            report.feedback_results[0].proxy_survival_probability,
+            Some(0.5)
+        );
     }
 
     #[test]
@@ -1667,7 +1748,13 @@ mod tests {
             ),
         )
         .unwrap();
-        let late = feedback(2, "s0", "l0", 1, LabelConsumptionEligibilityV1::EligibleUnderDeclaredPolicy);
+        let late = feedback(
+            2,
+            "s0",
+            "l0",
+            1,
+            LabelConsumptionEligibilityV1::EligibleUnderDeclaredPolicy,
+        );
         let report = step_ca_ocrc_round_v1(
             &mut engine,
             &input(
@@ -1676,9 +1763,15 @@ mod tests {
             ),
         )
         .unwrap();
-        assert_eq!(report.feedback_results[0].disposition, CaOcrcFeedbackDispositionV1::NotTracked);
+        assert_eq!(
+            report.feedback_results[0].disposition,
+            CaOcrcFeedbackDispositionV1::NotTracked
+        );
         assert_eq!(report.feedback_results[0].actual_delay_steps, Some(2));
-        assert_eq!(report.feedback_results[0].reasons, vec![CaOcrcReasonV1::PredictionNotTracked]);
+        assert_eq!(
+            report.feedback_results[0].reasons,
+            vec![CaOcrcReasonV1::PredictionNotTracked]
+        );
         assert!(report.theorem_assumptions_intact);
     }
 
@@ -1698,11 +1791,20 @@ mod tests {
             &mut engine,
             &input(
                 prediction(1, "s1", CaOcrcSetKindV1::Interval, true, Some(0.9)),
-                vec![feedback(1, "s0", "l0", 1, LabelConsumptionEligibilityV1::Unknown)],
+                vec![feedback(
+                    1,
+                    "s0",
+                    "l0",
+                    1,
+                    LabelConsumptionEligibilityV1::Unknown,
+                )],
             ),
         )
         .unwrap();
-        assert_eq!(report.feedback_results[0].disposition, CaOcrcFeedbackDispositionV1::HeldUnknown);
+        assert_eq!(
+            report.feedback_results[0].disposition,
+            CaOcrcFeedbackDispositionV1::HeldUnknown
+        );
         assert_eq!(engine.state.threshold, before);
         assert!(engine.state.tracked.contains_key(&0));
         assert!(!report.theorem_assumptions_intact);
@@ -1724,11 +1826,20 @@ mod tests {
             &mut engine,
             &input(
                 prediction(1, "s1", CaOcrcSetKindV1::Interval, true, Some(0.9)),
-                vec![feedback(1, "s0", "l0", 1, LabelConsumptionEligibilityV1::Blocked)],
+                vec![feedback(
+                    1,
+                    "s0",
+                    "l0",
+                    1,
+                    LabelConsumptionEligibilityV1::Blocked,
+                )],
             ),
         )
         .unwrap();
-        assert_eq!(report.feedback_results[0].disposition, CaOcrcFeedbackDispositionV1::Blocked);
+        assert_eq!(
+            report.feedback_results[0].disposition,
+            CaOcrcFeedbackDispositionV1::Blocked
+        );
         assert_eq!(engine.state.threshold, before);
         assert!(!report.theorem_assumptions_intact);
         assert!(!engine.state.tracked.contains_key(&0));
@@ -1740,7 +1851,13 @@ mod tests {
         let report = step_ca_ocrc_round_v1(
             &mut engine,
             &input(
-                prediction(0, "not-measured", CaOcrcSetKindV1::Interval, false, Some(0.9)),
+                prediction(
+                    0,
+                    "not-measured",
+                    CaOcrcSetKindV1::Interval,
+                    false,
+                    Some(0.9),
+                ),
                 Vec::new(),
             ),
         )
@@ -1748,7 +1865,12 @@ mod tests {
         assert!(!report.prediction_receipt.admitted_to_tracking);
         assert_eq!(report.tracking_occupancy_after, 0);
         assert!(!report.theorem_assumptions_intact);
-        assert!(engine.state.guarantee_invalid_reasons.contains("physical_measurement_not_selected"));
+        assert!(
+            engine
+                .state
+                .guarantee_invalid_reasons
+                .contains("physical_measurement_not_selected")
+        );
     }
 
     #[test]
@@ -1762,7 +1884,13 @@ mod tests {
             ),
         )
         .unwrap();
-        let mut bad = feedback(1, "s0", "l0", 2, LabelConsumptionEligibilityV1::EligibleUnderDeclaredPolicy);
+        let mut bad = feedback(
+            1,
+            "s0",
+            "l0",
+            2,
+            LabelConsumptionEligibilityV1::EligibleUnderDeclaredPolicy,
+        );
         bad.eligibility_report.label_revision = 1;
         let mut canonical = bad.eligibility_report.clone();
         canonical.report_sha256.clear();
@@ -1776,7 +1904,10 @@ mod tests {
             ),
         )
         .unwrap();
-        assert_eq!(report.feedback_results[0].disposition, CaOcrcFeedbackDispositionV1::Rejected);
+        assert_eq!(
+            report.feedback_results[0].disposition,
+            CaOcrcFeedbackDispositionV1::Rejected
+        );
         assert_eq!(engine.state.threshold, before);
     }
 
@@ -1882,7 +2013,13 @@ mod tests {
                 &mut engine,
                 &input(
                     prediction(1, "s1", CaOcrcSetKindV1::Interval, true, Some(0.9)),
-                    vec![feedback(1, "s0", "l0", 1, LabelConsumptionEligibilityV1::EligibleUnderDeclaredPolicy)],
+                    vec![feedback(
+                        1,
+                        "s0",
+                        "l0",
+                        1,
+                        LabelConsumptionEligibilityV1::EligibleUnderDeclaredPolicy,
+                    )],
                 ),
             )
             .unwrap();
