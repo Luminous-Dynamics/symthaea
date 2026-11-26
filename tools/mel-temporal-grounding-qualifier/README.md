@@ -67,4 +67,4 @@ Run the synthetic unitizing corpus with:
 
     cargo +1.96.0 run --locked --manifest-path tools/mel-temporal-grounding-qualifier/Cargo.toml --bin mel-temporal-unitizing-audit -- tools/mel-temporal-grounding-qualifier/fixtures/mel-temporal-unitizing-alpha-u.synthetic.json
 
-The corpus summary is descriptive and unweighted by item; source-work summaries remain separate. It does not pool unrelated recordings into one coefficient or compute confidence intervals. See docs/research/MEL-GROUND-008-UNITIZING-ALPHA-U-V1.md for formulas, reference vectors and claim boundaries.
+The report preserves each annotator's original intervals and status reason, plus the exact audio clock, query text, annotation-policy version and source-work lineage. Ambiguous/NotEstimable exclusions remain visible. Corpus summaries are descriptive and unweighted by item; source-work summaries remain separate. It does not pool unrelated recordings into one coefficient or compute confidence intervals. See docs/research/MEL-GROUND-008-UNITIZING-ALPHA-U-V1.md for formulas, reference vectors and claim boundaries.
