@@ -17,7 +17,7 @@ The module consumes the receipt contract proposed in [PR #13709](https://github.
 - Encrypted immutable request-body artifact profile binding, including storage, encryption, access, retention and custody digests.
 - Request-body resolution through an explicit artifact resolver interface; the resolver owns ciphertext, custody and decryption verification.
 - Exact plaintext byte-length and SHA-256 verification against both receipt and artifact commitments.
-- Byte-range bounds, per-span SHA-256, duplicate exposure-ID, duplicate-parent and overlap checks.
+- Byte-range bounds, per-span SHA-256, duplicate exposure-ID, duplicate-parent and strict disjoint-span checks (v0.1 rejects all overlapping spans).
 - Rejection when evidence appears in both the admitted-exposure and admission-denial sets.
 - Delegated evidence identity, transitive lineage, source, authority, scope, estimand, rights and current-at-use checks through the existing canonical MACE owner interface.
 - Ed25519 signature verification over `SHA-256("MACE-CONTEXT-EXPOSURE-V1\\0" || JCS(receipt_without_signature))`.
