@@ -267,6 +267,8 @@ struct DeltaEntry {
     observation_count: usize,
     /// Number of prequential residual observations (first sample has no prior predictor).
     residual_observation_count: usize,
+    /// Number of prequential residuals rejected because their norm was non-finite.
+    non_finite_prequential_residual_count: usize,
     /// Mean squared L2 residual against the mean delta before each update.
     mean_squared_prequential_delta_error: f64,
 }
@@ -294,6 +296,7 @@ pub struct TransitionPredictionDiagnostics {
     pub support: TransitionSupport,
     pub observation_count: usize,
     pub residual_observation_count: usize,
+    pub non_finite_prequential_residual_count: usize,
     pub mean_squared_prequential_delta_error: Option<f64>,
 }
 
@@ -368,6 +371,7 @@ impl NixWorldModel {
                 },
                 observation_count: entry.observation_count,
                 residual_observation_count: entry.residual_observation_count,
+                non_finite_prequential_residual_count: entry.non_finite_prequential_residual_count,
                 mean_squared_prequential_delta_error: (entry.residual_observation_count > 0)
                     .then_some(entry.mean_squared_prequential_delta_error),
             },
@@ -376,6 +380,7 @@ impl NixWorldModel {
                 support: TransitionSupport::NoExamples,
                 observation_count: 0,
                 residual_observation_count: 0,
+                non_finite_prequential_residual_count: 0,
                 mean_squared_prequential_delta_error: None,
             },
         }
@@ -416,16 +421,21 @@ impl NixWorldModel {
                 delta: ContinuousHV::zero(self.dim),
                 observation_count: 0,
                 residual_observation_count: 0,
+                non_finite_prequential_residual_count: 0,
                 mean_squared_prequential_delta_error: 0.0,
             });
 
         if entry.observation_count > 0 {
             let residual = observed_delta.subtract(&entry.delta);
             let squared_error = f64::from(residual.norm()).powi(2);
-            entry.residual_observation_count += 1;
-            let residual_count = entry.residual_observation_count as f64;
-            entry.mean_squared_prequential_delta_error +=
-                (squared_error - entry.mean_squared_prequential_delta_error) / residual_count;
+            if squared_error.is_finite() {
+                entry.residual_observation_count += 1;
+                let residual_count = entry.residual_observation_count as f64;
+                entry.mean_squared_prequential_delta_error +=
+                    (squared_error - entry.mean_squared_prequential_delta_error) / residual_count;
+            } else {
+                entry.non_finite_prequential_residual_count += 1;
+            }
         }
 
         entry.observation_count += 1;
@@ -763,6 +773,25 @@ mod tests {
         let second = wm.predict_state_with_diagnostics(&action);
         assert_eq!(second.residual_observation_count, 1);
         assert!(second.mean_squared_prequential_delta_error.is_some_and(|error| error < 1e-10));
+    }
+
+
+    #[test]
+    fn non_finite_prequential_residual_is_counted_not_folded_into_mean() {
+        let dim = 128;
+        let mut wm = NixWorldModel::new(dim);
+        let action = ActionCategory::Install;
+        let before = ContinuousHV::random(dim, 101);
+        let mut invalid_values = vec![0.5_f32; dim];
+        invalid_values[7] = f32::NAN;
+        let invalid_after = ContinuousHV::from_vec(invalid_values);
+
+        wm.learn_transition(&before, action.clone(), &invalid_after);
+        wm.learn_transition(&before, action.clone(), &invalid_after);
+        let diagnostics = wm.predict_state_with_diagnostics(&action);
+        assert_eq!(diagnostics.residual_observation_count, 0);
+        assert_eq!(diagnostics.non_finite_prequential_residual_count, 1);
+        assert!(diagnostics.mean_squared_prequential_delta_error.is_none());
     }
 
     #[test]
