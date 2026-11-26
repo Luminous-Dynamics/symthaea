@@ -697,7 +697,9 @@ mod tests {
             .map(|selection| ObservedAuditOutcomeV1 {
                 item_id: selection.item_id.clone(),
                 source_work_id_sha256: selection.source_work_id_sha256.clone(),
-                scoring_report_sha256: digest('3'),
+                scoring_report_sha256: crate::evidence_digest::sha256_hex(
+                    selection.item_id.as_bytes(),
+                ),
                 model_identity_sha256: digest('1'),
                 evaluator_version: "mel-grounding-model-eval-v1".into(),
                 scoring_plan_sha256: digest('2'),
