@@ -1,0 +1,105 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://luminousdynamics.io/schemas/worldfailbench-boundary-rate-pair-v0.1.json",
+  "title": "WorldFailBench Boundary Rate Pair Adapter Record v0.1",
+  "type": "object",
+  "additionalProperties": false,
+  "required": [
+    "schema_version",
+    "fixture_status",
+    "dataset_release",
+    "platform",
+    "task_id",
+    "policy_configuration_id",
+    "reference_policy_checkpoint_sha256",
+    "candidate_checkpoint_sha256",
+    "domain_id",
+    "environment_family_id",
+    "environment_cluster_id",
+    "pair",
+    "scene_sides"
+  ],
+  "properties": {
+    "schema_version": { "const": "worldfailbench-boundary-rate-pair-v0.1" },
+    "fixture_status": { "enum": ["synthetic_mapping_example", "source_admitted"] },
+    "dataset_release": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["dataset_id", "revision", "archive_sha256", "license"],
+      "properties": {
+        "dataset_id": { "const": "ACERobotics/WorldFailBench" },
+        "revision": { "type": "string", "minLength": 1 },
+        "archive_sha256": { "$ref": "#/$defs/sha256" },
+        "license": { "const": "Apache-2.0" }
+      }
+    },
+    "platform": { "enum": ["RoboTwin", "LIBERO", "PhysicalG1"] },
+    "task_id": { "type": "string", "minLength": 1 },
+    "policy_configuration_id": { "type": "string", "minLength": 1 },
+    "reference_policy_checkpoint_sha256": { "$ref": "#/$defs/sha256" },
+    "candidate_checkpoint_sha256": { "$ref": "#/$defs/sha256" },
+    "domain_id": { "type": "string", "minLength": 1 },
+    "environment_family_id": { "type": "string", "minLength": 1 },
+    "environment_cluster_id": { "type": "string", "minLength": 1 },
+    "pair": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "pair_id",
+        "pair_source_manifest_sha256",
+        "perturbation_dimension_id",
+        "success_side_perturbation_units",
+        "failure_side_perturbation_units"
+      ],
+      "properties": {
+        "pair_id": { "type": "string", "minLength": 1 },
+        "pair_source_manifest_sha256": { "$ref": "#/$defs/sha256" },
+        "perturbation_dimension_id": { "enum": ["position", "orientation", "size"] },
+        "success_side_perturbation_units": { "type": "integer" },
+        "failure_side_perturbation_units": { "type": "integer" }
+      }
+    },
+    "scene_sides": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["success_side", "failure_side"],
+      "properties": {
+        "success_side": { "$ref": "#/$defs/side" },
+        "failure_side": { "$ref": "#/$defs/side" }
+      }
+    },
+    "action_trace_provenance": {
+      "description": "Optional per-side action transcript digests if the source runner makes them available. Their absence does not convert a scene-perturbation pair into an identical-action counterfactual.",
+      "type": "object",
+      "additionalProperties": false,
+      "properties": {
+        "success_side_action_trace_sha256": { "$ref": "#/$defs/sha256" },
+        "failure_side_action_trace_sha256": { "$ref": "#/$defs/sha256" }
+      }
+    }
+  },
+  "$defs": {
+    "sha256": {
+      "type": "string",
+      "pattern": "^[A-Fa-f0-9]{64}$"
+    },
+    "side": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "scene_sha256",
+        "reference_successes",
+        "reference_trials",
+        "candidate_predicted_successes",
+        "candidate_predicted_trials"
+      ],
+      "properties": {
+        "scene_sha256": { "$ref": "#/$defs/sha256" },
+        "reference_successes": { "type": "integer", "minimum": 0 },
+        "reference_trials": { "type": "integer", "minimum": 1 },
+        "candidate_predicted_successes": { "type": "integer", "minimum": 0 },
+        "candidate_predicted_trials": { "type": "integer", "minimum": 1 }
+      }
+    }
+  }
+}
