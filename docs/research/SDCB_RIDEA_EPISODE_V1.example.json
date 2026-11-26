@@ -37,7 +37,7 @@
         4
       ],
       "expected_information_gain": 1.2,
-      "cost_units": 1.5,
+      "cost_units": 1,
       "current_prediction": 0.9,
       "proxy_prediction": 0.8
     }
