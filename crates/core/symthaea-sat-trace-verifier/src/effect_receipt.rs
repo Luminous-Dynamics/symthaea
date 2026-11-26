@@ -4,9 +4,10 @@
 
 //! Read-only structural reconciliation for external effect receipts.
 //!
-//! This module binds every source assertion to the exact run, manifest,
-//! attempt, idempotency key, intent and effect binding. It compares the
-//! observed sink projection to the requested effect. It deliberately does
+//! This module first binds the attempt to evaluator-owned, independently
+//! pinned context, then binds every source assertion to that exact run,
+//! manifest, attempt, idempotency key, intent and effect binding. It compares
+//! the observed sink projection to the requested effect. It deliberately does
 //! NOT verify signatures, key status, transparency proofs, source
 //! independence or physical/business truth. It never authorizes retries.
 
@@ -680,6 +681,7 @@ mod tests {
     fn synthetic_example_is_structurally_bound_but_not_authenticated() {
         let report = verify_effect_receipt(ATTEMPT, RECEIPT, &expected_context()).unwrap();
         assert!(report.attempt_identity_matches);
+        assert!(report.pinned_context_matches_attempt);
         assert!(report.all_source_attestations_bind_to_attempt);
         assert_eq!(report.effect_correspondence, EffectCorrespondence::Exact);
         assert_eq!(report.source_outcome_agreement, SourceOutcomeAgreement::Agree);
