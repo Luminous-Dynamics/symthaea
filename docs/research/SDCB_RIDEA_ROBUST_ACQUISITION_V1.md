@@ -45,6 +45,13 @@ R-IDeA multiplies R-I by a sigmoid de-amplification weight:
 
 Here \hat f^(n) is the current fitted predictor and g is a proxy intended to approximate the best-in-class predictor while retaining disagreement with the current model. The original paper trains g with a data-fit term plus a hinge penalty that encourages a minimum separation from \hat f^(n). It does not assume access to the true data-generating function during acquisition.
 
+
+
+The upstream source snapshot checked for this correction was `e011b448e5707930a83f18e891760c4d7f530960`:
+- [MMD helper](https://github.com/TrbingWY/robust-boed/blob/e011b448e5707930a83f18e891760c4d7f530960/dad_regression/script/fixedmodel/utils.py)
+- [R-I acquisition multiplier](https://github.com/TrbingWY/robust-boed/blob/e011b448e5707930a83f18e891760c4d7f530960/dad_regression/script/fixedmodel/boed_experiment.py)
+- [R-IDeA implementation](https://github.com/TrbingWY/robust-boed/blob/e011b448e5707930a83f18e891760c4d7f530960/pk/scripts/boed_experiment.py)
+
 ## 3. What the reference implementation covers
 
 The Rust file implements the paper's scoring layer for a finite candidate pool:
