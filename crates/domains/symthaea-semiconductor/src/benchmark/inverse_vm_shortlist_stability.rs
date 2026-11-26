@@ -667,6 +667,81 @@ mod tests {
     }
 
     #[test]
+    fn late_forward_receipt_in_stress_scenario_reduces_feasibility_not_probability() {
+        let baseline = input(vec![candidate("a", 220.0, 45.0, 99.0, 101.0)]);
+        let mut late = baseline.clone();
+        let receipt = late.candidates[0].forward_evaluation_receipt.as_mut().unwrap();
+        receipt.available_at_unix_seconds = 101;
+        receipt.receipt_sha256 = seal_forward_evaluation_receipt_v1(receipt).unwrap();
+        late.candidates[0].candidate_evidence_sha256 =
+            seal_inverse_vm_candidate_v1(&late.candidates[0]).unwrap();
+
+        let stability = InverseVmStabilityInputV1 {
+            schema: INVERSE_VM_STABILITY_INPUT_SCHEMA_V1.into(),
+            stability_input_id: "late-receipt-stability.v1".into(),
+            baseline_input: baseline,
+            scenarios: vec![scenario("late-receipt", "label_delay", late)],
+            maximum_rank_spread: 0,
+        };
+        let report = evaluate_inverse_vm_stability_v1(&stability).unwrap();
+        let entry = &report.candidates[0];
+        assert_eq!(entry.feasible_scenario_count, 0);
+        assert_eq!(entry.selected_scenario_count, 0);
+        assert_eq!(entry.feasibility_fraction, 0.0);
+        assert_eq!(entry.selection_fraction, 0.0);
+        assert!(!report.scenario_frequency_is_probability);
+    }
+
+    #[test]
+    fn rank_reversal_is_exposed_as_a_scenario_rank_envelope() {
+        let mut base_policy = policy();
+        base_policy.diversity_weight = 0.0;
+        base_policy.minimum_recipe_diversity_distance = 0.02;
+        let baseline = InverseVmShortlistInputV1 {
+            schema: INVERSE_VM_SHORTLIST_INPUT_SCHEMA_V1.into(),
+            input_id: "rank-envelope-base.v1".into(),
+            process_snapshot_sha256: digest('e'),
+            decision_at_unix_seconds: 100,
+            clock_domain_id: "fab-clock".into(),
+            clock_mapping_sha256: digest('9'),
+            policy: base_policy,
+            candidates: vec![
+                candidate("a", 220.0, 45.0, 99.95, 100.05),
+                candidate("b", 470.0, 90.0, 99.0, 101.8),
+            ],
+        };
+        let mut stressed = baseline.clone();
+        stressed.candidates[0].predicted_metrics[0].lower = 100.5;
+        stressed.candidates[0].predicted_metrics[0].upper = 102.0;
+        let mut metrics = stressed.candidates[0].predicted_metrics.clone();
+        metrics.sort_by(|left, right| left.measurand_id.cmp(&right.measurand_id));
+        let metrics_sha256 = digest_bytes(&metrics);
+        let receipt = stressed.candidates[0]
+            .forward_evaluation_receipt
+            .as_mut()
+            .unwrap();
+        receipt.predicted_metrics_sha256 = metrics_sha256;
+        receipt.receipt_sha256 = seal_forward_evaluation_receipt_v1(receipt).unwrap();
+        stressed.candidates[0].candidate_evidence_sha256 =
+            seal_inverse_vm_candidate_v1(&stressed.candidates[0]).unwrap();
+
+        let stability = InverseVmStabilityInputV1 {
+            schema: INVERSE_VM_STABILITY_INPUT_SCHEMA_V1.into(),
+            stability_input_id: "rank-envelope.v1".into(),
+            baseline_input: baseline,
+            scenarios: vec![scenario("reference-shift", "reference_drift", stressed)],
+            maximum_rank_spread: 0,
+        };
+        let report = evaluate_inverse_vm_stability_v1(&stability).unwrap();
+        let a = report.candidates.iter().find(|entry| entry.candidate_id == "a").unwrap();
+        assert!(a.selected_in_all_scenarios);
+        assert_eq!(a.best_selected_rank, Some(1));
+        assert_eq!(a.worst_selected_rank, Some(2));
+        assert_eq!(a.selected_rank_spread, Some(1));
+        assert!(!a.rank_spread_within_limit);
+    }
+
+    #[test]
     fn scenario_order_does_not_change_stability_digest() {
         let baseline = input(vec![
             candidate("a", 220.0, 45.0, 99.0, 101.0),
