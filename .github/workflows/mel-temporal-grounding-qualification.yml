@@ -101,6 +101,7 @@ jobs:
           jq -e '
             .schema == "mel-audio-evidence-verification-report-v1"
             and .verified_window_count == 2
+            and .target_source_lineage_id == "synthetic-source-lineage-001"
             and .source_lineage_id == "synthetic-source-lineage-001"
             and .source_audio_bytes_recomputed == true
             and .decoded_pcm_bytes_recomputed == true
