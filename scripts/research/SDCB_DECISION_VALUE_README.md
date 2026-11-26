@@ -25,7 +25,7 @@ The module depends only on the Rust standard library and does not require the Sy
 
 ## Counterexample
 
-The example episode has three hypotheses, two actions and two experiments. The hypothesis-split probe has higher information gain but zero EVSI because it only distinguishes hypotheses with identical action utilities. The decision-boundary probe has lower information gain but EVSI = 0.2 utility units. The source tests that the EVSI planner selects the latter.
+The example episode has three hypotheses, two actions and two experiments. Its independent numerical result is recorded in docs/research/SDCB_DECISION_VALUE_EPISODE_V1.expected.json. The hypothesis-split probe has higher information gain but zero EVSI because it only distinguishes hypotheses with identical action utilities. The decision-boundary probe has lower information gain but EVSI = 0.2 utility units. The source tests that the EVSI planner selects the latter.
 
 ## Limits
 
