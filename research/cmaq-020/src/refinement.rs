@@ -440,10 +440,10 @@ pub fn score_refinement_transition(
             let before_false_split = !before_merged && equivalent;
             let after_false_split = !after_merged && equivalent;
 
-            false_merges_resolved += usize::from(before_false_merge && !after_false_merge);
-            false_merges_added += usize::from(!before_false_merge && after_false_merge);
-            false_splits_resolved += usize::from(before_false_split && !after_false_split);
-            false_splits_added += usize::from(!before_false_split && after_false_split);
+            false_merges_resolved += (before_false_merge && !after_false_merge) as usize;
+            false_merges_added += (!before_false_merge && after_false_merge) as usize;
+            false_splits_resolved += (before_false_split && !after_false_split) as usize;
+            false_splits_added += (!before_false_split && after_false_split) as usize;
         }
     }
 
