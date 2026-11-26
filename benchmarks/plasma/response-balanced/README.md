@@ -126,12 +126,16 @@ for applicable exact invariants, plus equation-specific inequalities / dissipati
 \]
 Reachability and observability define promising candidate directions; \(\mathcal R_r\) determines which candidate representation is actually affordable and reconstructible without erasing registered future responses. v0.1 implements only the first part of that decomposition.
 
-A useful research abstraction is **future-response equivalence**. For a frozen contract \(\mathcal C\), states \(x,x'\) are \((\epsilon,T)\)-equivalent only when
+A useful research primitive is **future-response indistinguishability**, not an equivalence relation by default. For a frozen contract \(\mathcal C\), define the pairwise predicate
 \[
+x\approx_{\epsilon,T}x'
+\quad\Longleftrightarrow\quad
 \sup_{u\in\mathcal U,\,t\in[0,T]}
 \|y(x;u,t)-y(x';u,t)\|_Q\le\epsilon.
 \]
-This is stronger than matching current moments or the current field. It is a task-conditional quotient, not a claim of universal state equivalence. Finite probes justify only the covered intervention subset and certified coverage radius; an untested pulse family remains UNKNOWN.
+It is reflexive and symmetric under a norm, but a thresholded metric predicate is not generally transitive. The repository already includes a non-transitive response triple as a negative control. Do not form a quotient using single-link clustering. An atlas cell must instead have a certified all-pairs diameter, complete response coverage for its declared intervention set, a stable branch association, and explicit UNKNOWN handling outside the covered set. A genuine quotient or partition is justified only if those stronger conditions (or another transitivity proof) are established.
+
+This is stronger than matching current moments or the current field, but finite probes still justify only the covered intervention subset and a certified coverage radius; an untested pulse family remains UNKNOWN. The related state-equivalence contract and non-transitive fixture live at \`benchmarks/plasma/state-equivalence/\`.
 
 For \(M_r=L^T L\), coordinates \(\tilde x=Lx\) make the reconstruction norm Euclidean. If the reachability and observability factors are transformed consistently with the dynamics, exact balanced truncation is coordinate-covariant: the physical trial/test subspaces do not gain new information simply because the coordinates were whitened. Therefore the metric must enter as an explicit reconstruction constraint / rate–distortion objective (or through physically justified weighting in the measured factors), not as a cosmetic pre- and post-multiplication that claims to change the physics.
 
