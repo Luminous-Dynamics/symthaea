@@ -132,3 +132,12 @@ The snapshot exposes only active messages, ordered by valid timestamp and then o
 This is not yet a hosted AML Add/Search service, durable append-only database, distributed CAS writer, or complete rights-erasure implementation. The erasure request removes payload from this in-memory projection, but message-derived mutation commitments remain; production must separately erase derived indexes, caches, replicas and backups and verify deletion receipts. Raw JSONL bytes and publisher/source authenticity remain the responsibility of the upstream ingestion/qualification boundaries.
 
 Protocol and benchmark: [MACE Streaming Temporal Session Ledger V1](../../../docs/research/MACE_STREAMING_TEMPORAL_SESSION_LEDGER_V1.md). Eleven deterministic test functions are authored; they have not been executed.
+
+
+## Dependency-aware derived-memory invalidation
+
+The `temporal_projection` module tracks summaries, embeddings, preference models, plans, fact indexes and answer caches as versioned derived projections with exact source-event and parent-projection dependencies. It consumes the streaming ledger's hash-committed invalidation receipts and propagates correction, quarantine, revocation and rights-erasure states through all descendants. A revalidated source does **not** automatically reactivate old summaries or plans; a fresh projection must be built with a new ID, current dependencies and a new derivation receipt.
+
+The index rejects registration against stale source events or non-current parent projections, applies transitions in contiguous sequence order, and produces deterministic invalidation receipts. It is an in-memory reference, not a durable registry or a distributed invalidation service. The erasure acknowledgement clears the in-memory projection commitments only; external index/cache/replica/backup deletion must be separately executed and verified.
+
+Protocol: [MACE Derived-Memory Invalidation V1](../../../docs/research/MACE_DERIVED_MEMORY_INVALIDATION_V1.md). Tests are authored but not executed.
