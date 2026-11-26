@@ -7,9 +7,11 @@
 
 Symthaea combines hyperdimensional computing (HDC), closed-form liquid neural dynamics (CfC), consciousness-relevant measurement (IIT-inspired Φ, Butlin-indicator probes), and zero-knowledge proofs. **It does not claim to prove consciousness, and nothing below is a regulatory compliance certification.** What it does have: working ZK circuits over HDC's binary-field structure, measured against a prime-field baseline, and an internal research program that documents its own retractions — see the Evidence table below before trusting any specific number.
 
-[**Live Demo**](https://symthaea.luminousdynamics.io) | [**Paper**](papers/binius-hdc/) | [**Benchmarks**](papers/binius-hdc/reproduce.sh) | [**Honest Status**](docs/HONEST_STATUS.md)
+[**Live Demo**](https://symthaea.luminousdynamics.io) | [**Paper**](papers/binius-hdc/) | [**Benchmarks**](papers/binius-hdc/reproduce.sh) | [**Historical Status Audit (2026-02-05)**](docs/HONEST_STATUS.md)
 
 ---
+
+> **Documentation freshness (2026-11-26).** This is a large, actively changing research workspace. Older package, test, feature-flag, and artifact-size totals are intentionally not presented as current facts. To inventory the exact checkout you are using, run `cargo metadata --no-deps --format-version 1` and the relevant test commands below. Benchmark results are scoped to their stated harness and machine; rerun the linked reproduction scripts before relying on them externally. The linked Honest Status document is a historical audit, not a current workspace inventory.
 
 ## Evidence Table
 
@@ -45,7 +47,7 @@ nix develop
 # Build
 cargo build --release
 
-# Run tests (21K+ workspace-wide)
+# Run workspace library tests (coverage depends on the selected workspace members)
 cargo nextest run --workspace --lib
 
 # Run ZKP benchmarks
@@ -91,8 +93,8 @@ XOR binding — the core HDC operation — requires **zero non-linear constraint
 | Butlin indicator probes | 4/12 rows survive construct-validity re-check; 1 has empirical support so far, scope-limited | Not evidence of consciousness — see Evidence table |
 | Moral reasoning (Hendrycks Ethics) | 56.2% overall (virtue: 76.5%) | Corrected 2026-07-15; supersedes an earlier retracted 91.1% figure |
 | HDC dimension | 16,384D binary + continuous | — |
-| WASM kernel | 324 KB (runs in browser) | — |
-| Workspace | 87 crates, 21K+ tests | — |
+| WASM kernel | Browser WASM target; final artifact size depends on build profile and enabled features | — |
+| Workspace | Multi-tier Rust workspace; use the checked-out revision for an exact package and test inventory | — |
 
 ## For Developers
 
@@ -100,15 +102,15 @@ XOR binding — the core HDC operation — requires **zero non-linear constraint
 
 | Crate | What | Tests |
 |-------|------|-------|
-| `symthaea` | Main cognitive loop (4-phase: perceive → evolve → measure → act) | 7K+ |
-| `symthaea-core` | HDC vectors, CfC neurons, consciousness math | 3K+ |
-| `mycelix-zkp-core` | ZKP infrastructure: backends, circuits, Dilithium5, domain tags | 65+ |
+| `symthaea` | Main cognitive loop (4-phase: perceive → evolve → measure → act) | See crate-local tests |
+| `symthaea-core` | HDC vectors, CfC neurons, consciousness math | See crate-local tests |
+| `mycelix-zkp-core` | ZKP infrastructure: backends, circuits, Dilithium5, domain tags | See crate-local tests |
 | `hdc-zkp-bench` | Binius benchmark circuits (XOR, bundling, CfC, FL, Hamming) | Benchmarks |
-| `symthaea-zkproof` | Consciousness attestation (RISC0) + cycle integrity | 23+ |
-| `symthaea-spore` | Browser WASM kernel (324 KB) | 183 |
-| `symthaea-broca` | Language generation (CfC-HDC thought-to-text) | 229+ |
+| `symthaea-zkproof` | Computation attestation (RISC0) + cycle integrity | See crate-local tests |
+| `symthaea-spore` | Browser WASM kernel | See crate-local tests |
+| `symthaea-broca` | Language generation and CfC-HDC experiments | See crate-local tests |
 
-**Feature flags:** 98 flags, default = minimal. Key flags: `reasoning_engine`, `identity`, `neural-bridge`, `ssm_language`. See [FEATURE_FLAGS.md](docs/FEATURE_FLAGS.md).
+**Feature flags:** Feature availability varies by crate and is evolving. The root manifest's defaults are intentionally minimal. Key flags: `reasoning_engine`, `identity`, `neural-bridge`, `ssm_language`. See [FEATURE_FLAGS.md](docs/FEATURE_FLAGS.md).
 
 **Contributing:** See [CONTRIBUTING.md](CONTRIBUTING.md). Start with [docs/START_HERE.md](docs/START_HERE.md).
 
