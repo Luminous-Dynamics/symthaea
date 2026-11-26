@@ -950,5 +950,63 @@
       ],
       "rationale": "Package fixity or signature verification is unresolved; do not infer source authenticity from a readable descriptor."
     }
-  ]
+  ],
+  "bootstrap_code": {
+    "format_id": "bootstrap-mds-6-4-v1",
+    "field": "GF(2^8)",
+    "primitive_polynomial_hex": "0x11d",
+    "data_shards": 4,
+    "parity_shards": 2,
+    "total_shards": 6,
+    "correction_bound": "up to two known shard erasures; no unknown-error claim in v0.1",
+    "systematic_generator_rows": [
+      [
+        1,
+        0,
+        0,
+        0
+      ],
+      [
+        0,
+        1,
+        0,
+        0
+      ],
+      [
+        0,
+        0,
+        1,
+        0
+      ],
+      [
+        0,
+        0,
+        0,
+        1
+      ],
+      [
+        1,
+        1,
+        1,
+        1
+      ],
+      [
+        1,
+        2,
+        3,
+        4
+      ]
+    ],
+    "data_tile_order": [
+      0,
+      15,
+      16,
+      31
+    ],
+    "parity_tile_order": [
+      32,
+      47
+    ],
+    "canonicalization": "Canonical bootstrap bundle is serialized into four equal-length, zero-padded data shard streams in the declared data_tile_order; two parity streams use the final generator rows. The four in-media data records are format identity, code definition, physical layout and reader calibration. Index, known-answer vectors, reader bootstrap and capsule reference remain separately recorded external-package objects in this synthetic fixture. A real package must define canonical bytes, lengths, padding and digest rules before using this profile."
+  }
 }
