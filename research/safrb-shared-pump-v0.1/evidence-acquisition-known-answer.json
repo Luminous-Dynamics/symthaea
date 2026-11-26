@@ -28,7 +28,31 @@
       "reserve-pump",
       "dispatch-fuel",
       "modify-inventory"
-    ]
+    ],
+    "time_window_obligations": [
+      {
+        "window": "[1,2)",
+        "required": 6,
+        "lower_bound_delivered": 6,
+        "upper_bound_delivered": 6,
+        "disposition": "guaranteed_within_synthetic_fixture"
+      },
+      {
+        "window": "[2,3)",
+        "required": 6,
+        "lower_bound_delivered": 3,
+        "upper_bound_delivered": 6,
+        "disposition": "indeterminate_not_guaranteed"
+      }
+    ],
+    "lower_bound_horizon_flow": {
+      "quantity": 9,
+      "unit": "t"
+    },
+    "upper_bound_horizon_flow": {
+      "quantity": 12,
+      "unit": "t"
+    }
   },
   "admissible_model_family": [
     {
@@ -113,6 +137,24 @@
       "downtime_class": "none",
       "permission": "rights_holder_and_local_review_required",
       "authority_effect": "no_dispatch_authority"
+    },
+    {
+      "action_id": "operation-window-two-independent-throughput-test",
+      "targets": [
+        "pump-throughput-lower-bound-window-2"
+      ],
+      "measurement_origin": "independent_calibrated_reference",
+      "possible_outcomes": [
+        "qualified_lower_bound_gte_6_t",
+        "qualified_lower_bound_lt_6_t",
+        "inconclusive"
+      ],
+      "can_change_physical_deliverability_decision": true,
+      "cost_class": "medium",
+      "elapsed_time_class": "before-window-2-decision-deadline",
+      "downtime_class": "must-be-declared",
+      "permission": "asset_owner_required",
+      "authority_effect": "none"
     }
   ],
   "required_policy_baselines": [
@@ -130,7 +172,9 @@
     "no-unweighted-model-averaging",
     "out-of-model-observation-triggers-model-adequacy-failure",
     "investigation-result-does-not-auto-admit-evidence",
-    "a-pump-test-does-not-establish-title-custody-or-contract-access"
+    "a-pump-test-does-not-establish-title-custody-or-contract-access",
+    "do-not-aggregate-horizon-flow-to-hide-a-time-window-service-floor-breach",
+    "do-not-allow-later-window-observations-to-backdate-earlier-service"
   ],
   "metrics": [
     "decision-regret",
@@ -142,11 +186,25 @@
     "dependency-aware-corroboration",
     "unsupported-model-rate",
     "abstention-quality",
-    "human-review-effort"
+    "human-review-effort",
+    "per-window-decision-regret",
+    "time-to-evidence-before-service-deadline"
   ],
   "prospective_target": {
     "decision_regret_reduction_vs_best_matched_baseline": 0.2,
     "false_safe_rate_increase": 0,
     "claim": "research target only; not a result"
-  }
+  },
+  "source_scenarios": [
+    {
+      "case_id": "SAFRB-SHARED-PUMP-2ROUTE-001",
+      "scenario_sha256": "0a1c507d3bff9b3062e24ca8718e102244473d839c2a31c5ead31812ee249be2",
+      "certificate_ref": "https://github.com/Luminous-Dynamics/symtropy/pull/7543"
+    },
+    {
+      "case_id": "SAFRB-TWO-WINDOW-SHARED-PUMP-001",
+      "scenario_sha256": "edfd1c2a5a3eb52a0026a0e63abb38ab2ca8109c4de3d96fbff1215ad78f0308",
+      "certificate_ref": "https://github.com/Luminous-Dynamics/symtropy/pull/7543"
+    }
+  ]
 }
