@@ -44,4 +44,4 @@ cargo fmt --check
 cargo test
 ```
 
-Twenty-two deterministic unit tests are authored, covering route selection, temporal re-observation, summary ancestry, HDC substrate separation, component-wise budget enforcement, phase-cost accounting, amortization basis, overflow and catalogue-order determinism. Tests have not been executed in this environment.
+Twenty-five deterministic unit tests are authored, covering route selection, temporal re-observation, summary ancestry/fallback, HDC substrate separation, binding-digest presence, component-wise budget enforcement, phase-cost accounting, amortization basis, overflow and catalogue-order determinism. Tests have not been executed in this environment.
