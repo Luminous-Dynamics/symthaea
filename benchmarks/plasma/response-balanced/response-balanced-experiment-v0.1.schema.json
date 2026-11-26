@@ -20,7 +20,8 @@
     "success_targets",
     "resource_budget",
     "claim_boundary",
-    "provenance"
+    "provenance",
+    "adjacent_methods"
   ],
   "properties": {
     "schema_version": {
@@ -525,6 +526,19 @@
             "type": "string"
           }
         }
+      }
+    },
+    "adjacent_methods": {
+      "type": "array",
+      "minItems": 4,
+      "uniqueItems": true,
+      "items": {
+        "enum": [
+          "adaptive_opinf_port",
+          "adaptive_nitrom_port",
+          "adaptive_opinf_nitrom_hybrid_port",
+          "symmetry_augmented_kinetic_closure"
+        ]
       }
     }
   },
