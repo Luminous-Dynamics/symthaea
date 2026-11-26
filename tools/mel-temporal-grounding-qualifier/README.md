@@ -131,3 +131,35 @@ Run the synthetic audit with:
     cargo +1.96.0 run --locked --manifest-path tools/mel-temporal-grounding-qualifier/Cargo.toml --bin mel-selective-design-risk-audit -- tools/mel-temporal-grounding-qualifier/fixtures/mel-selective-design-risk.synthetic.json
 
 The output hard-codes `selective_outcomes_authenticated=false` and `population_confidence_claim_permitted=false`. A signed execution/scoring receipt and a qualified rights/consent frame remain necessary before a population performance claim.
+
+
+## Design-weighted selective risk and coverage
+
+The temporal_selective_design adapter joins:
+- the exact source-work-first ProbabilityAudit selections from temporal_acquisition;
+- selective decisions and unconditional candidate correctness from temporal_selective;
+- first-/second-order inclusion probabilities and the shared HT variance primitive from temporal_design_estimator.
+
+It accepts only a complete, exact set of selected ProbabilityAudit rows. ActiveRefinement and unselected items are rejected. Each outcome binds item/query/source-work/recording and model/runtime/decoding/hardware/evaluator/scoring-plan identities. The recording digest must equal the candidate manifest's exact recording digest.
+
+A frozen threshold plan is canonically hashed. V1 supports strictly increasing integer PPM thresholds and the greater_or_equal tie rule. Only Answer and ClaimAbsent decisions at or above a threshold are covered; both abstention reasons remain uncovered. A false-absence flag is required to exactly equal ClaimAbsent plus incorrect decision.
+
+The input has an explicit synthetic_demonstration flag. It must be true exactly when the expected selection receipt is null. Production/reviewed inputs must supply the expected receipt. Receipt replay is deterministic structural verification, not cryptographic authentication of selection, rights, consent or outcomes.
+
+The report keeps these apart:
+- query-item-weighted coverage and selective risk;
+- equal-source-work contribution coverage and selective risk;
+- false-absence rate for each estimand;
+- always-answer and random-retention comparison;
+- unsupported design variances, which remain unavailable rather than being replaced by zero.
+
+At each frozen threshold, selective risk uses the ratio-linearized residual E - R*C and the same HT variance primitive as #13692. V1 provides threshold-specific normal-approximation intervals only. It deliberately does not attach an AURC confidence interval because covariance across thresholds is not implemented. Threshold selection must be source-lineage-disjoint from the confirmatory audit.
+
+Run:
+
+    cargo +1.96.0 run --locked --manifest-path tools/mel-temporal-grounding-qualifier/Cargo.toml --bin mel-selective-design-risk-audit -- tools/mel-temporal-grounding-qualifier/fixtures/mel-selective-design-risk.synthetic.json
+
+The synthetic one-work/two-item fixture is a complete census, so its design variance is zero. Rust tests cover two-of-three source-work samples, unequal work sizes, zero coverage/undefined risk, false-absence errors, exact recording joins, receipt and threshold tampering, active/unselected rows, and unsupported one-work variance. None is a model result or population claim.
+
+Protocol: docs/research/MEL-GROUND-010-DESIGN-WEIGHTED-SELECTIVE-RISK-COVERAGE-V1.md
+Input schema: schemas/mel-selective-design-risk-input-v1.schema.json
