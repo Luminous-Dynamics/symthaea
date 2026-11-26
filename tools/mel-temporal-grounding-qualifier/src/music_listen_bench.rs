@@ -97,6 +97,10 @@ pub struct MusicListenBenchCaseV1 {
     pub schema: String,
     pub benchmark_id: String,
     pub benchmark_version: String,
+    /// Immutable dataset/manifest revision used for the evaluated items.
+    pub dataset_revision_sha256: String,
+    /// Git tree or commit identity for the official benchmark scorer.
+    pub official_scorer_revision_sha256: String,
     pub split: MusicListenSplitV1,
     pub triads: Vec<MusicListenTriadV1>,
 }
@@ -107,6 +111,9 @@ pub struct VariantMetricV1 {
     pub correct: usize,
     pub incorrect: usize,
     pub answered: usize,
+    pub choice_a: usize,
+    pub choice_b: usize,
+    pub choice_a_rate_among_answered: Option<f64>,
     pub unparseable: usize,
     pub abstained: usize,
     pub accuracy: Option<f64>,
@@ -172,6 +179,8 @@ pub struct MusicListenBenchReportV1 {
     pub evaluator_version: &'static str,
     pub benchmark_id: String,
     pub benchmark_version: String,
+    pub dataset_revision_sha256: String,
+    pub official_scorer_revision_sha256: String,
     pub split: MusicListenSplitV1,
     pub overall: PairedMetricsV1,
     pub by_task: Vec<MusicListenTaskSliceV1>,
@@ -191,6 +200,8 @@ struct ScoredVariantV1 {
     predicted: Option<MusicalRelationV1>,
     correct: bool,
     answered: bool,
+    choice_a: bool,
+    choice_b: bool,
     unparseable: bool,
     abstained: bool,
 }
@@ -216,7 +227,15 @@ pub fn audit_music_listen_case(
         return Err(format!("unsupported MusicListenBench case schema: {}", case.schema));
     }
     require_text(&case.benchmark_id, "benchmark_id")?;
+    if case.benchmark_id != "MusicListenBench" {
+        return Err("benchmark_id must be MusicListenBench".into());
+    }
     require_text(&case.benchmark_version, "benchmark_version")?;
+    validate_digest(&case.dataset_revision_sha256, "dataset_revision_sha256")?;
+    validate_digest(
+        &case.official_scorer_revision_sha256,
+        "official_scorer_revision_sha256",
+    )?;
     if case.benchmark_version != "1.0" {
         return Err("this adapter only admits the pinned MusicListenBench v1.0 protocol".into());
     }
@@ -227,6 +246,18 @@ pub fn audit_music_listen_case(
     let mut item_ids = BTreeSet::new();
     let mut pair_ids = BTreeSet::new();
     let mut lineage_ids = BTreeSet::new();
+    let first_identity = &case.triads[0];
+    for (index, triad) in case.triads.iter().enumerate().skip(1) {
+        if triad.model_identity_sha256 != first_identity.model_identity_sha256
+            || triad.system_prompt_sha256 != first_identity.system_prompt_sha256
+            || triad.runtime_identity_sha256 != first_identity.runtime_identity_sha256
+            || triad.decoding_config_sha256 != first_identity.decoding_config_sha256
+        {
+            return Err(format!(
+                "triads[{index}] changes model/prompt/runtime/decoding identity within one evaluation run"
+            ));
+        }
+    }
     let mut triad_results = Vec::with_capacity(case.triads.len());
     let mut scored = Vec::with_capacity(case.triads.len());
 
@@ -335,6 +366,8 @@ pub fn audit_music_listen_case(
         evaluator_version: EVALUATOR_VERSION_V1,
         benchmark_id: case.benchmark_id.clone(),
         benchmark_version: case.benchmark_version.clone(),
+        dataset_revision_sha256: case.dataset_revision_sha256.clone(),
+        official_scorer_revision_sha256: case.official_scorer_revision_sha256.clone(),
         split: case.split,
         overall,
         by_task,
@@ -467,6 +500,8 @@ fn score_variant(variant: &MusicListenVariantV1) -> ScoredVariantV1 {
         predicted,
         correct: predicted == Some(variant.expected_relation),
         answered: predicted.is_some(),
+        choice_a: variant.model_answer == MusicListenAnswerV1::ChoiceA,
+        choice_b: variant.model_answer == MusicListenAnswerV1::ChoiceB,
         unparseable: variant.model_answer == MusicListenAnswerV1::Unparseable,
         abstained: variant.model_answer == MusicListenAnswerV1::Abstain,
     }
@@ -536,6 +571,8 @@ fn variant_metrics(
     let items = values.len();
     let correct = values.iter().filter(|value| value.correct).count();
     let answered = values.iter().filter(|value| value.answered).count();
+    let choice_a = values.iter().filter(|value| value.choice_a).count();
+    let choice_b = values.iter().filter(|value| value.choice_b).count();
     let unparseable = values.iter().filter(|value| value.unparseable).count();
     let abstained = values.iter().filter(|value| value.abstained).count();
     VariantMetricV1 {
@@ -543,6 +580,9 @@ fn variant_metrics(
         correct,
         incorrect: items - correct,
         answered,
+        choice_a,
+        choice_b,
+        choice_a_rate_among_answered: rate(choice_a, answered),
         unparseable,
         abstained,
         accuracy: rate(correct, items),
@@ -750,6 +790,38 @@ mod tests {
         assert_eq!(report.overall.flip.unparseable, 1);
         assert_eq!(report.overall.flip.coverage, Some(0.0));
         assert_eq!(report.overall.accuracy_flip_stay, Some(0.5));
+    }
+
+    #[test]
+    fn mixed_model_runtime_or_prompt_identities_cannot_be_aggregated() {
+        let mut input = case(vec![
+            triad(
+                MusicListenTaskV1::Melody,
+                MusicListenFlipFactorV1::NoteIdentity,
+                MusicListenStayFactorV1::Room,
+            ),
+            triad(
+                MusicListenTaskV1::Harmony,
+                MusicListenFlipFactorV1::ChordThirdQuality,
+                MusicListenStayFactorV1::Hiss,
+            ),
+        ]);
+        input.triads[1].runtime_identity_sha256 =
+            "1212121212121212121212121212121212121212121212121212121212121212".into();
+        assert!(audit_music_listen_case(&input).is_err());
+    }
+
+    #[test]
+    fn report_exposes_letter_bias_without_using_letters_as_semantics() {
+        let input = case(vec![triad(
+            MusicListenTaskV1::Melody,
+            MusicListenFlipFactorV1::NoteIdentity,
+            MusicListenStayFactorV1::Hiss,
+        )]);
+        let report = audit_music_listen_case(&input).unwrap();
+        assert_eq!(report.overall.clean.choice_a_rate_among_answered, Some(1.0));
+        assert_eq!(report.overall.flip.choice_a_rate_among_answered, Some(0.0));
+        assert_eq!(report.overall.stay.choice_a_rate_among_answered, Some(1.0));
     }
 
     #[test]
