@@ -382,6 +382,70 @@ pub fn controllability_rank(h:&LinearHypothesis)->Result<usize,ActiveScienceErro
     matrix_rank(&Matrix::new(columns)?)
 }
 
+/// Deterministic 2–4 state family with exact passive equivalence and a
+/// one-pulse intervention that separates adjacent input-coupling hypotheses.
+pub fn generated_shift_episode(n: usize) -> Result<CandidateEpisode, ActiveScienceError> {
+    if !(MIN_STATES..=MAX_STATES).contains(&n) {
+        return Err(ActiveScienceError::InvalidEpisode);
+    }
+    let mut a = vec![vec![0.0; n]; n];
+    for i in 0..(n - 1) { a[i][i + 1] = 1.0; }
+    let mut c = vec![0.0; n];
+    c[0] = 1.0;
+    let mut b_early = vec![0.0; n];
+    b_early[n - 2] = 1.0;
+    let mut b_late = vec![0.0; n];
+    b_late[n - 1] = 1.0;
+    let a = Matrix::new(a)?;
+    let c = Matrix::new(vec![c])?;
+    let hypotheses = vec![
+        LinearHypothesis {
+            hypothesis_id: "earlier-input-coupling".into(),
+            a: a.clone(),
+            b: b_early,
+            c: c.clone(),
+        },
+        LinearHypothesis {
+            hypothesis_id: "later-input-coupling".into(),
+            a,
+            b: b_late,
+            c,
+        },
+    ];
+    let passive_input_sequence = vec![0.0; n];
+    let passive_observation_trace = vec![0.0; n + 1];
+    let mut impulse = vec![0.0; n];
+    impulse[0] = 1.0;
+    let episode = CandidateEpisode {
+        schema_version: "sdcb-active-science-v2".into(),
+        episode_id: format!("generated-shift-{n}-state-v1"),
+        hypotheses,
+        initial_state: vec![0.0; n],
+        passive_sensor_index: 0,
+        passive_input_sequence,
+        passive_observation_trace,
+        sensor_noise_bound: 0.05,
+        maximum_absolute_input: 1.0,
+        permitted_probes: vec![
+            Probe {
+                probe_id: "passive-no-op".into(),
+                sensor_index: 0,
+                input_sequence: vec![0.0; n],
+                cost: ResourceVector { query_units: 1, experiment_units: 0, measurement_units: 1 },
+            },
+            Probe {
+                probe_id: "unit-impulse".into(),
+                sensor_index: 0,
+                input_sequence: impulse,
+                cost: ResourceVector { query_units: 1, experiment_units: 1, measurement_units: 1 },
+            },
+        ],
+        remaining_budget: ResourceVector { query_units: 2, experiment_units: 1, measurement_units: 2 },
+    };
+    validate_episode(&episode)?;
+    Ok(episode)
+}
+
 /// Frozen pair: passive zero-input outputs match; an impulse separates mechanisms.
 pub fn observational_equivalence_fixture()->CandidateEpisode {
     let a=Matrix::new(vec![vec![0.0,1.0],vec![0.0,0.0]]).unwrap();
@@ -408,6 +472,22 @@ pub fn observational_equivalence_fixture()->CandidateEpisode {
 #[cfg(test)]
 mod tests {
     use super::*;
+
+    #[test]
+    fn generated_two_three_and_four_state_families_preserve_the_equivalence_control() {
+        for n in 2..=4 {
+            let e = generated_shift_episode(n).unwrap();
+            let passive_a = predict_trace(&e.hypotheses[0], &e.initial_state, 0, &e.passive_input_sequence).unwrap();
+            let passive_b = predict_trace(&e.hypotheses[1], &e.initial_state, 0, &e.passive_input_sequence).unwrap();
+            assert_eq!(passive_a, passive_b);
+            let probe = find_probe(&e, "unit-impulse").unwrap();
+            let a = predict_trace(&e.hypotheses[0], &e.initial_state, 0, &probe.input_sequence).unwrap();
+            let b = predict_trace(&e.hypotheses[1], &e.initial_state, 0, &probe.input_sequence).unwrap();
+            assert_ne!(a, b);
+            assert!((minimum_pairwise_margin(&e, probe).unwrap() - 0.9).abs() < EPS);
+            assert_eq!(observability_rank(&e.hypotheses[0], 0).unwrap(), n);
+        }
+    }
 
     #[test]
     fn passive_zero_input_cannot_identify_equivalent_mechanisms() {
