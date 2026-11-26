@@ -3,6 +3,7 @@ name: EQC Reference Seed Validation
 on:
   pull_request:
     paths:
+      - "Cargo.lock"
       - "xtask/src/eqc.rs"
       - "xtask/src/main.rs"
       - "docs/research/eqc-task-v0.1.schema.json"
@@ -23,7 +24,7 @@ on:
   workflow_dispatch:
 
 permissions:
-  contents: read
+  contents: write
 
 concurrency:
   group: eqc-reference-validation-${{ github.event.pull_request.head.sha || github.sha }}
@@ -51,7 +52,35 @@ jobs:
       - name: Format xtask
         run: cargo fmt --manifest-path xtask/Cargo.toml -p xtask -- --check
 
-      - name: Run xtask unit and negative-control tests
+      - name: Reconcile workspace lockfile on the owned feature branch
+        env:
+          SOURCE_HEAD: ${{ github.sha }}
+          EVENT_NAME: ${{ github.event_name }}
+        run: |
+          set -euo pipefail
+          # The base workspace PR changes the member/exclusion graph. Resolve
+          # that graph once, commit any lockfile delta, then require all later
+          # checks to pass with --locked.
+          cargo metadata --format-version 1 > "$RUNNER_TEMP/eqc-metadata-unlocked.json"
+          jq -e '.packages | length > 0' "$RUNNER_TEMP/eqc-metadata-unlocked.json" >/dev/null
+
+          if ! git diff --quiet -- Cargo.lock; then
+            if [[ "$EVENT_NAME" == "push" && "$GITHUB_REF_NAME" == "feat/eqc-rust-reference-evaluator-2026-11-26" ]]; then
+              git config user.name "github-actions[bot]"
+              git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+              git add Cargo.lock
+              git commit -m "chore(deps): reconcile EQC workspace Cargo.lock"
+              git push origin HEAD:feat/eqc-rust-reference-evaluator-2026-11-26
+            else
+              echo "Cargo.lock requires reconciliation; only the owned feature-branch push may persist it." >&2
+              git diff -- Cargo.lock >&2
+              exit 1
+            fi
+          else
+            echo "Cargo.lock already matches the workspace graph."
+          fi
+
+      - name: Run xtask unit and negative-control tests (locked)
         run: cargo test --locked -p xtask
 
       - name: Evaluate public EQC seed with reference policy
@@ -76,6 +105,7 @@ jobs:
         run: |
           {
             echo "workflow_sha=$GITHUB_SHA"
+            echo "checked_out_final_head=$(git rev-parse HEAD)"
             echo "source_head_sha=$PR_HEAD_SHA"
             echo "base_sha=$PR_BASE_SHA"
             echo "rustc=$(rustc --version)"
