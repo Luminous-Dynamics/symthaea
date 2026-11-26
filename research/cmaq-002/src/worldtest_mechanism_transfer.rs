@@ -545,14 +545,13 @@ pub fn evaluate_mechanism_transfer(
                 target_family_id: task.environment_family_id.clone(),
             });
         }
-        if let Some(existing) =
-            cluster_condition.insert(task.environment_cluster_id.clone(), row.condition)
+        if cluster_condition
+            .insert(task.environment_cluster_id.clone(), row.condition)
+            .is_some_and(|existing| existing != row.condition)
         {
-            if existing != row.condition {
-                return Err(MechanismTransferError::ClusterSpansMechanismConditions {
-                    cluster_id: task.environment_cluster_id.clone(),
-                });
-            }
+            return Err(MechanismTransferError::ClusterSpansMechanismConditions {
+                cluster_id: task.environment_cluster_id.clone(),
+            });
         }
 
         let cluster_key = (row.condition, task.environment_cluster_id.clone());
@@ -1064,16 +1063,17 @@ mod tests {
     #[test]
     fn failed_and_abstained_tasks_remain_in_cluster_and_cell_denominators() {
         let mut input = base_input();
-        let row = input
-            .tasks
-            .iter_mut()
-            .find(|row| {
-                row.condition == MechanismTransferCondition::ParameterShift
-                    && row.task.query_family == QueryFamily::Planning
-                    && row.task.environment_cluster_id.ends_with("cluster-1")
-            })
-            .unwrap();
-        row.task.disposition = TaskDisposition::Failed { score_ppm: 0 };
+        for row in &mut input.tasks {
+            if row.condition == MechanismTransferCondition::ParameterShift
+                && row.task.query_family == QueryFamily::Planning
+            {
+                if row.task.environment_cluster_id.ends_with("cluster-1") {
+                    row.task.disposition = TaskDisposition::Failed { score_ppm: 0 };
+                } else {
+                    row.task.disposition = TaskDisposition::Abstained { score_ppm: 200_000 };
+                }
+            }
+        }
         let result = evaluate_mechanism_transfer(&input).unwrap();
         let cell = result
             .cell_summaries
@@ -1085,8 +1085,10 @@ mod tests {
             .unwrap();
         assert_eq!(cell.task_count, 2);
         assert_eq!(cell.failed_count, 1);
-        assert_eq!(cell.mean_score_ppm, 400_000);
-        let cluster = result
+        assert_eq!(cell.abstained_count, 1);
+        assert_eq!(cell.mean_score_ppm, 100_000);
+
+        let failed_cluster = result
             .cluster_summaries
             .iter()
             .find(|cluster| {
@@ -1094,13 +1096,29 @@ mod tests {
                     && cluster.environment_cluster_id.ends_with("cluster-1")
             })
             .unwrap();
-        let planning = cluster
+        let failed_planning = failed_cluster
             .query_family_summaries
             .iter()
             .find(|row| row.query_family == QueryFamily::Planning)
             .unwrap();
-        assert_eq!(planning.failed_count, 1);
-        assert_eq!(planning.mean_score_ppm, 0);
+        assert_eq!(failed_planning.failed_count, 1);
+        assert_eq!(failed_planning.mean_score_ppm, 0);
+
+        let abstained_cluster = result
+            .cluster_summaries
+            .iter()
+            .find(|cluster| {
+                cluster.condition == MechanismTransferCondition::ParameterShift
+                    && cluster.environment_cluster_id.ends_with("cluster-2")
+            })
+            .unwrap();
+        let abstained_planning = abstained_cluster
+            .query_family_summaries
+            .iter()
+            .find(|row| row.query_family == QueryFamily::Planning)
+            .unwrap();
+        assert_eq!(abstained_planning.abstained_count, 1);
+        assert_eq!(abstained_planning.mean_score_ppm, 200_000);
     }
 
     #[test]
