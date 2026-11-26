@@ -9,13 +9,16 @@ func base() (Graph,map[string]VerifierPin) {
 	in:=digest("input","abc","source-response")
 	inv:=digest("invocation-record","call","signed-tool-invocation")
 	md:=digest("manifest:tool-call","manifest","capture-manifest")
+	sourceKey:=digest("source-a","source-key","agent-identity")
+	collectorKey:=digest("collector","collector-key","agent-identity")
 	activity:=Node{ID:"tool-call",Kind:Activity,DeclaredInputs:[]string{"source-input"}}
 	nodes:=[]Node{
 		{ID:"source-input",Kind:Entity,Digest:&in,ExternalRoot:true,RequiresVerification:true},
 		{ID:"invocation-record",Kind:Entity,Digest:&inv,ExternalRoot:true,RequiresVerification:true},
 		activity,
 		{ID:"output",Kind:Entity,Digest:ptrDigest(digest("output","out","derived-output"))},
-		{ID:"collector",Kind:Agent},
+		{ID:"source-a",Kind:Agent,Digest:&sourceKey,ExternalRoot:true,RequiresVerification:true},
+		{ID:"collector",Kind:Agent,Digest:&collectorKey,ExternalRoot:true,RequiresVerification:true},
 	}
 	edges:=[]Edge{
 		{ID:"use-1",Kind:Used,From:"source-input",To:"tool-call",EvidenceID:"invocation-record"},
@@ -24,7 +27,7 @@ func base() (Graph,map[string]VerifierPin) {
 	}
 	m:=Manifest{ActivityID:"tool-call",CollectorID:"collector",SourceID:"source-a",SnapshotID:"s1",QueryID:"q1",StartCursor:"0",EndCursor:"1",TerminalWatermark:"1",ObservedInputs:[]string{"source-input"},Complete:true,Digest:md,ObservedAt:200}
 	mk:=func(id string,d DigestRef)VerifierReport{return VerifierReport{SubjectID:id,InputDigest:d,Status:"verified",VerifierID:"v1",Version:"1",BuildDigest:"b1",TrustStoreDigest:"t1",VerifiedAt:100,FreshUntil:500}}
-	return Graph{Nodes:nodes,Edges:edges,Manifests:[]Manifest{m},Reports:[]VerifierReport{mk("source-input",in),mk("invocation-record",inv),mk("manifest:tool-call",md)}},map[string]VerifierPin{"v1":{"v1","1","b1","t1"}}
+	return Graph{Nodes:nodes,Edges:edges,Manifests:[]Manifest{m},Reports:[]VerifierReport{mk("source-input",in),mk("invocation-record",inv),mk("source-a",sourceKey),mk("collector",collectorKey),mk("manifest:tool-call",md)}},map[string]VerifierPin{"v1":{"v1","1","b1","t1"}}
 }
 func ptrDigest(d DigestRef)*DigestRef{return &d}
 func check(t *testing.T,g Graph,p map[string]VerifierPin,want Decision) {
@@ -58,4 +61,6 @@ func TestCaptureManifestSignatureMissing(t *testing.T){g,p:=base();g.Reports=g.R
 func TestCaptureManifestDigestMismatch(t *testing.T){g,p:=base();g.Reports[2].InputDigest.Value="tampered";check(t,g,p,Denied)}
 func TestEdgeEvidenceNotVerified(t *testing.T){g,p:=base();g.Nodes[1].RequiresVerification=false;check(t,g,p,Indeterminate)}
 func TestTraceIdAloneCannotProveCompleteness(t *testing.T){g,p:=base();g.Manifests[0].CollectorID="";check(t,g,p,Indeterminate)}
+func TestCaptureCollectorIdentityMissing(t *testing.T){g,p:=base();for i,n:=range g.Nodes{if n.ID=="collector"{g.Nodes=append(g.Nodes[:i],g.Nodes[i+1:]...);break}};check(t,g,p,Indeterminate)}
+func TestCaptureSourceIdentityUnverified(t *testing.T){g,p:=base();for i:=range g.Reports{if g.Reports[i].SubjectID=="source-a"{g.Reports[i].Status="unverified"}};check(t,g,p,Indeterminate)}
 func FuzzDigestProfileIsolation(f *testing.F){f.Add("response","decision","value");f.Fuzz(func(t *testing.T,a,b,v string){if a==b{return};x:=digest("s",v,a);y:=digest("s",v,b);eq,cmp:=x.Equal(y);if eq||cmp{t.Fatal("different digest purposes compared")}})}
