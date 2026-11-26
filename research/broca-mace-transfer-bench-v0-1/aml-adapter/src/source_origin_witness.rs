@@ -269,6 +269,11 @@ impl VerifiedSourceOriginWitnessSetV1 {
             )?;
             let verifier = verifier_map.get(receipt.operator_id.as_str())
                 .ok_or(SourceOriginWitnessRejectV1::InvalidVerifierSet)?;
+            if graph.authority_key_ids().iter().any(|key| key == &receipt.key_id)
+                || origin.signer_key_ids().iter().any(|key| key == &receipt.key_id)
+            {
+                return Err(SourceOriginWitnessRejectV1::SharedAuthority);
+            }
             if let Some(owner) = cross_operator_keys.get(&receipt.key_id) {
                 if owner != &receipt.operator_id {
                     return Err(SourceOriginWitnessRejectV1::SharedAuthority);
@@ -279,9 +284,6 @@ impl VerifiedSourceOriginWitnessSetV1 {
             validate_witness_time_and_signature(
                 receipt, &item.pae, &item.signature, verifier, now_unix,
             )?;
-            if sha256_hex(item.envelope_sha256.as_bytes()) == self.policy_sha256 {
-                return Err(SourceOriginWitnessRejectV1::BindingMismatch);
-            }
         }
         validate_per_node_quorum(graph, policy, &self.witnesses)?;
         Ok(())
@@ -348,6 +350,11 @@ pub fn verify_source_origin_witnesses_v1(
         let item = verify_one_witness_receipt_v1(
             input.envelope_json, &binding, verifier, now_unix,
         )?;
+        if graph.authority_key_ids().iter().any(|key| key == &item.receipt.key_id)
+            || origin.signer_key_ids().iter().any(|key| key == &item.receipt.key_id)
+        {
+            return Err(SourceOriginWitnessRejectV1::SharedAuthority);
+        }
         if let Some(owner) = cross_operator_keys.get(&item.receipt.key_id) {
             if owner != &item.receipt.operator_id {
                 return Err(SourceOriginWitnessRejectV1::SharedAuthority);
@@ -590,7 +597,7 @@ fn validate_witness_time(
     {
         return Err(SourceOriginWitnessRejectV1::ObservationStale);
     }
-    if receipt.issued_at_unix > now_unix || now_unix < receipt.issued_at_unix {
+    if receipt.issued_at_unix > now_unix {
         return Err(SourceOriginWitnessRejectV1::NotYetValid);
     }
     if receipt.issued_at_unix < receipt.observed_at_unix
@@ -742,6 +749,9 @@ fn source_origin_bundle_sha256(origin: &VerifiedSourceOriginSetV1) -> String {
     signers.sort();
     h.update((signers.len() as u64).to_be_bytes());
     for signer in signers { hash_field(&mut h, &signer); }
+    let receipts = origin.envelope_sha256s();
+    h.update((receipts.len() as u64).to_be_bytes());
+    for receipt in receipts { hash_field(&mut h, &receipt); }
     hex_digest(&h.finalize())
 }
 
@@ -891,6 +901,8 @@ mod tests {
                 },
             ],
         };
-        assert_ne!(make(2).digest().unwrap(), make(1).digest().unwrap_err().to_string());
+        let mut stricter = make(2);
+        stricter.maximum_observation_age_secs = 300;
+        assert_ne!(make(2).digest().unwrap(), stricter.digest().unwrap());
     }
 }
