@@ -66,6 +66,16 @@ The harness captures a bounded artifact (such as a patch, action log, or simulat
 
 The original SWE-Bench Pro public benchmark received external criticism for task validity; its V2 release describes changes made in response, including task removal, instruction correction, two-sided checks and pristine re-grading. EQC should institutionalize that kind of independent challenge rather than assume any external benchmark is infallible.
 
+## 2.4 v0.1 machine-readable seed contract
+
+The initial contract artifacts are committed alongside this proposal:
+
+- `eqc-task-v0.1.schema.json`: versioned task/authority/request/expected-outcome contract.
+- `eqc-run-receipt-v0.1.schema.json`: source-head, environment, action, replay, independent-verifier and qualification receipt.
+- `eqc-seed-corpus-v0.1.json`: four synthetic public episodes covering an authorized read, wrong-subject denial, revoked-authority denial, and replayed-challenge denial.
+
+The seed corpus is explicitly marked `synthetic_public_seed_unqualified`. It has no live health records and does not claim a clinical, EHR, Holochain, or cryptographic integration. JSON Schema validation and the reference/no-op harness are the next implementation gate; the presence of a schema or fixture alone is not a passing benchmark.
+
 ## 3. Six independent dimensions
 
 Publish all six dimensions separately. Do not collapse them into a weighted aggregate.
