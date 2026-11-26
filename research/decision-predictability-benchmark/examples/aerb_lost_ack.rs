@@ -55,7 +55,7 @@ fn main() {
                 loss_row(&states, &[0.45; 8]),
             ),
         ]),
-        maximum_worst_case_loss: 1.0,
+        maximum_worst_case_loss: 0.45,
     };
 
     // A journal read plus independently validated scope-closure receipt
