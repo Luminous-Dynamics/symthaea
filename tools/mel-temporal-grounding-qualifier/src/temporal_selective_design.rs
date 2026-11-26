@@ -41,6 +41,8 @@ pub struct SelectiveAuditOutcomeV1 {
     pub item_id: String,
     pub query_id: String,
     pub source_work_id_sha256: String,
+    /// Exact recording artifact from the selected candidate, not only source-work identity.
+    pub recording_sha256: String,
     /// Digest of the selective-grounding case/report record that produced this row.
     pub selective_report_sha256: String,
     pub adjudication_profile_sha256: String,
@@ -66,7 +68,8 @@ pub struct SelectiveAuditOutcomeV1 {
 pub struct SelectiveDesignRiskInputV1 {
     pub schema: String,
     pub dataset: AnnotationAcquisitionDatasetV1,
-    /// Null is allowed for synthetic demonstration only.
+    /// Null is allowed only when the caller explicitly marks this as a synthetic demonstration.
+    pub synthetic_demonstration: bool,
     pub expected_selection_receipt_sha256: Option<String>,
     pub model_identity_sha256: String,
     pub runtime_identity_sha256: String,
@@ -111,6 +114,8 @@ pub struct SelectiveRiskCoveragePointV1 {
 #[derive(Debug, Clone, PartialEq, Serialize)]
 pub struct EvidenceStratumSampleCountV1 {
     pub evidence_stratum: String,
+    /// This summary uses all selective decisions before a threshold is applied.
+    pub threshold_ppm: u32,
     pub sampled_items: usize,
     pub covered_items: usize,
     pub covered_errors: usize,
@@ -145,6 +150,8 @@ pub struct SelectiveDesignRiskReportV1 {
     pub random_retention_baseline_is_unconditional_error: bool,
     pub risk_coverage: Vec<SelectiveRiskCoveragePointV1>,
     pub active_refinement_stream_used: bool,
+    pub synthetic_demonstration: bool,
+    pub expected_selection_receipt_supplied: bool,
     pub exact_selection_receipt_replayed: bool,
     pub selection_receipt_match_verified: bool,
     pub selective_outcomes_authenticated: bool,
@@ -186,6 +193,12 @@ pub fn audit_selective_design_risk(
         return Err("frozen threshold-plan digest does not match its contents".into());
     }
     require_text(&input.dataset.dataset_id, "dataset.dataset_id")?;
+    if input.synthetic_demonstration != input.expected_selection_receipt_sha256.is_none() {
+        return Err(
+            "synthetic demonstrations must omit an expected receipt; reviewed runs must supply one"
+                .into(),
+        );
+    }
     validate_digest(&input.model_identity_sha256, "model_identity_sha256")?;
     validate_digest(&input.runtime_identity_sha256, "runtime_identity_sha256")?;
     validate_digest(&input.decoding_config_sha256, "decoding_config_sha256")?;
@@ -217,11 +230,11 @@ pub fn audit_selective_design_risk(
     let mut report_digests = BTreeSet::new();
     for outcome in &input.observed_probability_audit_outcomes {
         validate_outcome_identity(input, outcome)?;
-        if outcome.false_absence_claim
-            && (outcome.decision != SelectiveDecisionV1::ClaimAbsent || outcome.decision_correct)
-        {
+        let expected_false_absence = outcome.decision == SelectiveDecisionV1::ClaimAbsent
+            && !outcome.decision_correct;
+        if outcome.false_absence_claim != expected_false_absence {
             return Err(format!(
-                "item {} has an inconsistent false-absence flag",
+                "item {} false-absence flag does not match its ClaimAbsent decision and correctness",
                 outcome.item_id
             ));
         }
@@ -267,11 +280,18 @@ pub fn audit_selective_design_risk(
             .get(selection.item_id.as_str())
             .copied()
             .ok_or_else(|| format!("missing selective outcome for {}", selection.item_id))?;
+        let candidate = input
+            .dataset
+            .candidates
+            .iter()
+            .find(|candidate| candidate.item_id == selection.item_id)
+            .ok_or_else(|| format!("selected item {} is absent from the candidate manifest", selection.item_id))?;
         if outcome.query_id != selection.query_id
             || outcome.source_work_id_sha256 != selection.source_work_id_sha256
+            || outcome.recording_sha256 != candidate.recording_sha256
         {
             return Err(format!(
-                "selective outcome {} does not bind to its exact planner query/source work",
+                "selective outcome {} does not bind to its exact query, source work and recording",
                 selection.item_id
             ));
         }
@@ -554,6 +574,8 @@ pub fn audit_selective_design_risk(
         random_retention_baseline_is_unconditional_error: true,
         risk_coverage,
         active_refinement_stream_used: false,
+        synthetic_demonstration: input.synthetic_demonstration,
+        expected_selection_receipt_supplied: input.expected_selection_receipt_sha256.is_some(),
         exact_selection_receipt_replayed: true,
         selection_receipt_match_verified: input.expected_selection_receipt_sha256.is_some(),
         selective_outcomes_authenticated: false,
@@ -795,6 +817,7 @@ fn summarize_sample_evidence_strata(
                 .collect();
             EvidenceStratumSampleCountV1 {
                 evidence_stratum: evidence_stratum.to_owned(),
+                threshold_ppm: 0,
                 sampled_items: items.len(),
                 covered_items: covered.len(),
                 covered_errors: covered
@@ -932,6 +955,7 @@ mod tests {
             item_id: item_id.into(),
             query_id: format!("query-{item_id}"),
             source_work_id_sha256: work,
+            recording_sha256: digest(work.chars().next().unwrap().to_ascii_lowercase()),
             selective_report_sha256: crate::evidence_digest::sha256_hex(item_id.as_bytes()),
             adjudication_profile_sha256: digest('3'),
             model_identity_sha256: digest('4'),
@@ -976,6 +1000,7 @@ mod tests {
         SelectiveDesignRiskInputV1 {
             schema: INPUT_SCHEMA_V1.into(),
             dataset,
+            synthetic_demonstration: false,
             expected_selection_receipt_sha256: Some(planned.selection_receipt_sha256),
             model_identity_sha256: digest('4'),
             runtime_identity_sha256: digest('5'),
