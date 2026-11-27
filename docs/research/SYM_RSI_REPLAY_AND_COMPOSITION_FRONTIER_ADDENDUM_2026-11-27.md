@@ -407,3 +407,97 @@ This aligns the R4 goal with the strongest newly visible empirical gap: agents c
 
 No reported SOTA comparison should mix these six levels into a single leaderboard number.
 
+## 16. Research-decision replay: extend replay from search branches to scientific judgment
+
+### Hypothesis
+
+Dream-RSI replays recorded candidate-search decisions. RecurSciBench and METR indicate that scientific RSI also depends on decisions that occur before and after candidate execution:
+
+- which problem or uncertainty is worth addressing;
+- which causal/mechanistic explanation is plausible;
+- which experiment most discriminates among live explanations;
+- which controls and replication budget are necessary;
+- when a result is sufficiently trustworthy to change a belief or action;
+- when to stop, pivot, replicate or escalate to an expert.
+
+**Research hypothesis:** replaying complete evidence-bound research-decision trajectories, including the cost and delay of obtaining trustworthy feedback, may improve research judgment and experiment allocation beyond replaying candidate outcomes alone. This must be compared empirically with ordinary task-outcome replay, not assumed to work.
+
+### Decision-episode contract
+
+Use an append-only sequence of versioned decision episodes. Each episode binds to the existing candidate, task, evidence, evaluator and benchmark receipt identities rather than introducing a competing ledger.
+
+Candidate-visible fields:
+
+- research question and task-family identity;
+- currently admitted hypotheses and their explicit assumptions;
+- evidence available *at decision time*, including provenance and observation/arrival times;
+- candidate actions available under current permissions, budget and deadline;
+- pre-registered predicted outcome distributions or explicit set-valued predictions;
+- declared decision utility/loss and units, when defensible;
+- complete visible cost estimates and uncertainty;
+- selected action, rationale artifact, parent episode and policy version.
+
+Evaluator-only fields, held outside the candidate process:
+
+- sealed ground truth, future observations and reference hypotheses;
+- hidden task identity/seed mappings;
+- independent adjudication and post-run verification;
+- true long-run outcomes not available at the decision time.
+
+Resolution states must remain typed and non-collapsed:
+
+- immediate_observed;
+- delayed_observed;
+- censored_at_deadline;
+- unsupported_counterfactual;
+- indeterminate;
+- invalid_execution.
+
+A censored or indeterminate episode is not a failed prediction and is not a success. It remains in the full accounting. Unsupported counterfactual choices must never be assigned synthetic or oracle outcomes.
+
+### Replay lanes
+
+Compare the following under the same task history and compute/labor budget:
+
+1. **Outcome-only replay:** replay candidate and evaluator outcomes as in a conventional search tree.
+2. **Process-only replay:** replay question, hypothesis, experiment and interpretation decisions but hide outcome labels during policy development.
+3. **Evidence-and-cost replay:** replay the same process with evidence quality, verification delay, lifecycle cost and evaluator uncertainty included.
+4. **Full-decision replay:** combine process, evidence, outcome and cost histories with explicit support constraints.
+5. **No-history / shuffled-history / success-only controls:** estimate whether improvements depend on coherent causal history, rather than extra context tokens or a success-only selection bias.
+
+A fixed coder/executor should be used for one comparison lane to isolate research judgment from implementation capability. A second end-to-end lane can measure their interaction. Both use the same task, model, context, tool and total resource constraints within their respective comparisons.
+
+### Policy objective and qualification
+
+Do not optimize raw score, entropy reduction or information gain alone. Keep separate:
+
+- decision regret relative to the frozen outcome/loss contract;
+- experiment discrimination among surviving hypotheses;
+- prediction calibration and selective coverage;
+- verified scientific usefulness;
+- total lifecycle cost and time-to-decision;
+- expert escalation burden and value;
+- protected capability retention and worst-family regression.
+
+Use probabilistic EVSI only where priors, likelihoods and utility units are defensible. Otherwise use prior-free robust/minimax decision regret. Neither calculation authorizes an external action; execution permissions remain separate.
+
+Replay may propose better decisions only within observed support. For actions outside support, report unsupported and allocate a real new experiment if the value justifies its cost. For long-delay outcomes, replay can guide intermediate allocation, but it cannot replace the eventual independent confirmation.
+
+### Critical falsification tests
+
+- A history policy wins because its extra context contains future/outcome labels: leakage control must fail.
+- A policy chooses an experiment with high information gain but no decision consequence: decision-value lane must not reward it as a task improvement.
+- A low-probability alternative has large downstream impact: query/decision-critical recovery must not collapse to prior-frequency sampling.
+- A strong candidate is judged by a weaker or same-family generator: crossed generator/judge strength and independent expert anchors expose evaluator overconfidence.
+- A candidate improves mean score while regressing many tasks: report the full paired distribution and worst-family loss.
+- A slow result is censored at the deadline: preserve censoring rather than converting it to failure or dropping it.
+- A policy proposes an unobserved branch: mark unsupported, never use nearest-neighbor or guessed outcome imputation.
+- A model-generated benchmark task is fluent but not scientifically informative: blinded expert admission must reject or qualify it.
+- More agents improve a cheap optimizer but harm a judgment task: keep the task lanes separate and report the interaction.
+
+### Proposed differentiator and limits
+
+This is a candidate research direction, not a novelty claim. Its potential advantage is the integration of Dream-RSI-style replay with #10877's research-taste outcomes, #10756's independent evaluator checks and the decision-value/lifecycle-cost methods in the scientific decision-intelligence work.
+
+A positive process-replay result would establish better allocation or judgment on the tested support. It would not establish that the system can invent unknown causal mechanisms, predict unsupported branches, autonomously validate all scientific truth, or recursively accelerate without bound.
+
