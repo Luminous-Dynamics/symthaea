@@ -831,6 +831,17 @@ mod tests {
     }
 
     #[test]
+    fn self_reported_outcome_claims_do_not_change_causal_verification() {
+        let mut trace = valid_trace();
+        let original = InteractionTraceVerifier::verify_value(&trace).unwrap();
+        trace["unverified_claims"]["unauthorized_actions"] = json!(999);
+        trace["unverified_claims"]["post_expiry_frames"] = json!(999);
+        trace["unverified_claims"]["semantic_preservation_score"] = json!(0.0);
+        let altered = InteractionTraceVerifier::verify_value(&trace).unwrap();
+        assert_eq!(altered, original);
+    }
+
+    #[test]
     fn timestamp_regression_is_checked_within_each_clock_domain() {
         let mut trace = valid_trace();
         trace["events"][4]["source_now_monotonic_ns"] = json!(120);
