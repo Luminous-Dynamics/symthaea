@@ -234,7 +234,8 @@
         "empirical_cluster_unsafe_rate",
         "mean_selective_loss",
         "adjusted_delta",
-        "parent_fallback_certificate_sha256"
+        "parent_fallback_certificate_sha256",
+        "decision_policy_sha256"
       ],
       "properties": {
         "schema_version": {
@@ -430,6 +431,9 @@
               "type": "null"
             }
           ]
+        },
+        "decision_policy_sha256": {
+          "$ref": "#/$defs/sha256"
         }
       },
       "allOf": [
