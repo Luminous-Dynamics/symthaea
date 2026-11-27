@@ -222,6 +222,13 @@ The Zenodo release provides a viable **hourly screening tier** while the raw CED
 
 The release contains standardized hourly records from London, Manchester and York, including commercial sensor systems, reference monitors and duplicate reference instruments. It provides NO, NO2, O3, PM1, PM2.5, PM10 and meteorological channels. The Zenodo record identifies the sensor data as derived from CEDA under OGL v3.0; the reference series originate from public site data and have been harmonized to hourly averages; the duplicate reference data are only in the Zenodo release. The Zenodo record's top-level Rights field states CC BY 4.0, but the data components have their own provenance statements. Preserve per-file source attribution and licence metadata rather than flattening provenance into a single undifferentiated claim.
 
+
+### Duplicate-reference cohort scope discovered from the published CSV preview
+
+A web-readable preview of `QUANT_DuplicateRef_hourly.csv` exposes the row schema `time,location,instrument,serial,measurand,measurement,qc_flag`, with a total of 19,523 lines including the header. The first row is Manchester, 13 October 2020 10:00; the final row is Manchester, 19 November 2021 10:00. Searches across the indexed CSV preview returned no "London" or "York" matches, and the visible initial and terminal samples are Manchester.
+
+This is strong evidence that the duplicate-reference file is a Manchester-only subset, or at minimum that the preview exposes no duplicate-reference rows for London/York. **Do not score it as a three-site duplicate-reference control.** Before final cohort freeze, independently parse a locally acquired copy and verify unique location, instrument, serial, measurand, time coverage, all provider QC flags, duplicate pairing semantics and missingness. The preview is not local file acquisition, SHA-256 custody, or independent content-hash verification; no such claim is made.
+
 ### Tiered use and limits
 
 1. **Q0 — hourly screening:** use the curated Zenodo files to qualify parsing, units, site/device mapping, missingness, duplicate-reference disagreement, hourly calibration baselines and chronological/leave-device/site holdouts. The reference data have been processed/harmonized and may have undergone later ratification. This tier is useful for cohort construction and coarse predictive evaluation, not for reconstructing sub-hourly dynamics.
