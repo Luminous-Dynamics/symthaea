@@ -21,6 +21,7 @@ const BLOCK_LENGTH_GRID: [usize; 3] = [1, 8, 32];
 const CALIBRATION_BLOCKS: usize = 39;
 const ALPHA: f64 = 0.10;
 const TRIALS: u64 = 2_500;
+#[cfg(test)]
 const TEST_TRIALS: u64 = 10_000;
 const WILSON_Z: f64 = 1.959_963_984_540_054;
 
