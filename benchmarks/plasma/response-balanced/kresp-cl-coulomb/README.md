@@ -4,7 +4,7 @@
 
 ## Why this is a separate track
 
-K-RESP-C-VPD studies the Vlasov–Poisson–Dougherty model and compares response-aware enrichment inside an entropy-based moment model. This benchmark is different: it targets the **Vlasov–Poisson–Landau equation with the Coulomb collision operator** near a global Maxwellian. Dougherty and Landau collision operators are not interchangeable. Do not transfer VPD results, entropy identities, solver timings or parameter claims to this cohort.
+K-RESP-C-VPD studies the Vlasov–Poisson–Dougherty model and compares response-aware enrichment inside an entropy-based moment model. This benchmark is different: it targets the **three-dimensional Vlasov–Poisson–Landau equation on \\(\\mathbb T^3_x\\times\\mathbb R^3_v\\)** with the Coulomb collision operator near a global Maxwellian. Dougherty and Landau collision operators are not interchangeable. Do not transfer VPD results, entropy identities, solver timings or parameter claims to this cohort.
 
 Zhao and Zi (15 November 2026), *Stability of Plasma Echo Growth and the Sharp Sobolev Stability Threshold for the Vlasov–Poisson–Landau Equation*, arXiv:2611.20080, prove stability of growing echo cascades under changes in the linearized operator (including collisions and exact evolving background coefficients) and under nonlinear perturbations. They construct initial Sobolev perturbations with size
 \[
@@ -22,13 +22,13 @@ The differentiator is **not** “plasma echoes exist,” “second-order echoes 
 
 ## Frozen model and scaling
 
-Use the 1D1V Vlasov–Poisson–Landau equation with Coulomb collisions near a global Maxwellian. The contract records the perturbation scaling
+Use the 1D1V Vlasov–Poisson–Landau equation with Coulomb collisions near a global Maxwellian. The contract records three spatial periods of \\(2\\pi\\), a three-dimensional velocity cube with tail extension, and the perturbation scaling
 \[
 \epsilon=c\,\nu^{1/3}\,[\log(1/\nu)]^p,\qquad 0<\nu<1,
 \]
 and an observation window ending at a declared fraction of \(\nu^{-1/3}\). The fixture's \(c\) and \(p\) values are an exploratory benchmark grid, not constants asserted by Zhao and Zi. Every numerical trajectory starts at physical time zero and is integrated forward; do not initialize from a backward-constructed Sobolev profile and present it as a physical initial-value run.
 
-The synthetic cohort varies collision parameter, prefactor, logarithmic exponent, initial spatial modes and echo cascade depth. It includes training, validation and sealed holdout roles, with immutable initial-state digests. It is metadata only: placeholder digests are not numerical states, and the computed \(\epsilon\) values are benchmark-design calculations, not solver results.
+The synthetic cohort varies collision parameter, prefactor, logarithmic exponent, initial three-component spatial wavevectors and echo cascade depth. It includes training, validation and sealed holdout roles, with immutable initial-state digests. It is metadata only: placeholder digests are not numerical states, and the computed \(\epsilon\) values are benchmark-design calculations, not solver results.
 
 ## Required observable and structure planes
 
@@ -49,7 +49,7 @@ Mandatory comparisons include:
 - symplectic particle Vlasov ROM as an adjacent method, with unsupported metrics identified;
 - entropy VPD ROM only as an explicitly **different-equation** comparator, never a direct Landau baseline.
 
-Use matched initial data, \(\nu\), spatial modes, collision normalization, time horizon, boundary/tail treatment and QoIs. Match equal rank, equal stored bytes, equal end-to-end wall time and equal full-order solver budget. Report collision-operator quadrature, nonlinear field solve, diagnostics and fallback costs.
+Use matched initial data, \(\nu\), spatial wavevectors, collision normalization, time horizon, boundary/tail treatment and QoIs. Match equal rank, equal stored bytes, equal end-to-end wall time and equal full-order solver budget. Report collision-operator quadrature, nonlinear field solve, diagnostics and fallback costs.
 
 ## Qualification protocol
 
