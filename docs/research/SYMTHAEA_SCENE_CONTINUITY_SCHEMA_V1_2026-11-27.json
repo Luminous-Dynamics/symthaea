@@ -1,0 +1,89 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://luminousdynamics.io/schemas/symthaea/scene-continuity-descriptor-v1.json",
+  "title": "Symthaea Scene Continuity Descriptor v1",
+  "description": "A renderer planning descriptor only. It is not a consent grant or live authorization permit.",
+  "type": "object",
+  "additionalProperties": false,
+  "required": [
+    "session_id",
+    "clock_domain_id",
+    "event_id",
+    "grant_id",
+    "canonical_cue_digest",
+    "sequence",
+    "form",
+    "motion_mode",
+    "privacy_class",
+    "effective_intensity",
+    "observed_at_monotonic_ns",
+    "effective_expires_at_monotonic_ns"
+  ],
+  "properties": {
+    "session_id": {
+      "type": "string",
+      "pattern": "^[A-Za-z0-9._:-]{1,128}$"
+    },
+    "clock_domain_id": {
+      "type": "string",
+      "pattern": "^[A-Za-z0-9._:-]{1,128}$"
+    },
+    "event_id": {
+      "type": "string",
+      "pattern": "^[A-Za-z0-9._:-]{1,128}$"
+    },
+    "grant_id": {
+      "type": "string",
+      "pattern": "^[A-Za-z0-9._:-]{1,128}$"
+    },
+    "canonical_cue_digest": {
+      "type": "string",
+      "pattern": "^[a-f0-9]{64}$"
+    },
+    "sequence": {
+      "type": "integer",
+      "minimum": 0,
+      "maximum": 9007199254740991
+    },
+    "form": {
+      "type": "string",
+      "enum": [
+        "living_constellation",
+        "puppet_theatre",
+        "mycelial_being",
+        "swarm",
+        "living_instrument",
+        "hearth_companion",
+        "cognitive_mandala"
+      ]
+    },
+    "motion_mode": {
+      "type": "string",
+      "enum": [
+        "dynamic",
+        "static"
+      ]
+    },
+    "privacy_class": {
+      "type": "string",
+      "enum": [
+        "public",
+        "local_sensitive",
+        "restricted"
+      ]
+    },
+    "effective_intensity": {
+      "type": "number",
+      "minimum": 0,
+      "maximum": 1
+    },
+    "observed_at_monotonic_ns": {
+      "type": "string",
+      "pattern": "^(0|[1-9][0-9]*)$"
+    },
+    "effective_expires_at_monotonic_ns": {
+      "type": "string",
+      "pattern": "^(0|[1-9][0-9]*)$"
+    }
+  }
+}
