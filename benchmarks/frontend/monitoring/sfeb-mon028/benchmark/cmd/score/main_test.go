@@ -66,7 +66,7 @@ func jsonMarshal(value any) ([]byte,error) {
 func TestVerifyCustodyBundleAcceptsTrustedExactSuite(t *testing.T) {
 	root,manifestPath,runID,publicKey,_:=makeCustodyBundle(t)
 	manifest,result,err:=verifyCustodyBundle(root,manifestPath,"SUITE.json","suite-authority-key",publicKey,
-		runID,1,"","benchmark-authority-clock",time.Hour,100*time.Millisecond)
+		runID,1,"","benchmark-authority-clock",24*time.Hour,100*time.Millisecond)
 	if err!=nil { t.Fatal(err) }
 	if result.Verdict!=custody.VerdictQualified || manifest.RunID!=runID {
 		t.Fatalf("expected trusted suite custody, got result=%+v manifest=%+v",result,manifest)
@@ -76,14 +76,14 @@ func TestVerifyCustodyBundleAcceptsTrustedExactSuite(t *testing.T) {
 func TestVerifyCustodyBundleRejectsUndeclaredSuiteArtifact(t *testing.T) {
 	root,manifestPath,runID,publicKey,_:=makeCustodyBundle(t)
 	_,_,err:=verifyCustodyBundle(root,manifestPath,"other.json","suite-authority-key",publicKey,
-		runID,1,"","benchmark-authority-clock",time.Hour,100*time.Millisecond)
+		runID,1,"","benchmark-authority-clock",24*time.Hour,100*time.Millisecond)
 	if err==nil { t.Fatal("artifact absent from signed inventory must be rejected") }
 }
 
 func TestVerifyCustodyBundleBlocksWrongExpectedRun(t *testing.T) {
 	root,manifestPath,_,publicKey,_:=makeCustodyBundle(t)
 	_,result,err:=verifyCustodyBundle(root,manifestPath,"SUITE.json","suite-authority-key",publicKey,
-		"another-run",1,"","benchmark-authority-clock",time.Hour,100*time.Millisecond)
+		"another-run",1,"","benchmark-authority-clock",24*time.Hour,100*time.Millisecond)
 	if err==nil || result.Verdict!=custody.VerdictBlocked {
 		t.Fatalf("expected wrong run identity to block, result=%+v err=%v",result,err)
 	}
