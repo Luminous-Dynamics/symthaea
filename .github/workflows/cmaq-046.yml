@@ -4,6 +4,7 @@ on:
   pull_request:
     paths:
       - "research/cmaq-046/**"
+      - "research/cmaq-047/**"
       - ".github/workflows/cmaq-046.yml"
   push:
     branches:
@@ -16,7 +17,7 @@ permissions:
   contents: read
 
 concurrency:
-  group: cmaq-046-\${{ github.ref }}
+  group: cmaq-046-${{ github.ref }}
   cancel-in-progress: true
 
 jobs:
@@ -42,4 +43,29 @@ jobs:
         with:
           name: cmaq-046-approachability-smoke
           path: cmaq-046-approachability-smoke.csv
+          if-no-files-found: error
+
+  controlled-blackwell-actions:
+    name: CMAQ-047 controlled Blackwell actions
+    if: github.event_name == 'pull_request' && github.event.pull_request.head.ref == 'research/cmaq-047-controlled-blackwell-actions-v0-1-20261127'
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - name: Install Rust 1.100.0
+        uses: dtolnay/rust-toolchain@1.100.0
+        with:
+          components: rustfmt, clippy
+      - name: Check formatting
+        run: cargo +1.100.0 fmt --manifest-path research/cmaq-047/Cargo.toml --all -- --check
+      - name: Run deterministic tests
+        run: cargo +1.100.0 test --manifest-path research/cmaq-047/Cargo.toml --locked
+      - name: Strict Clippy
+        run: cargo +1.100.0 clippy --manifest-path research/cmaq-047/Cargo.toml --locked --all-targets -- -D warnings
+      - name: Controlled action smoke probe
+        run: cargo +1.100.0 run --release --manifest-path research/cmaq-047/Cargo.toml --locked --bin controlled_action_probe -- 64 > cmaq-047-controlled-actions-smoke.csv
+      - name: Preserve controlled action artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: cmaq-047-controlled-actions-smoke
+          path: cmaq-047-controlled-actions-smoke.csv
           if-no-files-found: error
