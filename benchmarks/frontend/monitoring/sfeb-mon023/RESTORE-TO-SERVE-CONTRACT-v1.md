@@ -155,3 +155,12 @@ For service recovery it additionally checks:
 A verified dependency that is explicitly unavailable or a required application probe that fails is denied. Missing, stale or unverified evidence remains indeterminate. A lower claim never implicitly upgrades to a higher claim.
 
 Current Go source includes 48 named tests, one fuzz target and dependency-count benchmarks. No exact-head Go test, race test, vet, fuzz run or numeric benchmark is claimed for the evolving branch; a fresh GitHub checkout could not be obtained in this environment. The scenario corpus is 38 descriptive seeds / 12 positive controls, not yet a frozen independently authored executable oracle set.
+
+
+## 12. Semantic evaluator and execution status
+
+The standard-library Go module under restore-assurance/ evaluates the requested claim tier and reports the highest tier qualified. It keeps artifact validation, database recovery and service recovery distinct. A lower claim never implicitly promotes to a higher one.
+
+The semantic checks include source/backup/WAL identity and coverage; isolated restore target binding; recovered source/database/timeline identity; target reached and timeline lineage; MON-022 surface inventory digest, declared scope and complete required-surface count; conservative RPO/database-RTO/service-RTO upper bounds using a common trusted clock domain; required dependency readiness; version-pinned read/write/invariant probes; write-probe rollback; old-primary/stale-endpoint fencing; and the order of database readiness, fencing, traffic enablement and service acceptance.
+
+The current module includes an adversarial test suite, one RPO-bound fuzz target and a dependency-count benchmark harness. These sources have not been run against an exact branch checkout. No exact-head Go test/race/vet/fuzz or numeric benchmark result is claimed; a fresh GitHub checkout was not available in the execution environment. The 38 scenarios are descriptive seeds, not yet a frozen independently authored executable oracle.
