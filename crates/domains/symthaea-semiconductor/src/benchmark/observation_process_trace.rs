@@ -578,13 +578,7 @@ fn validate_controller(
             }
         }
         ControllerTrackingStateV1::Expired | ControllerTrackingStateV1::Evicted => {
-            if controller.feedback_update_applied
-                || !matches!(
-                    row.operational.state,
-                    OperationalAcquisitionStateV1::SelectedPending
-                        | OperationalAcquisitionStateV1::Measured
-                )
-            {
+            if controller.feedback_update_applied {
                 return Err(ObservationProcessTraceErrorV1(format!(
                     "round {} expired/evicted feedback cannot update an online controller",
                     row.round_id
@@ -613,8 +607,26 @@ fn validate_controller(
         }
     }
 
+    if controller.state == ControllerTrackingStateV1::NotSubmitted {
+        return Err(ObservationProcessTraceErrorV1(format!(
+            "round {} declares an online controller but no prediction/feedback path was submitted",
+            row.round_id
+        )));
+    }
+
     match declaration.kind {
         OnlineControllerKindV1::TauDaci => {
+            if matches!(
+                controller.state,
+                ControllerTrackingStateV1::ConsumedQualified
+                    | ControllerTrackingStateV1::ReceivedUnqualified
+            ) && controller.actual_delay_steps != declaration.maximum_delay_steps
+            {
+                return Err(ObservationProcessTraceErrorV1(format!(
+                    "round {} tau-DACI feedback delay differs from the fixed policy delay",
+                    row.round_id
+                )));
+            }
             if controller.proxy_delay_steps.is_some()
                 || controller.proxy_survival_probability.is_some()
             {
@@ -632,6 +644,31 @@ fn validate_controller(
                     "round {} CA-OCRC path is missing its proxy delay",
                     row.round_id
                 )));
+            }
+            if matches!(
+                controller.state,
+                ControllerTrackingStateV1::ConsumedQualified
+                    | ControllerTrackingStateV1::ReceivedUnqualified
+            ) {
+                let actual = controller.actual_delay_steps.ok_or_else(|| {
+                    ObservationProcessTraceErrorV1(format!(
+                        "round {} consumed CA-OCRC feedback is missing actual delay",
+                        row.round_id
+                    ))
+                })?;
+                let proxy = controller.proxy_delay_steps.unwrap_or(-1);
+                if actual > declaration.maximum_delay_steps.unwrap_or(0)
+                    || proxy < 0
+                    || proxy < actual as i64
+                    || controller
+                        .proxy_survival_probability
+                        .is_none_or(|probability| probability <= 0.0)
+                {
+                    return Err(ObservationProcessTraceErrorV1(format!(
+                        "round {} CA-OCRC consumed feedback is outside proxy survival bounds",
+                        row.round_id
+                    )));
+                }
             }
         }
         OnlineControllerKindV1::None => {}
@@ -808,6 +845,8 @@ pub fn evaluate_observation_process_trace_v1(
             || !design.minimum_inclusion_probability.is_finite()
             || design.minimum_inclusion_probability <= 0.0
             || design.minimum_inclusion_probability > 1.0
+            || !design.confidence_delta.is_finite()
+            || !(0.0..1.0).contains(&design.confidence_delta)
         {
             return Err(ObservationProcessTraceErrorV1(
                 "independent audit design is incomplete or not independent of operational qualification".into(),
