@@ -16,8 +16,8 @@
 use std::sync::{Arc, Mutex};
 
 use axum::{
-    body::Bytes,
-    extract::{DefaultBodyLimit, State, rejection::BytesRejection},
+    body::to_bytes,
+    extract::{Request, State},
     http::{
         header::{AUTHORIZATION, CONTENT_TYPE, RETRY_AFTER},
         HeaderMap, HeaderValue, StatusCode,
@@ -171,6 +171,7 @@ struct HttpStateV1<S, V, C> {
     auth: ApiAuthV1,
     track: Track,
     request_permit: Arc<Semaphore>,
+    max_json_body_bytes: usize,
 }
 
 impl<S, V, C> Clone for HttpStateV1<S, V, C> {
@@ -180,6 +181,7 @@ impl<S, V, C> Clone for HttpStateV1<S, V, C> {
             auth: self.auth.clone(),
             track: self.track,
             request_permit: Arc::clone(&self.request_permit),
+            max_json_body_bytes: self.max_json_body_bytes,
         }
     }
 }
@@ -202,13 +204,13 @@ where
         auth: config.auth,
         track: config.track,
         request_permit: Arc::new(Semaphore::new(1)),
+        max_json_body_bytes: body_limit,
     };
 
     Router::new()
         .route("/health", get(health))
         .route("/add", post(add_handler::<S, V, C>))
         .route("/search", post(search_handler::<S, V, C>))
-        .layer(DefaultBodyLimit::max(body_limit))
         .with_state(state)
 }
 
@@ -218,26 +220,26 @@ async fn health() -> StatusCode {
 
 async fn add_handler<S, V, C>(
     State(state): State<HttpStateV1<S, V, C>>,
-    headers: HeaderMap,
-    body: Result<Bytes, BytesRejection>,
+    request: Request,
 ) -> Response
 where
     S: DurableAmlStoreV1 + Send + 'static,
     V: super::AddVisibilityVerifierV1 + Send + 'static,
     C: FrozenAdapterWordCounter + Send + 'static,
 {
-    if !state.auth.authorize(&headers) {
+    if !state.auth.authorize(request.headers()) {
         return api_error(StatusCode::UNAUTHORIZED, "authentication_required", None);
     }
-    if !is_json_content_type(&headers) {
+    if !is_json_content_type(request.headers()) {
         return api_error(StatusCode::UNSUPPORTED_MEDIA_TYPE, "application_json_required", None);
     }
-    let bytes = match body {
+    let permit = match Arc::clone(&state.request_permit).try_acquire_owned() {
+        Ok(permit) => permit,
+        Err(_) => return api_error(StatusCode::TOO_MANY_REQUESTS, "service_at_capacity", Some(1)),
+    };
+    let bytes = match to_bytes(request.into_body(), state.max_json_body_bytes).await {
         Ok(bytes) => bytes,
-        Err(rejection) => {
-            let status = rejection.into_response().status();
-            return api_error(status, "request_body_rejected", None);
-        }
+        Err(_) => return api_error(StatusCode::PAYLOAD_TOO_LARGE, "request_body_rejected", None),
     };
     let value = match serde_json::from_slice::<Value>(&bytes) {
         Ok(value) => value,
@@ -247,13 +249,6 @@ where
         Ok(request) => request,
         Err(error) => return api_error(StatusCode::UNPROCESSABLE_ENTITY, input_error_code(error), None),
     };
-    let permit = match Arc::clone(&state.request_permit).try_acquire_owned() {
-        Ok(permit) => permit,
-        Err(_) => {
-            return api_error(StatusCode::TOO_MANY_REQUESTS, "service_at_capacity", Some(1));
-        }
-    };
-
     let service = Arc::clone(&state.service);
     let track = state.track;
     let result = tokio::task::spawn_blocking(move || {
@@ -272,26 +267,26 @@ where
 
 async fn search_handler<S, V, C>(
     State(state): State<HttpStateV1<S, V, C>>,
-    headers: HeaderMap,
-    body: Result<Bytes, BytesRejection>,
+    request: Request,
 ) -> Response
 where
     S: DurableAmlStoreV1 + Send + 'static,
     V: super::AddVisibilityVerifierV1 + Send + 'static,
     C: FrozenAdapterWordCounter + Send + 'static,
 {
-    if !state.auth.authorize(&headers) {
+    if !state.auth.authorize(request.headers()) {
         return api_error(StatusCode::UNAUTHORIZED, "authentication_required", None);
     }
-    if !is_json_content_type(&headers) {
+    if !is_json_content_type(request.headers()) {
         return api_error(StatusCode::UNSUPPORTED_MEDIA_TYPE, "application_json_required", None);
     }
-    let bytes = match body {
+    let permit = match Arc::clone(&state.request_permit).try_acquire_owned() {
+        Ok(permit) => permit,
+        Err(_) => return api_error(StatusCode::TOO_MANY_REQUESTS, "service_at_capacity", Some(1)),
+    };
+    let bytes = match to_bytes(request.into_body(), state.max_json_body_bytes).await {
         Ok(bytes) => bytes,
-        Err(rejection) => {
-            let status = rejection.into_response().status();
-            return api_error(status, "request_body_rejected", None);
-        }
+        Err(_) => return api_error(StatusCode::PAYLOAD_TOO_LARGE, "request_body_rejected", None),
     };
     let value = match serde_json::from_slice::<Value>(&bytes) {
         Ok(value) => value,
@@ -301,13 +296,6 @@ where
         Ok(request) => request,
         Err(error) => return api_error(StatusCode::UNPROCESSABLE_ENTITY, input_error_code(error), None),
     };
-    let permit = match Arc::clone(&state.request_permit).try_acquire_owned() {
-        Ok(permit) => permit,
-        Err(_) => {
-            return api_error(StatusCode::TOO_MANY_REQUESTS, "service_at_capacity", Some(1));
-        }
-    };
-
     let service = Arc::clone(&state.service);
     let track = state.track;
     let result = tokio::task::spawn_blocking(move || {
