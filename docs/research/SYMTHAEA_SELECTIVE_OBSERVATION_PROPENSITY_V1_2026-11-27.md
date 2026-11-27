@@ -16,6 +16,7 @@ This Symthaea increment adopts the support diagnostic and inverse-inclusion poin
 
 Each row includes:
 - the exact candidate prediction, confidence, abstention status and optional independent truth;
+- any adjudicator/panel assignment made before the outcome is observed (separate from the actual adjudicator on a completed label);
 - a known adjudication-inclusion probability for the chance that an independent label is observed by the frozen evaluation cutoff;
 - the sampling design ID and a reference to its independently frozen manifest.
 
@@ -49,7 +50,7 @@ This is an inverse-inclusion point estimator under the declared design and assum
 
 AURC uses the same item-wise convention as the selective-prediction lane. Equal-confidence groups are averaged over within-tie permutations so input order cannot change the result. The full-cohort rank/coverage denominator includes pending labels because candidate predictions are available for every cohort row. AURC is withheld if the labelled sample has no support in any confidence prefix; no confidence interval is produced.
 
-Fixed 50%, 80% and 90% operating points use full tie groups and report achieved coverage. The report also contains always-answer, observed-policy and inclusive confidence-threshold summaries. The same support and effective-sample-size checks are applied separately to domain, source-family, delayed/censored and adjudicator strata.
+Fixed 50%, 80% and 90% operating points use full tie groups and report achieved coverage. The report also contains always-answer, observed-policy and inclusive confidence-threshold summaries. The same support and effective-sample-size checks are applied separately to domain, source-family, delayed/censored and pre-label adjudicator-assignment strata. The completed label's actual adjudicator is not used as a population stratum because it may be unknown precisely for pending rows.
 
 ## Uncertainty limitation
 
@@ -66,6 +67,7 @@ The field should stop treating "we have independent labels" as equivalent to "we
 The next experiment should randomize a small audit sample across the whole candidate cohort, including abstained and low-confidence cases, stratify by domain and source family, freeze the audit probabilities before adjudication, and compare:
 - observed adjudicated-only risk;
 - inverse-propensity population risk;
+- complete-label oracle risk, retained only by the evaluator after candidate outputs are frozen.
 - complete-label oracle risk, available only to the evaluator after the prediction cohort is frozen.
 
 This permits a direct estimate of selection bias and audit-efficiency trade-offs without exposing hidden outcomes to the candidate.
