@@ -19,6 +19,7 @@ const PRIVATE_SCHEMA: &str = "mace_dsm_evaluator_private_v0_1";
 const RESPONSE_SCHEMA: &str = "mace_dsm_response_v0_1";
 const REPORT_SCHEMA: &str = "mace_dsm_score_report_v0_1";
 const CANDIDATE_DOMAIN: &[u8] = b"luminous:mace:dsm:candidate-input:v0.1\0";
+const ARM_BINDING_DOMAIN: &[u8] = b"luminous:mace:dsm:arm-response:v0.1\0";
 
 #[derive(Clone, Debug, Deserialize, Serialize)]
 #[serde(deny_unknown_fields)]
@@ -107,6 +108,7 @@ struct Response {
     episode_id: String,
     arm_id: String,
     candidate_sha256: String,
+    arm_binding_sha256: String,
     action: String,
     selected_evidence_ids: Vec<String>,
     observation_requests: usize,
@@ -180,6 +182,14 @@ fn candidate_digest(episode_id: &str, seed: u64, family: &str, candidate: &Candi
     h.update((bytes.len() as u64).to_be_bytes());
     h.update(bytes);
     Ok(hex(&h.finalize()))
+}
+fn arm_binding_digest(candidate_sha256: &str, arm_id: &str) -> String {
+    let mut h = Sha256::new();
+    h.update(ARM_BINDING_DOMAIN);
+    h.update(candidate_sha256.as_bytes());
+    h.update([0]);
+    h.update(arm_id.as_bytes());
+    hex(&h.finalize())
 }
 fn read_jsonl<T: DeserializeOwned>(path: &str) -> Result<Vec<T>, String> {
     let file = fs::File::open(path).map_err(|e| format!("open {path}: {e}"))?;
@@ -301,6 +311,9 @@ fn score_one(c: &CandidateRow, p: &PrivateRow, r: &Response) -> Result<ScoreRow,
         computed_candidate_sha256 != p.candidate_sha256 ||
         computed_candidate_sha256 != r.candidate_sha256 {
         return Err(format!("{id}: candidate/response/evaluator digest binding mismatch"));
+    }
+    if arm_binding_digest(&computed_candidate_sha256, &r.arm_id) != r.arm_binding_sha256 {
+        return Err(format!("{id}: response is not bound to its declared arm ID"));
     }
     if r.arm_id.trim().is_empty() || !c.candidate.allowed_actions.contains(&r.action) {
         return Err(format!("{id}: empty arm or disallowed action"));
@@ -608,10 +621,12 @@ mod tests {
         let e=generated_episode(0,77);
         let c=CandidateRow{schema_version:CANDIDATE_SCHEMA.into(),episode_id:e.episode_id.clone(),seed:e.seed,family:e.family.clone(),candidate_sha256:candidate_digest(&e.episode_id, e.seed, &e.family, &e.candidate).unwrap(),candidate:e.candidate.clone()};
         let p=PrivateRow{schema_version:PRIVATE_SCHEMA.into(),episode_id:e.episode_id.clone(),seed:e.seed,family:e.family.clone(),candidate_sha256:candidate_digest(&e.episode_id, e.seed, &e.family, &e.candidate).unwrap(),evaluator_private:e.evaluator_private.clone()};
-        let r=Response{schema_version:RESPONSE_SCHEMA.into(),episode_id:e.episode_id,arm_id:"bad-memory".into(),candidate_sha256:c.candidate_sha256.clone(),action:"use_old_account".into(),selected_evidence_ids:vec!["event-000000-old".into()],observation_requests:0,cost:Cost{ingest_operations:1,query_operations:1,maintenance_operations:0,retained_bytes:10,returned_bytes:10,latency_us:None}};
+        let r=Response{schema_version:RESPONSE_SCHEMA.into(),episode_id:e.episode_id,arm_id:"bad-memory".into(),candidate_sha256:c.candidate_sha256.clone(),arm_binding_sha256:arm_binding_digest(&c.candidate_sha256,"bad-memory"),action:"use_old_account".into(),selected_evidence_ids:vec!["event-000000-old".into()],observation_requests:0,cost:Cost{ingest_operations:1,query_operations:1,maintenance_operations:0,retained_bytes:10,returned_bytes:10,latency_us:None}};
         let s=score_one(&c,&p,&r).unwrap();
         let mut mismatched = r.clone(); mismatched.candidate_sha256 = "0".repeat(64);
         assert!(score_one(&c,&p,&mismatched).is_err());
+        let mut relabelled = r.clone(); relabelled.arm_id = "other-arm".into();
+        assert!(score_one(&c,&p,&relabelled).is_err());
         assert_eq!(s.regret,12.0);assert!(s.worse_than_declared_no_memory_reference);assert_eq!(s.gain_vs_declared_no_memory_reference,-10.0);assert_eq!(s.stale_or_superseded_evidence_count,1);
     }
 }
