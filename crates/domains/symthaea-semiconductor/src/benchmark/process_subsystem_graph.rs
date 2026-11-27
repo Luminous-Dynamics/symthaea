@@ -49,7 +49,6 @@ pub enum ProcessSubsystemRelationKindV1 {
     MeasurementDependency,
     ThermalCoupling,
     ElectricalCoupling,
-    Other,
 }
 
 impl ProcessSubsystemRelationKindV1 {
@@ -821,24 +820,34 @@ mod tests {
     }
 
     #[test]
-    fn symmetric_thermal_coupling_can_be_bidirectional_without_false_cycle() {
+    fn symmetric_coupling_cycle_is_allowed_without_implying_causality() {
         let mut graph = valid_manifest();
+        graph.subsystems.push(subsystem("vacuum", "etch"));
         graph.relations = vec![
             relation(
-                "r-thermal-1",
+                "thermal-gas-plasma",
                 "gas",
                 "plasma",
                 ProcessSubsystemRelationKindV1::ThermalCoupling,
             ),
             relation(
-                "r-thermal-2",
+                "thermal-plasma-vacuum",
                 "plasma",
+                "vacuum",
+                ProcessSubsystemRelationKindV1::ThermalCoupling,
+            ),
+            relation(
+                "thermal-vacuum-gas",
+                "vacuum",
                 "gas",
                 ProcessSubsystemRelationKindV1::ThermalCoupling,
             ),
         ];
         graph.graph_sha256 = seal_process_subsystem_graph_v1(&graph).unwrap();
-        assert!(validate_process_subsystem_graph_v1(&graph).is_err());
+        let report = validate_process_subsystem_graph_v1(&graph).unwrap();
+        assert_eq!(report.status, ProcessSubsystemGraphStatusV1::Complete);
+        assert!(report.directed_dependency_graph_is_acyclic);
+        assert!(!report.physical_causality_proven);
     }
 
     #[test]
