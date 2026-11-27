@@ -1,0 +1,463 @@
+{
+  "schema_version": "sdcb-decision-sufficiency-v1",
+  "title": "Decision sufficiency under physical-process / sensor-response observational equivalence",
+  "status": "frozen-synthetic-analytic-control-not-physical-validation",
+  "source_challenge": {
+    "path": "docs/research/SDCB_RESPONSE_IDENTIFIABILITY_CHALLENGE_V1.json",
+    "commit": "32ed97333ce383ab4c604ee558bb642341872f3e",
+    "world_ids": [
+      "world_a_physical_slow_sensor_fast",
+      "world_b_physical_fast_sensor_slow"
+    ]
+  },
+  "model_scope": {
+    "family": "stationary_scalar_ou_followed_by_first_order_low_pass_sensor",
+    "worlds_are_zero_mean_gaussian": true,
+    "passive_equivalence_claim": "Equality of the mean and full autocovariance function establishes equality of finite-dimensional distributions for this declared Gaussian family.",
+    "upstream_equivalence_claim": "The declared unit-DC-gain first-order physical relaxation followed by the first-order sensor has a pole-symmetric transfer function.",
+    "sensor_inlet_inference": "The passive observations identify the unordered pole pair; a traceable sensor-inlet step identifies the sensor pole, and the remaining pole is then the physical pole within this two-pole model family.",
+    "exclusions": [
+      "unknown model families",
+      "nonlinear sensor response",
+      "unknown delay",
+      "unknown or drifting response parameters",
+      "uncharacterized reference dynamics"
+    ]
+  },
+  "equivalence_protocols": [
+    {
+      "id": "passive_sensor_output_autocovariance",
+      "source_probe_id": "passive_sensor_output_autocovariance",
+      "equivalence_class_partition": [
+        [
+          "world_a_physical_slow_sensor_fast",
+          "world_b_physical_fast_sensor_slow"
+        ]
+      ],
+      "mechanism_identifiability": "non_identifiable",
+      "comparison_scope": "complete zero-mean Gaussian finite-dimensional output law, not a finite vector treated as independent observations"
+    },
+    {
+      "id": "upstream_command_first_order_relaxation_cascade",
+      "source_probe_id": "upstream_command_first_order_relaxation_cascade",
+      "equivalence_class_partition": [
+        [
+          "world_a_physical_slow_sensor_fast",
+          "world_b_physical_fast_sensor_slow"
+        ]
+      ],
+      "mechanism_identifiability": "non_identifiable",
+      "comparison_scope": "pole-symmetric command-to-output transfer function"
+    },
+    {
+      "id": "traceable_sensor_inlet_step",
+      "source_probe_id": "traceable_sensor_inlet_step",
+      "source_json_pointers": {
+        "world_a_at_0_5": "/probes/traceable_sensor_inlet_step/world_a_expected/0",
+        "world_b_at_0_5": "/probes/traceable_sensor_inlet_step/world_b_expected/0"
+      },
+      "equivalence_class_partition": [
+        [
+          "world_a_physical_slow_sensor_fast"
+        ],
+        [
+          "world_b_physical_fast_sensor_slow"
+        ]
+      ],
+      "mechanism_identifiability": "identifiable_for_declared_two_pole_family",
+      "comparison_scope": "traceable stimulus applied at the sensor inlet, bypassing the unknown physical process"
+    },
+    {
+      "id": "independent_reference_of_latent_process",
+      "source_probe_id": "independent_reference_of_latent_process",
+      "source_json_pointers": {
+        "world_a_at_lag_0_5": "/probes/independent_reference_of_latent_process/world_a_expected/0",
+        "world_b_at_lag_0_5": "/probes/independent_reference_of_latent_process/world_b_expected/0"
+      },
+      "equivalence_class_partition": [
+        [
+          "world_a_physical_slow_sensor_fast"
+        ],
+        [
+          "world_b_physical_fast_sensor_slow"
+        ]
+      ],
+      "mechanism_identifiability": "identifiable_for_declared_reference_contract",
+      "comparison_scope": "independently characterized reference observing the physical process"
+    }
+  ],
+  "probes": [
+    {
+      "id": "passive_sensor_output_autocovariance",
+      "kind": "passive_observation",
+      "source_probe_id": "passive_sensor_output_autocovariance",
+      "information_relation": "identical_complete_law",
+      "partitions": [
+        [
+          "world_a_physical_slow_sensor_fast",
+          "world_b_physical_fast_sensor_slow"
+        ]
+      ],
+      "resource_cost_vector": {
+        "experiment_units": 1,
+        "reference_units": 0,
+        "elapsed_ticks": 1,
+        "compute_ticks": 0
+      },
+      "cost_units": "synthetic benchmark units only"
+    },
+    {
+      "id": "upstream_command_first_order_relaxation_cascade",
+      "kind": "upstream_intervention",
+      "source_probe_id": "upstream_command_first_order_relaxation_cascade",
+      "information_relation": "identical_transfer_function_under_pole_swap",
+      "partitions": [
+        [
+          "world_a_physical_slow_sensor_fast",
+          "world_b_physical_fast_sensor_slow"
+        ]
+      ],
+      "resource_cost_vector": {
+        "experiment_units": 1,
+        "reference_units": 0,
+        "elapsed_ticks": 1,
+        "compute_ticks": 0
+      },
+      "cost_units": "synthetic benchmark units only"
+    },
+    {
+      "id": "traceable_sensor_inlet_step",
+      "kind": "sensor_inlet_calibration",
+      "source_probe_id": "traceable_sensor_inlet_step",
+      "information_relation": "distinct_deterministic_signatures",
+      "partitions": [
+        [
+          "world_a_physical_slow_sensor_fast"
+        ],
+        [
+          "world_b_physical_fast_sensor_slow"
+        ]
+      ],
+      "resource_cost_vector": {
+        "experiment_units": 1,
+        "reference_units": 1,
+        "elapsed_ticks": 1,
+        "compute_ticks": 0
+      },
+      "cost_units": "synthetic benchmark units only"
+    },
+    {
+      "id": "independent_reference_of_latent_process",
+      "kind": "independent_reference",
+      "source_probe_id": "independent_reference_of_latent_process",
+      "information_relation": "distinct_deterministic_signatures",
+      "partitions": [
+        [
+          "world_a_physical_slow_sensor_fast"
+        ],
+        [
+          "world_b_physical_fast_sensor_slow"
+        ]
+      ],
+      "resource_cost_vector": {
+        "experiment_units": 1,
+        "reference_units": 2,
+        "elapsed_ticks": 2,
+        "compute_ticks": 0
+      },
+      "cost_units": "synthetic benchmark units only"
+    },
+    {
+      "id": "world_independent_nuisance_bit",
+      "kind": "nuisance_measurement",
+      "information_relation": "one_bit_entropy_but_zero_world_information",
+      "outcome_probabilities_by_world": {
+        "world_a_physical_slow_sensor_fast": {
+          "zero": 0.5,
+          "one": 0.5
+        },
+        "world_b_physical_fast_sensor_slow": {
+          "zero": 0.5,
+          "one": 0.5
+        }
+      },
+      "partitions_by_possible_outcome": {
+        "zero": [
+          [
+            "world_a_physical_slow_sensor_fast",
+            "world_b_physical_fast_sensor_slow"
+          ]
+        ],
+        "one": [
+          [
+            "world_a_physical_slow_sensor_fast",
+            "world_b_physical_fast_sensor_slow"
+          ]
+        ]
+      },
+      "mutual_information_bits_between_outcome_and_world": 0,
+      "outcome_entropy_bits": 1,
+      "resource_cost_vector": {
+        "experiment_units": 1,
+        "reference_units": 0,
+        "elapsed_ticks": 0,
+        "compute_ticks": 1
+      },
+      "cost_units": "synthetic benchmark units only"
+    }
+  ],
+  "decision_tasks": [
+    {
+      "id": "non_identifiable_but_decision_sufficient",
+      "purpose": "Show that unresolved mechanism identity does not imply an unresolved terminal decision.",
+      "worlds": [
+        "world_a_physical_slow_sensor_fast",
+        "world_b_physical_fast_sensor_slow"
+      ],
+      "prior_for_bayesian_track": {
+        "world_a_physical_slow_sensor_fast": 0.5,
+        "world_b_physical_fast_sensor_slow": 0.5,
+        "status": "synthetic_evaluator_prior_not_empirical"
+      },
+      "terminal_loss": {
+        "actions": [
+          {
+            "id": "apply_shared_output_policy",
+            "loss_by_world": {
+              "world_a_physical_slow_sensor_fast": 0,
+              "world_b_physical_fast_sensor_slow": 0
+            }
+          },
+          {
+            "id": "disable_and_escalate",
+            "loss_by_world": {
+              "world_a_physical_slow_sensor_fast": 1,
+              "world_b_physical_fast_sensor_slow": 1
+            }
+          }
+        ]
+      },
+      "known_answers": {
+        "prior_free_robust": {
+          "no_probe": {
+            "minimax_terminal_loss": 0,
+            "optimal_action": "apply_shared_output_policy"
+          },
+          "passive_probe": {
+            "minimax_terminal_loss": 0,
+            "optimal_policy": "stop_without_additional_probe"
+          },
+          "upstream_probe": {
+            "minimax_terminal_loss": 0,
+            "optimal_policy": "stop_without_additional_probe"
+          },
+          "sensor_inlet_probe": {
+            "minimax_terminal_loss": 0,
+            "optimal_policy": "no_decision_value_from_probe"
+          },
+          "nuisance_probe": {
+            "minimax_terminal_loss": 0,
+            "optimal_policy": "no_decision_value_from_probe"
+          }
+        },
+        "bayesian": {
+          "prior_bayes_risk_without_probe": 0,
+          "posterior_bayes_risk_after_any_listed_probe": 0,
+          "evsi_by_probe": {
+            "passive_sensor_output_autocovariance": 0,
+            "upstream_command_first_order_relaxation_cascade": 0,
+            "traceable_sensor_inlet_step": 0,
+            "independent_reference_of_latent_process": 0,
+            "world_independent_nuisance_bit": 0
+          },
+          "preferred_policy": "stop_without_additional_probe"
+        }
+      }
+    },
+    {
+      "id": "non_identifiable_and_decision_sensitive",
+      "purpose": "Show that a probe is valuable when the optimal terminal action changes across members of the current observational-equivalence class.",
+      "worlds": [
+        "world_a_physical_slow_sensor_fast",
+        "world_b_physical_fast_sensor_slow"
+      ],
+      "prior_for_bayesian_track": {
+        "world_a_physical_slow_sensor_fast": 0.5,
+        "world_b_physical_fast_sensor_slow": 0.5,
+        "status": "synthetic_evaluator_prior_not_empirical"
+      },
+      "terminal_loss": {
+        "actions": [
+          {
+            "id": "treat_as_slow_physical_process",
+            "loss_by_world": {
+              "world_a_physical_slow_sensor_fast": 0,
+              "world_b_physical_fast_sensor_slow": 1
+            }
+          },
+          {
+            "id": "treat_as_fast_physical_process",
+            "loss_by_world": {
+              "world_a_physical_slow_sensor_fast": 1,
+              "world_b_physical_fast_sensor_slow": 0
+            }
+          }
+        ]
+      },
+      "budgets": {
+        "max_experiment_units": 1,
+        "max_reference_units": 1,
+        "max_elapsed_ticks": 1,
+        "max_compute_ticks": 1,
+        "interpretation": "Synthetic resource constraints; no conversion to terminal loss."
+      },
+      "known_answers": {
+        "prior_free_robust": {
+          "no_probe": {
+            "minimax_terminal_loss": 1,
+            "optimal_action_set": [
+              "treat_as_fast_physical_process",
+              "treat_as_slow_physical_process"
+            ]
+          },
+          "passive_probe": {
+            "minimax_terminal_loss": 1,
+            "equivalence_partition": [
+              [
+                "world_a_physical_slow_sensor_fast",
+                "world_b_physical_fast_sensor_slow"
+              ]
+            ]
+          },
+          "upstream_probe": {
+            "minimax_terminal_loss": 1,
+            "equivalence_partition": [
+              [
+                "world_a_physical_slow_sensor_fast",
+                "world_b_physical_fast_sensor_slow"
+              ]
+            ]
+          },
+          "sensor_inlet_probe": {
+            "minimax_terminal_loss": 0,
+            "equivalence_partition": [
+              [
+                "world_a_physical_slow_sensor_fast"
+              ],
+              [
+                "world_b_physical_fast_sensor_slow"
+              ]
+            ],
+            "outcome_to_terminal_action": {
+              "fast_sensor_response_world_a": "treat_as_slow_physical_process",
+              "slow_sensor_response_world_b": "treat_as_fast_physical_process"
+            }
+          },
+          "independent_reference_probe": {
+            "minimax_terminal_loss": 0,
+            "equivalence_partition": [
+              [
+                "world_a_physical_slow_sensor_fast"
+              ],
+              [
+                "world_b_physical_fast_sensor_slow"
+              ]
+            ],
+            "outcome_to_terminal_action": {
+              "slow_physical_response_world_a": "treat_as_slow_physical_process",
+              "fast_physical_response_world_b": "treat_as_fast_physical_process"
+            },
+            "budget_status": "not_feasible_under_declared_reference_units"
+          },
+          "nuisance_probe": {
+            "minimax_terminal_loss": 1,
+            "equivalence_partition_by_outcome": {
+              "zero": [
+                [
+                  "world_a_physical_slow_sensor_fast",
+                  "world_b_physical_fast_sensor_slow"
+                ]
+              ],
+              "one": [
+                [
+                  "world_a_physical_slow_sensor_fast",
+                  "world_b_physical_fast_sensor_slow"
+                ]
+              ]
+            }
+          }
+        },
+        "bayesian": {
+          "prior_bayes_risk_without_probe": 0.5,
+          "posterior_bayes_risk_after_passive_probe": 0.5,
+          "posterior_bayes_risk_after_upstream_probe": 0.5,
+          "posterior_bayes_risk_after_sensor_inlet_probe": 0,
+          "posterior_bayes_risk_after_nuisance_probe": 0.5,
+          "evsi_by_probe": {
+            "passive_sensor_output_autocovariance": 0,
+            "upstream_command_first_order_relaxation_cascade": 0,
+            "traceable_sensor_inlet_step": 0.5,
+            "independent_reference_of_latent_process": 0.5,
+            "world_independent_nuisance_bit": 0
+          },
+          "preferred_feasible_probe_under_declared_budget": "traceable_sensor_inlet_step"
+        }
+      }
+    }
+  ],
+  "fixed_design_identifiability_adapter": {
+    "owner": "#12454",
+    "status": "not_executable_until_each_mapped_action_supplies_all_required_fields",
+    "required_fields": [
+      "finite expected mean per candidate mechanism",
+      "known positive Gaussian sigma per action",
+      "positive replicate cost per action",
+      "independent replicates justified by the measurement protocol"
+    ],
+    "permitted_use": "The sensor-inlet scalar response may be mapped only after the evaluator supplies and justifies its noise and replicate-cost model.",
+    "forbidden_use": "Do not map the passive autocovariance kernel or a serially dependent time series into independent scalar replicates by relabeling covariance values as means."
+  },
+  "adaptive_policy_adapter": {
+    "owner": "#13567",
+    "required_estimands": [
+      "prior-free robust terminal loss",
+      "Bayesian expected terminal loss when a defensible prior/likelihood exists"
+    ],
+    "constraints": [
+      "non-anticipativity",
+      "resource-vector budgets",
+      "outcome support preservation",
+      "deterministic tie-breaking",
+      "stop represented as a terminal decision"
+    ],
+    "policy": "No new experiment planner is introduced by this fixture."
+  },
+  "numerical_decision_adapter": {
+    "owner": "#14000",
+    "rule": "A terminal action is numerically unique only when its conservative lower value bound exceeds every competing upper value bound.",
+    "unresolved_behavior": "Keep the decision unresolved and abstain when enclosures overlap or a hard computation budget is exhausted."
+  },
+  "evidence_authority": {
+    "owner": "#13805",
+    "rule": "A valid likelihood or identifiability classification is not an independently verified observation receipt and does not authorize a ledger mutation or physical action."
+  },
+  "scoring": {
+    "hard_failures": [
+      "unique mechanism assignment under passive or upstream pole-symmetric observations",
+      "selecting a positive-cost probe in the decision-invariant task solely to reduce mechanism uncertainty",
+      "crediting the nuisance probe with decision value",
+      "claiming decision resolution when probe outcome support still contains both worlds",
+      "converting synthetic resource units into terminal loss without a declared task utility"
+    ],
+    "report_separately": [
+      "mechanism equivalence-class coverage",
+      "decision-sufficiency correctness",
+      "Bayesian EVSI",
+      "prior-free robust terminal loss",
+      "probe resource vector",
+      "policy regret against #13567",
+      "abstention and unsupported-case rate"
+    ]
+  },
+  "claim_boundary": "A synthetic analytic decision-sufficiency control. No physical sensor calibration, metrological traceability, real-data validation, SOTA score, or production policy performance is established."
+}
