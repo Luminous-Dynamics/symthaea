@@ -279,6 +279,7 @@ pub enum EvaluationErrorV1 {
     DuplicateAblationTarget,
     AblationSetIncomplete,
     AblationEvidenceSetMismatch,
+    AblationSelectedSetMismatch,
     AblationSystemMismatch,
     NoClusteredEpisodes,
     EmptyClusterId,
@@ -1191,6 +1192,7 @@ mod tests {
             decision_seed: full.decision_seed,
             chosen_action: "abstain".to_owned(),
             retrieved_evidence_ids: vec![],
+            decision_support_evidence_ids: vec![],
         };
         without.downstream_policy_digest = "c".repeat(64);
         assert_eq!(
