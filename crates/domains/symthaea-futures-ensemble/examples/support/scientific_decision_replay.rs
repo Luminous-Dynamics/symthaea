@@ -380,6 +380,8 @@ pub struct EvaluatorResolution {
     pub action_support: ActionSupport,
     pub recorded_action_id: Option<String>,
     pub recorded_action_payload_digest: Option<String>,
+    /// Upstream executor/Lab job receipt reference; this module never creates the receipt.
+    pub execution_receipt_ref: Option<String>,
     pub outcome_label: Option<String>,
     pub evaluator_evidence: Vec<EvidenceReference>,
     pub finalized_at_ms: Option<u64>,
@@ -419,6 +421,9 @@ impl EvaluatorResolution {
         }
         if let Some(r) = &self.independent_adjudication_ref {
             require_nonempty("adjudication reference", r)?;
+        }
+        if let Some(r) = &self.execution_receipt_ref {
+            require_nonempty("execution receipt reference", r)?;
         }
 
         match self.execution_status {
@@ -539,6 +544,11 @@ impl EvaluatorResolution {
         if actual_id != expected_id || actual_payload != expected_payload_digest {
             return Err("recorded action identity/payload differs from proposal".into());
         }
+        let receipt = self
+            .execution_receipt_ref
+            .as_deref()
+            .ok_or_else(|| "recorded action requires an upstream execution receipt reference".to_string())?;
+        require_nonempty("execution receipt reference", receipt)?;
         Ok(())
     }
 }
@@ -683,6 +693,7 @@ mod tests {
             recorded_action_payload_digest: Some(
                 "6666666666666666666666666666666666666666666666666666666666666666".into(),
             ),
+            execution_receipt_ref: Some("lab-job-0001".into()),
             outcome_label: Some("yes".into()),
             evaluator_evidence: vec![EvidenceReference {
                 evidence_id: "result".into(),
@@ -818,6 +829,19 @@ mod tests {
     }
 
     #[test]
+    fn recorded_action_requires_upstream_execution_receipt() {
+        let c = context();
+        let p = proposal(&c);
+        let mut r = resolution(&c);
+        r.execution_receipt_ref = None;
+        assert!(
+            r.validate_against(&c, &p)
+                .unwrap_err()
+                .contains("upstream execution receipt reference")
+        );
+    }
+
+    #[test]
     fn rejects_fabricated_unsupported_outcome() {
         let c = context();
         let p = proposal(&c);
@@ -827,6 +851,7 @@ mod tests {
         r.action_support = ActionSupport::NoRecordedAction;
         r.recorded_action_id = None;
         r.recorded_action_payload_digest = None;
+        r.execution_receipt_ref = None;
         r.outcome_label = Some("yes".into());
         r.evaluator_evidence.clear();
         r.finalized_at_ms = None;
