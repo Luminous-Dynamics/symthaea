@@ -36,6 +36,7 @@ fn row(
         event_time_unix_seconds: 10_000 + round_id as i64 * 10,
         prediction_time_unix_seconds: 10_001 + round_id as i64 * 10,
         clock_domain_id: "oracle-clock".into(),
+        context_stratum_id: Some(format!("oracle-stratum-{}", round_id % 2)),
         acquisition: PhysicalAcquisitionRecordV1 {
             state: acquisition,
             selection_design_kind: PhysicalSelectionDesignKindV1::DeterministicOrAdaptive,
