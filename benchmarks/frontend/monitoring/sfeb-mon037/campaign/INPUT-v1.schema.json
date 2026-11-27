@@ -37,7 +37,16 @@
     "transaction_proofs_sha256",
     "topic_partitions_sha256",
     "required_surface_ids_sha256",
-    "surface_assertions_sha256"
+    "surface_assertions_sha256",
+    "source_truth_boundary_sha256",
+    "observed_capture_boundary_sha256",
+    "transaction_report_boundary_sha256",
+    "surface_inventory_boundary_sha256",
+    "mon034_boundary_sha256",
+    "mon035_boundary_sha256",
+    "mon036_boundary_sha256",
+    "mon024_boundary_sha256",
+    "recovery_boundary"
   ],
   "properties": {
     "profile": {
@@ -231,19 +240,147 @@
       ],
       "properties": {
         "mon033_offset_proof": {
-          "type": "object"
+          "type": "object",
+          "required": [
+            "profile",
+            "version",
+            "target",
+            "target_reached",
+            "captured_at",
+            "offsets_sha256",
+            "boundary_sha256",
+            "offset"
+          ],
+          "properties": {
+            "profile": {
+              "const": "mon033-postgres-offset-target-v1"
+            },
+            "version": {
+              "const": "1.0.0"
+            },
+            "target": {
+              "enum": [
+                "lsn_events_processed_1",
+                "transactional_message"
+              ]
+            },
+            "target_reached": {
+              "type": "boolean"
+            },
+            "captured_at": {
+              "type": "string",
+              "format": "date-time"
+            },
+            "offsets_sha256": {
+              "$ref": "#/$defs/digest"
+            },
+            "boundary_sha256": {
+              "$ref": "#/$defs/digest"
+            },
+            "offset": {
+              "type": "object"
+            }
+          }
         },
         "mon034_timeline_result": {
-          "type": "object"
+          "type": "object",
+          "required": [
+            "profile",
+            "version",
+            "boundary_sha256",
+            "result"
+          ],
+          "properties": {
+            "profile": {
+              "const": "mon034-postgres-timeline-ancestry-result-v1"
+            },
+            "version": {
+              "const": "1.0.0"
+            },
+            "boundary_sha256": {
+              "$ref": "#/$defs/digest"
+            },
+            "result": {
+              "type": "object"
+            }
+          }
         },
         "mon035_observer_result": {
-          "type": "object"
+          "type": "object",
+          "required": [
+            "profile",
+            "version",
+            "boundary_sha256",
+            "result"
+          ],
+          "properties": {
+            "profile": {
+              "const": "mon035-observer-independence-result-v1"
+            },
+            "version": {
+              "const": "1.0.0"
+            },
+            "boundary_sha256": {
+              "$ref": "#/$defs/digest"
+            },
+            "result": {
+              "type": "object"
+            }
+          }
         },
         "mon036_continuity_result": {
-          "type": "object"
+          "type": "object",
+          "required": [
+            "profile",
+            "version",
+            "boundary_sha256",
+            "ledger_integrity_valid",
+            "ledger_complete",
+            "claims"
+          ],
+          "properties": {
+            "profile": {
+              "const": "mon036-recovery-evidence-continuity-result-v1"
+            },
+            "version": {
+              "const": "1.0.0"
+            },
+            "boundary_sha256": {
+              "$ref": "#/$defs/digest"
+            },
+            "ledger_integrity_valid": {
+              "type": "boolean"
+            },
+            "ledger_complete": {
+              "type": "boolean"
+            },
+            "claims": {
+              "type": "array"
+            }
+          }
         },
         "mon024_proof_graph_result": {
-          "type": "object"
+          "type": "object",
+          "required": [
+            "boundary_sha256",
+            "verdict",
+            "may_enable_traffic"
+          ],
+          "properties": {
+            "boundary_sha256": {
+              "$ref": "#/$defs/digest"
+            },
+            "verdict": {
+              "enum": [
+                "qualified",
+                "blocked",
+                "indeterminate"
+              ]
+            },
+            "may_enable_traffic": {
+              "type": "boolean"
+            }
+          }
         }
       }
     },
@@ -298,6 +435,81 @@
     },
     "deduplication_coverage_sha256": {
       "$ref": "#/$defs/digest"
+    },
+    "source_truth_boundary_sha256": {
+      "$ref": "#/$defs/digest"
+    },
+    "observed_capture_boundary_sha256": {
+      "$ref": "#/$defs/digest"
+    },
+    "transaction_report_boundary_sha256": {
+      "$ref": "#/$defs/digest"
+    },
+    "surface_inventory_boundary_sha256": {
+      "$ref": "#/$defs/digest"
+    },
+    "mon034_boundary_sha256": {
+      "$ref": "#/$defs/digest"
+    },
+    "mon035_boundary_sha256": {
+      "$ref": "#/$defs/digest"
+    },
+    "mon036_boundary_sha256": {
+      "$ref": "#/$defs/digest"
+    },
+    "mon024_boundary_sha256": {
+      "$ref": "#/$defs/digest"
+    },
+    "mon033_boundary_sha256": {
+      "$ref": "#/$defs/digest"
+    },
+    "recovery_boundary": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "incident_id",
+        "claim_id",
+        "source_cluster_id",
+        "database",
+        "source_epoch",
+        "timeline_id",
+        "snapshot_id",
+        "terminal_position",
+        "scope_digest",
+        "inventory_digest"
+      ],
+      "properties": {
+        "incident_id": {
+          "$ref": "#/$defs/identifier"
+        },
+        "claim_id": {
+          "$ref": "#/$defs/identifier"
+        },
+        "source_cluster_id": {
+          "$ref": "#/$defs/identifier"
+        },
+        "database": {
+          "$ref": "#/$defs/identifier"
+        },
+        "source_epoch": {
+          "$ref": "#/$defs/identifier"
+        },
+        "timeline_id": {
+          "$ref": "#/$defs/identifier"
+        },
+        "snapshot_id": {
+          "$ref": "#/$defs/identifier"
+        },
+        "terminal_position": {
+          "$ref": "#/$defs/identifier"
+        },
+        "scope_digest": {
+          "$ref": "#/$defs/digest"
+        },
+        "inventory_digest": {
+          "$ref": "#/$defs/digest"
+        }
+      }
     }
   },
   "allOf": [
@@ -325,6 +537,23 @@
             "$ref": "#/$defs/digest"
           }
         }
+      }
+    },
+    {
+      "if": {
+        "properties": {
+          "offset_target_required": {
+            "const": true
+          }
+        },
+        "required": [
+          "offset_target_required"
+        ]
+      },
+      "then": {
+        "required": [
+          "mon033_boundary_sha256"
+        ]
       }
     }
   ],
