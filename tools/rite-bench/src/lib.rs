@@ -36,7 +36,7 @@ pub struct CitationRecord {
     pub origin_id: String,
     /// Set by an independent evaluator against the claim-specific rubric.
     pub eligible_for_claim: bool,
-    pub supports_claim: bool,
+    pub supports_expected_decision: bool,
 }
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
@@ -44,6 +44,8 @@ pub struct InterventionObservation {
     pub kind: InterventionKind,
     pub decision_before: Decision,
     pub decision_after: Decision,
+    /// Ground-truth decision after this intervention.
+    pub expected_after: Decision,
 }
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
@@ -100,7 +102,7 @@ pub struct TaskRecord {
     pub confidence_correct: f64,
     pub citations: Vec<CitationRecord>,
     /// Oracle-defined requirement; mirrored URLs do not increase this count.
-    pub minimum_independent_support_origins: usize,
+    pub minimum_independent_decision_origins: usize,
     pub interventions: Vec<InterventionObservation>,
     pub replay_required: bool,
     pub replay: Option<ReplayEvidence>,
@@ -144,8 +146,8 @@ pub struct Scorecard {
     pub expected_calibration_error_10_bin: Mean,
     pub citation_precision: Rate,
     pub independent_support_adequacy: Rate,
-    pub counterfactual_sensitivity: Rate,
-    pub source_removal_sensitivity: Rate,
+    pub counterfactual_oracle_accuracy: Rate,
+    pub source_removal_oracle_accuracy: Rate,
     pub placebo_invariance: Rate,
     pub replay_pass_rate: Rate,
     pub budget_compliance: Rate,
@@ -166,6 +168,8 @@ pub enum EvaluationError {
     EmptyCitationOriginId(String),
     EmptyBudgetLimits(String),
     UnexpectedReplayEvidence(String),
+    InvalidPlaceboOracle(String),
+    ResourceTotalsOverflow,
 }
 
 impl fmt::Display for EvaluationError {
@@ -189,6 +193,12 @@ impl fmt::Display for EvaluationError {
             Self::UnexpectedReplayEvidence(id) => {
                 write!(f, "replay evidence supplied when replay is not required: {id}")
             }
+            Self::InvalidPlaceboOracle(id) => {
+                write!(f, "placebo oracle must preserve the pre-intervention decision: {id}")
+            }
+            Self::ResourceTotalsOverflow => {
+                f.write_str("resource totals overflowed the supported integer range")
+            }
         }
     }
 }
@@ -205,7 +215,7 @@ struct CalibrationBin {
 fn support_origin_count(record: &TaskRecord) -> usize {
     let mut origins = HashSet::new();
     for citation in &record.citations {
-        if citation.eligible_for_claim && citation.supports_claim {
+        if citation.eligible_for_claim && citation.supports_expected_decision {
             origins.insert(citation.origin_id.as_str());
         }
     }
@@ -245,6 +255,12 @@ fn validate(records: &[TaskRecord]) -> Result<(), EvaluationError> {
         if record.replay.is_some() && !record.replay_required {
             return Err(EvaluationError::UnexpectedReplayEvidence(task_id.to_string()));
         }
+        if record.interventions.iter().any(|intervention| {
+            intervention.kind == InterventionKind::Placebo
+                && intervention.expected_after != intervention.decision_before
+        }) {
+            return Err(EvaluationError::InvalidPlaceboOracle(task_id.to_string()));
+        }
     }
     Ok(())
 }
@@ -262,16 +278,16 @@ pub fn evaluate(records: &[TaskRecord]) -> Result<Scorecard, EvaluationError> {
         std::array::from_fn(|_| CalibrationBin::default());
 
     let mut citation_count = 0_u64;
-    let mut eligible_citations = 0_u64;
+    let mut correct_supporting_citations = 0_u64;
     let mut support_required = 0_u64;
     let mut support_adequate = 0_u64;
 
     let mut counterfactual_count = 0_u64;
-    let mut counterfactual_changed = 0_u64;
+    let mut counterfactual_oracle_correct = 0_u64;
     let mut source_removal_count = 0_u64;
-    let mut source_removal_changed = 0_u64;
+    let mut source_removal_oracle_correct = 0_u64;
     let mut placebo_count = 0_u64;
-    let mut placebo_unchanged = 0_u64;
+    let mut placebo_oracle_correct = 0_u64;
 
     let mut replay_required = 0_u64;
     let mut replay_passed = 0_u64;
@@ -309,39 +325,37 @@ pub fn evaluate(records: &[TaskRecord]) -> Result<Scorecard, EvaluationError> {
 
         for citation in &record.citations {
             citation_count += 1;
-            if citation.eligible_for_claim {
-                eligible_citations += 1;
+            if citation.eligible_for_claim && citation.supports_expected_decision {
+                correct_supporting_citations += 1;
             }
         }
 
-        if record.expected_decision == Decision::Supported
-            && record.minimum_independent_support_origins > 0
-        {
+        if record.minimum_independent_decision_origins > 0 {
             support_required += 1;
-            if support_origin_count(record) >= record.minimum_independent_support_origins {
+            if support_origin_count(record) >= record.minimum_independent_decision_origins {
                 support_adequate += 1;
             }
         }
 
         for intervention in &record.interventions {
-            let changed = intervention.decision_before != intervention.decision_after;
+            let matched_oracle = intervention.decision_after == intervention.expected_after;
             match intervention.kind {
                 InterventionKind::Counterfactual => {
                     counterfactual_count += 1;
-                    if changed {
-                        counterfactual_changed += 1;
+                    if matched_oracle {
+                        counterfactual_oracle_correct += 1;
                     }
                 }
                 InterventionKind::SourceRemoval => {
                     source_removal_count += 1;
-                    if changed {
-                        source_removal_changed += 1;
+                    if matched_oracle {
+                        source_removal_oracle_correct += 1;
                     }
                 }
                 InterventionKind::Placebo => {
                     placebo_count += 1;
-                    if !changed {
-                        placebo_unchanged += 1;
+                    if matched_oracle {
+                        placebo_oracle_correct += 1;
                     }
                 }
             }
@@ -366,11 +380,18 @@ pub fn evaluate(records: &[TaskRecord]) -> Result<Scorecard, EvaluationError> {
             }
         }
 
-        total_tokens = total_tokens.saturating_add(record.resources.tokens);
-        total_tool_calls = total_tool_calls.saturating_add(record.resources.tool_calls);
-        total_wall_time_ms = total_wall_time_ms.saturating_add(record.resources.wall_time_ms);
-        total_cost_micros_usd =
-            total_cost_micros_usd.saturating_add(record.resources.cost_micros_usd);
+        total_tokens = total_tokens
+            .checked_add(record.resources.tokens)
+            .ok_or(EvaluationError::ResourceTotalsOverflow)?;
+        total_tool_calls = total_tool_calls
+            .checked_add(record.resources.tool_calls)
+            .ok_or(EvaluationError::ResourceTotalsOverflow)?;
+        total_wall_time_ms = total_wall_time_ms
+            .checked_add(record.resources.wall_time_ms)
+            .ok_or(EvaluationError::ResourceTotalsOverflow)?;
+        total_cost_micros_usd = total_cost_micros_usd
+            .checked_add(record.resources.cost_micros_usd)
+            .ok_or(EvaluationError::ResourceTotalsOverflow)?;
     }
 
     let task_count = records.len() as u64;
@@ -408,23 +429,23 @@ pub fn evaluate(records: &[TaskRecord]) -> Result<Scorecard, EvaluationError> {
             denominator: task_count,
         },
         citation_precision: Rate {
-            numerator: eligible_citations,
+            numerator: correct_supporting_citations,
             denominator: citation_count,
         },
         independent_support_adequacy: Rate {
             numerator: support_adequate,
             denominator: support_required,
         },
-        counterfactual_sensitivity: Rate {
-            numerator: counterfactual_changed,
+        counterfactual_oracle_accuracy: Rate {
+            numerator: counterfactual_oracle_correct,
             denominator: counterfactual_count,
         },
-        source_removal_sensitivity: Rate {
-            numerator: source_removal_changed,
+        source_removal_oracle_accuracy: Rate {
+            numerator: source_removal_oracle_correct,
             denominator: source_removal_count,
         },
         placebo_invariance: Rate {
-            numerator: placebo_unchanged,
+            numerator: placebo_oracle_correct,
             denominator: placebo_count,
         },
         replay_pass_rate: Rate {
@@ -455,7 +476,7 @@ mod tests {
             submitted_decision: submitted,
             confidence_correct: 0.9,
             citations: Vec::new(),
-            minimum_independent_support_origins: 0,
+            minimum_independent_decision_origins: 0,
             interventions: Vec::new(),
             replay_required: false,
             replay: None,
@@ -514,25 +535,25 @@ mod tests {
     #[test]
     fn mirrored_urls_from_one_origin_count_as_one_independent_origin() {
         let mut record = task("mirrors", Decision::Supported, Decision::Supported);
-        record.minimum_independent_support_origins = 2;
+        record.minimum_independent_decision_origins = 2;
         record.citations = vec![
             CitationRecord {
                 source_id: "url-a".to_string(),
                 origin_id: "publisher-report-17".to_string(),
                 eligible_for_claim: true,
-                supports_claim: true,
+                supports_expected_decision: true,
             },
             CitationRecord {
                 source_id: "url-b".to_string(),
                 origin_id: "publisher-report-17".to_string(),
                 eligible_for_claim: true,
-                supports_claim: true,
+                supports_expected_decision: true,
             },
             CitationRecord {
                 source_id: "decoy".to_string(),
                 origin_id: "independent-decoy".to_string(),
-                eligible_for_claim: false,
-                supports_claim: true,
+                eligible_for_claim: true,
+                supports_expected_decision: false,
             },
         ];
         let result = evaluate(&[record]).unwrap();
@@ -543,7 +564,7 @@ mod tests {
     #[test]
     fn two_eligible_independent_origins_meet_the_support_requirement() {
         let mut record = task("independent", Decision::Supported, Decision::Supported);
-        record.minimum_independent_support_origins = 2;
+        record.minimum_independent_decision_origins = 2;
         record.citations = ["origin-a", "origin-b"]
             .into_iter()
             .enumerate()
@@ -551,7 +572,7 @@ mod tests {
                 source_id: format!("source-{index}"),
                 origin_id: origin.to_string(),
                 eligible_for_claim: true,
-                supports_claim: true,
+                supports_expected_decision: true,
             })
             .collect();
         let result = evaluate(&[record]).unwrap();
@@ -566,21 +587,24 @@ mod tests {
                 kind: InterventionKind::Counterfactual,
                 decision_before: Decision::Supported,
                 decision_after: Decision::Contradicted,
+                expected_after: Decision::Contradicted,
             },
             InterventionObservation {
                 kind: InterventionKind::SourceRemoval,
                 decision_before: Decision::Supported,
                 decision_after: Decision::InsufficientEvidence,
+                expected_after: Decision::InsufficientEvidence,
             },
             InterventionObservation {
                 kind: InterventionKind::Placebo,
                 decision_before: Decision::Supported,
                 decision_after: Decision::Supported,
+                expected_after: Decision::Supported,
             },
         ];
         let result = evaluate(&[record]).unwrap();
-        assert_eq!(result.counterfactual_sensitivity.value(), Some(1.0));
-        assert_eq!(result.source_removal_sensitivity.value(), Some(1.0));
+        assert_eq!(result.counterfactual_oracle_accuracy.value(), Some(1.0));
+        assert_eq!(result.source_removal_oracle_accuracy.value(), Some(1.0));
         assert_eq!(result.placebo_invariance.value(), Some(1.0));
     }
 
@@ -591,6 +615,7 @@ mod tests {
             kind: InterventionKind::Placebo,
             decision_before: Decision::Supported,
             decision_after: Decision::Contradicted,
+            expected_after: Decision::Supported,
         });
         let result = evaluate(&[record]).unwrap();
         assert_eq!(result.placebo_invariance.value(), Some(0.0));
@@ -641,8 +666,8 @@ mod tests {
         .unwrap();
         assert_eq!(result.citation_precision.value(), None);
         assert_eq!(result.independent_support_adequacy.value(), None);
-        assert_eq!(result.counterfactual_sensitivity.value(), None);
-        assert_eq!(result.source_removal_sensitivity.value(), None);
+        assert_eq!(result.counterfactual_oracle_accuracy.value(), None);
+        assert_eq!(result.source_removal_oracle_accuracy.value(), None);
         assert_eq!(result.placebo_invariance.value(), None);
         assert_eq!(result.replay_pass_rate.value(), None);
         assert_eq!(result.budget_compliance.value(), None);
@@ -688,7 +713,7 @@ mod tests {
             source_id: "source-1".to_string(),
             origin_id: "   ".to_string(),
             eligible_for_claim: true,
-            supports_claim: true,
+            supports_expected_decision: true,
         });
         assert!(matches!(
             evaluate(&[record]),
@@ -718,6 +743,46 @@ mod tests {
             evaluate(&[record]),
             Err(EvaluationError::UnexpectedReplayEvidence(_))
         ));
+    }
+
+    #[test]
+    fn rejects_interventions_that_change_to_the_wrong_counterfactual_answer() {
+        let mut record = task("wrong-counterfactual", Decision::Supported, Decision::Supported);
+        record.interventions.push(InterventionObservation {
+            kind: InterventionKind::Counterfactual,
+            decision_before: Decision::Supported,
+            decision_after: Decision::Contradicted,
+            expected_after: Decision::Supported,
+        });
+        let result = evaluate(&[record]).unwrap();
+        assert_eq!(result.counterfactual_oracle_accuracy.value(), Some(0.0));
+    }
+
+    #[test]
+    fn rejects_placebo_records_with_a_changed_oracle_target() {
+        let mut record = task("bad-placebo-oracle", Decision::Supported, Decision::Supported);
+        record.interventions.push(InterventionObservation {
+            kind: InterventionKind::Placebo,
+            decision_before: Decision::Supported,
+            decision_after: Decision::Supported,
+            expected_after: Decision::Contradicted,
+        });
+        assert!(matches!(
+            evaluate(&[record]),
+            Err(EvaluationError::InvalidPlaceboOracle(_))
+        ));
+    }
+
+    #[test]
+    fn rejects_resource_total_overflow_instead_of_saturating() {
+        let mut first = task("overflow-a", Decision::Supported, Decision::Supported);
+        first.resources.tokens = u64::MAX;
+        let mut second = task("overflow-b", Decision::Supported, Decision::Supported);
+        second.resources.tokens = 1;
+        assert_eq!(
+            evaluate(&[first, second]).unwrap_err(),
+            EvaluationError::ResourceTotalsOverflow
+        );
     }
 
     #[test]
