@@ -117,10 +117,20 @@ pub struct CalibrationDiagnostics {
     pub held_out_evaluation_cluster_count: usize,
 }
 
+/// One immutable order-statistic input, retained for downstream monitoring.
+#[derive(Clone, Debug, PartialEq, Eq)]
+pub struct CalibrationClusterScore {
+    pub independent_cluster_id: String,
+    pub score_units: u64,
+    pub block_manifest_sha256: String,
+}
+
 #[derive(Clone, Debug, PartialEq, Eq)]
 pub struct CalibrationResult {
     pub qualified: QualifiedMarginCalibration,
     pub diagnostics: CalibrationDiagnostics,
+    /// Exact unsorted per-cluster scores used to produce the qualified quantile.
+    pub cluster_scores: Vec<CalibrationClusterScore>,
 }
 
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
@@ -254,6 +264,7 @@ pub fn calibrate_recoverability_margin(
     let mut cluster_ids = HashSet::new();
     let mut family_ids = HashSet::new();
     let mut scores = Vec::with_capacity(manifest.calibration_units.len());
+    let mut cluster_scores = Vec::with_capacity(manifest.calibration_units.len());
 
     for unit in &manifest.calibration_units {
         let reference = &unit.reference;
@@ -295,6 +306,11 @@ pub fn calibrate_recoverability_margin(
         }
         let score = score_calibration_unit(&unit.candidate, reference, &contract.spec)?;
         scores.push(score);
+        cluster_scores.push(CalibrationClusterScore {
+            independent_cluster_id: reference.independent_cluster_id.clone(),
+            score_units: score,
+            block_manifest_sha256: reference.block_manifest_sha256.clone(),
+        });
         family_ids.insert(reference.environment_family_id.clone());
     }
 
@@ -326,6 +342,7 @@ pub fn calibrate_recoverability_margin(
             validation_cluster_count: manifest.scale_validation_cluster_ids.len(),
             held_out_evaluation_cluster_count: manifest.held_out_evaluation_cluster_ids.len(),
         },
+        cluster_scores,
     })
 }
 
@@ -820,6 +837,30 @@ mod tests {
         assert_eq!(result.qualified.optimism_radius_units, 19);
         assert_eq!(result.qualified.calibration_cluster_count, 19);
         assert_eq!(result.diagnostics.calibration_family_count, 3);
+    }
+
+    #[test]
+    fn calibration_result_retains_exact_per_cluster_scores() {
+        let m = manifest(19);
+        let result = calibrate_recoverability_margin(contract(), &m).unwrap();
+        assert_eq!(
+            result.cluster_scores.len(),
+            result.qualified.calibration_cluster_count
+        );
+        for (score, unit) in result.cluster_scores.iter().zip(&m.calibration_units) {
+            assert_eq!(
+                score.independent_cluster_id,
+                unit.reference.independent_cluster_id
+            );
+            assert_eq!(
+                score.block_manifest_sha256,
+                unit.reference.block_manifest_sha256
+            );
+            assert_eq!(
+                score.score_units,
+                score_calibration_unit(&unit.candidate, &unit.reference, &spec()).unwrap()
+            );
+        }
     }
 
     #[test]
