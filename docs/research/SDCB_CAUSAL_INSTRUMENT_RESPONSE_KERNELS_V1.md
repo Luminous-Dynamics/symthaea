@@ -1,6 +1,6 @@
 # SDCB causal instrument-response kernels v1
 
-**Status:** The standalone scalar OU + first-order response analytic reference is authored in `scripts/research/sdcb_exponential_response.rs` with nineteen Rust tests. The tests are not compiled or executed in this environment. No integration into the existing interval-observation module, high-rate experiment, physical qualification, or SOTA result is claimed.
+**Status:** The standalone scalar OU + first-order response analytic reference is authored in `scripts/research/sdcb_exponential_response.rs` with twenty Rust tests. The tests are not compiled or executed in this environment. No integration into the existing interval-observation module, high-rate experiment, physical qualification, or SOTA result is claimed.
 
 ## 1. Motivation
 
@@ -65,12 +65,56 @@ Do not claim arbitrary nonlinear hysteresis in M0. Hysteresis must be represente
 `dz = (x-z)/tau_s dt`.
 It computes the stationary covariance, exact 2x2 transition matrix, future/past cross-covariance, filtered-sensor autocovariance, normalized step response, and first-order frequency response. It includes the repeated-root case (equal latent and sensor rates) and uses exp_m1-based rate-gap formulas near that case.
 
-Nineteen Rust tests are authored for stationary covariance, equal-rate and distinct-rate fixtures, zero lag, near-equal-rate continuity, step response, -3 dB / phase behavior, invalid inputs and negative elapsed time. An independent authoring-runtime check using SciPy matrix exponential and continuous Lyapunov solution reproduced the distinct-rate transition/cross-covariance fixture to below 2e-15 absolute difference. This is an independent numerical calculation, not Rust execution, crate compilation, CI, or physical sensor validation.
+Twenty Rust tests are authored for stationary covariance, equal-rate and distinct-rate fixtures, zero lag, near-equal-rate continuity, step response, -3 dB / phase behavior, invalid inputs and negative elapsed time. An independent authoring-runtime check using SciPy matrix exponential and continuous Lyapunov solution reproduced the distinct-rate transition/cross-covariance fixture to below 2e-15 absolute difference. This is an independent numerical calculation, not Rust execution, crate compilation, CI, or physical sensor validation.
 An additional independent convolution identity is used to test the state-space covariance calculation. With q = mu*sigma^2/(lambda+mu), for h >= 0 and mu != lambda:
 `C_zz(h) = q * (mu*exp(-lambda*h) - lambda*exp(-mu*h)) / (mu-lambda)`.
 At equal rates mu=lambda, the continuous limit is
 `C_zz(h) = q*exp(-lambda*h)*(1+lambda*h)`.
 The implementation uses exp_m1-based factorizations to avoid subtractive cancellation near equal rates. Two tests compare this direct-convolution expression against exp(Ah)P across both rate orderings, equal and near-equal rates, and several elapsed times. A separate Python check exercised 49 parameter/time combinations; the maximum absolute discrepancy was below 5e-12.
+
+
+## Structural identifiability: physical dynamics versus sensor response
+
+The first-order OU + first-order sensor model has an important exact non-identifiability under passive single-channel observation.
+
+Let the latent OU decay rate be lambda, the instrument response rate be mu, and the latent stationary variance be sigma_x^2. The filtered output autocovariance can be written, for h >= 0, as
+
+[
+C_{zz}(h)=q,e^{-r h}left[1+r h,psi(g h)ight],
+quad
+q=rac{musigma_x^2}{lambda+mu},
+quad
+r=min(lambda,mu),
+quad
+g=|lambda-mu|,
+]
+with (psi(x)=(1-e^{-x})/x) and (psi(0)=1).
+
+The normalized covariance shape is symmetric in lambda and mu. More strongly, the parameter transformation
+
+[
+(lambda,mu,sigma_x^2)
+mapsto
+left(mu,lambda,rac{mu}{lambda}sigma_x^2ight)
+]
+
+preserves q and therefore preserves the **entire output autocovariance function**. The two worlds are observationally indistinguishable from passive second-order output statistics, even with infinite data and perfect numerical integration.
+
+A Rust regression now freezes this negative control using:
+- World A: latent decay lambda=0.25, sensor response mu=4, process variance 9;
+- World B: latent decay lambda=4, sensor response mu=0.25, process variance 144.
+
+Both yield the same output covariance at every lag. This is a structural identifiability limitation, not an optimizer defect or numerical tolerance issue.
+
+### Required modelling response
+
+- Do not report a unique physical-process time constant and a unique sensor-response time constant from this single-channel passive data alone.
+- Preserve the observational equivalence class / set of parameter assignments, or report that the physical-vs-instrument attribution is non-identifiable.
+- To distinguish the mechanisms, require additional information such as independently characterized instrument response, a known controlled input/step or frequency sweep, or an independently qualified reference channel with distinct and known response.
+- Treat prior-driven pole attribution as prior-sensitive, not as empirical identification.
+- Benchmark both predictive equivalence and causal attribution separately: identical passive predictions may coexist with different physical explanations.
+
+This identifiability requirement composes with #13691 (active scientific intelligence and hidden mechanism identifiability) and #13567 (exact sequential policy oracle). A calibration action should be selected using the existing decision owner, not by adding a new planner to this response-kernel track.
 
 ## 4. Required fixtures and invariants
 
