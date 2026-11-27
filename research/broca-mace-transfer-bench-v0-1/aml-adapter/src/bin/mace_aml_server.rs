@@ -14,7 +14,7 @@ use std::net::SocketAddr;
 
 use broca_aml_adapter::{
     durable_service::DurableAmlServiceV1,
-    http_service::{router, AmlHttpConfigV1, ApiAuthV1, AuthSchemeV1},
+    http_service::{router, AmlHttpConfigV1, ApiAuthV1, AuthSchemeV1, DEFAULT_MAX_JSON_BODY_BYTES},
     redb_store::{RedbDurableAmlStoreV1, RedbVisibilityVerifierV1},
     FrozenAdapterWordCounter, Message, Track,
 };
@@ -73,7 +73,7 @@ fn authentication() -> Result<ApiAuthV1, IoError> {
             &required_env("MACE_AML_API_KEY")?,
         )
         .map_err(|_| IoError::new(ErrorKind::InvalidInput, "invalid X-Api-Key authentication")),
-        "public-smoke" if env::var("MACE_AML_ENABLE_PUBLIC_SMOKE").as_deref() == Ok("1") => {
+        "public-smoke" if env::var("MACE_AML_ENABLE_PUBLIC_SMOKE").ok().as_deref() == Some("1") => {
             Ok(ApiAuthV1::public_smoke())
         }
         "public-smoke" => Err(IoError::new(
@@ -112,7 +112,7 @@ async fn main() -> Result<(), Box<dyn Error>> {
 
     let body_limit = match env::var("MACE_AML_MAX_BODY_BYTES") {
         Ok(value) => value.parse::<usize>()?,
-        Err(_) => http_service::DEFAULT_MAX_JSON_BODY_BYTES,
+        Err(_) => DEFAULT_MAX_JSON_BODY_BYTES,
     };
     let auth = authentication()?;
     let config = AmlHttpConfigV1::with_body_limit(track, auth, body_limit)
