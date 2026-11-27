@@ -1494,10 +1494,12 @@ mod tests {
         let dynamic = evaluate_sequential_robust(&problem).unwrap();
         let exhaustive = enumerate_sequential_robust(&problem).unwrap();
 
-        let selected = |policy: &SequentialPolicyNode| match policy {
-            SequentialPolicyNode::Stop { decision_id, .. } => decision_id.as_str(),
-            SequentialPolicyNode::Probe { .. } => panic!("unexpected probe"),
-        };
+        fn selected(policy: &SequentialPolicyNode) -> &str {
+            match policy {
+                SequentialPolicyNode::Stop { decision_id, .. } => decision_id.as_str(),
+                SequentialPolicyNode::Probe { .. } => panic!("unexpected probe"),
+            }
+        }
         assert_eq!(selected(&dynamic.policy), "a_first");
         assert_eq!(selected(&exhaustive.policy), "a_first");
     }
