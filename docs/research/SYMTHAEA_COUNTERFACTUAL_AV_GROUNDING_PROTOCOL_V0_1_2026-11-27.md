@@ -136,7 +136,7 @@ Symthaea proposes and records a decision; the evaluator controls the counterfact
 Two companion artifacts define a reproducible manifest format:
 
 - `SYMTHAEA_AV_COUNTERFACTUAL_ITEM_SCHEMA_V1_2026-11-27.json`: Draft 2020-12 schema for condition types, audio/video payload digests, timing profiles, cue annotations, task family, and expected decisions.
-- `SYMTHAEA_AV_COUNTERFACTUAL_ITEM_FIXTURES_V1_2026-11-27.json`: one six-condition turn-yield example plus four negative cross-condition cases.
+- `SYMTHAEA_AV_COUNTERFACTUAL_ITEM_FIXTURES_V1_2026-11-27.json`: one six-condition turn-yield example plus four negative cross-condition cases encoded as deterministic JSON Patch mutations against the positive item.
 
 The six conditions include AV-positive, AV-counterfactual, irrelevant visual control, audio-only, video-only, and temporally shuffled AV. The same baseline audio digest is declared for all audio-bearing conditions. Video conditions share an identical timing profile in the positive fixture.
 
