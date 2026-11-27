@@ -349,6 +349,9 @@ pub struct EventSource {
 pub struct EmbodimentEvent {
     pub schema: String,
     pub session_id: String,
+    /// Opaque identifier for the monotonic clock epoch used by both timestamps.
+    /// Events from different clock domains must not be compared by raw ns values.
+    pub clock_domain_id: String,
     pub event_id: String,
     pub sequence: u64,
     /// Decimal string in monotonic nanoseconds; string encoding avoids JSON
@@ -374,6 +377,7 @@ impl EmbodimentEvent {
             return Err(EventValidationError::WrongSchema);
         }
         validate_identifier("session_id", &self.session_id)?;
+        validate_identifier("clock_domain_id", &self.clock_domain_id)?;
         validate_identifier("event_id", &self.event_id)?;
         validate_identifier("source.component", &self.source.component)?;
         validate_identifier("source.instance_id", &self.source.instance_id)?;
@@ -438,6 +442,7 @@ pub const MAX_EVENTS_PER_SESSION: usize = 65_536;
 #[derive(Debug, Clone)]
 pub struct EmbodimentStreamValidator {
     session_id: String,
+    clock_domain_id: Option<String>,
     last_sequence: Option<u64>,
     last_observed_at_ns: Option<u64>,
     seen_event_ids: HashSet<String>,
@@ -463,6 +468,7 @@ impl EmbodimentStreamValidator {
         }
         Ok(Self {
             session_id,
+            clock_domain_id: None,
             last_sequence: None,
             last_observed_at_ns: None,
             seen_event_ids: HashSet::with_capacity(max_events.min(1024)),
@@ -485,6 +491,13 @@ impl EmbodimentStreamValidator {
 
         if event.session_id != self.session_id {
             return Err(EventValidationError::SessionMismatch);
+        }
+        if self
+            .clock_domain_id
+            .as_deref()
+            .is_some_and(|clock_domain_id| clock_domain_id != event.clock_domain_id)
+        {
+            return Err(EventValidationError::ClockDomainMismatch);
         }
         if observed > now {
             return Err(EventValidationError::EventObservedInFuture);
@@ -537,6 +550,9 @@ impl EmbodimentStreamValidator {
 
         // Mutate stream state only after every validation has succeeded.
         self.seen_event_ids.insert(event.event_id.clone());
+        if self.clock_domain_id.is_none() {
+            self.clock_domain_id = Some(event.clock_domain_id.clone());
+        }
         if let Some(target_event_id) = cancel_target {
             self.cancelled_event_ids.insert(target_event_id);
         }
@@ -561,6 +577,10 @@ impl EmbodimentStreamValidator {
 
     pub fn session_id(&self) -> &str {
         &self.session_id
+    }
+
+    pub fn clock_domain_id(&self) -> Option<&str> {
+        self.clock_domain_id.as_deref()
     }
 }
 
@@ -604,6 +624,7 @@ pub enum EventValidationError {
     MissingReducedMotionValue,
     MissingIntensity,
     SessionMismatch,
+    ClockDomainMismatch,
     DuplicateEventId,
     SequenceMustStartAtZero,
     SequenceRegression,
@@ -669,6 +690,7 @@ mod tests {
         EmbodimentEvent {
             schema: EMBODIMENT_EVENT_SCHEMA_V1.to_owned(),
             session_id: "session-1".to_owned(),
+            clock_domain_id: "clock:dialogue-epoch-1".to_owned(),
             event_id: event_id.to_owned(),
             sequence,
             observed_at_monotonic_ns: (100 + sequence).to_string(),
@@ -715,6 +737,23 @@ mod tests {
             Err(EventValidationError::DuplicateEventId)
         );
         assert_eq!(validator.last_sequence(), Some(0));
+    }
+
+    #[test]
+    fn rejects_mixed_monotonic_clock_domains_within_a_session() {
+        let mut validator = EmbodimentStreamValidator::new("session-1").unwrap();
+        validator.accept(&listening_event(0, "event-0"), "200").unwrap();
+        let mut next = listening_event(1, "event-1");
+        next.clock_domain_id = "clock:other-process-epoch".to_owned();
+        assert_eq!(
+            validator.accept(&next, "300"),
+            Err(EventValidationError::ClockDomainMismatch)
+        );
+        assert_eq!(validator.last_sequence(), Some(0));
+        assert_eq!(
+            validator.clock_domain_id(),
+            Some("clock:dialogue-epoch-1")
+        );
     }
 
     #[test]
