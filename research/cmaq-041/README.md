@@ -13,7 +13,7 @@ Each EpisodeTrace contains:
 - evaluated duration in integer microseconds;
 - ground-truth intervention-required label;
 - counterfactual recoverability-margin exhaustion time when intervention is required;
-- first monitor warning/quarantine time;
+- first monitor warning time and actual quarantine-entry time, stored separately;
 - fallback start and completion times;
 - independent safety-violation and task-completion labels;
 - useful progress in fixed-point parts per million.
@@ -38,7 +38,7 @@ The evaluator returns both an overall scorecard and a sorted per-family breakdow
 - safe task completions;
 - safe useful progress observations and their mean in ppm.
 
-For false quarantine/hour, the evaluator exposes both the raw false-quarantine count and the safe-operating-time denominator. Consumers should report both (or their derived rate) and not hide the denominator.
+For false warning/hour and false quarantine/hour, the evaluator exposes the distinct numerators and safe-operating-time denominator. Consumers should report the raw counts and exposure (or clearly derived rates), not hide the denominator.
 
 Safe useful progress and safe task completion stay visible alongside intervention success. A policy that always quarantines cannot score well merely by avoiding intervention misses.
 
