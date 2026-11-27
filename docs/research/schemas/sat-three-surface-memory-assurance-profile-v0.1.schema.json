@@ -1,0 +1,322 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://luminousdynamics.io/schemas/sat-three-surface-memory-assurance-profile-v0.1.schema.json",
+  "title": "SAT Three-Surface Memory Assurance Federation Profile v0.1",
+  "type": "object",
+  "additionalProperties": false,
+  "required": [
+    "schema_version",
+    "profile_id",
+    "subject",
+    "evaluation_profile",
+    "surfaces",
+    "related_dimensions",
+    "aggregation_policy"
+  ],
+  "properties": {
+    "schema_version": {
+      "const": "sat-three-surface-memory-assurance-profile/v0.1"
+    },
+    "profile_id": {
+      "type": "string",
+      "minLength": 1
+    },
+    "subject": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "sut_name",
+        "sut_version",
+        "memory_component",
+        "status"
+      ],
+      "properties": {
+        "sut_name": {
+          "type": "string",
+          "minLength": 1
+        },
+        "sut_version": {
+          "type": "string",
+          "minLength": 1
+        },
+        "memory_component": {
+          "type": "string",
+          "minLength": 1
+        },
+        "status": {
+          "enum": [
+            "synthetic_example",
+            "research_draft",
+            "executed_candidate",
+            "independently_reproduced"
+          ]
+        }
+      }
+    },
+    "evaluation_profile": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "infrastructure_profiles",
+        "scenario_profile",
+        "sut_boundary"
+      ],
+      "properties": {
+        "infrastructure_profiles": {
+          "type": "array",
+          "minItems": 4,
+          "maxItems": 4,
+          "uniqueItems": true,
+          "items": {
+            "enum": [
+              "foundation_model",
+              "interaction_access_layer",
+              "execution_and_scheduling",
+              "underlying_infrastructure"
+            ]
+          }
+        },
+        "scenario_profile": {
+          "enum": [
+            "personalized_long_term_memory_agent"
+          ]
+        },
+        "sut_boundary": {
+          "enum": [
+            "composite_agent_and_memory_store",
+            "memory_component_only",
+            "store_only"
+          ]
+        }
+      }
+    },
+    "surfaces": {
+      "type": "array",
+      "minItems": 3,
+      "maxItems": 3,
+      "items": {
+        "$ref": "#/$defs/surface"
+      },
+      "allOf": [
+        {
+          "contains": {
+            "properties": {
+              "surface_id": {
+                "const": "write_path_poisoning"
+              }
+            },
+            "required": [
+              "surface_id"
+            ]
+          },
+          "minContains": 1,
+          "maxContains": 1
+        },
+        {
+          "contains": {
+            "properties": {
+              "surface_id": {
+                "const": "cross_context_isolation"
+              }
+            },
+            "required": [
+              "surface_id"
+            ]
+          },
+          "minContains": 1,
+          "maxContains": 1
+        },
+        {
+          "contains": {
+            "properties": {
+              "surface_id": {
+                "const": "at_rest_integrity"
+              }
+            },
+            "required": [
+              "surface_id"
+            ]
+          },
+          "minContains": 1,
+          "maxContains": 1
+        }
+      ]
+    },
+    "related_dimensions": {
+      "type": "array",
+      "items": {
+        "$ref": "#/$defs/related_dimension"
+      },
+      "minItems": 1
+    },
+    "aggregation_policy": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "emit_global_security_score",
+        "preserve_native_scores",
+        "report_surfaces_separately",
+        "double_counting_rule"
+      ],
+      "properties": {
+        "emit_global_security_score": {
+          "const": false
+        },
+        "preserve_native_scores": {
+          "const": true
+        },
+        "report_surfaces_separately": {
+          "const": true
+        },
+        "double_counting_rule": {
+          "type": "string",
+          "minLength": 20
+        },
+        "comparability_requires": {
+          "type": "array",
+          "items": {
+            "type": "string",
+            "minLength": 1
+          },
+          "minItems": 1
+        }
+      }
+    },
+    "notes": {
+      "type": "array",
+      "items": {
+        "type": "string"
+      }
+    }
+  },
+  "$defs": {
+    "surface": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "surface_id",
+        "native_metric",
+        "measurement_state",
+        "adversary_boundary",
+        "measured_dimensions",
+        "protocol_refs"
+      ],
+      "properties": {
+        "surface_id": {
+          "enum": [
+            "write_path_poisoning",
+            "cross_context_isolation",
+            "at_rest_integrity"
+          ]
+        },
+        "native_metric": {
+          "type": "string",
+          "minLength": 1
+        },
+        "measurement_state": {
+          "enum": [
+            "not_started",
+            "declared_not_measured",
+            "contract_authored_not_executed",
+            "executed_local_only",
+            "native_benchmark_reproduced",
+            "independently_reproduced"
+          ]
+        },
+        "adversary_boundary": {
+          "type": "string",
+          "minLength": 10
+        },
+        "measured_dimensions": {
+          "type": "array",
+          "items": {
+            "type": "string"
+          },
+          "minItems": 1
+        },
+        "protocol_refs": {
+          "type": "array",
+          "items": {
+            "type": "string",
+            "format": "uri-reference"
+          },
+          "minItems": 1
+        },
+        "implementation_refs": {
+          "type": "array",
+          "items": {
+            "type": "string",
+            "minLength": 1
+          }
+        },
+        "case_ids": {
+          "type": "array",
+          "items": {
+            "type": "string",
+            "minLength": 1
+          }
+        },
+        "control_ids": {
+          "type": "array",
+          "items": {
+            "type": "string",
+            "minLength": 1
+          }
+        },
+        "native_score": {
+          "type": [
+            "number",
+            "null"
+          ],
+          "minimum": 0,
+          "maximum": 1
+        },
+        "notes": {
+          "type": "array",
+          "items": {
+            "type": "string"
+          }
+        }
+      }
+    },
+    "related_dimension": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "dimension_id",
+        "measurement_state",
+        "relationship"
+      ],
+      "properties": {
+        "dimension_id": {
+          "enum": [
+            "data_deletion_completeness",
+            "memory_lifecycle_poisoning_and_repair",
+            "clean_memory_utility",
+            "external_effect_consequence",
+            "witness_survivability"
+          ]
+        },
+        "measurement_state": {
+          "enum": [
+            "not_measured",
+            "referenced_not_run",
+            "measured_separately",
+            "not_applicable"
+          ]
+        },
+        "relationship": {
+          "type": "string",
+          "minLength": 10
+        },
+        "protocol_refs": {
+          "type": "array",
+          "items": {
+            "type": "string",
+            "format": "uri-reference"
+          }
+        }
+      }
+    }
+  }
+}

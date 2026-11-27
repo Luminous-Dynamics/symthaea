@@ -1,0 +1,445 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://luminousdynamics.io/schemas/sat-memory-lifecycle-trace-v0.1.schema.json",
+  "title": "SAT Memory Lifecycle Causal Trace v0.1",
+  "type": "object",
+  "additionalProperties": false,
+  "required": [
+    "schema_version",
+    "trace_id",
+    "execution_state",
+    "scenario",
+    "sut_boundary",
+    "claim_scope",
+    "attack_profile",
+    "native_adapter_refs",
+    "events",
+    "invariants",
+    "expected_disposition"
+  ],
+  "properties": {
+    "schema_version": {
+      "const": "sat-memory-lifecycle-trace/v0.1"
+    },
+    "trace_id": {
+      "type": "string",
+      "minLength": 1
+    },
+    "execution_state": {
+      "enum": [
+        "synthetic_fixture_not_executed",
+        "executed_candidate",
+        "independently_reproduced"
+      ]
+    },
+    "scenario": {
+      "enum": [
+        "benign_correction",
+        "write_path_poisoning",
+        "adaptive_dormant_poisoning",
+        "positive_control_effect",
+        "cross_context_isolation",
+        "erasure_restore",
+        "store_only_boundary",
+        "counterfactual_repair_replay"
+      ]
+    },
+    "sut_boundary": {
+      "enum": [
+        "composite_agent_and_memory_store",
+        "memory_component_only",
+        "store_only"
+      ]
+    },
+    "claim_scope": {
+      "enum": [
+        "full_agent_lifecycle",
+        "memory_component_lifecycle",
+        "store_only_observation"
+      ]
+    },
+    "paired_control_trace_id": {
+      "type": [
+        "string",
+        "null"
+      ]
+    },
+    "attack_profile": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "family",
+        "depth",
+        "adaptive_round_budget",
+        "rounds_observed",
+        "feedback_policy"
+      ],
+      "properties": {
+        "family": {
+          "enum": [
+            "benign",
+            "write_path_poisoning",
+            "cross_context_isolation",
+            "at_rest_integrity",
+            "erasure_resurrection"
+          ]
+        },
+        "depth": {
+          "enum": [
+            "not_applicable",
+            "L1",
+            "L2",
+            "L3"
+          ]
+        },
+        "adaptive_round_budget": {
+          "type": "integer",
+          "minimum": 0,
+          "maximum": 15
+        },
+        "rounds_observed": {
+          "type": "integer",
+          "minimum": 0,
+          "maximum": 15
+        },
+        "feedback_policy": {
+          "enum": [
+            "none",
+            "fixed_feedback",
+            "full_adaptive_feedback"
+          ]
+        }
+      }
+    },
+    "native_adapter_refs": {
+      "type": "array",
+      "minItems": 1,
+      "items": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": [
+          "surface_id",
+          "protocol_ref",
+          "adapter_ref",
+          "case_ids"
+        ],
+        "properties": {
+          "surface_id": {
+            "enum": [
+              "write_path_poisoning",
+              "cross_context_isolation",
+              "at_rest_integrity",
+              "witness_survivability",
+              "derived_memory_lifecycle"
+            ]
+          },
+          "protocol_ref": {
+            "type": "string",
+            "format": "uri-reference",
+            "minLength": 1
+          },
+          "adapter_ref": {
+            "type": "string",
+            "minLength": 1
+          },
+          "case_ids": {
+            "type": "array",
+            "minItems": 1,
+            "uniqueItems": true,
+            "items": {
+              "type": "string",
+              "minLength": 1
+            }
+          }
+        }
+      }
+    },
+    "run_manifest_ref": {
+      "type": [
+        "string",
+        "null"
+      ]
+    },
+    "events": {
+      "type": "array",
+      "minItems": 2,
+      "items": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": [
+          "event_id",
+          "sequence",
+          "previous_event_id",
+          "stage",
+          "actor",
+          "trust_boundary",
+          "outcome",
+          "record_ids",
+          "evidence"
+        ],
+        "properties": {
+          "event_id": {
+            "type": "string",
+            "minLength": 1
+          },
+          "sequence": {
+            "type": "integer",
+            "minimum": 0
+          },
+          "previous_event_id": {
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "stage": {
+            "enum": [
+              "attack_attempt",
+              "write_admission",
+              "persistence_confirmation",
+              "session_boundary",
+              "retrieval_exposure",
+              "agent_decision",
+              "external_effect_observation",
+              "correction",
+              "revocation",
+              "projection_invalidation",
+              "projection_rebuild",
+              "erasure",
+              "restore_attempt",
+              "witness_reconciliation",
+              "post_restore_read",
+              "clean_task",
+              "counterfactual_replay",
+              "residual_influence_check"
+            ]
+          },
+          "actor": {
+            "enum": [
+              "attacker",
+              "user",
+              "agent",
+              "memory_store",
+              "evaluator",
+              "independent_sink",
+              "witness",
+              "operator"
+            ]
+          },
+          "trust_boundary": {
+            "enum": [
+              "agent_interface",
+              "memory_store",
+              "agent_read_path",
+              "agent_policy",
+              "external_sink",
+              "authority_registry",
+              "witness_service",
+              "backup_restore",
+              "clean_control"
+            ]
+          },
+          "outcome": {
+            "enum": [
+              "attempted",
+              "accepted",
+              "rejected",
+              "persisted",
+              "served_authorized",
+              "served_untrusted",
+              "served_cross_context",
+              "blocked",
+              "action_attempted",
+              "effect_confirmed",
+              "effect_absent",
+              "corrected",
+              "revoked",
+              "invalidated",
+              "rebuilt_new_projection",
+              "erasure_committed",
+              "restore_applied",
+              "restore_rejected",
+              "reconciled",
+              "not_served",
+              "clean_task_passed",
+              "unknown",
+              "residual_influence_detected",
+              "residual_influence_absent"
+            ]
+          },
+          "record_ids": {
+            "type": "array",
+            "uniqueItems": true,
+            "items": {
+              "type": "string",
+              "minLength": 1
+            }
+          },
+          "context_id": {
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "adaptive_round": {
+            "type": [
+              "integer",
+              "null"
+            ],
+            "minimum": 1,
+            "maximum": 15
+          },
+          "evidence": {
+            "type": "array",
+            "minItems": 1,
+            "items": {
+              "type": "object",
+              "additionalProperties": false,
+              "required": [
+                "evidence_ref",
+                "observer",
+                "independence_status"
+              ],
+              "properties": {
+                "evidence_ref": {
+                  "type": "string",
+                  "format": "uri-reference",
+                  "minLength": 1
+                },
+                "observer": {
+                  "enum": [
+                    "harness",
+                    "sut",
+                    "independent_sink",
+                    "independent_witness",
+                    "operator",
+                    "not_assessed"
+                  ]
+                },
+                "independence_status": {
+                  "enum": [
+                    "independent",
+                    "same_sut_boundary",
+                    "not_assessed"
+                  ]
+                },
+                "artifact_sha256": {
+                  "type": "string",
+                  "pattern": "^sha256:[0-9a-f]{64}$"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "invariants": {
+      "type": "array",
+      "minItems": 1,
+      "items": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": [
+          "invariant_id",
+          "status",
+          "supporting_event_ids"
+        ],
+        "properties": {
+          "invariant_id": {
+            "enum": [
+              "benign_memory_retained",
+              "surfaced_content_not_acted_on",
+              "agent_action_not_external_effect",
+              "external_effect_observed_independently",
+              "cross_context_read_denied",
+              "derived_views_invalidated_on_source_change",
+              "repair_uses_new_projection",
+              "erasure_survives_stale_restore",
+              "complete_deletion_not_inferred_from_t10",
+              "store_only_does_not_claim_agent_action",
+              "native_scores_not_blended",
+              "causal_memory_effect_supported_by_counterfactual",
+              "residual_influence_absent_after_repair"
+            ]
+          },
+          "status": {
+            "enum": [
+              "holds",
+              "violated",
+              "unknown",
+              "not_applicable"
+            ]
+          },
+          "supporting_event_ids": {
+            "type": "array",
+            "uniqueItems": true,
+            "items": {
+              "type": "string",
+              "minLength": 1
+            }
+          }
+        }
+      }
+    },
+    "expected_disposition": {
+      "enum": [
+        "clean_utility_retained",
+        "contained_no_external_effect",
+        "external_effect_detected_positive_control",
+        "cross_context_access_denied",
+        "erasure_reconciled",
+        "store_only_observation_only",
+        "not_evaluable",
+        "counterfactual_memory_effect_attributable",
+        "residual_influence_absent_after_repair"
+      ]
+    },
+    "notes": {
+      "type": "array",
+      "items": {
+        "type": "string"
+      }
+    }
+  },
+  "allOf": [
+    {
+      "if": {
+        "properties": {
+          "execution_state": {
+            "enum": [
+              "executed_candidate",
+              "independently_reproduced"
+            ]
+          }
+        },
+        "required": [
+          "execution_state"
+        ]
+      },
+      "then": {
+        "required": [
+          "run_manifest_ref"
+        ],
+        "properties": {
+          "run_manifest_ref": {
+            "type": "string",
+            "minLength": 1
+          },
+          "events": {
+            "items": {
+              "properties": {
+                "evidence": {
+                  "items": {
+                    "required": [
+                      "artifact_sha256"
+                    ]
+                  }
+                }
+              }
+            }
+          }
+        }
+      }
+    }
+  ]
+}
