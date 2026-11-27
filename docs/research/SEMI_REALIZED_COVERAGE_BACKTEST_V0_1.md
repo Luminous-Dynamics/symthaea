@@ -2,7 +2,7 @@
 
 **Issue:** #14014  
 **Implementation:** `symthaea-semiconductor::benchmark::realized_coverage_backtest`  
-**Status:** named HAC/Bartlett baseline with unit tests authored; exact-head validation pending.
+**Status:** named HAC/Bartlett baseline with 12 Rust unit tests and 2 independent-oracle integration tests authored; exact-head validation pending.
 
 ## Estimand
 
@@ -76,6 +76,10 @@ Each observation includes:
 - evaluation cutoff.
 
 The evaluator checks prediction/report digests, label/event/revision/value/payload identity, K1 frontier, availability chronology, clock-domain equality, uniqueness of sample/event/revision/prediction sequence, and monotone event-time order. It does not authenticate issuers or prove physical traceability.
+
+## Independent known-answer oracle
+
+The integration test independently recomputes the lag-zero and lag-one autocovariances from a frozen clustered miss sequence and checks the reported Bartlett HAC standard error. A second test verifies that clustered positive-autocorrelation misses produce a larger HAC standard error than the IID diagnostic. The oracle is deliberately a separate test implementation; it does not call the private production HAC helper.
 
 ## Baselines and planned extensions
 
