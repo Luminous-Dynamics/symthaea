@@ -1,0 +1,434 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://luminousdynamics.io/schemas/mon038-kafka-partition-capture-input-v1.schema.json",
+  "title": "MON-038 Kafka Partition-Vector Capture Input",
+  "type": "object",
+  "additionalProperties": false,
+  "required": [
+    "profile",
+    "version",
+    "trial_id",
+    "capture_id",
+    "mode",
+    "evaluated_at",
+    "recovery_boundary",
+    "boundary_sha256",
+    "producer_fenced",
+    "producer_fence_proof_sha256",
+    "producer_fenced_at",
+    "capture_started_at",
+    "capture_completed_at",
+    "topic_inventory_complete",
+    "topic_inventory_sha256",
+    "topic_inventory",
+    "partition_ranges_sha256",
+    "partition_captures",
+    "business_events_sha256",
+    "business_events"
+  ],
+  "properties": {
+    "profile": {
+      "const": "mon038-kafka-partition-capture-input-v1"
+    },
+    "version": {
+      "const": "1.0.0"
+    },
+    "trial_id": {
+      "$ref": "#/$defs/id"
+    },
+    "capture_id": {
+      "$ref": "#/$defs/id"
+    },
+    "mode": {
+      "enum": [
+        "offline_fixture",
+        "runtime_candidate"
+      ]
+    },
+    "evaluated_at": {
+      "type": "string",
+      "format": "date-time"
+    },
+    "recovery_boundary": {
+      "$ref": "#/$defs/boundary"
+    },
+    "boundary_sha256": {
+      "$ref": "#/$defs/digest"
+    },
+    "producer_fenced": {
+      "type": "boolean"
+    },
+    "producer_fence_proof_sha256": {
+      "$ref": "#/$defs/digest"
+    },
+    "producer_fenced_at": {
+      "type": "string",
+      "format": "date-time"
+    },
+    "capture_started_at": {
+      "type": "string",
+      "format": "date-time"
+    },
+    "capture_completed_at": {
+      "type": "string",
+      "format": "date-time"
+    },
+    "topic_inventory_complete": {
+      "type": "boolean"
+    },
+    "topic_inventory_sha256": {
+      "$ref": "#/$defs/digest"
+    },
+    "topic_inventory": {
+      "type": "array",
+      "minItems": 1,
+      "maxItems": 10000,
+      "items": {
+        "$ref": "#/$defs/topic"
+      }
+    },
+    "partition_ranges_sha256": {
+      "$ref": "#/$defs/digest"
+    },
+    "partition_captures": {
+      "type": "array",
+      "minItems": 1,
+      "maxItems": 100000,
+      "items": {
+        "$ref": "#/$defs/partition_capture"
+      }
+    },
+    "business_events_sha256": {
+      "$ref": "#/$defs/digest"
+    },
+    "business_events": {
+      "type": "array",
+      "maxItems": 1000000,
+      "items": {
+        "$ref": "#/$defs/business_event"
+      }
+    }
+  },
+  "$defs": {
+    "id": {
+      "type": "string",
+      "minLength": 1,
+      "maxLength": 512,
+      "pattern": "^\\S(?:[^\\r\\n]*\\S)?$"
+    },
+    "digest": {
+      "type": "string",
+      "pattern": "^[0-9a-f]{64}$"
+    },
+    "boundary": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "incident_id",
+        "claim_id",
+        "source_cluster_id",
+        "database",
+        "source_epoch",
+        "timeline_id",
+        "snapshot_id",
+        "terminal_position",
+        "scope_digest",
+        "inventory_digest"
+      ],
+      "properties": {
+        "incident_id": {
+          "$ref": "#/$defs/id"
+        },
+        "claim_id": {
+          "$ref": "#/$defs/id"
+        },
+        "source_cluster_id": {
+          "$ref": "#/$defs/id"
+        },
+        "database": {
+          "$ref": "#/$defs/id"
+        },
+        "source_epoch": {
+          "$ref": "#/$defs/id"
+        },
+        "timeline_id": {
+          "$ref": "#/$defs/id"
+        },
+        "snapshot_id": {
+          "$ref": "#/$defs/id"
+        },
+        "terminal_position": {
+          "$ref": "#/$defs/id"
+        },
+        "scope_digest": {
+          "$ref": "#/$defs/digest"
+        },
+        "inventory_digest": {
+          "$ref": "#/$defs/digest"
+        }
+      }
+    },
+    "topic": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "cluster_id",
+        "topic",
+        "topic_id",
+        "partition_count",
+        "cleanup_policy",
+        "config_sha256"
+      ],
+      "properties": {
+        "cluster_id": {
+          "$ref": "#/$defs/id"
+        },
+        "topic": {
+          "$ref": "#/$defs/id"
+        },
+        "topic_id": {
+          "$ref": "#/$defs/id"
+        },
+        "partition_count": {
+          "type": "integer",
+          "minimum": 1,
+          "maximum": 100000
+        },
+        "cleanup_policy": {
+          "const": "delete"
+        },
+        "config_sha256": {
+          "$ref": "#/$defs/digest"
+        }
+      }
+    },
+    "record": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "topic",
+        "topic_id",
+        "partition",
+        "offset",
+        "record_class",
+        "payload_sha256"
+      ],
+      "properties": {
+        "topic": {
+          "$ref": "#/$defs/id"
+        },
+        "topic_id": {
+          "$ref": "#/$defs/id"
+        },
+        "partition": {
+          "type": "integer",
+          "minimum": 0
+        },
+        "offset": {
+          "type": "integer",
+          "minimum": 0
+        },
+        "record_class": {
+          "enum": [
+            "row_change",
+            "logical_message",
+            "transaction_metadata",
+            "heartbeat",
+            "tombstone",
+            "opaque"
+          ]
+        },
+        "event_id": {
+          "$ref": "#/$defs/id"
+        },
+        "transaction_id": {
+          "$ref": "#/$defs/id"
+        },
+        "data_collection": {
+          "$ref": "#/$defs/id"
+        },
+        "payload_sha256": {
+          "$ref": "#/$defs/digest"
+        },
+        "key_sha256": {
+          "$ref": "#/$defs/digest"
+        }
+      }
+    },
+    "partition_capture": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "capture_id",
+        "cluster_id",
+        "topic",
+        "topic_id",
+        "partition",
+        "boundary_sha256",
+        "start_offset_inclusive",
+        "end_offset_exclusive",
+        "log_start_offset_at_start",
+        "log_start_offset_at_end",
+        "last_stable_offset_before",
+        "last_stable_offset_after",
+        "high_watermark_before",
+        "high_watermark_after",
+        "leader_epoch_before",
+        "leader_epoch_after",
+        "isolation_level",
+        "cleanup_policy",
+        "capture_started_at",
+        "capture_completed_at",
+        "capture_complete",
+        "record_count",
+        "records_sha256",
+        "manifest_sha256",
+        "records"
+      ],
+      "properties": {
+        "capture_id": {
+          "$ref": "#/$defs/id"
+        },
+        "cluster_id": {
+          "$ref": "#/$defs/id"
+        },
+        "topic": {
+          "$ref": "#/$defs/id"
+        },
+        "topic_id": {
+          "$ref": "#/$defs/id"
+        },
+        "partition": {
+          "type": "integer",
+          "minimum": 0
+        },
+        "boundary_sha256": {
+          "$ref": "#/$defs/digest"
+        },
+        "start_offset_inclusive": {
+          "type": "integer",
+          "minimum": 0
+        },
+        "end_offset_exclusive": {
+          "type": "integer",
+          "minimum": 0
+        },
+        "log_start_offset_at_start": {
+          "type": "integer",
+          "minimum": 0
+        },
+        "log_start_offset_at_end": {
+          "type": "integer",
+          "minimum": 0
+        },
+        "last_stable_offset_before": {
+          "type": "integer",
+          "minimum": 0
+        },
+        "last_stable_offset_after": {
+          "type": "integer",
+          "minimum": 0
+        },
+        "high_watermark_before": {
+          "type": "integer",
+          "minimum": 0
+        },
+        "high_watermark_after": {
+          "type": "integer",
+          "minimum": 0
+        },
+        "leader_epoch_before": {
+          "type": "integer",
+          "minimum": 0
+        },
+        "leader_epoch_after": {
+          "type": "integer",
+          "minimum": 0
+        },
+        "isolation_level": {
+          "const": "read_committed"
+        },
+        "cleanup_policy": {
+          "const": "delete"
+        },
+        "capture_started_at": {
+          "type": "string",
+          "format": "date-time"
+        },
+        "capture_completed_at": {
+          "type": "string",
+          "format": "date-time"
+        },
+        "capture_complete": {
+          "type": "boolean"
+        },
+        "record_count": {
+          "type": "integer",
+          "minimum": 0
+        },
+        "records_sha256": {
+          "$ref": "#/$defs/digest"
+        },
+        "manifest_sha256": {
+          "$ref": "#/$defs/digest"
+        },
+        "records": {
+          "type": "array",
+          "maxItems": 1000000,
+          "items": {
+            "$ref": "#/$defs/record"
+          }
+        }
+      }
+    },
+    "business_event": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "event_id",
+        "transaction_id",
+        "topic",
+        "topic_id",
+        "partition",
+        "offset",
+        "record_class",
+        "data_collection",
+        "payload_sha256"
+      ],
+      "properties": {
+        "event_id": {
+          "$ref": "#/$defs/id"
+        },
+        "transaction_id": {
+          "$ref": "#/$defs/id"
+        },
+        "topic": {
+          "$ref": "#/$defs/id"
+        },
+        "topic_id": {
+          "$ref": "#/$defs/id"
+        },
+        "partition": {
+          "type": "integer",
+          "minimum": 0
+        },
+        "offset": {
+          "type": "integer",
+          "minimum": 0
+        },
+        "record_class": {
+          "enum": [
+            "row_change",
+            "logical_message"
+          ]
+        },
+        "data_collection": {
+          "$ref": "#/$defs/id"
+        },
+        "payload_sha256": {
+          "$ref": "#/$defs/digest"
+        }
+      }
+    }
+  }
+}
