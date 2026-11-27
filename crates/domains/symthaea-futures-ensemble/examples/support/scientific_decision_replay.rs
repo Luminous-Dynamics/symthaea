@@ -250,6 +250,7 @@ impl CandidateDecisionContext {
         if self.deadline_ms.is_some_and(|d| d < self.decision_time_ms) {
             return Err("deadline precedes decision time".into());
         }
+        let mut evidence_ids = Vec::with_capacity(self.evidence_available_at_decision.len());
         for e in &self.evidence_available_at_decision {
             require_nonempty("evidence_id", &e.evidence_id)?;
             validate_sha256("evidence content_digest", &e.content_digest)?;
@@ -259,7 +260,9 @@ impl CandidateDecisionContext {
             if e.available_at_ms > self.decision_time_ms {
                 return Err(format!("look-ahead leakage in evidence {}", e.evidence_id));
             }
+            evidence_ids.push(e.evidence_id.clone());
         }
+        ensure_unique("evidence_ids", &evidence_ids)?;
         Ok(())
     }
     /// Canonical ordered-list digest proposed for adoption by the upstream #11015 AgentView.
@@ -939,6 +942,17 @@ mod tests {
             .canonical_context_sha256()
             .expect("mutated context remains canonically serializable");
         assert!(c.validate().unwrap_err().contains("NotQuantified"));
+    }
+
+    #[test]
+    fn rejects_duplicate_decision_evidence_ids() {
+        let mut c = context();
+        let duplicate = c.evidence_available_at_decision[0].clone();
+        c.evidence_available_at_decision.push(duplicate);
+        c.context_digest = c
+            .canonical_context_sha256()
+            .expect("duplicate evidence context remains canonically serializable");
+        assert!(c.validate().unwrap_err().contains("evidence_ids"));
     }
 
     #[test]
