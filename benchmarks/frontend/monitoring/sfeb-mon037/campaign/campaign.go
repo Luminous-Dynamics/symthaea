@@ -31,109 +31,111 @@ const (
 )
 
 type Event struct {
- EventID string `json:event_id`
- TransactionID string `json:transaction_id`
- Topic string `json:topic`
- Operation string `json:operation`
- PayloadSHA256 string `json:payload_sha256`
- TotalOrder int `json:total_order`
- CollectionOrder int `json:collection_order`
- Partition int `json:partition`
- Offset int64 `json:offset`
+ EventID string `json:"event_id"`
+ TransactionID string `json:"transaction_id"`
+ Topic string `json:"topic"`
+ DataCollection string `json:"data_collection"`
+ Operation string `json:"operation"`
+ PayloadSHA256 string `json:"payload_sha256"`
+ TotalOrder int `json:"total_order"`
+ CollectionOrder int `json:"collection_order"`
+ Partition int `json:"partition"`
+ Offset int64 `json:"offset"`
 }
 type TopicPartition struct {
- Topic string `json:topic`
- PartitionCount int `json:partition_count`
+ Topic string `json:"topic"`
+ PartitionCount int `json:"partition_count"`
 }
 type TransactionProof struct {
- TransactionID string `json:transaction_id`
- ExpectedEventCount int `json:expected_event_count`
- BeginObserved bool `json:begin_observed`
- EndObserved bool `json:end_observed`
- EndEventCount int `json:end_event_count`
- DataCollections map[string]int `json:data_collections`
+ TransactionID string `json:"transaction_id"`
+ ExpectedEventCount int `json:"expected_event_count"`
+ BeginObserved bool `json:"begin_observed"`
+ EndObserved bool `json:"end_observed"`
+ EndEventCount int `json:"end_event_count"`
+ DataCollections map[string]int `json:"data_collections"`
 }
 type OffsetProof struct {
- Profile string `json:profile`
- Version string `json:version`
- Target string `json:target`
- TargetReached bool `json:target_reached`
- CapturedAt time.Time `json:captured_at`
- OffsetsSHA256 string `json:offsets_sha256`
+ Profile string `json:"profile"`
+ Version string `json:"version"`
+ Target string `json:"target"`
+ TargetReached bool `json:"target_reached"`
+ CapturedAt time.Time `json:"captured_at"`
+ OffsetsSHA256 string `json:"offsets_sha256"`
  Offset struct {
-  LSN string `json:lsn`
-  LSNProc string `json:lsn_proc`
-  LSNCommit string `json:lsn_commit`
-  MessageType string `json:messageType`
-  EventsProcessed int `json:lsn_events_processed`
-  TxID string `json:txId`
- } `json:offset`
+  LSN string `json:"lsn"`
+  LSNProc string `json:"lsn_proc"`
+  LSNCommit string `json:"lsn_commit"`
+  MessageType string `json:"messageType"`
+  EventsProcessed int `json:"lsn_events_processed"`
+  TxID string `json:"txId"`
+ } `json:"offset"`
 }
 type Surface struct {
- ID string `json:id`
- Disposition string `json:disposition`
- SourceSHA256 string `json:source_sha256,omitempty`
- RestoredSHA256 string `json:restored_sha256,omitempty`
- JustificationSHA256 string `json:justification_sha256,omitempty`
+ ID string `json:"id"`
+ Disposition string `json:"disposition"`
+ SourceSHA256 string `json:"source_sha256,omitempty"`
+ RestoredSHA256 string `json:"restored_sha256,omitempty"`
+ JustificationSHA256 string `json:"justification_sha256,omitempty"`
 }
 type Components struct {
- OffsetProof json.RawMessage `json:mon033_offset_proof,omitempty`
- TimelineResult json.RawMessage `json:mon034_timeline_result`
- ObserverResult json.RawMessage `json:mon035_observer_result`
- ContinuityResult json.RawMessage `json:mon036_continuity_result`
- ProofGraphResult json.RawMessage `json:mon024_proof_graph_result`
+ OffsetProof json.RawMessage `json:"mon033_offset_proof,omitempty"`
+ TimelineResult json.RawMessage `json:"mon034_timeline_result"`
+ ObserverResult json.RawMessage `json:"mon035_observer_result"`
+ ContinuityResult json.RawMessage `json:"mon036_continuity_result"`
+ ProofGraphResult json.RawMessage `json:"mon024_proof_graph_result"`
 }
 type Input struct {
- Profile string `json:profile`
- Version string `json:version`
- TrialID string `json:trial_id`
- ScenarioID string `json:scenario_id`
- Mode Mode `json:mode`
- EvaluatedAt time.Time `json:evaluated_at`
- OffsetTargetRequired bool `json:offset_target_required`
- OffsetTarget string `json:offset_target,omitempty`
- RequiredClaimIDs []string `json:required_claim_ids`
- SourceEvents []Event `json:source_events`
- ObservedEvents []Event `json:observed_events`
- TopicPartitions []TopicPartition `json:topic_partitions`
- Transactions []TransactionProof `json:transactions`
- ExactReplayDeduplicationProven bool `json:exact_replay_deduplication_proven`
- SurfaceScope string `json:surface_scope`
- Surfaces []Surface `json:surfaces`
- RestoreChecks map[string]string `json:restore_checks`
- TrafficCurrentlyEnabled bool `json:traffic_currently_enabled`
- Components Components `json:components`
+ Profile string `json:"profile"`
+ Version string `json:"version"`
+ TrialID string `json:"trial_id"`
+ ScenarioID string `json:"scenario_id"`
+ Mode Mode `json:"mode"`
+ EvaluatedAt time.Time `json:"evaluated_at"`
+ OffsetTargetRequired bool `json:"offset_target_required"`
+ OffsetTarget string `json:"offset_target,omitempty"`
+ RequiredClaimIDs []string `json:"required_claim_ids"`
+ SourceEvents []Event `json:"source_events"`
+ ObservedEvents []Event `json:"observed_events"`
+ TopicPartitions []TopicPartition `json:"topic_partitions"`
+ Transactions []TransactionProof `json:"transactions"`
+ ExactReplayDeduplicationProven bool `json:"exact_replay_deduplication_proven"`
+ DeduplicationProofSHA256 string `json:"deduplication_proof_sha256,omitempty"`
+ SurfaceScope string `json:"surface_scope"`
+ Surfaces []Surface `json:"surfaces"`
+ RestoreChecks map[string]string `json:"restore_checks"`
+ TrafficCurrentlyEnabled bool `json:"traffic_currently_enabled"`
+ Components Components `json:"components"`
 }
 type Reconciliation struct {
- ExpectedEvents int `json:expected_events`
- ObservedEvents int `json:observed_events`
- UniqueObservedEvents int `json:unique_observed_events`
- DuplicateReplays int `json:duplicate_replays`
- MissingEventIDs []string `json:missing_event_ids`
- ExtraEventIDs []string `json:extra_event_ids`
- ConflictingEventIDs []string `json:conflicting_event_ids`
- MismatchedEventIDs []string `json:mismatched_event_ids`
- OrderingViolations []string `json:ordering_violations`
- TransactionViolations []string `json:transaction_violations`
- SurfaceCounts map[string]int `json:surface_counts`
+ ExpectedEvents int `json:"expected_events"`
+ ObservedEvents int `json:"observed_events"`
+ UniqueObservedEvents int `json:"unique_observed_events"`
+ DuplicateReplays int `json:"duplicate_replays"`
+ MissingEventIDs []string `json:"missing_event_ids"`
+ ExtraEventIDs []string `json:"extra_event_ids"`
+ ConflictingEventIDs []string `json:"conflicting_event_ids"`
+ MismatchedEventIDs []string `json:"mismatched_event_ids"`
+ OrderingViolations []string `json:"ordering_violations"`
+ TransactionViolations []string `json:"transaction_violations"`
+ SurfaceCounts map[string]int `json:"surface_counts"`
 }
 type ComponentStatus struct {
- Name string `json:name`
- Verdict Verdict `json:verdict`
- ReasonCodes []string `json:reason_codes`
+ Name string `json:"name"`
+ Verdict Verdict `json:"verdict"`
+ ReasonCodes []string `json:"reason_codes"`
 }
 type Result struct {
- Profile string `json:profile`
- Version string `json:version`
- TrialID string `json:trial_id`
- ScenarioID string `json:scenario_id`
- Mode Mode `json:mode`
- ComponentVerdict Verdict `json:component_verdict`
- CampaignVerdict Verdict `json:campaign_verdict`
- TrafficActivationPermitted bool `json:traffic_activation_permitted`
- Components []ComponentStatus `json:components`
- Reconciliation Reconciliation `json:reconciliation`
- ReasonCodes []string `json:reason_codes`
+ Profile string `json:"profile"`
+ Version string `json:"version"`
+ TrialID string `json:"trial_id"`
+ ScenarioID string `json:"scenario_id"`
+ Mode Mode `json:"mode"`
+ ComponentVerdict Verdict `json:"component_verdict"`
+ CampaignVerdict Verdict `json:"campaign_verdict"`
+ TrafficActivationPermitted bool `json:"traffic_activation_permitted"`
+ Components []ComponentStatus `json:"components"`
+ Reconciliation Reconciliation `json:"reconciliation"`
+ ReasonCodes []string `json:"reason_codes"`
 }
 
 type flags struct { blocked bool; unknown bool; reasons map[string]struct{} }
@@ -146,34 +148,34 @@ func merge(dst,src *flags,prefix string){dst.blocked=dst.blocked||src.blocked;ds
 func validID(s string)bool{return s!=""&&len(s)<=256&&!strings.ContainsAny(s," \t\r\n")}
 func validDigest(s string)bool{if len(s)!=64{return false};_,err:=hex.DecodeString(s);return err==nil&&s==strings.ToLower(s)}
 func contains(v []string,w string)bool{for _,s:=range v{if s==w{return true}};return false}
-func sameEvent(a,b Event)bool{return a.EventID==b.EventID&&a.TransactionID==b.TransactionID&&a.Topic==b.Topic&&a.Operation==b.Operation&&a.PayloadSHA256==b.PayloadSHA256&&a.TotalOrder==b.TotalOrder&&a.CollectionOrder==b.CollectionOrder}
+func sameEvent(a,b Event)bool{return a.EventID==b.EventID&&a.TransactionID==b.TransactionID&&a.Topic==b.Topic&&a.DataCollection==b.DataCollection&&a.Operation==b.Operation&&a.PayloadSHA256==b.PayloadSHA256&&a.TotalOrder==b.TotalOrder&&a.CollectionOrder==b.CollectionOrder}
 func decode(raw json.RawMessage,dst any,name string,f *flags){if len(raw)==0{f.hold(name+"_missing");return};if err:=json.Unmarshal(raw,dst);err!=nil{f.block(name+"_invalid_json")}}
 func status(name string,f *flags)ComponentStatus{return ComponentStatus{Name:name,Verdict:f.verdict(),ReasonCodes:f.codes()}}
 func checkVerdict(v,name string,f *flags){switch v{case "qualified":case "blocked":f.block(name+"_blocked");case "indeterminate":f.hold(name+"_indeterminate");default:f.hold(name+"_verdict_invalid")}}
 
 type envelope34 struct {
- Profile string `json:profile`
- Version string `json:version`
- Result struct { Verdict string `json:verdict` } `json:result`
+ Profile string `json:"profile"`
+ Version string `json:"version"`
+ Result struct { Verdict string `json:"verdict"` } `json:"result"`
 }
 type envelope35 struct {
- Profile string `json:profile`
- Version string `json:version`
+ Profile string `json:"profile"`
+ Version string `json:"version"`
  Result struct {
-  Verdict string `json:verdict`
-  Independent bool `json:independent`
-  SharedDomains []struct {Class string `json:class`;DomainID string `json:domain_id`} `json:shared_domains`
-  ObserverAssessments []struct {ObserverID string `json:observer_id`;Eligible bool `json:eligible`} `json:observer_assessments`
- } `json:result`
+  Verdict string `json:"verdict"`
+  Independent bool `json:"independent"`
+  SharedDomains []struct {Class string `json:"class"`;DomainID string `json:"domain_id"`} `json:"shared_domains"`
+  ObserverAssessments []struct {ObserverID string `json:"observer_id"`;Eligible bool `json:"eligible"`} `json:"observer_assessments"`
+ } `json:"result"`
 }
 type envelope36 struct {
- Profile string `json:profile`
- Version string `json:version`
- LedgerIntegrityValid bool `json:ledger_integrity_valid`
- LedgerComplete bool `json:ledger_complete`
- Claims []struct {ClaimID string `json:claim_id`;Disposition string `json:disposition`} `json:claims`
+ Profile string `json:"profile"`
+ Version string `json:"version"`
+ LedgerIntegrityValid bool `json:"ledger_integrity_valid"`
+ LedgerComplete bool `json:"ledger_complete"`
+ Claims []struct {ClaimID string `json:"claim_id"`;Disposition string `json:"disposition"`} `json:"claims"`
 }
-type envelope24 struct {Verdict string `json:verdict`;MayEnableTraffic bool `json:may_enable_traffic`}
+type envelope24 struct {Verdict string `json:"verdict"`;MayEnableTraffic bool `json:"may_enable_traffic"`}
 
 func Evaluate(in Input)Result{
  out:=Result{
@@ -231,11 +233,11 @@ func checkContinuity(in Input,f *flags){
 }
 func reconcileEvents(in Input,r *Reconciliation,cdc,txn *flags){
  r.ExpectedEvents=len(in.SourceEvents);r.ObservedEvents=len(in.ObservedEvents);if len(in.SourceEvents)==0{cdc.hold("source_truth_missing")}
- want:=map[string]Event{};for _,e:=range in.SourceEvents{if !validID(e.EventID)||!validID(e.TransactionID)||!validID(e.Topic)||!validDigest(e.PayloadSHA256)||e.TotalOrder<1||e.CollectionOrder<1{cdc.block("source_event_malformed");continue};if _,ok:=want[e.EventID];ok{cdc.block("duplicate_source_event_id:"+e.EventID)};want[e.EventID]=e}
+ want:=map[string]Event{};for _,e:=range in.SourceEvents{if !validID(e.EventID)||!validID(e.TransactionID)||!validID(e.Topic)||!validID(e.DataCollection)||!validDigest(e.PayloadSHA256)||e.TotalOrder<1||e.CollectionOrder<1{cdc.block("source_event_malformed");continue};if _,ok:=want[e.EventID];ok{cdc.block("duplicate_source_event_id:"+e.EventID)};want[e.EventID]=e}
  got:=map[string][]Event{};unique:=map[string]Event{};for _,e:=range in.ObservedEvents{if !validID(e.EventID)||!validID(e.TransactionID)||!validID(e.Topic)||!validDigest(e.PayloadSHA256)||e.TotalOrder<1||e.CollectionOrder<1||e.Partition<0||e.Offset<0{cdc.block("observed_event_malformed");continue};got[e.EventID]=append(got[e.EventID],e);if _,ok:=unique[e.EventID];!ok{unique[e.EventID]=e}}
  r.UniqueObservedEvents=len(unique)
  for id,w:=range want{records,ok:=got[id];if !ok{r.MissingEventIDs=append(r.MissingEventIDs,id);continue};for _,a:=range records{if !sameEvent(w,a){r.MismatchedEventIDs=append(r.MismatchedEventIDs,id);break}}}
- for id,records:=range got{if _,ok:=want[id];!ok{r.ExtraEventIDs=append(r.ExtraEventIDs,id)};if len(records)>1{exact:=true;for _,a:=range records[1:]{if !sameEvent(records[0],a){exact=false}};if exact{r.DuplicateReplays+=len(records)-1;if !in.ExactReplayDeduplicationProven{cdc.hold("exact_replay_not_proven_idempotent:"+id)}}else{r.ConflictingEventIDs=append(r.ConflictingEventIDs,id)}}}
+ for id,records:=range got{if _,ok:=want[id];!ok{r.ExtraEventIDs=append(r.ExtraEventIDs,id)};if len(records)>1{exact:=true;for _,a:=range records[1:]{if !sameEvent(records[0],a){exact=false}};if exact{r.DuplicateReplays+=len(records)-1;if !in.ExactReplayDeduplicationProven||!validDigest(in.DeduplicationProofSHA256){cdc.hold("exact_replay_not_proven_idempotent:"+id)}}else{r.ConflictingEventIDs=append(r.ConflictingEventIDs,id)}}}
  for _,list:=range [][]string{r.MissingEventIDs,r.ExtraEventIDs,r.ConflictingEventIDs,r.MismatchedEventIDs}{sort.Strings(list)}
  if len(r.MissingEventIDs)>0{cdc.block("missing_events")};if len(r.ExtraEventIDs)>0{cdc.block("extra_events")};if len(r.ConflictingEventIDs)>0{cdc.block("conflicting_event_ids")};if len(r.MismatchedEventIDs)>0{cdc.block("event_payload_mismatch")}
  parts:=map[string]int{};for _,tp:=range in.TopicPartitions{if !validID(tp.Topic)||tp.PartitionCount<1{cdc.hold("topic_partition_inventory_invalid");continue};if _,ok:=parts[tp.Topic];ok{cdc.block("duplicate_topic_partition_inventory:"+tp.Topic)};parts[tp.Topic]=tp.PartitionCount}
@@ -247,7 +249,7 @@ func reconcileEvents(in Input,r *Reconciliation,cdc,txn *flags){
  txProofs:=map[string]struct{}{};byTx:=map[string][]Event{};for _,e:=range unique{byTx[e.TransactionID]=append(byTx[e.TransactionID],e)}
  for _,p:=range in.Transactions{if !validID(p.TransactionID)||p.ExpectedEventCount<=0{txn.block("transaction_proof_malformed");continue};if _,ok:=txProofs[p.TransactionID];ok{txn.block("duplicate_transaction_proof:"+p.TransactionID);continue};txProofs[p.TransactionID]=struct{}{};records:=byTx[p.TransactionID]
  if len(records)!=p.ExpectedEventCount{r.TransactionViolations=append(r.TransactionViolations,p.TransactionID+":event_count")};if !p.BeginObserved||!p.EndObserved{r.TransactionViolations=append(r.TransactionViolations,p.TransactionID+":begin_end")};if p.EndEventCount!=p.ExpectedEventCount{r.TransactionViolations=append(r.TransactionViolations,p.TransactionID+":end_count")}
- order:=make([]int,0,len(records));collections:=map[string]int{};for _,e:=range records{order=append(order,e.TotalOrder);collections[e.Topic]++};sort.Ints(order);for i,n:=range order{if n!=i+1{r.TransactionViolations=append(r.TransactionViolations,p.TransactionID+":total_order");break}}
+ order:=make([]int,0,len(records));collections:=map[string]int{};for _,e:=range records{order=append(order,e.TotalOrder);collections[e.DataCollection]++};sort.Ints(order);for i,n:=range order{if n!=i+1{r.TransactionViolations=append(r.TransactionViolations,p.TransactionID+":total_order");break}}
  if len(collections)!=len(p.DataCollections){r.TransactionViolations=append(r.TransactionViolations,p.TransactionID+":data_collections")}else{for topic,n:=range collections{if p.DataCollections[topic]!=n{r.TransactionViolations=append(r.TransactionViolations,p.TransactionID+":collection_count:"+topic)}}}}
  for id:=range byTx{if _,ok:=txProofs[id];!ok{r.TransactionViolations=append(r.TransactionViolations,id+":proof_missing")}};if len(r.TransactionViolations)>0{sort.Strings(r.TransactionViolations);txn.block("transaction_not_closed")}
 }
