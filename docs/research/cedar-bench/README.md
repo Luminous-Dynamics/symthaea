@@ -35,7 +35,7 @@ Store auditor output separately from the candidate environment. Do not upload ge
 - placebo: change an unrelated field without changing the target fact;
 - source_removed: remove the declared source and test whether the answer becomes unresolved or remains supported by independent evidence.
 
-Each template now binds an answer-oracle specification to exact fact IDs and supporting source IDs. The generator chooses a counterfactual value only when the oracle answer actually changes, and records expected answer and citation rules in the auditor stream only. Citation-swap decoys are explicitly forbidden as support; prompt-injection tasks preserve source text as untrusted data. The initial generator is contract scaffolding; it does not implement a model runner or an automated semantic judge.
+Each template now binds an answer-oracle specification to exact fact IDs and supporting source IDs. CEDAR-08 also includes a mirrored URL sharing one origin ID, so three URLs cannot be mistaken for three independent sources; source removal deletes both mirrors and forces a one-origin corroboration downgrade. The generator chooses a counterfactual value only when the oracle answer actually changes, and records expected answer and citation rules in the auditor stream only. Citation-swap decoys are explicitly forbidden as support; prompt-injection tasks preserve source text as untrusted data. The initial generator is contract scaffolding; it does not implement a model runner or an automated semantic judge.
 
 ## Metrics and guardrails
 
