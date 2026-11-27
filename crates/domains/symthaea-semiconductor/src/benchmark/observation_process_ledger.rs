@@ -1778,6 +1778,77 @@ mod tests {
     }
 
     #[test]
+    fn label_availability_cannot_predate_physical_measurement() {
+        let mut measured = row(
+            1,
+            PhysicalAcquisitionStateV1::Measured,
+            K1QualificationStateV1::Eligible,
+            FeedbackTrackingStateV1::NotApplicable,
+        );
+        measured.qualification.label_available_at_unix_seconds = Some(114);
+        let data = input(ObservationRiskControllerV1::None, vec![measured]);
+        assert!(evaluate_observation_process_v1(&data).is_err());
+    }
+
+    #[test]
+    fn controller_feedback_cannot_predate_the_k1_report() {
+        let mut received = row(
+            1,
+            PhysicalAcquisitionStateV1::Measured,
+            K1QualificationStateV1::Eligible,
+            FeedbackTrackingStateV1::TrackedReceived,
+        );
+        received.tracking.proxy_delay_rounds = Some(2);
+        received.tracking.actual_feedback_delay_rounds = Some(1);
+        received.tracking.proxy_survival_probability = Some(0.5);
+        received.tracking.tracking_slot_id = Some(101);
+        received.tracking.tracking_end_round = Some(2);
+        received.tracking.controller_feedback_received_at_unix_seconds =
+            Some(received.qualification.report_available_at_unix_seconds.unwrap() - 1);
+        received.tracking.controller_update_applied = true;
+        let data = input(
+            ObservationRiskControllerV1::CapacityAwareOcrcBounded,
+            vec![received],
+        );
+        assert!(evaluate_observation_process_v1(&data).is_err());
+    }
+
+    #[test]
+    fn closeout_must_include_every_population_prediction_round() {
+        let data = input(
+            ObservationRiskControllerV1::None,
+            vec![row(
+                1,
+                PhysicalAcquisitionStateV1::NotSelected,
+                K1QualificationStateV1::NotApplicable,
+                FeedbackTrackingStateV1::NotApplicable,
+            )],
+        );
+        let mut truncated = data;
+        truncated.closeout_round = 0;
+        assert!(evaluate_observation_process_v1(&truncated).is_err());
+    }
+
+    #[test]
+    fn unresolved_due_feedback_is_reported_as_trace_incomplete() {
+        let mut pending = row(
+            1,
+            PhysicalAcquisitionStateV1::Measured,
+            K1QualificationStateV1::Eligible,
+            FeedbackTrackingStateV1::UnlimitedPending,
+        );
+        pending.tracking.action_receipt_sha256 = None;
+        pending.tracking.controller_update_applied = false;
+        let mut data = input(ObservationRiskControllerV1::FixedDelayAci, vec![pending]);
+        data.closeout_round = 1;
+        let report = evaluate_observation_process_v1(&data).unwrap();
+        assert_eq!(
+            report.controller_assumption_state,
+            ControllerAssumptionStateV1::TraceIncomplete
+        );
+    }
+
+    #[test]
     fn input_order_does_not_change_sealed_ledger_or_report() {
         let rows = vec![
             row(
