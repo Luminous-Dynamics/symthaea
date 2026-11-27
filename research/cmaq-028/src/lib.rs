@@ -34,6 +34,10 @@ pub enum PreviousOutcome {
 pub struct PortfolioPrefix {
     pub step: u32,
     pub context_scope_sha256: String,
+    /// Digest of the exact state observation to which this prefix applies.
+    pub state_evidence_sha256: String,
+    /// Receipt digest binding the independently computed reachable-set bound.
+    pub reachability_evidence_sha256: String,
     /// Upper bound supplied by an independent reachable-set adapter.
     pub reachable_error_bound_units: u64,
 }
@@ -130,8 +134,17 @@ pub fn assess_recovery_portfolio(
         if prefix.step as usize != index {
             return Err(PortfolioError::NonContiguousPrefixSequence);
         }
-        if !is_sha256_hex(&prefix.context_scope_sha256) {
-            return Err(PortfolioError::InvalidSha256("prefix.context_scope_sha256"));
+        for (field, digest) in [
+            ("prefix.context_scope_sha256", &prefix.context_scope_sha256),
+            ("prefix.state_evidence_sha256", &prefix.state_evidence_sha256),
+            (
+                "prefix.reachability_evidence_sha256",
+                &prefix.reachability_evidence_sha256,
+            ),
+        ] {
+            if !is_sha256_hex(digest) {
+                return Err(PortfolioError::InvalidSha256(field));
+            }
         }
     }
 
@@ -457,6 +470,8 @@ mod tests {
         PortfolioPrefix {
             step,
             context_scope_sha256: digest(context),
+            state_evidence_sha256: digest('d'),
+            reachability_evidence_sha256: digest('8'),
             reachable_error_bound_units: bound,
         }
     }
