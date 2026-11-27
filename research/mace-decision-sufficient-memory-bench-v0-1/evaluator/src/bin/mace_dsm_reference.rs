@@ -355,8 +355,8 @@ fn score(
     let memory_manifest: RunManifestWire = read_json(memory_manifest_path)?;
     let no_memory_manifest: RunManifestWire = read_json(no_memory_manifest_path)?;
     for (label, manifest) in [("memory", &memory_manifest), ("no-memory", &no_memory_manifest)] {
-        if manifest.schema_version != MANIFEST_SCHEMA || manifest.profile != "native-research"
-            || manifest.evaluation.metric_profile != "dsm-v0.1"
+        if manifest.schema_version != MANIFEST_SCHEMA || manifest.profile.trim().is_empty()
+            || manifest.evaluation.metric_profile.trim().is_empty()
             || manifest.downstream_policy.policy_digest_sha256.trim().is_empty()
             || manifest.system.system_version.trim().is_empty()
             || !is_sha256(&manifest.system.artifact_digest_sha256)
@@ -367,6 +367,10 @@ fn score(
     if memory_manifest.run_id == no_memory_manifest.run_id
         || memory_manifest.system.artifact_digest_sha256 == no_memory_manifest.system.artifact_digest_sha256 {
         return Err("memory and no-memory manifests must identify distinct runs and artifacts".into());
+    }
+    if memory_manifest.profile != no_memory_manifest.profile
+        || memory_manifest.evaluation.metric_profile != no_memory_manifest.evaluation.metric_profile {
+        return Err("paired run manifests use different evaluation profiles".into());
     }
     if memory_manifest.downstream_policy.policy_digest_sha256 != no_memory_manifest.downstream_policy.policy_digest_sha256
         || memory_manifest.downstream_policy.reader_seed != no_memory_manifest.downstream_policy.reader_seed {
