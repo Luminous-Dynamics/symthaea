@@ -674,34 +674,17 @@ impl QualifiedGroup {
         }
         self.source_families.insert(item.source_family);
         self.source_root_digests.insert(item.source_root_digest);
-        if item.event_id >= 100 {
-            let same_digest = self.estimand_digest == Some(item.causal_identification.estimand_digest);
-            let same_semantic = self.semantic_estimand == Some(item.causal_identification.semantic_estimand);
-            eprintln!(
-                "MACE group add action={:?} event={} mixed_before={} digest_present={} semantic_present={} same_digest={} same_semantic={} state=({:?},{:?}) item=({:?},{:?})",
-                item.action,
-                item.event_id,
-                self.mixed_estimands,
-                self.estimand_digest.is_some(),
-                self.semantic_estimand.is_some(),
-                same_digest,
-                same_semantic,
-                self.estimand_digest,
-                self.semantic_estimand.map(|value| value.canonical_digest()),
-                item.causal_identification.estimand_digest,
-                item.causal_identification.semantic_estimand.canonical_digest()
-            );
-        }
         match (self.estimand_digest, self.semantic_estimand) {
             (None, None) => {
                 self.estimand_digest = Some(item.causal_identification.estimand_digest);
                 self.semantic_estimand = Some(item.causal_identification.semantic_estimand);
             }
-            (Some(existing_digest), Some(existing_semantic))
+            (Some(existing_digest), Some(existing_semantic)) => {
                 if existing_digest != item.causal_identification.estimand_digest
-                    || existing_semantic != item.causal_identification.semantic_estimand =>
-            {
-                self.mixed_estimands = true;
+                    || existing_semantic != item.causal_identification.semantic_estimand
+                {
+                    self.mixed_estimands = true;
+                }
             }
             _ => self.mixed_estimands = true,
         }
@@ -762,13 +745,6 @@ fn causal_qualified_policy(memory: &[Experience], query: Query) -> Decision {
     let b = groups.get(&Action::B).cloned().unwrap_or_default();
     let a_ok = a.is_qualified();
     let b_ok = b.is_qualified();
-    eprintln!(
-        "MACE aggregate groups: A ok={a_ok} count={} families={:?} roots={} events={} one_estimand={} mixed={} digest={:?}; B ok={b_ok} count={} families={:?} roots={} events={} one_estimand={} mixed={} digest={:?}",
-        a.count, a.source_families, a.source_root_digests.len(), a.source_events.len(),
-        a.has_single_estimand(), a.mixed_estimands, a.estimand_digest,
-        b.count, b.source_families, b.source_root_digests.len(), b.source_events.len(),
-        b.has_single_estimand(), b.mixed_estimands, b.estimand_digest
-    );
     if MACE_REQUIRE_BOTH_ACTION_ALTERNATIVES && !(a_ok && b_ok) {
         return Decision::abstain();
     }
