@@ -46,6 +46,10 @@ pub enum Error {
     AsymmetricMatrix,
     MatrixNotPositiveDefinite,
     EmptyActionSet,
+    EmptyScenarioSet,
+    TooManyScenarios,
+    InvalidScenarioIdentity,
+    DuplicateScenarioIdentity,
     TooManyActions,
     InvalidActionIdentity,
     DuplicateActionIdentity,
@@ -383,6 +387,161 @@ pub fn optimize(design: &FullCovarianceDesign) -> Result<DesignReport, Error> {
     })
 }
 
+
+#[derive(Debug, Clone, PartialEq)]
+pub struct CovarianceScenario {
+    pub id: String,
+    pub prior_covariance: Vec<Vec<f64>>,
+    pub residual_covariance: Vec<Vec<f64>>,
+}
+
+#[derive(Debug, Clone, PartialEq)]
+pub struct RobustFullCovarianceDesign {
+    pub latent_ids: Vec<String>,
+    pub science_index: usize,
+    pub budget_units: u64,
+    pub actions: Vec<MeasurementAction>,
+    /// Frozen finite set of plausible covariance models; one subset is evaluated in all.
+    pub scenarios: Vec<CovarianceScenario>,
+}
+
+#[derive(Debug, Clone, PartialEq)]
+pub struct RobustDesignReport {
+    pub selected_action_ids: Vec<String>,
+    pub selected_cost_units: u64,
+    pub budget_units: u64,
+    pub prior_worst_case_science_variance: f64,
+    pub posterior_worst_case_science_variance: f64,
+    pub worst_case_variance_reduction_fraction: f64,
+    pub posterior_science_variance_by_scenario: Vec<(String, f64)>,
+    pub scenarios_evaluated: u64,
+    pub subsets_evaluated: u64,
+}
+
+const MAX_COVARIANCE_SCENARIOS: usize = 8;
+
+/// Finite-scenario maximin design. Guarantees apply only to the supplied scenarios.
+pub fn optimize_maximin(
+    design: &RobustFullCovarianceDesign,
+) -> Result<RobustDesignReport, Error> {
+    if design.scenarios.is_empty() {
+        return Err(Error::EmptyScenarioSet);
+    }
+    if design.scenarios.len() > MAX_COVARIANCE_SCENARIOS {
+        return Err(Error::TooManyScenarios);
+    }
+
+    let mut contexts: Vec<(String, FullCovarianceDesign, Vec<Vec<f64>>, Posterior)> =
+        Vec::with_capacity(design.scenarios.len());
+    for (i, scenario) in design.scenarios.iter().enumerate() {
+        if scenario.id.trim().is_empty() {
+            return Err(Error::InvalidScenarioIdentity);
+        }
+        if design.scenarios[..i].iter().any(|other| other.id == scenario.id) {
+            return Err(Error::DuplicateScenarioIdentity);
+        }
+        let scenario_design = FullCovarianceDesign {
+            latent_ids: design.latent_ids.clone(),
+            prior_covariance: scenario.prior_covariance.clone(),
+            science_index: design.science_index,
+            budget_units: design.budget_units,
+            actions: design.actions.clone(),
+            residual_covariance: scenario.residual_covariance.clone(),
+        };
+        validate_design(&scenario_design)?;
+        let (prior_precision, _) = invert_spd(&scenario_design.prior_covariance)?;
+        let prior = posterior_for_selection(&scenario_design, &[], &prior_precision)?;
+        contexts.push((scenario.id.clone(), scenario_design, prior_precision, prior));
+    }
+
+    let prior_worst_case_science_variance = contexts
+        .iter()
+        .map(|(_, scenario_design, _, prior)| {
+            prior.covariance[scenario_design.science_index][scenario_design.science_index]
+        })
+        .fold(0.0_f64, f64::max);
+
+    let mut best_selected = Vec::<usize>::new();
+    let mut best_cost = 0_u64;
+    let mut best_worst_case = prior_worst_case_science_variance;
+    let mut best_variances: Vec<(String, f64)> = contexts
+        .iter()
+        .map(|(id, scenario_design, _, prior)| (
+            id.clone(),
+            prior.covariance[scenario_design.science_index][scenario_design.science_index],
+        ))
+        .collect();
+
+    let subset_count = 1_u64 << design.actions.len();
+    for mask in 1_u64..subset_count {
+        let selected: Vec<usize> = (0..design.actions.len())
+            .filter(|index| (mask & (1_u64 << *index)) != 0)
+            .collect();
+        let mut total_cost = 0_u64;
+        let mut affordable = true;
+        for &index in &selected {
+            match total_cost.checked_add(design.actions[index].cost_units) {
+                Some(sum) => total_cost = sum,
+                None => {
+                    affordable = false;
+                    break;
+                }
+            }
+            if total_cost > design.budget_units {
+                affordable = false;
+                break;
+            }
+        }
+        if !affordable {
+            continue;
+        }
+
+        let mut scenario_variances = Vec::with_capacity(contexts.len());
+        let mut worst_case = 0.0_f64;
+        for (id, scenario_design, prior_precision, _) in &contexts {
+            let posterior = posterior_for_selection(scenario_design, &selected, prior_precision)?;
+            let variance =
+                posterior.covariance[scenario_design.science_index][scenario_design.science_index];
+            if !variance.is_finite() || variance <= 0.0 {
+                return Err(Error::NumericFailure);
+            }
+            worst_case = worst_case.max(variance);
+            scenario_variances.push((id.clone(), variance));
+        }
+
+        let candidate_ids = ids_for_selection(&contexts[0].1, &selected);
+        let best_ids = ids_for_selection(&contexts[0].1, &best_selected);
+        let lower_worst_case = worst_case < best_worst_case - OBJECTIVE_TOL;
+        let same_worst_case = (worst_case - best_worst_case).abs() <= OBJECTIVE_TOL;
+        let deterministic_tie = same_worst_case
+            && (total_cost < best_cost
+                || (total_cost == best_cost && candidate_ids < best_ids));
+        if lower_worst_case || deterministic_tie {
+            best_selected = selected;
+            best_cost = total_cost;
+            best_worst_case = worst_case;
+            best_variances = scenario_variances;
+        }
+    }
+
+    let worst_case_variance_reduction_fraction =
+        1.0 - best_worst_case / prior_worst_case_science_variance;
+    if !worst_case_variance_reduction_fraction.is_finite() {
+        return Err(Error::NumericFailure);
+    }
+    Ok(RobustDesignReport {
+        selected_action_ids: ids_for_selection(&contexts[0].1, &best_selected),
+        selected_cost_units: best_cost,
+        budget_units: design.budget_units,
+        prior_worst_case_science_variance,
+        posterior_worst_case_science_variance: best_worst_case,
+        worst_case_variance_reduction_fraction,
+        posterior_science_variance_by_scenario: best_variances,
+        scenarios_evaluated: contexts.len() as u64,
+        subsets_evaluated: subset_count,
+    })
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -525,4 +684,91 @@ mod tests {
         }
         assert_eq!(optimize(&design), Err(Error::TooManyActions));
     }
+
+    fn robust_fixture(reverse_scenarios: bool) -> RobustFullCovarianceDesign {
+        let scenario_a = CovarianceScenario {
+            id: "reference-chain-a-correlated".into(),
+            prior_covariance: vec![vec![1.0, 0.0], vec![0.0, 1.0]],
+            residual_covariance: vec![
+                vec![0.01, 0.0, 0.003],
+                vec![0.0, 0.01, 0.0],
+                vec![0.003, 0.0, 0.01],
+            ],
+        };
+        let scenario_b = CovarianceScenario {
+            id: "reference-chain-b-correlated".into(),
+            prior_covariance: vec![vec![1.0, 0.0], vec![0.0, 1.0]],
+            residual_covariance: vec![
+                vec![0.01, 0.0, 0.0],
+                vec![0.0, 0.01, 0.003],
+                vec![0.0, 0.003, 0.01],
+            ],
+        };
+        let mut scenarios = vec![scenario_a, scenario_b];
+        if reverse_scenarios {
+            scenarios.reverse();
+        }
+        RobustFullCovarianceDesign {
+            latent_ids: vec!["science".into(), "shared_bias".into()],
+            science_index: 0,
+            budget_units: 2,
+            actions: vec![
+                MeasurementAction { id: "science-a".into(), cost_units: 1, loadings: vec![1.0, 1.0] },
+                MeasurementAction { id: "science-b".into(), cost_units: 1, loadings: vec![1.0, 1.0] },
+                MeasurementAction { id: "reference".into(), cost_units: 1, loadings: vec![0.0, 1.0] },
+            ],
+            scenarios,
+        }
+    }
+
+    #[test]
+    fn maximin_selects_one_common_subset_across_covariance_scenarios() {
+        let report = optimize_maximin(&robust_fixture(false)).unwrap();
+        assert_eq!(report.selected_action_ids, vec!["reference".to_string(), "science-a".to_string()]);
+        assert!((report.posterior_worst_case_science_variance - 201.0 / 10_301.0).abs() < 1e-10);
+        assert_eq!(report.scenarios_evaluated, 2);
+        assert_eq!(report.selected_cost_units, 2);
+        assert_eq!(report.subsets_evaluated, 8);
+    }
+
+    #[test]
+    fn maximin_report_preserves_each_scenario_result() {
+        let report = optimize_maximin(&robust_fixture(false)).unwrap();
+        assert_eq!(report.posterior_science_variance_by_scenario.len(), 2);
+        assert!(report.posterior_science_variance_by_scenario.iter().all(|(_, v)| *v > 0.0));
+        let maximum = report.posterior_science_variance_by_scenario
+            .iter()
+            .map(|(_, v)| *v)
+            .fold(0.0_f64, f64::max);
+        assert!((maximum - report.posterior_worst_case_science_variance).abs() < 1e-12);
+    }
+
+    #[test]
+    fn maximin_result_is_invariant_to_scenario_order() {
+        let forward = optimize_maximin(&robust_fixture(false)).unwrap();
+        let reverse = optimize_maximin(&robust_fixture(true)).unwrap();
+        assert_eq!(forward.selected_action_ids, reverse.selected_action_ids);
+        assert!((forward.posterior_worst_case_science_variance
+            - reverse.posterior_worst_case_science_variance).abs() < 1e-12);
+    }
+
+    #[test]
+    fn maximin_rejects_empty_or_duplicate_scenario_registry() {
+        let mut empty = robust_fixture(false);
+        empty.scenarios.clear();
+        assert_eq!(optimize_maximin(&empty), Err(Error::EmptyScenarioSet));
+        let mut duplicate = robust_fixture(false);
+        duplicate.scenarios[1].id = duplicate.scenarios[0].id.clone();
+        assert_eq!(optimize_maximin(&duplicate), Err(Error::DuplicateScenarioIdentity));
+    }
+
+    #[test]
+    fn maximin_enforces_common_hard_budget() {
+        let mut design = robust_fixture(false);
+        design.budget_units = 1;
+        let report = optimize_maximin(&design).unwrap();
+        assert!(report.selected_cost_units <= 1);
+        assert_eq!(report.posterior_science_variance_by_scenario.len(), 2);
+    }
+
 }
