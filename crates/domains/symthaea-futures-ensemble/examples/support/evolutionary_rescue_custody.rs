@@ -272,9 +272,9 @@ pub fn verify_encoded_replay_artifacts(
 
 fn validate_observation_policy_id(value: &str) -> Result<(), String> {
     match value {
-        "population_census_v1"
-        | "noisy_trait_v1"
-        | "shuffled_trait_negative_control_v1" => Ok(()),
+        "population_census_v1" | "noisy_trait_v1" | "shuffled_trait_negative_control_v1" => {
+            Ok(())
+        },
         _ => Err("unsupported observation policy ID".into()),
     }
 }
@@ -314,7 +314,10 @@ fn validate_replay_artifact_structure(
 ) -> Result<(), String> {
     require_nonempty("manifest world_id", &manifest.world_id)?;
     require_nonempty("manifest source_commit", &manifest.source_commit)?;
-    require_nonempty("manifest observation_policy_id", &manifest.observation_policy_id)?;
+    require_nonempty(
+        "manifest observation_policy_id",
+        &manifest.observation_policy_id,
+    )?;
     validate_commit_sha(&manifest.source_commit)?;
     validate_observation_policy_id(&manifest.observation_policy_id)?;
     validate_candidate_archive(candidate)?;
@@ -713,10 +716,18 @@ mod tests {
         let mut archive: ReplayObservationArchive =
             serde_json::from_slice(&encoded.replay_archive_json).unwrap();
         archive.observation_policy_id = "candidate-invented-policy".into();
-        assert!(build_decision_prefix(&archive, 0).unwrap_err().contains("policy"));
+        assert!(
+            build_decision_prefix(&archive, 0)
+                .unwrap_err()
+                .contains("policy")
+        );
         archive.observation_policy_id = ObservationView::Census.policy_id().into();
         archive.world_id = "  ".into();
-        assert!(build_decision_prefix(&archive, 0).unwrap_err().contains("world_id"));
+        assert!(
+            build_decision_prefix(&archive, 0)
+                .unwrap_err()
+                .contains("world_id")
+        );
     }
 
     #[test]
@@ -733,8 +744,9 @@ mod tests {
             serde_json::from_slice(&encoded.evaluator_capsule_json).unwrap();
         evaluator.trajectory_collapsed.pop();
         encoded.evaluator_capsule_json = serde_json::to_vec(&evaluator).unwrap();
-        encoded.evaluator_digest =
-            blake3::hash(&encoded.evaluator_capsule_json).to_hex().to_string();
+        encoded.evaluator_digest = blake3::hash(&encoded.evaluator_capsule_json)
+            .to_hex()
+            .to_string();
         let mut manifest: WorldCustodyManifest =
             serde_json::from_slice(&encoded.evaluator_manifest_json).unwrap();
         manifest.evaluator_capsule_blake3 = encoded.evaluator_digest.clone();
@@ -765,8 +777,9 @@ mod tests {
             serde_json::from_slice(&encoded.replay_archive_json).unwrap();
         archive.observations[1].tick = 9;
         encoded.replay_archive_json = serde_json::to_vec(&archive).unwrap();
-        encoded.replay_digest =
-            blake3::hash(&encoded.replay_archive_json).to_hex().to_string();
+        encoded.replay_digest = blake3::hash(&encoded.replay_archive_json)
+            .to_hex()
+            .to_string();
         let mut receipt: ReplayArchiveReceipt =
             serde_json::from_slice(&encoded.replay_receipt_json).unwrap();
         receipt.replay_archive_blake3 = encoded.replay_digest.clone();
