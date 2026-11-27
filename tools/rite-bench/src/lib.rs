@@ -653,7 +653,7 @@ mod tests {
         let mut record = task("calibration", Decision::Supported, Decision::Supported);
         record.confidence_correct = 0.8;
         let result = evaluate(&[record]).unwrap();
-        assert_eq!(result.brier_score.value(), Some(0.04));
+        assert!((result.brier_score.value().unwrap() - 0.04).abs() < 1e-9);
         assert!((result.expected_calibration_error_10_bin.value().unwrap() - 0.2).abs() < 1e-9);
     }
 
