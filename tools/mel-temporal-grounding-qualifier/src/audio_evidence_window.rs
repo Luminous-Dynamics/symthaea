@@ -776,6 +776,7 @@ mod tests {
         assert!(!report.model_runtime_identity_authenticated);
         assert!(!report.runner_receipt_verified);
         assert!(report.request_body_bytes_recomputed);
+        assert!(report.request_body_semantics_bound);
         assert!(!report.request_body_delivery_attested);
         assert!(!report.model_input_attested);
     }
