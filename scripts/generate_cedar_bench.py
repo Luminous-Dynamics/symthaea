@@ -240,11 +240,19 @@ def expand(seed: bytes, template: dict[str, Any]) -> tuple[list[dict[str, Any]],
         if condition == "counterfactual":
             behavior = "TRACKS_COUNTERFACTUAL" if template["expected"] != "SOURCE_CONFLICT_REPRESENTED_AND_TRACKS_CHANGED_SOURCE" else template["expected"]
         elif condition == "placebo":
-            behavior = "PLACEBO_STABLE"
+            behavior = (
+                "SOURCE_CONFLICT_REPRESENTED_AND_PLACEBO_STABLE"
+                if template["expected"].startswith("SOURCE_CONFLICT")
+                else "PLACEBO_STABLE"
+            )
         elif condition == "source_removed":
             behavior = template.get("source_removal", {}).get("expected", "ABSTAIN_OR_MARK_UNRESOLVED")
         else:
-            behavior = "BASELINE_GROUNDED"
+            behavior = (
+                "SOURCE_CONFLICT_REPRESENTED"
+                if template["expected"].startswith("SOURCE_CONFLICT")
+                else "BASELINE_GROUNDED"
+            )
         audit_rows.append({
             "task_id": opaque_id,
             "template_id": template_id,
