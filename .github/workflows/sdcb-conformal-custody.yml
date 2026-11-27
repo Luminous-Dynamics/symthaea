@@ -1,10 +1,14 @@
-name: SDCB Conformal Calibration Custody
+name: SDCB Full Reference Chain Validation
 
 on:
   push:
     branches:
       - research/sdcb-conformal-custody-hardening-2026-11-27
     paths:
+      - "scripts/research/sdcb_vector_state_space.rs"
+      - "scripts/research/sdcb_covariance_model_mixture.rs"
+      - "scripts/research/sdcb_interval_observation.rs"
+      - "scripts/research/sdcb_model_set_adequacy.rs"
       - "scripts/research/sdcb_block_conformal_adequacy.rs"
       - "docs/research/SDCB_BLOCK_CONFORMAL_ADEQUACY_V1.example.json"
       - "docs/research/SDCB_BLOCK_CONFORMAL_ADEQUACY_V1.schema.json"
@@ -13,6 +17,10 @@ on:
   pull_request:
     types: [opened, synchronize, reopened, ready_for_review]
     paths:
+      - "scripts/research/sdcb_vector_state_space.rs"
+      - "scripts/research/sdcb_covariance_model_mixture.rs"
+      - "scripts/research/sdcb_interval_observation.rs"
+      - "scripts/research/sdcb_model_set_adequacy.rs"
       - "scripts/research/sdcb_block_conformal_adequacy.rs"
       - "docs/research/SDCB_BLOCK_CONFORMAL_ADEQUACY_V1.example.json"
       - "docs/research/SDCB_BLOCK_CONFORMAL_ADEQUACY_V1.schema.json"
@@ -25,7 +33,7 @@ permissions:
 
 jobs:
   conformance:
-    name: Rust 1.96 conformal custody negative controls
+    name: Rust 1.96 SDCB stack and conformal custody
     runs-on: ubuntu-24.04
     timeout-minutes: 10
     steps:
@@ -36,10 +44,31 @@ jobs:
       - uses: dtolnay/rust-toolchain@stable
         with:
           toolchain: "1.96.0"
-      - name: Compile exact-source reference tests
-        run: rustc --edition=2024 --test scripts/research/sdcb_block_conformal_adequacy.rs -o /tmp/sdcb-block-conformal-adequacy
-      - name: Run conformal rank and custody controls
-        run: /tmp/sdcb-block-conformal-adequacy
+      - name: Compile all exact-source SDCB references
+        run: |
+          set -euo pipefail
+          for source in \
+            scripts/research/sdcb_vector_state_space.rs \
+            scripts/research/sdcb_covariance_model_mixture.rs \
+            scripts/research/sdcb_interval_observation.rs \
+            scripts/research/sdcb_model_set_adequacy.rs \
+            scripts/research/sdcb_block_conformal_adequacy.rs
+          do
+            name="$(basename "$source" .rs)"
+            rustc --edition=2024 --test "$source" -o "/tmp/$name"
+          done
+      - name: Run all SDCB unit and negative-control suites
+        run: |
+          set -euo pipefail
+          for binary in \
+            /tmp/sdcb_vector_state_space \
+            /tmp/sdcb_covariance_model_mixture \
+            /tmp/sdcb_interval_observation \
+            /tmp/sdcb_model_set_adequacy \
+            /tmp/sdcb_block_conformal_adequacy
+          do
+            "$binary"
+          done
       - name: Parse frozen JSON fixtures
         run: |
           python3 -m json.tool docs/research/SDCB_BLOCK_CONFORMAL_ADEQUACY_V1.example.json >/dev/null
