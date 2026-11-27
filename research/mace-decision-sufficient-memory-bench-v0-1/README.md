@@ -150,7 +150,7 @@ For each episode:
 3. Submit the original decision query and declared evidence/observation budget.
 4. Accept ranked `retrieved_evidence_ids` from the memory system.
 5. Resolve every returned ID independently against canonical source records; compute admissibility, source-family/root lineage and contradiction relationships evaluator-side.
-6. Pass a selected evidence packet to the frozen downstream decision policy and record its IDs separately as `decision_support_evidence_ids`. The selected set must be a unique subset of the retrieved set. The JSON contract is [candidate-run-v0.1.schema.json](schemas/candidate-run-v0.1.schema.json); the Rust scorer enforces the cross-field subset invariant that JSON Schema cannot express.
+6. Pass a selected evidence packet to the frozen downstream decision policy and record its IDs separately as `decision_support_evidence_ids`. The selected set must be a unique subset of the retrieved set. The JSON contract is [candidate-run-v0.1.schema.json](schemas/candidate-run-v0.1.schema.json); the Rust scorer enforces the cross-field subset invariant that JSON Schema cannot express. This records the policy input builder's selected IDs, not proof that a generative model attended to or cited each item; exact serialized-context exposure is a separate receipt requirement tracked by [#13722](https://github.com/Luminous-Dynamics/symthaea/issues/13722).
 7. Score the chosen action using evaluator-private state and loss tables. Keep retrieval precision/recall distinct from decision-support precision/recall.
 
 This separates the memory subsystem's evidence contribution from the downstream model's ability to answer. A later end-to-end agent experiment may be added, but it must be reported separately.
@@ -396,6 +396,9 @@ For AML, keep the independent target of +3 absolute points over the published op
 - [Issue #13875](https://github.com/Luminous-Dynamics/symthaea/issues/13875) tracks the official frozen Textual word counter.
 - [Issue #13893](https://github.com/Luminous-Dynamics/symthaea/issues/13893) tracks this research programme.
 - [PR #13935](https://github.com/Luminous-Dynamics/symthaea/pull/13935) adds retrieval-versus-decision-support scoring, source-family/root diversity and retrieved-conflict gates to the paired evaluator.
+- [Issue #13264](https://github.com/Luminous-Dynamics/symthaea/issues/13264) owns verified transitive dependency closure; the current direct-root counts are a precursor, not the completed lineage verifier.
+- [Issue #13332](https://github.com/Luminous-Dynamics/symthaea/issues/13332) owns group-conditional selective-risk calibration; deterministic hard gates do not themselves provide a calibrated risk guarantee.
+- [Issue #13287](https://github.com/Luminous-Dynamics/symthaea/issues/13287) owns independent candidate/evaluator custody; this paired evaluator remains diagnostic until that boundary is qualified.
 
 These are authored engineering changes and proposed research work. No DSM evaluator, benchmark score, AML Smoke pass, leaderboard improvement, production deployment or SOTA result is claimed by this protocol document.
 
