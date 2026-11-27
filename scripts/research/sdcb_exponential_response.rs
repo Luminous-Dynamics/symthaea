@@ -11,6 +11,17 @@
 
 const MAX_SCALED_TIME: f64 = 700.0;
 
+/// Stable evaluation of (1 - exp(-x)) / x for x >= 0.
+/// For subnormal x, replacing the ratio by one changes it by less than half
+/// a subnormal-scale relative term and avoids division by a subnormal value.
+fn one_minus_exp_neg_over_x(x: f64) -> f64 {
+    if x < f64::MIN_POSITIVE {
+        1.0
+    } else {
+        -(-x).exp_m1() / x
+    }
+}
+
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub enum ResponseModelError {
     InvalidProcessDecayRate,
@@ -118,45 +129,20 @@ impl FirstOrderResponseOu {
         let e_l = (-scaled_l).exp();
         let e_m = (-scaled_m).exp();
         let delta = m - l;
-
+        let gap_scaled = delta.abs() * t;
+        if !gap_scaled.is_finite() {
+            return Err(ResponseModelError::NumericalFailure);
+        }
+        // The transition gain is (mu*t) * (1-exp(-|mu-lambda|t)) /
+        // (|mu-lambda|t). This factorization avoids intermediate underflow
+        // and preserves accuracy for subnormal rate-gap products.
+        let response_gain = scaled_m * one_minus_exp_neg_over_x(gap_scaled);
         let lower_left = if delta > 0.0 {
-            // m * exp(-l t) * (1 - exp(-delta t)) / delta.
-            // If delta*t underflows to zero while m*t is representable,
-            // use the repeated-root limit instead of losing the transition.
-            let gap_scaled = delta * t;
-            if gap_scaled < f64::MIN_POSITIVE && t > 0.0 {
-                let scaled = m * t;
-                if !scaled.is_finite() {
-                    return Err(ResponseModelError::NumericalFailure);
-                }
-                scaled * e_l
-            } else {
-                let response_gain = m * ((-(-gap_scaled).exp_m1()) / delta);
-                e_l * response_gain
-            }
+            e_l * response_gain
         } else if delta < 0.0 {
-            // m * exp(-m t) * (1 - exp(-(-delta) t)) / (-delta).
-            let gap = -delta;
-            let gap_scaled = gap * t;
-            if gap_scaled == 0.0 && t > 0.0 {
-                let scaled = m * t;
-                if !scaled.is_finite() {
-                    return Err(ResponseModelError::NumericalFailure);
-                }
-                scaled * e_m
-            } else {
-                let response_gain = m * ((-(-gap_scaled).exp_m1()) / gap);
-                e_m * response_gain
-            }
+            e_m * response_gain
         } else {
-            // The repeated-root term is (lambda*t)*exp(-lambda*t). If
-            // lambda*t overflows, the exact term is far below binary64 range.
-            let scaled = m * t;
-            if scaled.is_finite() {
-                scaled * (-scaled).exp()
-            } else {
-                0.0
-            }
+            e_l * scaled_m
         };
 
         if !lower_left.is_finite() {
@@ -216,20 +202,16 @@ impl FirstOrderResponseOu {
         let h = elapsed_time;
         let slow_rate = self.lambda.min(self.mu);
         let slow_scaled = slow_rate * h;
-        if !slow_scaled.is_finite() || slow_scaled > MAX_SCALED_TIME {
+        let gap_scaled = (self.lambda - self.mu).abs() * h;
+        if !slow_scaled.is_finite()
+            || slow_scaled > MAX_SCALED_TIME
+            || !gap_scaled.is_finite()
+            || gap_scaled > MAX_SCALED_TIME
+        {
             return Err(ResponseModelError::NumericalFailure);
         }
-        let factor = if self.mu > self.lambda {
-            let gap = self.mu - self.lambda;
-            let ratio = -(-gap * h).exp_m1() / gap;
-            (-slow_scaled).exp() * (1.0 + self.lambda * ratio)
-        } else if self.mu < self.lambda {
-            let gap = self.lambda - self.mu;
-            let ratio = -(-gap * h).exp_m1() / gap;
-            (-slow_scaled).exp() * (1.0 + self.mu * ratio)
-        } else {
-            (-slow_scaled).exp() * (1.0 + slow_scaled)
-        };
+        let factor = (-slow_scaled).exp()
+            * (1.0 + slow_scaled * one_minus_exp_neg_over_x(gap_scaled));
         let covariance = q * factor;
 
         if covariance.is_finite() && covariance >= 0.0 {
