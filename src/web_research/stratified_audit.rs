@@ -114,7 +114,10 @@ impl std::fmt::Display for StratifiedAuditError {
             }
             Self::InvalidQuota { stratum_id, sample_size, population_size } => write!(
                 formatter,
-                "invalid audit quota {sample_size} for stratum {stratum_id} with population {population_size}"
+                concat!(
+                    "invalid audit quota {sample_size} for stratum {stratum_id} ",
+                    "with population {population_size}"
+                )
             ),
         }
     }
@@ -315,13 +318,41 @@ mod tests {
 
     fn candidates() -> Vec<AuditCandidate> {
         vec![
-            AuditCandidate { record_id: "a1".to_owned(), stratum_id: "domain-a".to_owned(), random_priority: 40 },
-            AuditCandidate { record_id: "a2".to_owned(), stratum_id: "domain-a".to_owned(), random_priority: 10 },
-            AuditCandidate { record_id: "a3".to_owned(), stratum_id: "domain-a".to_owned(), random_priority: 30 },
-            AuditCandidate { record_id: "a4".to_owned(), stratum_id: "domain-a".to_owned(), random_priority: 20 },
-            AuditCandidate { record_id: "b1".to_owned(), stratum_id: "domain-b".to_owned(), random_priority: 90 },
-            AuditCandidate { record_id: "b2".to_owned(), stratum_id: "domain-b".to_owned(), random_priority: 70 },
-            AuditCandidate { record_id: "b3".to_owned(), stratum_id: "domain-b".to_owned(), random_priority: 80 },
+            AuditCandidate {
+                record_id: "a1".to_owned(),
+                stratum_id: "domain-a".to_owned(),
+                random_priority: 40,
+            },
+            AuditCandidate {
+                record_id: "a2".to_owned(),
+                stratum_id: "domain-a".to_owned(),
+                random_priority: 10,
+            },
+            AuditCandidate {
+                record_id: "a3".to_owned(),
+                stratum_id: "domain-a".to_owned(),
+                random_priority: 30,
+            },
+            AuditCandidate {
+                record_id: "a4".to_owned(),
+                stratum_id: "domain-a".to_owned(),
+                random_priority: 20,
+            },
+            AuditCandidate {
+                record_id: "b1".to_owned(),
+                stratum_id: "domain-b".to_owned(),
+                random_priority: 90,
+            },
+            AuditCandidate {
+                record_id: "b2".to_owned(),
+                stratum_id: "domain-b".to_owned(),
+                random_priority: 70,
+            },
+            AuditCandidate {
+                record_id: "b3".to_owned(),
+                stratum_id: "domain-b".to_owned(),
+                random_priority: 80,
+            },
         ]
     }
 
@@ -391,6 +422,58 @@ mod tests {
     fn cross_stratum_joint_probability_is_the_product_under_independent_strata() {
         let plan = build();
         assert!((plan.joint_inclusion_probability("a1", "b1").unwrap() - 1.0 / 6.0).abs() < 1e-12);
+    }
+
+    #[test]
+    fn selected_units_are_exactly_the_lowest_random_priorities_in_each_stratum() {
+        let plan = build();
+        let selected: HashSet<&str> = plan
+            .selections
+            .iter()
+            .filter(|row| row.selected_for_adjudication)
+            .map(|row| row.record_id.as_str())
+            .collect();
+        assert_eq!(
+            selected,
+            HashSet::from(["a2", "a4", "b2"])
+        );
+    }
+
+    #[test]
+    fn census_stratum_has_unit_first_and_second_order_probabilities() {
+        let mut input = candidates();
+        input.retain(|candidate| candidate.stratum_id == "domain-b");
+        let quota = vec![AuditStratumQuota {
+            stratum_id: "domain-b".to_owned(),
+            sample_size: 3,
+        }];
+        let plan = build_stratified_random_audit_plan(
+            &input,
+            &quota,
+            "census-audit-v1",
+            "custody://randomization-manifest/census",
+        )
+        .unwrap();
+        assert!(plan.selections.iter().all(|row| {
+            row.selected_for_adjudication && row.inclusion_probability == 1.0
+        }));
+        assert_eq!(plan.joint_inclusion_probability("b1", "b2"), Some(1.0));
+    }
+
+    #[test]
+    fn duplicate_record_ids_are_rejected() {
+        let mut input = candidates();
+        input[1].record_id = input[0].record_id.clone();
+        assert_eq!(
+            build_stratified_random_audit_plan(
+                &input,
+                &quotas(),
+                "audit-design-v1",
+                "custody://randomization-manifest/one",
+            )
+            .unwrap_err(),
+            StratifiedAuditError::DuplicateRecordId("a1".to_owned())
+        );
     }
 
     #[test]
