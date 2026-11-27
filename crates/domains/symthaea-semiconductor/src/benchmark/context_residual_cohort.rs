@@ -14,8 +14,7 @@ use thiserror::Error;
 
 use super::gated_streaming_adapter::StreamingPredictionReceiptV1;
 use super::label_consumption_guard::{
-    LabelConsumptionEligibilityReportV1, LabelConsumptionEligibilityV1,
-    LabelEvidenceFrontierV1,
+    LabelConsumptionEligibilityReportV1, LabelConsumptionEligibilityV1, LabelEvidenceFrontierV1,
 };
 
 pub const CONTEXT_RESIDUAL_COHORT_SCHEMA_V1: &str =
@@ -114,9 +113,7 @@ fn sha256_hex(bytes: &[u8]) -> String {
     format!("{:x}", Sha256::digest(bytes))
 }
 
-fn json_sha256<T: Serialize + ?Sized>(
-    value: &T,
-) -> Result<String, ContextResidualCohortErrorV1> {
+fn json_sha256<T: Serialize + ?Sized>(value: &T) -> Result<String, ContextResidualCohortErrorV1> {
     let bytes = serde_json::to_vec(value).map_err(|error| {
         ContextResidualCohortErrorV1(format!("canonical JSON serialization failed: {error}"))
     })?;
@@ -275,8 +272,14 @@ pub fn evaluate_context_residual_cohort_v1(
         }
         require_text(&observation.observation_id, "observation.observation_id")?;
         require_text(&observation.label_id, "observation.label_id")?;
-        require_text(&observation.common_cause_group_id, "observation.common_cause_group_id")?;
-        require_text(&observation.calibration_epoch_id, "observation.calibration_epoch_id")?;
+        require_text(
+            &observation.common_cause_group_id,
+            "observation.common_cause_group_id",
+        )?;
+        require_text(
+            &observation.calibration_epoch_id,
+            "observation.calibration_epoch_id",
+        )?;
         let context_key = observation
             .prediction_receipt
             .context_key
@@ -295,13 +298,16 @@ pub fn evaluate_context_residual_cohort_v1(
                 observation.observation_id
             )));
         }
-        if !label_revision_keys.insert((observation.label_id.as_str(), observation.label_revision)) {
+        if !label_revision_keys.insert((observation.label_id.as_str(), observation.label_revision))
+        {
             return Err(ContextResidualCohortErrorV1(format!(
                 "duplicate label/revision {}:{}",
                 observation.label_id, observation.label_revision
             )));
         }
-        if !measurement_event_ids.insert(observation.prediction_receipt.measurement_event_id.as_str()) {
+        if !measurement_event_ids
+            .insert(observation.prediction_receipt.measurement_event_id.as_str())
+        {
             return Err(ContextResidualCohortErrorV1(format!(
                 "duplicate measurement event {}",
                 observation.prediction_receipt.measurement_event_id
@@ -354,8 +360,7 @@ pub fn evaluate_context_residual_cohort_v1(
             || observation.calibration_epoch_id != cohort.calibration_epoch_id
             || prediction.event_time_unix_seconds < cohort.window_start_unix_seconds
             || prediction.event_time_unix_seconds > cohort.window_end_unix_seconds
-            || observation.label_available_at_unix_seconds
-                < prediction.event_time_unix_seconds
+            || observation.label_available_at_unix_seconds < prediction.event_time_unix_seconds
             || observation.eligibility_report_available_at_unix_seconds
                 < observation.label_available_at_unix_seconds
             || observation.delivered_at_unix_seconds
@@ -438,8 +443,7 @@ pub fn evaluate_context_residual_cohort_v1(
     let mut local_context_residual_offsets = BTreeMap::new();
     for (context, mut residuals) in context_residuals {
         let local_median = median(&mut residuals)?;
-        local_context_residual_offsets
-            .insert(context, local_median - global_common_mode_residual);
+        local_context_residual_offsets.insert(context, local_median - global_common_mode_residual);
     }
 
     let mut report = ContextResidualCohortReportV1 {
@@ -517,7 +521,8 @@ mod tests {
         let label_id = format!("label-{id}");
         let payload = digest('e');
         let mut prediction = StreamingPredictionReceiptV1 {
-            schema: super::super::gated_streaming_adapter::STREAMING_PREDICTION_RECEIPT_SCHEMA_V1.into(),
+            schema: super::super::gated_streaming_adapter::STREAMING_PREDICTION_RECEIPT_SCHEMA_V1
+                .into(),
             sequence: id.parse::<u64>().unwrap_or(0),
             sample_id: format!("sample-{id}"),
             measurement_event_id: event_id.clone(),
@@ -622,7 +627,12 @@ mod tests {
         let report = evaluate_context_residual_cohort_v1(&input).unwrap();
         assert_eq!(report.status, ContextResidualCohortStatusV1::Complete);
         assert!((report.global_common_mode_residual.unwrap() - 2.0).abs() < 1.0e-12);
-        assert!(report.local_context_residual_offsets.values().all(|v| v.abs() <= 0.2 + 1.0e-12));
+        assert!(
+            report
+                .local_context_residual_offsets
+                .values()
+                .all(|v| v.abs() <= 0.2 + 1.0e-12)
+        );
         assert!(!report.physical_independence_proven);
         assert!(!report.adapter_state_mutated);
     }
