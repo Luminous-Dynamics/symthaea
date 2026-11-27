@@ -772,9 +772,9 @@ fn box_center_and_radii(
             (middle, half)
         } else {
             // Adjacent representable endpoints have no interior midpoint.
-            // Sampling one endpoint remains valid when the full radius is
-            // retained in the Lipschitz envelope.
-            (left, half * 2.0)
+            // Use the full endpoint difference: half-width arithmetic can
+            // underflow to zero for subnormal intervals near zero.
+            (left, right - left)
         };
         if !radius.is_finite() || radius < 0.0 {
             return Err(ChallengeSearchError::NonFiniteUpperBound);
@@ -985,6 +985,31 @@ mod tests {
             }),
             Err(ChallengeSearchError::FullOrderResponseUnqualified)
         );
+    }
+
+    #[test]
+    fn box_search_subnormal_adjacent_endpoints_do_not_collapse_to_zero_radius() {
+        let smallest_subnormal = f64::from_bits(1);
+        let config = BoxChallengeSearchConfig::new(
+            vec!["subnormal_axis".to_owned(), "regular_axis".to_owned()],
+            vec![0.0, 0.0],
+            vec![smallest_subnormal, 1.0],
+            vec![1.0, 0.0],
+            0.0,
+            1,
+            "stable-branch",
+            certificate(),
+        );
+        let report = search_box_response_challenge(&config, |_| {
+            Ok(ChallengeObjectiveSample::new(0.0, "stable-branch", true))
+        })
+        .unwrap();
+        assert_eq!(
+            report.termination,
+            ChallengeSearchTermination::EvaluationBudgetExhausted
+        );
+        assert!(report.global_upper_bound > 0.0);
+        assert!(report.absolute_gap > 0.0);
     }
 
     #[test]
