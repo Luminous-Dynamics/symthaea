@@ -143,6 +143,17 @@ def validate(candidate_path: Path, audit_path: Path) -> None:
         require(baseline["citation_contract"] == counterfactual["citation_contract"]
                 == placebo["citation_contract"],
                 f"{template_id}: non-removal intervention changed citation eligibility")
+        if template_id == "CEDAR-10":
+            require(baseline["citation_contract"]["independent_origin_count"] == 1,
+                    "CEDAR-10 must not count the unrelated decoy origin as supporting corroboration")
+            require(len(baseline["citation_contract"]["origin_groups"]) == 2,
+                    "CEDAR-10 should retain both source origins for audit")
+            require(len(baseline["citation_contract"]["support_origin_groups"]) == 1,
+                    "CEDAR-10 support-origin count must include only protocol-p17")
+            require(baseline["citation_contract"]["allowed_citation_source_ids"] == ["protocol-p17"],
+                    "CEDAR-10 decoy source must never become eligible support")
+            require(baseline["citation_contract"]["forbidden_decoy_source_ids"] == ["decoy-supportive"],
+                    "CEDAR-10 supportive-but-irrelevant decoy must remain forbidden")
         if template_id == "CEDAR-08":
             require(baseline["citation_contract"]["independent_origin_count"] == 2,
                     "CEDAR-08 must have two independent origins despite three URLs")
