@@ -31,12 +31,11 @@ raw="$tmp/topic.jsonl"
 result="$tmp/result.json"
 
 expected_json="$("${DC[@]}" exec -T -e PGPASSWORD="$MON025_DB_PASSWORD" "postgres$MAJOR" \
-  psql -X -h 127.0.0.1 -U "${MON025_DB_USER:-mon025}" -d "${MON025_DB_NAME:-mon025}" \
-  -v ON_ERROR_STOP=1 -v batch_id="$BATCH_ID" -At \
-  -c "SELECT coalesce(json_agg(event_id ORDER BY event_id), '[]'::json) FROM public.ledger WHERE batch_id = :'batch_id'")"
+  psql -X -q -A -t -h 127.0.0.1 -U "${MON025_DB_USER:-mon025}" -d "${MON025_DB_NAME:-mon025}" \
+  -v ON_ERROR_STOP=1 -v batch_id="$BATCH_ID" -f /lab/postgres/source-expected-batch.sql)"
 printf '%s\n' "$expected_json" >"$expected"
 jq -e 'type == "array" and length == '"$EXPECTED_COUNT" "$expected" >/dev/null || {
-  echo "source oracle does not contain the requested expected number of batch IDs" >&2
+  echo "source oracle does not contain the requested expected number of batch rows" >&2
   exit 65
 }
 
@@ -47,30 +46,41 @@ set +e
 consumer_status=$?
 set -e
 # The console consumer may return non-zero when its bounded timeout expires.
-# The independent JSON/event-set checks below determine whether the batch arrived.
+# The independent event-set and payload checks below determine whether the batch arrived.
 if [ "$consumer_status" -gt 1 ]; then
   echo "Kafka console consumer failed with status $consumer_status" >&2
   exit "$consumer_status"
 fi
 
 jq -s --arg batch "$BATCH_ID" --slurpfile expected "$expected" '
-  [ .[] | select((.payload.after? // null) != null and .payload.after.batch_id == $batch) | .payload.after ] as $rows
+  [ .[]
+    | select((.payload.after? // null) != null and .payload.after.batch_id == $batch)
+    | .payload.after
+    | {event_id, batch_id, account_id, amount}
+  ] as $rows
   | ($rows | group_by(.event_id)) as $groups
   | [ $groups[] | select((map(tojson) | unique | length) > 1) | .[0].event_id ] as $conflicts
-  | [ $groups[] | .[0].event_id ] as $actual
+  | [ $groups[] | .[0] ] as $unique
   | ($expected[0] // []) as $want
+  | ($want | map({key:.event_id, value:.}) | from_entries) as $expected_map
+  | ($unique | map({key:.event_id, value:.}) | from_entries) as $actual_map
+  | [ $want[] | select(($actual_map[.event_id] // null) == null) | .event_id ] as $missing
+  | [ $want[] | select(($actual_map[.event_id] // null) != .) | .event_id ] as $mismatched
+  | [ $unique[] | select(($expected_map[.event_id] // null) == null) | .event_id ] as $extra
   | {
       expected_count: ($want | length),
       observed_messages: ($rows | length),
-      unique_observed_count: ($actual | length),
-      duplicate_count: (([$groups[] | length] | add // 0) - ($actual | length)),
-      missing_event_ids: [$want[] | select(. as $id | ($actual | index($id)) == null)],
-      extra_event_ids: [$actual[] | select(. as $id | ($want | index($id)) == null)],
-      conflicting_event_ids: $conflicts
+      unique_observed_count: ($unique | length),
+      duplicate_count: (([$groups[] | length] | add // 0) - ($unique | length)),
+      missing_event_ids: $missing,
+      extra_event_ids: $extra,
+      conflicting_event_ids: $conflicts,
+      mismatched_payload_event_ids: $mismatched
     }
 ' "$raw" >"$result"
 
-cat "$result" | jq .
-jq -e '(.missing_event_ids | length) == 0 and (.extra_event_ids | length) == 0 and (.conflicting_event_ids | length) == 0 and .unique_observed_count == .expected_count' "$result" >/dev/null
+jq . "$result"
+jq -e '(.missing_event_ids | length) == 0 and (.extra_event_ids | length) == 0 and (.conflicting_event_ids | length) == 0 and (.mismatched_payload_event_ids | length) == 0 and .unique_observed_count == .expected_count' "$result" >/dev/null
 
-echo "CDC event-set check passed. Exact duplicate replays are reported separately; downstream idempotency still requires its own test."
+echo "CDC event IDs and source-derived payload fields match. Exact duplicate replays are reported separately and are not confused with conflicting identity reuse."
+echo "Generated-column fields are intentionally not treated as covered by this row event comparison; MON-022 accounts for that surface separately."
