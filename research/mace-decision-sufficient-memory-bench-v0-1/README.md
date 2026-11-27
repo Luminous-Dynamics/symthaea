@@ -335,7 +335,7 @@ These are authored engineering changes and proposed research work. No DSM evalua
 
 ## Executable Rust reference evaluator
 
-A standalone Rust reference implementation now exists under [reference-evaluator/](reference-evaluator/README.md). It adds deterministic first-four-family episode generation, a candidate/evaluator-private preparation split, a strict response schema, balanced-arm scoring, regret versus the complete-information optimum, memory gain/harm versus the no-memory baseline, evidence lifecycle checks and cost-field reporting. Its six-response positive-control JSONL is a synthetic conformance fixture, not a benchmark run.
+A standalone Rust reference implementation now exists under [reference-evaluator/](reference-evaluator/README.md). It adds deterministic first-four-family episode generation, a candidate/evaluator-private preparation split, a strict response schema, balanced-arm scoring, regret versus the complete-information optimum, gain/worsening versus the task-declared no-memory reference (not a substitute for a separately executed no-memory arm), evidence lifecycle checks and cost-field reporting. Its six-response positive-control JSONL is a synthetic conformance fixture, not a benchmark run.
 
 The implementation does not create a process sandbox, sign candidate data, or independently measure resource counters. Candidate/evaluator isolation and sealed-label custody remain deployment requirements. Exact-head compilation, tests, formatting and Clippy are pending; no CI pass or MACE score is claimed.
 
