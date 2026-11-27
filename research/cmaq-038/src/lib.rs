@@ -6,8 +6,7 @@
 //! n+1 possible one-based predictive-rank buckets. Every contrast is scaled
 //! to [-1/2, 1/2], centered against the exact predictive law
 //!
-//!     pi[t,j] = (1 + N[t-1,j]) / (n + t),
-//!
+//! `pi[t,j] = (1 + N[t-1,j]) / (n + t)`.
 //! and assigned positive- and negative-direction fixed-bet e-processes.
 //! A normalized, pre-registered mixture across resolutions and directions
 //! preserves the anytime null guarantee under the same fixed-reference
@@ -642,7 +641,7 @@ mod tests {
 
     #[test]
     fn betting_factors_remain_nonnegative_for_all_ranks() {
-        let mut monitor = RankSpectrumMonitor::new(99, 1, 20).unwrap();
+        let monitor = RankSpectrumMonitor::new(99, 1, 20).unwrap();
         for rank in 1..=100 {
             let t = monitor.observations_seen() + 1;
             for contrast in monitor.contrasts() {
