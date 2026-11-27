@@ -13,8 +13,8 @@ use symthaea_plasma_probes::{
     rbkr::{
         FiniteHorizonGramianConfig, RbkrConfig, ResponseBalancedBasis,
         ResponseGramianAggregationConfig, ResponseGramianScenario, ResponseScenarioRole,
-        aggregate_response_gramians,
-        build_finite_horizon_gramians, evaluate_response_scenario_residuals,
+        aggregate_response_gramians, build_finite_horizon_gramians,
+        evaluate_response_scenario_residuals,
     },
 };
 
