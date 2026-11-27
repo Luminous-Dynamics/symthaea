@@ -47,6 +47,8 @@ event contract.
 - [Competitive baselines and differentiation](SYMTHAEA_EMBODIMENT_COMPETITIVE_BASELINES_V0_1_2026-11-27.md)
 - [Integrated interaction benchmark protocol](SYMTHAEA_INTERACTION_BENCH_INTEGRATION_V0_1_2026-11-27.md)
 - [Counterfactual audiovisual grounding protocol](SYMTHAEA_COUNTERFACTUAL_AV_GROUNDING_PROTOCOL_V0_1_2026-11-27.md)
+- [Counterfactual AV item JSON Schema](SYMTHAEA_AV_COUNTERFACTUAL_ITEM_SCHEMA_V1_2026-11-27.json)
+- [Counterfactual AV paired fixtures](SYMTHAEA_AV_COUNTERFACTUAL_ITEM_FIXTURES_V1_2026-11-27.json)
 - [Visual language and perceptual qualification](SYMTHAEA_VISUAL_LANGUAGE_AND_PERCEPTUAL_QUALIFICATION_V0_1_2026-11-27.md)
 - [Explicit scene relationship graph v2](SYMTHAEA_SCENE_RELATIONSHIP_GRAPH_V0_1_2026-11-27.md)
 - [Scene graph v2 JSON Schema](SYMTHAEA_SCENE_GRAPH_SCHEMA_V2_2026-11-27.json)
