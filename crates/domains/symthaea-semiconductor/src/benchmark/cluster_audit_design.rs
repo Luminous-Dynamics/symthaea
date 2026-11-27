@@ -846,7 +846,7 @@ pub fn evaluate_cluster_audit_v1(
         population_estimate += weight * stratum_mean;
 
         let first_order = audited_cluster_count as f64 / population_cluster_count as f64;
-        let second_order = if audited_cluster_count >= 2 && population_cluster_count >= 2 {
+        let second_order = if population_cluster_count >= 2 {
             Some(
                 audited_cluster_count as f64
                     * (audited_cluster_count - 1) as f64
@@ -1216,6 +1216,115 @@ mod tests {
     }
 
     #[test]
+    fn sample_must_match_the_committed_randomization_replay() {
+        let mut input = make_input();
+        input.audited_clusters.swap(0, 1);
+        let selected = input.audited_clusters[0].cluster_id.clone();
+        let other = input.audited_clusters[1].cluster_id.clone();
+        input.audited_clusters[0].cluster_id = other;
+        input.audited_clusters[1].cluster_id = selected;
+        for record in &mut input.audited_clusters {
+            let frame_cluster = input
+                .frame
+                .clusters
+                .iter()
+                .find(|cluster| cluster.cluster_id == record.cluster_id)
+                .unwrap();
+            record.stratum_id = frame_cluster.stratum_id.clone();
+            record.cluster_audit_receipt_sha256 =
+                seal_cluster_audit_record_v1(record).unwrap();
+        }
+        assert!(evaluate_cluster_audit_v1(&input).is_err());
+    }
+
+    #[test]
+    fn hard_reference_capacity_is_enforced_before_estimation() {
+        let mut input = make_input();
+        input.design.maximum_audit_unit_capacity = 9;
+        assert!(evaluate_cluster_audit_v1(&input).is_err());
+    }
+
+    #[test]
+    fn frame_digest_is_order_invariant_but_seed_commitment_binds_the_frame() {
+        let mut input = make_input();
+        let original_frame_digest = input.frame.frame_sha256.clone();
+        input.frame.clusters.reverse();
+        for cluster in &mut input.frame.clusters {
+            cluster.units.reverse();
+        }
+        assert_eq!(
+            seal_cluster_audit_frame_v1(&input.frame).unwrap(),
+            original_frame_digest
+        );
+        input.design.stratum_plans.reverse();
+        input.audited_clusters.reverse();
+        for record in &mut input.audited_clusters {
+            record.unit_outcomes.reverse();
+        }
+        let first = evaluate_cluster_audit_v1(&input).unwrap();
+
+        // A changed frame manifest must invalidate the precommitted random seed.
+        input.frame.clusters[0].common_cause_membership_receipt_sha256 = digest('f');
+        input.frame.frame_sha256 = seal_cluster_audit_frame_v1(&input.frame).unwrap();
+        input.design.frame_sha256 = input.frame.frame_sha256.clone();
+        assert!(evaluate_cluster_audit_v1(&input).is_err());
+
+        // Restore the original frame, then prove order changes do not affect report identity.
+        input.frame.clusters[0].common_cause_membership_receipt_sha256 = digest('c');
+        input.frame.frame_sha256 = seal_cluster_audit_frame_v1(&input.frame).unwrap();
+        input.design.frame_sha256 = input.frame.frame_sha256.clone();
+        let seed = hex_seed(&input.design.randomization_seed_reveal_hex).unwrap();
+        input.design.seed_commitment_sha256 = seed_commitment(
+            &seed,
+            &input.design.design_id,
+            &input.design.population_manifest_sha256,
+            &input.design.frame_sha256,
+            &input.design.randomization_algorithm,
+        );
+        let second = evaluate_cluster_audit_v1(&input).unwrap();
+        assert_eq!(first.report_sha256, second.report_sha256);
+    }
+
+    #[test]
+    fn one_cluster_pairwise_probability_is_zero_and_not_missing() {
+        let mut input = make_input();
+        for plan in &mut input.design.stratum_plans {
+            plan.audited_cluster_count = 1;
+        }
+        input.design.maximum_audit_unit_capacity = 5;
+        let seed = hex_seed(&input.design.randomization_seed_reveal_hex).unwrap();
+        input.audited_clusters.clear();
+        for plan in &input.design.stratum_plans {
+            let ids = input
+                .frame
+                .clusters
+                .iter()
+                .filter(|cluster| cluster.stratum_id == plan.stratum_id)
+                .map(|cluster| cluster.cluster_id.clone())
+                .collect::<Vec<_>>();
+            for id in expected_sample(
+                &ids,
+                1,
+                seed,
+                &input.design.design_id,
+                &plan.stratum_id,
+            )
+            .unwrap()
+            {
+                let cluster = input.frame.clusters.iter().find(|value| value.cluster_id == id).unwrap();
+                input.audited_clusters.push(make_record(
+                    cluster,
+                    &vec![0.5; cluster.units.len()],
+                ));
+            }
+        }
+        let report = evaluate_cluster_audit_v1(&input).unwrap();
+        assert!(report.stratum_reports.iter().all(|row| {
+            row.second_order_cluster_inclusion_probability == Some(0.0)
+        }));
+    }
+
+    #[test]
     fn non_qualified_reference_outcome_returns_unknown_not_a_point_estimate() {
         let mut input = make_input();
         let record = &mut input.audited_clusters[0];
@@ -1227,6 +1336,6 @@ mod tests {
         let report = evaluate_cluster_audit_v1(&input).unwrap();
         assert_eq!(report.status, ClusterAuditStatusV1::Unknown);
         assert_eq!(report.population_risk_estimate, None);
-        assert!(!report.randomization_replay_verified);
+        assert!(report.randomization_replay_verified);
     }
 }
