@@ -1,0 +1,24 @@
+name: CEDAR-Bench Template Contract
+
+on:
+  pull_request:
+    types: [opened, synchronize, reopened, ready_for_review]
+    paths:
+      - "docs/research/cedar-bench/**"
+      - "scripts/generate_cedar_bench.py"
+      - "scripts/validate_cedar_bench_templates.py"
+      - ".github/workflows/cedar-bench-template-contract.yml"
+
+permissions:
+  contents: read
+
+jobs:
+  templates:
+    runs-on: ubuntu-24.04
+    timeout-minutes: 3
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          persist-credentials: false
+      - name: Validate CEDAR-Bench template corpus
+        run: python3 scripts/validate_cedar_bench_templates.py
