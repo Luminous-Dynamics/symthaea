@@ -899,7 +899,10 @@ pub fn validate_preregistration(root: &Value) -> ValidationReport {
     if !string_at(root, &["experiment", "protocol_contract_commit"])
         .is_some_and(|value| is_lower_hex(value, 40))
     {
-        report.issue("PROTOCOL_CONTRACT_COMMIT_INVALID", "expected a frozen 40-character lowercase commit SHA");
+        report.issue(
+            "PROTOCOL_CONTRACT_COMMIT_INVALID",
+            "protocol_contract_commit must identify the exact protocol implementation commit (40 lowercase hexadecimal characters)",
+        );
     }
     if !string_at(root, &["experiment", "preregistered_at_utc"])
         .is_some_and(|value| value.ends_with('Z'))
@@ -1002,6 +1005,17 @@ mod tests {
         assert!(!report.ready_for_independent_review);
         assert!(report.issues.iter().any(|issue| issue.starts_with("DOCUMENT_NOT_FROZEN")));
         assert!(report.issues.iter().any(|issue| issue.starts_with("UNRESOLVED_PLACEHOLDER")));
+    }
+
+    #[test]
+    fn rejects_missing_protocol_contract_commit() {
+        let mut value = valid_specimen();
+        value["experiment"]["protocol_contract_commit"] = Value::String(String::new());
+        let report = validate_preregistration(&value);
+        assert!(report
+            .issues
+            .iter()
+            .any(|issue| issue.starts_with("PROTOCOL_CONTRACT_COMMIT_INVALID")));
     }
 
     #[test]
