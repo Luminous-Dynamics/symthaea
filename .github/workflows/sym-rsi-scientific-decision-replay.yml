@@ -35,7 +35,31 @@ jobs:
         with:
           toolchain: "1.96.0"
           components: clippy, rustfmt
-      - name: Format changed Rust targets
+      - name: Generate rustfmt preview
+        run: |
+          rustfmt --edition 2024 --config skip_children=true \
+            crates/domains/symthaea-futures-ensemble/examples/scientific_decision_replay_contract.rs \
+            crates/domains/symthaea-futures-ensemble/examples/evolutionary_rescue_split_capsules.rs \
+            crates/domains/symthaea-futures-ensemble/examples/support/scientific_decision_replay.rs \
+            crates/domains/symthaea-futures-ensemble/examples/support/evolutionary_rescue_custody.rs
+      - name: Upload rustfmt preview
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: scientific-decision-replay-rustfmt-preview
+          path: |
+            crates/domains/symthaea-futures-ensemble/examples/scientific_decision_replay_contract.rs
+            crates/domains/symthaea-futures-ensemble/examples/evolutionary_rescue_split_capsules.rs
+            crates/domains/symthaea-futures-ensemble/examples/support/scientific_decision_replay.rs
+            crates/domains/symthaea-futures-ensemble/examples/support/evolutionary_rescue_custody.rs
+      - name: Restore the exact committed sources
+        run: |
+          git checkout -- \
+            crates/domains/symthaea-futures-ensemble/examples/scientific_decision_replay_contract.rs \
+            crates/domains/symthaea-futures-ensemble/examples/evolutionary_rescue_split_capsules.rs \
+            crates/domains/symthaea-futures-ensemble/examples/support/scientific_decision_replay.rs \
+            crates/domains/symthaea-futures-ensemble/examples/support/evolutionary_rescue_custody.rs
+      - name: Check formatting on committed sources
         run: |
           rustfmt --edition 2024 --check --config skip_children=true \
             crates/domains/symthaea-futures-ensemble/examples/scientific_decision_replay_contract.rs \
