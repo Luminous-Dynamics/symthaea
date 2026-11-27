@@ -24,6 +24,8 @@ pub const FDM_COVERAGE_SCHEMA_V1: &str = "luminous.semi-bench.fdm-coverage.v1";
 pub const FDM_COVERAGE_SCORE_SCHEMA_V1: &str = "luminous.semi-bench.fdm-coverage-score.v1";
 pub const FDM_COVERAGE_ASSUMPTION_SCHEMA_V1: &str =
     "luminous.semi-bench.fdm-coverage-assumption.v1";
+pub const FDM_COVERAGE_POLICY_SCHEMA_V1: &str =
+    "luminous.semi-bench.fdm-coverage-policy.v1";
 pub const FDM_COVERAGE_REPORT_SCHEMA_V1: &str =
     "luminous.semi-bench.fdm-coverage-report.v1";
 
@@ -237,9 +239,7 @@ fn report_digest(report: &FdmCoverageReportV1) -> Result<String, FdmCoverageErro
 }
 
 fn validate_policy(policy: &FdmCoveragePolicyV1) -> Result<(), FdmCoverageErrorV1> {
-    if policy.schema != FDM_COVERAGE_ASSUMPTION_SCHEMA_V1
-        && policy.schema != "luminous.semi-bench.fdm-coverage-policy.v1"
-    {
+    if policy.schema != FDM_COVERAGE_POLICY_SCHEMA_V1 {
         return Err(FdmCoverageErrorV1("FDM coverage policy schema is unsupported".into()));
     }
     require_text(&policy.policy_id, "policy.policy_id")?;
@@ -382,7 +382,8 @@ fn validate_score_observation(
         return Err(FdmCoverageErrorV1("score observation digest mismatch".into()));
     }
     let prediction = &row.prediction_receipt;
-    if !valid_sha256(&prediction.receipt_sha256)
+    if prediction.schema != "luminous.semi-bench.streaming-prediction-receipt.v1"
+        || !valid_sha256(&prediction.receipt_sha256)
         || prediction_digest(prediction)? != prediction.receipt_sha256
         || !valid_sha256(&prediction.global_model_artifact_sha256)
         || !valid_sha256(&prediction.feature_schema_sha256)
@@ -405,6 +406,8 @@ fn validate_score_observation(
         || report.label_revision != row.label_revision
         || report.label_sha256 != row.label_payload_sha256
         || report.measurement_event_id != prediction.measurement_event_id
+        || report.equipment_control_authority
+        || report.training_snapshot_mutated
         || !report.qualified_corrected_value.is_finite()
         || !report.qualified_standard_uncertainty_upper_bound.is_some_and(|value| {
             value.is_finite() && value >= 0.0
@@ -773,7 +776,7 @@ mod tests {
 
     fn policy(block_length: usize) -> FdmCoveragePolicyV1 {
         FdmCoveragePolicyV1 {
-            schema: "luminous.semi-bench.fdm-coverage-policy.v1".into(),
+            schema: FDM_COVERAGE_POLICY_SCHEMA_V1.into(),
             policy_id: "fdm-paper-short-memory-v1".into(),
             revision: 1,
             target_coverage: 0.90,
