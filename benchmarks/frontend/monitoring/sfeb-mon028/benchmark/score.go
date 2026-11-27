@@ -13,6 +13,7 @@ import (
 )
 
 const (
+	MaxPlannedObservations = uint64(1_000_000)
 	SuiteProfile = "mon028-falsification-first-suite-v1"
 	ResultProfile = "mon028-falsification-first-results-v1"
 	Version = "1.0.0"
@@ -176,6 +177,7 @@ func ValidateSuite(s Suite) error {
 		return ErrInvalidSuite
 	}
 	seen := make(map[string]struct{}, len(s.Cases))
+	var planned uint64
 	positive, unsafe := false, false
 	for _, c := range s.Cases {
 		if strings.TrimSpace(c.CaseID) == "" || strings.TrimSpace(c.FaultID) == "" ||
@@ -186,6 +188,10 @@ func ValidateSuite(s Suite) error {
 			return fmt.Errorf("%w: duplicate case ID %q", ErrInvalidSuite, c.CaseID)
 		}
 		seen[c.CaseID] = struct{}{}
+		planned += uint64(c.Replicates)
+		if planned > MaxPlannedObservations {
+			return fmt.Errorf("%w: planned observations exceed %d", ErrInvalidSuite, MaxPlannedObservations)
+		}
 		if c.Expected == Qualified { positive = true } else { unsafe = true }
 	}
 	if !positive || !unsafe {
