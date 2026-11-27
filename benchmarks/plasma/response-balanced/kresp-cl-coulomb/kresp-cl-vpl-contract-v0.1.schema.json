@@ -103,13 +103,13 @@
           "prefixItems": [
             {
               "type": "number",
-              "exclusiveMinimum": 0.000001,
-              "exclusiveMaximum": 1
+              "exclusiveMaximum": 1,
+              "minimum": 0.000001
             },
             {
               "type": "number",
               "exclusiveMinimum": 0,
-              "exclusiveMaximum": 0.0001
+              "maximum": 0.0001
             }
           ],
           "minItems": 2,
@@ -120,7 +120,7 @@
           "minItems": 2,
           "items": {
             "type": "number",
-            "exclusiveMinimum": 0.1
+            "minimum": 0.1
           }
         },
         "log_power_p_values": {
