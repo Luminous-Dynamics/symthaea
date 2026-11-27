@@ -4,23 +4,26 @@ Profile: mon039-counterfactual-fault-reduction-input-v1. Status: deterministic r
 
 ## Objective
 
-Given a deterministic fault schedule whose independent recovery verifier returns a failure, identify a smaller subset of injected interventions that preserves the exact same verifier outcome. The minimizer narrows hypotheses; it does not prove physical or metaphysical causation.
+Given a deterministic fault schedule whose independent recovery verifier returns a blocked outcome, identify a smaller subset of injected interventions that preserves the exact same verifier outcome. The minimizer narrows hypotheses; it does not prove physical or metaphysical causation.
 
 ## Unit of analysis
 
-Each observation is keyed by the canonical sorted fault-ID set and binds:
+Each observation is keyed by a canonical sorted fault-ID set and binds:
+- explicit trial ID;
 - scenario SHA-256;
 - recovery-boundary SHA-256;
-- exact source code revision;
+- exact lowercase source code revision;
 - observation time;
 - verifier disposition;
 - failure-signature SHA-256;
 - outcome-receipt SHA-256;
 - completeness assertion.
 
-All subset observations must share the same scenario, recovery boundary and code revision. Missing, incomplete, duplicate or stale rows cannot be interpreted as absence of failure.
+All subset observations must share the same trial, scenario, recovery boundary and code revision. The outcome receipt is recomputed as SHA-256 over the entire canonical observation record with outcome_receipt_sha256 blank. A malformed or altered observation cannot retain its old receipt digest. Scenario and boundary digests are checked against committed manifest files in the offline fixture runner.
 
-The target signature is the exact (verdict, failure_signature_sha256) pair observed for the complete initial fault set. A blocked result with a different signature is not treated as preserving the target failure.
+Missing, incomplete, duplicate or stale rows cannot be interpreted as absence of failure. The zero-fault control must be represented by an explicit empty array; omitted/null fault-ID arrays are invalid.
+
+The target signature is the exact (verdict, failure_signature_sha256) pair observed for the complete initial fault set. Only a blocked baseline is eligible for minimization. An indeterminate result is not a reproduced recovery fault. A blocked result with a different signature is not treated as preserving the target failure.
 
 ## Search and guarantees
 
@@ -35,11 +38,11 @@ For n > 12:
 - claim one_minimal only when every single deletion from the final set has been evaluated and none preserves the target;
 - do not infer global minimum or monotonicity.
 
-If a replay row is missing, incomplete, exceeds the evaluation budget, or changes the code/boundary/scenario, minimality is not_established or the input is blocked. Missing evidence is not a no-failure result.
+If a replay row is missing, incomplete, exceeds the evaluation budget, or changes the trial/code/boundary/scenario, minimality is not_established or the input is blocked. Missing evidence is not a no-failure result.
 
 ## Interpretation
 
-A global candidate minimum is globally minimum only within the submitted, finite fault set and deterministic oracle. A one-minimal set is irreducible under any one-fault deletion, but a smaller multi-fault subset may still exist in a non-monotone system. Neither result alone proves causality outside the tested intervention space.
+A global candidate minimum is globally minimum only within the submitted finite fault set and deterministic oracle. A one-minimal set is irreducible under any one-fault deletion, but a smaller multi-fault subset may still exist in a non-monotone system. Neither result alone proves causality outside the tested intervention space.
 
 Symthaea is a hypothesis proposer and prioritizer. MON-037/MON-038 and the independently captured verifier outputs remain the adjudication oracle. The model must not generate the expected result and then certify its own generated explanation.
 
