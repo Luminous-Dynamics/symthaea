@@ -22,18 +22,18 @@ Run the Rust unit tests when a Rust 2024 toolchain is available:
 
 Score a balanced set of candidate responses:
 
-    cargo run --manifest-path research/mace-decision-sufficient-memory-bench-v0-1/reference-evaluator/Cargo.toml -- score /tmp/dsm-candidate.jsonl /secure/dsm-private.jsonl /tmp/dsm-responses.jsonl research/mace-decision-sufficient-memory-bench-v0-1/reference-evaluator/fixtures/arms-v0.1.json /tmp/dsm-report.json
+    cargo run --manifest-path research/mace-decision-sufficient-memory-bench-v0-1/reference-evaluator/Cargo.toml -- score /tmp/dsm-candidate.jsonl /secure/dsm-private.jsonl /tmp/dsm-responses.jsonl research/mace-decision-sufficient-memory-bench-v0-1/reference-evaluator/fixtures/arms-v0.1.json /secure/dsm-pairs.json /tmp/dsm-report.json
 
-Run the six synthetic positive-control records against the six source episodes already in the parent fixture:
+Run the six synthetic positive-control records against the six source episodes already in the parent fixture. The evaluator-private pair manifest binds every episode to a pair block, independent world cluster, query ID and candidate digest, and commits to the arm manifest:
 
     cargo run --manifest-path research/mace-decision-sufficient-memory-bench-v0-1/reference-evaluator/Cargo.toml -- prepare research/mace-decision-sufficient-memory-bench-v0-1/fixtures/seed-v0.1.jsonl /tmp/dsm-candidate.jsonl /secure/dsm-private.jsonl
 
-    cargo run --manifest-path research/mace-decision-sufficient-memory-bench-v0-1/reference-evaluator/Cargo.toml -- score /tmp/dsm-candidate.jsonl /secure/dsm-private.jsonl research/mace-decision-sufficient-memory-bench-v0-1/reference-evaluator/fixtures/reference-qualified-responses-v0.1.jsonl research/mace-decision-sufficient-memory-bench-v0-1/reference-evaluator/fixtures/arms-v0.1.json /tmp/dsm-fixture-report.json
+    cargo run --manifest-path research/mace-decision-sufficient-memory-bench-v0-1/reference-evaluator/Cargo.toml -- score /tmp/dsm-candidate.jsonl /secure/dsm-private.jsonl research/mace-decision-sufficient-memory-bench-v0-1/reference-evaluator/fixtures/reference-qualified-responses-v0.1.jsonl research/mace-decision-sufficient-memory-bench-v0-1/reference-evaluator/fixtures/arms-v0.1.json research/mace-decision-sufficient-memory-bench-v0-1/reference-evaluator/fixtures/pairs-v0.1.json /tmp/dsm-fixture-report.json
 
 ## Evaluator semantics
 
 - Every candidate response must resolve to a known episode and an allowed action.
-- The evidence and observation budgets are enforced before scoring. Retrieved IDs are validated and scored separately from decision-support IDs; selected IDs must be drawn from the retrieved set. The response arm IDs must match the preregistered arm manifest; an arm cannot disappear because its output is missing.
+- The evidence and observation budgets are enforced before scoring. Retrieved IDs are validated and scored separately from decision-support IDs; selected IDs must be drawn from the retrieved set. The response arm IDs must match the preregistered arm manifest; an arm cannot disappear because its output is missing. Every episode must also appear exactly once in an evaluator-private pair/cluster manifest whose candidate digest matches the candidate stream and whose arm-manifest digest matches the exact arm manifest bytes.
 - Each episode has exactly one response per arm declared in a separate preregistered arm manifest. Undeclared arms, missing and duplicate episode/arm pairs are rejected; no arm can silently drop hard episodes.
 - Candidate-visible and evaluator-private inventories must match exactly. The candidate row and private record commit to a domain-separated SHA-256 digest of the exact identity-bound typed candidate projection; the response must echo the same digest. The private stream has its own evaluator-only schema at schemas/evaluator-private-v0.1.schema.json. Modified or mismatched candidate/response inputs are rejected. This binds the response record to the presented input and declared arm to prevent accidental cross-arm relabelling; it is not a signature, response-payload attestation or proof that the adapter reasoned from the input.
 - Knowledge time is explicit: an event is not available before observed_at_ms. Valid time is half-open: valid-from is inclusive and valid-until is exclusive. A supersession/retraction only invalidates its parent once that change has itself been observed and reached its valid-from time; later observations cannot leak into earlier decisions.
@@ -69,7 +69,7 @@ Cost fields are candidate-reported receipts. Unknown operation counts, bytes or 
 - Uncertainty ppm is preserved but not calibrated and is not used as a probability.
 - Observation requests are scored as actions and budget use; no physical or external probe is executed.
 - This version is a response scorer, not a fully autonomous memory-system runner. It does not ingest candidate events into a production store or drive a downstream action environment.
-- There is no schema-validation dependency in this package. Use a Draft 2020-12 validator on the episode, candidate-input, evaluator-private, response and arm-manifest schemas as a separate release check.
+- There is no schema-validation dependency in this package. Use a Draft 2020-12 validator on the episode, candidate-input, evaluator-private, response, arm-manifest and pair-manifest schemas as a separate release check.
 
 ## Tests
 
@@ -88,6 +88,6 @@ No Rust compilation, Cargo test, rustfmt, Clippy, CI pass or benchmark result is
 ## Composition with the MACE programme
 
 - Parent DSM protocol and seed fixtures: research/mace-decision-sufficient-memory-bench-v0-1/
-- Paired causal-memory interventions and phase-attributed costs: PRs #13836 and #13869. They remain distinct scenario and adapter contracts; this package does not silently claim interoperability with their JSONL outputs.
+- Paired causal-memory interventions and phase-attributed costs: PRs #13836 and #13869. Their output contract is mapped in [MACE DSM paired-intervention adapter contract v0.1](../../../../docs/research/MACE_DSM_PAIRED_INTERVENTION_ADAPTER_V0_1.md). This document specifies a fail-closed adapter path but does not claim an executable adapter or full interoperability.
 - Dependency-aware evidence knockouts and cluster-level reduction: existing counterfactual-evidence research branch. Reuse it through a versioned adapter rather than implementing another Shapley or knockout engine.
 - Claim-relative invalidation, projection rebuild and store metamemory summaries: PRs #13849, #13876 and #13878. These provide complementary lifecycle primitives, not a DSM score.
