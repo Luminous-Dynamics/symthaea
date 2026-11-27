@@ -3,7 +3,8 @@
 use symthaea_semiconductor::benchmark::{
     CA_OCRC_FEEDBACK_SCHEMA_V1, CA_OCRC_POLICY_SCHEMA_V1, CA_OCRC_ROUND_INPUT_SCHEMA_V1,
     CaoOcrcDelayAssumptionV1, CaoOcrcEngineV1, CaoOcrcFeedbackInputV1, CaoOcrcPolicyV1,
-    CaoOcrcPopulationScopeV1, CaoOcrcRoundInputV1, LabelConsumptionEligibilityReportV1,
+    CaoOcrcPopulationScopeV1, CaoOcrcRoundInputV1, CaoOcrcStochasticAssumptionStatusV1,
+    LabelConsumptionEligibilityReportV1,
     LabelConsumptionEligibilityV1, LabelEvidenceFrontierV1, advance_ca_ocrc_round_v1,
     compute_ca_ocrc_stochastic_risk_bound_v1, create_ca_ocrc_engine_v1,
     optimize_ca_ocrc_stochastic_proxy_v1,
