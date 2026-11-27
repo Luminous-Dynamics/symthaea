@@ -32,6 +32,7 @@ event contract.
 - [Polyembodiment architecture](SYMTHAEA_POLYEMBODIMENT_ARCHITECTURE_V0_1_2026-11-27.md)
 - [Embodiment benchmark plan](SYMTHAEA_EMBODIMENT_BENCHMARK_PLAN_V0_1_2026-11-27.md)
 - [Dynamic temporal attention](SYMTHAEA_DYNAMIC_TEMPORAL_ATTENTION_V0_1_2026-11-27.md)
+- [Consent and presentation policy](SYMTHAEA_EMBODIMENT_CONSENT_POLICY_V0_1_2026-11-27.md)
 - [Event schema](SYMTHAEA_EMBODIMENT_EVENT_SCHEMA_V1_2026-11-27.json)
 - [Event fixtures](SYMTHAEA_EMBODIMENT_EVENT_FIXTURES_V1_2026-11-27.json)
 - [Embodiment form registry](SYMTHAEA_EMBODIMENT_FORM_REGISTRY_V1_2026-11-27.json)
