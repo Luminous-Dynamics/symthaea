@@ -69,7 +69,10 @@ pub struct AdaptiveReport {
 }
 
 fn validate_distribution(values: &[f64]) -> Result<(), Error> {
-    if values.len() < 2 || values.len() > MAX_OUTCOMES
+    if values.len() > MAX_OUTCOMES {
+        return Err(Error::TooManyOutcomes);
+    }
+    if values.len() < 2
         || values.iter().any(|p| !p.is_finite() || *p < 0.0 || *p > 1.0)
         || (values.iter().sum::<f64>() - 1.0).abs() > PROB_TOL
     {
