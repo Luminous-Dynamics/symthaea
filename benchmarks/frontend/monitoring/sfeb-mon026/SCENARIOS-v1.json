@@ -1,0 +1,199 @@
+{
+  "profile": "mon026-evidence-custody-v1",
+  "version": "1.0.0",
+  "classification": "synthetic-descriptive-seeds",
+  "scenarios": [
+    {
+      "id": "MON026-P001",
+      "class": "positive_control",
+      "name": "valid_signed_exact_inventory",
+      "expected_outcome": "qualified",
+      "mutation": "none",
+      "notes": "Trusted Ed25519 signer, fresh manifest, exact run/sequence and all artifact bytes match."
+    },
+    {
+      "id": "MON026-P002",
+      "class": "positive_control",
+      "name": "artifact_list_reordered",
+      "expected_outcome": "qualified",
+      "mutation": "reorder JSON artifact array without changing semantic fields",
+      "notes": "Canonical root sorts artifacts by normalized path, so presentation order does not alter verification."
+    },
+    {
+      "id": "MON026-P003",
+      "class": "positive_control",
+      "name": "valid_chained_bundle",
+      "expected_outcome": "qualified",
+      "mutation": "sequence two references the independently expected prior root",
+      "notes": "A valid second bundle qualifies only when run ID, exact sequence and previous root match verifier policy."
+    },
+    {
+      "id": "MON026-N001",
+      "class": "negative_control",
+      "name": "artifact_byte_mutation",
+      "expected_outcome": "blocked",
+      "mutation": "change one byte in a listed artifact",
+      "notes": "SHA-256 mismatch must block."
+    },
+    {
+      "id": "MON026-N002",
+      "class": "negative_control",
+      "name": "artifact_size_mismatch",
+      "expected_outcome": "blocked",
+      "mutation": "truncate or extend a listed file while preserving its path",
+      "notes": "Observed file length must match the signed manifest."
+    },
+    {
+      "id": "MON026-N003",
+      "class": "negative_control",
+      "name": "declared_artifact_missing",
+      "expected_outcome": "blocked",
+      "mutation": "remove a file named by the manifest",
+      "notes": "Missing declared evidence blocks."
+    },
+    {
+      "id": "MON026-N004",
+      "class": "negative_control",
+      "name": "path_traversal",
+      "expected_outcome": "blocked",
+      "mutation": "use ../ or absolute path in artifact path",
+      "notes": "The verifier must not read outside the bundle root."
+    },
+    {
+      "id": "MON026-N005",
+      "class": "negative_control",
+      "name": "symlink_artifact",
+      "expected_outcome": "blocked",
+      "mutation": "replace a declared file or parent path with a symlink",
+      "notes": "The verifier must not follow symlink indirection."
+    },
+    {
+      "id": "MON026-N006",
+      "class": "negative_control",
+      "name": "duplicate_artifact_path",
+      "expected_outcome": "blocked",
+      "mutation": "declare the same relative path twice",
+      "notes": "Ambiguous inventory entries block."
+    },
+    {
+      "id": "MON026-N007",
+      "class": "negative_control",
+      "name": "manifest_root_mutation",
+      "expected_outcome": "blocked",
+      "mutation": "change source timeline or artifact metadata without recomputing root",
+      "notes": "Signed semantic root mismatch blocks."
+    },
+    {
+      "id": "MON026-N008",
+      "class": "negative_control",
+      "name": "invalid_signature",
+      "expected_outcome": "blocked",
+      "mutation": "change signature bytes or sign with an untrusted private key",
+      "notes": "Invalid signature must block."
+    },
+    {
+      "id": "MON026-N009",
+      "class": "indeterminate_control",
+      "name": "unknown_signer",
+      "expected_outcome": "indeterminate",
+      "mutation": "use a key ID absent from independently configured trust map",
+      "notes": "Unknown signer identity is not automatically trusted."
+    },
+    {
+      "id": "MON026-N010",
+      "class": "indeterminate_control",
+      "name": "signature_missing",
+      "expected_outcome": "indeterminate",
+      "mutation": "omit signature fields",
+      "notes": "Unsigned evidence never qualifies."
+    },
+    {
+      "id": "MON026-N011",
+      "class": "negative_control",
+      "name": "run_id_replay",
+      "expected_outcome": "blocked",
+      "mutation": "supply a correctly signed bundle for a different run ID",
+      "notes": "Verifier policy must bind the exact expected run ID."
+    },
+    {
+      "id": "MON026-N012",
+      "class": "negative_control",
+      "name": "sequence_replay",
+      "expected_outcome": "blocked",
+      "mutation": "supply a correctly signed older or later sequence",
+      "notes": "Verifier policy must bind the exact expected sequence."
+    },
+    {
+      "id": "MON026-N013",
+      "class": "negative_control",
+      "name": "previous_root_mismatch",
+      "expected_outcome": "blocked",
+      "mutation": "change predecessor digest from expected chain head",
+      "notes": "Run chain fork or splice must block."
+    },
+    {
+      "id": "MON026-N014",
+      "class": "indeterminate_control",
+      "name": "expected_predecessor_unavailable",
+      "expected_outcome": "indeterminate",
+      "mutation": "verify sequence >1 without an independently retained expected chain head",
+      "notes": "A signature cannot establish which predecessor the verifier expected."
+    },
+    {
+      "id": "MON026-N015",
+      "class": "indeterminate_control",
+      "name": "manifest_expired",
+      "expected_outcome": "indeterminate",
+      "mutation": "verify after the configured maximum age",
+      "notes": "Stale custody evidence cannot qualify current claims."
+    },
+    {
+      "id": "MON026-N016",
+      "class": "indeterminate_control",
+      "name": "clock_domain_mismatch",
+      "expected_outcome": "indeterminate",
+      "mutation": "sign with a capture clock domain different from policy",
+      "notes": "Incomparable timestamps cannot qualify freshness."
+    },
+    {
+      "id": "MON026-N017",
+      "class": "indeterminate_control",
+      "name": "clock_uncertainty_exceeded",
+      "expected_outcome": "indeterminate",
+      "mutation": "set manifest or artifact uncertainty above policy",
+      "notes": "Bounded time is required for freshness and incident correlation."
+    },
+    {
+      "id": "MON026-N018",
+      "class": "negative_control",
+      "name": "unlisted_artifact_file",
+      "expected_outcome": "blocked",
+      "mutation": "add a regular file not declared in the signed inventory",
+      "notes": "The artifact root is an exact file inventory; extra files are not silently ignored."
+    },
+    {
+      "id": "MON026-N019",
+      "class": "negative_control",
+      "name": "nonregular_artifact",
+      "expected_outcome": "blocked",
+      "mutation": "place a FIFO, device or directory where a file is declared",
+      "notes": "Only regular files are admissible."
+    },
+    {
+      "id": "MON026-N020",
+      "class": "negative_control",
+      "name": "source_boundary_substitution",
+      "expected_outcome": "blocked",
+      "mutation": "alter source system ID, timeline, snapshot or target LSN",
+      "notes": "The signed bundle is bound to the exact source/recovery boundary."
+    },
+    {
+      "id": "MON026-N021",
+      "class": "indeterminate_control",
+      "name": "artifact_clock_domain_mismatch",
+      "expected_outcome": "indeterminate",
+      "mutation": "give one artifact an incomparable collection clock",
+      "notes": "Per-artifact collection time must be comparable to the bundle clock."
+    }
+  ]
+}
