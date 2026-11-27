@@ -23,6 +23,8 @@ The current source observation record exposes simulation tick and sample values 
 
 The custody module now includes `build_decision_prefix(archive, decision_tick)`. It validates tick continuity and emits a separate `DecisionObservationPrefix` containing observations only through the requested tick, plus a BLAKE3 digest of that prefix. It rejects out-of-range cutoffs. This is a tested projection helper, not yet a running replay service: an isolated driver still has to deliver the prefix to the candidate and keep the archive/evaluator roots inaccessible.
 
+The AS-Bench action binder is designed to pass its SHA-256 directly into the decision proposal. For Nuclease the request payload identifies the exact stage and ordered variant IDs; for Propylene it identifies the exact campaign, design-ID field and submitted batch. #10947 remains authoritative for job-state/result-row validation: queued/running jobs remain pending, failed jobs do not advance the stage, and only completed jobs with exact result identity and full measurements may resolve an outcome.
+
 The pilot materializes three separate artifacts and a runtime-only candidate view.
 
 ### Custodian-only replay observation archive
@@ -124,13 +126,15 @@ The actual decision-policy comparison should run through #11012 and #10921, reus
 
 Use fixed script, fixed sequential/best-of-N, static threshold, state-contingent adaptive and matched-cost random-branch controllers from #11012. Keep model, available roles, coder, API/tools, context and total cost fixed; only the orchestration policy changes. Apply the decision episode to each actual batch submission, binding the research-state/evidence prefix, selected-design payload digest, predictions, resource estimate, next-action rule and actual lab job/result identity. Keep the benchmark-owned discovery and learning gates intact.
 
-The pinned compatibility adapter PR #10947 has 38 authored tests. Its dedicated `Sym-RSI AS-Bench Adapter` GitHub Actions workflow passed on exact head `f23caa7b8a177f002ee25eaec34404d4e675946f`: formatting, all 38 adapter tests, strict Clippy, compatibility-manifest validation and Lab API fixture validation. Other general workflows on that head were skipped. This is offline contract qualification only; it has not executed a campaign or reached the upstream verifier. The next bridge should use the selected-action payload digest to bind an AS-Bench submission to its exact design IDs, followed by a replay campaign—not a claim based on schema conformance.
+The pinned compatibility adapter PR #10947 has 38 authored tests. Its dedicated `Sym-RSI AS-Bench Adapter` GitHub Actions workflow passed on exact head `f23caa7b8a177f002ee25eaec34404d4e675946f`: formatting, all 38 adapter tests, strict Clippy, compatibility-manifest validation and Lab API fixture validation. Other general workflows on that head were skipped. This is offline contract qualification only; it has not executed a campaign or reached the upstream verifier.
+
+The new `examples/support/asb_action_payload.rs` defines `AsBenchBatchPayloadV1`: a versioned, fixed-field representation of API version, compatibility-manifest SHA-256, campaign ID, stage, design-ID field and exact ordered design IDs. It validates stage batch size, catalog membership and uniqueness, then computes lowercase SHA-256 over the pinned serde JSON representation. This digest is the value to place in `DecisionProposal.selected_action_payload_digest`; the later evaluator resolution binds the same digest to the #10947 completed-job/result receipt. Reordering a submitted batch intentionally changes its digest. The helper does not reimplement the Lab API client, catalog parser or asynchronous job lifecycle.
 
 Example custody-archive commands (replace paths and source SHA with actual campaign values; the first output is a custodian-only archive, not candidate input):
 
 ```sh
 cargo run --release --example evolutionary_rescue_generate_worlds -p symthaea-futures-ensemble
-cargo run --release --example evolutionary_rescue_split_capsules -p symthaea-futures-ensemble -- /secure/candidate /secure/evaluator <40-or-64-hex-source-commit> census
+cargo run --release --example evolutionary_rescue_split_capsules -p symthaea-futures-ensemble -- /secure/replay-archive /secure/evaluator <40-or-64-hex-source-commit> census
 ```
 
 The materializer creates both roots if absent, rejects equal/nested roots, requires both roots to be empty before starting, refuses to overwrite existing files, writes the manifest last, and reads all four output artifacts back before accepting the pair. It does not set filesystem ACLs, create separate OS identities or launch the candidate/evaluator processes. Those are required deployment controls, not provided by this fixture utility.
@@ -293,12 +297,13 @@ These are paper/author-reported baselines unless independently reproduced under 
 Implemented in this branch:
 - candidate-visible decision context and prospective proposal, including a decision-objective reference and required exact ResearchState/evidence-prefix/action-offer-list SHA-256 bindings from #13665/#11015;
 - outcome distribution, full randomized action propensities over action/payload identities, exact selected-payload binding and causal-design declarations;
+- versioned AS-Bench batch payload SHA-256 over campaign, stage, manifest, ID field and exact ordered design IDs;
 - evaluator-owned resolution and distinct execution/outcome states;
 - validation for look-ahead evidence, action support, unsupported counterfactuals, delayed/censored/indeterminate outcomes and cost completeness;
 - twelve authored decision-contract tests;
 - custodian-only replay-archive/evaluator projection, BLAKE3 digests, opaque IDs, empty/disjoint-root checks, no-overwrite writes, manifest-last materialization and disk-readback checks;
 - decision-time observation-prefix builder with digest and out-of-range rejection;
-- nine authored custody/prefix tests, two output-root tests and a capsule materializer example (23 authored tests total across these new files).
+- nine authored custody/prefix tests, five AS-Bench payload tests, two materializer output-root tests and a capsule materializer example (28 authored unit tests across the new Rust files; 26 are covered by the standalone harness and the two materializer tests still await the production-example workspace build).
 
 Not implemented or not yet verified:
 - the ten worlds have not been generated or split in this environment; the existing source seed split is public and is not a sealed confirmatory split;
