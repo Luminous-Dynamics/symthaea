@@ -81,7 +81,7 @@ The native profile may expose typed evidence and lifecycle operations that are n
 
 AML compatibility remains a separate contract. The participant provides Add and Search; AML performs Answer and Score. Do not insert a participant-generated final answer into Search or change the official request/response shape.
 
-For Open-source Methods, any embedding component must use text-embedding-v4 and any LLM-related component must use gpt-4o-mini; rerankers are unrestricted. If an academic implementation uses no embedding or LLM component, it must disclose that fact rather than imply model usage. Commercial Products are evaluated as a separate profile without those model restrictions. Report scores and costs separately.
+For Open-source Methods, any embedding component must use text-embedding-v4 and any LLM-related component must use gpt-4o-mini; rerankers are unrestricted. If an academic implementation uses no embedding or participant LLM component, it must disclose that fact rather than imply model usage. The run manifest makes this explicit with uses_embeddings and uses_participant_llm booleans; when true, the model identifiers are constrained to the designated models, and when false the corresponding model fields must be explicitly null. The AML platform's own Answer/Score reader is not declared as a participant LLM. Commercial Products are evaluated as a separate profile without those model restrictions. Report scores and costs separately.
 
 The formal AML Search limit is top_k=100 across tracks. The platform preserves returned order and rejects over-limit or malformed results rather than silently truncating. Re-check the live guide before every future submission:
 https://agentmemoryleaderboard.ai/api-guide
