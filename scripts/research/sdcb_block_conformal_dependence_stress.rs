@@ -236,10 +236,7 @@ fn run_suite(trials: u64) -> Vec<CoverageReport> {
                     block_len,
                     gap,
                     trials,
-                    0x5344_4342_1000_0000
-                        ^ rho_seed
-                        ^ ((block_len as u64) << 16)
-                        ^ gap as u64,
+                    0x5344_4342_1000_0000 ^ rho_seed ^ ((block_len as u64) << 16) ^ gap as u64,
                 ));
             }
         }
