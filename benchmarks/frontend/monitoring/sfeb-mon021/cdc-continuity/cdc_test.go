@@ -7,9 +7,24 @@ func base()(Profile,SlotState,Manifest){
 	p:=Profile{SystemIdentifier:"sys-1",DatabaseOID:42,DatabaseName:"app",SlotName:"mon_slot",OutputPlugin:"pgoutput",PluginProfileDigest:"plugin-v1",SchemaProfileDigest:"schema-v1",SourceEpoch:"epoch-1",TimelineID:1,ConsistentPoint:&cp,SnapshotName:"snap-1",SnapshotDigest:"snapshot-digest"}
 	s:=SlotState{SlotType:"logical",DatabaseOID:42,DatabaseName:"app",SlotName:"mon_slot",OutputPlugin:"pgoutput",WALStatus:"reserved",RestartLSN:&restart,ConfirmedFlushLSN:&flush,SafeWALSize:ptrI(1<<30),CatalogXmin:"100",Xmin:"100"}
 	m:=Manifest{SourceEpoch:"epoch-1",TimelineID:1,SlotName:"mon_slot",DatabaseOID:42,PluginProfileDigest:"plugin-v1",SchemaProfileDigest:"schema-v1",StartExclusiveLSN:cp,TerminalLSN:0x140,SnapshotConsistentPoint:cp,SnapshotDigest:"snapshot-digest",Events:[]DecodedEvent{{ID:"e1",XID:"10",CommitLSN:0x110,Ordinal:1,PayloadDigest:"d1"},{ID:"e2",XID:"11",CommitLSN:0x130,Ordinal:1,PayloadDigest:"d2"}},Complete:true,EvidenceThroughLSN:0x140,AcknowledgementRequestedLSN:0x140,Witnessed:true,ManifestDigest:"manifest-digest"}
+	m.Transactions=[]Transaction{
+		{XID:"10",State:"committed",BeginLSN:0x108,CommitLSN:0x110,EndLSN:0x118,EventIDs:[]string{"e1"}},
+		{XID:"11",State:"committed",BeginLSN:0x128,CommitLSN:0x130,EndLSN:0x138,EventIDs:[]string{"e2"}},
+	}
 	return p,s,m
 }
 func ptrI(v int64)*int64{return &v}
+func setEventCommitLSN(m *Manifest,id string,lsn LSN){
+	for i:=range m.Events{if m.Events[i].ID==id{m.Events[i].CommitLSN=lsn}}
+	for i:=range m.Transactions{if (m.Transactions[i].XID=="10"&&id=="e1")||(m.Transactions[i].XID=="11"&&id=="e2"){m.Transactions[i].CommitLSN=lsn}}
+}
+func mergeEventsIntoFirstTransaction(m *Manifest){
+	m.Events[1].XID=m.Events[0].XID
+	m.Events[1].CommitLSN=m.Events[0].CommitLSN
+	m.Events[1].Ordinal=m.Events[0].Ordinal+1
+	m.Transactions[0].EventIDs=append(m.Transactions[0].EventIDs,m.Events[1].ID)
+	m.Transactions=m.Transactions[:1]
+}
 func want(t *testing.T,r Result,d Decision){t.Helper();if r.Decision!=d{t.Fatalf("got %s (%s), want %s",r.Decision,r.Reason,d)}}
 func TestLSNParseAndRoundTrip(t *testing.T){for _,x:=range []string{"0/0","0/16B6C50","A/F"}{v,e:=ParseLSN(x);if e!=nil{t.Fatal(e)};if _,e=ParseLSN(v.String());e!=nil{t.Fatal(e)}}}
 func TestLSNRejectMalformed(t *testing.T){for _,x:=range []string{"","A","A/B/C","-1/0","0/xyz"}{if _,e:=ParseLSN(x);e==nil{t.Fatalf("accepted %q",x)}}}
@@ -27,10 +42,10 @@ func TestConfirmedFlushAheadDurableDenied(t *testing.T){p,s,m:=base();s.Confirme
 func TestEvidenceWatermarkMustEqualTerminal(t *testing.T){p,s,m:=base();m.EvidenceThroughLSN=0x130;want(t,ValidateCapture(p,s,m),Indeterminate)}
 func TestRestartLSNUnknownIndeterminate(t *testing.T){p,s,m:=base();s.RestartLSN=nil;want(t,ValidateCapture(p,s,m),Indeterminate)}
 func TestRestartLSNAfterRequiredStartIndeterminate(t *testing.T){p,s,m:=base();s.RestartLSN=ptr(0x120);want(t,ValidateCapture(p,s,m),Indeterminate)}
-func TestLSNGapsAllowed(t *testing.T){p,s,m:=base();m.Events[1].CommitLSN=0x138;want(t,ValidateCapture(p,s,m),Qualified)}
-func TestLSNRegressionDenied(t *testing.T){p,s,m:=base();m.Events[1].CommitLSN=0x108;want(t,ValidateCapture(p,s,m),Denied)}
-func TestSameLSNOrdinalRegressionDenied(t *testing.T){p,s,m:=base();m.Events[1].CommitLSN=m.Events[0].CommitLSN;m.Events[1].XID=m.Events[0].XID;m.Events[1].Ordinal=1;m.Events[0].Ordinal=2;want(t,ValidateCapture(p,s,m),Denied)}
-func TestSameLSNDifferentXIDAllowed(t *testing.T){p,s,m:=base();m.Events[1].CommitLSN=m.Events[0].CommitLSN;m.Events[1].XID="11";want(t,ValidateCapture(p,s,m),Qualified)}
+func TestLSNGapsAllowed(t *testing.T){p,s,m:=base();setEventCommitLSN(&m,"e2",0x138);want(t,ValidateCapture(p,s,m),Qualified)}
+func TestLSNRegressionDenied(t *testing.T){p,s,m:=base();setEventCommitLSN(&m,"e2",0x108);want(t,ValidateCapture(p,s,m),Denied)}
+func TestSameTransactionMessageOrdinalRegressionDenied(t *testing.T){p,s,m:=base();mergeEventsIntoFirstTransaction(&m);m.Events[1].Ordinal=1;want(t,ValidateCapture(p,s,m),Denied)}
+func TestSameCommitBoundaryRequiresSameTransaction(t *testing.T){p,s,m:=base();m.Events[1].CommitLSN=m.Events[0].CommitLSN;want(t,ValidateCapture(p,s,m),Denied)}
 func TestSameEventIDConflictingPayloadDivergent(t *testing.T){p,s,m:=base();m.Events[1].ID=m.Events[0].ID;m.Events[1].PayloadDigest="conflict";want(t,ValidateCapture(p,s,m),Divergent)}
 func TestDuplicateIDChangedLSNDivergent(t *testing.T){p,s,m:=base();e:=m.Events[1];e.CommitLSN++;m.Events=append(m.Events,e);want(t,ValidateCapture(p,s,m),Divergent)}
 func TestExactReplayDuplicateAccepted(t *testing.T){p,s,m:=base();m.Events=append(m.Events,m.Events[1]);want(t,ValidateCapture(p,s,m),Qualified)}
@@ -47,3 +62,9 @@ func TestFailoverStandbyBehindIndeterminate(t *testing.T){_,m,f:=failoverFixture
 func TestFailoverOldPrimaryNotFencedIndeterminate(t *testing.T){_,m,f:=failoverFixture();f.OldPrimaryFenced=false;want(t,ValidateFailover(f,m.EvidenceThroughLSN),Indeterminate)}
 func TestFailoverWrongStandbySlotDenied(t *testing.T){_,m,f:=failoverFixture();f.StandbySlot.DatabaseOID++;want(t,ValidateFailover(f,m.EvidenceThroughLSN),Denied)}
 func FuzzLSNParse(f *testing.F){f.Add("0/0");f.Add("A/FFFF");f.Fuzz(func(t *testing.T,s string){v,e:=ParseLSN(s);if e==nil&&v.String()==""{t.Fatal("empty normalized LSN")}})}
+
+func TestTransactionEnvelopeMissingIndeterminate(t *testing.T){p,s,m:=base();m.Transactions=m.Transactions[:1];want(t,ValidateCapture(p,s,m),Indeterminate)}
+func TestTransactionEventMembershipMissingIndeterminate(t *testing.T){p,s,m:=base();m.Transactions[0].EventIDs=nil;want(t,ValidateCapture(p,s,m),Indeterminate)}
+func TestTransactionEnvelopeContradictsCommitBoundaryDenied(t *testing.T){p,s,m:=base();m.Transactions[0].CommitLSN=0x111;want(t,ValidateCapture(p,s,m),Denied)}
+func TestPreparedTransactionNotYetQualified(t *testing.T){p,s,m:=base();m.Transactions[0].State="prepared";want(t,ValidateCapture(p,s,m),Indeterminate)}
+func TestTwoPhaseSlotNotQualified(t *testing.T){p,s,m:=base();s.TwoPhase=true;want(t,ValidateCapture(p,s,m),Indeterminate)}
