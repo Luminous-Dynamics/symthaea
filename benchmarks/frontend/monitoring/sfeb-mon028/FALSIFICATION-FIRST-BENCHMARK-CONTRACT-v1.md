@@ -18,7 +18,7 @@ These are ordered neither as a scalar quality score nor as interchangeable safe 
 
 ## 3. Independent suite
 
-The signed suite binds:
+The signed suite uses the MON-028 domain-separated, length-prefixed binary suite root (fixed field order; cases sorted by CaseID) and binds:
 - campaign and benchmark IDs;
 - exact fault-matrix digest;
 - ground-truth oracle digest;
@@ -52,7 +52,7 @@ Report:
 - planned unsafe-case denominator;
 - observed false-qualified rate;
 - one-sided 95% Wilson score upper bound;
-- false-qualified count by case family and system version.
+- false-qualified count and confidence bound by case family and system version.
 
 A campaign with any false-qualified result fails the safety gate. Zero false qualifications is not proof of zero risk; the confidence bound must be reported.
 
@@ -81,7 +81,7 @@ Latency is descriptive unless the benchmark specifies a required operational bou
 
 The scorer reports a one-sided 95% Wilson score upper confidence bound for the false-qualified proportion. For zero observed errors among (n) completed unsafe cases, the upper bound remains nonzero. With 10,000 independent unsafe trials, it is approximately (2.7\times10^{-4}) (0.027%).
 
-Replicates sharing a reset, host, fault injector or common-cause event may not be statistically independent. Confirmatory analysis must report clustering and use an appropriate cluster-aware interval or resampling method. The built-in Wilson interval is a screening statistic, not a substitute for the confirmatory design.
+Replicates sharing a reset, host, fault injector or common-cause event may not be statistically independent. Confirmatory analysis must report clustering and use an appropriate cluster-aware interval or resampling method. The built-in Wilson interval is a screening statistic, not a substitute for the confirmatory design. Suite validation caps a single suite at 1,000,000 planned observations and 100,000 case definitions to bound scorer resource use.
 
 ## 7. Campaign completeness and gates
 
