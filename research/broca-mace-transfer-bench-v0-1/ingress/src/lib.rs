@@ -2230,11 +2230,15 @@ mod tests {
         let mut after_validity = raw();
         after_validity.outcome_observed_at_ms = 350;
         after_validity.occurred_at_ms = 170;
+        let authority_after_outcome = TestVerifier {
+            raw_event_received_at_ms: 360,
+            ..TestVerifier::default()
+        };
         assert!(matches!(
             ingest_as_known(
                 &after_validity,
                 query(180, 400),
-                &TestVerifier::default()
+                &authority_after_outcome
             ),
             Err(IngestReject::InvalidMeasurementBound)
         ));
