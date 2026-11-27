@@ -167,7 +167,7 @@ Claim-relative revalidation bridges the MACE derived-memory invalidation work wi
 
 ## 9. Production boundary
 
-The current implementation is a policy/reference classifier. Production still requires:
+The current implementation is a policy/reference classifier plus a guarded in-memory projection-registration path. Production still requires:
 1. a trusted independent verifier with pinned trust roots and key rotation;
 2. a sandboxed, reproducible test execution service;
 3. a durable claim/projection registry;
@@ -178,3 +178,24 @@ The current implementation is a policy/reference classifier. Production still re
 8. an independent audit of every claim transition and later decision use.
 
 No production capability or physical erasure is implied by the reference module.
+
+
+## 10. Integrated rebuild admission
+
+The assessment now carries and commits to the claim digest, original source event ID and exact source-transition receipt digest as explicit fields. Its integrity check validates those fields in addition to the claim binding and verifier evidence.
+
+The function `register_rebuilt_projection_after_claim_revalidation_v1` connects this assessment to `DerivedProjectionIndexV1`. It admits registration only when:
+1. the assessment integrity commitment is valid;
+2. disposition is `PreservedNeedsRebuild`, with new-build permission true and old-projection reactivation false;
+3. claim ID, claim digest, original source event, source-transition digest and binding digest match;
+4. the transition is an exact receipt retained by the same streaming ledger;
+5. the transition is a correction affecting the bound source event;
+6. the ledger and projection spec remain at that exact transition sequence;
+7. the new projection depends on the correction event (the new active source revision), not the superseded source event;
+8. the projection registry itself accepts the new ID and current dependencies.
+
+The registry must already have consumed the same transition. If not, its sequence check rejects the rebuild. An old projection ID cannot be silently replaced because the registry treats projection IDs as immutable and unique.
+
+Four integration-focused tests exercise successful fresh rebuild, rejection of the old source ID, rejection before invalidation-index catch-up, and refusal after a failed claim check. A further test commits claim/source/transition identity into the assessment digest. The module therefore has fourteen authored deterministic tests in this snapshot; none have been compiled or executed here.
+
+This closes the in-memory reference path from source correction to projection invalidation, claim-specific revalidation and fresh projection admission. It does not yet run the test itself, independently verify the injected verifier's signature, rebuild embeddings or remote caches, or provide durable transactional storage.

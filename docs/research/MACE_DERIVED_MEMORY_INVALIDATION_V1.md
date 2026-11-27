@@ -141,3 +141,12 @@ Quarantine, revocation and rights erasure remain hard overrides. Missing, skippe
 This separation directly addresses the claim-relative invalidation question raised by *Impact Is Not Invalidation*: a changed source is a reason to re-check claims, not a universal proof that every dependent proposition is false. The public paper artifact is not yet available for a paper-comparable reproduction in this snapshot. See [MACE Claim-Relative Invalidation V1](MACE_CLAIM_RELATIVE_INVALIDATION_V1.md) for the policy, schema, test matrix and external benchmark plan.
 
 The module adds nine authored deterministic tests. They are not compiled or executed here.
+
+
+## 10. Claim-qualified rebuild registration
+
+The claim-relative module now exposes a guarded registration function joining a successful claim assessment to the derived projection index. It carries the exact claim digest, superseded source event ID and transition receipt digest in the assessment. A rebuild is rejected unless the same ledger still retains the exact correction receipt, the projection index has consumed that transition, and the new projection binds to the correction event's newly active source revision.
+
+A passing claim test therefore cannot bypass projection dependency checks, register against the old source event, or resurrect the prior projection ID. Failed, skipped, unverified or inconclusive checks cannot use the guarded path.
+
+This extends the previous policy reference to an integrated in-memory qualification path. It still does not rebuild external embeddings, lexical stores, remote caches, replicas or backups, and it does not provide durable/atomic multi-store coordination. Fourteen deterministic tests are authored across assessment and rebuild integration; they are not executed here.

@@ -170,3 +170,6 @@ Only an independently verified claim-check result can classify a corrected claim
 A preserved claim never reactivates its old summary, embedding, plan or cache. It only permits a fresh projection with a new ID and current dependencies. The evidence verifier is an injected trust boundary; this reference module is not a test runner or cryptographic verifier.
 
 Protocol and schema: [MACE Claim-Relative Invalidation V1](../../../docs/research/MACE_CLAIM_RELATIVE_INVALIDATION_V1.md) and [mace_claim_relative_revalidation_v1.schema.json](../../../data/schemas/mace_claim_relative_revalidation_v1.schema.json). Nine deterministic tests are authored and not yet executed.
+
+
+The guarded function `register_rebuilt_projection_after_claim_revalidation_v1` connects a passing claim assessment to the temporal projection index. It requires a valid assessment bound to the exact retained correction receipt, an index that has consumed that transition, and a new projection whose source dependencies include the corrected event rather than the superseded source event. Failed/unverified claims and stale source dependencies cannot enter this path. Fourteen tests are authored for claim assessment and rebuild integration; they have not been executed.
