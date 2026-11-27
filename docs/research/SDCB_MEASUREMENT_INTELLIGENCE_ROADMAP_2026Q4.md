@@ -253,3 +253,8 @@ The OU fixture cross-checks the #13903 known-answer matrix and endpoint posterio
 ## Open-world covariance-model adequacy — stacked after interval observations
 
 The covariance-model mixture path also includes a separate open-world diagnostic in `scripts/research/sdcb_model_set_adequacy.rs`. It prevents normalized Bayesian weights from being mistaken for proof that any registered model is adequate. A caller supplies a best-model prequential log-density threshold calibrated on independent chronological validation data; when all positive-prior candidates fall below it, the report is flagged inadequate and downstream scientific decisions are not eligible for automatic update. Robust support membership remains separate. The reference does not infer unknown physical causes or calibrate a universal threshold. Four Rust tests are authored, not compiled/executed here.
+
+
+## Block-conformal open-world adequacy follow-on — 27 November 2026
+
+The fixed-threshold adequacy diagnostic now has an exact finite-rank calibration companion in `scripts/research/sdcb_block_conformal_adequacy.rs`. It computes a conservative upper-tail conformal p-value from block-maximum predictive nonconformity scores, requires a frozen model-set/scoring-protocol digest, reports finite-sample p-value resolution, and rejects reuse of calibration epoch/unit IDs across adaptive stages. The guarantee is only for exchangeable calibration/test units; serially dependent time-series blocks are not automatically exchangeable. Eight Rust tests are authored, not compiled/executed here. This is not a time-series validity guarantee or physical calibration result.

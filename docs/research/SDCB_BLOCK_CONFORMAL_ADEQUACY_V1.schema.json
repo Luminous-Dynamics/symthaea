@@ -1,0 +1,126 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://github.com/Luminous-Dynamics/symthaea/blob/main/docs/research/SDCB_BLOCK_CONFORMAL_ADEQUACY_V1.schema.json",
+  "title": "SDCB block conformal adequacy fixture v1",
+  "type": "object",
+  "additionalProperties": false,
+  "required": [
+    "schema_version",
+    "calibration",
+    "test",
+    "alpha",
+    "previously_consumed_epoch_ids",
+    "previously_consumed_unit_ids"
+  ],
+  "properties": {
+    "schema_version": {
+      "const": "sdcb_block_conformal_adequacy.v1"
+    },
+    "calibration": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "epoch_id",
+        "model_set_digest",
+        "scoring_protocol_digest",
+        "exchangeability_unit",
+        "blocks"
+      ],
+      "properties": {
+        "epoch_id": {
+          "type": "string",
+          "minLength": 1
+        },
+        "model_set_digest": {
+          "type": "string",
+          "minLength": 1
+        },
+        "scoring_protocol_digest": {
+          "type": "string",
+          "minLength": 1
+        },
+        "exchangeability_unit": {
+          "enum": [
+            "independent-episode",
+            "exchangeable-block"
+          ]
+        },
+        "blocks": {
+          "type": "array",
+          "minItems": 1,
+          "items": {
+            "type": "object",
+            "additionalProperties": false,
+            "required": [
+              "unit_id",
+              "max_nonconformity_score"
+            ],
+            "properties": {
+              "unit_id": {
+                "type": "string",
+                "minLength": 1
+              },
+              "max_nonconformity_score": {
+                "type": "number"
+              }
+            }
+          }
+        }
+      }
+    },
+    "test": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "unit_id",
+        "model_set_digest",
+        "scoring_protocol_digest",
+        "nonconformity_scores"
+      ],
+      "properties": {
+        "unit_id": {
+          "type": "string",
+          "minLength": 1
+        },
+        "model_set_digest": {
+          "type": "string",
+          "minLength": 1
+        },
+        "scoring_protocol_digest": {
+          "type": "string",
+          "minLength": 1
+        },
+        "nonconformity_scores": {
+          "type": "array",
+          "minItems": 1,
+          "items": {
+            "type": "number"
+          }
+        }
+      }
+    },
+    "alpha": {
+      "type": "number",
+      "exclusiveMinimum": 0,
+      "exclusiveMaximum": 1
+    },
+    "previously_consumed_epoch_ids": {
+      "type": "array",
+      "items": {
+        "type": "string"
+      }
+    },
+    "previously_consumed_unit_ids": {
+      "type": "array",
+      "items": {
+        "type": "string"
+      }
+    },
+    "notes": {
+      "type": "array",
+      "items": {
+        "type": "string"
+      }
+    }
+  }
+}

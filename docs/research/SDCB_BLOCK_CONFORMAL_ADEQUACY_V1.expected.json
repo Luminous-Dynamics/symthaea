@@ -1,0 +1,12 @@
+{
+  "schema_version": "sdcb_block_conformal_adequacy.expected.v1",
+  "calibration_units": 19,
+  "test_block_max_score": 2,
+  "conformal_p_value": 0.05,
+  "alpha": 0.05,
+  "minimum_resolvable_p_value": 0.05,
+  "minimum_calibration_units_for_alpha": 19,
+  "significance_level_resolvable": true,
+  "alarm": "flagged_out_of_calibrated_envelope",
+  "claim_boundary": "Constructed exchangeable-rank fixture; not a time-series validity or physical sensor result."
+}
