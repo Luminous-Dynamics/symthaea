@@ -130,3 +130,8 @@ Kok and Tabandeh's 2026 work addresses short mobile-sensor collocation with a sl
 NIST's current calibration guidance does not mandate one universal recalibration interval. It points to application accuracy requirements, instrument stability, environmental effects, cross-comparisons, and control-chart evidence: https://www.nist.gov/calibrations/recommended-calibration-interval
 
 **Evidence status:** the twelve Rust tests are authored but not executed in this environment. The example, expected-result, and schema will be fetched and parsed from the committed branch; precision-matrix calculations are independently reproduced in a separate numerical implementation. No raw data, physical measurement, or external tournament result is claimed.
+
+
+Additional 2026 system comparators:
+- Kaparounakis & Stanley-Marbell, *Digital methods to quantify sensor output uncertainty in real time*, Communications Engineering (13 May 2026), https://doi.org/10.1038/s44172-026-00679-4. This demonstrates processor-native propagation of uncertainty from quantized calibration coefficients on FPGA/RISC-V hardware. It reports 42.9x and 94.4x speedups over equal-accuracy Monte Carlo. It is a relevant edge uncertainty-propagation baseline, not a network-level common-cause or adaptive experiment-selection comparator.
+- dos Reis et al., *Towards Industry 5.0 Metrology: Traceable self-calibrating networks of non-removable smart sensors in hydraulic flow conduits*, Measurement (30 January 2026), https://doi.org/10.1016/j.measurement.2025.119196. It proposes Digital Metrological Twins, fixed/mobile standards and semi-blind in-situ calibration. The paper states that no data were used, so it is an architectural comparator rather than a reproducible benchmark.
