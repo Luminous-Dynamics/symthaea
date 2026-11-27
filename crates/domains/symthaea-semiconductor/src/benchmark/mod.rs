@@ -12,6 +12,7 @@ pub mod mf_acquisition;
 pub mod pair_manifest;
 pub mod process_event_graph;
 pub mod fdm_coverage_inference;
+pub mod long_memory_coverage_inference;
 pub mod realized_coverage_backtest;
 pub mod secom_fold_preprocessor;
 pub mod secom_logistic;
@@ -167,4 +168,12 @@ pub use fdm_coverage_inference::{
     FdmCoverageAssumptionEvidenceV1, FdmCoverageErrorV1, FdmCoverageInferenceMethodV1,
     FdmCoverageInputV1, FdmCoveragePolicyV1, FdmCoverageReportV1, FdmCoverageStatusV1,
     FdmQualifiedScoreObservationV1, evaluate_fdm_coverage_inference_v1,
+};
+
+pub use long_memory_coverage_inference::{
+    LONG_MEMORY_ASSUMPTION_SCHEMA_V1, LONG_MEMORY_COVERAGE_POLICY_SCHEMA_V1,
+    LONG_MEMORY_COVERAGE_REPORT_SCHEMA_V1, LONG_MEMORY_COVERAGE_SCHEMA_V1,
+    GaussianLinearLongMemoryEvidenceV1, LongMemoryCoverageErrorV1, LongMemoryCoverageInputV1,
+    LongMemoryCoveragePolicyV1, LongMemoryCoverageReportV1, LongMemoryCoverageStatusV1,
+    LongMemoryLimitRegimeV1, evaluate_long_memory_coverage_inference_v1,
 };
