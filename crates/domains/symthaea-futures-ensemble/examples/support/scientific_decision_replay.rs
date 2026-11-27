@@ -103,9 +103,15 @@ pub struct PredictedOutcome {
 }
 
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
+pub struct ActionProbability {
+    pub action_id: String,
+    pub probability_micros: u32,
+}
+
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
 #[serde(tag = "kind", rename_all = "snake_case")]
 pub enum AssignmentMechanism {
-    Randomized { selected_action_probability_micros: u32, protocol_ref: String },
+    Randomized { action_probabilities: Vec<ActionProbability>, protocol_ref: String },
     Deterministic { policy_digest: String },
     Observational { selection_process_ref: String },
     Unknown,
@@ -150,11 +156,35 @@ impl DecisionProposal {
         ensure_unique("outcome labels", &labels)?;
         if sum != u64::from(PROBABILITY_SCALE) { return Err("probabilities must sum to 1,000,000".into()); }
         match &self.assignment_mechanism {
-            AssignmentMechanism::Randomized { selected_action_probability_micros, protocol_ref } => {
-                if *selected_action_probability_micros == 0 || *selected_action_probability_micros > PROBABILITY_SCALE {
-                    return Err("randomized propensity must be in 1..=1,000,000".into());
-                }
+            AssignmentMechanism::Randomized { action_probabilities, protocol_ref } => {
                 require_nonempty("randomization protocol reference", protocol_ref)?;
+                if action_probabilities.len() != c.permitted_action_ids.len() {
+                    return Err("randomized policy must log probabilities for every permitted action".into());
+                }
+                let mut action_ids = Vec::with_capacity(action_probabilities.len());
+                let mut probability_sum = 0_u64;
+                let mut selected_probability = 0_u32;
+                for entry in action_probabilities {
+                    require_nonempty("randomized action_id", &entry.action_id)?;
+                    if !c.permits(&entry.action_id) {
+                        return Err("randomization distribution contains an action outside the permitted set".into());
+                    }
+                    if entry.probability_micros > PROBABILITY_SCALE {
+                        return Err("action propensity exceeds probability scale".into());
+                    }
+                    if entry.action_id == self.selected_action_id {
+                        selected_probability = entry.probability_micros;
+                    }
+                    action_ids.push(entry.action_id.clone());
+                    probability_sum += u64::from(entry.probability_micros);
+                }
+                ensure_unique("randomized action IDs", &action_ids)?;
+                if probability_sum != u64::from(PROBABILITY_SCALE) {
+                    return Err("action propensities must sum to 1,000,000".into());
+                }
+                if selected_probability == 0 {
+                    return Err("selected action must have nonzero randomized propensity".into());
+                }
             }
             AssignmentMechanism::Deterministic { policy_digest } => require_nonempty("assignment policy digest", policy_digest)?,
             AssignmentMechanism::Observational { selection_process_ref } => require_nonempty("selection process reference", selection_process_ref)?,
@@ -330,7 +360,11 @@ mod tests {
                 PredictedOutcome { outcome_label: "no".into(), probability_micros: 600_000 },
             ],
             assignment_mechanism: AssignmentMechanism::Randomized {
-                selected_action_probability_micros: 500_000, protocol_ref: "random-protocol".into(),
+                action_probabilities: vec![
+                    ActionProbability { action_id: "a".into(), probability_micros: 500_000 },
+                    ActionProbability { action_id: "b".into(), probability_micros: 500_000 },
+                ],
+                protocol_ref: "random-protocol".into(),
             },
             causal_design: CausalDesign::RandomizedControlled,
             identification_assumption_digests: vec!["sha256:consistency".into()],
@@ -366,6 +400,18 @@ mod tests {
     fn rejects_probability_mass_error() {
         let c = context(); let mut p = proposal(&c); p.predicted_outcomes[0].probability_micros = 399_999;
         assert!(p.validate_against(&c).unwrap_err().contains("sum to"));
+    }
+    #[test]
+    fn randomized_design_requires_full_positive_action_distribution() {
+        let c = context();
+        let mut p = proposal(&c);
+        p.assignment_mechanism = AssignmentMechanism::Randomized {
+            action_probabilities: vec![
+                ActionProbability { action_id: "a".into(), probability_micros: 1_000_000 },
+            ],
+            protocol_ref: "random-protocol".into(),
+        };
+        assert!(p.validate_against(&c).unwrap_err().contains("every permitted action"));
     }
     #[test]
     fn rejects_unauthorized_action() {
