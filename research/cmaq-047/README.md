@@ -76,6 +76,16 @@ Run:
     cargo +1.100.0 test --manifest-path research/cmaq-047/Cargo.toml --locked
     cargo +1.100.0 clippy --manifest-path research/cmaq-047/Cargo.toml --locked --all-targets -- -D warnings
 
+## Paired protocol probe
+
+Run:
+
+    cargo +1.100.0 run --release --manifest-path research/cmaq-047/Cargo.toml --locked --bin controlled_action_probe -- 64 > cmaq-047-controlled-actions.csv
+
+The executable visits four unknown directional alternatives and the action-conditional null. It logs each predictable normal, selected action, support slack, diagnostic alignment and log e-value. Under the null, each action generates a small bounded residual around a point inside its action-specific null box. Under alternatives, the residual mean moves in one of four directions. The first action is selected at the zero normal; later actions adapt to the OCO witness.
+
+This is a protocol smoke test and an action-selection coverage diagnostic. It is not a powered false-alarm experiment or proof that an external device satisfies its action contract.
+
 ## Benchmark protocol
 
 Compare adaptive null-safe action selection with:
