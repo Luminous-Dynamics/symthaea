@@ -1,7 +1,7 @@
 {
   "schema": "luminous.eqc.seed-corpus.v0.1",
   "status": "synthetic_public_seed_unqualified",
-  "description": "Four synthetic authorization and replay-control episodes. These tasks test only a small contract surface; they are not an EHR integration, clinical evaluation, cryptographic audit, or production qualification.",
+  "description": "Six synthetic authorization, scope, expiry and replay-control episodes. These tasks test only a small contract surface; they are not an EHR integration, clinical evaluation, cryptographic audit, or production qualification.",
   "task_schema": "eqc-task-v0.1.schema.json",
   "tasks": [
     {
@@ -264,6 +264,146 @@
         "state_mutation_count": 0,
         "state_must_remain_unchanged": true,
         "reason_code": "challenge_already_consumed"
+      },
+      "resource_budget": {
+        "timeout_seconds": 10,
+        "max_tool_calls": 3,
+        "network_policy": "none",
+        "cpu_seconds": 5,
+        "memory_mib": 128
+      },
+      "required_provenance": [
+        "task_digest",
+        "input_digests",
+        "actor_identity",
+        "authority_snapshot",
+        "policy_digest",
+        "system_identity",
+        "environment_identity",
+        "action_log",
+        "result_digest",
+        "independent_verifier"
+      ]
+    },
+    {
+      "schema": "luminous.eqc.task.v0.1",
+      "task_id": "eqc-health-expired-authority-deny-001",
+      "domain": "healthcare",
+      "split": "public_seed",
+      "statement": "The requested patient and action match an active authority snapshot, but the consent validity window ended before the request was evaluated. Deny the request without reading or mutating state.",
+      "actor": {
+        "actor_id": "synthetic-coordinator-01",
+        "roles": [
+          "care_coordinator"
+        ]
+      },
+      "subject": {
+        "kind": "patient",
+        "subject_id": "synthetic-patient-001"
+      },
+      "input_refs": [
+        {
+          "input_id": "synthetic-consent-expired-001",
+          "artifact_path": "docs/research/eqc-fixtures/consent-expired-001.json",
+          "classification": "synthetic",
+          "sha256": "25954b122b9da76797fb5c89874a0069f33158f143f5c36c0097bef642b9eabe"
+        }
+      ],
+      "authority_snapshot": {
+        "snapshot_id": "synthetic-authority-expired-001",
+        "status": "active",
+        "principal_id": "synthetic-coordinator-01",
+        "subject_id": "synthetic-patient-001",
+        "scopes": [
+          "patient:synthetic-patient-001:read"
+        ],
+        "observed_at": "2026-11-26T00:00:00Z",
+        "valid_until": "2026-11-26T00:30:00Z"
+      },
+      "request": {
+        "action": "patient.read",
+        "resource_id": "patient-record-001",
+        "subject_id": "synthetic-patient-001",
+        "evaluated_at": "2026-11-26T01:00:00Z"
+      },
+      "negative_controls": [
+        "expired_authority"
+      ],
+      "expected": {
+        "disposition": "deny",
+        "state_mutation_count": 0,
+        "state_must_remain_unchanged": true,
+        "reason_code": "authority_expired"
+      },
+      "resource_budget": {
+        "timeout_seconds": 10,
+        "max_tool_calls": 3,
+        "network_policy": "none",
+        "cpu_seconds": 5,
+        "memory_mib": 128
+      },
+      "required_provenance": [
+        "task_digest",
+        "input_digests",
+        "actor_identity",
+        "authority_snapshot",
+        "policy_digest",
+        "system_identity",
+        "environment_identity",
+        "action_log",
+        "result_digest",
+        "independent_verifier"
+      ]
+    },
+    {
+      "schema": "luminous.eqc.task.v0.1",
+      "task_id": "eqc-health-wrong-scope-deny-001",
+      "domain": "healthcare",
+      "split": "public_seed",
+      "statement": "The coordinator is correctly identified and the patient is correct, but consent permits a write rather than the requested read. Deny the mismatched operation and prove there was no access or state mutation.",
+      "actor": {
+        "actor_id": "synthetic-coordinator-01",
+        "roles": [
+          "care_coordinator"
+        ]
+      },
+      "subject": {
+        "kind": "patient",
+        "subject_id": "synthetic-patient-001"
+      },
+      "input_refs": [
+        {
+          "input_id": "synthetic-consent-wrong-scope-001",
+          "artifact_path": "docs/research/eqc-fixtures/consent-wrong-scope-001.json",
+          "classification": "synthetic",
+          "sha256": "0d15ecf6adec96725aee18c4c4789cff838e9682682e5b0dca0957a111698b2f"
+        }
+      ],
+      "authority_snapshot": {
+        "snapshot_id": "synthetic-authority-wrong-scope-001",
+        "status": "active",
+        "principal_id": "synthetic-coordinator-01",
+        "subject_id": "synthetic-patient-001",
+        "scopes": [
+          "patient:synthetic-patient-001:write"
+        ],
+        "observed_at": "2026-11-26T00:00:00Z",
+        "valid_until": "2026-11-27T00:00:00Z"
+      },
+      "request": {
+        "action": "patient.read",
+        "resource_id": "patient-record-001",
+        "subject_id": "synthetic-patient-001",
+        "evaluated_at": "2026-11-26T01:00:00Z"
+      },
+      "negative_controls": [
+        "wrong_scope"
+      ],
+      "expected": {
+        "disposition": "deny",
+        "state_mutation_count": 0,
+        "state_must_remain_unchanged": true,
+        "reason_code": "authority_scope_mismatch"
       },
       "resource_budget": {
         "timeout_seconds": 10,
