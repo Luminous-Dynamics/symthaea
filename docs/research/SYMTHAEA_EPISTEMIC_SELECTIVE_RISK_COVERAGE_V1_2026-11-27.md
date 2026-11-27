@@ -26,11 +26,9 @@ For an eligible cohort of size N, sort predictions by descending confidence. Let
 
 Equal confidence values are admitted atomically. No tie is split by input order or record ID. A requested coverage target selects the first complete confidence group whose achieved coverage is at least the target; therefore achieved coverage may exceed 50%, 80%, or 90%.
 
-AURC uses a specified right-step integral: for each complete tie group j, multiply the increase in coverage by the risk of the resulting accepted set, then sum. For group sizes m_j, cumulative accepted n_j and cumulative errors e_j:
+AURC follows the conventional empirical item-wise definition: `AURC = (1/N) * sum(k=1..N) risk(k/N)`. When confidence values are unique, this is exactly the standard rank-wise calculation. For equal-confidence groups, the evaluator averages the rank-wise risk over every possible permutation within the tie group. For a tie group of size m with e errors, after j positions the expected cumulative error count is `E_previous + j*e/m`; the expected risk at that rank contributes `(E_previous + j*e/m)/(A_previous+j)/N`. This yields deterministic, input-order-invariant AURC without arbitrarily breaking ties. Fixed-coverage operating points still admit ties atomically and report the next achieved coverage above the target.
 
-`AURC = sum_j (m_j / N) * (e_j / n_j)`.
-
-This convention produces 0 for an all-correct cohort and 1 for an all-wrong cohort. It is tie-invariant under the evaluator's atomic-group rule. Alternative trapezoidal or item-wise conventions must use a different metric version; scores are not interchangeable.
+This convention returns 0 for an all-correct cohort and 1 for an all-wrong cohort. It matches the usual empirical AURC when all confidences are distinct and is the uniform-permutation expectation when ties occur.
 
 ## Baselines and uncertainty
 
