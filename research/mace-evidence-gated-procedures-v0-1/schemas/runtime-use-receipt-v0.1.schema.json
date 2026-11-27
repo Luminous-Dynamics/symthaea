@@ -22,7 +22,8 @@
     "steps",
     "postcondition_checks",
     "terminal_outcome",
-    "outcome_verification"
+    "outcome_verification",
+    "source_dependencies"
   ],
   "properties": {
     "schema_version": {
@@ -140,7 +141,8 @@
             "pattern": "^[0-9a-f]{64}$"
           }
         }
-      }
+      },
+      "minItems": 1
     },
     "steps": {
       "type": "array",
@@ -214,7 +216,8 @@
             "pattern": "^[0-9a-f]{64}$"
           }
         }
-      }
+      },
+      "minItems": 1
     },
     "terminal_outcome": {
       "enum": [
@@ -255,6 +258,32 @@
     },
     "failure_reason": {
       "type": "string"
+    },
+    "source_dependencies": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "all_active",
+        "dependency_digest_sha256",
+        "revoked_source_ids"
+      ],
+      "properties": {
+        "all_active": {
+          "type": "boolean"
+        },
+        "dependency_digest_sha256": {
+          "type": "string",
+          "pattern": "^[0-9a-f]{64}$"
+        },
+        "revoked_source_ids": {
+          "type": "array",
+          "items": {
+            "type": "string",
+            "minLength": 1
+          },
+          "uniqueItems": true
+        }
+      }
     }
   },
   "allOf": [
@@ -315,6 +344,130 @@
           },
           "steps": {
             "maxItems": 0
+          }
+        }
+      }
+    },
+    {
+      "if": {
+        "properties": {
+          "source_dependencies": {
+            "properties": {
+              "all_active": {
+                "const": false
+              }
+            },
+            "required": [
+              "all_active"
+            ]
+          }
+        },
+        "required": [
+          "source_dependencies"
+        ]
+      },
+      "then": {
+        "properties": {
+          "terminal_outcome": {
+            "enum": [
+              "aborted",
+              "not_executed"
+            ]
+          },
+          "steps": {
+            "maxItems": 0
+          }
+        }
+      }
+    },
+    {
+      "if": {
+        "properties": {
+          "precondition_checks": {
+            "contains": {
+              "properties": {
+                "result": {
+                  "enum": [
+                    "fail",
+                    "unknown",
+                    "not_checked"
+                  ]
+                }
+              },
+              "required": [
+                "result"
+              ]
+            }
+          }
+        },
+        "required": [
+          "precondition_checks"
+        ]
+      },
+      "then": {
+        "properties": {
+          "terminal_outcome": {
+            "enum": [
+              "aborted",
+              "not_executed"
+            ]
+          },
+          "steps": {
+            "maxItems": 0
+          }
+        }
+      }
+    },
+    {
+      "if": {
+        "properties": {
+          "terminal_outcome": {
+            "const": "success"
+          }
+        },
+        "required": [
+          "terminal_outcome"
+        ]
+      },
+      "then": {
+        "properties": {
+          "steps": {
+            "items": {
+              "properties": {
+                "status": {
+                  "const": "completed"
+                }
+              }
+            }
+          },
+          "outcome_verification": {
+            "properties": {
+              "verification_type": {
+                "enum": [
+                  "tool_confirmed",
+                  "independent_evaluator",
+                  "human_authorized"
+                ]
+              }
+            }
+          },
+          "postcondition_checks": {
+            "not": {
+              "contains": {
+                "properties": {
+                  "result": {
+                    "enum": [
+                      "fail",
+                      "unknown",
+                      "not_checked"
+                    ]
+                  }
+                },
+                "required": [
+                  "result"
+                ]
+              }
+            }
           }
         }
       }
