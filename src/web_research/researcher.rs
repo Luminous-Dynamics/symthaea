@@ -1000,7 +1000,8 @@ impl WebResearcher {
                     }
                 }
             }
-    
+        }
+
         // Preserve duplicate offers here so the global planner can emit one
         // DuplicateSuppressed receipt for each repeated URL in deterministic
         // query/provider order.
