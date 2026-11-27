@@ -8,6 +8,7 @@
 //! epistemic consciousness loop.
 
 use anyhow::Result;
+use std::collections::{HashMap, HashSet};
 
 use super::knowledge_graph::{EdgeType, KnowledgeGraph, KnowledgeSource, NodeId, NodeType};
 use super::types::{EpistemicStatus, IntegrationResult, VerifiedClaim, WebResearchResult};
@@ -99,30 +100,21 @@ impl KnowledgeIntegrator {
         let mut nodes_added = 0;
         let mut edges_added = 0;
 
-        // Create source node if linking sources
-        let source_node = if self.config.link_sources && !result.url.is_empty() {
-            let node_id = self.knowledge_graph.add_node_with_config(
-                &result.url,
-                NodeType::Source,
-                result.confidence,
-                KnowledgeSource::External(result.url.clone()),
-            );
-            nodes_added += 1;
-            Some(node_id)
-        } else {
-            None
-        };
+        // Reuse source nodes by their claim-specific source identifier. A
+        // result-level URL is not evidence that every extracted claim came
+        // from that page.
+        let mut source_nodes_by_url = HashMap::new();
 
         // Integrate verified claims
         for claim in result.claims.iter().take(self.config.max_claims_per_result) {
             if claim.confidence >= self.config.min_confidence {
-                let claim_node = self.integrate_claim(claim, source_node)?;
+                let (claim_node, new_source_nodes, new_source_edges) =
+                    self.integrate_claim(claim, &mut source_nodes_by_url)?;
+                nodes_added += new_source_nodes;
+                edges_added += new_source_edges;
                 if claim_node.is_some() {
                     claims_integrated += 1;
                     nodes_added += 1;
-                    if source_node.is_some() {
-                        edges_added += 1; // Edge to source
-                    }
                 }
             }
         }
@@ -150,15 +142,19 @@ impl KnowledgeIntegrator {
         })
     }
 
-    /// Integrate a single claim into the knowledge graph
+    /// Integrate a single claim using only that claim's explicit source list.
+    ///
+    /// Returns the claim node and the number of newly created source nodes and
+    /// claim-to-source edges. The enclosing result URL is deliberately not used
+    /// as evidence for every claim in a multi-source research result.
     fn integrate_claim(
         &mut self,
         claim: &VerifiedClaim,
-        source_node: Option<NodeId>,
-    ) -> Result<Option<NodeId>> {
+        source_nodes_by_url: &mut HashMap<String, NodeId>,
+    ) -> Result<(Option<NodeId>, usize, usize)> {
         // Skip claims that shouldn't be integrated
         if !self.should_integrate_claim(claim) {
-            return Ok(None);
+            return Ok((None, 0, 0));
         }
 
         // Determine node type based on epistemic status
@@ -169,33 +165,73 @@ impl KnowledgeIntegrator {
             _ => NodeType::Abstract, // Less certain claims are abstract concepts
         };
 
-        // Create the claim node
-        let confidence = claim.confidence;
-        let source = if claim.supporting_sources.is_empty() {
-            KnowledgeSource::Internal
-        } else {
-            KnowledgeSource::External(claim.supporting_sources[0].clone())
-        };
+        // Keep the first non-empty claim-specific source as the node's primary
+        // provenance hint. All accepted sources are represented by graph edges.
+        let primary_source = claim
+            .supporting_sources
+            .iter()
+            .find(|url| !url.trim().is_empty())
+            .cloned();
+        let source = primary_source
+            .clone()
+            .map(KnowledgeSource::External)
+            .unwrap_or(KnowledgeSource::Internal);
 
+        let confidence = claim.confidence;
         let claim_id =
             self.knowledge_graph
                 .add_node_with_config(&claim.text, node_type, confidence, source);
 
-        // Link to source node if provided
-        if let Some(source_id) = source_node {
-            self.knowledge_graph.add_edge_with_meta(
-                claim_id,
-                EdgeType::SourcedFrom,
-                source_id,
-                confidence,
-                KnowledgeSource::Internal,
-            );
+        let mut source_nodes_added = 0;
+        let mut source_edges_added = 0;
+
+        if self.config.link_sources {
+            let mut seen_for_claim = HashSet::new();
+            for raw_url in &claim.supporting_sources {
+                let url = raw_url.trim();
+                if url.is_empty() || !seen_for_claim.insert(url.to_owned()) {
+                    continue;
+                }
+
+                let source_id = if let Some(source_id) = source_nodes_by_url.get(url) {
+                    *source_id
+                } else {
+                    let existing_source = self
+                        .knowledge_graph
+                        .get_node_by_name(url)
+                        .filter(|node| node.node_type == NodeType::Source)
+                        .map(|node| node.id);
+
+                    let source_id = if let Some(source_id) = existing_source {
+                        source_id
+                    } else {
+                        source_nodes_added += 1;
+                        self.knowledge_graph.add_node_with_config(
+                            url,
+                            NodeType::Source,
+                            confidence,
+                            KnowledgeSource::External(url.to_owned()),
+                        )
+                    };
+                    source_nodes_by_url.insert(url.to_owned(), source_id);
+                    source_id
+                };
+
+                self.knowledge_graph.add_edge_with_meta(
+                    claim_id,
+                    EdgeType::SourcedFrom,
+                    source_id,
+                    confidence,
+                    KnowledgeSource::External(url.to_owned()),
+                );
+                source_edges_added += 1;
+            }
         }
 
         // Find and link related existing nodes
         self.link_related_nodes(claim_id, &claim.text);
 
-        Ok(Some(claim_id))
+        Ok((Some(claim_id), source_nodes_added, source_edges_added))
     }
 
     /// Determine if a claim should be integrated
@@ -335,11 +371,25 @@ mod tests {
     use super::*;
 
     fn make_test_claim(text: &str, confidence: f32, status: EpistemicStatus) -> VerifiedClaim {
+        make_test_claim_with_sources(
+            text,
+            confidence,
+            status,
+            vec!["https://example.com".to_string()],
+        )
+    }
+
+    fn make_test_claim_with_sources(
+        text: &str,
+        confidence: f32,
+        status: EpistemicStatus,
+        supporting_sources: Vec<String>,
+    ) -> VerifiedClaim {
         VerifiedClaim {
             text: text.to_string(),
             status,
             confidence,
-            supporting_sources: vec!["https://example.com".to_string()],
+            supporting_sources,
             contradicting_sources: vec![],
             hedge: status.hedge_phrase().to_string(),
         }
@@ -378,6 +428,94 @@ mod tests {
         assert!(integration_result.claims_integrated >= 1);
         assert!(integration_result.nodes_added >= 1);
         assert!(integration_result.phi_after >= integration_result.phi_before);
+    }
+
+    #[tokio::test]
+    async fn source_edges_follow_each_claim_and_deduplicate_shared_sources() {
+        let mut integrator = KnowledgeIntegrator::new();
+        let first_claim = make_test_claim_with_sources(
+            "Quantum lattice exhibits bounded response",
+            0.9,
+            EpistemicStatus::HighConfidence,
+            vec![
+                "https://evidence.example/shared".to_string(),
+                "https://evidence.example/first".to_string(),
+                "https://evidence.example/shared".to_string(),
+            ],
+        );
+        let second_claim = make_test_claim_with_sources(
+            "Ocean salinity drives seasonal mixing",
+            0.85,
+            EpistemicStatus::ModerateConfidence,
+            vec![
+                "https://evidence.example/shared".to_string(),
+                "https://evidence.example/second".to_string(),
+            ],
+        );
+        let result_url = "https://aggregator.example/search-result";
+        let result = WebResearchResult {
+            title: "Multi-source result".to_string(),
+            url: result_url.to_string(),
+            content: "Aggregate content".to_string(),
+            summary: "Aggregate summary".to_string(),
+            source_type: ResearchSource::Web,
+            relevance: 0.9,
+            confidence: 0.9,
+            epistemic_status: EpistemicStatus::HighConfidence,
+            status: super::super::types::ResearchStatus::Success,
+            claims: vec![first_claim, second_claim],
+        };
+
+        let outcome = integrator.integrate(result).await.unwrap();
+
+        assert_eq!(outcome.claims_integrated, 2);
+        assert_eq!(outcome.nodes_added, 5); // two claims and three unique sources
+        assert_eq!(outcome.edges_added, 4); // duplicate source within a claim is removed
+        assert!(integrator.graph().get_node_by_name(result_url).is_none());
+
+        let first = integrator
+            .graph()
+            .get_node_by_name("Quantum lattice exhibits bounded response")
+            .expect("first claim node");
+        let first_sources: HashSet<String> = integrator
+            .graph()
+            .outgoing_edges(first.id)
+            .iter()
+            .filter(|edge| edge.edge_type == EdgeType::SourcedFrom)
+            .map(|edge| integrator.graph().get_node(edge.to).unwrap().name.clone())
+            .collect();
+        assert_eq!(
+            first_sources,
+            HashSet::from([
+                "https://evidence.example/shared".to_string(),
+                "https://evidence.example/first".to_string(),
+            ])
+        );
+
+        let second = integrator
+            .graph()
+            .get_node_by_name("Ocean salinity drives seasonal mixing")
+            .expect("second claim node");
+        let second_sources: HashSet<String> = integrator
+            .graph()
+            .outgoing_edges(second.id)
+            .iter()
+            .filter(|edge| edge.edge_type == EdgeType::SourcedFrom)
+            .map(|edge| integrator.graph().get_node(edge.to).unwrap().name.clone())
+            .collect();
+        assert_eq!(
+            second_sources,
+            HashSet::from([
+                "https://evidence.example/shared".to_string(),
+                "https://evidence.example/second".to_string(),
+            ])
+        );
+
+        let shared_source = integrator
+            .graph()
+            .get_node_by_name("https://evidence.example/shared")
+            .expect("shared source node");
+        assert_eq!(shared_source.node_type, NodeType::Source);
     }
 
     #[test]
