@@ -199,9 +199,10 @@ fn run_replication(
                 draw_predictive_rank(&mut rng, &predictive_counts)
             }
             Scenario::StationarySticky => {
-                let previous = previous_rank.ok_or_else(|| {
-                    "sticky alternative has no previous rank at change point".to_string()
-                })?;
+                let previous = previous_rank.unwrap_or_else(|| {
+                    usize::try_from(rng.below(RANK_BUCKETS as u64) + 1)
+                        .expect("rank bucket index fits usize")
+                });
                 draw_stationary_sticky_rank(&mut rng, previous)
             }
         };
