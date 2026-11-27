@@ -305,8 +305,14 @@ func reconcileEvents(in Input,r *Reconciliation,cdc,txn *flags){
  if len(r.MissingEventIDs)>0{cdc.block("missing_events")};if len(r.ExtraEventIDs)>0{cdc.block("extra_events")};if len(r.ConflictingEventIDs)>0{cdc.block("conflicting_event_ids")};if len(r.MismatchedEventIDs)>0{cdc.block("event_payload_mismatch")}
  parts:=map[string]int{};for _,tp:=range in.TopicPartitions{if !validID(tp.Topic)||tp.PartitionCount<1{cdc.hold("topic_partition_inventory_invalid");continue};if _,ok:=parts[tp.Topic];ok{cdc.block("duplicate_topic_partition_inventory:"+tp.Topic)};parts[tp.Topic]=tp.PartitionCount}
  for _,e:=range in.SourceEvents{if _,ok:=parts[e.Topic];!ok{cdc.hold("topic_partition_inventory_missing:"+e.Topic)}};for topic,n:=range parts{if n!=1{cdc.hold("multi_partition_order_unsupported:"+topic)}}
- topics:=map[string][]Event{};for _,e:=range unique{topics[e.Topic]=append(topics[e.Topic],e)}
- for topic,records:=range topics{sort.Slice(records,func(i,j int)bool{return records[i].Offset<records[j].Offset});for i,e:=range records{if parts[topic]==1&&e.Partition!=0{r.OrderingViolations=append(r.OrderingViolations,topic+":partition")};if i>0&&e.Offset<=records[i-1].Offset{r.OrderingViolations=append(r.OrderingViolations,topic+":offset_not_monotonic")}}}
+ type topicPartitionKey struct{topic string;partition int}
+ byTopicPartition:=map[topicPartitionKey][]Event{}
+ for _,e:=range unique{key:=topicPartitionKey{topic:e.Topic,partition:e.Partition};byTopicPartition[key]=append(byTopicPartition[key],e)}
+ for key,records:=range byTopicPartition{
+  sort.Slice(records,func(i,j int)bool{return records[i].Offset<records[j].Offset})
+  if declared,ok:=parts[key.topic];ok&&declared==1&&key.partition!=0{r.OrderingViolations=append(r.OrderingViolations,key.topic+":nonzero_partition")}
+  for i:=1;i<len(records);i++{if records[i].Offset<=records[i-1].Offset{r.OrderingViolations=append(r.OrderingViolations,key.topic+":partition_offset_not_monotonic")}}
+ }
  if len(r.OrderingViolations)>0{sort.Strings(r.OrderingViolations);cdc.block("per_topic_order_violation")}
  if len(in.Transactions)==0{txn.hold("transaction_proofs_missing")}
  txProofs:=map[string]struct{}{};byTx:=map[string][]Event{};for _,e:=range unique{byTx[e.TransactionID]=append(byTx[e.TransactionID],e)}
