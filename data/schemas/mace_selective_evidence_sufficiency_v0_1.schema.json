@@ -32,7 +32,9 @@
         "not_estimable_insufficient_calibration_clusters",
         "unsupported_distribution_shift",
         "parent_group_fallback",
-        "rejected_hard_gate"
+        "rejected_hard_gate",
+        "risk_exceeds_target",
+        "not_estimable_exchangeability_not_established"
       ]
     },
     "threshold": {
@@ -68,7 +70,13 @@
         "resampling_unit",
         "exchangeability_status",
         "threshold_selection",
-        "evaluator_custody"
+        "evaluator_custody",
+        "threshold_grid_sha256",
+        "threshold_count",
+        "group_count",
+        "familywise_delta",
+        "unacceptable_loss_threshold",
+        "minimum_independent_clusters"
       ],
       "properties": {
         "schema_version": {
@@ -119,7 +127,8 @@
             "category_conditioned",
             "hierarchical_group_conditional_crc",
             "conformalized_abstention_policy",
-            "fixed_sequence_confidence_bound"
+            "fixed_sequence_confidence_bound",
+            "hierarchical_group_conditional_exact_cluster_risk"
           ]
         },
         "risk_target_alpha": {
@@ -134,7 +143,9 @@
             "bonferroni",
             "holm",
             "hierarchical_fallback",
-            "other_preregistered"
+            "other_preregistered",
+            "bonferroni_over_group_threshold_hypotheses",
+            "bonferroni_over_groups_fixed_sequence_over_thresholds"
           ]
         },
         "resampling_unit": {
@@ -144,7 +155,8 @@
             "independent_source_cluster",
             "independent_user_cluster",
             "independent_task_cluster",
-            "other_preregistered"
+            "other_preregistered",
+            "independent_declared_cluster"
           ]
         },
         "exchangeability_status": {
@@ -156,7 +168,12 @@
           ]
         },
         "threshold_selection": {
-          "const": "calibration_split_only"
+          "type": "string",
+          "enum": [
+            "calibration_split_only",
+            "fixed_sequence_cluster_acceptance_prefix",
+            "simultaneous_bonferroni_on_calibration_split"
+          ]
         },
         "evaluator_custody": {
           "type": "string",
@@ -165,6 +182,31 @@
             "independent_reviewer",
             "public_diagnostic_only"
           ]
+        },
+        "threshold_grid_sha256": {
+          "$ref": "#/$defs/sha256"
+        },
+        "threshold_count": {
+          "type": "integer",
+          "minimum": 1
+        },
+        "group_count": {
+          "type": "integer",
+          "minimum": 1
+        },
+        "familywise_delta": {
+          "type": "number",
+          "exclusiveMinimum": 0,
+          "maximum": 1
+        },
+        "unacceptable_loss_threshold": {
+          "type": "number",
+          "minimum": 0,
+          "maximum": 1
+        },
+        "minimum_independent_clusters": {
+          "type": "integer",
+          "minimum": 2
         }
       }
     },
@@ -191,7 +233,18 @@
         "risk_bound_method",
         "certificate_scope",
         "distribution_shift_detected",
-        "minimum_cluster_requirement"
+        "minimum_cluster_requirement",
+        "accepted_cluster_count",
+        "unsafe_cluster_count",
+        "hard_gate_rejected_count",
+        "empirical_cluster_unsafe_rate",
+        "mean_selective_loss",
+        "adjusted_delta",
+        "parent_fallback_certificate_sha256",
+        "decision_policy_sha256",
+        "sufficiency_score_definition_sha256",
+        "group_hierarchy_sha256",
+        "decision_coverage"
       ],
       "properties": {
         "schema_version": {
@@ -302,7 +355,8 @@
             "empirical_bernstein",
             "conformal_risk_control",
             "cluster_bootstrap_upper_bound",
-            "not_estimable"
+            "not_estimable",
+            "clopper_pearson_cluster_any_unsafe_v1"
           ]
         },
         "certificate_scope": {
@@ -332,6 +386,79 @@
         "minimum_cluster_requirement": {
           "type": "integer",
           "minimum": 2
+        },
+        "accepted_cluster_count": {
+          "type": "integer",
+          "minimum": 0
+        },
+        "unsafe_cluster_count": {
+          "type": "integer",
+          "minimum": 0
+        },
+        "hard_gate_rejected_count": {
+          "type": "integer",
+          "minimum": 0
+        },
+        "empirical_cluster_unsafe_rate": {
+          "oneOf": [
+            {
+              "$ref": "#/$defs/risk_bound"
+            },
+            {
+              "type": "null"
+            }
+          ]
+        },
+        "mean_selective_loss": {
+          "oneOf": [
+            {
+              "$ref": "#/$defs/risk_bound"
+            },
+            {
+              "type": "null"
+            }
+          ]
+        },
+        "adjusted_delta": {
+          "oneOf": [
+            {
+              "type": "number",
+              "exclusiveMinimum": 0,
+              "maximum": 1
+            },
+            {
+              "type": "null"
+            }
+          ]
+        },
+        "parent_fallback_certificate_sha256": {
+          "oneOf": [
+            {
+              "$ref": "#/$defs/sha256"
+            },
+            {
+              "type": "null"
+            }
+          ]
+        },
+        "decision_policy_sha256": {
+          "$ref": "#/$defs/sha256"
+        },
+        "sufficiency_score_definition_sha256": {
+          "$ref": "#/$defs/sha256"
+        },
+        "group_hierarchy_sha256": {
+          "$ref": "#/$defs/sha256"
+        },
+        "decision_coverage": {
+          "oneOf": [
+            {
+              "$ref": "#/$defs/risk_bound"
+            },
+            {
+              "type": "null"
+            }
+          ]
         }
       },
       "allOf": [
@@ -371,7 +498,8 @@
                   "not_estimable_no_calibration_clusters",
                   "not_estimable_insufficient_calibration_clusters",
                   "unsupported_distribution_shift",
-                  "rejected_hard_gate"
+                  "rejected_hard_gate",
+                  "not_estimable_exchangeability_not_established"
                 ]
               }
             }
@@ -425,7 +553,11 @@
         "status",
         "risk_target_alpha",
         "risk_upper_bound",
-        "policy_sha256"
+        "policy_sha256",
+        "group_id",
+        "threshold",
+        "sufficiency_score_definition_sha256",
+        "group_hierarchy_sha256"
       ],
       "properties": {
         "schema_version": {
@@ -515,6 +647,25 @@
         "reason": {
           "type": "string",
           "maxLength": 2048
+        },
+        "group_id": {
+          "$ref": "#/$defs/identifier"
+        },
+        "threshold": {
+          "oneOf": [
+            {
+              "$ref": "#/$defs/threshold"
+            },
+            {
+              "type": "null"
+            }
+          ]
+        },
+        "sufficiency_score_definition_sha256": {
+          "$ref": "#/$defs/sha256"
+        },
+        "group_hierarchy_sha256": {
+          "$ref": "#/$defs/sha256"
         }
       },
       "allOf": [
