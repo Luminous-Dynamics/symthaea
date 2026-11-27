@@ -10,7 +10,7 @@ The handoff requires:
 
 1. A genuine CMAQ-031 quarantine update.
 2. A reconciled current execution outcome and digest-bound current-state receipt.
-3. A CMAQ-028 request containing exactly one prefix: the current state at step zero.
+3. A CMAQ-028 request containing exactly one prefix: the current state at step zero, with a state-evidence digest equal to the reconciled state digest and a separate reachability-evidence receipt digest binding the supplied reachable-set bound.
 4. A recovery portfolio assessed by the actual CMAQ-028 evaluator.
 5. At least k+1 independent selected failure domains, so that after one declared domain failure at least k remain.
 6. No selected recovery option may reuse the active recovery/controller profile that was quarantined.
@@ -21,7 +21,7 @@ Unknown or unreconciled execution returns BlockUntilReconciliation without runni
 
 ## Trust boundary
 
-The adapter checks identity correspondence, declared failure-domain uniqueness, scope binding, and SHA-256 digest syntax. It does not authenticate receipts, verify signers, prove physical independence, or command actuators. A separately governed evidence-ingestion boundary must authenticate the state receipt and recovery certificates. The runtime caller must treat every error or non-switch disposition as no new commitment.
+The adapter checks identity correspondence, declared failure-domain uniqueness, plant/context scope, exact prefix-state digest equality, reachability-receipt digest shape, and SHA-256 syntax. CMAQ-028 rejects prefixes missing either the state evidence or reachability evidence digest. It does not authenticate receipts, verify signers, prove physical independence, or command actuators. A separately governed evidence-ingestion boundary must authenticate the state receipt and recovery certificates. The runtime caller must treat every error or non-switch disposition as no new commitment.
 
 The k+1 rule is deliberate: a requirement of k usable recovery options after one declared domain failure requires at least k+1 distinct options before that failure.
 
