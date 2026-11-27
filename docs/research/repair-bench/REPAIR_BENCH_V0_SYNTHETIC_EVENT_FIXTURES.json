@@ -721,6 +721,9 @@
           "claim_protocol_version",
           "decision_temperature_alert",
           "decision_control_accept"
+        ],
+        "ignored_untrusted": [
+          "untrusted-notice-001"
         ]
       }
     }
