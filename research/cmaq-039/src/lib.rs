@@ -12,7 +12,8 @@
 use std::collections::{BTreeMap, HashSet};
 
 use cmaq_031_anytime_calibration_monitor::{
-    AnytimeCalibrationMonitor, CalibrationRankReference, CalibrationRankScore, MonitorError,
+    AnytimeCalibrationMonitor, CalibrationRankReference, CalibrationRankScore,
+    DeploymentRankObservation, MonitorError, MonitorUpdate,
 };
 use cmaq_036_common_cause_closure::{
     ClosureManifest, EvidenceSplit, IndependentBlock, KeyReceiptBinding, SplitCount,
@@ -93,8 +94,49 @@ impl ClosureQualifiedRankReference {
         self,
         alpha_numerator: u32,
         alpha_denominator: u32,
-    ) -> Result<AnytimeCalibrationMonitor, MonitorError> {
-        AnytimeCalibrationMonitor::new(self.reference, alpha_numerator, alpha_denominator)
+    ) -> Result<ClosureQualifiedMonitor, MonitorError> {
+        let monitor =
+            AnytimeCalibrationMonitor::new(self.reference, alpha_numerator, alpha_denominator)?;
+        Ok(ClosureQualifiedMonitor {
+            monitor,
+            diagnostics: self.diagnostics,
+        })
+    }
+}
+
+/// Runtime monitor that keeps closure provenance attached to CMAQ-031 state.
+#[derive(Clone, Debug, PartialEq)]
+pub struct ClosureQualifiedMonitor {
+    monitor: AnytimeCalibrationMonitor,
+    diagnostics: ClosureAdmissionDiagnostics,
+}
+
+impl ClosureQualifiedMonitor {
+    pub fn diagnostics(&self) -> &ClosureAdmissionDiagnostics {
+        &self.diagnostics
+    }
+
+    pub fn observe(
+        &mut self,
+        observation: DeploymentRankObservation,
+    ) -> Result<MonitorUpdate, MonitorError> {
+        self.monitor.observe(observation)
+    }
+
+    pub fn is_quarantined(&self) -> bool {
+        self.monitor.is_quarantined()
+    }
+
+    pub fn observations_seen(&self) -> u64 {
+        self.monitor.observations_seen()
+    }
+
+    pub fn calibration_reference_count(&self) -> usize {
+        self.monitor.calibration_reference_count()
+    }
+
+    pub fn log_mixture_wealth(&self) -> Result<f64, MonitorError> {
+        self.monitor.log_mixture_wealth()
     }
 }
 
