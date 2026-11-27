@@ -1,6 +1,6 @@
 # SDCB decision-certified numerical computation v1
 
-**Status:** Research specification plus an authored finite outcome action-value enclosure reference (`scripts/research/sdcb_decision_value_bounds.rs`, eight Rust tests). No certified Gaussian probability enclosure implementation is claimed; the action-value reference consumes already supplied probability intervals. Rust tests remain uncompiled/unexecuted.
+**Status:** Research specification plus an authored finite outcome action-value enclosure reference (`scripts/research/sdcb_decision_value_bounds.rs`, nine Rust tests). No certified Gaussian probability enclosure implementation is claimed; the action-value reference consumes already supplied probability intervals. Rust tests remain uncompiled/unexecuted.
 
 ## 1. Motivation
 
@@ -113,7 +113,7 @@ It uses the LP dual identity
 
 and evaluates utility breakpoints as dual multipliers. Each multiplication/addition is expanded outward by one binary64 representable step. An exact binary64 probability-sum accumulator (integer units of 2^-1074) checks feasibility of the interval box plus exact unit-sum constraint without a rounded sum comparison. It selects a unique best action only when that action's lower value bound strictly exceeds every competing upper bound.
 
-Eight Rust tests are authored for exact unit sums, decimal-float overage, a 3-cell utility fixture, exact probabilities, negative utilities, infeasible boxes, unique action separation, unresolved overlap and malformed inputs. A separate Python oracle using exact `Fraction.from_float` summation and `nextafter` outward arithmetic passed the fixed fixtures and 2,000 randomized box-plus-normalization LP-extrema checks. This is independent authoring-runtime verification, not Rust execution or a formally verified compiler/arithmetic proof.
+Nine Rust tests are authored for exact unit sums, decimal-float overage, a 3-cell utility fixture, exact probabilities, negative utilities, infeasible boxes, unique action separation, unresolved overlap and malformed inputs. A separate Python oracle using exact `Fraction.from_float` summation and `nextafter` outward arithmetic passed the fixed fixtures and 2,000 randomized box-plus-normalization LP-extrema checks; a separate exact-sum bit-accumulator check matched `Fraction.from_float` on 10,000 random vectors of up to 64 cells. This is independent authoring-runtime verification, not Rust execution or a formally verified compiler/arithmetic proof.
 
 Current scope is deliberately limited to interval boxes plus one normalization equality. Extra pairwise marginal or cross-moment constraints are not handled by this module; they require a richer constrained LP. This is an evaluator only: it does not construct experiments, mutate #13805, authorize actions or validate the supplied probability enclosures themselves.
 
