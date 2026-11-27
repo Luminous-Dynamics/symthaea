@@ -359,6 +359,18 @@ The implication is sharper than ordinary marginal drift: **an unchanged pointwis
 
 This is specific to two stationary Gaussian AR(1) regimes, block-max scores, 39 calibration blocks, alpha=.10, the tested grid and 2,500 trials per condition. The 36-condition report is an initial diagnostic, not a universal guarantee, production detector or physical calibration. Confirmatory work must add independent seeds, more trials, negative rho, heavy tails, latent common causes, drift and held-out regimes.
 
+### 9.7 Heavy-tailed common-scale regime shift
+
+The next child increment, #13990, repeats the identical-marginal shift in a standardized Student-t(5) common-scale process. Each independent path draws one `V~chi-square(5)` and shares `sqrt(3/V)` across its Gaussian AR(1) observations. This gives each one-point observation a standardized Student-t(5) marginal with unit variance while introducing a simple shared latent scale factor.
+
+The exact-source Rust 1.96 workflow passed **7/7 controls** and completed 72 conditions × 2,500 trials = **180,000 simulations** on code head `394919be85c65b04510a8ca33b490116a56dcff2` ([workflow](https://github.com/Luminous-Dynamics/symthaea/actions/runs/46003315297), [CSV + manifest](https://github.com/Luminous-Dynamics/symthaea/actions/runs/46003315297/artifacts/15199048151)). Controls included a 50,000-sample unit-variance check, a one-point rank-invariance check, both dependence-shift directions and deterministic replay.
+
+In the t5 independent-block arm at nominal alpha=.10, calibration rho=.05 → test rho=.95 yields 4.56% alarms for block length 8 (Wilson 95%: 3.810–5.450%) and 3.92% for length 32 (3.227–4.754%). Reversing the shift produces 23.20% at length 8 (21.587–24.895%) and 22.60% at length 32 (21.003–24.281%). Independent length-1 controls remain near nominal (10.60% and 9.64%). This reproduces the qualitative over-conservative/undercoverage asymmetry with heavier tails and a shared latent scale.
+
+The serial-path results share the same path-level scale through calibration and test, so that positive scale cancels in within-path rank comparisons; the serial arm is mainly a cross-block-dependence test here. Independent-block rows are the clean evidence for the t5 block-score distribution shift.
+
+This is still a narrow synthetic model with 2,500 trials per condition. It is not a proof, general common-cause model, production detector or physical data result. The confirmatory path is 50,000–100,000+ trials per condition, independent seeds, negative rho, skew, time-varying scale, multi-factor/common-mode shocks and held-out regimes.
+
 ## References
 
 - AML Cycle 2 official results (19 November 2026): https://agentmemoryleaderboard.ai/results/cycle-2/
