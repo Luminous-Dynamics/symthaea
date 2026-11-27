@@ -66,6 +66,7 @@ pub struct PropensitySupportDiagnostics {
     pub missing_probability_records: usize,
     pub zero_probability_records: usize,
     pub invalid_probability_records: usize,
+    pub invalid_prediction_confidence_records: usize,
     pub positive_support_for_entire_cohort: bool,
     pub maximum_inverse_probability_weight: Option<f64>,
     pub kish_effective_sample_size: Option<f64>,
@@ -158,6 +159,9 @@ pub enum SelectiveObservationError {
     EmptyConditioningVariable,
     EmptyRecordId,
     DuplicateRecordId(String),
+    InvalidMinimumSampleSize,
+    InvalidCoverageTarget,
+    InvalidConfidenceThreshold,
 }
 
 impl std::fmt::Display for SelectiveObservationError {
@@ -172,6 +176,15 @@ impl std::fmt::Display for SelectiveObservationError {
             }
             Self::EmptyRecordId => write!(formatter, "record IDs must not be empty"),
             Self::DuplicateRecordId(id) => write!(formatter, "duplicate record ID: {id}"),
+            Self::InvalidMinimumSampleSize => {
+                write!(formatter, "minimum sample size must be positive")
+            }
+            Self::InvalidCoverageTarget => {
+                write!(formatter, "coverage targets must be finite and in (0, 1]")
+            }
+            Self::InvalidConfidenceThreshold => {
+                write!(formatter, "confidence thresholds must be finite and in [0, 1]")
+            }
         }
     }
 }
@@ -187,6 +200,23 @@ pub fn evaluate_selective_observation(
     design: &AdjudicationSamplingDesign,
     config: &RiskCoverageConfig,
 ) -> Result<SelectiveObservationEvaluation, SelectiveObservationError> {
+    if config.minimum_sample_size == 0 {
+        return Err(SelectiveObservationError::InvalidMinimumSampleSize);
+    }
+    if config
+        .target_coverages
+        .iter()
+        .any(|value| !value.is_finite() || *value <= 0.0 || *value > 1.0)
+    {
+        return Err(SelectiveObservationError::InvalidCoverageTarget);
+    }
+    if config
+        .confidence_thresholds
+        .iter()
+        .any(|value| !value.is_finite() || !(0.0..=1.0).contains(value))
+    {
+        return Err(SelectiveObservationError::InvalidConfidenceThreshold);
+    }
     if design.design_id.trim().is_empty() {
         return Err(SelectiveObservationError::EmptyDesignId);
     }
@@ -223,6 +253,13 @@ pub fn evaluate_selective_observation(
                     "population risk is not identifiable from this cohort: every record needs a known, strictly positive adjudication inclusion probability".to_owned(),
                 ),
             )
+        } else if diagnostics.invalid_prediction_confidence_records > 0 {
+            (
+                None,
+                Some(
+                    "population estimate withheld because the candidate emitted invalid confidence values".to_owned(),
+                ),
+            )
         } else if diagnostics.kish_effective_sample_size.unwrap_or(0.0)
             < config.minimum_sample_size as f64
         {
@@ -255,19 +292,21 @@ pub fn evaluate_selective_observation(
     })
 }
 
-fn valid_probability(probability: Option<f64>) -> bool {
-    probability.is_some_and(|value| value.is_finite() && value > 0.0 && value <= 1.0)
-}
-
 fn support_diagnostics(records: &[SelectiveObservationRecord]) -> PropensitySupportDiagnostics {
     let mut adjudicated_records = 0;
     let mut pending_records = 0;
     let mut missing_probability_records = 0;
     let mut zero_probability_records = 0;
     let mut invalid_probability_records = 0;
+    let mut invalid_prediction_confidence_records = 0;
     let mut weights = Vec::new();
 
     for record in records {
+        if !record.prediction.predicted_confidence.is_finite()
+            || !(0.0..=1.0).contains(&record.prediction.predicted_confidence)
+        {
+            invalid_prediction_confidence_records += 1;
+        }
         if record.prediction.adjudicated_truth.is_some() {
             adjudicated_records += 1;
         } else {
@@ -304,6 +343,7 @@ fn support_diagnostics(records: &[SelectiveObservationRecord]) -> PropensitySupp
         missing_probability_records,
         zero_probability_records,
         invalid_probability_records,
+        invalid_prediction_confidence_records,
         positive_support_for_entire_cohort,
         maximum_inverse_probability_weight: weights.iter().copied().reduce(f64::max),
         kish_effective_sample_size,
@@ -371,9 +411,12 @@ fn compute_population_report(
             independently_labelled_accepted_count: accepted_label_weights.len(),
             kish_effective_sample_size: effective_n,
             estimated_error_total: cumulative_error_weight,
-            estimated_risk: (effective_n >= config.minimum_sample_size as f64)
+            // AURC is exploratory at each rank; no pointwise confidence
+            // guarantee is asserted. The overall effective sample-size gate
+            // is applied before this report is constructed.
+            estimated_risk: (effective_n > 0.0)
                 .then_some(cumulative_error_weight / accepted_count as f64),
-            estimate_outside_unit_interval: effective_n >= config.minimum_sample_size as f64
+            estimate_outside_unit_interval: effective_n > 0.0
                 && cumulative_error_weight / accepted_count as f64 > 1.0,
         };
         if point.estimated_risk.is_none() {
