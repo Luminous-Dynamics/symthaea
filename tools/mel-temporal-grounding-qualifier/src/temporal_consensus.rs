@@ -371,9 +371,7 @@ pub fn audit_multi_annotator_case(
     })
 }
 
-fn validate_annotation_commitments(
-    case: &MultiAnnotatorTemporalCaseV1,
-) -> Result<(), String> {
+fn validate_annotation_commitments(case: &MultiAnnotatorTemporalCaseV1) -> Result<(), String> {
     let mut manifest_entries = Vec::with_capacity(case.annotations.len());
     for (index, annotation) in case.annotations.iter().enumerate() {
         let record = AnnotationRecordCommitmentV1 {
@@ -399,9 +397,7 @@ fn validate_annotation_commitments(
             annotation_sha256: &annotation.annotation_sha256,
         });
     }
-    manifest_entries.sort_by(|left, right| {
-        left.annotator_id_sha256.cmp(right.annotator_id_sha256)
-    });
+    manifest_entries.sort_by(|left, right| left.annotator_id_sha256.cmp(right.annotator_id_sha256));
     let manifest = AnnotationManifestCommitmentV1 {
         schema: "mel-temporal-annotation-manifest-v1",
         query_id: &case.query_id,
@@ -954,8 +950,20 @@ mod tests {
         }];
         let original = case(
             vec![
-                annotation('1', 'a', GroundTruthStateV1::Present, intervals.clone(), None),
-                annotation('2', 'b', GroundTruthStateV1::Present, intervals.clone(), None),
+                annotation(
+                    '1',
+                    'a',
+                    GroundTruthStateV1::Present,
+                    intervals.clone(),
+                    None,
+                ),
+                annotation(
+                    '2',
+                    'b',
+                    GroundTruthStateV1::Present,
+                    intervals.clone(),
+                    None,
+                ),
             ],
             prediction(intervals),
         );
@@ -967,17 +975,21 @@ mod tests {
 
         let mut changed_interval = original.clone();
         changed_interval.annotations[0].intervals[0].end_frame = 201;
-        assert!(audit_multi_annotator_case(&changed_interval)
-            .unwrap_err()
-            .contains("annotation record digest mismatch"));
+        assert!(
+            audit_multi_annotator_case(&changed_interval)
+                .unwrap_err()
+                .contains("annotation record digest mismatch")
+        );
 
         let mut changed_state = original;
         changed_state.annotations[0].state = GroundTruthStateV1::Absent;
         changed_state.annotations[0].intervals.clear();
         changed_state.annotations[0].status_reason = None;
-        assert!(audit_multi_annotator_case(&changed_state)
-            .unwrap_err()
-            .contains("annotation record digest mismatch"));
+        assert!(
+            audit_multi_annotator_case(&changed_state)
+                .unwrap_err()
+                .contains("annotation record digest mismatch")
+        );
     }
 
     #[test]
@@ -988,23 +1000,45 @@ mod tests {
         }];
         let original = case(
             vec![
-                annotation('1', 'a', GroundTruthStateV1::Present, intervals.clone(), None),
-                annotation('2', 'b', GroundTruthStateV1::Present, intervals.clone(), None),
-                annotation('3', 'c', GroundTruthStateV1::Present, intervals.clone(), None),
+                annotation(
+                    '1',
+                    'a',
+                    GroundTruthStateV1::Present,
+                    intervals.clone(),
+                    None,
+                ),
+                annotation(
+                    '2',
+                    'b',
+                    GroundTruthStateV1::Present,
+                    intervals.clone(),
+                    None,
+                ),
+                annotation(
+                    '3',
+                    'c',
+                    GroundTruthStateV1::Present,
+                    intervals.clone(),
+                    None,
+                ),
             ],
             prediction(intervals),
         );
         let mut changed_panel = original.clone();
         changed_panel.annotations.pop();
-        assert!(audit_multi_annotator_case(&changed_panel)
-            .unwrap_err()
-            .contains("annotation manifest digest mismatch"));
+        assert!(
+            audit_multi_annotator_case(&changed_panel)
+                .unwrap_err()
+                .contains("annotation manifest digest mismatch")
+        );
 
         let mut changed_policy = original;
         changed_policy.annotation_policy_version = "music-temporal-annotation-v2".into();
-        assert!(audit_multi_annotator_case(&changed_policy)
-            .unwrap_err()
-            .contains("annotation record digest mismatch"));
+        assert!(
+            audit_multi_annotator_case(&changed_policy)
+                .unwrap_err()
+                .contains("annotation record digest mismatch")
+        );
     }
 
     #[test]
@@ -1015,8 +1049,20 @@ mod tests {
         }];
         let original = case(
             vec![
-                annotation('2', 'b', GroundTruthStateV1::Present, intervals.clone(), None),
-                annotation('1', 'a', GroundTruthStateV1::Present, intervals.clone(), None),
+                annotation(
+                    '2',
+                    'b',
+                    GroundTruthStateV1::Present,
+                    intervals.clone(),
+                    None,
+                ),
+                annotation(
+                    '1',
+                    'a',
+                    GroundTruthStateV1::Present,
+                    intervals.clone(),
+                    None,
+                ),
             ],
             prediction(intervals),
         );
