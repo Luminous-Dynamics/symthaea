@@ -34,11 +34,6 @@
       "maxLength": 128,
       "pattern": "^[A-Za-z0-9._:-]+$"
     },
-    "correlation_id": {
-      "type": "string",
-      "minLength": 1,
-      "maxLength": 128
-    },
     "sequence": {
       "type": "integer",
       "minimum": 0,
@@ -206,7 +201,8 @@
               "segment_id": {
                 "type": "string",
                 "minLength": 1,
-                "maxLength": 128
+                "maxLength": 128,
+                "pattern": "^[A-Za-z0-9._:-]+$"
               },
               "text_ref": {
                 "type": "string",
@@ -317,7 +313,8 @@
               "target": {
                 "type": "string",
                 "minLength": 1,
-                "maxLength": 256
+                "maxLength": 256,
+                "pattern": "^[A-Za-z0-9._:-]+$"
               },
               "strength": {
                 "type": "number",
@@ -408,7 +405,8 @@
               "subject": {
                 "type": "string",
                 "minLength": 1,
-                "maxLength": 256
+                "maxLength": 256,
+                "pattern": "^[A-Za-z0-9._:-]+$"
               },
               "level": {
                 "type": "number",
@@ -448,7 +446,8 @@
               "subject_id": {
                 "type": "string",
                 "minLength": 1,
-                "maxLength": 256
+                "maxLength": 256,
+                "pattern": "^[A-Za-z0-9._:-]+$"
               },
               "status": {
                 "type": "string",
@@ -462,11 +461,34 @@
               },
               "verifier_receipt_ref": {
                 "type": "string",
-                "maxLength": 256
+                "maxLength": 256,
+                "pattern": "^[A-Za-z0-9._:-]+$"
               }
-            }
+            },
+            "allOf": [
+              {
+                "if": {
+                  "properties": {
+                    "status": {
+                      "const": "supported"
+                    }
+                  },
+                  "required": [
+                    "status"
+                  ]
+                },
+                "then": {
+                  "required": [
+                    "verifier_receipt_ref"
+                  ]
+                }
+              }
+            ]
           }
-        }
+        },
+        "required": [
+          "evidence_refs"
+        ]
       }
     },
     {
@@ -510,8 +532,83 @@
                 "type": "number",
                 "minimum": 0,
                 "maximum": 1
+              },
+              "target_event_id": {
+                "type": "string",
+                "maxLength": 128,
+                "pattern": "^[A-Za-z0-9._:-]+$"
               }
-            }
+            },
+            "allOf": [
+              {
+                "if": {
+                  "properties": {
+                    "action": {
+                      "const": "cancel"
+                    }
+                  },
+                  "required": [
+                    "action"
+                  ]
+                },
+                "then": {
+                  "required": [
+                    "target_event_id"
+                  ]
+                }
+              },
+              {
+                "if": {
+                  "properties": {
+                    "action": {
+                      "const": "choose_form"
+                    }
+                  },
+                  "required": [
+                    "action"
+                  ]
+                },
+                "then": {
+                  "required": [
+                    "form_id"
+                  ]
+                }
+              },
+              {
+                "if": {
+                  "properties": {
+                    "action": {
+                      "const": "set_reduced_motion"
+                    }
+                  },
+                  "required": [
+                    "action"
+                  ]
+                },
+                "then": {
+                  "required": [
+                    "enabled"
+                  ]
+                }
+              },
+              {
+                "if": {
+                  "properties": {
+                    "action": {
+                      "const": "set_intensity"
+                    }
+                  },
+                  "required": [
+                    "action"
+                  ]
+                },
+                "then": {
+                  "required": [
+                    "intensity"
+                  ]
+                }
+              }
+            ]
           }
         }
       }
