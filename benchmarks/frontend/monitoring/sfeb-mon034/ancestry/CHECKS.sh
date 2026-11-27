@@ -25,7 +25,13 @@ jq -e '
   and (.allOf | length == 1)
 ' "$ROOT/INPUT-v1.schema.json" >/dev/null
 
-cd "$ROOT"
+TMP="$(mktemp -d)"
+trap 'rm -rf "$TMP"' EXIT
+cp "$ROOT"/go.mod "$ROOT"/*.go "$TMP"/
+cp -R "$ROOT"/cmd "$TMP"/
+cp "$ROOT"/INPUT-example*.json "$TMP"/
+cp "$ROOT/INPUT-v1.schema.json" "$TMP"/
+cd "$TMP"
 gofmt -w ./*.go ./cmd/qualify/*.go
 go vet ./...
 go test ./...
