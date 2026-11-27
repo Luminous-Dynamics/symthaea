@@ -63,7 +63,7 @@ Essential state must be communicated through shape and text, not colour alone, a
 
 - Implementation: crates/domains/symthaea-soma/src/embodiment_scene.rs
 - Exported as symthaea_soma::embodiment_scene.
-- Eight authored Rust regression tests cover deterministic compilation, all seven forms, reduced motion, privacy-aware accessibility and no raw-reference disclosure, uncertainty branching, evidence-status honesty, channel mismatch, and modified-payload rejection.
+- Nine authored Rust regression tests cover deterministic compilation, all seven forms, reduced motion, privacy-aware accessibility and no raw-reference disclosure, uncertainty branching, evidence-status honesty, channel mismatch, and modified-payload rejection.
 - The tests are authored, not compiled or executed. No Bevy renderer, frame timing, accessibility user study, or hardware profiling is claimed.
 
 ## Next renderer integration
