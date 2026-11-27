@@ -98,7 +98,14 @@ impl FirstOrderResponseOu {
     pub fn continuous_time_matrices(
         &self,
     ) -> Result<([[f64; 2]; 2], [[f64; 2]; 2]), ResponseModelError> {
-        let diffusion = (self.lambda * self.process_variance) * 2.0;
+        let undoubled_diffusion = self.lambda * self.process_variance;
+        let diffusion = if undoubled_diffusion < f64::MIN_POSITIVE
+            && self.lambda <= f64::MAX / 2.0
+        {
+            (self.lambda * 2.0) * self.process_variance
+        } else {
+            undoubled_diffusion * 2.0
+        };
         if !diffusion.is_finite() || diffusion < 0.0 {
             return Err(ResponseModelError::NumericalFailure);
         }
@@ -318,6 +325,14 @@ mod tests {
             (actual - expected).abs() <= tolerance,
             "actual={actual:.17e}, expected={expected:.17e}, tolerance={tolerance:.3e}"
         );
+    }
+
+    #[test]
+    fn continuous_time_diffusion_preserves_subnormal_doubled_product() {
+        let model = FirstOrderResponseOu::new(f64::from_bits(1), 0.3, 1.0).unwrap();
+        let (_, diffusion) = model.continuous_time_matrices().unwrap();
+        assert_eq!(diffusion[0][0], f64::from_bits(1));
+        assert_eq!(diffusion[1][1], 0.0);
     }
 
     #[test]
