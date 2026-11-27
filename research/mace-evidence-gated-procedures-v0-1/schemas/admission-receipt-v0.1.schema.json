@@ -1,0 +1,359 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "admission-receipt-v0.1.schema.json",
+  "title": "MACE Procedure Admission Receipt v0.1 (independent authority output)",
+  "type": "object",
+  "additionalProperties": false,
+  "required": [
+    "schema_version",
+    "receipt_id",
+    "proposal_digest_sha256",
+    "skill_id",
+    "skill_version",
+    "decision",
+    "verifier",
+    "evidence_audit",
+    "replay",
+    "authority_audit",
+    "validity",
+    "attestation"
+  ],
+  "properties": {
+    "schema_version": {
+      "const": "mace_procedure_admission_receipt_v0_1"
+    },
+    "receipt_id": {
+      "type": "string",
+      "minLength": 1
+    },
+    "proposal_digest_sha256": {
+      "type": "string",
+      "pattern": "^[0-9a-f]{64}$"
+    },
+    "skill_id": {
+      "type": "string",
+      "minLength": 1
+    },
+    "skill_version": {
+      "type": "integer",
+      "minimum": 1
+    },
+    "admitted_skill_digest_sha256": {
+      "oneOf": [
+        {
+          "type": "string",
+          "pattern": "^[0-9a-f]{64}$"
+        },
+        {
+          "type": "null"
+        }
+      ]
+    },
+    "decision": {
+      "enum": [
+        "admitted",
+        "rejected",
+        "quarantined"
+      ]
+    },
+    "decision_reason": {
+      "type": "string",
+      "minLength": 1
+    },
+    "verifier": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "verifier_id",
+        "verifier_version",
+        "policy_digest_sha256"
+      ],
+      "properties": {
+        "verifier_id": {
+          "type": "string",
+          "minLength": 1
+        },
+        "verifier_version": {
+          "type": "string",
+          "minLength": 1
+        },
+        "policy_digest_sha256": {
+          "type": "string",
+          "pattern": "^[0-9a-f]{64}$"
+        }
+      }
+    },
+    "evidence_audit": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "trace_digests_verified",
+        "source_events_resolved",
+        "unsupported_step_ids",
+        "unresolved_claim_count",
+        "revoked_source_ids",
+        "evidence_audit_digest_sha256"
+      ],
+      "properties": {
+        "trace_digests_verified": {
+          "type": "boolean"
+        },
+        "source_events_resolved": {
+          "type": "boolean"
+        },
+        "unsupported_step_ids": {
+          "type": "array",
+          "items": {
+            "type": "string"
+          },
+          "uniqueItems": true
+        },
+        "unresolved_claim_count": {
+          "type": "integer",
+          "minimum": 0
+        },
+        "revoked_source_ids": {
+          "type": "array",
+          "items": {
+            "type": "string"
+          },
+          "uniqueItems": true
+        },
+        "evidence_audit_digest_sha256": {
+          "type": "string",
+          "pattern": "^[0-9a-f]{64}$"
+        }
+      }
+    },
+    "replay": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "sandbox_image_digest_sha256",
+        "environment_digest_sha256",
+        "scenario_suite_digest_sha256",
+        "attempts",
+        "passed",
+        "failed",
+        "counterexamples",
+        "negative_control_failures",
+        "result_digest_sha256"
+      ],
+      "properties": {
+        "sandbox_image_digest_sha256": {
+          "type": "string",
+          "pattern": "^[0-9a-f]{64}$"
+        },
+        "environment_digest_sha256": {
+          "type": "string",
+          "pattern": "^[0-9a-f]{64}$"
+        },
+        "scenario_suite_digest_sha256": {
+          "type": "string",
+          "pattern": "^[0-9a-f]{64}$"
+        },
+        "attempts": {
+          "type": "integer",
+          "minimum": 0
+        },
+        "passed": {
+          "type": "integer",
+          "minimum": 0
+        },
+        "failed": {
+          "type": "integer",
+          "minimum": 0
+        },
+        "counterexamples": {
+          "type": "integer",
+          "minimum": 0
+        },
+        "negative_control_failures": {
+          "type": "integer",
+          "minimum": 0
+        },
+        "result_digest_sha256": {
+          "type": "string",
+          "pattern": "^[0-9a-f]{64}$"
+        }
+      }
+    },
+    "authority_audit": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "permissions_checked",
+        "unauthorized_effects",
+        "scope_check_passed",
+        "authority_audit_digest_sha256"
+      ],
+      "properties": {
+        "permissions_checked": {
+          "type": "array",
+          "items": {
+            "type": "string",
+            "minLength": 1
+          },
+          "uniqueItems": true
+        },
+        "unauthorized_effects": {
+          "type": "array",
+          "items": {
+            "type": "string",
+            "minLength": 1
+          }
+        },
+        "scope_check_passed": {
+          "type": "boolean"
+        },
+        "authority_audit_digest_sha256": {
+          "type": "string",
+          "pattern": "^[0-9a-f]{64}$"
+        }
+      }
+    },
+    "validity": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "admitted_at_utc",
+        "expires_at_utc",
+        "environment_constraints_digest_sha256",
+        "source_dependency_digest_sha256"
+      ],
+      "properties": {
+        "admitted_at_utc": {
+          "type": "string",
+          "format": "date-time"
+        },
+        "expires_at_utc": {
+          "type": "string",
+          "format": "date-time"
+        },
+        "environment_constraints_digest_sha256": {
+          "type": "string",
+          "pattern": "^[0-9a-f]{64}$"
+        },
+        "source_dependency_digest_sha256": {
+          "type": "string",
+          "pattern": "^[0-9a-f]{64}$"
+        },
+        "supersedes_skill_digest_sha256": {
+          "oneOf": [
+            {
+              "type": "string",
+              "pattern": "^[0-9a-f]{64}$"
+            },
+            {
+              "type": "null"
+            }
+          ]
+        },
+        "rollback_target_digest_sha256": {
+          "oneOf": [
+            {
+              "type": "string",
+              "pattern": "^[0-9a-f]{64}$"
+            },
+            {
+              "type": "null"
+            }
+          ]
+        }
+      }
+    },
+    "attestation": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "algorithm",
+        "key_id",
+        "signature_base64"
+      ],
+      "properties": {
+        "algorithm": {
+          "const": "Ed25519"
+        },
+        "key_id": {
+          "type": "string",
+          "minLength": 1
+        },
+        "signature_base64": {
+          "type": "string",
+          "minLength": 80,
+          "maxLength": 100
+        }
+      }
+    }
+  },
+  "allOf": [
+    {
+      "if": {
+        "properties": {
+          "decision": {
+            "const": "admitted"
+          }
+        },
+        "required": [
+          "decision"
+        ]
+      },
+      "then": {
+        "required": [
+          "admitted_skill_digest_sha256"
+        ],
+        "properties": {
+          "admitted_skill_digest_sha256": {
+            "type": "string",
+            "pattern": "^[0-9a-f]{64}$"
+          },
+          "evidence_audit": {
+            "properties": {
+              "trace_digests_verified": {
+                "const": true
+              },
+              "source_events_resolved": {
+                "const": true
+              },
+              "unsupported_step_ids": {
+                "maxItems": 0
+              },
+              "unresolved_claim_count": {
+                "const": 0
+              },
+              "revoked_source_ids": {
+                "maxItems": 0
+              }
+            }
+          },
+          "replay": {
+            "properties": {
+              "attempts": {
+                "minimum": 1
+              },
+              "failed": {
+                "const": 0
+              },
+              "counterexamples": {
+                "const": 0
+              },
+              "negative_control_failures": {
+                "const": 0
+              }
+            }
+          },
+          "authority_audit": {
+            "properties": {
+              "unauthorized_effects": {
+                "maxItems": 0
+              },
+              "scope_check_passed": {
+                "const": true
+              }
+            }
+          }
+        }
+      }
+    }
+  ]
+}
