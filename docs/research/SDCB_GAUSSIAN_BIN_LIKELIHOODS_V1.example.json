@@ -1,0 +1,20 @@
+{
+  "schema_version": "sdcb_gaussian_bin_likelihoods.v1",
+  "predictive_observation": {
+    "mean": 0,
+    "variance": 1
+  },
+  "thresholds": [
+    -1,
+    1
+  ],
+  "outcome_bins": [
+    "(-inf,-1]",
+    "(-1,1]",
+    "(1,+inf)"
+  ],
+  "threshold_basis": "benchmark_partition",
+  "notes": [
+    "Synthetic standard-normal known-answer fixture only."
+  ]
+}
