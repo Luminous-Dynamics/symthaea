@@ -8,20 +8,22 @@ MON-039 reduces a deterministic injected fault set while preserving the exact fa
     go run ./cmd/minimize --input INPUT-example.json
     bash CHECKS.sh
 
-The public fixture starts with three hypotheses. The replay table contains all eight subsets. The same blocked signature is preserved by fault-a plus fault-c, while fault-b is incidental. Since all smaller subsets have observations, the fixture can report a global candidate minimum within the submitted three-fault set.
+The fixture binds an eight-row replay table to committed scenario and recovery-boundary manifest files. The initial set contains three hypotheses. The same blocked signature is preserved by fault-a plus fault-c, while fault-b is incidental. Because every candidate subset up to the winning cardinality is observed, the example can report a global candidate minimum within this three-fault universe.
 
 ## Two minimality levels
 
 - For up to 12 candidate faults, the minimizer enumerates subsets by increasing cardinality and requires complete replay evidence for all smaller candidate sets before claiming global_candidate_minimum.
 - Above 12 faults, it uses deterministic single-fault deletion. It may claim one_minimal only after every single deletion from the final set has been evaluated and none preserves the same verdict and signature. It never calls this globally minimal.
 
-The algorithm makes no monotonicity assumption. It compares the exact pair (verdict, failure_signature_sha256), not just "blocked". A different blocked reason is a different outcome.
+The algorithm makes no monotonicity assumption. It compares the exact pair (verdict, failure_signature_sha256), not just "blocked". A different blocked reason is a different outcome. Only a blocked full-set baseline is minimized; an indeterminate baseline is not treated as a reproduced fault.
 
 ## Evidence binding
 
-Every observation is pinned to the same scenario digest, recovery-boundary digest, exact 40/64-character code revision, time window and canonical fault-set digest. Duplicate, stale, future-dated or malformed observations block. A missing or incomplete subset replay makes minimality not_established; it is never treated as a passing control.
+Every observation is pinned to the same trial ID, scenario digest, recovery-boundary digest, exact 40/64-character lowercase code revision, time and canonical fault-set digest. The outcome receipt SHA-256 is recomputed over the complete observation record with its own receipt field blank. The fixture's scenario and recovery-boundary SHA-256 values are verified against committed manifest bytes.
 
-The outcome receipt digest is byte binding only. MON-026 or another independent custody system must authenticate the receipt and its provenance before runtime conclusions are admissible.
+Duplicate, stale, future-dated, incomplete or malformed observations block. A missing subset replay makes minimality not_established; it is never treated as a passing control.
+
+The receipt digest is byte binding, not authenticity. MON-026 or another independent custody system must authenticate the receipt and its provenance before runtime conclusions are admissible.
 
 ## Symthaea's role
 
