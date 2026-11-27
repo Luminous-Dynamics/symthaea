@@ -7,9 +7,9 @@
 //! fixtures. This executable loads those fixtures; it does not rerun or mutate the worlds.
 //!
 //! Usage:
-//! cargo run --release --example evolutionary_rescue_split_capsules -p symthaea-futures-ensemble -- <candidate-dir> <evaluator-dir> <source-commit-sha> <census|noisy-trait|shuffled-trait>
+//! cargo run --release --example evolutionary_rescue_split_capsules -p symthaea-futures-ensemble -- <replay-archive-dir> <evaluator-dir> <source-commit-sha> <census|noisy-trait|shuffled-trait>
 //!
-//! Only candidate observation files and candidate receipts are written below candidate-dir.
+//! Only replay archive files and candidate receipts are written below replay-archive-dir.
 //! Hidden outcomes, privileged observations, seeds, split labels and the cross-capsule manifest
 //! are written below evaluator-dir. Directory ACLs / service boundaries remain an operator
 //! responsibility; separate paths alone are not a security boundary.
@@ -34,12 +34,12 @@ fn run() -> Result<(), String> {
     let args: Vec<String> = std::env::args().skip(1).collect();
     if args.len() != 4 {
         return Err(
-            "usage: <candidate-dir> <evaluator-dir> <source-commit-sha> <census|noisy-trait|shuffled-trait>"
+            "usage: <replay-archive-dir> <evaluator-dir> <source-commit-sha> <census|noisy-trait|shuffled-trait>"
                 .into(),
         );
     }
 
-    let candidate_root = PathBuf::from(&args[0]);
+    let replay_root = PathBuf::from(&args[0]);
     let evaluator_root = PathBuf::from(&args[1]);
     let source_commit = &args[2];
     let view = match args[3].as_str() {
@@ -49,14 +49,14 @@ fn run() -> Result<(), String> {
         other => return Err(format!("unknown observation view {other}")),
     };
 
-    fs::create_dir_all(&candidate_root)
-        .map_err(|e| format!("create candidate directory {}: {e}", candidate_root.display()))?;
+    fs::create_dir_all(&replay_root)
+        .map_err(|e| format!("create replay archive directory {}: {e}", replay_root.display()))?;
     fs::create_dir_all(&evaluator_root)
         .map_err(|e| format!("create evaluator directory {}: {e}", evaluator_root.display()))?;
-    ensure_disjoint_roots(&candidate_root, &evaluator_root)?;
+    ensure_disjoint_roots(&replay_root, &evaluator_root)?;
 
-    let candidate_root = fs::canonicalize(&candidate_root)
-        .map_err(|e| format!("canonicalize candidate directory: {e}"))?;
+    let replay_root = fs::canonicalize(&replay_root)
+        .map_err(|e| format!("canonicalize replay archive directory: {e}"))?;
     let evaluator_root = fs::canonicalize(&evaluator_root)
         .map_err(|e| format!("canonicalize evaluator directory: {e}"))?;
 
@@ -79,17 +79,17 @@ fn run() -> Result<(), String> {
             let encoded = custody::encode_world(
                 &world, &world_id, split, view, source_commit,
             )?;
-            custody::verify_encoded_capsules(
-                &encoded, &encoded.candidate_digest, &encoded.evaluator_digest,
+            custody::verify_encoded_replay_artifacts(
+                &encoded, &encoded.replay_digest, &encoded.evaluator_digest,
             )?;
 
             write_new(
-                &candidate_root.join(format!("{world_id}.observations.json")),
-                &encoded.candidate_capsule_json,
+                &replay_root.join(format!("{world_id}.observations.json")),
+                &encoded.replay_archive_json,
             )?;
             write_new(
-                &candidate_root.join(format!("{world_id}.receipt.json")),
-                &encoded.candidate_receipt_json,
+                &replay_root.join(format!("{world_id}.receipt.json")),
+                &encoded.replay_receipt_json,
             )?;
             write_new(
                 &evaluator_root.join(format!("{world_id}.outcomes.json")),
@@ -102,25 +102,25 @@ fn run() -> Result<(), String> {
                 &encoded.evaluator_manifest_json,
             )?;
 
-            let disk_set = custody::EncodedCapsuleSet {
-                candidate_capsule_json: fs::read(candidate_root.join(format!("{world_id}.observations.json")))
+            let disk_set = custody::EncodedReplayArtifacts {
+                replay_archive_json: fs::read(replay_root.join(format!("{world_id}.observations.json")))
                     .map_err(|e| format!("read back candidate capsule {world_id}: {e}"))?,
-                candidate_receipt_json: fs::read(candidate_root.join(format!("{world_id}.receipt.json")))
+                replay_receipt_json: fs::read(replay_root.join(format!("{world_id}.receipt.json")))
                     .map_err(|e| format!("read back candidate receipt {world_id}: {e}"))?,
                 evaluator_capsule_json: fs::read(evaluator_root.join(format!("{world_id}.outcomes.json")))
                     .map_err(|e| format!("read back evaluator capsule {world_id}: {e}"))?,
                 evaluator_manifest_json: fs::read(evaluator_root.join(format!("{world_id}.manifest.json")))
                     .map_err(|e| format!("read back evaluator manifest {world_id}: {e}"))?,
-                candidate_digest: encoded.candidate_digest.clone(),
+                replay_digest: encoded.replay_digest.clone(),
                 evaluator_digest: encoded.evaluator_digest.clone(),
             };
-            custody::verify_encoded_capsules(
-                &disk_set, &encoded.candidate_digest, &encoded.evaluator_digest,
+            custody::verify_encoded_replay_artifacts(
+                &disk_set, &encoded.replay_digest, &encoded.evaluator_digest,
             )?;
 
             println!(
-                "materialized world_id={world_id} observation_policy={} candidate_digest={} evaluator_digest={}",
-                view.policy_id(), encoded.candidate_digest, encoded.evaluator_digest
+                "materialized world_id={world_id} observation_policy={} replay_digest={} evaluator_digest={}",
+                view.policy_id(), encoded.replay_digest, encoded.evaluator_digest
             );
             generated += 1;
         }
@@ -130,18 +130,18 @@ fn run() -> Result<(), String> {
         return Err(format!("generated {generated} worlds; expected exactly 10"));
     }
     println!(
-        "done: {generated} candidate/evaluator capsule pairs; candidate and evaluator roots are disjoint"
+        "done: {generated} replay/evaluator capsule pairs; replay and evaluator roots are disjoint"
     );
     Ok(())
 }
 
 fn ensure_disjoint_roots(candidate: &Path, evaluator: &Path) -> Result<(), String> {
     let c = fs::canonicalize(candidate)
-        .map_err(|e| format!("canonicalize candidate root: {e}"))?;
+        .map_err(|e| format!("canonicalize replay root: {e}"))?;
     let e = fs::canonicalize(evaluator)
         .map_err(|e| format!("canonicalize evaluator root: {e}"))?;
     if c == e || c.starts_with(&e) || e.starts_with(&c) {
-        return Err("candidate and evaluator roots must be distinct and non-overlapping".into());
+        return Err("replay and evaluator roots must be distinct and non-overlapping".into());
     }
     Ok(())
 }
