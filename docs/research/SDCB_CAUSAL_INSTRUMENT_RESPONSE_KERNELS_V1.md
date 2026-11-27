@@ -267,3 +267,14 @@ A positive sensor-inlet calibration control is also authored: the two observatio
 A further executable identifiability control now evaluates the frequency response of the unit-DC-gain physical relaxation + first-order sensor cascade:
 `H(s)=lambda*mu/((s+lambda)*(s+mu))`.
 The magnitude is `(lambda/hypot(lambda,omega))*(mu/hypot(mu,omega))`; phase is `-atan2(omega,lambda)-atan2(omega,mu)`. A new test verifies identical magnitude and phase under the same pole-swap transformation across six frequencies. This demonstrates that even an upstream frequency sweep cannot label the two poles for this symmetric cascade. The sensor-inlet frequency response remains a separate observable and can break that ambiguity. The standalone response source now has twenty-four authored Rust tests; the interval bridge has four.
+
+## Frozen process/sensor identifiability challenge asset
+
+Added `docs/research/SDCB_RESPONSE_IDENTIFIABILITY_CHALLENGE_V1.json`. It freezes two pole-swapped worlds, 60-digit decimal known answers, and five probe families:
+- Passive sensor autocovariance: equal across both worlds; correct output is non-identifiable/equivalence class.
+- Upstream command through unit-DC-gain first-order physical relaxation and sensor: equal transfer magnitude/phase under pole swap; still non-identifiable.
+- Traceable sensor-inlet step: distinct response; identifies the sensor pole for the declared model.
+- Traceable sensor-inlet frequency sweep: distinct magnitude/phase; identifies the sensor pole.
+- Independent reference with known response observing the physical process: distinct autocovariance; identifies the physical pole under the stated reference contract.
+
+The JSON was fetched back from the branch and parsed successfully. This is a synthetic analytic benchmark asset. It does not establish real instrument behaviour or a qualified calibration policy.
