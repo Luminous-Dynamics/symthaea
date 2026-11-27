@@ -70,16 +70,25 @@ pub struct QualifiedObservationUnitV1 {
     pub probabilities: ObservationStageProbabilitiesV1,
 }
 
+#[derive(Clone, Copy, Debug, Eq, PartialEq, Serialize, Deserialize)]
+#[serde(rename_all = "snake_case")]
+pub enum ObservationAssumptionStatusV1 {
+    Satisfied,
+    Violated,
+    Unknown,
+}
+
 #[derive(Clone, Debug, PartialEq, Serialize, Deserialize)]
 pub struct ObservationProcessAssumptionsV1 {
-    /// Declared conditional-probability factorization order is S, R|S, Q|R,
-    /// A|S, V|Q. This flag records whether each probability is justified.
-    pub conditional_probability_factorization_verified: bool,
-    /// Qualification/delivery are ignorable conditional on the declared
-    /// covariates and stages. False for unresolved MNAR mechanisms.
-    pub conditional_ignorability_verified: bool,
-    /// All required stage propensities are known and strictly positive.
-    pub positivity_verified: bool,
+    /// Support for the declared S, R|S, Q|R factorization (plus A|S and V|Q
+    /// for online-update estimands).
+    pub conditional_probability_factorization: ObservationAssumptionStatusV1,
+    /// Ignorability given the declared covariates/stages. Unknown or violated
+    /// means the estimator must not silently use MAR/IPW.
+    pub conditional_ignorability: ObservationAssumptionStatusV1,
+    /// Positivity and known propensities for the stages used by the estimand.
+    pub positivity: ObservationAssumptionStatusV1,
+    /// Evidence reference for this assessment; a digest alone is not a signature.
     pub evidence_receipt_sha256: String,
 }
 
@@ -120,6 +129,8 @@ pub struct QualifiedObservationRiskReportV1 {
     pub input_id: String,
     pub population_units: u64,
     pub identification: PopulationRiskIdentificationV1,
+    /// Exact census value when every population unit has a qualified bounded loss.
+    pub exact_population_risk: Option<f64>,
     pub worst_case_bounds: PopulationRiskBoundsV1,
     /// Horvitz-Thompson estimates of population risk, only when all declared
     /// assumptions and all required propensities are available.
@@ -127,8 +138,13 @@ pub struct QualifiedObservationRiskReportV1 {
     /// Optional IPW estimate based only on feedback actually used online.
     /// This helps diagnose the additional tracking/availability selection.
     pub online_update_ipw: Option<InverseProbabilityRiskEstimateV1>,
+    pub selection_fraction: f64,
+    pub physical_delivery_fraction: f64,
     pub qualified_fraction: f64,
     pub online_update_fraction: f64,
+    pub not_selected_fraction: f64,
+    pub not_received_fraction: f64,
+    pub unavailable_by_frontier_fraction: f64,
     pub unknown_fraction: f64,
     pub blocked_or_revoked_fraction: f64,
     pub mnar_or_propensity_warning: bool,
@@ -233,6 +249,20 @@ fn validate_unit(unit: &QualifiedObservationUnitV1) -> Result<(), QualifiedObser
             "round {} is available without a received physical result",
             unit.round
         )));
+    }
+    match (unit.selected_for_metrology, unit.physical_result_received, unit.qualification_status) {
+        (false, _, MetrologyQualificationStatusV1::NotSelected) => {}
+        (true, false, MetrologyQualificationStatusV1::NotReceived) => {}
+        (true, true, MetrologyQualificationStatusV1::Qualified
+            | MetrologyQualificationStatusV1::Unknown
+            | MetrologyQualificationStatusV1::Blocked
+            | MetrologyQualificationStatusV1::Revoked) => {}
+        _ => {
+            return Err(QualifiedObservationRiskErrorV1(format!(
+                "round {} has an inconsistent selection/delivery/qualification state",
+                unit.round
+            )));
+        }
     }
     if unit.online_update_used
         && (!unit.selected_for_metrology
@@ -358,10 +388,15 @@ pub fn compute_qualified_observation_risk_v1(
     let mut observed_loss_sum = 0.0;
     let mut observed_count = 0_usize;
     let mut online_count = 0_usize;
+    let mut selected_count = 0_usize;
+    let mut received_count = 0_usize;
     let mut unknown_count = 0_usize;
     let mut blocked_count = 0_usize;
-    let mut probabilities_complete = true;
-    let mut positive_propensities = true;
+    let mut unavailable_count = 0_usize;
+    let mut physical_probabilities_complete = true;
+    let mut physical_propensities_positive = true;
+    let mut online_probabilities_complete = true;
+    let mut online_propensities_positive = true;
 
     let mut sorted_units = input.units.clone();
     sorted_units.sort_by_key(|unit| unit.round);
@@ -373,6 +408,11 @@ pub fn compute_qualified_observation_risk_v1(
             ));
         }
 
+        selected_count += usize::from(unit.selected_for_metrology);
+        received_count += usize::from(unit.physical_result_received);
+        unavailable_count += usize::from(
+            unit.physical_result_received && !unit.available_by_update_frontier,
+        );
         match unit.qualification_status {
             MetrologyQualificationStatusV1::Unknown => unknown_count += 1,
             MetrologyQualificationStatusV1::Blocked | MetrologyQualificationStatusV1::Revoked => {
@@ -388,19 +428,30 @@ pub fn compute_qualified_observation_risk_v1(
             online_count += 1;
         }
 
-        let required = [
+        let physical_required = [
             unit.probabilities.selection_probability,
             unit.probabilities.physical_delivery_probability_given_selection,
             unit.probabilities.qualification_probability_given_delivery,
+        ];
+        if physical_required.iter().any(Option::is_none) {
+            physical_probabilities_complete = false;
+        }
+        for value in physical_required.into_iter().flatten() {
+            if !value.is_finite() || value <= 0.0 || value > 1.0 {
+                physical_propensities_positive = false;
+            }
+        }
+
+        let online_required = [
             unit.probabilities.online_tracking_probability_given_selection,
             unit.probabilities.frontier_availability_probability_given_qualified,
         ];
-        if required.iter().any(Option::is_none) {
-            probabilities_complete = false;
+        if online_required.iter().any(Option::is_none) {
+            online_probabilities_complete = false;
         }
-        for value in required.into_iter().flatten() {
+        for value in online_required.into_iter().flatten() {
             if !value.is_finite() || value <= 0.0 || value > 1.0 {
-                positive_propensities = false;
+                online_propensities_positive = false;
             }
         }
     }
@@ -424,35 +475,34 @@ pub fn compute_qualified_observation_risk_v1(
         interval_width: upper_bound - lower_bound,
     };
 
-    let assumptions_verified = input.assumptions.conditional_probability_factorization_verified
-        && input.assumptions.conditional_ignorability_verified
-        && input.assumptions.positivity_verified
-        && probabilities_complete
-        && positive_propensities;
+    let physical_assumptions_verified =
+        input.assumptions.conditional_probability_factorization == ObservationAssumptionStatusV1::Satisfied
+        && input.assumptions.conditional_ignorability == ObservationAssumptionStatusV1::Satisfied
+        && input.assumptions.positivity == ObservationAssumptionStatusV1::Satisfied
+        && physical_probabilities_complete
+        && physical_propensities_positive;
 
-    let (physical_observation_ipw, online_update_ipw, identification, mnar_warning, reason_codes) =
+    let online_assumptions_verified = physical_assumptions_verified
+        && online_probabilities_complete
+        && online_propensities_positive;
+
+    let (exact_population_risk, physical_observation_ipw, online_update_ipw, identification, mnar_warning, mut reason_codes) =
         if observed_count == input.population_round_count {
             (
-                Some(InverseProbabilityRiskEstimateV1 {
-                    estimate: observed_loss_sum / population,
-                    observed_units: observed_count,
-                    population_units: input.population_round_count,
-                    effective_sample_size: population,
-                    minimum_joint_inclusion_probability: 1.0,
-                    maximum_inverse_weight: 1.0,
-                }),
+                Some(observed_loss_sum / population),
+                None,
                 None,
                 PopulationRiskIdentificationV1::ExactAllUnitRisk,
                 false,
                 Vec::new(),
             )
-        } else if assumptions_verified {
+        } else if physical_assumptions_verified {
             let physical = horvitz_thompson(
                 &sorted_units,
                 input.population_round_count,
                 false,
             )?;
-            let online = if online_count > 0 {
+            let online = if online_count > 0 && online_assumptions_verified {
                 Some(horvitz_thompson(
                     &sorted_units,
                     input.population_round_count,
@@ -461,28 +511,40 @@ pub fn compute_qualified_observation_risk_v1(
             } else {
                 None
             };
+            let mut reasons = Vec::new();
+            if online_count > 0 && !online_assumptions_verified {
+                reasons.push("online_tracking_or_frontier_propensity_incomplete".to_string());
+            }
             (
+                None,
                 Some(physical),
                 online,
                 PopulationRiskIdentificationV1::IpwIdentifiedUnderDeclaredAssumptions,
                 false,
-                Vec::new(),
+                reasons,
             )
         } else {
             let mut reasons = Vec::new();
-            if !input.assumptions.conditional_probability_factorization_verified {
-                reasons.push("conditional_probability_factorization_unverified".to_string());
+            if input.assumptions.conditional_probability_factorization
+                != ObservationAssumptionStatusV1::Satisfied
+            {
+                reasons.push("conditional_probability_factorization_unverified_or_violated".to_string());
             }
-            if !input.assumptions.conditional_ignorability_verified {
+            if input.assumptions.conditional_ignorability
+                != ObservationAssumptionStatusV1::Satisfied
+            {
                 reasons.push("conditional_ignorability_unverified_or_mnar_possible".to_string());
             }
-            if !input.assumptions.positivity_verified || !positive_propensities {
+            if input.assumptions.positivity != ObservationAssumptionStatusV1::Satisfied
+                || !physical_propensities_positive
+            {
                 reasons.push("positivity_not_verified".to_string());
             }
-            if !probabilities_complete {
-                reasons.push("stage_propensities_incomplete".to_string());
+            if !physical_probabilities_complete {
+                reasons.push("physical_stage_propensities_incomplete".to_string());
             }
             (
+                None,
                 None,
                 None,
                 PopulationRiskIdentificationV1::WorstCaseBoundsOnly,
@@ -491,16 +553,33 @@ pub fn compute_qualified_observation_risk_v1(
             )
         };
 
+    if !online_probabilities_complete || !online_propensities_positive {
+        reason_codes.push("online_stage_propensities_incomplete_or_invalid".to_string());
+    }
+    reason_codes.sort();
+    reason_codes.dedup();
+
+    let selection_fraction = selected_count as f64 / population;
+    let physical_delivery_fraction = received_count as f64 / population;
+    let not_selected_fraction = (input.population_round_count as usize - selected_count) as f64 / population;
+    let not_received_fraction = (selected_count - received_count) as f64 / population;
+
     let mut report = QualifiedObservationRiskReportV1 {
         schema: QUALIFIED_OBSERVATION_RISK_REPORT_SCHEMA_V1.into(),
         input_id: input.input_id.clone(),
         population_units: input.population_round_count,
         identification,
+        exact_population_risk,
         worst_case_bounds,
         physical_observation_ipw,
         online_update_ipw,
+        selection_fraction,
+        physical_delivery_fraction,
         qualified_fraction: observed_count as f64 / population,
         online_update_fraction: online_count as f64 / population,
+        not_selected_fraction,
+        not_received_fraction,
+        unavailable_by_frontier_fraction: unavailable_count as f64 / population,
         unknown_fraction: unknown_count as f64 / population,
         blocked_or_revoked_fraction: blocked_count as f64 / population,
         mnar_or_propensity_warning: mnar_warning,
@@ -718,7 +797,7 @@ mod tests {
             assumptions(true)
         ))
         .is_err());
-        let mut invalid = qualified_unit(1, 1.2, true);
+        let invalid = qualified_unit(1, 1.2, true);
         assert!(compute_qualified_observation_risk_v1(&input(
             vec![invalid],
             assumptions(true)
