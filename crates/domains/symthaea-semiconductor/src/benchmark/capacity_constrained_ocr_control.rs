@@ -753,7 +753,7 @@ pub fn advance_capacity_ocrc_round_v1(
             } else if reasons.iter().any(|reason| {
                 matches!(
                     reason,
-                    OcrcFeedbackReasonV1::LabelAvailableAtDelivery
+                    OcrcFeedbackReasonV1::LabelUnavailableAtDelivery
                         | OcrcFeedbackReasonV1::ReportUnavailableAtDelivery
                         | OcrcFeedbackReasonV1::ReportPredatesLabelAvailability
                         | OcrcFeedbackReasonV1::DelayOutOfRange
@@ -1325,8 +1325,8 @@ mod tests {
     fn empirical_risk_bound_matches_scalar_formula() {
         let p = policy();
         let bound = capacity_ocrc_risk_bound_v1(&p, 10_000).unwrap();
-        let load = 0.75 + 0.50 + 0.25;
-        let ratio = load / 2.0;
+        let load: f64 = 0.75 + 0.50 + 0.25;
+        let ratio: f64 = load / 2.0;
         let h = ratio - 1.0 - ratio.ln();
         let expected = 4.0 / (0.2 * 10_000.0) + 3.0 / (0.25 * 10_000.0) + (-2.0 * h).exp();
         assert!((bound.risk_gap_upper_bound - expected).abs() < 1.0e-12);
