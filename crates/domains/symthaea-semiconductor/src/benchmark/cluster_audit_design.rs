@@ -859,17 +859,27 @@ pub fn evaluate_cluster_audit_v1(
         let is_census = audited_cluster_count == population_cluster_count;
         exact_census &= is_census;
         let (sample_variance, stratum_variance, radius) = if is_census {
-            (Some(0.0), Some(0.0), 0.0)
+            let variance = if audited_cluster_count >= 2 {
+                Some(
+                    means
+                        .iter()
+                        .map(|value| (value - stratum_mean).powi(2))
+                        .sum::<f64>()
+                        / (audited_cluster_count - 1) as f64,
+                )
+            } else {
+                None
+            };
+            (variance, Some(0.0), 0.0)
         } else {
             let radius = (log_term / (2.0 * audited_cluster_count as f64)).sqrt();
             if audited_cluster_count < 2 {
                 design_variance_available = false;
                 (None, None, radius)
             } else {
-                let sample_mean = stratum_mean;
                 let variance = means
                     .iter()
-                    .map(|value| (value - sample_mean).powi(2))
+                    .map(|value| (value - stratum_mean).powi(2))
                     .sum::<f64>()
                     / (audited_cluster_count - 1) as f64;
                 let design_variance = (1.0 - first_order) * variance
@@ -878,7 +888,7 @@ pub fn evaluate_cluster_audit_v1(
                 (Some(variance), Some(design_variance), radius)
             }
         };
-        combined_hoeffding_radius += weight * radius;
+combined_hoeffding_radius += weight * radius;
         stratum_reports.push(ClusterAuditStratumReportV1 {
             stratum_id: stratum_id.clone(),
             population_cluster_count,
