@@ -568,6 +568,31 @@ mod tests {
     }
 
     #[test]
+    fn duplicate_channel_joint_bins_are_not_mistaken_for_independent_evidence() {
+        let result = bivariate_gaussian_joint_bins(
+            [0.0, 0.0], [[1.0, 1.0], [1.0, 1.0]], &[0.0], &[0.0],
+        ).unwrap();
+        close(result.probabilities[0][0], 0.5, 2.0e-13);
+        close(result.probabilities[0][1], 0.0, 0.0);
+        close(result.probabilities[1][0], 0.0, 0.0);
+        close(result.probabilities[1][1], 0.5, 2.0e-13);
+        close(result.probability_sum, 1.0, 2.0e-13);
+        assert!(result.marginalization_error < 2.0e-13);
+    }
+
+    #[test]
+    fn perfect_anticorrelation_joint_bins_occupy_only_off_diagonal_cells() {
+        let result = bivariate_gaussian_joint_bins(
+            [0.0, 0.0], [[1.0, -1.0], [-1.0, 1.0]], &[0.0], &[0.0],
+        ).unwrap();
+        close(result.probabilities[0][0], 0.0, 0.0);
+        close(result.probabilities[0][1], 0.5, 2.0e-13);
+        close(result.probabilities[1][0], 0.5, 2.0e-13);
+        close(result.probabilities[1][1], 0.0, 0.0);
+        close(result.probability_sum, 1.0, 2.0e-13);
+    }
+
+    #[test]
     fn exact_duplicate_channels_are_integrated_on_rank_one_support() {
         let r = bivariate_gaussian_rectangle(
             [0.0, 0.0], [[1.0, 1.0], [1.0, 1.0]],
