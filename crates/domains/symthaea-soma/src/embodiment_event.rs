@@ -488,7 +488,7 @@ impl EmbodimentStreamValidator {
     ) -> Result<(), EventValidationError> {
         event.validate()?;
         validate_identifier("now_clock_domain_id", now_clock_domain_id)?;
-        if now_clock_domain_id != event.clock_domain_id {
+        if now_clock_domain_id != event.clock_domain_id.as_str() {
             return Err(EventValidationError::ClockDomainMismatch);
         }
         let now = parse_monotonic_ns(now_monotonic_ns)?;
@@ -501,7 +501,7 @@ impl EmbodimentStreamValidator {
         if self
             .clock_domain_id
             .as_deref()
-            .is_some_and(|clock_domain_id| clock_domain_id != event.clock_domain_id)
+            .is_some_and(|clock_domain_id| clock_domain_id != event.clock_domain_id.as_str())
         {
             return Err(EventValidationError::ClockDomainMismatch);
         }
