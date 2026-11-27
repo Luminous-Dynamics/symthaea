@@ -138,6 +138,21 @@
                   "minLength": 1
                 },
                 "uniqueItems": true
+              },
+              "source_family": {
+                "type": "string",
+                "minLength": 1
+              },
+              "source_root_sha256": {
+                "oneOf": [
+                  {
+                    "type": "string",
+                    "pattern": "^[0-9a-f]{64}$"
+                  },
+                  {
+                    "type": "null"
+                  }
+                ]
               }
             }
           }
