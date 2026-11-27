@@ -45,18 +45,19 @@ MON-028's proposed additional contribution is independent known-answer scoring f
 
 See `benchmark/` for:
 - independent `Suite` and candidate `CampaignResult` types;
+- deterministic MON-025-to-MON-028 suite generator that reconciles 41 raw fault seeds against a separately maintained oracle;
 - deterministic validation and scoring;
 - matched comparison;
 - JSON CLI;
 - tests, fuzz target and microbenchmark.
 
-Start with `SUITE-example.json`. Run `bash CHECKS.sh` from this directory on a machine with Go 1.23+ to execute formatting, vet, unit, race, fuzz and benchmark checks.
+Generate the full recovery suite with `go run ./benchmark/cmd/suite-from-mon025` (see `benchmark/README.md`), then package the suite, oracle and input profiles through MON-027. `SUITE-example.json` remains a small scorer smoke fixture. Run `bash CHECKS.sh` from this directory on a machine with Go 1.23+ to execute formatting, vet, unit, race, fuzz and benchmark checks.
 
 The benchmark suite itself should be signed/custodied with MON-026/027. The scorer's output should also be exported as a MON-026 artifact, with benchmark matrix digest, oracle digest, system implementation digest, environment and resource envelope.
 
 ## Status and limits
 
-- JSON profiles and seed data are structurally authored; they have not yet been validated by the Go CLI on this exact head.
+- JSON profiles, 41-case oracle and seed data are structurally authored; the generator and integration tests are present but have not been executed on this exact head.
 - No MON-025 live experiment output exists from this authoring environment.
 - No systems have been measured against the suite; there is no SOTA or vendor-superiority claim.
 - Exact Go test/race/vet/fuzz/benchmark execution remains pending.
