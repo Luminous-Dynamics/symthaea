@@ -116,18 +116,20 @@ fn iid_feedback_uses_qg_times_proxy_survival_in_the_ipw_weight() {
     // True delay PMF is [0.2, 0.5, 0.3], so G=[1,0.8,0.3,0].
     // Proxy horizon is one, q_G=P(d<=1)=0.7. F=[1,0.5].
     let mut controller = engine(policy(2, 1, vec![1.0, 0.5], vec![1.0, 0.8, 0.3, 0.0]));
+    let first_threshold = controller.threshold;
     let first = advance_ca_ocrc_round_v1(
         &mut controller,
-        &round(1, controller.threshold, 0.75), // proxy delay 1
+        &round(1, first_threshold, 0.75), // proxy delay 1
         &[],
     )
     .unwrap();
     assert_eq!(first.selected_proxy_delay_rounds, 1);
     assert!((first.q_g - 0.7).abs() < 1.0e-12);
 
+    let second_threshold = controller.threshold;
     let second = advance_ca_ocrc_round_v1(
         &mut controller,
-        &round(2, controller.threshold, 0.1), // proxy delay 0
+        &round(2, second_threshold, 0.1), // proxy delay 0
         &[feedback(1, 2, 11.0, "label-1")], // actual delay 1, outside interval
     )
     .unwrap();
@@ -144,9 +146,10 @@ fn iid_feedback_uses_qg_times_proxy_survival_in_the_ipw_weight() {
 #[test]
 fn outcomes_beyond_proxy_horizon_are_untracked_but_within_true_support() {
     let mut controller = engine(policy(2, 1, vec![1.0, 0.5], vec![1.0, 0.8, 0.3, 0.0]));
+    let first_threshold = controller.threshold;
     advance_ca_ocrc_round_v1(
         &mut controller,
-        &round(1, controller.threshold, 0.75), // proxy expiry at round 2
+        &round(1, first_threshold, 0.75), // proxy expiry at round 2
         &[],
     )
     .unwrap();
