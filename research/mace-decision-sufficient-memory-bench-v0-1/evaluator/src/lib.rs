@@ -27,6 +27,23 @@ pub struct ActionLossV1 {
     pub loss_micros: u64,
 }
 
+/// Typed lineage attached to one canonical source event. Digests are identities,
+/// not signatures or proof that two roots are statistically independent.
+#[derive(Clone, Debug, Eq, PartialEq)]
+pub struct EvidenceLineageV1 {
+    pub evidence_id: String,
+    pub source_family: Option<String>,
+    pub source_root_digest_sha256: Option<String>,
+}
+
+/// An evaluator-adjudicated contradictory pair. v0.2 has no conflict-resolution
+/// receipt, so co-retrieving both sides is reported and blocks sufficiency.
+#[derive(Clone, Debug, Eq, PartialEq)]
+pub struct EvidenceConflictV1 {
+    pub left_evidence_id: String,
+    pub right_evidence_id: String,
+}
+
 /// Hidden evaluator data. Never expose this structure to candidate systems.
 #[derive(Clone, Debug, Eq, PartialEq)]
 pub struct EvaluatorCaseV1 {
@@ -39,6 +56,10 @@ pub struct EvaluatorCaseV1 {
     pub admissible_evidence_ids: Vec<String>,
     /// Evidence required to achieve the reference evidence objective.
     pub required_evidence_ids: Vec<String>,
+    /// Source-family/root metadata resolved from the canonical candidate episode.
+    pub evidence_lineage: Vec<EvidenceLineageV1>,
+    /// Contradictions adjudicated from the canonical source-event graph.
+    pub contradiction_pairs: Vec<EvidenceConflictV1>,
 }
 
 /// Candidate-facing output from one memory system for one episode.
@@ -53,6 +74,9 @@ pub struct CandidateRunV1 {
     pub chosen_action: String,
     /// Ordered evidence IDs returned by Search / evidence resolution.
     pub retrieved_evidence_ids: Vec<String>,
+    /// Evidence IDs actually passed to the downstream decision policy.
+    /// Must be a unique subset of retrieved_evidence_ids.
+    pub decision_support_evidence_ids: Vec<String>,
 }
 
 /// Exact integer ratio. A missing ratio is used when its denominator is zero.
@@ -73,7 +97,28 @@ pub struct RunScoreV1 {
     pub returned_evidence_count: u64,
     pub admissible_returned_evidence_count: u64,
     pub inadmissible_returned_evidence_count: u64,
+    pub decision_support_evidence_count: u64,
+    pub admissible_decision_support_evidence_count: u64,
+    pub inadmissible_decision_support_evidence_count: u64,
+    /// Recall among all IDs returned by retrieval.
+    pub retrieved_required_evidence_recall: Option<CountRatioV1>,
+    /// Primary required-evidence recall: evidence actually used by the policy.
     pub required_evidence_recall: Option<CountRatioV1>,
+    /// Precision among IDs actually used as decision support.
+    pub decision_support_evidence_precision: Option<CountRatioV1>,
+    /// Distinct source-family and upstream-root counts; these are not attestations.
+    pub retrieved_distinct_source_family_count: u64,
+    pub retrieved_unknown_source_family_count: u64,
+    pub retrieved_distinct_source_root_count: u64,
+    pub retrieved_unknown_source_root_count: u64,
+    pub decision_support_distinct_source_family_count: u64,
+    pub decision_support_unknown_source_family_count: u64,
+    pub decision_support_distinct_source_root_count: u64,
+    pub decision_support_unknown_source_root_count: u64,
+    pub unresolved_retrieved_contradiction_pair_count: u64,
+    pub unresolved_decision_support_contradiction_pair_count: u64,
+    pub decision_sufficient: bool,
+    /// Precision of the full Search result, retained for backward-compatible reporting.
     pub admissible_evidence_precision: Option<CountRatioV1>,
 }
 
@@ -210,6 +255,13 @@ pub enum EvaluationErrorV1 {
     DuplicateAdmissibleEvidenceId,
     DuplicateRequiredEvidenceId,
     RequiredEvidenceIsNotAdmissible,
+    DuplicateEvidenceLineageId,
+    InvalidEvidenceLineage,
+    MissingEvidenceLineage,
+    DuplicateContradictionPair,
+    InvalidContradictionPair,
+    UnknownRetrievedEvidence,
+    DecisionSupportEvidenceNotRetrieved,
     EpisodeMismatch,
     SameSystemUsedForBothArms,
     EmptyDownstreamPolicyDigest,
@@ -220,6 +272,7 @@ pub enum EvaluationErrorV1 {
     EmptyActionId,
     EmptyEvidenceId,
     DuplicateReturnedEvidenceId,
+    DuplicateDecisionSupportEvidenceId,
     NoMemoryArmContainsEvidence,
     NoMemoryArmActionMismatch,
     AblationTargetMissing,
@@ -239,6 +292,70 @@ pub enum EvaluationErrorV1 {
 
 fn contains(values: &[String], target: &str) -> bool {
     values.iter().any(|value| value == target)
+}
+
+fn is_lowercase_sha256(value: &str) -> bool {
+    value.len() == 64
+        && value
+            .bytes()
+            .all(|byte| byte.is_ascii_hexdigit() && !byte.is_ascii_uppercase())
+}
+
+#[derive(Clone, Copy, Debug, Default)]
+struct SourceLineageCountsV1 {
+    distinct_families: u64,
+    unknown_families: u64,
+    distinct_roots: u64,
+    unknown_roots: u64,
+}
+
+fn source_lineage_counts(
+    case: &EvaluatorCaseV1,
+    evidence_ids: &[String],
+) -> SourceLineageCountsV1 {
+    let mut families = BTreeSet::new();
+    let mut roots = BTreeSet::new();
+    let mut unknown_families = 0_u64;
+    let mut unknown_roots = 0_u64;
+
+    for evidence_id in evidence_ids {
+        if let Some(lineage) = case
+            .evidence_lineage
+            .iter()
+            .find(|lineage| lineage.evidence_id == *evidence_id)
+        {
+            if let Some(family) = &lineage.source_family {
+                families.insert(family.as_str());
+            } else {
+                unknown_families += 1;
+            }
+            if let Some(root) = &lineage.source_root_digest_sha256 {
+                roots.insert(root.as_str());
+            } else {
+                unknown_roots += 1;
+            }
+        }
+    }
+
+    SourceLineageCountsV1 {
+        distinct_families: families.len() as u64,
+        unknown_families,
+        distinct_roots: roots.len() as u64,
+        unknown_roots,
+    }
+}
+
+fn unresolved_conflict_count(
+    case: &EvaluatorCaseV1,
+    evidence_ids: &[String],
+) -> u64 {
+    case.contradiction_pairs
+        .iter()
+        .filter(|pair| {
+            contains(evidence_ids, &pair.left_evidence_id)
+                && contains(evidence_ids, &pair.right_evidence_id)
+        })
+        .count() as u64
 }
 
 fn unique(values: &[String]) -> bool {
@@ -287,6 +404,45 @@ pub fn validate_case(case: &EvaluatorCaseV1) -> Result<(), EvaluationErrorV1> {
         .collect();
     if allowed != losses {
         return Err(EvaluationErrorV1::LossActionSetMismatch);
+    }
+
+    let mut lineage_ids = BTreeSet::new();
+    for lineage in &case.evidence_lineage {
+        if lineage.evidence_id.trim().is_empty()
+            || !lineage_ids.insert(lineage.evidence_id.as_str())
+        {
+            return Err(EvaluationErrorV1::DuplicateEvidenceLineageId);
+        }
+        if lineage.source_family.as_ref().is_some_and(|family| family.trim().is_empty())
+            || lineage.source_root_digest_sha256.as_ref().is_some_and(|root| !is_lowercase_sha256(root))
+            || (lineage.source_root_digest_sha256.is_some() && lineage.source_family.is_none())
+        {
+            return Err(EvaluationErrorV1::InvalidEvidenceLineage);
+        }
+    }
+    if case.admissible_evidence_ids.iter().chain(case.required_evidence_ids.iter())
+        .any(|evidence_id| !lineage_ids.contains(evidence_id.as_str()))
+    {
+        return Err(EvaluationErrorV1::MissingEvidenceLineage);
+    }
+    let mut conflict_pairs = BTreeSet::new();
+    for pair in &case.contradiction_pairs {
+        if pair.left_evidence_id.trim().is_empty()
+            || pair.right_evidence_id.trim().is_empty()
+            || pair.left_evidence_id == pair.right_evidence_id
+            || !lineage_ids.contains(pair.left_evidence_id.as_str())
+            || !lineage_ids.contains(pair.right_evidence_id.as_str())
+        {
+            return Err(EvaluationErrorV1::InvalidContradictionPair);
+        }
+        let canonical = if pair.left_evidence_id < pair.right_evidence_id {
+            (pair.left_evidence_id.as_str(), pair.right_evidence_id.as_str())
+        } else {
+            (pair.right_evidence_id.as_str(), pair.left_evidence_id.as_str())
+        };
+        if !conflict_pairs.insert(canonical) {
+            return Err(EvaluationErrorV1::DuplicateContradictionPair);
+        }
     }
 
     if !contains(&case.allowed_actions, &case.no_memory_action) {
@@ -363,6 +519,22 @@ fn validate_candidate(
     {
         return Err(EvaluationErrorV1::EmptyEvidenceId);
     }
+    if !unique(&candidate.decision_support_evidence_ids) {
+        return Err(EvaluationErrorV1::DuplicateDecisionSupportEvidenceId);
+    }
+    if candidate.decision_support_evidence_ids.iter().any(|id| id.trim().is_empty()) {
+        return Err(EvaluationErrorV1::EmptyEvidenceId);
+    }
+    if candidate.decision_support_evidence_ids.iter()
+        .any(|id| !contains(&candidate.retrieved_evidence_ids, id))
+    {
+        return Err(EvaluationErrorV1::DecisionSupportEvidenceNotRetrieved);
+    }
+    if candidate.retrieved_evidence_ids.iter()
+        .any(|id| !case.evidence_lineage.iter().any(|lineage| lineage.evidence_id == *id))
+    {
+        return Err(EvaluationErrorV1::UnknownRetrievedEvidence);
+    }
     Ok(())
 }
 
@@ -393,11 +565,32 @@ fn score_run(
         .iter()
         .filter(|id| admissible.contains(id.as_str()))
         .count() as u64;
-    let required_recalled = candidate
+    let retrieved_required = candidate
         .retrieved_evidence_ids
         .iter()
         .filter(|id| required.contains(id.as_str()))
         .count() as u64;
+    let selected = candidate.decision_support_evidence_ids.len() as u64;
+    let admissible_selected = candidate
+        .decision_support_evidence_ids
+        .iter()
+        .filter(|id| admissible.contains(id.as_str()))
+        .count() as u64;
+    let selected_required = candidate
+        .decision_support_evidence_ids
+        .iter()
+        .filter(|id| required.contains(id.as_str()))
+        .count() as u64;
+    let retrieved_lineage = source_lineage_counts(case, &candidate.retrieved_evidence_ids);
+    let selected_lineage = source_lineage_counts(case, &candidate.decision_support_evidence_ids);
+    let retrieved_conflicts = unresolved_conflict_count(case, &candidate.retrieved_evidence_ids);
+    let selected_conflicts = unresolved_conflict_count(case, &candidate.decision_support_evidence_ids);
+    let decision_optimal = decision_loss_micros == oracle_loss_micros;
+    let all_required_selected = required.is_empty() || selected_required == required.len() as u64;
+    let decision_sufficient = decision_optimal
+        && all_required_selected
+        && admissible_returned == returned
+        && retrieved_conflicts == 0;
 
     Ok(RunScoreV1 {
         system_id: candidate.system_id.clone(),
@@ -405,14 +598,36 @@ fn score_run(
         decision_loss_micros,
         oracle_loss_micros,
         decision_regret_micros: decision_loss_micros - oracle_loss_micros,
-        decision_optimal: decision_loss_micros == oracle_loss_micros,
+        decision_optimal,
         returned_evidence_count: returned,
         admissible_returned_evidence_count: admissible_returned,
         inadmissible_returned_evidence_count: returned - admissible_returned,
-        required_evidence_recall: (!required.is_empty()).then_some(CountRatioV1 {
-            numerator: required_recalled,
+        decision_support_evidence_count: selected,
+        admissible_decision_support_evidence_count: admissible_selected,
+        inadmissible_decision_support_evidence_count: selected - admissible_selected,
+        retrieved_required_evidence_recall: (!required.is_empty()).then_some(CountRatioV1 {
+            numerator: retrieved_required,
             denominator: required.len() as u64,
         }),
+        required_evidence_recall: (!required.is_empty()).then_some(CountRatioV1 {
+            numerator: selected_required,
+            denominator: required.len() as u64,
+        }),
+        decision_support_evidence_precision: (selected > 0).then_some(CountRatioV1 {
+            numerator: admissible_selected,
+            denominator: selected,
+        }),
+        retrieved_distinct_source_family_count: retrieved_lineage.distinct_families,
+        retrieved_unknown_source_family_count: retrieved_lineage.unknown_families,
+        retrieved_distinct_source_root_count: retrieved_lineage.distinct_roots,
+        retrieved_unknown_source_root_count: retrieved_lineage.unknown_roots,
+        decision_support_distinct_source_family_count: selected_lineage.distinct_families,
+        decision_support_unknown_source_family_count: selected_lineage.unknown_families,
+        decision_support_distinct_source_root_count: selected_lineage.distinct_roots,
+        decision_support_unknown_source_root_count: selected_lineage.unknown_roots,
+        unresolved_retrieved_contradiction_pair_count: retrieved_conflicts,
+        unresolved_decision_support_contradiction_pair_count: selected_conflicts,
+        decision_sufficient,
         admissible_evidence_precision: (returned > 0).then_some(CountRatioV1 {
             numerator: admissible_returned,
             denominator: returned,
@@ -446,7 +661,9 @@ pub fn score_paired(
     if no_memory.chosen_action != case.no_memory_action {
         return Err(EvaluationErrorV1::NoMemoryArmActionMismatch);
     }
-    if !no_memory.retrieved_evidence_ids.is_empty() {
+    if !no_memory.retrieved_evidence_ids.is_empty()
+        || !no_memory.decision_support_evidence_ids.is_empty()
+    {
         return Err(EvaluationErrorV1::NoMemoryArmContainsEvidence);
     }
 
@@ -521,6 +738,15 @@ pub fn score_leave_one_out(
             .collect();
         if ablation.output_without_evidence.retrieved_evidence_ids != expected_evidence {
             return Err(EvaluationErrorV1::AblationEvidenceSetMismatch);
+        }
+        let expected_support: Vec<String> = full
+            .decision_support_evidence_ids
+            .iter()
+            .filter(|id| *id != &ablation.removed_evidence_id)
+            .cloned()
+            .collect();
+        if ablation.output_without_evidence.decision_support_evidence_ids != expected_support {
+            return Err(EvaluationErrorV1::AblationSelectedSetMismatch);
         }
 
         let without_score = score_run(case, &ablation.output_without_evidence)?;
@@ -784,6 +1010,32 @@ mod tests {
             oracle_action: "hold".to_owned(),
             admissible_evidence_ids: vec!["signed-current".to_owned()],
             required_evidence_ids: vec!["signed-current".to_owned()],
+            evidence_lineage: vec![
+                EvidenceLineageV1 {
+                    evidence_id: "signed-current".to_owned(),
+                    source_family: Some("supplier-registry".to_owned()),
+                    source_root_digest_sha256: Some("a".repeat(64)),
+                },
+                EvidenceLineageV1 {
+                    evidence_id: "expired-account".to_owned(),
+                    source_family: Some("supplier-registry".to_owned()),
+                    source_root_digest_sha256: Some("a".repeat(64)),
+                },
+                EvidenceLineageV1 {
+                    evidence_id: "chat-assertion".to_owned(),
+                    source_family: Some("team-chat".to_owned()),
+                    source_root_digest_sha256: None,
+                },
+                EvidenceLineageV1 {
+                    evidence_id: "signed-release-gate".to_owned(),
+                    source_family: Some("release-gate".to_owned()),
+                    source_root_digest_sha256: Some("b".repeat(64)),
+                },
+            ],
+            contradiction_pairs: vec![EvidenceConflictV1 {
+                left_evidence_id: "chat-assertion".to_owned(),
+                right_evidence_id: "signed-release-gate".to_owned(),
+            }],
         }
     }
 
@@ -795,6 +1047,7 @@ mod tests {
             decision_seed: 4101,
             chosen_action: action.to_owned(),
             retrieved_evidence_ids: evidence.iter().map(|id| (*id).to_owned()).collect(),
+            decision_support_evidence_ids: evidence.iter().map(|id| (*id).to_owned()).collect(),
         }
     }
 
@@ -853,6 +1106,7 @@ mod tests {
             decision_seed: full.decision_seed,
             chosen_action: "abstain".to_owned(),
             retrieved_evidence_ids: vec![],
+            decision_support_evidence_ids: vec![],
         };
         let result = score_leave_one_out(
             &case(),
@@ -966,7 +1220,8 @@ mod tests {
             downstream_policy_digest: "b".repeat(64),
             decision_seed: 77,
             chosen_action: memory_action.to_owned(),
-            retrieved_evidence_ids: memory_evidence.into_iter().map(str::to_owned).collect(),
+            retrieved_evidence_ids: memory_evidence.iter().map(|id| (*id).to_owned()).collect(),
+            decision_support_evidence_ids: memory_evidence.iter().map(|id| (*id).to_owned()).collect(),
         };
         let baseline = CandidateRunV1 {
             episode_id: episode.to_owned(),
@@ -975,6 +1230,7 @@ mod tests {
             decision_seed: 77,
             chosen_action: "abstain".to_owned(),
             retrieved_evidence_ids: vec![],
+            decision_support_evidence_ids: vec![],
         };
         // The candidate evidence may intentionally be inadmissible; the
         // aggregate function scores the paired result, not its correctness.
