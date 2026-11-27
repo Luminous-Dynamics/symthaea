@@ -47,4 +47,4 @@ Generate and review the package lockfile first, then use the exact committed loc
 
 ## Current tests
 
-Two Rust tests are authored for monotonic clock regression and clock-domain/expiry guard behavior. They have not been compiled or executed. The main Soma event, projection, policy, receipt and scene modules have 76 authored Rust tests, also not compiled or executed. GitHub Actions runs associated with the current draft PR have been skipped rather than passed.
+Five Rust tests are authored for monotonic clock regression, exact expiry, cross-domain rejection, authorized-intensity clamping and zero-intensity output. They have not been compiled or executed. The main Soma event, projection, policy, receipt and scene modules have 76 authored Rust tests, also not compiled or executed. GitHub Actions runs associated with the current draft PR have been skipped rather than passed.
