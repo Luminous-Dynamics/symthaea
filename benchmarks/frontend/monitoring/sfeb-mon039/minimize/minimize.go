@@ -113,6 +113,10 @@ func FaultSetDigest(ids []string)string{
 	canonical,ok:=canonicalFaults(ids);if !ok{return ""}
 	return digestJSON(canonical)
 }
+func ObservationReceiptDigest(o Observation)string{
+	o.OutcomeReceiptSHA256=""
+	return digestJSON(o)
+}
 func sameIDs(a,b []string)bool{if len(a)!=len(b){return false};for i:=range a{if a[i]!=b[i]{return false}};return true}
 func sameFailure(o Observation,target Verdict,signature string)bool{return o.Verdict==target&&o.FailureSignatureSHA256==signature}
 
@@ -142,6 +146,7 @@ func validateInput(in Input,f *flags)map[string]Observation{
 		}
 		if o.ObservedAt.IsZero()||(!in.EvaluatedAt.IsZero()&&o.ObservedAt.After(in.EvaluatedAt)){f.block("observation_time_invalid");continue}
 		if !validVerdict(o.Verdict)||!validDigest(o.FailureSignatureSHA256)||!validDigest(o.OutcomeReceiptSHA256){f.block("observation_result_invalid");continue}
+		if o.OutcomeReceiptSHA256!=ObservationReceiptDigest(o){f.block("observation_receipt_digest_mismatch");continue}
 		if _,exists:=index[digest];exists{f.block("duplicate_fault_set_observation");continue}
 		index[digest]=o
 	}
