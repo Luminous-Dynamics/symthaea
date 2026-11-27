@@ -1,0 +1,54 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://luminousdynamics.io/schemas/mon027-signature-envelope-v1.schema.json",
+  "title": "MON-027 Detached Signature Envelope",
+  "type": "object",
+  "additionalProperties": false,
+  "required": [
+    "profile",
+    "version",
+    "request_id",
+    "run_id",
+    "sequence",
+    "root_sha256",
+    "algorithm",
+    "key_id",
+    "value"
+  ],
+  "properties": {
+    "profile": {
+      "const": "mon027-detached-signature-v1"
+    },
+    "version": {
+      "const": "1.0.0"
+    },
+    "request_id": {
+      "type": "string",
+      "pattern": "^[0-9a-f]{64}$"
+    },
+    "run_id": {
+      "type": "string",
+      "minLength": 1
+    },
+    "sequence": {
+      "type": "integer",
+      "minimum": 1
+    },
+    "root_sha256": {
+      "type": "string",
+      "pattern": "^[0-9a-fA-F]{64}$"
+    },
+    "algorithm": {
+      "const": "Ed25519"
+    },
+    "key_id": {
+      "type": "string",
+      "minLength": 1
+    },
+    "value": {
+      "type": "string",
+      "contentEncoding": "base64",
+      "minLength": 1
+    }
+  }
+}
