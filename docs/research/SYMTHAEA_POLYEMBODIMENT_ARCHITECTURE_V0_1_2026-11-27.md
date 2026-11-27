@@ -297,7 +297,15 @@ A second renderer-neutral module has been added:
 
 This is a semantic projection and replay harness, not a visual renderer. The
 form IDs are present; no Bevy scene, puppet rig, or animation implementation is
-claimed.
+claimed. The projection also provides privacy-aware accessible descriptions:
+local-sensitive and restricted cue subjects are omitted from generic text
+alternatives. The canonical cue still carries its privacy label; renderer
+authorization and data isolation remain a separate policy boundary.
+
+The current implementation has **33 authored Rust regression tests** across the
+event contract and projection/replay modules. They have not been compiled or
+executed. The event-schema and fixture JSON documents have been parsed as JSON,
+but have not yet been checked by an independent JSON Schema 2020-12 validator.
 
 ### P1 protocol hardening — 2026-11-27
 
