@@ -37,7 +37,7 @@ Run the six synthetic positive-control records against the six source episodes a
 - Each episode has exactly one response per arm declared in a separate preregistered arm manifest. Undeclared arms, missing and duplicate episode/arm pairs are rejected; no arm can silently drop hard episodes.
 - Candidate-visible and evaluator-private inventories must match exactly. The candidate row and private record commit to a domain-separated SHA-256 digest of the exact typed candidate projection; the response must echo the same digest. Modified or mismatched candidate/response inputs are rejected. This binds the response record to the presented input and declared arm to prevent accidental cross-arm relabelling; it is not a signature, response-payload attestation or proof that the adapter reasoned from the input.
 - Knowledge time is explicit: an event is not available before observed_at_ms. Valid time is half-open: valid-from is inclusive and valid-until is exclusive. A supersession/retraction only invalidates its parent once that change has itself been observed and reached its valid-from time; later observations cannot leak into earlier decisions.
-- Superseded or retracted parent records are stale at query time. A contradiction edge does not itself erase its parent; it is measured as a conflict requiring policy handling.
+- Superseded or retracted parent records are stale at query time. A contradiction edge does not itself erase its parent; co-retrieving contradictory records is measured, and v0.1 fails decision-sufficiency closed when a conflicting pair is returned because the response protocol does not yet carry an explicit conflict-resolution receipt.
 - Untrusted and evaluator-labelled forbidden records are inadmissible. The evaluator does not interpret similarity, authority tiers or uncertainty as proof of truth.
 - Required-evidence recall, valid-evidence precision, stale/forbidden/untrusted use, unresolved contradiction co-retrieval, regret, gain/worsening versus the declared reference action, decision sufficiency and resource counters are reported independently.
 - The episode's no_memory_action is a task-authored reference action, not a measured memory-system baseline. The report labels this comparison as a declared reference only. To measure true paired system impact, execute a real no-memory arm and list its ID in the arm manifest's optional no_memory_arm_id field; the report then emits per-arm matched gain and harm rates against that executed no-memory arm.
@@ -78,7 +78,9 @@ Authored unit tests cover:
 - untrusted lifecycle events cannot revoke trusted evidence;
 - response-to-candidate digest mismatch rejection;
 - the distinction between contradiction and supersession/retraction;
-- fail-closed handling of untrusted evidence;
+- rejection of cyclic/duplicate evidence ancestry;
+- co-retrieved conflicts cannot silently pass decision sufficiency;
+- fail-closed handling of untrusted evidence and untrusted lifecycle events;
 - seeded deterministic generation and first-four-family coverage;
 - separation of regret from memory-induced harm.
 
