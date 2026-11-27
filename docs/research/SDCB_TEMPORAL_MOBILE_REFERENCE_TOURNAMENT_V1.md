@@ -83,7 +83,7 @@ Use the S1–S4 scenarios in the existing SDCB_REAL_SENSOR_BENCHMARK_PLAN_V1.md:
 - chronological drift;
 - event-conditioned shifts.
 
-The current release describes five locations within one laboratory, not five independent laboratories. Real indoor measurand covariance and sensor-error covariance must remain separate. Use forward-only chronological splits and leave-one-location-out rotations. Confirm release-asset data terms before redistribution or commercial use.
+The current release describes five locations within one university laboratory, not five independent laboratories. Real indoor measurand covariance and sensor-error covariance must remain separate. Use forward-only chronological splits and leave-one-location-out rotations. The repository exposes an MIT code/repository licence, but the downloaded release ZIP does not have a clearly surfaced independent data-licence grant in the material reviewed here; confirm dataset terms with the authors before redistribution or commercial use.
 
 ### 4.3 UCI Gas Sensor Array Drift
 
