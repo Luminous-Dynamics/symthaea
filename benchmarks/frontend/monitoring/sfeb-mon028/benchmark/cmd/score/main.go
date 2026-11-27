@@ -131,7 +131,7 @@ func run() int {
 		if suiteCustody.Verdict==custody.VerdictIndeterminate { return 3 }
 		return 2
 	}
-	_,resultCustody,err:=verifyCustodyBundle(*resultRoot,*resultManifestPath,*resultArtifact,*resultKeyID,resultPub,
+	resultManifest,resultCustody,err:=verifyCustodyBundle(*resultRoot,*resultManifestPath,*resultArtifact,*resultKeyID,resultPub,
 		*resultRunID,*resultSequence,*resultPrevious,*resultClock,*resultMaxAge,*resultMaxUncertainty)
 	if err!=nil {
 		_ = json.NewEncoder(os.Stdout).Encode(resultCustody)
@@ -154,6 +154,14 @@ func run() int {
 		Comparison *benchmark.Comparison `json:"comparison,omitempty"`
 	}{SuiteCustody:suiteCustody,ResultCustody:resultCustody,Score:score}
 	if *baselineArtifact!="" {
+		baselineDeclared:=false
+		for _,artifact:=range resultManifest.Artifacts {
+			if artifact.Path==*baselineArtifact { baselineDeclared=true; break }
+		}
+		if !baselineDeclared {
+			fmt.Fprintln(os.Stderr,"selected baseline artifact is not in the signed result inventory")
+			return 2
+		}
 		baseline,readErr:=readBundleArtifact[benchmark.CampaignResult](*resultRoot,*baselineArtifact)
 		if readErr!=nil { fmt.Fprintf(os.Stderr,"read baseline result artifact: %v\n",readErr); return 65 }
 		comparison,compareErr:=benchmark.CompareMatched(suite,baseline,result)
