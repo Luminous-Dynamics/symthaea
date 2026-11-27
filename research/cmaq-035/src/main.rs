@@ -302,7 +302,7 @@ pub fn run_scenario(
         horizon: config.horizon,
     };
     let mut fixed_two = MethodSummary {
-        method: "cmaq035_fixed_two_features",
+        method: "cmaq035_fixed_positive_two_feature_ablation",
         alarm_delays: Vec::new(),
         replications: config.replications,
         horizon: config.horizon,
