@@ -143,7 +143,7 @@ Use AutoSciBench-style task recipes to generate *new sealed variants* from vette
 
 ## Artifact-native research follow-up
 
-The WebResearcher content extractor remains HTML-oriented; its numeric-series helper is line-based and explicitly does not parse units. The acquisition receipt is an integrity record for captured content, not a typed scientific-artifact parser or a stable table/cell/page locator. [Issue #13900](https://github.com/Luminous-Dynamics/symthaea/issues/13900) now owns the staged artifact-intake contract: immutable raw bytes, parser/configuration receipts, typed source locations, and explicit unsupported/malformed outcomes. It composes with #13854 acquisition, #12471 method execution and #13796 claim/source relation adjudication; it does not introduce a second planner or evidence ledger.
+The WebResearcher content extractor remains HTML-oriented; its numeric-series helper is line-based and explicitly does not parse units. The acquisition receipt is an integrity record for captured content, not a typed scientific-artifact parser or a stable table/cell/page locator. [Issue #13900](https://github.com/Luminous-Dynamics/symthaea/issues/13900) and [manifest PR #13901](https://github.com/Luminous-Dynamics/symthaea/pull/13901) own the staged artifact-intake contract. The new [CSV/TSV adapter PR #14031](https://github.com/Luminous-Dynamics/symthaea/pull/14031) starts the executable path with raw/acquisition digest checks, exact CSV_CELL byte spans, preserved numeric lexemes, strict UTF-8/row validation and explicit resource caps. It does not infer units, coerce null sentinels or admit partial observations. This composes with #13854 acquisition, #12471 method execution and #13796 claim/source relation adjudication; it does not introduce a second planner or evidence ledger.
 
 ## Longitudinal evidence correction: REPAIR-Bench
 
@@ -188,7 +188,7 @@ Primary references:
 
 ## Counterfactual evidence dependence: CEDAR-Bench
 
-Citation support does not prove that a system used the cited source. [CEDAR-Bench issue #13993](https://github.com/Luminous-Dynamics/symthaea/issues/13993) and [draft PR #13996](https://github.com/Luminous-Dynamics/symthaea/pull/13996) add a 20-template synthetic corpus with paired baseline, counterfactual, placebo and source-removal trials. Candidate inputs and auditor keys are generated to separate files from an out-of-band seed. This track is motivated by the parametric-provenance finding above; its operational labels measure behavior under interventions, not hidden model state or world truth. Keep its scores separate from DISCERN, LifeSciBench and REPAIR-Bench.
+Citation support does not prove that a system used the cited source. [CEDAR-Bench issue #13993](https://github.com/Luminous-Dynamics/symthaea/issues/13993) and [draft PR #13996](https://github.com/Luminous-Dynamics/symthaea/pull/13996) add a 20-template synthetic corpus with paired baseline, counterfactual, placebo and source-removal trials. Candidate inputs and auditor keys are generated to separate files from an out-of-band seed. Its answer oracle and citation contract remain auditor-only. Source independence is measured over eligible supporting origins, not raw URLs: CEDAR-08 includes two mirror URLs with one origin ID and a separate report, then removes both mirrors to test a downgrade from two independent supporting origins to one. CEDAR-10 ensures an unrelated decoy origin does not inflate support corroboration. This track is motivated by the parametric-provenance finding above; its operational labels measure behavior under interventions, not hidden model state or world truth. Keep its scores separate from DISCERN, LifeSciBench and REPAIR-Bench.
 
 ## 3. Benchmark architecture
 
@@ -385,7 +385,7 @@ Do not introduce a new web-research planner to solve an evidence-model defect. R
 
 A source receipt is not trustworthy if the mechanism that acquired it can be redirected into an internal network. The bounded acquisition path in [PR #13854](https://github.com/Luminous-Dynamics/symthaea/pull/13854) currently uses a default reqwest client for search-result URLs. The branch audit found no visible destination-IP policy in the page-fetch path; reqwest follows redirects by default and honors system proxy settings unless configured otherwise. This is a security follow-on, not evidence that the bounded-acquisition work is invalid.
 
-[Issue #13870](https://github.com/Luminous-Dynamics/symthaea/issues/13870) owns the implementation. The required invariant is:
+[Issue #13870](https://github.com/Luminous-Dynamics/symthaea/issues/13870) owns the implementation. The initial redirect/proxy hardening was tracked by #13930; [DNS-pinned destination policy PR #14043](https://github.com/Luminous-Dynamics/symthaea/pull/14043) adds whole-answer-set rejection, exact validated-address return, IP-literal validation, typed URL/DNS/redirect receipts and special-use IP range checks. It remains draft and has not yet passed the full Rust gates. The required invariant is:
 
 > Every outbound research connection must be pinned to an address that was validated for that exact request. Redirects, retries and alternate addresses must repeat the same checks. A source-controlled URL or HTTP response must never increase the researcher's network authority.
 
