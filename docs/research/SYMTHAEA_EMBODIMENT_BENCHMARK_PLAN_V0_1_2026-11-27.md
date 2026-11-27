@@ -587,7 +587,7 @@ Safety behavior:
 
 The material fade changes presentation opacity only; it does not change scene semantics, semantic confidence or policy-authorized intensity. The adapter's ECS acknowledgement is not a compositor observation.
 
-**Evidence status:** source implementation committed; 143 Rust tests authored (128 Soma core and 15 adapter), none compiled or executed; no Bevy runtime/display, compositor observer or device qualification. Bevy dependency resolution and lockfile are still pending. The adapter README records the current limitations.
+**Evidence status:** source implementation committed; 144 Rust tests authored (129 Soma core and 15 adapter), none compiled or executed; no Bevy runtime/display, compositor observer or device qualification. Bevy dependency resolution and lockfile are still pending. The adapter README records the current limitations.
 
 See:
 - `SYMTHAEA_CROSS_FORM_CONTINUITY_V0_1_2026-11-27.md`
@@ -619,6 +619,6 @@ The CLI accepts either a single trace or the fixture bundle, requiring the posit
 cargo run -p symthaea-soma --bin verify_interaction_trace -- docs/research/SYMTHAEA_INTERACTION_TRACE_FIXTURES_V1_2026-11-27.json
 ```
 
-The verifier has 19 authored tests. The existing seven Soma modules have 109 tests; the Bevy adapter has 15. **Total: 143 authored Rust tests, none compiled or executed.** No lockfile, structural JSON Schema validator run, runtime display or benchmark execution is claimed.
+The verifier has 20 authored tests. The post-revocation negative fixture now places a frame after revocation but before the stop marker, so it exercises authorization invalidation directly. The existing seven Soma modules have 109 tests; the Bevy adapter has 15. **Total: 144 authored Rust tests, none compiled or executed.** No lockfile, structural JSON Schema validator run, runtime display or benchmark execution is claimed.
 
 Limitations remain explicit: JSON Schema validation is a separate step; observer IDs are not cryptographic attestations; the verifier cannot establish compositor independence, actual physical output, semantic relevance of grounding support, or user task success. Those require separate trusted observers and scorers.
