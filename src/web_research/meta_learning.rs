@@ -375,7 +375,11 @@ impl EpistemicLearner {
         let mut squared_error = 0.0_f64;
         let mut count = 0_usize;
 
-        for outcome in self.outcomes.iter().filter(|item| item.was_correct.is_some()) {
+        for outcome in self
+            .outcomes
+            .iter()
+            .filter(|item| item.was_correct.is_some())
+        {
             let probability = outcome.predicted_confidence;
             if !probability.is_finite() || !(0.0..=1.0).contains(&probability) {
                 continue;
@@ -405,13 +409,16 @@ impl EpistemicLearner {
         let mut correct_counts = [0_usize; BIN_COUNT];
         let mut total = 0_usize;
 
-        for outcome in self.outcomes.iter().filter(|item| item.was_correct.is_some()) {
+        for outcome in self
+            .outcomes
+            .iter()
+            .filter(|item| item.was_correct.is_some())
+        {
             let probability = outcome.predicted_confidence;
             if !probability.is_finite() || !(0.0..=1.0).contains(&probability) {
                 continue;
             }
-            let bin = ((probability * BIN_COUNT as f32).floor() as usize)
-                .min(BIN_COUNT - 1);
+            let bin = ((probability * BIN_COUNT as f32).floor() as usize).min(BIN_COUNT - 1);
             counts[bin] += 1;
             confidence_sums[bin] += f64::from(probability);
             if outcome.was_correct == Some(true) {
@@ -706,8 +713,8 @@ mod tests {
         let mut learner = EpistemicLearner::new();
         for index in 0..10 {
             let correct = index < 8;
-            let outcome = make_outcome("science", "calibration.example", correct)
-                .with_confidence(0.9);
+            let outcome =
+                make_outcome("science", "calibration.example", correct).with_confidence(0.9);
             learner.record_outcome(outcome).unwrap();
         }
         let baseline = learner.stats();
@@ -725,7 +732,10 @@ mod tests {
             )
             .unwrap();
         let with_pending = learner.stats();
-        assert_eq!(with_pending.calibration_outcomes, baseline.calibration_outcomes);
+        assert_eq!(
+            with_pending.calibration_outcomes,
+            baseline.calibration_outcomes
+        );
         assert_eq!(with_pending.brier_score, baseline.brier_score);
         assert_eq!(
             with_pending.expected_calibration_error,
