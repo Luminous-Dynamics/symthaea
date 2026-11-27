@@ -62,6 +62,7 @@ func testFixture(t *testing.T) (string, Manifest, ed25519.PublicKey, ed25519.Pri
 	policy := Policy{
 		Now: now.Add(time.Minute), MaxAge: time.Hour, ClockDomain: "lab-clock",
 		MaxClockUncertaintyNS: int64(50 * time.Millisecond),
+		ExpectedRunID: "run-001", ExpectedSequence: 1,
 		TrustedKeys: map[string]ed25519.PublicKey{"custody-key-1": pub},
 	}
 	return root, m, pub, private, policy
@@ -190,6 +191,7 @@ func TestPreviousRootMustMatchExpectedChainHead(t *testing.T) {
 	if err := SignManifest(&m, "custody-key-1", private); err != nil {
 		t.Fatal(err)
 	}
+	policy.ExpectedSequence = 2
 	policy.ExpectedPreviousRoot = digestBytes([]byte("expected previous root"))
 	r := VerifyBundle(root, m, policy)
 	if r.Verdict != VerdictBlocked || !hasReason(r, "previous_root_mismatch") {
@@ -201,6 +203,7 @@ func TestMissingPreviousRootExpectationIsIndeterminate(t *testing.T) {
 	root, m, _, private, policy := testFixture(t)
 	m.Sequence = 2
 	m.PreviousRootSHA256 = digestBytes([]byte("previous"))
+	policy.ExpectedSequence = 2
 	if err := SignManifest(&m, "custody-key-1", private); err != nil {
 		t.Fatal(err)
 	}
@@ -271,4 +274,33 @@ func FuzzValidateRelativePathNeverPanics(f *testing.F) {
 	f.Fuzz(func(t *testing.T, candidate string) {
 		_ = validateRelativePath(candidate)
 	})
+}
+
+func TestUnlistedArtifactFileBlocks(t *testing.T) {
+	root, m, _, _, policy := testFixture(t)
+	if err := os.WriteFile(filepath.Join(root, "unlisted.log"), []byte("not in manifest"), 0o600); err != nil {
+		t.Fatal(err)
+	}
+	r := VerifyBundle(root, m, policy)
+	if r.Verdict != VerdictBlocked || !hasReason(r, "unlisted_artifact_file") {
+		t.Fatalf("expected unlisted file to block exact inventory, got %+v", r)
+	}
+}
+
+func TestExpectedRunIDMismatchBlocks(t *testing.T) {
+	root, m, _, _, policy := testFixture(t)
+	policy.ExpectedRunID = "another-run"
+	r := VerifyBundle(root, m, policy)
+	if r.Verdict != VerdictBlocked || !hasReason(r, "run_id_mismatch") {
+		t.Fatalf("expected run replay to block, got %+v", r)
+	}
+}
+
+func TestExpectedSequenceMismatchBlocks(t *testing.T) {
+	root, m, _, _, policy := testFixture(t)
+	policy.ExpectedSequence = 2
+	r := VerifyBundle(root, m, policy)
+	if r.Verdict != VerdictBlocked || !hasReason(r, "sequence_mismatch") {
+		t.Fatalf("expected stale sequence to block, got %+v", r)
+	}
 }
