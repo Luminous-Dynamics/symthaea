@@ -94,19 +94,7 @@ pub fn build_decision_prefix(
     archive: &ReplayObservationArchive,
     decision_tick: u64,
 ) -> Result<EncodedDecisionPrefix, String> {
-    if archive.schema_version != CAPSULE_SCHEMA_VERSION {
-        return Err("unsupported replay archive schema version".into());
-    }
-    if archive.observations.is_empty() {
-        return Err("replay archive has no observations".into());
-    }
-    for (index, observation) in archive.observations.iter().enumerate() {
-        if observation.tick != index as u64 {
-            return Err(format!(
-                "replay archive tick discontinuity at index {index}"
-            ));
-        }
-    }
+    validate_candidate_archive(archive)?;
     let cutoff = usize::try_from(decision_tick)
         .map_err(|_| "decision tick does not fit platform index".to_owned())?;
     if cutoff >= archive.observations.len() {
@@ -278,6 +266,88 @@ pub fn verify_encoded_replay_artifacts(
     {
         return Err("capsule receipt/manifest linkage mismatch".into());
     }
+    validate_replay_artifact_structure(&manifest, &candidate, &evaluator)?;
+    Ok(())
+}
+
+fn validate_observation_policy_id(value: &str) -> Result<(), String> {
+    match value {
+        "population_census_v1"
+        | "noisy_trait_v1"
+        | "shuffled_trait_negative_control_v1" => Ok(()),
+        _ => Err("unsupported observation policy ID".into()),
+    }
+}
+
+/// Validate a candidate-visible archive before deriving any decision-time prefix.
+fn validate_candidate_archive(archive: &ReplayObservationArchive) -> Result<(), String> {
+    if archive.schema_version != CAPSULE_SCHEMA_VERSION {
+        return Err("unsupported replay archive schema version".into());
+    }
+    require_nonempty("world_id", &archive.world_id)?;
+    if archive.world_format_version != common::WORLD_FORMAT_VERSION {
+        return Err("unsupported replay archive world format".into());
+    }
+    validate_observation_policy_id(&archive.observation_policy_id)?;
+    if archive.observations.is_empty() {
+        return Err("replay archive has no observations".into());
+    }
+    let trait_allowed = archive.observation_policy_id != "population_census_v1";
+    validate_stream(
+        "replay archive",
+        &archive.observations,
+        archive.observations.len(),
+        trait_allowed,
+    )?;
+    if trait_allowed {
+        validate_trait_presence("replay archive", &archive.observations)?;
+    }
+    Ok(())
+}
+
+/// Validate content invariants after exact-byte digests and cross-capsule links pass.
+/// Hash validity alone must not turn a structurally impossible capsule into a replayable world.
+fn validate_replay_artifact_structure(
+    manifest: &WorldCustodyManifest,
+    candidate: &ReplayObservationArchive,
+    evaluator: &EvaluatorOutcomeCapsule,
+) -> Result<(), String> {
+    require_nonempty("manifest world_id", &manifest.world_id)?;
+    require_nonempty("manifest source_commit", &manifest.source_commit)?;
+    require_nonempty("manifest observation_policy_id", &manifest.observation_policy_id)?;
+    validate_commit_sha(&manifest.source_commit)?;
+    validate_observation_policy_id(&manifest.observation_policy_id)?;
+    validate_candidate_archive(candidate)?;
+
+    if evaluator.trajectory_collapsed.is_empty() {
+        return Err("evaluator trajectory must not be empty".into());
+    }
+    if evaluator.max_population == 0 {
+        return Err("evaluator max_population must be positive".into());
+    }
+    if candidate.observations.len() != evaluator.trajectory_collapsed.len() {
+        return Err("candidate observation and evaluator trajectory lengths differ".into());
+    }
+    validate_stream(
+        "privileged",
+        &evaluator.privileged_observations,
+        evaluator.trajectory_collapsed.len(),
+        true,
+    )?;
+    let expected_first_extinction = evaluator
+        .trajectory_collapsed
+        .iter()
+        .position(|&collapsed| collapsed)
+        .map(|index| index as u64);
+    if evaluator.first_extinction_tick != expected_first_extinction {
+        return Err("evaluator first_extinction_tick disagrees with trajectory".into());
+    }
+    if evaluator
+        .trait_level_just_before_extinction
+        .is_some_and(|value| !value.is_finite())
+    {
+        return Err("evaluator trait level must be finite".into());
+    }
     Ok(())
 }
 
@@ -382,7 +452,11 @@ fn validate_trait_presence(
 
 fn validate_commit_sha(value: &str) -> Result<(), String> {
     let valid_len = value.len() == 40 || value.len() == 64;
-    if !valid_len || !value.bytes().all(|b| b.is_ascii_hexdigit()) {
+    if !valid_len
+        || !value
+            .bytes()
+            .all(|b| b.is_ascii_digit() || (b'a'..=b'f').contains(&b))
+    {
         return Err("source_commit must be a 40- or 64-character hexadecimal commit ID".into());
     }
     Ok(())
@@ -611,6 +685,105 @@ mod tests {
             )
             .unwrap_err()
             .contains("linkage mismatch")
+        );
+    }
+
+    #[test]
+    fn rejects_noncanonical_source_commit_hex() {
+        let result = encode_world(
+            &world(),
+            "opaque",
+            WorldSplit::Training,
+            ObservationView::Census,
+            "0123456789ABCDEF0123456789ABCDEF01234567",
+        );
+        assert!(result.unwrap_err().contains("source_commit"));
+    }
+
+    #[test]
+    fn prefix_rejects_unknown_observation_policy_and_empty_identity() {
+        let encoded = encode_world(
+            &world(),
+            "opaque",
+            WorldSplit::Training,
+            ObservationView::Census,
+            "0123456789abcdef0123456789abcdef01234567",
+        )
+        .unwrap();
+        let mut archive: ReplayObservationArchive =
+            serde_json::from_slice(&encoded.replay_archive_json).unwrap();
+        archive.observation_policy_id = "candidate-invented-policy".into();
+        assert!(build_decision_prefix(&archive, 0).unwrap_err().contains("policy"));
+        archive.observation_policy_id = ObservationView::Census.policy_id().into();
+        archive.world_id = "  ".into();
+        assert!(build_decision_prefix(&archive, 0).unwrap_err().contains("world_id"));
+    }
+
+    #[test]
+    fn rehashed_capsules_with_mismatched_trajectory_length_are_rejected() {
+        let mut encoded = encode_world(
+            &world(),
+            "opaque",
+            WorldSplit::Training,
+            ObservationView::Census,
+            "0123456789abcdef0123456789abcdef01234567",
+        )
+        .unwrap();
+        let mut evaluator: EvaluatorOutcomeCapsule =
+            serde_json::from_slice(&encoded.evaluator_capsule_json).unwrap();
+        evaluator.trajectory_collapsed.pop();
+        encoded.evaluator_capsule_json = serde_json::to_vec(&evaluator).unwrap();
+        encoded.evaluator_digest =
+            blake3::hash(&encoded.evaluator_capsule_json).to_hex().to_string();
+        let mut manifest: WorldCustodyManifest =
+            serde_json::from_slice(&encoded.evaluator_manifest_json).unwrap();
+        manifest.evaluator_capsule_blake3 = encoded.evaluator_digest.clone();
+        encoded.evaluator_manifest_json = serde_json::to_vec(&manifest).unwrap();
+
+        assert!(
+            verify_encoded_replay_artifacts(
+                &encoded,
+                &encoded.replay_digest,
+                &encoded.evaluator_digest,
+            )
+            .unwrap_err()
+            .contains("trajectory lengths differ")
+        );
+    }
+
+    #[test]
+    fn rehashed_capsules_with_invalid_candidate_ticks_are_rejected() {
+        let mut encoded = encode_world(
+            &world(),
+            "opaque",
+            WorldSplit::Training,
+            ObservationView::Census,
+            "0123456789abcdef0123456789abcdef01234567",
+        )
+        .unwrap();
+        let mut archive: ReplayObservationArchive =
+            serde_json::from_slice(&encoded.replay_archive_json).unwrap();
+        archive.observations[1].tick = 9;
+        encoded.replay_archive_json = serde_json::to_vec(&archive).unwrap();
+        encoded.replay_digest =
+            blake3::hash(&encoded.replay_archive_json).to_hex().to_string();
+        let mut receipt: ReplayArchiveReceipt =
+            serde_json::from_slice(&encoded.replay_receipt_json).unwrap();
+        receipt.replay_archive_blake3 = encoded.replay_digest.clone();
+        encoded.replay_receipt_json = serde_json::to_vec(&receipt).unwrap();
+        let mut manifest: WorldCustodyManifest =
+            serde_json::from_slice(&encoded.evaluator_manifest_json).unwrap();
+        manifest.replay_archive_blake3 = encoded.replay_digest.clone();
+        encoded.evaluator_manifest_json = serde_json::to_vec(&manifest).unwrap();
+
+        assert!(
+            verify_encoded_replay_artifacts(
+                &encoded,
+                &encoded.replay_digest,
+                &encoded.evaluator_digest,
+            )
+            .unwrap_err()
+            .contains("tick discontinuity")
         );
     }
 
