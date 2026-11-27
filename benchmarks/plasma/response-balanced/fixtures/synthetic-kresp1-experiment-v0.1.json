@@ -323,7 +323,12 @@
     "pulse_application_time_jacobian_required": true,
     "pulse_time_finite_difference_cross_check_required": true,
     "pulse_time_sensitivity_convention": "scheduled_reset_D_R_f_minus_plus_R_t_minus_f_plus",
-    "pulse_time_sensitivity_status": "synthetic_not_computed"
+    "pulse_time_sensitivity_status": "synthetic_not_computed",
+    "distribution_pulse_pullback_required": true,
+    "distribution_pulse_remap_mass_ledger_required": true,
+    "distribution_pulse_pullback_status": "first_order_piecewise_constant_module_only",
+    "distribution_pulse_remap_jacobian_status": "not_implemented_solver_adapter_required",
+    "distribution_pulse_boundary_outflow_disposition": "UNQUALIFIED_UNLESS_GRID_CONVERGENCE_OR_EXPLICIT_BOUNDARY_ERROR"
   },
   "response_qualification": {
     "checkpoint_state_residual_required": true,
