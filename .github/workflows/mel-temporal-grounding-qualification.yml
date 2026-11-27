@@ -302,6 +302,16 @@ jobs:
             and .item_count == 30
             and .source_work_clusters == 30
             and .minimum_source_work_clusters == 30
+            and (.by_target_property | length) == 1
+            and .by_target_property[0].target_property == "ChordQuality"
+            and .by_target_property[0].source_work_clusters == 30
+            and .by_target_property[0].status == "SourceWorkClusterFloorMet"
+            and (.by_performance_stay_factor | length) == 1
+            and .by_performance_stay_factor[0].performance_stay_factor == "DifferentTakeSamePerformer"
+            and .by_performance_stay_factor[0].source_work_clusters == 30
+            and (.by_musical_flip_factor | length) == 1
+            and .by_musical_flip_factor[0].musical_flip_factor == "ChordQualityChange"
+            and .by_musical_flip_factor[0].source_work_clusters == 30
             and .bootstrap_replicates == 2000
             and .bootstrap_seed == 20261127
             and .performance_stay_false_difference.estimate.baseline == 0.5
