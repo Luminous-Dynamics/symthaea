@@ -39,10 +39,8 @@ use serde::{Deserialize, Serialize};
 use serde_json::{json, Value};
 use sha2::{Digest, Sha256};
 
-/// Textual and Multimodal formal retrieval limits.
+/// Formal external evaluations use a maximum of 100 Search results per track.
 pub const FORMAL_TOP_K: usize = 100;
-/// Coding Memory permits up to 1,000 returned candidates per Search call.
-pub const CODING_MAX_TOP_K: usize = 1_000;
 pub const TEXTUAL_MAX_MESSAGES: usize = 20;
 pub const TEXTUAL_MAX_WORDS: usize = 2_000;
 pub const MAX_IMAGE_BYTES: usize = 10 * 1024 * 1024;
@@ -373,11 +371,7 @@ pub fn validate_search_request_for_track(
     request: &SearchRequest,
 ) -> Result<(), AmlReject> {
     validate_search_request_common(request)?;
-    let max_top_k = match track {
-        Track::Coding => CODING_MAX_TOP_K,
-        Track::Textual | Track::Multimodal => FORMAL_TOP_K,
-    };
-    if request.top_k > max_top_k {
+    if request.top_k > FORMAL_TOP_K {
         return Err(AmlReject::InvalidTopK);
     }
     if track != Track::Multimodal
@@ -1566,29 +1560,23 @@ mod tests {
     }
 
     #[test]
-    fn coding_search_allows_one_thousand_results_but_textual_and_multimodal_stop_at_one_hundred() {
-        let coding = SearchRequest {
-            query: MessageContent::Text("query".into()),
-            options: None,
-            user_id: "user".into(),
-            top_k: CODING_MAX_TOP_K,
-        };
-        assert_eq!(validate_search_request_for_track(Track::Coding, &coding), Ok(()));
-        assert_eq!(
-            validate_search_request_for_track(Track::Textual, &coding),
-            Err(AmlReject::InvalidTopK)
-        );
-        assert_eq!(
-            validate_search_request_for_track(Track::Multimodal, &coding),
-            Err(AmlReject::InvalidTopK)
-        );
+    fn formal_search_top_k_is_capped_at_one_hundred_for_every_track() {
+        for track in [Track::Textual, Track::Coding, Track::Multimodal] {
+            let valid = SearchRequest {
+                query: MessageContent::Text("query".into()),
+                options: None,
+                user_id: "user".into(),
+                top_k: FORMAL_TOP_K,
+            };
+            assert_eq!(validate_search_request_for_track(track, &valid), Ok(()));
 
-        let mut over_limit = coding;
-        over_limit.top_k = CODING_MAX_TOP_K + 1;
-        assert_eq!(
-            validate_search_request_for_track(Track::Coding, &over_limit),
-            Err(AmlReject::InvalidTopK)
-        );
+            let mut over_limit = valid;
+            over_limit.top_k = FORMAL_TOP_K + 1;
+            assert_eq!(
+                validate_search_request_for_track(track, &over_limit),
+                Err(AmlReject::InvalidTopK)
+            );
+        }
     }
 
     #[test]
