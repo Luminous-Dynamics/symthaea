@@ -64,19 +64,19 @@ func TestCleanFixturePassesComponentModelButNotProduction(t *testing.T){
  if got.ComponentVerdict!=Qualified||got.CampaignVerdict!=Indeterminate||got.TrafficActivationPermitted{t.Fatalf("offline fixture must remain production-indeterminate: %+v",got)}
 }
 func TestMissingAcknowledgedEventBlocks(t *testing.T){in:=fixture();in.ObservedEvents=in.ObservedEvents[:1];refreshRecordDigests(&in);expect(t,in,Blocked)}
-func TestUnexpectedEventBlocks(t *testing.T){in:=fixture();e:=in.ObservedEvents[0];e.EventID="extra";e.PayloadSHA256=dc;e.Offset=11;e.TotalOrder=3;e.CollectionOrder=2;in.ObservedEvents=append(in.ObservedEvents,e);expect(t,in,Blocked)}
-func TestConflictingDuplicateIdentityBlocks(t *testing.T){in:=fixture();e:=in.ObservedEvents[0];e.PayloadSHA256=dc;e.Offset=11;in.ObservedEvents=append(in.ObservedEvents,e);expect(t,in,Blocked)}
+func TestUnexpectedEventBlocks(t *testing.T){in:=fixture();e:=in.ObservedEvents[0];e.EventID="extra";e.PayloadSHA256=dc;e.Offset=11;e.TotalOrder=3;e.CollectionOrder=2;in.ObservedEvents=append(in.ObservedEvents,e);refreshRecordDigests(&in);expect(t,in,Blocked)}
+func TestConflictingDuplicateIdentityBlocks(t *testing.T){in:=fixture();e:=in.ObservedEvents[0];e.PayloadSHA256=dc;e.Offset=11;in.ObservedEvents=append(in.ObservedEvents,e);refreshRecordDigests(&in);expect(t,in,Blocked)}
 func TestExactReplayRequiresDeduplicationProof(t *testing.T){
- in:=fixture();e:=in.ObservedEvents[0];e.Offset=11;in.ObservedEvents=append(in.ObservedEvents,e)
+ in:=fixture();e:=in.ObservedEvents[0];e.Offset=11;in.ObservedEvents=append(in.ObservedEvents,e);refreshRecordDigests(&in)
  expect(t,in,Indeterminate)
  in.ExactReplayDeduplicationProven=true;in.DeduplicationProofSHA256=fixtureDigest("MON037 synthetic replay-deduplication proof v1\n");expect(t,in,Qualified)
  got:=Evaluate(in);if got.Reconciliation.DuplicateReplays!=1{t.Fatalf("duplicate replay count lost: %+v",got.Reconciliation)}
 }
-func TestPayloadMismatchBlocks(t *testing.T){in:=fixture();in.ObservedEvents[0].PayloadSHA256=dc;expect(t,in,Blocked)}
+func TestPayloadMismatchBlocks(t *testing.T){in:=fixture();in.ObservedEvents[0].PayloadSHA256=dc;refreshRecordDigests(&in);expect(t,in,Blocked)}
 func TestTransactionEndCountMismatchBlocks(t *testing.T){in:=fixture();in.Transactions[0].EndEventCount=1;refreshRecordDigests(&in);expect(t,in,Blocked)}
 func TestTransactionDataCollectionsMismatchBlocks(t *testing.T){in:=fixture();in.Transactions[0].DataCollections["LOGICAL_DECODING_MESSAGE"]=2;refreshRecordDigests(&in);expect(t,in,Blocked)}
 func TestPerTopicPartitionViolationBlocks(t *testing.T){in:=fixture();in.ObservedEvents[0].Partition=1;refreshRecordDigests(&in);expect(t,in,Blocked)}
-func TestMultiplePartitionsAreIndeterminate(t *testing.T){in:=fixture();in.TopicPartitions[0].PartitionCount=2;expect(t,in,Indeterminate)}
+func TestMultiplePartitionsAreIndeterminate(t *testing.T){in:=fixture();in.TopicPartitions[0].PartitionCount=2;refreshRecordDigests(&in);expect(t,in,Indeterminate)}
 func TestTimelineBlockedPropagates(t *testing.T){in:=fixture();in.Components.TimelineResult=raw(map[string]any{"profile":"mon034-postgres-timeline-ancestry-result-v1","version":"1.0.0","result":map[string]any{"verdict":"blocked"}});expect(t,in,Blocked)}
 func TestObserverSharedDomainBlocks(t *testing.T){
  in:=fixture()
@@ -111,9 +111,9 @@ func TestOffsetPredicateMismatchBlocks(t *testing.T){
  in.Components.OffsetProof=raw(p);expect(t,in,Blocked)
 }
 func TestSurfaceDigestMismatchBlocks(t *testing.T){in:=fixture();in.Surfaces[0].RestoredSHA256=dc;refreshRecordDigests(&in);expect(t,in,Blocked)}
-func TestFullStateExclusionBlocks(t *testing.T){in:=fixture();in.Surfaces=append(in.Surfaces,Surface{ID:"generated",Disposition:"excluded"});in.RequiredSurfaceIDs=append(in.RequiredSurfaceIDs,"generated");expect(t,in,Blocked)}
+func TestFullStateExclusionBlocks(t *testing.T){in:=fixture();in.Surfaces=append(in.Surfaces,Surface{ID:"generated",Disposition:"excluded"});in.RequiredSurfaceIDs=append(in.RequiredSurfaceIDs,"generated");refreshRecordDigests(&in);expect(t,in,Blocked)}
 func TestRowStreamAllowsExplicitExclusion(t *testing.T){in:=fixture();in.SurfaceScope="row_stream";in.Surfaces=append(in.Surfaces,Surface{ID:"generated",Disposition:"excluded",ExclusionManifestSHA256:fixtureDigest("MON037 synthetic generated-surface exclusion manifest v1\n")});in.RequiredSurfaceIDs=append(in.RequiredSurfaceIDs,"generated");expect(t,in,Qualified)}
-func TestUnknownSurfaceIsIndeterminate(t *testing.T){in:=fixture();in.Surfaces=append(in.Surfaces,Surface{ID:"unknown",Disposition:"unknown"});in.RequiredSurfaceIDs=append(in.RequiredSurfaceIDs,"unknown");expect(t,in,Indeterminate)}
+func TestUnknownSurfaceIsIndeterminate(t *testing.T){in:=fixture();in.Surfaces=append(in.Surfaces,Surface{ID:"unknown",Disposition:"unknown"});in.RequiredSurfaceIDs=append(in.RequiredSurfaceIDs,"unknown");refreshRecordDigests(&in);expect(t,in,Indeterminate)}
 func TestOldPrimaryUnfencedBlocks(t *testing.T){in:=fixture();in.RestoreChecks["old_primary_fenced"]="failed";expect(t,in,Blocked)}
 func TestMissingRestoreCheckIsIndeterminate(t *testing.T){in:=fixture();delete(in.RestoreChecks,"application_write_readback");expect(t,in,Indeterminate)}
 func TestTrafficAlreadyEnabledBlocks(t *testing.T){in:=fixture();in.TrafficCurrentlyEnabled=true;got:=Evaluate(in);if got.CampaignVerdict!=Blocked||got.TrafficActivationPermitted{t.Fatalf("unsafe traffic not blocked: %+v",got)}}
