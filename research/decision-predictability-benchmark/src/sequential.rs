@@ -207,7 +207,9 @@ fn validate(problem: &SequentialRobustProblem) -> Result<(), SequentialOracleErr
         return Err(SequentialOracleError::EmptyStateSet);
     }
     if problem.state_ids.len() > MAX_STATES {
-        return Err(SequentialOracleError::TooManyStates(problem.state_ids.len()));
+        return Err(SequentialOracleError::TooManyStates(
+            problem.state_ids.len(),
+        ));
     }
     if problem.decision_ids.is_empty() {
         return Err(SequentialOracleError::EmptyDecisionSet);
@@ -458,9 +460,7 @@ fn validate(problem: &SequentialRobustProblem) -> Result<(), SequentialOracleErr
                 }
                 covered = true;
                 let next_protocol_state_id = &outcome.next_protocol_state_id;
-                let next_support = reachable
-                    .entry(next_protocol_state_id.clone())
-                    .or_default();
+                let next_support = reachable.entry(next_protocol_state_id.clone()).or_default();
                 if next_support.insert(state_id.clone()) {
                     worklist.push_back((next_protocol_state_id.clone(), state_id.clone()));
                 }
@@ -486,9 +486,10 @@ fn terminal_minimax(
     let mut best: Option<(f64, String)> = None;
 
     for decision_id in ordered_decisions {
-        let losses = problem.decision_loss.get(&decision_id).ok_or_else(|| {
-            SequentialOracleError::UnknownDecision(decision_id.clone())
-        })?;
+        let losses = problem
+            .decision_loss
+            .get(&decision_id)
+            .ok_or_else(|| SequentialOracleError::UnknownDecision(decision_id.clone()))?;
         let mut worst_loss = 0.0_f64;
         for state_id in possible_states {
             let loss = losses.get(state_id).copied().ok_or_else(|| {
@@ -503,8 +504,7 @@ fn terminal_minimax(
             None => true,
             Some((best_loss, best_decision)) => {
                 worst_loss < *best_loss
-                    || (worst_loss == *best_loss
-                        && decision_id.as_str() < best_decision.as_str())
+                    || (worst_loss == *best_loss && decision_id.as_str() < best_decision.as_str())
             }
         };
         if replace {
@@ -529,13 +529,15 @@ fn feasible_action(
 
     let mut next_budget = BTreeMap::new();
     for (dimension, remaining) in remaining_budget {
-        let cost = action.resource_costs.get(dimension).copied().ok_or_else(|| {
-            SequentialOracleError::ResourceDimensionMismatch {
+        let cost = action
+            .resource_costs
+            .get(dimension)
+            .copied()
+            .ok_or_else(|| SequentialOracleError::ResourceDimensionMismatch {
                 action_id: action.action_id.clone(),
                 expected: remaining_budget.keys().cloned().collect(),
                 actual: action.resource_costs.keys().cloned().collect(),
-            }
-        })?;
+            })?;
         if cost > *remaining {
             return Ok(None);
         }
@@ -625,9 +627,7 @@ fn solve_node(
         .protocol_states
         .iter()
         .find(|state| state.protocol_state_id == protocol_state_id)
-        .ok_or_else(|| {
-            SequentialOracleError::UnknownProtocolState(protocol_state_id.to_owned())
-        })?;
+        .ok_or_else(|| SequentialOracleError::UnknownProtocolState(protocol_state_id.to_owned()))?;
     let mut legal_action_ids = protocol_state.legal_action_ids.clone();
     legal_action_ids.sort();
 
@@ -703,7 +703,8 @@ pub fn evaluate_sequential_robust(
         problem.maximum_actions,
         &mut nodes,
     )?;
-    let terminal_resource_paths = terminal_resource_paths(problem, &solved.policy, &possible_states)?;
+    let terminal_resource_paths =
+        terminal_resource_paths(problem, &solved.policy, &possible_states)?;
     Ok(SequentialPolicyValue {
         current_minimax_loss,
         current_risk_gate_passed: current_minimax_loss
@@ -846,7 +847,11 @@ fn enumeration_active_branches(
     for outcome in &action.outcomes {
         let mut consistent = Vec::new();
         for current_state in possible_states {
-            if outcome.possible_state_ids.iter().any(|id| id == current_state) {
+            if outcome
+                .possible_state_ids
+                .iter()
+                .any(|id| id == current_state)
+            {
                 consistent.push(current_state.clone());
                 states_accounted_for.insert(current_state.clone());
             }
@@ -908,8 +913,7 @@ fn enumerate_node(
         let is_better = match &stop_decision {
             None => true,
             Some(current_id) => {
-                worst < stop_value
-                    || (worst == stop_value && decision_id < current_id)
+                worst < stop_value || (worst == stop_value && decision_id < current_id)
             }
         };
         if is_better {
@@ -933,9 +937,7 @@ fn enumerate_node(
         .protocol_states
         .iter()
         .find(|state| state.protocol_state_id == protocol_state_id)
-        .ok_or_else(|| {
-            SequentialOracleError::UnknownProtocolState(protocol_state_id.to_owned())
-        })?;
+        .ok_or_else(|| SequentialOracleError::UnknownProtocolState(protocol_state_id.to_owned()))?;
     let mut legal = protocol.legal_action_ids.clone();
     legal.sort();
 
@@ -954,8 +956,7 @@ fn enumerate_node(
 
         // Cartesian product of all branch-continuation choices constructs
         // complete policies. Each branch sees only its own public outcome.
-        let mut combinations: Vec<(Vec<SequentialPolicyBranch>, f64)> =
-            vec![(Vec::new(), 0.0)];
+        let mut combinations: Vec<(Vec<SequentialPolicyBranch>, f64)> = vec![(Vec::new(), 0.0)];
         for (outcome_id, support, next_protocol_state_id) in active {
             let child_policies = enumerate_node(
                 problem,
@@ -977,10 +978,7 @@ fn enumerate_node(
                         next_protocol_state_id: next_protocol_state_id.clone(),
                         continuation: Box::new(child.policy.clone()),
                     });
-                    next_combinations.push((
-                        branches,
-                        partial_worst_loss.max(child.loss),
-                    ));
+                    next_combinations.push((branches, partial_worst_loss.max(child.loss)));
                     if next_combinations.len() > MAX_ENUMERATED_CHOICES {
                         return Err(SequentialOracleError::EnumerationLimitExceeded(
                             next_combinations.len(),
@@ -1147,10 +1145,7 @@ mod tests {
         SequentialRobustProblem {
             state_ids,
             decision_ids: vec!["d0".to_owned(), "d1".to_owned()],
-            decision_loss: BTreeMap::from([
-                ("d0".to_owned(), loss_d0),
-                ("d1".to_owned(), loss_d1),
-            ]),
+            decision_loss: BTreeMap::from([("d0".to_owned(), loss_d0), ("d1".to_owned(), loss_d1)]),
             maximum_worst_case_loss: 0.0,
             initial_protocol_state_id: "root".to_owned(),
             protocol_states: vec![
@@ -1209,7 +1204,6 @@ mod tests {
         }
     }
 
-
     struct TinyRng(u64);
 
     impl TinyRng {
@@ -1264,8 +1258,7 @@ mod tests {
         let state_count = 2 + rng.range(3);
         let state_ids: Vec<String> = (0..state_count).map(|i| format!("s{i}")).collect();
         let decision_count = 2 + rng.range(2);
-        let decision_ids: Vec<String> =
-            (0..decision_count).map(|i| format!("d{i}")).collect();
+        let decision_ids: Vec<String> = (0..decision_count).map(|i| format!("d{i}")).collect();
 
         let mut decision_loss = BTreeMap::new();
         for decision_id in &decision_ids {
@@ -1308,9 +1301,8 @@ mod tests {
                 let child_groups = random_support_partition(branch_support, 3, rng);
                 let mut child_outcomes = Vec::new();
                 for (child_index, child_support) in child_groups.into_iter().enumerate() {
-                    let terminal_protocol = format!(
-                        "terminal_{root_index}_{branch_index}_{child_index}"
-                    );
+                    let terminal_protocol =
+                        format!("terminal_{root_index}_{branch_index}_{child_index}");
                     protocol_states.push(SequentialProtocolState {
                         protocol_state_id: terminal_protocol.clone(),
                         legal_action_ids: Vec::new(),
@@ -1433,7 +1425,10 @@ mod tests {
             exhaustive.worst_case_terminal_loss
         );
         assert!(matches!(dynamic.policy, SequentialPolicyNode::Probe { .. }));
-        assert!(matches!(exhaustive.policy, SequentialPolicyNode::Probe { .. }));
+        assert!(matches!(
+            exhaustive.policy,
+            SequentialPolicyNode::Probe { .. }
+        ));
     }
 
     #[test]
@@ -1449,18 +1444,15 @@ mod tests {
             });
 
             assert_eq!(
-                dynamic.current_minimax_loss,
-                exhaustive.current_minimax_loss,
+                dynamic.current_minimax_loss, exhaustive.current_minimax_loss,
                 "current minimax mismatch on generated case {case_index}"
             );
             assert_eq!(
-                dynamic.current_risk_gate_passed,
-                exhaustive.current_risk_gate_passed,
+                dynamic.current_risk_gate_passed, exhaustive.current_risk_gate_passed,
                 "current risk-gate mismatch on generated case {case_index}"
             );
             assert_eq!(
-                dynamic.worst_case_terminal_loss,
-                exhaustive.worst_case_terminal_loss,
+                dynamic.worst_case_terminal_loss, exhaustive.worst_case_terminal_loss,
                 "terminal value mismatch on generated case {case_index}"
             );
             assert_eq!(
@@ -1478,8 +1470,14 @@ mod tests {
             // Deliberately reverse the lexical order.
             decision_ids: vec!["z_last".to_owned(), "a_first".to_owned()],
             decision_loss: BTreeMap::from([
-                ("z_last".to_owned(), BTreeMap::from([("s0".to_owned(), 0.25)])),
-                ("a_first".to_owned(), BTreeMap::from([("s0".to_owned(), 0.25)])),
+                (
+                    "z_last".to_owned(),
+                    BTreeMap::from([("s0".to_owned(), 0.25)]),
+                ),
+                (
+                    "a_first".to_owned(),
+                    BTreeMap::from([("s0".to_owned(), 0.25)]),
+                ),
             ]),
             maximum_worst_case_loss: 0.5,
             initial_protocol_state_id: "root".to_owned(),
@@ -1519,7 +1517,11 @@ mod tests {
         };
         assert_eq!(branches.len(), 2);
         for branch in branches {
-            let expected = if branch.outcome_id == "z0" { "C0" } else { "C1" };
+            let expected = if branch.outcome_id == "z0" {
+                "C0"
+            } else {
+                "C1"
+            };
             assert_eq!(root_action(&branch.continuation), Some(expected));
         }
     }
@@ -1527,7 +1529,9 @@ mod tests {
     #[test]
     fn terminal_resource_paths_report_exact_branch_costs() {
         let mut problem = branch_unlock_world();
-        problem.resource_budget.insert("compute_units".to_owned(), 1);
+        problem
+            .resource_budget
+            .insert("compute_units".to_owned(), 1);
         for action in &mut problem.actions {
             action.resource_costs.insert("compute_units".to_owned(), 0);
         }
@@ -1551,13 +1555,15 @@ mod tests {
             assert_eq!(path.steps.len(), 2);
             assert_eq!(path.steps[0].action_id, "B");
             assert_eq!(path.steps[0].possible_state_ids.len(), 8);
-            assert!(
-                path.steps[1].action_id == "C0" || path.steps[1].action_id == "C1"
-            );
+            assert!(path.steps[1].action_id == "C0" || path.steps[1].action_id == "C1");
             assert_eq!(path.steps[1].possible_state_ids.len(), 4);
             assert_eq!(path.terminal_possible_state_ids.len(), 4);
             assert_eq!(path.resource_usage["experiment_units"], 2);
-            let expected_compute = if path.steps[1].action_id == "C0" { 0 } else { 1 };
+            let expected_compute = if path.steps[1].action_id == "C0" {
+                0
+            } else {
+                1
+            };
             assert_eq!(path.resource_usage["compute_units"], expected_compute);
 
             let terminal_x = path.terminal_possible_state_ids[0]
@@ -1566,9 +1572,11 @@ mod tests {
                 .chars()
                 .next()
                 .unwrap();
-            assert!(path.terminal_possible_state_ids.iter().all(|state| {
-                state.starts_with(&format!("x{terminal_x}_"))
-            }));
+            assert!(
+                path.terminal_possible_state_ids
+                    .iter()
+                    .all(|state| { state.starts_with(&format!("x{terminal_x}_")) })
+            );
             assert_eq!(path.terminal_decision_id, format!("d{terminal_x}"));
             assert_eq!(path.terminal_worst_case_loss, 0.0);
         }
@@ -1615,12 +1623,14 @@ mod tests {
             state_ids: states.clone(),
             decision_ids: vec!["d0".to_owned(), "d1".to_owned()],
             decision_loss: BTreeMap::from([
-                ("d0".to_owned(), BTreeMap::from([
-                    ("s0".to_owned(), 0.0), ("s1".to_owned(), 1.0),
-                ])),
-                ("d1".to_owned(), BTreeMap::from([
-                    ("s0".to_owned(), 1.0), ("s1".to_owned(), 0.0),
-                ])),
+                (
+                    "d0".to_owned(),
+                    BTreeMap::from([("s0".to_owned(), 0.0), ("s1".to_owned(), 1.0)]),
+                ),
+                (
+                    "d1".to_owned(),
+                    BTreeMap::from([("s0".to_owned(), 1.0), ("s1".to_owned(), 0.0)]),
+                ),
             ]),
             maximum_worst_case_loss: 0.0,
             initial_protocol_state_id: "root".to_owned(),
@@ -1661,7 +1671,10 @@ mod tests {
         assert!(matches!(value.policy, SequentialPolicyNode::Stop { .. }));
         let exhaustive = enumerate_sequential_robust(&problem).unwrap();
         assert_eq!(exhaustive.worst_case_terminal_loss, 1.0);
-        assert!(matches!(exhaustive.policy, SequentialPolicyNode::Stop { .. }));
+        assert!(matches!(
+            exhaustive.policy,
+            SequentialPolicyNode::Stop { .. }
+        ));
     }
 
     #[test]
@@ -1673,7 +1686,10 @@ mod tests {
         assert!(matches!(value.policy, SequentialPolicyNode::Stop { .. }));
         let exhaustive = enumerate_sequential_robust(&problem).unwrap();
         assert_eq!(exhaustive.worst_case_terminal_loss, 1.0);
-        assert!(matches!(exhaustive.policy, SequentialPolicyNode::Stop { .. }));
+        assert!(matches!(
+            exhaustive.policy,
+            SequentialPolicyNode::Stop { .. }
+        ));
     }
 
     #[test]
@@ -1723,7 +1739,10 @@ mod tests {
         assert_eq!(dynamic.worst_case_terminal_loss, 1.0);
         assert_eq!(exhaustive.worst_case_terminal_loss, 1.0);
         assert!(matches!(dynamic.policy, SequentialPolicyNode::Stop { .. }));
-        assert!(matches!(exhaustive.policy, SequentialPolicyNode::Stop { .. }));
+        assert!(matches!(
+            exhaustive.policy,
+            SequentialPolicyNode::Stop { .. }
+        ));
     }
 
     #[test]
@@ -1736,22 +1755,32 @@ mod tests {
         assert_eq!(dynamic.worst_case_terminal_loss, 1.0);
         assert_eq!(exhaustive.worst_case_terminal_loss, 1.0);
         assert!(matches!(dynamic.policy, SequentialPolicyNode::Stop { .. }));
-        assert!(matches!(exhaustive.policy, SequentialPolicyNode::Stop { .. }));
+        assert!(matches!(
+            exhaustive.policy,
+            SequentialPolicyNode::Stop { .. }
+        ));
     }
 
     #[test]
     fn every_resource_dimension_is_enforced_component_wise() {
         let mut problem = branch_unlock_world();
-        problem.resource_budget.insert("compute_units".to_owned(), 1);
+        problem
+            .resource_budget
+            .insert("compute_units".to_owned(), 1);
         for action in &mut problem.actions {
             action.resource_costs.insert("compute_units".to_owned(), 0);
         }
-        problem.actions[1].resource_costs.insert("compute_units".to_owned(), 2);
+        problem.actions[1]
+            .resource_costs
+            .insert("compute_units".to_owned(), 2);
         let value = evaluate_sequential_robust(&problem).unwrap();
         assert_eq!(value.worst_case_terminal_loss, 1.0);
         assert!(matches!(value.policy, SequentialPolicyNode::Stop { .. }));
         let exhaustive = enumerate_sequential_robust(&problem).unwrap();
         assert_eq!(exhaustive.worst_case_terminal_loss, 1.0);
-        assert!(matches!(exhaustive.policy, SequentialPolicyNode::Stop { .. }));
+        assert!(matches!(
+            exhaustive.policy,
+            SequentialPolicyNode::Stop { .. }
+        ));
     }
 }
