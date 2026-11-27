@@ -573,7 +573,7 @@ mod tests {
     #[test] fn bad_memory_is_measured_against_no_memory_separately_from_regret(){
         let e=generated_episode(0,77);
         let c=CandidateRow{schema_version:CANDIDATE_SCHEMA.into(),episode_id:e.episode_id.clone(),seed:e.seed,family:e.family.clone(),candidate_sha256:candidate_digest(&e.episode_id, e.seed, &e.family, &e.candidate).unwrap(),candidate:e.candidate.clone()};
-        let p=PrivateRow{schema_version:PRIVATE_SCHEMA.into(),episode_id:e.episode_id.clone(),seed:e.seed,family:e.family.clone(),candidate_sha256:candidate_digest(&e.candidate).unwrap(),evaluator_private:e.evaluator_private.clone()};
+        let p=PrivateRow{schema_version:PRIVATE_SCHEMA.into(),episode_id:e.episode_id.clone(),seed:e.seed,family:e.family.clone(),candidate_sha256:candidate_digest(&e.episode_id, e.seed, &e.family, &e.candidate).unwrap(),evaluator_private:e.evaluator_private.clone()};
         let r=Response{schema_version:RESPONSE_SCHEMA.into(),episode_id:e.episode_id,arm_id:"bad-memory".into(),candidate_sha256:c.candidate_sha256.clone(),action:"use_old_account".into(),selected_evidence_ids:vec!["event-000000-old".into()],observation_requests:0,cost:Cost{ingest_operations:1,query_operations:1,maintenance_operations:0,retained_bytes:10,returned_bytes:10,latency_us:None}};
         let s=score_one(&c,&p,&r).unwrap();
         let mut mismatched = r.clone(); mismatched.candidate_sha256 = "0".repeat(64);
