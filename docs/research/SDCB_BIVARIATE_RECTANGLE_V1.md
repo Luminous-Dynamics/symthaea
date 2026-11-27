@@ -1,6 +1,6 @@
 # SDCB bivariate Gaussian rectangle reference v1
 
-**Status:** bounded, two-channel numerical reference authored in Rust. Eighteen tests are authored but have not been compiled or executed here. Fixture values are checked using the analytic bivariate orthant identity and an independent conditional-normal integration. This is not a general multivariate solver or a SOTA claim.
+**Status:** bounded, two-channel numerical reference authored in Rust. Twenty-five tests are authored but have not been compiled or executed here. Fixture values are checked using the analytic bivariate orthant identity and an independent conditional-normal integration. This is not a general multivariate solver or a SOTA claim.
 
 ## 1. Why this increment
 
@@ -55,7 +55,19 @@ The joint-bin function accepts ordered thresholds per channel and emits the comp
 - total probability within \(10^{-9}\) of one;
 - both row/column marginals agree with the #13944 scalar likelihood adapter within \(10^{-9}\).
 
-The table is a likelihood for simultaneous observations. It must be conditioned on the correct dynamic state/model before being supplied to a finite policy tree. It does not authorize actions, update the evidence ledger, or claim physical common-cause identity.
+The bound adapter also preserves a caller-supplied conditional context beside the table:
+- episode and prediction identity/version;
+- covariance/dynamics model identity/version;
+- the full conditioning-state identity/version (the caller must identify the scientific, common-cause and device-state assignment used to produce the conditional Gaussian);
+- common-cause identity/version;
+- channel and device identities with each device evidence version;
+- **separate acquisition-window ID and start/end timestamps for each channel**, including overlapping or unequal windows;
+- per-channel calibration context and epoch;
+- measurement action identity.
+
+It also returns the conditional mean/covariance, per-channel threshold arrays and numerical-method settings (inner Gauss–Legendre order, truncation cutoff, tolerances and outer evaluation cap). This makes the output inspectable and replay-keyed rather than an unlabelled probability table. For each model/common/device conditioning assignment, invoke the adapter with that exact state-conditioned Gaussian; do not marginalize hidden states or model indices prematurely.
+
+**Trust boundary:** the context is caller-supplied identity propagation. This reference validates required fields and internal consistency but does not authenticate signatures, verify digest preimages, or establish source custody. It is not a verifier or evidence ledger. It does not authorize actions, update #13805, or claim physical common-cause identity.
 
 ## 5. Frozen known-answer fixtures
 
@@ -71,6 +83,8 @@ Independent calculations used:
 | Shifted/scaled asymmetric rectangle | 0.35895496926483000 |
 | Correlated tail (8,9] × (8,9], rho = 0.5 | \(1.7805614713759896\times10^{-21}\) |
 | Exact duplicate channels, common interval (0,1] | 0.3413447460685429 |
+| Duplicate-channel joint bins at threshold 0 | [[0.5, 0], [0, 0.5]] |
+| Perfect anti-correlation joint bins at threshold 0 | [[0, 0.5], [0.5, 0]] |
 | Perfect anti-correlation, support intersection (0,1) | 0.3413447460685429 |
 | One deterministic channel; other in (-0.5,0.5] | 0.3829249225480262 |
 | Rank-zero deterministic point inside rectangle | 1.0 |
@@ -79,7 +93,7 @@ These are mathematical numerical fixtures, not measured sensor probabilities. Or
 
 ## 6. Tests and limits
 
-The 18 authored tests cover independence, positive/negative correlation, analytic orthants, finite asymmetric bounds, a rare joint tail, joint-bin normalization/marginalization, exact duplicate support, perfect anti-correlation, one deterministic coordinate, rank-zero deterministic support, non-PSD rejection, even-small-asymmetry rejection, near-singular rejection, zero-width rectangles, invalid covariance/bounds, and bounded evaluation, including a no-overrun check for the outer integrand-evaluation budget.
+The 25 authored tests cover independence, positive/negative correlation, analytic orthants, finite asymmetric bounds, a rare joint tail, joint-bin normalization/marginalization, duplicate-channel tables with zero off-diagonal support, perfect-anti-correlation tables with zero diagonal support, exact duplicate support, perfect anti-correlation, one deterministic coordinate, rank-zero deterministic support, non-PSD rejection, even-small-asymmetry rejection, near-singular rejection, zero-width rectangles, invalid covariance/bounds, bound-context preservation/rejection (including per-channel window and calibration versions), and bounded evaluation, including a no-overrun check for the outer integrand-evaluation budget.
 
 Not implemented:
 - trivariate or general n-variate integration;
