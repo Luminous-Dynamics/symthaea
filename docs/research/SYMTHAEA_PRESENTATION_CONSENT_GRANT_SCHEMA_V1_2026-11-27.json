@@ -1,0 +1,75 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://luminousdynamics.io/schemas/symthaea/presentation-consent-grant-v1.json",
+  "title": "Symthaea Presentation Consent Grant v1",
+  "description": "A bounded consent grant for presentation output only. It does not authorize sensor capture, remote export unless the destination is explicitly Remote, or physical actuation.",
+  "type": "object",
+  "additionalProperties": false,
+  "required": [
+    "grant_id",
+    "session_id",
+    "clock_domain_id",
+    "channel",
+    "destination",
+    "allowed_forms",
+    "expires_at_monotonic_ns",
+    "max_intensity"
+  ],
+  "properties": {
+    "grant_id": {
+      "type": "string",
+      "pattern": "^[A-Za-z0-9._:-]{1,128}$"
+    },
+    "session_id": {
+      "type": "string",
+      "pattern": "^[A-Za-z0-9._:-]{1,128}$"
+    },
+    "clock_domain_id": {
+      "type": "string",
+      "pattern": "^[A-Za-z0-9._:-]{1,128}$"
+    },
+    "channel": {
+      "type": "string",
+      "enum": [
+        "visual",
+        "audio",
+        "haptic",
+        "spatial"
+      ]
+    },
+    "destination": {
+      "type": "string",
+      "enum": [
+        "local_private",
+        "local_shared",
+        "remote"
+      ]
+    },
+    "allowed_forms": {
+      "type": "array",
+      "minItems": 1,
+      "uniqueItems": true,
+      "items": {
+        "type": "string",
+        "enum": [
+          "living_constellation",
+          "puppet_theatre",
+          "mycelial_being",
+          "swarm",
+          "living_instrument",
+          "hearth_companion",
+          "cognitive_mandala"
+        ]
+      }
+    },
+    "expires_at_monotonic_ns": {
+      "type": "string",
+      "pattern": "^(0|[1-9][0-9]*)$"
+    },
+    "max_intensity": {
+      "type": "number",
+      "minimum": 0,
+      "maximum": 1
+    }
+  }
+}
