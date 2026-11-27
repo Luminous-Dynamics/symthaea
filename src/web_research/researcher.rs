@@ -218,7 +218,7 @@ impl WebResearcher {
         let source_plan =
             plan_page_candidates(search_results, self.config.max_sources_per_research);
         acquisition_receipts.extend(source_plan.receipts);
-        let acquisition_incomplete =
+        let mut acquisition_incomplete =
             prior_acquisition_incomplete || source_plan.acquisition_incomplete;
         let source_candidates = source_plan.candidates;
 
@@ -1210,7 +1210,7 @@ impl WebResearcher {
                 receipt.requested_url = Some(candidate.url.clone());
                 receipt.final_url = Some(final_url);
                 receipt.http_status = Some(status.as_u16());
-                receipt.content_type = content_type;
+                receipt.content_type = content_type.clone();
                 receipt.reason_code = Some("UNSUPPORTED_MEDIA_TYPE".to_string());
                 receipt.reason = Some(format!(
                     "binary/non-text media is not admitted by the HTML extractor: {content_type_value}"
