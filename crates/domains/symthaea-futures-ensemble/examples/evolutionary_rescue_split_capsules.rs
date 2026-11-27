@@ -1,7 +1,7 @@
 // Copyright (C) 2024-2026 Tristan Stoltz / Luminous Dynamics
 // SPDX-License-Identifier: AGPL-3.0-or-later
 // Commercial licensing: see COMMERCIAL_LICENSE.md at repository root
-//! Materialize evaluator- and candidate-separated evolutionary-rescue replay capsules.
+//! Materialize a custodian-only replay archive and a separate evaluator-only outcome capsule.
 //!
 //! Prerequisite: run evolutionary_rescue_generate_worlds once to create the frozen source
 //! fixtures. This executable loads those fixtures; it does not rerun or mutate the worlds.
@@ -9,10 +9,11 @@
 //! Usage:
 //! cargo run --release --example evolutionary_rescue_split_capsules -p symthaea-futures-ensemble -- <replay-archive-dir> <evaluator-dir> <source-commit-sha> <census|noisy-trait|shuffled-trait>
 //!
-//! Only replay archive files and candidate receipts are written below replay-archive-dir.
+//! Only the full, custodian-only replay archive and its receipt are written below replay-archive-dir.
 //! Hidden outcomes, privileged observations, seeds, split labels and the cross-capsule manifest
-//! are written below evaluator-dir. Directory ACLs / service boundaries remain an operator
-//! responsibility; separate paths alone are not a security boundary.
+//! are written below evaluator-dir. The replay archive includes future observations and MUST NOT
+//! be mounted into candidate code. A trusted replay driver must emit only the time-valid prefix
+//! for each decision. Directory ACLs/service boundaries remain an operator responsibility.
 
 #[path = "support/evolutionary_rescue_common.rs"]
 mod common;
@@ -60,6 +61,9 @@ fn run() -> Result<(), String> {
     let evaluator_root = fs::canonicalize(&evaluator_root)
         .map_err(|e| format!("canonicalize evaluator directory: {e}"))?;
 
+    ensure_empty_root(&replay_root)?;
+    ensure_empty_root(&evaluator_root)?;
+
     let mut generated = 0usize;
     for (split, seeds) in [
         (custody::WorldSplit::Training, common::TRAIN_SEEDS.as_slice()),
@@ -104,9 +108,9 @@ fn run() -> Result<(), String> {
 
             let disk_set = custody::EncodedReplayArtifacts {
                 replay_archive_json: fs::read(replay_root.join(format!("{world_id}.observations.json")))
-                    .map_err(|e| format!("read back candidate capsule {world_id}: {e}"))?,
+                    .map_err(|e| format!("read back replay archive {world_id}: {e}"))?,
                 replay_receipt_json: fs::read(replay_root.join(format!("{world_id}.receipt.json")))
-                    .map_err(|e| format!("read back candidate receipt {world_id}: {e}"))?,
+                    .map_err(|e| format!("read back replay archive receipt {world_id}: {e}"))?,
                 evaluator_capsule_json: fs::read(evaluator_root.join(format!("{world_id}.outcomes.json")))
                     .map_err(|e| format!("read back evaluator capsule {world_id}: {e}"))?,
                 evaluator_manifest_json: fs::read(evaluator_root.join(format!("{world_id}.manifest.json")))
@@ -144,6 +148,41 @@ fn ensure_disjoint_roots(candidate: &Path, evaluator: &Path) -> Result<(), Strin
         return Err("replay and evaluator roots must be distinct and non-overlapping".into());
     }
     Ok(())
+}
+
+fn ensure_empty_root(path: &Path) -> Result<(), String> {
+    let entries = fs::read_dir(path)
+        .map_err(|e| format!("inspect output directory {}: {e}", path.display()))?;
+    if entries.into_iter().next().is_some() {
+        return Err(format!(
+            "output directory {} must be empty; reconcile/remove prior partial or completed artifacts before retrying",
+            path.display()
+        ));
+    }
+    Ok(())
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn output_roots_must_be_disjoint() {
+        let root = std::env::temp_dir().join(format!("symthaea-custody-{}", uuid::Uuid::new_v4()));
+        let nested = root.join("nested");
+        fs::create_dir_all(&nested).unwrap();
+        assert!(ensure_disjoint_roots(&root, &nested).is_err());
+        fs::remove_dir_all(&root).unwrap();
+    }
+
+    #[test]
+    fn output_roots_must_be_empty_before_materialization() {
+        let root = std::env::temp_dir().join(format!("symthaea-custody-{}", uuid::Uuid::new_v4()));
+        fs::create_dir_all(&root).unwrap();
+        fs::write(root.join("partial.json"), b"partial").unwrap();
+        assert!(ensure_empty_root(&root).unwrap_err().contains("must be empty"));
+        fs::remove_dir_all(&root).unwrap();
+    }
 }
 
 fn write_new(path: &Path, bytes: &[u8]) -> Result<(), String> {
